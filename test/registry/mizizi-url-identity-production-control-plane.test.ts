@@ -165,6 +165,15 @@ describe("MIZIZI current URL-identity production control plane", () => {
     expect(currentControlPlane).toContain(
       "tracks: 2091",
     );
+    expect(currentControlPlane).toContain(
+      "public_music_identity_batch_a_safe_slug",
+    );
+    expect(currentControlPlane).toContain(
+      "EXPECTED_BATCH_A_SAFE_SLUG_CANDIDATE_FINGERPRINT",
+    );
+    expect(currentControlPlane).toContain(
+      "363bed8410570611a8cdf43194f7b47a0e0f380877fac342201fc48e2b6576e9",
+    );
 
     expect(workflow).toContain(
       "public_music_identity_batch_a_safe_slug",
@@ -181,6 +190,12 @@ describe("MIZIZI current URL-identity production control plane", () => {
     expect(workflow).toContain(
       'test "$GITHUB_REF" = "refs/heads/main"',
     );
+    expect(workflow).toContain(
+      "MIZIZI_TRIGGER_FILE=.github/public-music-identity-batch-a-safe-slug-apply.json",
+    );
+    expect(workflow).toContain(
+      "inputs.operation == 'public_music_identity_batch_a_safe_slug'",
+    );
 
     expect(batch).toContain(
       "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_EXECUTOR=PASS",
@@ -195,10 +210,31 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "issue_stewardship_execution_grant_v1",
     );
     expect(batch).toContain(
-      "execute_stewardship_operation_v1",
+      "execute_stewardship_operation_v2",
     );
     expect(batch).toContain(
+      "verify_stewardship_operation_v2",
+    );
+    expect(batch).not.toContain(
+      "execute_stewardship_operation_v1",
+    );
+    expect(batch).not.toContain(
       "verify_stewardship_operation_v1",
+    );
+    expect(batch).toContain(
+      "capability_grant_id",
+    );
+    expect(batch).toContain(
+      "assertHumanAuthority",
+    );
+    expect(batch).toContain(
+      "close_stewardship_authority_window_v1",
+    );
+    expect(batch).toContain(
+      "assertZeroAtRest",
+    );
+    expect(batch).toContain(
+      "exact human Track-slug stewardship authority accepted",
     );
     expect(batch).toContain(
       "public_music_identity_safe_slug_repair",

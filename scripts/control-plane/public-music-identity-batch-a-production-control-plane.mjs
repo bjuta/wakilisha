@@ -18,6 +18,14 @@ const ARTIFACT_DIR =
   process.env.MIZIZI_ARTIFACT_DIR ||
   "artifacts/public-music-identity-batch-a";
 
+const OPERATION_KEY = "registry.track_slug.canonicalize";
+const CAPABILITY_KEY = "canonicalize_registry_track_slug";
+const EXPECTED_CANDIDATE_FINGERPRINT =
+  "363bed8410570611a8cdf43194f7b47a0e0f380877fac342201fc48e2b6576e9";
+const CLOSE_MIGRATION_VERSION = "20260922143000";
+const CLOSE_MIGRATION_NAME =
+  "mizizi_url_identity_authority_window_close_v1";
+
 const SAFE_SLUG_ROWS = [
   {
     reviewId: "740dbe7e-b423-4e69-b479-83dc91a76da2",
@@ -82,8 +90,24 @@ function sqlUuidArray(values) {
   );
 }
 
+function requireUuid(value, label) {
+  const normalized = String(value || "").toLowerCase();
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      normalized,
+    )
+  ) {
+    throw new Error(label + " must be an exact UUID.");
+  }
+  return normalized;
+}
+
 function assertReviewedTrigger() {
-  if (!TRIGGER_FILE) return;
+  if (!TRIGGER_FILE) {
+    throw new Error(
+      "Batch A reviewed trigger file is required for Production mutation.",
+    );
+  }
 
   if (!fs.existsSync(TRIGGER_FILE)) {
     throw new Error(
@@ -117,6 +141,12 @@ function assertReviewedTrigger() {
     Number(trigger.programme_issue) !== 1094 ||
     trigger.confirm !==
       "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_APPLY" ||
+    Number(trigger.expected_candidate_count) !==
+      SAFE_SLUG_ROWS.length ||
+    trigger.expected_candidate_fingerprint !==
+      EXPECTED_CANDIDATE_FINGERPRINT ||
+    trigger.expected_operation_key !== OPERATION_KEY ||
+    trigger.expected_capability_key !== CAPABILITY_KEY ||
     JSON.stringify(actualSafe) !==
       JSON.stringify(expectedSafe) ||
     JSON.stringify(actualDuplicate) !==
@@ -127,9 +157,175 @@ function assertReviewedTrigger() {
     );
   }
 
+  const capabilityGrantId = requireUuid(
+    trigger.capability_grant_id,
+    "capability_grant_id",
+  );
+
   console.log(
     "PASS: exact reviewed Batch A trigger manifest accepted",
   );
+
+  return {
+    ...trigger,
+    capability_grant_id: capabilityGrantId,
+  };
+}
+
+function assertHumanAuthority(trigger) {
+  const grantId = trigger.capability_grant_id;
+  const state = queryViaLinkedCli(`
+select
+  exists(
+    select 1
+    from supabase_migrations.schema_migrations
+    where version='${CLOSE_MIGRATION_VERSION}'
+      and name='${CLOSE_MIGRATION_NAME}'
+  ) as close_migration_applied,
+  exists(
+    select 1
+    from platform_private.registry_operation_types
+    where operation_key='${OPERATION_KEY}'
+      and operation_version=1
+      and capability_key='${CAPABILITY_KEY}'
+      and enabled
+  ) as operation_enabled,
+  exists(
+    select 1
+    from platform_private.system_actor_capability_grants grant_row
+    where grant_row.id='${grantId}'::uuid
+      and grant_row.actor_key='mizizi'
+      and grant_row.capability_key='${CAPABILITY_KEY}'
+      and grant_row.status='active'
+      and grant_row.valid_from<=now()
+      and grant_row.expires_at>now()+interval '30 minutes'
+      and grant_row.revoked_at is null
+      and grant_row.scope @> jsonb_build_object(
+        'operation_key','${OPERATION_KEY}',
+        'operation_version',1,
+        'subject_type','track',
+        'max_rows',1
+      )
+  ) as exact_human_grant,
+  (
+    select count(*)::int
+    from platform_private.system_actor_capability_grants
+    where actor_key='mizizi'
+      and status='active'
+  ) as active_standing_total,
+  (
+    select count(*)::int
+    from platform_private.registry_execution_grants
+    where actor_key='mizizi'
+      and status='active'
+  ) as active_exact_total
+`);
+
+  const expected = {
+    close_migration_applied: true,
+    operation_enabled: true,
+    exact_human_grant: true,
+    active_standing_total: 1,
+    active_exact_total: 0,
+  };
+
+  for (const [key, value] of Object.entries(expected)) {
+    if (String(state?.[key]) !== String(value)) {
+      throw new Error(
+        "Batch A human stewardship authority " +
+          key +
+          "=" +
+          state?.[key] +
+          " expected " +
+          value,
+      );
+    }
+  }
+
+  console.log(
+    "PASS: exact human Track-slug stewardship authority accepted",
+  );
+}
+
+function assertZeroAtRest(label) {
+  const state = queryViaLinkedCli(`
+select
+  (
+    select count(*)::int
+    from platform_private.system_actor_capability_grants
+    where actor_key='mizizi'
+      and status='active'
+  ) as active_standing,
+  (
+    select count(*)::int
+    from platform_private.registry_execution_grants
+    where actor_key='mizizi'
+      and status='active'
+  ) as active_exact,
+  (
+    select count(*)::int
+    from platform_private.registry_execution_grants
+    where actor_key='mizizi'
+      and status='active'
+      and consumed_at is null
+  ) as unconsumed_exact,
+  (
+    select count(*)::int
+    from platform_private.registry_operation_types
+    where operation_version=1
+      and operation_key in (
+        'registry.track_slug.canonicalize',
+        'registry.release_taxonomy.repair',
+        'registry.release_slug.canonicalize',
+        'registry.chart_track_slug.synchronize',
+        'registry.release_single_identity.align'
+      )
+      and enabled
+  ) as enabled_operations
+`);
+
+  for (const [key, value] of Object.entries({
+    active_standing: 0,
+    active_exact: 0,
+    unconsumed_exact: 0,
+    enabled_operations: 0,
+  })) {
+    if (String(state?.[key]) !== String(value)) {
+      throw new Error(
+        label +
+          " " +
+          key +
+          "=" +
+          state?.[key] +
+          " expected " +
+          value,
+      );
+    }
+  }
+
+  return state;
+}
+
+async function closeAuthorityWindow(pool, trigger, reason) {
+  const result = await pool.query(
+    `
+    select *
+    from mizizi_private.close_stewardship_authority_window_v1(
+      $1::text,
+      $2::uuid,
+      $3::text
+    )
+    `,
+    [OPERATION_KEY, trigger.capability_grant_id, reason],
+  );
+
+  if (result.rowCount !== 1) {
+    throw new Error(
+      "Batch A authority-window close did not return one receipt.",
+    );
+  }
+
+  return result.rows[0];
 }
 
 function assertExactMain() {
@@ -139,17 +335,31 @@ function assertExactMain() {
     );
   }
 
+  runCommand("git", [
+    "fetch",
+    "--prune",
+    "origin",
+    "main",
+  ]);
+
   const head = runCommand(
     "git",
     ["rev-parse", "HEAD"],
     { capture: true },
   );
+  const main = runCommand(
+    "git",
+    ["rev-parse", "origin/main"],
+    { capture: true },
+  );
 
-  if (head !== EXPECTED_MAIN) {
+  if (head !== EXPECTED_MAIN || main !== EXPECTED_MAIN) {
     throw new Error(
-      "Batch A executor checkout " +
+      "Batch A executor is not on exact protected main: head=" +
         head +
-        " does not match expected main " +
+        " origin/main=" +
+        main +
+        " expected=" +
         EXPECTED_MAIN,
     );
   }
@@ -372,7 +582,7 @@ async function executeSafeSlug(jit, row, stateRow) {
   const execution = await jit.pool.query(
     `
     select *
-    from mizizi_private.execute_stewardship_operation_v1(
+    from mizizi_private.execute_stewardship_operation_v2(
       $1::uuid
     )
     `,
@@ -395,7 +605,7 @@ async function executeSafeSlug(jit, row, stateRow) {
   const verification = await jit.pool.query(
     `
     select *
-    from mizizi_private.verify_stewardship_operation_v1(
+    from mizizi_private.verify_stewardship_operation_v2(
       $1::uuid
     )
     `,
@@ -449,54 +659,9 @@ async function main() {
   );
 
   assertExactMain();
-  assertReviewedTrigger();
+  const trigger = assertReviewedTrigger();
   linkSupabaseProject(PROJECT_REF);
-
-  const before = batchState();
-
-  if (
-    Number(before.safe_rows || 0) !== SAFE_SLUG_ROWS.length ||
-    Number(before.safe_ready || 0) !== SAFE_SLUG_ROWS.length ||
-    Number(before.duplicate_rows || 0) !==
-      DUPLICATE_REVIEW_IDS.length ||
-    Number(before.duplicate_resolved || 0) !==
-      DUPLICATE_REVIEW_IDS.length
-  ) {
-    fs.writeFileSync(
-      ARTIFACT_DIR + "/preflight-failed.json",
-      JSON.stringify(before, null, 2) + "\n",
-    );
-
-    throw new Error(
-      "Batch A is not ready for MIZIZI safe-slug execution. " +
-        "Expected 5 recorded safe-slug decisions and 10 fully resolved duplicate reviews.",
-    );
-  }
-
-  const safeState = parsePayload(
-    before.safe_payload,
-    "Batch A safe payload",
-  );
-
-  fs.writeFileSync(
-    ARTIFACT_DIR + "/preflight.json",
-    JSON.stringify(
-      {
-        expectedMain: EXPECTED_MAIN,
-        safeState,
-        duplicateState: parsePayload(
-          before.duplicate_payload,
-          "Batch A duplicate payload",
-        ),
-      },
-      null,
-      2,
-    ) + "\n",
-  );
-
-  const byReview = new Map(
-    safeState.map((row) => [String(row.reviewId), row]),
-  );
+  assertHumanAuthority(trigger);
 
   const jit = await openMiziziJitSession({
     projectRef: PROJECT_REF,
@@ -505,8 +670,58 @@ async function main() {
 
   const operations = [];
   let primaryError = null;
+  let closeError = null;
+  let restoreError = null;
+  let restError = null;
 
   try {
+    const before = batchState();
+
+    if (
+      Number(before.safe_rows || 0) !== SAFE_SLUG_ROWS.length ||
+      Number(before.safe_ready || 0) !== SAFE_SLUG_ROWS.length ||
+      Number(before.duplicate_rows || 0) !==
+        DUPLICATE_REVIEW_IDS.length ||
+      Number(before.duplicate_resolved || 0) !==
+        DUPLICATE_REVIEW_IDS.length
+    ) {
+      fs.writeFileSync(
+        ARTIFACT_DIR + "/preflight-failed.json",
+        JSON.stringify(before, null, 2) + "\n",
+      );
+
+      throw new Error(
+        "Batch A is not ready for MIZIZI safe-slug execution. " +
+          "Expected 5 recorded safe-slug decisions and 10 fully resolved duplicate reviews.",
+      );
+    }
+
+    const safeState = parsePayload(
+      before.safe_payload,
+      "Batch A safe payload",
+    );
+
+    fs.writeFileSync(
+      ARTIFACT_DIR + "/preflight.json",
+      JSON.stringify(
+        {
+          expectedMain: EXPECTED_MAIN,
+          capabilityGrantId: trigger.capability_grant_id,
+          safeState,
+          duplicateState: parsePayload(
+            before.duplicate_payload,
+            "Batch A duplicate payload",
+          ),
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
+    const byReview = new Map(
+      safeState.map((row) => [String(row.reviewId), row]),
+    );
+
     for (const row of SAFE_SLUG_ROWS) {
       const stateRow = byReview.get(row.reviewId);
 
@@ -531,24 +746,63 @@ async function main() {
   }
 
   try {
-    await jit.restore();
-  } catch (restoreError) {
-    if (primaryError) {
-      throw new Error(
-        (primaryError instanceof Error
-          ? primaryError.message
-          : String(primaryError)) +
-          "; JIT cleanup also failed: " +
-          (restoreError instanceof Error
-            ? restoreError.message
-            : String(restoreError)),
-      );
-    }
-    throw restoreError;
+    const closeReceipt = await closeAuthorityWindow(
+      jit.pool,
+      trigger,
+      primaryError
+        ? "close after failed governed Batch A safe-slug apply"
+        : "close after accepted governed Batch A safe-slug apply",
+    );
+
+    fs.writeFileSync(
+      ARTIFACT_DIR + "/authority-close.json",
+      JSON.stringify(closeReceipt, null, 2) + "\n",
+    );
+  } catch (error) {
+    closeError = error;
   }
 
-  if (primaryError) {
-    throw primaryError;
+  try {
+    await jit.restore();
+  } catch (error) {
+    restoreError = error;
+  }
+
+  try {
+    assertZeroAtRest("Batch A post-apply authority");
+  } catch (error) {
+    restError = error;
+  }
+
+  const lifecycleErrors = [
+    primaryError
+      ? "apply failed: " +
+        (primaryError instanceof Error
+          ? primaryError.message
+          : String(primaryError))
+      : null,
+    closeError
+      ? "authority close failed: " +
+        (closeError instanceof Error
+          ? closeError.message
+          : String(closeError))
+      : null,
+    restoreError
+      ? "JIT cleanup failed: " +
+        (restoreError instanceof Error
+          ? restoreError.message
+          : String(restoreError))
+      : null,
+    restError
+      ? "zero-at-rest verification failed: " +
+        (restError instanceof Error
+          ? restError.message
+          : String(restError))
+      : null,
+  ].filter(Boolean);
+
+  if (lifecycleErrors.length) {
+    throw new Error(lifecycleErrors.join("; "));
   }
 
   const post = queryViaLinkedCli(`
