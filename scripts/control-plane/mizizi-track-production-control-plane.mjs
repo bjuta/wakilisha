@@ -372,6 +372,11 @@ const POST_TRACK_ZERO_BASELINE = {
   reviews:32,
 };
 
+const POST_PRIMARY_FOLLOWUP_BASELINE = {
+  ...POST_APPLY_BASELINE,
+  reviews:27,
+};
+
 function fieldsMatch(actual, expected) {
   return Object.entries(expected).every(
     ([key, value]) => String(actual?.[key]) === String(value),
@@ -418,6 +423,10 @@ function classifyTrackProductionState(state) {
     postApplyDomainFieldsMatch(state, POST_TRACK_ZERO_BASELINE) &&
     postApplyLedgerAccepted(state, POST_TRACK_ZERO_BASELINE)
   ) return 'post_track_zero';
+  if (
+    postApplyDomainFieldsMatch(state, POST_PRIMARY_FOLLOWUP_BASELINE) &&
+    postApplyLedgerAccepted(state, POST_PRIMARY_FOLLOWUP_BASELINE)
+  ) return 'post_primary_followup';
   return 'unexpected';
 }
 
@@ -425,8 +434,13 @@ function assertAcceptedPostApply(state) {
   const reviewCount = Number(state?.reviews);
   const acceptedHistorical = reviewCount === 66;
   const acceptedTrackZeroResidual = reviewCount === 32;
+  const acceptedPrimaryFollowupResidual = reviewCount === 27;
 
-  if (!acceptedHistorical && !acceptedTrackZeroResidual) {
+  if (
+    !acceptedHistorical &&
+    !acceptedTrackZeroResidual &&
+    !acceptedPrimaryFollowupResidual
+  ) {
     throw new Error(
       `accepted Track review boundary is not recognized: ${reviewCount}`,
     );
@@ -462,17 +476,22 @@ function assertAcceptedPostApply(state) {
     'impact',
   );
 
-  const expectedClasses = acceptedTrackZeroResidual
+  const expectedClasses = acceptedPrimaryFollowupResidual
     ? {
         track_collision:26,
-        missing_primary:6,
+        missing_primary:1,
       }
-    : {
-        thread_collision:28,
-        track_collision:26,
-        missing_primary:6,
-        ambiguous_thread:6,
-      };
+    : acceptedTrackZeroResidual
+      ? {
+          track_collision:26,
+          missing_primary:6,
+        }
+      : {
+          thread_collision:28,
+          track_collision:26,
+          missing_primary:6,
+          ambiguous_thread:6,
+        };
 
   assertFields(
     state.classes,
@@ -594,7 +613,7 @@ function assertAudit(text, before) {
         `track_slug_identity_noise expected 506, found ${identityNoise}`,
       );
     }
-  } else if (![66,32].includes(identityNoise)) {
+  } else if (![66,32,27].includes(identityNoise)) {
     throw new Error(
       `track_slug_identity_noise is outside accepted post-apply boundaries: ${identityNoise}`,
     );
@@ -776,7 +795,8 @@ async function main() {
 
       if (
         productionState === 'post_apply' ||
-        productionState === 'post_track_zero'
+        productionState === 'post_track_zero' ||
+        productionState === 'post_primary_followup'
       ) {
         console.log('PASS: accepted historical Track post-apply baseline detected');
 

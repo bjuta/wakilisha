@@ -3655,3 +3655,31 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
     );
   });
 });
+
+
+describe("Public Music Identity Track production accepted-state lineage", () => {
+  it("recognizes the post-primary-follow-up 27-review Production boundary", () => {
+    const controlPlane = read(
+      "scripts/control-plane/mizizi-track-production-control-plane.mjs",
+    );
+
+    expect(controlPlane).toContain(
+      "const POST_PRIMARY_FOLLOWUP_BASELINE",
+    );
+    expect(controlPlane).toContain(
+      "reviews:27",
+    );
+    expect(controlPlane).toContain(
+      "post_primary_followup",
+    );
+    expect(controlPlane).toContain(
+      "track_collision:26",
+    );
+    expect(controlPlane).toContain(
+      "missing_primary:1",
+    );
+    expect(controlPlane).toContain(
+      "[66,32,27]",
+    );
+  });
+});
