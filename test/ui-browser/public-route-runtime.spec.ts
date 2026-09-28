@@ -6,6 +6,10 @@ const routerSource = readFileSync(
   "utf8",
 );
 
+const tokenBackedPatterns = new Set([
+  "/preview/:nonce",
+]);
+
 const publicPatterns = Array.from(
   routerSource.matchAll(
     /\{\s*path:\s*"([^"]+)"\s*,\s*element:\s*<([^\n]+?)\/>\s*\}/g,
@@ -19,6 +23,7 @@ const publicPatterns = Array.from(
       route.startsWith("/")
       && !route.startsWith("/admin")
       && !element.includes("NotFound")
+      && !tokenBackedPatterns.has(route)
     );
   })
   .map((match) => match[1]);
@@ -51,12 +56,10 @@ function materialize(pattern: string): string {
 const fatalConsolePattern =
   /(?:ReferenceError|TypeError|RangeError|SyntaxError|\bis not defined\b|Cannot read properties of|Invalid hook call|Maximum update depth|Minified React error)/i;
 
-test("every declared public route mounts without an uncaught runtime crash", async ({
-  page,
-}) => {
-  const failures: string[] = [];
-
-  for (const pattern of publicPatterns) {
+for (const pattern of publicPatterns) {
+  test(`public route ${pattern} mounts without an uncaught runtime crash`, async ({
+    page,
+  }) => {
     const route = materialize(pattern);
     const routeErrors: string[] = [];
 
@@ -120,15 +123,9 @@ test("every declared public route mounts without an uncaught runtime crash", asy
       page.off("console", onConsole);
     }
 
-    if (routeErrors.length > 0) {
-      failures.push(
-        `${pattern} -> ${route}\n  ${routeErrors.join("\n  ")}`,
-      );
-    }
-  }
-
-  expect(
-    failures,
-    failures.join("\n\n"),
-  ).toEqual([]);
-});
+    expect(
+      routeErrors,
+      `${pattern} -> ${route}\n  ${routeErrors.join("\n  ")}`,
+    ).toEqual([]);
+  });
+}
