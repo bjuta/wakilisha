@@ -285,6 +285,7 @@ export function WkTemporalPicker({
       </Button>
 
       <Popover
+        data-wk-temporal-popover
         placement="bottom start"
         offset={8}
         className="w-[min(460px,calc(100vw-2rem))] overflow-visible rounded-2xl border border-wk-border-2 bg-wk-surface p-4 shadow-[var(--wk-shadow)]"
