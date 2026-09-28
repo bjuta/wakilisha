@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { EditorialTextDiff } from "@/components/design-system/editorial/EditorialTextDiff";
 import { supabase } from "@/lib/supabase";
@@ -491,51 +492,55 @@ export function ArticleRevisionHistory({ articleId, currentStatus, currentTitle,
         );
       })}
 
-      {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm mx-4 rounded-2xl border border-wk-border bg-wk-surface p-6 shadow-lg">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-warning-soft text-wk-warning">
-              <WkIcon name="RotateCcw" size={22} />
-            </div>
-            <h3 className="text-[16px] font-bold text-wk-text mb-2">Restore Version as Draft?</h3>
-            <p className="text-[13px] text-wk-text-muted mb-3">
-              This will restore version {showConfirm.revision_number} from{" "}
-              {new Date(showConfirm.created_at).toLocaleString()} into the editor.
-            </p>
-            <p className="mb-5 rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2 text-[12px] leading-5 text-wk-warning">
-              Restored content must be saved, submitted, and approved again before it can be published.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowConfirm(null)}
-                className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const payload: RestorePayload = {
-                    title: showConfirm.title || "",
-                    excerpt: showConfirm.excerpt || "",
-                    content: showConfirm.content_html || "",
-                    author: showConfirm.author || "",
-                    categories: Array.isArray(showConfirm.categories) ? showConfirm.categories : [],
-                    tags: Array.isArray(showConfirm.tags) ? showConfirm.tags : [],
-                    seo: (showConfirm.seo as Record<string, unknown>) || {},
-                    publishedAt: showConfirm.published_at || "",
-                    wpStatus: showConfirm.wp_status,
-                  };
-                  onRestore?.(payload);
-                  setShowConfirm(null);
-                }}
-                className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-warning text-wk-brand-on hover:opacity-90 border border-wk-warning"
-              >
-                Restore
-              </button>
-            </div>
+      <Modal
+        open={Boolean(showConfirm)}
+        onClose={() => setShowConfirm(null)}
+        title="Restore Version as Draft?"
+        maxWidth="sm"
+        footer={
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowConfirm(null)}
+              className="wk-button wk-button-secondary wk-button-sm flex-1 whitespace-nowrap"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                if (!showConfirm) return;
+                const payload: RestorePayload = {
+                  title: showConfirm.title || "",
+                  excerpt: showConfirm.excerpt || "",
+                  content: showConfirm.content_html || "",
+                  author: showConfirm.author || "",
+                  categories: Array.isArray(showConfirm.categories) ? showConfirm.categories : [],
+                  tags: Array.isArray(showConfirm.tags) ? showConfirm.tags : [],
+                  seo: (showConfirm.seo as Record<string, unknown>) || {},
+                  publishedAt: showConfirm.published_at || "",
+                  wpStatus: showConfirm.wp_status,
+                };
+                onRestore?.(payload);
+                setShowConfirm(null);
+              }}
+              className="wk-button wk-button-sm flex-1 whitespace-nowrap bg-wk-warning text-wk-brand-on hover:opacity-90 border border-wk-warning"
+            >
+              Restore
+            </button>
           </div>
+        }
+      >
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-wk-warning-soft text-wk-warning">
+          <WkIcon name="RotateCcw" size={22} />
         </div>
-      )}
+        <p className="text-[13px] text-wk-text-muted">
+          {showConfirm ? (
+            <>Restore version {showConfirm.revision_number} from {new Date(showConfirm.created_at).toLocaleString()} into the editor.</>
+          ) : null}
+        </p>
+        <p className="mt-3 rounded-lg border border-wk-warning/30 bg-wk-warning-soft px-3 py-2 text-[12px] leading-5 text-wk-warning">
+          Restored content must be saved, submitted, and approved again before it can be published.
+        </p>
+      </Modal>
     </div>
   );
 }
