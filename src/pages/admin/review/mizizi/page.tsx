@@ -212,15 +212,37 @@ function decisionLabel(value: RegistryDecisionType | null | undefined): string {
   }
 }
 
-async function loadWorkspace(): Promise<WorkspaceItem[]> {
-  const page = await loadRegistryReviewItems({
-    status: "open",
-    reviewType: "mizizi_data_hygiene",
-    entityType: "track",
-    limit: 100,
-  });
+async function loadCurrentProgrammeReviews(): Promise<RegistryReviewItemRow[]> {
+  const reviews = new Map<string, RegistryReviewItemRow>();
+  let offset = 0;
+  let total = 0;
 
-  const reviews = page.rows.filter(isPublicMusicIdentityTrackReview);
+  do {
+    const page = await loadRegistryReviewItems({
+      status: "open",
+      reviewType: "mizizi_data_hygiene",
+      entityType: "track",
+      offset,
+      limit: 100,
+    });
+
+    for (const review of page.rows) {
+      if (isPublicMusicIdentityTrackReview(review)) {
+        reviews.set(review.id, review);
+      }
+    }
+
+    total = page.total;
+    offset += page.rows.length;
+
+    if (page.rows.length === 0) break;
+  } while (offset < total);
+
+  return [...reviews.values()];
+}
+
+async function loadWorkspace(): Promise<WorkspaceItem[]> {
+  const reviews = await loadCurrentProgrammeReviews();
   const reviewIds = reviews.map((review) => review.id);
   if (!reviewIds.length) return [];
 
