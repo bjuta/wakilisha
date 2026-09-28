@@ -119,7 +119,6 @@ function ActionDialog({
       </div>
     </Modal>
   );
-  );
 }
 
 export default function AdminRelationshipViewerPage() {
