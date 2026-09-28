@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Portal } from "@/components/base/Portal";
 import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ADMIN_SEARCH_INDEX, type AdminSearchItem } from "@/data/adminSearchIndex";
@@ -93,7 +94,8 @@ export function AdminCommandPalette({ open, onClose }: { open: boolean; onClose:
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-[15vh]">
+    <Portal>
+      <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-[15vh]">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
@@ -228,6 +230,7 @@ export function AdminCommandPalette({ open, onClose }: { open: boolean; onClose:
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </Portal>
   );
 }
