@@ -7,6 +7,7 @@ on:
       - "scripts/control-plane/mizizi-production-jit-runtime.mjs"
       - "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs"
       - "scripts/control-plane/public-music-identity-batch-a-production-control-plane.mjs"
+      - "scripts/control-plane/public-music-identity-track-actual-zero-audit.mjs"
       - "scripts/control-plane/verify-mizizi-url-identity-authority-window-close.sql"
       - "supabase/migrations/20260922143000_mizizi_url_identity_authority_window_close_v1.sql"
       - "supabase/migrations/20260922171632_mizizi_release_slug_resume_integrity_v1.sql"
@@ -147,6 +148,13 @@ jobs:
         if: (github.event_name == 'workflow_dispatch' && inputs.operation == 'public_music_identity_batch_a_safe_slug') || env.PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY == 'true'
         run: node scripts/control-plane/public-music-identity-batch-a-production-control-plane.mjs
 
+      - name: Snapshot full active Track slug corpus after Batch A
+        if: (github.event_name == 'workflow_dispatch' && inputs.operation == 'public_music_identity_batch_a_safe_slug') || env.PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY == 'true'
+        env:
+          PUBLIC_MUSIC_IDENTITY_ZERO_MODE: report
+          PUBLIC_MUSIC_IDENTITY_ZERO_ARTIFACT_DIR: artifacts/public-music-identity-track-actual-zero
+        run: node scripts/control-plane/public-music-identity-track-actual-zero-audit.mjs
+
       - name: Upload URL-identity control-plane evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -155,5 +163,6 @@ jobs:
           path: |
             artifacts/mizizi-url-identity-production-control-plane
             artifacts/public-music-identity-batch-a
+            artifacts/public-music-identity-track-actual-zero
           if-no-files-found: ignore
           retention-days: 30
