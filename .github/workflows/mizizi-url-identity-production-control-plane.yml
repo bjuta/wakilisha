@@ -26,6 +26,7 @@ on:
       - ".github/public-music-identity-release-single-alignment-apply.json"
       - ".github/public-music-identity-track-slug-zero-apply.json"
       - ".github/public-music-identity-track-slug-primary-followup-apply.json"
+      - ".github/public-music-identity-batch-a-safe-slug-apply.json"
   push:
     branches:
       - main
@@ -34,6 +35,7 @@ on:
       - ".github/public-music-identity-release-single-alignment-apply.json"
       - ".github/public-music-identity-track-slug-zero-apply.json"
       - ".github/public-music-identity-track-slug-primary-followup-apply.json"
+      - ".github/public-music-identity-batch-a-safe-slug-apply.json"
   workflow_dispatch:
     inputs:
       operation:
@@ -63,6 +65,7 @@ jobs:
       MIZIZI_CONTROL_PLANE_MODE: preflight
       MIZIZI_EXPECTED_MAIN_SHA: ""
       MIZIZI_TRIGGER_FILE: ""
+      PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY: ""
       MIZIZI_ARTIFACT_DIR: artifacts/mizizi-url-identity-production-control-plane
 
     steps:
@@ -90,25 +93,30 @@ jobs:
           SINGLE_FILE=".github/public-music-identity-release-single-alignment-apply.json"
           TRACK_ZERO_FILE=".github/public-music-identity-track-slug-zero-apply.json"
           TRACK_PRIMARY_FILE=".github/public-music-identity-track-slug-primary-followup-apply.json"
+          BATCH_A_FILE=".github/public-music-identity-batch-a-safe-slug-apply.json"
 
           TOTAL="$(printf '%s\n' "$CHANGED" | sed '/^$/d' | wc -l | tr -d ' ')"
           LEGACY_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$LEGACY_FILE" || true)"
           SINGLE_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$SINGLE_FILE" || true)"
           TRACK_ZERO_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$TRACK_ZERO_FILE" || true)"
           TRACK_PRIMARY_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$TRACK_PRIMARY_FILE" || true)"
+          BATCH_A_COUNT="$(printf '%s\n' "$CHANGED" | grep -Fxc "$BATCH_A_FILE" || true)"
 
-          if [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "1" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "0" ] && [ "$TRACK_PRIMARY_COUNT" = "0" ]; then
+          if [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "1" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "0" ] && [ "$TRACK_PRIMARY_COUNT" = "0" ] && [ "$BATCH_A_COUNT" = "0" ]; then
             echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
             echo "MIZIZI_TRIGGER_FILE=$LEGACY_FILE" >> "$GITHUB_ENV"
-          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "1" ] && [ "$TRACK_ZERO_COUNT" = "0" ] && [ "$TRACK_PRIMARY_COUNT" = "0" ]; then
+          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "1" ] && [ "$TRACK_ZERO_COUNT" = "0" ] && [ "$TRACK_PRIMARY_COUNT" = "0" ] && [ "$BATCH_A_COUNT" = "0" ]; then
             echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
             echo "MIZIZI_TRIGGER_FILE=$SINGLE_FILE" >> "$GITHUB_ENV"
-          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "1" ] && [ "$TRACK_PRIMARY_COUNT" = "0" ]; then
+          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "1" ] && [ "$TRACK_PRIMARY_COUNT" = "0" ] && [ "$BATCH_A_COUNT" = "0" ]; then
             echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
             echo "MIZIZI_TRIGGER_FILE=$TRACK_ZERO_FILE" >> "$GITHUB_ENV"
-          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "0" ] && [ "$TRACK_PRIMARY_COUNT" = "1" ]; then
+          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "0" ] && [ "$TRACK_PRIMARY_COUNT" = "1" ] && [ "$BATCH_A_COUNT" = "0" ]; then
             echo "MIZIZI_CONTROL_PLANE_MODE=apply" >> "$GITHUB_ENV"
             echo "MIZIZI_TRIGGER_FILE=$TRACK_PRIMARY_FILE" >> "$GITHUB_ENV"
+          elif [ "$TOTAL" = "1" ] && [ "$LEGACY_COUNT" = "0" ] && [ "$SINGLE_COUNT" = "0" ] && [ "$TRACK_ZERO_COUNT" = "0" ] && [ "$TRACK_PRIMARY_COUNT" = "0" ] && [ "$BATCH_A_COUNT" = "1" ]; then
+            echo "PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY=true" >> "$GITHUB_ENV"
+            echo "MIZIZI_TRIGGER_FILE=$BATCH_A_FILE" >> "$GITHUB_ENV"
           else
             echo "STOP: Production intent push must change exactly one reviewed URL-identity trigger file."
             printf '%s\n' "$CHANGED"
@@ -132,11 +140,11 @@ jobs:
           fi
 
       - name: Run current MIZIZI URL-identity control plane
-        if: github.event_name != 'workflow_dispatch' || inputs.operation == 'preflight'
+        if: (github.event_name != 'workflow_dispatch' || inputs.operation == 'preflight') && env.PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY != 'true'
         run: node scripts/control-plane/mizizi-url-identity-production-control-plane.mjs
 
       - name: Run Public Music Identity Batch A safe-slug executor
-        if: github.event_name == 'workflow_dispatch' && inputs.operation == 'public_music_identity_batch_a_safe_slug'
+        if: (github.event_name == 'workflow_dispatch' && inputs.operation == 'public_music_identity_batch_a_safe_slug') || env.PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY == 'true'
         run: node scripts/control-plane/public-music-identity-batch-a-production-control-plane.mjs
 
       - name: Upload URL-identity control-plane evidence
