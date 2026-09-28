@@ -58,6 +58,27 @@ describe(
     );
 
     it(
+      "does not misclassify ordinary reviewed runtime boundary prose as production reconciliation",
+      () => {
+        expect(
+          analyzeMigrationText(`
+            raise exception
+              'Duplicate finalization found a current-pointer surface outside the reviewed Community-thread boundary.';
+          `),
+        ).toEqual([]);
+
+        expect(
+          analyzeMigrationText(`
+            raise exception
+              'STOP: reviewed Production boundary is exactly 8 Release identities';
+          `),
+        ).toContain(
+          "reviewed production boundary",
+        );
+      },
+    );
+
+    it(
       "would have blocked the August 19 Organization backfill trap",
       () => {
         expect(

@@ -3686,3 +3686,92 @@ describe("Public Music Identity Track production accepted-state lineage", () => 
     );
   });
 });
+
+
+describe("Public Music Identity #1094 verified review finalization", () => {
+  const migrations =
+    readdirSync("supabase/migrations").filter((name) =>
+      name.endsWith(
+        "_public_music_identity_track_review_finalization_v1.sql",
+      ),
+    );
+
+  it("closes only workflow/derived-pointer state after exact verified canonical evidence", () => {
+    expect(migrations).toHaveLength(1);
+
+    const migration = read(
+      "supabase/migrations/" + migrations[0],
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-public-music-identity-track-review-finalization-v1.sql",
+    );
+
+    expect(migration).toContain(
+      "public_music_identity_track_review_terminal_evidence_v1",
+    );
+    expect(migration).toContain(
+      "admin_finalize_public_music_identity_track_review_v1",
+    );
+    expect(migration).toContain(
+      "registry.track_slug.canonicalize",
+    );
+    expect(migration).toContain(
+      "registry.track.duplicate_repair",
+    );
+    expect(migration).toContain(
+      "public.admin_archive_registry_music_entity_v1",
+    );
+    expect(migration).toContain(
+      "operation.completed_at>=v_decision.created_at",
+    );
+    expect(migration).toContain(
+      "verifier_status='passed'",
+    );
+    expect(migration).toContain(
+      "This human decision is intentionally non-terminal",
+    );
+
+    expect(migration).toContain(
+      "update public.community_threads",
+    );
+    expect(migration).toContain(
+      "update public.registry_review_items",
+    );
+    expect(migration).toContain(
+      "update public.registry_canonicalization_decisions",
+    );
+
+    expect(migration).not.toMatch(
+      /update\s+public\.registry_tracks/i,
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.registry_track_artists/i,
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.registry_release_tracks/i,
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.wk_chart_entries_v2/i,
+    );
+    expect(migration).not.toContain(
+      "wk_slug_redirects",
+    );
+
+    expect(migration).toContain(
+      "drop policy if exists\n  registry_review_items_admin_update",
+    );
+    expect(migration).toContain(
+      "and not (\n    status='resolved'",
+    );
+    expect(migration).toContain(
+      "Duplicate finalization has ambiguous Community thread ownership",
+    );
+
+    expect(verifier).toContain(
+      "PUBLIC_MUSIC_IDENTITY_TRACK_REVIEW_FINALIZATION_V1_PASS",
+    );
+    expect(verifier).toContain(
+      "Finalizer gained canonical Registry/Chart/redirect mutation authority",
+    );
+  });
+});
