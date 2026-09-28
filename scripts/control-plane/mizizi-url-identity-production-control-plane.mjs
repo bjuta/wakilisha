@@ -69,6 +69,55 @@ const EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATES = 5;
 const EXPECTED_TRACK_PRIMARY_FOLLOWUP_CANDIDATE_FINGERPRINT =
   "71d13b5535983bf937fcb0c0dbbf3b790e0961f8e8b0543c742b8d9d9f6c7cdf";
 const EXPECTED_TRACK_PRIMARY_FOLLOWUP_IDENTITY_NOISE_REMAINING = 27;
+const EXPECTED_BATCH_A_DUPLICATE_IDENTITY_NOISE_REMAINING = 17;
+const EXPECTED_BATCH_A_SAFE_SLUG_IDENTITY_NOISE_REMAINING = 12;
+const ACCEPTED_TRACK_AUDIT_SNAPSHOTS = new Map([
+  [
+    66,
+    {
+      findings: 664,
+      tracks: 2101,
+      titleNoise: 492,
+      recordingIdentityConflict: 91,
+    },
+  ],
+  [
+    EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING,
+    {
+      findings: 630,
+      tracks: 2101,
+      titleNoise: 492,
+      recordingIdentityConflict: 91,
+    },
+  ],
+  [
+    EXPECTED_TRACK_PRIMARY_FOLLOWUP_IDENTITY_NOISE_REMAINING,
+    {
+      findings: 625,
+      tracks: 2101,
+      titleNoise: 492,
+      recordingIdentityConflict: 91,
+    },
+  ],
+  [
+    EXPECTED_BATCH_A_DUPLICATE_IDENTITY_NOISE_REMAINING,
+    {
+      findings: 585,
+      tracks: 2091,
+      titleNoise: 482,
+      recordingIdentityConflict: 71,
+    },
+  ],
+  [
+    EXPECTED_BATCH_A_SAFE_SLUG_IDENTITY_NOISE_REMAINING,
+    {
+      findings: 580,
+      tracks: 2091,
+      titleNoise: 482,
+      recordingIdentityConflict: 71,
+    },
+  ],
+]);
 const EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_CANDIDATES = 8;
 const EXPECTED_RELEASE_SINGLE_TRACK_PRIMARY_FOLLOWUP_PORTABLE_FINGERPRINT =
   "8ea62e193987bd875ec584caaca23a4db021e2b6644c9bede13abeb6d457f430";
@@ -292,13 +341,10 @@ function assertAudit(
       "track_slug_identity_noise",
     );
 
-    if (
-      ![
-        66,
-        EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING,
-        EXPECTED_TRACK_PRIMARY_FOLLOWUP_IDENTITY_NOISE_REMAINING,
-      ].includes(slugNoise)
-    ) {
+    const acceptedSnapshot =
+      ACCEPTED_TRACK_AUDIT_SNAPSHOTS.get(slugNoise);
+
+    if (!acceptedSnapshot) {
       throw new Error(
         "Track slug-identity audit state is outside the accepted programme boundary: " +
           slugNoise,
@@ -308,11 +354,11 @@ function assertAudit(
     assertFields(
       summary,
       {
-        findings: 598 + slugNoise,
+        findings: acceptedSnapshot.findings,
         applied: 0,
         queued: 0,
         stale: 0,
-        tracks: 2101,
+        tracks: acceptedSnapshot.tracks,
         releases: 0,
         chart: 0,
       },
@@ -338,10 +384,11 @@ function assertAudit(
         ),
       },
       {
-        titleNoise: 492,
+        titleNoise: acceptedSnapshot.titleNoise,
         mismatch: 3,
         creditEvidenceGap: 12,
-        recordingIdentityConflict: 91,
+        recordingIdentityConflict:
+          acceptedSnapshot.recordingIdentityConflict,
       },
       "Track findings",
     );

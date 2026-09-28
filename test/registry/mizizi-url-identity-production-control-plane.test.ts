@@ -132,6 +132,119 @@ describe("MIZIZI current URL-identity production control plane", () => {
 
   });
 
+  it("executes reviewed Public Music Identity Batch A only through the existing exact MIZIZI broker", () => {
+    const workflow = readFileSync(
+      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "utf8",
+    );
+    const batch = readFileSync(
+      "scripts/control-plane/public-music-identity-batch-a-production-control-plane.mjs",
+      "utf8",
+    );
+    const actualZero = readFileSync(
+      "scripts/control-plane/public-music-identity-track-actual-zero-audit.mjs",
+      "utf8",
+    );
+    const currentControlPlane = readFileSync(
+      "scripts/control-plane/mizizi-url-identity-production-control-plane.mjs",
+      "utf8",
+    );
+
+    expect(currentControlPlane).toContain(
+      "EXPECTED_BATCH_A_DUPLICATE_IDENTITY_NOISE_REMAINING = 17",
+    );
+    expect(currentControlPlane).toContain(
+      "EXPECTED_BATCH_A_SAFE_SLUG_IDENTITY_NOISE_REMAINING = 12",
+    );
+    expect(currentControlPlane).toContain(
+      "ACCEPTED_TRACK_AUDIT_SNAPSHOTS",
+    );
+    expect(currentControlPlane).toContain(
+      "recordingIdentityConflict: 71",
+    );
+    expect(currentControlPlane).toContain(
+      "tracks: 2091",
+    );
+
+    expect(workflow).toContain(
+      "public_music_identity_batch_a_safe_slug",
+    );
+    expect(workflow).toContain(
+      "public-music-identity-batch-a-production-control-plane.mjs",
+    );
+    expect(workflow).toContain(
+      ".github/public-music-identity-batch-a-safe-slug-apply.json",
+    );
+    expect(workflow).toContain(
+      "PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY",
+    );
+    expect(workflow).toContain(
+      'test "$GITHUB_REF" = "refs/heads/main"',
+    );
+
+    expect(batch).toContain(
+      "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_EXECUTOR=PASS",
+    );
+    expect(batch).toContain(
+      "assertReviewedTrigger",
+    );
+    expect(batch).toContain(
+      "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_APPLY",
+    );
+    expect(batch).toContain(
+      "issue_stewardship_execution_grant_v1",
+    );
+    expect(batch).toContain(
+      "execute_stewardship_operation_v1",
+    );
+    expect(batch).toContain(
+      "verify_stewardship_operation_v1",
+    );
+    expect(batch).toContain(
+      "public_music_identity_safe_slug_repair",
+    );
+    expect(batch).toContain(
+      "Expected 5 recorded safe-slug decisions and 10 fully resolved duplicate reviews.",
+    );
+    expect(batch).toContain(
+      "740dbe7e-b423-4e69-b479-83dc91a76da2",
+    );
+    expect(batch).toContain(
+      "d723ff1e-31ad-42ff-9fe0-871c9b9e9b52",
+    );
+    expect(batch).not.toMatch(
+      /\b(?:insert\s+into|update|delete\s+from)\s+public\.registry_tracks/i,
+    );
+    expect(batch).not.toMatch(
+      /\b(?:insert\s+into|update|delete\s+from)\s+public\.registry_review_items/i,
+    );
+
+    expect(workflow).toContain(
+      "public-music-identity-track-actual-zero-audit.mjs",
+    );
+    expect(actualZero).toContain(
+      "OPEN_SCOPED_REVIEWS=",
+    );
+    expect(actualZero).toContain(
+      "ACTIVE_FEATURE_SLUG_COUNT=",
+    );
+    expect(actualZero).toContain(
+      "ACTIVE_FEATURE_SLUG_OUTSIDE_OPEN_SCOPE=",
+    );
+    expect(actualZero).toContain(
+      "ACTIVE_ROUTE_MANIFEST_FINGERPRINT=",
+    );
+    expect(actualZero).toContain(
+      "DIRTY_PUBLIC_TRACK_ROUTE ",
+    );
+    expect(actualZero).toContain(
+      "PUBLIC_MUSIC_IDENTITY_TRACK_ACTUAL_ZERO=PASS",
+    );
+    expect(actualZero).not.toMatch(
+      /\b(?:insert\s+into|update|delete\s+from)\s+(?:public|platform_private)\./i,
+    );
+  });
+
   it("adds only executor-bound authority reduction", () => {
     const migration = readFileSync(
       "supabase/migrations/20260922143000_mizizi_url_identity_authority_window_close_v1.sql",
@@ -827,7 +940,13 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING = 32",
     );
     expect(controlPlane).toContain(
-      "[\n        66,\n        EXPECTED_TRACK_ZERO_IDENTITY_NOISE_REMAINING,",
+      "ACCEPTED_TRACK_AUDIT_SNAPSHOTS",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_BATCH_A_DUPLICATE_IDENTITY_NOISE_REMAINING = 17",
+    );
+    expect(controlPlane).toContain(
+      "EXPECTED_BATCH_A_SAFE_SLUG_IDENTITY_NOISE_REMAINING = 12",
     );
     expect(controlPlane).toContain(
       "titlePackaging: slugPackaging",
