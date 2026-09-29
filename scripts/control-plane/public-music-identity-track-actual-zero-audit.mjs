@@ -130,6 +130,35 @@ dirty_active as (
   from active_tracks track
   where track.slug ~ '(^|-)(feat|ft|featuring)(-|$)'
 ),
+synthetic_suffix_active as (
+  select
+    track.*,
+    regexp_replace(
+      track.slug,
+      '-[0-9a-f]{6}$',
+      ''
+    ) as base_slug,
+    coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'trackId',peer.id,
+          'title',peer.title,
+          'slug',peer.slug,
+          'status',peer.status
+        )
+        order by peer.id::text
+      )
+      from public.registry_tracks peer
+      where peer.id<>track.id
+        and peer.slug=regexp_replace(
+          track.slug,
+          '-[0-9a-f]{6}$',
+          ''
+        )
+    ),'[]'::jsonb) as same_base_tracks
+  from active_tracks track
+  where track.slug ~ '-[0-9a-f]{6}$'
+),
 route_manifest as (
   select coalesce(
     jsonb_agg(
@@ -185,6 +214,26 @@ select
   ) as active_feature_slug_outside_open_scope,
   (
     select count(*)::int
+    from dirty_active dirty
+    where exists (
+      select 1
+      from scoped_reviews review
+      where review.track_id=dirty.id
+        and review.status='resolved'
+    )
+      and not exists (
+        select 1
+        from scoped_reviews review
+        where review.track_id=dirty.id
+          and review.status='open'
+      )
+  ) as active_feature_slug_with_resolved_scope,
+  (
+    select count(*)::int
+    from synthetic_suffix_active
+  ) as active_synthetic_suffix_count,
+  (
+    select count(*)::int
     from active_tracks track
     where track.primary_artist_count<>1
   ) as active_track_non_single_primary_count,
@@ -218,7 +267,26 @@ select
       order by dirty.primary_artist_slug nulls last,dirty.slug,dirty.id
     )
     from dirty_active dirty
-  ),'[]'::jsonb)::text as dirty_route_payload
+  ),'[]'::jsonb)::text as dirty_route_payload,
+  coalesce((
+    select jsonb_agg(
+      jsonb_build_object(
+        'trackId',synthetic.id,
+        'title',synthetic.title,
+        'slug',synthetic.slug,
+        'baseSlug',synthetic.base_slug,
+        'isrc',synthetic.isrc,
+        'primaryArtistCount',synthetic.primary_artist_count,
+        'primaryArtistSlug',synthetic.primary_artist_slug,
+        'sameBaseTracks',synthetic.same_base_tracks
+      )
+      order by
+        synthetic.primary_artist_slug nulls last,
+        synthetic.slug,
+        synthetic.id
+    )
+    from synthetic_suffix_active synthetic
+  ),'[]'::jsonb)::text as synthetic_suffix_route_payload
 `);
 }
 
@@ -234,6 +302,9 @@ function main() {
 
   const row = snapshot();
   const dirtyRoutes = parseRows(row.dirty_route_payload);
+  const syntheticSuffixRoutes = parseRows(
+    row.synthetic_suffix_route_payload,
+  );
 
   const result = {
     mode: MODE,
@@ -248,6 +319,12 @@ function main() {
     activeFeatureSlugOutsideOpenScope: Number(
       row.active_feature_slug_outside_open_scope || 0,
     ),
+    activeFeatureSlugWithResolvedScope: Number(
+      row.active_feature_slug_with_resolved_scope || 0,
+    ),
+    activeSyntheticSuffixCount: Number(
+      row.active_synthetic_suffix_count || 0,
+    ),
     activeTrackNonSinglePrimaryCount: Number(
       row.active_track_non_single_primary_count || 0,
     ),
@@ -255,6 +332,7 @@ function main() {
       row.active_route_manifest_fingerprint || "",
     ),
     dirtyRoutes,
+    syntheticSuffixRoutes,
   };
 
   fs.writeFileSync(
@@ -283,6 +361,14 @@ function main() {
       result.activeFeatureSlugOutsideOpenScope,
   );
   console.log(
+    "ACTIVE_FEATURE_SLUG_WITH_RESOLVED_SCOPE=" +
+      result.activeFeatureSlugWithResolvedScope,
+  );
+  console.log(
+    "ACTIVE_SYNTHETIC_SUFFIX_COUNT=" +
+      result.activeSyntheticSuffixCount,
+  );
+  console.log(
     "ACTIVE_ROUTE_MANIFEST_FINGERPRINT=" +
       result.activeRouteManifestFingerprint,
   );
@@ -294,13 +380,21 @@ function main() {
     );
   }
 
+  for (const route of syntheticSuffixRoutes) {
+    console.log(
+      "SYNTHETIC_PUBLIC_TRACK_ROUTE " +
+        JSON.stringify(route),
+    );
+  }
+
   if (MODE === "assert-zero") {
     if (
       result.openScopedReviews !== 0 ||
       result.openIdentityNoise !== 0 ||
       result.openCreditGap !== 0 ||
       result.activeFeatureSlugCount !== 0 ||
-      result.activeFeatureSlugOutsideOpenScope !== 0
+      result.activeFeatureSlugOutsideOpenScope !== 0 ||
+      result.activeSyntheticSuffixCount !== 0
     ) {
       throw new Error(
         "PUBLIC_MUSIC_IDENTITY_TRACK_ACTUAL_ZERO=FAIL",
