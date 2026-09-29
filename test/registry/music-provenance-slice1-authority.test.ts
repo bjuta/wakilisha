@@ -17,6 +17,9 @@ const admissionMigration = read(
 const verifier = read(
   "scripts/control-plane/verify-music-provenance-slice1-authority.sql",
 );
+const behaviorVerifier = read(
+  "scripts/control-plane/verify-music-provenance-slice1-behavior.sql",
+);
 const slice2Verifier = read(
   "scripts/control-plane/verify-music-identity-rights-slice2-authority.sql",
 );
@@ -280,6 +283,33 @@ describe("Music provenance Slice 1 authority", () => {
     );
     expect(admissionMigration).toContain(
       "v_state<>'confirmed'",
+    );
+  });
+
+  it("keeps Preview behavioral acceptance rollback-only and covers the frozen exit chain", () => {
+    expect(behaviorVerifier.trimStart()).toMatch(/^-- Rollback-only/);
+    expect(behaviorVerifier).toContain("begin;");
+    expect(behaviorVerifier.trimEnd()).toMatch(/rollback;$/);
+    expect(behaviorVerifier).toContain(
+      "MUSIC_PROVENANCE_SLICE1_BEHAVIOR_V1_PASS",
+    );
+    expect(behaviorVerifier).toContain(
+      "WK_PROVENANCE_ATTESTATION_REVIEW_REQUIRED",
+    );
+    expect(behaviorVerifier).toContain(
+      "Unresolved Fixture Producer",
+    );
+    expect(behaviorVerifier).toContain(
+      "public.registry_rights_claims",
+    );
+    expect(behaviorVerifier).toContain(
+      "v_track_contributions_after_membership",
+    );
+    expect(behaviorVerifier).toContain(
+      "v_active_grants<>0",
+    );
+    expect(behaviorVerifier).toContain(
+      "v_passed_operations<>4",
     );
   });
 
