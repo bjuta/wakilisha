@@ -107,22 +107,24 @@ describe("Music provenance Slice 1 authority", () => {
     expect(identityMigration).toContain("change_kind in ('grant','replace','withdraw')");
   });
 
-  it("extends accepted Person identity links for Registry Artist without creating a parallel bridge", () => {
+  it("adds a narrow governed Person-to-Registry-Artist bridge without destabilizing Person source identity", () => {
     expect(identityMigration).toContain(
-      "alter table editorial.person_identity_links",
+      "create table editorial.person_registry_artist_links",
     );
-    expect(identityMigration).toContain("registry_artist_id");
     expect(identityMigration).toContain(
-      "person_identity_links_active_registry_artist_unique",
+      "person_registry_artist_links_active_artist_unique",
     );
     expect(identityMigration).toContain(
       "admin_link_person_registry_artist_v1",
     );
+    expect(identityMigration).toContain(
+      "transfer_person_registry_artist_links_on_merge_v1",
+    );
     expect(identityMigration).not.toContain(
-      "create table editorial.person_registry_artist_links",
+      "alter table editorial.person_identity_links\n  add column registry_artist_id",
     );
     expect(identityMigration).toContain(
-      "Registry Artist identity was incorrectly turned into automatic Person presentation authority.",
+      "Registry Artist bridge was incorrectly turned into automatic Person presentation authority.",
     );
   });
 

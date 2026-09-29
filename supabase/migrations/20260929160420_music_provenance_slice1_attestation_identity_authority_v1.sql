@@ -24,23 +24,15 @@ begin
      or to_regclass('public.registry_artists') is null
      or to_regclass('editorial.people') is null
      or to_regclass('editorial.organizations') is null
-     or to_regclass('editorial.person_identity_links') is null
      or to_regclass('platform_private.registry_evidence_assertions') is null
      or to_regclass('public.registry_canonical_write_events') is null
      or to_regprocedure('public.current_user_has_capability(text)') is null
-     or to_regprocedure('editorial.protect_person_identity_link_target()') is null
   then
     raise exception
       'STOP: accepted Person / Registry / evidence authority required by provenance Slice 1 is incomplete';
   end if;
 
-  if exists (
-    select 1
-    from information_schema.columns
-    where table_schema='editorial'
-      and table_name='person_identity_links'
-      and column_name='registry_artist_id'
-  )
+  if to_regclass('editorial.person_registry_artist_links') is not null
      or to_regclass('platform_private.registry_contribution_attestations') is not null
      or to_regclass('platform_private.registry_contribution_attestation_state_events') is not null
      or to_regclass('platform_private.registry_contribution_attestation_permission_versions') is not null
@@ -631,103 +623,210 @@ revoke all on function
   platform_private.assert_registry_contribution_attestation_history_v1()
 from public,anon,authenticated,service_role;
 
-alter table editorial.person_identity_links
-  add column registry_artist_id uuid
+create table editorial.person_registry_artist_links (
+  id uuid primary key default gen_random_uuid(),
+  person_resource_id uuid not null
+    references editorial.people(resource_id)
+    on update restrict
+    on delete restrict,
+  registry_artist_id uuid not null
     references public.registry_artists(id)
     on update restrict
-    on delete restrict;
+    on delete restrict,
+  evidence_assertion_id uuid not null
+    references platform_private.registry_evidence_assertions(id)
+    on update restrict
+    on delete restrict,
+  link_state text not null default 'active',
+  link_reason text not null,
+  supersedes_link_id uuid
+    references editorial.person_registry_artist_links(id)
+    on update restrict
+    on delete restrict,
+  superseded_by_link_id uuid
+    references editorial.person_registry_artist_links(id)
+    on update restrict
+    on delete restrict,
+  created_by uuid
+    references auth.users(id)
+    on update restrict
+    on delete set null,
+  created_at timestamptz not null default now(),
+  retired_by uuid
+    references auth.users(id)
+    on update restrict
+    on delete set null,
+  retired_at timestamptz,
+  retired_reason text,
 
-alter table editorial.person_identity_links
-  drop constraint person_identity_links_exactly_one_source_check;
+  constraint person_registry_artist_links_state_check
+    check (
+      link_state in ('active','disputed','superseded','retired')
+    ),
 
-alter table editorial.person_identity_links
-  add constraint person_identity_links_exactly_one_source_check
-  check (
-    num_nonnulls(
-      user_id,
-      retired_user_id_snapshot,
-      registry_author_id,
-      external_contributor_id,
-      registry_artist_id
-    )=1
-  );
+  constraint person_registry_artist_links_reason_check
+    check (
+      btrim(link_reason)<>''
+      and octet_length(link_reason)<=4000
+    ),
 
-alter table editorial.person_identity_links
-  drop constraint person_identity_links_retired_user_snapshot_state_check;
+  constraint person_registry_artist_links_supersedes_check
+    check (
+      supersedes_link_id is null
+      or supersedes_link_id<>id
+    ),
 
-alter table editorial.person_identity_links
-  add constraint person_identity_links_retired_user_snapshot_state_check
-  check (
-    retired_user_id_snapshot is null
-    or (
-      user_id is null
-      and registry_author_id is null
-      and external_contributor_id is null
-      and registry_artist_id is null
-      and link_state in ('retired','superseded')
+  constraint person_registry_artist_links_superseded_by_check
+    check (
+      superseded_by_link_id is null
+      or superseded_by_link_id<>id
+    ),
+
+  constraint person_registry_artist_links_retirement_check
+    check (
+      (
+        link_state in ('active','disputed')
+        and retired_at is null
+        and retired_reason is null
+      )
+      or
+      (
+        link_state in ('superseded','retired')
+        and retired_at is not null
+        and retired_reason is not null
+        and btrim(retired_reason)<>''
+        and octet_length(retired_reason)<=4000
+      )
     )
+);
+
+comment on table editorial.person_registry_artist_links is
+  'Governed Person-to-Registry-Artist persona bridge. It is separate from Person source-identity links and never inferred from matching names.';
+
+create unique index person_registry_artist_links_active_artist_unique
+  on editorial.person_registry_artist_links(registry_artist_id)
+  where link_state='active';
+
+create index person_registry_artist_links_person_idx
+  on editorial.person_registry_artist_links(
+    person_resource_id,
+    link_state,
+    created_at desc
   );
 
-create unique index person_identity_links_active_registry_artist_unique
-  on editorial.person_identity_links(registry_artist_id)
-  where link_state='active'
-    and registry_artist_id is not null;
+create index person_registry_artist_links_evidence_idx
+  on editorial.person_registry_artist_links(evidence_assertion_id);
 
-create index person_identity_links_person_registry_artist_idx
-  on editorial.person_identity_links(person_resource_id,registry_artist_id,created_at)
-  where registry_artist_id is not null;
+revoke all on table editorial.person_registry_artist_links
+from public,anon,authenticated,service_role;
 
-create or replace function editorial.protect_person_identity_link_target()
+create function editorial.transfer_person_registry_artist_links_on_merge_v1()
 returns trigger
 language plpgsql
-set search_path=pg_catalog
+security definer
+set search_path=pg_catalog,public,editorial
 as $$
+declare
+  v_link editorial.person_registry_artist_links%rowtype;
+  v_new_link_id uuid;
+  v_event_id uuid;
 begin
-  if new.person_resource_id is distinct from old.person_resource_id
-     or new.person_resource_kind is distinct from old.person_resource_kind
-     or new.user_id is distinct from old.user_id
-     or new.retired_user_id_snapshot is distinct from old.retired_user_id_snapshot
-     or new.registry_author_id is distinct from old.registry_author_id
-     or new.external_contributor_id is distinct from old.external_contributor_id
-     or new.registry_artist_id is distinct from old.registry_artist_id
+  if old.person_state='active'
+     and new.person_state='merged'
+     and new.merged_into_person_resource_id is not null
   then
-    if old.user_id is not null
-       and new.user_id is null
-       and old.retired_user_id_snapshot is null
-       and new.retired_user_id_snapshot=old.user_id
-       and new.person_resource_id=old.person_resource_id
-       and new.person_resource_kind=old.person_resource_kind
-       and new.registry_author_id is not distinct from old.registry_author_id
-       and new.external_contributor_id is not distinct from old.external_contributor_id
-       and new.registry_artist_id is not distinct from old.registry_artist_id
-       and old.link_state in ('retired','superseded')
-       and new.link_state=old.link_state
-    then
-      return new;
-    end if;
+    for v_link in
+      select link.*
+      from editorial.person_registry_artist_links link
+      where link.person_resource_id=new.resource_id
+        and link.link_state='active'
+      order by link.id
+      for update
+    loop
+      v_new_link_id:=gen_random_uuid();
 
-    raise exception 'Person identity links cannot be retargeted.';
+      update editorial.person_registry_artist_links link
+      set
+        link_state='superseded',
+        superseded_by_link_id=v_new_link_id,
+        retired_by=new.updated_by,
+        retired_at=now(),
+        retired_reason='Transferred through governed Person merge.'
+      where link.id=v_link.id;
+
+      insert into editorial.person_registry_artist_links (
+        id,
+        person_resource_id,
+        registry_artist_id,
+        evidence_assertion_id,
+        link_state,
+        link_reason,
+        supersedes_link_id,
+        created_by
+      )
+      values (
+        v_new_link_id,
+        new.merged_into_person_resource_id,
+        v_link.registry_artist_id,
+        v_link.evidence_assertion_id,
+        'active',
+        'Transferred through governed Person merge. '||v_link.link_reason,
+        v_link.id,
+        new.updated_by
+      );
+
+      insert into public.registry_canonical_write_events (
+        registry_entity_type,
+        registry_entity_id,
+        source_suggestion_id,
+        source_table,
+        field_name,
+        target_path,
+        before_value,
+        after_value,
+        action,
+        status,
+        actor
+      )
+      values (
+        'artist',
+        v_link.registry_artist_id::text,
+        v_link.evidence_assertion_id::text,
+        'platform_private.registry_evidence_assertions',
+        'person_identity',
+        'editorial.person_registry_artist_links',
+        jsonb_build_object(
+          'identity_link_id',v_link.id,
+          'person_resource_id',new.resource_id
+        ),
+        jsonb_build_object(
+          'identity_link_id',v_new_link_id,
+          'person_resource_id',new.merged_into_person_resource_id
+        ),
+        'transfer_person_registry_artist_on_merge',
+        'succeeded',
+        case
+          when new.updated_by is null then 'system:person_merge'
+          else 'user:'||new.updated_by::text
+        end
+      )
+      returning id into v_event_id;
+    end loop;
   end if;
 
   return new;
 end
 $$;
 
-drop trigger person_identity_links_protect_target
-on editorial.person_identity_links;
-
-create trigger person_identity_links_protect_target
-before update of
-  person_resource_id,
-  person_resource_kind,
-  user_id,
-  retired_user_id_snapshot,
-  registry_author_id,
-  external_contributor_id,
-  registry_artist_id
-on editorial.person_identity_links
+create trigger person_registry_artist_links_person_merge_transfer
+after update of person_state,merged_into_person_resource_id
+on editorial.people
 for each row
-execute function editorial.protect_person_identity_link_target();
+execute function editorial.transfer_person_registry_artist_links_on_merge_v1();
+
+revoke all on function
+  editorial.transfer_person_registry_artist_links_on_merge_v1()
+from public,anon,authenticated,service_role;
 
 create function public.admin_link_person_registry_artist_v1(
   p_person_resource_id uuid,
@@ -746,10 +845,9 @@ declare
   v_person editorial.people%rowtype;
   v_artist public.registry_artists%rowtype;
   v_evidence platform_private.registry_evidence_assertions%rowtype;
-  v_existing editorial.person_identity_links%rowtype;
-  v_link_id uuid;
+  v_existing editorial.person_registry_artist_links%rowtype;
+  v_link editorial.person_registry_artist_links%rowtype;
   v_event_id uuid;
-  v_prior_revision bigint;
 begin
   if v_actor is null
      or not coalesce(public.current_user_has_capability('manage_registry'),false)
@@ -824,7 +922,7 @@ begin
 
   select link.*
   into v_existing
-  from editorial.person_identity_links link
+  from editorial.person_registry_artist_links link
   where link.registry_artist_id=p_registry_artist_id
     and link.link_state='active';
 
@@ -838,61 +936,27 @@ begin
       'person_resource_id',p_person_resource_id,
       'registry_artist_id',p_registry_artist_id,
       'identity_link_id',v_existing.id,
-      'identity_revision',v_person.identity_revision,
       'changed',false
     );
   end if;
 
-  v_link_id:=gen_random_uuid();
-  v_prior_revision:=v_person.identity_revision;
-
-  insert into editorial.person_identity_links (
-    id,
+  insert into editorial.person_registry_artist_links (
     person_resource_id,
-    person_resource_kind,
     registry_artist_id,
+    evidence_assertion_id,
     link_state,
-    link_method,
     link_reason,
     created_by
   )
   values (
-    v_link_id,
     p_person_resource_id,
-    'person',
     p_registry_artist_id,
+    p_evidence_assertion_id,
     'active',
-    'admin_reconciliation',
     btrim(p_reason),
     v_actor
-  );
-
-  update editorial.people person
-  set
-    identity_revision=person.identity_revision+1,
-    updated_by=v_actor,
-    updated_at=now()
-  where person.resource_id=p_person_resource_id
-  returning person.* into v_person;
-
-  insert into editorial.person_identity_events (
-    person_resource_id,
-    actor_id,
-    event_type,
-    identity_link_id,
-    prior_identity_revision,
-    resulting_identity_revision,
-    reason
   )
-  values (
-    p_person_resource_id,
-    v_actor,
-    'identity_linked',
-    v_link_id,
-    v_prior_revision,
-    v_person.identity_revision,
-    btrim(p_reason)
-  );
+  returning * into v_link;
 
   insert into public.registry_canonical_write_events (
     registry_entity_type,
@@ -913,10 +977,10 @@ begin
     p_evidence_assertion_id::text,
     'platform_private.registry_evidence_assertions',
     'person_identity',
-    'editorial.person_identity_links',
+    'editorial.person_registry_artist_links',
     null,
     jsonb_build_object(
-      'identity_link_id',v_link_id,
+      'identity_link_id',v_link.id,
       'person_resource_id',p_person_resource_id
     ),
     'link_person_registry_artist',
@@ -928,8 +992,7 @@ begin
   return jsonb_build_object(
     'person_resource_id',p_person_resource_id,
     'registry_artist_id',p_registry_artist_id,
-    'identity_link_id',v_link_id,
-    'identity_revision',v_person.identity_revision,
+    'identity_link_id',v_link.id,
     'evidence_assertion_id',p_evidence_assertion_id,
     'canonical_write_event_id',v_event_id,
     'changed',true
@@ -1324,15 +1387,35 @@ begin
       'Provenance Slice 1 reviewed identity RPC leaked execution authority.';
   end if;
 
+  if has_table_privilege(
+       'anon',
+       'editorial.person_registry_artist_links',
+       'SELECT,INSERT,UPDATE,DELETE'
+     )
+     or has_table_privilege(
+       'authenticated',
+       'editorial.person_registry_artist_links',
+       'SELECT,INSERT,UPDATE,DELETE'
+     )
+     or has_table_privilege(
+       'service_role',
+       'editorial.person_registry_artist_links',
+       'SELECT,INSERT,UPDATE,DELETE'
+     )
+  then
+    raise exception
+      'Person-to-Registry-Artist bridge leaked ambient table authority.';
+  end if;
+
   if position(
-       'registry_artist_id'
+       'person_registry_artist_links'
        in pg_get_functiondef(
          'editorial.resolve_person_presentation(uuid)'::regprocedure
        )
      )<>0
   then
     raise exception
-      'Registry Artist identity was incorrectly turned into automatic Person presentation authority.';
+      'Registry Artist bridge was incorrectly turned into automatic Person presentation authority.';
   end if;
 
   if exists (

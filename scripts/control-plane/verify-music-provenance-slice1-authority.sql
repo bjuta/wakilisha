@@ -14,43 +14,57 @@ begin
     raise exception 'Music provenance Slice 1 typed attestation/membership authority is incomplete';
   end if;
 
-  if not exists (
-    select 1
-    from information_schema.columns
-    where table_schema='editorial'
-      and table_name='person_identity_links'
-      and column_name='registry_artist_id'
-  ) then
-    raise exception 'Person identity links do not include Registry Artist identity';
-  end if;
-
-  select pg_get_constraintdef(oid)
-  into v_constraint
-  from pg_constraint
-  where conrelid='editorial.person_identity_links'::regclass
-    and conname='person_identity_links_exactly_one_source_check';
-
-  if v_constraint is null
-     or position('registry_artist_id' in v_constraint)=0
-     or position('num_nonnulls' in lower(v_constraint))=0
-  then
-    raise exception 'Person identity exactly-one-source authority did not absorb Registry Artist';
+  if to_regclass('editorial.person_registry_artist_links') is null then
+    raise exception 'Person-to-Registry-Artist bridge is missing';
   end if;
 
   if to_regclass(
-       'editorial.person_identity_links_active_registry_artist_unique'
+       'editorial.person_registry_artist_links_active_artist_unique'
      ) is null
   then
     raise exception 'Active Registry Artist to Person uniqueness is missing';
   end if;
 
+  if has_table_privilege(
+       'anon',
+       'editorial.person_registry_artist_links',
+       'SELECT,INSERT,UPDATE,DELETE'
+     )
+     or has_table_privilege(
+       'authenticated',
+       'editorial.person_registry_artist_links',
+       'SELECT,INSERT,UPDATE,DELETE'
+     )
+     or has_table_privilege(
+       'service_role',
+       'editorial.person_registry_artist_links',
+       'SELECT,INSERT,UPDATE,DELETE'
+     )
+  then
+    raise exception 'Person-to-Registry-Artist bridge leaked ambient table authority';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_trigger
+    where tgrelid='editorial.people'::regclass
+      and tgname='person_registry_artist_links_person_merge_transfer'
+      and not tgisinternal
+  )
+     or to_regprocedure(
+          'editorial.transfer_person_registry_artist_links_on_merge_v1()'
+        ) is null
+  then
+    raise exception 'Person merge does not preserve Registry Artist bridge history';
+  end if;
+
   select pg_get_functiondef(
-    'editorial.protect_person_identity_link_target()'::regprocedure
+    'public.merge_people(uuid,uuid,bigint,bigint,text,text,uuid)'::regprocedure
   )
   into v_definition;
 
-  if position('registry_artist_id' in v_definition)=0 then
-    raise exception 'Person identity retarget protection omitted Registry Artist';
+  if position('person_registry_artist_links' in v_definition)<>0 then
+    raise exception 'Existing Person merge primitive was rewritten instead of composed';
   end if;
 
   select pg_get_functiondef(
@@ -58,8 +72,8 @@ begin
   )
   into v_definition;
 
-  if position('registry_artist_id' in v_definition)<>0 then
-    raise exception 'Registry Artist identity became automatic Person presentation authority';
+  if position('person_registry_artist_links' in v_definition)<>0 then
+    raise exception 'Registry Artist bridge became automatic Person presentation authority';
   end if;
 
   if not exists (
