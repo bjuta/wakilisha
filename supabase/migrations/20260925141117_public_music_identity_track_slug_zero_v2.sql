@@ -1094,12 +1094,31 @@ begin
       'STOP: MIZIZI authority is not zero at rest.';
   end if;
 
-  -- Historical clean-replay boundary:
-  -- the exact 34-row Track-slug zero candidate manifest was Production
-  -- execution authority, not schema-installation authority. It remains frozen
-  -- in the reviewed Production control plane and permanent verifier. A fresh
-  -- data-less replay must be able to install the same V2 runtime with zero
-  -- business rows present.
+  if (
+    select count(*)
+    from public.registry_review_items review
+    join public.registry_tracks track
+      on track.id::text=review.source_id
+     and track.status='active'
+    where review.status='open'
+      and review.review_type='mizizi_data_hygiene'
+      and review.entity_type='track'
+      and review.source_payload->>'ruleId'=
+          'track_slug_identity_noise'
+      and (
+        review.source_payload->'evidence'->>'collision'
+          like
+          'candidate_slug_collides_with_current_community_thread:%'
+        or
+        review.source_payload->'evidence'->>'collision'
+          like
+          'current_community_thread_ownership_ambiguous:%'
+      )
+  )<>34
+  then
+    raise exception
+      'STOP: Track-slug zero candidate count drifted from 34.';
+  end if;
 end
 $preflight$;
 

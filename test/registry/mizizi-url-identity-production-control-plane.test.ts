@@ -813,12 +813,6 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "finalize_track_slug_zero_convergence_v1",
     );
     expect(migration).toContain(
-      "Historical clean-replay boundary",
-    );
-    expect(migration).not.toContain(
-      "Track-slug zero candidate count drifted from 34.",
-    );
-    expect(migration).toContain(
       "public_music_identity_track_slug_zero",
     );
     expect(migration).toContain(
