@@ -27,6 +27,25 @@ const slice2Verifier = read(
   "scripts/control-plane/verify-music-identity-rights-slice2-authority.sql",
 );
 
+const slice2ParticipationMigration = read(
+  "supabase/migrations/20260929194020_music_provenance_slice2_creator_public_authority_v1.sql",
+);
+const creditsPage = read(
+  "src/pages/credits/page.tsx",
+);
+const creditInvitePage = read(
+  "src/pages/credits/invite/page.tsx",
+);
+const claimComposer = read(
+  "src/components/music/ClaimComposer.tsx",
+);
+const musicProvenanceService = read(
+  "src/services/musicProvenance.ts",
+);
+const notificationsPage = read(
+  "src/pages/notifications/page.tsx",
+);
+
 function between(
   source: string,
   startMarker: string,
@@ -364,6 +383,227 @@ describe("Music provenance Slice 1 authority", () => {
     );
     expect(verifier).toContain(
       "MUSIC_PROVENANCE_SLICE1_AUTHORITY_V1_PASS",
+    );
+  });
+});
+
+
+describe("Music provenance Slice 2 participation and public product", () => {
+  it("keeps invitation context private, append-only, token-hashed, and inviter-mediated", () => {
+    expect(slice2ParticipationMigration).toContain(
+      "create table platform_private.registry_contribution_invitations",
+    );
+    expect(slice2ParticipationMigration).toContain(
+      "create table platform_private.registry_contribution_invitation_events",
+    );
+    expect(slice2ParticipationMigration).toContain(
+      "registry_contribution_invitations_append_only",
+    );
+    expect(slice2ParticipationMigration).toContain(
+      "registry_contribution_invitation_events_append_only",
+    );
+    expect(slice2ParticipationMigration).toContain(
+      "token_hash text not null unique",
+    );
+    expect(slice2ParticipationMigration).toContain(
+      "extensions.gen_random_bytes(32)",
+    );
+    expect(slice2ParticipationMigration).not.toContain(
+      "raw_token",
+    );
+    expect(slice2ParticipationMigration).toContain(
+      "inviter_share_only",
+    );
+  });
+
+  it("uses Notifications for an existing WAKILISHA invitee and never adds a cold outreach sender", () => {
+    expect(slice2ParticipationMigration).toContain(
+      "'credit_confirmation_request'",
+    );
+    expect(slice2ParticipationMigration).toContain(
+      "'credit_confirmation_response'",
+    );
+    expect(slice2ParticipationMigration).toContain(
+      "messaging.active_user_for_person",
+    );
+    expect(slice2ParticipationMigration).toContain(
+      "insert into public.community_notifications",
+    );
+    for (const coldRoad of [
+      "send_email",
+      "send_sms",
+      "resend",
+      "twilio",
+      "net.http_post",
+      "http_post(",
+    ]) {
+      expect(slice2ParticipationMigration.toLowerCase()).not.toContain(
+        coldRoad,
+      );
+    }
+    expect(notificationsPage).toContain(
+      "credit_confirmation_request",
+    );
+    expect(notificationsPage).toContain(
+      "credit_confirmation_response",
+    );
+    expect(notificationsPage).toContain(
+      'notification.entityType === "music_credit_invite"',
+    );
+  });
+
+  it("makes creator attestation open-response-first and keeps canonical contribution admission separate", () => {
+    const creatorCommand = between(
+      slice2ParticipationMigration,
+      "create function public.create_my_music_credit_attestation_v1(",
+      "end\n$$;",
+    );
+
+    expect(creatorCommand).toContain(
+      "'open_response','self_claim','suggested_confirmation'",
+    );
+    expect(creatorCommand).toContain(
+      "p_candidate_shown_payload is null",
+    );
+    expect(creatorCommand).toContain(
+      "v_person_id:=v_actor.person_resource_id",
+    );
+    expect(creatorCommand).toContain(
+      "v_credited_as",
+    );
+    expect(creatorCommand).not.toContain(
+      "insert into public.registry_track_contributions",
+    );
+    expect(creatorCommand).not.toContain(
+      "insert into public.registry_work_contributions",
+    );
+    expect(claimComposer).toContain("Open response first");
+    expect(claimComposer).toContain("Not on WAKILISHA yet");
+    expect(claimComposer).toContain("WAKILISHA will not contact them automatically");
+  });
+
+  it("binds counterparty confirmation to the exact parent candidate and preserves disputes", () => {
+    const responseCommand = between(
+      slice2ParticipationMigration,
+      "create function public.respond_music_credit_invitation_v1(",
+      "end\n$$;",
+    );
+
+    expect(responseCommand).toContain(
+      "'counterparty_confirmation'",
+    );
+    expect(responseCommand).toContain(
+      "'parent_attestation_id',v_parent.id",
+    );
+    expect(responseCommand).toContain(
+      "'credited_as',v_parent.credited_as",
+    );
+    expect(responseCommand).toContain(
+      "'role_key',v_parent.role_key",
+    );
+    expect(responseCommand).toContain(
+      "'candidate_shown_payload'",
+    );
+    expect(responseCommand).toContain(
+      "then 'confirmed'",
+    );
+    expect(responseCommand).toContain(
+      "then 'disputed'",
+    );
+  });
+
+  it("keeps sharing permission versioned and independent from historical fact", () => {
+    const permissionCommand = between(
+      slice2ParticipationMigration,
+      "create function public.set_my_music_credit_permission_v1(",
+      "end\n$$;",
+    );
+    const transitionCommand = between(
+      slice2ParticipationMigration,
+      "create function public.transition_my_music_credit_attestation_v1(",
+      "end\n$$;",
+    );
+
+    expect(permissionCommand).toContain(
+      "registry_contribution_attestation_permission_versions",
+    );
+    expect(permissionCommand).toContain(
+      "supersedes_permission_id",
+    );
+    expect(permissionCommand).toContain(
+      "music_provenance_creator_sharing",
+    );
+    expect(transitionCommand).toContain(
+      "'withdraw'",
+    );
+    expect(transitionCommand).not.toContain(
+      "delete from platform_private.registry_contribution_attestations",
+    );
+  });
+
+  it("publishes only verified canonical contribution authority, never pending attestations", () => {
+    const trackPublic = between(
+      slice2ParticipationMigration,
+      "create function public.get_public_track_provenance_v1(",
+      "end\n$$;",
+    );
+    const personPublic = between(
+      slice2ParticipationMigration,
+      "create function public.get_public_person_music_credits_v1(",
+      "end\n$$;",
+    );
+    const artistPublic = between(
+      slice2ParticipationMigration,
+      "create function public.get_public_artist_music_provenance_v1(",
+      "end\n$$;",
+    );
+
+    for (const publicRead of [trackPublic, personPublic, artistPublic]) {
+      expect(publicRead).toContain("'verified'");
+      expect(publicRead).not.toContain(
+        "platform_private.registry_contribution_attestations",
+      );
+    }
+
+    expect(trackPublic).toContain(
+      "public.registry_track_contributions",
+    );
+    expect(trackPublic).toContain(
+      "public.registry_work_contributions",
+    );
+    expect(trackPublic).toContain(
+      "public.registry_track_work_links",
+    );
+    expect(personPublic).toContain(
+      "resource.visibility='public'",
+    );
+    expect(artistPublic).toContain(
+      "public.registry_artist_person_memberships",
+    );
+  });
+
+  it("provides the complete creator workspace and invite landing without exposing generated schema debt", () => {
+    expect(slice2ParticipationMigration).toContain(
+      "create function public.get_my_music_credits_v1()",
+    );
+    for (const section of [
+      "needsYou",
+      "yourWork",
+      "activity",
+      "sharingPermissions",
+    ]) {
+      expect(slice2ParticipationMigration).toContain(section);
+      expect(creditsPage).toContain(section);
+    }
+    expect(creditInvitePage).toContain("Credit confirmation");
+    expect(creditInvitePage).toContain("Confirm");
+    expect(creditInvitePage).toContain("Dispute");
+    expect(creditInvitePage).toContain("Decline");
+    expect(musicProvenanceService).toContain(
+      "temporary typed",
+    );
+    expect(musicProvenanceService).not.toContain(
+      "database.types.ts",
     );
   });
 });

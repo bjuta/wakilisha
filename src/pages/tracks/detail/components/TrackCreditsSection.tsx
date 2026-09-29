@@ -145,6 +145,7 @@ export default function TrackCreditsSection({
         onClose={() => setReceiptOpen(false)}
         title="How we know this"
         side="bottom"
+        bodyClassName="pb-[calc(6rem+env(safe-area-inset-bottom))]"
       >
         <div className="space-y-4">
           <p className="text-[14px] font-semibold leading-6 text-[var(--wk-text)]">

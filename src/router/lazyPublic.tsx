@@ -181,6 +181,14 @@ export const NotificationsPage = lazy(
   () => import("../pages/notifications/page"),
 );
 
+export const CreditsPage = lazy(
+  () => import("../pages/credits/page"),
+);
+
+export const CreditInvitePage = lazy(
+  () => import("../pages/credits/invite/page"),
+);
+
 export const MessagesPage = lazy(
   () => import("../pages/messages/page"),
 );
