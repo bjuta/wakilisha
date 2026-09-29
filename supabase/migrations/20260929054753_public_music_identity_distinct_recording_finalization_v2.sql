@@ -246,8 +246,7 @@ begin
         nullif(
           btrim(
             coalesce(
-              v_decision.after_payload->
-                >'evidenceRecordingIdentityReviewId',
+              v_decision.after_payload->>'evidenceRecordingIdentityReviewId',
               ''
             )
           ),
