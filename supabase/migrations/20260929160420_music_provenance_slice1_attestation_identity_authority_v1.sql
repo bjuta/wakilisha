@@ -703,9 +703,9 @@ create table editorial.person_registry_artist_links (
 comment on table editorial.person_registry_artist_links is
   'Governed Person-to-Registry-Artist persona bridge. It is separate from Person source-identity links and never inferred from matching names.';
 
-create unique index person_registry_artist_links_active_artist_unique
+create unique index person_registry_artist_links_current_artist_unique
   on editorial.person_registry_artist_links(registry_artist_id)
-  where link_state='active';
+  where link_state in ('active','disputed');
 
 create index person_registry_artist_links_person_idx
   on editorial.person_registry_artist_links(
@@ -770,7 +770,7 @@ begin
         v_link.registry_artist_id,
         v_link.evidence_assertion_id,
         'active',
-        'Transferred through governed Person merge. '||v_link.link_reason,
+        'Transferred through governed Person merge.',
         v_link.id,
         new.updated_by
       );
@@ -924,9 +924,14 @@ begin
   into v_existing
   from editorial.person_registry_artist_links link
   where link.registry_artist_id=p_registry_artist_id
-    and link.link_state='active';
+    and link.link_state in ('active','disputed');
 
   if found then
+    if v_existing.link_state='disputed' then
+      raise exception using errcode='23514',
+        message='WK_PERSON_ARTIST_REVIEW_REQUIRED: Registry Artist identity is disputed.';
+    end if;
+
     if v_existing.person_resource_id<>p_person_resource_id then
       raise exception using errcode='23505',
         message='Registry Artist is already linked to another Person.';

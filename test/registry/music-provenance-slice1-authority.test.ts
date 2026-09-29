@@ -112,7 +112,7 @@ describe("Music provenance Slice 1 authority", () => {
       "create table editorial.person_registry_artist_links",
     );
     expect(identityMigration).toContain(
-      "person_registry_artist_links_active_artist_unique",
+      "person_registry_artist_links_current_artist_unique",
     );
     expect(identityMigration).toContain(
       "admin_link_person_registry_artist_v1",

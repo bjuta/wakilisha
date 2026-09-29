@@ -19,7 +19,7 @@ begin
   end if;
 
   if to_regclass(
-       'editorial.person_registry_artist_links_active_artist_unique'
+       'editorial.person_registry_artist_links_current_artist_unique'
      ) is null
   then
     raise exception 'Active Registry Artist to Person uniqueness is missing';
