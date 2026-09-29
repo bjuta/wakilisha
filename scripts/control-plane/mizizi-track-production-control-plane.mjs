@@ -377,6 +377,18 @@ const POST_PRIMARY_FOLLOWUP_BASELINE = {
   reviews:27,
 };
 
+const POST_BATCH_A_BASELINE = {
+  ...POST_APPLY_BASELINE,
+  active_tracks:2091,
+  reviews:12,
+};
+
+const POST_BATCH_B1_BASELINE = {
+  ...POST_APPLY_BASELINE,
+  active_tracks:2091,
+  reviews:5,
+};
+
 function fieldsMatch(actual, expected) {
   return Object.entries(expected).every(
     ([key, value]) => String(actual?.[key]) === String(value),
@@ -427,6 +439,14 @@ function classifyTrackProductionState(state) {
     postApplyDomainFieldsMatch(state, POST_PRIMARY_FOLLOWUP_BASELINE) &&
     postApplyLedgerAccepted(state, POST_PRIMARY_FOLLOWUP_BASELINE)
   ) return 'post_primary_followup';
+  if (
+    postApplyDomainFieldsMatch(state, POST_BATCH_A_BASELINE) &&
+    postApplyLedgerAccepted(state, POST_BATCH_A_BASELINE)
+  ) return 'post_batch_a';
+  if (
+    postApplyDomainFieldsMatch(state, POST_BATCH_B1_BASELINE) &&
+    postApplyLedgerAccepted(state, POST_BATCH_B1_BASELINE)
+  ) return 'post_batch_b1';
   return 'unexpected';
 }
 
@@ -435,11 +455,15 @@ function assertAcceptedPostApply(state) {
   const acceptedHistorical = reviewCount === 66;
   const acceptedTrackZeroResidual = reviewCount === 32;
   const acceptedPrimaryFollowupResidual = reviewCount === 27;
+  const acceptedBatchAResidual = reviewCount === 12;
+  const acceptedBatchB1Residual = reviewCount === 5;
 
   if (
     !acceptedHistorical &&
     !acceptedTrackZeroResidual &&
-    !acceptedPrimaryFollowupResidual
+    !acceptedPrimaryFollowupResidual &&
+    !acceptedBatchAResidual &&
+    !acceptedBatchB1Residual
   ) {
     throw new Error(
       `accepted Track review boundary is not recognized: ${reviewCount}`,
@@ -449,7 +473,10 @@ function assertAcceptedPostApply(state) {
   assertFields(
     state,
     {
-      active_tracks:2101,
+      active_tracks:
+        acceptedBatchAResidual || acceptedBatchB1Residual
+          ? 2091
+          : 2101,
       events:440,
       unique_fingerprints:440,
       event_track_matches:440,
@@ -476,22 +503,32 @@ function assertAcceptedPostApply(state) {
     'impact',
   );
 
-  const expectedClasses = acceptedPrimaryFollowupResidual
+  const expectedClasses = acceptedBatchB1Residual
     ? {
-        track_collision:26,
+        track_collision:4,
         missing_primary:1,
       }
-    : acceptedTrackZeroResidual
+    : acceptedBatchAResidual
       ? {
-          track_collision:26,
-          missing_primary:6,
+          track_collision:11,
+          missing_primary:1,
         }
-      : {
-          thread_collision:28,
-          track_collision:26,
-          missing_primary:6,
-          ambiguous_thread:6,
-        };
+      : acceptedPrimaryFollowupResidual
+        ? {
+            track_collision:26,
+            missing_primary:1,
+          }
+        : acceptedTrackZeroResidual
+          ? {
+              track_collision:26,
+              missing_primary:6,
+            }
+          : {
+              thread_collision:28,
+              track_collision:26,
+              missing_primary:6,
+              ambiguous_thread:6,
+            };
 
   assertFields(
     state.classes,
@@ -613,17 +650,22 @@ function assertAudit(text, before) {
         `track_slug_identity_noise expected 506, found ${identityNoise}`,
       );
     }
-  } else if (![66,32,27].includes(identityNoise)) {
+  } else if (![66,32,27,12].includes(identityNoise)) {
     throw new Error(
       `track_slug_identity_noise is outside accepted post-apply boundaries: ${identityNoise}`,
     );
   }
 
+  const postBatchA = identityNoise === 12;
+  const titleNoise = postBatchA ? 482 : 492;
+  const recordingIdentityConflict = postBatchA ? 71 : 91;
+  const trackCount = postBatchA ? 2091 : 2101;
+
   const rules = [
-    ['track_title_credit_noise',492],
+    ['track_title_credit_noise',titleNoise],
     ['track_slug_identity_mismatch',3],
     ['track_slug_credit_evidence_gap',12],
-    ['track_recording_identity_conflict',91],
+    ['track_recording_identity_conflict',recordingIdentityConflict],
   ];
 
   for (const [rule,count] of rules) {
@@ -636,12 +678,18 @@ function assertAudit(text, before) {
     }
   }
 
-  const expectedFindings = 598 + identityNoise;
+  const expectedFindings =
+    identityNoise +
+    titleNoise +
+    3 +
+    12 +
+    recordingIdentityConflict;
+  const observeOnly = titleNoise + 3;
   const summary = new RegExp(
     `\\u2502\\s*0\\s*\\u2502\\s*${expectedFindings}` +
       `\\s*\\u2502\\s*0\\s*\\u2502\\s*0` +
-      `\\s*\\u2502\\s*495\\s*\\u2502\\s*0` +
-      `\\s*\\u2502\\s*2101\\s*\\u2502`,
+      `\\s*\\u2502\\s*${observeOnly}\\s*\\u2502\\s*0` +
+      `\\s*\\u2502\\s*${trackCount}\\s*\\u2502`,
   );
 
   if (
@@ -796,7 +844,9 @@ async function main() {
       if (
         productionState === 'post_apply' ||
         productionState === 'post_track_zero' ||
-        productionState === 'post_primary_followup'
+        productionState === 'post_primary_followup' ||
+        productionState === 'post_batch_a' ||
+        productionState === 'post_batch_b1'
       ) {
         console.log('PASS: accepted historical Track post-apply baseline detected');
 
@@ -818,7 +868,19 @@ async function main() {
           auditCurrent,
         );
         assertAudit(fs.readFileSync(auditCurrent,'utf8'),false);
-        console.log(`PASS: fresh post-apply audit = ${598 + Number(acceptedState.reviews)} findings / ${acceptedState.reviews} deterministic candidates / 12 credit-evidence reviews / 91 recording-identity reviews / 495 observe-only / 2101 Tracks`);
+        const postBatchAState =
+          Number(acceptedState.active_tracks) === 2091;
+        const auditIdentityNoise =
+          postBatchAState ? 12 : Number(acceptedState.reviews);
+        const auditFindings =
+          postBatchAState ? 580 : 598 + auditIdentityNoise;
+        const auditRecordingConflicts =
+          postBatchAState ? 71 : 91;
+        const auditObserveOnly =
+          postBatchAState ? 485 : 495;
+        console.log(
+          `PASS: fresh post-apply audit = ${auditFindings} findings / ${auditIdentityNoise} deterministic analyzer candidates / 12 credit-evidence reviews / ${auditRecordingConflicts} recording-identity reviews / ${auditObserveOnly} observe-only / ${acceptedState.active_tracks} Tracks`,
+        );
 
         if (MODE === 'review') {
           console.log('\n=== 6. REVIEW-ONLY PRODUCTION AUTHORITY ===');

@@ -58,9 +58,26 @@ begin
      or v_evidence not like '%verifier_status=''passed''%'
      or v_evidence not like '%public_music_identity_credit_correction_required%'
      or v_evidence not like '%public_music_identity_needs_more_research%'
+     or v_evidence not like '%public_music_identity_distinct_recording%'
+     or v_evidence not like '%Distinct-recording finalization preserves canonical identity and accepts no mutation receipt.%'
+     or v_evidence not like '%registry_subject_state_fingerprint%'
+     or v_evidence not like '%evidencePrimaryArtistSlug%'
+     or v_evidence not like '%evidenceFeaturedArtistSlugs%'
+     or v_evidence not like '%evidenceRecordingPeerIds%'
+     or v_evidence not like '%evidenceRecordingIdentityReviewId%'
+     or v_evidence not like '%track_recording_identity_conflict%'
+     or v_evidence not like '%wk_chart_entries_v2%'
+     or v_evidence not like '%chart_entry.track_slug is distinct from v_expected_slug%'
   then
     raise exception
       'Terminal evidence binding drifted';
+  end if;
+
+  if v_evidence !~
+       $gate$if[[:space:]]+v_decision_type[[:space:]]+in[[:space:]]*\([[:space:]]*'public_music_identity_safe_slug_repair'[[:space:]]*,[[:space:]]*'public_music_identity_true_duplicate'[[:space:]]*\)[[:space:]]*then[[:space:]]*if[[:space:]]+p_verified_operation_id[[:space:]]+is[[:space:]]+null[[:space:]]+or[[:space:]]+p_archive_event_id[[:space:]]+is[[:space:]]+not[[:space:]]+null$gate$
+  then
+    raise exception
+      'Distinct-recording finalization regained a fake canonical operation requirement';
   end if;
 
   if v_guard not like

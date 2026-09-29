@@ -1460,10 +1460,13 @@ describe("MIZIZI Cultural Data Steward", () => {
       "accepted Track review boundary is not recognized",
     );
     expect(controlPlane).toContain(
-      "[66,32,27].includes(identityNoise)",
+      "[66,32,27,12].includes(identityNoise)",
     );
     expect(controlPlane).toContain(
-      "598 + identityNoise",
+      "const postBatchA = identityNoise === 12",
+    );
+    expect(controlPlane).toContain(
+      "const trackCount = postBatchA ? 2091 : 2101",
     );
     expect(controlPlane).toContain(
       "accepted historical Track post-apply baseline detected",
@@ -3661,7 +3664,7 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
 
 
 describe("Public Music Identity Track production accepted-state lineage", () => {
-  it("recognizes the post-primary-follow-up 27-review Production boundary", () => {
+  it("recognizes historical and exact post-Batch A / B1 Production boundaries", () => {
     const controlPlane = read(
       "scripts/control-plane/mizizi-track-production-control-plane.mjs",
     );
@@ -3670,19 +3673,34 @@ describe("Public Music Identity Track production accepted-state lineage", () => 
       "const POST_PRIMARY_FOLLOWUP_BASELINE",
     );
     expect(controlPlane).toContain(
-      "reviews:27",
+      "const POST_BATCH_A_BASELINE",
     );
     expect(controlPlane).toContain(
-      "post_primary_followup",
+      "const POST_BATCH_B1_BASELINE",
     );
     expect(controlPlane).toContain(
-      "track_collision:26",
+      "active_tracks:2091",
     );
     expect(controlPlane).toContain(
-      "missing_primary:1",
+      "reviews:12",
     );
     expect(controlPlane).toContain(
-      "[66,32,27]",
+      "reviews:5",
+    );
+    expect(controlPlane).toContain(
+      "post_batch_a",
+    );
+    expect(controlPlane).toContain(
+      "post_batch_b1",
+    );
+    expect(controlPlane).toContain(
+      "track_collision:11",
+    );
+    expect(controlPlane).toContain(
+      "track_collision:4",
+    );
+    expect(controlPlane).toContain(
+      "[66,32,27,12]",
     );
   });
 });
@@ -3695,12 +3713,23 @@ describe("Public Music Identity #1094 verified review finalization", () => {
         "_public_music_identity_track_review_finalization_v1.sql",
       ),
     );
+  const distinctRecordingMigrations =
+    readdirSync("supabase/migrations").filter((name) =>
+      name.endsWith(
+        "_public_music_identity_distinct_recording_finalization_v2.sql",
+      ),
+    );
 
   it("closes only workflow/derived-pointer state after exact verified canonical evidence", () => {
     expect(migrations).toHaveLength(1);
+    expect(distinctRecordingMigrations).toHaveLength(1);
 
     const migration = read(
       "supabase/migrations/" + migrations[0],
+    );
+    const distinctRecordingMigration = read(
+      "supabase/migrations/" +
+        distinctRecordingMigrations[0],
     );
     const verifier = read(
       "scripts/control-plane/verify-public-music-identity-track-review-finalization-v1.sql",
@@ -3767,8 +3796,66 @@ describe("Public Music Identity #1094 verified review finalization", () => {
       "Duplicate finalization has ambiguous Community thread ownership",
     );
 
+    expect(distinctRecordingMigration).toContain(
+      "create or replace function\nplatform_private.public_music_identity_track_review_terminal_evidence_v1",
+    );
+    expect(distinctRecordingMigration).toContain(
+      "Distinct-recording finalization preserves canonical identity and accepts no mutation receipt.",
+    );
+    expect(distinctRecordingMigration).toContain(
+      "registry_subject_state_fingerprint",
+    );
+    expect(distinctRecordingMigration).toContain(
+      "evidencePrimaryArtistSlug",
+    );
+    expect(distinctRecordingMigration).toContain(
+      "evidenceFeaturedArtistSlugs",
+    );
+    expect(distinctRecordingMigration).toContain(
+      "evidenceRecordingPeerIds",
+    );
+    expect(distinctRecordingMigration).toContain(
+      "evidenceRecordingIdentityReviewId",
+    );
+    expect(distinctRecordingMigration).toContain(
+      "track_recording_identity_conflict",
+    );
+    expect(distinctRecordingMigration).toContain(
+      "wk_chart_entries_v2",
+    );
+    expect(distinctRecordingMigration).toContain(
+      "chart_entry.track_slug is distinct from v_expected_slug",
+    );
+    expect(distinctRecordingMigration).not.toContain(
+      "insert into platform_private.registry_operation_types",
+    );
+    expect(distinctRecordingMigration).not.toContain(
+      "issue_stewardship_execution_grant",
+    );
+    expect(distinctRecordingMigration).not.toContain(
+      "execute_stewardship_operation",
+    );
+    expect(distinctRecordingMigration).not.toMatch(
+      /update\s+public\.registry_tracks/i,
+    );
+    expect(distinctRecordingMigration).not.toMatch(
+      /update\s+public\.registry_track_artists/i,
+    );
+    expect(distinctRecordingMigration).not.toMatch(
+      /update\s+public\.registry_release_tracks/i,
+    );
+    expect(distinctRecordingMigration).not.toMatch(
+      /update\s+public\.wk_chart_entries_v2/i,
+    );
+    expect(distinctRecordingMigration).not.toContain(
+      "wk_slug_redirects",
+    );
+
     expect(verifier).toContain(
       "PUBLIC_MUSIC_IDENTITY_TRACK_REVIEW_FINALIZATION_V1_PASS",
+    );
+    expect(verifier).toContain(
+      "Distinct-recording finalization regained a fake canonical operation requirement",
     );
     expect(verifier).toContain(
       "Finalizer gained canonical Registry/Chart/redirect mutation authority",
