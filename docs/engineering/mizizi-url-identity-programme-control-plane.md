@@ -755,3 +755,45 @@ Closure requires:
 The existing redirect table remains historical evidence only. This tranche
 must not insert, update, delete, resolve through, or resurrect redirect
 authority.
+
+
+## Forward amendment — multi-MainArtist Track route authority
+
+**Decision date: 29 September 2026.**
+
+The earlier Public Music Identity language that describes one
+`primaryArtistSlug` for every Track is not a valid general Registry invariant.
+ERN-compatible Track artist authority may contain more than one legitimate
+MainArtist.
+
+The forward Track routing contract is now:
+
+```
+(MainArtist UUID, semanticTrackSlug) -> exactly one Registry Track UUID
+```
+
+One Track UUID may therefore own multiple Artist-scoped route bindings when
+authoritative evidence establishes multiple MainArtists. Exactly one binding is
+canonical, selected from authoritative MainArtist display sequence; additional
+MainArtist bindings are valid presentation routes to the same Track UUID, not
+redirects and not duplicate Track identities.
+
+Artist-profile membership is derived from authoritative Track↔Artist role data,
+never from the URL namespace. MainArtists may receive primary-discography
+presentation; FeaturedArtists may receive featured/appearance presentation but
+do not earn MainArtist route bindings solely from that role.
+
+Collaborator-credit contamination in a Track slug is also independent of credit
+repair. A dirty slug such as `summer-feat-bensoul` is not made canonical merely
+because structured credits are incomplete or contradictory. Credit uncertainty
+may block automatic role mutation; it does not block recognition of dirty public
+identity.
+
+The complete normative contract, collision behavior, proposed route-binding
+authority, writer requirements and acceptance gates are recorded in:
+
+`docs/engineering/public-music-identity-multi-main-artist-route-binding-authority.md`
+
+This is a forward amendment. Historical Production acceptance records above
+remain evidence of the state and assumptions under which they were accepted and
+must not be rewritten.
