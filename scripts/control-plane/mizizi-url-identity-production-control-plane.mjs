@@ -154,9 +154,9 @@ const EXPECTED_BLOBS = {
   "supabase/migrations/20260925082706_public_music_identity_slice3_release_single_alignment_v1.sql":
     "bb2a936a8082a506d9b6e1ba94236c2b0aad446b",
   "supabase/migrations/20260925141117_public_music_identity_track_slug_zero_v2.sql":
-    "3686a83f65c7ac92de5e7d89c5ed906427c00a2c",
+    "285697c98741a2395262e7447de51dac0fa47f2c",
   "supabase/migrations/20260925213519_public_music_identity_track_slug_primary_followup_v1.sql":
-    "3fba2832b2a49a93cbf990954bc2da8c56ae3d0a",
+    "7569d93e68da9f2b28df88e43f64fe471fa1b848",
 };
 
 const APPLY_SCOPES = {

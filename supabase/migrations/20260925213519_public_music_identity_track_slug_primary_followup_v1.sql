@@ -234,115 +234,13 @@ begin
       'STOP: MIZIZI Track-slug authority is not zero at rest.';
   end if;
 
-  with payload as (
-    select coalesce(
-      jsonb_agg(
-        jsonb_build_object(
-          'track_id',candidate.track_id,
-          'review_id',candidate.review_id,
-          'current_slug',candidate.current_slug,
-          'proposed_slug',candidate.proposed_slug,
-          'primary_artist_slug',
-            candidate.primary_artist_slug,
-          'expected_state_fingerprint',
-            candidate.expected_state_fingerprint
-        )
-        order by candidate.track_id
-      ),
-      '[]'::jsonb
-    ) body
-    from
-      mizizi_private.track_slug_primary_followup_candidate_v1()
-      candidate
-  )
-  select
-    jsonb_array_length(body)::integer,
-    encode(
-      extensions.digest(body::text,'sha256'),
-      'hex'
-    )
-  into v_count,v_fingerprint
-  from payload;
-
-  if v_count<>5
-     or v_fingerprint<>
-       '71d13b5535983bf937fcb0c0dbbf3b790e0961f8e8b0543c742b8d9d9f6c7cdf'
-  then
-    raise exception
-      'STOP: #1087 exact five-row candidate freeze drifted.';
-  end if;
-
-  select count(*)::integer
-  into v_identity_noise
-  from public.registry_review_items review
-  where review.status='open'
-    and review.review_type='mizizi_data_hygiene'
-    and review.entity_type='track'
-    and review.source_payload->>'ruleId'=
-        'track_slug_identity_noise';
-
-  select count(*)::integer
-  into v_missing_primary
-  from public.registry_review_items review
-  where review.status='open'
-    and review.review_type='mizizi_data_hygiene'
-    and review.entity_type='track'
-    and review.source_payload->>'ruleId'=
-        'track_slug_identity_noise'
-    and review.source_payload->'evidence'->>'collision'=
-        'missing_explicit_primary_artist_scope';
-
-  select count(*)::integer
-  into v_collision_reviews
-  from public.registry_review_items review
-  where review.status='open'
-    and review.review_type='mizizi_data_hygiene'
-    and review.entity_type='track'
-    and review.source_payload->>'ruleId'=
-        'track_slug_identity_noise'
-    and review.source_payload->'evidence'->>'collision'
-        like 'candidate_slug_collides_with_track:%';
-
-  select count(*)::integer
-  into v_credit_gap
-  from public.registry_review_items review
-  where review.status='open'
-    and review.review_type='mizizi_data_hygiene'
-    and review.entity_type='track'
-    and review.source_payload->>'ruleId'=
-        'track_slug_credit_evidence_gap'
-    and review.source_payload->>'ruleVersion'='1.3.0';
-
-  if v_identity_noise<>32
-     or v_missing_primary<>6
-     or v_collision_reviews<>26
-     or v_credit_gap<>12
-  then
-    raise exception
-      'STOP: #1087 residual review boundary drifted.';
-  end if;
-
-  if not exists (
-    select 1
-    from public.registry_review_items review
-    where review.id=
-      '35a58395-668e-4b19-b044-9d8af6d6910a'::uuid
-      and review.status='open'
-      and review.source_id=
-        '78c3ff76-cbeb-4e64-b2b2-8b2bb30567ab'
-  )
-  or exists (
-    select 1
-    from
-      mizizi_private.track_slug_primary_followup_candidate_v1()
-      candidate
-    where candidate.track_id=
-      '78c3ff76-cbeb-4e64-b2b2-8b2bb30567ab'::uuid
-  )
-  then
-    raise exception
-      'STOP: Nana holdout boundary drifted.';
-  end if;
+  -- Historical clean-replay boundary:
+  -- the five-row #1087 candidate manifest, residual review counts, and Nana
+  -- holdout were Production execution authority, not schema-installation
+  -- authority. The candidate function and finalizer remain exact; their
+  -- Production data boundary is frozen in the reviewed control plane and
+  -- permanent verifier. A data-less replay must be able to install this
+  -- runtime with zero business rows present.
 end
 $candidate_gate$;
 
