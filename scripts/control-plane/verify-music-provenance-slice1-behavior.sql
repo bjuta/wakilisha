@@ -127,8 +127,8 @@ begin
     'active',
     '{"fixture":"music_provenance_slice1"}'::jsonb,
     false,
-    'provenance-slice1-'||left(replace(v_admin::text,'-',''),12),
-    'provenance-slice1-'||left(replace(v_admin::text,'-',''),12)
+    'provenance'||left(replace(v_admin::text,'-',''),12),
+    'provenance'||left(replace(v_admin::text,'-',''),12)
   )
   on conflict (user_id)
   do update
