@@ -291,6 +291,7 @@ as $$
 declare
   v_user_id uuid;
   v_capability text;
+  v_expected_subject_type text;
   v_plan_fingerprint text;
   v_target_set jsonb;
   v_target_fingerprint text;
@@ -313,7 +314,16 @@ begin
     else null
   end;
 
+  v_expected_subject_type:=case p_operation_key
+    when 'registry.work.create' then 'work'
+    when 'registry.track_work_link.admit' then 'track_work_link'
+    when 'registry.track_contribution.admit' then 'track_contribution'
+    when 'registry.work_contribution.admit' then 'work_contribution'
+    else null
+  end;
+
   if v_capability is null
+     or v_expected_subject_type is null
      or p_future_subject_id is null
      or p_plan is null
      or jsonb_typeof(p_plan)<>'object'
@@ -322,12 +332,7 @@ begin
      or p_plan->>'future_subject_id'<>p_future_subject_id::text
      or p_plan->>'policy_ruleset_version'<>
           'music-provenance-slice1-admission-v1'
-     or p_subject_type is distinct from case p_operation_key
-          when 'registry.work.create' then 'work'
-          when 'registry.track_work_link.admit' then 'track_work_link'
-          when 'registry.track_contribution.admit' then 'track_contribution'
-          when 'registry.work_contribution.admit' then 'work_contribution'
-        end
+     or p_subject_type is distinct from v_expected_subject_type
   then
     raise exception using errcode='22023',
       message='Exact typed provenance operation plan is required.';

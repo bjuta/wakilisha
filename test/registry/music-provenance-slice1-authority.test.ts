@@ -209,6 +209,18 @@ describe("Music provenance Slice 1 authority", () => {
     );
   });
 
+  it("keeps grant subject typing PL/pgSQL-safe", () => {
+    expect(admissionMigration).toContain(
+      "v_expected_subject_type:=case p_operation_key",
+    );
+    expect(admissionMigration).toContain(
+      "p_subject_type is distinct from v_expected_subject_type",
+    );
+    expect(admissionMigration).not.toContain(
+      "p_subject_type is distinct from case p_operation_key",
+    );
+  });
+
   it("keeps canonical writes behind human exact grants with zero standing authority", () => {
     expect(admissionMigration).toContain(
       "authority_mode','human_exact_grant'",
