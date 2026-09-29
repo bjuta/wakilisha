@@ -3661,7 +3661,7 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
 
 
 describe("Public Music Identity Track production accepted-state lineage", () => {
-  it("recognizes the post-primary-follow-up 27-review Production boundary", () => {
+  it("recognizes historical and exact post-Batch A / B1 Production boundaries", () => {
     const controlPlane = read(
       "scripts/control-plane/mizizi-track-production-control-plane.mjs",
     );
@@ -3670,19 +3670,34 @@ describe("Public Music Identity Track production accepted-state lineage", () => 
       "const POST_PRIMARY_FOLLOWUP_BASELINE",
     );
     expect(controlPlane).toContain(
-      "reviews:27",
+      "const POST_BATCH_A_BASELINE",
     );
     expect(controlPlane).toContain(
-      "post_primary_followup",
+      "const POST_BATCH_B1_BASELINE",
     );
     expect(controlPlane).toContain(
-      "track_collision:26",
+      "active_tracks:2091",
     );
     expect(controlPlane).toContain(
-      "missing_primary:1",
+      "reviews:12",
     );
     expect(controlPlane).toContain(
-      "[66,32,27]",
+      "reviews:5",
+    );
+    expect(controlPlane).toContain(
+      "post_batch_a",
+    );
+    expect(controlPlane).toContain(
+      "post_batch_b1",
+    );
+    expect(controlPlane).toContain(
+      "track_collision:11",
+    );
+    expect(controlPlane).toContain(
+      "track_collision:4",
+    );
+    expect(controlPlane).toContain(
+      "[66,32,27,12]",
     );
   });
 });
