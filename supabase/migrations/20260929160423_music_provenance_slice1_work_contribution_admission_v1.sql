@@ -1325,14 +1325,40 @@ begin
      or jsonb_typeof(
           coalesce(v_evidence.claim_payload->'metadata','{}'::jsonb)
         )<>'object'
-     or exists (
-       select 1
-       from public.registry_works work
-       where work.id=v_evidence.subject_id
-     )
   then
     raise exception using errcode='42501',
       message='Evidence is not an admissible exact Work-creation candidate.';
+  end if;
+
+  select work.*
+  into v_row
+  from public.registry_works work
+  where work.id=v_evidence.subject_id;
+
+  if found then
+    if v_row.title<>v_evidence.claim_payload->>'title'
+       or v_row.normalized_title<>
+            v_evidence.claim_payload->>'normalized_title'
+       or v_row.metadata<>coalesce(
+            v_evidence.claim_payload->'metadata',
+            '{}'::jsonb
+          )
+    then
+      raise exception using errcode='23505',
+        message='Work UUID already exists with different canonical state.';
+    end if;
+
+    return to_jsonb(v_row)||
+      jsonb_build_object(
+        '_authority',
+        jsonb_build_object(
+          'mode','already_current',
+          'verified',true,
+          'evidence_assertion_id',v_evidence.id,
+          'operation_key','registry.work.create',
+          'operation_version',1
+        )
+      );
   end if;
 
   v_plan:=jsonb_build_object(
@@ -1458,14 +1484,67 @@ begin
        where work.id=v_work_id
          and work.status<>'archived'
      )
-     or exists (
-       select 1
-       from public.registry_track_work_links link
-       where link.id=v_evidence.subject_id
-     )
   then
     raise exception using errcode='23514',
       message='Track-to-Work candidate is invalid or stale.';
+  end if;
+
+  select link.*
+  into v_row
+  from public.registry_track_work_links link
+  where link.id=v_evidence.subject_id;
+
+  if found then
+    if v_row.track_id<>v_track_id
+       or v_row.work_id<>v_work_id
+       or v_row.relationship_kind<>
+            v_evidence.claim_payload->>'relationship_kind'
+    then
+      raise exception using errcode='23505',
+        message='Track-to-Work UUID already exists with different canonical state.';
+    end if;
+
+    return to_jsonb(v_row)||
+      jsonb_build_object(
+        '_authority',
+        jsonb_build_object(
+          'mode','already_current',
+          'verified',v_row.status='verified',
+          'evidence_assertion_id',v_row.evidence_assertion_id,
+          'operation_key','registry.track_work_link.admit',
+          'operation_version',1
+        )
+      );
+  end if;
+
+  select link.*
+  into v_row
+  from public.registry_track_work_links link
+  where link.track_id=v_track_id
+    and link.work_id=v_work_id
+    and link.relationship_kind=
+        v_evidence.claim_payload->>'relationship_kind'
+    and link.status not in ('superseded','rejected')
+  order by link.created_at
+  limit 1;
+
+  if found then
+    if v_row.status='disputed' then
+      raise exception using errcode='23514',
+        message='WK_PROVENANCE_TRACK_WORK_REVIEW_REQUIRED: equivalent relation is disputed.';
+    end if;
+
+    return to_jsonb(v_row)||
+      jsonb_build_object(
+        '_authority',
+        jsonb_build_object(
+          'mode','already_current',
+          'verified',v_row.status='verified',
+          'evidence_assertion_id',v_row.evidence_assertion_id,
+          'operation_key','registry.track_work_link.admit',
+          'operation_version',1
+        )
+      );
   end if;
 
   v_plan:=jsonb_build_object(
@@ -1587,6 +1666,33 @@ begin
   then
     raise exception using errcode='42501',
       message='WK_PROVENANCE_ATTESTATION_REVIEW_REQUIRED: Recording contribution requires corroborated/confirmed reviewed attestation.';
+  end if;
+
+  select contribution.*
+  into v_row
+  from public.registry_track_contributions contribution
+  where contribution.evidence_assertion_id=v_evidence.id
+  order by contribution.created_at desc
+  limit 1;
+
+  if found then
+    if v_row.status='verified' then
+      return to_jsonb(v_row)||
+        jsonb_build_object(
+          '_authority',
+          jsonb_build_object(
+            'mode','already_current',
+            'verified',true,
+            'attestation_id',v_attestation.id,
+            'evidence_assertion_id',v_evidence.id,
+            'operation_key','registry.track_contribution.admit',
+            'operation_version',1
+          )
+        );
+    end if;
+
+    raise exception using errcode='23514',
+      message='WK_PROVENANCE_TRACK_CONTRIBUTION_REVIEW_REQUIRED: attestation already has non-current canonical history; create a new reviewed attestation.';
   end if;
 
   v_plan:=jsonb_build_object(
@@ -1719,6 +1825,33 @@ begin
   then
     raise exception using errcode='42501',
       message='WK_PROVENANCE_ATTESTATION_REVIEW_REQUIRED: Work contribution requires corroborated/confirmed reviewed attestation.';
+  end if;
+
+  select contribution.*
+  into v_row
+  from public.registry_work_contributions contribution
+  where contribution.evidence_assertion_id=v_evidence.id
+  order by contribution.created_at desc
+  limit 1;
+
+  if found then
+    if v_row.status='verified' then
+      return to_jsonb(v_row)||
+        jsonb_build_object(
+          '_authority',
+          jsonb_build_object(
+            'mode','already_current',
+            'verified',true,
+            'attestation_id',v_attestation.id,
+            'evidence_assertion_id',v_evidence.id,
+            'operation_key','registry.work_contribution.admit',
+            'operation_version',1
+          )
+        );
+    end if;
+
+    raise exception using errcode='23514',
+      message='WK_PROVENANCE_WORK_CONTRIBUTION_REVIEW_REQUIRED: attestation already has non-current canonical history; create a new reviewed attestation.';
   end if;
 
   v_plan:=jsonb_build_object(

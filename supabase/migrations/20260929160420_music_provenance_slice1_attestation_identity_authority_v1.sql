@@ -23,6 +23,7 @@ begin
      or to_regclass('public.registry_works') is null
      or to_regclass('public.registry_artists') is null
      or to_regclass('editorial.people') is null
+     or to_regclass('editorial.organizations') is null
      or to_regclass('editorial.person_identity_links') is null
      or to_regclass('platform_private.registry_evidence_assertions') is null
      or to_regclass('public.registry_canonical_write_events') is null
@@ -162,10 +163,9 @@ create table platform_private.registry_contribution_attestations (
   instrument_key text,
   detail_text text,
 
-  asserting_user_id uuid
-    references auth.users(id)
-    on update restrict
-    on delete restrict,
+  -- Historical user UUID snapshot. Deliberately no auth.users FK: account
+  -- retirement must not erase or block provenance history.
+  asserting_user_id uuid,
   asserting_person_resource_id uuid
     references editorial.people(resource_id)
     on update restrict
@@ -175,10 +175,8 @@ create table platform_private.registry_contribution_attestations (
     on update restrict
     on delete restrict,
   stated_relationship text,
-  inviter_user_id uuid
-    references auth.users(id)
-    on update restrict
-    on delete restrict,
+  -- Historical inviter UUID snapshot; see asserting_user_id above.
+  inviter_user_id uuid,
   parent_attestation_id uuid
     references platform_private.registry_contribution_attestations(id)
     on update restrict
@@ -399,7 +397,7 @@ create table platform_private.registry_contribution_attestation_state_events (
   actor_user_id uuid
     references auth.users(id)
     on update restrict
-    on delete restrict,
+    on delete set null,
   reason text,
   created_at timestamptz not null default now(),
 
@@ -444,10 +442,7 @@ create table platform_private.registry_contribution_attestation_permission_versi
     references platform_private.registry_contribution_attestations(id)
     on update restrict
     on delete restrict,
-  supersedes_permission_id uuid
-    references platform_private.registry_contribution_attestation_permission_versions(id)
-    on update restrict
-    on delete restrict,
+  supersedes_permission_id uuid,
   change_kind text not null,
   policy_key text not null,
   policy_version text not null,
@@ -455,16 +450,23 @@ create table platform_private.registry_contribution_attestation_permission_versi
   cmo_rights_contexts text[] not null default '{}'::text[],
   approved_partner_keys text[] not null default '{}'::text[],
   third_party_commercial_reuse boolean not null default false,
-  actor_user_id uuid not null
-    references auth.users(id)
-    on update restrict
-    on delete restrict,
+  -- Historical actor UUID snapshot. Deliberately no auth.users FK.
+  actor_user_id uuid not null,
   actor_person_resource_id uuid
     references editorial.people(resource_id)
     on update restrict
     on delete restrict,
   reason text,
   created_at timestamptz not null default now(),
+
+  constraint registry_contribution_attestation_permissions_id_attestation_key
+    unique (id,attestation_id),
+
+  constraint registry_contribution_attestation_permissions_supersession_fkey
+    foreign key (supersedes_permission_id,attestation_id)
+    references platform_private.registry_contribution_attestation_permission_versions(id,attestation_id)
+    on update restrict
+    on delete restrict,
 
   constraint registry_contribution_attestation_permissions_supersession_check
     check (
@@ -969,11 +971,11 @@ create table public.registry_artist_person_memberships (
   created_by uuid
     references auth.users(id)
     on update restrict
-    on delete restrict,
+    on delete set null,
   reviewed_by uuid
     references auth.users(id)
     on update restrict
-    on delete restrict,
+    on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
