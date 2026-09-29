@@ -830,12 +830,22 @@ begin
   if v_person_id is not null then
     perform 1
     from editorial.people person
+    join editorial.resources resource
+      on resource.id=person.resource_id
+     and resource.resource_kind='person'
     where person.resource_id=v_person_id
-      and person.person_state='active';
+      and person.person_state='active'
+      and (
+        v_person_id=v_actor.person_resource_id
+        or (
+          resource.lifecycle_state='active'
+          and resource.visibility='public'
+        )
+      );
 
     if not found then
       raise exception using errcode='P0002',
-        message='Selected Person is missing or inactive.';
+        message='Selected Person is unavailable for creator credit selection.';
     end if;
   end if;
 
@@ -864,7 +874,6 @@ begin
 
   v_claim:=jsonb_strip_nulls(
     jsonb_build_object(
-      'attestation_id',v_attestation_id::text,
       'subject_kind',p_subject_kind,
       'subject_id',p_subject_id::text,
       'proposed_person_resource_id',v_person_id::text,
@@ -1346,6 +1355,7 @@ declare
   v_token_hash text;
   v_invitee_name text:=nullif(btrim(coalesce(p_invitee_credited_as,'')),'');
   v_recipient_user_id uuid;
+  v_notification_rows integer:=0;
   v_notified boolean:=false;
 begin
   select *
@@ -1392,12 +1402,17 @@ begin
 
     perform 1
     from editorial.people person
+    join editorial.resources resource
+      on resource.id=person.resource_id
+     and resource.resource_kind='person'
+     and resource.lifecycle_state='active'
+     and resource.visibility='public'
     where person.resource_id=p_invitee_person_resource_id
       and person.person_state='active';
 
     if not found then
       raise exception using errcode='P0002',
-        message='Invitee Person is missing or inactive.';
+        message='Invitee Person is unavailable for creator credit invitations.';
     end if;
 
     v_recipient_user_id:=
@@ -1498,7 +1513,8 @@ begin
         and notification.entity_id=v_invitation_id::text
     );
 
-    get diagnostics v_notified = row_count;
+    get diagnostics v_notification_rows = row_count;
+    v_notified:=v_notification_rows=1;
   end if;
 
   return jsonb_build_object(
@@ -1673,7 +1689,7 @@ begin
     end if;
   end if;
 
-  if not found then
+  if v_invitation.id is null then
     return null;
   end if;
 
@@ -3093,7 +3109,13 @@ begin
   end if;
 
   if position(
-       'status=''verified'''
+       'registry_track_contributions'
+       in pg_get_functiondef(
+         'public.get_public_track_provenance_v1(uuid)'::regprocedure
+       )
+     )=0
+     or position(
+       '''verified'''
        in pg_get_functiondef(
          'public.get_public_track_provenance_v1(uuid)'::regprocedure
        )
