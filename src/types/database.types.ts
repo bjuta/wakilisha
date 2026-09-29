@@ -2654,6 +2654,76 @@ export type Database = {
           },
         ]
       }
+      person_registry_artist_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          evidence_assertion_id: string
+          id: string
+          link_reason: string
+          link_state: string
+          person_resource_id: string
+          registry_artist_id: string
+          retired_at: string | null
+          retired_by: string | null
+          retired_reason: string | null
+          superseded_by_link_id: string | null
+          supersedes_link_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          evidence_assertion_id: string
+          id?: string
+          link_reason: string
+          link_state?: string
+          person_resource_id: string
+          registry_artist_id: string
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+          superseded_by_link_id?: string | null
+          supersedes_link_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          evidence_assertion_id?: string
+          id?: string
+          link_reason?: string
+          link_state?: string
+          person_resource_id?: string
+          registry_artist_id?: string
+          retired_at?: string | null
+          retired_by?: string | null
+          retired_reason?: string | null
+          superseded_by_link_id?: string | null
+          supersedes_link_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_registry_artist_links_person_resource_id_fkey"
+            columns: ["person_resource_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["resource_id"]
+          },
+          {
+            foreignKeyName: "person_registry_artist_links_superseded_by_link_id_fkey"
+            columns: ["superseded_by_link_id"]
+            isOneToOne: false
+            referencedRelation: "person_registry_artist_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_registry_artist_links_supersedes_link_id_fkey"
+            columns: ["supersedes_link_id"]
+            isOneToOne: false
+            referencedRelation: "person_registry_artist_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playlist_item_resources: {
         Row: {
           playlist_item_id: string
@@ -13062,6 +13132,72 @@ export type Database = {
           },
         ]
       }
+      registry_artist_person_memberships: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          evidence_assertion_id: string
+          group_artist_id: string
+          id: string
+          person_resource_id: string
+          review_state: string
+          reviewed_by: string | null
+          role_detail: string | null
+          role_key: string
+          superseded_by_membership_id: string | null
+          updated_at: string
+          valid_from: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          evidence_assertion_id: string
+          group_artist_id: string
+          id?: string
+          person_resource_id: string
+          review_state: string
+          reviewed_by?: string | null
+          role_detail?: string | null
+          role_key?: string
+          superseded_by_membership_id?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          evidence_assertion_id?: string
+          group_artist_id?: string
+          id?: string
+          person_resource_id?: string
+          review_state?: string
+          reviewed_by?: string | null
+          role_detail?: string | null
+          role_key?: string
+          superseded_by_membership_id?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registry_artist_person_members_superseded_by_membership_id_fkey"
+            columns: ["superseded_by_membership_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artist_person_memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registry_artist_person_memberships_group_artist_id_fkey"
+            columns: ["group_artist_id"]
+            isOneToOne: false
+            referencedRelation: "registry_artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registry_artist_relationships: {
         Row: {
           artist_a_id: string
@@ -19967,6 +20103,18 @@ export type Database = {
         Args: { p_artist_id: string; p_media_asset_id: string }
         Returns: Json
       }
+      admin_admit_registry_artist_person_membership_v1: {
+        Args: {
+          p_evidence_assertion_id: string
+          p_group_artist_id: string
+          p_person_resource_id: string
+          p_role_detail: string
+          p_role_key: string
+          p_valid_from: string
+          p_valid_to: string
+        }
+        Returns: Json
+      }
       admin_admit_registry_external_identifier_candidate_v1: {
         Args: {
           p_scheme_key: string
@@ -19978,6 +20126,10 @@ export type Database = {
       }
       admin_admit_registry_release_label_candidate_v1: {
         Args: { p_label_id: string; p_release_id: string }
+        Returns: Json
+      }
+      admin_admit_registry_track_contribution_v1: {
+        Args: { p_attestation_id: string }
         Returns: Json
       }
       admin_admit_registry_track_intake_release_profile_v1: {
@@ -20029,6 +20181,14 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_admit_registry_track_work_link_v1: {
+        Args: { p_evidence_assertion_id: string }
+        Returns: Json
+      }
+      admin_admit_registry_work_contribution_v1: {
+        Args: { p_attestation_id: string }
+        Returns: Json
+      }
       admin_apply_artist_decouple_decision: {
         Args: { p_decision_id: string }
         Returns: Json
@@ -20073,6 +20233,10 @@ export type Database = {
       }
       admin_create_registry_track_intake_identity_v1: {
         Args: { p_suggestion_id: string; p_title: string }
+        Returns: Json
+      }
+      admin_create_registry_work_v1: {
+        Args: { p_evidence_assertion_id: string }
         Returns: Json
       }
       admin_execute_registry_artist_bio_admission: {
@@ -20264,6 +20428,16 @@ export type Database = {
           p_reason: string
         }
         Returns: string
+      }
+      admin_link_person_registry_artist_v1: {
+        Args: {
+          p_evidence_assertion_id: string
+          p_expected_identity_revision: number
+          p_person_resource_id: string
+          p_reason: string
+          p_registry_artist_id: string
+        }
+        Returns: Json
       }
       admin_log_artist_resolution_event: {
         Args: {
