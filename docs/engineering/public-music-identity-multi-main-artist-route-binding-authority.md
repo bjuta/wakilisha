@@ -467,3 +467,32 @@ Public routing reflects those roles without duplicating the Track.
 Exactly one route is canonical, selected from authoritative MainArtist sequence.
 Additional MainArtist routes are valid first-class presentation bindings to the
 same Track UUID and are not redirects.
+
+
+## Contributor-provenance dependency
+
+The route-binding contract in this document governs public Artist billing and
+Track presentation identity only.
+
+It must not be interpreted as a complete music-provenance graph.
+
+A 29 September 2026 Production audit confirmed that the canonical contribution
+authorities installed by the Music Identity & Rights foundation currently
+contain:
+
+- `public.registry_track_contributions`: **0 rows**;
+- `public.registry_work_contributions`: **0 rows**;
+
+and that both typed admission operations remain disabled.
+
+Accordingly, Track↔Artist billing authority can determine MainArtist /
+FeaturedArtist presentation and route entitlement, but it cannot stand in for
+the complete participant graph of a Recording or Musical Work.
+
+The forward contributor completion contract is documented in:
+
+`docs/engineering/music-provenance-contributor-graph-operational-gap.md`
+
+Public Music Identity implementation must not manufacture contributor-looking
+credits by parsing display strings while that canonical contribution graph
+remains unpopulated.
