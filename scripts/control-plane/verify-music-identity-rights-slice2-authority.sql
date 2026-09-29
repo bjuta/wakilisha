@@ -332,10 +332,10 @@ begin
   into v_operation_count
   from (
     values
-      ('registry.work.create',1,'create_registry_work','medium','work',false,false),
-      ('registry.track_work_link.admit',1,'admit_registry_track_work_link','medium','track_work_link',false,false),
-      ('registry.track_contribution.admit',1,'admit_registry_track_contribution','medium','track_contribution',false,false),
-      ('registry.work_contribution.admit',1,'admit_registry_work_contribution','medium','work_contribution',false,false),
+      ('registry.work.create',1,'create_registry_work','medium','work',false,true),
+      ('registry.track_work_link.admit',1,'admit_registry_track_work_link','medium','track_work_link',false,true),
+      ('registry.track_contribution.admit',1,'admit_registry_track_contribution','medium','track_contribution',false,true),
+      ('registry.work_contribution.admit',1,'admit_registry_work_contribution','medium','work_contribution',false,true),
       ('registry.rights_claim.admit',1,'admit_registry_rights_claim','high','rights_claim',false,false),
       ('registry.rights_claim.reviewed_reconcile',1,'reconcile_registry_rights_claim','high','rights_claim',true,false),
       ('registry.external_identifier_assertion.admit',1,'admit_registry_external_identifier_assertion','medium','external_identifier_assertion',false,true),
@@ -371,10 +371,6 @@ begin
     select 1
     from platform_private.registry_operation_types
     where operation_key in (
-      'registry.work.create',
-      'registry.track_work_link.admit',
-      'registry.track_contribution.admit',
-      'registry.work_contribution.admit',
       'registry.rights_claim.admit',
       'registry.rights_claim.reviewed_reconcile',
       'registry.external_identifier_assertion.reviewed_reconcile'

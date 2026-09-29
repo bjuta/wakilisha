@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260929160423_music_provenance_slice1_work_contribution_admission_v1.sql",
+  "migration_sha256": "31d59d6bbd606f9c04fdba03d5a2aedcfe856bf5c587cd245f2b56e326769cff",
+  "base_main_sha": "42a8dc534bc966216e916454a6456c69202ac95b",
+  "preview_project_ref": "ssvdmhxgcvdsxvgegoqh",
+  "preview_branch_id": "9d7b6d95-aeb4-4e75-ac73-b8102a62733b",
+  "preview_migration_head": "20260929160423",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-music-provenance-slice1-authority.sql",
+  "schema_types_sha256": "1f4d375a752f52c11322eda37a00887ae614700852e898932232de3cabf8b8eb",
+  "schema_migration_count": 191,
+  "schema_migration_head": "20260929185454",
+  "verified_at": "2026-09-29T19:03:46.558Z"
+}
