@@ -14,6 +14,9 @@ const identityMigration = read(
 const admissionMigration = read(
   "supabase/migrations/20260929160423_music_provenance_slice1_work_contribution_admission_v1.sql",
 );
+const reviewBindingIntegrityMigration = read(
+  "supabase/migrations/20260929185454_music_provenance_slice1_review_binding_integrity_v1.sql",
+);
 const verifier = read(
   "scripts/control-plane/verify-music-provenance-slice1-authority.sql",
 );
@@ -218,6 +221,24 @@ describe("Music provenance Slice 1 authority", () => {
     );
     expect(admissionMigration).not.toContain(
       "p_subject_type is distinct from case p_operation_key",
+    );
+  });
+
+  it("binds every reviewed provenance grant to immutable evidence trust class", () => {
+    expect(reviewBindingIntegrityMigration).toContain(
+      "'trust_class',v_evidence.trust_class",
+    );
+    expect(reviewBindingIntegrityMigration).toContain(
+      "v_evidence.trust_class is distinct from",
+    );
+    expect(reviewBindingIntegrityMigration).toContain(
+      "v_plan->>'trust_class'",
+    );
+    expect(verifier).toContain(
+      "Provenance executor is not sealed to immutable evidence trust class",
+    );
+    expect(verifier).toContain(
+      "Reviewed provenance plan lacks trust-class binding",
     );
   });
 

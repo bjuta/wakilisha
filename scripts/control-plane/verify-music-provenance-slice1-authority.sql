@@ -3,6 +3,7 @@
 do $verify$
 declare
   v_definition text;
+  v_signature text;
   v_constraint text;
   v_operation_count integer;
 begin
@@ -434,6 +435,28 @@ begin
   then
     raise exception 'Contribution executor contains prohibited Rights Claim mutation';
   end if;
+
+  if position('v_evidence.trust_class is distinct from' in v_definition)=0
+     or position('v_plan->>''trust_class''' in v_definition)=0
+  then
+    raise exception 'Provenance executor is not sealed to immutable evidence trust class';
+  end if;
+
+  foreach v_signature in array array[
+    'public.admin_create_registry_work_v1(uuid)',
+    'public.admin_admit_registry_track_work_link_v1(uuid)',
+    'public.admin_admit_registry_track_contribution_v1(uuid)',
+    'public.admin_admit_registry_work_contribution_v1(uuid)'
+  ]
+  loop
+    select pg_get_functiondef(v_signature::regprocedure)
+    into v_definition;
+
+    if position('''trust_class'',v_evidence.trust_class' in v_definition)=0
+    then
+      raise exception 'Reviewed provenance plan lacks trust-class binding: %',v_signature;
+    end if;
+  end loop;
 
   select pg_get_functiondef(
     'public.admin_admit_registry_track_contribution_v1(uuid)'::regprocedure
