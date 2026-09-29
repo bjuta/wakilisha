@@ -526,3 +526,19 @@ PR 1 is complete when:
 ## Next decision after merge
 
 Begin PR 2 with a schema-level relationship plan and verification queries. Do not apply changes until the plan accounts for all current relationship consumers and preserves the 6,468 existing rows.
+
+
+## Forward execution reference — music contributor provenance
+
+The current Registry knowledge model is being operationalized for canonical
+Recording and Work Contributions through:
+
+`docs/engineering/music-provenance-mizizi-binding-execution-scope-20260929.md`
+
+Decision date: 29 September 2026.
+
+The execution plan does not change Registry ownership. It explicitly preserves
+the distinction between public Artist billing and complete Recording/Work
+provenance, and assigns the terminology correction for the existing
+`Track credits -> registry_track_artists` shorthand to the implementation
+slice that activates structured public contribution projections.
