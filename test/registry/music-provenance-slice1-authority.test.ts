@@ -134,6 +134,24 @@ describe("Music provenance Slice 1 authority", () => {
     );
   });
 
+  it("binds reviewed Person/Artist and Group-membership evidence to the exact candidate", () => {
+    expect(identityMigration).toContain(
+      "'person_resource_id',p_person_resource_id::text",
+    );
+    expect(identityMigration).toContain(
+      "'registry_artist_id',p_registry_artist_id::text",
+    );
+    expect(identityMigration).toContain(
+      "'group_artist_id',p_group_artist_id::text",
+    );
+    expect(identityMigration).toContain(
+      "'role_key',p_role_key",
+    );
+    expect(identityMigration).toContain(
+      "v_evidence.claim_payload<>",
+    );
+  });
+
   it("keeps Group membership typed and separate from Recording participation", () => {
     expect(identityMigration).toContain(
       "public.registry_artist_person_memberships",
@@ -220,6 +238,16 @@ describe("Music provenance Slice 1 authority", () => {
     );
     expect(executor).not.toContain("insert into editorial.people");
     expect(executor).not.toContain("create_person_for_identity");
+  });
+
+  it("re-locks contributor identities before canonical contribution writes", () => {
+    expect(executor).toContain("from editorial.people person");
+    expect(executor).toContain("person.person_state='active'");
+    expect(executor).toContain("from editorial.organizations organization");
+    expect(executor).toContain("organization.organization_state='active'");
+    expect(executor).toContain("from public.registry_artists artist");
+    expect(executor).toContain("artist.status<>'archived'");
+    expect(executor).toContain("for update");
   });
 
   it("does not infer rights or Recording participation from contribution or membership", () => {

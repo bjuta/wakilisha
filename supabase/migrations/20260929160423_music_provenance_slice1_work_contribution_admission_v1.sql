@@ -817,31 +817,55 @@ begin
         message='WK_STALE_TRACK_CONTRIBUTION_SUBJECT: Track changed after review.';
     end if;
 
-    if v_person_id is not null
-       and platform_private.registry_provenance_entity_fingerprint_v1(
-             'person',v_person_id
-           ) is distinct from v_plan->>'person_state_fingerprint'
-    then
-      raise exception using errcode='40001',
-        message='WK_STALE_TRACK_CONTRIBUTION_PERSON: Person changed after review.';
+    if v_person_id is not null then
+      perform 1
+      from editorial.people person
+      where person.resource_id=v_person_id
+        and person.person_state='active'
+      for update;
+
+      if not found
+         or platform_private.registry_provenance_entity_fingerprint_v1(
+              'person',v_person_id
+            ) is distinct from v_plan->>'person_state_fingerprint'
+      then
+        raise exception using errcode='40001',
+          message='WK_STALE_TRACK_CONTRIBUTION_PERSON: Person changed after review.';
+      end if;
     end if;
 
-    if v_organization_id is not null
-       and platform_private.registry_provenance_entity_fingerprint_v1(
-             'organization',v_organization_id
-           ) is distinct from v_plan->>'organization_state_fingerprint'
-    then
-      raise exception using errcode='40001',
-        message='WK_STALE_TRACK_CONTRIBUTION_ORGANIZATION: Organisation changed after review.';
+    if v_organization_id is not null then
+      perform 1
+      from editorial.organizations organization
+      where organization.resource_id=v_organization_id
+        and organization.organization_state='active'
+      for update;
+
+      if not found
+         or platform_private.registry_provenance_entity_fingerprint_v1(
+              'organization',v_organization_id
+            ) is distinct from v_plan->>'organization_state_fingerprint'
+      then
+        raise exception using errcode='40001',
+          message='WK_STALE_TRACK_CONTRIBUTION_ORGANIZATION: Organisation changed after review.';
+      end if;
     end if;
 
-    if v_artist_id is not null
-       and platform_private.registry_provenance_entity_fingerprint_v1(
-             'artist',v_artist_id
-           ) is distinct from v_plan->>'artist_state_fingerprint'
-    then
-      raise exception using errcode='40001',
-        message='WK_STALE_TRACK_CONTRIBUTION_ARTIST: Artist changed after review.';
+    if v_artist_id is not null then
+      perform 1
+      from public.registry_artists artist
+      where artist.id=v_artist_id
+        and artist.status<>'archived'
+      for update;
+
+      if not found
+         or platform_private.registry_provenance_entity_fingerprint_v1(
+              'artist',v_artist_id
+            ) is distinct from v_plan->>'artist_state_fingerprint'
+      then
+        raise exception using errcode='40001',
+          message='WK_STALE_TRACK_CONTRIBUTION_ARTIST: Artist changed after review.';
+      end if;
     end if;
 
     insert into public.registry_track_contributions (
@@ -934,31 +958,55 @@ begin
         message='WK_STALE_WORK_CONTRIBUTION_SUBJECT: Work changed after review.';
     end if;
 
-    if v_person_id is not null
-       and platform_private.registry_provenance_entity_fingerprint_v1(
-             'person',v_person_id
-           ) is distinct from v_plan->>'person_state_fingerprint'
-    then
-      raise exception using errcode='40001',
-        message='WK_STALE_WORK_CONTRIBUTION_PERSON: Person changed after review.';
+    if v_person_id is not null then
+      perform 1
+      from editorial.people person
+      where person.resource_id=v_person_id
+        and person.person_state='active'
+      for update;
+
+      if not found
+         or platform_private.registry_provenance_entity_fingerprint_v1(
+              'person',v_person_id
+            ) is distinct from v_plan->>'person_state_fingerprint'
+      then
+        raise exception using errcode='40001',
+          message='WK_STALE_WORK_CONTRIBUTION_PERSON: Person changed after review.';
+      end if;
     end if;
 
-    if v_organization_id is not null
-       and platform_private.registry_provenance_entity_fingerprint_v1(
-             'organization',v_organization_id
-           ) is distinct from v_plan->>'organization_state_fingerprint'
-    then
-      raise exception using errcode='40001',
-        message='WK_STALE_WORK_CONTRIBUTION_ORGANIZATION: Organisation changed after review.';
+    if v_organization_id is not null then
+      perform 1
+      from editorial.organizations organization
+      where organization.resource_id=v_organization_id
+        and organization.organization_state='active'
+      for update;
+
+      if not found
+         or platform_private.registry_provenance_entity_fingerprint_v1(
+              'organization',v_organization_id
+            ) is distinct from v_plan->>'organization_state_fingerprint'
+      then
+        raise exception using errcode='40001',
+          message='WK_STALE_WORK_CONTRIBUTION_ORGANIZATION: Organisation changed after review.';
+      end if;
     end if;
 
-    if v_artist_id is not null
-       and platform_private.registry_provenance_entity_fingerprint_v1(
-             'artist',v_artist_id
-           ) is distinct from v_plan->>'artist_state_fingerprint'
-    then
-      raise exception using errcode='40001',
-        message='WK_STALE_WORK_CONTRIBUTION_ARTIST: Artist changed after review.';
+    if v_artist_id is not null then
+      perform 1
+      from public.registry_artists artist
+      where artist.id=v_artist_id
+        and artist.status<>'archived'
+      for update;
+
+      if not found
+         or platform_private.registry_provenance_entity_fingerprint_v1(
+              'artist',v_artist_id
+            ) is distinct from v_plan->>'artist_state_fingerprint'
+      then
+        raise exception using errcode='40001',
+          message='WK_STALE_WORK_CONTRIBUTION_ARTIST: Artist changed after review.';
+      end if;
     end if;
 
     insert into public.registry_work_contributions (

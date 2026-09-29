@@ -922,6 +922,10 @@ begin
      or v_evidence.subject_type<>'artist'
      or v_evidence.subject_id<>p_registry_artist_id
      or v_evidence.claim_key<>'registry.person_artist.link'
+     or v_evidence.claim_payload<>jsonb_build_object(
+          'person_resource_id',p_person_resource_id::text,
+          'registry_artist_id',p_registry_artist_id::text
+        )
      or v_evidence.trust_class not in (
        'INTERNAL_FACT',
        'EXTERNAL_EVIDENCE',
@@ -1235,6 +1239,17 @@ begin
      or v_evidence.subject_type<>'artist'
      or v_evidence.subject_id<>p_group_artist_id
      or v_evidence.claim_key<>'registry.artist.person_membership'
+     or v_evidence.claim_payload<>
+          jsonb_strip_nulls(
+            jsonb_build_object(
+              'group_artist_id',p_group_artist_id::text,
+              'person_resource_id',p_person_resource_id::text,
+              'role_key',p_role_key,
+              'role_detail',nullif(btrim(coalesce(p_role_detail,'')),''),
+              'valid_from',p_valid_from,
+              'valid_to',p_valid_to
+            )
+          )
      or v_evidence.trust_class not in (
        'INTERNAL_FACT',
        'EXTERNAL_EVIDENCE',
