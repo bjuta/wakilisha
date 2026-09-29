@@ -601,3 +601,18 @@ are inventoried in:
 
 No contribution-admission implementation should be reviewed as complete unless
 its downstream contracts are evaluated against that impact audit.
+
+
+## Binding execution scope
+
+The operational gap described in this document is now governed by the four-slice
+execution plan in:
+
+`docs/engineering/music-provenance-mizizi-binding-execution-scope-20260929.md`
+
+That plan is the binding implementation/rollback authority for attestation,
+identity, creator UX, MIZIZI stewardship, public projection, route convergence,
+SEO/analytics and controlled corpus activation.
+
+Where this document describes required completion layers without prescribing
+implementation order, the binding execution-scope document controls sequencing.

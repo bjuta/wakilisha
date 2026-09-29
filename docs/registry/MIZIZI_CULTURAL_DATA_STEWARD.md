@@ -896,3 +896,30 @@ Review materialization must prove all of the following before closure:
 - standing MIZIZI capability grants remain zero;
 - unconsumed exact MIZIZI execution grants remain zero;
 - temporary JIT access and role mapping are restored at rest.
+
+
+## Forward execution authority — contributor provenance
+
+The binding programme for extending MIZIZI from current Registry identity
+stewardship into Recording/Work contributor provenance is:
+
+`docs/engineering/music-provenance-mizizi-binding-execution-scope-20260929.md`
+
+Decision date: 29 September 2026.
+
+The execution plan preserves this document's stewardship doctrine and adds a
+staged path for:
+
+- first-party contribution attestations;
+- evidence/human lineage;
+- scoped sharing permissions;
+- Person↔Artist and Group membership authority;
+- reviewed Work/Contribution admission;
+- creator-facing provenance workflows;
+- claim-family-specific earned autonomy;
+- provenance drift detection;
+- controlled corpus backfill.
+
+MIZIZI remains a steward of Registry authority, not a competing source of
+truth. Admin remains the exception handler rather than the routine provenance
+operator.

@@ -496,3 +496,17 @@ The forward contributor completion contract is documented in:
 Public Music Identity implementation must not manufacture contributor-looking
 credits by parsing display strings while that canonical contribution graph
 remains unpopulated.
+
+
+## Binding execution dependency
+
+Physical implementation of this route-binding authority is assigned to Slice 2
+of:
+
+`docs/engineering/music-provenance-mizizi-binding-execution-scope-20260929.md`
+
+That execution plan requires route binding to converge together with the public
+provenance product because Artist billing is the first layer of Track
+provenance.
+
+This does not weaken or replace any invariant in this document.
