@@ -187,6 +187,15 @@ describe("canonical public Track and Release routes", () => {
     expect(scopedTrackResolver).toContain(
       '.eq("is_primary", true)',
     );
+    expect(scopedTrackResolver).toContain(
+      '.eq("status", "active")',
+    );
+    expect(scopedTrackResolver).not.toContain(
+      "needs_review",
+    );
+    expect(scopedTrackResolver).not.toContain(
+      "draft",
+    );
     expect(scopedTrackResolver).not.toContain(
       "return matches.sort",
     );
@@ -203,6 +212,27 @@ describe("canonical public Track and Release routes", () => {
     );
     expect(publicTrackBranch).toContain(
       '.eq("is_primary", true)',
+    );
+    expect(publicTrackBranch).not.toContain(
+      'reason: "track_not_found_for_artist"',
+    );
+    expect(publicTrackBranch).not.toContain(
+      "artist_slug.ilike.%",
+    );
+    expect(publicTrackBranch).toContain(
+      "const mainArtists = artistsWithRoles",
+    );
+    expect(publicTrackBranch).toContain(
+      "const canonicalMainArtist = mainArtists[0]",
+    );
+    expect(publicTrackBranch).toContain(
+      "const routeBindings = mainArtists.map",
+    );
+    expect(publicTrackBranch).toContain(
+      "canonicalPath",
+    );
+    expect(publicTrackBranch).toContain(
+      "loadPublicTrackProvenance",
     );
 
     const releaseResolver = edge.slice(
@@ -248,6 +278,9 @@ describe("canonical public Track and Release routes", () => {
       "TrackMomentSummary",
       "TrackChartSparkline",
       "ChartKpiGrid",
+      "TrackCreditsSection",
+      "How we know this",
+      "I worked on this",
       "TrackLyricsSection",
       "TrackRelatedTracks",
       "ConnectedArtists",

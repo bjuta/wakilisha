@@ -114,7 +114,7 @@ async function findTrackByScopedPublicSlug(
     .select("track_id, artist_slug, is_primary, credit_order, status")
     .eq("artist_slug", artistSlug)
     .eq("is_primary", true)
-    .in("status", ["active", "needs_review", "draft"])
+    .eq("status", "active")
     .order("is_primary", { ascending: false })
     .order("credit_order", { ascending: true })
     .limit(500);
@@ -128,7 +128,7 @@ async function findTrackByScopedPublicSlug(
     .from("registry_tracks")
     .select(MUSIC_ENTITY_SELECT)
     .in("id", trackIds)
-    .in("status", ["active", "needs_review", "draft"]);
+    .eq("status", "active");
 
   const matches = (tracks ?? []).filter((track: any) => {
     const registrySlug = slugify(String(track.slug || ""));
@@ -141,6 +141,58 @@ async function findTrackByScopedPublicSlug(
   }
 
   return { track: matches[0], matchCount: 1 };
+}
+
+type PublicTrackProvenancePayload = {
+  recordingContributions: unknown[];
+  works: unknown[];
+  provenanceReceipt: Record<string, unknown> | null;
+};
+
+function emptyPublicTrackProvenance(): PublicTrackProvenancePayload {
+  return {
+    recordingContributions: [],
+    works: [],
+    provenanceReceipt: null,
+  };
+}
+
+async function loadPublicTrackProvenance(
+  supabase: ReturnType<typeof createClient>,
+  trackId: string,
+): Promise<PublicTrackProvenancePayload> {
+  const { data, error } = await supabase.rpc(
+    "get_public_track_provenance_v1",
+    { p_track_id: trackId },
+  );
+
+  if (error) {
+    console.error(
+      "Failed to load public Track provenance:",
+      error.message,
+    );
+    return emptyPublicTrackProvenance();
+  }
+
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return emptyPublicTrackProvenance();
+  }
+
+  const payload = data as Record<string, unknown>;
+  return {
+    recordingContributions: Array.isArray(payload.recordingContributions)
+      ? payload.recordingContributions
+      : [],
+    works: Array.isArray(payload.works)
+      ? payload.works
+      : [],
+    provenanceReceipt:
+      payload.provenanceReceipt &&
+      typeof payload.provenanceReceipt === "object" &&
+      !Array.isArray(payload.provenanceReceipt)
+        ? payload.provenanceReceipt as Record<string, unknown>
+        : null,
+  };
 }
 
 async function findReleaseByScopedPublicSlug(
@@ -2218,34 +2270,6 @@ Deno.serve(async (req) => {
       track = scopedLookup.track;
 
       if (!track) return jsonResponse({ data: null }, origin, 404);
-      if (urlArtistSlug) {
-        const normalizedUrlArtistSlug = slugify(urlArtistSlug);
-        const trackMeta = (track.metadata || {}) as Record<string, unknown>;
-        const metadataArtistSlug = String(trackMeta.primary_artist_slug || "").trim();
-
-        const { data: trackArtist } = await supabase
-          .from("registry_track_artists")
-          .select("artist_slug, status")
-          .eq("track_id", String(track.id))
-          .eq("artist_slug", normalizedUrlArtistSlug)
-          .eq("is_primary", true)
-          .in("status", ["active", "needs_review", "draft"])
-          .maybeSingle();
-
-        if (!trackArtist && metadataArtistSlug !== normalizedUrlArtistSlug) {
-          const { data: chartEntry } = await supabase
-            .from("wk_chart_entries_v2")
-            .select("id")
-            .eq("canonical_track_id", String(track.id))
-            .or(`artist_slug.eq.${normalizedUrlArtistSlug},artist_slug.ilike.%${normalizedUrlArtistSlug}%`)
-            .limit(1)
-            .maybeSingle();
-
-          if (!chartEntry) {
-            return jsonResponse({ data: null, meta: { reason: "track_not_found_for_artist" } }, origin, 404);
-          }
-        }
-      }
       const trackId = String(track.id);
 
       let releaseMembership: any =
@@ -2313,7 +2337,12 @@ Deno.serve(async (req) => {
             .maybeSingle()
         : { data: null };
       const { data: label } = release && release.label_id ? await supabase.from("registry_labels").select("slug, name, country_code").eq("id", String(release.label_id)).maybeSingle() : { data: null };
-      const { data: trackArtists } = await supabase.from("registry_track_artists").select("artist_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order, role").eq("track_id", trackId).in("status", ["active", "needs_review", "draft"]).order("credit_order", { ascending: true });
+      const { data: trackArtists } = await supabase
+        .from("registry_track_artists")
+        .select("artist_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order, role")
+        .eq("track_id", trackId)
+        .eq("status", "active")
+        .order("credit_order", { ascending: true });
       const releaseTrackCountResult = releaseIdFromMembership ? await supabase.from("registry_release_tracks").select("id", { count: "exact", head: true }).eq("release_id", releaseIdFromMembership).eq("status", "active") : { count: 0 };
 
       let releaseTracks: any[] = [];
@@ -2366,39 +2395,54 @@ Deno.serve(async (req) => {
       let movementAmount = 0; if (bestEntry) { const curr = Number(bestEntry.rank || 0); if (!rawMovement) { if (!prevRank || prevRank <= 0) movement = "new"; else if (curr > 0 && curr < prevRank) { movement = "up"; movementAmount = prevRank - curr; } else if (curr > 0 && curr > prevRank) { movement = "down"; movementAmount = curr - prevRank; } } else if (prevRank && curr > 0) movementAmount = Math.abs(prevRank - curr); }
       const firstChartedDate = (historyEntries ?? []).length > 0 ? (historyEntries as any[])[0].release_date || "" : "";
       const sourceProviders: string[] = Array.isArray(trackMeta.source_providers) ? (trackMeta.source_providers as string[]) : [];
-      let artistsWithRoles = (trackArtists ?? []).map((ta: any) => ({ name: String(ta.artist_name_text || ta.artist_slug || ""), slug: String(ta.artist_slug || ""), isPrimary: Boolean(ta.is_primary), isFeatured: Boolean(ta.is_featured), creditOrder: Number(ta.credit_order || 0), role: String(ta.role || "primary") }));
+      const artistsWithRoles = (trackArtists ?? []).map((ta: any) => ({
+        artistId: String(ta.artist_id || ""),
+        name: String(ta.artist_name_text || ta.artist_slug || ""),
+        slug: String(ta.artist_slug || ""),
+        isPrimary: Boolean(ta.is_primary),
+        isFeatured: Boolean(ta.is_featured),
+        creditOrder: Number(ta.credit_order || 0),
+        role: String(ta.role || "primary"),
+      }));
 
-      if (artistsWithRoles.length === 0) {
-        const firstChartEntry = (chartEntriesList ?? [])[0] as any;
-        const chartArtistSlug = String(firstChartEntry?.artist_slug || "").split(",")[0]?.trim() || "";
-        const chartArtistName = String(firstChartEntry?.artist_name || "").split(",")[0]?.trim() || "";
-        const metadataArtistSlug = String(trackMeta.primary_artist_slug || "").trim();
-        const fallbackSlug = slugify(String(urlArtistSlug || metadataArtistSlug || chartArtistSlug || chartArtistName || "").split(",")[0] || "");
-        let fallbackName = chartArtistName || String(trackMeta.artist_name || "").trim() || fallbackSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      const mainArtists = artistsWithRoles
+        .filter((artist) => artist.isPrimary && artist.artistId && artist.slug)
+        .sort((a, b) => a.creditOrder - b.creditOrder);
 
-        if (fallbackSlug) {
-          const { data: fallbackArtist } = await supabase
-            .from("registry_artists")
-            .select("slug, display_name, public_image_url, status")
-            .eq("slug", fallbackSlug)
-            .in("status", ["active", "needs_review", "draft"])
-            .maybeSingle();
-
-          if (fallbackArtist) {
-            fallbackName = String(fallbackArtist.display_name || fallbackName);
-          }
-
-          artistsWithRoles = [{
-            name: fallbackName || fallbackSlug,
-            slug: String(fallbackArtist?.slug || fallbackSlug),
-            isPrimary: true,
-            isFeatured: false,
-            creditOrder: 0,
-            role: "primary",
-          }];
-        }
+      if (mainArtists.length === 0) {
+        return jsonResponse(
+          {
+            data: null,
+            meta: {
+              reason: "main_artist_route_authority_missing",
+              identityReviewRequired: true,
+            },
+          },
+          origin,
+          409,
+        );
       }
-      data = { track: { id: String(track.id), slug: cleanPublicMusicSlug(track.slug, track.title, artistsWithRoles[0]?.slug || urlArtistSlug || trackMeta.primary_artist_slug || ""), title: String(track.title), durationMs: track.duration_ms || 0, artworkUrl: track.artwork_url || "", isrc: track.isrc || null, explicit: track.explicit || false, trackNumber: Number(releaseMembership?.track_number || track.track_number || 0), discNumber: Number(releaseMembership?.disc_number || track.disc_number || 0), metadata: track.metadata || {}, status: track.status || "active", previewUrl: track.preview_url || null, appleMusicId: readAppleMusicCatalogId(track), appleMusicCatalogId: readAppleMusicCatalogId(track) }, artists: artistsWithRoles, artist: artistsWithRoles.length > 0 ? { slug: artistsWithRoles[0].slug, name: artistsWithRoles[0].name, imageUrl: bestEntry?.artwork_url || "" } : { slug: "", name: "Unknown", imageUrl: "" }, release: release ? { id: String(release.id), slug: String(release.slug), title: String(release.title), releaseDate: release.release_date || "", releaseType: String(release.release_type || "single"), artworkUrl: release.artwork_url || "", trackCount: releaseTrackCountResult.count || releaseTracks.length || 0, labelName: label?.name || "", labelSlug: label?.slug || "", tracks: releaseTracks } : null, label: label ? { slug: String(label.slug), name: String(label.name), countryCode: label.country_code || null } : null, genres: genres2, chartHistory: chartHistoryUnique, chartAppearances: allChartAppearances, chartAppearanceCount: allChartAppearances.length, peakRank, weeksOnChart: historyEntries ? historyEntries.length : 0, currentRank: bestEntry ? Number(bestEntry.rank) : null, previousRank: prevRank, movement, movementAmount, previewUrl: track.preview_url || null, appleMusicId: readAppleMusicCatalogId(track), appleMusicCatalogId: readAppleMusicCatalogId(track), firstChartedDate, editionLabels: editionLabelsAll, sourceProviders };
+
+      const canonicalMainArtist = mainArtists[0];
+      const semanticTrackSlug = cleanPublicMusicSlug(
+        track.slug,
+        track.title,
+        canonicalMainArtist.slug,
+      );
+      const routeBindings = mainArtists.map((artist, index) => ({
+        artistId: artist.artistId,
+        artistSlug: artist.slug,
+        artistName: artist.name,
+        displaySequence: artist.creditOrder,
+        isCanonical: index === 0,
+        path: `/tracks/${artist.slug}/${semanticTrackSlug}`,
+      }));
+      const canonicalPath = routeBindings[0].path;
+      const provenance = await loadPublicTrackProvenance(
+        supabase,
+        trackId,
+      );
+      data = { track: { id: String(track.id), slug: semanticTrackSlug, title: String(track.title), durationMs: track.duration_ms || 0, artworkUrl: track.artwork_url || "", isrc: track.isrc || null, explicit: track.explicit || false, trackNumber: Number(releaseMembership?.track_number || track.track_number || 0), discNumber: Number(releaseMembership?.disc_number || track.disc_number || 0), metadata: track.metadata || {}, status: track.status || "active", previewUrl: track.preview_url || null, appleMusicId: readAppleMusicCatalogId(track), appleMusicCatalogId: readAppleMusicCatalogId(track) }, artists: artistsWithRoles, artist: { slug: canonicalMainArtist.slug, name: canonicalMainArtist.name, imageUrl: bestEntry?.artwork_url || "" }, canonicalPath, routeBindings, recordingContributions: provenance.recordingContributions, works: provenance.works, provenanceReceipt: provenance.provenanceReceipt, release: release ? { id: String(release.id), slug: String(release.slug), title: String(release.title), releaseDate: release.release_date || "", releaseType: String(release.release_type || "single"), artworkUrl: release.artwork_url || "", trackCount: releaseTrackCountResult.count || releaseTracks.length || 0, labelName: label?.name || "", labelSlug: label?.slug || "", tracks: releaseTracks } : null, label: label ? { slug: String(label.slug), name: String(label.name), countryCode: label.country_code || null } : null, genres: genres2, chartHistory: chartHistoryUnique, chartAppearances: allChartAppearances, chartAppearanceCount: allChartAppearances.length, peakRank, weeksOnChart: historyEntries ? historyEntries.length : 0, currentRank: bestEntry ? Number(bestEntry.rank) : null, previousRank: prevRank, movement, movementAmount, previewUrl: track.preview_url || null, appleMusicId: readAppleMusicCatalogId(track), appleMusicCatalogId: readAppleMusicCatalogId(track), firstChartedDate, editionLabels: editionLabelsAll, sourceProviders };
     }
 
     else if (path === "/charts" || path === "/charts/") { const { data: programs } = await supabase.from("wk_chart_programs_v2").select("id, public_slug, public_label, source_family_slug, series_slug, market_slug, chart_size, default_period_type, default_methodology_version").order("public_label", { ascending: true }); const programsWithEditions = await Promise.all((programs ?? []).map(async (p: any) => { const { data: editions } = await supabase.from("wk_chart_editions_v2").select("edition_slug, edition_label, edition_date, period_start, period_end, entry_count, status").eq("program_id", p.id).eq("status", "published").order("edition_date", { ascending: false }); const latestEdition = editions && editions.length > 0 ? { id: String(editions[0].edition_slug), slug: String(editions[0].edition_slug), label: String(editions[0].edition_label), date: String(editions[0].edition_date), periodStart: editions[0].period_start || null, periodEnd: editions[0].period_end || null, entryCount: editions[0].entry_count || 0 } : null; return { id: String(p.id), publicSlug: String(p.public_slug), publicLabel: String(p.public_label), shortLabel: String(p.public_label), sourceFamilySlug: String(p.source_family_slug || p.public_slug), seriesSlug: String(p.series_slug || ""), seriesLabel: String(p.series_slug || ""), marketSlug: String(p.market_slug || ""), marketLabel: String(p.market_slug || ""), periodType: String(p.default_period_type || "weekly"), methodologyVersion: String(p.default_methodology_version || "legacy-import-v1"), eligibilityRulesVersion: "legacy-import-v1", latestEdition, archive: (editions ?? []).map((e: any) => ({ id: String(e.edition_slug), slug: String(e.edition_slug), label: String(e.edition_label), date: String(e.edition_date), periodStart: e.period_start || null, periodEnd: e.period_end || null, entryCount: e.entry_count || 0 })) }; })); data = { programs: programsWithEditions }; }

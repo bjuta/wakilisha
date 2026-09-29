@@ -8,6 +8,7 @@ import { MetaTags } from "@/components/seo/MetaTags";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import type { MusicRecordingSchema } from "@/components/seo/SchemaOrg";
 import TrackLyricsSection from "./components/TrackLyricsSection";
+import TrackCreditsSection from "./components/TrackCreditsSection";
 import TrackRelatedTracks from "./components/TrackRelatedTracks";
 import TrackReleaseTracklist from "./components/TrackReleaseTracklist";
 import { releaseUrl } from "@/utils/releaseUrl";
@@ -49,6 +50,7 @@ type TrackViewModel = {
   artist: string;
   artistSlug: string;
   artists: Array<{
+    artistId?: string;
     name: string;
     slug: string;
     isPrimary: boolean;
@@ -56,6 +58,10 @@ type TrackViewModel = {
     creditOrder: number;
     role: string;
   }>;
+  canonicalPath: string;
+  recordingContributions: PublicTrackDetail["recordingContributions"];
+  works: PublicTrackDetail["works"];
+  provenanceReceipt: PublicTrackDetail["provenanceReceipt"];
   genre: string;
   genreSlug: string;
   genres: string[];
@@ -169,6 +175,7 @@ function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
 
   const rawArtists = Array.isArray(raw.artists) ? raw.artists : [];
   const mappedArtists = rawArtists.map((artist: any, index: number) => ({
+    artistId: clean(artist.artistId || artist.artist_id),
     name: clean(artist.name || artist.artist_name_text),
     slug: clean(artist.slug || artist.artist_slug),
     isPrimary: Boolean(artist.isPrimary ?? artist.is_primary),
@@ -332,6 +339,15 @@ function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
     artist: artistName,
     artistSlug: resolvedArtistSlug,
     artists,
+    canonicalPath: clean(raw.canonicalPath),
+    recordingContributions: Array.isArray(raw.recordingContributions)
+      ? raw.recordingContributions
+      : [],
+    works: Array.isArray(raw.works) ? raw.works : [],
+    provenanceReceipt:
+      raw.provenanceReceipt && typeof raw.provenanceReceipt === "object"
+        ? raw.provenanceReceipt
+        : null,
     genre: primaryGenre,
     genreSlug: primaryGenreSlug,
     genres: allGenres,
@@ -890,7 +906,7 @@ export default function TrackDetail() {
   const canPlayFullTrack = hasAppleCatalog && applePlaybackConnected;
   const hasPlayableSource = track.isPlayable || canPlayFullTrack;
   const canonicalArtistSlug =
-    track.albumArtistSlug ||
+    track.artists.find((artist) => artist.isPrimary)?.slug ||
     track.artistSlug ||
     artistSlug ||
     "";
@@ -901,10 +917,12 @@ export default function TrackDetail() {
   const canonicalReleaseSlug =
     track.albumSlug ||
     "";
-  const canonicalPath = canonicalTrackUrl(
-    canonicalArtistSlug,
-    canonicalTrackSlug,
-  );
+  const canonicalPath =
+    track.canonicalPath ||
+    canonicalTrackUrl(
+      canonicalArtistSlug,
+      canonicalTrackSlug,
+    );
   const canonicalAbsoluteUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}${canonicalPath}`
@@ -1279,6 +1297,13 @@ export default function TrackDetail() {
                 <ChartKpiGrid vm={track} />
               </section>
             )}
+
+            <TrackCreditsSection
+              trackId={track.id}
+              recordingContributions={track.recordingContributions}
+              works={track.works}
+              provenanceReceipt={track.provenanceReceipt}
+            />
 
             <TrackLyricsSection
               trackId={track.id} trackSlug={track.slug} artistSlug={track.artistSlug} trackTitle={track.title} artistName={track.artist} lyrics={track.lyrics} lyricsContributor={track.lyricsContributor} />
