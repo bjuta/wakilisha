@@ -842,14 +842,6 @@ begin
       message='Reviewed credit correction requires an active canonical Artist.';
   end if;
 
-  if public.wk_slugify_text(v_artist.display_name)
-       is distinct from v_artist.slug
-     and lower(v_artist.slug)<>lower(public.wk_slugify_text(v_artist.display_name))
-  then
-    raise exception using errcode='23514',
-      message='Reviewed Artist identity is not route-stable.';
-  end if;
-
   v_evidence_text:=lower(
     coalesce(v_review.source_payload#>>'{evidence,title}','')||' '||
     coalesce(v_review.summary,'')||' '||
@@ -1999,19 +1991,6 @@ begin
       message='Requested Artist identity is not present in frozen review/decision evidence.';
   end if;
 
-  if exists (
-       select 1
-       from public.registry_artists artist
-       where lower(artist.slug)=lower(v_slug)
-          or platform_private.registry_identity_normalize_text_v1(
-               artist.display_name
-             )=v_normalized_name
-     )
-  then
-    raise exception using errcode='23505',
-      message='Reviewed Artist identity already exists in canonical Registry authority.';
-  end if;
-
   v_source_fingerprint:=encode(
     extensions.digest(
       jsonb_build_object(
@@ -2143,8 +2122,76 @@ declare
   v_grant_id uuid;
   v_execution record;
   v_verification record;
+  v_prior record;
+  v_prior_desired jsonb;
+  v_current jsonb;
 begin
   perform platform_private.registry_public_music_identity_current_admin_v1();
+
+  select
+    operation.id as operation_id,
+    operation.result_payload,
+    execution_grant.plan_payload
+  into v_prior
+  from platform_private.registry_mutation_operations operation
+  join platform_private.registry_execution_grants execution_grant
+    on execution_grant.id=operation.execution_grant_id
+  where operation.actor_key='registry_public_music_identity_credit_admin'
+    and operation.operation_key='registry.track_artist_credit.reviewed_reconcile'
+    and operation.operation_version=2
+    and operation.status='succeeded'
+    and operation.verifier_status='passed'
+    and execution_grant.plan_payload->>'review_id'=p_review_id::text
+    and execution_grant.plan_payload->>'decision_id'=p_decision_id::text
+    and execution_grant.plan_payload->>'track_id'=p_track_id::text
+    and execution_grant.plan_payload->'desired'->>'artist_id'=p_artist_id::text
+    and execution_grant.plan_payload->'desired'->>'role'=p_role
+    and (execution_grant.plan_payload->'desired'->>'credit_order')::integer
+          =p_credit_order
+    and execution_grant.plan_payload->'desired'->>'display_credit'
+          is not distinct from btrim(p_display_credit)
+  order by operation.completed_at desc nulls last,operation.id
+  limit 1;
+
+  if found then
+    v_prior_desired:=v_prior.plan_payload->'desired';
+
+    select to_jsonb(credit)
+    into v_current
+    from public.registry_track_artists credit
+    where credit.id=(v_prior.result_payload->>'relation_id')::uuid;
+
+    if v_current is not null
+       and v_current->>'track_id'=p_track_id::text
+       and v_current->>'artist_id'=p_artist_id::text
+       and v_current->>'role'=p_role
+       and (v_current->>'credit_order')::integer=p_credit_order
+       and v_current->>'display_credit' is not distinct from btrim(p_display_credit)
+       and v_current->>'artist_slug' is not distinct from v_prior_desired->>'artist_slug'
+       and v_current->>'artist_name_text' is not distinct from v_prior_desired->>'artist_name_text'
+       and (v_current->>'is_primary')::boolean=(v_prior_desired->>'is_primary')::boolean
+       and (v_current->>'is_featured')::boolean=(v_prior_desired->>'is_featured')::boolean
+       and v_current->>'source'='public_music_identity_review'
+       and (v_current->>'confidence')::integer=100
+       and v_current->>'status'='active'
+       and v_current->'metadata'->>'source_review_id'=p_review_id::text
+       and v_current->'metadata'->>'source_decision_id'=p_decision_id::text
+       and v_current->'metadata'->>'correction_contract'
+            ='public-music-identity-reviewed-credit-reconcile-v1'
+    then
+      return jsonb_build_object(
+        'review_id',p_review_id,
+        'decision_id',p_decision_id,
+        'track_id',p_track_id,
+        'artist_id',p_artist_id,
+        'relation_id',v_prior.result_payload->>'relation_id',
+        'mode','already_current',
+        'operation_id',v_prior.operation_id,
+        'verifier_status','passed',
+        'idempotent_replay',true
+      );
+    end if;
+  end if;
 
   v_snapshot:=
     platform_private.registry_public_music_identity_credit_review_snapshot_v1(
