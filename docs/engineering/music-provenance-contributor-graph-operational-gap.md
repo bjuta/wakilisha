@@ -587,3 +587,17 @@ The provenance moat becomes real only when all participants in Recordings and
 Works can be represented through canonical, evidence-backed, governed
 contributions and those relationships are visible through public product
 surfaces.
+
+
+## Cross-stack implementation dependency
+
+Contributor provenance affects more than canonical contribution tables.
+
+The required schema, public read, Artist/Group/Track presentation, SEO,
+prerender, JSON-LD, GA4, Admin, MIZIZI, CI and Production control-plane changes
+are inventoried in:
+
+`docs/engineering/music-provenance-cross-stack-platform-impact-audit.md`
+
+No contribution-admission implementation should be reviewed as complete unless
+its downstream contracts are evaluated against that impact audit.
