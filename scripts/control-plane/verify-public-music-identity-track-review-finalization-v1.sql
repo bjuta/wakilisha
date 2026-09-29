@@ -1,6 +1,7 @@
 do $verify$
 declare
   v_evidence text;
+  v_operation_receipt_gate text;
   v_guard text;
   v_finalizer text;
   v_policy text;
@@ -73,10 +74,25 @@ begin
       'Terminal evidence binding drifted';
   end if;
 
-  if v_evidence not like
-       '%if v_decision_type in (%public_music_identity_safe_slug_repair%public_music_identity_true_duplicate%'
-     or v_evidence like
-       '%if v_decision_type in (%public_music_identity_safe_slug_repair%public_music_identity_distinct_recording%public_music_identity_true_duplicate%'
+  v_operation_receipt_gate:=
+    substring(
+      v_evidence
+      from greatest(
+        strpos(
+          v_evidence,
+          'This decision requires exactly one verified canonical operation receipt.'
+        ) - 900,
+        1
+      )
+      for 1200
+    );
+
+  if v_operation_receipt_gate not like
+       '%public_music_identity_safe_slug_repair%'
+     or v_operation_receipt_gate not like
+       '%public_music_identity_true_duplicate%'
+     or v_operation_receipt_gate like
+       '%public_music_identity_distinct_recording%'
   then
     raise exception
       'Distinct-recording finalization regained a fake canonical operation requirement';
