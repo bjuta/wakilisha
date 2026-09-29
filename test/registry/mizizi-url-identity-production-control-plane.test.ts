@@ -268,10 +268,22 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "ACTIVE_FEATURE_SLUG_OUTSIDE_OPEN_SCOPE=",
     );
     expect(actualZero).toContain(
+      "ACTIVE_FEATURE_SLUG_WITH_RESOLVED_SCOPE=",
+    );
+    expect(actualZero).toContain(
+      "ACTIVE_SYNTHETIC_SUFFIX_COUNT=",
+    );
+    expect(actualZero).toContain(
       "ACTIVE_ROUTE_MANIFEST_FINGERPRINT=",
     );
     expect(actualZero).toContain(
       "DIRTY_PUBLIC_TRACK_ROUTE ",
+    );
+    expect(actualZero).toContain(
+      "SYNTHETIC_PUBLIC_TRACK_ROUTE ",
+    );
+    expect(actualZero).toContain(
+      "track.slug ~ '-[0-9a-f]{6}$'",
     );
     expect(actualZero).toContain(
       "PUBLIC_MUSIC_IDENTITY_TRACK_ACTUAL_ZERO=PASS",
