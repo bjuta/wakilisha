@@ -376,6 +376,7 @@ create index registry_contribution_attestations_asserting_user_idx
 
 create table platform_private.registry_contribution_attestation_state_events (
   id uuid primary key default gen_random_uuid(),
+  event_sequence bigint generated always as identity unique,
   attestation_id uuid not null
     references platform_private.registry_contribution_attestations(id)
     on update restrict
@@ -424,12 +425,12 @@ create table platform_private.registry_contribution_attestation_state_events (
 create index registry_contribution_attestation_state_events_attestation_idx
   on platform_private.registry_contribution_attestation_state_events(
     attestation_id,
-    created_at desc,
-    id desc
+    event_sequence desc
   );
 
 create table platform_private.registry_contribution_attestation_permission_versions (
   id uuid primary key default gen_random_uuid(),
+  event_sequence bigint generated always as identity unique,
   attestation_id uuid not null
     references platform_private.registry_contribution_attestations(id)
     on update restrict
@@ -509,8 +510,7 @@ create table platform_private.registry_contribution_attestation_permission_versi
 create index registry_contribution_attestation_permissions_attestation_idx
   on platform_private.registry_contribution_attestation_permission_versions(
     attestation_id,
-    created_at desc,
-    id desc
+    event_sequence desc
   );
 
 create unique index registry_contribution_attestation_permissions_one_root
@@ -537,7 +537,7 @@ as $$
   select event.state
   from platform_private.registry_contribution_attestation_state_events event
   where event.attestation_id=p_attestation_id
-  order by event.created_at desc,event.id desc
+  order by event.event_sequence desc
   limit 1
 $$;
 
@@ -597,7 +597,7 @@ begin
   into v_first_state
   from platform_private.registry_contribution_attestation_state_events event
   where event.attestation_id=v_attestation_id
-  order by event.created_at,event.id
+  order by event.event_sequence
   limit 1;
 
   if v_first_state is distinct from 'asserted' then

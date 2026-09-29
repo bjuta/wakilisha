@@ -188,6 +188,25 @@ begin
     raise exception 'Attestation elicitation provenance vocabulary drifted';
   end if;
 
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema='platform_private'
+      and table_name='registry_contribution_attestation_state_events'
+      and column_name='event_sequence'
+      and is_identity='YES'
+  )
+  or not exists (
+    select 1
+    from information_schema.columns
+    where table_schema='platform_private'
+      and table_name='registry_contribution_attestation_permission_versions'
+      and column_name='event_sequence'
+      and is_identity='YES'
+  ) then
+    raise exception 'Attestation history lacks deterministic append order';
+  end if;
+
   select pg_get_constraintdef(oid)
   into v_constraint
   from pg_constraint
