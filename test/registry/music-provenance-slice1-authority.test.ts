@@ -98,6 +98,12 @@ describe("Music provenance Slice 1 authority", () => {
     expect(identityMigration).toContain(
       "registry_contribution_attestation_permissions_append_only",
     );
+    expect(identityMigration).toContain(
+      "registry_contribution_attestation_permissions_one_root",
+    );
+    expect(identityMigration).toContain(
+      "registry_contribution_attestation_permissions_one_successor",
+    );
     expect(identityMigration).toContain("public_display");
     expect(identityMigration).toContain("cmo_rights_contexts");
     expect(identityMigration).toContain("approved_partner_keys");

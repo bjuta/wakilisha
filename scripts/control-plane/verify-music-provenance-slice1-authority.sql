@@ -134,6 +134,16 @@ begin
     raise exception 'Contribution attestation authority leaked outside platform_private';
   end if;
 
+  if to_regclass(
+       'platform_private.registry_contribution_attestation_permissions_one_root'
+     ) is null
+     or to_regclass(
+       'platform_private.registry_contribution_attestation_permissions_one_successor'
+     ) is null
+  then
+    raise exception 'Attestation permission-version chain can fork or have multiple roots';
+  end if;
+
   if not exists (
     select 1
     from pg_trigger

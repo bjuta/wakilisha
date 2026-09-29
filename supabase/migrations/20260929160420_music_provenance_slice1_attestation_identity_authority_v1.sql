@@ -513,6 +513,18 @@ create index registry_contribution_attestation_permissions_attestation_idx
     id desc
   );
 
+create unique index registry_contribution_attestation_permissions_one_root
+  on platform_private.registry_contribution_attestation_permission_versions(
+    attestation_id
+  )
+  where supersedes_permission_id is null;
+
+create unique index registry_contribution_attestation_permissions_one_successor
+  on platform_private.registry_contribution_attestation_permission_versions(
+    supersedes_permission_id
+  )
+  where supersedes_permission_id is not null;
+
 create function platform_private.registry_contribution_attestation_current_state_v1(
   p_attestation_id uuid
 )
