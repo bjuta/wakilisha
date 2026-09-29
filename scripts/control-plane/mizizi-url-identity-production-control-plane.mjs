@@ -156,7 +156,7 @@ const EXPECTED_BLOBS = {
   "supabase/migrations/20260925141117_public_music_identity_track_slug_zero_v2.sql":
     "285697c98741a2395262e7447de51dac0fa47f2c",
   "supabase/migrations/20260925213519_public_music_identity_track_slug_primary_followup_v1.sql":
-    "3fba2832b2a49a93cbf990954bc2da8c56ae3d0a",
+    "7569d93e68da9f2b28df88e43f64fe471fa1b848",
 };
 
 const APPLY_SCOPES = {
