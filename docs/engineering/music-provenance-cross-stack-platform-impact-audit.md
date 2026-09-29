@@ -749,3 +749,22 @@ It is:
 > make WAKILISHA's evidence-backed music provenance graph a first-class,
 > governed public product without weakening the existing Registry, identity,
 > route, analytics, SEO or Production-control-plane guarantees.
+
+
+## Binding execution scope
+
+The impact inventory in this document is implemented through the four-slice
+programme frozen in:
+
+`docs/engineering/music-provenance-mizizi-binding-execution-scope-20260929.md`
+
+That document is the binding source for:
+
+- slice boundaries;
+- creator/public UX manifestation;
+- schema-vs-engine timing;
+- MIZIZI earned-autonomy sequencing;
+- control-plane ownership;
+- programme exit gates.
+
+This impact audit remains the cross-stack dependency inventory.
