@@ -262,8 +262,14 @@ describe("canonical public Track and Release routes", () => {
     expect(chartArtistResolver).not.toContain(
       "trackSlugsNeedingLookup",
     );
-    expect(chartArtistResolver).not.toContain(
-      '.in("slug",',
+    expect(chartArtistResolver).toContain(
+      '.in("track_id", allTrackIds)',
+    );
+    expect(chartArtistResolver).toContain(
+      '.in("slug", relationshipSlugs)',
+    );
+    expect(chartArtistResolver).toContain(
+      '.in("alias_slug", relationshipSlugs)',
     );
   });
 
