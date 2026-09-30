@@ -43,6 +43,407 @@ export type MiziziFinding = {
   evidence: Record<string, unknown>;
 };
 
+export type EvidenceLineageInput = {
+  id: string;
+  subjectType: string;
+  subjectId: string;
+  claimKey: string;
+  claimPayload: unknown;
+  sourceKind: string;
+  sourceRef: string;
+  sourcePayloadFingerprint: string;
+  parentAssertionId?: string | null;
+  originatorRef?: string | null;
+  upstreamSourceRef?: string | null;
+  lineageKey?: string | null;
+  independenceGroupHint?: string | null;
+  verificationMethod?: string | null;
+  sourceUseBasis?: string | null;
+};
+
+export type EvidenceLineageBasis =
+  | "explicit_lineage"
+  | "parent_assertion"
+  | "upstream_source"
+  | "independence_group_hint"
+  | "exact_payload_echo"
+  | "unknown";
+
+export type EvidenceLineageGroup = {
+  groupKey: string;
+  basis: EvidenceLineageBasis[];
+  independenceStatus: "related" | "unknown";
+  assertionIds: string[];
+  subjectCount: number;
+  sourceKinds: string[];
+  sourceRefs: string[];
+  claimPayloadFingerprints: string[];
+  hasDissent: boolean;
+};
+
+function stableJsonValue(
+  value: unknown,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map(stableJsonValue);
+  }
+
+  if (
+    value &&
+    typeof value === "object"
+  ) {
+    return Object.fromEntries(
+      Object.entries(
+        value as Record<string, unknown>,
+      )
+        .sort(([left], [right]) =>
+          left.localeCompare(right),
+        )
+        .map(([key, item]) => [
+          key,
+          stableJsonValue(item),
+        ]),
+    );
+  }
+
+  return value;
+}
+
+function stablePayloadFingerprint(
+  value: unknown,
+): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify(
+        stableJsonValue(value),
+      ),
+    )
+    .digest("hex");
+}
+
+export function analyzeEvidenceLineage(
+  assertions: EvidenceLineageInput[],
+): EvidenceLineageGroup[] {
+  if (assertions.length === 0) {
+    return [];
+  }
+
+  const parents = assertions.map(
+    (_, index) => index,
+  );
+
+  const find = (index: number): number => {
+    let current = index;
+
+    while (parents[current] !== current) {
+      parents[current] =
+        parents[parents[current]];
+      current = parents[current];
+    }
+
+    return current;
+  };
+
+  const union = (
+    left: number,
+    right: number,
+  ): void => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+
+    if (leftRoot !== rightRoot) {
+      parents[rightRoot] = leftRoot;
+    }
+  };
+
+  const relationMembers =
+    new Map<
+      string,
+      {
+        basis: Exclude<
+          EvidenceLineageBasis,
+          "unknown"
+        >;
+        indexes: number[];
+      }
+    >();
+
+  const addRelation = (
+    key: string,
+    basis: Exclude<
+      EvidenceLineageBasis,
+      "unknown"
+    >,
+    index: number,
+  ): void => {
+    if (!key) return;
+
+    const existing =
+      relationMembers.get(key);
+
+    if (existing) {
+      existing.indexes.push(index);
+      return;
+    }
+
+    relationMembers.set(key, {
+      basis,
+      indexes: [index],
+    });
+  };
+
+  assertions.forEach(
+    (assertion, index) => {
+      addRelation(
+        "assertion:" + assertion.id,
+        "parent_assertion",
+        index,
+      );
+
+      if (assertion.parentAssertionId) {
+        addRelation(
+          "assertion:" +
+            assertion.parentAssertionId,
+          "parent_assertion",
+          index,
+        );
+      }
+
+      if (assertion.lineageKey) {
+        addRelation(
+          "lineage:" +
+            assertion.lineageKey,
+          "explicit_lineage",
+          index,
+        );
+      }
+
+      if (assertion.upstreamSourceRef) {
+        addRelation(
+          "upstream:" +
+            assertion.upstreamSourceRef,
+          "upstream_source",
+          index,
+        );
+      }
+
+      if (
+        assertion.independenceGroupHint
+      ) {
+        addRelation(
+          "independence:" +
+            assertion.independenceGroupHint,
+          "independence_group_hint",
+          index,
+        );
+      }
+
+      if (
+        assertion.sourcePayloadFingerprint
+      ) {
+        addRelation(
+          "payload:" +
+            assertion.sourcePayloadFingerprint,
+          "exact_payload_echo",
+          index,
+        );
+      }
+    },
+  );
+
+  for (
+    const relation
+    of relationMembers.values()
+  ) {
+    if (relation.indexes.length < 2) {
+      continue;
+    }
+
+    const first = relation.indexes[0];
+
+    for (
+      const index
+      of relation.indexes.slice(1)
+    ) {
+      union(first, index);
+    }
+  }
+
+  const componentIndexes =
+    new Map<number, number[]>();
+
+  assertions.forEach((_, index) => {
+    const root = find(index);
+    const indexes =
+      componentIndexes.get(root) || [];
+
+    indexes.push(index);
+    componentIndexes.set(
+      root,
+      indexes,
+    );
+  });
+
+  const basisByRoot =
+    new Map<
+      number,
+      Set<
+        Exclude<
+          EvidenceLineageBasis,
+          "unknown"
+        >
+      >
+    >();
+
+  for (
+    const relation
+    of relationMembers.values()
+  ) {
+    if (relation.indexes.length < 2) {
+      continue;
+    }
+
+    const root =
+      find(relation.indexes[0]);
+    const basis =
+      basisByRoot.get(root) ||
+      new Set();
+
+    basis.add(relation.basis);
+    basisByRoot.set(root, basis);
+  }
+
+  return [
+    ...componentIndexes.entries(),
+  ]
+    .map(([root, indexes]) => {
+      const rows =
+        indexes
+          .map(
+            (index) =>
+              assertions[index],
+          )
+          .sort(
+            (left, right) =>
+              left.id.localeCompare(
+                right.id,
+              ),
+          );
+
+      const basisSet =
+        basisByRoot.get(root) ||
+        new Set();
+
+      const basis:
+        EvidenceLineageBasis[] =
+        basisSet.size > 0
+          ? [...basisSet].sort()
+          : ["unknown"];
+
+      const claimVariants =
+        new Map<string, Set<string>>();
+
+      for (const row of rows) {
+        const claimIdentity = [
+          row.subjectType,
+          row.subjectId,
+          row.claimKey,
+        ].join(":");
+
+        const variants =
+          claimVariants.get(
+            claimIdentity,
+          ) || new Set();
+
+        variants.add(
+          stablePayloadFingerprint(
+            row.claimPayload,
+          ),
+        );
+
+        claimVariants.set(
+          claimIdentity,
+          variants,
+        );
+      }
+
+      const assertionIds =
+        rows.map((row) => row.id);
+
+      return {
+        groupKey:
+          createHash("sha256")
+            .update(
+              JSON.stringify({
+                assertions:
+                  assertionIds,
+                basis,
+              }),
+            )
+            .digest("hex"),
+        basis,
+        independenceStatus:
+          rows.length > 1 &&
+          basis[0] !== "unknown"
+            ? "related"
+            : "unknown",
+        assertionIds,
+        subjectCount:
+          new Set(
+            rows.map(
+              (row) =>
+                row.subjectType +
+                ":" +
+                row.subjectId,
+            ),
+          ).size,
+        sourceKinds: [
+          ...new Set(
+            rows
+              .map(
+                (row) =>
+                  row.sourceKind,
+              )
+              .filter(Boolean),
+          ),
+        ].sort(),
+        sourceRefs: [
+          ...new Set(
+            rows
+              .map(
+                (row) =>
+                  row.sourceRef,
+              )
+              .filter(Boolean),
+          ),
+        ].sort(),
+        claimPayloadFingerprints: [
+          ...new Set(
+            rows.map(
+              (row) =>
+                stablePayloadFingerprint(
+                  row.claimPayload,
+                ),
+            ),
+          ),
+        ].sort(),
+        hasDissent:
+          [...claimVariants.values()]
+            .some(
+              (variants) =>
+                variants.size > 1,
+            ),
+      };
+    })
+    .sort(
+      (left, right) =>
+        left.assertionIds[0]
+          .localeCompare(
+            right.assertionIds[0],
+          ),
+    );
+}
+
 export type TrackIdentityInput = {
   id: string;
   slug: string;
