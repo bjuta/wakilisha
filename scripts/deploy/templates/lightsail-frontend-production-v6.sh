@@ -203,6 +203,40 @@ ssh \
 
 echo 'LIGHTSAIL_PREFLIGHT=PASS'
 
+printf '\n=== NGINX PRE-ACTIVATION HEALTH ===\n'
+ssh \
+  -i "$SSH_KEY" \
+  -o BatchMode=yes \
+  -o StrictHostKeyChecking=accept-new \
+  "${SSH_USER}@${HOST}" \
+  "set -eu; sudo systemctl is-active --quiet nginx; sudo nginx -t"
+
+for route in / /messages /admin/messages; do
+  code="$(
+    curl \
+      -ksS \
+      --connect-timeout 5 \
+      --max-time 15 \
+      -o /dev/null \
+      -w '%{http_code}' \
+      --resolve "wakilisha.africa:443:${HOST}" \
+      "https://wakilisha.africa${route}"
+  )"
+
+  printf 'PRE_ACTIVATION_ORIGIN_ROUTE=%s HTTP=%s\n' "$route" "$code"
+  test "$code" = "200"
+done
+
+ssh \
+  -i "$SSH_KEY" \
+  -o BatchMode=yes \
+  -o StrictHostKeyChecking=accept-new \
+  "${SSH_USER}@${HOST}" \
+  "set -eu; test -f /etc/nginx/snippets/wakilisha-audio-public-delivery.conf; sudo grep -Fq 'resolver 127.0.0.53 valid=30s ipv6=off;' /etc/nginx/snippets/wakilisha-audio-public-delivery.conf; test \"\$(sudo grep -Fc 'proxy_pass https://\\$wk_audio_public_upstream_host;' /etc/nginx/snippets/wakilisha-audio-public-delivery.conf)\" = '2'; ! sudo grep -Fq 'proxy_pass https://pgzizndxdyhqmtyywjmt.supabase.co;' /etc/nginx/snippets/wakilisha-audio-public-delivery.conf"
+
+echo 'NGINX_PRE_ACTIVATION_HEALTH=PASS'
+echo 'AUDIO_RUNTIME_DNS_AUTHORITY=PASS'
+
 UTC_STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 SHORT_SHA="$(printf '%s' "$EXPECTED_MAIN" | cut -c1-8)"
 BACKUP="${BACKUP_ROOT}/gate-d-${UTC_STAMP}-${SHORT_SHA}"
@@ -372,6 +406,8 @@ for route in / /messages /admin/messages; do
   code="$(
     curl \
       -ksS \
+      --connect-timeout 5 \
+      --max-time 15 \
       -o /dev/null \
       -w '%{http_code}' \
       --resolve "wakilisha.africa:443:${HOST}" \
@@ -385,6 +421,8 @@ done
 DIRECT_ENTRY_SHA="$(
   curl \
     -ksS \
+    --connect-timeout 5 \
+    --max-time 30 \
     --resolve "wakilisha.africa:443:${HOST}" \
     "https://wakilisha.africa/${LOCAL_ENTRY}" \
     | shasum -a 256 \
@@ -401,6 +439,8 @@ for route in / /messages /admin/messages; do
   code="$(
     curl \
       -sS \
+      --connect-timeout 5 \
+      --max-time 15 \
       -o /dev/null \
       -w '%{http_code}' \
       "https://wakilisha.africa${route}"
@@ -413,6 +453,8 @@ done
 PUBLIC_ENTRY_SHA="$(
   curl \
     -sS \
+    --connect-timeout 5 \
+    --max-time 30 \
     "https://wakilisha.africa/${LOCAL_ENTRY}" \
     | shasum -a 256 \
     | awk '{print $1}'

@@ -10,7 +10,7 @@ SCRIPT_DIR="$(
   CDPATH= cd -- "$(dirname -- "$0")" >/dev/null 2>&1
   pwd
 )"
-TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v5.sh"
+TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v6.sh"
 
 EXPECTED_MAIN=""
 DEPLOY_LABEL=""
