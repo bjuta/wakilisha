@@ -31,6 +31,12 @@ const personPage =
     "utf8",
   );
 
+const personMusicCredits =
+  readFileSync(
+    "src/pages/people/detail/components/PersonMusicCredits.tsx",
+    "utf8",
+  );
+
 const authorPage =
   readFileSync(
     "src/pages/authors/detail/page.tsx",
@@ -312,6 +318,41 @@ describe(
         expect(personPage)
           .not.toContain(
             "resolveAuthorMeta",
+          );
+      },
+    );
+
+    it(
+      "adds verified canonical music credits without turning pending assertions into public Person work",
+      () => {
+        expect(service)
+          .toContain(
+            "getPublicPersonMusicCredits",
+          );
+
+        expect(personPage)
+          .toContain(
+            "getPublicPersonMusicCredits",
+          );
+
+        expect(personPage)
+          .toContain(
+            'label: "Music Credits"',
+          );
+
+        expect(personPage)
+          .toContain(
+            "<PersonMusicCredits",
+          );
+
+        expect(personMusicCredits)
+          .toContain(
+            "Pending claims are never shown publicly.",
+          );
+
+        expect(personMusicCredits)
+          .not.toContain(
+            "registry_contribution_attestations",
           );
       },
     );

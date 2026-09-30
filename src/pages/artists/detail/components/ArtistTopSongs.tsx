@@ -62,6 +62,8 @@ function SongExpandedPanel({
         artworkUrl: song.image,
         isPlayable: true,
         previewUrl: song.songUrl,
+        artistSlug: song.artistSlug || artistSlug,
+        trackSlug: song.slug,
       },
       undefined,
       {
@@ -157,6 +159,8 @@ function ArtistSongRow({
       artworkUrl: song.image,
       isPlayable: true,
       previewUrl: song.songUrl,
+      artistSlug: song.artistSlug || artistSlug,
+      trackSlug: song.slug,
     }, undefined, {
       pageType: "artist_detail",
       entitySlug: artistSlug,

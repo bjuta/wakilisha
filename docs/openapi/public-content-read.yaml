@@ -184,8 +184,8 @@ paths:
 
   /tracks/{artistSlug}/{trackSlug}:
     get:
-      summary: Canonical Track detail by Artist and Track slug
-      description: Registry Track UUID remains internal identity. Ambiguous Artist-scoped Track identity fails closed for human review.
+      summary: Track detail by active MainArtist route and Track slug
+      description: Any active MainArtist binding may resolve the Track. The response exposes sequence-one canonical identity, all active MainArtist route bindings, and verified canonical Recording/Work contributions. FeaturedArtist does not gain route ownership.
       operationId: getTrackDetail
       tags: [Tracks]
       parameters:
@@ -199,19 +199,16 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          description: Unique Track detail
+          description: Unique Track detail with structured billing, provenance, canonical route identity, chart history, and release context
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data:
-                    type: object
-                    properties:
-                      track:
-                        $ref: "#/components/schemas/TrackDetail"
+                    $ref: "#/components/schemas/TrackDetailPayload"
         "404":
-          description: Track not found for Artist scope
+          description: Track not found for active MainArtist scope
         "409":
           description: Ambiguous Track identity; human review is required
 
@@ -596,6 +593,7 @@ components:
         topSongs: { type: array, items: { $ref: "#/components/schemas/TopSong" } }
         relatedArtists: { type: array, items: { $ref: "#/components/schemas/RelatedArtist" } }
         videos: { type: array, items: { $ref: "#/components/schemas/VideoRef" } }
+        musicProvenance: { $ref: "#/components/schemas/ArtistMusicProvenance" }
         discographySource: { type: string }
 
     ArtistRef:
@@ -667,6 +665,7 @@ components:
     TrackOut:
       type: object
       properties:
+        artistSlug: { type: string }
         title: { type: string }
         duration: { type: string }
         artists: { type: string }
@@ -677,6 +676,7 @@ components:
       properties:
         id: { type: string }
         slug: { type: string }
+        artistSlug: { type: string }
         title: { type: string }
         artist: { type: string }
         duration: { type: number }
@@ -724,6 +724,110 @@ components:
         isFeatured: { type: boolean }
         creditOrder: { type: integer }
         role: { type: string }
+
+    TrackRouteBinding:
+      type: object
+      properties:
+        artistId: { type: string }
+        artistSlug: { type: string }
+        artistName: { type: string }
+        displaySequence: { type: integer }
+        isCanonical: { type: boolean }
+        path: { type: string }
+
+    ContributionResolvedEntity:
+      type: object
+      nullable: true
+      properties:
+        kind: { type: string, enum: [person, artist, organization] }
+        id: { type: string }
+        name: { type: string }
+        path: { type: string, nullable: true }
+
+    MusicContribution:
+      type: object
+      properties:
+        id: { type: string }
+        creditedName: { type: string }
+        roleKey: { type: string }
+        roleLabel: { type: string }
+        instrument: { type: string, nullable: true }
+        detail: { type: string, nullable: true }
+        creditOrder: { type: integer, nullable: true }
+        resolvedEntity: { $ref: "#/components/schemas/ContributionResolvedEntity" }
+
+    WorkProvenance:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        relationshipKind: { type: string }
+        contributions: { type: array, items: { $ref: "#/components/schemas/MusicContribution" } }
+
+    ProvenanceReceipt:
+      type: object
+      nullable: true
+      properties:
+        summary: { type: string }
+        lastCheckedAt: { type: string, format: date-time, nullable: true }
+
+    PublicMusicSubject:
+      type: object
+      nullable: true
+      properties:
+        kind: { type: string, enum: [track, work] }
+        id: { type: string }
+        title: { type: string }
+        path: { type: string, nullable: true }
+        artworkUrl: { type: string, nullable: true }
+
+    ArtistMusicCredit:
+      type: object
+      properties:
+        id: { type: string }
+        roleKey: { type: string }
+        roleLabel: { type: string }
+        subject: { $ref: "#/components/schemas/PublicMusicSubject" }
+
+    ArtistGroupMember:
+      type: object
+      properties:
+        membershipId: { type: string }
+        roleKey: { type: string }
+        roleLabel: { type: string }
+        roleDetail: { type: string, nullable: true }
+        validFrom: { type: string, nullable: true }
+        validTo: { type: string, nullable: true }
+        person:
+          type: object
+          properties:
+            kind: { type: string, enum: [person] }
+            id: { type: string }
+            name: { type: string }
+            path: { type: string, nullable: true }
+
+    ArtistMusicProvenance:
+      type: object
+      properties:
+        artistId: { type: string }
+        recordingCredits: { type: array, items: { $ref: "#/components/schemas/ArtistMusicCredit" } }
+        workCredits: { type: array, items: { $ref: "#/components/schemas/ArtistMusicCredit" } }
+        groupMembers: { type: array, items: { $ref: "#/components/schemas/ArtistGroupMember" } }
+
+    TrackDetailPayload:
+      type: object
+      properties:
+        track: { $ref: "#/components/schemas/TrackDetail" }
+        artist: { $ref: "#/components/schemas/ArtistRef" }
+        artists: { type: array, items: { $ref: "#/components/schemas/TrackArtistRole" } }
+        canonicalPath: { type: string }
+        routeBindings: { type: array, items: { $ref: "#/components/schemas/TrackRouteBinding" } }
+        recordingContributions: { type: array, items: { $ref: "#/components/schemas/MusicContribution" } }
+        works: { type: array, items: { $ref: "#/components/schemas/WorkProvenance" } }
+        provenanceReceipt: { $ref: "#/components/schemas/ProvenanceReceipt" }
+        release: { $ref: "#/components/schemas/TrackReleaseRef", nullable: true }
+        label: { $ref: "#/components/schemas/LabelRef", nullable: true }
+        genres: { type: array, items: { $ref: "#/components/schemas/GenreRef" } }
 
     TrackReleaseRef:
       type: object

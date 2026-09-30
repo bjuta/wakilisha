@@ -102,12 +102,52 @@ export interface PublicTrackArtist {
 }
 
 export interface PublicTrackArtistRole {
+  artistId?: string;
   name: string;
   slug: string;
   isPrimary: boolean;
   isFeatured: boolean;
   creditOrder: number;
   role: string;
+}
+
+export interface PublicTrackRouteBinding {
+  artistId: string;
+  artistSlug: string;
+  artistName: string;
+  displaySequence: number;
+  isCanonical: boolean;
+  path: string;
+}
+
+export interface PublicContributionResolvedEntity {
+  kind: "person" | "artist" | "organization";
+  id: string;
+  name: string;
+  path: string | null;
+}
+
+export interface PublicMusicContribution {
+  id: string;
+  creditedName: string;
+  roleKey: string;
+  roleLabel: string;
+  instrument: string | null;
+  detail: string | null;
+  creditOrder: number | null;
+  resolvedEntity: PublicContributionResolvedEntity | null;
+}
+
+export interface PublicTrackWorkProvenance {
+  id: string;
+  title: string;
+  relationshipKind: string;
+  contributions: PublicMusicContribution[];
+}
+
+export interface PublicProvenanceReceipt {
+  summary: string;
+  lastCheckedAt: string | null;
 }
 
 // v28: enriched release with label and track count for NLG summaries
@@ -150,6 +190,11 @@ export interface PublicTrackDetail {
   // v28: structured per-role artist list (primary, featured, etc.)
   artists: PublicTrackArtistRole[];
   artist: PublicTrackArtist;
+  canonicalPath: string;
+  routeBindings: PublicTrackRouteBinding[];
+  recordingContributions: PublicMusicContribution[];
+  works: PublicTrackWorkProvenance[];
+  provenanceReceipt: PublicProvenanceReceipt | null;
   release: PublicTrackRelease | null;
   label: PublicTrackLabel | null;
   genres: PublicTrackGenreRef[];

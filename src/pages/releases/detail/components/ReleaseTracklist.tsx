@@ -48,7 +48,7 @@ export default function ReleaseTracklist({
       appleMusicCatalogId: t.appleMusicCatalogId || t.appleMusicId || null,
       album: release.title,
       releaseId: release.id,
-      artistSlug,
+      artistSlug: t.artistSlug || undefined,
       trackSlug: t.slug,
     }));
 
@@ -65,7 +65,7 @@ export default function ReleaseTracklist({
       appleMusicCatalogId: t.appleMusicCatalogId || t.appleMusicId || null,
       album: release.title,
       releaseId: release.id,
-      artistSlug,
+      artistSlug: t.artistSlug || undefined,
       trackSlug: t.slug,
     }));
 
@@ -96,9 +96,12 @@ export default function ReleaseTracklist({
           {tracks.map((track, index) => {
             const isCurrentTrack = currentTrack?.id === track.id;
             const isThisPlaying = isCurrentTrack && isPlaying;
-            const trackHref = canonicalTrackUrl(
-              artistSlug,
-              track.slug);
+            const trackHref = track.artistSlug
+              ? canonicalTrackUrl(
+                  track.artistSlug,
+                  track.slug,
+                )
+              : null;
 
             return (
               <div
@@ -134,9 +137,10 @@ export default function ReleaseTracklist({
                 </PlayableArtwork>
 
                 {/* Track info — clicking navigates to track detail */}
-                <Link
-                  to={trackHref}
-                  className="min-w-0 block"
+                {trackHref ? (
+                  <Link
+                    to={trackHref}
+                    className="min-w-0 block"
                   onClick={(e) => {
                     // Don't navigate if we're interacting with the play button area
                     if ((e.target as HTMLElement).closest("button")) {
@@ -150,7 +154,17 @@ export default function ReleaseTracklist({
                   <div className="mt-1 truncate text-[11px] font-semibold text-[var(--wk-text-muted)]">
                     {track.artist}
                   </div>
-                </Link>
+                  </Link>
+                ) : (
+                  <div className="min-w-0">
+                    <div className="line-clamp-2 text-[14px] font-extrabold leading-tight text-[var(--wk-text)]">
+                      {track.title}
+                    </div>
+                    <div className="mt-1 truncate text-[11px] font-semibold text-[var(--wk-text-muted)]">
+                      {track.artist}
+                    </div>
+                  </div>
+                )}
 
                 {/* Duration */}
                 <div className="text-[12px] font-bold text-[var(--wk-text-faint)] text-right tabular-nums">
@@ -162,7 +176,7 @@ export default function ReleaseTracklist({
                   registryTrackId={track.id}
                   trackTitle={track.title}
                   artistName={track.artist}
-                  artistSlug={artistSlug}
+                  artistSlug={track.artistSlug || null}
                   artworkUrl={track.artworkUrl || release.artworkUrl}
                   trackSlug={track.slug}
                   trackHref={trackHref}

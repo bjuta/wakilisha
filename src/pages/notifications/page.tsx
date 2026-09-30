@@ -45,6 +45,8 @@ const NOTIFICATION_LABELS: Record<
   post_repost: "reposted your Post",
   post_quote: "quoted your Post",
   direct_message: "sent you a message",
+  credit_confirmation_request: "asked you to confirm a music credit",
+  credit_confirmation_response: "responded to your music credit request",
 };
 
 const NOTIFICATION_ICONS: Record<
@@ -63,6 +65,8 @@ const NOTIFICATION_ICONS: Record<
   post_repost: "ri-repeat-2-line",
   post_quote: "ri-double-quotes-l",
   direct_message: "ri-mail-line",
+  credit_confirmation_request: "ri-music-2-line",
+  credit_confirmation_response: "ri-checkbox-circle-line",
 };
 
 function timeAgo(value: string): string {
@@ -118,6 +122,24 @@ function notificationTarget(
     }
 
     return "/messages";
+  }
+
+  if (notification.entityType === "music_credit_invite") {
+    const canonicalPath =
+      (
+        notification.metadata as
+          | Record<string, unknown>
+          | null
+      )?.canonical_path;
+
+    if (
+      typeof canonicalPath === "string"
+      && canonicalPath.startsWith("/credits")
+    ) {
+      return canonicalPath;
+    }
+
+    return "/credits";
   }
 
   if (notification.entityType === "post") {

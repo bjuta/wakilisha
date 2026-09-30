@@ -1,5 +1,5 @@
 import type { RouteObject } from "react-router-dom";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import {
   AdminGuard,
   AdminAnalyticsPage,
@@ -149,6 +149,8 @@ import {
   ProfilePage,
   FollowingPage,
   NotificationsPage,
+  CreditsPage,
+  CreditInvitePage,
   MessagesPage,
   MusicPage,
   PostDetailPage,
@@ -239,6 +241,28 @@ function AuthenticatedFieldRoute() {
   }
 
   return <FieldIntakePage />;
+}
+
+function AuthenticatedCreditsRoute() {
+  const authUser = useAuthUser();
+  const location = useLocation();
+
+  if (authUser.loading) {
+    return (
+      <div
+        className="min-h-[40vh]"
+        aria-busy="true"
+        aria-label="Loading Your Credits"
+      />
+    );
+  }
+
+  if (!authUser.id) {
+    const returnTo = location.pathname + location.search;
+    return <Navigate to={`/auth?returnTo=${encodeURIComponent(returnTo)}`} replace />;
+  }
+
+  return <CreditsPage />;
 }
 
 function AuthenticatedMessagesRoute() {
@@ -348,6 +372,8 @@ const routes: RouteObject[] = [
       { path: "/music", element: <ResponsivePage mobile={<MusicPage />} desktop={<MusicPage />} /> },
       { path: "/following", element: <ResponsivePage mobile={<FollowingPage />} desktop={<FollowingPage />} /> },
       { path: "/notifications", element: <ResponsivePage mobile={<NotificationsPage />} desktop={<NotificationsPage />} /> },
+      { path: "/credits/invite/:inviteRef", element: <ResponsivePage mobile={<CreditInvitePage />} desktop={<CreditInvitePage />} /> },
+      { path: "/credits", element: <AuthenticatedCreditsRoute /> },
       { path: "/messages", element: <AuthenticatedMessagesRoute /> },
       { path: "/u/:username/playlists/:playlistSlug", element: <ResponsivePage mobile={<PersonPlaylistDetailPage />} desktop={<PersonPlaylistDetailPage />} /> },
       { path: "/u/:username/playlists", element: <ResponsivePage mobile={<PersonPlaylistsPage />} desktop={<PersonPlaylistsPage />} /> },

@@ -121,6 +121,12 @@ describe("canonical public Track and Release routes", () => {
     expect(seoEdge).toContain(
       'loc: makeUrl(`/tracks/${artistSlug}/${row.slug}`)',
     );
+    expect(seoEdge).toContain(
+      '.eq("status", "active")',
+    );
+    expect(seoEdge).toContain(
+      "trackArtistByTrackId.has(trackId)",
+    );
     expect(seoEdge).not.toContain(
       'path: `/releases/${releaseArtistSlug}/${releaseSlug}/${row.slug}`',
     );
@@ -187,6 +193,15 @@ describe("canonical public Track and Release routes", () => {
     expect(scopedTrackResolver).toContain(
       '.eq("is_primary", true)',
     );
+    expect(scopedTrackResolver).toContain(
+      '.eq("status", "active")',
+    );
+    expect(scopedTrackResolver).not.toContain(
+      "needs_review",
+    );
+    expect(scopedTrackResolver).not.toContain(
+      "draft",
+    );
     expect(scopedTrackResolver).not.toContain(
       "return matches.sort",
     );
@@ -204,6 +219,27 @@ describe("canonical public Track and Release routes", () => {
     expect(publicTrackBranch).toContain(
       '.eq("is_primary", true)',
     );
+    expect(publicTrackBranch).not.toContain(
+      'reason: "track_not_found_for_artist"',
+    );
+    expect(publicTrackBranch).not.toContain(
+      "artist_slug.ilike.%",
+    );
+    expect(publicTrackBranch).toContain(
+      "const mainArtists = artistsWithRoles",
+    );
+    expect(publicTrackBranch).toContain(
+      "const canonicalMainArtist = mainArtists[0]",
+    );
+    expect(publicTrackBranch).toContain(
+      "const routeBindings = mainArtists.map",
+    );
+    expect(publicTrackBranch).toContain(
+      "canonicalPath",
+    );
+    expect(publicTrackBranch).toContain(
+      "loadPublicTrackProvenance",
+    );
 
     const releaseResolver = edge.slice(
       edge.indexOf("async function findReleaseByScopedPublicSlug("),
@@ -214,6 +250,26 @@ describe("canonical public Track and Release routes", () => {
     );
     expect(edge).not.toContain(
       "byReleaseSlug",
+    );
+
+    const chartArtistResolver = edge.slice(
+      edge.indexOf("async function resolvePublicChartEntryArtists("),
+      edge.indexOf("function extractLabelAndGenres"),
+    );
+    expect(chartArtistResolver).toContain(
+      "canonical_track_id",
+    );
+    expect(chartArtistResolver).not.toContain(
+      "trackSlugsNeedingLookup",
+    );
+    expect(chartArtistResolver).toContain(
+      '.in("track_id", allTrackIds)',
+    );
+    expect(chartArtistResolver).toContain(
+      '.in("slug", relationshipSlugs)',
+    );
+    expect(chartArtistResolver).toContain(
+      '.in("alias_slug", relationshipSlugs)',
     );
   });
 
@@ -230,12 +286,28 @@ describe("canonical public Track and Release routes", () => {
       "src/pages/tracks/detail/page.tsx",
       "utf8",
     );
+    const trackCreditsSection = readFileSync(
+      "src/pages/tracks/detail/components/TrackCreditsSection.tsx",
+      "utf8",
+    );
 
     expect(desktopRelease).toContain(
       "canonicalTrackUrl(",
     );
     expect(mobileRelease).toContain(
       "canonicalTrackUrl(",
+    );
+    expect(desktopRelease).toContain(
+      "track.artistSlug",
+    );
+    expect(desktopRelease).toContain(
+      "artistSlug: t.artistSlug || undefined",
+    );
+    expect(mobileRelease).toContain(
+      "track.artistSlug",
+    );
+    expect(mobileRelease).toContain(
+      "artistSlug: track.artistSlug || undefined",
     );
 
     for (const capability of [
@@ -248,6 +320,7 @@ describe("canonical public Track and Release routes", () => {
       "TrackMomentSummary",
       "TrackChartSparkline",
       "ChartKpiGrid",
+      "TrackCreditsSection",
       "TrackLyricsSection",
       "TrackRelatedTracks",
       "ConnectedArtists",
@@ -258,5 +331,18 @@ describe("canonical public Track and Release routes", () => {
     ]) {
       expect(trackPage).toContain(capability);
     }
+
+    expect(trackCreditsSection).toContain(
+      "How we know this",
+    );
+    expect(trackCreditsSection).toContain(
+      "I worked on this",
+    );
+    expect(trackCreditsSection).toContain(
+      "pb-[calc(6rem+env(safe-area-inset-bottom))]",
+    );
+    expect(trackPage).toContain(
+      "artistSlug: artistSlug || track.artistSlug || undefined",
+    );
   });
 });
