@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   analyzeChartIdentity,
   analyzeEvidenceLineage,
+  analyzeProvenanceAttestationAdmission,
   analyzeReleaseIdentity,
   analyzeTrackIdentity,
   MIZIZI_AGENT_KEY,
@@ -12,13 +13,14 @@ import {
   stripFeatureCreditNoise,
   type EvidenceLineageInput,
   type MiziziFinding,
+  type ProvenanceAttestationAdmissionInput,
 } from "./core";
 import {
   createRegistryPool,
   hasTable,
 } from "../../phase1-db";
 
-type EntityScope = "track" | "release" | "chart" | "evidence" | "all";
+type EntityScope = "track" | "release" | "chart" | "evidence" | "provenance" | "all";
 type RunMode = "audit" | "review" | "apply";
 
 type Options = {
@@ -67,6 +69,11 @@ type EvidenceRow = EvidenceLineageInput & {
   createdAt: string;
 };
 
+type ProvenanceAttestationRow =
+  ProvenanceAttestationAdmissionInput & {
+    createdAt: string;
+  };
+
 type ScopeCandidate = {
   id: string;
   slug: string;
@@ -89,7 +96,7 @@ type RunStats = {
   queued: number;
   observed: number;
   stale: number;
-  rowsScanned: Record<"track" | "release" | "chart", number>;
+  rowsScanned: Record<"track" | "release" | "chart" | "provenance", number>;
   byRule: Map<string, number>;
   sample: MiziziFinding[];
   cursors: Record<
@@ -111,6 +118,7 @@ function newStats(): RunStats {
       track: 0,
       release: 0,
       chart: 0,
+      provenance: 0,
     },
     byRule: new Map(),
     sample: [],
@@ -207,13 +215,14 @@ function parseOptions(): Options {
       "release",
       "chart",
       "evidence",
+      "provenance",
       "all",
     ].includes(
       entity,
     )
   ) {
     throw new Error(
-      "Unsupported --entity. Use track, release, chart, evidence, or all.",
+      "Unsupported --entity. Use track, release, chart, evidence, provenance, or all.",
     );
   }
 
@@ -223,6 +232,15 @@ function parseOptions(): Options {
   ) {
     throw new Error(
       "Evidence lineage scope is audit-only until a typed provenance review broker is accepted.",
+    );
+  }
+
+  if (
+    entity === "provenance" &&
+    mode !== "audit"
+  ) {
+    throw new Error(
+      "Provenance finding scope is audit-only until a typed provenance review broker is accepted.",
     );
   }
 
@@ -1284,6 +1302,250 @@ function shouldContinue(
     seen < options.limit
   );
 }
+
+async function scanProvenanceAttestations(
+  pool: ReturnType<typeof createRegistryPool>,
+  options: Options,
+  stats: RunStats,
+): Promise<void> {
+  if (options.mode !== "audit") {
+    throw new Error(
+      "Provenance finding scope is audit-only until a typed provenance review broker is accepted.",
+    );
+  }
+
+  for (const table of [
+    "platform_private.registry_contribution_attestations",
+    "platform_private.registry_contribution_attestation_state_events",
+    "platform_private.registry_evidence_assertions",
+    "public.registry_track_contributions",
+    "public.registry_work_contributions",
+  ]) {
+    if (
+      !(await hasTable(
+        pool,
+        table,
+      ))
+    ) {
+      throw new Error(
+        "Required MIZIZI provenance dependency missing: " +
+          table,
+      );
+    }
+  }
+
+  let seen = 0;
+  let cursorCreatedAt:
+    string | null = null;
+  let cursorId = "";
+
+  while (
+    shouldContinue(
+      options,
+      seen,
+    )
+  ) {
+    const take =
+      remainingLimit(
+        options,
+        seen,
+      );
+
+    if (take <= 0) {
+      break;
+    }
+
+    const result =
+      await pool.query(
+        `
+        select
+          attestation.id::text
+            as "attestationId",
+          case
+            when attestation.track_id
+              is not null
+              then 'track'
+            else 'work'
+          end as "subjectType",
+          coalesce(
+            attestation.track_id,
+            attestation.work_id
+          )::text as "subjectId",
+          attestation.evidence_assertion_id::text
+            as "evidenceAssertionId",
+          attestation.elicitation_method
+            as "elicitationMethod",
+          coalesce(
+            latest_state.state,
+            ''
+          ) as "latestState",
+          evidence.subject_type
+            as "evidenceSubjectType",
+          evidence.subject_id::text
+            as "evidenceSubjectId",
+          evidence.claim_key
+            as "evidenceClaimKey",
+          case
+            when attestation.track_id
+              is not null
+              then coalesce(
+                track_history.contribution_count,
+                0
+              )
+            else coalesce(
+              work_history.contribution_count,
+              0
+            )
+          end::int
+            as "canonicalContributionCount",
+          case
+            when attestation.track_id
+              is not null
+              then track_history.latest_status
+            else work_history.latest_status
+          end as "canonicalContributionStatus",
+          attestation.created_at::text
+            as "createdAt"
+        from platform_private
+          .registry_contribution_attestations
+          attestation
+        join platform_private
+          .registry_evidence_assertions
+          evidence
+          on evidence.id=
+             attestation.evidence_assertion_id
+        left join lateral (
+          select event.state
+          from platform_private
+            .registry_contribution_attestation_state_events
+            event
+          where event.attestation_id=
+                attestation.id
+          order by
+            event.event_sequence desc
+          limit 1
+        ) latest_state on true
+        left join lateral (
+          select
+            count(*)::int
+              as contribution_count,
+            (
+              array_agg(
+                contribution.status
+                order by
+                  contribution.created_at desc,
+                  contribution.id desc
+              )
+            )[1] as latest_status
+          from public
+            .registry_track_contributions
+            contribution
+          where attestation.track_id
+                is not null
+            and contribution
+                .evidence_assertion_id=
+                attestation
+                  .evidence_assertion_id
+        ) track_history on true
+        left join lateral (
+          select
+            count(*)::int
+              as contribution_count,
+            (
+              array_agg(
+                contribution.status
+                order by
+                  contribution.created_at desc,
+                  contribution.id desc
+              )
+            )[1] as latest_status
+          from public
+            .registry_work_contributions
+            contribution
+          where attestation.work_id
+                is not null
+            and contribution
+                .evidence_assertion_id=
+                attestation
+                  .evidence_assertion_id
+        ) work_history on true
+        where (
+            $1::timestamptz is null
+            or attestation.created_at >=
+               $1::timestamptz
+          )
+          and (
+            $2::timestamptz is null
+            or attestation.created_at >
+               $2::timestamptz
+            or (
+              attestation.created_at =
+                $2::timestamptz
+              and attestation.id::text > $3
+            )
+          )
+          and mod(
+            hashtextextended(
+              attestation.id::text,
+              0
+            )::numeric +
+              9223372036854775808,
+            $4::numeric
+          ) = $5::numeric
+        order by
+          attestation.created_at,
+          attestation.id
+        limit $6
+        `,
+        [
+          options.since,
+          cursorCreatedAt,
+          cursorId,
+          options.shardCount,
+          options.shardIndex,
+          take,
+        ],
+      );
+
+    if (!result.rowCount) {
+      break;
+    }
+
+    const rows =
+      result.rows as
+        ProvenanceAttestationRow[];
+
+    for (const row of rows) {
+      const findings =
+        analyzeProvenanceAttestationAdmission(
+          row,
+        );
+
+      for (
+        const finding
+        of findings
+      ) {
+        recordFinding(
+          stats,
+          finding,
+        );
+      }
+    }
+
+    seen += rows.length;
+    stats.rowsScanned.provenance +=
+      rows.length;
+
+    const last =
+      rows[rows.length - 1];
+
+    cursorCreatedAt =
+      last.createdAt;
+    cursorId =
+      last.attestationId;
+  }
+}
+
 
 async function scanEvidenceLineage(
   pool: ReturnType<typeof createRegistryPool>,
@@ -2388,6 +2650,8 @@ function printStats(
         stats.rowsScanned.release,
       chart_entries_scanned:
         stats.rowsScanned.chart,
+      provenance_attestations_scanned:
+        stats.rowsScanned.provenance,
       mode: options.mode,
       rule_set:
         MIZIZI_RULESET_VERSION,
@@ -2602,6 +2866,17 @@ async function main(): Promise<void> {
       options.entity === "all"
     ) {
       await scanCharts(
+        pool,
+        options,
+        stats,
+      );
+    }
+
+    if (
+      options.entity ===
+        "provenance"
+    ) {
+      await scanProvenanceAttestations(
         pool,
         options,
         stats,

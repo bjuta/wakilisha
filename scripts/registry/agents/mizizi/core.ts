@@ -23,8 +23,13 @@ export const MIZIZI_AGENT_KEY = "mizizi";
 export const MIZIZI_AGENT_LABEL = "MIZIZI Cultural Data Steward";
 export const MIZIZI_RULESET_VERSION = "1.2.0";
 export const MIZIZI_PUBLIC_IDENTITY_REVIEW_RULE_VERSION = "1.3.0";
+export const MIZIZI_PROVENANCE_AUDIT_RULE_VERSION = "1.0.0";
 
-export type MiziziEntityType = "track" | "release" | "chart_entry";
+export type MiziziEntityType =
+  | "track"
+  | "release"
+  | "chart_entry"
+  | "contribution_attestation";
 export type MiziziDisposition = "auto_fix_candidate" | "review" | "observe";
 
 export type MiziziFinding = {
@@ -443,6 +448,227 @@ export function analyzeEvidenceLineage(
             right.assertionIds[0],
           ),
     );
+}
+
+export type ProvenanceAttestationAdmissionInput = {
+  attestationId: string;
+  subjectType: "track" | "work";
+  subjectId: string;
+  evidenceAssertionId: string;
+  evidenceSubjectType: string;
+  evidenceSubjectId: string;
+  evidenceClaimKey: string;
+  latestState: string;
+  elicitationMethod: string;
+  canonicalContributionCount: number;
+  canonicalContributionStatus?: string | null;
+};
+
+export function analyzeProvenanceAttestationAdmission(
+  input: ProvenanceAttestationAdmissionInput,
+): MiziziFinding[] {
+  const findings: MiziziFinding[] = [];
+  const expectedBinding = [
+    input.subjectType,
+    input.subjectId,
+    "registry.contribution.attestation",
+  ].join(":");
+  const currentBinding = [
+    input.evidenceSubjectType,
+    input.evidenceSubjectId,
+    input.evidenceClaimKey,
+  ].join(":");
+
+  if (
+    input.evidenceSubjectType !==
+      input.subjectType ||
+    input.evidenceSubjectId !==
+      input.subjectId ||
+    input.evidenceClaimKey !==
+      "registry.contribution.attestation"
+  ) {
+    findings.push(
+      makeFinding({
+        ruleId:
+          "provenance_attestation_evidence_binding_drift",
+        ruleVersion:
+          MIZIZI_PROVENANCE_AUDIT_RULE_VERSION,
+        entityType:
+          "contribution_attestation",
+        entityId:
+          input.attestationId,
+        fieldName:
+          "evidence_binding",
+        currentValue:
+          currentBinding,
+        proposedValue:
+          expectedBinding,
+        confidence: 1,
+        severity: "high",
+        disposition: "review",
+        reason:
+          "contribution_attestation_evidence_no_longer_matches_subject_authority",
+        evidence: {
+          subjectType:
+            input.subjectType,
+          subjectId:
+            input.subjectId,
+          evidenceAssertionId:
+            input.evidenceAssertionId,
+          latestState:
+            input.latestState,
+          elicitationMethod:
+            input.elicitationMethod,
+        },
+      }),
+    );
+
+    return findings;
+  }
+
+  const matureState =
+    input.latestState ===
+      "corroborated" ||
+    input.latestState ===
+      "confirmed";
+  const selfClaimReady =
+    input.elicitationMethod !==
+      "self_claim" ||
+    input.latestState ===
+      "confirmed";
+  const admissible =
+    matureState && selfClaimReady;
+
+  if (!admissible) {
+    return findings;
+  }
+
+  if (
+    input.canonicalContributionCount >
+      1
+  ) {
+    findings.push(
+      makeFinding({
+        ruleId:
+          "provenance_attestation_multiple_canonical_rows",
+        ruleVersion:
+          MIZIZI_PROVENANCE_AUDIT_RULE_VERSION,
+        entityType:
+          "contribution_attestation",
+        entityId:
+          input.attestationId,
+        fieldName:
+          "canonical_contribution_count",
+        currentValue:
+          String(
+            input.canonicalContributionCount,
+          ),
+        proposedValue:
+          "single_canonical_history",
+        confidence: 1,
+        severity: "high",
+        disposition: "review",
+        reason:
+          "one_exact_attestation_evidence_assertion_has_multiple_canonical_contribution_rows",
+        evidence: {
+          subjectType:
+            input.subjectType,
+          subjectId:
+            input.subjectId,
+          evidenceAssertionId:
+            input.evidenceAssertionId,
+          latestState:
+            input.latestState,
+        },
+      }),
+    );
+
+    return findings;
+  }
+
+  if (
+    input.canonicalContributionCount ===
+      0
+  ) {
+    findings.push(
+      makeFinding({
+        ruleId:
+          "provenance_admissible_attestation_pending_review",
+        ruleVersion:
+          MIZIZI_PROVENANCE_AUDIT_RULE_VERSION,
+        entityType:
+          "contribution_attestation",
+        entityId:
+          input.attestationId,
+        fieldName:
+          "canonical_contribution",
+        currentValue: "none",
+        proposedValue:
+          "human_review_required",
+        confidence: 1,
+        severity: "medium",
+        disposition: "review",
+        reason:
+          "corroborated_or_confirmed_attestation_has_no_canonical_contribution",
+        evidence: {
+          subjectType:
+            input.subjectType,
+          subjectId:
+            input.subjectId,
+          evidenceAssertionId:
+            input.evidenceAssertionId,
+          latestState:
+            input.latestState,
+          elicitationMethod:
+            input.elicitationMethod,
+        },
+      }),
+    );
+
+    return findings;
+  }
+
+  if (
+    input.canonicalContributionStatus !==
+      "verified"
+  ) {
+    findings.push(
+      makeFinding({
+        ruleId:
+          "provenance_attestation_noncurrent_canonical_history",
+        ruleVersion:
+          MIZIZI_PROVENANCE_AUDIT_RULE_VERSION,
+        entityType:
+          "contribution_attestation",
+        entityId:
+          input.attestationId,
+        fieldName:
+          "canonical_contribution",
+        currentValue:
+          input.canonicalContributionStatus ||
+          "unknown",
+        proposedValue:
+          "new_reviewed_attestation_required",
+        confidence: 1,
+        severity: "high",
+        disposition: "review",
+        reason:
+          "attestation_has_noncurrent_canonical_history_and_cannot_be_reused_for_admission",
+        evidence: {
+          subjectType:
+            input.subjectType,
+          subjectId:
+            input.subjectId,
+          evidenceAssertionId:
+            input.evidenceAssertionId,
+          latestState:
+            input.latestState,
+        },
+      }),
+    );
+  }
+
+  return findings;
 }
 
 export type TrackIdentityInput = {

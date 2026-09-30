@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeChartIdentity,
   analyzeEvidenceLineage,
+  analyzeProvenanceAttestationAdmission,
   analyzeReleaseIdentity,
   analyzeTrackIdentity,
   MIZIZI_RULESET_VERSION,
@@ -200,6 +201,293 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
     expect(runner).toContain(
       "No review rows or canonical Registry rows were changed.",
+    );
+  });
+
+  it("keeps pending creator attestations out of provenance review work", () => {
+    expect(
+      analyzeProvenanceAttestationAdmission({
+        attestationId:
+          "attestation-pending",
+        subjectType: "track",
+        subjectId: "track-a",
+        evidenceAssertionId:
+          "evidence-pending",
+        evidenceSubjectType:
+          "track",
+        evidenceSubjectId:
+          "track-a",
+        evidenceClaimKey:
+          "registry.contribution.attestation",
+        latestState: "asserted",
+        elicitationMethod:
+          "self_claim",
+        canonicalContributionCount:
+          0,
+        canonicalContributionStatus:
+          null,
+      }),
+    ).toEqual([]);
+
+    expect(
+      analyzeProvenanceAttestationAdmission({
+        attestationId:
+          "attestation-self-corroborated",
+        subjectType: "track",
+        subjectId: "track-a",
+        evidenceAssertionId:
+          "evidence-self-corroborated",
+        evidenceSubjectType:
+          "track",
+        evidenceSubjectId:
+          "track-a",
+        evidenceClaimKey:
+          "registry.contribution.attestation",
+        latestState:
+          "corroborated",
+        elicitationMethod:
+          "self_claim",
+        canonicalContributionCount:
+          0,
+        canonicalContributionStatus:
+          null,
+      }),
+    ).toEqual([]);
+  });
+
+  it("routes admissible creator evidence with no canonical contribution to human review", () => {
+    const selfClaim =
+      analyzeProvenanceAttestationAdmission({
+        attestationId:
+          "attestation-self-confirmed",
+        subjectType: "track",
+        subjectId: "track-a",
+        evidenceAssertionId:
+          "evidence-self-confirmed",
+        evidenceSubjectType:
+          "track",
+        evidenceSubjectId:
+          "track-a",
+        evidenceClaimKey:
+          "registry.contribution.attestation",
+        latestState: "confirmed",
+        elicitationMethod:
+          "self_claim",
+        canonicalContributionCount:
+          0,
+        canonicalContributionStatus:
+          null,
+      });
+
+    expect(selfClaim).toContainEqual(
+      expect.objectContaining({
+        ruleId:
+          "provenance_admissible_attestation_pending_review",
+        ruleVersion: "1.0.0",
+        entityType:
+          "contribution_attestation",
+        fieldName:
+          "canonical_contribution",
+        currentValue: "none",
+        proposedValue:
+          "human_review_required",
+        disposition: "review",
+      }),
+    );
+
+    const corroboratedOpenResponse =
+      analyzeProvenanceAttestationAdmission({
+        attestationId:
+          "attestation-open-corroborated",
+        subjectType: "work",
+        subjectId: "work-a",
+        evidenceAssertionId:
+          "evidence-open-corroborated",
+        evidenceSubjectType:
+          "work",
+        evidenceSubjectId:
+          "work-a",
+        evidenceClaimKey:
+          "registry.contribution.attestation",
+        latestState:
+          "corroborated",
+        elicitationMethod:
+          "open_response",
+        canonicalContributionCount:
+          0,
+        canonicalContributionStatus:
+          null,
+      });
+
+    expect(
+      corroboratedOpenResponse,
+    ).toHaveLength(1);
+    expect(
+      corroboratedOpenResponse[0]
+        .ruleId,
+    ).toBe(
+      "provenance_admissible_attestation_pending_review",
+    );
+  });
+
+  it("detects provenance evidence binding drift before admission", () => {
+    const findings =
+      analyzeProvenanceAttestationAdmission({
+        attestationId:
+          "attestation-drift",
+        subjectType: "track",
+        subjectId: "track-a",
+        evidenceAssertionId:
+          "evidence-drift",
+        evidenceSubjectType:
+          "work",
+        evidenceSubjectId:
+          "work-a",
+        evidenceClaimKey:
+          "registry.contribution.attestation",
+        latestState: "confirmed",
+        elicitationMethod:
+          "counterparty_confirmation",
+        canonicalContributionCount:
+          0,
+        canonicalContributionStatus:
+          null,
+      });
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        ruleId:
+          "provenance_attestation_evidence_binding_drift",
+        disposition: "review",
+        severity: "high",
+        currentValue:
+          "work:work-a:registry.contribution.attestation",
+        proposedValue:
+          "track:track-a:registry.contribution.attestation",
+      }),
+    ]);
+  });
+
+  it("treats verified canonical contribution as current and non-current history as new-attestation review", () => {
+    expect(
+      analyzeProvenanceAttestationAdmission({
+        attestationId:
+          "attestation-current",
+        subjectType: "track",
+        subjectId: "track-a",
+        evidenceAssertionId:
+          "evidence-current",
+        evidenceSubjectType:
+          "track",
+        evidenceSubjectId:
+          "track-a",
+        evidenceClaimKey:
+          "registry.contribution.attestation",
+        latestState: "confirmed",
+        elicitationMethod:
+          "counterparty_confirmation",
+        canonicalContributionCount:
+          1,
+        canonicalContributionStatus:
+          "verified",
+      }),
+    ).toEqual([]);
+
+    const nonCurrent =
+      analyzeProvenanceAttestationAdmission({
+        attestationId:
+          "attestation-history",
+        subjectType: "work",
+        subjectId: "work-a",
+        evidenceAssertionId:
+          "evidence-history",
+        evidenceSubjectType:
+          "work",
+        evidenceSubjectId:
+          "work-a",
+        evidenceClaimKey:
+          "registry.contribution.attestation",
+        latestState: "confirmed",
+        elicitationMethod:
+          "counterparty_confirmation",
+        canonicalContributionCount:
+          1,
+        canonicalContributionStatus:
+          "superseded",
+      });
+
+    expect(nonCurrent).toContainEqual(
+      expect.objectContaining({
+        ruleId:
+          "provenance_attestation_noncurrent_canonical_history",
+        currentValue:
+          "superseded",
+        proposedValue:
+          "new_reviewed_attestation_required",
+        disposition: "review",
+      }),
+    );
+
+    const duplicateHistory =
+      analyzeProvenanceAttestationAdmission({
+        attestationId:
+          "attestation-duplicate-history",
+        subjectType: "track",
+        subjectId: "track-a",
+        evidenceAssertionId:
+          "evidence-duplicate-history",
+        evidenceSubjectType:
+          "track",
+        evidenceSubjectId:
+          "track-a",
+        evidenceClaimKey:
+          "registry.contribution.attestation",
+        latestState: "confirmed",
+        elicitationMethod:
+          "counterparty_confirmation",
+        canonicalContributionCount:
+          2,
+        canonicalContributionStatus:
+          "verified",
+      });
+
+    expect(
+      duplicateHistory,
+    ).toContainEqual(
+      expect.objectContaining({
+        ruleId:
+          "provenance_attestation_multiple_canonical_rows",
+        currentValue: "2",
+        proposedValue:
+          "single_canonical_history",
+        disposition: "review",
+      }),
+    );
+  });
+
+  it("keeps provenance findings audit-only until the typed review broker exists", () => {
+    const runner = readFileSync(
+      "scripts/registry/agents/mizizi/run.ts",
+      "utf8",
+    );
+
+    expect(runner).toContain(
+      '"provenance"',
+    );
+    expect(runner).toContain(
+      'entity === "provenance" &&',
+    );
+    expect(runner).toContain(
+      "Provenance finding scope is audit-only until a typed provenance review broker is accepted.",
+    );
+    expect(runner).toContain(
+      "registry_contribution_attestation_state_events",
+    );
+    expect(runner).toContain(
+      "analyzeProvenanceAttestationAdmission(",
+    );
+    expect(runner).not.toContain(
+      'options.entity === "all" ||\n        options.entity === "provenance"',
     );
   });
 
