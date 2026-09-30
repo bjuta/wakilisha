@@ -465,10 +465,62 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
   });
 
-  it("keeps provenance findings audit-only until the typed review broker exists", () => {
+  it("materializes provenance findings through a typed review broker while keeping apply closed", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260930175049_music_provenance_slice3_review_materialization_v1.sql",
+      "utf8",
+    );
+    const verifier = readFileSync(
+      "scripts/control-plane/verify-music-provenance-slice3-review-materialization.sql",
+      "utf8",
+    );
     const runner = readFileSync(
       "scripts/registry/agents/mizizi/run.ts",
       "utf8",
+    );
+    const service = readFileSync(
+      "src/services/adminReviewCommandCenter.ts",
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "queue_music_provenance_review_v1",
+    );
+    expect(migration).toContain(
+      "music_provenance_scan_v1",
+    );
+    expect(migration).toContain(
+      "Slice 3A leaked direct provenance read authority to mizizi_executor",
+    );
+    expect(migration).toContain(
+      "perform mizizi_private.assert_executor_v1()",
+    );
+    expect(migration).toContain(
+      "provenance_attestation_evidence_binding_drift",
+    );
+    expect(migration).toContain(
+      "provenance_attestation_multiple_canonical_rows",
+    );
+    expect(migration).toContain(
+      "provenance_admissible_attestation_pending_review",
+    );
+    expect(migration).toContain(
+      "provenance_attestation_noncurrent_canonical_history",
+    );
+    expect(migration).toContain(
+      "insert into public.registry_review_items",
+    );
+    expect(migration).toContain(
+      "to mizizi_executor",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_track_contributions",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_work_contributions",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_canonical_write_events",
     );
 
     expect(runner).toContain(
@@ -478,16 +530,94 @@ describe("MIZIZI Cultural Data Steward", () => {
       'entity === "provenance" &&',
     );
     expect(runner).toContain(
-      "Provenance finding scope is audit-only until a typed provenance review broker is accepted.",
+      "Provenance finding scope supports audit or review only.",
     );
     expect(runner).toContain(
-      "registry_contribution_attestation_state_events",
+      '"queue_music_provenance_review_v1"',
+    );
+    expect(runner).toContain(
+      ".music_provenance_scan_v1(",
+    );
+    const provenanceScanner = runner.slice(
+      runner.indexOf(
+        "async function scanProvenanceAttestations(",
+      ),
+      runner.indexOf(
+        "async function scanEvidenceLineage(",
+      ),
+    );
+
+    expect(provenanceScanner).not.toContain(
+      "hasTable(",
+    );
+    expect(provenanceScanner).not.toContain(
+      "platform_private.registry_contribution_attestations",
+    );
+    expect(provenanceScanner).not.toContain(
+      "platform_private.registry_contribution_attestation_state_events",
+    );
+    expect(provenanceScanner).not.toContain(
+      "platform_private.registry_evidence_assertions",
+    );
+    expect(runner).toContain(
+      '"contribution_attestation"',
     );
     expect(runner).toContain(
       "analyzeProvenanceAttestationAdmission(",
     );
-    expect(runner).not.toContain(
-      'options.entity === "all" ||\n        options.entity === "provenance"',
+    expect(runner).toContain(
+      'options.mode === "review"',
+    );
+    expect(runner).not.toMatch(
+      /options\.entity === "all"\s*\|\|\s*options\.entity === "provenance"/,
+    );
+
+    expect(verifier).toContain(
+      "MUSIC_PROVENANCE_SLICE3_REVIEW_MATERIALIZATION_PASS",
+    );
+    expect(verifier).toContain(
+      "forbidden canonical write path",
+    );
+    expect(verifier).toContain(
+      "Standing MIZIZI authority is not zero",
+    );
+
+    expect(migration).toContain(
+      "admin_get_music_provenance_contribution_review_context_v1",
+    );
+    expect(migration).toContain(
+      "admin_record_music_provenance_contribution_review_decision_v1",
+    );
+    expect(migration).toContain(
+      "public.admin_admit_registry_track_contribution_v1",
+    );
+    expect(migration).toContain(
+      "public.admin_admit_registry_work_contribution_v1",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_track_contributions",
+    );
+    expect(migration).not.toContain(
+      "insert into public.registry_work_contributions",
+    );
+
+    expect(service).toContain(
+      "isMusicProvenanceContributionReview",
+    );
+    expect(service).toContain(
+      "admin_get_music_provenance_contribution_review_context_v1",
+    );
+    expect(service).toContain(
+      "admin_record_music_provenance_contribution_review_decision_v1",
+    );
+    expect(service.indexOf("isMusicProvenanceContributionReview(item)"))
+      .toBeLessThan(
+        service.indexOf(
+          'supabase.from("registry_canonicalization_decisions").insert',
+        ),
+      );
+    expect(verifier).toContain(
+      "Typed Music Provenance Admin decision semantics drifted.",
     );
   });
 
@@ -920,7 +1050,40 @@ describe("MIZIZI Cultural Data Steward", () => {
       runner.match(
         /options\.mode === "review"/g,
       ),
-    ).toHaveLength(5);
+    ).toHaveLength(6);
+
+    const provenanceScanStart =
+      runner.indexOf(
+        "async function scanProvenanceAttestations",
+      );
+    const provenanceScanEnd =
+      runner.indexOf(
+        "async function scanEvidenceLineage",
+        provenanceScanStart,
+      );
+    const provenanceScan =
+      runner.slice(
+        provenanceScanStart,
+        provenanceScanEnd,
+      );
+
+    expect(provenanceScanStart).toBeGreaterThan(-1);
+    expect(provenanceScanEnd).toBeGreaterThan(
+      provenanceScanStart,
+    );
+    expect(provenanceScan).toContain(
+      'options.mode === "review"',
+    );
+    expect(provenanceScan).toContain(
+      "await queueReview(",
+    );
+    expect(provenanceScan).not.toContain(
+      "await apply",
+    );
+    expect(provenanceScan).not.toContain(
+      "executeBrokeredStewardshipOperation(",
+    );
+
     expect(runner).toContain(
       "Review mode completed. No canonical Registry rows were changed.",
     );

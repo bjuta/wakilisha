@@ -142,7 +142,11 @@ export type RegistryDecisionType =
   | "public_music_identity_true_duplicate"
   | "public_music_identity_retire_unresolvable"
   | "public_music_identity_credit_correction_required"
-  | "public_music_identity_needs_more_research";
+  | "public_music_identity_needs_more_research"
+  | "music_provenance_admit_contribution"
+  | "music_provenance_request_new_attestation"
+  | "music_provenance_escalate_integrity_conflict"
+  | "music_provenance_needs_more_evidence";
 
 export type RegistryReviewDecisionInput = {
   item: RegistryReviewItemRow;
@@ -150,6 +154,7 @@ export type RegistryReviewDecisionInput = {
   notes: string;
   resolutionPayload?: Record<string, unknown>;
   expectedTrackStateFingerprint?: string;
+  expectedProvenanceContextFingerprint?: string;
 };
 
 export type PublicMusicIdentityTrackReviewContext = {
@@ -167,6 +172,42 @@ export type PublicMusicIdentityTrackReviewContext = {
   reviewEvidence: Record<string, unknown>;
   activeCredits: Array<Record<string, unknown>>;
   openRecordingIdentityReviewId: string | null;
+  existingDecision: Record<string, unknown> | null;
+};
+
+export type MusicProvenanceContributionReviewContext = {
+  reviewId: string;
+  reviewStatus: string;
+  reviewUpdatedAt: string;
+  ruleId: string;
+  ruleVersion: string;
+  contextFingerprint: string;
+  attestationId: string;
+  attestationState: string;
+  elicitationMethod: string;
+  subjectType: "track" | "work";
+  subjectId: string;
+  subjectTitle: string;
+  roleKey: string;
+  instrumentKey: string | null;
+  detailText: string | null;
+  creditedAs: string | null;
+  proposedPersonResourceId: string | null;
+  proposedOrganizationResourceId: string | null;
+  proposedArtistId: string | null;
+  evidenceAssertionId: string;
+  evidenceFingerprint: string;
+  evidenceTrustClass: string | null;
+  evidenceBinding: {
+    subjectType: string;
+    subjectId: string;
+    claimKey: string;
+    matchesAttestationSubject: boolean;
+  };
+  canonicalContributionCount: number;
+  latestCanonicalStatus: string | null;
+  canonicalContributions: Array<Record<string, unknown>>;
+  canAdmit: boolean;
   existingDecision: Record<string, unknown> | null;
 };
 
@@ -308,6 +349,50 @@ export function isPublicMusicIdentityTrackReview(
   );
 }
 
+export function isMusicProvenanceContributionReview(
+  item: RegistryReviewItemRow,
+): boolean {
+  const source = item.source_payload ?? {};
+  const ruleId =
+    typeof source.ruleId === "string"
+      ? source.ruleId
+      : "";
+  const ruleVersion =
+    typeof source.ruleVersion === "string"
+      ? source.ruleVersion
+      : "";
+
+  return (
+    item.entity_type === "contribution_attestation"
+    && item.review_type === "mizizi_data_hygiene"
+    && ruleVersion === "1.0.0"
+    && [
+      "provenance_attestation_evidence_binding_drift",
+      "provenance_attestation_multiple_canonical_rows",
+      "provenance_admissible_attestation_pending_review",
+      "provenance_attestation_noncurrent_canonical_history",
+    ].includes(ruleId)
+  );
+}
+
+export async function loadMusicProvenanceContributionReviewContext(
+  reviewId: string,
+): Promise<MusicProvenanceContributionReviewContext> {
+  const { data, error } = await supabase.rpc(
+    "admin_get_music_provenance_contribution_review_context_v1",
+    { p_review_id: reviewId },
+  );
+
+  if (error) throw error;
+  if (!data || typeof data !== "object") {
+    throw new Error(
+      "Music Provenance contribution review context was not returned.",
+    );
+  }
+
+  return data as MusicProvenanceContributionReviewContext;
+}
+
 export async function loadPublicMusicIdentityTrackReviewContext(
   reviewId: string,
 ): Promise<PublicMusicIdentityTrackReviewContext> {
@@ -418,6 +503,32 @@ export async function recordRegistryReviewDecision(input: RegistryReviewDecision
   const item = input.item;
   const notes = input.notes.trim();
   const resolutionPayload = { decisionType: input.decisionType, notes, ...(input.resolutionPayload ?? {}) };
+
+  if (isMusicProvenanceContributionReview(item)) {
+    const expectedContextFingerprint =
+      input.expectedProvenanceContextFingerprint?.trim();
+
+    if (!expectedContextFingerprint) {
+      throw new Error(
+        "Reload this contribution review before recording a Music Provenance decision.",
+      );
+    }
+
+    const { error } = await supabase.rpc(
+      "admin_record_music_provenance_contribution_review_decision_v1",
+      {
+        p_review_id: item.id,
+        p_decision_type: input.decisionType,
+        p_decision_payload: resolutionPayload,
+        p_expected_context_fingerprint:
+          expectedContextFingerprint,
+        p_notes: notes,
+      },
+    );
+
+    if (error) throw error;
+    return;
+  }
 
   if (isPublicMusicIdentityTrackReview(item)) {
     const expectedTrackStateFingerprint =

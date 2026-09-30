@@ -9,10 +9,13 @@ import {
 } from "@/components/design-system/primitives/WorkflowRail";
 import { supabase } from "@/lib/supabase";
 import {
+  isMusicProvenanceContributionReview,
   isPublicMusicIdentityTrackReview,
+  loadMusicProvenanceContributionReviewContext,
   loadPublicMusicIdentityTrackReviewContext,
   loadRegistryReviewItems,
   recordRegistryReviewDecision,
+  type MusicProvenanceContributionReviewContext,
   type PublicMusicIdentityTrackReviewContext,
   type RegistryDecisionType,
   type RegistryReviewItemRow,
@@ -58,13 +61,30 @@ type DetailState = {
   peers: PeerTrack[];
 };
 
+type ProvenanceDecisionType =
+  | "music_provenance_admit_contribution"
+  | "music_provenance_request_new_attestation"
+  | "music_provenance_escalate_integrity_conflict"
+  | "music_provenance_needs_more_evidence";
+
+type ProvenanceDetailState = {
+  loading: boolean;
+  error: string;
+  context: MusicProvenanceContributionReviewContext | null;
+};
+
+type ProvenanceDecisionForm = {
+  decisionType: ProvenanceDecisionType | "";
+  notes: string;
+};
+
 const PROGRAMME_KEY = "public_music_identity_track_actual_zero_v1";
 
 const WORKFLOW_STEPS: WkWorkflowStep[] = [
   { id: "review", label: "Review", description: "See what MIZIZI found.", state: "complete" },
   { id: "decide", label: "Decide", description: "Choose the right outcome.", state: "current" },
-  { id: "apply", label: "Apply", description: "MIZIZI uses the approved fix.", state: "available" },
-  { id: "verify", label: "Verify", description: "The issue leaves this list when the fix is proven.", state: "upcoming" },
+  { id: "apply", label: "Apply", description: "Approved work uses its governed write path.", state: "available" },
+  { id: "verify", label: "Verify", description: "The issue leaves this list when the result is proven.", state: "upcoming" },
 ];
 
 const EMPTY_FORM: DecisionForm = {
@@ -82,6 +102,24 @@ const EMPTY_DETAIL: DetailState = {
   context: null,
   peers: [],
 };
+
+const EMPTY_PROVENANCE_DETAIL: ProvenanceDetailState = {
+  loading: false,
+  error: "",
+  context: null,
+};
+
+const EMPTY_PROVENANCE_FORM: ProvenanceDecisionForm = {
+  decisionType: "",
+  notes: "",
+};
+
+const PROVENANCE_DECISION_TYPES: ProvenanceDecisionType[] = [
+  "music_provenance_admit_contribution",
+  "music_provenance_request_new_attestation",
+  "music_provenance_escalate_integrity_conflict",
+  "music_provenance_needs_more_evidence",
+];
 
 const LANES: Array<{ key: Lane; label: string }> = [
   { key: "needs_decision", label: "Needs a decision" },
@@ -168,6 +206,34 @@ function defaultNote(decisionType: RegistryDecisionType): string {
   }
 }
 
+function defaultProvenanceNote(decisionType: ProvenanceDecisionType): string {
+  switch (decisionType) {
+    case "music_provenance_admit_contribution":
+      return "Admit this reviewed contribution through the existing verified provenance authority.";
+    case "music_provenance_request_new_attestation":
+      return "Require a new reviewed attestation before this contribution can become current.";
+    case "music_provenance_escalate_integrity_conflict":
+      return "Escalate this provenance integrity conflict without changing canonical contribution data.";
+    default:
+      return "More provenance evidence is required before any canonical change.";
+  }
+}
+
+function provenanceRuleLabel(review: RegistryReviewItemRow): string {
+  switch (ruleId(review)) {
+    case "provenance_admissible_attestation_pending_review":
+      return "Ready for human admission";
+    case "provenance_attestation_noncurrent_canonical_history":
+      return "Fresh attestation required";
+    case "provenance_attestation_evidence_binding_drift":
+      return "Evidence binding conflict";
+    case "provenance_attestation_multiple_canonical_rows":
+      return "Canonical history conflict";
+    default:
+      return "Contribution provenance review";
+  }
+}
+
 function parsePeers(value: unknown): PeerTrack[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -242,6 +308,35 @@ async function loadCurrentProgrammeReviews(): Promise<RegistryReviewItemRow[]> {
   return [...reviews.values()];
 }
 
+async function loadCurrentProvenanceReviews(): Promise<RegistryReviewItemRow[]> {
+  const reviews = new Map<string, RegistryReviewItemRow>();
+  let offset = 0;
+  let total = 0;
+
+  do {
+    const page = await loadRegistryReviewItems({
+      status: "open",
+      reviewType: "mizizi_data_hygiene",
+      entityType: "contribution_attestation",
+      offset,
+      limit: 100,
+    });
+
+    for (const review of page.rows) {
+      if (isMusicProvenanceContributionReview(review)) {
+        reviews.set(review.id, review);
+      }
+    }
+
+    total = page.total;
+    offset += page.rows.length;
+
+    if (page.rows.length === 0) break;
+  } while (offset < total);
+
+  return [...reviews.values()];
+}
+
 async function loadWorkspace(): Promise<WorkspaceItem[]> {
   const reviews = await loadCurrentProgrammeReviews();
   const reviewIds = reviews.map((review) => review.id);
@@ -300,12 +395,23 @@ export default function AdminMiziziWorkspacePage() {
   const [form, setForm] = useState<DecisionForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [provenanceReviews, setProvenanceReviews] = useState<RegistryReviewItemRow[]>([]);
+  const [selectedProvenance, setSelectedProvenance] = useState<RegistryReviewItemRow | null>(null);
+  const [provenanceDetail, setProvenanceDetail] = useState<ProvenanceDetailState>(EMPTY_PROVENANCE_DETAIL);
+  const [provenanceForm, setProvenanceForm] = useState<ProvenanceDecisionForm>(EMPTY_PROVENANCE_FORM);
+  const [provenanceSubmitting, setProvenanceSubmitting] = useState(false);
+  const [provenanceMessage, setProvenanceMessage] = useState("");
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setPageError("");
     try {
-      setItems(await loadWorkspace());
+      const [workspace, provenance] = await Promise.all([
+        loadWorkspace(),
+        loadCurrentProvenanceReviews(),
+      ]);
+      setItems(workspace);
+      setProvenanceReviews(provenance);
     } catch (error) {
       setPageError(error instanceof Error ? error.message : "MIZIZI could not load.");
     } finally {
@@ -455,6 +561,97 @@ export default function AdminMiziziWorkspacePage() {
     }
   };
 
+  const openProvenanceReview = useCallback(async (review: RegistryReviewItemRow) => {
+    setSelectedProvenance(review);
+    setProvenanceMessage("");
+    setProvenanceForm(EMPTY_PROVENANCE_FORM);
+    setProvenanceDetail({ ...EMPTY_PROVENANCE_DETAIL, loading: true });
+
+    try {
+      const context = await loadMusicProvenanceContributionReviewContext(review.id);
+      const existing = asObject(context.existingDecision);
+      const existingType = textValue(existing.decisionType);
+      const decisionType = PROVENANCE_DECISION_TYPES.includes(
+        existingType as ProvenanceDecisionType,
+      )
+        ? existingType as ProvenanceDecisionType
+        : "";
+
+      setProvenanceDetail({
+        loading: false,
+        error: "",
+        context,
+      });
+      setProvenanceForm({
+        decisionType,
+        notes: textValue(existing.notes),
+      });
+    } catch (error) {
+      setProvenanceDetail({
+        ...EMPTY_PROVENANCE_DETAIL,
+        error:
+          error instanceof Error
+            ? error.message
+            : "This contribution review could not be loaded.",
+      });
+    }
+  }, []);
+
+  const chooseProvenanceOutcome = (decisionType: ProvenanceDecisionType) => {
+    setProvenanceForm((current) => ({
+      decisionType,
+      notes: current.notes || defaultProvenanceNote(decisionType),
+    }));
+    setProvenanceMessage("");
+  };
+
+  const submitProvenance = async () => {
+    const context = provenanceDetail.context;
+    if (!selectedProvenance || !context || !provenanceForm.decisionType) {
+      setProvenanceMessage("Choose an outcome before recording the decision.");
+      return;
+    }
+
+    const notes = provenanceForm.notes.trim();
+    if (!notes) {
+      setProvenanceMessage("Add a short note for the provenance audit trail.");
+      return;
+    }
+
+    setProvenanceSubmitting(true);
+    setProvenanceMessage("");
+
+    try {
+      await recordRegistryReviewDecision({
+        item: selectedProvenance,
+        decisionType: provenanceForm.decisionType,
+        notes,
+        expectedProvenanceContextFingerprint: context.contextFingerprint,
+        resolutionPayload: {
+          reviewedFrom: "admin_mizizi_workspace",
+          programmeIssue: 1121,
+          attestationId: context.attestationId,
+          subjectType: context.subjectType,
+          subjectId: context.subjectId,
+          rightsClaimInferred: false,
+        },
+      });
+
+      setProvenanceReviews(await loadCurrentProvenanceReviews());
+      setSelectedProvenance(null);
+      setProvenanceDetail(EMPTY_PROVENANCE_DETAIL);
+      setProvenanceForm(EMPTY_PROVENANCE_FORM);
+    } catch (error) {
+      setProvenanceMessage(
+        error instanceof Error
+          ? error.message
+          : "The provenance decision could not be recorded.",
+      );
+    } finally {
+      setProvenanceSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6" data-wk-mizizi-workspace>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -462,7 +659,7 @@ export default function AdminMiziziWorkspacePage() {
           <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Music Registry</div>
           <h1 className="text-[26px] font-black tracking-tight text-wk-text">MIZIZI</h1>
           <p className="mt-1 max-w-3xl text-[13px] leading-6 text-wk-text-muted">
-            Work through music identity issues that need a human decision. Old review history stays out of the way.
+            Work through music identity and contribution provenance issues that need a human decision. Old review history stays out of the way.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -491,7 +688,7 @@ export default function AdminMiziziWorkspacePage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-[15px] font-black text-wk-text">Current work</h2>
-              <p className="mt-1 text-[12px] text-wk-text-muted">Only active MIZIZI Track reviews are shown here.</p>
+              <p className="mt-1 text-[12px] text-wk-text-muted">Only active MIZIZI Track identity reviews are shown here.</p>
             </div>
             <label className="block w-full max-w-sm">
               <span className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">Search</span>
@@ -547,6 +744,31 @@ export default function AdminMiziziWorkspacePage() {
         )}
       </WkSurface>
 
+      <ProvenanceReviewSection
+        reviews={provenanceReviews}
+        onOpen={(review) => void openProvenanceReview(review)}
+      />
+
+      {selectedProvenance ? (
+        <ProvenanceDecisionModal
+          review={selectedProvenance}
+          detail={provenanceDetail}
+          form={provenanceForm}
+          message={provenanceMessage}
+          submitting={provenanceSubmitting}
+          onClose={() => {
+            if (provenanceSubmitting) return;
+            setSelectedProvenance(null);
+            setProvenanceDetail(EMPTY_PROVENANCE_DETAIL);
+            setProvenanceForm(EMPTY_PROVENANCE_FORM);
+            setProvenanceMessage("");
+          }}
+          onChooseOutcome={chooseProvenanceOutcome}
+          onFormChange={setProvenanceForm}
+          onSubmit={() => void submitProvenance()}
+        />
+      ) : null}
+
       {selected ? (
         <DecisionModal
           item={selected}
@@ -567,6 +789,298 @@ export default function AdminMiziziWorkspacePage() {
         />
       ) : null}
     </div>
+  );
+}
+
+function ProvenanceReviewSection({
+  reviews,
+  onOpen,
+}: {
+  reviews: RegistryReviewItemRow[];
+  onOpen: (review: RegistryReviewItemRow) => void;
+}) {
+  return (
+    <WkSurface
+      className="overflow-hidden p-0"
+      data-wk-mizizi-provenance-reviews
+    >
+      <div className="border-b border-wk-border p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-[15px] font-black text-wk-text">
+              Contribution provenance
+            </h2>
+            <p className="mt-1 max-w-3xl text-[12px] leading-5 text-wk-text-muted">
+              MIZIZI can surface contribution evidence problems here. Only a human review can admit a canonical contribution.
+            </p>
+          </div>
+          <span className="self-start rounded-full bg-wk-surface-raised px-2.5 py-1 text-[11px] font-black text-wk-text-muted">
+            {new Intl.NumberFormat().format(reviews.length)}
+          </span>
+        </div>
+      </div>
+
+      {reviews.length ? (
+        <div className="divide-y divide-wk-border">
+          {reviews.map((review) => {
+            const source = asObject(review.source_payload);
+            return (
+              <div
+                key={review.id}
+                className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-[14px] font-black text-wk-text">
+                      {review.title || "Contribution review"}
+                    </h3>
+                    <span className="rounded-full bg-wk-brand-soft px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-wk-brand">
+                      {provenanceRuleLabel(review)}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
+                    {review.summary || "Review the current contribution evidence before any canonical action."}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-wk-text-faint">
+                    <span>{textValue(source.subjectType) || "Registry"} contribution</span>
+                    <span>{textValue(source.attestationState) || "Unknown attestation state"}</span>
+                    <span>{review.priority === "high" ? "High priority" : "Review"}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpen(review)}
+                  className="wk-button wk-button-primary wk-button-sm shrink-0"
+                >
+                  Review
+                  <WkIcon name="ArrowRight" size={13} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="p-10 text-center">
+          <WkIcon name="Inbox" size={24} className="mx-auto text-wk-text-faint" />
+          <div className="mt-3 text-[13px] font-bold text-wk-text">
+            No contribution provenance exceptions
+          </div>
+          <p className="mt-1 text-[12px] text-wk-text-muted">
+            New MIZIZI provenance findings will appear here for human review.
+          </p>
+        </div>
+      )}
+    </WkSurface>
+  );
+}
+
+function ProvenanceDecisionModal({
+  review,
+  detail,
+  form,
+  message,
+  submitting,
+  onClose,
+  onChooseOutcome,
+  onFormChange,
+  onSubmit,
+}: {
+  review: RegistryReviewItemRow;
+  detail: ProvenanceDetailState;
+  form: ProvenanceDecisionForm;
+  message: string;
+  submitting: boolean;
+  onClose: () => void;
+  onChooseOutcome: (decisionType: ProvenanceDecisionType) => void;
+  onFormChange: Dispatch<SetStateAction<ProvenanceDecisionForm>>;
+  onSubmit: () => void;
+}) {
+  const context = detail.context;
+  const choice = (value: ProvenanceDecisionType) =>
+    form.decisionType === value
+      ? "border-wk-brand bg-wk-brand-soft text-wk-brand"
+      : "border-wk-border bg-wk-surface text-wk-text hover:bg-wk-surface-raised";
+
+  const footer = (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={submitting}
+        className="wk-button wk-button-ghost wk-button-sm"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={submitting || !context || !form.decisionType}
+        className="wk-button wk-button-primary wk-button-sm"
+      >
+        {submitting ? "Recording..." : "Record provenance decision"}
+      </button>
+    </div>
+  );
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={review.title || "Contribution provenance review"}
+      maxWidth="3xl"
+      dismissable={!submitting}
+      footer={footer}
+    >
+      <div className="mb-5">
+        <div className="text-[11px] font-black uppercase tracking-wider text-wk-brand">
+          Contribution provenance
+        </div>
+        <p className="mt-1 text-[12px] text-wk-text-muted">
+          Review the live attestation and evidence before choosing an outcome.
+        </p>
+      </div>
+
+      {detail.loading ? (
+        <div className="py-16 text-center text-[13px] text-wk-text-muted">
+          Loading the latest contribution evidence...
+        </div>
+      ) : detail.error || !context ? (
+        <div className="rounded-xl border border-wk-danger/25 bg-wk-danger-soft p-4 text-[12px] text-wk-danger">
+          {detail.error || "This contribution review could not be loaded."}
+        </div>
+      ) : (
+        <>
+          <section>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Fact
+                label="Subject"
+                value={context.subjectTitle || `${context.subjectType} contribution`}
+              />
+              <Fact label="Role" value={context.roleKey} />
+              <Fact
+                label="Credited as"
+                value={context.creditedAs || "Not supplied"}
+              />
+              <Fact
+                label="Attestation state"
+                value={context.attestationState}
+              />
+              <Fact
+                label="Evidence trust"
+                value={context.evidenceTrustClass || "Not classified"}
+              />
+              <Fact
+                label="Canonical history"
+                value={`${context.canonicalContributionCount} contribution row${context.canonicalContributionCount === 1 ? "" : "s"}`}
+              />
+            </div>
+
+            <div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+              <div className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">
+                What MIZIZI found
+              </div>
+              <div className="mt-1 text-[13px] font-black text-wk-text">
+                {provenanceRuleLabel(review)}
+              </div>
+              <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
+                {review.summary || "This contribution needs a human provenance decision."}
+              </p>
+            </div>
+          </section>
+
+          <section className="mt-6 border-t border-wk-border pt-5">
+            <h3 className="text-[13px] font-black text-wk-text">
+              Choose the outcome
+            </h3>
+            <p className="mt-1 text-[12px] text-wk-text-muted">
+              Canonical contribution admission is available only when the live evidence is admissible and still current.
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {context.canAdmit ? (
+                <OutcomeButton
+                  activeClass={choice("music_provenance_admit_contribution")}
+                  label="Admit contribution"
+                  help="Use the existing verified human admission path for this exact attestation."
+                  onClick={() =>
+                    onChooseOutcome("music_provenance_admit_contribution")
+                  }
+                />
+              ) : null}
+
+              {context.ruleId === "provenance_attestation_noncurrent_canonical_history" ? (
+                <OutcomeButton
+                  activeClass={choice("music_provenance_request_new_attestation")}
+                  label="Require fresh attestation"
+                  help="Do not revive old contribution history. Collect a new reviewed attestation."
+                  onClick={() =>
+                    onChooseOutcome("music_provenance_request_new_attestation")
+                  }
+                />
+              ) : null}
+
+              {[
+                "provenance_attestation_evidence_binding_drift",
+                "provenance_attestation_multiple_canonical_rows",
+              ].includes(context.ruleId) ? (
+                <OutcomeButton
+                  activeClass={choice("music_provenance_escalate_integrity_conflict")}
+                  label="Escalate integrity conflict"
+                  help="Keep canonical contribution data unchanged while the inconsistency is repaired."
+                  onClick={() =>
+                    onChooseOutcome("music_provenance_escalate_integrity_conflict")
+                  }
+                />
+              ) : null}
+
+              <OutcomeButton
+                activeClass={choice("music_provenance_needs_more_evidence")}
+                label="Need more evidence"
+                help="Keep this review open until stronger provenance is available."
+                onClick={() =>
+                  onChooseOutcome("music_provenance_needs_more_evidence")
+                }
+              />
+            </div>
+          </section>
+
+          {context.existingDecision ? (
+            <section className="mt-5 rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+              <div className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">
+                Latest recorded decision
+              </div>
+              <div className="mt-1 text-[12px] font-semibold text-wk-text">
+                {textValue(asObject(context.existingDecision).decisionType) || "Recorded"}
+              </div>
+              <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">
+                {textValue(asObject(context.existingDecision).notes) || "No note recorded."}
+              </p>
+            </section>
+          ) : null}
+
+          {form.decisionType ? (
+            <section className="mt-5">
+              <TextArea
+                label="Decision note"
+                value={form.notes}
+                placeholder="State the evidence or remediation required."
+                onChange={(value) =>
+                  onFormChange((current) => ({
+                    ...current,
+                    notes: value,
+                  }))
+                }
+              />
+            </section>
+          ) : null}
+
+          {message ? (
+            <p className="mt-4 rounded-lg bg-wk-warning-soft px-3 py-2 text-[12px] font-semibold text-wk-warning">
+              {message}
+            </p>
+          ) : null}
+        </>
+      )}
+    </Modal>
   );
 }
 
