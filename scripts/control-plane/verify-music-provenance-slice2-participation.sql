@@ -285,6 +285,41 @@ begin
       'Public Artist/Group provenance authority is incomplete';
   end if;
 
+  if not exists (
+    select 1
+    from pg_catalog.pg_proc function_row
+    join pg_catalog.pg_namespace namespace_row
+      on namespace_row.oid=function_row.pronamespace
+    where namespace_row.nspname='platform_private'
+      and function_row.proname=
+          'assert_registry_contribution_attestation_history_v1'
+      and function_row.prosecdef
+      and pg_catalog.pg_get_userbyid(function_row.proowner)='postgres'
+  ) then
+    raise exception
+      'Deferred attestation-history integrity helper lost SECURITY DEFINER authority';
+  end if;
+
+  if pg_catalog.has_function_privilege(
+       'anon',
+       'platform_private.assert_registry_contribution_attestation_history_v1()',
+       'EXECUTE'
+     )
+     or pg_catalog.has_function_privilege(
+       'authenticated',
+       'platform_private.assert_registry_contribution_attestation_history_v1()',
+       'EXECUTE'
+     )
+     or pg_catalog.has_function_privilege(
+       'service_role',
+       'platform_private.assert_registry_contribution_attestation_history_v1()',
+       'EXECUTE'
+     )
+  then
+    raise exception
+      'Deferred attestation-history integrity helper leaked direct execution authority';
+  end if;
+
   raise notice 'MUSIC_PROVENANCE_SLICE2_PARTICIPATION_V1_PASS';
 end
 $verify$;
