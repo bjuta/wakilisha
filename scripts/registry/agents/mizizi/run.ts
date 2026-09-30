@@ -96,7 +96,7 @@ type RunStats = {
   queued: number;
   observed: number;
   stale: number;
-  rowsScanned: Record<"track" | "release" | "chart" | "provenance", number>;
+  rowsScanned: Record<"track" | "release" | "chart", number>;
   byRule: Map<string, number>;
   sample: MiziziFinding[];
   cursors: Record<
@@ -118,7 +118,6 @@ function newStats(): RunStats {
       track: 0,
       release: 0,
       chart: 0,
-      provenance: 0,
     },
     byRule: new Map(),
     sample: [],
@@ -1533,8 +1532,6 @@ async function scanProvenanceAttestations(
     }
 
     seen += rows.length;
-    stats.rowsScanned.provenance +=
-      rows.length;
 
     const last =
       rows[rows.length - 1];
@@ -1544,6 +1541,11 @@ async function scanProvenanceAttestations(
     cursorId =
       last.attestationId;
   }
+
+  console.log(
+    "Provenance attestations scanned: " +
+      seen,
+  );
 }
 
 
@@ -2650,8 +2652,6 @@ function printStats(
         stats.rowsScanned.release,
       chart_entries_scanned:
         stats.rowsScanned.chart,
-      provenance_attestations_scanned:
-        stats.rowsScanned.provenance,
       mode: options.mode,
       rule_set:
         MIZIZI_RULESET_VERSION,
