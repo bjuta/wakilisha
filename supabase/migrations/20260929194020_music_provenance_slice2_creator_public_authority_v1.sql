@@ -2486,6 +2486,76 @@ begin
     where invitation.inviter_user_id=v_actor.user_id
        or invitation.invitee_person_resource_id=v_actor.person_resource_id
        or event.resolved_person_resource_id=v_actor.person_resource_id
+
+    union all
+
+    select
+      contribution.created_at,
+      jsonb_build_object(
+        'kind','canonical_admission',
+        'canonicalContributionId',contribution.id,
+        'state','canonical',
+        'at',contribution.created_at,
+        'roleLabel',
+          platform_private.registry_music_role_label_v1(
+            contribution.role_key
+          ),
+        'subject',
+          platform_private.registry_music_subject_presentation_v1(
+            contribution.track_id,
+            null
+          )
+      )
+    from public.registry_track_contributions contribution
+    where contribution.status='verified'
+      and contribution.superseded_by_contribution_id is null
+      and (
+        contribution.person_resource_id=v_actor.person_resource_id
+        or exists (
+          select 1
+          from platform_private.registry_contribution_attestations attestation
+          where attestation.evidence_assertion_id=
+                contribution.evidence_assertion_id
+            and attestation.asserting_user_id=v_actor.user_id
+            and attestation.asserting_person_resource_id=
+                v_actor.person_resource_id
+        )
+      )
+
+    union all
+
+    select
+      contribution.created_at,
+      jsonb_build_object(
+        'kind','canonical_admission',
+        'canonicalContributionId',contribution.id,
+        'state','canonical',
+        'at',contribution.created_at,
+        'roleLabel',
+          platform_private.registry_music_role_label_v1(
+            contribution.role_key
+          ),
+        'subject',
+          platform_private.registry_music_subject_presentation_v1(
+            null,
+            contribution.work_id
+          )
+      )
+    from public.registry_work_contributions contribution
+    where contribution.status='verified'
+      and contribution.superseded_by_contribution_id is null
+      and (
+        contribution.person_resource_id=v_actor.person_resource_id
+        or exists (
+          select 1
+          from platform_private.registry_contribution_attestations attestation
+          where attestation.evidence_assertion_id=
+                contribution.evidence_assertion_id
+            and attestation.asserting_user_id=v_actor.user_id
+            and attestation.asserting_person_resource_id=
+                v_actor.person_resource_id
+        )
+      )
   ) activity;
 
   select coalesce(jsonb_agg(permission.payload order by permission.sort_at desc),'[]'::jsonb)

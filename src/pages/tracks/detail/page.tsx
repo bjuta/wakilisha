@@ -961,7 +961,7 @@ export default function TrackDetail() {
       previewUrl: track.previewUrl || undefined,
       appleMusicId: track.appleMusicId,
       appleMusicCatalogId: track.appleMusicCatalogId,
-      artistSlug: track.artistSlug || artistSlug || undefined,
+      artistSlug: artistSlug || track.artistSlug || undefined,
       trackSlug: track.slug || trackSlug || undefined,
     };
     playTrack(playerTrack, [playerTrack], {
@@ -1244,7 +1244,7 @@ export default function TrackDetail() {
             {/* Multi-track Release context only. */}
             {track.albumTotalTracks > 1 && (
               <TrackReleaseTracklist
-                artistSlug={track.artistSlug}
+                artistSlug={artistSlug || track.artistSlug}
                 currentTrackSlug={track.slug}
                 albumTitle={track.albumTitle}
                 tracks={track.releaseTracks}

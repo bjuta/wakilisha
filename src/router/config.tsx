@@ -1,5 +1,5 @@
 import type { RouteObject } from "react-router-dom";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import {
   AdminGuard,
   AdminAnalyticsPage,
@@ -245,6 +245,7 @@ function AuthenticatedFieldRoute() {
 
 function AuthenticatedCreditsRoute() {
   const authUser = useAuthUser();
+  const location = useLocation();
 
   if (authUser.loading) {
     return (
@@ -257,7 +258,8 @@ function AuthenticatedCreditsRoute() {
   }
 
   if (!authUser.id) {
-    return <Navigate to="/auth?returnTo=%2Fcredits" replace />;
+    const returnTo = location.pathname + location.search;
+    return <Navigate to={`/auth?returnTo=${encodeURIComponent(returnTo)}`} replace />;
   }
 
   return <CreditsPage />;

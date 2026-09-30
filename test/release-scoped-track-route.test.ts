@@ -280,6 +280,10 @@ describe("canonical public Track and Release routes", () => {
       "src/pages/tracks/detail/page.tsx",
       "utf8",
     );
+    const trackCreditsSection = readFileSync(
+      "src/pages/tracks/detail/components/TrackCreditsSection.tsx",
+      "utf8",
+    );
 
     expect(desktopRelease).toContain(
       "canonicalTrackUrl(",
@@ -299,8 +303,6 @@ describe("canonical public Track and Release routes", () => {
       "TrackChartSparkline",
       "ChartKpiGrid",
       "TrackCreditsSection",
-      "How we know this",
-      "I worked on this",
       "TrackLyricsSection",
       "TrackRelatedTracks",
       "ConnectedArtists",
@@ -311,5 +313,18 @@ describe("canonical public Track and Release routes", () => {
     ]) {
       expect(trackPage).toContain(capability);
     }
+
+    expect(trackCreditsSection).toContain(
+      "How we know this",
+    );
+    expect(trackCreditsSection).toContain(
+      "I worked on this",
+    );
+    expect(trackCreditsSection).toContain(
+      "pb-[calc(6rem+env(safe-area-inset-bottom))]",
+    );
+    expect(trackPage).toContain(
+      "artistSlug: artistSlug || track.artistSlug || undefined",
+    );
   });
 });

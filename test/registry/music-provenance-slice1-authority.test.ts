@@ -60,6 +60,15 @@ const personPage = read(
 const artistTopSongs = read(
   "src/pages/artists/detail/components/ArtistTopSongs.tsx",
 );
+const slice2ParticipationVerifier = read(
+  "scripts/control-plane/verify-music-provenance-slice2-participation.sql",
+);
+const publicContentSpec = read(
+  "src/data/api-specs/public-content-read.ts",
+);
+const publicContentOpenApi = read(
+  "docs/openapi/public-content-read.yaml",
+);
 
 function between(
   source: string,
@@ -401,6 +410,10 @@ describe("Music provenance Slice 1 authority", () => {
     );
   });
 
+});
+
+
+describe("Music provenance Slice 2 participation and public product", () => {
   it("converges Person and Artist public product on verified canonical provenance only", () => {
     expect(personPage).toContain(
       "getPublicPersonMusicCredits",
@@ -479,10 +492,6 @@ describe("Music provenance Slice 1 authority", () => {
       "meta.artist_slug",
     );
   });
-});
-
-
-describe("Music provenance Slice 2 participation and public product", () => {
   it("keeps invitation context private, append-only, token-hashed, and inviter-mediated", () => {
     expect(slice2ParticipationMigration).toContain(
       "create table platform_private.registry_contribution_invitations",
@@ -678,6 +687,60 @@ describe("Music provenance Slice 2 participation and public product", () => {
     );
     expect(artistPublic).toContain(
       "public.registry_artist_person_memberships",
+    );
+  });
+
+  it("records canonical admission in creator Activity when reviewed contribution authority completes", () => {
+    const workspaceRead = between(
+      slice2ParticipationMigration,
+      "create function public.get_my_music_credits_v1()",
+      "end\n$;",
+    );
+
+    expect(workspaceRead).toContain(
+      "'kind','canonical_admission'",
+    );
+    expect(workspaceRead).toContain(
+      "public.registry_track_contributions",
+    );
+    expect(workspaceRead).toContain(
+      "public.registry_work_contributions",
+    );
+    expect(workspaceRead).toContain(
+      "contribution.status='verified'",
+    );
+  });
+
+  it("seals Slice 2 database invariants in a permanent SQL verifier", () => {
+    expect(slice2ParticipationVerifier).toContain(
+      "MUSIC_PROVENANCE_SLICE2_PARTICIPATION_V1_PASS",
+    );
+    expect(slice2ParticipationVerifier).toContain(
+      "registry_contribution_invitations_append_only",
+    );
+    expect(slice2ParticipationVerifier).toContain(
+      "Creator attestation gained canonical Contribution or Rights mutation authority",
+    );
+    expect(slice2ParticipationVerifier).toContain(
+      "Public provenance read is not sealed to verified canonical authority",
+    );
+  });
+
+  it("keeps public-content-read OpenAPI aligned with structured contribution and route authority", () => {
+    for (const contract of [publicContentSpec, publicContentOpenApi]) {
+      expect(contract).toContain("TrackDetailPayload");
+      expect(contract).toContain("MusicContribution");
+      expect(contract).toContain("WorkProvenance");
+      expect(contract).toContain("ProvenanceReceipt");
+      expect(contract).toContain("TrackRouteBinding");
+      expect(contract).toContain("ArtistMusicProvenance");
+    }
+
+    expect(publicContentSpec).toContain(
+      "FeaturedArtist does not gain route ownership",
+    );
+    expect(publicContentOpenApi).toContain(
+      "FeaturedArtist does not gain route ownership",
     );
   });
 

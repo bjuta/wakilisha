@@ -103,16 +103,24 @@ export default function TrackCreditsSection({
           </h2>
         </div>
 
-        {hasCredits && (
-          <button
-            type="button"
-            onClick={() => setReceiptOpen(true)}
-            className="inline-flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] font-bold text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-raised)]"
+        <div className="flex flex-wrap items-center gap-2">
+          {hasCredits ? (
+            <button
+              type="button"
+              onClick={() => setReceiptOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] font-bold text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-raised)]"
+            >
+              <WkIcon name="Info" size={13} />
+              How we know this
+            </button>
+          ) : null}
+          <Link
+            to={`/credits?track_id=${encodeURIComponent(trackId)}&claim=1`}
+            className="inline-flex items-center justify-center rounded-xl bg-[var(--wk-brand)] px-3 py-2 text-[12px] font-extrabold text-[var(--wk-brand-on)] transition-opacity hover:opacity-90"
           >
-            <WkIcon name="Info" size={13} />
-            How we know this
-          </button>
-        )}
+            I worked on this
+          </Link>
+        </div>
       </div>
 
       {hasCredits ? (
@@ -127,16 +135,10 @@ export default function TrackCreditsSection({
           />
         </div>
       ) : (
-        <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-5 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-bg)] p-4">
           <p className="max-w-xl text-[13px] font-semibold leading-6 text-[var(--wk-text-muted)]">
             Credits for this recording have not been confirmed yet.
           </p>
-          <Link
-            to={`/credits?track_id=${encodeURIComponent(trackId)}&claim=1`}
-            className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[var(--wk-brand)] px-4 py-2.5 text-[12px] font-extrabold text-[var(--wk-brand-on)] transition-opacity hover:opacity-90"
-          >
-            I worked on this
-          </Link>
         </div>
       )}
 
