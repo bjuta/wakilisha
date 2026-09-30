@@ -709,7 +709,7 @@ describe("Music provenance Slice 2 participation and public product", () => {
     const workspaceRead = between(
       slice2ParticipationMigration,
       "create function public.get_my_music_credits_v1()",
-      "end\n$;",
+      "end\n$$;",
     );
 
     expect(workspaceRead).toContain(
