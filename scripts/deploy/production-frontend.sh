@@ -11,6 +11,7 @@ SCRIPT_DIR="$(
   pwd
 )"
 TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v6.sh"
+AUDIO_NGINX_TEMPLATE="$SCRIPT_DIR/templates/wakilisha-audio-public-delivery.conf"
 
 EXPECTED_MAIN=""
 DEPLOY_LABEL=""
@@ -83,6 +84,11 @@ done
 
 test -f "$TEMPLATE" || {
   echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_TEMPLATE_MISSING'
+  exit 1
+}
+
+test -f "$AUDIO_NGINX_TEMPLATE" || {
+  echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_AUDIO_NGINX_TEMPLATE_MISSING'
   exit 1
 }
 
@@ -209,6 +215,16 @@ if [ "$SELF_TEST" -eq 1 ]; then
   grep -Fq 'export VITE_GA_MEASUREMENT_ID="$PRODUCTION_GA_MEASUREMENT_ID"' "$TMP_SELF"
   grep -Fq 'PRODUCTION_PUBLIC_BUILD_CONFIG=PASS' "$TMP_SELF"
 
+  grep -Fq 'resolver 127.0.0.53 valid=30s ipv6=off;' "$AUDIO_NGINX_TEMPLATE"
+  test "$(
+    grep -Fc 'proxy_pass https://$wk_audio_public_upstream_host;' "$AUDIO_NGINX_TEMPLATE"
+  )" = "2"
+  if grep -Fq     'proxy_pass https://pgzizndxdyhqmtyywjmt.supabase.co;'     "$AUDIO_NGINX_TEMPLATE"
+  then
+    echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_AUDIO_NGINX_STATIC_DNS_REINTRODUCED'
+    exit 1
+  fi
+
   if ! grep -Fq 'rev-parse --is-inside-work-tree' "$TMP_SELF"; then
     echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_SELF_TEST_WORKTREE_AUTHORITY_MISSING'
     exit 1
@@ -224,6 +240,7 @@ if [ "$SELF_TEST" -eq 1 ]; then
   grep -Fq -- '--connect-timeout 5' "$TMP_SELF"
   grep -Fq -- '--max-time 15' "$TMP_SELF"
 
+  echo 'PRODUCTION_FRONTEND_AUDIO_NGINX_TEMPLATE_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_ORIGIN_HEALTH_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_AUDIO_RUNTIME_DNS_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_WEB_MODE_AUTHORITY=PASS'
