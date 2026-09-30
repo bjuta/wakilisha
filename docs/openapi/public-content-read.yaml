@@ -665,6 +665,7 @@ components:
     TrackOut:
       type: object
       properties:
+        artistSlug: { type: string }
         title: { type: string }
         duration: { type: string }
         artists: { type: string }
@@ -675,6 +676,7 @@ components:
       properties:
         id: { type: string }
         slug: { type: string }
+        artistSlug: { type: string }
         title: { type: string }
         artist: { type: string }
         duration: { type: number }

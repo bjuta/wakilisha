@@ -97,6 +97,7 @@ export type PublicReleaseDetail = PublicRelease & {
   tracks: Array<{
     id: string;
     slug: string;
+    artistSlug: string;
     title: string;
     artist: string;
     duration: number;
@@ -1501,6 +1502,7 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
       return {
         id: track.id,
         slug: track.slug || rt.track_id,
+        artistSlug: primaryArtist?.slug || "",
         title: track.title,
         artist: artistStr,
         duration: durationSeconds,

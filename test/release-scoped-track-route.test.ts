@@ -291,6 +291,18 @@ describe("canonical public Track and Release routes", () => {
     expect(mobileRelease).toContain(
       "canonicalTrackUrl(",
     );
+    expect(desktopRelease).toContain(
+      "track.artistSlug",
+    );
+    expect(desktopRelease).toContain(
+      "artistSlug: t.artistSlug || undefined",
+    );
+    expect(mobileRelease).toContain(
+      "track.artistSlug",
+    );
+    expect(mobileRelease).toContain(
+      "artistSlug: track.artistSlug || undefined",
+    );
 
     for (const capability of [
       "From This Release",

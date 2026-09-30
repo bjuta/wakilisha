@@ -315,7 +315,7 @@ export default function MobileReleaseDetail() {
     appleMusicId: track.appleMusicId || track.appleMusicCatalogId || null,
     appleMusicCatalogId: track.appleMusicCatalogId || track.appleMusicId || null,
     album: release?.title,
-    artistSlug: release ? slugify(release.artist) : artistSlug,
+    artistSlug: track.artistSlug || undefined,
     trackSlug: track.slug,
   });
 
@@ -678,9 +678,12 @@ export default function MobileReleaseDetail() {
               {release.tracks.map((track, index) => {
                 const isCurrentTrack = currentTrack?.id === track.id;
                 const isThisPlaying = isCurrentTrack && isPlaying;
-                const trackHref = canonicalTrackUrl(
-                  artistSlug,
-                  track.slug);
+                const trackHref = track.artistSlug
+                  ? canonicalTrackUrl(
+                      track.artistSlug,
+                      track.slug,
+                    )
+                  : null;
                 return (
                   <div key={track.id} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--wk-divider)] last:border-b-0 active:bg-[var(--wk-surface-raised)] transition-colors">
                     <PlayableArtwork
@@ -705,16 +708,23 @@ export default function MobileReleaseDetail() {
                         </div>
                       )}
                     </PlayableArtwork>
-                    <Link to={trackHref} className="min-w-0 flex-1">
-                      <div className="line-clamp-2 text-[13px] font-bold leading-tight text-[var(--wk-text)]">{track.title}</div>
-                      <div className="mt-1 truncate text-[11px] text-[var(--wk-text-muted)]">{track.artist}</div>
-                    </Link>
+                    {trackHref ? (
+                      <Link to={trackHref} className="min-w-0 flex-1">
+                        <div className="line-clamp-2 text-[13px] font-bold leading-tight text-[var(--wk-text)]">{track.title}</div>
+                        <div className="mt-1 truncate text-[11px] text-[var(--wk-text-muted)]">{track.artist}</div>
+                      </Link>
+                    ) : (
+                      <div className="min-w-0 flex-1">
+                        <div className="line-clamp-2 text-[13px] font-bold leading-tight text-[var(--wk-text)]">{track.title}</div>
+                        <div className="mt-1 truncate text-[11px] text-[var(--wk-text-muted)]">{track.artist}</div>
+                      </div>
+                    )}
                     <span className="text-[11px] font-semibold text-[var(--wk-text-faint)] tabular-nums">{formatDuration(track.duration)}</span>
                     <TrackActionsMenu
                       registryTrackId={track.id}
                       trackTitle={track.title}
                       artistName={track.artist}
-                      artistSlug={artistSlug}
+                      artistSlug={track.artistSlug || null}
                       artworkUrl={track.artworkUrl || release.artworkUrl}
                       trackSlug={track.slug}
                       trackHref={trackHref}

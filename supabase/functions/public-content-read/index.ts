@@ -1835,10 +1835,43 @@ Deno.serve(async (req) => {
         const artistsByTrackId = new Map<string, Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean }>>();
         for (const ta of (trackArtistRows ?? [])) { const tid = String(ta.track_id); if (!artistsByTrackId.has(tid)) artistsByTrackId.set(tid, []); artistsByTrackId.get(tid)!.push({ name: String(ta.artist_name_text || ta.artist_slug || ""), slug: String(ta.artist_slug || ""), isPrimary: Boolean(ta.is_primary), isFeatured: Boolean(ta.is_featured) }); }
         for (const ta of (trackArtistRows ?? [])) { if (ta.is_featured && ta.artist_slug && ta.artist_slug !== primaryArtistSlug) { const key = String(ta.artist_slug || ta.artist_name_text || ""); if (key && !releaseFeaturedSeen.has(key)) { releaseFeaturedSeen.set(key, { name: String(ta.artist_name_text || ta.artist_slug || ""), slug: String(ta.artist_slug || "") }); } } }
-        trackList = releaseTracks.map((rt: any) => { const t = trackById.get(String(rt.track_id)); if (!t) return null; const tArtists = artistsByTrackId.get(String(t.id)) || []; const tPrimary = tArtists.find((a) => a.isPrimary) || tArtists[0]; const tFeatured = tArtists.filter((a) => !a.isPrimary && a.name).map((a) => a.name); const artistStr = tFeatured.length > 0 ? `${tPrimary?.name || artistName} (feat. ${tFeatured.join(", ")})` : (tPrimary?.name || artistName); return { id: String(t.id), slug: cleanPublicMusicSlug(t.slug || t.id, t.title || "", tPrimary?.slug || primaryArtistSlug || ""), title: String(t.title), artist: artistStr, duration: Number(t.duration_ms || 0) / 1000, trackNumber: Number(rt.track_number || t.track_number || 0), artworkUrl: t.artwork_url || "", previewUrl: t.preview_url || null, appleMusicId: readAppleMusicCatalogId(t), appleMusicCatalogId: readAppleMusicCatalogId(t) }; }).filter(Boolean);
+        trackList = releaseTracks.map((rt: any) => { const t = trackById.get(String(rt.track_id)); if (!t) return null; const tArtists = artistsByTrackId.get(String(t.id)) || []; const tPrimary = tArtists.find((a) => a.isPrimary) || tArtists[0]; const tFeatured = tArtists.filter((a) => !a.isPrimary && a.name).map((a) => a.name); const artistStr = tFeatured.length > 0 ? `${tPrimary?.name || artistName} (feat. ${tFeatured.join(", ")})` : (tPrimary?.name || artistName); return { id: String(t.id), slug: cleanPublicMusicSlug(t.slug || t.id, t.title || "", tPrimary?.slug || primaryArtistSlug || ""), artistSlug: String(tPrimary?.slug || ""), title: String(t.title), artist: artistStr, duration: Number(t.duration_ms || 0) / 1000, trackNumber: Number(rt.track_number || t.track_number || 0), artworkUrl: t.artwork_url || "", previewUrl: t.preview_url || null, appleMusicId: readAppleMusicCatalogId(t), appleMusicCatalogId: readAppleMusicCatalogId(t) }; }).filter(Boolean);
       } else {
         const { data: tracks } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, track_number, artwork_url, preview_url, metadata").eq("release_id", releaseId).eq("status", "active").order("track_number", { ascending: true });
-        trackList = (tracks ?? []).map((t: any) => ({ id: String(t.id), slug: String(t.slug || t.id), title: String(t.title), artist: artistName, duration: Number(t.duration_ms || 0) / 1000, trackNumber: t.track_number || 0, artworkUrl: t.artwork_url || "", previewUrl: t.preview_url || null }));
+        const fallbackTrackIds = (tracks ?? []).map((track: any) => String(track.id || "")).filter(Boolean);
+        const { data: fallbackTrackArtists } = fallbackTrackIds.length > 0
+          ? await supabase
+              .from("registry_track_artists")
+              .select("track_id, artist_slug, artist_name_text, is_primary, credit_order")
+              .in("track_id", fallbackTrackIds)
+              .eq("is_primary", true)
+              .eq("status", "active")
+              .order("credit_order", { ascending: true })
+          : { data: [] };
+        const routeArtistByTrack = new Map<string, { slug: string; name: string }>();
+        for (const credit of fallbackTrackArtists ?? []) {
+          const trackId = String(credit.track_id || "");
+          const routeSlug = String(credit.artist_slug || "");
+          if (!trackId || !routeSlug || routeArtistByTrack.has(trackId)) continue;
+          routeArtistByTrack.set(trackId, {
+            slug: routeSlug,
+            name: String(credit.artist_name_text || routeSlug),
+          });
+        }
+        trackList = (tracks ?? []).map((t: any) => {
+          const routeArtist = routeArtistByTrack.get(String(t.id));
+          return {
+            id: String(t.id),
+            slug: cleanPublicMusicSlug(t.slug || t.id, t.title || "", routeArtist?.slug || ""),
+            artistSlug: routeArtist?.slug || "",
+            title: String(t.title),
+            artist: routeArtist?.name || artistName,
+            duration: Number(t.duration_ms || 0) / 1000,
+            trackNumber: t.track_number || 0,
+            artworkUrl: t.artwork_url || "",
+            previewUrl: t.preview_url || null,
+          };
+        });
       }
       if (trackList.length <= 1) {
         return jsonResponse(
