@@ -121,6 +121,12 @@ describe("canonical public Track and Release routes", () => {
     expect(seoEdge).toContain(
       'loc: makeUrl(`/tracks/${artistSlug}/${row.slug}`)',
     );
+    expect(seoEdge).toContain(
+      '.eq("status", "active")',
+    );
+    expect(seoEdge).toContain(
+      "trackArtistByTrackId.has(trackId)",
+    );
     expect(seoEdge).not.toContain(
       'path: `/releases/${releaseArtistSlug}/${releaseSlug}/${row.slug}`',
     );
@@ -244,6 +250,20 @@ describe("canonical public Track and Release routes", () => {
     );
     expect(edge).not.toContain(
       "byReleaseSlug",
+    );
+
+    const chartArtistResolver = edge.slice(
+      edge.indexOf("async function resolvePublicChartEntryArtists("),
+      edge.indexOf("function extractLabelAndGenres"),
+    );
+    expect(chartArtistResolver).toContain(
+      "canonical_track_id",
+    );
+    expect(chartArtistResolver).not.toContain(
+      "trackSlugsNeedingLookup",
+    );
+    expect(chartArtistResolver).not.toContain(
+      '.in("slug",',
     );
   });
 

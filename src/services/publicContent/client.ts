@@ -197,6 +197,47 @@ export type PublicArtistDetail = PublicArtist & {
     sharedTitles?: string[];
   }>;
   videos?: PublicArtistVideo[];
+  musicProvenance: {
+    artistId: string;
+    recordingCredits: Array<{
+      id: string;
+      roleKey: string;
+      roleLabel: string;
+      subject: {
+        kind: "track" | "work";
+        id: string;
+        title: string;
+        path: string | null;
+        artworkUrl?: string;
+      } | null;
+    }>;
+    workCredits: Array<{
+      id: string;
+      roleKey: string;
+      roleLabel: string;
+      subject: {
+        kind: "track" | "work";
+        id: string;
+        title: string;
+        path: string | null;
+        artworkUrl?: string;
+      } | null;
+    }>;
+    groupMembers: Array<{
+      membershipId: string;
+      roleKey: string;
+      roleLabel: string;
+      roleDetail: string | null;
+      validFrom: string | null;
+      validTo: string | null;
+      person: {
+        kind: "person";
+        id: string;
+        name: string;
+        path: string | null;
+      };
+    }>;
+  };
 };
 
 /* ─── Registry Discography (authoritative source) ─── */
@@ -1300,6 +1341,16 @@ export async function getArtist(slug: string): Promise<PublicArtistDetail | null
         type: "track",
       }),
     })),
+    musicProvenance:
+      artist.musicProvenance &&
+      typeof artist.musicProvenance === "object"
+        ? artist.musicProvenance
+        : {
+            artistId: artist.id,
+            recordingCredits: [],
+            workCredits: [],
+            groupMembers: [],
+          },
   };
   return await enrichArtistMedia(mapped) as PublicArtistDetail;
 }

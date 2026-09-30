@@ -46,7 +46,10 @@ import {
   listPublicPersonWork,
   type PublicPerson,
   type PublicPersonWork,
+  getPublicPersonMusicCredits,
+  type PublicPersonMusicCredits,
 } from "@/services/people/personPublicService";
+import { PersonMusicCredits } from "./components/PersonMusicCredits";
 
 type SortMode =
   | "latest"
@@ -54,6 +57,7 @@ type SortMode =
   | "longest";
 
 type PersonProfileTab =
+  | "music"
   | "articles"
   | "playlists"
   | "comments"
@@ -857,6 +861,14 @@ export default function PersonDetailPage() {
     useState(false);
 
   const [
+    musicCredits,
+    setMusicCredits,
+  ] =
+    useState<PublicPersonMusicCredits | null>(
+      null,
+    );
+
+  const [
     activeProfileTab,
     setActiveProfileTab,
   ] =
@@ -963,6 +975,7 @@ export default function PersonDetailPage() {
           setPublicReplies([]);
           setOwnerSaves([]);
           setOwnerSavesLoaded(false);
+          setMusicCredits(null);
           setFollowerCount(0);
           setFollowingCount(0);
           setActiveProfileTab("articles");
@@ -1010,6 +1023,7 @@ export default function PersonDetailPage() {
               loadedCommunityProfile,
               loadedComments,
               loadedReplies,
+              loadedMusicCredits,
             ] =
               await Promise.all([
                 listAllPublicPersonWork(
@@ -1047,6 +1061,11 @@ export default function PersonDetailPage() {
                   20,
                 ).catch(
                   () => [],
+                ),
+                getPublicPersonMusicCredits(
+                  loadedPerson.personId,
+                ).catch(
+                  () => null,
                 ),
               ]);
 
@@ -1161,6 +1180,10 @@ export default function PersonDetailPage() {
               loadedReplies,
             );
 
+            setMusicCredits(
+              loadedMusicCredits,
+            );
+
             setActiveProfileTab(
               presentations.some(
                 (item) =>
@@ -1172,9 +1195,17 @@ export default function PersonDetailPage() {
                         item.isPlaylist,
                     )
                   ? "playlists"
-                  : loadedCommunityProfile
-                    ? "comments"
-                    : "articles",
+                  : (
+                      loadedMusicCredits &&
+                      (
+                        loadedMusicCredits.recordingCredits.length > 0 ||
+                        loadedMusicCredits.workCredits.length > 0
+                      )
+                    )
+                    ? "music"
+                    : loadedCommunityProfile
+                      ? "comments"
+                      : "articles",
             );
 
             setFollowerCount(
@@ -2056,6 +2087,18 @@ export default function PersonDetailPage() {
     });
   }
 
+  const musicCreditCount =
+    (musicCredits?.recordingCredits.length ?? 0) +
+    (musicCredits?.workCredits.length ?? 0);
+
+  if (musicCreditCount > 0) {
+    profileTabs.push({
+      id: "music",
+      label: "Music Credits",
+      count: musicCreditCount,
+    });
+  }
+
   if (playlistCount > 0) {
     profileTabs.push({
       id: "playlists",
@@ -2398,6 +2441,13 @@ export default function PersonDetailPage() {
                 ),
               )}
             </nav>
+          ) : null}
+
+          {activeProfileTab === "music" && musicCredits ? (
+            <PersonMusicCredits
+              credits={musicCredits}
+              personName={person.displayName}
+            />
           ) : null}
 
           {(activeProfileTab ===

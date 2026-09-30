@@ -772,7 +772,7 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
           .select(
             "track_id, artist_slug, artist_name_text, is_primary, is_featured, credit_order, status",
           )
-          .in("status", ["active", "shadow"])
+          .eq("status", "active")
           .order("track_id", { ascending: true })
           .order("credit_order", { ascending: true })
           .range(from, to),
@@ -966,18 +966,20 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
   for (const row of trackArtists.data ?? []) {
     const trackId = String(row.track_id || "").trim();
     const slug = String(row.artist_slug || "").trim();
-    if (!trackId || !slug) continue;
 
-    const existing = trackArtistByTrackId.get(trackId);
-    const isPrimary = Boolean(row.is_primary);
-    const creditOrder = Number(row.credit_order || 999);
-
-    if (!existing || isPrimary || creditOrder === 1) {
-      trackArtistByTrackId.set(trackId, {
-        slug,
-        name: String(row.artist_name_text || slug).trim(),
-      });
+    if (
+      !trackId ||
+      !slug ||
+      !Boolean(row.is_primary) ||
+      trackArtistByTrackId.has(trackId)
+    ) {
+      continue;
     }
+
+    trackArtistByTrackId.set(trackId, {
+      slug,
+      name: String(row.artist_name_text || slug).trim(),
+    });
   }
 
   for (const row of releases.data ?? []) {
@@ -1002,16 +1004,13 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
   }
 
   for (const row of tracks.data ?? []) {
-    const meta = (row.metadata || {}) as Record<string, unknown>;
     const trackId = String(row.id);
     const linkedArtist = trackArtistByTrackId.get(trackId);
-    const artistSlug = String(
-      meta.primary_artist_slug ||
-      meta.artist_slug ||
-      linkedArtist?.slug ||
-      "",
-    ).trim();
+    const artistSlug = String(linkedArtist?.slug || "").trim();
 
+    // A public Track without an active ordered MainArtist route authority is
+    // omitted from canonical discovery instead of being reconstructed from
+    // metadata strings.
     if (!artistSlug) continue;
 
     items.push({

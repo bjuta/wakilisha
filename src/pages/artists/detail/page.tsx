@@ -12,6 +12,7 @@ import { ArtistChartSection } from "./components/ArtistChartSection";
 import { ArtistDiscography } from "./components/ArtistDiscography";
 import { RelatedArtistsShelf, type ArtistConnection } from "./components/RelatedArtistsShelf";
 import { ArtistTopSongs } from "./components/ArtistTopSongs";
+import { ArtistMusicProvenance } from "./components/ArtistMusicProvenance";
 import { ArtistBioSection, cleanBioExcerpt } from "./components/ArtistBioSection";
 import { ArtistVideos } from "./components/ArtistVideos";
 import { ArtistNewsletterSection } from "./components/ArtistNewsletterSection";
@@ -347,6 +348,10 @@ export default function ArtistDetail() {
   const hasReleases = artist.releases.length > 0;
   const hasConnections = artistConnections.length > 0;
   const hasTopSongs = artist.topSongs.length > 0;
+  const hasMusicProvenance =
+    artist.musicProvenance.recordingCredits.length > 0 ||
+    artist.musicProvenance.workCredits.length > 0 ||
+    artist.musicProvenance.groupMembers.length > 0;
   const presentedBio = artistAuthority?.presentation?.bio?.trim() || "";
   const displayBio = presentedBio || artist.bio || "";
   const displayFullBio = presentedBio || artist.fullBio || artist.bio || "";
@@ -359,7 +364,8 @@ export default function ArtistDetail() {
     hasReleases ||
     hasAppearsOn ||
     hasVideos ||
-    hasChartEntries;
+    hasChartEntries ||
+    hasMusicProvenance;
   const heroBio = cleanBioExcerpt(displayFullBio || displayBio);
   const bioForSeo = cleanBioExcerpt(displayFullBio || displayBio);
   const seoDescription = bioForSeo || `Explore ${artist.name} on WAKILISHA: songs, releases, chart moments, and more.`;
@@ -486,6 +492,13 @@ export default function ArtistDetail() {
                   songs={artist.topSongs}
                   artistSlug={artist.slug}
                   reviewedRelationships={reviewedPopularTracks}
+                />
+              )}
+
+              {hasMusicProvenance && (
+                <ArtistMusicProvenance
+                  artistName={artist.name}
+                  provenance={artist.musicProvenance}
                 />
               )}
 

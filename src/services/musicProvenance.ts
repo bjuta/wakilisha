@@ -116,7 +116,7 @@ type RpcResult<T> = {
 };
 
 // New Slice 2 RPC names are intentionally kept behind one temporary typed
-// boundary until Preview regenerates src/types/database.types.ts.
+// boundary until Preview regenerates the canonical Supabase type snapshot.
 async function provenanceRpc<T>(
   functionName: string,
   args: Record<string, unknown> = {},

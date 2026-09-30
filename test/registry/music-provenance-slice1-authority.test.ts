@@ -45,6 +45,21 @@ const musicProvenanceService = read(
 const notificationsPage = read(
   "src/pages/notifications/page.tsx",
 );
+const publicContentRead = read(
+  "supabase/functions/public-content-read/index.ts",
+);
+const seoSitemapAdmin = read(
+  "supabase/functions/seo-sitemap-admin/index.ts",
+);
+const artistPage = read(
+  "src/pages/artists/detail/page.tsx",
+);
+const personPage = read(
+  "src/pages/people/detail/page.tsx",
+);
+const artistTopSongs = read(
+  "src/pages/artists/detail/components/ArtistTopSongs.tsx",
+);
 
 function between(
   source: string,
@@ -385,6 +400,85 @@ describe("Music provenance Slice 1 authority", () => {
       "MUSIC_PROVENANCE_SLICE1_AUTHORITY_V1_PASS",
     );
   });
+
+  it("converges Person and Artist public product on verified canonical provenance only", () => {
+    expect(personPage).toContain(
+      "getPublicPersonMusicCredits",
+    );
+    expect(personPage).toContain(
+      'id: "music"',
+    );
+    expect(personPage).toContain(
+      "PersonMusicCredits",
+    );
+    expect(artistPage).toContain(
+      "ArtistMusicProvenance",
+    );
+    expect(publicContentRead).toContain(
+      "get_public_artist_music_provenance_v1",
+    );
+    expect(publicContentRead).not.toContain(
+      "public Artist music provenance pending attestation",
+    );
+  });
+
+  it("keeps multi-MainArtist public routes on active structured Track Artist authority", () => {
+    const artistFallback = between(
+      publicContentRead,
+      "async function getArtistPublicTracksFromCredits(",
+      "function buildProgramSummary",
+    );
+    const chartResolver = between(
+      publicContentRead,
+      "async function resolvePublicChartEntryArtists(",
+      "function extractLabelAndGenres",
+    );
+
+    expect(artistFallback).toContain(
+      '.eq("status", "active")',
+    );
+    expect(artistFallback).toContain(
+      "const mainArtists = credits.filter",
+    );
+    expect(artistFallback).toContain(
+      "const pageMainArtist = mainArtists.find",
+    );
+    expect(artistFallback).not.toContain(
+      "PUBLIC_MUSIC_RELATIONSHIP_STATUSES",
+    );
+
+    expect(chartResolver).toContain(
+      "canonical_track_id",
+    );
+    expect(chartResolver).toContain(
+      '.eq("status", "active")',
+    );
+    expect(chartResolver).not.toContain(
+      "trackSlugsNeedingLookup",
+    );
+
+    expect(artistTopSongs).toContain(
+      "artistSlug: song.artistSlug || artistSlug",
+    );
+    expect(artistTopSongs).toContain(
+      "trackSlug: song.slug",
+    );
+
+    expect(seoSitemapAdmin).toContain(
+      "trackArtistByTrackId.has(trackId)",
+    );
+    const sitemapTrackLoop = between(
+      seoSitemapAdmin,
+      "for (const row of tracks.data ?? [])",
+      "for (const row of genres.data ?? [])",
+    );
+    expect(sitemapTrackLoop).not.toContain(
+      "primary_artist_slug",
+    );
+    expect(sitemapTrackLoop).not.toContain(
+      "meta.artist_slug",
+    );
+  });
 });
 
 
@@ -408,7 +502,12 @@ describe("Music provenance Slice 2 participation and public product", () => {
     expect(slice2ParticipationMigration).toContain(
       "extensions.gen_random_bytes(32)",
     );
-    expect(slice2ParticipationMigration).not.toContain(
+    const invitationTable = between(
+      slice2ParticipationMigration,
+      "create table platform_private.registry_contribution_invitations (",
+      ");",
+    );
+    expect(invitationTable).not.toContain(
       "raw_token",
     );
     expect(slice2ParticipationMigration).toContain(
@@ -502,13 +601,13 @@ describe("Music provenance Slice 2 participation and public product", () => {
       "'role_key',v_parent.role_key",
     );
     expect(responseCommand).toContain(
-      "'candidate_shown_payload'",
+      "candidate_shown_payload",
     );
     expect(responseCommand).toContain(
       "then 'confirmed'",
     );
     expect(responseCommand).toContain(
-      "then 'disputed'",
+      "else 'disputed'",
     );
   });
 
@@ -602,8 +701,8 @@ describe("Music provenance Slice 2 participation and public product", () => {
     expect(musicProvenanceService).toContain(
       "temporary typed",
     );
-    expect(musicProvenanceService).not.toContain(
-      "database.types.ts",
+    expect(musicProvenanceService).toContain(
+      "canonical Supabase type snapshot",
     );
   });
 });

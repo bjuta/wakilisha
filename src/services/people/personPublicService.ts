@@ -451,3 +451,12 @@ export async function getPersonFollowState(
         : false,
   };
 }
+
+
+export {
+  getPublicPersonMusicCredits,
+} from "@/services/musicProvenance";
+export type {
+  PublicPersonMusicCredit,
+  PublicPersonMusicCredits,
+} from "@/services/musicProvenance";
