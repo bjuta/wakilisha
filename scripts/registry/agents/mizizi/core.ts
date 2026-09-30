@@ -112,12 +112,13 @@ function stableJsonValue(
 function stablePayloadFingerprint(
   value: unknown,
 ): string {
+  const serialized =
+    JSON.stringify(
+      stableJsonValue(value),
+    ) ?? "null";
+
   return createHash("sha256")
-    .update(
-      JSON.stringify(
-        stableJsonValue(value),
-      ),
-    )
+    .update(serialized)
     .digest("hex");
 }
 
