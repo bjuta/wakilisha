@@ -129,7 +129,32 @@ The current retained evidence corpus is small:
 
 Total represented assertions in this audit: **31**.
 
+All 31 historical rows predate the Slice 1 lineage enrichment in practical data terms:
+
+- rows with `parent_assertion_id`: **0**
+- rows with `originator_ref`: **0**
+- rows with `upstream_source_ref`: **0**
+- rows with `lineage_key`: **0**
+- rows with `independence_group_hint`: **0**
+- rows with `verification_method`: **0**
+- rows with `source_use_basis`: **0**
+
+However, all 31 retain `source_ref` and `source_payload_fingerprint`.
+
+Observed exact-echo evidence includes:
+
+- seven `discography_review_plan` assertions sharing one source ref and one payload fingerprint;
+- two `apple_music_discography_snapshot` assertions with distinct source refs but one shared payload fingerprint.
+
 ### Consequence
+
+The lineage resolver may classify exact shared payload/source fingerprints as an echo/common-origin signal.
+
+It must **not** infer independence merely because two historical rows have different IDs or source refs.
+
+Historical evidence without explicit lineage authority remains `unknown` unless a deterministic derivation is supported by retained metadata.
+
+New evidence writers introduced or touched by this programme must populate the accepted lineage/source-use fields at creation time.
 
 No autonomous music-provenance claim family is selected at opening merely because the schema can represent one.
 
@@ -186,6 +211,21 @@ Slice 3 must not invent a generic contribution mutation road.
 It should add deterministic finding/benchmark/policy orchestration around these exact operations.
 
 Any later autonomous policy still has to earn a bounded path through this existing operation authority and independent verification.
+
+### Pre-cohort autonomy boundary
+
+The binding programme explicitly keeps contributor identity/role autonomy downstream of the real-creator cohort.
+
+Therefore #1118 is a hard dependency for any autonomous Recording/Work contributor identity or role admission policy.
+
+Before that cohort, the only plausible autonomy candidate identified by the binding direction is a **strongly bound external-identifier reconciliation/admission family**, and only after benchmark proof.
+
+Current external-identifier authority is still conservative:
+
+- `registry.external_identifier_assertion.admit/v1` is enabled but requires human approval and an independent verifier;
+- `registry.external_identifier_assertion.reviewed_reconcile/v1` is disabled.
+
+Slice 3 must not change either posture until the benchmark establishes the exact claim family, precision, abstention behavior, and bounded policy.
 
 ## 7. Shared Registry review authority already supports provenance subjects
 
