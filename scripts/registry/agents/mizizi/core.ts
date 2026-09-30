@@ -78,7 +78,7 @@ export type EvidenceLineageGroup = {
   sourceKinds: string[];
   sourceRefs: string[];
   claimPayloadFingerprints: string[];
-  hasDissent: boolean;
+  hasClaimVariants: boolean;
 };
 
 function stableJsonValue(
@@ -428,7 +428,7 @@ export function analyzeEvidenceLineage(
             ),
           ),
         ].sort(),
-        hasDissent:
+        hasClaimVariants:
           [...claimVariants.values()]
             .some(
               (variants) =>

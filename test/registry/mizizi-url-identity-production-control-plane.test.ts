@@ -409,7 +409,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
       '"scripts/registry/agents/mizizi/run.ts":',
     );
     expect(controlPlane).toContain(
-      '"92e5e73e0307d5e97e8fdc67f3f7eb1800a53976"',
+      '"9e5c9a3017b7e6575cadea66be2f241ab5173165"',
     );
     expect(controlPlane).toContain(
       "executeReleaseResumePlans",

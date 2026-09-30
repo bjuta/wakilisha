@@ -226,6 +226,27 @@ function parseOptions(): Options {
     );
   }
 
+  if (
+    entity === "evidence" &&
+    limit !== 0
+  ) {
+    throw new Error(
+      "Evidence lineage audit requires --limit=0 so related assertions are not truncated.",
+    );
+  }
+
+  if (
+    entity === "evidence" &&
+    (
+      shardCount !== 1 ||
+      shardIndex !== 0
+    )
+  ) {
+    throw new Error(
+      "Evidence lineage audit requires --shard-count=1 and --shard-index=0 so related assertions stay in one authority set.",
+    );
+  }
+
   if (shardIndex >= shardCount) {
     throw new Error(
       "--shard-index must be lower than --shard-count.",
@@ -1409,10 +1430,10 @@ async function scanEvidenceLineage(
         ),
     );
 
-  const dissentGroups =
+  const claimVariantGroups =
     groups.filter(
       (group) =>
-        group.hasDissent,
+        group.hasClaimVariants,
     );
 
   console.log(
@@ -1433,8 +1454,8 @@ async function scanEvidenceLineage(
         exactEchoGroups.length,
       unknown_groups:
         unknownGroups.length,
-      dissent_groups:
-        dissentGroups.length,
+      claim_variant_groups:
+        claimVariantGroups.length,
     },
   ]);
 
@@ -1464,8 +1485,8 @@ async function scanEvidenceLineage(
           group.basis.join(","),
         independence:
           group.independenceStatus,
-        dissent:
-          group.hasDissent,
+        claim_variants:
+          group.hasClaimVariants,
         sources:
           group.sourceKinds.join(","),
       })),
@@ -2588,12 +2609,8 @@ async function main(): Promise<void> {
     }
 
     if (
-      options.mode === "audit" &&
-      (
-        options.entity ===
-          "evidence" ||
-        options.entity === "all"
-      )
+      options.entity ===
+        "evidence"
     ) {
       await scanEvidenceLineage(
         pool,

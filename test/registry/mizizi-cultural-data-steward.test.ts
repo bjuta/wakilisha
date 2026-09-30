@@ -52,14 +52,14 @@ describe("MIZIZI Cultural Data Steward", () => {
       ],
       independenceStatus:
         "related",
-      hasDissent: false,
+      hasClaimVariants: false,
     });
     expect(groups[0].basis).toContain(
       "exact_payload_echo",
     );
   });
 
-  it("preserves dissent inside explicit evidence lineage instead of collapsing it into votes", () => {
+  it("preserves claim variants inside explicit evidence lineage instead of collapsing them into votes", () => {
     const groups =
       analyzeEvidenceLineage([
         {
@@ -106,7 +106,7 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(groups[0]).toMatchObject({
       independenceStatus:
         "related",
-      hasDissent: true,
+      hasClaimVariants: true,
       subjectCount: 1,
     });
     expect(groups[0].basis).toEqual(
@@ -166,7 +166,7 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(
       groups.some(
         (group) =>
-          group.hasDissent,
+          group.hasClaimVariants,
       ),
     ).toBe(false);
   });
@@ -185,6 +185,12 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
     expect(runner).toContain(
       'mode !== "audit"',
+    );
+    expect(runner).toContain(
+      "Evidence lineage audit requires --limit=0",
+    );
+    expect(runner).toContain(
+      "Evidence lineage audit requires --shard-count=1 and --shard-index=0",
     );
     expect(runner).toContain(
       "platform_private.registry_evidence_assertions",
