@@ -60,6 +60,9 @@ const personPage = read(
 const artistTopSongs = read(
   "src/pages/artists/detail/components/ArtistTopSongs.tsx",
 );
+const artistMusicProvenance = read(
+  "src/pages/artists/detail/components/ArtistMusicProvenance.tsx",
+);
 const slice2ParticipationVerifier = read(
   "scripts/control-plane/verify-music-provenance-slice2-participation.sql",
 );
@@ -427,6 +430,15 @@ describe("Music provenance Slice 2 participation and public product", () => {
     expect(artistPage).toContain(
       "ArtistMusicProvenance",
     );
+    expect(artistMusicProvenance).toContain(
+      "Recording roles",
+    );
+    expect(artistMusicProvenance).toContain(
+      "Songwriting & Work roles",
+    );
+    expect(artistMusicProvenance).toContain(
+      "Membership is a relationship to this Artist identity",
+    );
     expect(publicContentRead).toContain(
       "get_public_artist_music_provenance_v1",
     );
@@ -578,6 +590,9 @@ describe("Music provenance Slice 2 participation and public product", () => {
     );
     expect(creatorCommand).toContain(
       "v_credited_as",
+    );
+    expect(creatorCommand).toContain(
+      "pg_catalog.pg_advisory_xact_lock",
     );
     expect(creatorCommand).not.toContain(
       "insert into public.registry_track_contributions",

@@ -7,10 +7,13 @@ type ArtistMusicProvenanceProps = {
   provenance: PublicArtistDetail["musicProvenance"];
 };
 
+type ArtistMusicCredit =
+  PublicArtistDetail["musicProvenance"]["recordingCredits"][number];
+
 function SubjectCredit({
   credit,
 }: {
-  credit: PublicArtistDetail["musicProvenance"]["recordingCredits"][number];
+  credit: ArtistMusicCredit;
 }) {
   const subject = credit.subject;
   const content = (
@@ -42,6 +45,36 @@ function SubjectCredit({
   return subject?.path ? <Link to={subject.path}>{content}</Link> : content;
 }
 
+function CreditGroup({
+  heading,
+  description,
+  credits,
+}: {
+  heading: string;
+  description: string;
+  credits: ArtistMusicCredit[];
+}) {
+  if (!credits.length) return null;
+
+  return (
+    <div>
+      <div className="mb-3">
+        <h3 className="text-[11px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
+          {heading}
+        </h3>
+        <p className="mt-1 max-w-2xl text-[10px] leading-4 text-[var(--wk-text-muted)]">
+          {description}
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {credits.map((credit) => (
+          <SubjectCredit key={credit.id} credit={credit} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ArtistMusicProvenance({
   artistName,
   provenance,
@@ -69,53 +102,66 @@ export function ArtistMusicProvenance({
         </p>
       </div>
 
-      {hasCredits ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {[...recordingCredits, ...workCredits].map((credit) => (
-            <SubjectCredit key={credit.id} credit={credit} />
-          ))}
-        </div>
-      ) : null}
+      <div className="space-y-8">
+        <CreditGroup
+          heading="Recording roles"
+          description="Performance, production and recording-side work tied to specific recordings."
+          credits={recordingCredits}
+        />
 
-      {hasMembers ? (
-        <div className={hasCredits ? "mt-8" : ""}>
-          <h3 className="mb-3 text-[11px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
-            Group members
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {groupMembers.map((membership) => {
-              const person = membership.person;
-              const body = (
-                <div className="flex items-center gap-3 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-colors hover:bg-[var(--wk-surface-raised)]">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
-                    <WkIcon name="User" size={17} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-black text-[var(--wk-text)]">
-                      {person.name}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] font-bold text-[var(--wk-text-muted)]">
-                      {membership.roleLabel}
-                      {membership.roleDetail ? " · " + membership.roleDetail : ""}
-                    </span>
-                  </span>
-                  {person.path ? (
-                    <WkIcon name="ArrowUpRight" size={14} className="text-[var(--wk-text-faint)]" />
-                  ) : null}
-                </div>
-              );
+        <CreditGroup
+          heading="Songwriting & Work roles"
+          description="Authorship and other contribution roles tied to canonical Musical Works."
+          credits={workCredits}
+        />
 
-              return person.path ? (
-                <Link key={membership.membershipId} to={person.path}>
-                  {body}
-                </Link>
-              ) : (
-                <div key={membership.membershipId}>{body}</div>
-              );
-            })}
+        {hasMembers ? (
+          <div>
+            <h3 className="mb-1 text-[11px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
+              Group members
+            </h3>
+            <p className="mb-3 max-w-2xl text-[10px] leading-4 text-[var(--wk-text-muted)]">
+              Membership is a relationship to this Artist identity. It does not imply participation on every recording.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {groupMembers.map((membership) => {
+                const person = membership.person;
+                const body = (
+                  <div className="flex items-center gap-3 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-colors hover:bg-[var(--wk-surface-raised)]">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
+                      <WkIcon name="User" size={17} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-black text-[var(--wk-text)]">
+                        {person.name}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] font-bold text-[var(--wk-text-muted)]">
+                        {membership.roleLabel}
+                        {membership.roleDetail ? " · " + membership.roleDetail : ""}
+                      </span>
+                    </span>
+                    {person.path ? (
+                      <WkIcon
+                        name="ArrowUpRight"
+                        size={14}
+                        className="text-[var(--wk-text-faint)]"
+                      />
+                    ) : null}
+                  </div>
+                );
+
+                return person.path ? (
+                  <Link key={membership.membershipId} to={person.path}>
+                    {body}
+                  </Link>
+                ) : (
+                  <div key={membership.membershipId}>{body}</div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </section>
   );
 }

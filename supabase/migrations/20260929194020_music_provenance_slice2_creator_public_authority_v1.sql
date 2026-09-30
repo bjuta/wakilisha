@@ -900,6 +900,13 @@ begin
     v_actor.user_id::text||':'||
     p_idempotency_key;
 
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      v_source_ref,
+      0
+    )
+  );
+
   select assertion.*
   into v_existing_evidence
   from platform_private.registry_evidence_assertions assertion
@@ -1115,7 +1122,8 @@ begin
   from platform_private.registry_contribution_attestations attestation
   where attestation.id=p_attestation_id
     and attestation.asserting_user_id=v_actor.user_id
-    and attestation.asserting_person_resource_id=v_actor.person_resource_id;
+    and attestation.asserting_person_resource_id=v_actor.person_resource_id
+  for update;
 
   if not found then
     raise exception using errcode='42501',
@@ -1355,6 +1363,7 @@ declare
   v_token_hash text;
   v_invitee_name text:=nullif(btrim(coalesce(p_invitee_credited_as,'')),'');
   v_recipient_user_id uuid;
+  v_expires_at timestamptz;
   v_notification_rows integer:=0;
   v_notified boolean:=false;
 begin
@@ -1419,6 +1428,9 @@ begin
       messaging.active_user_for_person(p_invitee_person_resource_id);
   end if;
 
+  v_expires_at:=
+    now()+(p_expires_in_days||' days')::interval;
+
   v_raw_token:=
     'wkci_'||
     encode(extensions.gen_random_bytes(32),'hex');
@@ -1459,7 +1471,7 @@ begin
     v_parent.instrument_key,
     v_parent.detail_text,
     v_token_hash,
-    now()+(p_expires_in_days||' days')::interval
+    v_expires_at
   );
 
   insert into platform_private.registry_contribution_invitation_events (
@@ -1520,7 +1532,7 @@ begin
   return jsonb_build_object(
     'invitationId',v_invitation_id,
     'sharePath','/credits/invite/'||v_raw_token,
-    'expiresAt',now()+(p_expires_in_days||' days')::interval,
+    'expiresAt',v_expires_at,
     'notificationDelivered',v_notified,
     'deliveryMode',
       case
