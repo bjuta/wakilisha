@@ -1,16 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
-RUNNER_VERSION="5"
+RUNNER_VERSION="6"
 BASE_EXPECTED_MAIN="57e4c9de7a205bbffde0ff97c9ec40f9a46b1b65"
 BASE_PREVIEW_REF="oeownzbanzbuvuyidwqh"
-TEMPLATE_SHA256="b0234973c22d2d7cd08567b860fd8d2948af6a0ccb415748953a8d43d63b9b00"
+TEMPLATE_SHA256="acc75c740d64e6e72a6bee7f7620983dc5931cba1fa5252cb7a2915f01233d13"
 
 SCRIPT_DIR="$(
   CDPATH= cd -- "$(dirname -- "$0")" >/dev/null 2>&1
   pwd
 )"
-TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v5.sh"
+TEMPLATE="$SCRIPT_DIR/templates/lightsail-frontend-production-v6.sh"
+AUDIO_NGINX_TEMPLATE="$SCRIPT_DIR/templates/wakilisha-audio-public-delivery.conf"
 
 EXPECTED_MAIN=""
 DEPLOY_LABEL=""
@@ -83,6 +84,11 @@ done
 
 test -f "$TEMPLATE" || {
   echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_TEMPLATE_MISSING'
+  exit 1
+}
+
+test -f "$AUDIO_NGINX_TEMPLATE" || {
+  echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_AUDIO_NGINX_TEMPLATE_MISSING'
   exit 1
 }
 
@@ -209,6 +215,16 @@ if [ "$SELF_TEST" -eq 1 ]; then
   grep -Fq 'export VITE_GA_MEASUREMENT_ID="$PRODUCTION_GA_MEASUREMENT_ID"' "$TMP_SELF"
   grep -Fq 'PRODUCTION_PUBLIC_BUILD_CONFIG=PASS' "$TMP_SELF"
 
+  grep -Fq 'resolver 127.0.0.53 valid=30s ipv6=off;' "$AUDIO_NGINX_TEMPLATE"
+  test "$(
+    grep -Fc 'proxy_pass https://$wk_audio_public_upstream_host;' "$AUDIO_NGINX_TEMPLATE"
+  )" = "2"
+  if grep -Fq     'proxy_pass https://pgzizndxdyhqmtyywjmt.supabase.co;'     "$AUDIO_NGINX_TEMPLATE"
+  then
+    echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_AUDIO_NGINX_STATIC_DNS_REINTRODUCED'
+    exit 1
+  fi
+
   if ! grep -Fq 'rev-parse --is-inside-work-tree' "$TMP_SELF"; then
     echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_SELF_TEST_WORKTREE_AUTHORITY_MISSING'
     exit 1
@@ -218,7 +234,15 @@ if [ "$SELF_TEST" -eq 1 ]; then
   grep -Fq 'LIVE_WEB_MODE_CONTRACT=PASS' "$TMP_SELF"
   grep -Fq 'chmod 755' "$TMP_SELF"
   grep -Fq 'chmod 644' "$TMP_SELF"
+  grep -Fq 'sudo systemctl is-active --quiet nginx' "$TMP_SELF"
+  grep -Fq 'PRE_ACTIVATION_ORIGIN_ROUTE=' "$TMP_SELF"
+  grep -Fq 'AUDIO_RUNTIME_DNS_AUTHORITY=PASS' "$TMP_SELF"
+  grep -Fq -- '--connect-timeout 5' "$TMP_SELF"
+  grep -Fq -- '--max-time 15' "$TMP_SELF"
 
+  echo 'PRODUCTION_FRONTEND_AUDIO_NGINX_TEMPLATE_AUTHORITY=PASS'
+  echo 'PRODUCTION_FRONTEND_ORIGIN_HEALTH_AUTHORITY=PASS'
+  echo 'PRODUCTION_FRONTEND_AUDIO_RUNTIME_DNS_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_WEB_MODE_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_FULL_BUILD_AUTHORITY=PASS'
   echo 'PRODUCTION_FRONTEND_PUBLIC_BUILD_CONFIG_AUTHORITY=PASS'
