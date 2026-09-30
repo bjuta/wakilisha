@@ -812,6 +812,7 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
       return {
         id: relationship.trackId,
         slug,
+        artistSlug: primaryArtist?.slug || "",
         title,
         artist: artistStr,
         duration: numberValue(track, ["duration", "duration_seconds", "length_seconds"], 0),
