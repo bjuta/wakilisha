@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-09-29T19:04:10Z",
-  "typesSha256": "1f4d375a752f52c11322eda37a00887ae614700852e898932232de3cabf8b8eb",
+  "generatedAt": "2026-09-30T08:13:28Z",
+  "typesSha256": "f6ee3b3b66a6b0ad9cd5b9b5ba1101c9da121c91fe65d0a30411023d3b9bb867",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 191,
-  "latestMigration": "20260929185454_music_provenance_slice1_review_binding_integrity_v1.sql",
+  "migrationCount": 192,
+  "latestMigration": "20260929194020_music_provenance_slice2_creator_public_authority_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "ssvdmhxgcvdsxvgegoqh",
-    "migrationHead": "20260929185454",
-    "baseMainSha": "42a8dc534bc966216e916454a6456c69202ac95b",
-    "previewBranchId": "9d7b6d95-aeb4-4e75-ac73-b8102a62733b"
+    "sourceProjectRef": "elpdbjhvbynawsbghsnh",
+    "migrationHead": "20260929194020",
+    "baseMainSha": "b8df143fd84b511b5d609c8bfe0dd8f0b59da39c",
+    "previewBranchId": "e002389c-5f9a-4b4a-bf68-a8ab575caa51"
   }
 }

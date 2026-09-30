@@ -22929,6 +22929,31 @@ export type Database = {
         }
         Returns: Json
       }
+      create_music_credit_invitation_v1: {
+        Args: {
+          p_expires_in_days?: number
+          p_invitee_credited_as?: string
+          p_invitee_person_resource_id?: string
+          p_parent_attestation_id: string
+        }
+        Returns: Json
+      }
+      create_my_music_credit_attestation_v1: {
+        Args: {
+          p_candidate_shown_payload?: Json
+          p_credited_as?: string
+          p_detail_text?: string
+          p_elicitation_method?: string
+          p_idempotency_key?: string
+          p_instrument_key?: string
+          p_proposed_artist_id?: string
+          p_proposed_person_resource_id?: string
+          p_role_key: string
+          p_subject_id: string
+          p_subject_kind: string
+        }
+        Returns: Json
+      }
       create_personal_playlist: {
         Args: {
           p_correlation_id?: string
@@ -23713,6 +23738,10 @@ export type Database = {
         Returns: Json
       }
       get_messages_system_actors: { Args: never; Returns: Json }
+      get_music_credit_invite_v1: {
+        Args: { p_invite_ref: string }
+        Returns: Json
+      }
       get_my_field_submission_v1: {
         Args: { p_submission_resource_id: string }
         Returns: {
@@ -23768,6 +23797,7 @@ export type Database = {
       get_my_message_preferences: { Args: never; Returns: Json }
       get_my_message_safety_state_v1: { Args: never; Returns: Json }
       get_my_message_unread_counts: { Args: never; Returns: Json }
+      get_my_music_credits_v1: { Args: never; Returns: Json }
       get_my_personal_playlist: {
         Args: { p_playlist_id: string }
         Returns: Json
@@ -23794,6 +23824,10 @@ export type Database = {
       }
       get_playlist_review_workspace: {
         Args: { p_playlist_id: string }
+        Returns: Json
+      }
+      get_public_artist_music_provenance_v1: {
+        Args: { p_artist_id: string }
         Returns: Json
       }
       get_public_artist_relationships: {
@@ -23858,6 +23892,10 @@ export type Database = {
       }
       get_public_organization: { Args: { p_slug: string }; Returns: Json }
       get_public_person: { Args: { p_slug: string }; Returns: Json }
+      get_public_person_music_credits_v1: {
+        Args: { p_person_resource_id: string }
+        Returns: Json
+      }
       get_public_person_social_summary: {
         Args: { p_person_resource_id: string }
         Returns: Json
@@ -23884,6 +23922,10 @@ export type Database = {
       }
       get_public_show_index: { Args: { p_limit?: number }; Returns: Json }
       get_public_track_lyrics: { Args: { p_track_id: string }; Returns: Json }
+      get_public_track_provenance_v1: {
+        Args: { p_track_id: string }
+        Returns: Json
+      }
       get_public_video_caption_delivery_target: {
         Args: { p_publication_version_id: string; p_track_number: number }
         Returns: Json
@@ -25941,6 +25983,14 @@ export type Database = {
           source_id: string
         }[]
       }
+      respond_music_credit_invitation_v1: {
+        Args: {
+          p_invite_ref: string
+          p_reason?: string
+          p_response_mode: string
+        }
+        Returns: Json
+      }
       restore_article_from_archive: {
         Args: { p_article_id: string; p_note?: string }
         Returns: {
@@ -26273,6 +26323,10 @@ export type Database = {
         }
         Returns: Json
       }
+      revoke_my_music_credit_invitation_v1: {
+        Args: { p_invitation_id: string; p_reason?: string }
+        Returns: Json
+      }
       revoke_user_role_admin: {
         Args: { target_role_key: string; target_user_id: string }
         Returns: boolean
@@ -26458,6 +26512,10 @@ export type Database = {
           target_kind: string
         }[]
       }
+      search_music_credit_people_v1: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: Json
+      }
       search_public_registry_v1: {
         Args: {
           p_after_id?: string
@@ -26619,6 +26677,17 @@ export type Database = {
           p_enabled: boolean
           p_expected_revision: number
           p_idempotency_key: string
+        }
+        Returns: Json
+      }
+      set_my_music_credit_permission_v1: {
+        Args: {
+          p_approved_partner_keys?: string[]
+          p_attestation_id: string
+          p_cmo_rights_contexts?: string[]
+          p_public_display: boolean
+          p_reason?: string
+          p_third_party_commercial_reuse?: boolean
         }
         Returns: Json
       }
@@ -27140,6 +27209,10 @@ export type Database = {
           p_user_id?: string
         }
         Returns: number
+      }
+      transition_my_music_credit_attestation_v1: {
+        Args: { p_action: string; p_attestation_id: string; p_reason?: string }
+        Returns: Json
       }
       triage_correction_case: {
         Args: {
