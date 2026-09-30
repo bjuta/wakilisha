@@ -234,6 +234,9 @@ for (const [name, source] of [
 
 for (const marker of [
   'const magazineIndexPath = path.join(',
+  'const MAGAZINE_FALLBACK_TIMEOUT_MS = Math.max(',
+  'const MAGAZINE_FALLBACK_RETRY_COUNT = Math.max(',
+  'await fetchWithTimeout(',
   'data-wakilisha-lcp-preload="magazine"',
   'data-wakilisha-lcp-path="/magazine"',
   "Magazine prerender first-visual authority: inline fallback + route-specific hero preload.",

@@ -184,9 +184,13 @@ const directLazyImports = [
  * - ../pages/LegacyArticleRedirect
  * - ../pages/authors/legacy-redirect/page
  *
- * The current authority is therefore 71 direct lazy imports.
+ * Music Provenance Slice 2 adds two creator-facing lazy modules:
+ * - ../pages/credits/page
+ * - ../pages/credits/invite/page
+ *
+ * The current authority is therefore 73 direct lazy imports.
  */
-const expectedDirectLazyImportCount = 71;
+const expectedDirectLazyImportCount = 73;
 
 if (
   directLazyImports.length !==
@@ -278,6 +282,8 @@ for (const requiredModule of [
   "../pages/mobile/releases/detail/page",
   "../pages/following/page",
   "../pages/notifications/page",
+  "../pages/credits/page",
+  "../pages/credits/invite/page",
   "../pages/messages/page",
   "../pages/start/page",
   "../pages/settings/page",
@@ -440,12 +446,17 @@ const routePaths = [
  * Dedicated MIZIZI Admin workflow adds one internal Review path:
  * - mizizi
  *
- * Current route authority is therefore 178 paths. Removing the Messages paths,
- * the Artist Studio path, the Field intake path, the Admin MIZIZI path, the five
- * declared public Audio and Show paths, the two K5B Admin Video paths, and the
- * two public Video paths reproduces the exact 163-path preserved pre-M1 sequence.
+ * Music Provenance Slice 2 adds two creator-facing paths:
+ * - /credits
+ * - /credits/invite/:inviteRef
+ *
+ * Current route authority is therefore 180 paths. Removing the Credits paths,
+ * the Messages paths, the Artist Studio path, the Field intake path, the Admin
+ * MIZIZI path, the five declared public Audio and Show paths, the two K5B Admin
+ * Video paths, and the two public Video paths reproduces the exact 163-path
+ * preserved pre-M1 sequence.
  */
-const expectedRoutePathCount = 178;
+const expectedRoutePathCount = 180;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -453,6 +464,8 @@ const publicShowPath = "/shows/:showSlug";
 const publicShowEpisodePath = "/shows/:showSlug/:episodeSlug";
 const publicArtistStudioPath = "/artist-studio";
 const publicFieldPath = "/field";
+const publicCreditsPath = "/credits";
+const publicCreditInvitePath = "/credits/invite/:inviteRef";
 const publicMessagesPath = "/messages";
 const adminMessagesPath = "messages";
 const adminFieldPath = "field";
@@ -498,6 +511,8 @@ for (const [routePath, label] of [
   [publicShowEpisodePath, "Show Episode"],
   [publicArtistStudioPath, "Artist Studio"],
   [publicFieldPath, "Field Intake"],
+  [publicCreditsPath, "Credits"],
+  [publicCreditInvitePath, "Credit Invite"],
   [publicMessagesPath, "Messages"],
   [adminMessagesPath, "Admin Messages Control Center"],
   [adminFieldPath, "Admin Field"],
@@ -511,7 +526,7 @@ for (const [routePath, label] of [
     routePaths.filter((candidate) => candidate === routePath).length !== 1
   ) {
     fail(
-      `Declared Artist Studio, Field, Audio, Show, Admin Video, and public Video authority must retain exactly one ${label} route at ${routePath}`,
+      `Declared Credits, Artist Studio, Field, Audio, Show, Admin Video, and public Video authority must retain exactly one ${label} route at ${routePath}`,
     );
   }
 }
@@ -535,6 +550,8 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== publicShowEpisodePath &&
     routePath !== publicArtistStudioPath &&
     routePath !== publicFieldPath &&
+    routePath !== publicCreditsPath &&
+    routePath !== publicCreditInvitePath &&
     routePath !== publicMessagesPath &&
     routePath !== adminMessagesPath &&
     routePath !== adminFieldPath &&

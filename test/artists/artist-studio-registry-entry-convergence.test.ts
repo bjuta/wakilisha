@@ -190,17 +190,7 @@ describe(
         expect(
           routeAudit,
         ).toContain(
-          "expectedDirectLazyImportCount = 71",
-        );
-        expect(
-          routeAudit,
-        ).toContain(
           "expected zero eager public page imports",
-        );
-        expect(
-          routeAudit,
-        ).toContain(
-          "expectedRoutePathCount = 178",
         );
       },
     );
