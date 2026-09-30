@@ -179,7 +179,7 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
 
     expect(runner).toContain(
-      '"track" | "release" | "chart" | "evidence" | "all"',
+      '"track" | "release" | "chart" | "evidence" | "provenance" | "all"',
     );
     expect(runner).toContain(
       'entity === "evidence" &&',
