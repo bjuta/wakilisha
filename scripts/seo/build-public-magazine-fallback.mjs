@@ -33,6 +33,48 @@ function envValue(key) {
   return process.env[key] || readEnvFileValue(key) || "";
 }
 
+const MAGAZINE_FALLBACK_TIMEOUT_MS = Math.max(
+  1000,
+  Number(
+    envValue("SEO_MAGAZINE_FALLBACK_TIMEOUT_MS")
+      || envValue("SEO_PRERENDER_FETCH_TIMEOUT_MS")
+      || 10000,
+  ),
+);
+
+const MAGAZINE_FALLBACK_RETRY_COUNT = Math.max(
+  1,
+  Number(
+    envValue("SEO_MAGAZINE_FALLBACK_RETRY_COUNT")
+      || 3,
+  ),
+);
+
+async function sleep(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithTimeout(
+  url,
+  options = {},
+  timeoutMs = MAGAZINE_FALLBACK_TIMEOUT_MS,
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    timeoutMs,
+  );
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function cleanStory(story) {
   return {
     id: String(story?.id || ""),
@@ -62,16 +104,58 @@ if (!supabaseUrl || !anonKey) {
 
 const endpoint = `${supabaseUrl}/functions/v1/public-content-read/magazine?limit=24`;
 
-const response = await fetch(endpoint, {
-  headers: {
-    Accept: "application/json",
-    apikey: anonKey,
-    Authorization: `Bearer ${anonKey}`,
-  },
-});
+let response = null;
+let lastError = null;
 
-if (!response.ok) {
-  fail(`Magazine fallback API failed: ${response.status} ${response.statusText}`);
+for (
+  let attempt = 1;
+  attempt <= MAGAZINE_FALLBACK_RETRY_COUNT;
+  attempt += 1
+) {
+  try {
+    response = await fetchWithTimeout(
+      endpoint,
+      {
+        headers: {
+          Accept: "application/json",
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+      },
+    );
+
+    if (response.ok) {
+      break;
+    }
+
+    lastError = new Error(
+      `${response.status} ${response.statusText}`,
+    );
+  } catch (error) {
+    lastError = error;
+  }
+
+  if (attempt < MAGAZINE_FALLBACK_RETRY_COUNT) {
+    console.warn(
+      `Magazine fallback retry ${attempt}/${MAGAZINE_FALLBACK_RETRY_COUNT} failed: ${
+        lastError instanceof Error
+          ? lastError.message
+          : String(lastError)
+      }`,
+    );
+
+    await sleep(attempt * 1000);
+  }
+}
+
+if (!response?.ok) {
+  fail(
+    `Magazine fallback API unavailable after ${MAGAZINE_FALLBACK_RETRY_COUNT} attempt(s): ${
+      lastError instanceof Error
+        ? lastError.message
+        : String(lastError || "unknown error")
+    }`,
+  );
 }
 
 const payload = await response.json();
