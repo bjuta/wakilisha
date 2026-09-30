@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   analyzeChartIdentity,
+  analyzeEvidenceLineage,
   analyzeReleaseIdentity,
   analyzeTrackIdentity,
   MIZIZI_RULESET_VERSION,
@@ -12,6 +13,196 @@ import {
 } from "../../scripts/registry/agents/mizizi/core";
 
 describe("MIZIZI Cultural Data Steward", () => {
+  it("groups exact evidence payload echoes without calling them independent", () => {
+    const groups =
+      analyzeEvidenceLineage([
+        {
+          id: "evidence-a",
+          subjectType: "track",
+          subjectId: "track-a",
+          claimKey: "registry.track.contribution_attestation",
+          claimPayload: {
+            roleKey: "producer",
+          },
+          sourceKind: "provider_snapshot",
+          sourceRef: "provider:item-a",
+          sourcePayloadFingerprint:
+            "a".repeat(64),
+        },
+        {
+          id: "evidence-b",
+          subjectType: "track",
+          subjectId: "track-a",
+          claimKey: "registry.track.contribution_attestation",
+          claimPayload: {
+            roleKey: "producer",
+          },
+          sourceKind: "provider_snapshot_copy",
+          sourceRef: "provider:item-b",
+          sourcePayloadFingerprint:
+            "a".repeat(64),
+        },
+      ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({
+      assertionIds: [
+        "evidence-a",
+        "evidence-b",
+      ],
+      independenceStatus:
+        "related",
+      hasClaimVariants: false,
+    });
+    expect(groups[0].basis).toContain(
+      "exact_payload_echo",
+    );
+  });
+
+  it("preserves claim variants inside explicit evidence lineage instead of collapsing them into votes", () => {
+    const groups =
+      analyzeEvidenceLineage([
+        {
+          id: "claim-a",
+          subjectType: "track",
+          subjectId: "track-a",
+          claimKey: "registry.track.contribution_attestation",
+          claimPayload: {
+            roleKey: "producer",
+          },
+          sourceKind: "creator_attestation",
+          sourceRef: "attestation:a",
+          sourcePayloadFingerprint:
+            "b".repeat(64),
+          lineageKey:
+            "creator-attestation:shared",
+          originatorRef:
+            "user:creator-a",
+        },
+        {
+          id: "claim-b",
+          subjectType: "track",
+          subjectId: "track-a",
+          claimKey: "registry.track.contribution_attestation",
+          claimPayload: {
+            roleKey: "composer",
+          },
+          sourceKind: "counterparty_confirmation",
+          sourceRef: "attestation:b",
+          sourcePayloadFingerprint:
+            "c".repeat(64),
+          parentAssertionId:
+            "claim-a",
+          lineageKey:
+            "creator-attestation:shared",
+          upstreamSourceRef:
+            "credit-invite:shared",
+          originatorRef:
+            "user:creator-b",
+        },
+      ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({
+      independenceStatus:
+        "related",
+      hasClaimVariants: true,
+      subjectCount: 1,
+    });
+    expect(groups[0].basis).toEqual(
+      expect.arrayContaining([
+        "explicit_lineage",
+        "parent_assertion",
+      ]),
+    );
+    expect(
+      groups[0]
+        .claimPayloadFingerprints,
+    ).toHaveLength(2);
+  });
+
+  it("keeps unlinked historical evidence lineage unknown", () => {
+    const groups =
+      analyzeEvidenceLineage([
+        {
+          id: "legacy-a",
+          subjectType: "track",
+          subjectId: "track-a",
+          claimKey: "legacy.claim",
+          claimPayload: {
+            value: "one",
+          },
+          sourceKind: "legacy_source",
+          sourceRef: "legacy:a",
+          sourcePayloadFingerprint:
+            "d".repeat(64),
+        },
+        {
+          id: "legacy-b",
+          subjectType: "track",
+          subjectId: "track-a",
+          claimKey: "legacy.claim",
+          claimPayload: {
+            value: "two",
+          },
+          sourceKind: "legacy_source",
+          sourceRef: "legacy:b",
+          sourcePayloadFingerprint:
+            "e".repeat(64),
+        },
+      ]);
+
+    expect(groups).toHaveLength(2);
+    expect(
+      groups.every(
+        (group) =>
+          group.independenceStatus ===
+            "unknown" &&
+          group.basis.length === 1 &&
+          group.basis[0] ===
+            "unknown",
+      ),
+    ).toBe(true);
+    expect(
+      groups.some(
+        (group) =>
+          group.hasClaimVariants,
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps evidence lineage execution audit-only until a typed provenance review broker exists", () => {
+    const runner = readFileSync(
+      "scripts/registry/agents/mizizi/run.ts",
+      "utf8",
+    );
+
+    expect(runner).toContain(
+      '"track" | "release" | "chart" | "evidence" | "all"',
+    );
+    expect(runner).toContain(
+      'entity === "evidence" &&',
+    );
+    expect(runner).toContain(
+      'mode !== "audit"',
+    );
+    expect(runner).toContain(
+      "Evidence lineage audit requires --limit=0",
+    );
+    expect(runner).toContain(
+      "Evidence lineage audit requires --shard-count=1 and --shard-index=0",
+    );
+    expect(runner).toContain(
+      "platform_private.registry_evidence_assertions",
+    );
+    expect(runner).toContain(
+      "analyzeEvidenceLineage(",
+    );
+    expect(runner).toContain(
+      "No review rows or canonical Registry rows were changed.",
+    );
+  });
+
   it("uses minimal route-safe slug grammar", () => {
     expect(
       slugifyIdentity("Chai & Maziwa"),

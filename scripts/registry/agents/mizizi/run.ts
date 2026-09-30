@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import {
   analyzeChartIdentity,
+  analyzeEvidenceLineage,
   analyzeReleaseIdentity,
   analyzeTrackIdentity,
   MIZIZI_AGENT_KEY,
@@ -9,6 +10,7 @@ import {
   MIZIZI_RULESET_VERSION,
   slugifyIdentity,
   stripFeatureCreditNoise,
+  type EvidenceLineageInput,
   type MiziziFinding,
 } from "./core";
 import {
@@ -16,7 +18,7 @@ import {
   hasTable,
 } from "../../phase1-db";
 
-type EntityScope = "track" | "release" | "chart" | "all";
+type EntityScope = "track" | "release" | "chart" | "evidence" | "all";
 type RunMode = "audit" | "review" | "apply";
 
 type Options = {
@@ -59,6 +61,10 @@ type ChartRow = {
   canonical_track_slug: string | null;
   canonical_primary_artist_slug: string | null;
   updated_at: string;
+};
+
+type EvidenceRow = EvidenceLineageInput & {
+  createdAt: string;
 };
 
 type ScopeCandidate = {
@@ -196,12 +202,48 @@ function parseOptions(): Options {
   }
 
   if (
-    !["track", "release", "chart", "all"].includes(
+    ![
+      "track",
+      "release",
+      "chart",
+      "evidence",
+      "all",
+    ].includes(
       entity,
     )
   ) {
     throw new Error(
-      "Unsupported --entity. Use track, release, chart, or all.",
+      "Unsupported --entity. Use track, release, chart, evidence, or all.",
+    );
+  }
+
+  if (
+    entity === "evidence" &&
+    mode !== "audit"
+  ) {
+    throw new Error(
+      "Evidence lineage scope is audit-only until a typed provenance review broker is accepted.",
+    );
+  }
+
+  if (
+    entity === "evidence" &&
+    limit !== 0
+  ) {
+    throw new Error(
+      "Evidence lineage audit requires --limit=0 so related assertions are not truncated.",
+    );
+  }
+
+  if (
+    entity === "evidence" &&
+    (
+      shardCount !== 1 ||
+      shardIndex !== 0
+    )
+  ) {
+    throw new Error(
+      "Evidence lineage audit requires --shard-count=1 and --shard-index=0 so related assertions stay in one authority set.",
     );
   }
 
@@ -1242,6 +1284,219 @@ function shouldContinue(
     seen < options.limit
   );
 }
+
+async function scanEvidenceLineage(
+  pool: ReturnType<typeof createRegistryPool>,
+  options: Options,
+): Promise<void> {
+  if (options.mode !== "audit") {
+    throw new Error(
+      "Evidence lineage scanning is audit-only until a typed provenance review broker is accepted.",
+    );
+  }
+
+  if (
+    !(await hasTable(
+      pool,
+      "platform_private.registry_evidence_assertions",
+    ))
+  ) {
+    throw new Error(
+      "Required MIZIZI dependency missing: platform_private.registry_evidence_assertions",
+    );
+  }
+
+  let seen = 0;
+  let cursorCreatedAt: string | null =
+    null;
+  let cursorId = "";
+  const evidenceRows:
+    EvidenceRow[] = [];
+
+  while (
+    shouldContinue(options, seen)
+  ) {
+    const take =
+      remainingLimit(
+        options,
+        seen,
+      );
+
+    if (take <= 0) {
+      break;
+    }
+
+    const result =
+      await pool.query(
+        `
+        select
+          assertion.id::text as "id",
+          assertion.subject_type as "subjectType",
+          assertion.subject_id::text as "subjectId",
+          assertion.claim_key as "claimKey",
+          assertion.claim_payload as "claimPayload",
+          assertion.source_kind as "sourceKind",
+          assertion.source_ref as "sourceRef",
+          assertion.source_payload_fingerprint as "sourcePayloadFingerprint",
+          assertion.parent_assertion_id::text as "parentAssertionId",
+          assertion.originator_ref as "originatorRef",
+          assertion.upstream_source_ref as "upstreamSourceRef",
+          assertion.lineage_key as "lineageKey",
+          assertion.independence_group_hint as "independenceGroupHint",
+          assertion.verification_method as "verificationMethod",
+          assertion.source_use_basis as "sourceUseBasis",
+          assertion.created_at::text as "createdAt"
+        from platform_private.registry_evidence_assertions assertion
+        where (
+            $1::timestamptz is null
+            or assertion.created_at >=
+               $1::timestamptz
+          )
+          and (
+            $2::timestamptz is null
+            or assertion.created_at >
+               $2::timestamptz
+            or (
+              assertion.created_at =
+                $2::timestamptz
+              and assertion.id::text > $3
+            )
+          )
+          and mod(
+            hashtextextended(
+              assertion.id::text,
+              0
+            )::numeric +
+              9223372036854775808,
+            $4::numeric
+          ) = $5::numeric
+        order by
+          assertion.created_at,
+          assertion.id
+        limit $6
+        `,
+        [
+          options.since,
+          cursorCreatedAt,
+          cursorId,
+          options.shardCount,
+          options.shardIndex,
+          take,
+        ],
+      );
+
+    if (!result.rowCount) {
+      break;
+    }
+
+    const rows =
+      result.rows as EvidenceRow[];
+
+    evidenceRows.push(...rows);
+    seen += rows.length;
+
+    const last =
+      rows[rows.length - 1];
+
+    cursorCreatedAt =
+      last.createdAt;
+    cursorId = last.id;
+  }
+
+  const groups =
+    analyzeEvidenceLineage(
+      evidenceRows,
+    );
+
+  const relatedGroups =
+    groups.filter(
+      (group) =>
+        group.independenceStatus ===
+          "related",
+    );
+
+  const unknownGroups =
+    groups.filter(
+      (group) =>
+        group.independenceStatus ===
+          "unknown",
+    );
+
+  const exactEchoGroups =
+    groups.filter(
+      (group) =>
+        group.basis.includes(
+          "exact_payload_echo",
+        ),
+    );
+
+  const claimVariantGroups =
+    groups.filter(
+      (group) =>
+        group.hasClaimVariants,
+    );
+
+  console.log(
+    "\nEvidence lineage audit",
+  );
+  console.log(
+    "-".repeat(80),
+  );
+  console.table([
+    {
+      assertions:
+        evidenceRows.length,
+      lineage_groups:
+        groups.length,
+      related_groups:
+        relatedGroups.length,
+      exact_echo_groups:
+        exactEchoGroups.length,
+      unknown_groups:
+        unknownGroups.length,
+      claim_variant_groups:
+        claimVariantGroups.length,
+    },
+  ]);
+
+  console.log(
+    "\nSample evidence lineage groups",
+  );
+  console.log(
+    "-".repeat(80),
+  );
+  console.table(
+    groups
+      .slice(
+        0,
+        MAX_SAMPLE_FINDINGS,
+      )
+      .map((group) => ({
+        group:
+          group.groupKey.slice(
+            0,
+            12,
+          ),
+        assertions:
+          group.assertionIds.length,
+        subjects:
+          group.subjectCount,
+        basis:
+          group.basis.join(","),
+        independence:
+          group.independenceStatus,
+        claim_variants:
+          group.hasClaimVariants,
+        sources:
+          group.sourceKinds.join(","),
+      })),
+  );
+
+  console.log(
+    "Evidence lineage audit completed. No review rows or canonical Registry rows were changed.",
+  );
+}
+
 
 async function scanTracks(
   pool: ReturnType<typeof createRegistryPool>,
@@ -2350,6 +2605,16 @@ async function main(): Promise<void> {
         pool,
         options,
         stats,
+      );
+    }
+
+    if (
+      options.entity ===
+        "evidence"
+    ) {
+      await scanEvidenceLineage(
+        pool,
+        options,
       );
     }
 
