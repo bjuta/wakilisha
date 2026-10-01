@@ -1,5 +1,22 @@
 # Phase 6A Provider Capability Matrix
 
+> **Work-resolution policy note — 1 October 2026**
+>
+> This Phase 6A document predates the Work-resolution provider-policy audit.
+> For musical Work identity, provider retention policy, and explicit optional-field
+> selection, the current authority is:
+>
+> `docs/engineering/music-work-provider-evidence-audit-20261001.md`
+>
+> In particular:
+>
+> - Spotify is Recording corroboration, not Work authority;
+> - Apple Music API fields may remain useful retained evidence, but new bulk
+>   Work-registry acquisition is not approved under the current MusicKit terms;
+> - Apple Music Feed is blocked for this Registry purpose;
+> - MusicBrainz, The MLC, ACRCloud, CISAC/ISWC, and legitimate DDEX partner
+>   feeds are the preferred Work-resolution sources.
+>
 Phase 6A defines what each provider can safely contribute to the WAKILISHA registry enrichment and canonicalization workflow.
 
 This is intentionally documentation-first. It does not add API calls, schema migrations, provider credentials, canonical registry writes, or public rendering changes.
