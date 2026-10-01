@@ -1052,6 +1052,26 @@
       "legacyDebt": false
     },
     {
+      "id": "admin-admit-registry-track-isrc-projection-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_track_isrc_projection_v1(uuid,uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_orchestrator_over_retained_typed_provider_evidence_exact_grant_operation_and_independent_verifier",
+      "targets": [
+        "registry_external_identifier_assertions",
+        "registry_tracks"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "typed_track_isrc_assertion_and_hot_path_projection_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
       "id": "chart-admit-track-provider-link-v1",
       "kind": "database_function",
       "entrypoint": "public.chart_admit_track_provider_link_v1(uuid)",
