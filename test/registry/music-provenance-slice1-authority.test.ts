@@ -73,6 +73,22 @@ const publicContentOpenApi = read(
   "docs/openapi/public-content-read.yaml",
 );
 
+const releasePage = read(
+  "src/pages/releases/detail/page.tsx",
+);
+const mobileReleasePage = read(
+  "src/pages/mobile/releases/detail/page.tsx",
+);
+const releaseMusicProvenance = read(
+  "src/pages/releases/detail/components/ReleaseMusicProvenance.tsx",
+);
+const releaseStructuredData = read(
+  "src/services/publicContent/releaseStructuredData.ts",
+);
+const artistDisplay = read(
+  "src/utils/musicArtistDisplay.ts",
+);
+
 function between(
   source: string,
   startMarker: string,
@@ -793,3 +809,104 @@ describe("Music provenance Slice 2 participation and public product", () => {
     );
   });
 });
+
+describe("Music provenance Slice 3 public surface convergence", () => {
+  it("keeps Release contribution presentation derived from Track and Work authority", () => {
+    expect(releaseMusicProvenance).toContain(
+      "Who worked on this release",
+    );
+    expect(releaseMusicProvenance).toContain(
+      "Release Artist billing is separate from contribution roles.",
+    );
+    expect(releaseMusicProvenance).toContain(
+      "WAKILISHA does not infer contribution from Release Artist billing.",
+    );
+    expect(publicContentRead).toContain(
+      "loadPublicTrackProvenance",
+    );
+    expect(publicContentRead).toContain(
+      "releaseMusicProvenance",
+    );
+    expect(publicContentRead).toContain(
+      "publicReleaseArtists",
+    );
+    expect(publicContentRead).not.toContain(
+      "registry_release_contributions",
+    );
+    expect(releaseMusicProvenance).not.toContain(
+      "release_contributions",
+    );
+  });
+
+  it("uses one Release provenance surface on desktop and mobile", () => {
+    expect(releasePage).toContain(
+      "ReleaseMusicProvenance",
+    );
+    expect(mobileReleasePage).toContain(
+      "ReleaseMusicProvenance",
+    );
+    expect(releasePage).toContain(
+      "buildReleaseSchemaArtists",
+    );
+    expect(mobileReleasePage).toContain(
+      "buildReleaseSchemaArtists",
+    );
+  });
+
+  it("preserves ordered Person vs MusicGroup Release Artist ontology", () => {
+    expect(releaseStructuredData).toContain(
+      "artist.creditOrder",
+    );
+    expect(releaseStructuredData).toContain(
+      'artist.artistType === "solo"',
+    );
+    expect(releaseStructuredData).toContain(
+      '"Person"',
+    );
+    expect(releaseStructuredData).toContain(
+      '"MusicGroup"',
+    );
+    expect(publicContentRead).toContain(
+      "creditOrder: Number.isFinite(Number(row.credit_order))",
+    );
+    expect(publicContentRead).toContain(
+      "artistType:",
+    );
+  });
+
+  it("keeps Release provenance documented in both public API contracts", () => {
+    for (const contract of [
+      publicContentSpec,
+      publicContentOpenApi,
+    ]) {
+      expect(contract).toContain(
+        "ReleaseArtist",
+      );
+      expect(contract).toContain(
+        "ReleaseTrackProvenance",
+      );
+      expect(contract).toContain(
+        "ReleaseMusicProvenance",
+      );
+    }
+  });
+
+  it("removes grouping punctuation from Artist display tokens", () => {
+    expect(artistTopSongs).toContain(
+      "splitMusicArtistDisplayNames",
+    );
+    expect(artistDisplay).toContain(
+      "bracketedFeature",
+    );
+    expect(artistDisplay).toContain(
+      "feat",
+    );
+    expect(artistDisplay).toContain(
+      ".replace(/^[([{]+",
+    );
+    expect(artistDisplay).toContain(
+      ".replace(/\\s*[)\\]}]+$/",
+    );
+  });
+});
+
