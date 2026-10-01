@@ -447,21 +447,21 @@
         {
           "key": "spotify_track_id",
           "category": "recording_identity",
-          "defaultSelected": true,
+          "defaultSelected": false,
           "retention": "conditional",
           "description": "Spotify recording identity; corroboration only."
         },
         {
           "key": "isrc",
           "category": "recording_identity",
-          "defaultSelected": true,
+          "defaultSelected": false,
           "retention": "conditional",
           "description": "ISRC when present; corroboration only."
         },
         {
           "key": "artist_ids",
           "category": "recording_identity",
-          "defaultSelected": true,
+          "defaultSelected": false,
           "retention": "conditional",
           "description": "Spotify Artist identities used to corroborate the recording match."
         },
