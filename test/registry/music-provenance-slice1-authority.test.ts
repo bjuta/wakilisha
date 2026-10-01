@@ -916,3 +916,79 @@ describe("Music provenance Slice 3 public surface convergence", () => {
   });
 });
 
+describe("Creator credits cohort blocker repair", () => {
+  it("keeps Supabase RPC calls bound to the client instance", () => {
+    expect(musicProvenanceService).toContain(
+      "await client.rpc(functionName, args)",
+    );
+    expect(musicProvenanceService).not.toContain(
+      "await call(functionName, args)",
+    );
+  });
+
+  it("hydrates a deep-linked Track directly and searches the full Registry server-side", () => {
+    expect(musicProvenanceService).toContain(
+      "export async function getMusicCreditTrackById",
+    );
+    expect(musicProvenanceService).toContain(
+      '"search_public_registry_v1"',
+    );
+    expect(musicProvenanceService).toContain(
+      'p_types: ["track"]',
+    );
+    expect(claimComposer).toContain(
+      "getMusicCreditTrackById",
+    );
+    expect(claimComposer).toContain(
+      "setSelectedTrack(track)",
+    );
+    expect(claimComposer).not.toContain(
+      "useTrackSearchData",
+    );
+  });
+
+  it("keeps internal provenance doctrine out of creator-facing copy", () => {
+    for (const internalCopy of [
+      "Open response first",
+      "hidden metadata guess",
+      "fake Person",
+      "canonical Registry",
+      "No active Registry recording",
+      "Loading verified Works",
+      "canonical credits and assertions",
+      "Append-only history",
+      "submit an attestation",
+      "Music provenance",
+    ]) {
+      expect(claimComposer).not.toContain(
+        internalCopy,
+      );
+      expect(creditsPage).not.toContain(
+        internalCopy,
+      );
+    }
+
+    expect(claimComposer).toContain(
+      "Choose the recording, add the role, and tell us who the credit belongs to.",
+    );
+    expect(claimComposer).toContain(
+      "People on WAKILISHA get a notification. Otherwise, we’ll give you a private link to share.",
+    );
+    expect(creditsPage).toContain(
+      "Review your credits, confirmation requests, disputes, and sharing choices.",
+    );
+  });
+
+  it("does not expose raw workspace exceptions to the creator", () => {
+    expect(creditsPage).toContain(
+      "We couldn’t load your credits. Try again.",
+    );
+    expect(creditsPage).toContain(
+      "Could not load credits workspace:",
+    );
+    expect(creditsPage).not.toContain(
+      "error.message\n          : \"Could not load your credits.\"",
+    );
+  });
+});
+
