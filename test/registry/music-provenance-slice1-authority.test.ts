@@ -625,9 +625,24 @@ describe("Music provenance Slice 2 participation and public product", () => {
     expect(creatorCommand).not.toContain(
       "insert into public.registry_work_contributions",
     );
-    expect(claimComposer).toContain("Open response first");
-    expect(claimComposer).toContain("Not on WAKILISHA yet");
-    expect(claimComposer).toContain("WAKILISHA will not contact them automatically");
+    expect(claimComposer).toContain(
+      'contributorMode === "self"',
+    );
+    expect(claimComposer).toContain(
+      '? "self_claim"',
+    );
+    expect(claimComposer).toContain(
+      ': "open_response"',
+    );
+    expect(claimComposer).not.toContain(
+      "Open response first",
+    );
+    expect(claimComposer).toContain(
+      "Not on WAKILISHA yet",
+    );
+    expect(claimComposer).toContain(
+      "People on WAKILISHA get a notification. Otherwise, we’ll give you a private link to share.",
+    );
   });
 
   it("binds counterparty confirmation to the exact parent candidate and preserves disputes", () => {
