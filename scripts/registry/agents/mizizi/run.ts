@@ -236,10 +236,10 @@ function parseOptions(): Options {
 
   if (
     entity === "provenance" &&
-    mode !== "audit"
+    mode === "apply"
   ) {
     throw new Error(
-      "Provenance finding scope is audit-only until a typed provenance review broker is accepted.",
+      "Provenance finding scope supports audit or review only.",
     );
   }
 
@@ -341,23 +341,28 @@ async function queueReview(
 ): Promise<void> {
   if (
     finding.entityType !== "track" &&
-    finding.entityType !== "release"
+    finding.entityType !== "release" &&
+    finding.entityType !==
+      "contribution_attestation"
   ) {
     throw new Error(
-      "Stage B review broker only accepts Track/Release slug review work.",
+      "MIZIZI review broker does not accept this finding type.",
     );
   }
 
   const reviewBroker =
-    finding.ruleVersion === "1.3.0" &&
-    (
-      finding.ruleId ===
-        "track_slug_credit_evidence_gap" ||
-      finding.ruleId ===
-        "track_recording_identity_conflict"
-    )
-      ? "queue_public_music_identity_review_v1"
-      : "queue_registry_review_v1";
+    finding.entityType ===
+      "contribution_attestation"
+      ? "queue_music_provenance_review_v1"
+      : finding.ruleVersion === "1.3.0" &&
+          (
+            finding.ruleId ===
+              "track_slug_credit_evidence_gap" ||
+            finding.ruleId ===
+              "track_recording_identity_conflict"
+          )
+        ? "queue_public_music_identity_review_v1"
+        : "queue_registry_review_v1";
 
   const result =
     await pool.query(
@@ -1307,31 +1312,16 @@ async function scanProvenanceAttestations(
   options: Options,
   stats: RunStats,
 ): Promise<void> {
-  if (options.mode !== "audit") {
+  if (options.mode === "apply") {
     throw new Error(
-      "Provenance finding scope is audit-only until a typed provenance review broker is accepted.",
+      "Provenance finding scope supports audit or review only.",
     );
   }
 
-  for (const table of [
-    "platform_private.registry_contribution_attestations",
-    "platform_private.registry_contribution_attestation_state_events",
-    "platform_private.registry_evidence_assertions",
-    "public.registry_track_contributions",
-    "public.registry_work_contributions",
-  ]) {
-    if (
-      !(await hasTable(
-        pool,
-        table,
-      ))
-    ) {
-      throw new Error(
-        "Required MIZIZI provenance dependency missing: " +
-          table,
-      );
-    }
-  }
+  // Provenance dependencies are intentionally hidden behind the
+  // typed mizizi_private.music_provenance_scan_v1 read broker.
+  // The Stage C executor must remain unable to introspect or read
+  // the underlying private provenance tables directly.
 
   let seen = 0;
   let cursorCreatedAt:
@@ -1357,144 +1347,16 @@ async function scanProvenanceAttestations(
     const result =
       await pool.query(
         `
-        select
-          attestation.id::text
-            as "attestationId",
-          case
-            when attestation.track_id
-              is not null
-              then 'track'
-            else 'work'
-          end as "subjectType",
-          coalesce(
-            attestation.track_id,
-            attestation.work_id
-          )::text as "subjectId",
-          attestation.evidence_assertion_id::text
-            as "evidenceAssertionId",
-          attestation.elicitation_method
-            as "elicitationMethod",
-          coalesce(
-            latest_state.state,
-            ''
-          ) as "latestState",
-          evidence.subject_type
-            as "evidenceSubjectType",
-          evidence.subject_id::text
-            as "evidenceSubjectId",
-          evidence.claim_key
-            as "evidenceClaimKey",
-          case
-            when attestation.track_id
-              is not null
-              then coalesce(
-                track_history.contribution_count,
-                0
-              )
-            else coalesce(
-              work_history.contribution_count,
-              0
-            )
-          end::int
-            as "canonicalContributionCount",
-          case
-            when attestation.track_id
-              is not null
-              then track_history.latest_status
-            else work_history.latest_status
-          end as "canonicalContributionStatus",
-          attestation.created_at::text
-            as "createdAt"
-        from platform_private
-          .registry_contribution_attestations
-          attestation
-        join platform_private
-          .registry_evidence_assertions
-          evidence
-          on evidence.id=
-             attestation.evidence_assertion_id
-        left join lateral (
-          select event.state
-          from platform_private
-            .registry_contribution_attestation_state_events
-            event
-          where event.attestation_id=
-                attestation.id
-          order by
-            event.event_sequence desc
-          limit 1
-        ) latest_state on true
-        left join lateral (
-          select
-            count(*)::int
-              as contribution_count,
-            (
-              array_agg(
-                contribution.status
-                order by
-                  contribution.created_at desc,
-                  contribution.id desc
-              )
-            )[1] as latest_status
-          from public
-            .registry_track_contributions
-            contribution
-          where attestation.track_id
-                is not null
-            and contribution
-                .evidence_assertion_id=
-                attestation
-                  .evidence_assertion_id
-        ) track_history on true
-        left join lateral (
-          select
-            count(*)::int
-              as contribution_count,
-            (
-              array_agg(
-                contribution.status
-                order by
-                  contribution.created_at desc,
-                  contribution.id desc
-              )
-            )[1] as latest_status
-          from public
-            .registry_work_contributions
-            contribution
-          where attestation.work_id
-                is not null
-            and contribution
-                .evidence_assertion_id=
-                attestation
-                  .evidence_assertion_id
-        ) work_history on true
-        where (
-            $1::timestamptz is null
-            or attestation.created_at >=
-               $1::timestamptz
+        select *
+        from mizizi_private
+          .music_provenance_scan_v1(
+            $1::timestamptz,
+            $2::timestamptz,
+            $3::text,
+            $4::integer,
+            $5::integer,
+            $6::integer
           )
-          and (
-            $2::timestamptz is null
-            or attestation.created_at >
-               $2::timestamptz
-            or (
-              attestation.created_at =
-                $2::timestamptz
-              and attestation.id::text > $3
-            )
-          )
-          and mod(
-            hashtextextended(
-              attestation.id::text,
-              0
-            )::numeric +
-              9223372036854775808,
-            $4::numeric
-          ) = $5::numeric
-        order by
-          attestation.created_at,
-          attestation.id
-        limit $6
         `,
         [
           options.since,
@@ -1528,6 +1390,18 @@ async function scanProvenanceAttestations(
           stats,
           finding,
         );
+
+        if (
+          options.mode === "review" &&
+          finding.disposition ===
+            "review"
+        ) {
+          await queueReview(
+            pool,
+            finding,
+          );
+          stats.queued += 1;
+        }
       }
     }
 

@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20260930175049_music_provenance_slice3_review_materialization_v1.sql",
+  "migration_sha256": "0ec01523f2c3842be5b5c56a0ebd955cbcc0c8142d7b5c82ff2b34d26dc8d70d",
+  "base_main_sha": "148904e9a948bf3f4b4e2ac35ed9a4b38f9103d7",
+  "preview_project_ref": "ioveindzhuihvtjfamma",
+  "preview_branch_id": "a07f06f9-fa58-4aab-aa85-53e8787ea063",
+  "preview_migration_head": "20260930175049",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-music-provenance-slice3-review-materialization.sql",
+  "schema_types_sha256": "d12405446fc3e64aae43d55a4ff69418cdd2cac96243c90f9e959f627aed6ea6",
+  "schema_migration_count": 194,
+  "schema_migration_head": "20260930175049",
+  "verified_at": "2026-09-30T20:55:34.616Z"
+}

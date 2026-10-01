@@ -15,6 +15,14 @@ describe("MIZIZI current URL-identity production control plane", () => {
       ".github/workflows/mizizi-release-production-control-plane.yml",
       "utf8",
     );
+    const trackControlPlane = readFileSync(
+      "scripts/control-plane/mizizi-track-production-control-plane.mjs",
+      "utf8",
+    );
+    const releaseControlPlane = readFileSync(
+      "scripts/control-plane/mizizi-release-production-control-plane.mjs",
+      "utf8",
+    );
     const runtime = readFileSync(
       "scripts/control-plane/mizizi-production-jit-runtime.mjs",
       "utf8",
@@ -40,6 +48,16 @@ describe("MIZIZI current URL-identity production control plane", () => {
     );
     expect(workflow).toContain("queue: max");
     expect(workflow).not.toContain("cancel-in-progress:");
+
+    for (const acceptedControlPlane of [
+      trackControlPlane,
+      releaseControlPlane,
+      controlPlane,
+    ]) {
+      expect(acceptedControlPlane).toContain(
+        "0518258a8fa439b06b8f017decb09f3d9da447cf",
+      );
+    }
 
     expect(runtime).toContain(
       "current programme transport = mizizi_executor",
@@ -409,7 +427,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
       '"scripts/registry/agents/mizizi/run.ts":',
     );
     expect(controlPlane).toContain(
-      '"30b28b6002778c60bde277296e11571618aaa719"',
+      '"0518258a8fa439b06b8f017decb09f3d9da447cf"',
     );
     expect(controlPlane).toContain(
       "executeReleaseResumePlans",

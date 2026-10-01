@@ -9,6 +9,7 @@ describe("MIZIZI Admin workspace", () => {
   const routes = read("src/router/config.tsx");
   const lazy = read("src/router/lazyAdmin.tsx");
   const search = read("src/data/adminSearchIndex.ts");
+  const service = read("src/services/adminReviewCommandCenter.ts");
 
   it("gives MIZIZI a dedicated current-work surface", () => {
     expect(page).toContain("data-wk-mizizi-workspace");
@@ -54,6 +55,34 @@ describe("MIZIZI Admin workspace", () => {
     expect(page).toContain("public_music_identity_true_duplicate");
     expect(page).toContain("public_music_identity_safe_slug_repair");
     expect(page).toContain("admin_mizizi_workspace");
+  });
+
+  it("adds contribution provenance as typed human review instead of a second mutation path", () => {
+    expect(page).toContain("data-wk-mizizi-provenance-reviews");
+    expect(page).toContain("Contribution provenance");
+    expect(page).toContain("loadCurrentProvenanceReviews");
+    expect(page).toContain("loadMusicProvenanceContributionReviewContext");
+    expect(page).toContain("expectedProvenanceContextFingerprint");
+    expect(page).toContain("Admit contribution");
+    expect(page).toContain("Require fresh attestation");
+    expect(page).toContain("Escalate integrity conflict");
+    expect(page).toContain("Need more evidence");
+    expect(page).toContain(
+      "Only a human review can admit a canonical contribution.",
+    );
+    expect(page).toContain("rightsClaimInferred: false");
+
+    expect(service).toContain("isMusicProvenanceContributionReview");
+    expect(service).toContain(
+      "admin_get_music_provenance_contribution_review_context_v1",
+    );
+    expect(service).toContain(
+      "admin_record_music_provenance_contribution_review_decision_v1",
+    );
+
+    expect(page).not.toContain("Candidate payload");
+    expect(page).not.toContain("Source payload");
+    expect(page).not.toContain("—");
   });
 
   it("keeps the decision modal viewport-bound with pinned actions", () => {
