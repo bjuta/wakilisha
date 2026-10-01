@@ -231,8 +231,8 @@ Artist pages, track pages, release pages, search, charts, Magazine, playlists, b
 | Release identity | Registry release record | provider links, tracklists, release shells |
 | Label identity | Registry label record | provider and editorial observations |
 | Genre identity | Registry genre record | aliases and curated taxonomy |
-| Track credits | `registry_track_artists` | provider observations and editorial review |
-| Release credits | `registry_release_artists` | provider observations and editorial review |
+| Track Artist billing | `registry_track_artists` | provider observations and editorial review |
+| Release Artist billing | `registry_release_artists` | provider observations and editorial review |
 | Release tracklist | `registry_release_tracks` | provider payloads and editorial review |
 | Artist genre | `registry_artist_genres` | imported classifications and editorial review |
 | General cultural relationship | Registry relationship graph | evidence, imports, suggestions, contributions |
@@ -539,6 +539,11 @@ Decision date: 29 September 2026.
 
 The execution plan does not change Registry ownership. It explicitly preserves
 the distinction between public Artist billing and complete Recording/Work
-provenance, and assigns the terminology correction for the existing
-`Track credits -> registry_track_artists` shorthand to the implementation
-slice that activates structured public contribution projections.
+provenance. The active terminology is now explicit:
+
+- Track Artist billing -> `registry_track_artists`;
+- Release Artist billing -> `registry_release_artists`;
+- Recording Contributions -> `registry_track_contributions`;
+- Work Contributions -> `registry_work_contributions`.
+
+Contribution terminology must not be inferred from Artist billing rows.
