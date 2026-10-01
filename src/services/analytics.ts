@@ -190,6 +190,7 @@ export type MusicProvenanceAnalyticsEvent =
 export type MusicProvenanceAnalyticsContext = {
   surface:
     | "track"
+    | "release"
     | "your_credits"
     | "credit_invite"
     | "person";
