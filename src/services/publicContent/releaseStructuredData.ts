@@ -30,14 +30,25 @@ export function buildReleaseSchemaArtists(
       ? primary
       : ordered;
 
-  return selected.map((artist) => ({
-    "@type":
-      artist.artistType === "solo"
-        ? "Person"
-        : "MusicGroup",
-    name: artist.name,
-    url: artist.slug
-      ? `/artists/${artist.slug}`
-      : undefined,
-  }));
+  return selected.flatMap((artist) => {
+    const artistType =
+      String(
+        artist.artistType || "",
+      )
+        .trim()
+        .toLowerCase();
+
+    if (!artistType) return [];
+
+    return [{
+      "@type":
+        artistType === "solo"
+          ? "Person"
+          : "MusicGroup",
+      name: artist.name,
+      url: artist.slug
+        ? `/artists/${artist.slug}`
+        : undefined,
+    }];
+  });
 }
