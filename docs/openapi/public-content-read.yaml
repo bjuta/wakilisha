@@ -154,7 +154,7 @@ paths:
   /releases/{artistSlug}/{releaseSlug}:
     get:
       summary: Multi-track Release detail with tracklist
-      description: One-track Releases remain Registry objects but do not own public Release detail pages.
+      description: One-track Releases remain Registry objects but do not own public Release detail pages. Ordered Release Artist billing is exposed separately from canonical Track and Work contribution provenance.
       operationId: getReleaseDetail
       tags: [Releases]
       parameters:
@@ -168,7 +168,7 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          description: Multi-track Release detail
+          description: Multi-track Release detail with typed Artist billing and canonical Track and Work provenance
           content:
             application/json:
               schema:
@@ -648,7 +648,54 @@ components:
         tracks: { type: array, items: { $ref: "#/components/schemas/TrackRef" } }
         totalDuration: { type: number }
         description: { type: string }
+        artists: { type: array, items: { $ref: "#/components/schemas/ReleaseArtist" } }
+        musicProvenance: { $ref: "#/components/schemas/ReleaseMusicProvenance" }
+        featuredArtists:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              slug: { type: string }
+              imageUrl: { type: string, nullable: true }
         metadata: { type: object }
+
+    ReleaseArtist:
+      type: object
+      properties:
+        artistId: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        isPrimary: { type: boolean }
+        isFeatured: { type: boolean }
+        creditOrder: { type: integer }
+        artistType: { type: string, nullable: true }
+
+    ReleaseTrackProvenance:
+      type: object
+      properties:
+        trackId: { type: string }
+        trackSlug: { type: string }
+        artistSlug: { type: string }
+        title: { type: string }
+        artworkUrl: { type: string }
+        recordingContributions:
+          type: array
+          items: { $ref: "#/components/schemas/MusicContribution" }
+        works:
+          type: array
+          items: { $ref: "#/components/schemas/WorkProvenance" }
+        provenanceReceipt: { $ref: "#/components/schemas/ProvenanceReceipt" }
+
+    ReleaseMusicProvenance:
+      type: object
+      properties:
+        tracks:
+          type: array
+          items: { $ref: "#/components/schemas/ReleaseTrackProvenance" }
+        recordingCreditCount: { type: integer }
+        workCreditCount: { type: integer }
+        hasCanonicalCredits: { type: boolean }
 
     ReleaseWithTracks:
       type: object

@@ -1820,7 +1820,44 @@ Deno.serve(async (req) => {
       const releaseId = String(release.id);
       const releaseMeta = (release.metadata || {}) as Record<string, unknown>;
       const { data: releaseTracks } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", releaseId).eq("status", "active").order("track_number", { ascending: true });
-      const { data: releaseArtists } = await supabase.from("registry_release_artists").select("artist_id, artist_name_text, is_primary, is_featured, artist_slug").eq("release_id", releaseId).eq("status", "active").order("credit_order", { ascending: true }).limit(20);
+      const { data: releaseArtists } = await supabase.from("registry_release_artists").select("artist_id, artist_name_text, is_primary, is_featured, artist_slug, credit_order").eq("release_id", releaseId).eq("status", "active").order("credit_order", { ascending: true }).limit(20);
+      const releaseArtistIds = [...new Set(
+        (releaseArtists ?? [])
+          .map((row: any) => String(row.artist_id || "").trim())
+          .filter(Boolean),
+      )];
+      const { data: releaseArtistEntities } = releaseArtistIds.length > 0
+        ? await supabase
+            .from("registry_artists")
+            .select("id, artist_type")
+            .in("id", releaseArtistIds)
+            .eq("status", "active")
+        : { data: [] };
+      const releaseArtistTypeById = new Map(
+        (releaseArtistEntities ?? []).map((artist: any) => [
+          String(artist.id),
+          String(artist.artist_type || ""),
+        ]),
+      );
+      const publicReleaseArtists = (releaseArtists ?? [])
+        .map((row: any) => ({
+          artistId: String(row.artist_id || ""),
+          name: String(row.artist_name_text || row.artist_slug || ""),
+          slug: String(row.artist_slug || ""),
+          isPrimary: Boolean(row.is_primary),
+          isFeatured: Boolean(row.is_featured),
+          creditOrder: Number.isFinite(Number(row.credit_order))
+            ? Number(row.credit_order)
+            : 999,
+          artistType:
+            releaseArtistTypeById.get(String(row.artist_id || "")) || null,
+        }))
+        .filter((artist: any) => artist.name && artist.slug)
+        .sort(
+          (a: any, b: any) =>
+            a.creditOrder - b.creditOrder
+            || a.artistId.localeCompare(b.artistId),
+        );
       const primaryArtistRow = (releaseArtists ?? []).find((ra: any) => ra.is_primary) || (releaseArtists ?? [])[0];
       const artistName = primaryArtistRow ? String(primaryArtistRow.artist_name_text || primaryArtistRow.artist_slug || "Unknown") : "Unknown";
       const primaryArtistSlug = primaryArtistRow ? String(primaryArtistRow.artist_slug || "") : "";
@@ -1884,6 +1921,77 @@ Deno.serve(async (req) => {
         );
       }
 
+      const releaseProvenanceTracks = await Promise.all(
+        trackList.map(async (track: any) => {
+          const provenance =
+            await loadPublicTrackProvenance(
+              supabase,
+              String(track.id),
+            );
+
+          return {
+            trackId: String(track.id),
+            trackSlug: String(track.slug || ""),
+            artistSlug: String(track.artistSlug || ""),
+            title: String(track.title || ""),
+            artworkUrl: String(track.artworkUrl || ""),
+            recordingContributions:
+              provenance.recordingContributions,
+            works: provenance.works,
+            provenanceReceipt:
+              provenance.provenanceReceipt,
+          };
+        }),
+      );
+      const releaseRecordingCreditCount =
+        releaseProvenanceTracks.reduce(
+          (sum: number, track: any) =>
+            sum +
+            (
+              Array.isArray(
+                track.recordingContributions,
+              )
+                ? track.recordingContributions.length
+                : 0
+            ),
+          0,
+        );
+      const releaseWorkCreditCount =
+        releaseProvenanceTracks.reduce(
+          (sum: number, track: any) =>
+            sum +
+            (
+              Array.isArray(track.works)
+                ? track.works.reduce(
+                    (
+                      workSum: number,
+                      work: any,
+                    ) =>
+                      workSum +
+                      (
+                        Array.isArray(
+                          work?.contributions,
+                        )
+                          ? work.contributions.length
+                          : 0
+                      ),
+                    0,
+                  )
+                : 0
+            ),
+          0,
+        );
+      const releaseMusicProvenance = {
+        tracks: releaseProvenanceTracks,
+        recordingCreditCount:
+          releaseRecordingCreditCount,
+        workCreditCount:
+          releaseWorkCreditCount,
+        hasCanonicalCredits:
+          releaseRecordingCreditCount > 0 ||
+          releaseWorkCreditCount > 0,
+      };
+
       let releaseChartStats = null;
       if (trackList.length > 0) {
         const releaseTrackIds = trackList.map((t: any) => String(t.id));
@@ -1901,7 +2009,7 @@ Deno.serve(async (req) => {
       const labelName = label?.name || String(releaseMeta.record_label || releaseMeta.wp_label || "Independent");
       let description = release.description || "";
       if (!description || description.trim().length === 0) { const rType = releaseTypeLabel(String(release.release_type || "album")); const niceDate = formatDateNicely(String(release.release_date || "")); const yearOnly = release.release_date ? String(release.release_date).split("-")[0] : ""; let desc = release.title + " is " + articleize(rType) + " by " + artistName; if (niceDate && niceDate !== yearOnly) desc += ", released on " + niceDate; else if (yearOnly) desc += ", released in " + yearOnly; if (labelName && labelName !== "Independent" && labelName !== "Unknown") desc += " through " + labelName; desc += "."; description = desc; }
-      data = { release: { id: releaseId, slug: cleanPublicMusicSlug(release.slug, release.title, primaryArtistSlug || urlArtistSlug || ""), title: String(release.title), artist: artistName, year: release.release_date ? String(release.release_date).split("-")[0] : "", releaseDate: release.release_date || "", releaseType: releaseTypeLabelFromActiveTrackCount(trackList.length) || "Release", labelName, labelSlug: label?.slug || "", artworkUrl: release.artwork_url || "", trackCount: trackList.length, tracks: trackList, totalDuration, description, featuredArtists: allFeaturedArtists, chartStats: releaseChartStats, metadata: { ...releaseMeta, wpLabel: releaseMeta.wp_label || null, wpDistributor: releaseMeta.wp_distributor || null, wpWriters: releaseMeta.wp_writers || null, wpProducers: releaseMeta.wp_producers || null } } };
+      data = { release: { id: releaseId, slug: cleanPublicMusicSlug(release.slug, release.title, primaryArtistSlug || urlArtistSlug || ""), title: String(release.title), artist: artistName, year: release.release_date ? String(release.release_date).split("-")[0] : "", releaseDate: release.release_date || "", releaseType: releaseTypeLabelFromActiveTrackCount(trackList.length) || "Release", labelName, labelSlug: label?.slug || "", artworkUrl: release.artwork_url || "", trackCount: trackList.length, tracks: trackList, totalDuration, description, artists: publicReleaseArtists, musicProvenance: releaseMusicProvenance, featuredArtists: allFeaturedArtists, chartStats: releaseChartStats, metadata: { ...releaseMeta, wpLabel: releaseMeta.wp_label || null, wpDistributor: releaseMeta.wp_distributor || null, wpWriters: releaseMeta.wp_writers || null, wpProducers: releaseMeta.wp_producers || null } } };
     }
 
     else if (path === "/releases" || path === "/releases/") {

@@ -22,7 +22,19 @@ const soloArtist = {
   instagram: "",
   chartEntries: [],
   releases: [],
-  topSongs: [],
+  topSongs: [
+    {
+      id: "13f03a01-9e07-4ac4-8fa5-000000000031",
+      slug: "slice3-grouped-artist-track",
+      artistSlug: "slice3-browser-solo",
+      title: "Slice 3 Grouped Artist Track",
+      artists:
+        "Slice 3 Browser Solo (feat. Preview Producer, Preview Songwriter)",
+      image: "",
+      duration: "3:05",
+      songUrl: "",
+    },
+  ],
   relatedArtists: [],
   videos: [],
   musicProvenance: {
@@ -41,6 +53,7 @@ const groupArtist = {
   bio: "Preview group artist",
   fullBio: "Preview group artist",
   artistType: "group",
+  topSongs: [],
   musicProvenance: {
     artistId: "13f03a01-9e07-4ac4-8fa5-000000000021",
     recordingCredits: [],
@@ -175,6 +188,100 @@ const trackDetail = {
   sourceProviders: [],
 };
 
+const releaseDetail = {
+  id: "13f03a01-9e07-4ac4-8fa5-000000000027",
+  slug: "slice3-browser-release",
+  title: "Slice 3 Browser Release",
+  artist: soloArtist.name,
+  artistSlug: soloArtist.slug,
+  year: "2026",
+  releaseDate: "2026-10-01",
+  releaseType: "Album",
+  labelName: "Preview Label",
+  labelSlug: "preview-label",
+  artworkUrl: "",
+  trackCount: 2,
+  totalDuration: 365,
+  description: "Preview release",
+  tracks: [
+    {
+      id: trackDetail.track.id,
+      slug: trackDetail.track.slug,
+      artistSlug: soloArtist.slug,
+      title: trackDetail.track.title,
+      artist: soloArtist.name,
+      duration: 185,
+      trackNumber: 1,
+      artworkUrl: "",
+      previewUrl: null,
+    },
+    {
+      id: "13f03a01-9e07-4ac4-8fa5-000000000028",
+      slug: "slice3-browser-track-two",
+      artistSlug: groupArtist.slug,
+      title: "Slice 3 Browser Track Two",
+      artist: groupArtist.name,
+      duration: 180,
+      trackNumber: 2,
+      artworkUrl: "",
+      previewUrl: null,
+    },
+  ],
+  metadata: {},
+  artists: [
+    {
+      artistId: soloArtist.id,
+      name: soloArtist.name,
+      slug: soloArtist.slug,
+      isPrimary: true,
+      isFeatured: false,
+      creditOrder: 0,
+      artistType: "solo",
+    },
+    {
+      artistId: groupArtist.id,
+      name: groupArtist.name,
+      slug: groupArtist.slug,
+      isPrimary: true,
+      isFeatured: false,
+      creditOrder: 1,
+      artistType: "group",
+    },
+  ],
+  musicProvenance: {
+    tracks: [
+      {
+        trackId: trackDetail.track.id,
+        trackSlug: trackDetail.track.slug,
+        artistSlug: soloArtist.slug,
+        title: trackDetail.track.title,
+        artworkUrl: "",
+        recordingContributions:
+          trackDetail.recordingContributions,
+        works: trackDetail.works,
+        provenanceReceipt:
+          trackDetail.provenanceReceipt,
+      },
+      {
+        trackId:
+          "13f03a01-9e07-4ac4-8fa5-000000000028",
+        trackSlug: "slice3-browser-track-two",
+        artistSlug: groupArtist.slug,
+        title: "Slice 3 Browser Track Two",
+        artworkUrl: "",
+        recordingContributions: [],
+        works: [],
+        provenanceReceipt: null,
+      },
+    ],
+    recordingCreditCount: 1,
+    workCreditCount: 1,
+    hasCanonicalCredits: true,
+  },
+  featuredArtists: [],
+  chartStats: null,
+};
+
 async function fulfillJson(
   route: import("@playwright/test").Route,
   body: unknown,
@@ -201,15 +308,29 @@ async function installPublicReadFixtures(
   );
 
   await page.route(
-    "**://*.supabase.co/rest/v1/rpc/track_analytics_event",
+    "**://*.supabase.co/rest/v1/**",
     async (route) => {
-      await fulfillJson(route, null);
+      await fulfillJson(route, []);
     },
   );
 
   await page.route(
-    "**://*.supabase.co/rest/v1/**",
+    "**://*.supabase.co/rest/v1/rpc/**",
     async (route) => {
+      const url = new URL(
+        route.request().url(),
+      );
+      const rpcName =
+        url.pathname.split("/").pop() || "";
+
+      if (
+        rpcName ===
+        "track_analytics_event"
+      ) {
+        await fulfillJson(route, null);
+        return;
+      }
+
       await fulfillJson(route, []);
     },
   );
@@ -275,6 +396,33 @@ async function installPublicReadFixtures(
       ) {
         await fulfillJson(route, {
           data: trackDetail,
+        });
+        return;
+      }
+
+      if (
+        path.endsWith(
+          "/public-content-read/releases/slice3-browser-solo/slice3-browser-release",
+        )
+      ) {
+        await fulfillJson(route, {
+          data: {
+            release:
+              releaseDetail,
+          },
+        });
+        return;
+      }
+
+      if (
+        path.endsWith(
+          "/public-content-read/releases",
+        )
+      ) {
+        await fulfillJson(route, {
+          data: {
+            releases: [],
+          },
         });
         return;
       }
@@ -460,4 +608,202 @@ test("Slice 3 preserves ordered multi-MainArtist recording schema and provenance
     "href",
     /\/credits\?track_id=/,
   );
+});
+
+test("Slice 3 normalizes grouped Artist credits without hanging brackets", async ({
+  page,
+}) => {
+  await page.goto(
+    "/artists/slice3-browser-solo",
+    {
+      waitUntil: "domcontentloaded",
+    },
+  );
+
+  await page
+    .getByRole("tab", {
+      name: "Music",
+      exact: true,
+    })
+    .click();
+
+  await page
+    .getByText(
+      "Slice 3 Grouped Artist Track",
+      { exact: true },
+    )
+    .click();
+
+  const chips = page.locator(
+    "[data-wk-artist-credit-chip]",
+  );
+
+  await expect(chips).toHaveCount(3);
+  await expect(chips.nth(0)).toHaveText(
+    soloArtist.name,
+  );
+  await expect(chips.nth(1)).toHaveText(
+    "Preview Producer",
+  );
+  await expect(chips.nth(2)).toHaveText(
+    "Preview Songwriter",
+  );
+
+  expect(
+    await chips.allTextContents(),
+  ).toEqual([
+    soloArtist.name,
+    "Preview Producer",
+    "Preview Songwriter",
+  ]);
+});
+
+test("Slice 3 renders Release provenance and ordered typed Artist schema on desktop", async ({
+  page,
+}) => {
+  await page.setViewportSize({
+    width: 1280,
+    height: 900,
+  });
+
+  await page.goto(
+    "/releases/slice3-browser-solo/slice3-browser-release",
+    {
+      waitUntil: "domcontentloaded",
+    },
+  );
+
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: releaseDetail.title,
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  await expect(
+    page.getByRole("heading", {
+      level: 2,
+      name:
+        "Who worked on this release",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  await expect(
+    page.getByText(
+      "Preview Producer",
+      { exact: true },
+    ),
+  ).toBeVisible();
+
+  await expect(
+    page.getByText(
+      "Preview Songwriter",
+      { exact: true },
+    ),
+  ).toBeVisible();
+
+  const schemas = await jsonLd(page);
+  const album = schemas.find(
+    (value: Record<string, unknown>) =>
+      value?.["@type"] ===
+        "MusicAlbum" &&
+      value?.name ===
+        releaseDetail.title,
+  ) as
+    | {
+        byArtist?: Array<{
+          "@type": string;
+          name: string;
+        }>;
+      }
+    | undefined;
+
+  expect(album).toBeTruthy();
+  expect(album?.byArtist).toEqual([
+    expect.objectContaining({
+      "@type": "Person",
+      name: soloArtist.name,
+    }),
+    expect.objectContaining({
+      "@type": "MusicGroup",
+      name: groupArtist.name,
+    }),
+  ]);
+
+  await page
+    .getByRole("button", {
+      name: "How we know this",
+      exact: true,
+    })
+    .click();
+
+  await expect(
+    page.getByText(
+      "WAKILISHA does not infer contribution from Release Artist billing.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+});
+
+test("Slice 3 renders the same Release provenance contract on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({
+    width: 390,
+    height: 844,
+  });
+
+  await page.goto(
+    "/releases/slice3-browser-solo/slice3-browser-release",
+    {
+      waitUntil: "domcontentloaded",
+    },
+  );
+
+  await expect(
+    page.getByRole("heading", {
+      level: 2,
+      name:
+        "Who worked on this release",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  await expect(
+    page
+      .locator(
+        "[data-wk-release-provenance]",
+      ),
+  ).toContainText(
+    "Release Artist billing is separate from contribution roles.",
+  );
+
+  const schemas = await jsonLd(page);
+  const album = schemas.find(
+    (value: Record<string, unknown>) =>
+      value?.["@type"] ===
+        "MusicAlbum" &&
+      value?.name ===
+        releaseDetail.title,
+  ) as
+    | {
+        byArtist?: Array<{
+          "@type": string;
+          name: string;
+        }>;
+      }
+    | undefined;
+
+  expect(album?.byArtist).toEqual([
+    expect.objectContaining({
+      "@type": "Person",
+      name: soloArtist.name,
+    }),
+    expect.objectContaining({
+      "@type": "MusicGroup",
+      name: groupArtist.name,
+    }),
+  ]);
 });

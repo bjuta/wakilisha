@@ -7,13 +7,16 @@ import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { ReleaseSaveButton } from "@/components/releases/ReleaseSaveButton";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import { usePlayer } from "@/context/PlayerContext";
 import { getRelease, slugify, listReleases, releaseUrl, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
+import { buildReleaseSchemaArtists } from "@/services/publicContent/releaseStructuredData";
 import { canonicalTrackUrl } from "@/utils/trackUrl";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import ReleaseMusicProvenance from "@/pages/releases/detail/components/ReleaseMusicProvenance";
 
 function formatDuration(seconds: number): string {
   if (!seconds) return "—";
@@ -460,6 +463,11 @@ export default function MobileReleaseDetail() {
   const restSentences = sentences.slice(2).join(". ").trim();
   const hasMoreDescription = restSentences.length > 0;
 
+  const schemaArtists =
+    buildReleaseSchemaArtists(
+      release.artists,
+    );
+
   const communityEntity = {
     type: "release" as const,
     id: release.id,
@@ -480,6 +488,46 @@ export default function MobileReleaseDetail() {
         type="music.album"
         artistName={release.artist}
         releaseDate={release.releaseDate}
+      />
+
+      <SchemaOrg
+        data={{
+          "@type": "MusicAlbum",
+          name: release.title,
+          byArtist:
+            schemaArtists.length === 0
+              ? undefined
+              : schemaArtists.length === 1
+                ? schemaArtists[0]
+                : schemaArtists,
+          image: release.artworkUrl,
+          datePublished:
+            release.releaseDate,
+          numTracks:
+            release.trackCount,
+          genre:
+            Array.isArray(
+              release.metadata?.genres,
+            )
+              ? release.metadata.genres as string[]
+              : undefined,
+          url:
+            typeof window !== "undefined"
+              ? window.location.href
+              : undefined,
+          track: release.tracks.map(
+            (track, index) => ({
+              "@type":
+                "MusicRecording" as const,
+              name: track.title,
+              duration:
+                track.duration > 0
+                  ? `PT${String(Math.floor(track.duration / 60))}M${String(Math.floor(track.duration % 60))}S`
+                  : undefined,
+              position: index + 1,
+            }),
+          ),
+        }}
       />
 
       {/* Floating top bar */}
@@ -740,6 +788,10 @@ export default function MobileReleaseDetail() {
             </div>
           )}
         </section>
+
+        <ReleaseMusicProvenance
+          release={release}
+        />
 
         {/* Registry info */}
         <section>
