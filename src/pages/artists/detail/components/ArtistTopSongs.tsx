@@ -113,6 +113,7 @@ function SongExpandedPanel({
             {artistList.map((name) => (
               <span
                 key={name}
+                data-wk-artist-credit-chip
                 className="flex items-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--wk-text-muted)] whitespace-nowrap"
               >
                 {name}
