@@ -65,7 +65,7 @@ describe("Creator cohort Work provider resolution", () => {
     );
 
     expect(edge).toContain(
-      'p_capability_key: "manage_registry"',
+      'required_capability: "manage_registry"',
     );
   });
 
@@ -98,6 +98,12 @@ describe("Creator cohort Work provider resolution", () => {
     );
     expect(edge).toContain(
       "musicbrainz_multiple_works",
+    );
+    expect(edge).toContain(
+      "musicbrainz_work_relation_not_exact_embodiment",
+    );
+    expect(edge).toContain(
+      'relationType !== "performance"',
     );
   });
 
@@ -156,7 +162,7 @@ describe("Creator cohort Work provider resolution", () => {
       "public.admin_admit_registry_track_work_link_v1",
     );
     expect(migration).toContain(
-      "public.admin_admit_registry_external_identifier_candidate_v1",
+      "public.admin_admit_registry_work_external_identifier_candidate_v1",
     );
 
     expect(migration).not.toContain(
@@ -208,7 +214,7 @@ describe("Creator cohort Work provider resolution", () => {
     );
 
     expect(migration).toContain(
-      "p_subject_type='work'",
+      "registry_work_external_identifier_candidate_state_v1",
     );
     expect(migration).toContain(
       "insert into public.registry_external_identifier_assertions",
