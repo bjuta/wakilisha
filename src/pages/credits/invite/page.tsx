@@ -69,19 +69,27 @@ export default function CreditInvitePage() {
         mode,
         reason.trim() || null,
       );
-      trackMusicProvenanceEvent(
-        mode === "accepted"
-          ? "credit_confirmation_completed"
-          : mode === "disputed"
-            ? "credit_disputed"
-            : "credit_confirmation_completed",
-        {
-          surface: "credit_invite",
-          subjectKind:
-            invite.subject?.kind,
-          outcome: mode,
-        },
-      );
+      if (mode === "accepted") {
+        trackMusicProvenanceEvent(
+          "credit_confirmation_completed",
+          {
+            surface: "credit_invite",
+            subjectKind:
+              invite.subject?.kind,
+            outcome: "accepted",
+          },
+        );
+      } else if (mode === "disputed") {
+        trackMusicProvenanceEvent(
+          "credit_disputed",
+          {
+            surface: "credit_invite",
+            subjectKind:
+              invite.subject?.kind,
+            outcome: "disputed",
+          },
+        );
+      }
       const refreshed = await getMusicCreditInvite(inviteRef);
       setInvite(refreshed);
       setMessage({
