@@ -1,0 +1,688 @@
+{
+  "version": 1,
+  "purpose": "Read-only planning contract for musical Work resolution. Provider availability never authorizes canonical mutation.",
+  "defaultProfile": "work-evidence-only",
+  "profiles": {
+    "work-evidence-only": {
+      "description": "Select only fields needed to resolve Recording identity, Work identity, and writer relationships.",
+      "categories": [
+        "recording_identity",
+        "work_identity",
+        "work_contributor"
+      ]
+    },
+    "work-plus-registry-enrichment": {
+      "description": "Work evidence plus optional Registry enrichment selected by policy.",
+      "categories": [
+        "recording_identity",
+        "work_identity",
+        "work_contributor",
+        "registry_enrichment"
+      ]
+    },
+    "review-all-available": {
+      "description": "Select every policy-allowed field in the manifest for operator review. Policy-blocked fields remain excluded.",
+      "categories": [
+        "recording_identity",
+        "work_identity",
+        "work_contributor",
+        "registry_enrichment",
+        "provider_context"
+      ]
+    }
+  },
+  "providers": {
+    "musicbrainz": {
+      "label": "MusicBrainz",
+      "acquisitionMode": "public_or_commercial_api",
+      "workEvidenceStrength": "strong",
+      "policyStatus": "allowed_with_service_terms",
+      "policyNote": "Public web service is free for non-commercial use and rate-limited. Commercial use requires an appropriate commercial arrangement or licensed data path.",
+      "docs": [
+        "https://musicbrainz.org/doc/MusicBrainz_API",
+        "https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting"
+      ],
+      "fields": [
+        {
+          "key": "isrc",
+          "category": "recording_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Recording identity lookup key."
+        },
+        {
+          "key": "recording_mbid",
+          "category": "recording_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "MusicBrainz Recording identity."
+        },
+        {
+          "key": "work_mbid",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "MusicBrainz Work identity reached through Recording to Work relationships."
+        },
+        {
+          "key": "iswc",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "International Standard Musical Work Code when present."
+        },
+        {
+          "key": "work_title",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Title of the matched musical Work."
+        },
+        {
+          "key": "composer_relations",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Composer relationships attached to the Work."
+        },
+        {
+          "key": "lyricist_relations",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Lyricist relationships attached to the Work."
+        },
+        {
+          "key": "writer_mbids",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "MusicBrainz Artist identities for Work contributors."
+        },
+        {
+          "key": "work_language",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Language metadata for the Work."
+        },
+        {
+          "key": "work_type",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "MusicBrainz Work type."
+        },
+        {
+          "key": "aliases",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Work aliases for review and discovery."
+        },
+        {
+          "key": "tags",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Community/provider tags; never identity authority."
+        }
+      ]
+    },
+    "mlc": {
+      "label": "The MLC",
+      "acquisitionMode": "registered_public_api_or_bwarm",
+      "workEvidenceStrength": "strong",
+      "policyStatus": "allowed_with_service_terms",
+      "policyNote": "The Musical Works Database may be used for lawful purposes. API and bulk access require registration.",
+      "docs": [
+        "https://www.themlc.com/dataprograms",
+        "https://www.themlc.com/musicalworksdatabasetermsuse"
+      ],
+      "fields": [
+        {
+          "key": "isrc",
+          "category": "recording_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Matched sound-recording identifier."
+        },
+        {
+          "key": "work_identifier",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "MLC musical Work identity."
+        },
+        {
+          "key": "work_title",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Registered musical Work title."
+        },
+        {
+          "key": "writers",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Writer parties associated with the Work."
+        },
+        {
+          "key": "publishers",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Publisher/administrator information."
+        },
+        {
+          "key": "ownership_shares",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Ownership-share context. Do not infer user ownership or royalties from absence/presence alone."
+        },
+        {
+          "key": "matched_recordings",
+          "category": "recording_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Recording-to-Work match evidence."
+        },
+        {
+          "key": "products_releases",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Related product/release context."
+        }
+      ]
+    },
+    "acrcloud": {
+      "label": "ACRCloud",
+      "acquisitionMode": "paid_metadata_api",
+      "workEvidenceStrength": "strong_corroboration",
+      "policyStatus": "allowed_with_service_terms",
+      "policyNote": "Metadata API supports include_works=1. Current terms permit lawful internal-business use; plan/order terms still control exact capabilities.",
+      "docs": [
+        "https://docs.acrcloud.com/reference/metadata-api",
+        "https://acrcloud.com/terms/"
+      ],
+      "fields": [
+        {
+          "key": "isrc",
+          "category": "recording_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Recording identifier."
+        },
+        {
+          "key": "work_title",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Work title returned with include_works=1 when available."
+        },
+        {
+          "key": "iswc",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "ISWC returned with Work metadata when available."
+        },
+        {
+          "key": "creators",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Creators returned for the Work."
+        },
+        {
+          "key": "composer",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Composer metadata."
+        },
+        {
+          "key": "lyricist",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Lyricist metadata."
+        },
+        {
+          "key": "ipi",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "IPI identifiers when supplied."
+        },
+        {
+          "key": "musicbrainz_id",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Cross-provider MusicBrainz identity when supplied."
+        },
+        {
+          "key": "spotify_id",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Cross-provider Spotify Track identity."
+        },
+        {
+          "key": "apple_music_id",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Cross-provider Apple Music Track identity."
+        },
+        {
+          "key": "deezer_id",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Cross-provider Deezer Track identity."
+        },
+        {
+          "key": "album",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Album context."
+        },
+        {
+          "key": "genres",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Provider genre context."
+        },
+        {
+          "key": "release_date",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Release date context."
+        }
+      ]
+    },
+    "iswc": {
+      "label": "CISAC ISWC",
+      "acquisitionMode": "licensed_third_party_api_or_open_data",
+      "workEvidenceStrength": "highest_external_identifier",
+      "policyStatus": "contract_required",
+      "policyNote": "Third-party lookup is paid/contracted. Open-data use is restricted to identifying preferred/archived ISWCs under the published license.",
+      "docs": [
+        "https://www.iswc.org/third-parties",
+        "https://www.iswc.org/open-data"
+      ],
+      "fields": [
+        {
+          "key": "iswc",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Preferred ISWC."
+        },
+        {
+          "key": "work_title",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Work title."
+        },
+        {
+          "key": "creator_names",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Creator names returned with the Work."
+        },
+        {
+          "key": "ipi_name_numbers",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "IPI Name Numbers for creators."
+        },
+        {
+          "key": "creator_roles",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Creator role codes."
+        },
+        {
+          "key": "derivation",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Derived/version relationship where available."
+        }
+      ]
+    },
+    "ddex_ern": {
+      "label": "DDEX ERN / Partner Feed",
+      "acquisitionMode": "partner_supply_chain_feed",
+      "workEvidenceStrength": "strong_when_supplied",
+      "policyStatus": "allowed_with_partner_rights",
+      "policyNote": "DDEX defines the message standard; WAKILISHA still needs an Implementation Licence and contractual rights to each partner feed.",
+      "docs": [
+        "https://ddex.net/resources-orig/",
+        "https://service.ddex.net/doc/Standards/ERN431/ERN-3306%20-%20ERN%20Part%202%20Release%20profiles%20v2.3.1.pdf"
+      ],
+      "fields": [
+        {
+          "key": "isrc",
+          "category": "recording_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Primary-resource recording identifier."
+        },
+        {
+          "key": "underlying_work_identifier",
+          "category": "work_identity",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Underlying musical Work identifier, preferably ISWC when supplied."
+        },
+        {
+          "key": "composer",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Composer contributor."
+        },
+        {
+          "key": "lyricist",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Lyricist contributor."
+        },
+        {
+          "key": "composer_lyricist",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Combined composer/lyricist role."
+        },
+        {
+          "key": "adapter",
+          "category": "work_contributor",
+          "defaultSelected": true,
+          "retention": "retain",
+          "description": "Adapter contributor."
+        },
+        {
+          "key": "release_metadata",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Release context supplied by the partner."
+        },
+        {
+          "key": "deal_terms",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Commercial deal metadata; not required for Work resolution."
+        }
+      ]
+    },
+    "spotify": {
+      "label": "Spotify",
+      "acquisitionMode": "web_api",
+      "workEvidenceStrength": "recording_only",
+      "policyStatus": "restricted_storage",
+      "policyNote": "Use only data needed to operate the Spotify-integrated application. Spotify content must not be stored indefinitely; refresh/delete obligations apply.",
+      "docs": [
+        "https://developer.spotify.com/documentation/web-api/reference/get-track",
+        "https://developer.spotify.com/terms"
+      ],
+      "fields": [
+        {
+          "key": "spotify_track_id",
+          "category": "recording_identity",
+          "defaultSelected": true,
+          "retention": "conditional",
+          "description": "Spotify recording identity; corroboration only."
+        },
+        {
+          "key": "isrc",
+          "category": "recording_identity",
+          "defaultSelected": true,
+          "retention": "conditional",
+          "description": "ISRC when present; corroboration only."
+        },
+        {
+          "key": "artist_ids",
+          "category": "recording_identity",
+          "defaultSelected": true,
+          "retention": "conditional",
+          "description": "Spotify Artist identities used to corroborate the recording match."
+        },
+        {
+          "key": "album_id",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "conditional_optional",
+          "description": "Spotify album context."
+        },
+        {
+          "key": "release_date",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "conditional_optional",
+          "description": "Release-date context."
+        },
+        {
+          "key": "duration_ms",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "conditional_optional",
+          "description": "Duration context."
+        },
+        {
+          "key": "artwork",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "conditional_optional",
+          "description": "Visual content subject to Spotify display/attribution rules."
+        },
+        {
+          "key": "markets",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "conditional_optional",
+          "description": "Market availability; not Work evidence."
+        },
+        {
+          "key": "popularity",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "conditional_optional",
+          "description": "Provider-specific context; not Work evidence."
+        }
+      ]
+    },
+    "apple_music": {
+      "label": "Apple Music API / MusicKit",
+      "acquisitionMode": "musickit_catalog_api",
+      "workEvidenceStrength": "recording_and_contributor_context",
+      "policyStatus": "restricted_not_approved_for_registry_backfill",
+      "policyNote": "MusicKit use is tied to facilitating end-user Apple Music subscription access. Do not use as the bulk independent Work-registry backbone without a separate permitted-use basis.",
+      "docs": [
+        "https://developer.apple.com/documentation/musickit/song",
+        "https://developer.apple.com/la/support/terms/apple-developer-program-license-agreement/"
+      ],
+      "fields": [
+        {
+          "key": "apple_music_song_id",
+          "category": "recording_identity",
+          "defaultSelected": false,
+          "retention": "policy_blocked_for_backfill",
+          "description": "Technically available. Existing retained IDs remain evidence; new bulk acquisition is not approved by this manifest."
+        },
+        {
+          "key": "isrc",
+          "category": "recording_identity",
+          "defaultSelected": false,
+          "retention": "policy_blocked_for_backfill",
+          "description": "Technically available."
+        },
+        {
+          "key": "composer_name",
+          "category": "work_contributor",
+          "defaultSelected": false,
+          "retention": "policy_blocked_for_backfill",
+          "description": "Technically available but not approved for independent Work-registry bulk acquisition."
+        },
+        {
+          "key": "composers",
+          "category": "work_contributor",
+          "defaultSelected": false,
+          "retention": "policy_blocked_for_backfill",
+          "description": "Technically available relationship in MusicKit models."
+        },
+        {
+          "key": "work_name",
+          "category": "work_identity",
+          "defaultSelected": false,
+          "retention": "policy_blocked_for_backfill",
+          "description": "Technically available for classical content; not a general Work identity."
+        },
+        {
+          "key": "album_title",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "policy_blocked_for_backfill",
+          "description": "Technically available."
+        },
+        {
+          "key": "genre_names",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "policy_blocked_for_backfill",
+          "description": "Technically available."
+        }
+      ]
+    },
+    "apple_music_feed": {
+      "label": "Apple Music Feed",
+      "acquisitionMode": "bulk_feed",
+      "workEvidenceStrength": "not_permitted_for_this_purpose",
+      "policyStatus": "blocked",
+      "policyNote": "Apple explicitly prohibits using Feed data to power/enhance internal systems or for unrelated music/artist analysis.",
+      "docs": [
+        "https://developer.apple.com/documentation/AppleMusicFeed"
+      ],
+      "fields": [
+        {
+          "key": "all_feed_fields",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "policy_blocked",
+          "description": "Do not acquire for WAKILISHA Work-resolution or Registry-enrichment purposes."
+        }
+      ]
+    },
+    "youtube": {
+      "label": "YouTube Data API",
+      "acquisitionMode": "web_api",
+      "workEvidenceStrength": "media_only",
+      "policyStatus": "allowed_with_service_terms",
+      "policyNote": "Useful for media corroboration only; does not provide canonical Work identity.",
+      "docs": [
+        "https://developers.google.com/youtube/v3/docs/videos"
+      ],
+      "fields": [
+        {
+          "key": "video_id",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Media identity."
+        },
+        {
+          "key": "channel_id",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Uploader/channel context."
+        },
+        {
+          "key": "title",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Video title context."
+        },
+        {
+          "key": "description",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Video description context."
+        },
+        {
+          "key": "duration",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Video duration."
+        },
+        {
+          "key": "licensed_content",
+          "category": "provider_context",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Whether the video is licensed content."
+        }
+      ]
+    },
+    "soundcloud": {
+      "label": "SoundCloud",
+      "acquisitionMode": "web_api",
+      "workEvidenceStrength": "recording_context_only",
+      "policyStatus": "allowed_with_service_terms",
+      "policyNote": "Creator-originated recording metadata can corroborate identity but is not Work authority.",
+      "docs": [
+        "https://developers.soundcloud.com/"
+      ],
+      "fields": [
+        {
+          "key": "track_id",
+          "category": "recording_identity",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "SoundCloud track identity."
+        },
+        {
+          "key": "isrc",
+          "category": "recording_identity",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Uploader-supplied ISRC when present."
+        },
+        {
+          "key": "label",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Uploader/provider label context."
+        },
+        {
+          "key": "release_date",
+          "category": "registry_enrichment",
+          "defaultSelected": false,
+          "retention": "optional",
+          "description": "Uploader/provider release-date context."
+        }
+      ]
+    }
+  }
+}
