@@ -346,6 +346,13 @@ async function installPublicReadFixtures(
   );
 
   await page.route(
+    "**://*.supabase.co/rest/v1/**",
+    async (route) => {
+      await fulfillJson(route, []);
+    },
+  );
+
+  await page.route(
     "**://*.supabase.co/rest/v1/rpc/track_analytics_event",
     async (route) => {
       await fulfillJson(route, null);
@@ -388,13 +395,6 @@ async function installPublicReadFixtures(
         route,
         personMusicCredits,
       );
-    },
-  );
-
-  await page.route(
-    "**://*.supabase.co/rest/v1/**",
-    async (route) => {
-      await fulfillJson(route, []);
     },
   );
 
