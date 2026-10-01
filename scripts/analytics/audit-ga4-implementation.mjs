@@ -49,6 +49,10 @@ const trackCredits = read(
   "src/pages/tracks/detail/components/TrackCreditsSection.tsx",
 );
 
+const releaseCredits = read(
+  "src/pages/releases/detail/components/ReleaseMusicProvenance.tsx",
+);
+
 const creditsWorkspace = read(
   "src/pages/credits/page.tsx",
 );
@@ -426,6 +430,7 @@ for (
   const source
   of [
     trackCredits,
+    releaseCredits,
     creditsWorkspace,
     creditInvite,
   ]
@@ -450,6 +455,12 @@ if (
   )
   || !trackCredits.includes(
     '"credit_claim_started"',
+  )
+  || !releaseCredits.includes(
+    '"credits_section_viewed"',
+  )
+  || !releaseCredits.includes(
+    '"provenance_opened"',
   )
   || !creditsWorkspace.includes(
     '"credit_disputed"',
