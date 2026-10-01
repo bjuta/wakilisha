@@ -490,7 +490,16 @@ describe("Music provenance Slice 2 participation and public product", () => {
     );
 
     expect(seoSitemapAdmin).toContain(
-      "trackArtistByTrackId.has(trackId)",
+      "preferredOrderedArtist",
+    );
+    expect(seoSitemapAdmin).toContain(
+      "normalizedCreditOrder",
+    );
+    expect(seoSitemapAdmin).toContain(
+      "!Boolean(row.is_primary)",
+    );
+    expect(seoSitemapAdmin).not.toContain(
+      "row.credit_order || 999",
     );
     const sitemapTrackLoop = between(
       seoSitemapAdmin,
