@@ -16,6 +16,39 @@ export interface MusicCreditPersonCandidate {
   path: string;
 }
 
+export interface MusicCreditTrackCandidate {
+  id: string;
+  slug: string;
+  artistSlug: string;
+  title: string;
+  artist: string;
+  artworkUrl: string;
+}
+
+type MusicCreditTrackSearchRow = {
+  entity_type?: string | null;
+  entity_id?: string | null;
+  slug?: string | null;
+  parent_slug?: string | null;
+  title?: string | null;
+  subtitle?: string | null;
+  image_url?: string | null;
+  payload?: Record<string, unknown> | null;
+};
+
+type MusicCreditTrackRow = {
+  id: string;
+  slug: string;
+  title: string;
+  artwork_url: string | null;
+};
+
+type MusicCreditTrackArtistRow = {
+  track_id: string;
+  artist_name_text: string | null;
+  artist_slug: string | null;
+};
+
 export interface MusicCreditWorkspaceItem {
   kind: string;
   attestationId?: string;
@@ -121,20 +154,254 @@ async function provenanceRpc<T>(
   functionName: string,
   args: Record<string, unknown> = {},
 ): Promise<T> {
-  const call = supabase.rpc as unknown as (
-    name: string,
-    parameters?: Record<string, unknown>,
-  ) => Promise<RpcResult<T>>;
+  const client = supabase as unknown as {
+    rpc: (
+      name: string,
+      parameters?: Record<string, unknown>,
+    ) => Promise<RpcResult<T>>;
+  };
 
-  const { data, error } = await call(functionName, args);
+  const { data, error } =
+    await client.rpc(functionName, args);
 
   if (error) {
     throw new Error(
-      error.message || "Music provenance request failed.",
+      error.message ||
+        "We couldn’t load this credit information.",
     );
   }
 
   return data as T;
+}
+
+function mapMusicCreditTrackSearchRow(
+  row: MusicCreditTrackSearchRow,
+): MusicCreditTrackCandidate | null {
+  const id = String(row.entity_id || "").trim();
+  const title = String(row.title || "").trim();
+
+  if (!id || !title) return null;
+
+  const payload =
+    row.payload &&
+    typeof row.payload === "object"
+      ? row.payload
+      : {};
+
+  return {
+    id,
+    slug: String(row.slug || "").trim(),
+    artistSlug: String(
+      row.parent_slug ||
+        payload.artistSlug ||
+        "",
+    ).trim(),
+    title,
+    artist: String(
+      row.subtitle ||
+        payload.artist ||
+        "Unknown artist",
+    ).trim(),
+    artworkUrl: String(
+      row.image_url ||
+        payload.artworkUrl ||
+        "",
+    ).trim(),
+  };
+}
+
+async function primaryArtistsForTracks(
+  trackIds: string[],
+): Promise<Map<string, {
+  name: string;
+  slug: string;
+}>> {
+  if (trackIds.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("registry_track_artists")
+    .select(
+      "track_id, artist_name_text, artist_slug, credit_order",
+    )
+    .in("track_id", trackIds)
+    .eq("status", "active")
+    .eq("is_primary", true)
+    .order("credit_order", {
+      ascending: true,
+    });
+
+  if (error) {
+    throw new Error(
+      error.message ||
+        "We couldn’t load the recording artist.",
+    );
+  }
+
+  const artists = new Map<string, {
+    name: string;
+    slug: string;
+  }>();
+
+  for (const row of (data || []) as Array<
+    MusicCreditTrackArtistRow & {
+      credit_order?: number | null;
+    }
+  >) {
+    const trackId = String(
+      row.track_id || "",
+    ).trim();
+
+    if (!trackId || artists.has(trackId)) {
+      continue;
+    }
+
+    artists.set(trackId, {
+      name:
+        String(
+          row.artist_name_text ||
+            "Unknown artist",
+        ).trim() ||
+        "Unknown artist",
+      slug: String(
+        row.artist_slug || "",
+      ).trim(),
+    });
+  }
+
+  return artists;
+}
+
+export async function getMusicCreditTrackById(
+  trackId: string,
+): Promise<MusicCreditTrackCandidate | null> {
+  const id = trackId.trim();
+  if (!id) return null;
+
+  const { data, error } = await supabase
+    .from("registry_tracks")
+    .select(
+      "id, slug, title, artwork_url",
+    )
+    .eq("id", id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      error.message ||
+        "We couldn’t load this recording.",
+    );
+  }
+
+  const track =
+    data as MusicCreditTrackRow | null;
+
+  if (!track) return null;
+
+  const artists =
+    await primaryArtistsForTracks([
+      track.id,
+    ]);
+  const artist = artists.get(track.id);
+
+  return {
+    id: track.id,
+    slug: track.slug,
+    artistSlug: artist?.slug || "",
+    title: track.title,
+    artist:
+      artist?.name || "Unknown artist",
+    artworkUrl:
+      track.artwork_url || "",
+  };
+}
+
+export async function listMusicCreditTracks(
+  limit = 8,
+): Promise<MusicCreditTrackCandidate[]> {
+  const safeLimit = Math.max(
+    1,
+    Math.min(limit, 20),
+  );
+
+  const { data, error } = await supabase
+    .from("registry_tracks")
+    .select(
+      "id, slug, title, artwork_url",
+    )
+    .eq("status", "active")
+    .order("title", {
+      ascending: true,
+    })
+    .limit(safeLimit);
+
+  if (error) {
+    throw new Error(
+      error.message ||
+        "We couldn’t load recordings.",
+    );
+  }
+
+  const tracks =
+    (data || []) as MusicCreditTrackRow[];
+  const artists =
+    await primaryArtistsForTracks(
+      tracks.map((track) => track.id),
+    );
+
+  return tracks.map((track) => {
+    const artist =
+      artists.get(track.id);
+
+    return {
+      id: track.id,
+      slug: track.slug,
+      artistSlug:
+        artist?.slug || "",
+      title: track.title,
+      artist:
+        artist?.name ||
+        "Unknown artist",
+      artworkUrl:
+        track.artwork_url || "",
+    };
+  });
+}
+
+export async function searchMusicCreditTracks(
+  query: string,
+): Promise<MusicCreditTrackCandidate[]> {
+  const needle = query.trim();
+  if (!needle) {
+    return listMusicCreditTracks();
+  }
+
+  const rows =
+    await provenanceRpc<
+      MusicCreditTrackSearchRow[]
+    >(
+      "search_public_registry_v1",
+      {
+        p_query: needle,
+        p_types: ["track"],
+        p_limit: 8,
+        p_after_score: null,
+        p_after_type_rank: null,
+        p_after_title: null,
+        p_after_id: null,
+      },
+    );
+
+  return (rows || [])
+    .map(mapMusicCreditTrackSearchRow)
+    .filter(
+      (
+        track,
+      ): track is MusicCreditTrackCandidate =>
+        Boolean(track),
+    );
 }
 
 export function getMyMusicCredits(): Promise<MusicCreditsWorkspace> {
