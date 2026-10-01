@@ -53,6 +53,11 @@ export interface TrackEventOptions {
    * Use only for deliberate admin diagnostics. Normal internal/dev traffic is suppressed.
    */
   allowInternal?: boolean;
+  /**
+   * Removes raw/query-bearing URLs and attribution details for sensitive
+   * provenance interactions.
+   */
+  privacyMode?: "default" | "provenance";
 }
 
 export const INTERNAL_TRAFFIC_STORAGE_KEY = "wakilisha_internal_traffic";
@@ -127,14 +132,28 @@ export function trackEvent(
   const referrer =
     typeof document !== "undefined" ? document.referrer || undefined : undefined;
 
+  const provenanceSafe =
+    options.privacyMode === "provenance";
+
   const enrichedContext = {
     ...(options.context ?? {}),
-    attribution: getAttributionContext(rawPageUrl, referrer),
-    raw_page_url: rawPageUrl || null,
-    canonical_page_url: pageUrl || null,
-    analytics_traffic_type: "external",
-    analytics_is_internal: false,
-    analytics_hostname: hostname || null,
+    attribution: provenanceSafe
+      ? null
+      : getAttributionContext(
+          rawPageUrl,
+          referrer,
+        ),
+    raw_page_url: provenanceSafe
+      ? null
+      : rawPageUrl || null,
+    canonical_page_url:
+      pageUrl || null,
+    analytics_traffic_type:
+      "external",
+    analytics_is_internal:
+      false,
+    analytics_hostname:
+      hostname || null,
   };
 
   const payload = {
@@ -146,7 +165,9 @@ export function trackEvent(
     p_context: enrichedContext,
     p_session_id: sessionId,
     p_user_id: options.userId ?? null,
-    p_referrer: referrer ?? null,
+    p_referrer: provenanceSafe
+      ? null
+      : referrer ?? null,
   };
 
   // Fire-and-forget — never await, never throw
@@ -155,6 +176,87 @@ export function trackEvent(
       console.warn("[analytics] trackEvent failed:", error.message);
     }
   });
+}
+
+export type MusicProvenanceAnalyticsEvent =
+  | "credits_section_viewed"
+  | "credits_expanded"
+  | "contributor_opened"
+  | "provenance_opened"
+  | "credit_claim_started"
+  | "credit_confirmation_completed"
+  | "credit_disputed";
+
+export type MusicProvenanceAnalyticsContext = {
+  surface:
+    | "track"
+    | "your_credits"
+    | "credit_invite"
+    | "person";
+  subjectKind?:
+    | "track"
+    | "work";
+  contributorKind?:
+    | "person"
+    | "artist"
+    | "organization";
+  outcome?:
+    | "accepted"
+    | "disputed"
+    | "declined";
+  hasCanonicalCredits?: boolean;
+  recordingCreditCount?: number;
+  workCreditCount?: number;
+};
+
+const PROVENANCE_CONTEXT_KEYS =
+  new Set<keyof MusicProvenanceAnalyticsContext>([
+    "surface",
+    "subjectKind",
+    "contributorKind",
+    "outcome",
+    "hasCanonicalCredits",
+    "recordingCreditCount",
+    "workCreditCount",
+  ]);
+
+export function trackMusicProvenanceEvent(
+  eventName:
+    MusicProvenanceAnalyticsEvent,
+  context:
+    MusicProvenanceAnalyticsContext,
+): void {
+  const safeContext:
+    Record<string, unknown> = {};
+
+  for (
+    const [key, value]
+    of Object.entries(context)
+  ) {
+    if (
+      !PROVENANCE_CONTEXT_KEYS.has(
+        key as keyof MusicProvenanceAnalyticsContext,
+      )
+    ) {
+      continue;
+    }
+
+    safeContext[key] = value;
+  }
+
+  trackEvent(
+    eventName,
+    {
+      pageType:
+        "music_provenance",
+      entityType:
+        context.subjectKind ||
+        "music_provenance",
+      context: safeContext,
+      privacyMode:
+        "provenance",
+    },
+  );
 }
 
 /**
