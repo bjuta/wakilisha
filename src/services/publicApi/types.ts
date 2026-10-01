@@ -99,6 +99,7 @@ export interface PublicTrackArtist {
   slug: string;
   name: string;
   imageUrl: string;
+  artistType?: string;
 }
 
 export interface PublicTrackArtistRole {
@@ -109,6 +110,7 @@ export interface PublicTrackArtistRole {
   isFeatured: boolean;
   creditOrder: number;
   role: string;
+  artistType?: string;
 }
 
 export interface PublicTrackRouteBinding {
