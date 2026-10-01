@@ -297,14 +297,14 @@ classified as (
     case
       when coalesce(w.current_work_link_count, 0) > 0
         then 'already_work_linked'
-      when t.apple_music_track_id is not null
-       and coalesce(a.assignment_count, 0) > 1
-        then 'provider_collision_review'
       when t.isrc is not null
        and coalesce(c.composer_string_count, 0) > 0
         then 'external_work_resolution_ready_with_retained_composer'
       when t.isrc is not null
         then 'external_work_resolution_ready_isrc'
+      when t.apple_music_track_id is not null
+       and coalesce(a.assignment_count, 0) > 1
+        then 'provider_collision_review'
       when t.apple_music_track_id is not null
        and coalesce(a.assignment_count, 0) = 1
         then 'recording_identity_only_apple_policy_restricted'
