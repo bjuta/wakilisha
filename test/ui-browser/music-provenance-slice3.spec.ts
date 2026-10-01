@@ -283,22 +283,22 @@ const releaseDetail = {
 };
 
 const personFixture = {
-  personId:
+  person_id:
     "13f03a01-9e07-4ac4-8fa5-000000000024",
-  canonicalPath: "/people/preview-producer",
-  displayName: "Preview Producer",
+  canonical_path: "/people/preview-producer",
+  display_name: "Preview Producer",
   bio: "Preview producer",
-  avatarUrl: null,
-  coverUrl: null,
+  avatar_url: null,
+  cover_url: null,
   location: "Nairobi",
   username: null,
-  registryAuthorSlug: null,
-  publicRoles: [],
-  redirectTo: null,
+  registry_author_slug: null,
+  public_roles: [],
+  redirect_to: null,
 };
 
 const personMusicCredits = {
-  personId: personFixture.personId,
+  personId: personFixture.person_id,
   recordingCredits: [
     {
       id: trackDetail.recordingContributions[0].id,
@@ -381,7 +381,7 @@ async function installPublicReadFixtures(
     async (route) => {
       await fulfillJson(route, {
         person_id:
-          personFixture.personId,
+          personFixture.person_id,
         follower_count: 0,
         following_count: 0,
       });
@@ -472,6 +472,19 @@ async function installPublicReadFixtures(
           data: {
             release:
               releaseDetail,
+          },
+        });
+        return;
+      }
+
+      if (
+        path.endsWith(
+          "/public-content-read/releases",
+        )
+      ) {
+        await fulfillJson(route, {
+          data: {
+            releases: [],
           },
         });
         return;
@@ -669,6 +682,13 @@ test("Slice 3 normalizes grouped Artist credits without hanging brackets", async
       waitUntil: "domcontentloaded",
     },
   );
+
+  await page
+    .getByRole("tab", {
+      name: "Music",
+      exact: true,
+    })
+    .click();
 
   await page
     .getByText(
