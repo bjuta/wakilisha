@@ -41,6 +41,22 @@ const edge = read(
   "supabase/functions/ga4-measurement-protocol/index.ts",
 );
 
+const analyticsService = read(
+  "src/services/analytics.ts",
+);
+
+const trackCredits = read(
+  "src/pages/tracks/detail/components/TrackCreditsSection.tsx",
+);
+
+const creditsWorkspace = read(
+  "src/pages/credits/page.tsx",
+);
+
+const creditInvite = read(
+  "src/pages/credits/invite/page.tsx",
+);
+
 const packageJson =
   JSON.parse(
     read("package.json"),
@@ -356,6 +372,94 @@ if (
 ) {
   fail(
     "legacy browser-to-server page-view service still exists",
+  );
+}
+
+const provenanceEvents = [
+  "credits_section_viewed",
+  "credits_expanded",
+  "contributor_opened",
+  "provenance_opened",
+  "credit_claim_started",
+  "credit_confirmation_completed",
+  "credit_disputed",
+];
+
+for (
+  const eventName
+  of provenanceEvents
+) {
+  if (
+    !analyticsService.includes(
+      `"${eventName}"`,
+    )
+  ) {
+    fail(
+      `privacy-safe provenance event is missing: ${eventName}`,
+    );
+  }
+}
+
+if (
+  !analyticsService.includes(
+    'privacyMode?: "default" | "provenance"',
+  )
+  || !analyticsService.includes(
+    'options.privacyMode === "provenance"',
+  )
+  || !analyticsService.includes(
+    "raw_page_url: provenanceSafe",
+  )
+  || !analyticsService.includes(
+    "p_referrer: provenanceSafe",
+  )
+  || !analyticsService.includes(
+    "PROVENANCE_CONTEXT_KEYS",
+  )
+) {
+  fail(
+    "music provenance analytics does not enforce the bounded privacy-safe context path",
+  );
+}
+
+for (
+  const source
+  of [
+    trackCredits,
+    creditsWorkspace,
+    creditInvite,
+  ]
+) {
+  if (
+    !source.includes(
+      "trackMusicProvenanceEvent",
+    )
+  ) {
+    fail(
+      "a provenance interaction surface bypasses the privacy-safe analytics helper",
+    );
+  }
+}
+
+if (
+  !trackCredits.includes(
+    '"credits_section_viewed"',
+  )
+  || !trackCredits.includes(
+    '"provenance_opened"',
+  )
+  || !trackCredits.includes(
+    '"credit_claim_started"',
+  )
+  || !creditsWorkspace.includes(
+    '"credit_disputed"',
+  )
+  || !creditInvite.includes(
+    '"credit_confirmation_completed"',
+  )
+) {
+  fail(
+    "provenance product event vocabulary is not wired into the accepted creator/public surfaces",
   );
 }
 
