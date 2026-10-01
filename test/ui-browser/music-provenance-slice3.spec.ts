@@ -353,48 +353,66 @@ async function installPublicReadFixtures(
   );
 
   await page.route(
-    "**://*.supabase.co/rest/v1/rpc/track_analytics_event",
+    "**://*.supabase.co/rest/v1/rpc/**",
     async (route) => {
-      await fulfillJson(route, null);
-    },
-  );
-
-  await page.route(
-    "**://*.supabase.co/rest/v1/rpc/get_public_person",
-    async (route) => {
-      await fulfillJson(
-        route,
-        personFixture,
+      const url = new URL(
+        route.request().url(),
       );
-    },
-  );
+      const rpcName =
+        url.pathname.split("/").pop() || "";
 
-  await page.route(
-    "**://*.supabase.co/rest/v1/rpc/list_public_person_work",
-    async (route) => {
+      if (
+        rpcName ===
+        "track_analytics_event"
+      ) {
+        await fulfillJson(route, null);
+        return;
+      }
+
+      if (
+        rpcName ===
+        "get_public_person"
+      ) {
+        await fulfillJson(
+          route,
+          personFixture,
+        );
+        return;
+      }
+
+      if (
+        rpcName ===
+        "list_public_person_work"
+      ) {
+        await fulfillJson(route, []);
+        return;
+      }
+
+      if (
+        rpcName ===
+        "get_public_person_social_summary"
+      ) {
+        await fulfillJson(route, {
+          person_id:
+            personFixture.person_id,
+          follower_count: 0,
+          following_count: 0,
+        });
+        return;
+      }
+
+      if (
+        rpcName ===
+        "get_public_person_music_credits_v1"
+      ) {
+        await fulfillJson(
+          route,
+          personMusicCredits,
+        );
+        return;
+      }
+
       await fulfillJson(route, []);
-    },
-  );
-
-  await page.route(
-    "**://*.supabase.co/rest/v1/rpc/get_public_person_social_summary",
-    async (route) => {
-      await fulfillJson(route, {
-        person_id:
-          personFixture.person_id,
-        follower_count: 0,
-        following_count: 0,
-      });
-    },
-  );
-
-  await page.route(
-    "**://*.supabase.co/rest/v1/rpc/get_public_person_music_credits_v1",
-    async (route) => {
-      await fulfillJson(
-        route,
-        personMusicCredits,
-      );
     },
   );
 
