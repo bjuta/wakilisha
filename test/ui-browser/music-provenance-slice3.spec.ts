@@ -497,6 +497,45 @@ async function installPublicReadFixtures(
   );
 }
 
+async function installAuthenticatedCreditsSession(
+  page: import("@playwright/test").Page,
+) {
+  await page.addInitScript(() => {
+    const now = Math.floor(Date.now() / 1000);
+    const session = {
+      access_token: "browser-test-access-token",
+      token_type: "bearer",
+      expires_in: 3600,
+      expires_at: now + 3600,
+      refresh_token: "browser-test-refresh-token",
+      user: {
+        id:
+          "13f03a01-9e07-4ac4-8fa5-000000000029",
+        aud: "authenticated",
+        role: "authenticated",
+        email: "credits-browser@wakilisha.test",
+        email_confirmed_at:
+          "2026-10-01T00:00:00.000Z",
+        confirmed_at:
+          "2026-10-01T00:00:00.000Z",
+        app_metadata: {},
+        user_metadata: {
+          full_name:
+            "Credits Browser Test",
+        },
+        identities: [],
+        created_at:
+          "2026-10-01T00:00:00.000Z",
+      },
+    };
+
+    window.localStorage.setItem(
+      "sb-pgzizndxdyhqmtyywjmt-auth-token",
+      JSON.stringify(session),
+    );
+  });
+}
+
 async function jsonLd(
   page: import("@playwright/test").Page,
 ) {
@@ -676,6 +715,10 @@ test("Slice 3 preserves ordered multi-MainArtist recording schema and provenance
 test("creator credits deep link keeps the requested Track selected", async ({
   page,
 }) => {
+  await installAuthenticatedCreditsSession(
+    page,
+  );
+
   await page.goto(
     `/credits?track_id=${trackDetail.track.id}&claim=1`,
     {
