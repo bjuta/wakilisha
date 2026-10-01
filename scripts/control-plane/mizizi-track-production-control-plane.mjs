@@ -13,7 +13,7 @@ const EXPECTED_FINGERPRINT = '551b29431700536937c26ecb1e396c3cf9314edefd88c58928
 const EXPECTED_REVIEW_INPUT_FINGERPRINT = '6d9fa72f13ce4a5d774a457552e3cd3824475fb8a651473d5999605a3dcc29fb';
 const EXPECTED_BLOBS = {
   'scripts/registry/agents/mizizi/run.ts': '0518258a8fa439b06b8f017decb09f3d9da447cf',
-  'scripts/registry/agents/mizizi/core.ts': '2e1065c47715a8dfa95e37c2cf1078953b5da469',
+  'scripts/registry/agents/mizizi/core.ts': '412f4c2b11971a675dcea74ee02787887c8cb334',
   'supabase/functions/_shared/registry-track-identity.ts': '7bcab485aecc3cc7b90e2a3154d90dcee81be92c',
 };
 

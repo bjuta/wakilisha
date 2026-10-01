@@ -1,5 +1,8 @@
 
 
+[functions.public-content-read]
+verify_jwt = false
+
 [functions.seo-sitemap-admin]
 verify_jwt = false
 

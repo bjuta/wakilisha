@@ -450,6 +450,161 @@ export function analyzeEvidenceLineage(
     );
 }
 
+export type ExternalIdentifierAutonomyCandidate = {
+  subjectType: string;
+  schemeKey: string;
+  exactProviderIdentifier: boolean;
+  sourceStateCurrent: boolean;
+  sourceFingerprintMatches: boolean;
+  candidateFingerprintMatches: boolean;
+  conflictingCurrentAssertionCount: number;
+  duplicateAssignmentCount: number;
+};
+
+export type ExternalIdentifierAutonomyDecision = {
+  disposition: "eligible" | "abstain";
+  reasons: string[];
+};
+
+export type ExternalIdentifierBenchmarkCase = {
+  id: string;
+  candidate: ExternalIdentifierAutonomyCandidate;
+  expectedDisposition: ExternalIdentifierAutonomyDecision["disposition"];
+};
+
+export type ExternalIdentifierBenchmarkResult = {
+  family: "strongly_bound_external_identifier_candidate_admission";
+  fixtureCount: number;
+  fixtureCorrect: number;
+  falsePositiveCount: number;
+  falseNegativeCount: number;
+  fixturePrecision: number;
+  fixtureAbstentionRate: number;
+  productionGoldRows: number;
+  minimumGoldRows: number;
+  autonomyEarned: boolean;
+  decision: "keep_human_review" | "eligible_for_bounded_policy";
+};
+
+const EXTERNAL_IDENTIFIER_SUBJECTS =
+  new Set(["artist", "track", "release"]);
+
+const EXTERNAL_IDENTIFIER_SCHEMES =
+  new Set(["apple_music", "spotify"]);
+
+export function evaluateExternalIdentifierAutonomyCandidate(
+  candidate: ExternalIdentifierAutonomyCandidate,
+): ExternalIdentifierAutonomyDecision {
+  const reasons: string[] = [];
+
+  if (!EXTERNAL_IDENTIFIER_SUBJECTS.has(candidate.subjectType)) {
+    reasons.push("unsupported_subject");
+  }
+
+  if (!EXTERNAL_IDENTIFIER_SCHEMES.has(candidate.schemeKey)) {
+    reasons.push("unsupported_scheme");
+  }
+
+  if (!candidate.exactProviderIdentifier) {
+    reasons.push("identifier_not_exact");
+  }
+
+  if (!candidate.sourceStateCurrent) {
+    reasons.push("stale_source_state");
+  }
+
+  if (!candidate.sourceFingerprintMatches) {
+    reasons.push("source_fingerprint_drift");
+  }
+
+  if (!candidate.candidateFingerprintMatches) {
+    reasons.push("candidate_fingerprint_drift");
+  }
+
+  if (candidate.conflictingCurrentAssertionCount > 0) {
+    reasons.push("conflicting_current_assertion");
+  }
+
+  if (candidate.duplicateAssignmentCount > 0) {
+    reasons.push("duplicate_assignment");
+  }
+
+  return {
+    disposition:
+      reasons.length === 0
+        ? "eligible"
+        : "abstain",
+    reasons,
+  };
+}
+
+export function benchmarkExternalIdentifierAutonomy(
+  cases: ExternalIdentifierBenchmarkCase[],
+  productionGoldRows: number,
+  minimumGoldRows = 25,
+): ExternalIdentifierBenchmarkResult {
+  let fixtureCorrect = 0;
+  let falsePositiveCount = 0;
+  let falseNegativeCount = 0;
+  let eligibleCount = 0;
+
+  for (const item of cases) {
+    const actual =
+      evaluateExternalIdentifierAutonomyCandidate(
+        item.candidate,
+      ).disposition;
+
+    if (actual === "eligible") {
+      eligibleCount += 1;
+    }
+
+    if (actual === item.expectedDisposition) {
+      fixtureCorrect += 1;
+    } else if (
+      actual === "eligible" &&
+      item.expectedDisposition === "abstain"
+    ) {
+      falsePositiveCount += 1;
+    } else {
+      falseNegativeCount += 1;
+    }
+  }
+
+  const fixtureCount = cases.length;
+  const fixturePrecision =
+    eligibleCount === 0
+      ? 1
+      : (eligibleCount - falsePositiveCount) / eligibleCount;
+  const fixtureAbstentionRate =
+    fixtureCount === 0
+      ? 1
+      : (fixtureCount - eligibleCount) / fixtureCount;
+
+  const autonomyEarned =
+    fixtureCount > 0 &&
+    falsePositiveCount === 0 &&
+    fixturePrecision === 1 &&
+    productionGoldRows >= minimumGoldRows;
+
+  return {
+    family:
+      "strongly_bound_external_identifier_candidate_admission",
+    fixtureCount,
+    fixtureCorrect,
+    falsePositiveCount,
+    falseNegativeCount,
+    fixturePrecision,
+    fixtureAbstentionRate,
+    productionGoldRows,
+    minimumGoldRows,
+    autonomyEarned,
+    decision:
+      autonomyEarned
+        ? "eligible_for_bounded_policy"
+        : "keep_human_review",
+  };
+}
+
 export type ProvenanceAttestationAdmissionInput = {
   attestationId: string;
   subjectType: "track" | "work";

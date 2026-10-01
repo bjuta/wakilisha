@@ -144,7 +144,7 @@ const EXPECTED_BLOBS = {
   "scripts/registry/agents/mizizi/run.ts":
     "0518258a8fa439b06b8f017decb09f3d9da447cf",
   "scripts/registry/agents/mizizi/core.ts":
-    "2e1065c47715a8dfa95e37c2cf1078953b5da469",
+    "412f4c2b11971a675dcea74ee02787887c8cb334",
   "supabase/migrations/20260918173446_mizizi_stage_b_broker_convergence_v1.sql":
     "1cd6c591fe312225a8cbfa431b53063431127b77",
   "supabase/migrations/20260920095334_mizizi_stage_c_narrow_executor_transport_v1.sql":

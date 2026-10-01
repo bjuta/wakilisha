@@ -198,7 +198,7 @@ function defaultNote(decisionType: RegistryDecisionType): string {
     case "public_music_identity_distinct_recording":
       return "This is a different recording and needs its own route identity.";
     case "public_music_identity_credit_correction_required":
-      return "The Track credits need correction before MIZIZI can finish.";
+      return "The Track Artist billing needs correction before MIZIZI can finish.";
     case "public_music_identity_retire_unresolvable":
       return "This Track cannot be resolved safely and should be retired.";
     default:
@@ -627,6 +627,7 @@ export default function AdminMiziziWorkspacePage() {
         decisionType: provenanceForm.decisionType,
         notes,
         expectedProvenanceContextFingerprint: context.contextFingerprint,
+        provenanceContext: context,
         resolutionPayload: {
           reviewedFrom: "admin_mizizi_workspace",
           programmeIssue: 1121,
@@ -679,7 +680,7 @@ export default function AdminMiziziWorkspacePage() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Needs a decision" value={counts.needsDecision} help="MIZIZI found the issue. You choose the outcome." />
         <SummaryCard label="Approved" value={counts.approved} help="A human decision is recorded and ready for the apply step." />
-        <SummaryCard label="Credit issues" value={counts.credit} help="Track credits need attention before route cleanup can finish." />
+        <SummaryCard label="Credit issues" value={counts.credit} help="Track Artist billing needs attention before route cleanup can finish." />
         <SummaryCard label="Needs research" value={counts.research} help="These stay open until better evidence arrives." />
       </div>
 

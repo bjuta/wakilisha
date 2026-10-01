@@ -5,6 +5,8 @@ import {
   analyzeChartIdentity,
   analyzeEvidenceLineage,
   analyzeProvenanceAttestationAdmission,
+  benchmarkExternalIdentifierAutonomy,
+  evaluateExternalIdentifierAutonomyCandidate,
   analyzeReleaseIdentity,
   analyzeTrackIdentity,
   MIZIZI_RULESET_VERSION,
@@ -201,6 +203,120 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
     expect(runner).toContain(
       "No review rows or canonical Registry rows were changed.",
+    );
+  });
+
+  it("benchmarks strongly bound external identifiers without granting autonomy before evidence earns it", () => {
+    const safe = {
+      subjectType: "track",
+      schemeKey: "apple_music",
+      exactProviderIdentifier: true,
+      sourceStateCurrent: true,
+      sourceFingerprintMatches: true,
+      candidateFingerprintMatches: true,
+      conflictingCurrentAssertionCount: 0,
+      duplicateAssignmentCount: 0,
+    };
+
+    expect(
+      evaluateExternalIdentifierAutonomyCandidate(
+        safe,
+      ),
+    ).toEqual({
+      disposition: "eligible",
+      reasons: [],
+    });
+
+    for (const candidate of [
+      {
+        ...safe,
+        sourceStateCurrent: false,
+      },
+      {
+        ...safe,
+        conflictingCurrentAssertionCount: 1,
+      },
+      {
+        ...safe,
+        duplicateAssignmentCount: 1,
+      },
+      {
+        ...safe,
+        candidateFingerprintMatches: false,
+      },
+      {
+        ...safe,
+        subjectType: "work",
+      },
+      {
+        ...safe,
+        schemeKey: "musicbrainz",
+      },
+    ]) {
+      expect(
+        evaluateExternalIdentifierAutonomyCandidate(
+          candidate,
+        ).disposition,
+      ).toBe("abstain");
+    }
+
+    const benchmark =
+      benchmarkExternalIdentifierAutonomy(
+        [
+          {
+            id: "safe",
+            candidate: safe,
+            expectedDisposition:
+              "eligible",
+          },
+          {
+            id: "conflict",
+            candidate: {
+              ...safe,
+              conflictingCurrentAssertionCount:
+                1,
+            },
+            expectedDisposition:
+              "abstain",
+          },
+          {
+            id: "stale",
+            candidate: {
+              ...safe,
+              sourceStateCurrent: false,
+            },
+            expectedDisposition:
+              "abstain",
+          },
+        ],
+        0,
+      );
+
+    expect(benchmark).toMatchObject({
+      family:
+        "strongly_bound_external_identifier_candidate_admission",
+      fixtureCount: 3,
+      fixtureCorrect: 3,
+      falsePositiveCount: 0,
+      productionGoldRows: 0,
+      minimumGoldRows: 25,
+      autonomyEarned: false,
+      decision: "keep_human_review",
+    });
+
+    const migration = readFileSync(
+      "supabase/migrations/20260923120155_music_identity_rights_slice3_external_identifier_admission_v1.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "external identifier reviewed reconcile must remain disabled",
+    );
+    expect(migration).toContain(
+      "requires_human_approval",
+    );
+    expect(migration).not.toContain(
+      "requires_human_approval=false",
     );
   });
 
@@ -2792,6 +2908,20 @@ describe("MIZIZI Slice 2 Gate B Pure Public Read", () => {
           "wakilisha-public-api",
       ),
     ).toBe(false);
+  });
+
+  it("declares public-content-read as a public Edge endpoint", () => {
+    const config = read("supabase/config.toml");
+    const source = read(
+      "supabase/functions/public-content-read/index.ts",
+    );
+
+    expect(source).toContain(
+      "public API, no JWT required",
+    );
+    expect(config).toMatch(
+      /\[functions\.public-content-read\]\s*\nverify_jwt = false/,
+    );
   });
 
   it("keeps public Registry reads free of direct canonical Registry DML", () => {

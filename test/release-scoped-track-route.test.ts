@@ -125,7 +125,13 @@ describe("canonical public Track and Release routes", () => {
       '.eq("status", "active")',
     );
     expect(seoEdge).toContain(
-      "trackArtistByTrackId.has(trackId)",
+      "preferredOrderedArtist",
+    );
+    expect(seoEdge).toContain(
+      "normalizedCreditOrder",
+    );
+    expect(seoEdge).not.toContain(
+      "row.credit_order || 999",
     );
     expect(seoEdge).not.toContain(
       'path: `/releases/${releaseArtistSlug}/${releaseSlug}/${row.slug}`',
@@ -270,6 +276,94 @@ describe("canonical public Track and Release routes", () => {
     );
     expect(chartArtistResolver).toContain(
       '.in("alias_slug", relationshipSlugs)',
+    );
+  });
+
+  it("converges ordered Artist SEO authority and Person-vs-MusicGroup JSON-LD", () => {
+    const publicEdge = readFileSync(
+      "supabase/functions/public-content-read/index.ts",
+      "utf8",
+    );
+    const seoEdge = readFileSync(
+      "supabase/functions/seo-sitemap-admin/index.ts",
+      "utf8",
+    );
+    const schemaOrg = readFileSync(
+      "src/components/seo/SchemaOrg.tsx",
+      "utf8",
+    );
+    const artistPage = readFileSync(
+      "src/pages/artists/detail/page.tsx",
+      "utf8",
+    );
+    const trackPage = readFileSync(
+      "src/pages/tracks/detail/page.tsx",
+      "utf8",
+    );
+
+    expect(publicEdge).toContain(
+      "artist_type, gender, origin_iso2",
+    );
+    expect(publicEdge).toContain(
+      'artistType: String(artist.artist_type || "")',
+    );
+    expect(publicEdge).not.toContain(
+      "artistType: String(artist.gender",
+    );
+    expect(publicEdge).toContain(
+      '.select("id, artist_type")',
+    );
+    expect(publicEdge).toContain(
+      "artistType: artistTypeById.get",
+    );
+    expect(publicEdge).toContain(
+      "a.artistId.localeCompare(b.artistId)",
+    );
+
+    expect(seoEdge).toContain(
+      "normalizedCreditOrder",
+    );
+    expect(seoEdge).toContain(
+      "preferredOrderedArtist",
+    );
+    expect(seoEdge).toContain(
+      "value === null",
+    );
+    expect(seoEdge).not.toContain(
+      "row.credit_order || 999",
+    );
+
+    expect(schemaOrg).toContain(
+      'export interface MusicPersonSchema',
+    );
+    expect(schemaOrg).toContain(
+      'export type MusicArtistSchema',
+    );
+    expect(schemaOrg).toContain(
+      'case "Person":',
+    );
+    expect(schemaOrg).toContain(
+      "MusicArtistSchema | MusicArtistSchema[]",
+    );
+
+    expect(artistPage).toContain(
+      'artist.artistType === "solo"',
+    );
+    expect(artistPage).toContain(
+      '"@type": "Person"',
+    );
+    expect(artistPage).toContain(
+      '"@type": "MusicGroup"',
+    );
+
+    expect(trackPage).toContain(
+      "const schemaArtists: MusicArtistSchema[]",
+    );
+    expect(trackPage).toContain(
+      'artist.artistType === "solo"',
+    );
+    expect(trackPage).toContain(
+      "schemaArtists.length === 1",
     );
   });
 

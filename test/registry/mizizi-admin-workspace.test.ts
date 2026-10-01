@@ -10,6 +10,7 @@ describe("MIZIZI Admin workspace", () => {
   const lazy = read("src/router/lazyAdmin.tsx");
   const search = read("src/data/adminSearchIndex.ts");
   const service = read("src/services/adminReviewCommandCenter.ts");
+  const knowledge = read("docs/registry/REGISTRY_KNOWLEDGE_CONTRACT.md");
 
   it("gives MIZIZI a dedicated current-work surface", () => {
     expect(page).toContain("data-wk-mizizi-workspace");
@@ -79,10 +80,62 @@ describe("MIZIZI Admin workspace", () => {
     expect(service).toContain(
       "admin_record_music_provenance_contribution_review_decision_v1",
     );
+    expect(service).toContain(
+      "buildMusicProvenanceProjectionRefreshPlan",
+    );
+    expect(service).toContain(
+      '"public_content_read"',
+    );
+    expect(service).toContain(
+      '"person_music_credits"',
+    );
+    expect(service).toContain(
+      '"artist_music"',
+    );
+    expect(service).toContain(
+      '"seo_metadata"',
+    );
+    expect(service).toContain(
+      '"prerender"',
+    );
+    expect(service).toContain(
+      '"sitemap"',
+    );
+    expect(service).toContain(
+      "dependencyFanout",
+    );
+    expect(page).toContain(
+      "provenanceContext: context",
+    );
 
     expect(page).not.toContain("Candidate payload");
     expect(page).not.toContain("Source payload");
     expect(page).not.toContain("—");
+  });
+
+  it("uses explicit Artist billing and contribution terminology", () => {
+    expect(page).toContain(
+      "Track Artist billing needs correction",
+    );
+    expect(page).toContain(
+      "Track Artist billing needs attention",
+    );
+    expect(page).not.toContain(
+      "Track credits need",
+    );
+
+    expect(knowledge).toContain(
+      "Track Artist billing | `registry_track_artists`",
+    );
+    expect(knowledge).toContain(
+      "Release Artist billing | `registry_release_artists`",
+    );
+    expect(knowledge).toContain(
+      "Recording Contributions -> `registry_track_contributions`",
+    );
+    expect(knowledge).toContain(
+      "Work Contributions -> `registry_work_contributions`",
+    );
   });
 
   it("keeps the decision modal viewport-bound with pinned actions", () => {

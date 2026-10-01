@@ -602,6 +602,7 @@ components:
         slug: { type: string }
         name: { type: string }
         imageUrl: { type: string }
+        artistType: { type: string, nullable: true }
 
     RelatedArtist:
       type: object
@@ -718,12 +719,14 @@ components:
     TrackArtistRole:
       type: object
       properties:
+        artistId: { type: string }
         name: { type: string }
         slug: { type: string }
         isPrimary: { type: boolean }
         isFeatured: { type: boolean }
         creditOrder: { type: integer }
         role: { type: string }
+        artistType: { type: string, nullable: true }
 
     TrackRouteBinding:
       type: object

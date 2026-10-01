@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   PublicMusicContribution,
@@ -7,6 +7,7 @@ import type {
 } from "@/services/publicApi/types";
 import { Sheet } from "@/components/design-system/primitives/Sheet";
 import { WkIcon } from "@/components/design-system/Icon";
+import { trackMusicProvenanceEvent } from "@/services/analytics";
 
 function creditHref(credit: PublicMusicContribution): string | null {
   return credit.resolvedEntity?.path || null;
@@ -25,6 +26,16 @@ function CreditRow({ credit }: { credit: PublicMusicContribution }) {
         {href ? (
           <Link
             to={href}
+            onClick={() =>
+              trackMusicProvenanceEvent(
+                "contributor_opened",
+                {
+                  surface: "track",
+                  contributorKind:
+                    credit.resolvedEntity?.kind,
+                },
+              )
+            }
             className="mt-1 inline-flex max-w-full items-center gap-1.5 text-[14px] font-extrabold text-[var(--wk-text)] hover:text-[var(--wk-brand)]"
           >
             <span className="truncate">{name}</span>
@@ -85,6 +96,26 @@ export default function TrackCreditsSection({
     recordingContributions.length > 0 ||
     workCredits.length > 0;
 
+  useEffect(() => {
+    trackMusicProvenanceEvent(
+      "credits_section_viewed",
+      {
+        surface: "track",
+        subjectKind: "track",
+        hasCanonicalCredits: hasCredits,
+        recordingCreditCount:
+          recordingContributions.length,
+        workCreditCount:
+          workCredits.length,
+      },
+    );
+  }, [
+    trackId,
+    hasCredits,
+    recordingContributions.length,
+    workCredits.length,
+  ]);
+
   return (
     <section
       aria-labelledby="track-credits-heading"
@@ -107,7 +138,29 @@ export default function TrackCreditsSection({
           {hasCredits ? (
             <button
               type="button"
-              onClick={() => setReceiptOpen(true)}
+              onClick={() => {
+                trackMusicProvenanceEvent(
+                  "credits_expanded",
+                  {
+                    surface: "track",
+                    subjectKind: "track",
+                    hasCanonicalCredits: true,
+                    recordingCreditCount:
+                      recordingContributions.length,
+                    workCreditCount:
+                      workCredits.length,
+                  },
+                );
+                trackMusicProvenanceEvent(
+                  "provenance_opened",
+                  {
+                    surface: "track",
+                    subjectKind: "track",
+                    hasCanonicalCredits: true,
+                  },
+                );
+                setReceiptOpen(true);
+              }}
               className="inline-flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-2 text-[12px] font-bold text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-raised)]"
             >
               <WkIcon name="Info" size={13} />
@@ -116,6 +169,15 @@ export default function TrackCreditsSection({
           ) : null}
           <Link
             to={`/credits?track_id=${encodeURIComponent(trackId)}&claim=1`}
+            onClick={() =>
+              trackMusicProvenanceEvent(
+                "credit_claim_started",
+                {
+                  surface: "track",
+                  subjectKind: "track",
+                },
+              )
+            }
             className="inline-flex items-center justify-center rounded-xl bg-[var(--wk-brand)] px-3 py-2 text-[12px] font-extrabold text-[var(--wk-brand-on)] transition-opacity hover:opacity-90"
           >
             I worked on this

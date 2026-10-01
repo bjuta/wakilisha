@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
-import type { MusicGroupSchema } from "@/components/seo/SchemaOrg";
+import type { MusicArtistSchema } from "@/components/seo/SchemaOrg";
 import { getArtist, getArtistAppearsOn, clearDiscographyCache, type PublicArtistDetail, type RegistryAppearsOnRelease } from "@/services/publicContent/client";
 import { getPublicArtistRelationships, type PublicArtistRelationship } from "@/services/publicArtistRelationships";
 import { supabase } from "@/lib/supabase";
@@ -370,6 +370,38 @@ export default function ArtistDetail() {
   const bioForSeo = cleanBioExcerpt(displayFullBio || displayBio);
   const seoDescription = bioForSeo || `Explore ${artist.name} on WAKILISHA: songs, releases, chart moments, and more.`;
 
+  const artistSchema: MusicArtistSchema =
+    artist.artistType === "solo"
+      ? {
+          "@type": "Person",
+          name: artist.name,
+          image: displayProfileImage,
+          description: bioForSeo,
+          url:
+            typeof window !== "undefined"
+              ? window.location.href
+              : undefined,
+          sameAs:
+            artist.spotifyUrl
+              ? [artist.spotifyUrl]
+              : undefined,
+        }
+      : {
+          "@type": "MusicGroup",
+          name: artist.name,
+          image: displayProfileImage,
+          description: bioForSeo,
+          genre: registeredGenres,
+          url:
+            typeof window !== "undefined"
+              ? window.location.href
+              : undefined,
+          sameAs:
+            artist.spotifyUrl
+              ? [artist.spotifyUrl]
+              : undefined,
+        };
+
   const communityEntity = {
     type: "artist" as const,
     id: artist.id,
@@ -388,17 +420,7 @@ export default function ArtistDetail() {
         type="website"
       />
 
-      <SchemaOrg
-        data={{
-          "@type": "MusicGroup",
-          name: artist.name,
-          image: displayProfileImage,
-          description: bioForSeo,
-          genre: registeredGenres,
-          url: typeof window !== "undefined" ? window.location.href : undefined,
-          sameAs: artist.spotifyUrl ? [artist.spotifyUrl] : undefined,
-        } satisfies MusicGroupSchema}
-      />
+      <SchemaOrg data={artistSchema} />
 
       <ArtistDetailHero
         key="artist-detail-hero"
