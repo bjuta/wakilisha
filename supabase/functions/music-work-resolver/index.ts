@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
 
   const { data: canManage, error: capabilityError } =
     await userClient.rpc("current_user_has_capability", {
-      p_capability_key: "manage_registry",
+      required_capability: "manage_registry",
     });
 
   if (capabilityError || canManage !== true) {
