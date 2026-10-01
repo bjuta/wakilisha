@@ -6,7 +6,7 @@ import { buildTrackHeroIntro, buildTrackSeoDescription } from "@/services/cultur
 import { TrackChartSparkline } from "@/components/charts/TrackChartSparkline";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
-import type { MusicRecordingSchema } from "@/components/seo/SchemaOrg";
+import type { MusicArtistSchema, MusicRecordingSchema } from "@/components/seo/SchemaOrg";
 import TrackLyricsSection from "./components/TrackLyricsSection";
 import TrackCreditsSection from "./components/TrackCreditsSection";
 import TrackRelatedTracks from "./components/TrackRelatedTracks";
@@ -57,6 +57,7 @@ type TrackViewModel = {
     isFeatured: boolean;
     creditOrder: number;
     role: string;
+    artistType?: string;
   }>;
   canonicalPath: string;
   recordingContributions: PublicTrackDetail["recordingContributions"];
@@ -182,6 +183,7 @@ function apiToViewModel(api: PublicTrackDetail): TrackViewModel {
     isFeatured: Boolean(artist.isFeatured ?? artist.is_featured),
     creditOrder: Number(artist.creditOrder ?? artist.credit_order ?? index),
     role: artist.role || "primary",
+    artistType: clean(artist.artistType || artist.artist_type),
   })).filter((artist: TrackViewModel["artists"][number]) => artist.name);
   const hasPrimary = mappedArtists.some((artist) => artist.isPrimary);
   const artists = hasPrimary ? mappedArtists : mappedArtists.map((artist, index) => ({ ...artist, isPrimary: index === 0 }));
@@ -995,6 +997,40 @@ export default function TrackDetail() {
     }
   };
 
+  const schemaArtists: MusicArtistSchema[] =
+    track.artists
+      .filter((artist) => artist.isPrimary)
+      .sort(
+        (left, right) =>
+          left.creditOrder - right.creditOrder
+          || String(left.artistId || "").localeCompare(
+            String(right.artistId || ""),
+          ),
+      )
+      .map((artist) => ({
+        "@type":
+          artist.artistType === "solo"
+            ? "Person"
+            : "MusicGroup",
+        name: artist.name,
+        url: artist.slug
+          ? `/artists/${artist.slug}`
+          : undefined,
+      }));
+
+  if (
+    schemaArtists.length === 0 &&
+    track.artist
+  ) {
+    schemaArtists.push({
+      "@type": "MusicGroup",
+      name: track.artist,
+      url: track.artistSlug
+        ? `/artists/${track.artistSlug}`
+        : undefined,
+    });
+  }
+
   const communityEntity = {
     type: "track" as const,
     id: track.slug || trackSlug || undefined,
@@ -1021,7 +1057,10 @@ export default function TrackDetail() {
         data={{
           "@type": "MusicRecording",
           name: track.title,
-          byArtist: { "@type": "MusicGroup", name: track.artist, url: track.artistSlug ? `/artists/${track.artistSlug}` : undefined },
+          byArtist:
+            schemaArtists.length === 1
+              ? schemaArtists[0]
+              : schemaArtists,
           image: track.artworkUrl,
           duration: track.duration > 0 ? `PT${String(Math.floor(track.duration / 60))}M${String(track.duration % 60)}S` : undefined,
           datePublished: track.releaseDate || track.releaseYear,
