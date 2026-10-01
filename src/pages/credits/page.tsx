@@ -25,13 +25,13 @@ import {
 function statusLabel(state: string): string {
   const labels: Record<string, string> = {
     asserted: "Pending",
-    under_review: "Under review",
-    corroborated: "Under review",
+    under_review: "In review",
+    corroborated: "In review",
     confirmed: "Confirmed",
-    canonical: "Canonical",
+    canonical: "Verified",
     disputed: "Disputed",
     withdrawn: "Withdrawn",
-    superseded: "Superseded",
+    superseded: "Updated",
     pending: "Needs response",
   };
   return labels[state] || state.replace(/_/g, " ");
@@ -103,8 +103,8 @@ function WorkspaceCard({
         item.attestationId,
         action,
         action === "withdrawn"
-          ? "Creator withdrew this assertion."
-          : "Creator disputed this assertion.",
+          ? "Creator withdrew this credit."
+          : "Creator disputed this credit.",
       );
       if (action === "disputed") {
         trackMusicProvenanceEvent(
@@ -220,11 +220,11 @@ function PermissionCard({
             {item.roleLabel}
           </div>
           <div className="mt-1 text-[11px] text-[var(--wk-text-muted)]">
-            {item.subject?.title || "Credit assertion"}
+            {item.subject?.title || "Credit"}
           </div>
         </div>
         <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
-          {permission.changeKind === "none" ? "No permission yet" : permission.changeKind}
+          Sharing
         </span>
       </div>
 
@@ -243,10 +243,10 @@ function PermissionCard({
         >
           <span>
             <span className="block text-[11px] font-black text-[var(--wk-text)]">
-              Public display permission
+              Show this credit publicly
             </span>
             <span className="mt-0.5 block text-[10px] text-[var(--wk-text-muted)]">
-              Permission over this attestation; it does not create or erase a canonical fact.
+              Turn this on to show the credit on WAKILISHA.
             </span>
           </span>
           <span
@@ -281,10 +281,10 @@ function PermissionCard({
         >
           <span>
             <span className="block text-[11px] font-black text-[var(--wk-text)]">
-              Third-party commercial reuse
+              Allow commercial reuse
             </span>
             <span className="mt-0.5 block text-[10px] text-[var(--wk-text-muted)]">
-              Off by default. Rights ownership or royalty entitlement is never inferred.
+              Allow approved third parties to reuse this credit commercially.
             </span>
           </span>
           <span
@@ -340,10 +340,12 @@ export default function CreditsPage() {
     try {
       setWorkspace(await getMyMusicCredits());
     } catch (error) {
+      console.error(
+        "Could not load credits workspace:",
+        error,
+      );
       setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Could not load your credits.",
+        "We couldn’t load your credits. Try again.",
       );
     } finally {
       setLoading(false);
@@ -390,13 +392,13 @@ export default function CreditsPage() {
         <header className="flex flex-col gap-6 border-b border-[var(--wk-divider)] pb-8 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--wk-brand)]">
-              Music provenance
+              Credits
             </div>
             <h1 className="mt-2 text-[34px] font-black tracking-[-0.045em] text-[var(--wk-text)] md:text-[44px]">
               Your Credits
             </h1>
             <p className="mt-3 max-w-2xl text-[13px] leading-6 text-[var(--wk-text-muted)]">
-              Claims, confirmations, disputes, canonical credits and sharing permissions in one place.
+              Review your credits, confirmation requests, disputes, and sharing choices.
             </p>
           </div>
           <WkButton
@@ -473,7 +475,7 @@ export default function CreditsPage() {
                     Your work
                   </h2>
                   <p className="mt-1 text-[11px] text-[var(--wk-text-muted)]">
-                    Canonical credits and assertions you have made.
+                    Credits you’ve added or confirmed.
                   </p>
                 </div>
                 <span className="text-[11px] font-black text-[var(--wk-text-faint)]">
@@ -491,7 +493,7 @@ export default function CreditsPage() {
                   ))}
                 </div>
               ) : (
-                <EmptyState text="No music credits are connected to your Person yet." />
+                <EmptyState text="You haven’t added any credits yet." />
               )}
             </section>
 
@@ -502,7 +504,7 @@ export default function CreditsPage() {
                     Activity
                   </h2>
                   <p className="mt-1 text-[11px] text-[var(--wk-text-muted)]">
-                    Append-only history around your claims and invitations.
+                    A record of your credit activity and confirmation requests.
                   </p>
                 </div>
                 <span className="text-[11px] font-black text-[var(--wk-text-faint)]">
@@ -546,7 +548,7 @@ export default function CreditsPage() {
                     Sharing permissions
                   </h2>
                   <p className="mt-1 max-w-2xl text-[11px] leading-5 text-[var(--wk-text-muted)]">
-                    Permission controls how WAKILISHA may use your attestation. It does not decide who owns rights or royalties.
+                    Choose where your credit can appear and whether others may reuse it commercially. This doesn’t change ownership or royalties.
                   </p>
                 </div>
                 <span className="text-[11px] font-black text-[var(--wk-text-faint)]">
@@ -564,7 +566,7 @@ export default function CreditsPage() {
                   ))}
                 </div>
               ) : (
-                <EmptyState text="Sharing controls appear after you submit an attestation." />
+                <EmptyState text="Sharing options will appear after you add a credit." />
               )}
             </section>
           </div>

@@ -310,6 +310,54 @@ async function installPublicReadFixtures(
   await page.route(
     "**://*.supabase.co/rest/v1/**",
     async (route) => {
+      const url = new URL(
+        route.request().url(),
+      );
+      const path = url.pathname;
+
+      if (
+        path.endsWith(
+          "/rest/v1/registry_tracks",
+        ) &&
+        url.searchParams
+          .get("id")
+          ?.includes(
+            trackDetail.track.id,
+          )
+      ) {
+        await fulfillJson(route, {
+          id: trackDetail.track.id,
+          slug: trackDetail.track.slug,
+          title: trackDetail.track.title,
+          artwork_url: null,
+        });
+        return;
+      }
+
+      if (
+        path.endsWith(
+          "/rest/v1/registry_track_artists",
+        ) &&
+        url.searchParams
+          .get("track_id")
+          ?.includes(
+            trackDetail.track.id,
+          )
+      ) {
+        await fulfillJson(route, [
+          {
+            track_id:
+              trackDetail.track.id,
+            artist_name_text:
+              soloArtist.name,
+            artist_slug:
+              soloArtist.slug,
+            credit_order: 0,
+          },
+        ]);
+        return;
+      }
+
       await fulfillJson(route, []);
     },
   );
@@ -328,6 +376,21 @@ async function installPublicReadFixtures(
         "track_analytics_event"
       ) {
         await fulfillJson(route, null);
+        return;
+      }
+
+      if (
+        rpcName ===
+        "get_my_music_credits_v1"
+      ) {
+        await fulfillJson(route, {
+          personId:
+            "13f03a01-9e07-4ac4-8fa5-000000000029",
+          needsYou: [],
+          yourWork: [],
+          activity: [],
+          sharingPermissions: [],
+        });
         return;
       }
 
@@ -432,6 +495,45 @@ async function installPublicReadFixtures(
       });
     },
   );
+}
+
+async function installAuthenticatedCreditsSession(
+  page: import("@playwright/test").Page,
+) {
+  await page.addInitScript(() => {
+    const now = Math.floor(Date.now() / 1000);
+    const session = {
+      access_token: "browser-test-access-token",
+      token_type: "bearer",
+      expires_in: 3600,
+      expires_at: now + 3600,
+      refresh_token: "browser-test-refresh-token",
+      user: {
+        id:
+          "13f03a01-9e07-4ac4-8fa5-000000000029",
+        aud: "authenticated",
+        role: "authenticated",
+        email: "credits-browser@wakilisha.test",
+        email_confirmed_at:
+          "2026-10-01T00:00:00.000Z",
+        confirmed_at:
+          "2026-10-01T00:00:00.000Z",
+        app_metadata: {},
+        user_metadata: {
+          full_name:
+            "Credits Browser Test",
+        },
+        identities: [],
+        created_at:
+          "2026-10-01T00:00:00.000Z",
+      },
+    };
+
+    window.localStorage.setItem(
+      "sb-pgzizndxdyhqmtyywjmt-auth-token",
+      JSON.stringify(session),
+    );
+  });
 }
 
 async function jsonLd(
@@ -608,6 +710,71 @@ test("Slice 3 preserves ordered multi-MainArtist recording schema and provenance
     "href",
     /\/credits\?track_id=/,
   );
+});
+
+test("creator credits deep link keeps the requested Track selected", async ({
+  page,
+}) => {
+  await installAuthenticatedCreditsSession(
+    page,
+  );
+
+  await page.goto(
+    `/credits?track_id=${trackDetail.track.id}&claim=1`,
+    {
+      waitUntil: "domcontentloaded",
+    },
+  );
+
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: "Your Credits",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  const search = page.getByPlaceholder(
+    "Search title or artist",
+  );
+
+  await expect(search).toHaveValue(
+    trackDetail.track.title,
+  );
+
+  const selectedTrack =
+    page.getByRole("button", {
+      name: new RegExp(
+        trackDetail.track.title,
+      ),
+    });
+
+  await expect(
+    selectedTrack,
+  ).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  await expect(
+    page.getByText(
+      "Choose the recording, add the role, and tell us who the credit belongs to.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+
+  await expect(
+    page.getByText(
+      "Open response first",
+      { exact: true },
+    ),
+  ).toHaveCount(0);
+
+  await expect(
+    page.getByText(
+      /Cannot read properties of undefined/,
+    ),
+  ).toHaveCount(0);
 });
 
 test("Slice 3 normalizes grouped Artist credits without hanging brackets", async ({
