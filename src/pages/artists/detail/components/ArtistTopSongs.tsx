@@ -6,6 +6,7 @@ import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwor
 import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
 import { usePlayer } from "@/context/PlayerContext";
 import type { PublicArtistRelationship } from "@/services/publicArtistRelationships";
+import { splitMusicArtistDisplayNames } from "@/utils/musicArtistDisplay";
 
 interface Song {
   id: string;
@@ -38,10 +39,10 @@ function SongExpandedPanel({
   artistSlug?: string;
 }) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
-  const artistList = song.artists
-    .split(/,\s*|feat\.\s*|ft\.\s*/i)
-    .map((a) => a.trim())
-    .filter(Boolean);
+  const artistList =
+    splitMusicArtistDisplayNames(
+      song.artists,
+    );
 
   const trackId = `top-song-${song.id}`;
   const isCurrentTrack = currentTrack?.id === trackId;
