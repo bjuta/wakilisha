@@ -309,6 +309,26 @@ Deno.serve(async (req) => {
   }
 
   const relation = workRelations[0];
+  const relationType = nonBlank(relation.relationshipType);
+  const relationAttributes = relation.relationshipAttributes
+    .map((value) => String(value ?? "").trim().toLowerCase())
+    .filter(Boolean);
+
+  if (
+    relationType !== "performance" ||
+    relationAttributes.includes("partial")
+  ) {
+    return json(req, 200, {
+      state: "review_required",
+      reason: "musicbrainz_work_relation_not_exact_embodiment",
+      track_id: trackId,
+      isrc,
+      recording_mbid: recordingId,
+      relationship_type: relationType,
+      relationship_attributes: relationAttributes,
+    });
+  }
+
   const workId = nonBlank(relation.id);
   if (!workId || !UUID_RE.test(workId)) {
     return json(req, 200, {
