@@ -605,7 +605,7 @@ export function ClaimComposer({
               ))
             ) : (
               <p className="text-[11px] font-semibold text-[var(--wk-text-muted)]">
-                No active Registry recording matches this search.
+                No recording matches this search.
               </p>
             )}
           </div>
@@ -646,7 +646,7 @@ export function ClaimComposer({
             <div className="mt-3 space-y-2">
               {loadingWorks ? (
                 <p className="text-[11px] text-[var(--wk-text-muted)]">
-                  Loading verified Works…
+                  Loading songwriting details…
                 </p>
               ) : linkedWorks.length ? (
                 linkedWorks.map((work) => (
