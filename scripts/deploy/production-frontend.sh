@@ -4,7 +4,7 @@ set -euo pipefail
 RUNNER_VERSION="6"
 BASE_EXPECTED_MAIN="57e4c9de7a205bbffde0ff97c9ec40f9a46b1b65"
 BASE_PREVIEW_REF="oeownzbanzbuvuyidwqh"
-TEMPLATE_SHA256="acc75c740d64e6e72a6bee7f7620983dc5931cba1fa5252cb7a2915f01233d13"
+TEMPLATE_SHA256="923dea89c9a4724d712197e75d90efe9a94f507ac078ac4e0e4272c66e35bfb9"
 
 SCRIPT_DIR="$(
   CDPATH= cd -- "$(dirname -- "$0")" >/dev/null 2>&1
@@ -193,6 +193,22 @@ if [ "$SELF_TEST" -eq 1 ]; then
 
   if grep -Fq "$BASE_PREVIEW_REF" "$TMP_SELF"; then
     echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_SELF_TEST_OLD_PREVIEW_REMAINS'
+    exit 1
+  fi
+
+  if ! grep -Fq \
+    'proxy_pass https://\$wk_audio_public_upstream_host;' \
+    "$TMP_SELF"
+  then
+    echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_AUDIO_REMOTE_VARIABLE_ESCAPE_MISSING'
+    exit 1
+  fi
+
+  if grep -Fq \
+    'proxy_pass https://\\$wk_audio_public_upstream_host;' \
+    "$TMP_SELF"
+  then
+    echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_AUDIO_REMOTE_VARIABLE_DOUBLE_ESCAPE'
     exit 1
   fi
 

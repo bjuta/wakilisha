@@ -232,7 +232,7 @@ ssh \
   -o BatchMode=yes \
   -o StrictHostKeyChecking=accept-new \
   "${SSH_USER}@${HOST}" \
-  "set -eu; test -f /etc/nginx/snippets/wakilisha-audio-public-delivery.conf; sudo grep -Fq 'resolver 127.0.0.53 valid=30s ipv6=off;' /etc/nginx/snippets/wakilisha-audio-public-delivery.conf; test \"\$(sudo grep -Fc 'proxy_pass https://\\$wk_audio_public_upstream_host;' /etc/nginx/snippets/wakilisha-audio-public-delivery.conf)\" = '2'; ! sudo grep -Fq 'proxy_pass https://pgzizndxdyhqmtyywjmt.supabase.co;' /etc/nginx/snippets/wakilisha-audio-public-delivery.conf"
+  "set -eu; test -f /etc/nginx/snippets/wakilisha-audio-public-delivery.conf; sudo grep -Fq 'resolver 127.0.0.53 valid=30s ipv6=off;' /etc/nginx/snippets/wakilisha-audio-public-delivery.conf; test \"\$(sudo grep -Fc 'proxy_pass https://\$wk_audio_public_upstream_host;' /etc/nginx/snippets/wakilisha-audio-public-delivery.conf)\" = '2'; ! sudo grep -Fq 'proxy_pass https://pgzizndxdyhqmtyywjmt.supabase.co;' /etc/nginx/snippets/wakilisha-audio-public-delivery.conf"
 
 echo 'NGINX_PRE_ACTIVATION_HEALTH=PASS'
 echo 'AUDIO_RUNTIME_DNS_AUTHORITY=PASS'
