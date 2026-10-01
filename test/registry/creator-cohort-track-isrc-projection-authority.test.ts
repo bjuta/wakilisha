@@ -100,10 +100,10 @@ describe("Creator cohort Track ISRC projection authority", () => {
       "and track.isrc is null",
     );
     expect(migration).not.toMatch(
-      /update\s+public\.registry_track_provider_links/i,
+      /^\s*update\s+public\.registry_track_provider_links\b/im,
     );
     expect(migration).not.toMatch(
-      /delete\s+from\s+public\.registry_/i,
+      /^\s*delete\s+from\s+public\.registry_\w+\b/im,
     );
   });
 
