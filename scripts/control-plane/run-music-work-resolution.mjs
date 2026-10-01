@@ -54,7 +54,7 @@ function printHelp() {
       "Usage: node scripts/control-plane/run-music-work-resolution.mjs [options]",
       "",
       "Options:",
-      "  --apply              Execute provider resolution and governed promotion.",
+      "  --apply              Execute a bounded provider-resolution cohort.",
       "  --limit <n>          Process at most n unresolved Tracks.",
       "  --result-log <path>  Durable JSONL result path.",
       "  --resume-log <path>  Skip Tracks already recorded in a prior JSONL run.",
@@ -182,6 +182,13 @@ function loadCompleted(pathname) {
 }
 
 const args = parseArgs(process.argv.slice(2));
+
+if (args.apply && args.limit == null) {
+  throw new Error(
+    "V1 apply mode requires an explicit --limit. Unbounded catalogue resolution is not accepted.",
+  );
+}
+
 const root = process.cwd();
 const env = parseEnvFile(path.join(root, ".env"));
 
