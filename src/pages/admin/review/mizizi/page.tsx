@@ -627,6 +627,7 @@ export default function AdminMiziziWorkspacePage() {
         decisionType: provenanceForm.decisionType,
         notes,
         expectedProvenanceContextFingerprint: context.contextFingerprint,
+        provenanceContext: context,
         resolutionPayload: {
           reviewedFrom: "admin_mizizi_workspace",
           programmeIssue: 1121,
