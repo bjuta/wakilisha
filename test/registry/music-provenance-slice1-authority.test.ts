@@ -858,7 +858,10 @@ describe("Music provenance Slice 3 public surface convergence", () => {
       "artist.creditOrder",
     );
     expect(releaseStructuredData).toContain(
-      'artist.artistType === "solo"',
+      'artistType === "solo"',
+    );
+    expect(releaseStructuredData).toContain(
+      "if (!artistType) return [];",
     );
     expect(releaseStructuredData).toContain(
       '"Person"',
