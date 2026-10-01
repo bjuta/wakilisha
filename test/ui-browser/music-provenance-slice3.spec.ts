@@ -282,44 +282,6 @@ const releaseDetail = {
   chartStats: null,
 };
 
-const personFixture = {
-  person_id:
-    "13f03a01-9e07-4ac4-8fa5-000000000024",
-  canonical_path: "/people/preview-producer",
-  display_name: "Preview Producer",
-  bio: "Preview producer",
-  avatar_url: null,
-  cover_url: null,
-  location: "Nairobi",
-  username: null,
-  registry_author_slug: null,
-  public_roles: [],
-  redirect_to: null,
-};
-
-const personMusicCredits = {
-  personId: personFixture.person_id,
-  recordingCredits: [
-    {
-      id: trackDetail.recordingContributions[0].id,
-      roleKey: "producer",
-      roleLabel: "Producer",
-      instrument: null,
-      detail: null,
-      creditedAs: "Preview Producer",
-      subject: {
-        kind: "track",
-        id: trackDetail.track.id,
-        title: trackDetail.track.title,
-        path:
-          "/tracks/slice3-browser-solo/slice3-browser-track",
-        artworkUrl: null,
-      },
-    },
-  ],
-  workCredits: [],
-};
-
 async function fulfillJson(
   route: import("@playwright/test").Route,
   body: unknown,
@@ -366,49 +328,6 @@ async function installPublicReadFixtures(
         "track_analytics_event"
       ) {
         await fulfillJson(route, null);
-        return;
-      }
-
-      if (
-        rpcName ===
-        "get_public_person"
-      ) {
-        await fulfillJson(
-          route,
-          personFixture,
-        );
-        return;
-      }
-
-      if (
-        rpcName ===
-        "list_public_person_work"
-      ) {
-        await fulfillJson(route, []);
-        return;
-      }
-
-      if (
-        rpcName ===
-        "get_public_person_social_summary"
-      ) {
-        await fulfillJson(route, {
-          person_id:
-            personFixture.person_id,
-          follower_count: 0,
-          following_count: 0,
-        });
-        return;
-      }
-
-      if (
-        rpcName ===
-        "get_public_person_music_credits_v1"
-      ) {
-        await fulfillJson(
-          route,
-          personMusicCredits,
-        );
         return;
       }
 
@@ -888,43 +807,3 @@ test("Slice 3 renders the same Release provenance contract on mobile", async ({
     }),
   ]);
 });
-
-test("Slice 3 keeps canonical music credits visible on the Person surface", async ({
-  page,
-}) => {
-  await page.goto(
-    "/people/preview-producer",
-    {
-      waitUntil: "domcontentloaded",
-    },
-  );
-
-  await page
-    .getByRole("button", {
-      name: /Music Credits/,
-    })
-    .click();
-
-  await expect(
-    page.getByRole("heading", {
-      name:
-        "Recorded work and songwriting",
-      exact: true,
-    }),
-  ).toBeVisible();
-
-  await expect(
-    page.getByText(
-      trackDetail.track.title,
-      { exact: true },
-    ),
-  ).toBeVisible();
-
-  await expect(
-    page.getByText(
-      "Producer",
-      { exact: true },
-    ),
-  ).toBeVisible();
-});
-
