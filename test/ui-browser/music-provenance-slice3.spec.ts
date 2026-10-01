@@ -881,6 +881,12 @@ test("Slice 3 keeps canonical music credits visible on the Person surface", asyn
     },
   );
 
+  await page
+    .getByRole("button", {
+      name: /Music Credits/,
+    })
+    .click();
+
   await expect(
     page.getByRole("heading", {
       name:
