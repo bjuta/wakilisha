@@ -10,10 +10,23 @@ export interface MusicGroupSchema {
   sameAs?: string[];
 }
 
+export interface MusicPersonSchema {
+  "@type": "Person";
+  name: string;
+  image?: string;
+  description?: string;
+  url?: string;
+  sameAs?: string[];
+}
+
+export type MusicArtistSchema =
+  | MusicGroupSchema
+  | MusicPersonSchema;
+
 export interface MusicAlbumSchema {
   "@type": "MusicAlbum";
   name: string;
-  byArtist?: { "@type": "MusicGroup"; name: string; url?: string };
+  byArtist?: MusicArtistSchema | MusicArtistSchema[];
   image?: string;
   datePublished?: string;
   numTracks?: number;
@@ -40,18 +53,14 @@ export interface MusicPlaylistSchema {
     position?: number;
     duration?: string;
     url?: string;
-    byArtist?: {
-      "@type": "MusicGroup";
-      name: string;
-      url?: string;
-    };
+    byArtist?: MusicArtistSchema | MusicArtistSchema[];
   }>;
 }
 
 export interface MusicRecordingSchema {
   "@type": "MusicRecording";
   name: string;
-  byArtist?: { "@type": "MusicGroup"; name: string; url?: string };
+  byArtist?: MusicArtistSchema | MusicArtistSchema[];
   image?: string;
   duration?: string;
   datePublished?: string;
@@ -99,6 +108,7 @@ export interface WebPageSchema {
 
 export type SchemaData =
   | MusicGroupSchema
+  | MusicPersonSchema
   | MusicAlbumSchema
   | MusicPlaylistSchema
   | MusicRecordingSchema
@@ -135,6 +145,15 @@ function buildJsonLd(data: SchemaData | SchemaData[]): Record<string, unknown> {
         if (d.image) schema.image = d.image;
         if (d.description) schema.description = d.description;
         if (d.genre) schema.genre = d.genre;
+        if (d.url) schema.url = d.url;
+        if (d.sameAs) schema.sameAs = d.sameAs;
+        break;
+      }
+      case "Person": {
+        const d = item as MusicPersonSchema;
+        schema.name = d.name;
+        if (d.image) schema.image = d.image;
+        if (d.description) schema.description = d.description;
         if (d.url) schema.url = d.url;
         if (d.sameAs) schema.sameAs = d.sameAs;
         break;
