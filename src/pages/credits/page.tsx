@@ -12,6 +12,7 @@ import { ClaimComposer } from "@/components/music/ClaimComposer";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { trackMusicProvenanceEvent } from "@/services/analytics";
 import {
   getMyMusicCredits,
   setMyMusicCreditPermission,
@@ -105,6 +106,17 @@ function WorkspaceCard({
           ? "Creator withdrew this assertion."
           : "Creator disputed this assertion.",
       );
+      if (action === "disputed") {
+        trackMusicProvenanceEvent(
+          "credit_disputed",
+          {
+            surface: "your_credits",
+            subjectKind:
+              item.subject?.kind,
+            outcome: "disputed",
+          },
+        );
+      }
       await onRefresh();
     } finally {
       setWorking(false);
@@ -390,7 +402,19 @@ export default function CreditsPage() {
           <WkButton
             type="button"
             variant="primary"
-            onClick={() => setClaimOpen(true)}
+            onClick={() => {
+              trackMusicProvenanceEvent(
+                "credit_claim_started",
+                {
+                  surface: "your_credits",
+                  subjectKind:
+                    initialTrackId
+                      ? "track"
+                      : undefined,
+                },
+              );
+              setClaimOpen(true);
+            }}
           >
             Add a credit
           </WkButton>
