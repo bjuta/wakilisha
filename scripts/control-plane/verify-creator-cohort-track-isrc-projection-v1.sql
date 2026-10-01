@@ -112,10 +112,8 @@ begin
        'update public.registry_tracks'
        in lower(v_execute)
      )=0
-     or position(
-       'set isrc=v_isrc'
-       in lower(v_execute)
-     )=0
+     or lower(v_execute) !~
+          'set[[:space:]]+isrc=v_isrc'
      or position(
        'admit_isrc_projection'
        in v_execute
