@@ -1,14 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-01T05:56:45Z",
+  "generatedAt": "2026-10-01T18:18:14Z",
   "typesSha256": "d12405446fc3e64aae43d55a4ff69418cdd2cac96243c90f9e959f627aed6ea6",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 194,
-  "latestMigration": "20260930175049_music_provenance_slice3_review_materialization_v1.sql",
+  "migrationCount": 195,
+  "latestMigration": "20261001171611_creator_cohort_track_isrc_projection.sql",
   "schemaSeal": {
-    "mode": "production",
-    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
-    "migrationHead": "20260930175049"
+    "mode": "preview",
+    "sourceProjectRef": "oazjmdsqqgyejpvqhtul",
+    "migrationHead": "20261001171611",
+    "baseMainSha": "cc1c33f4012c323db361d8f6172ae65cdf3ae427",
+    "previewBranchId": "1d64e6cc-eaaf-4dd4-a868-ab06c8d9bc7f"
   }
 }
