@@ -310,7 +310,7 @@ describe("MIZIZI Cultural Data Steward", () => {
     );
 
     expect(migration).toContain(
-      "External identifier reviewed reconcile enabled prematurely",
+      "external identifier reviewed reconcile must remain disabled",
     );
     expect(migration).toContain(
       "requires_human_approval",
