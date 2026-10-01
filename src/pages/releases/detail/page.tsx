@@ -5,6 +5,7 @@ import { WkButton } from "@/components/design-system/primitives/Button";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import type { MusicAlbumSchema } from "@/components/seo/SchemaOrg";
+import { buildReleaseSchemaArtists } from "@/services/publicContent/releaseStructuredData";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { getRelease, listReleases, releaseUrl, slugify, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
@@ -15,6 +16,7 @@ import ReleaseMetadata from "./components/ReleaseMetadata";
 import ReleaseRelatedReleases from "./components/ReleaseRelatedReleases";
 import ReleaseExcerpt from "./components/ReleaseExcerpt";
 import ReleaseFeaturedArtists from "./components/ReleaseFeaturedArtists";
+import ReleaseMusicProvenance from "./components/ReleaseMusicProvenance";
 import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import {
@@ -157,6 +159,11 @@ export default function ReleaseDetail() {
     });
   };
 
+  const schemaArtists =
+    buildReleaseSchemaArtists(
+      release.artists,
+    );
+
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
       {/* SEO */}
@@ -173,7 +180,12 @@ export default function ReleaseDetail() {
         data={{
           "@type": "MusicAlbum",
           name: release.title,
-          byArtist: { "@type": "MusicGroup", name: release.artist, url: release.artist ? `/artists/${slugify(release.artist)}` : undefined },
+          byArtist:
+            schemaArtists.length === 0
+              ? undefined
+              : schemaArtists.length === 1
+                ? schemaArtists[0]
+                : schemaArtists,
           image: release.artworkUrl,
           datePublished: release.releaseDate,
           numTracks: release.trackCount,
@@ -253,6 +265,10 @@ export default function ReleaseDetail() {
               tracks={release.tracks}
               artistSlug={artistSlug}
               onDiscussTrack={openReleaseTrackDiscussion}
+            />
+
+            <ReleaseMusicProvenance
+              release={release}
             />
 
             <ContextAnchorSummary
