@@ -855,7 +855,10 @@ describe("Music provenance Slice 3 public surface convergence", () => {
 
   it("preserves ordered Person vs MusicGroup Release Artist ontology", () => {
     expect(releaseStructuredData).toContain(
-      "artist.creditOrder",
+      "a.creditOrder",
+    );
+    expect(releaseStructuredData).toContain(
+      "b.creditOrder",
     );
     expect(releaseStructuredData).toContain(
       'artistType === "solo"',
