@@ -93,8 +93,8 @@ describe("Creator cohort Track ISRC projection authority", () => {
     expect(migration).toContain(
       "update public.registry_tracks",
     );
-    expect(migration).toContain(
-      "set isrc=v_isrc",
+    expect(migration).toMatch(
+      /set\s+isrc=v_isrc,/,
     );
     expect(migration).toContain(
       "and track.isrc is null",
