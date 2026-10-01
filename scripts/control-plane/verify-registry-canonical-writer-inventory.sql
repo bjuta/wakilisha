@@ -86,6 +86,7 @@ begin
       ('public.admin_activate_registry_track_intake_v1(uuid)'),
       ('public.admin_admit_registry_track_intake_release_profile_v1(uuid,uuid,boolean)'),
       ('public.admin_admit_registry_track_intake_track_profile_v1(uuid,uuid,boolean)'),
+      ('public.admin_admit_registry_track_isrc_projection_v1(uuid,uuid)'),
       ('public.admin_admit_registry_track_primary_from_release_v1(uuid,uuid,uuid,text)'),
       ('public.admin_admit_registry_track_provider_link_v1(uuid,text,text,text,text[],text,text,text,text,integer,text,text,numeric,text,jsonb)'),
       ('public.admin_apply_artist_decouple_decision(uuid)'),
