@@ -135,23 +135,40 @@ const FIXTURES: ExternalIdentifierBenchmarkCase[] = [
   },
 ];
 
-async function main(): Promise<void> {
+async function resolveProductionGoldRows(): Promise<number> {
+  const explicit =
+    process.env.MIZIZI_BENCHMARK_PRODUCTION_GOLD_ROWS;
+
+  if (explicit !== undefined) {
+    const parsed = Number(explicit);
+
+    if (
+      !Number.isInteger(parsed) ||
+      parsed < 0
+    ) {
+      throw new Error(
+        "MIZIZI_BENCHMARK_PRODUCTION_GOLD_ROWS must be a non-negative integer.",
+      );
+    }
+
+    return parsed;
+  }
+
   const pool = createRegistryPool();
 
   try {
     const gold = await pool.query<{
       gold_rows: string;
     }>(`
-      select count(*)::text as gold_rows
+      select count(distinct assertion.id)::text as gold_rows
       from public.registry_external_identifier_assertions assertion
+      join public.registry_canonical_write_events event
+        on event.registry_entity_id = assertion.id::text
+       and event.source_table = 'registry_external_identifier_assertions'
+       and event.action = 'admit_external_identifier_assertion'
+       and event.status = 'succeeded'
       join platform_private.registry_operation_write_events write_link
-        on write_link.canonical_write_event_id = any (
-          select event.id
-          from public.registry_canonical_write_events event
-          where event.registry_entity_id = assertion.id::text
-            and event.action = 'admit_external_identifier_assertion'
-            and event.status = 'succeeded'
-        )
+        on write_link.canonical_write_event_id = event.id
       join platform_private.registry_mutation_operations operation
         on operation.id = write_link.operation_id
       where operation.operation_key = 'registry.external_identifier_assertion.admit'
@@ -159,14 +176,23 @@ async function main(): Promise<void> {
         and operation.verifier_status = 'passed'
     `);
 
-    const productionGoldRows =
-      Number(gold.rows[0]?.gold_rows || 0);
+    return Number(
+      gold.rows[0]?.gold_rows || 0,
+    );
+  } finally {
+    await pool.end();
+  }
+}
 
-    const result =
-      benchmarkExternalIdentifierAutonomy(
-        FIXTURES,
-        productionGoldRows,
-      );
+async function main(): Promise<void> {
+  const productionGoldRows =
+    await resolveProductionGoldRows();
+
+  const result =
+    benchmarkExternalIdentifierAutonomy(
+      FIXTURES,
+      productionGoldRows,
+    );
 
     console.log(
       JSON.stringify(
@@ -204,13 +230,10 @@ async function main(): Promise<void> {
       );
     }
 
-    if (!result.autonomyEarned) {
-      console.log(
-        "MIZIZI_PROVENANCE_AUTONOMY_DECISION=KEEP_HUMAN_REVIEW",
-      );
-    }
-  } finally {
-    await pool.end();
+  if (!result.autonomyEarned) {
+    console.log(
+      "MIZIZI_PROVENANCE_AUTONOMY_DECISION=KEEP_HUMAN_REVIEW",
+    );
   }
 }
 
