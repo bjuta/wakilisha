@@ -12,7 +12,7 @@ const EXPECTED_AUTHORITY_FINGERPRINT = 'cf71fc24d54bb71d64a469e159daaf06b137680f
 const EXPECTED_CANDIDATE_FINGERPRINT = '238a817a5e342f8311ac04fc9a6bc978f67276cb664046cddc9e375bc323e9c4';
 const EXPECTED_BLOBS = {
   'scripts/registry/agents/mizizi/run.ts': '0518258a8fa439b06b8f017decb09f3d9da447cf',
-  'scripts/registry/agents/mizizi/core.ts': '2e1065c47715a8dfa95e37c2cf1078953b5da469',
+  'scripts/registry/agents/mizizi/core.ts': '412f4c2b11971a675dcea74ee02787887c8cb334',
   'supabase/functions/_shared/release-taxonomy.ts': 'e424dea443d7fb6ce85acca4f0c33375c56669ca',
 };
 
