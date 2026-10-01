@@ -1,0 +1,282 @@
+create function platform_private.execute_registry_work_external_identifier_admin_v1(
+  p_execution_grant_id uuid
+)
+returns table (
+  operation_id uuid,
+  operation_status text,
+  verifier_status text,
+  idempotent_replay boolean
+)
+language plpgsql
+security definer
+set search_path=pg_catalog,public,platform_private,extensions
+as $execute$
+declare
+  v_begin record;
+  v_operation platform_private.registry_mutation_operations%rowtype;
+  v_grant platform_private.registry_execution_grants%rowtype;
+  v_target platform_private.registry_execution_grant_targets%rowtype;
+  v_evidence platform_private.registry_evidence_assertions%rowtype;
+  v_plan jsonb;
+  v_candidate jsonb;
+  v_current_candidate jsonb;
+  v_current_candidate_fingerprint text;
+  v_work_id uuid;
+  v_scheme text;
+  v_source text;
+  v_comparison text;
+  v_existing_assertion_id uuid;
+  v_inserted public.registry_external_identifier_assertions%rowtype;
+  v_event_id uuid;
+begin
+  select *
+  into v_begin
+  from platform_private.begin_registry_mutation_operation(
+    'registry_external_identifier_admin',
+    p_execution_grant_id
+  );
+
+  select operation.*
+  into v_operation
+  from platform_private.registry_mutation_operations operation
+  where operation.id=v_begin.operation_id
+  for update;
+
+  if v_begin.idempotent_replay
+     and v_operation.status='succeeded'
+  then
+    operation_id:=v_operation.id;
+    operation_status:=v_operation.status;
+    verifier_status:=v_operation.verifier_status;
+    idempotent_replay:=true;
+    return next;
+    return;
+  end if;
+
+  select execution_grant.*
+  into v_grant
+  from platform_private.registry_execution_grants execution_grant
+  where execution_grant.id=p_execution_grant_id;
+
+  if v_operation.status<>'authorized'
+     or not found
+     or v_grant.actor_key<>'registry_external_identifier_admin'
+     or v_grant.operation_key<>
+          'registry.external_identifier_assertion.admit'
+     or v_grant.operation_version<>1
+     or v_grant.capability_key<>
+          'admit_registry_external_identifier_assertion'
+     or v_grant.max_rows<>1
+     or v_grant.policy_ruleset_version<>
+          'registry-external-identifier-admission-v1'
+     or v_grant.required_user_capability_key<>'manage_registry'
+  then
+    raise exception using errcode='42501',
+      message='Execution grant is not Registry external identifier authority.';
+  end if;
+
+  select target.*
+  into v_target
+  from platform_private.registry_execution_grant_targets target
+  where target.execution_grant_id=v_grant.id;
+
+  if not found
+     or v_target.subject_type<>'external_identifier_assertion'
+     or v_target.expected_state_fingerprint is not null
+     or (
+       select count(*)
+       from platform_private.registry_execution_grant_targets target_count
+       where target_count.execution_grant_id=v_grant.id
+     )<>1
+  then
+    raise exception using errcode='42501',
+      message='Work external identifier admission requires one exact future assertion target.';
+  end if;
+
+  v_plan:=v_grant.plan_payload;
+  v_candidate:=v_plan->'candidate_state';
+
+  if (v_plan-array[
+       'operation_key',
+       'operation_version',
+       'future_assertion_id',
+       'candidate_state',
+       'candidate_state_fingerprint',
+       'evidence_assertion_id',
+       'evidence_assertion_fingerprint',
+       'trust_class',
+       'policy_ruleset_version'
+     ]::text[])<>'{}'::jsonb
+     or v_plan->>'operation_key'<>
+          'registry.external_identifier_assertion.admit'
+     or coalesce((v_plan->>'operation_version')::integer,0)<>1
+     or v_plan->>'future_assertion_id'<>v_target.subject_id::text
+     or v_plan->>'policy_ruleset_version'<>
+          'registry-external-identifier-admission-v1'
+     or v_candidate->>'subject_type'<>'work'
+  then
+    raise exception using errcode='42501',
+      message='Work external identifier execution plan is malformed.';
+  end if;
+
+  select assertion.*
+  into v_evidence
+  from platform_private.registry_evidence_assertions assertion
+  where assertion.id=(v_plan->>'evidence_assertion_id')::uuid;
+
+  if not found
+     or v_evidence.subject_type<>'external_identifier_assertion'
+     or v_evidence.subject_id<>v_target.subject_id
+     or v_evidence.claim_key<>'registry.external_identifier_assertion.admit'
+     or v_evidence.trust_class<>'INTERNAL_FACT'
+     or v_evidence.source_kind<>'retained_registry_metadata'
+     or v_evidence.assertion_fingerprint<>
+          v_plan->>'evidence_assertion_fingerprint'
+     or v_evidence.claim_payload<>v_candidate
+  then
+    raise exception using errcode='42501',
+      message='Bound Work external identifier evidence no longer satisfies the exact plan.';
+  end if;
+
+  v_work_id:=(v_candidate->>'subject_id')::uuid;
+  v_scheme:=v_candidate->>'scheme_key';
+  v_source:=v_candidate->>'source_value';
+  v_comparison:=v_candidate->>'comparison_value';
+
+  perform 1
+  from public.registry_works work
+  where work.id=v_work_id
+    and work.status<>'archived'
+  for update;
+
+  if not found then
+    raise exception using errcode='P0002',
+      message='Registry Work is missing or archived.';
+  end if;
+
+  v_current_candidate:=
+    platform_private.registry_work_external_identifier_candidate_state_v1(
+      v_work_id,
+      v_scheme,
+      v_source
+    );
+
+  v_current_candidate_fingerprint:=
+    encode(
+      extensions.digest(v_current_candidate::text,'sha256'),
+      'hex'
+    );
+
+  if v_current_candidate_fingerprint<>
+       v_plan->>'candidate_state_fingerprint'
+     or v_current_candidate->>'candidate_state'<>
+          'deterministic_candidate'
+     or coalesce(
+          (v_current_candidate->>'canonical_entity_count')::integer,
+          0
+        )<>1
+     or coalesce(
+          (v_current_candidate->>'conflicting_current_assertion_count')::integer,
+          0
+        )<>0
+  then
+    raise exception using errcode='P0001',
+      message='WK_STALE_WORK_EXTERNAL_IDENTIFIER_CANDIDATE: retained Work provider identity changed after review.';
+  end if;
+
+  v_existing_assertion_id:=
+    platform_private.registry_work_external_identifier_existing_v1(
+      v_work_id,
+      v_scheme,
+      v_comparison
+    );
+
+  if v_existing_assertion_id is not null then
+    raise exception using errcode='23505',
+      message='An equivalent current Work external identifier assertion already exists.';
+  end if;
+
+  insert into public.registry_external_identifier_assertions (
+    id,
+    work_id,
+    scheme_key,
+    source_value,
+    comparison_value,
+    assertion_status,
+    evidence_assertion_id
+  )
+  values (
+    v_target.subject_id,
+    v_work_id,
+    v_scheme,
+    v_source,
+    v_comparison,
+    'candidate',
+    v_evidence.id
+  )
+  returning * into v_inserted;
+
+  insert into public.registry_canonical_write_events (
+    registry_entity_type,
+    registry_entity_id,
+    source_suggestion_id,
+    source_table,
+    field_name,
+    target_path,
+    before_value,
+    after_value,
+    action,
+    status,
+    actor
+  )
+  values (
+    'work',
+    v_work_id::text,
+    v_evidence.id::text,
+    'platform_private.registry_evidence_assertions',
+    'external_identifier.'||v_scheme,
+    'public.registry_external_identifier_assertions',
+    null,
+    to_jsonb(v_inserted),
+    'admit_external_identifier_assertion',
+    'succeeded',
+    'system:registry_external_identifier_admin'
+  )
+  returning id into v_event_id;
+
+  insert into platform_private.registry_operation_write_events (
+    operation_id,
+    canonical_write_event_id
+  )
+  values (
+    v_operation.id,
+    v_event_id
+  );
+
+  update platform_private.registry_mutation_operations
+  set
+    affected_rows=1,
+    status='succeeded',
+    verifier_status='pending',
+    result_payload=jsonb_build_object(
+      'external_identifier_assertion_id',v_inserted.id,
+      'canonical_subject_type','work',
+      'canonical_subject_id',v_work_id,
+      'scheme_key',v_scheme,
+      'source_value',v_source,
+      'comparison_value',v_comparison,
+      'assertion_status',v_inserted.assertion_status,
+      'evidence_assertion_id',v_evidence.id,
+      'canonical_write_event_id',v_event_id
+    ),
+    completed_at=now(),
+    updated_at=now()
+  where id=v_operation.id;
+
+  operation_id:=v_operation.id;
+  operation_status:='succeeded';
+  verifier_status:='pending';
+  idempotent_replay:=v_begin.idempotent_replay;
+  return next;
+end
+$execute$;
