@@ -11,6 +11,7 @@ import {
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { trackMusicProvenanceEvent } from "@/services/analytics";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import {
   getMusicCreditInvite,
@@ -67,6 +68,19 @@ export default function CreditInvitePage() {
         inviteRef,
         mode,
         reason.trim() || null,
+      );
+      trackMusicProvenanceEvent(
+        mode === "accepted"
+          ? "credit_confirmation_completed"
+          : mode === "disputed"
+            ? "credit_disputed"
+            : "credit_confirmation_completed",
+        {
+          surface: "credit_invite",
+          subjectKind:
+            invite.subject?.kind,
+          outcome: mode,
+        },
       );
       const refreshed = await getMusicCreditInvite(inviteRef);
       setInvite(refreshed);
