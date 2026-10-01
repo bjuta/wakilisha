@@ -246,6 +246,53 @@ if (
   );
 }
 
+const compiledJavascript =
+  javascriptFiles
+    .map(
+      (filename) =>
+        fs.readFileSync(
+          path.join(
+            distAssetsPath,
+            filename,
+          ),
+          "utf8",
+        ),
+    )
+    .join("\n");
+
+for (
+  const eventName
+  of [
+    "credits_section_viewed",
+    "credits_expanded",
+    "contributor_opened",
+    "provenance_opened",
+    "credit_claim_started",
+    "credit_confirmation_completed",
+    "credit_disputed",
+  ]
+) {
+  if (
+    !compiledJavascript.includes(
+      eventName,
+    )
+  ) {
+    fail(
+      `compiled application is missing provenance event ${eventName}`,
+    );
+  }
+}
+
+if (
+  !compiledJavascript.includes(
+    "music_provenance",
+  )
+) {
+  fail(
+    "compiled application is missing the bounded music provenance analytics surface marker",
+  );
+}
+
 console.log(
   `GA4 build-output audit passed: entry=${entryFilename}`,
 );
