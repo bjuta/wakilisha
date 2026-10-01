@@ -118,6 +118,9 @@ describe("Creator cohort Work provider resolution", () => {
       'value === "--resume-log"',
     );
     expect(runner).toContain(
+      "V1 apply mode requires an explicit --limit",
+    );
+    expect(runner).toContain(
       "PLAN ONLY: no provider calls and no Registry mutation performed.",
     );
     expect(runner).toContain(
