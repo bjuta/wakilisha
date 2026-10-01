@@ -79,6 +79,33 @@ describe("MIZIZI Admin workspace", () => {
     expect(service).toContain(
       "admin_record_music_provenance_contribution_review_decision_v1",
     );
+    expect(service).toContain(
+      "buildMusicProvenanceProjectionRefreshPlan",
+    );
+    expect(service).toContain(
+      '"public_content_read"',
+    );
+    expect(service).toContain(
+      '"person_music_credits"',
+    );
+    expect(service).toContain(
+      '"artist_music"',
+    );
+    expect(service).toContain(
+      '"seo_metadata"',
+    );
+    expect(service).toContain(
+      '"prerender"',
+    );
+    expect(service).toContain(
+      '"sitemap"',
+    );
+    expect(service).toContain(
+      "dependencyFanout",
+    );
+    expect(page).toContain(
+      "provenanceContext: context",
+    );
 
     expect(page).not.toContain("Candidate payload");
     expect(page).not.toContain("Source payload");
