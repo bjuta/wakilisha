@@ -2910,6 +2910,20 @@ describe("MIZIZI Slice 2 Gate B Pure Public Read", () => {
     ).toBe(false);
   });
 
+  it("declares public-content-read as a public Edge endpoint", () => {
+    const config = read("supabase/config.toml");
+    const source = read(
+      "supabase/functions/public-content-read/index.ts",
+    );
+
+    expect(source).toContain(
+      "public API, no JWT required",
+    );
+    expect(config).toMatch(
+      /\[functions\.public-content-read\]\s*\nverify_jwt = false/,
+    );
+  });
+
   it("keeps public Registry reads free of direct canonical Registry DML", () => {
     const directRegistryMutation =
       /\.from\(\s*["']registry_[^"']+["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s;
