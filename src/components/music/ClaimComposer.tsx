@@ -1,19 +1,21 @@
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
 import { Sheet } from "@/components/design-system/primitives/Sheet";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkIcon } from "@/components/design-system/Icon";
-import { useTrackSearchData, type TrackSearchItem } from "@/hooks/useTrackSearchData";
 import {
   createMusicCreditInvitation,
   createMyMusicCreditAttestation,
+  getMusicCreditTrackById,
   getPublicTrackProvenanceById,
+  listMusicCreditTracks,
   searchMusicCreditPeople,
+  searchMusicCreditTracks,
   type MusicCreditPersonCandidate,
+  type MusicCreditTrackCandidate,
 } from "@/services/musicProvenance";
 
 const RECORDING_ROLES = [
@@ -55,7 +57,7 @@ function TrackResult({
   selected,
   onSelect,
 }: {
-  track: TrackSearchItem;
+  track: MusicCreditTrackCandidate;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -110,13 +112,14 @@ export function ClaimComposer({
   initialTrackId?: string | null;
   onSaved?: () => void | Promise<void>;
 }) {
-  const {
-    data: tracks,
-    loading: tracksLoading,
-  } = useTrackSearchData(open);
-
+  const [tracks, setTracks] =
+    useState<MusicCreditTrackCandidate[]>([]);
+  const [tracksLoading, setTracksLoading] =
+    useState(false);
   const [trackQuery, setTrackQuery] = useState("");
   const [selectedTrackId, setSelectedTrackId] = useState("");
+  const [selectedTrack, setSelectedTrack] =
+    useState<MusicCreditTrackCandidate | null>(null);
   const [layer, setLayer] = useState<CreditLayer>("recording");
   const [selectedWorkId, setSelectedWorkId] = useState("");
   const [linkedWorks, setLinkedWorks] = useState<Array<{ id: string; title: string }>>([]);
@@ -137,10 +140,17 @@ export function ClaimComposer({
   const [message, setMessage] =
     useState<{ type: "success" | "error"; text: string } | null>(null);
   const [sharePath, setSharePath] = useState<string | null>(null);
+  const trackSearchSequence = useRef(0);
   const personSearchSequence = useRef(0);
 
   useEffect(() => {
     if (!open) return;
+
+    const requestId =
+      ++trackSearchSequence.current;
+    const requestedTrackId =
+      initialTrackId?.trim() || "";
+
     setMessage(null);
     setSharePath(null);
     setLayer("recording");
@@ -154,30 +164,147 @@ export function ClaimComposer({
     setUnlistedName("");
     setAskForConfirmation(true);
     setSelectedWorkId("");
-    setSelectedTrackId(initialTrackId || "");
+    setTrackQuery("");
+    setTracks([]);
+    setSelectedTrack(null);
+    setSelectedTrackId(
+      requestedTrackId,
+    );
+    setTracksLoading(true);
+
+    const loadTracks = requestedTrackId
+      ? getMusicCreditTrackById(
+          requestedTrackId,
+        ).then((track) => {
+          if (
+            trackSearchSequence.current !==
+            requestId
+          ) {
+            return;
+          }
+
+          if (track) {
+            setSelectedTrack(track);
+            setSelectedTrackId(track.id);
+            setTrackQuery(track.title);
+            setTracks([track]);
+          } else {
+            setSelectedTrackId("");
+            return listMusicCreditTracks().then(
+              (items) => {
+                if (
+                  trackSearchSequence.current ===
+                  requestId
+                ) {
+                  setTracks(items);
+                }
+              },
+            );
+          }
+        })
+      : listMusicCreditTracks().then(
+          (items) => {
+            if (
+              trackSearchSequence.current ===
+              requestId
+            ) {
+              setTracks(items);
+            }
+          },
+        );
+
+    void loadTracks
+      .catch(() => {
+        if (
+          trackSearchSequence.current ===
+          requestId
+        ) {
+          setTracks([]);
+        }
+      })
+      .finally(() => {
+        if (
+          trackSearchSequence.current ===
+          requestId
+        ) {
+          setTracksLoading(false);
+        }
+      });
+
+    return () => {
+      if (
+        trackSearchSequence.current ===
+        requestId
+      ) {
+        trackSearchSequence.current += 1;
+      }
+    };
   }, [initialTrackId, open]);
 
-  const selectedTrack =
-    tracks.find((track) => track.id === selectedTrackId) ?? null;
-
   useEffect(() => {
-    if (!open || !initialTrackId || !selectedTrack) return;
-    if (!trackQuery) setTrackQuery(selectedTrack.title);
-  }, [initialTrackId, open, selectedTrack, trackQuery]);
+    if (!open) return;
 
-  const visibleTracks = useMemo(() => {
-    const needle = trackQuery.trim().toLowerCase();
-    if (!needle) {
-      if (selectedTrack) return [selectedTrack];
-      return tracks.slice(0, 8);
+    const needle = trackQuery.trim();
+
+    if (
+      selectedTrack &&
+      needle === selectedTrack.title
+    ) {
+      setTracks([selectedTrack]);
+      setTracksLoading(false);
+      return;
     }
 
-    return tracks
-      .filter((track) =>
-        (track.title + " " + track.artist).toLowerCase().includes(needle),
+    if (!needle) return;
+
+    const requestId =
+      ++trackSearchSequence.current;
+    setTracksLoading(true);
+
+    const timer = window.setTimeout(() => {
+      void searchMusicCreditTracks(
+        needle,
       )
-      .slice(0, 8);
-  }, [selectedTrack, trackQuery, tracks]);
+        .then((items) => {
+          if (
+            trackSearchSequence.current ===
+            requestId
+          ) {
+            setTracks(items);
+          }
+        })
+        .catch(() => {
+          if (
+            trackSearchSequence.current ===
+            requestId
+          ) {
+            setTracks([]);
+          }
+        })
+        .finally(() => {
+          if (
+            trackSearchSequence.current ===
+            requestId
+          ) {
+            setTracksLoading(false);
+          }
+        });
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timer);
+      if (
+        trackSearchSequence.current ===
+        requestId
+      ) {
+        trackSearchSequence.current += 1;
+      }
+    };
+  }, [
+    open,
+    selectedTrack,
+    trackQuery,
+  ]);
 
   useEffect(() => {
     let alive = true;
@@ -278,21 +405,21 @@ export function ClaimComposer({
         type: "error",
         text:
           linkedWorks.length === 0
-            ? "This recording does not yet have a verified Work record to claim against."
-            : "Choose the Work this songwriting credit belongs to.",
+            ? "We don’t have a songwriting record linked to this recording yet."
+            : "Choose which songwriting record this credit belongs to.",
       });
       return;
     }
 
     if (contributorMode === "person" && !selectedPerson) {
-      setMessage({ type: "error", text: "Choose the Person you are crediting." });
+      setMessage({ type: "error", text: "Choose who this credit belongs to." });
       return;
     }
 
     if (contributorMode === "unlisted" && !unlistedName.trim()) {
       setMessage({
         type: "error",
-        text: "Enter the credited name before creating an invite.",
+        text: "Enter their name first.",
       });
       return;
     }
@@ -341,20 +468,20 @@ export function ClaimComposer({
           setMessage({
             type: "success",
             text:
-              "Claim saved. Share this private confirmation link yourself — WAKILISHA will not contact them automatically.",
+              "Credit saved. Share the private confirmation link with them.",
           });
         } else {
           setMessage({
             type: "success",
             text:
-              "Claim saved. The selected WAKILISHA user received a confirmation request in Notifications.",
+              "Credit saved. We sent them a confirmation request.",
           });
         }
       } else {
         setMessage({
           type: "success",
           text:
-            "Claim saved as evidence. It is not public unless it is separately admitted into the canonical Registry.",
+            "Credit saved. It isn’t public yet.",
         });
       }
 
@@ -365,7 +492,7 @@ export function ClaimComposer({
         text:
           error instanceof Error
             ? error.message
-            : "We could not save this credit claim.",
+            : "We couldn’t save this credit.",
       });
     } finally {
       setSubmitting(false);
@@ -410,14 +537,9 @@ export function ClaimComposer({
       }
     >
       <div className="space-y-7">
-        <div>
-          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
-            Open response first
-          </div>
-          <p className="mt-2 text-[13px] leading-6 text-[var(--wk-text-muted)]">
-            Tell WAKILISHA what happened. We do not show you a hidden metadata guess first.
-          </p>
-        </div>
+        <p className="text-[13px] leading-6 text-[var(--wk-text-muted)]">
+          Choose the recording, add the role, and tell us who the credit belongs to.
+        </p>
 
         {message ? (
           <div
@@ -467,15 +589,17 @@ export function ClaimComposer({
               <p className="text-[11px] font-semibold text-[var(--wk-text-muted)]">
                 Loading recordings…
               </p>
-            ) : visibleTracks.length ? (
-              visibleTracks.map((track) => (
+            ) : tracks.length ? (
+              tracks.map((track) => (
                 <TrackResult
                   key={track.id}
                   track={track}
                   selected={track.id === selectedTrackId}
                   onSelect={() => {
+                    setSelectedTrack(track);
                     setSelectedTrackId(track.id);
                     setTrackQuery(track.title);
+                    setTracks([track]);
                   }}
                 />
               ))
@@ -489,12 +613,12 @@ export function ClaimComposer({
 
         <section>
           <h3 className="text-[12px] font-black text-[var(--wk-text)]">
-            2. Recording credit or songwriting credit?
+            2. What kind of credit is this?
           </h3>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {([
               ["recording", "Recording"],
-              ["work", "Songwriting / Work"],
+              ["work", "Songwriting"],
             ] as const).map(([value, label]) => (
               <button
                 key={value}
@@ -543,7 +667,7 @@ export function ClaimComposer({
                 ))
               ) : selectedTrackId ? (
                 <p className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 py-3 text-[11px] leading-5 text-[var(--wk-text-muted)]">
-                  No verified Work is linked to this recording yet. WAKILISHA will not invent a Work from the title.
+                  We don’t have a songwriting record linked to this recording yet. You can still add a recording credit.
                 </p>
               ) : null}
             </div>
@@ -632,7 +756,7 @@ export function ClaimComposer({
                   setPersonQuery(event.target.value);
                   setSelectedPerson(null);
                 }}
-                placeholder="Search a public Person"
+                placeholder="Search by name"
                 autoComplete="off"
                 className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)]"
               />
@@ -678,7 +802,7 @@ export function ClaimComposer({
                 className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[13px] text-[var(--wk-text)]"
               />
               <p className="mt-2 text-[11px] leading-5 text-[var(--wk-text-muted)]">
-                WAKILISHA keeps this as an unresolved credited name. It does not create a fake Person.
+                We’ll keep this name with the credit. It won’t create a WAKILISHA profile.
               </p>
             </div>
           ) : null}
@@ -696,7 +820,7 @@ export function ClaimComposer({
                   Ask them to confirm
                 </span>
                 <span className="mt-1 block text-[10px] leading-4 text-[var(--wk-text-muted)]">
-                  Existing users get a WAKILISHA Notification. For anyone else, you share the private link yourself.
+                  People on WAKILISHA get a notification. Otherwise, we’ll give you a private link to share.
                 </span>
               </span>
               <span
