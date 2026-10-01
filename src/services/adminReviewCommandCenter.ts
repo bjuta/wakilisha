@@ -155,6 +155,7 @@ export type RegistryReviewDecisionInput = {
   resolutionPayload?: Record<string, unknown>;
   expectedTrackStateFingerprint?: string;
   expectedProvenanceContextFingerprint?: string;
+  provenanceContext?: MusicProvenanceContributionReviewContext;
 };
 
 export type PublicMusicIdentityTrackReviewContext = {
@@ -210,6 +211,93 @@ export type MusicProvenanceContributionReviewContext = {
   canAdmit: boolean;
   existingDecision: Record<string, unknown> | null;
 };
+
+export type MusicProvenanceProjectionRefreshPlan = {
+  version: 1;
+  trigger: "canonical_contribution_admitted";
+  subjects: Array<{
+    kind:
+      | "track"
+      | "work"
+      | "person"
+      | "organization"
+      | "artist";
+    id: string;
+  }>;
+  projections: Array<
+    | "public_content_read"
+    | "public_track_or_work"
+    | "person_music_credits"
+    | "artist_music"
+    | "seo_metadata"
+    | "prerender"
+    | "sitemap"
+  >;
+  dependencyFanout:
+    "resolve_from_canonical_graph";
+};
+
+export function buildMusicProvenanceProjectionRefreshPlan(
+  context: MusicProvenanceContributionReviewContext,
+): MusicProvenanceProjectionRefreshPlan {
+  const subjects:
+    MusicProvenanceProjectionRefreshPlan["subjects"] = [
+      {
+        kind: context.subjectType,
+        id: context.subjectId,
+      },
+    ];
+
+  const addSubject = (
+    kind:
+      MusicProvenanceProjectionRefreshPlan["subjects"][number]["kind"],
+    id: string | null,
+  ) => {
+    const clean = id?.trim();
+    if (!clean) return;
+    if (
+      subjects.some(
+        (subject) =>
+          subject.kind === kind &&
+          subject.id === clean,
+      )
+    ) {
+      return;
+    }
+    subjects.push({ kind, id: clean });
+  };
+
+  addSubject(
+    "person",
+    context.proposedPersonResourceId,
+  );
+  addSubject(
+    "organization",
+    context.proposedOrganizationResourceId,
+  );
+  addSubject(
+    "artist",
+    context.proposedArtistId,
+  );
+
+  return {
+    version: 1,
+    trigger:
+      "canonical_contribution_admitted",
+    subjects,
+    projections: [
+      "public_content_read",
+      "public_track_or_work",
+      "person_music_credits",
+      "artist_music",
+      "seo_metadata",
+      "prerender",
+      "sitemap",
+    ],
+    dependencyFanout:
+      "resolve_from_canonical_graph",
+  };
+}
 
 export type ReviewCommandCenterData = {
   totals: {
@@ -502,9 +590,31 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
 export async function recordRegistryReviewDecision(input: RegistryReviewDecisionInput): Promise<void> {
   const item = input.item;
   const notes = input.notes.trim();
-  const resolutionPayload = { decisionType: input.decisionType, notes, ...(input.resolutionPayload ?? {}) };
+  let resolutionPayload = {
+    decisionType: input.decisionType,
+    notes,
+    ...(input.resolutionPayload ?? {}),
+  };
 
   if (isMusicProvenanceContributionReview(item)) {
+    if (
+      input.decisionType ===
+        "music_provenance_admit_contribution"
+    ) {
+      if (!input.provenanceContext) {
+        throw new Error(
+          "Reload this contribution review before admitting a canonical contribution.",
+        );
+      }
+
+      resolutionPayload = {
+        ...resolutionPayload,
+        projectionRefresh:
+          buildMusicProvenanceProjectionRefreshPlan(
+            input.provenanceContext,
+          ),
+      };
+    }
     const expectedContextFingerprint =
       input.expectedProvenanceContextFingerprint?.trim();
 
