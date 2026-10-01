@@ -1,4 +1,6 @@
 import { deepDecode } from "@/utils/decodeHtmlEntities";
+import type { PublicMusicContribution, PublicProvenanceReceipt, PublicTrackWorkProvenance } from "@/services/publicApi/types";
+import { getPublicTrackProvenanceById } from "@/services/musicProvenance";
 import { withPlaceholderImage } from "@/utils/imagePlaceholders";
 import { supabase } from "@/lib/supabase";
 import { resolvePublicContentApiBase } from "@/services/publicContent/runtimeBase";
@@ -90,6 +92,34 @@ export type PublicLabel = {
   artistImageUrl?: string | null;
 };
 
+export type PublicReleaseArtist = {
+  artistId: string;
+  name: string;
+  slug: string;
+  isPrimary: boolean;
+  isFeatured: boolean;
+  creditOrder: number;
+  artistType: string | null;
+};
+
+export type PublicReleaseTrackProvenance = {
+  trackId: string;
+  trackSlug: string;
+  artistSlug: string;
+  title: string;
+  artworkUrl: string;
+  recordingContributions: PublicMusicContribution[];
+  works: PublicTrackWorkProvenance[];
+  provenanceReceipt: PublicProvenanceReceipt | null;
+};
+
+export type PublicReleaseMusicProvenance = {
+  tracks: PublicReleaseTrackProvenance[];
+  recordingCreditCount: number;
+  workCreditCount: number;
+  hasCanonicalCredits: boolean;
+};
+
 export type PublicReleaseDetail = PublicRelease & {
   releaseDate: string;
   labelSlug: string;
@@ -108,6 +138,8 @@ export type PublicReleaseDetail = PublicRelease & {
     appleMusicCatalogId?: string | null;
   }>;
   metadata: Record<string, unknown>;
+  artists: PublicReleaseArtist[];
+  musicProvenance: PublicReleaseMusicProvenance;
   featuredArtists: Array<{ name: string; slug: string; imageUrl?: string | null }>;
   chartStats?: {
     totalChartAppearances: number;
@@ -115,6 +147,89 @@ export type PublicReleaseDetail = PublicRelease & {
     totalWeeksOnChart: number;
   } | null;
 };
+
+async function loadReleaseMusicProvenance(
+  tracks: PublicReleaseDetail["tracks"],
+): Promise<PublicReleaseMusicProvenance> {
+  const trackPayloads = await Promise.all(
+    tracks.map(async (track) => {
+      try {
+        const payload =
+          await getPublicTrackProvenanceById(
+            track.id,
+          );
+
+        return {
+          trackId: track.id,
+          trackSlug: track.slug,
+          artistSlug: track.artistSlug,
+          title: track.title,
+          artworkUrl: track.artworkUrl,
+          recordingContributions:
+            Array.isArray(
+              payload?.recordingContributions,
+            )
+              ? payload.recordingContributions as PublicMusicContribution[]
+              : [],
+          works:
+            Array.isArray(payload?.works)
+              ? payload.works as PublicTrackWorkProvenance[]
+              : [],
+          provenanceReceipt:
+            payload?.provenanceReceipt &&
+            typeof payload.provenanceReceipt ===
+              "object"
+              ? payload.provenanceReceipt as PublicProvenanceReceipt
+              : null,
+        };
+      } catch (error) {
+        console.warn(
+          `Release provenance lookup failed for Track ${track.id}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+
+        return {
+          trackId: track.id,
+          trackSlug: track.slug,
+          artistSlug: track.artistSlug,
+          title: track.title,
+          artworkUrl: track.artworkUrl,
+          recordingContributions: [],
+          works: [],
+          provenanceReceipt: null,
+        };
+      }
+    }),
+  );
+
+  const recordingCreditCount =
+    trackPayloads.reduce(
+      (sum, track) =>
+        sum +
+        track.recordingContributions.length,
+      0,
+    );
+  const workCreditCount =
+    trackPayloads.reduce(
+      (sum, track) =>
+        sum +
+        track.works.reduce(
+          (workSum, work) =>
+            workSum +
+            work.contributions.length,
+          0,
+        ),
+      0,
+    );
+
+  return {
+    tracks: trackPayloads,
+    recordingCreditCount,
+    workCreditCount,
+    hasCanonicalCredits:
+      recordingCreditCount > 0 ||
+      workCreditCount > 0,
+  };
+}
 
 export type PublicVideoProviderSource = {
   sourceId: string;
@@ -1393,7 +1508,83 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
     .from("registry_release_artists")
     .select("artist_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order, confidence")
     .eq("release_id", releaseId)
-    .eq("status", "active");
+    .eq("status", "active")
+    .order("credit_order", { ascending: true });
+
+  const releaseArtistIds = [
+    ...new Set(
+      (releaseArtistRows || [])
+        .map((row) =>
+          String(row.artist_id || "").trim(),
+        )
+        .filter(Boolean),
+    ),
+  ];
+
+  const { data: releaseArtistEntities } =
+    releaseArtistIds.length > 0
+      ? await supabase
+          .from("registry_artists")
+          .select("id, artist_type")
+          .in("id", releaseArtistIds)
+          .eq("status", "active")
+      : { data: [] };
+
+  const artistTypeById = new Map(
+    (releaseArtistEntities || []).map(
+      (artist) => [
+        String(artist.id),
+        String(artist.artist_type || ""),
+      ],
+    ),
+  );
+
+  const releaseArtists: PublicReleaseArtist[] =
+    (releaseArtistRows || [])
+      .map((row) => ({
+        artistId: String(
+          row.artist_id || "",
+        ),
+        name: String(
+          row.artist_name_text ||
+          row.artist_slug ||
+          "",
+        ),
+        slug: String(
+          row.artist_slug || "",
+        ),
+        isPrimary: Boolean(
+          row.is_primary,
+        ),
+        isFeatured: Boolean(
+          row.is_featured,
+        ),
+        creditOrder:
+          Number.isFinite(
+            Number(row.credit_order),
+          )
+            ? Number(row.credit_order)
+            : 999,
+        artistType:
+          artistTypeById.get(
+            String(row.artist_id || ""),
+          ) || null,
+      }))
+      .filter(
+        (artist) =>
+          Boolean(
+            artist.name &&
+            artist.slug,
+          ),
+      )
+      .sort(
+        (a, b) =>
+          a.creditOrder -
+            b.creditOrder ||
+          a.artistId.localeCompare(
+            b.artistId,
+          ),
+      );
 
   const primaryReleaseArtist =
     selectPrimaryReleaseArtistCredit(
@@ -1568,6 +1759,10 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
 
   const rawFeaturedArtists = allRawFeatured;
   const featuredArtists = await batchResolveArtistImages(rawFeaturedArtists);
+  const musicProvenance =
+    await loadReleaseMusicProvenance(
+      tracks,
+    );
 
   return {
     id: releaseRow.id,
@@ -1590,6 +1785,8 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
       tracklistSource: "registry_release_tracks",
       artworkSource: releaseRow.artwork_url ? "registry_releases" : "generated",
     },
+    artists: releaseArtists,
+    musicProvenance,
     featuredArtists,
   };
 }
@@ -1608,6 +1805,19 @@ export async function getRelease(artistSlug: string, releaseSlug: string): Promi
       ...track,
       artworkUrl: image(track.artworkUrl, { id: track.id, slug: track.slug, name: track.title, type: "track" }),
     })),
+    artists:
+      Array.isArray(
+        result.release.artists,
+      )
+        ? result.release.artists
+        : [],
+    musicProvenance:
+      result.release.musicProvenance &&
+      typeof result.release.musicProvenance === "object"
+        ? result.release.musicProvenance
+        : await loadReleaseMusicProvenance(
+            result.release.tracks || [],
+          ),
     featuredArtists: result.release.featuredArtists || [],
     chartStats: (result.release as any).chartStats || null,
   };
