@@ -254,7 +254,7 @@ describe("Music Work provider evidence audit", () => {
     );
   });
 
-  it("keeps Spotify as recording corroboration rather than Work authority", () => {
+  it("keeps Spotify as opt-in recording corroboration rather than Work authority", () => {
     expect(
       manifest.providers.spotify
         .workEvidenceStrength,
@@ -269,6 +269,19 @@ describe("Music Work provider evidence audit", () => {
             "work_contributor",
       ),
     ).toBe(false);
+
+    const spotifyPlan = plan(
+      "work-evidence-only",
+      "spotify",
+    );
+
+    expect(
+      spotifyPlan.providers[0].selected,
+    ).toEqual([]);
+    expect(
+      spotifyPlan.providers[0]
+        .optionalAvailable.length,
+    ).toBeGreaterThan(0);
   });
 
   it("exposes Work-specific sources and identifiers", () => {
