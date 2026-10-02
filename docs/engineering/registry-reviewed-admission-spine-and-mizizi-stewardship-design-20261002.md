@@ -226,6 +226,29 @@ UPC/provider identity and exact Artist-scoped Release relationships remain stron
 
 This converges new creation with the historical MIZIZI Release-slug stewardship direction rather than creating a second URL grammar.
 
+### Artist-scoped Track slug invariant
+
+The same route-scoping rule applies to Tracks.
+
+Canonical public Track routes are Artist-scoped:
+
+`/tracks/{artist-slug}/{track-slug}`
+
+Discography must therefore not create Track slugs that redundantly append the Artist slug inside `track-slug`.
+
+The affected 2 October ingest proved the current stale path still produced values such as:
+
+- `jiji-sofresh-254`;
+- `sheng-sofresh-254`;
+- `254-sofresh-254`;
+- `nairobi-a-z-sofresh-254`.
+
+For the reviewed admission path, the canonical Track slug candidate is the clean recording-title identity within Artist scope, subject to the existing Track collision/recording-identity rules.
+
+This does not authorize collapsing genuinely distinct recordings that share a title. ISRC, reviewed credits, recording identity evidence, and collision policy continue to control identity resolution.
+
+The first Discography consumer must therefore converge both new Release and new Track slug creation onto the already-earned artist-scoped public-identity model before activation.
+
 ## 7. Primitive D — frozen typed admission plan
 
 A reviewed domain workflow converts one immutable observation plus one exhaustive review decision set into one immutable typed operation graph.
