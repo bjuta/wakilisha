@@ -26,6 +26,7 @@ const intakeDrawerPath = "src/components/admin/registry/artist-discography/Artis
 const discographyPanelPath = "src/pages/admin/registry/artists/detail/components/DiscographyPanel.tsx";
 const artistDetailPath = "src/pages/admin/registry/artists/detail/page.tsx";
 const manifestPath = "scripts/control-plane/registry-privileged-writer-manifest.json";
+const reviewedAdmissionMigrationPath = "supabase/migrations/20261002162223_discography_review_publication_convergence_v1.sql";
 
 const provider = read(providerPath);
 const governedBroker = read(governedBrokerPath);
@@ -37,6 +38,7 @@ const intakeDrawer = read(intakeDrawerPath);
 const discographyPanel = read(discographyPanelPath);
 const artistDetail = read(artistDetailPath);
 const manifest = JSON.parse(read(manifestPath));
+const reviewedAdmissionMigration = read(reviewedAdmissionMigrationPath);
 const writers = Array.isArray(manifest.writers) ? manifest.writers : [];
 
 // Provider credentials may exist only in the evidence-acquisition boundary.
@@ -187,6 +189,26 @@ forbidText(intakeDrawer, 'supabase.functions.invoke(', intakeDrawerPath);
 requireText(discographyPanel, 'artistId: string', discographyPanelPath);
 requireText(discographyPanel, 'artistId={artistId}', discographyPanelPath);
 requireText(artistDetail, 'artistId={artist.id}', artistDetailPath);
+
+// Reviewed Registry Admission Spine must remain exhaustive, active-ingest,
+// artist-scoped, and MIZIZI-sentry guarded.
+for (const fragment of [
+  "Every observed Release requires one explicit Discography review decision.",
+  "registry.draft_identity.reconcile",
+  "registry.track.activate",
+  "registry.release.activate",
+  "active_ingest_v1",
+  "mizizi_private.registry_reviewed_admission_sentry_v1",
+  "accepted_release_not_active",
+  "accepted_track_not_active",
+]) {
+  requireText(reviewedAdmissionMigration, fragment, reviewedAdmissionMigrationPath);
+}
+forbidText(
+  reviewedAdmissionMigration,
+  "|| v_artist_slug",
+  reviewedAdmissionMigrationPath,
+);
 
 const brokerWriter = writers.find((row) => row.id === "ingest-artist-discography");
 if (!brokerWriter) {
