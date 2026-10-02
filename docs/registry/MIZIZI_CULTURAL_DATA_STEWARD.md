@@ -923,3 +923,34 @@ staged path for:
 MIZIZI remains a steward of Registry authority, not a competing source of
 truth. Admin remains the exception handler rather than the routine provenance
 operator.
+
+## Reviewed admission spine and stewardship expansion — design authority, 2 October 2026
+
+The binding design authority for MIZIZI's next stewardship expansion is:
+
+`docs/engineering/registry-reviewed-admission-spine-and-mizizi-stewardship-design-20261002.md`
+
+This design was earned by a real Production Discography ingest that preserved provider evidence but exposed three control-plane gaps: accepting review defaults without explicit per-Release decisions, successful parent finalization while newly admitted recordings remained draft, and new Release identity creation that could still carry provider packaging in canonical slugs.
+
+The design expands MIZIZI from a bounded hygiene agent toward the permanent Registry integrity steward.
+
+The expansion is intentionally asymmetric:
+
+- **standing power is broad for observation, audit, diagnosis, finding classification, review materialization, repair planning, authority-drift detection, and pre/post-finalization invariant checks;**
+- **canonical mutation remains narrow, typed, evidence-bound, target-bounded, independently verified, independently disableable, and autonomously executable only for operation families whose safety has been explicitly earned.**
+
+MIZIZI should become powerful enough to notice systemic Registry drift before a human encounters it, explain the violated invariant, block invalid workflow finalization, compile the exact repair plan, and execute deterministic accepted repair families through governed authority.
+
+MIZIZI must not become an ambient service-role superuser or a competing source of cultural truth.
+
+The standing rule remains:
+
+> **MIZIZI may be maximally informed and maximally capable of safe orchestration without being maximally privileged to mutate.**
+
+Human review remains authoritative for ambiguous cultural meaning, disputed identity, rights/ownership/splits, and any mutation family that has not earned autonomy.
+
+The first consumer of the new design is the Discography review/publication convergence branch and canonical forward migration:
+
+`20261002162223_discography_review_publication_convergence_v1.sql`
+
+This checkpoint is design authority only until the implementation passes clean Preview replay, permanent verifier acceptance, protected CI, protected-main merge, and Production promotion.
