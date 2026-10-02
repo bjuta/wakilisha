@@ -1217,6 +1217,143 @@
       "publicCallable": false,
       "canonicalMutation": true,
       "legacyDebt": false
+    },
+    {
+      "id": "music-work-resolver",
+      "kind": "edge_function",
+      "entrypoint": "supabase/functions/music-work-resolver/index.ts",
+      "authentication": "request_bearer_user",
+      "authorization": "manage_registry",
+      "executionAuthority": "service_role_provider_observation_only_plus_caller_jwt_typed_work_external_identifier_and_track_work_operations",
+      "targets": [
+        "registry_evidence_assertions",
+        "registry_works",
+        "registry_external_identifier_assertions",
+        "registry_track_work_links",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "high",
+      "disposition": "keep",
+      "futureBoundary": "provider_observation_plus_existing_typed_work_authorities",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-create-registry-work-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_create_registry_work_v1(uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_orchestrator_over_external_or_reviewed_evidence_exact_grant_and_independent_verifier",
+      "targets": [
+        "registry_works",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "high",
+      "disposition": "keep",
+      "futureBoundary": "typed_registry_work_creation",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-track-work-link-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_track_work_link_v1(uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_orchestrator_over_external_or_reviewed_evidence_exact_grant_and_independent_verifier",
+      "targets": [
+        "registry_track_work_links",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "high",
+      "disposition": "keep",
+      "futureBoundary": "typed_recording_to_work_relationship_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-external-identifier-candidate-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_external_identifier_candidate_v1(text,uuid,text,text)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_orchestrator_over_retained_provider_identifier_exact_grant_and_independent_verifier",
+      "targets": [
+        "registry_external_identifier_assertions",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "typed_external_identifier_assertion_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-work-external-identifier-candidate-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_work_external_identifier_candidate_v1(uuid,text,text)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_work_adapter_over_registry_external_identifier_admin_exact_grant_and_independent_verifier",
+      "targets": [
+        "registry_external_identifier_assertions",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "typed_work_external_identifier_assertion_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-work-provider-observation-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_work_provider_observation_v1(uuid,uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_composition_over_existing_work_external_identifier_and_track_work_exact_grant_operations",
+      "targets": [
+        "registry_works",
+        "registry_external_identifier_assertions",
+        "registry_track_work_links",
+        "registry_canonical_write_events",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "high",
+      "disposition": "keep",
+      "futureBoundary": "provider_observation_composition_without_generic_work_writer",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
     }
   ]
 }

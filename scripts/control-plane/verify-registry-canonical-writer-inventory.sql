@@ -33,7 +33,7 @@ begin
     select *
     from public_api
     where definition ~
-      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres))'
+      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|works|track_work_links|external_identifier_assertions|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres))'
   ),
   private_executor_bridges as (
     select *
@@ -46,7 +46,7 @@ begin
     from public_api
     where definition ~ '(^|[^a-z0-9_])execute[[:space:]]'
       and definition ~
-        'registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres)'
+        'registry_(artists|tracks|releases|works|track_work_links|external_identifier_assertions|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres)'
   ),
   mutation_graph(signature, proname, definition, anon_execute, authenticated_execute) as (
     select signature, proname, definition, anon_execute, authenticated_execute
@@ -84,11 +84,15 @@ begin
     values
       ('public.accept_registry_missing_artist_intake(uuid,text)'),
       ('public.admin_activate_registry_track_intake_v1(uuid)'),
+      ('public.admin_admit_registry_external_identifier_candidate_v1(text,uuid,text,text)'),
       ('public.admin_admit_registry_track_intake_release_profile_v1(uuid,uuid,boolean)'),
       ('public.admin_admit_registry_track_intake_track_profile_v1(uuid,uuid,boolean)'),
       ('public.admin_admit_registry_track_isrc_projection_v1(uuid,uuid)'),
       ('public.admin_admit_registry_track_primary_from_release_v1(uuid,uuid,uuid,text)'),
       ('public.admin_admit_registry_track_provider_link_v1(uuid,text,text,text,text[],text,text,text,text,integer,text,text,numeric,text,jsonb)'),
+      ('public.admin_admit_registry_track_work_link_v1(uuid)'),
+      ('public.admin_admit_registry_work_external_identifier_candidate_v1(uuid,text,text)'),
+      ('public.admin_admit_registry_work_provider_observation_v1(uuid,uuid)'),
       ('public.admin_apply_artist_decouple_decision(uuid)'),
       ('public.admin_apply_chart_artist_resolution_decision(uuid)'),
       ('public.admin_apply_registry_track_duplicate_repair(uuid,uuid[],text,boolean)'),
@@ -97,6 +101,7 @@ begin
       ('public.admin_create_registry_artist_intake_shell_v1(uuid)'),
       ('public.admin_create_registry_discography_artist_shell_v1(uuid,text)'),
       ('public.admin_create_registry_track_intake_identity_v1(uuid,text)'),
+      ('public.admin_create_registry_work_v1(uuid)'),
       ('public.admin_execute_registry_artist_enrichment_evidence_admission(uuid)'),
       ('public.admin_execute_registry_artist_origin_admission(uuid,text,numeric,text,text,text,timestamp with time zone)'),
       ('public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb)'),
@@ -160,7 +165,7 @@ begin
     select *
     from public_api
     where definition ~
-      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres))'
+      '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public[.](registry_(artists|tracks|releases|works|track_work_links|external_identifier_assertions|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres))'
   ),
   private_executor_bridges as (
     select *
@@ -173,7 +178,7 @@ begin
     from public_api
     where definition ~ '(^|[^a-z0-9_])execute[[:space:]]'
       and definition ~
-        'registry_(artists|tracks|releases|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres)'
+        'registry_(artists|tracks|releases|works|track_work_links|external_identifier_assertions|track_artists|release_artists|release_tracks|artist_aliases|entity_relationships|relationship_evidence|track_provider_links|labels|genres)'
   ),
   mutation_graph(signature, proname, definition, anon_execute, authenticated_execute) as (
     select signature, proname, definition, anon_execute, authenticated_execute
@@ -226,7 +231,10 @@ begin
   foreach v_table in array array[
     'public.registry_artist_aliases',
     'public.registry_track_provider_links',
-    'public.registry_relationship_evidence'
+    'public.registry_relationship_evidence',
+    'public.registry_works',
+    'public.registry_track_work_links',
+    'public.registry_external_identifier_assertions'
   ]
   loop
     foreach v_role in array array[
