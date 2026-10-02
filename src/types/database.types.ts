@@ -20390,6 +20390,10 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_finalize_verified_artist_claim_persona_v1: {
+        Args: { p_claim_id: string; p_reason: string }
+        Returns: Json
+      }
       admin_get_artist_decouple_decisions: {
         Args: { p_source_type?: string }
         Returns: Json
