@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20261002114451_creator_claim_person_artist_composition_v1.sql",
+  "migration_sha256": "1afe320b7e0f828b1792a4e7015f7608d30b77aa294ee92ed1402da62c2a72fc",
+  "base_main_sha": "62baa4a256319f09783cd7810bef09abd54c3c8e",
+  "preview_project_ref": "ehyaavmomgnzycdbkhvi",
+  "preview_branch_id": "e02244af-a683-4b31-9eb3-86ff99104034",
+  "preview_migration_head": "20261002114451",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-creator-claim-persona-composition-v1.sql",
+  "schema_types_sha256": "1e55c7f479b9de2cd7952df6112d654d02285ffa24bedffd034a7f0b9213ae20",
+  "schema_migration_count": 197,
+  "schema_migration_head": "20261002114451",
+  "verified_at": "2026-10-02T12:46:12Z"
+}
