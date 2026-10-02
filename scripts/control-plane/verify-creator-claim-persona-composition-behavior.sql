@@ -188,7 +188,7 @@ begin
 
   v_strong_submission :=
     public.community_submit_new_artist_claim(
-      'Claim Persona Strong Fixture',
+      'Claim Persona Strong Fixture C611 20261002',
       'solo',
       'KE',
       array[]::text[],
@@ -273,7 +273,7 @@ begin
 
   v_weak_submission :=
     public.community_submit_new_artist_claim(
-      'Claim Persona Weak Fixture',
+      'Claim Persona Weak Fixture C613 20261002',
       'solo',
       'KE',
       array[]::text[],
