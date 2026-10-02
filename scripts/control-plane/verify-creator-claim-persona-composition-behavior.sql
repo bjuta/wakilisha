@@ -77,7 +77,18 @@ values
   'Claim Persona Weak Reviewer','active',
   '{"fixture":"creator_claim_persona"}'::jsonb,true,
   'claimpersonaweakreviewer','claimpersonaweakreviewer'
-);
+)
+on conflict (user_id)
+do update
+set
+  email=excluded.email,
+  display_name=excluded.display_name,
+  status='active',
+  metadata=excluded.metadata,
+  is_public=true,
+  username=excluded.username,
+  username_normalized=excluded.username_normalized,
+  updated_at=now();
 
 select editorial.create_person_for_identity(
   '00000000-0000-4000-8000-00000000c611'::uuid,
