@@ -2431,3 +2431,872 @@ begin
 end
 $$;
 
+
+
+-- ---------------------------------------------------------------------------
+-- Discography execution composition.
+-- ---------------------------------------------------------------------------
+
+create or replace function
+public.admin_execute_registry_discography_evidence_v1(
+  p_artist_id uuid,
+  p_evidence_assertion_id uuid,
+  p_reviewed_selections jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=pg_catalog,public,platform_private,auth
+as $$
+declare
+  v_user_id uuid;
+  v_review_plan_id uuid;
+  v_review platform_private.registry_discography_review_plans%rowtype;
+  v_master platform_private.registry_evidence_assertions%rowtype;
+  v_child jsonb;
+  v_payload jsonb;
+  v_operation_key text;
+  v_subject_type text;
+  v_subject_id uuid;
+  v_child_ref text;
+  v_idempotency_key text;
+  v_grant_id uuid;
+  v_evidence_id uuid;
+  v_evidence platform_private.registry_evidence_assertions%rowtype;
+  v_grant_plan jsonb;
+  v_expected_state text;
+  v_max_rows integer;
+  v_execution record;
+  v_verification record;
+  v_receipts jsonb:='[]'::jsonb;
+  v_errors jsonb:='[]'::jsonb;
+  v_child_operation_ids jsonb:='[]'::jsonb;
+  v_parent_plan jsonb;
+  v_parent_idempotency text;
+begin
+  v_user_id:=platform_private.registry_discography_current_admin_v1();
+
+  v_review_plan_id:=
+    platform_private.freeze_registry_discography_review_plan_v1(
+      p_artist_id,p_evidence_assertion_id,p_reviewed_selections
+    );
+
+  select review.*
+  into v_review
+  from platform_private.registry_discography_review_plans review
+  where review.id=v_review_plan_id
+    and review.reviewed_by_user_id=v_user_id;
+
+  select assertion.*
+  into v_master
+  from platform_private.registry_evidence_assertions assertion
+  where assertion.id=v_review.evidence_assertion_id;
+
+  for v_child in
+    select value
+    from jsonb_array_elements(v_review.frozen_plan->'operations')
+    with ordinality as operation(value,ordinality)
+    order by ordinality
+  loop
+    begin
+      v_operation_key:=v_child->>'operation_key';
+      v_subject_type:=v_child->>'subject_type';
+      v_subject_id:=(v_child->>'subject_id')::uuid;
+      v_child_ref:=v_child->>'ref';
+      v_payload:=v_child->'payload';
+
+      v_idempotency_key:=
+        platform_private.registry_discography_idempotency_key_v1(
+          v_review.id,v_child_ref
+        );
+
+      v_grant_id:=null;
+
+      select execution_grant.id
+      into v_grant_id
+      from platform_private.registry_execution_grants execution_grant
+      where execution_grant.actor_key='registry_discography_admin'
+        and execution_grant.operation_key=v_operation_key
+        and execution_grant.operation_version=1
+        and execution_grant.idempotency_key=v_idempotency_key;
+
+      if v_grant_id is null then
+        if v_child->>'kind'='materialization' then
+          v_evidence_id:=
+            platform_private.record_registry_discography_derived_evidence_v1(
+              v_review.id,
+              v_subject_type,
+              v_subject_id,
+              case v_operation_key
+                when 'registry.release.create'
+                  then 'registry.release.identity.create'
+                when 'registry.track.create'
+                  then 'registry.track.identity.create'
+                else 'registry.artist.identity.create'
+              end,
+              v_payload,
+              'EXTERNAL_EVIDENCE'
+            );
+
+          select assertion.*
+          into v_evidence
+          from platform_private.registry_evidence_assertions assertion
+          where assertion.id=v_evidence_id;
+
+          if v_operation_key='registry.release.create' then
+            v_grant_plan:=jsonb_build_object(
+              'operation_key',v_operation_key,
+              'operation_version',1,
+              'release_id',v_subject_id,
+              'title',v_payload->>'title',
+              'normalized_title',v_payload->>'normalized_title',
+              'slug',v_payload->>'slug',
+              'upc',nullif(v_payload->>'upc',''),
+              'identity_artist_id',
+                (v_payload->>'identity_artist_id')::uuid,
+              'collision_state_fingerprint',
+                v_payload->>'collision_state_fingerprint',
+              'evidence_assertion_id',v_evidence.id,
+              'evidence_assertion_fingerprint',
+                v_evidence.assertion_fingerprint,
+              'trust_class',v_evidence.trust_class,
+              'policy_ruleset_version','registry-materialization-v1'
+            );
+          else
+            v_grant_plan:=jsonb_build_object(
+              'operation_key',v_operation_key,
+              'operation_version',1,
+              'track_id',v_subject_id,
+              'title',v_payload->>'title',
+              'normalized_title',v_payload->>'normalized_title',
+              'slug',v_payload->>'slug',
+              'isrc',nullif(v_payload->>'isrc',''),
+              'identity_artist_id',
+                (v_payload->>'identity_artist_id')::uuid,
+              'collision_state_fingerprint',
+                v_payload->>'collision_state_fingerprint',
+              'evidence_assertion_id',v_evidence.id,
+              'evidence_assertion_fingerprint',
+                v_evidence.assertion_fingerprint,
+              'trust_class',v_evidence.trust_class,
+              'policy_ruleset_version','registry-materialization-v1'
+            );
+          end if;
+
+          v_grant_id:=
+            platform_private.issue_registry_discography_user_execution_grant_v1(
+              v_evidence.id,
+              v_operation_key,
+              v_subject_type,
+              v_subject_id,
+              v_grant_plan,
+              v_idempotency_key,
+              1
+            );
+
+        elsif v_child->>'kind' in (
+          'identity_reconciliation','lifecycle'
+        ) then
+          v_expected_state:=
+            platform_private.registry_subject_state_fingerprint(
+              v_subject_type,v_subject_id
+            );
+
+          if v_expected_state is null then
+            raise exception using errcode='40001',
+              message='Frozen reviewed-admission target does not exist at execution time.';
+          end if;
+
+          v_grant_plan:=jsonb_build_object(
+            'operation_key',v_operation_key,
+            'operation_version',1,
+            'review_plan_id',v_review.id,
+            'child_ref',v_child_ref,
+            'expected_state_fingerprint',v_expected_state,
+            'evidence_assertion_id',v_master.id,
+            'evidence_assertion_fingerprint',
+              v_master.assertion_fingerprint,
+            'trust_class',v_master.trust_class,
+            'policy_ruleset_version',
+              case
+                when v_child->>'kind'='identity_reconciliation'
+                  then 'registry-reviewed-admission-identity-v1'
+                else 'registry-reviewed-lifecycle-v1'
+              end,
+            'child_payload_fingerprint',
+              platform_private.registry_discography_observation_fingerprint_v1(
+                v_payload
+              )
+          );
+
+          v_grant_id:=
+            platform_private.issue_registry_reviewed_admission_grant_v1(
+              v_master.id,
+              v_operation_key,
+              v_subject_type,
+              v_subject_id,
+              v_grant_plan,
+              v_idempotency_key
+            );
+
+        else
+          v_expected_state:=
+            platform_private.registry_subject_state_fingerprint(
+              v_subject_type,v_subject_id
+            );
+
+          if v_expected_state is null then
+            raise exception using errcode='40001',
+              message='Frozen Discography child target does not exist at execution time.';
+          end if;
+
+          v_max_rows:=case
+            when v_operation_key in (
+              'registry.release_artist_set.replace',
+              'registry.release_track_set.replace',
+              'registry.track_artist_credit_set.replace'
+            )
+              then greatest((v_payload->>'total_rows')::integer,1)
+            else 1
+          end;
+
+          v_grant_plan:=jsonb_build_object(
+            'operation_key',v_operation_key,
+            'operation_version',1,
+            'review_plan_id',v_review.id,
+            'child_ref',v_child_ref,
+            'expected_state_fingerprint',v_expected_state,
+            'evidence_assertion_id',v_master.id,
+            'evidence_assertion_fingerprint',
+              v_master.assertion_fingerprint,
+            'trust_class',v_master.trust_class,
+            'policy_ruleset_version','registry-discography-exact-set-v1',
+            'child_payload_fingerprint',
+              platform_private.registry_discography_observation_fingerprint_v1(
+                v_payload
+              ),
+            'current_set_fingerprint',
+              v_payload->>'current_set_fingerprint',
+            'final_set_fingerprint',
+              v_payload->>'final_set_fingerprint',
+            'removed_rows',
+              case
+                when v_payload->>'removed_rows' is null then null
+                else (v_payload->>'removed_rows')::integer
+              end,
+            'inserted_rows',
+              case
+                when v_payload->>'inserted_rows' is null then null
+                else (v_payload->>'inserted_rows')::integer
+              end,
+            'total_rows',
+              case
+                when v_payload->>'total_rows' is null then null
+                else (v_payload->>'total_rows')::integer
+              end
+          );
+
+          v_grant_id:=
+            platform_private.issue_registry_discography_user_execution_grant_v1(
+              v_master.id,
+              v_operation_key,
+              v_subject_type,
+              v_subject_id,
+              v_grant_plan,
+              v_idempotency_key,
+              v_max_rows
+            );
+        end if;
+      end if;
+
+      if v_child->>'kind'='materialization' then
+        select *
+        into v_execution
+        from platform_private.execute_registry_materialization_v1(
+          'registry_discography_admin',v_grant_id
+        );
+
+        select *
+        into v_verification
+        from platform_private.verify_registry_materialization_v1(
+          v_execution.operation_id
+        );
+
+      elsif v_child->>'kind'='identity_reconciliation' then
+        select *
+        into v_execution
+        from platform_private.execute_registry_reviewed_identity_reconciliation_v1(
+          'registry_discography_admin',v_grant_id
+        );
+
+        select *
+        into v_verification
+        from platform_private.verify_registry_reviewed_identity_reconciliation_v1(
+          v_execution.operation_id
+        );
+
+      elsif v_child->>'kind'='lifecycle' then
+        select *
+        into v_execution
+        from platform_private.execute_registry_reviewed_lifecycle_v1(
+          'registry_discography_admin',v_grant_id
+        );
+
+        select *
+        into v_verification
+        from platform_private.verify_registry_reviewed_lifecycle_v1(
+          v_execution.operation_id
+        );
+
+      else
+        select *
+        into v_execution
+        from platform_private.execute_registry_discography_operation_v1(
+          v_grant_id
+        );
+
+        select *
+        into v_verification
+        from platform_private.verify_registry_discography_operation_v1(
+          v_execution.operation_id
+        );
+      end if;
+
+      if v_verification.verifier_status<>'passed' then
+        raise exception using errcode='40001',
+          message='Independent reviewed Discography child verification failed.';
+      end if;
+
+      v_receipts:=v_receipts||jsonb_build_array(
+        jsonb_build_object(
+          'ref',v_child_ref,
+          'operation_key',v_operation_key,
+          'operation_id',v_execution.operation_id,
+          'verifier_status',v_verification.verifier_status,
+          'idempotent_replay',v_execution.idempotent_replay
+        )
+      );
+
+      v_child_operation_ids:=
+        v_child_operation_ids||to_jsonb(v_execution.operation_id::text);
+
+    exception when others then
+      v_errors:=v_errors||to_jsonb(v_child_ref||': '||sqlerrm);
+    end;
+  end loop;
+
+  if jsonb_array_length(v_errors)=0 then
+    begin
+      v_parent_idempotency:=
+        platform_private.registry_discography_idempotency_key_v1(
+          v_review.id,'parent.apply'
+        );
+
+      v_grant_id:=null;
+
+      select execution_grant.id
+      into v_grant_id
+      from platform_private.registry_execution_grants execution_grant
+      where execution_grant.actor_key='registry_discography_admin'
+        and execution_grant.operation_key='registry.discography.apply'
+        and execution_grant.operation_version=1
+        and execution_grant.idempotency_key=v_parent_idempotency;
+
+      if v_grant_id is null then
+        v_expected_state:=
+          platform_private.registry_subject_state_fingerprint(
+            'artist',p_artist_id
+          );
+
+        v_parent_plan:=jsonb_build_object(
+          'operation_key','registry.discography.apply',
+          'operation_version',1,
+          'artist_id',p_artist_id,
+          'review_plan_id',v_review.id,
+          'child_operation_ids',v_child_operation_ids,
+          'expected_state_fingerprint',v_expected_state,
+          'evidence_assertion_id',v_master.id,
+          'evidence_assertion_fingerprint',v_master.assertion_fingerprint,
+          'trust_class',v_master.trust_class,
+          'policy_ruleset_version','registry-discography-exact-set-v1'
+        );
+
+        v_grant_id:=
+          platform_private.issue_registry_discography_user_execution_grant_v1(
+            v_master.id,
+            'registry.discography.apply',
+            'artist',
+            p_artist_id,
+            v_parent_plan,
+            v_parent_idempotency,
+            1
+          );
+      end if;
+
+      select *
+      into v_execution
+      from platform_private.execute_registry_discography_operation_v1(
+        v_grant_id
+      );
+
+      select *
+      into v_verification
+      from platform_private.verify_registry_discography_operation_v1(
+        v_execution.operation_id
+      );
+
+      if v_verification.verifier_status<>'passed' then
+        raise exception using errcode='40001',
+          message='Discography parent receipt verification failed.';
+      end if;
+
+      v_receipts:=v_receipts||jsonb_build_array(
+        jsonb_build_object(
+          'ref','parent.apply',
+          'operation_key','registry.discography.apply',
+          'operation_id',v_execution.operation_id,
+          'verifier_status',v_verification.verifier_status,
+          'idempotent_replay',v_execution.idempotent_replay
+        )
+      );
+
+    exception when others then
+      v_errors:=v_errors||to_jsonb('parent.apply: '||sqlerrm);
+    end;
+  end if;
+
+  return jsonb_build_object(
+    'summary',
+      (v_review.frozen_plan->'summary')
+      || jsonb_build_object(
+        'operations',v_receipts,
+        'errors',v_errors
+      )
+  );
+end
+$$;
+
+
+-- ---------------------------------------------------------------------------
+-- MIZIZI terminal sentry.
+--
+-- MIZIZI receives broad read authority over the frozen review result and may
+-- veto parent finalization. It does not receive ambient canonical table writes.
+-- ---------------------------------------------------------------------------
+
+create function
+mizizi_private.registry_reviewed_admission_sentry_v1(
+  p_review_plan_id uuid
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path=pg_catalog,public,platform_private,mizizi_private
+as $$
+declare
+  v_review platform_private.registry_discography_review_plans%rowtype;
+  v_snapshot platform_private.registry_discography_provider_snapshots%rowtype;
+  v_reviewed_count integer;
+  v_observed_count integer;
+  v_accepted_count integer;
+  v_left_count integer;
+  v_release_count integer;
+  v_track_count integer;
+  v_active_release_count integer;
+  v_active_track_count integer;
+  v_blockers jsonb:='[]'::jsonb;
+  v_operation jsonb;
+  v_expected_slug text;
+  v_actual_slug text;
+  v_subject_id uuid;
+begin
+  select review.*
+  into v_review
+  from platform_private.registry_discography_review_plans review
+  where review.id=p_review_plan_id;
+
+  if not found
+     or platform_private.registry_discography_observation_fingerprint_v1(
+          v_review.frozen_plan
+        )<>v_review.frozen_plan_fingerprint
+  then
+    return jsonb_build_object(
+      'status','block',
+      'blockers',jsonb_build_array('review_plan_integrity_mismatch')
+    );
+  end if;
+
+  select snapshot.*
+  into v_snapshot
+  from platform_private.registry_discography_provider_snapshots snapshot
+  where snapshot.id=v_review.snapshot_id
+    and snapshot.artist_id=v_review.artist_id;
+
+  if not found
+     or platform_private.registry_discography_observation_fingerprint_v1(
+          v_snapshot.observation
+        )<>v_snapshot.observation_fingerprint
+  then
+    return jsonb_build_object(
+      'status','block',
+      'blockers',jsonb_build_array('provider_snapshot_integrity_mismatch')
+    );
+  end if;
+
+  v_observed_count:=jsonb_array_length(v_snapshot.observation->'albums');
+  v_reviewed_count:=jsonb_array_length(v_review.reviewed_selections);
+
+  select
+    count(*) filter (where selection->>'action'<>'ignore')::integer,
+    count(*) filter (where selection->>'action'='ignore')::integer
+  into v_accepted_count,v_left_count
+  from jsonb_array_elements(v_review.reviewed_selections) selection;
+
+  if v_reviewed_count<>v_observed_count
+     or (
+       select count(distinct selection->>'apple_music_id')
+       from jsonb_array_elements(v_review.reviewed_selections) selection
+     )<>v_observed_count
+  then
+    v_blockers:=v_blockers||
+      to_jsonb('review_decision_set_not_exhaustive');
+  end if;
+
+  select count(*)::integer
+  into v_release_count
+  from jsonb_array_elements(v_review.frozen_plan->'operations') operation
+  where operation->>'operation_key'=
+        'registry.release.provider_profile.admit';
+
+  if v_release_count<>v_accepted_count then
+    v_blockers:=v_blockers||
+      to_jsonb('accepted_release_operation_count_mismatch');
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(v_review.reviewed_selections) selection
+    where selection->>'action'='ignore'
+      and exists (
+        select 1
+        from jsonb_array_elements(v_review.frozen_plan->'operations') operation
+        where operation->>'operation_key'=
+              'registry.release.provider_profile.admit'
+          and operation#>>'{payload,apple_music_album_id}'=
+              selection->>'apple_music_id'
+      )
+  ) then
+    v_blockers:=v_blockers||
+      to_jsonb('left_release_escaped_into_canonical_plan');
+  end if;
+
+  select count(*)::integer
+  into v_active_release_count
+  from (
+    select distinct (operation->>'subject_id')::uuid as release_id
+    from jsonb_array_elements(v_review.frozen_plan->'operations') operation
+    where operation->>'operation_key'=
+          'registry.release.provider_profile.admit'
+  ) accepted
+  join public.registry_releases release
+    on release.id=accepted.release_id
+   and release.status='active';
+
+  if v_active_release_count<>v_release_count then
+    v_blockers:=v_blockers||
+      to_jsonb('accepted_release_not_active');
+  end if;
+
+  select count(*)::integer
+  into v_track_count
+  from (
+    select distinct (operation->>'subject_id')::uuid as track_id
+    from jsonb_array_elements(v_review.frozen_plan->'operations') operation
+    where operation->>'operation_key'=
+          'registry.track.provider_profile.admit'
+  ) accepted;
+
+  select count(*)::integer
+  into v_active_track_count
+  from (
+    select distinct (operation->>'subject_id')::uuid as track_id
+    from jsonb_array_elements(v_review.frozen_plan->'operations') operation
+    where operation->>'operation_key'=
+          'registry.track.provider_profile.admit'
+  ) accepted
+  join public.registry_tracks track
+    on track.id=accepted.track_id
+   and track.status='active';
+
+  if v_active_track_count<>v_track_count then
+    v_blockers:=v_blockers||
+      to_jsonb('accepted_track_not_active');
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(v_review.frozen_plan->'operations') operation
+    where operation->>'operation_key'=
+          'registry.release.provider_profile.admit'
+      and not exists (
+        select 1
+        from public.registry_release_tracks membership
+        join public.registry_tracks track
+          on track.id=membership.track_id
+         and track.status='active'
+        where membership.release_id=(operation->>'subject_id')::uuid
+          and membership.status<>'archived'
+      )
+  ) then
+    v_blockers:=v_blockers||
+      to_jsonb('accepted_release_has_no_active_track_membership');
+  end if;
+
+  -- Any reviewed draft-identity repair must be visible in the final active
+  -- canonical row. This covers both the historical broken shells and new
+  -- provider-packaged Release shells before first activation.
+  for v_operation in
+    select value
+    from jsonb_array_elements(v_review.frozen_plan->'operations')
+    where value->>'operation_key'='registry.draft_identity.reconcile'
+    order by value->>'ref'
+  loop
+    v_subject_id:=(v_operation->>'subject_id')::uuid;
+    v_expected_slug:=v_operation#>>'{payload,canonical_slug}';
+
+    if v_operation->>'subject_type'='track' then
+      select track.slug
+      into v_actual_slug
+      from public.registry_tracks track
+      where track.id=v_subject_id
+        and track.status='active';
+    else
+      select release.slug
+      into v_actual_slug
+      from public.registry_releases release
+      where release.id=v_subject_id
+        and release.status='active';
+    end if;
+
+    if v_actual_slug is distinct from v_expected_slug then
+      v_blockers:=v_blockers||
+        to_jsonb(
+          'reconciled_identity_not_canonical:'||
+          (v_operation->>'subject_type')||':'||
+          v_subject_id::text
+        );
+    end if;
+  end loop;
+
+  if jsonb_array_length(v_blockers)>0 then
+    return jsonb_build_object(
+      'status','block',
+      'rule_id','reviewed_registry_admission_terminal_integrity',
+      'rule_version','1.0.0',
+      'review_plan_id',v_review.id,
+      'observed',v_observed_count,
+      'reviewed',v_reviewed_count,
+      'accepted',v_accepted_count,
+      'left',v_left_count,
+      'active_releases',v_active_release_count,
+      'active_tracks',v_active_track_count,
+      'blockers',v_blockers
+    );
+  end if;
+
+  return jsonb_build_object(
+    'status','pass',
+    'rule_id','reviewed_registry_admission_terminal_integrity',
+    'rule_version','1.0.0',
+    'review_plan_id',v_review.id,
+    'observed',v_observed_count,
+    'reviewed',v_reviewed_count,
+    'accepted',v_accepted_count,
+    'left',v_left_count,
+    'active_releases',v_active_release_count,
+    'active_tracks',v_active_track_count,
+    'blockers','[]'::jsonb
+  );
+end
+$$;
+
+
+-- Wrap the accepted Discography verifier so MIZIZI can veto parent
+-- finalization without changing the domain-specific child verifiers.
+
+alter function
+  platform_private.verify_registry_discography_operation_v1(uuid)
+rename to verify_registry_discography_operation_core_v1;
+
+create function
+platform_private.verify_registry_discography_operation_v1(
+  p_operation_id uuid
+)
+returns table (
+  operation_id uuid,
+  verifier_status text
+)
+language plpgsql
+security definer
+set search_path=pg_catalog,public,platform_private,mizizi_private
+as $$
+declare
+  v_operation platform_private.registry_mutation_operations%rowtype;
+  v_grant platform_private.registry_execution_grants%rowtype;
+  v_sentry jsonb;
+  v_core record;
+begin
+  select operation.*
+  into v_operation
+  from platform_private.registry_mutation_operations operation
+  where operation.id=p_operation_id;
+
+  if not found then
+    raise exception using errcode='P0002',
+      message='Discography operation not found.';
+  end if;
+
+  if v_operation.operation_key='registry.discography.apply' then
+    select execution_grant.*
+    into v_grant
+    from platform_private.registry_execution_grants execution_grant
+    where execution_grant.id=v_operation.execution_grant_id;
+
+    if not found then
+      raise exception using errcode='42501',
+        message='Discography parent execution grant is missing.';
+    end if;
+
+    v_sentry:=
+      mizizi_private.registry_reviewed_admission_sentry_v1(
+        (v_grant.plan_payload->>'review_plan_id')::uuid
+      );
+
+    if v_sentry->>'status'<>'pass' then
+      update platform_private.registry_mutation_operations
+      set
+        verifier_status='failed',
+        error_code='mizizi_reviewed_admission_terminal_block',
+        error_message=coalesce(v_sentry->'blockers','[]'::jsonb)::text,
+        result_payload=
+          result_payload||
+          jsonb_build_object(
+            'mizizi_terminal_sentry',v_sentry
+          ),
+        updated_at=now()
+      where id=v_operation.id;
+
+      operation_id:=v_operation.id;
+      verifier_status:='failed';
+      return next;
+      return;
+    end if;
+  end if;
+
+  select *
+  into v_core
+  from platform_private.verify_registry_discography_operation_core_v1(
+    p_operation_id
+  );
+
+  if v_operation.operation_key='registry.discography.apply'
+     and v_core.verifier_status='passed'
+  then
+    update platform_private.registry_mutation_operations
+    set
+      result_payload=
+        result_payload||
+        jsonb_build_object(
+          'mizizi_terminal_sentry',v_sentry
+        ),
+      updated_at=now()
+    where id=v_operation.id;
+  end if;
+
+  operation_id:=v_core.operation_id;
+  verifier_status:=v_core.verifier_status;
+  return next;
+end
+$$;
+
+
+create or replace function
+public.admin_verify_registry_discography_operation_v1(
+  p_operation_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=pg_catalog,public,platform_private,auth
+as $$
+declare
+  v_user_id uuid;
+  v_operation platform_private.registry_mutation_operations%rowtype;
+  v_grant platform_private.registry_execution_grants%rowtype;
+  v_result record;
+begin
+  v_user_id:=platform_private.registry_discography_current_admin_v1();
+
+  select operation.*
+  into v_operation
+  from platform_private.registry_mutation_operations operation
+  where operation.id=p_operation_id
+    and operation.actor_key='registry_discography_admin';
+
+  if not found then
+    raise exception using errcode='P0002',
+      message='Discography operation not found.';
+  end if;
+
+  select execution_grant.*
+  into v_grant
+  from platform_private.registry_execution_grants execution_grant
+  where execution_grant.id=v_operation.execution_grant_id
+    and execution_grant.issued_by_user_id=v_user_id;
+
+  if not found then
+    raise exception using errcode='42501',
+      message='Discography operation belongs to another principal.';
+  end if;
+
+  if v_operation.operation_key in (
+    'registry.artist.create',
+    'registry.track.create',
+    'registry.release.create'
+  ) then
+    select *
+    into v_result
+    from platform_private.verify_registry_materialization_v1(
+      p_operation_id
+    );
+  elsif v_operation.operation_key='registry.draft_identity.reconcile' then
+    select *
+    into v_result
+    from platform_private.verify_registry_reviewed_identity_reconciliation_v1(
+      p_operation_id
+    );
+  elsif v_operation.operation_key in (
+    'registry.track.activate',
+    'registry.release.activate'
+  ) then
+    select *
+    into v_result
+    from platform_private.verify_registry_reviewed_lifecycle_v1(
+      p_operation_id
+    );
+  else
+    select *
+    into v_result
+    from platform_private.verify_registry_discography_operation_v1(
+      p_operation_id
+    );
+  end if;
+
+  return jsonb_build_object(
+    'operation_id',v_result.operation_id,
+    'verifier_status',v_result.verifier_status
+  );
+end
+$$;
+
