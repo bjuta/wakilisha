@@ -48,6 +48,17 @@ values
   'https://example.invalid/archived-artist.jpg',
   'archived',
   '{"fixture":"artist_studio_registry_entry"}'::jsonb
+),
+(
+  '00000000-0000-4000-8000-00000000a504'::uuid,
+  'artist-studio-evidence-guard-fixture',
+  'Artist Studio Evidence Guard Fixture',
+  'artist studio evidence guard fixture',
+  'solo',
+  'KE',
+  null,
+  'needs_review',
+  '{"fixture":"artist_studio_registry_entry"}'::jsonb
 );
 
 insert into auth.users (
@@ -195,6 +206,8 @@ declare
     '00000000-0000-4000-8000-00000000a501'::uuid;
   v_resolution_target constant uuid :=
     '00000000-0000-4000-8000-00000000a502'::uuid;
+  v_evidence_guard_artist constant uuid :=
+    '00000000-0000-4000-8000-00000000a504'::uuid;
 
   v_review_before integer;
   v_review_after integer;
@@ -208,11 +221,17 @@ declare
   v_resolution jsonb;
   v_creation jsonb;
   v_workspace jsonb;
+  v_evidence_guard_submission jsonb;
+  v_evidence_guard_rejection jsonb;
   v_resolved_claim_id uuid;
+  v_evidence_guard_claim_id uuid;
   v_created_claim_id uuid;
   v_created_artist_id uuid;
   v_created_artist_slug text;
   v_exact_rejected boolean := false;
+  v_empty_existing_rejected boolean := false;
+  v_empty_proposed_rejected boolean := false;
+  v_missing_evidence_verification_rejected boolean := false;
 begin
   select count(*)::integer
   into v_review_before
@@ -286,6 +305,10 @@ begin
       )
     );
 
+  delete from public.artist_claim_evidence
+  where claim_id =
+        (v_existing_claim->>'claim_id')::uuid;
+
   v_existing_replay :=
     public.community_submit_artist_claim(
       v_draft_artist,
@@ -317,6 +340,16 @@ begin
          and claim.status =
              'pending'
      ) <> 1
+     or (
+       select count(*)
+       from public.artist_claim_evidence evidence
+       where evidence.claim_id =
+             (v_existing_claim->>'claim_id')::uuid
+         and evidence.evidence_type =
+             'official_social'
+         and evidence.reference =
+             'https://example.invalid/artist-studio-draft-proof'
+     ) <> 1
   then
     raise exception
       'ARTIST_STUDIO_BEHAVIOR_FAIL: existing Artist claim retry is not idempotent';
@@ -337,6 +370,86 @@ begin
     raise exception
       'ARTIST_STUDIO_BEHAVIOR_FAIL: draft Artist claim state is not representation-aware';
   end if;
+
+  begin
+    perform public.community_submit_artist_claim(
+      v_evidence_guard_artist,
+      'artist',
+      'I am the Artist and can verify this Registry identity.',
+      '[]'::jsonb
+    );
+
+    raise exception
+      'ARTIST_STUDIO_BEHAVIOR_FAIL: existing Artist claim accepted no evidence';
+  exception
+    when others then
+      if sqlerrm = 'claim_evidence_required' then
+        v_empty_existing_rejected := true;
+      elsif sqlerrm like 'ARTIST_STUDIO_BEHAVIOR_FAIL:%' then
+        raise;
+      else
+        raise exception
+          'ARTIST_STUDIO_BEHAVIOR_FAIL: existing Artist evidence requirement failed for the wrong reason: %',
+          sqlerrm;
+      end if;
+  end;
+
+  if not v_empty_existing_rejected then
+    raise exception
+      'ARTIST_STUDIO_BEHAVIOR_FAIL: existing Artist claim evidence requirement did not fail closed';
+  end if;
+
+  begin
+    perform public.community_submit_new_artist_claim(
+      'Artist Studio Evidence Required Proposed Fixture',
+      'solo',
+      'KE',
+      array[]::text[],
+      'artist',
+      'I am the Artist and can verify this proposed identity.',
+      '[]'::jsonb
+    );
+
+    raise exception
+      'ARTIST_STUDIO_BEHAVIOR_FAIL: proposed Artist claim accepted no evidence';
+  exception
+    when others then
+      if sqlerrm = 'claim_evidence_required' then
+        v_empty_proposed_rejected := true;
+      elsif sqlerrm like 'ARTIST_STUDIO_BEHAVIOR_FAIL:%' then
+        raise;
+      else
+        raise exception
+          'ARTIST_STUDIO_BEHAVIOR_FAIL: proposed Artist evidence requirement failed for the wrong reason: %',
+          sqlerrm;
+      end if;
+  end;
+
+  if not v_empty_proposed_rejected then
+    raise exception
+      'ARTIST_STUDIO_BEHAVIOR_FAIL: proposed Artist claim evidence requirement did not fail closed';
+  end if;
+
+  v_evidence_guard_submission :=
+    public.community_submit_artist_claim(
+      v_evidence_guard_artist,
+      'artist',
+      'I am the Artist and can verify this Registry identity.',
+      jsonb_build_array(
+        jsonb_build_object(
+          'type',
+            'official_website',
+          'reference',
+            'https://example.invalid/evidence-guard'
+        )
+      )
+    );
+
+  v_evidence_guard_claim_id :=
+    (v_evidence_guard_submission->>'claim_id')::uuid;
+
+  delete from public.artist_claim_evidence
+  where claim_id = v_evidence_guard_claim_id;
 
   begin
     perform public.community_submit_new_artist_claim(
@@ -392,12 +505,19 @@ begin
       )
     );
 
+  delete from public.artist_claim_evidence
+  where claim_id =
+        (v_resolve_submission->>'claim_id')::uuid;
+
+  -- Deliberately omit the original alternate name. The fingerprint changes,
+  -- so this replay can only recover the existing pending claim through the
+  -- unique claimant + normalized Artist name fallback.
   v_resolve_replay :=
     public.community_submit_new_artist_claim(
       'Kivuli Meridian Fixture',
       'group',
       'KE',
-      array['Kivuli Meridian'],
+      array[]::text[],
       'manager',
       'I manage this Artist and can verify the relationship.',
       jsonb_build_array(
@@ -420,6 +540,16 @@ begin
           (v_resolve_replay->>'idempotent_replay')::boolean,
           false
         ) is not true
+     or (
+       select count(*)
+       from public.artist_claim_evidence evidence
+       where evidence.claim_id =
+             v_resolved_claim_id
+         and evidence.evidence_type =
+             'official_website'
+         and evidence.reference =
+             'https://example.invalid/kivuli-meridian'
+     ) <> 1
   then
     raise exception
       'ARTIST_STUDIO_BEHAVIOR_FAIL: proposed Artist claim retry is not idempotent';
@@ -492,6 +622,53 @@ begin
     )::text,
     true
   );
+
+  begin
+    perform public.community_admin_decide_artist_claim(
+      v_evidence_guard_claim_id,
+      'verified',
+      'Evidence guard verification attempt.',
+      null,
+      null,
+      null,
+      null
+    );
+
+    raise exception
+      'ARTIST_STUDIO_BEHAVIOR_FAIL: evidence-free claim was verified';
+  exception
+    when others then
+      if sqlerrm = 'claim_evidence_required' then
+        v_missing_evidence_verification_rejected := true;
+      elsif sqlerrm like 'ARTIST_STUDIO_BEHAVIOR_FAIL:%' then
+        raise;
+      else
+        raise exception
+          'ARTIST_STUDIO_BEHAVIOR_FAIL: evidence-free verification failed for the wrong reason: %',
+          sqlerrm;
+      end if;
+  end;
+
+  if not v_missing_evidence_verification_rejected then
+    raise exception
+      'ARTIST_STUDIO_BEHAVIOR_FAIL: verification did not require claim evidence';
+  end if;
+
+  v_evidence_guard_rejection :=
+    public.community_admin_decide_artist_claim(
+      v_evidence_guard_claim_id,
+      'rejected',
+      'Rejected after evidence was removed in the rollback verifier.',
+      null,
+      null,
+      null,
+      null
+    );
+
+  if v_evidence_guard_rejection->>'status' <> 'rejected' then
+    raise exception
+      'ARTIST_STUDIO_BEHAVIOR_FAIL: evidence-free claim could not still be rejected';
+  end if;
 
   v_queue :=
     public.community_admin_get_artist_claims(

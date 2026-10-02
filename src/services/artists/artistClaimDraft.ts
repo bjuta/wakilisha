@@ -1,4 +1,4 @@
-export const ARTIST_CLAIM_DRAFT_VERSION = 3;
+export const ARTIST_CLAIM_DRAFT_VERSION = 4;
 
 export type ArtistClaimDraft = {
   version:
@@ -11,12 +11,17 @@ export type ArtistClaimDraft = {
   phoneCountryIso2: string;
   phoneNumber: string;
   statement: string;
+  evidenceType: string;
+  evidenceReference: string;
+  evidenceNote: string;
   updatedAt: string;
 };
 
 const KEY_PREFIX =
-  "wk-artist-claim-draft:v3:";
+  "wk-artist-claim-draft:v4:";
 const PREVIOUS_KEY_PREFIX =
+  "wk-artist-claim-draft:v3:";
+const OLDER_KEY_PREFIX =
   "wk-artist-claim-draft:v2:";
 const LEGACY_KEY_PREFIX =
   "wk-artist-claim-draft:v1:";
@@ -52,6 +57,12 @@ function parseCurrentDraft(
       "string" ||
     typeof parsed.statement !==
       "string" ||
+    typeof parsed.evidenceType !==
+      "string" ||
+    typeof parsed.evidenceReference !==
+      "string" ||
+    typeof parsed.evidenceNote !==
+      "string" ||
     typeof parsed.updatedAt !==
       "string"
   ) {
@@ -79,6 +90,12 @@ function parseCurrentDraft(
       parsed.phoneNumber,
     statement:
       parsed.statement,
+    evidenceType:
+      parsed.evidenceType,
+    evidenceReference:
+      parsed.evidenceReference,
+    evidenceNote:
+      parsed.evidenceNote,
     updatedAt:
       parsed.updatedAt,
   };
@@ -87,7 +104,7 @@ function parseCurrentDraft(
 function parseOlderDraft(
   raw: string,
   artistId: string,
-  expectedVersion: 1 | 2,
+  expectedVersion: 1 | 2 | 3,
 ): ArtistClaimDraft | null {
   const parsed =
     JSON.parse(raw) as
@@ -109,14 +126,20 @@ function parseOlderDraft(
     return null;
   }
 
+  const claimantRoleOther =
+    expectedVersion === 3 &&
+    typeof parsed.claimantRoleOther ===
+      "string"
+      ? parsed.claimantRoleOther
+      : "";
   const phoneCountryIso2 =
-    expectedVersion === 2 &&
+    expectedVersion >= 2 &&
     typeof parsed.phoneCountryIso2 ===
       "string"
       ? parsed.phoneCountryIso2
       : "";
   const phoneNumber =
-    expectedVersion === 2 &&
+    expectedVersion >= 2 &&
     typeof parsed.phoneNumber ===
       "string"
       ? parsed.phoneNumber
@@ -135,11 +158,14 @@ function parseOlderDraft(
         : null,
     claimantRole:
       parsed.claimantRole,
-    claimantRoleOther: "",
+    claimantRoleOther,
     phoneCountryIso2,
     phoneNumber,
     statement:
       parsed.statement,
+    evidenceType: "",
+    evidenceReference: "",
+    evidenceNote: "",
     updatedAt:
       parsed.updatedAt,
   };
@@ -179,6 +205,22 @@ export function readArtistClaimDraft(
     if (previousRaw) {
       return parseOlderDraft(
         previousRaw,
+        artistId,
+        3,
+      );
+    }
+
+    const olderRaw =
+      window.localStorage.getItem(
+        keyFor(
+          artistId,
+          OLDER_KEY_PREFIX,
+        ),
+      );
+
+    if (olderRaw) {
+      return parseOlderDraft(
+        olderRaw,
         artistId,
         2,
       );
@@ -246,6 +288,12 @@ export function saveArtistClaimDraft(
     window.localStorage.removeItem(
       keyFor(
         input.artistId,
+        OLDER_KEY_PREFIX,
+      ),
+    );
+    window.localStorage.removeItem(
+      keyFor(
+        input.artistId,
         LEGACY_KEY_PREFIX,
       ),
     );
@@ -276,6 +324,7 @@ export function clearArtistClaimDraft(
     for (const prefix of [
       KEY_PREFIX,
       PREVIOUS_KEY_PREFIX,
+      OLDER_KEY_PREFIX,
       LEGACY_KEY_PREFIX,
     ]) {
       window.localStorage.removeItem(

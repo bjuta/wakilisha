@@ -57,6 +57,12 @@ const migration = read(
 const verifier = read(
   "scripts/control-plane/verify-artist-studio-claimant-ux-correction.sql",
 );
+const evidenceFollowupMigration = read(
+  "supabase/migrations/20261002132539_artist_claim_evidence_followup_v1.sql",
+);
+const convergenceBehavior = read(
+  "scripts/control-plane/verify-artist-studio-registry-entry-convergence-behavior.sql",
+);
 
 describe(
   "Artist Studio claimant UX correction",
@@ -201,7 +207,7 @@ describe(
     );
 
     it(
-      "removes the misleading proof-link UI from both submission flows",
+      "collects one reviewable evidence item without restoring the old proof-link shortcut",
       () => {
         for (const sheet of [
           claim,
@@ -213,18 +219,77 @@ describe(
           expect(sheet).not.toContain(
             "proofLink",
           );
-          expect(sheet).toContain(
+          expect(sheet).not.toContain(
             "evidence: []",
           );
+          expect(sheet).toContain(
+            "Evidence Type",
+          );
+          expect(sheet).toContain(
+            "Link or Reference",
+          );
+          expect(sheet).toContain(
+            "evidenceType",
+          );
+          expect(sheet).toContain(
+            "evidenceReference",
+          );
+          expect(sheet).toContain(
+            "evidenceNote",
+          );
         }
+
+        expect(
+          evidenceFollowupMigration,
+        ).toContain(
+          "claim_evidence_required",
+        );
+        expect(
+          evidenceFollowupMigration,
+        ).toContain(
+          "proposal.normalized_name = v_normalized_name",
+        );
+        expect(
+          evidenceFollowupMigration,
+        ).toContain(
+          "artist_claim_pending_identity_ambiguous",
+        );
+        expect(
+          evidenceFollowupMigration,
+        ).toContain(
+          "is not distinct from",
+        );
+        expect(
+          evidenceFollowupMigration,
+        ).toContain(
+          "execute_registry_reviewed_artist_identity_materialization_v1",
+        );
+        expect(
+          evidenceFollowupMigration,
+        ).toContain(
+          "execute_registry_artist_alias_state_v1",
+        );
+        expect(
+          evidenceFollowupMigration,
+        ).not.toMatch(
+          /community_admin_decide_artist_claim[\s\S]*insert\s+into\s+public\.registry_artists/i,
+        );
+        expect(
+          convergenceBehavior,
+        ).toContain(
+          "claim_evidence_required",
+        );
       },
     );
 
     it(
-      "preserves old drafts while advancing claimant role detail to v3",
+      "preserves v3, v2, and v1 drafts while advancing claim evidence to v4",
       () => {
         expect(claimDraft).toContain(
-          "ARTIST_CLAIM_DRAFT_VERSION = 3",
+          "ARTIST_CLAIM_DRAFT_VERSION = 4",
+        );
+        expect(claimDraft).toContain(
+          "wk-artist-claim-draft:v3:",
         );
         expect(claimDraft).toContain(
           "wk-artist-claim-draft:v2:",
@@ -234,7 +299,10 @@ describe(
         );
 
         expect(proposedDraft).toContain(
-          "NEW_ARTIST_CLAIM_DRAFT_VERSION = 3",
+          "NEW_ARTIST_CLAIM_DRAFT_VERSION = 4",
+        );
+        expect(proposedDraft).toContain(
+          "wk-new-artist-claim-draft:v3:",
         );
         expect(proposedDraft).toContain(
           "wk-new-artist-claim-draft:v2:",
@@ -249,6 +317,15 @@ describe(
         ]) {
           expect(draft).toContain(
             "claimantRoleOther",
+          );
+          expect(draft).toContain(
+            "evidenceType",
+          );
+          expect(draft).toContain(
+            "evidenceReference",
+          );
+          expect(draft).toContain(
+            "evidenceNote",
           );
         }
       },
