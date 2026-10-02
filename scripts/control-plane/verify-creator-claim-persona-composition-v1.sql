@@ -58,6 +58,9 @@ begin
      )=0
      or position('manage_registry' in v_trigger)=0
      or position('manage_people_identity' in v_trigger)=0
+     or position('editorial.person_identity_links' in v_trigger)=0
+     or position('person.person_state=''active''' in replace(v_trigger,' ',''))=0
+     or position(')=1' in replace(v_trigger,' ',''))=0
   then
     raise exception
       'CREATOR_CLAIM_PERSONA_COMPOSITION_FAIL: trigger widened self-Artist identity authority';
