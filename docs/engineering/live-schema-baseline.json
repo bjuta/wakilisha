@@ -1,8 +1,8 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-02T12:46:12Z",
-  "typesSha256": "1e55c7f479b9de2cd7952df6112d654d02285ffa24bedffd034a7f0b9213ae20",
+  "generatedAt": "2026-10-02T12:52:33Z",
+  "typesSha256": "fb819cc37ff60c96e721e7a87b389786186c09dc4f3a09da907bda8c73fac980",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 197,
   "latestMigration": "20261002114451_creator_claim_person_artist_composition_v1.sql",

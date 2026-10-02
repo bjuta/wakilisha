@@ -9,8 +9,8 @@
   "candidate_apply": "pass",
   "verifier": "pass",
   "verifier_file": "scripts/control-plane/verify-creator-claim-persona-composition-v1.sql",
-  "schema_types_sha256": "1e55c7f479b9de2cd7952df6112d654d02285ffa24bedffd034a7f0b9213ae20",
+  "schema_types_sha256": "fb819cc37ff60c96e721e7a87b389786186c09dc4f3a09da907bda8c73fac980",
   "schema_migration_count": 197,
   "schema_migration_head": "20261002114451",
-  "verified_at": "2026-10-02T12:46:12Z"
+  "verified_at": "2026-10-02T12:52:33.967Z"
 }
