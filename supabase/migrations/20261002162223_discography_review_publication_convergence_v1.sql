@@ -3300,3 +3300,122 @@ begin
 end
 $$;
 
+
+
+-- ---------------------------------------------------------------------------
+-- Authority surface.
+-- ---------------------------------------------------------------------------
+
+revoke all on function
+  platform_private.registry_reviewed_release_slug_v1(text,text,uuid),
+  platform_private.issue_registry_reviewed_admission_grant_v1(uuid,text,text,uuid,jsonb,text),
+  platform_private.registry_discography_build_frozen_plan_core_v1(uuid,uuid,uuid,jsonb),
+  platform_private.execute_registry_reviewed_identity_reconciliation_v1(text,uuid),
+  platform_private.verify_registry_reviewed_identity_reconciliation_v1(uuid),
+  platform_private.execute_registry_reviewed_lifecycle_v1(text,uuid),
+  platform_private.verify_registry_reviewed_lifecycle_v1(uuid),
+  platform_private.verify_registry_discography_operation_core_v1(uuid)
+from public,anon,authenticated,service_role;
+
+revoke all on function
+  mizizi_private.registry_reviewed_admission_sentry_v1(uuid)
+from public,anon,authenticated,service_role;
+
+revoke all on function
+  public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb),
+  public.admin_verify_registry_discography_operation_v1(uuid)
+from public,anon,service_role;
+
+grant execute on function
+  public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb),
+  public.admin_verify_registry_discography_operation_v1(uuid)
+to authenticated;
+
+do $postcondition$
+declare
+  v_definition text;
+begin
+  if not exists (
+       select 1
+       from platform_private.registry_operation_types operation_type
+       where operation_type.operation_key='registry.release.activate'
+         and operation_type.operation_version=1
+         and operation_type.capability_key='activate_registry_release'
+         and operation_type.allowed_subject_types=array['release']::text[]
+         and operation_type.requires_existing_target
+         and operation_type.max_targets=1
+         and operation_type.max_rows_ceiling=1
+         and operation_type.max_grant_ttl_seconds=300
+         and operation_type.requires_human_approval
+         and operation_type.requires_verifier
+         and operation_type.enabled
+     )
+     or not exists (
+       select 1
+       from platform_private.registry_operation_types operation_type
+       where operation_type.operation_key='registry.draft_identity.reconcile'
+         and operation_type.operation_version=1
+         and operation_type.capability_key='reconcile_registry_draft_identity'
+         and operation_type.allowed_subject_types=array['track','release']::text[]
+         and operation_type.requires_existing_target
+         and operation_type.max_targets=1
+         and operation_type.max_rows_ceiling=1
+         and operation_type.max_grant_ttl_seconds=300
+         and operation_type.requires_human_approval
+         and operation_type.requires_verifier
+         and operation_type.enabled
+     )
+  then
+    raise exception
+      'Reviewed Registry Admission operation vocabulary did not converge.';
+  end if;
+
+  select pg_get_functiondef(
+    'platform_private.registry_discography_normalize_reviewed_selections_v1(uuid,jsonb,jsonb)'::regprocedure
+  )
+  into v_definition;
+
+  if position(
+       'Every observed Release requires one explicit Discography review decision.'
+       in v_definition
+     )=0
+     or position(
+       'plan cannot ignore every Album'
+       in v_definition
+     )>0
+  then
+    raise exception
+      'Exhaustive Discography review contract did not converge.';
+  end if;
+
+  select pg_get_functiondef(
+    'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)'::regprocedure
+  )
+  into v_definition;
+
+  if position('active_ingest_v1' in v_definition)=0
+     or position('registry.release.activate' in v_definition)=0
+     or position('registry.track.activate' in v_definition)=0
+     or position('registry.draft_identity.reconcile' in v_definition)=0
+  then
+    raise exception
+      'Reviewed active-ingest frozen-plan composition did not converge.';
+  end if;
+
+  if to_regprocedure(
+       'mizizi_private.registry_reviewed_admission_sentry_v1(uuid)'
+     ) is null
+     or to_regprocedure(
+       'platform_private.execute_registry_reviewed_lifecycle_v1(text,uuid)'
+     ) is null
+     or to_regprocedure(
+       'platform_private.verify_registry_reviewed_lifecycle_v1(uuid)'
+     ) is null
+  then
+    raise exception
+      'Reviewed Registry Admission stewardship/lifecycle primitives are missing.';
+  end if;
+end
+$postcondition$;
+
+commit;
