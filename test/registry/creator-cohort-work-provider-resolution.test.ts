@@ -118,7 +118,16 @@ describe("Creator cohort Work provider resolution", () => {
       'value === "--resume-log"',
     );
     expect(runner).toContain(
-      "V1 apply mode requires an explicit --limit",
+      "Production apply requires an explicit reviewed cohort",
+    );
+    expect(runner).toContain(
+      'value === "--track-id"',
+    );
+    expect(runner).toContain(
+      'value === "--track-ids-file"',
+    );
+    expect(runner).toContain(
+      "Do not combine --apply with --limit",
     );
     expect(runner).toContain(
       "PLAN ONLY: no provider calls and no Registry mutation performed.",
@@ -146,7 +155,31 @@ describe("Creator cohort Work provider resolution", () => {
     );
 
     expect(output).toContain("--apply");
+    expect(output).toContain("--track-id");
+    expect(output).toContain("--track-ids-file");
     expect(output).toContain("--resume-log");
+
+    const manifest = JSON.parse(
+      read(
+        "scripts/control-plane/music-work-resolution-cohorts/creator-cohort-work-resolution-v1.json",
+      ),
+    );
+
+    expect(manifest.production_project_ref).toBe(
+      "pgzizndxdyhqmtyywjmt",
+    );
+    expect(manifest.tracks).toEqual([
+      expect.objectContaining({
+        id: "8ae9c169-3ece-4c29-8c86-07352bf93dd9",
+        isrc: "ZA34K2301678",
+        expected_state: "verified",
+      }),
+      expect.objectContaining({
+        id: "c4ecbbf1-c7ec-450b-81b2-8476964a6069",
+        isrc: "ZA56E2302202",
+        expected_state: "review_required",
+      }),
+    ]);
   });
 
   it("adds provider observations without creating a second Work authority", () => {

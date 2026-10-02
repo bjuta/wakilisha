@@ -10,6 +10,8 @@ function parseArgs(argv) {
   const args = {
     apply: false,
     limit: null,
+    trackIds: [],
+    trackIdsFile: null,
     resultLog: null,
     resumeLog: null,
   };
@@ -27,6 +29,14 @@ function parseArgs(argv) {
         throw new Error("--limit must be a positive integer.");
       }
       args.limit = parsed;
+      continue;
+    }
+    if (value === "--track-id") {
+      args.trackIds.push(argv[++index] || "");
+      continue;
+    }
+    if (value === "--track-ids-file") {
+      args.trackIdsFile = argv[++index] || null;
       continue;
     }
     if (value === "--result-log") {
@@ -55,12 +65,15 @@ function printHelp() {
       "",
       "Options:",
       "  --apply              Execute a bounded provider-resolution cohort.",
-      "  --limit <n>          Process at most n unresolved Tracks.",
+      "  --limit <n>          Plan at most n unresolved Tracks (not accepted with --apply).",
+      "  --track-id <uuid>     Exact reviewed Track UUID; repeatable.",
+      "  --track-ids-file <p>  JSON or newline-delimited reviewed Track UUID manifest.",
       "  --result-log <path>  Durable JSONL result path.",
       "  --resume-log <path>  Skip Tracks already recorded in a prior JSONL run.",
       "  --help               Show this help.",
       "",
       "Without --apply this command performs no provider calls and no mutation.",
+      "Production --apply requires an explicit reviewed Track-ID cohort.",
       "",
     ].join("\n"),
   );
@@ -149,6 +162,76 @@ async function fetchAll(url, anonKey, accessToken, table, query) {
   return rows;
 }
 
+function loadRequestedTrackIds(args) {
+  const values = [...args.trackIds];
+
+  if (args.trackIdsFile) {
+    if (!fs.existsSync(args.trackIdsFile)) {
+      throw new Error(`Track-ID manifest does not exist: ${args.trackIdsFile}`);
+    }
+
+    const raw = fs.readFileSync(args.trackIdsFile, "utf8").trim();
+    if (raw) {
+      let parsed = null;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = raw
+          .split(/\r?\n/)
+          .map((value) => value.trim())
+          .filter(Boolean);
+      }
+
+      if (Array.isArray(parsed)) {
+        for (const value of parsed) {
+          values.push(
+            typeof value === "string"
+              ? value
+              : value && typeof value === "object"
+                ? value.id
+                : "",
+          );
+        }
+      } else if (parsed && typeof parsed === "object") {
+        const source =
+          Array.isArray(parsed.track_ids)
+            ? parsed.track_ids
+            : Array.isArray(parsed.tracks)
+              ? parsed.tracks
+              : [];
+
+        for (const value of source) {
+          values.push(
+            typeof value === "string"
+              ? value
+              : value && typeof value === "object"
+                ? value.id
+                : "",
+          );
+        }
+      } else {
+        throw new Error("Track-ID manifest must be JSON or newline-delimited text.");
+      }
+    }
+  }
+
+  const normalized = values
+    .map((value) => String(value ?? "").trim().toLowerCase())
+    .filter(Boolean);
+
+  for (const value of normalized) {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+        value,
+      )
+    ) {
+      throw new Error(`Invalid reviewed Track UUID: ${value}`);
+    }
+  }
+
+  return [...new Set(normalized)];
+}
+
 function loadCompleted(pathname) {
   const completed = new Set();
   if (!pathname) return completed;
@@ -183,9 +266,17 @@ function loadCompleted(pathname) {
 
 const args = parseArgs(process.argv.slice(2));
 
-if (args.apply && args.limit == null) {
+const requestedTrackIds = loadRequestedTrackIds(args);
+
+if (args.apply && requestedTrackIds.length === 0) {
   throw new Error(
-    "V1 apply mode requires an explicit --limit. Unbounded catalogue resolution is not accepted.",
+    "Production apply requires an explicit reviewed cohort via --track-id or --track-ids-file.",
+  );
+}
+
+if (args.apply && args.limit != null) {
+  throw new Error(
+    "Do not combine --apply with --limit. Production apply is exact-ID only.",
   );
 }
 
@@ -263,12 +354,31 @@ const candidates = tracks
   }))
   .filter((track) => /^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(track.isrc));
 
+const candidateById = new Map(
+  candidates.map((track) => [String(track.id).toLowerCase(), track]),
+);
+
+let scopedCandidates = candidates;
+if (requestedTrackIds.length > 0) {
+  const missing = requestedTrackIds.filter(
+    (trackId) => !candidateById.has(trackId),
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `Reviewed Track IDs are missing, archived, or lack a valid canonical ISRC: ${missing.join(", ")}`,
+    );
+  }
+  scopedCandidates = requestedTrackIds.map(
+    (trackId) => candidateById.get(trackId),
+  );
+}
+
 const completed = loadCompleted(args.resumeLog);
-const pending = candidates.filter(
+const pending = scopedCandidates.filter(
   (track) => !completed.has(String(track.id)),
 );
 const selected =
-  args.limit == null
+  requestedTrackIds.length > 0 || args.limit == null
     ? pending
     : pending.slice(0, args.limit);
 
@@ -277,8 +387,9 @@ process.stdout.write(
     `Production host: ${host}`,
     `ISRC-bearing non-archived Tracks: ${candidates.length}`,
     `Already accounted by resume log: ${completed.size}`,
+    `Reviewed Track IDs: ${requestedTrackIds.length}`,
     `Pending this invocation: ${selected.length}`,
-    `Mode: ${args.apply ? "APPLY" : "PLAN_ONLY"}`,
+    `Mode: ${args.apply ? "APPLY_EXACT_IDS" : "PLAN_ONLY"}`,
     "",
   ].join("\n"),
 );

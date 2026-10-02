@@ -2,7 +2,7 @@
 
 Date: 1 October 2026
 
-Status: **IMPLEMENTATION CANDIDATE — NO PRODUCTION WORK BACKFILL YET**
+Status: **PRODUCTION SQL + EDGE DEPLOYED — FIRST BOUNDED WORK COHORT PENDING**
 
 Programme authority:
 
@@ -136,13 +136,26 @@ Without `--apply`:
 With `--apply`:
 
 - authenticates a real Registry administrator;
-- processes current ISRC-bearing non-archived Tracks;
+- requires an explicit reviewed Track cohort via repeatable `--track-id` or `--track-ids-file`;
+- refuses `--limit` as a Production apply selector so database ordering cannot change cohort membership;
+- resolves only those exact non-archived Tracks with valid canonical ISRCs;
 - calls the governed resolver sequentially;
 - records every verified or review-only result to a durable JSONL file;
 - supports `--resume-log`;
 - stops on an unexpected runtime failure.
 
 The runner does not receive or use the service-role key.
+
+The first reviewed Production Work-resolution cohort is committed at:
+
+`scripts/control-plane/music-work-resolution-cohorts/creator-cohort-work-resolution-v1.json`
+
+and contains exactly:
+
+- `Legend (Intro)` — Track `8ae9c169-3ece-4c29-8c86-07352bf93dd9`, ISRC `ZA34K2301678`, expected automatic `verified` lane;
+- `Legalization` — Track `c4ecbbf1-c7ec-450b-81b2-8476964a6069`, ISRC `ZA56E2302202`, expected `review_required` no-Work lane.
+
+The manifest is cohort authority only. Provider state remains live and runtime results are recorded from the actual resolver response.
 
 ## 7. Rate limit
 

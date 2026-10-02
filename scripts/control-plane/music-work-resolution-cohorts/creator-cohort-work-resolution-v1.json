@@ -1,0 +1,19 @@
+{
+  "cohort_key": "creator-cohort-work-resolution-v1",
+  "production_project_ref": "pgzizndxdyhqmtyywjmt",
+  "tracks": [
+    {
+      "id": "8ae9c169-3ece-4c29-8c86-07352bf93dd9",
+      "title": "Legend (Intro)",
+      "isrc": "ZA34K2301678",
+      "expected_state": "verified"
+    },
+    {
+      "id": "c4ecbbf1-c7ec-450b-81b2-8476964a6069",
+      "title": "Legalization",
+      "isrc": "ZA56E2302202",
+      "expected_state": "review_required",
+      "expected_reason": "musicbrainz_work_not_found"
+    }
+  ]
+}
