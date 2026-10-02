@@ -41,6 +41,15 @@ const CLAIM_ROLES = [
   ["other", "Other"],
 ] as const;
 
+const CLAIM_EVIDENCE_TYPES = [
+  ["official_website", "Official Website"],
+  ["official_social", "Official Social Profile"],
+  ["business_email", "Business Email"],
+  ["label_or_distributor", "Label or Distributor"],
+  ["public_announcement", "Public Announcement"],
+  ["other", "Other"],
+] as const;
+
 export function ArtistClaimSheet({
   open,
   artistId,
@@ -81,6 +90,18 @@ export function ArtistClaimSheet({
   ] = useState("");
   const [statement, setStatement] =
     useState("");
+  const [
+    evidenceType,
+    setEvidenceType,
+  ] = useState("");
+  const [
+    evidenceReference,
+    setEvidenceReference,
+  ] = useState("");
+  const [
+    evidenceNote,
+    setEvidenceNote,
+  ] = useState("");
   const [savedAt, setSavedAt] =
     useState<string | null>(null);
   const [
@@ -116,6 +137,15 @@ export function ArtistClaimSheet({
     setStatement(
       draft?.statement ?? "",
     );
+    setEvidenceType(
+      draft?.evidenceType ?? "",
+    );
+    setEvidenceReference(
+      draft?.evidenceReference ?? "",
+    );
+    setEvidenceNote(
+      draft?.evidenceNote ?? "",
+    );
     setSavedAt(
       draft?.updatedAt ?? null,
     );
@@ -134,7 +164,10 @@ export function ArtistClaimSheet({
       claimantRoleOther.trim().length > 0 ||
       phoneCountryIso2.length > 0 ||
       phoneNumber.trim().length > 0 ||
-      statement.trim().length > 0;
+      statement.trim().length > 0 ||
+      evidenceType.length > 0 ||
+      evidenceReference.trim().length > 0 ||
+      evidenceNote.trim().length > 0;
 
     if (!hasDraft) {
       setSavedAt(null);
@@ -154,6 +187,9 @@ export function ArtistClaimSheet({
             phoneCountryIso2,
             phoneNumber,
             statement,
+            evidenceType,
+            evidenceReference,
+            evidenceNote,
           });
 
         setDraftStorageAvailable(
@@ -177,6 +213,9 @@ export function ArtistClaimSheet({
     phoneCountryIso2,
     phoneNumber,
     statement,
+    evidenceType,
+    evidenceReference,
+    evidenceNote,
     open,
   ]);
 
@@ -206,6 +245,25 @@ export function ArtistClaimSheet({
       setMessage({
         type: "error",
         text: "Tell us how you’re connected to this Artist.",
+      });
+      return;
+    }
+
+    if (!evidenceType) {
+      setMessage({
+        type: "error",
+        text: "Choose the kind of evidence you’re sharing.",
+      });
+      return;
+    }
+
+    if (
+      evidenceReference.trim().length === 0 &&
+      evidenceNote.trim().length === 0
+    ) {
+      setMessage({
+        type: "error",
+        text: "Add a link, reference, or note we can review.",
       });
       return;
     }
@@ -240,6 +298,9 @@ export function ArtistClaimSheet({
         phoneCountryIso2,
         phoneNumber,
         statement,
+        evidenceType,
+        evidenceReference,
+        evidenceNote,
       });
 
     setDraftStorageAvailable(
@@ -284,7 +345,17 @@ export function ArtistClaimSheet({
         statement:
           statement.trim(),
         phone,
-        evidence: [],
+        evidence: [
+          {
+            type: evidenceType,
+            reference:
+              evidenceReference.trim() ||
+              null,
+            note:
+              evidenceNote.trim() ||
+              null,
+          },
+        ],
       });
 
       clearArtistClaimDraft(
@@ -295,6 +366,9 @@ export function ArtistClaimSheet({
       setPhoneCountryIso2("");
       setPhoneNumber("");
       setStatement("");
+      setEvidenceType("");
+      setEvidenceReference("");
+      setEvidenceNote("");
       setSavedAt(null);
       setDraftStorageAvailable(true);
       setMessage({
@@ -455,6 +529,79 @@ export function ArtistClaimSheet({
               className="w-full resize-y rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] leading-6 text-[var(--wk-text)]"
             />
           </label>
+
+          <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] p-4">
+            <div className="text-[12px] font-bold text-[var(--wk-text)]">
+              Evidence
+            </div>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--wk-text-muted)]">
+              Share one place we can verify your connection to this Artist.
+            </p>
+
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
+                Evidence Type
+              </span>
+              <WkSelect
+                value={evidenceType}
+                onChange={(value) =>
+                  setEvidenceType(value)
+                }
+                triggerClassName="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
+              >
+                <option value="">
+                  Choose evidence type
+                </option>
+                {CLAIM_EVIDENCE_TYPES.map(
+                  ([value, label]) => (
+                    <option
+                      key={value}
+                      value={value}
+                    >
+                      {label}
+                    </option>
+                  ),
+                )}
+              </WkSelect>
+            </label>
+
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
+                Link or Reference
+              </span>
+              <input
+                value={evidenceReference}
+                onChange={(event) =>
+                  setEvidenceReference(
+                    event.target.value,
+                  )
+                }
+                maxLength={2048}
+                autoComplete="off"
+                placeholder="Website, profile, email, or other reference"
+                className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] text-[var(--wk-text)]"
+              />
+            </label>
+
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-[12px] font-bold text-[var(--wk-text)]">
+                Context
+              </span>
+              <textarea
+                value={evidenceNote}
+                onChange={(event) =>
+                  setEvidenceNote(
+                    event.target.value,
+                  )
+                }
+                rows={3}
+                maxLength={2000}
+                placeholder="Add any context that will help us verify this."
+                className="w-full resize-y rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-[14px] leading-6 text-[var(--wk-text)]"
+              />
+            </label>
+          </div>
+
 
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">

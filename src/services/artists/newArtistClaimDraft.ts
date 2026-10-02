@@ -1,4 +1,4 @@
-export const NEW_ARTIST_CLAIM_DRAFT_VERSION = 3;
+export const NEW_ARTIST_CLAIM_DRAFT_VERSION = 4;
 
 export type NewArtistClaimDraft = {
   version:
@@ -13,12 +13,17 @@ export type NewArtistClaimDraft = {
   phoneCountryIso2: string;
   phoneNumber: string;
   statement: string;
+  evidenceType: string;
+  evidenceReference: string;
+  evidenceNote: string;
   updatedAt: string;
 };
 
 const KEY_PREFIX =
-  "wk-new-artist-claim-draft:v3:";
+  "wk-new-artist-claim-draft:v4:";
 const PREVIOUS_KEY_PREFIX =
+  "wk-new-artist-claim-draft:v3:";
+const OLDER_KEY_PREFIX =
   "wk-new-artist-claim-draft:v2:";
 const LEGACY_KEY_PREFIX =
   "wk-new-artist-claim-draft:v1:";
@@ -73,6 +78,12 @@ function parseCurrentDraft(
       "string" ||
     typeof parsed.statement !==
       "string" ||
+    typeof parsed.evidenceType !==
+      "string" ||
+    typeof parsed.evidenceReference !==
+      "string" ||
+    typeof parsed.evidenceNote !==
+      "string" ||
     typeof parsed.updatedAt !==
       "string"
   ) {
@@ -101,6 +112,12 @@ function parseCurrentDraft(
       parsed.phoneNumber,
     statement:
       parsed.statement,
+    evidenceType:
+      parsed.evidenceType,
+    evidenceReference:
+      parsed.evidenceReference,
+    evidenceNote:
+      parsed.evidenceNote,
     updatedAt:
       parsed.updatedAt,
   };
@@ -109,7 +126,7 @@ function parseCurrentDraft(
 function parseOlderDraft(
   raw: string,
   flowId: string,
-  expectedVersion: 1 | 2,
+  expectedVersion: 1 | 2 | 3,
 ): NewArtistClaimDraft | null {
   const parsed =
     JSON.parse(raw) as
@@ -137,14 +154,20 @@ function parseOlderDraft(
     return null;
   }
 
+  const claimantRoleOther =
+    expectedVersion === 3 &&
+    typeof parsed.claimantRoleOther ===
+      "string"
+      ? parsed.claimantRoleOther
+      : "";
   const phoneCountryIso2 =
-    expectedVersion === 2 &&
+    expectedVersion >= 2 &&
     typeof parsed.phoneCountryIso2 ===
       "string"
       ? parsed.phoneCountryIso2
       : "";
   const phoneNumber =
-    expectedVersion === 2 &&
+    expectedVersion >= 2 &&
     typeof parsed.phoneNumber ===
       "string"
       ? parsed.phoneNumber
@@ -164,11 +187,14 @@ function parseOlderDraft(
       parsed.alternateNames,
     claimantRole:
       parsed.claimantRole,
-    claimantRoleOther: "",
+    claimantRoleOther,
     phoneCountryIso2,
     phoneNumber,
     statement:
       parsed.statement,
+    evidenceType: "",
+    evidenceReference: "",
+    evidenceNote: "",
     updatedAt:
       parsed.updatedAt,
   };
@@ -208,6 +234,22 @@ export function readNewArtistClaimDraft(
     if (previousRaw) {
       return parseOlderDraft(
         previousRaw,
+        flowId,
+        3,
+      );
+    }
+
+    const olderRaw =
+      window.localStorage.getItem(
+        keyFor(
+          flowId,
+          OLDER_KEY_PREFIX,
+        ),
+      );
+
+    if (olderRaw) {
+      return parseOlderDraft(
+        olderRaw,
         flowId,
         2,
       );
@@ -275,6 +317,12 @@ export function saveNewArtistClaimDraft(
     window.localStorage.removeItem(
       keyFor(
         input.flowId,
+        OLDER_KEY_PREFIX,
+      ),
+    );
+    window.localStorage.removeItem(
+      keyFor(
+        input.flowId,
         LEGACY_KEY_PREFIX,
       ),
     );
@@ -305,6 +353,7 @@ export function clearNewArtistClaimDraft(
     for (const prefix of [
       KEY_PREFIX,
       PREVIOUS_KEY_PREFIX,
+      OLDER_KEY_PREFIX,
       LEGACY_KEY_PREFIX,
     ]) {
       window.localStorage.removeItem(
