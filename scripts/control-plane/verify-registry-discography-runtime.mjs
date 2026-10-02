@@ -151,6 +151,9 @@ for (const fragment of [
 }
 requireText(governedPlan, 'exact_artist_id', governedPlanPath);
 requireText(governedPlan, 'provider_source_payload_fingerprint', governedPlanPath);
+requireText(governedPlan, 'reviewed_decisions', governedPlanPath);
+requireText(governedPlan, 'Every observed release must be explicitly reviewed before Apply.', governedPlanPath);
+forbidText(governedPlan, 'has no albums selected for canonical action', governedPlanPath);
 
 // Frontend contract is exact-Artist + evidence-id based. Apply sends only reviewed
 // selection authority, never the provider observation or a caller-authored source fingerprint.
@@ -173,6 +176,13 @@ requireText(intakeDrawer, 'previewGovernedArtistDiscography(artistId)', intakeDr
 requireText(intakeDrawer, 'currentArtistId: artistId', intakeDrawerPath);
 requireText(intakeDrawer, 'evidenceAssertionId', intakeDrawerPath);
 requireText(intakeDrawer, 'applyReviewedArtistDiscography({', intakeDrawerPath);
+requireText(intakeDrawer, 'Review every release before applying.', intakeDrawerPath);
+requireText(intakeDrawer, 'disabled={applying || unsetCount > 0}', intakeDrawerPath);
+requireText(intakeDrawer, 'Apply review', intakeDrawerPath);
+requireText(intakeDrawer, 'Leave', intakeDrawerPath);
+forbidText(intakeDrawer, 'Reset defaults', intakeDrawerPath);
+forbidText(intakeDrawer, 'autoActions', intakeDrawerPath);
+forbidText(intakeDrawer, 'unset will be skipped', intakeDrawerPath);
 forbidText(intakeDrawer, 'supabase.functions.invoke(', intakeDrawerPath);
 requireText(discographyPanel, 'artistId: string', discographyPanelPath);
 requireText(discographyPanel, 'artistId={artistId}', discographyPanelPath);
