@@ -3319,11 +3319,13 @@ $$;
 revoke all on function
   platform_private.registry_reviewed_release_slug_v1(text,text,uuid),
   platform_private.issue_registry_reviewed_admission_grant_v1(uuid,text,text,uuid,jsonb,text),
+  platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb),
   platform_private.registry_discography_build_frozen_plan_core_v1(uuid,uuid,uuid,jsonb),
   platform_private.execute_registry_reviewed_identity_reconciliation_v1(text,uuid),
   platform_private.verify_registry_reviewed_identity_reconciliation_v1(uuid),
   platform_private.execute_registry_reviewed_lifecycle_v1(text,uuid),
   platform_private.verify_registry_reviewed_lifecycle_v1(uuid),
+  platform_private.verify_registry_discography_operation_v1(uuid),
   platform_private.verify_registry_discography_operation_core_v1(uuid)
 from public,anon,authenticated,service_role;
 
