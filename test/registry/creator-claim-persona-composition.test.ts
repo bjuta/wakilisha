@@ -103,6 +103,35 @@ describe("Creator claim Person↔Artist persona composition", () => {
     );
   });
 
+  it("keeps behavioral acceptance rollback-only and transport-exact", () => {
+    const behavior = read(
+      "scripts/control-plane/verify-creator-claim-persona-composition-behavior.sql",
+    );
+
+    expect(behavior.trimStart()).toMatch(/^-- Permanent rollback-only/);
+    expect(behavior).toContain("begin;");
+    expect(behavior.trimEnd()).toMatch(/rollback;$/);
+
+    expect(behavior).toContain(
+      "'registry_artist_identity_review'",
+    );
+    expect(behavior).toContain(
+      "session_user",
+    );
+    expect(behavior).toContain(
+      "CREATOR_CLAIM_PERSONA_STRONG_AUTO_COMPOSITION=PASS",
+    );
+    expect(behavior).toContain(
+      "CREATOR_CLAIM_PERSONA_WEAK_REVIEW_NO_ESCALATION=PASS",
+    );
+    expect(behavior).toContain(
+      "CREATOR_CLAIM_PERSONA_STRONG_LATER_FINALIZATION=PASS",
+    );
+    expect(behavior).toContain(
+      "admin_finalize_verified_artist_claim_persona_v1",
+    );
+  });
+
   it("does not leak direct persona mutation to browser or service roles", () => {
     const sql = migration();
     const verifier = read(
