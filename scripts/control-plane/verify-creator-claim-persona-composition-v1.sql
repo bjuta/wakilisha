@@ -53,7 +53,7 @@ begin
   into v_trigger;
 
   if position(
-       'claimant_role=''artist''',
+       'claimant_role=''artist''' in
        replace(v_trigger,' ','')
      )=0
      or position('manage_registry' in v_trigger)=0
