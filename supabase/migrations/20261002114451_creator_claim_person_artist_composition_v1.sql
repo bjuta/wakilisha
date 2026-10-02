@@ -401,7 +401,7 @@ begin
   into v_wrapper_definition;
 
   if position(
-       'compose_verified_artist_claim_persona_v1',
+       'compose_verified_artist_claim_persona_v1' in
        v_wrapper_definition
      )=0
   then
