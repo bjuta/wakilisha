@@ -54,6 +54,15 @@ describe("Creator claim Person↔Artist persona composition", () => {
       "new.claimant_role='artist'",
     );
     expect(sql).toContain(
+      "editorial.person_identity_links",
+    );
+    expect(sql).toContain(
+      "person.person_state='active'",
+    );
+    expect(sql).toContain(
+      ")=1",
+    );
+    expect(sql).toContain(
       "v_claim.claimant_role<>'artist'",
     );
     expect(sql).toContain(
