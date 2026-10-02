@@ -196,7 +196,7 @@ describe("Creator cohort Work provider resolution", () => {
       "musicbrainz_work_id",
     );
     expect(migration).toContain(
-      "musicbrainz_recording_id",
+      "musicbrainz:recording:",
     );
     expect(migration).toContain(
       "'musicbrainz'",
