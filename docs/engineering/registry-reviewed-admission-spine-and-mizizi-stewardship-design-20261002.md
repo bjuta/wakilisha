@@ -196,6 +196,36 @@ The original provider title remains preserved as evidence and may remain the can
 
 Slug identity cleanup does not authorize culturally meaningful title rewriting.
 
+### Artist-scoped Release slug invariant
+
+The live Registry schema does **not** impose global uniqueness on `registry_releases.slug`, and the canonical public Release route already carries Artist scope:
+
+`/releases/{artist-slug}/{release-slug}`
+
+Therefore canonical Release slug identity must not redundantly append the Artist slug inside `release-slug`.
+
+For a structurally proven provider title:
+
+`60 seconds (RB60s) - EP`
+
+the canonical Release slug candidate is:
+
+`60-seconds-rb60s`
+
+not:
+
+`60-seconds-rb60s-ep-sofresh-254`
+
+and not:
+
+`60-seconds-rb60s-sofresh-254`.
+
+Collision analysis for title-derived Release slugs is Artist-scoped. The same clean Release slug may legitimately exist for different primary Artists.
+
+UPC/provider identity and exact Artist-scoped Release relationships remain stronger identity evidence than slug alone.
+
+This converges new creation with the historical MIZIZI Release-slug stewardship direction rather than creating a second URL grammar.
+
 ## 7. Primitive D — frozen typed admission plan
 
 A reviewed domain workflow converts one immutable observation plus one exhaustive review decision set into one immutable typed operation graph.
