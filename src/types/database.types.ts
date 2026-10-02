@@ -20148,6 +20148,10 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_admit_registry_track_isrc_projection_v1: {
+        Args: { p_provider_link_id: string; p_track_id: string }
+        Returns: Json
+      }
       admin_admit_registry_track_media_asset_candidate_v1: {
         Args: { p_media_asset_id: string; p_track_id: string }
         Returns: Json
@@ -20187,6 +20191,21 @@ export type Database = {
       }
       admin_admit_registry_work_contribution_v1: {
         Args: { p_attestation_id: string }
+        Returns: Json
+      }
+      admin_admit_registry_work_external_identifier_candidate_v1: {
+        Args: {
+          p_scheme_key: string
+          p_source_value: string
+          p_work_id: string
+        }
+        Returns: Json
+      }
+      admin_admit_registry_work_provider_observation_v1: {
+        Args: {
+          p_track_work_evidence_assertion_id: string
+          p_work_evidence_assertion_id: string
+        }
         Returns: Json
       }
       admin_apply_artist_decouple_decision: {
@@ -25214,6 +25233,25 @@ export type Database = {
           p_title_hint: string
         }
         Returns: string
+      }
+      record_registry_work_provider_observation_v1: {
+        Args: {
+          p_iswc?: string
+          p_observed_at?: string
+          p_provider_key: string
+          p_provider_recording_id: string
+          p_provider_work_id: string
+          p_recording_isrc: string
+          p_source_payload?: Json
+          p_track_id: string
+          p_work_title: string
+        }
+        Returns: {
+          track_work_evidence_assertion_id: string
+          track_work_link_id: string
+          work_evidence_assertion_id: string
+          work_id: string
+        }[]
       }
       recover_expired_media_processing_jobs_v1: {
         Args: { p_limit?: number; p_retry_delay_seconds?: number }
