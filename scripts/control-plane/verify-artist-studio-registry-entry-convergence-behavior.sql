@@ -163,6 +163,27 @@ set
   notes = excluded.notes,
   updated_at = now();
 
+-- Direct SQL acceptance runs as the database operator rather than the
+-- PostgREST authenticator. Mirror the accepted provenance-verifier pattern
+-- with a rollback-only binding for this exact session_user.
+insert into platform_private.system_actor_executor_bindings (
+  actor_key,
+  executor_kind,
+  executor_key,
+  status
+)
+values (
+  'registry_artist_identity_review',
+  'database_role',
+  session_user,
+  'active'
+)
+on conflict (actor_key,executor_kind,executor_key)
+do update
+set
+  status='active',
+  updated_at=now();
+
 
 do $artist_studio_behavior$
 declare
