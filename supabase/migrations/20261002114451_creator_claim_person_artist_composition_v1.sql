@@ -334,6 +334,15 @@ begin
        public.current_user_has_capability('manage_people_identity'),
        false
      )
+     and (
+       select count(*)::integer
+       from editorial.person_identity_links link
+       join editorial.people person
+         on person.resource_id=link.person_resource_id
+       where link.user_id=new.claimant_user_id
+         and link.link_state='active'
+         and person.person_state='active'
+     )=1
   then
     perform platform_private.compose_verified_artist_claim_persona_v1(
       new.id,
