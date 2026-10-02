@@ -1751,3 +1751,683 @@ begin
 end
 $$;
 
+
+
+-- ---------------------------------------------------------------------------
+-- Exact reviewed-admission grant broker for the new reusable primitives.
+-- ---------------------------------------------------------------------------
+
+create function
+platform_private.issue_registry_reviewed_admission_grant_v1(
+  p_evidence_assertion_id uuid,
+  p_operation_key text,
+  p_subject_type text,
+  p_subject_id uuid,
+  p_plan_payload jsonb,
+  p_idempotency_key text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path=pg_catalog,public,platform_private,auth,extensions
+as $$
+declare
+  v_user_id uuid;
+  v_operation_type platform_private.registry_operation_types%rowtype;
+  v_evidence platform_private.registry_evidence_assertions%rowtype;
+  v_existing platform_private.registry_execution_grants%rowtype;
+  v_expected_state_fingerprint text;
+  v_plan_fingerprint text;
+  v_target_fingerprint text;
+  v_ruleset text;
+  v_grant_id uuid;
+begin
+  v_user_id:=platform_private.registry_discography_current_admin_v1();
+
+  if p_operation_key not in (
+       'registry.draft_identity.reconcile',
+       'registry.track.activate',
+       'registry.release.activate'
+     )
+     or p_subject_type not in ('track','release')
+     or p_subject_id is null
+     or p_plan_payload is null
+     or jsonb_typeof(p_plan_payload)<>'object'
+     or p_idempotency_key is null
+     or p_idempotency_key !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'
+  then
+    raise exception using errcode='22023',
+      message='Reviewed admission grant request is malformed.';
+  end if;
+
+  select operation_type.*
+  into v_operation_type
+  from platform_private.registry_operation_types operation_type
+  where operation_type.operation_key=p_operation_key
+    and operation_type.operation_version=1
+    and operation_type.enabled;
+
+  if not found
+     or not (p_subject_type=any(v_operation_type.allowed_subject_types))
+     or not v_operation_type.requires_existing_target
+     or v_operation_type.max_targets<>1
+     or v_operation_type.max_rows_ceiling<1
+     or not v_operation_type.requires_human_approval
+     or not v_operation_type.requires_verifier
+  then
+    raise exception using errcode='42501',
+      message='Reviewed admission operation is disabled or malformed.';
+  end if;
+
+  if (
+       p_operation_key='registry.draft_identity.reconcile'
+       and v_operation_type.capability_key<>'reconcile_registry_draft_identity'
+     )
+     or (
+       p_operation_key='registry.track.activate'
+       and (
+         p_subject_type<>'track'
+         or v_operation_type.capability_key<>'activate_registry_track'
+       )
+     )
+     or (
+       p_operation_key='registry.release.activate'
+       and (
+         p_subject_type<>'release'
+         or v_operation_type.capability_key<>'activate_registry_release'
+       )
+     )
+  then
+    raise exception using errcode='42501',
+      message='Reviewed admission operation/capability pair is invalid.';
+  end if;
+
+  select assertion.*
+  into v_evidence
+  from platform_private.registry_evidence_assertions assertion
+  where assertion.id=p_evidence_assertion_id;
+
+  if not found
+     or v_evidence.recorded_by_principal_key<>'user:'||v_user_id::text
+     or v_evidence.trust_class not in ('EXTERNAL_EVIDENCE','INTERNAL_FACT')
+  then
+    raise exception using errcode='42501',
+      message='Reviewed admission evidence is not bound to the current user.';
+  end if;
+
+  if not platform_private.registry_subject_exists(
+       p_subject_type,p_subject_id
+     )
+  then
+    raise exception using errcode='42501',
+      message='Reviewed admission target does not exist.';
+  end if;
+
+  v_expected_state_fingerprint:=
+    platform_private.registry_subject_state_fingerprint(
+      p_subject_type,p_subject_id
+    );
+
+  if v_expected_state_fingerprint is null then
+    raise exception using errcode='42501',
+      message='Reviewed admission target state fingerprint is missing.';
+  end if;
+
+  v_ruleset:=case
+    when p_operation_key='registry.draft_identity.reconcile'
+      then 'registry-reviewed-admission-identity-v1'
+    else 'registry-reviewed-lifecycle-v1'
+  end;
+
+  if p_plan_payload->>'operation_key' is distinct from p_operation_key
+     or coalesce((p_plan_payload->>'operation_version')::integer,0)<>1
+     or p_plan_payload->>'expected_state_fingerprint'
+          is distinct from v_expected_state_fingerprint
+     or p_plan_payload->>'evidence_assertion_id'
+          is distinct from v_evidence.id::text
+     or p_plan_payload->>'evidence_assertion_fingerprint'
+          is distinct from v_evidence.assertion_fingerprint
+     or p_plan_payload->>'trust_class'
+          is distinct from v_evidence.trust_class
+     or p_plan_payload->>'policy_ruleset_version'
+          is distinct from v_ruleset
+     or nullif(p_plan_payload->>'review_plan_id','') is null
+     or nullif(p_plan_payload->>'child_ref','') is null
+     or nullif(p_plan_payload->>'child_payload_fingerprint','') is null
+  then
+    raise exception using errcode='42501',
+      message='Reviewed admission execution plan is not bound to current evidence/state authority.';
+  end if;
+
+  v_plan_fingerprint:=
+    platform_private.registry_plan_fingerprint(p_plan_payload);
+
+  v_target_fingerprint:=encode(
+    extensions.digest(
+      jsonb_build_array(
+        jsonb_build_object(
+          'subject_type',p_subject_type,
+          'subject_id',p_subject_id::text,
+          'expected_state_fingerprint',v_expected_state_fingerprint
+        )
+      )::text,
+      'sha256'
+    ),
+    'hex'
+  );
+
+  select execution_grant.*
+  into v_existing
+  from platform_private.registry_execution_grants execution_grant
+  where execution_grant.actor_key='registry_discography_admin'
+    and execution_grant.operation_key=p_operation_key
+    and execution_grant.operation_version=1
+    and execution_grant.idempotency_key=p_idempotency_key;
+
+  if found then
+    if v_existing.issued_by_user_id<>v_user_id
+       or v_existing.plan_fingerprint<>v_plan_fingerprint
+       or v_existing.target_set_fingerprint<>v_target_fingerprint
+       or v_existing.max_rows<>1
+    then
+      raise exception using errcode='23505',
+        message='Reviewed admission idempotency key is bound to different authority.';
+    end if;
+    return v_existing.id;
+  end if;
+
+  insert into platform_private.registry_execution_grants (
+    actor_key,capability_key,system_actor_capability_grant_id,
+    operation_key,operation_version,plan_payload,plan_fingerprint,
+    target_set_fingerprint,max_rows,idempotency_key,status,
+    issued_by_user_id,issued_by_principal_key,policy_ruleset_version,
+    required_user_capability_key,issued_at,expires_at
+  )
+  values (
+    'registry_discography_admin',
+    v_operation_type.capability_key,
+    null,
+    p_operation_key,
+    1,
+    p_plan_payload,
+    v_plan_fingerprint,
+    v_target_fingerprint,
+    1,
+    p_idempotency_key,
+    'active',
+    v_user_id,
+    'user:'||v_user_id::text,
+    v_ruleset,
+    'manage_registry',
+    now(),
+    now()+interval '5 minutes'
+  )
+  returning id into v_grant_id;
+
+  insert into platform_private.registry_execution_grant_targets (
+    execution_grant_id,subject_type,subject_id,expected_state_fingerprint
+  )
+  values (
+    v_grant_id,p_subject_type,p_subject_id,v_expected_state_fingerprint
+  );
+
+  return v_grant_id;
+end
+$$;
+
+
+-- ---------------------------------------------------------------------------
+-- Preserve the accepted Discography V1 planner as a core and compose the new
+-- Reviewed Registry Admission Spine around its domain-specific operation graph.
+-- ---------------------------------------------------------------------------
+
+alter function
+  platform_private.registry_discography_build_frozen_plan_v1(
+    uuid,uuid,uuid,jsonb
+  )
+rename to registry_discography_build_frozen_plan_core_v1;
+
+create function
+platform_private.registry_discography_build_frozen_plan_v1(
+  p_artist_id uuid,
+  p_evidence_assertion_id uuid,
+  p_snapshot_id uuid,
+  p_reviewed_selections jsonb
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path=pg_catalog,public,platform_private
+as $$
+declare
+  v_snapshot platform_private.registry_discography_provider_snapshots%rowtype;
+  v_plan jsonb;
+  v_operations jsonb:='[]'::jsonb;
+  v_reconciliations jsonb:='[]'::jsonb;
+  v_track_activations jsonb:='[]'::jsonb;
+  v_release_activations jsonb:='[]'::jsonb;
+  v_operation jsonb;
+  v_album jsonb;
+  v_track jsonb;
+  v_create jsonb;
+  v_subject_id uuid;
+  v_current_status text;
+  v_current_slug text;
+  v_canonical_slug text;
+  v_album_id text;
+  v_track_apple_id text;
+  v_accepted_album_ids jsonb;
+  v_reviewed_count integer;
+  v_accepted_count integer;
+  v_left_count integer;
+  v_reconcile_count integer:=0;
+  v_track_activation_count integer:=0;
+  v_release_activation_count integer:=0;
+begin
+  select snapshot.*
+  into v_snapshot
+  from platform_private.registry_discography_provider_snapshots snapshot
+  where snapshot.id=p_snapshot_id
+    and snapshot.artist_id=p_artist_id;
+
+  if not found then
+    raise exception using errcode='P0002',
+      message='Immutable Discography snapshot is missing.';
+  end if;
+
+  v_plan:=
+    platform_private.registry_discography_build_frozen_plan_core_v1(
+      p_artist_id,
+      p_evidence_assertion_id,
+      p_snapshot_id,
+      p_reviewed_selections
+    );
+
+  select
+    count(*)::integer,
+    count(*) filter (where selection->>'action'<>'ignore')::integer,
+    count(*) filter (where selection->>'action'='ignore')::integer,
+    coalesce(
+      jsonb_agg(
+        to_jsonb(selection->>'apple_music_id')
+        order by selection->>'apple_music_id'
+      ) filter (where selection->>'action'<>'ignore'),
+      '[]'::jsonb
+    )
+  into
+    v_reviewed_count,
+    v_accepted_count,
+    v_left_count,
+    v_accepted_album_ids
+  from jsonb_array_elements(p_reviewed_selections) selection;
+
+  -- Preserve existing domain operations, but the Artist provider summary may
+  -- contain only explicitly admitted Album IDs. Leave-all performs no summary
+  -- mutation and still retains the immutable observation/review receipt.
+  for v_operation in
+    select value
+    from jsonb_array_elements(v_plan->'operations')
+    with ordinality as operation(value,ordinality)
+    order by ordinality
+  loop
+    if v_operation->>'operation_key'=
+       'registry.artist.discography_summary.admit'
+    then
+      if v_accepted_count>0 then
+        v_operation:=jsonb_set(
+          v_operation,
+          '{payload,apple_music_album_ids}',
+          v_accepted_album_ids,
+          true
+        );
+        v_operations:=v_operations||jsonb_build_array(v_operation);
+      end if;
+    else
+      v_operations:=v_operations||jsonb_build_array(v_operation);
+    end if;
+  end loop;
+
+  -- Draft Release identity reconciliation. Provider packaging is structural
+  -- evidence available here, so it is removed before first activation.
+  for v_operation in
+    select value
+    from jsonb_array_elements(v_plan->'operations')
+    where value->>'operation_key'='registry.release.provider_profile.admit'
+    order by value->>'subject_id'
+  loop
+    v_subject_id:=(v_operation->>'subject_id')::uuid;
+    v_album_id:=v_operation#>>'{payload,apple_music_album_id}';
+
+    select value
+    into v_album
+    from jsonb_array_elements(v_snapshot.observation->'albums')
+    where value->>'apple_music_id'=v_album_id;
+
+    if v_album is null then
+      raise exception using errcode='40001',
+        message='Accepted Release disappeared from immutable provider evidence.';
+    end if;
+
+    v_canonical_slug:=
+      platform_private.registry_reviewed_release_slug_v1(
+        v_album->>'title',
+        v_album->>'release_type',
+        p_artist_id
+      );
+
+    select release.status,release.slug
+    into v_current_status,v_current_slug
+    from public.registry_releases release
+    where release.id=v_subject_id;
+
+    if not found then
+      select value
+      into v_create
+      from jsonb_array_elements(v_plan->'operations')
+      where value->>'operation_key'='registry.release.create'
+        and (value->>'subject_id')::uuid=v_subject_id;
+
+      if v_create is null then
+        raise exception using errcode='40001',
+          message='Future accepted Release has no frozen materialization operation.';
+      end if;
+
+      v_current_status:='draft';
+      v_current_slug:=v_create#>>'{payload,slug}';
+    end if;
+
+    if v_current_status not in ('draft','active') then
+      raise exception using errcode='23514',
+        message='Active Discography ingest only accepts active or draft Release targets.';
+    end if;
+
+    if v_current_status='draft'
+       and v_current_slug is distinct from v_canonical_slug
+    then
+      v_reconciliations:=v_reconciliations||jsonb_build_array(
+        jsonb_build_object(
+          'ref','release.identity_reconcile:'||v_subject_id::text,
+          'kind','identity_reconciliation',
+          'operation_key','registry.draft_identity.reconcile',
+          'subject_type','release',
+          'subject_id',v_subject_id,
+          'payload',jsonb_build_object(
+            'current_slug',v_current_slug,
+            'canonical_slug',v_canonical_slug,
+            'identity_artist_id',p_artist_id,
+            'reason','reviewed_provider_release_identity'
+          )
+        )
+      );
+      v_reconcile_count:=v_reconcile_count+1;
+    end if;
+
+    if v_current_status='draft' then
+      v_release_activations:=v_release_activations||jsonb_build_array(
+        jsonb_build_object(
+          'ref','release.activate:'||v_subject_id::text,
+          'kind','lifecycle',
+          'operation_key','registry.release.activate',
+          'subject_type','release',
+          'subject_id',v_subject_id,
+          'payload',jsonb_build_object(
+            'from_status','draft',
+            'to_status','active',
+            'terminal_policy','active_ingest_v1'
+          )
+        )
+      );
+      v_release_activation_count:=v_release_activation_count+1;
+    end if;
+  end loop;
+
+  -- Draft Track identity reconciliation. Track slugs are Artist-scoped title
+  -- identity; old pre-convergence shells are repaired before first activation.
+  for v_operation in
+    select value
+    from jsonb_array_elements(v_plan->'operations')
+    where value->>'operation_key'='registry.track.provider_profile.admit'
+    order by value->>'subject_id'
+  loop
+    v_subject_id:=(v_operation->>'subject_id')::uuid;
+    v_track_apple_id:=v_operation#>>'{payload,apple_music_track_id}';
+
+    select track
+    into v_track
+    from jsonb_array_elements(v_snapshot.observation->'albums') album
+    cross join lateral jsonb_array_elements(album->'tracks') track
+    where track->>'apple_music_id'=v_track_apple_id
+    limit 1;
+
+    if v_track is null then
+      raise exception using errcode='40001',
+        message='Accepted Track disappeared from immutable provider evidence.';
+    end if;
+
+    v_canonical_slug:=
+      platform_private.registry_track_creation_slug_v1(
+        v_track->>'title',p_artist_id
+      );
+
+    select track_row.status,track_row.slug
+    into v_current_status,v_current_slug
+    from public.registry_tracks track_row
+    where track_row.id=v_subject_id;
+
+    if not found then
+      select value
+      into v_create
+      from jsonb_array_elements(v_plan->'operations')
+      where value->>'operation_key'='registry.track.create'
+        and (value->>'subject_id')::uuid=v_subject_id;
+
+      if v_create is null then
+        raise exception using errcode='40001',
+          message='Future accepted Track has no frozen materialization operation.';
+      end if;
+
+      v_current_status:='draft';
+      v_current_slug:=v_create#>>'{payload,slug}';
+    end if;
+
+    if v_current_status not in ('draft','active') then
+      raise exception using errcode='23514',
+        message='Active Discography ingest only accepts active or draft Track targets.';
+    end if;
+
+    if v_current_status='draft'
+       and v_current_slug is distinct from v_canonical_slug
+    then
+      v_reconciliations:=v_reconciliations||jsonb_build_array(
+        jsonb_build_object(
+          'ref','track.identity_reconcile:'||v_subject_id::text,
+          'kind','identity_reconciliation',
+          'operation_key','registry.draft_identity.reconcile',
+          'subject_type','track',
+          'subject_id',v_subject_id,
+          'payload',jsonb_build_object(
+            'current_slug',v_current_slug,
+            'canonical_slug',v_canonical_slug,
+            'identity_artist_id',p_artist_id,
+            'reason','artist_scoped_track_identity'
+          )
+        )
+      );
+      v_reconcile_count:=v_reconcile_count+1;
+    end if;
+
+    if v_current_status='draft' then
+      v_track_activations:=v_track_activations||jsonb_build_array(
+        jsonb_build_object(
+          'ref','track.activate:'||v_subject_id::text,
+          'kind','lifecycle',
+          'operation_key','registry.track.activate',
+          'subject_type','track',
+          'subject_id',v_subject_id,
+          'payload',jsonb_build_object(
+            'from_status','draft',
+            'to_status','active',
+            'terminal_policy','active_ingest_v1'
+          )
+        )
+      );
+      v_track_activation_count:=v_track_activation_count+1;
+    end if;
+  end loop;
+
+  -- Relationships/provider facts land before lifecycle transition. Tracks
+  -- activate before Releases, so Release activation can enforce active members.
+  v_operations:=
+    v_operations||
+    v_reconciliations||
+    v_track_activations||
+    v_release_activations;
+
+  return
+    (v_plan-'operations'-'summary'-'plan_version')
+    || jsonb_build_object(
+      'plan_version',2,
+      'terminal_policy','active_ingest_v1',
+      'operations',v_operations,
+      'summary',
+        coalesce(v_plan->'summary','{}'::jsonb)
+        || jsonb_build_object(
+          'reviewed',v_reviewed_count,
+          'accepted',v_accepted_count,
+          'left',v_left_count,
+          'identity_reconciliations',v_reconcile_count,
+          'track_activations',v_track_activation_count,
+          'release_activations',v_release_activation_count
+        )
+    );
+end
+$$;
+
+
+-- Freeze explicitly through the new composed planner rather than relying on
+-- dependency re-resolution after the core function rename.
+
+create or replace function
+platform_private.freeze_registry_discography_review_plan_v1(
+  p_artist_id uuid,
+  p_evidence_assertion_id uuid,
+  p_reviewed_selections jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path=pg_catalog,public,platform_private,auth
+as $$
+declare
+  v_user_id uuid;
+  v_evidence platform_private.registry_evidence_assertions%rowtype;
+  v_snapshot platform_private.registry_discography_provider_snapshots%rowtype;
+  v_normalized jsonb;
+  v_selection_fingerprint text;
+  v_frozen_plan jsonb;
+  v_plan_fingerprint text;
+  v_review_plan_id uuid;
+begin
+  v_user_id:=platform_private.registry_discography_current_admin_v1();
+
+  select assertion.*
+  into v_evidence
+  from platform_private.registry_evidence_assertions assertion
+  where assertion.id=p_evidence_assertion_id;
+
+  if not found
+     or v_evidence.subject_type<>'artist'
+     or v_evidence.subject_id<>p_artist_id
+     or v_evidence.claim_key<>'registry.artist.discography.provider_snapshot'
+     or v_evidence.trust_class<>'EXTERNAL_EVIDENCE'
+     or v_evidence.recorded_by_principal_key<>'user:'||v_user_id::text
+     or v_evidence.observed_at<now()-interval '30 days'
+     or v_evidence.observed_at>now()+interval '5 minutes'
+  then
+    raise exception using errcode='42501',
+      message='Reviewed Discography evidence is missing, stale, or belongs to another principal/Artist.';
+  end if;
+
+  select snapshot.*
+  into v_snapshot
+  from platform_private.registry_discography_provider_snapshots snapshot
+  where snapshot.id=(v_evidence.claim_payload->>'snapshot_id')::uuid
+    and snapshot.artist_id=p_artist_id
+    and snapshot.recorded_by_user_id=v_user_id
+    and snapshot.source_payload_fingerprint=
+        v_evidence.source_payload_fingerprint
+    and snapshot.observation_fingerprint=
+        v_evidence.claim_payload->>'observation_fingerprint';
+
+  if not found
+     or platform_private.registry_discography_observation_fingerprint_v1(
+          v_snapshot.observation
+        )<>v_snapshot.observation_fingerprint
+  then
+    raise exception using errcode='42501',
+      message='Immutable Discography provider snapshot no longer satisfies reviewed evidence.';
+  end if;
+
+  v_normalized:=
+    platform_private.registry_discography_normalize_reviewed_selections_v1(
+      p_artist_id,
+      v_snapshot.observation,
+      p_reviewed_selections
+    );
+
+  v_selection_fingerprint:=
+    platform_private.registry_discography_set_fingerprint_v1(v_normalized);
+
+  select review.id
+  into v_review_plan_id
+  from platform_private.registry_discography_review_plans review
+  where review.reviewed_by_user_id=v_user_id
+    and review.evidence_assertion_id=p_evidence_assertion_id
+    and review.selection_fingerprint=v_selection_fingerprint;
+
+  if found then
+    return v_review_plan_id;
+  end if;
+
+  v_frozen_plan:=
+    platform_private.registry_discography_build_frozen_plan_v1(
+      p_artist_id,
+      p_evidence_assertion_id,
+      v_snapshot.id,
+      v_normalized
+    );
+
+  v_plan_fingerprint:=
+    platform_private.registry_discography_observation_fingerprint_v1(
+      v_frozen_plan
+    );
+
+  insert into platform_private.registry_discography_review_plans (
+    artist_id,evidence_assertion_id,snapshot_id,reviewed_by_user_id,
+    reviewed_selections,selection_fingerprint,
+    frozen_plan,frozen_plan_fingerprint
+  )
+  values (
+    p_artist_id,p_evidence_assertion_id,v_snapshot.id,v_user_id,
+    v_normalized,v_selection_fingerprint,
+    v_frozen_plan,v_plan_fingerprint
+  )
+  on conflict (
+    reviewed_by_user_id,evidence_assertion_id,selection_fingerprint
+  ) do nothing
+  returning id into v_review_plan_id;
+
+  if v_review_plan_id is null then
+    select review.id
+    into v_review_plan_id
+    from platform_private.registry_discography_review_plans review
+    where review.reviewed_by_user_id=v_user_id
+      and review.evidence_assertion_id=p_evidence_assertion_id
+      and review.selection_fingerprint=v_selection_fingerprint;
+  end if;
+
+  return v_review_plan_id;
+end
+$$;
+
