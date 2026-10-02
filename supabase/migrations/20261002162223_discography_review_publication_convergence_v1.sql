@@ -1483,6 +1483,16 @@ begin
   end if;
 
   if v_target.subject_type='track' then
+    if not exists (
+      select 1
+      from public.registry_track_artists credit
+      where credit.track_id=v_target.subject_id
+        and credit.status='active'
+    ) then
+      raise exception using errcode='23514',
+        message='Track activation requires at least one active reviewed Artist credit.';
+    end if;
+
     update public.registry_tracks
     set status='active',updated_at=now()
     where id=v_target.subject_id
@@ -2193,11 +2203,11 @@ begin
     v_subject_id:=(v_operation->>'subject_id')::uuid;
     v_track_apple_id:=v_operation#>>'{payload,apple_music_track_id}';
 
-    select track
+    select track_payload
     into v_track
     from jsonb_array_elements(v_snapshot.observation->'albums') album
-    cross join lateral jsonb_array_elements(album->'tracks') track
-    where track->>'apple_music_id'=v_track_apple_id
+    cross join lateral jsonb_array_elements(album->'tracks') track_payload
+    where track_payload->>'apple_music_id'=v_track_apple_id
     limit 1;
 
     if v_track is null then
@@ -2960,7 +2970,7 @@ begin
      )<>v_observed_count
   then
     v_blockers:=v_blockers||
-      to_jsonb('review_decision_set_not_exhaustive');
+      jsonb_build_array('review_decision_set_not_exhaustive');
   end if;
 
   select count(*)::integer
@@ -2971,7 +2981,7 @@ begin
 
   if v_release_count<>v_accepted_count then
     v_blockers:=v_blockers||
-      to_jsonb('accepted_release_operation_count_mismatch');
+      jsonb_build_array('accepted_release_operation_count_mismatch');
   end if;
 
   if exists (
@@ -2988,7 +2998,7 @@ begin
       )
   ) then
     v_blockers:=v_blockers||
-      to_jsonb('left_release_escaped_into_canonical_plan');
+      jsonb_build_array('left_release_escaped_into_canonical_plan');
   end if;
 
   select count(*)::integer
@@ -3005,7 +3015,7 @@ begin
 
   if v_active_release_count<>v_release_count then
     v_blockers:=v_blockers||
-      to_jsonb('accepted_release_not_active');
+      jsonb_build_array('accepted_release_not_active');
   end if;
 
   select count(*)::integer
@@ -3031,7 +3041,7 @@ begin
 
   if v_active_track_count<>v_track_count then
     v_blockers:=v_blockers||
-      to_jsonb('accepted_track_not_active');
+      jsonb_build_array('accepted_track_not_active');
   end if;
 
   if exists (
@@ -3050,7 +3060,7 @@ begin
       )
   ) then
     v_blockers:=v_blockers||
-      to_jsonb('accepted_release_has_no_active_track_membership');
+      jsonb_build_array('accepted_release_has_no_active_track_membership');
   end if;
 
   -- Any reviewed draft-identity repair must be visible in the final active
@@ -3081,7 +3091,7 @@ begin
 
     if v_actual_slug is distinct from v_expected_slug then
       v_blockers:=v_blockers||
-        to_jsonb(
+        jsonb_build_array(
           'reconciled_identity_not_canonical:'||
           (v_operation->>'subject_type')||':'||
           v_subject_id::text
