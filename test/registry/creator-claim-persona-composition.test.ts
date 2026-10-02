@@ -56,6 +56,12 @@ describe("Creator claim Person↔Artist persona composition", () => {
     expect(sql).toContain(
       "v_claim.claimant_role<>'artist'",
     );
+    expect(sql).toContain(
+      "'claimant_role<>''artist''' in",
+    );
+    expect(sql).not.toContain(
+      "'claimant_role<>''artist''',",
+    );
   });
 
   it("derives persona authority from the reviewed claim rather than a name match", () => {
@@ -112,6 +118,12 @@ describe("Creator claim Person↔Artist persona composition", () => {
     );
     expect(verifier).toContain(
       "direct persona-link DML leaked",
+    );
+    expect(verifier).toContain(
+      "'claimant_role=''artist''' in",
+    );
+    expect(verifier).not.toContain(
+      "'claimant_role=''artist''',",
     );
   });
 });
