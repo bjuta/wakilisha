@@ -387,7 +387,7 @@ begin
      or position('registry.person_artist.link' in v_private_definition)=0
      or position('admin_link_person_registry_artist_v1' in v_private_definition)=0
      or position(
-       'claimant_role<>''artist''',
+       'claimant_role<>''artist''' in
        replace(v_private_definition,' ','')
      )=0
   then
