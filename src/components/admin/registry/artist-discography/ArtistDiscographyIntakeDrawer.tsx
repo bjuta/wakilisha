@@ -570,7 +570,7 @@ function AlbumCard({ album, action, onAction, applying, additionalPrimaryArtists
           } disabled:opacity-50`}
         >
           <WkIcon name={action === "canonicalize" ? "CheckCircle" : "PlusCircle"} size={13} />
-          {action === "canonicalize" ? "Will Canonicalize" : "Canonicalize (create new)"}
+          {action === "canonicalize" ? "Will Add" : "Add to Registry"}
         </button>
         <button
           onClick={() => onAction(album.apple_music_id, "ignore")}
@@ -582,7 +582,7 @@ function AlbumCard({ album, action, onAction, applying, additionalPrimaryArtists
           } disabled:opacity-50`}
         >
           <WkIcon name={action === "ignore" ? "MinusCircle" : "XCircle"} size={13} />
-          {action === "ignore" ? "Ignored" : "Ignore"}
+          {action === "ignore" ? "Will Leave" : "Leave"}
         </button>
         {action !== "ignore" && (
           <button
@@ -675,12 +675,9 @@ export function ArtistDiscographyIntakeDrawer({
         setFailedCount(response.albums_failed.length);
         setEvidenceAssertionId(response.evidence_assertion_id);
 
-        const autoActions: Record<string, AlbumAction> = {};
-        for (const album of enrichedAlbums) {
-          autoActions[album.apple_music_id] =
-            album.match_status === "existing" ? "merge" : "canonicalize";
-        }
-        setActions(autoActions);
+        // Review is explicit. Provider observation never implies admission.
+        setActions({});
+        setAdditionalPrimaryArtists({});
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch preview");
       } finally {
@@ -732,16 +729,19 @@ export function ArtistDiscographyIntakeDrawer({
   }, [artistId]);
 
   const handleApply = async () => {
-    const selectedAlbums = Object.entries(actions).map(([apple_music_id, action]) => ({
-      apple_music_id,
-      action,
-      additional_primary_artists: additionalPrimaryArtists[apple_music_id] || [],
-    }));
-
-    if (selectedAlbums.length === 0) {
-      setApplyError("Select at least one album with an action before applying.");
+    const missingDecisions = albums.filter((album) => !actions[album.apple_music_id]);
+    if (missingDecisions.length > 0) {
+      setApplyError(
+        `Review every release before applying. ${missingDecisions.length} decision${missingDecisions.length === 1 ? "" : "s"} remaining.`
+      );
       return;
     }
+
+    const selectedAlbums = albums.map((album) => ({
+      apple_music_id: album.apple_music_id,
+      action: actions[album.apple_music_id],
+      additional_primary_artists: additionalPrimaryArtists[album.apple_music_id] || [],
+    }));
 
     if (!evidenceAssertionId) {
       setApplyError("Immutable preview evidence is unavailable. Close and reopen the intake drawer before applying.");
@@ -791,27 +791,15 @@ export function ArtistDiscographyIntakeDrawer({
           {mergeCount + canonCount} album{mergeCount + canonCount !== 1 ? "s" : ""} selected
         </p>
         <p className="text-[11px] text-[#697062]">
-          {ignoreCount} ignored
+          {ignoreCount} left out
           {unsetCount > 0 ? (
-            <span className="ml-1 text-[#b8bfb2]">· {unsetCount} unset will be skipped</span>
-          ) : null}
+            <span className="ml-1 font-bold text-amber-700">· {unsetCount} decision{unsetCount === 1 ? "" : "s"} required</span>
+          ) : (
+            <span className="ml-1 font-bold text-emerald-700">· review complete</span>
+          )}
         </p>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <button
-          onClick={() => {
-            setApplyError(null);
-            const autoActions: Record<string, AlbumAction> = {};
-            for (const album of albums) {
-              autoActions[album.apple_music_id] = album.match_status === "existing" ? "merge" : "canonicalize";
-            }
-            setActions(autoActions);
-          }}
-          disabled={applying}
-          className="wk-button wk-button-ghost wk-button-sm"
-        >
-          Reset defaults
-        </button>
         <button
           onClick={() => {
             setApplyError(null);
@@ -830,7 +818,7 @@ export function ArtistDiscographyIntakeDrawer({
               handleApply();
             }
           }}
-          disabled={applying || mergeCount + canonCount === 0}
+          disabled={applying || unsetCount > 0}
           className="wk-button wk-button-primary wk-button-sm"
         >
           {applying ? (
@@ -841,7 +829,7 @@ export function ArtistDiscographyIntakeDrawer({
           ) : (
             <>
               <WkIcon name="Zap" size={14} />
-              Apply {mergeCount + canonCount} album{mergeCount + canonCount !== 1 ? "s" : ""}
+              Apply review
             </>
           )}
         </button>
@@ -1067,13 +1055,13 @@ export function ArtistDiscographyIntakeDrawer({
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                 {mergeCount} merge
                 <span className="h-1.5 w-1.5 rounded-full bg-[#85c441]" />
-                {canonCount} canonicalize
+                {canonCount} add
                 <span className="h-1.5 w-1.5 rounded-full bg-[#d0d0d0]" />
-                {ignoreCount} ignore
+                {ignoreCount} leave
                 {unsetCount > 0 && (
                   <>
                     <span className="h-1.5 w-1.5 rounded-full bg-[#b8bfb2]" />
-                    {unsetCount} unset
+                    {unsetCount} to review
                   </>
                 )}
               </div>

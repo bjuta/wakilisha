@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20261002162223_discography_review_publication_convergence_v1.sql",
+  "migration_sha256": "4d4cf5e2f0392fcf2382623ced4e4ebfb38c73a2e8686b86b2424724f35d3d38",
+  "base_main_sha": "3b952c00ea7f59c3c2a2ef76258709f20e7cbeea",
+  "preview_project_ref": "dtbapfborutequqlpmgq",
+  "preview_branch_id": "73d77bf9-1b21-47de-beba-3bbbb736c91b",
+  "preview_migration_head": "20261002162223",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-registry-discography-authority.sql",
+  "schema_types_sha256": "fb819cc37ff60c96e721e7a87b389786186c09dc4f3a09da907bda8c73fac980",
+  "schema_migration_count": 199,
+  "schema_migration_head": "20261002162223",
+  "verified_at": "2026-10-03T22:47:29.422Z"
+}
