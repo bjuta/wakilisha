@@ -107,11 +107,13 @@ begin
     'admit_registry_artist_discography_summary',
     'replace_registry_release_artist_set',
     'replace_registry_release_track_set',
-    'replace_registry_track_artist_credit_set'
+    'replace_registry_track_artist_credit_set',
+    'activate_registry_release',
+    'reconcile_registry_draft_identity'
   )
     and domain = 'registry';
 
-  if v_count <> 7 then
+  if v_count <> 9 then
     raise exception 'Discography V1 capability vocabulary is incomplete';
   end if;
 
@@ -125,7 +127,9 @@ begin
       'admit_registry_artist_discography_summary',
       'replace_registry_release_artist_set',
       'replace_registry_release_track_set',
-      'replace_registry_track_artist_credit_set'
+      'replace_registry_track_artist_credit_set',
+      'activate_registry_release',
+      'reconcile_registry_draft_identity'
     )
   ) then
     raise exception 'Discography V1 internal operation capability leaked into a standing product role';
@@ -141,10 +145,12 @@ begin
     'registry.artist.discography_summary.admit',
     'registry.release_artist_set.replace',
     'registry.release_track_set.replace',
-    'registry.track_artist_credit_set.replace'
+    'registry.track_artist_credit_set.replace',
+    'registry.release.activate',
+    'registry.draft_identity.reconcile'
   );
 
-  if v_count <> 7 then
+  if v_count <> 9 then
     raise exception 'Discography V1 operation family is incomplete';
   end if;
 
@@ -158,7 +164,9 @@ begin
       'registry.artist.discography_summary.admit',
       'registry.release_artist_set.replace',
       'registry.release_track_set.replace',
-      'registry.track_artist_credit_set.replace'
+      'registry.track_artist_credit_set.replace',
+      'registry.release.activate',
+      'registry.draft_identity.reconcile'
     )
   loop
     if v_operation.operation_version <> 1
@@ -183,7 +191,9 @@ begin
       'registry.artist.discography_summary.admit',
       'registry.release_artist_set.replace',
       'registry.release_track_set.replace',
-      'registry.track_artist_credit_set.replace'
+      'registry.track_artist_credit_set.replace',
+      'registry.release.activate',
+      'registry.draft_identity.reconcile'
     )
       and (
         (operation_type.operation_key = 'registry.discography.apply'
@@ -221,6 +231,16 @@ begin
             or operation_type.risk_class <> 'high'
             or operation_type.allowed_subject_types <> array['track']::text[]
             or operation_type.max_rows_ceiling <> 64))
+        or (operation_type.operation_key = 'registry.release.activate'
+          and (operation_type.capability_key <> 'activate_registry_release'
+            or operation_type.risk_class <> 'medium'
+            or operation_type.allowed_subject_types <> array['release']::text[]
+            or operation_type.max_rows_ceiling <> 1))
+        or (operation_type.operation_key = 'registry.draft_identity.reconcile'
+          and (operation_type.capability_key <> 'reconcile_registry_draft_identity'
+            or operation_type.risk_class <> 'medium'
+            or operation_type.allowed_subject_types <> array['track','release']::text[]
+            or operation_type.max_rows_ceiling <> 1))
       )
   ) then
     raise exception 'Discography V1 operation capability/risk/ceiling mapping drifted';
@@ -276,8 +296,16 @@ begin
     'platform_private.record_registry_discography_provider_evidence_v1(uuid,jsonb,text)',
     'platform_private.freeze_registry_discography_review_plan_v1(uuid,uuid,jsonb)',
     'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)',
+    'platform_private.registry_discography_build_frozen_plan_core_v1(uuid,uuid,uuid,jsonb)',
+    'platform_private.issue_registry_reviewed_admission_grant_v1(uuid,text,text,uuid,jsonb,text)',
+    'platform_private.execute_registry_reviewed_identity_reconciliation_v1(text,uuid)',
+    'platform_private.verify_registry_reviewed_identity_reconciliation_v1(uuid)',
+    'platform_private.execute_registry_reviewed_lifecycle_v1(text,uuid)',
+    'platform_private.verify_registry_reviewed_lifecycle_v1(uuid)',
     'platform_private.execute_registry_discography_operation_v1(uuid)',
     'platform_private.verify_registry_discography_operation_v1(uuid)',
+    'platform_private.verify_registry_discography_operation_core_v1(uuid)',
+    'mizizi_private.registry_reviewed_admission_sentry_v1(uuid)',
     'public.admin_prepare_registry_discography_evidence_v1(uuid,jsonb,text)',
     'public.admin_preview_registry_discography_evidence_v1(uuid)',
     'public.admin_create_registry_discography_artist_shell_v1(uuid,text)',
@@ -339,7 +367,7 @@ begin
   -- Multiple selected provider Albums must not resolve to one canonical Track
   -- with conflicting provider-profile facts.
   select pg_get_functiondef(
-    to_regprocedure('platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)')
+    to_regprocedure('platform_private.registry_discography_build_frozen_plan_core_v1(uuid,uuid,uuid,jsonb)')
   ) into v_definition;
   if position('v_track_buckets->v_track_key' in v_definition)=0
      or position('is distinct from v_profile' in v_definition)=0
@@ -349,6 +377,70 @@ begin
      )=0
   then
     raise exception 'Discography canonical Track provider-profile ambiguity guard drifted';
+  end if;
+
+  -- Reviewed admission must require an exhaustive decision set, allow Leave-all,
+  -- compose draft identity reconciliation + active lifecycle, and bind parent
+  -- finalization to the MIZIZI sentry.
+  select pg_get_functiondef(
+    to_regprocedure(
+      'platform_private.registry_discography_normalize_reviewed_selections_v1(uuid,jsonb,jsonb)'
+    )
+  ) into v_definition;
+  if position(
+       'Every observed Release requires one explicit Discography review decision.'
+       in v_definition
+     )=0
+     or position('plan cannot ignore every Album' in v_definition)>0
+  then
+    raise exception 'Discography exhaustive explicit-review authority drifted';
+  end if;
+
+  select pg_get_functiondef(
+    to_regprocedure(
+      'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)'
+    )
+  ) into v_definition;
+  if position('active_ingest_v1' in v_definition)=0
+     or position('registry.track.activate' in v_definition)=0
+     or position('registry.release.activate' in v_definition)=0
+     or position('registry.draft_identity.reconcile' in v_definition)=0
+  then
+    raise exception 'Discography active-ingest terminal plan drifted';
+  end if;
+
+  select pg_get_functiondef(
+    to_regprocedure(
+      'platform_private.registry_track_creation_slug_v1(text,uuid)'
+    )
+  ) into v_definition;
+  if position('|| v_artist_slug' in v_definition)>0
+     or position('||v_artist_slug' in v_definition)>0
+  then
+    raise exception 'Track creation still duplicates Artist scope inside Track slug identity';
+  end if;
+
+  select pg_get_functiondef(
+    to_regprocedure(
+      'platform_private.registry_release_creation_slug_v1(text,uuid)'
+    )
+  ) into v_definition;
+  if position('|| v_artist_slug' in v_definition)>0
+     or position('||v_artist_slug' in v_definition)>0
+  then
+    raise exception 'Release creation still duplicates Artist scope inside Release slug identity';
+  end if;
+
+  select pg_get_functiondef(
+    to_regprocedure(
+      'mizizi_private.registry_reviewed_admission_sentry_v1(uuid)'
+    )
+  ) into v_definition;
+  if position('accepted_release_not_active' in v_definition)=0
+     or position('accepted_track_not_active' in v_definition)=0
+     or position('left_release_escaped_into_canonical_plan' in v_definition)=0
+  then
+    raise exception 'MIZIZI reviewed-admission terminal sentry drifted';
   end if;
 
   -- Exact grants must use semantic idempotency keys, never a state fingerprint
@@ -393,8 +485,16 @@ begin
     'platform_private.record_registry_discography_provider_evidence_v1(uuid,jsonb,text)',
     'platform_private.freeze_registry_discography_review_plan_v1(uuid,uuid,jsonb)',
     'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)',
+    'platform_private.registry_discography_build_frozen_plan_core_v1(uuid,uuid,uuid,jsonb)',
+    'platform_private.issue_registry_reviewed_admission_grant_v1(uuid,text,text,uuid,jsonb,text)',
+    'platform_private.execute_registry_reviewed_identity_reconciliation_v1(text,uuid)',
+    'platform_private.verify_registry_reviewed_identity_reconciliation_v1(uuid)',
+    'platform_private.execute_registry_reviewed_lifecycle_v1(text,uuid)',
+    'platform_private.verify_registry_reviewed_lifecycle_v1(uuid)',
     'platform_private.execute_registry_discography_operation_v1(uuid)',
-    'platform_private.verify_registry_discography_operation_v1(uuid)'
+    'platform_private.verify_registry_discography_operation_v1(uuid)',
+    'platform_private.verify_registry_discography_operation_core_v1(uuid)',
+    'mizizi_private.registry_reviewed_admission_sentry_v1(uuid)'
   ]
   loop
     foreach v_role in array array['public','anon','authenticated','service_role']
@@ -434,7 +534,9 @@ begin
         'replace_registry_release_artist_set',
         'replace_registry_release_track_set',
         'replace_registry_track_artist_credit_set',
-        'create_registry_release'
+        'create_registry_release',
+        'activate_registry_release',
+        'reconcile_registry_draft_identity'
       )
       and grant_row.status = 'active'
       and grant_row.valid_from <= now()
@@ -468,7 +570,10 @@ begin
         'registry.artist.discography_summary.admit',
         'registry.release_artist_set.replace',
         'registry.release_track_set.replace',
-        'registry.track_artist_credit_set.replace'
+        'registry.track_artist_credit_set.replace',
+        'registry.release.activate',
+        'registry.draft_identity.reconcile',
+        'registry.track.activate'
       )
       and (
         execution_grant.operation_version <> 1

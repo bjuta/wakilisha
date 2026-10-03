@@ -58,6 +58,12 @@ export interface DiscographyProviderObservation {
   failed_album_ids: string[];
 }
 
+export interface FrozenDiscographyReviewDecision {
+  apple_music_id: string;
+  action: DiscographyAlbumAction;
+  additional_primary_artists: DiscographyAdditionalPrimaryArtist[];
+}
+
 export interface FrozenDiscographyAlbumSelection {
   apple_music_id: string;
   action: Exclude<DiscographyAlbumAction, "ignore">;
@@ -73,6 +79,7 @@ export interface FrozenReviewedDiscographyPlan {
   provider_storefront: string;
   provider_acquired_at: string;
   provider_source_payload_fingerprint: string;
+  reviewed_decisions: FrozenDiscographyReviewDecision[];
   selected_albums: FrozenDiscographyAlbumSelection[];
 }
 
@@ -162,6 +169,7 @@ export function freezeReviewedDiscographyPlan(input: {
     albumById.set(albumId, album);
   }
 
+  const reviewedByAlbum = new Map<string, FrozenDiscographyReviewDecision>();
   const selectedByAlbum = new Map<string, FrozenDiscographyAlbumSelection>();
   for (const raw of input.selections ?? []) {
     const albumId = clean(raw.apple_music_id);
@@ -169,7 +177,7 @@ export function freezeReviewedDiscographyPlan(input: {
     if (!["merge", "canonicalize", "ignore"].includes(raw.action)) {
       throw new Error(`Reviewed album ${albumId} has an unsupported action.`);
     }
-    if (selectedByAlbum.has(albumId)) {
+    if (reviewedByAlbum.has(albumId)) {
       throw new Error(`Reviewed album ${albumId} appears more than once.`);
     }
 
@@ -178,21 +186,37 @@ export function freezeReviewedDiscographyPlan(input: {
       throw new Error(`Reviewed album ${albumId} was not present in the immutable provider observation.`);
     }
 
-    if (raw.action === "ignore") continue;
+    const additionalPrimaryArtists = normalizeAdditionalPrimaryArtists(
+      artistId,
+      raw.additional_primary_artists,
+    );
+    if (raw.action === "ignore" && additionalPrimaryArtists.length > 0) {
+      throw new Error(`Reviewed album ${albumId} cannot carry co-primary Artist authority when left out.`);
+    }
 
-    selectedByAlbum.set(albumId, {
+    reviewedByAlbum.set(albumId, {
       apple_music_id: albumId,
       action: raw.action,
-      additional_primary_artists: normalizeAdditionalPrimaryArtists(
-        artistId,
-        raw.additional_primary_artists,
-      ),
-      provider_album: observedAlbum,
+      additional_primary_artists: additionalPrimaryArtists,
     });
+
+    if (raw.action !== "ignore") {
+      selectedByAlbum.set(albumId, {
+        apple_music_id: albumId,
+        action: raw.action,
+        additional_primary_artists: additionalPrimaryArtists,
+        provider_album: observedAlbum,
+      });
+    }
   }
 
-  if (selectedByAlbum.size === 0) {
-    throw new Error("Reviewed discography plan has no albums selected for canonical action.");
+  if (reviewedByAlbum.size !== albumById.size) {
+    const missing = [...albumById.keys()]
+      .filter((albumId) => !reviewedByAlbum.has(albumId))
+      .sort();
+    throw new Error(
+      `Every observed release must be explicitly reviewed before Apply. Missing: ${missing.join(", ")}`,
+    );
   }
 
   return {
@@ -203,6 +227,9 @@ export function freezeReviewedDiscographyPlan(input: {
     provider_storefront: clean(input.observation.storefront),
     provider_acquired_at: acquiredAt,
     provider_source_payload_fingerprint: sourceFingerprint,
+    reviewed_decisions: [...reviewedByAlbum.values()].sort((left, right) =>
+      left.apple_music_id.localeCompare(right.apple_music_id)
+    ),
     selected_albums: [...selectedByAlbum.values()].sort((left, right) =>
       left.apple_music_id.localeCompare(right.apple_music_id)
     ),

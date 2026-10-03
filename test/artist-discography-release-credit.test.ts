@@ -166,6 +166,19 @@ describe("reviewed discography plan freezing", () => {
 
     expect(plan.artist_id).toBe(CURRENT_ARTIST_ID);
     expect(plan.provider_source_payload_fingerprint).toBe("a".repeat(64));
+    expect(plan.reviewed_decisions).toEqual([
+      {
+        apple_music_id: "apple-album-1",
+        action: "canonicalize",
+        additional_primary_artists: [
+          {
+            artist_id: OTHER_ARTIST_ID,
+            artist_slug: "djames",
+            artist_name: "DJames",
+          },
+        ],
+      },
+    ]);
     expect(plan.selected_albums).toHaveLength(1);
     expect(plan.selected_albums[0].provider_album).toEqual(observation.albums[0]);
     expect(plan.selected_albums[0].additional_primary_artists).toEqual([
@@ -202,15 +215,33 @@ describe("reviewed discography plan freezing", () => {
     })).toThrow("was not present in the immutable provider observation");
   });
 
-  it("rejects a reviewed plan with no canonical action", () => {
-    expect(() => freezeReviewedDiscographyPlan({
+  it("accepts an explicit leave-all review without canonical selections", () => {
+    const plan = freezeReviewedDiscographyPlan({
       exact_artist_id: CURRENT_ARTIST_ID,
       provider_source_payload_fingerprint: "d".repeat(64),
       observation: providerObservation(),
       selections: [
         { apple_music_id: "apple-album-1", action: "ignore" },
       ],
-    })).toThrow("has no albums selected for canonical action");
+    });
+
+    expect(plan.reviewed_decisions).toEqual([
+      {
+        apple_music_id: "apple-album-1",
+        action: "ignore",
+        additional_primary_artists: [],
+      },
+    ]);
+    expect(plan.selected_albums).toEqual([]);
+  });
+
+  it("rejects an incomplete review decision set", () => {
+    expect(() => freezeReviewedDiscographyPlan({
+      exact_artist_id: CURRENT_ARTIST_ID,
+      provider_source_payload_fingerprint: "f".repeat(64),
+      observation: providerObservation(),
+      selections: [],
+    })).toThrow("Every observed release must be explicitly reviewed before Apply");
   });
 
   it("rejects inconsistent canonical identity for the same co-primary Artist", () => {
