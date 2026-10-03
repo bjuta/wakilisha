@@ -148,9 +148,14 @@ function TrackRow({ track, index }: { track: PreviewTrack; index: number }) {
             <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase bg-[#f0f0f0] text-[#8a8a8a]">E</span>
           )}
         </div>
-        {track.isrc && (
-          <p className="text-[10px] font-mono text-[#97a290] mt-0.5">{track.isrc}</p>
-        )}
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          {track.artist_name && (
+            <p className="text-[10px] font-semibold text-[#697062]">{track.artist_name}</p>
+          )}
+          {track.isrc && (
+            <p className="text-[10px] font-mono text-[#97a290]">{track.isrc}</p>
+          )}
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-3">
         <span className="text-[11px] font-mono text-[#b8bfb2]">{track.duration_display}</span>
@@ -646,7 +651,6 @@ export function ArtistDiscographyIntakeDrawer({
   const [applyResult, setApplyResult] = useState<ApplyResponse["summary"] | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [pendingApply, setPendingApply] = useState(false);
   const [evidenceAssertionId, setEvidenceAssertionId] = useState<string | null>(null);
 
   const hasFetched = useRef(false);
@@ -811,13 +815,7 @@ export function ArtistDiscographyIntakeDrawer({
           Clear all
         </button>
         <button
-          onClick={() => {
-            if (mergeCount > 0) {
-              setShowConfirm(true);
-            } else {
-              handleApply();
-            }
-          }}
+          onClick={() => setShowConfirm(true)}
           disabled={applying || unsetCount > 0}
           className="wk-button wk-button-primary wk-button-sm"
         >
@@ -982,11 +980,10 @@ export function ArtistDiscographyIntakeDrawer({
                   <WkIcon name="AlertTriangle" size={22} className="text-amber-600" />
                 </div>
                 <div>
-                  <p className="text-[15px] font-black text-amber-800">Confirm overwrite</p>
+                  <p className="text-[15px] font-black text-amber-800">Confirm Discography review</p>
                   <p className="text-[11px] text-amber-700">
-                    {mergeCount > 0
-                      ? `You selected ${mergeCount} album${mergeCount !== 1 ? "s" : ""} to merge. This will overwrite existing release, track, and artist relationships.`
-                      : "This will overwrite existing track-artist relationships for the selected albums."}
+                    Apply this complete review: {mergeCount} merge, {canonCount} add, {ignoreCount} leave.
+                    Accepted releases will be admitted to active Registry truth; left releases will remain evidence only.
                   </p>
                 </div>
               </div>
@@ -1000,7 +997,7 @@ export function ArtistDiscographyIntakeDrawer({
                   className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-600 px-4 py-2 text-[12px] font-bold text-white hover:bg-amber-700 disabled:opacity-50 cursor-pointer"
                 >
                   <WkIcon name="Check" size={12} />
-                  Yes, overwrite
+                  Yes, apply review
                 </button>
                 <button
                   onClick={() => setShowConfirm(false)}
@@ -1022,7 +1019,7 @@ export function ArtistDiscographyIntakeDrawer({
                   <p className="text-[13px] font-bold text-red-800">Apply failed</p>
                   <p className="text-[12px] text-red-700 mt-0.5">{applyError}</p>
                   <button
-                    onClick={handleApply}
+                    onClick={() => setShowConfirm(true)}
                     disabled={applying}
                     className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-[11px] font-bold text-red-700 hover:bg-red-100 disabled:opacity-50 cursor-pointer"
                   >
