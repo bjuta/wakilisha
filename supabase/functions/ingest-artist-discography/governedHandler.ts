@@ -47,9 +47,15 @@ function parseSelections(raw: unknown): DiscographyApplySelection[] {
     const rawAdditional = Array.isArray(row.additional_primary_artists)
       ? row.additional_primary_artists
       : [];
+    const appleMusicId = String(row.apple_music_id ?? "").trim();
+    const action = String(row.action ?? "").trim();
+    if (!["merge", "canonicalize", "ignore"].includes(action)) {
+      throw new Error(`invalid_review_action:${appleMusicId || "missing_album_id"}`);
+    }
+
     return {
-      apple_music_id: String(row.apple_music_id ?? "").trim(),
-      action: String(row.action ?? "ignore") as DiscographyApplySelection["action"],
+      apple_music_id: appleMusicId,
+      action: action as DiscographyApplySelection["action"],
       additional_primary_artists: rawAdditional.map((artist) => {
         const record = artist && typeof artist === "object"
           ? artist as Record<string, unknown>
