@@ -155,6 +155,9 @@ requireText(governedPlan, 'exact_artist_id', governedPlanPath);
 requireText(governedPlan, 'provider_source_payload_fingerprint', governedPlanPath);
 requireText(governedPlan, 'reviewed_decisions', governedPlanPath);
 requireText(governedPlan, 'Every observed release must be explicitly reviewed before Apply.', governedPlanPath);
+requireText(governedBroker, 'admin_execute_registry_discography_evidence_v1', governedBrokerPath);
+requireText(governedHandler, 'invalid_review_action:', governedHandlerPath);
+forbidText(governedHandler, 'row.action ?? "ignore"', governedHandlerPath);
 forbidText(governedPlan, 'has no albums selected for canonical action', governedPlanPath);
 
 // Frontend contract is exact-Artist + evidence-id based. Apply sends only reviewed
