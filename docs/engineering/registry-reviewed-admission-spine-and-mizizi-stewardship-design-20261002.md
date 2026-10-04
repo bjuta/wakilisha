@@ -2,7 +2,7 @@
 
 Date: 2 October 2026
 
-Status: **PRODUCTION-DEPLOYED BASELINE — RETRY-AUTHORITY FOLLOW-UP PREVIEW-ACCEPTED**
+Status: **PRODUCTION-ACCEPTED — REVIEWED ADMISSION / PROVIDER IDENTITY CONVERGENCE CLOSED**
 
 Initial implementation branch: `fix/discography-review-publication-convergence`
 
@@ -826,3 +826,54 @@ relations and trigger path:
 
 This closes the review-authority defect discovered by the real SoFresh 254
 retry without widening MIZIZI, client, or ambient Registry mutation authority.
+
+
+## 24. Production closure — 4 October 2026
+
+The Reviewed Registry Admission Spine / Discography provider-identity convergence
+is Production-accepted through protected main
+`88daef3af31448bb6845619c8d9b8b80ffc008a6`.
+
+Canonical Production migration head:
+
+`20261004122940_boys_mamako_historical_convergence_v1`
+
+The closure sequence is:
+
+- `20261004072423_discography_atomic_reviewed_admission_collision_recovery_v1`
+  — atomic Apply + deterministic Release collision recovery;
+- `20261004100745_discography_review_retry_authority_v1`
+  — bounded reviewed retry lifecycle authority;
+- `20261004114452_registry_provider_artist_identity_convergence_v1`
+  — active alias → canonical Artist binding, provider display-credit preservation,
+  Apple Single precedence, and public Release role/type projection;
+- `20261004122940_boys_mamako_historical_convergence_v1`
+  — exact historical correction for the already-active Boys Mamako Release.
+
+Production acceptance proves:
+
+1. reviewed Discography retry lifecycle converges without widening MIZIZI or
+   client mutation authority;
+2. sibling Release slug collision recovery is deterministic and atomic;
+3. active Artist aliases resolve to canonical Artist identity while provider
+   credited names remain preserved separately;
+4. known active alias drift is zero across Track and Release credit rows;
+5. `Boys Mamako Alikukanya (feat. Iphoolish) - Single` is stored as
+   `single`;
+6. Joefes, TheLuchi, and Unspoken Salaton are co-primary on both historical
+   Tracks;
+7. Iphoolish remains featured;
+8. exact Production promotion completed through the protected repository
+   migration workflow with zero pending migrations;
+9. the disposable Preview used for replay/acceptance was deleted after
+   Production verification.
+
+This closure is intentionally narrower than the broader creator-provenance
+rollout gate. Issue #1118 remains open until its real 5–10 creator cohort has
+been exercised and documented.
+
+One provider metadata debt also remains outside this closure: both Boys Mamako
+Tracks still carry the pre-existing `duration_ms = 1851` value. Exact duration
+replacement is blocked until authoritative provider milliseconds are
+re-observed and is tracked independently in issue #1145. No guessed duration
+value is authorized by this closure.
