@@ -425,6 +425,12 @@ declare
   v_collision_fingerprint text;
   v_collision_evidence_id uuid;
   v_collision_result jsonb;
+  v_recovery_observation jsonb;
+  v_recovery_fingerprint text;
+  v_recovery_evidence_id uuid;
+  v_recovery_plan_id uuid;
+  v_recovery_plan jsonb;
+  v_recovery_result jsonb;
   v_atomic_observation jsonb;
   v_atomic_fingerprint text;
   v_atomic_evidence_id uuid;
@@ -552,6 +558,124 @@ begin
   then
     raise exception
       'collision-aware Release slug allocation did not preserve distinct sibling identities';
+  end if;
+
+  -- Reproduce the Production recovery shape: the distinct Single already owns
+  -- the clean base while the Album is active on a dirty legacy slug. A fresh
+  -- reviewed plan must preserve the Single and reconcile the Album to a
+  -- structural disambiguator without changing either lifecycle state.
+  update public.registry_releases
+  set slug='sibling-identity-review-spine-artist',updated_at=now()
+  where metadata->>'apple_music_album_id'='wk-collision-album-001';
+
+  update public.registry_releases
+  set slug='sibling-identity',updated_at=now()
+  where metadata->>'apple_music_album_id'='wk-collision-single-001';
+
+  v_recovery_observation:=
+    jsonb_set(
+      v_collision_observation,
+      '{acquired_at}',
+      to_jsonb(clock_timestamp()+interval '1 second'),
+      true
+    );
+
+  v_recovery_fingerprint:=encode(
+    extensions.digest(v_recovery_observation::text,'sha256'),
+    'hex'
+  );
+
+  v_recovery_evidence_id:=
+    public.admin_prepare_registry_discography_evidence_v1(
+      v_artist_id,v_recovery_observation,v_recovery_fingerprint
+    );
+
+  v_recovery_plan_id:=
+    platform_private.freeze_registry_discography_review_plan_v1(
+      v_artist_id,
+      v_recovery_evidence_id,
+      jsonb_build_array(
+        jsonb_build_object(
+          'apple_music_id','wk-collision-album-001',
+          'action','canonicalize'
+        ),
+        jsonb_build_object(
+          'apple_music_id','wk-collision-single-001',
+          'action','canonicalize'
+        )
+      )
+    );
+
+  select review.frozen_plan
+  into v_recovery_plan
+  from platform_private.registry_discography_review_plans review
+  where review.id=v_recovery_plan_id;
+
+  if not exists (
+       select 1
+       from jsonb_array_elements(v_recovery_plan->'operations') operation
+       where operation->>'operation_key'=
+             'registry.release.identity.reconcile'
+         and operation->>'subject_type'='release'
+         and operation#>>'{payload,current_slug}'=
+             'sibling-identity-review-spine-artist'
+         and operation#>>'{payload,canonical_slug}'=
+             'sibling-identity-album'
+     )
+  then
+    raise exception
+      'active dirty Release recovery was not frozen as exact typed identity reconciliation: %',
+      v_recovery_plan;
+  end if;
+
+  v_recovery_result:=
+    public.admin_execute_registry_discography_evidence_v1(
+      v_artist_id,
+      v_recovery_evidence_id,
+      jsonb_build_array(
+        jsonb_build_object(
+          'apple_music_id','wk-collision-album-001',
+          'action','canonicalize'
+        ),
+        jsonb_build_object(
+          'apple_music_id','wk-collision-single-001',
+          'action','canonicalize'
+        )
+      )
+    );
+
+  if jsonb_array_length(
+       coalesce(v_recovery_result#>'{summary,errors}','[]'::jsonb)
+     )<>0
+     or not exists (
+       select 1
+       from public.registry_releases release
+       where release.metadata->>'apple_music_album_id'='wk-collision-album-001'
+         and release.status='active'
+         and release.slug='sibling-identity-album'
+     )
+     or not exists (
+       select 1
+       from public.registry_releases release
+       where release.metadata->>'apple_music_album_id'='wk-collision-single-001'
+         and release.status='active'
+         and release.slug='sibling-identity'
+     )
+     or not exists (
+       select 1
+       from platform_private.registry_mutation_operations operation
+       join platform_private.registry_execution_grants grant_row
+         on grant_row.id=operation.execution_grant_id
+       where operation.operation_key='registry.release.identity.reconcile'
+         and operation.status='succeeded'
+         and operation.verifier_status='passed'
+         and grant_row.plan_payload->>'review_plan_id'=
+             v_recovery_plan_id::text
+     )
+  then
+    raise exception
+      'active dirty Release identity did not recover through typed reviewed authority: %',
+      v_recovery_result;
   end if;
 
   -- Freeze a clean reviewed plan first, then introduce a same-Artist route
