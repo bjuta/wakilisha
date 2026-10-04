@@ -359,6 +359,71 @@ begin
     raise exception 'Discography provider evidence does not bind source payload fingerprint and acquisition time';
   end if;
 
+  select pg_get_functiondef(
+    to_regprocedure(
+      'platform_private.registry_discography_resolve_artist_name_v1(text)'
+    )
+  ) into v_definition;
+
+  if position('registry_artist_aliases' in v_definition)=0
+     or position('canonical_artist_id' in v_definition)=0
+     or position('alias_display_name' in v_definition)=0
+  then
+    raise exception 'Discography Artist resolution ignores active canonical alias authority';
+  end if;
+
+  if to_regprocedure(
+       'platform_private.registry_discography_resolve_artist_credit_v1(text)'
+     ) is null
+     or to_regprocedure(
+       'platform_private.registry_discography_title_feature_credit_includes_artist_v1(text,text)'
+     ) is null
+  then
+    raise exception 'Discography credited-name identity helpers are missing';
+  end if;
+
+  select pg_get_functiondef(
+    to_regprocedure(
+      'platform_private.registry_discography_track_artist_desired_v1(uuid,uuid,text,jsonb)'
+    )
+  ) into v_definition;
+
+  if position('registry_discography_resolve_artist_credit_v1' in v_definition)=0
+     or position('registry_discography_title_feature_credit_includes_artist_v1' in v_definition)=0
+  then
+    raise exception 'Discography Track Artist credit identity/role convergence drifted';
+  end if;
+
+  if exists (
+    select 1
+    from public.registry_track_artists credit
+    join public.registry_artist_aliases alias
+      on lower(alias.alias_slug)=lower(credit.artist_slug)
+     and alias.status='active'
+    join public.registry_artists canonical
+      on canonical.id=alias.canonical_artist_id
+     and canonical.status<>'archived'
+    where credit.artist_id is null
+      and credit.status='active'
+  ) then
+    raise exception 'Known active Artist alias remains text-only in Track credits';
+  end if;
+
+  if exists (
+    select 1
+    from public.registry_release_artists credit
+    join public.registry_artist_aliases alias
+      on lower(alias.alias_slug)=lower(credit.artist_slug)
+     and alias.status='active'
+    join public.registry_artists canonical
+      on canonical.id=alias.canonical_artist_id
+     and canonical.status<>'archived'
+    where credit.artist_id is null
+      and credit.status='active'
+  ) then
+    raise exception 'Known active Artist alias remains text-only in Release credits';
+  end if;
+
   -- Release Artist primary-credit parsing must preserve the primary side of a
   -- featured credit without promoting the featured side to primary.
   if not platform_private.registry_discography_credit_includes_artist_v1(
