@@ -1,6 +1,6 @@
 // ── SHARED BLOCK (Phase A) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { parseChartArtistCredits } from "./artistCredit.ts";
+import { parseChartArtistCredits, type ChartArtistCredit } from "./artistCredit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -422,12 +422,51 @@ async function openChartIdentityReviewIssue(
     .eq("id", candidateId);
 }
 
-async function materializeChartCandidate(db:ReturnType<typeof createClient>,runId:string,candidateId:string):Promise<ChartMaterializationResult>{
-  const {data,error}=await db.rpc("chart_materialize_candidate_registry_v1",{p_run_id:runId,p_candidate_id:candidateId});
-  if(error) throw new Error(`Governed Registry materialization failed for candidate ${candidateId}: ${error.message}`);
-  const result=(data??{}) as unknown as ChartMaterializationResult;
-  if(!result.track_id||!result.track_slug||!result.primary_artist_id||!result.primary_artist_slug) throw new Error(`Governed Registry materialization returned incomplete identity for candidate ${candidateId}.`);
-  return {...result,artists:Array.isArray(result.artists)?result.artists:[],credits:Array.isArray(result.credits)?result.credits:[]};
+async function materializeChartCandidate(
+  db: ReturnType<typeof createClient>,
+  runId: string,
+  candidateId: string,
+  credits: ChartArtistCredit[],
+): Promise<ChartMaterializationResult> {
+  const artistCredits = credits.map((credit) => ({
+    display_name: credit.displayName,
+    display_credit: credit.displayCredit,
+    role: credit.role,
+    credit_order: credit.creditOrder,
+  }));
+
+  const { data, error } = await db.rpc(
+    "chart_materialize_candidate_registry_v1",
+    {
+      p_run_id: runId,
+      p_candidate_id: candidateId,
+      p_artist_credits: artistCredits,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      `Governed Registry materialization failed for candidate ${candidateId}: ${error.message}`,
+    );
+  }
+
+  const result = (data ?? {}) as unknown as ChartMaterializationResult;
+  if (
+    !result.track_id ||
+    !result.track_slug ||
+    !result.primary_artist_id ||
+    !result.primary_artist_slug
+  ) {
+    throw new Error(
+      `Governed Registry materialization returned incomplete identity for candidate ${candidateId}.`,
+    );
+  }
+
+  return {
+    ...result,
+    artists: Array.isArray(result.artists) ? result.artists : [],
+    credits: Array.isArray(result.credits) ? result.credits : [],
+  };
 }
 
 // ── HANDLERS ──
@@ -4592,7 +4631,12 @@ async function handleApplyRowDecision(
 
         let materialized: ChartMaterializationResult;
         try {
-          materialized = await materializeChartCandidate(db, runId, candidateId);
+          materialized = await materializeChartCandidate(
+          db,
+          runId,
+          candidateId,
+          parsedCredits.credits,
+        );
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
 

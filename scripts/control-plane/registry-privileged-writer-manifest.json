@@ -726,7 +726,7 @@
     {
       "id": "chart-materialize-candidate-registry-v1",
       "kind": "database_function",
-      "entrypoint": "public.chart_materialize_candidate_registry_v1(uuid,uuid)",
+      "entrypoint": "public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)",
       "authentication": "auth_uid",
       "authorization": "chart_materialization_capability_plus_exact_run_candidate_binding",
       "executionAuthority": "security_definer_typed_chart_bridge",

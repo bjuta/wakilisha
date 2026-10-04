@@ -235,7 +235,8 @@ $function$;
 create or replace function
 public.chart_materialize_candidate_registry_v1(
   p_run_id uuid,
-  p_candidate_id uuid
+  p_candidate_id uuid,
+  p_artist_credits jsonb
 )
 returns jsonb
 language plpgsql
@@ -245,18 +246,18 @@ as $function$
 declare
   v_user_id uuid:=auth.uid();
   v_candidate public.chart_ingest_candidates%rowtype;
-  v_credit_segments text[];
-  v_primary_names text[]:=array[]::text[];
-  v_featured_names text[]:=array[]::text[];
+  v_credit_item jsonb;
   v_artist_names text[]:=array[]::text[];
+  v_display_credits text[]:=array[]::text[];
   v_artist_roles text[]:=array[]::text[];
   v_seen_keys text[]:=array[]::text[];
-  v_seen_roles text[]:=array[]::text[];
-  v_feature_marker_count integer:=0;
   v_artist_name text;
+  v_display_credit text;
   v_artist_role text;
   v_artist_key text;
-  v_seen_index integer;
+  v_credit_order integer;
+  v_expected_order integer:=1;
+  v_seen_featured boolean:=false;
   v_artist record;
   v_track record;
   v_credit record;
@@ -297,135 +298,90 @@ begin
       message='Exact eligible chart candidate is required.';
   end if;
 
-  select count(*)::integer
-  into v_feature_marker_count
-  from regexp_matches(
-    v_candidate.artist_display,
-    '\s+(?:feat\.?|ft\.?|featuring)\s+',
-    'ig'
-  );
-
-  if v_feature_marker_count > 1 then
-    raise exception using errcode='23505',
-      message='Chart Artist credit grammar is ambiguous in the Registry.';
-  end if;
-
-  v_credit_segments :=
-    regexp_split_to_array(
-      v_candidate.artist_display,
-      '\s+(?:feat\.?|ft\.?|featuring)\s+',
-      'i'
-    );
-
-  if coalesce(cardinality(v_credit_segments),0)=0
-     or nullif(btrim(v_credit_segments[1]),'') is null
-     or (
-       v_feature_marker_count=1
-       and (
-         cardinality(v_credit_segments) <> 2
-         or nullif(btrim(v_credit_segments[2]),'') is null
-       )
-     )
+  if p_artist_credits is null
+     or jsonb_typeof(p_artist_credits) <> 'array'
+     or jsonb_array_length(p_artist_credits)=0
   then
     raise exception using errcode='22023',
-      message='Chart candidate has ambiguous Artist credit grammar.';
+      message='Structured Chart Artist credits are required.';
   end if;
 
-  select coalesce(
-           array_agg(parts.artist_name order by parts.ord),
-           array[]::text[]
-         )
-  into v_primary_names
-  from (
-    select
-      btrim(split.part) as artist_name,
-      min(split.ord) as ord
-    from regexp_split_to_table(
-      v_credit_segments[1],
-      '\s*(?:,|&|\+|\sx\s|\sand\s)\s*',
-      'i'
-    ) with ordinality as split(part,ord)
-    where nullif(btrim(split.part),'') is not null
-    group by btrim(split.part)
-  ) parts;
-
-  if cardinality(v_primary_names)=0 then
-    raise exception using errcode='22023',
-      message='Chart candidate has no materializable primary Artist identity.';
-  end if;
-
-  if v_feature_marker_count=1 then
-    select coalesce(
-             array_agg(parts.artist_name order by parts.ord),
-             array[]::text[]
-           )
-    into v_featured_names
-    from (
-      select
-        btrim(split.part) as artist_name,
-        min(split.ord) as ord
-      from regexp_split_to_table(
-        v_credit_segments[2],
-        '\s*(?:,|&|\+|\sx\s|\sand\s)\s*',
-        'i'
-      ) with ordinality as split(part,ord)
-      where nullif(btrim(split.part),'') is not null
-      group by btrim(split.part)
-    ) parts;
-
-    if cardinality(v_featured_names)=0 then
+  for v_credit_item in
+    select value
+    from jsonb_array_elements(p_artist_credits)
+  loop
+    if jsonb_typeof(v_credit_item) <> 'object' then
       raise exception using errcode='22023',
-        message='Chart candidate has no materializable featured Artist identity.';
+        message='Structured Chart Artist credit must be an object.';
     end if;
-  end if;
 
-  for v_i in 1..cardinality(v_primary_names) loop
-    v_artist_name:=v_primary_names[v_i];
-    v_artist_role:='primary_artist';
+    v_artist_name:=nullif(btrim(v_credit_item->>'display_name'),'');
+    v_display_credit:=nullif(
+      btrim(
+        coalesce(
+          v_credit_item->>'display_credit',
+          v_credit_item->>'display_name'
+        )
+      ),
+      ''
+    );
+    v_artist_role:=nullif(btrim(v_credit_item->>'role'),'');
+
+    if v_artist_name is null
+       or v_display_credit is null
+       or v_artist_role not in (
+         'primary_artist',
+         'featured_artist'
+       )
+       or not (v_credit_item ? 'credit_order')
+       or coalesce(v_credit_item->>'credit_order','') !~ '^[1-9][0-9]*$'
+    then
+      raise exception using errcode='22023',
+        message='Structured Chart Artist credit is invalid.';
+    end if;
+
+    v_credit_order:=(v_credit_item->>'credit_order')::integer;
+
+    if v_credit_order <> v_expected_order then
+      raise exception using errcode='22023',
+        message='Structured Chart Artist credit order must be contiguous.';
+    end if;
+
+    if v_expected_order=1
+       and v_artist_role <> 'primary_artist'
+    then
+      raise exception using errcode='22023',
+        message='Structured Chart Artist credits must begin with a primary Artist.';
+    end if;
+
+    if v_artist_role='featured_artist' then
+      v_seen_featured:=true;
+    elsif v_seen_featured then
+      raise exception using errcode='23505',
+        message='Structured Chart Artist roles are ambiguous.';
+    end if;
+
     v_artist_key:=
       platform_private.registry_identity_comparison_key_v1(
         v_artist_name
       );
-    v_seen_index:=array_position(v_seen_keys,v_artist_key);
 
-    if v_seen_index is not null then
-      if v_seen_roles[v_seen_index] <> v_artist_role then
-        raise exception using errcode='23505',
-          message='Chart Artist credit grammar is ambiguous in the Registry.';
-      end if;
-      continue;
+    if nullif(v_artist_key,'') is null
+       or array_position(v_seen_keys,v_artist_key) is not null
+    then
+      raise exception using errcode='23505',
+        message='Structured Chart Artist identity is duplicated or ambiguous.';
     end if;
 
     v_seen_keys:=array_append(v_seen_keys,v_artist_key);
-    v_seen_roles:=array_append(v_seen_roles,v_artist_role);
     v_artist_names:=array_append(v_artist_names,v_artist_name);
+    v_display_credits:=array_append(
+      v_display_credits,
+      v_display_credit
+    );
     v_artist_roles:=array_append(v_artist_roles,v_artist_role);
+    v_expected_order:=v_expected_order+1;
   end loop;
-
-  if cardinality(v_featured_names) > 0 then
-    for v_i in 1..cardinality(v_featured_names) loop
-      v_artist_name:=v_featured_names[v_i];
-      v_artist_role:='featured_artist';
-      v_artist_key:=
-        platform_private.registry_identity_comparison_key_v1(
-          v_artist_name
-        );
-      v_seen_index:=array_position(v_seen_keys,v_artist_key);
-
-      if v_seen_index is not null then
-        if v_seen_roles[v_seen_index] <> v_artist_role then
-          raise exception using errcode='23505',
-            message='Chart Artist credit grammar is ambiguous in the Registry.';
-        end if;
-        continue;
-      end if;
-
-      v_seen_keys:=array_append(v_seen_keys,v_artist_key);
-      v_seen_roles:=array_append(v_seen_roles,v_artist_role);
-      v_artist_names:=array_append(v_artist_names,v_artist_name);
-      v_artist_roles:=array_append(v_artist_roles,v_artist_role);
-    end loop;
-  end if;
 
   if cardinality(v_artist_names)=0
      or v_artist_roles[1] <> 'primary_artist'
@@ -464,7 +420,7 @@ begin
           'artist_id',v_artist.artist_id,
           'artist_slug',v_artist.artist_slug,
           'artist_name',v_artist_name,
-          'display_credit',v_artist_name,
+          'display_credit',v_display_credits[v_i],
           'role',v_artist_roles[v_i],
           'credit_order',v_i,
           'created',v_artist.created,
@@ -492,7 +448,7 @@ begin
       p_candidate_id,
       v_track.track_id,
       v_artist_ids[v_i],
-      v_artist_names[v_i],
+      v_display_credits[v_i],
       v_artist_roles[v_i],
       v_i,
       case
@@ -508,7 +464,7 @@ begin
         jsonb_build_object(
           'credit_id',v_credit.credit_id,
           'artist_id',v_artist_ids[v_i],
-          'display_credit',v_artist_names[v_i],
+          'display_credit',v_display_credits[v_i],
           'role',v_artist_roles[v_i],
           'credit_order',v_i,
           'created',v_credit.created,
@@ -526,11 +482,27 @@ begin
     'track_operation_id',v_track.operation_id,
     'primary_artist_id',v_artist_ids[1],
     'primary_artist_slug',v_artist_slugs[1],
+    'provider_artist_display',v_candidate.artist_display,
     'artists',v_artist_results,
     'credits',v_credit_results
   );
 end
 $function$;
+
+revoke all on function
+public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)
+from public, anon, authenticated, service_role;
+
+grant execute on function
+public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)
+to authenticated;
+
+revoke all on function
+public.chart_materialize_candidate_registry_v1(uuid,uuid)
+from public, anon, authenticated, service_role;
+
+drop function
+public.chart_materialize_candidate_registry_v1(uuid,uuid);
 
 do $postcheck$
 declare
@@ -542,8 +514,16 @@ begin
   )
   into v_artist_definition;
 
+  if to_regprocedure(
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid)'
+     ) is not null
+  then
+    raise exception
+      'Superseded unstructured Chart materialization signature remains live.';
+  end if;
+
   select pg_get_functiondef(
-    'public.chart_materialize_candidate_registry_v1(uuid,uuid)'::regprocedure
+    'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)'::regprocedure
   )
   into v_materialize_definition;
 
@@ -581,9 +561,17 @@ begin
           in v_materialize_definition
         )=0
      or position(
-          'feat\.?|ft\.?|featuring'
+          'p_artist_credits'
           in v_materialize_definition
         )=0
+     or position(
+          'jsonb_array_elements'
+          in v_materialize_definition
+        )=0
+     or position(
+          'regexp_split_to_array'
+          in v_materialize_definition
+        )>0
      or position(
           'when v_i=1 then ''primary_artist'' else ''featured_artist'''
           in v_materialize_definition

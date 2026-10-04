@@ -42,8 +42,11 @@ begin
   end if;
 
   if to_regprocedure(
-       'public.chart_materialize_candidate_registry_v1(uuid,uuid)'
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)'
      ) is null
+     or to_regprocedure(
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid)'
+     ) is not null
      or to_regprocedure(
        'public.chart_admit_artist_origin_v1(uuid,text,uuid,uuid,text)'
      ) is null
@@ -97,17 +100,17 @@ begin
 
   if has_function_privilege(
        'anon',
-       'public.chart_materialize_candidate_registry_v1(uuid,uuid)',
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)',
        'EXECUTE'
      )
      or has_function_privilege(
        'service_role',
-       'public.chart_materialize_candidate_registry_v1(uuid,uuid)',
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)',
        'EXECUTE'
      )
      or not has_function_privilege(
        'authenticated',
-       'public.chart_materialize_candidate_registry_v1(uuid,uuid)',
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)',
        'EXECUTE'
      )
      or has_function_privilege(
@@ -195,7 +198,7 @@ begin
   end if;
 
   select pg_get_functiondef(
-    'public.chart_materialize_candidate_registry_v1(uuid,uuid)'::regprocedure
+    'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)'::regprocedure
   ) into v_materialize_definition;
 
   if position('manage_registry' in v_materialize_definition)=0
@@ -444,7 +447,7 @@ begin
        'platform_private.ensure_registry_chart_artist_v1(uuid,uuid,text,jsonb,text)'
      ) is null
      or to_regprocedure(
-       'public.chart_materialize_candidate_registry_v1(uuid,uuid)'
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)'
      ) is null
   then
     raise exception
@@ -485,7 +488,7 @@ begin
   end if;
 
   select pg_get_functiondef(
-    'public.chart_materialize_candidate_registry_v1(uuid,uuid)'::regprocedure
+    'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)'::regprocedure
   )
   into v_materialize_definition;
 
@@ -494,8 +497,10 @@ begin
      or position('v_artist_roles' in v_materialize_definition)=0
      or position('primary_artist' in v_materialize_definition)=0
      or position('featured_artist' in v_materialize_definition)=0
-     or position('feat\.?|ft\.?|featuring' in v_materialize_definition)=0
+     or position('p_artist_credits' in v_materialize_definition)=0
+     or position('jsonb_array_elements' in v_materialize_definition)=0
      or position('registry_identity_comparison_key_v1' in v_materialize_definition)=0
+     or position('regexp_split_to_array' in v_materialize_definition)>0
      or position(
           'when v_i=1 then ''primary_artist'' else ''featured_artist'''
           in v_materialize_definition

@@ -107,7 +107,8 @@ describe("Chart UUID identity authority", () => {
 
     expect(decisions).toContain('action === "create_shell"');
     expect(decisions).toContain('requireCap(db, "manage_registry")');
-    expect(decisions).toContain("materializeChartCandidate(db, runId, candidateId)");
+    expect(decisions).toContain("parsedCredits.credits");
+    expect(runtime).toContain("p_artist_credits: artistCredits");
     expect(decisions).toContain("forbidden_registry_admission");
 
     expect(migration).toContain(
