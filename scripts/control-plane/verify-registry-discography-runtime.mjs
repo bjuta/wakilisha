@@ -89,6 +89,14 @@ requireText(
   'duration_ms: Number.isFinite(Number(trackAttributes.durationInMillis)) ? Number(trackAttributes.durationInMillis) : null',
   providerPath,
 );
+requireText(provider, 'const SEARCH_PAGE_SIZE = 25;', providerPath);
+requireText(provider, 'const DISCOVERY_SAFETY_LIMIT = 1000;', providerPath);
+requireText(provider, 'while (ids.length < DISCOVERY_SAFETY_LIMIT)', providerPath);
+requireText(provider, 'skipped_existing_album_ids', providerPath);
+requireText(provider, 'artist.metadata?.apple_music_album_ids', providerPath);
+requireText(provider, 'targeted: requestedIds.length > 0', providerPath);
+requireText(provider, 'apple_music_catalogue_safety_limit_exceeded', providerPath);
+forbidText(provider, 'const MAX_ALBUMS = 25;', providerPath);
 
 for (const [path, source] of [
   [publicReadPath, publicRead],
@@ -192,6 +200,11 @@ requireText(governedBroker, 'admin_preview_registry_discography_evidence_v1', go
 requireText(governedBroker, 'admin_execute_registry_discography_evidence_v1', governedBrokerPath);
 requireText(governedBroker, 'admin_create_registry_discography_artist_shell_v1', governedBrokerPath);
 requireText(governedHandler, 'evidence_assertion_id', governedHandlerPath);
+requireText(governedHandler, 'body.album_ids', governedHandlerPath);
+requireText(governedHandler, 'albumIds: requestedAlbumIds.length ? requestedAlbumIds : undefined', governedHandlerPath);
+requireText(governedHandler, 'invalid_album_ids', governedHandlerPath);
+requireText(adminClient, 'albumIds?: string[]', adminClientPath);
+requireText(adminClient, 'album_ids: normalizedAlbumIds', adminClientPath);
 requireText(governedHandler, 'approved !== true', governedHandlerPath);
 requireText(governedHandler, 'executeReviewedDiscographyEvidence', governedHandlerPath);
 

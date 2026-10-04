@@ -306,6 +306,7 @@ begin
     'platform_private.record_registry_discography_provider_evidence_v1(uuid,jsonb,text)',
     'platform_private.freeze_registry_discography_review_plan_v1(uuid,uuid,jsonb)',
     'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)',
+    'platform_private.registry_discography_build_frozen_plan_pre_selective_v1(uuid,uuid,uuid,jsonb)',
     'platform_private.registry_discography_build_frozen_plan_core_v1(uuid,uuid,uuid,jsonb)',
     'platform_private.issue_registry_reviewed_admission_grant_v1(uuid,text,text,uuid,jsonb,text)',
     'platform_private.registry_reviewed_release_slug_v2(text,text,date,text,uuid,uuid,jsonb,jsonb)',
@@ -479,6 +480,22 @@ begin
       'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)'
     )
   ) into v_definition;
+  if position(
+       'registry_discography_build_frozen_plan_pre_selective_v1'
+       in v_definition
+     )=0
+     or position('v_existing_album_ids' in v_definition)=0
+     or position('v_union_album_ids' in v_definition)=0
+     or position('apple_music_album_ids' in v_definition)=0
+  then
+    raise exception 'Discography cumulative provider-ledger wrapper drifted';
+  end if;
+
+  select pg_get_functiondef(
+    to_regprocedure(
+      'platform_private.registry_discography_build_frozen_plan_pre_selective_v1(uuid,uuid,uuid,jsonb)'
+    )
+  ) into v_definition;
   if position('active_ingest_v2' in v_definition)=0
      or position('registry.track.activate' in v_definition)=0
      or position('registry.release.activate' in v_definition)=0
@@ -486,7 +503,7 @@ begin
      or position('registry.release.identity.reconcile' in v_definition)=0
      or position('registry_reviewed_release_slug_v2' in v_definition)=0
   then
-    raise exception 'Discography active-ingest terminal plan drifted';
+    raise exception 'Discography active-ingest terminal predecessor drifted';
   end if;
 
   select pg_get_functiondef(
@@ -573,6 +590,7 @@ begin
     'platform_private.record_registry_discography_provider_evidence_v1(uuid,jsonb,text)',
     'platform_private.freeze_registry_discography_review_plan_v1(uuid,uuid,jsonb)',
     'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)',
+    'platform_private.registry_discography_build_frozen_plan_pre_selective_v1(uuid,uuid,uuid,jsonb)',
     'platform_private.registry_discography_build_frozen_plan_core_v1(uuid,uuid,uuid,jsonb)',
     'platform_private.issue_registry_reviewed_admission_grant_v1(uuid,text,text,uuid,jsonb,text)',
     'platform_private.registry_reviewed_release_slug_v2(text,text,date,text,uuid,uuid,jsonb,jsonb)',

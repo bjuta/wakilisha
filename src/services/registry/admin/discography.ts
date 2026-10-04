@@ -128,10 +128,22 @@ async function invokeDiscography<T>(body: Record<string, unknown>): Promise<T> {
 
 export async function previewGovernedArtistDiscography(
   artistId: string,
+  albumIds?: string[],
 ): Promise<DiscographyPreviewResponse> {
+  const normalizedAlbumIds = albumIds
+    ? [...new Set(
+      albumIds
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean),
+    )]
+    : [];
+
   const response = await invokeDiscography<DiscographyPreviewResponse>({
     artist_id: artistId,
     mode: "preview",
+    ...(normalizedAlbumIds.length > 0
+      ? { album_ids: normalizedAlbumIds }
+      : {}),
   });
   if (!response.ok) {
     throw new Error(response.detail ?? response.error ?? "Discography preview failed.");

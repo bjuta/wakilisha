@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-04T12:35:13Z",
+  "generatedAt": "2026-10-04T16:07:00Z",
   "typesSha256": "fb819cc37ff60c96e721e7a87b389786186c09dc4f3a09da907bda8c73fac980",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 203,
-  "latestMigration": "20261004122940_boys_mamako_historical_convergence_v1.sql",
+  "migrationCount": 204,
+  "latestMigration": "20261004153723_discography_selective_provider_discovery_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "ybfzurdsyfolbycwwsml",
-    "migrationHead": "20261004122940",
-    "baseMainSha": "782fc7483587fa06931d8e9fd633f69008925bb9",
-    "previewBranchId": "3647afa0-f5f3-4bed-a708-c95dfacb908c"
+    "sourceProjectRef": "ahacziubtqswtbpcrfkj",
+    "migrationHead": "20261004153723",
+    "baseMainSha": "4eb5930449e5dbf1274984793a38b5a8ab71cbc2",
+    "previewBranchId": "abfd45ad-c1af-4c1a-9145-4545d05952a7"
   }
 }

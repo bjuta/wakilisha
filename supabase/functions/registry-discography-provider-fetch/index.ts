@@ -14,7 +14,9 @@ const ALLOWED_ORIGINS = [
   "http://localhost:3000",
 ];
 
-const MAX_ALBUMS = 25;
+const SEARCH_PAGE_SIZE = 25;
+const DISCOVERY_SAFETY_LIMIT = 1000;
+const TARGETED_FETCH_LIMIT = 25;
 const ALBUM_FETCH_CONCURRENCY = 4;
 
 function corsHeaders(req: Request): Record<string, string> {
@@ -156,30 +158,62 @@ async function searchAlbumIds(
   token: string,
   storefront: string,
   artistName: string,
-  limit: number,
-): Promise<string[]> {
+): Promise<{ ids: string[]; exhausted: boolean }> {
   const ids: string[] = [];
   let offset = 0;
-  while (ids.length < limit) {
-    const pageLimit = Math.min(25, limit - ids.length);
+  let exhausted = false;
+
+  while (ids.length < DISCOVERY_SAFETY_LIMIT) {
     const url = new URL(`https://api.music.apple.com/v1/catalog/${storefront}/search`);
     url.searchParams.set("term", artistName);
     url.searchParams.set("types", "albums");
-    url.searchParams.set("limit", String(pageLimit));
+    url.searchParams.set("limit", String(SEARCH_PAGE_SIZE));
     url.searchParams.set("offset", String(offset));
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (!response.ok) throw new Error(`Apple Music search failed (${response.status}).`);
-    const payload = await response.json() as { results?: { albums?: { data?: Array<{ id: string; attributes?: { artistName?: string } }> } } };
-    const rows = payload.results?.albums?.data ?? [];
-    if (!rows.length) break;
-    for (const row of rows) {
-      if (albumArtistCreditIncludesArtist(String(row.attributes?.artistName ?? ""), artistName)) ids.push(row.id);
-      if (ids.length >= limit) break;
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      throw new Error(`Apple Music search failed (${response.status}).`);
     }
+
+    const payload = await response.json() as {
+      results?: {
+        albums?: {
+          data?: Array<{ id: string; attributes?: { artistName?: string } }>;
+        };
+      };
+    };
+    const rows = payload.results?.albums?.data ?? [];
+
+    if (!rows.length) {
+      exhausted = true;
+      break;
+    }
+
+    for (const row of rows) {
+      if (
+        albumArtistCreditIncludesArtist(
+          String(row.attributes?.artistName ?? ""),
+          artistName,
+        )
+      ) {
+        ids.push(row.id);
+      }
+      if (ids.length >= DISCOVERY_SAFETY_LIMIT) break;
+    }
+
     offset += rows.length;
-    if (rows.length < pageLimit) break;
+    if (rows.length < SEARCH_PAGE_SIZE) {
+      exhausted = true;
+      break;
+    }
   }
-  return [...new Set(ids)];
+
+  return {
+    ids: [...new Set(ids)],
+    exhausted,
+  };
 }
 
 async function fetchAlbum(token: string, storefront: string, albumId: string): Promise<AppleAlbum | null> {
@@ -246,7 +280,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: artist, error: artistError } = await callerDb
     .from("registry_artists")
-    .select("id,slug,display_name,status")
+    .select("id,slug,display_name,status,metadata")
     .eq("id", artistId)
     .maybeSingle();
   if (artistError) return json(req, { ok: false, error: "artist_read_failed", detail: artistError.message }, 500);
@@ -274,20 +308,67 @@ Deno.serve(async (req: Request) => {
   }
 
   const requestedIds = Array.isArray(body.album_ids)
-    ? [...new Set(body.album_ids.map(String).map((value) => value.trim()).filter(Boolean))].slice(0, MAX_ALBUMS)
+    ? [...new Set(
+      body.album_ids
+        .map(String)
+        .map((value) => value.trim())
+        .filter(Boolean),
+    )].slice(0, TARGETED_FETCH_LIMIT)
     : [];
-  const limit = Math.min(Math.max(Number(body.limit) || MAX_ALBUMS, 1), MAX_ALBUMS);
 
-  let albumIds = requestedIds;
-  if (!albumIds.length) {
+  let discoveredAlbumIds: string[] = [];
+  let skippedExistingAlbumIds: string[] = [];
+  let albumIdsToFetch = requestedIds;
+  let discoveryExhausted = true;
+
+  if (!requestedIds.length) {
     try {
-      albumIds = await searchAlbumIds(providerToken, storefront, String(artist.display_name), limit);
+      const discovery = await searchAlbumIds(
+        providerToken,
+        storefront,
+        String(artist.display_name),
+      );
+      discoveredAlbumIds = discovery.ids;
+      discoveryExhausted = discovery.exhausted;
     } catch (error) {
-      return json(req, { ok: false, error: "apple_music_search_failed", detail: error instanceof Error ? error.message : String(error) }, 502);
+      return json(req, {
+        ok: false,
+        error: "apple_music_search_failed",
+        detail: error instanceof Error ? error.message : String(error),
+      }, 502);
     }
+
+    if (!discoveryExhausted) {
+      return json(req, {
+        ok: false,
+        error: "apple_music_catalogue_safety_limit_exceeded",
+        detail: `Artist catalogue reached discovery safety limit ${DISCOVERY_SAFETY_LIMIT}; refusing to present a truncated discography.`,
+      }, 409);
+    }
+
+    const existingAlbumIds = new Set(
+      Array.isArray(artist.metadata?.apple_music_album_ids)
+        ? artist.metadata.apple_music_album_ids
+          .map((value: unknown) => String(value ?? "").trim())
+          .filter(Boolean)
+        : [],
+    );
+
+    skippedExistingAlbumIds = discoveredAlbumIds.filter(
+      (albumId) => existingAlbumIds.has(albumId),
+    );
+    albumIdsToFetch = discoveredAlbumIds.filter(
+      (albumId) => !existingAlbumIds.has(albumId),
+    );
+  } else {
+    discoveredAlbumIds = requestedIds;
   }
 
-  const fetched = await fetchAlbums(providerToken, storefront, albumIds);
+  const fetched = await fetchAlbums(
+    providerToken,
+    storefront,
+    albumIdsToFetch,
+  );
   const acquiredAt = new Date().toISOString();
   const albums = fetched.albums.map((album) => {
     const attributes = album.attributes ?? {};
@@ -347,6 +428,15 @@ Deno.serve(async (req: Request) => {
     },
     albums,
     failed_album_ids: fetched.failed.sort(),
+    discovery: {
+      discovered_album_ids: discoveredAlbumIds.sort(),
+      skipped_existing_album_ids: skippedExistingAlbumIds.sort(),
+      fetched_album_ids: albumIdsToFetch.sort(),
+      targeted: requestedIds.length > 0,
+      discovery_exhausted: discoveryExhausted,
+      search_page_size: SEARCH_PAGE_SIZE,
+      discovery_safety_limit: DISCOVERY_SAFETY_LIMIT,
+    },
   };
   const observation = {
     ...providerPayload,
