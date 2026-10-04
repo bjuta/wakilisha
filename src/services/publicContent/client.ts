@@ -788,7 +788,7 @@ async function resolvePrimaryArtistsForReleases(
   for (const ids of chunkArray(trackIds)) {
     const { data, error } = await supabase
       .from("registry_track_artists")
-      .select("track_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order")
+      .select("track_id, artist_name_text, display_credit, artist_slug, is_primary, is_featured, credit_order")
       .in("track_id", ids)
       .eq("status", "active")
       .order("credit_order", { ascending: true });
@@ -883,7 +883,7 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
   for (const ta of (trackArtistRows || [])) {
     if (!artistsByTrack.has(ta.track_id)) artistsByTrack.set(ta.track_id, []);
     artistsByTrack.get(ta.track_id)!.push({
-      name: ta.artist_name_text || ta.artist_slug,
+      name: ta.display_credit || ta.artist_name_text || ta.artist_slug,
       slug: ta.artist_slug || "",
       isPrimary: ta.is_primary,
       isFeatured: ta.is_featured,
@@ -917,7 +917,13 @@ async function getRegistryTracklist(releaseId: string, fallbackArtist: string): 
       const trackArtists = artistsByTrack.get(relationship.trackId) || [];
       const primaryArtist = trackArtists.find((a) => a.isPrimary) || trackArtists[0];
       const featuredArtists = trackArtists
-        .filter((a) => a.slug !== (primaryArtist?.slug || ""))
+        .filter(
+          (a) =>
+            a.isFeatured &&
+            !a.isPrimary &&
+            a.slug !==
+              (primaryArtist?.slug || ""),
+        )
         .map((a) => a.name)
         .filter(Boolean);
       const artistStr = featuredArtists.length > 0
@@ -1052,23 +1058,47 @@ async function batchResolveArtistImages(
 /** Extract unique featured + co-primary artists from track artist rows (in-memory aggregation). */
 function aggregateFeaturedFromTrackArtists(
   trackArtistRows: GenericRow[] | null,
-  primaryArtistSlug: string
+  releasePrimaryArtistSlugs: Set<string>,
 ): Array<{ name: string; slug: string }> {
-  const seen = new Map<string, { name: string; slug: string }>();
+  const seen = new Map<
+    string,
+    { name: string; slug: string }
+  >();
+
   for (const ta of (trackArtistRows || [])) {
-    // Skip the release-level primary — they already own the page
-    if (!ta.artist_slug || ta.artist_slug === primaryArtistSlug) continue;
-    // Collect track-level primaries (co-primary artists like duos/collabs)
-    // as well as explicitly flagged featured artists
-    if (!ta.is_primary && !ta.is_featured) continue;
-    const key = ta.artist_slug || ta.artist_name_text;
+    const slug = String(
+      ta.artist_slug || "",
+    );
+
+    if (
+      !slug ||
+      releasePrimaryArtistSlugs.has(slug)
+    ) {
+      continue;
+    }
+
+    if (
+      !ta.is_featured ||
+      ta.is_primary
+    ) {
+      continue;
+    }
+
+    const key =
+      slug ||
+      ta.artist_name_text;
+
     if (key && !seen.has(key)) {
       seen.set(key, {
-        name: ta.artist_name_text || ta.artist_slug,
-        slug: ta.artist_slug || "",
+        name:
+          ta.display_credit ||
+          ta.artist_name_text ||
+          slug,
+        slug,
       });
     }
   }
+
   return Array.from(seen.values());
 }
 
@@ -1506,7 +1536,7 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
 
   const { data: releaseArtistRows } = await supabase
     .from("registry_release_artists")
-    .select("artist_id, artist_name_text, artist_slug, is_primary, is_featured, credit_order, confidence")
+    .select("artist_id, artist_name_text, display_credit, artist_slug, is_primary, is_featured, credit_order, confidence")
     .eq("release_id", releaseId)
     .eq("status", "active")
     .order("credit_order", { ascending: true });
@@ -1546,6 +1576,7 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
           row.artist_id || "",
         ),
         name: String(
+          row.display_credit ||
           row.artist_name_text ||
           row.artist_slug ||
           "",
@@ -1592,6 +1623,7 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
         (row) => ({
           artistId: row.artist_id,
           artistNameText:
+            row.display_credit ||
             row.artist_name_text,
           artistSlug:
             row.artist_slug,
@@ -1604,6 +1636,20 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
         }),
       ),
     );
+
+  const releasePrimaryArtistSlugs = new Set(
+    (releaseArtistRows || [])
+      .filter(
+        (row) =>
+          Boolean(
+            row.is_primary &&
+            row.artist_slug,
+          ),
+      )
+      .map((row) =>
+        String(row.artist_slug),
+      ),
+  );
 
   const releaseMetaForArtist =
     (releaseRow.metadata || {}) as Record<
@@ -1707,9 +1753,23 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
 
   const totalDuration = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
   const trackCount = tracks.length;
+  const storedReleaseType =
+    String(
+      releaseRow.release_type || "",
+    )
+      .trim()
+      .toLowerCase();
+
   const releaseType =
-    releaseTypeLabelFromActiveTrackCount(trackCount) ||
-    "Release";
+    storedReleaseType === "single"
+      ? "Single"
+      : storedReleaseType === "ep"
+        ? "EP"
+        : storedReleaseType === "album"
+          ? "Album"
+          : releaseTypeLabelFromActiveTrackCount(
+              trackCount,
+            ) || "Release";
 
   const releaseDate = releaseRow.release_date || "";
   const year = yearFromDate(releaseDate);
@@ -1738,13 +1798,20 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
   // Aggregate featured artists from release-level AND track-level data.
   // The ingest now writes featured artists into both tables, so we merge
   // both sources to get the complete picture.
-  const rawFeaturedFromTracks = aggregateFeaturedFromTrackArtists(trackArtistRows, fallbackArtistSlug);
+  const rawFeaturedFromTracks =
+    aggregateFeaturedFromTrackArtists(
+      trackArtistRows,
+      releasePrimaryArtistSlugs,
+    );
   const rawFeaturedFromRelease: Array<{ name: string; slug: string }> = [];
   for (const ra of (releaseArtistRows || [])) {
     if (ra.is_primary) continue;
-    if (!ra.artist_slug || ra.artist_slug === fallbackArtistSlug) continue;
-    if (!ra.artist_name_text) continue;
-    rawFeaturedFromRelease.push({ name: ra.artist_name_text, slug: ra.artist_slug });
+    if (!ra.artist_slug || releasePrimaryArtistSlugs.has(String(ra.artist_slug))) continue;
+    if (!ra.artist_name_text && !ra.display_credit) continue;
+    rawFeaturedFromRelease.push({
+      name: ra.display_credit || ra.artist_name_text,
+      slug: ra.artist_slug,
+    });
   }
 
   // Merge both sources, deduplicating by slug

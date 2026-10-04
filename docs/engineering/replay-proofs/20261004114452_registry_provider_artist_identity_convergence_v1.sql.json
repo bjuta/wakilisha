@@ -1,0 +1,42 @@
+{
+  "migration_file": "supabase/migrations/20261004114452_registry_provider_artist_identity_convergence_v1.sql",
+  "migration_sha256": "b6570fb7611b63b1648b016bb5eb797fa447ff07699dd4acff0fe3c2afd00ede",
+  "base_main_sha": "f02f0d77b904c7e373b561b437f243c54b40e3e5",
+  "preview_project_ref": "ybfzurdsyfolbycwwsml",
+  "preview_branch_id": "3647afa0-f5f3-4bed-a708-c95dfacb908c",
+  "preview_migration_head": "20261004114452",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-registry-discography-authority.sql",
+  "behavioral_fixtures": [
+    "active alias resolves to canonical Artist identity while preserving provider display credit; zero surviving fixture rows",
+    "co-primary Track credits remain primary while explicit title-level feat. credit remains featured; zero surviving fixture rows"
+  ],
+  "edge_functions": {
+    "registry-discography-provider-fetch": {
+      "preview_version": 3,
+      "verify_jwt": true,
+      "bundle_sha256": "ed018b1fc1182ecc09dccb1a109171eb0330b7bd5002265503cb0135c1e6ace2"
+    },
+    "public-content-read": {
+      "preview_version": 96,
+      "verify_jwt": false,
+      "bundle_sha256": "950b59d84ad72aa4ec8ad33dae0418610cf7424b7047473bec9a52cb54746ce1"
+    }
+  },
+  "provider_public_confirmation": {
+    "release": "Boys Mamako Alikukanya (feat. Iphoolish) - Single",
+    "primary_artists": [
+      "Joefes",
+      "TheLuchi",
+      "Unspoken Salaton"
+    ],
+    "featured_artist": "Iphoolish",
+    "duration_repair_deferred": true
+  },
+  "schema_types_sha256": "fb819cc37ff60c96e721e7a87b389786186c09dc4f3a09da907bda8c73fac980",
+  "schema_migration_count": 202,
+  "schema_migration_head": "20261004114452",
+  "verified_at": "2026-10-04T12:15:14.649451Z"
+}

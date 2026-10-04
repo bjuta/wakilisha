@@ -62,8 +62,8 @@ function parseReleaseType(attributes: Record<string, unknown>): "album" | "ep" |
   const isComplete = attributes.isComplete === true;
   const trackCount = Number(attributes.trackCount ?? 0);
   const name = String(attributes.name ?? "").toLowerCase();
-  if (name.includes("ep") || (trackCount >= 2 && trackCount <= 8 && !isComplete)) return "ep";
   if (isSingle || trackCount === 1) return "single";
+  if (name.includes("ep") || (trackCount >= 2 && trackCount <= 8 && !isComplete)) return "ep";
   return "album";
 }
 
