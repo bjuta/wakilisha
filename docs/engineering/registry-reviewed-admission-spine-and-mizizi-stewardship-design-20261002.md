@@ -2,7 +2,7 @@
 
 Date: 2 October 2026
 
-Status: **PRODUCTION-DEPLOYED BASELINE — RETRY-AUTHORITY FOLLOW-UP PREVIEW-ACCEPTED**
+Status: **PRODUCTION-ACCEPTED — REVIEWED ADMISSION SPINE CLOSED**
 
 Initial implementation branch: `fix/discography-review-publication-convergence`
 
@@ -826,3 +826,50 @@ relations and trigger path:
 
 This closes the review-authority defect discovered by the real SoFresh 254
 retry without widening MIZIZI, client, or ambient Registry mutation authority.
+
+## 24. Production closure — 4 October 2026
+
+The Reviewed Registry Admission Spine is Production accepted.
+
+Final repository authority:
+
+- PR #1140 merged the atomic reviewed-admission and Release-slug collision correction;
+- PR #1141 merged reviewed Discography retry-authority convergence;
+- protected `main` at closure is `f02f0d77b904c7e373b561b437f243c54b40e3e5`;
+- Production migration head is `20261004100745_discography_review_retry_authority_v1`;
+- Production migration count is 201;
+- the permanent shared-review and Discography authority gates pass after promotion.
+
+The real SoFresh 254 acceptance then completed successfully against the preserved
+planner-v3 / `active_ingest_v2` review plan:
+
+- 6 reviewed Releases remained Merge;
+- 1 reviewed Release remained Leave;
+- no new provider observation or replacement review was required;
+- the remaining active Release identity reconciliation completed atomically;
+- `254 Riddim - Single` retained `/releases/sofresh-254/254-riddim`;
+- `254 Riddim` Album converged to
+  `/releases/sofresh-254/254-riddim-album`;
+- `60 seconds (RB60s) - EP` retained
+  `/releases/sofresh-254/60-seconds-rb60s`;
+- the Album and Single remain distinct Release identities;
+- the Single contains one Track, `254 Riddim`, ISRC `QZGLM2673736`;
+- that Track is not one of the Album's 12 Tracks, whose ISRCs are
+  `QZGLS2670055` through `QZGLS2670066`;
+- Track and Release namespaces may therefore legitimately share the clean
+  terminal slug `254-riddim` without cross-type collision.
+
+The retry review case preserved append-only human causality and completed the
+accepted lifecycle:
+
+`decision → supersede → reopen → decision`
+
+with the new decision approved under a fresh exact grant.
+
+The disposable Preview used for the follow-up was deleted after Production
+acceptance. No Preview project remains. No Edge Function or frontend deployment
+was required by the two follow-up corrections.
+
+This closes the Reviewed Registry Admission Spine correction sequence. Future
+work should consume these invariants rather than reopen them unless new
+Production evidence proves a separate defect.
