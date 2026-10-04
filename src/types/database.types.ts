@@ -21310,7 +21310,11 @@ export type Database = {
         }[]
       }
       chart_materialize_candidate_registry_v1: {
-        Args: { p_candidate_id: string; p_run_id: string }
+        Args: {
+          p_artist_credits: Json
+          p_candidate_id: string
+          p_run_id: string
+        }
         Returns: Json
       }
       chart_reset_run_after_origin_resolution: {
