@@ -1354,6 +1354,133 @@
       "publicCallable": false,
       "canonicalMutation": true,
       "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-release-label-candidate-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_release_label_candidate_v1(uuid,uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_orchestrator_over_exact_reviewed_release_label_evidence_grant_execution_and_verifier",
+      "targets": [
+        "registry_releases",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "typed_release_label_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-track-media-asset-candidate-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_track_media_asset_candidate_v1(uuid,uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_orchestrator_over_exact_reviewed_track_media_asset_evidence_grant_execution_and_verifier",
+      "targets": [
+        "registry_tracks",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "typed_track_media_asset_binding_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-artist-media-asset-candidate-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_artist_media_asset_candidate_v1(uuid,uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_orchestrator_over_exact_reviewed_artist_media_asset_evidence_grant_execution_and_verifier",
+      "targets": [
+        "registry_artists",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "medium",
+      "disposition": "keep",
+      "futureBoundary": "typed_artist_media_asset_binding_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-track-contribution-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_track_contribution_v1(uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_orchestrator_over_reviewed_provenance_attestation_exact_grant_execution_and_verifier",
+      "targets": [
+        "registry_track_contributions",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "high",
+      "disposition": "keep",
+      "futureBoundary": "typed_recording_contribution_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-admit-registry-work-contribution-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_admit_registry_work_contribution_v1(uuid)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry",
+      "executionAuthority": "security_definer_orchestrator_over_reviewed_provenance_attestation_exact_grant_execution_and_verifier",
+      "targets": [
+        "registry_work_contributions",
+        "registry_operation_write_events",
+        "registry_mutation_operations"
+      ],
+      "riskClass": "high",
+      "disposition": "keep",
+      "futureBoundary": "typed_work_contribution_admission",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
+    },
+    {
+      "id": "admin-record-music-provenance-contribution-review-decision-v1",
+      "kind": "database_function",
+      "entrypoint": "public.admin_record_music_provenance_contribution_review_decision_v1(uuid,text,jsonb,text,text)",
+      "authentication": "auth_uid",
+      "authorization": "manage_registry_or_administrator",
+      "executionAuthority": "security_definer_human_review_command_composing_typed_provenance_contribution_admission",
+      "targets": [
+        "registry_canonicalization_decisions",
+        "registry_review_items",
+        "registry_track_contributions",
+        "registry_work_contributions"
+      ],
+      "riskClass": "high",
+      "disposition": "keep",
+      "futureBoundary": "human_reviewed_music_provenance_contribution_materialization",
+      "miziziCallable": false,
+      "humanCallable": true,
+      "publicCallable": false,
+      "canonicalMutation": true,
+      "legacyDebt": false
     }
   ]
 }
