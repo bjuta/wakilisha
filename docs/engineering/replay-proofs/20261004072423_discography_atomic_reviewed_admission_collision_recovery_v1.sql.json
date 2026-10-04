@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20261004072423_discography_atomic_reviewed_admission_collision_recovery_v1.sql",
+  "migration_sha256": "8824a6d8112bee441e2fddb721945f12b8deff095a74436af21029478d7c38d0",
+  "base_main_sha": "bbdb5b0782e0cb3155c90b3980a5871540958b8e",
+  "preview_project_ref": "dtbapfborutequqlpmgq",
+  "preview_branch_id": "73d77bf9-1b21-47de-beba-3bbbb736c91b",
+  "preview_migration_head": "20261004072423",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-registry-discography-authority.sql",
+  "schema_types_sha256": "fb819cc37ff60c96e721e7a87b389786186c09dc4f3a09da907bda8c73fac980",
+  "schema_migration_count": 200,
+  "schema_migration_head": "20261004072423",
+  "verified_at": "2026-10-04T09:00:06.250Z"
+}
