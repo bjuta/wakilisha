@@ -471,6 +471,12 @@ export async function submitNewArtistClaim(input: {
   };
 }
 
+export async function withdrawArtistClaim(claimId: string): Promise<void> {
+  await rpc("community_withdraw_artist_claim", {
+    p_claim_id: claimId,
+  });
+}
+
 export async function acceptArtistRepresentation(representationId: string): Promise<void> {
   await rpc("community_artist_accept_representation", {
     p_representation_id: representationId,
