@@ -86,10 +86,15 @@ describe("Chart UUID identity authority", () => {
       expect(source).toContain("registry_track_artists");
     }
 
-    expect(commit).toContain("exact_primary_artist_credit");
+    expect(commit).toContain('primaryCredits.length < 1');
+    expect(commit).toContain('const routeCredit = primaryCredits[0] ?? null');
+    expect(commit).toContain('Number(a.credit_order ?? Number.MAX_SAFE_INTEGER)');
+    expect(commit).not.toContain("exact_primary_artist_credit");
     expect(commit).not.toContain(
       'normalizeSlug(String(candidate.artist_display || ""))',
     );
+    expect(reingest).toContain('const routeCredit = primaryCredits[0] ?? null');
+    expect(reingest).not.toContain("exact_primary_artist_credit");
     expect(reingest).toContain("registry_presentation_incomplete");
   });
 
