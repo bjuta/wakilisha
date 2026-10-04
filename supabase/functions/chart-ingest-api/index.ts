@@ -216,6 +216,22 @@ function candidateEvidenceIdentityKey(candidate: Record<string, unknown>): strin
   return `candidate:${candidate.id || crypto.randomUUID()}`;
 }
 
+function candidateEvidenceIdentityAliases(candidate: Record<string, unknown>): string[] {
+  const strong = new Set<string>();
+
+  const isrc = normalizeIsrc(candidate.isrc);
+  if (isrc) strong.add(`isrc:${isrc}`);
+
+  for (const alias of providerIdentityAliasesFromJson(candidate.provider_ids_json)) {
+    strong.add(alias);
+  }
+
+  if (strong.size > 0) return [...strong].sort();
+
+  const normalizedKey = String(candidate.normalized_key || "");
+  return normalizedKey ? [`normalized:${normalizedKey}`] : [];
+}
+
 function canonicalTrackIdentityKey(trackId: unknown): string {
   const id = typeof trackId === "string" ? trackId.trim().toLowerCase() : "";
   return id ? `track:${id}` : "";
@@ -2677,6 +2693,74 @@ async function handleRunScoring(
     });
   }
 
+  const { data: rawSourceRows, error: rawSourceError } = await db
+    .from("chart_ingest_raw_rows")
+    .select("provider,isrc,provider_track_id,raw_payload_json,title_raw,artist_raw")
+    .eq("run_id", runId);
+
+  if (rawSourceError) {
+    return json(req, {
+      error: "scoring_source_evidence_lookup_failed",
+      detail: rawSourceError.message,
+    }, 500);
+  }
+
+  const sourceProvidersByIdentity = new Map<string, Set<string>>();
+
+  for (const raw of rawSourceRows || []) {
+    const row = raw as Record<string, unknown>;
+    const provider = normalizeProviderKey(row.provider) || "unknown";
+    const normalizedKey = build_normalized_key(
+      String(row.title_raw || ""),
+      String(row.artist_raw || ""),
+    );
+    const strongAliases = rawSongStrongIdentityAliases(row);
+    const aliases = strongAliases.length > 0
+      ? strongAliases
+      : [rawSongFallbackIdentityAlias(normalizedKey)].filter(Boolean);
+
+    for (const alias of aliases) {
+      if (!sourceProvidersByIdentity.has(alias)) {
+        sourceProvidersByIdentity.set(alias, new Set<string>());
+      }
+      sourceProvidersByIdentity.get(alias)!.add(provider);
+    }
+  }
+
+  const sourceProvidersByCandidate = new Map<string, string[]>();
+
+  for (const candidate of candidates) {
+    const candidateId = String(candidate.id);
+    const providers = new Set<string>();
+
+    for (const alias of candidateEvidenceIdentityAliases(
+      candidate as Record<string, unknown>,
+    )) {
+      for (const provider of sourceProvidersByIdentity.get(alias) || []) {
+        providers.add(provider);
+      }
+    }
+
+    const sourceProviders = [...providers].sort();
+    sourceProvidersByCandidate.set(candidateId, sourceProviders);
+
+    if (
+      !Boolean(candidate.carry_forward_only) &&
+      !Boolean(candidate.airplay_candidate_only) &&
+      sourceProviders.length !== Number(candidate.source_count || 0)
+    ) {
+      return json(req, {
+        ok: false,
+        runId,
+        error: "scoring_source_count_invariant_failed",
+        candidateId,
+        candidateSourceCount: Number(candidate.source_count || 0),
+        recoveredSourceCount: sourceProviders.length,
+        sourceProviders,
+      }, 409);
+    }
+  }
+
   const candidateIds = candidates.map((candidate) => String(candidate.id));
   const { data: matches, error: matchError } = await db
     .from("chart_ingest_matches")
@@ -2802,6 +2886,7 @@ async function handleRunScoring(
     previous_position: number | null;
     source_count: number;
     occurrence_count: number;
+    source_providers: string[];
     is_carry_forward: boolean;
     is_airplay_candidate: boolean;
   }> = [];
@@ -2847,6 +2932,7 @@ async function handleRunScoring(
       previous_position: previousPosition,
       source_count: Number(candidate.source_count || 0),
       occurrence_count: Number(candidate.occurrence_count || 0),
+      source_providers: sourceProvidersByCandidate.get(candidateId) || [],
       is_carry_forward: Boolean(candidate.carry_forward_only),
       is_airplay_candidate: Boolean(candidate.airplay_candidate_only),
     });
@@ -2927,6 +3013,8 @@ async function handleRunScoring(
         final_score: finalScore,
         source_count: score.source_count,
         occurrence_count: score.occurrence_count,
+        source_providers: score.source_providers,
+        source_evidence_identity_key: score.identity_key,
         recency_days: score.recency_days,
         previous_position: score.previous_position,
       },
@@ -4035,6 +4123,16 @@ async function handleCommitRun(
       artist_slug: presentation.artistSlug,
       canonical_track_id: trackId,
       total_score: Number(scoreByCandidate.get(candidateId)?.final_score || 0),
+      source_score: Number(scoreByCandidate.get(candidateId)?.source_score || 0),
+      cross_source_bonus: Number(scoreByCandidate.get(candidateId)?.cross_source_bonus || 0),
+      overlap_bonus: Number(scoreByCandidate.get(candidateId)?.overlap_bonus || 0),
+      recency_score: Number(scoreByCandidate.get(candidateId)?.recency_score || 0),
+      continuity_score: Number(scoreByCandidate.get(candidateId)?.continuity_score || 0),
+      carry_forward_bonus: Number(scoreByCandidate.get(candidateId)?.carry_forward_bonus || 0),
+      airplay_score: Number(scoreByCandidate.get(candidateId)?.airplay_score || 0),
+      anti_gaming_penalty: Number(scoreByCandidate.get(candidateId)?.anti_gaming_penalty || 0),
+      source_payload: (scoreByCandidate.get(candidateId)?.score_payload_json as Record<string, unknown>) || {},
+      source_urls_seen: Array.isArray(candidate.source_urls_seen) ? candidate.source_urls_seen : [],
       carry_forward_only: Boolean(candidate.carry_forward_only),
       release_date: sanitizeDate(candidate.release_date as string),
       source_count: Number(candidate.source_count || 0),
