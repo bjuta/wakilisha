@@ -600,12 +600,18 @@ async function handleReingestEdition(
 
   for (const trackId of trackIds) {
     const trackCredits = creditsByTrack.get(trackId) || [];
-    const primaryCredits = trackCredits.filter(
-      (credit) => Boolean(credit.is_primary),
-    );
-    const routeCredit = primaryCredits.length === 1
-      ? primaryCredits[0]
-      : null;
+    const primaryCredits = trackCredits
+      .filter((credit) => Boolean(credit.is_primary))
+      .sort((a, b) => {
+        const orderDelta =
+          Number(a.credit_order ?? Number.MAX_SAFE_INTEGER) -
+          Number(b.credit_order ?? Number.MAX_SAFE_INTEGER);
+        if (orderDelta !== 0) return orderDelta;
+        return String(a.artist_id || "").localeCompare(
+          String(b.artist_id || ""),
+        );
+      });
+    const routeCredit = primaryCredits[0] ?? null;
 
     const routeArtist = routeCredit?.artist_id
       ? artistById.get(String(routeCredit.artist_id))
@@ -635,7 +641,7 @@ async function handleReingestEdition(
 
     if (
       trackCredits.length > 0 &&
-      primaryCredits.length === 1 &&
+      primaryCredits.length >= 1 &&
       artistSlug &&
       artistName
     ) {
@@ -3058,7 +3064,7 @@ async function handleRunScoring(
         source_count: score.source_count,
         occurrence_count: score.occurrence_count,
         source_providers: score.source_providers,
-        source_evidence_identity_key: score.identity_key,
+        canonical_track_identity_key: score.identity_key,
         recency_days: score.recency_days,
         previous_position: score.previous_position,
       },
@@ -3909,12 +3915,18 @@ async function handleCommitRun(
     const candidateId = String(candidate.id);
     const trackId = trackByCandidate.get(candidateId)!;
     const trackCredits = creditsByTrack.get(trackId) || [];
-    const primaryCredits = trackCredits.filter(
-      (credit) => Boolean(credit.is_primary),
-    );
-    const routeCredit = primaryCredits.length === 1
-      ? primaryCredits[0]
-      : null;
+    const primaryCredits = trackCredits
+      .filter((credit) => Boolean(credit.is_primary))
+      .sort((a, b) => {
+        const orderDelta =
+          Number(a.credit_order ?? Number.MAX_SAFE_INTEGER) -
+          Number(b.credit_order ?? Number.MAX_SAFE_INTEGER);
+        if (orderDelta !== 0) return orderDelta;
+        return String(a.artist_id || "").localeCompare(
+          String(b.artist_id || ""),
+        );
+      });
+    const routeCredit = primaryCredits[0] ?? null;
 
     const routeArtist = routeCredit?.artist_id
       ? artistById.get(String(routeCredit.artist_id))
@@ -3946,7 +3958,7 @@ async function handleCommitRun(
     const artistName = creditNames.join(", ");
     const missing: string[] = [];
     if (trackCredits.length === 0) missing.push("active_track_credit");
-    if (primaryCredits.length !== 1) missing.push("exact_primary_artist_credit");
+    if (primaryCredits.length < 1) missing.push("primary_artist_credit");
     if (!artistSlug) missing.push("canonical_artist_slug");
     if (!artistName) missing.push("canonical_artist_display");
 
