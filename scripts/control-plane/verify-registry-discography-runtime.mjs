@@ -22,6 +22,8 @@ const governedHandlerPath = "supabase/functions/ingest-artist-discography/govern
 const governedPlanPath = "supabase/functions/ingest-artist-discography/governedPlan.ts";
 const brokerEntrypointPath = "supabase/functions/ingest-artist-discography/index.ts";
 const adminClientPath = "src/services/registry/admin/discography.ts";
+const publicReadPath = "supabase/functions/public-content-read/index.ts";
+const publicClientPath = "src/services/publicContent/client.ts";
 const intakeDrawerPath = "src/components/admin/registry/artist-discography/ArtistDiscographyIntakeDrawer.tsx";
 const discographyPanelPath = "src/pages/admin/registry/artists/detail/components/DiscographyPanel.tsx";
 const artistDetailPath = "src/pages/admin/registry/artists/detail/page.tsx";
@@ -35,6 +37,8 @@ const governedHandler = read(governedHandlerPath);
 const governedPlan = read(governedPlanPath);
 const brokerEntrypoint = read(brokerEntrypointPath);
 const adminClient = read(adminClientPath);
+const publicRead = read(publicReadPath);
+const publicClient = read(publicClientPath);
 const intakeDrawer = read(intakeDrawerPath);
 const discographyPanel = read(discographyPanelPath);
 const artistDetail = read(artistDetailPath);
@@ -62,6 +66,53 @@ requireText(provider, '...providerPayload,', providerPath);
 requireText(provider, 'sha256Hex(providerPayload)', providerPath);
 requireText(provider, '.sort((left, right) =>', providerPath);
 forbidText(provider, 'sha256Hex(observation)', providerPath);
+
+const singleGuard =
+  'if (isSingle || trackCount === 1) return "single";';
+const epGuard =
+  'if (name.includes("ep") || (trackCount >= 2 && trackCount <= 8 && !isComplete)) return "ep";';
+
+requireText(provider, singleGuard, providerPath);
+requireText(provider, epGuard, providerPath);
+
+if (
+  provider.indexOf(singleGuard) >
+  provider.indexOf(epGuard)
+) {
+  throw new Error(
+    `${providerPath}: explicit Apple isSingle authority must precede EP track-count heuristic`,
+  );
+}
+
+requireText(
+  provider,
+  'duration_ms: Number.isFinite(Number(trackAttributes.durationInMillis)) ? Number(trackAttributes.durationInMillis) : null',
+  providerPath,
+);
+
+for (const [path, source] of [
+  [publicReadPath, publicRead],
+  [publicClientPath, publicClient],
+]) {
+  requireText(source, 'display_credit', path);
+  requireText(source, 'releasePrimaryArtistSlugs', path);
+}
+
+requireText(
+  publicRead,
+  'canonicalReleaseType = String(release.release_type || "").trim().toLowerCase()',
+  publicReadPath,
+);
+requireText(
+  publicRead,
+  'releaseType: publicReleaseType',
+  publicReadPath,
+);
+requireText(
+  publicClient,
+  'storedReleaseType',
+  publicClientPath,
+);
 
 for (const fragment of [
   '.from("registry_artists").insert',
