@@ -1,0 +1,35 @@
+{
+  "migration_file": "20261004100745_discography_review_retry_authority_v1.sql",
+  "migration_sha256": "a3f249647921ae46963f670bf7f925f07920aa4e7ab36b54866eb5c270e7e35c",
+  "base_main_sha": "d8d1df434e148016bc241739b252b0a23cdfdac0",
+  "preview": {
+    "project_ref": "jyttkfsveqobibpuomum",
+    "branch_id": "4f7de3c9-da97-4ec1-9206-2692e09be162",
+    "branch_name": "discography-review-retry-authority-v1",
+    "baseline_migration_count": 200,
+    "baseline_head": "20261004072423",
+    "candidate_head": "20261004100745"
+  },
+  "acceptance": {
+    "native_preapply_exact_pending_set": "pass",
+    "native_candidate_apply": "pass",
+    "native_zero_pending_postcheck": "pass",
+    "final_local_remote_timestamp_alignment": "pass",
+    "mizizi_shared_review_authority_verifier": "MIZIZI_SHARED_REVIEW_AUTHORITY_PASS",
+    "registry_discography_authority_verifier": "REGISTRY_DISCOGRAPHY_AUTHORITY_V1_PASS",
+    "discography_retry_review_seal_verifier": "DISCOGRAPHY_RETRY_REVIEW_SEAL_PASS",
+    "rollback_only_retry_lifecycle": "pass",
+    "expected_event_sequence": [
+      "decision",
+      "supersede",
+      "reopen",
+      "decision"
+    ],
+    "zero_surviving_fixture_users": true,
+    "zero_surviving_fixture_evidence": true,
+    "zero_surviving_fixture_grants": true
+  },
+  "production_mutation": false,
+  "edge_change": false,
+  "frontend_change": false
+}

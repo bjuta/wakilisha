@@ -3,6 +3,7 @@
 do $$
 declare
   v_invalid bigint;
+  v_definition text;
 begin
   if to_regclass('platform_private.registry_review_cases') is null
      or to_regclass('platform_private.registry_review_events') is null
@@ -224,6 +225,19 @@ begin
 
   if v_invalid <> 0 then
     raise exception 'Gate E verifier: review case has multiple unsuperseded decisions';
+  end if;
+
+  select pg_get_functiondef(
+    'platform_private.seal_registry_execution_grant_review_v1()'::regprocedure
+  ) into v_definition;
+
+  if position('registry_discography_admin' in v_definition) = 0
+     or position('review_plan_id' in v_definition) = 0
+     or position('transition_registry_review_case_v1' in v_definition) = 0
+     or position('effective_execution_grant_id' in v_definition) = 0
+     or position('v_prior_grant.status' in v_definition) = 0
+  then
+    raise exception 'Gate E verifier: reviewed Discography retry lifecycle is not sealed to terminal prior authority';
   end if;
 
   if position(
