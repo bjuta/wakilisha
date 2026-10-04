@@ -149,7 +149,8 @@ begin
     'registry.release_track_set.replace',
     'registry.track_artist_credit_set.replace',
     'registry.release.activate',
-    'registry.draft_identity.reconcile'
+    'registry.draft_identity.reconcile',
+    'registry.release.identity.reconcile'
   );
 
   if v_count <> 10 then
