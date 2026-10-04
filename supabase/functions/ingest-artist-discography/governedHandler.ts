@@ -109,9 +109,32 @@ export async function handleGovernedDiscographyRequest(req: Request): Promise<Re
     const mode = String(body.mode ?? "preview").trim();
 
     if (mode === "preview") {
+      if (
+        body.album_ids !== undefined &&
+        !Array.isArray(body.album_ids)
+      ) {
+        return json(req, { ok: false, error: "invalid_album_ids" }, 400);
+      }
+
+      const requestedAlbumIds = Array.isArray(body.album_ids)
+        ? [...new Set(
+          body.album_ids
+            .map((value) => String(value ?? "").trim())
+            .filter(Boolean),
+        )]
+        : [];
+
+      if (
+        requestedAlbumIds.length > 25 ||
+        requestedAlbumIds.some((value) => !/^[0-9]+$/.test(value))
+      ) {
+        return json(req, { ok: false, error: "invalid_album_ids" }, 400);
+      }
+
       const provider = await fetchDiscographyProviderObservation({
         authorization: caller.authorization,
         artistId,
+        albumIds: requestedAlbumIds.length ? requestedAlbumIds : undefined,
       });
       const evidence = await recordImmutableDiscographyEvidence({
         db: caller.db,
