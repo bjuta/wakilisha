@@ -67,11 +67,14 @@ requireText(provider, 'sha256Hex(providerPayload)', providerPath);
 requireText(provider, '.sort((left, right) =>', providerPath);
 forbidText(provider, 'sha256Hex(observation)', providerPath);
 
+const singleTitleGuard =
+  'const explicitSingleTitle = /(?:\\s[-–—]\\s|\\s*\\()single\\)?$/.test(name);';
 const singleGuard =
-  'if (isSingle || trackCount === 1) return "single";';
+  'if (isSingle || explicitSingleTitle || trackCount === 1) return "single";';
 const epGuard =
   'if (name.includes("ep") || (trackCount >= 2 && trackCount <= 8 && !isComplete)) return "ep";';
 
+requireText(provider, singleTitleGuard, providerPath);
 requireText(provider, singleGuard, providerPath);
 requireText(provider, epGuard, providerPath);
 
@@ -80,7 +83,7 @@ if (
   provider.indexOf(epGuard)
 ) {
   throw new Error(
-    `${providerPath}: explicit Apple isSingle authority must precede EP track-count heuristic`,
+    `${providerPath}: Apple Single authority must precede EP track-count heuristic`,
   );
 }
 
