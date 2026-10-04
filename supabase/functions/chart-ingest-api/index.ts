@@ -1,5 +1,6 @@
 // ── SHARED BLOCK (Phase A) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { parseChartArtistCredits } from "./artistCredit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -376,6 +377,49 @@ interface ChartMaterializationResult {
   primary_artist_id:string; primary_artist_slug:string;
   artists:Array<{artist_id:string;artist_slug:string;artist_name:string;created:boolean;operation_id?:string}>;
   credits:Array<{credit_id:string;artist_id:string;created:boolean;operation_id?:string}>;
+}
+
+async function openChartIdentityReviewIssue(
+  db: ReturnType<typeof createClient>,
+  runId: string,
+  candidateId: string,
+  issueType: "artist_credit_ambiguity" | "artist_alias_ambiguity",
+  message: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  await db
+    .from("chart_ingest_review_issues")
+    .delete()
+    .eq("run_id", runId)
+    .eq("candidate_id", candidateId)
+    .eq("issue_type", issueType)
+    .eq("status", "open");
+
+  const { error } = await db
+    .from("chart_ingest_review_issues")
+    .insert({
+      id: crypto.randomUUID(),
+      run_id: runId,
+      candidate_id: candidateId,
+      issue_type: issueType,
+      severity: "error",
+      blocking: true,
+      message,
+      status: "open",
+      created_at: now,
+      updated_at: now,
+    });
+
+  if (error) {
+    throw new Error(`chart_identity_review_issue_failed:${error.message}`);
+  }
+
+  await db
+    .from("chart_ingest_candidates")
+    .update({ status: "needs_review", updated_at: now })
+    .eq("run_id", runId)
+    .eq("id", candidateId);
 }
 
 async function materializeChartCandidate(db:ReturnType<typeof createClient>,runId:string,candidateId:string):Promise<ChartMaterializationResult>{
@@ -4514,7 +4558,50 @@ async function handleApplyRowDecision(
           }, 403);
         }
 
-        const materialized = await materializeChartCandidate(db, runId, candidateId);
+        const parsedCredits = parseChartArtistCredits(
+          String(candidate.artist_display || ""),
+        );
+
+        if (parsedCredits.status !== "resolved") {
+          await openChartIdentityReviewIssue(
+            db,
+            runId,
+            candidateId,
+            "artist_credit_ambiguity",
+            `Chart Artist credit grammar requires review: ${parsedCredits.reason}.`,
+          );
+
+          return json(req, {
+            error: "chart_artist_credit_review_required",
+            reason: parsedCredits.reason,
+            candidateId,
+          }, 409);
+        }
+
+        let materialized: ChartMaterializationResult;
+        try {
+          materialized = await materializeChartCandidate(db, runId, candidateId);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+
+          if (/artist identity is ambiguous/i.test(message)) {
+            await openChartIdentityReviewIssue(
+              db,
+              runId,
+              candidateId,
+              "artist_alias_ambiguity",
+              "Chart Artist identity resolves to conflicting canonical/alias authority and requires review.",
+            );
+
+            return json(req, {
+              error: "chart_artist_alias_review_required",
+              candidateId,
+            }, 409);
+          }
+
+          throw error;
+        }
+
         requestedTrackId = materialized.track_id;
       }
 
