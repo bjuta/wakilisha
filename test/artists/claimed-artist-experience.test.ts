@@ -87,6 +87,7 @@ describe("claimed Artist experience", () => {
   it("uses M2 claims, representation, team, and review authority instead of duplicating it", () => {
     expect(service).toContain('"community_get_artist_representation_state"');
     expect(service).toContain('"community_submit_artist_claim_v3"');
+    expect(service).toContain('"community_withdraw_artist_claim"');
     expect(service).toContain('"community_artist_invite_representative"');
     expect(service).toContain('"community_artist_accept_representation"');
     expect(service).toContain('"community_artist_update_representative"');
@@ -127,6 +128,12 @@ describe("claimed Artist experience", () => {
     expect(authorityPanel).toContain("Claim this Artist");
     expect(authorityPanel).toContain("ri-user-add-line");
     expect(authorityPanel).toContain("Claim under review");
+    expect(authorityPanel).toContain("Withdraw Claim");
+    expect(authorityPanel).toContain("Withdraw this claim?");
+    expect(authorityPanel).toContain("Keep Claim");
+    expect(authorityPanel).toContain("Confirm Withdrawal");
+    expect(authorityPanel).toContain("withdrawArtistClaim");
+    expect(authorityPanel).not.toContain("window.confirm");
     expect(authorityPanel).toContain("Artist Studio");
     expect(authorityPanel).toContain("Edit Profile");
     expect(authorityPanel).toContain("ArtistPostComposer");

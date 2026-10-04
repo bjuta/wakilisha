@@ -11,6 +11,7 @@ import { ArtistClaimSheet } from "@/components/artists/ArtistClaimSheet";
 import {
   acceptArtistRepresentation,
   getArtistRepresentationState,
+  withdrawArtistClaim,
   type ArtistPublicAuthority,
   type ArtistRepresentationState,
 } from "@/services/artists/claimedArtist";
@@ -60,6 +61,7 @@ export function ArtistAuthorityPanel({
   const [stateLoading, setStateLoading] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const presentation = authority?.presentation;
@@ -188,6 +190,30 @@ export function ArtistAuthorityPanel({
     }
   }
 
+  async function handleWithdrawClaim() {
+    if (!state?.latestClaim?.id || state.latestClaim.status !== "pending") return;
+    setMessage(null);
+    setActionLoading(true);
+    try {
+      await withdrawArtistClaim(state.latestClaim.id);
+      setWithdrawConfirmOpen(false);
+      setMessage({
+        type: "success",
+        text: "Your Artist claim has been withdrawn.",
+      });
+      await refreshState();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "We could not withdraw this Artist claim.",
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   const activeRepresentation = state?.representation?.status === "active" ? state.representation : null;
   const pendingInvitation = state?.representation?.status === "pending" ? state.representation : null;
@@ -246,9 +272,40 @@ export function ArtistAuthorityPanel({
                 Accept Invitation
               </WkButton>
             ) : pendingClaim ? (
-              <span className="rounded-full bg-[var(--wk-brand-soft)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-brand)]">
-                Claim under review
-              </span>
+              withdrawConfirmOpen ? (
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <span className="text-[11px] font-semibold text-[var(--wk-text-muted)]">
+                    Withdraw this claim?
+                  </span>
+                  <WkButton
+                    variant="soft"
+                    onClick={() => setWithdrawConfirmOpen(false)}
+                    disabled={actionLoading}
+                  >
+                    Keep Claim
+                  </WkButton>
+                  <WkButton
+                    variant="primary"
+                    onClick={handleWithdrawClaim}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? "Withdrawing…" : "Confirm Withdrawal"}
+                  </WkButton>
+                </div>
+              ) : (
+                <>
+                  <span className="rounded-full bg-[var(--wk-brand-soft)] px-3 py-1.5 text-[11px] font-bold text-[var(--wk-brand)]">
+                    Claim under review
+                  </span>
+                  <WkButton
+                    variant="soft"
+                    onClick={() => setWithdrawConfirmOpen(true)}
+                    disabled={actionLoading}
+                  >
+                    Withdraw Claim
+                  </WkButton>
+                </>
+              )
             ) : canStartClaim ? (
               <button
                 type="button"
