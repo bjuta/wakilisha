@@ -2,12 +2,18 @@
 
 Date: 2 October 2026
 
-Status: **DESIGN AUTHORITY — IMPLEMENTATION NOT YET PRODUCTION ACCEPTED**
+Status: **PRODUCTION-DEPLOYED BASELINE — ATOMIC/COLLISION FOLLOW-UP IN IMPLEMENTATION**
 
-Implementation branch: `fix/discography-review-publication-convergence`
+Initial implementation branch: `fix/discography-review-publication-convergence`
 
-Canonical forward migration authority:
+Initial canonical forward migration authority:
 `supabase/migrations/20261002162223_discography_review_publication_convergence_v1.sql`
+
+4 October 2026 follow-up branch:
+`fix/discography-atomic-admission-slug-collision`
+
+Follow-up canonical migration authority:
+`supabase/migrations/20261004072423_discography_atomic_reviewed_admission_collision_recovery_v1.sql`
 
 Base protected-main authority:
 `3b952c00ea7f59c3c2a2ef76258709f20e7cbeea`
@@ -656,3 +662,94 @@ The desired steady state is:
 → ordinary public/editorial consumers require no repair knowledge.
 
 That is the direction for ten-year Registry infrastructure.
+
+
+## 22. 4 October Production acceptance correction
+
+The first real explicit SoFresh 254 re-review proved the baseline spine worked far enough to expose a deeper orchestration edge case rather than hiding it.
+
+The administrator explicitly reviewed all seven observed Releases as:
+
+- 6 Merge;
+- 0 Add;
+- 1 Leave.
+
+The accepted `60 seconds (RB60s) - EP` identity successfully converged to the clean Artist-scoped slug `60-seconds-rb60s`, its four Tracks became active, and the one Left Release remained draft.
+
+The same Apply exposed two additional invariants that are now binding.
+
+### 22.1 Sibling Release collision rule
+
+Two genuinely distinct SoFresh 254 Releases exist:
+
+- `254 Riddim` — Album;
+- `254 Riddim - Single` — Single.
+
+Both normalize to the clean base slug `254-riddim`.
+
+Provider packaging is still not canonical identity noise by default. However, structural type becomes a legitimate **disambiguator only when the clean Artist-scoped base is already occupied by a distinct sibling identity**.
+
+The durable allocation rule is therefore:
+
+1. preserve an already-owned clean base route when it is an exact existing sibling identity;
+2. for a new collision group with no existing base owner, deterministically choose one base owner from the reviewed accepted set;
+3. use structural `-album`, `-ep`, or `-single` only when required to distinguish a genuine sibling;
+4. if type still collides, use release date;
+5. if date still collides, use the immutable provider Album identifier as the final deterministic fallback;
+6. never reintroduce Artist-name suffix noise as a collision workaround.
+
+For the real Production pair, the already-active Single keeps `254-riddim` and the Album recovery target is `254-riddim-album`.
+
+### 22.2 Apply must be atomic across canonical children and parent finalization
+
+The first implementation caught each child exception independently and continued later children.
+
+That allowed later lifecycle operations to activate accepted Tracks/Releases even after one earlier Release identity-reconciliation child failed. Because the error list was then non-empty, the parent `registry.discography.apply` operation was not created, so the MIZIZI terminal sentry never received a parent finalization opportunity.
+
+That is not an acceptable reviewed-admission contract.
+
+The corrected contract is:
+
+- immutable observation and exhaustive reviewed plan may survive a failed Apply;
+- every canonical mutation child, exact grant, operation receipt, write event, lifecycle transition, and parent finalization must execute inside one savepoint-bounded canonical admission transaction;
+- the first child failure aborts the canonical batch;
+- a MIZIZI parent veto aborts the canonical batch;
+- the caller receives one bounded error receipt;
+- no partial canonical music state or mutation-operation residue may escape the failed Apply;
+- Retry must always use a fresh planner-version fingerprint when the planner policy changed.
+
+### 22.3 Active dirty Release recovery is typed authority
+
+A partially activated Release from the defective run cannot be repaired by pretending it is still a draft.
+
+The follow-up introduces a dedicated human-reviewed typed operation:
+
+`registry.release.identity.reconcile/v1`
+
+with capability:
+
+`reconcile_registry_release_identity`
+
+It may reconcile one exact active Release slug while preserving lifecycle state, only when:
+
+- the current user holds `manage_registry`;
+- immutable provider evidence and reviewed-plan authority are exact;
+- the target state fingerprint is current;
+- the new Artist-scoped slug is deterministic under the reviewed collision allocator;
+- the target is one exact Release;
+- the independent verifier proves the final active identity and canonical write causality.
+
+MIZIZI does not receive standing mutation authority for this operation. It remains the terminal invariant steward and may block parent finalization.
+
+### 22.4 Follow-up acceptance additions
+
+The follow-up cannot close unless Preview proves all of the following in rollback-only behavioral acceptance:
+
+- two reviewed sibling Releases sharing one clean base receive distinct deterministic Artist-scoped slugs;
+- a real active dirty Release can recover through `registry.release.identity.reconcile/v1`;
+- the existing clean sibling route is preserved;
+- a late identity collision after plan freeze causes Apply failure;
+- all earlier canonical children from that failed Apply are rolled back;
+- the immutable reviewed plan remains preserved;
+- no mutation-operation receipts from the failed canonical batch remain;
+- MIZIZI finalization remains reachable only after every canonical child verifier has passed.

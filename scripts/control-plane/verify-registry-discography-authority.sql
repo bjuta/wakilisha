@@ -109,11 +109,12 @@ begin
     'replace_registry_release_track_set',
     'replace_registry_track_artist_credit_set',
     'activate_registry_release',
-    'reconcile_registry_draft_identity'
+    'reconcile_registry_draft_identity',
+    'reconcile_registry_release_identity'
   )
     and domain = 'registry';
 
-  if v_count <> 9 then
+  if v_count <> 10 then
     raise exception 'Discography V1 capability vocabulary is incomplete';
   end if;
 
@@ -129,7 +130,8 @@ begin
       'replace_registry_release_track_set',
       'replace_registry_track_artist_credit_set',
       'activate_registry_release',
-      'reconcile_registry_draft_identity'
+      'reconcile_registry_draft_identity',
+      'reconcile_registry_release_identity'
     )
   ) then
     raise exception 'Discography V1 internal operation capability leaked into a standing product role';
@@ -147,10 +149,11 @@ begin
     'registry.release_track_set.replace',
     'registry.track_artist_credit_set.replace',
     'registry.release.activate',
-    'registry.draft_identity.reconcile'
+    'registry.draft_identity.reconcile',
+    'registry.release.identity.reconcile'
   );
 
-  if v_count <> 9 then
+  if v_count <> 10 then
     raise exception 'Discography V1 operation family is incomplete';
   end if;
 
@@ -166,7 +169,8 @@ begin
       'registry.release_track_set.replace',
       'registry.track_artist_credit_set.replace',
       'registry.release.activate',
-      'registry.draft_identity.reconcile'
+      'registry.draft_identity.reconcile',
+      'registry.release.identity.reconcile'
     )
   loop
     if v_operation.operation_version <> 1
@@ -193,7 +197,8 @@ begin
       'registry.release_track_set.replace',
       'registry.track_artist_credit_set.replace',
       'registry.release.activate',
-      'registry.draft_identity.reconcile'
+      'registry.draft_identity.reconcile',
+      'registry.release.identity.reconcile'
     )
       and (
         (operation_type.operation_key = 'registry.discography.apply'
@@ -240,6 +245,11 @@ begin
           and (operation_type.capability_key <> 'reconcile_registry_draft_identity'
             or operation_type.risk_class <> 'medium'
             or operation_type.allowed_subject_types <> array['track','release']::text[]
+            or operation_type.max_rows_ceiling <> 1))
+        or (operation_type.operation_key = 'registry.release.identity.reconcile'
+          and (operation_type.capability_key <> 'reconcile_registry_release_identity'
+            or operation_type.risk_class <> 'medium'
+            or operation_type.allowed_subject_types <> array['release']::text[]
             or operation_type.max_rows_ceiling <> 1))
       )
   ) then
@@ -298,8 +308,11 @@ begin
     'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)',
     'platform_private.registry_discography_build_frozen_plan_core_v1(uuid,uuid,uuid,jsonb)',
     'platform_private.issue_registry_reviewed_admission_grant_v1(uuid,text,text,uuid,jsonb,text)',
+    'platform_private.registry_reviewed_release_slug_v2(text,text,date,text,uuid,uuid,jsonb,jsonb)',
     'platform_private.execute_registry_reviewed_identity_reconciliation_v1(text,uuid)',
     'platform_private.verify_registry_reviewed_identity_reconciliation_v1(uuid)',
+    'platform_private.execute_registry_reviewed_release_identity_reconciliation_v1(text,uuid)',
+    'platform_private.verify_registry_reviewed_release_identity_reconciliation_v1(uuid)',
     'platform_private.execute_registry_reviewed_lifecycle_v1(text,uuid)',
     'platform_private.verify_registry_reviewed_lifecycle_v1(uuid)',
     'platform_private.execute_registry_discography_operation_v1(uuid)',
@@ -401,10 +414,12 @@ begin
       'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)'
     )
   ) into v_definition;
-  if position('active_ingest_v1' in v_definition)=0
+  if position('active_ingest_v2' in v_definition)=0
      or position('registry.track.activate' in v_definition)=0
      or position('registry.release.activate' in v_definition)=0
      or position('registry.draft_identity.reconcile' in v_definition)=0
+     or position('registry.release.identity.reconcile' in v_definition)=0
+     or position('registry_reviewed_release_slug_v2' in v_definition)=0
   then
     raise exception 'Discography active-ingest terminal plan drifted';
   end if;
@@ -463,6 +478,14 @@ begin
     raise exception 'Discography reviewed execution is not bound to semantic idempotency-key authority';
   end if;
 
+  if position('release_identity_reconciliation' in v_definition)=0
+     or position('v_receipts:=''[]''::jsonb' in v_definition)=0
+     or position('v_errors:=jsonb_build_array' in v_definition)=0
+     or position('v_errors:=v_errors||to_jsonb(v_child_ref' in v_definition)>0
+  then
+    raise exception 'Discography reviewed execution lost its atomic canonical admission boundary';
+  end if;
+
   select regexp_replace(
     pg_get_functiondef(
       to_regprocedure('public.admin_create_registry_discography_artist_shell_v1(uuid,text)')
@@ -487,8 +510,11 @@ begin
     'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)',
     'platform_private.registry_discography_build_frozen_plan_core_v1(uuid,uuid,uuid,jsonb)',
     'platform_private.issue_registry_reviewed_admission_grant_v1(uuid,text,text,uuid,jsonb,text)',
+    'platform_private.registry_reviewed_release_slug_v2(text,text,date,text,uuid,uuid,jsonb,jsonb)',
     'platform_private.execute_registry_reviewed_identity_reconciliation_v1(text,uuid)',
     'platform_private.verify_registry_reviewed_identity_reconciliation_v1(uuid)',
+    'platform_private.execute_registry_reviewed_release_identity_reconciliation_v1(text,uuid)',
+    'platform_private.verify_registry_reviewed_release_identity_reconciliation_v1(uuid)',
     'platform_private.execute_registry_reviewed_lifecycle_v1(text,uuid)',
     'platform_private.verify_registry_reviewed_lifecycle_v1(uuid)',
     'platform_private.execute_registry_discography_operation_v1(uuid)',
@@ -536,7 +562,8 @@ begin
         'replace_registry_track_artist_credit_set',
         'create_registry_release',
         'activate_registry_release',
-        'reconcile_registry_draft_identity'
+        'reconcile_registry_draft_identity',
+        'reconcile_registry_release_identity'
       )
       and grant_row.status = 'active'
       and grant_row.valid_from <= now()
@@ -573,6 +600,7 @@ begin
         'registry.track_artist_credit_set.replace',
         'registry.release.activate',
         'registry.draft_identity.reconcile',
+        'registry.release.identity.reconcile',
         'registry.track.activate'
       )
       and (

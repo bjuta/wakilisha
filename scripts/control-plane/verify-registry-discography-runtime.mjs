@@ -27,6 +27,7 @@ const discographyPanelPath = "src/pages/admin/registry/artists/detail/components
 const artistDetailPath = "src/pages/admin/registry/artists/detail/page.tsx";
 const manifestPath = "scripts/control-plane/registry-privileged-writer-manifest.json";
 const reviewedAdmissionMigrationPath = "supabase/migrations/20261002162223_discography_review_publication_convergence_v1.sql";
+const atomicAdmissionRecoveryMigrationPath = "supabase/migrations/20261004072423_discography_atomic_reviewed_admission_collision_recovery_v1.sql";
 
 const provider = read(providerPath);
 const governedBroker = read(governedBrokerPath);
@@ -39,6 +40,7 @@ const discographyPanel = read(discographyPanelPath);
 const artistDetail = read(artistDetailPath);
 const manifest = JSON.parse(read(manifestPath));
 const reviewedAdmissionMigration = read(reviewedAdmissionMigrationPath);
+const atomicAdmissionRecoveryMigration = read(atomicAdmissionRecoveryMigrationPath);
 const writers = Array.isArray(manifest.writers) ? manifest.writers : [];
 
 // Provider credentials may exist only in the evidence-acquisition boundary.
@@ -217,6 +219,36 @@ forbidText(
   reviewedAdmissionMigration,
   "|| v_artist_slug",
   reviewedAdmissionMigrationPath,
+);
+
+for (const fragment of [
+  "registry_reviewed_release_slug_v2",
+  "registry.release.identity.reconcile",
+  "active_ingest_v2",
+  "registry-reviewed-release-identity-v1",
+  "Canonical admission is one savepoint-bounded unit",
+  "release_identity_reconciliation",
+]) {
+  requireText(
+    atomicAdmissionRecoveryMigration,
+    fragment,
+    atomicAdmissionRecoveryMigrationPath,
+  );
+}
+
+const atomicApplyFunctionMatch = atomicAdmissionRecoveryMigration.match(
+  /create or replace function\s+public\.admin_execute_registry_discography_evidence_v1\([\s\S]*?\n\$\$;/,
+);
+if (!atomicApplyFunctionMatch) {
+  throw new Error(
+    `${atomicAdmissionRecoveryMigrationPath}: atomic Apply function definition missing`,
+  );
+}
+const atomicApplyFunction = atomicApplyFunctionMatch[0];
+forbidText(
+  atomicApplyFunction,
+  "v_errors:=v_errors||to_jsonb(v_child_ref",
+  "public.admin_execute_registry_discography_evidence_v1",
 );
 
 const brokerWriter = writers.find((row) => row.id === "ingest-artist-discography");
