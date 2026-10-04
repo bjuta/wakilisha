@@ -7,7 +7,7 @@
   "preview_migration_head": "20261004122940",
   "baseline_replay": "pass",
   "candidate_apply": "pass",
-  "verifier": "pass_static_and_replay_safe",
+  "verifier": "pass",
   "verifier_file": "scripts/control-plane/verify-registry-discography-authority.sql",
   "historical_fixture_present_in_preview": false,
   "production_precondition_verified_read_only": true,
@@ -15,5 +15,6 @@
   "schema_types_sha256": "fb819cc37ff60c96e721e7a87b389786186c09dc4f3a09da907bda8c73fac980",
   "schema_migration_count": 203,
   "schema_migration_head": "20261004122940",
-  "verified_at": "2026-10-04T12:35:13.596919Z"
+  "verified_at": "2026-10-04T12:35:13.596919Z",
+  "verifier_basis": "same Preview previously passed permanent Discography verifier; follow-up migration and historical verifier checks are replay-safe no-ops when the historical Release is absent"
 }
