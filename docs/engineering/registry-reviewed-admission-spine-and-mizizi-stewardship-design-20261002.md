@@ -2,7 +2,7 @@
 
 Date: 2 October 2026
 
-Status: **PRODUCTION-DEPLOYED BASELINE — ATOMIC/COLLISION FOLLOW-UP IN IMPLEMENTATION**
+Status: **PRODUCTION-DEPLOYED BASELINE — RETRY-AUTHORITY FOLLOW-UP PREVIEW-ACCEPTED**
 
 Initial implementation branch: `fix/discography-review-publication-convergence`
 
@@ -753,3 +753,76 @@ The follow-up cannot close unless Preview proves all of the following in rollbac
 - the immutable reviewed plan remains preserved;
 - no mutation-operation receipts from the failed canonical batch remain;
 - MIZIZI finalization remains reachable only after every canonical child verifier has passed.
+
+## 23. 4 October reviewed Retry authority correction
+
+Production acceptance of the atomic/collision follow-up reached the corrected
+planner and created a fresh planner-v3 / `active_ingest_v2` immutable review
+plan for the preserved SoFresh 254 decision set. Canonical Apply then stopped
+before mutation because the shared Registry review seal attempted to append a
+second approved decision directly onto an already-effective review case.
+
+The failure proved a separate retry-authority invariant:
+
+- a planner-version retry must not erase or mutate the original human decision;
+- a fresh exact grant for the same human, evidence assertion, typed operation,
+  and exact subject may replace the prior approval only after the prior exact
+  grant is terminal;
+- replacement uses the existing append-only review lifecycle:
+  `decision → supersede → reopen → decision`;
+- a prior active grant may never be superseded by this retry path;
+- reviewer principal, evidence assertion, actor, operation key/version, and
+  exact target authority must remain matched;
+- no client role receives direct authority over the private review seal.
+
+The correction is branch:
+
+`fix/discography-review-retry-authority`
+
+with canonical generated migration:
+
+`20261004100745_discography_review_retry_authority_v1.sql`
+
+The migration narrows the existing
+`platform_private.seal_registry_execution_grant_review_v1()` trigger function.
+For `registry_discography_admin` reviewed-plan retries only, an already-effective
+approved case may advance through `supersede → reopen` before the new exact
+approval is sealed when the bound prior grant is terminal and the same human,
+evidence, actor, and typed operation authority still match.
+
+### 23.1 Preview acceptance
+
+A fresh disposable Preview branch was created from Production and rebased until
+its baseline ledger reached exactly 200 migrations with head
+`20261004072423_discography_atomic_reviewed_admission_collision_recovery_v1`.
+
+The canonical repository migration replay then proved:
+
+- native pre-apply migration list: only
+  `20261004100745_discography_review_retry_authority_v1.sql` pending;
+- native `supabase db push --dry-run --linked`: exactly that file pending;
+- native `supabase db push --linked`: PASS;
+- native post-apply dry-run: remote database up to date;
+- final Preview ledger: local and remote both
+  `20261004100745_discography_review_retry_authority_v1`;
+- `MIZIZI_SHARED_REVIEW_AUTHORITY_PASS`;
+- `REGISTRY_DISCOGRAPHY_AUTHORITY_V1_PASS`;
+- `DISCOGRAPHY_RETRY_REVIEW_SEAL_PASS`.
+
+Rollback-only behavioral acceptance then exercised the real shared review
+relations and trigger path:
+
+1. one exact human-approved Discography grant sealed the first decision;
+2. that grant became terminal (`consumed`);
+3. a second exact grant for the same human/evidence/operation/subject was
+   issued with a new reviewed-plan identity;
+4. the case history converged exactly to
+   `decision → supersede → reopen → decision`;
+5. the second decision became the one effective approval;
+6. the first approval remained immutable historical causality and was no
+   longer effective;
+7. rollback left zero surviving auth-user, evidence, or execution-grant
+   fixtures.
+
+This closes the review-authority defect discovered by the real SoFresh 254
+retry without widening MIZIZI, client, or ambient Registry mutation authority.
