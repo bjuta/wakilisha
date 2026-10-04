@@ -192,6 +192,11 @@ requireText(governedBroker, 'admin_preview_registry_discography_evidence_v1', go
 requireText(governedBroker, 'admin_execute_registry_discography_evidence_v1', governedBrokerPath);
 requireText(governedBroker, 'admin_create_registry_discography_artist_shell_v1', governedBrokerPath);
 requireText(governedHandler, 'evidence_assertion_id', governedHandlerPath);
+requireText(governedHandler, 'body.album_ids', governedHandlerPath);
+requireText(governedHandler, 'albumIds: requestedAlbumIds.length ? requestedAlbumIds : undefined', governedHandlerPath);
+requireText(governedHandler, 'invalid_album_ids', governedHandlerPath);
+requireText(adminClient, 'albumIds?: string[]', adminClientPath);
+requireText(adminClient, 'album_ids: normalizedAlbumIds', adminClientPath);
 requireText(governedHandler, 'approved !== true', governedHandlerPath);
 requireText(governedHandler, 'executeReviewedDiscographyEvidence', governedHandlerPath);
 
