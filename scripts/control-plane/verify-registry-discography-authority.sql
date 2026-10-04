@@ -689,6 +689,58 @@ begin
     raise exception 'Discography V1 has active exact grants at verifier rest state';
   end if;
 
+  if exists (
+    select 1
+    from public.registry_releases r
+    where r.id='0eb24444-eec5-4f2d-8afa-64945c728599'::uuid
+      and (
+        r.status<>'active'
+        or r.release_type<>'single'
+        or r.metadata->>'apple_music_album_id'<>'6783357507'
+      )
+  ) then
+    raise exception 'Boys Mamako historical Release authority drifted';
+  end if;
+
+  if exists (
+    select 1
+    from public.registry_track_artists ta
+    where ta.track_id in (
+        'cfdd9175-1869-4767-af83-c5c55454119d'::uuid,
+        '6b8c6cc3-e96d-434b-a1a1-945d7a5fd067'::uuid
+      )
+      and ta.artist_id in (
+        '5c465840-5e43-48f1-b15a-b23847238f1f'::uuid,
+        '138fa127-9c8b-46c8-b469-06f5f4880e2f'::uuid
+      )
+      and ta.status='active'
+      and (
+        ta.role<>'primary_artist'
+        or not ta.is_primary
+        or ta.is_featured
+      )
+  ) then
+    raise exception 'Boys Mamako historical co-primary Track authority drifted';
+  end if;
+
+  if exists (
+    select 1
+    from public.registry_track_artists ta
+    where ta.track_id in (
+        'cfdd9175-1869-4767-af83-c5c55454119d'::uuid,
+        '6b8c6cc3-e96d-434b-a1a1-945d7a5fd067'::uuid
+      )
+      and ta.artist_id='fb5a17ed-d1d5-44d2-8585-4bed02859689'::uuid
+      and ta.status='active'
+      and (
+        ta.role<>'featured_artist'
+        or ta.is_primary
+        or not ta.is_featured
+      )
+  ) then
+    raise exception 'Boys Mamako Iphoolish Track authority drifted';
+  end if;
+
   if has_table_privilege('authenticated','public.registry_artists','INSERT')
      or has_table_privilege('authenticated','public.registry_artists','UPDATE')
      or has_table_privilege('authenticated','public.registry_artists','DELETE')

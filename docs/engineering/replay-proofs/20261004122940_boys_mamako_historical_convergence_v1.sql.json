@@ -1,0 +1,20 @@
+{
+  "migration_file": "supabase/migrations/20261004122940_boys_mamako_historical_convergence_v1.sql",
+  "migration_sha256": "12c8781451108d1fcde53b93e350ae6ffaf497341d145a50ab36db37d4beede0",
+  "base_main_sha": "782fc7483587fa06931d8e9fd633f69008925bb9",
+  "preview_project_ref": "ybfzurdsyfolbycwwsml",
+  "preview_branch_id": "3647afa0-f5f3-4bed-a708-c95dfacb908c",
+  "preview_migration_head": "20261004122940",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-registry-discography-authority.sql",
+  "historical_fixture_present_in_preview": false,
+  "production_precondition_verified_read_only": true,
+  "duration_repair_deferred": true,
+  "schema_types_sha256": "fb819cc37ff60c96e721e7a87b389786186c09dc4f3a09da907bda8c73fac980",
+  "schema_migration_count": 203,
+  "schema_migration_head": "20261004122940",
+  "verified_at": "2026-10-04T12:35:13.596919Z",
+  "verifier_basis": "same Preview previously passed permanent Discography verifier; follow-up migration and historical verifier checks are replay-safe no-ops when the historical Release is absent"
+}
