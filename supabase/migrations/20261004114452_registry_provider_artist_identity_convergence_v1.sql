@@ -119,10 +119,17 @@ begin
         and existing.id<>credit.id
     );
 
-  if v_track_rows<>12
-     or v_track_duplicates<>3
-     or v_release_rows<>2
-     or v_release_duplicates<>2
+  if not (
+       (v_track_rows=0
+        and v_track_duplicates=0
+        and v_release_rows=0
+        and v_release_duplicates=0)
+       or
+       (v_track_rows=12
+        and v_track_duplicates=3
+        and v_release_rows=2
+        and v_release_duplicates=2)
+     )
   then
     raise exception
       'Alias-credit repair scope drifted: Track %/% duplicates; Release %/% duplicates.',
