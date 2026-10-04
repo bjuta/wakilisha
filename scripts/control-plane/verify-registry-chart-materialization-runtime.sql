@@ -42,8 +42,11 @@ begin
   end if;
 
   if to_regprocedure(
-       'public.chart_materialize_candidate_registry_v1(uuid,uuid)'
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)'
      ) is null
+     or to_regprocedure(
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid)'
+     ) is not null
      or to_regprocedure(
        'public.chart_admit_artist_origin_v1(uuid,text,uuid,uuid,text)'
      ) is null
@@ -97,17 +100,17 @@ begin
 
   if has_function_privilege(
        'anon',
-       'public.chart_materialize_candidate_registry_v1(uuid,uuid)',
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)',
        'EXECUTE'
      )
      or has_function_privilege(
        'service_role',
-       'public.chart_materialize_candidate_registry_v1(uuid,uuid)',
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)',
        'EXECUTE'
      )
      or not has_function_privilege(
        'authenticated',
-       'public.chart_materialize_candidate_registry_v1(uuid,uuid)',
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)',
        'EXECUTE'
      )
      or has_function_privilege(
@@ -195,7 +198,7 @@ begin
   end if;
 
   select pg_get_functiondef(
-    'public.chart_materialize_candidate_registry_v1(uuid,uuid)'::regprocedure
+    'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)'::regprocedure
   ) into v_materialize_definition;
 
   if position('manage_registry' in v_materialize_definition)=0
@@ -428,3 +431,93 @@ begin
     'REGISTRY_CHART_ARTIST_RESOLUTION_REBASE_PASS';
 end
 $verify_chart_artist_resolution_rebase$;
+
+
+-- #1151: Chart evidence + identity convergence.
+--
+-- Charts must reuse canonical Artist aliases and structured credit semantics
+-- before materializing Registry identity. Provider text may never manufacture
+-- aliases, and ordinal position alone may never imply featured status.
+do $verify_chart_evidence_identity_convergence$
+declare
+  v_artist_definition text;
+  v_materialize_definition text;
+begin
+  if to_regprocedure(
+       'platform_private.ensure_registry_chart_artist_v1(uuid,uuid,text,jsonb,text)'
+     ) is null
+     or to_regprocedure(
+       'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)'
+     ) is null
+  then
+    raise exception
+      'Chart evidence identity convergence function family is incomplete';
+  end if;
+
+  select pg_get_functiondef(
+    'platform_private.ensure_registry_chart_artist_v1(uuid,uuid,text,jsonb,text)'::regprocedure
+  )
+  into v_artist_definition;
+
+  if position(
+       'registry_artist_aliases'
+       in v_artist_definition
+     )=0
+     or position(
+          'canonical_artist_id'
+          in v_artist_definition
+        )=0
+     or position(
+          'alias.status=''active'''
+          in replace(v_artist_definition,' ','')
+        )=0
+     or position(
+          'registry_artist_creation_collision_state_v1'
+          in v_artist_definition
+        )=0
+  then
+    raise exception
+      'Chart Artist resolution lost active alias-aware canonicalization';
+  end if;
+
+  if v_artist_definition ~*
+       '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public\.registry_artist_aliases'
+  then
+    raise exception
+      'Chart Artist resolution regained authority to manufacture aliases';
+  end if;
+
+  select pg_get_functiondef(
+    'public.chart_materialize_candidate_registry_v1(uuid,uuid,jsonb)'::regprocedure
+  )
+  into v_materialize_definition;
+
+  if position('manage_registry' in v_materialize_definition)=0
+     or position('publish_charts' in v_materialize_definition)>0
+     or position('v_artist_roles' in v_materialize_definition)=0
+     or position('primary_artist' in v_materialize_definition)=0
+     or position('featured_artist' in v_materialize_definition)=0
+     or position('p_artist_credits' in v_materialize_definition)=0
+     or position('jsonb_array_elements' in v_materialize_definition)=0
+     or position('registry_identity_comparison_key_v1' in v_materialize_definition)=0
+     or position('regexp_split_to_array' in v_materialize_definition)>0
+     or position(
+          'when v_i=1 then ''primary_artist'' else ''featured_artist'''
+          in v_materialize_definition
+        )>0
+  then
+    raise exception
+      'Chart Artist credit-role authority regressed to positional semantics';
+  end if;
+
+  if v_materialize_definition ~*
+       '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+public\.registry_(artists|track_artists)'
+  then
+    raise exception
+      'Chart materialization bypassed typed Registry operations';
+  end if;
+
+  raise notice
+    'REGISTRY_CHART_EVIDENCE_IDENTITY_CONVERGENCE_PASS';
+end
+$verify_chart_evidence_identity_convergence$;

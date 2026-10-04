@@ -86,10 +86,15 @@ describe("Chart UUID identity authority", () => {
       expect(source).toContain("registry_track_artists");
     }
 
-    expect(commit).toContain("exact_primary_artist_credit");
+    expect(commit).toContain('primaryCredits.length < 1');
+    expect(commit).toContain('const routeCredit = primaryCredits[0] ?? null');
+    expect(commit).toContain('Number(a.credit_order ?? Number.MAX_SAFE_INTEGER)');
+    expect(commit).not.toContain("exact_primary_artist_credit");
     expect(commit).not.toContain(
       'normalizeSlug(String(candidate.artist_display || ""))',
     );
+    expect(reingest).toContain('const routeCredit = primaryCredits[0] ?? null');
+    expect(reingest).not.toContain("exact_primary_artist_credit");
     expect(reingest).toContain("registry_presentation_incomplete");
   });
 
@@ -102,7 +107,8 @@ describe("Chart UUID identity authority", () => {
 
     expect(decisions).toContain('action === "create_shell"');
     expect(decisions).toContain('requireCap(db, "manage_registry")');
-    expect(decisions).toContain("materializeChartCandidate(db, runId, candidateId)");
+    expect(decisions).toContain("parsedCredits.credits");
+    expect(runtime).toContain("p_artist_credits: artistCredits");
     expect(decisions).toContain("forbidden_registry_admission");
 
     expect(migration).toContain(

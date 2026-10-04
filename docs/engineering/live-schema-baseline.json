@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-04T16:07:00Z",
-  "typesSha256": "fb819cc37ff60c96e721e7a87b389786186c09dc4f3a09da907bda8c73fac980",
+  "generatedAt": "2026-10-04T18:59:27Z",
+  "typesSha256": "aff99aab1f261c8b370280a78460cbd05c525b7f9082a57dc9379a1c2c95cfaa",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 204,
-  "latestMigration": "20261004153723_discography_selective_provider_discovery_v1.sql",
+  "migrationCount": 205,
+  "latestMigration": "20261004181332_chart_evidence_identity_convergence_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "ahacziubtqswtbpcrfkj",
-    "migrationHead": "20261004153723",
-    "baseMainSha": "4eb5930449e5dbf1274984793a38b5a8ab71cbc2",
-    "previewBranchId": "abfd45ad-c1af-4c1a-9145-4545d05952a7"
+    "sourceProjectRef": "daobxhhphazyubwhcgpp",
+    "migrationHead": "20261004181332",
+    "baseMainSha": "46707fa05956626738ae0813ca601b00639f4071",
+    "previewBranchId": "a969ef4e-8099-49a1-9d88-c079a6651d6c"
   }
 }

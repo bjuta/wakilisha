@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20261004181332_chart_evidence_identity_convergence_v1.sql",
+  "migration_sha256": "feaee66b50eeb2bb26df514f748dcbe219027fb41a94b4255d768ebcbd1a8110",
+  "base_main_sha": "46707fa05956626738ae0813ca601b00639f4071",
+  "preview_project_ref": "daobxhhphazyubwhcgpp",
+  "preview_branch_id": "a969ef4e-8099-49a1-9d88-c079a6651d6c",
+  "preview_migration_head": "20261004181332",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-registry-chart-materialization-runtime.sql",
+  "schema_types_sha256": "aff99aab1f261c8b370280a78460cbd05c525b7f9082a57dc9379a1c2c95cfaa",
+  "schema_migration_count": 205,
+  "schema_migration_head": "20261004181332",
+  "verified_at": "2026-10-04T18:59:27.194Z"
+}
