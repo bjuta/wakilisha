@@ -2241,13 +2241,20 @@ begin
       'Collision-aware reviewed admission planner did not converge.';
   end if;
 
-  select pg_get_functiondef(
-    'public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb)'::regprocedure
+  select regexp_replace(
+    pg_get_functiondef(
+      'public.admin_execute_registry_discography_evidence_v1(uuid,uuid,jsonb)'::regprocedure
+    ),
+    '[[:space:]]+',
+    '',
+    'g'
   )
   into v_definition;
 
-  if position('Canonical admission is one savepoint-bounded unit' in v_definition)=0
-     or position('release_identity_reconciliation' in v_definition)=0
+  if position('release_identity_reconciliation' in v_definition)=0
+     or position('v_receipts:=''[]''::jsonb' in v_definition)=0
+     or position('v_errors:=jsonb_build_array' in v_definition)=0
+     or position('v_errors:=v_errors||to_jsonb(v_child_ref' in v_definition)>0
   then
     raise exception
       'Atomic reviewed admission execution boundary did not converge.';
