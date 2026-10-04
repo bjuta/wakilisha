@@ -89,6 +89,14 @@ requireText(
   'duration_ms: Number.isFinite(Number(trackAttributes.durationInMillis)) ? Number(trackAttributes.durationInMillis) : null',
   providerPath,
 );
+requireText(provider, 'const SEARCH_PAGE_SIZE = 25;', providerPath);
+requireText(provider, 'const DISCOVERY_SAFETY_LIMIT = 1000;', providerPath);
+requireText(provider, 'while (ids.length < DISCOVERY_SAFETY_LIMIT)', providerPath);
+requireText(provider, 'skipped_existing_album_ids', providerPath);
+requireText(provider, 'artist.metadata?.apple_music_album_ids', providerPath);
+requireText(provider, 'targeted: requestedIds.length > 0', providerPath);
+requireText(provider, 'apple_music_catalogue_safety_limit_exceeded', providerPath);
+forbidText(provider, 'const MAX_ALBUMS = 25;', providerPath);
 
 for (const [path, source] of [
   [publicReadPath, publicRead],
