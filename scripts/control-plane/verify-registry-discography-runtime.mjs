@@ -235,10 +235,20 @@ for (const fragment of [
     atomicAdmissionRecoveryMigrationPath,
   );
 }
+
+const atomicApplyFunctionMatch = atomicAdmissionRecoveryMigration.match(
+  /create or replace function\s+public\.admin_execute_registry_discography_evidence_v1\([\s\S]*?\n\$\$;/,
+);
+if (!atomicApplyFunctionMatch) {
+  throw new Error(
+    `${atomicAdmissionRecoveryMigrationPath}: atomic Apply function definition missing`,
+  );
+}
+const atomicApplyFunction = atomicApplyFunctionMatch[0];
 forbidText(
-  atomicAdmissionRecoveryMigration,
+  atomicApplyFunction,
   "v_errors:=v_errors||to_jsonb(v_child_ref",
-  atomicAdmissionRecoveryMigrationPath,
+  "public.admin_execute_registry_discography_evidence_v1",
 );
 
 const brokerWriter = writers.find((row) => row.id === "ingest-artist-discography");
