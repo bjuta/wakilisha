@@ -70,7 +70,7 @@ describe("Chart independent source provenance", () => {
     );
 
     expect(scoring).toContain("source_providers: score.source_providers");
-    expect(scoring).toContain("source_evidence_identity_key");
+    expect(scoring).toContain("canonical_track_identity_key");
     expect(commit).toContain("source_payload:");
     expect(commit).toContain("score_payload_json");
     expect(commit).toContain("source_urls_seen:");
