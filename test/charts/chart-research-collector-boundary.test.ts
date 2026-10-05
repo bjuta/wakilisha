@@ -17,6 +17,12 @@ describe("D11B research collector boundary", () => {
     expect(collector).not.toContain('phase: "confirmatory_holdout"');
   });
 
+  it("authorizes gateway-verified service-role JWTs without token-string equality", () => {
+    expect(collector).toContain("verifiedJwtRole");
+    expect(collector).toContain('=== "service_role"');
+    expect(collector).not.toContain("token === SERVICE_KEY");
+  });
+
   it("exposes a deterministic due-collection action without qualification authority", () => {
     expect(collector).toContain('action === "collect_due"');
     expect(collector).toContain("dueD11BCollectionTargets");
