@@ -169,7 +169,8 @@ create table public.chart_research_observations (
   provider_row_key text not null check (nullif(btrim(provider_row_key),'') is not null),
   provider_track_id text,
   provider_release_id text,
-  provider_artist_ids jsonb not null default '[]'::jsonb,
+  provider_artist_ids jsonb not null default '[]'::jsonb
+    check (jsonb_typeof(provider_artist_ids)='array'),
   isrc text,
   canonical_track_id uuid
     references public.registry_tracks(id)
@@ -545,7 +546,10 @@ begin
     v_old_hash,
     v_new_hash,
     auth.uid(),
-    current_user,
+    coalesce(
+      nullif(current_setting('request.jwt.claim.role', true),''),
+      session_user::text
+    ),
     nullif(current_setting('request.jwt.claim.sub', true),'')
   );
 
