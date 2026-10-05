@@ -14,6 +14,7 @@ import {
   type QualifiedSource,
   validateCanonicalD11BWindow,
 } from "./adapters.ts";
+import { dueD11BCollectionTargets } from "./schedule.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -620,6 +621,60 @@ Deno.serve(async (req) => {
       const trackingEnd = String(body.trackingEnd ?? "");
       const window = await ensureWindow(db, trackingStart, trackingEnd);
       return json(req, { ok: true, window });
+    }
+
+    if (action === "collect_due") {
+      const windowId = String(body.windowId ?? "");
+      const now = body.now ? String(body.now) : new Date().toISOString();
+      if (!windowId) return json(req, { error: "windowId_required" }, 400);
+
+      const windowResult = await db
+        .from("chart_research_windows")
+        .select("*")
+        .eq("id", windowId)
+        .single();
+      if (windowResult.error || !windowResult.data) {
+        return json(req, { error: "research_window_not_found" }, 404);
+      }
+      if (windowResult.data.phase !== "engineering_pilot") {
+        return json(req, { error: "qualification_collection_not_authorized" }, 409);
+      }
+
+      const sourceRuns = await db
+        .from("chart_research_source_runs")
+        .select("source_key,fetch_status,parse_status")
+        .eq("window_id", windowId);
+      if (sourceRuns.error) throw sourceRuns.error;
+
+      const completedKeys = (sourceRuns.data ?? [])
+        .filter((row) =>
+          row.fetch_status === "succeeded" &&
+          row.parse_status === "succeeded"
+        )
+        .map((row) => String(row.source_key));
+
+      const due = dueD11BCollectionTargets(
+        String(windowResult.data.tracking_start),
+        String(windowResult.data.tracking_end),
+        now,
+        completedKeys,
+      );
+
+      const results: Record<string, unknown>[] = [];
+      for (const target of due) {
+        results.push(await collectOne(
+          db,
+          windowId,
+          target.source,
+          "checkpointDate" in target ? target.checkpointDate : undefined,
+        ));
+      }
+
+      return json(req, {
+        ok: results.every((result) => result.ok !== false),
+        due_count: due.length,
+        results,
+      });
     }
 
     if (action === "collect_source") {
