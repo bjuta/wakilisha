@@ -18,6 +18,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 
 // ── Test client setup ────────────────────────────────────────────────────────
@@ -26,6 +27,11 @@ const SUPABASE_URL = process.env.VITE_PUBLIC_SUPABASE_URL || 'http://localhost:5
 const ANON_KEY = process.env.VITE_PUBLIC_SUPABASE_ANON_KEY || '';
 
 const anonClient = createClient(SUPABASE_URL, ANON_KEY);
+
+const CHART_RESEARCH_MIGRATION = readFileSync(
+  'supabase/migrations/20261005122500_chart_research_observation_substrate_v1.sql',
+  'utf8',
+);
 
 function isAccessDeniedOrHidden(
   error: {
@@ -277,6 +283,22 @@ describe('RLS — Anonymous (no token)', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('RLS — Structural verification', () => {
+  it('chart research substrate has no publication-table mutation authority', () => {
+    expect(CHART_RESEARCH_MIGRATION).not.toMatch(
+      /\b(?:insert\s+into|update|delete\s+from)\s+public\.wk_chart_(?:editions|entries)_v2\b/i,
+    );
+
+    expect(CHART_RESEARCH_MIGRATION).toContain(
+      'chart_research_observations_append_only',
+    );
+    expect(CHART_RESEARCH_MIGRATION).toContain(
+      'revoke all on table',
+    );
+    expect(CHART_RESEARCH_MIGRATION).toContain(
+      'from public, anon, authenticated, service_role',
+    );
+  });
+
   it('anon client is configured with anon key (not service_role)', () => {
     // The anon key should be set and not be the service_role key
     expect(ANON_KEY).toBeTruthy();
