@@ -76,6 +76,18 @@ begin
 
   if not exists (
     select 1
+    from pg_indexes
+    where schemaname='public'
+      and tablename='chart_research_rank_outputs'
+      and indexname='chart_research_rank_outputs_track_idx'
+      and indexdef like '%(canonical_track_id)%'
+  ) then
+    raise exception
+      'CHART_RESEARCH_SUBSTRATE_FAIL: rank-output Track foreign key is not covered by the canonical_track_id index';
+  end if;
+
+  if not exists (
+    select 1
     from information_schema.columns
     where table_schema='public'
       and table_name='chart_research_observations'
