@@ -17,6 +17,12 @@ describe("D11B research collector boundary", () => {
     expect(collector).not.toContain('phase: "confirmatory_holdout"');
   });
 
+  it("exposes a deterministic due-collection action without qualification authority", () => {
+    expect(collector).toContain('action === "collect_due"');
+    expect(collector).toContain("dueD11BCollectionTargets");
+    expect(collector).toContain("qualification_collection_not_authorized");
+  });
+
   it("uses only the frozen inaugural source constitution", () => {
     expect(collector).toContain('"youtube", "audiomack", "apple"');
     expect(collector).not.toContain('"mdundo"');
