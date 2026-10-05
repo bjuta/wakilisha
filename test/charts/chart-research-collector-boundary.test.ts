@@ -23,10 +23,14 @@ describe("D11B research collector boundary", () => {
     expect(collector).not.toContain("token === SERVICE_KEY");
   });
 
-  it("exposes a deterministic due-collection action without qualification authority", () => {
+  it("exposes deterministic due collection without caller-controlled time", () => {
     expect(collector).toContain('action === "collect_due"');
     expect(collector).toContain("dueD11BCollectionTargets");
+    expect(collector).toContain("expiredD11BCollectionTargets");
+    expect(collector).toContain("current_only_checkpoint_missed");
+    expect(collector).toContain('"partial_window"');
     expect(collector).toContain("qualification_collection_not_authorized");
+    expect(collector).not.toContain("body.now");
   });
 
   it("uses only the frozen inaugural source constitution", () => {
