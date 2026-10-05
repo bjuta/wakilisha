@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-04T18:59:27Z",
-  "typesSha256": "aff99aab1f261c8b370280a78460cbd05c525b7f9082a57dc9379a1c2c95cfaa",
+  "generatedAt": "2026-10-05T15:11:41Z",
+  "typesSha256": "2a304f3f17b13903c166f91cbf626870bfc6bfa59881b3cbf002777614e9992e",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 205,
-  "latestMigration": "20261004181332_chart_evidence_identity_convergence_v1.sql",
+  "migrationCount": 206,
+  "latestMigration": "20261005122500_chart_research_observation_substrate_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "daobxhhphazyubwhcgpp",
-    "migrationHead": "20261004181332",
-    "baseMainSha": "46707fa05956626738ae0813ca601b00639f4071",
-    "previewBranchId": "a969ef4e-8099-49a1-9d88-c079a6651d6c"
+    "sourceProjectRef": "lthctoxsblsmlcyyjbxx",
+    "migrationHead": "20261005122500",
+    "baseMainSha": "db492fa2141632b83fa3a46ff04909d898b0d433",
+    "previewBranchId": "e10511bd-e27f-41bc-9168-cab3a4b19b61"
   }
 }
