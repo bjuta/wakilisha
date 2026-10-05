@@ -28,6 +28,24 @@ const ANON_KEY = process.env.VITE_PUBLIC_SUPABASE_ANON_KEY || '';
 
 const anonClient = createClient(SUPABASE_URL, ANON_KEY);
 
+function apiKeyRole(apiKey: string): string | null {
+  if (apiKey.startsWith('sb_publishable_')) return 'anon';
+  if (apiKey.startsWith('sb_secret_')) return 'service_role';
+
+  const parts = apiKey.split('.');
+  if (parts.length !== 3) return null;
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(parts[1], 'base64url').toString('utf8'),
+    ) as { role?: unknown };
+
+    return typeof payload.role === 'string' ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
 const CHART_RESEARCH_MIGRATION = readFileSync(
   'supabase/migrations/20261005122500_chart_research_observation_substrate_v1.sql',
   'utf8',
@@ -299,12 +317,11 @@ describe('RLS — Structural verification', () => {
     );
   });
 
-  it('anon client is configured with anon key (not service_role)', () => {
-    // The anon key should be set and not be the service_role key
+  it('anon client is configured with a non-privileged API key', () => {
     expect(ANON_KEY).toBeTruthy();
-    // Service role keys start with 'eyJ...' and are much longer
-    // Anon keys are also JWTs but shorter
     expect(ANON_KEY.length).toBeGreaterThan(20);
+    expect(ANON_KEY.startsWith('sb_secret_')).toBe(false);
+    expect(apiKeyRole(ANON_KEY)).toBe('anon');
   });
 
   it('anon client can connect to Supabase', async () => {
