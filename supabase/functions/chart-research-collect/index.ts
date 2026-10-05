@@ -66,11 +66,40 @@ function serviceDb(): Db {
   });
 }
 
+function verifiedJwtRole(token: string): string | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+
+  try {
+    const payload = JSON.parse(
+      new TextDecoder().decode(
+        Uint8Array.from(
+          atob(
+            parts[1]
+              .replace(/-/g, "+")
+              .replace(/_/g, "/")
+              .padEnd(Math.ceil(parts[1].length / 4) * 4, "="),
+          ),
+          (char) => char.charCodeAt(0),
+        ),
+      ),
+    ) as { role?: unknown };
+
+    return typeof payload.role === "string" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
 async function authorize(req: Request, db: Db): Promise<boolean> {
   const header = req.headers.get("Authorization");
   if (!header?.startsWith("Bearer ")) return false;
   const token = header.slice("Bearer ".length);
-  if (token === SERVICE_KEY) return true;
+
+  // Deployment keeps Supabase gateway JWT verification enabled. At this point a
+  // legacy service-role JWT has already passed project signature validation, so
+  // use its verified role claim rather than brittle token-string equality.
+  if (verifiedJwtRole(token) === "service_role") return true;
 
   const callerDb = createClient(SUPABASE_URL, ANON_KEY, {
     global: { headers: { Authorization: header } },
