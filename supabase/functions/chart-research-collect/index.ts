@@ -14,7 +14,13 @@ import {
   type QualifiedSource,
   validateCanonicalD11BWindow,
 } from "./adapters.ts";
-import { dueD11BCollectionTargets } from "./schedule.ts";
+import {
+  assertD11BTargetCollectableNow,
+  d11bCollectionSchedule,
+  dueD11BCollectionTargets,
+  expiredD11BCollectionTargets,
+  type D11BCollectionTarget,
+} from "./schedule.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -398,6 +404,80 @@ function sourceKey(
   return appleSourceKey(checkpointDate);
 }
 
+function targetForSourceKey(
+  trackingStart: string,
+  trackingEnd: string,
+  key: string,
+): D11BCollectionTarget {
+  const target = d11bCollectionSchedule(trackingStart, trackingEnd)
+    .find((candidate) => candidate.sourceKey === key);
+  if (!target) throw new Error("source_not_expected_for_window");
+  return target;
+}
+
+async function recordMissedCheckpoint(
+  db: Db,
+  windowId: string,
+  target: D11BCollectionTarget,
+): Promise<Record<string, unknown>> {
+  if (!("expiresAt" in target)) {
+    throw new Error("historical_period_source_cannot_expire");
+  }
+
+  const source = target.source;
+  const existing = await db
+    .from("chart_research_source_runs")
+    .select("id,failure_reason,receipt_json")
+    .eq("window_id", windowId)
+    .eq("source_key", target.sourceKey)
+    .maybeSingle();
+  if (existing.error) throw existing.error;
+
+  const missed = await db
+    .from("chart_research_source_runs")
+    .upsert({
+      window_id: windowId,
+      source_key: target.sourceKey,
+      provider: providerKey(source),
+      source_family: sourceFamily(source),
+      source_surface: target.sourceKey,
+      provider_market: "KE",
+      expected: true,
+      fetch_status: "failed",
+      parse_status: "not_applicable",
+      row_count: 0,
+      censoring_type: "top_n",
+      payload_hash: null,
+      health_state: "partial_window",
+      failure_reason: "current_only_checkpoint_missed",
+      adapter_version: D11B_ADAPTER_VERSION,
+      source_methodology_version: methodologyVersion(source),
+      territorial_confidence: "provider_defined",
+      receipt_json: {
+        checkpoint_due_at: target.dueAt,
+        checkpoint_expires_at: target.expiresAt,
+        checkpoint_date:
+          "checkpointDate" in target ? target.checkpointDate : null,
+        current_only: true,
+        backfill_permitted: false,
+        previous_failure_reason: existing.data?.failure_reason ?? null,
+        previous_receipt_json: existing.data?.receipt_json ?? null,
+      },
+    }, { onConflict: "window_id,source_key" })
+    .select("id")
+    .single();
+
+  if (missed.error) throw missed.error;
+
+  return {
+    ok: false,
+    terminal: true,
+    source_run_id: missed.data.id,
+    source: target.sourceKey,
+    error: "current_only_checkpoint_missed",
+  };
+}
+
 async function collectOne(
   db: Db,
   windowId: string,
@@ -451,7 +531,11 @@ async function collectOne(
     }
   }
 
-  const startedAt = new Date().toISOString();
+  const target = targetForSourceKey(trackingStart, trackingEnd, key);
+  const runtimeNow = new Date().toISOString();
+  assertD11BTargetCollectableNow(target, runtimeNow);
+
+  const startedAt = runtimeNow;
   let raw = "";
   let parsed: ParsedSourcePayload | null = null;
   let url = "";
@@ -654,7 +738,7 @@ Deno.serve(async (req) => {
 
     if (action === "collect_due") {
       const windowId = String(body.windowId ?? "");
-      const now = body.now ? String(body.now) : new Date().toISOString();
+      const now = new Date().toISOString();
       if (!windowId) return json(req, { error: "windowId_required" }, 400);
 
       const windowResult = await db
@@ -671,25 +755,43 @@ Deno.serve(async (req) => {
 
       const sourceRuns = await db
         .from("chart_research_source_runs")
-        .select("source_key,fetch_status,parse_status")
+        .select("source_key,fetch_status,parse_status,health_state,failure_reason")
         .eq("window_id", windowId);
       if (sourceRuns.error) throw sourceRuns.error;
 
       const completedKeys = (sourceRuns.data ?? [])
         .filter((row) =>
-          row.fetch_status === "succeeded" &&
-          row.parse_status === "succeeded"
+          (
+            row.fetch_status === "succeeded" &&
+            row.parse_status === "succeeded"
+          ) ||
+          (
+            row.health_state === "partial_window" &&
+            row.failure_reason === "current_only_checkpoint_missed"
+          )
         )
         .map((row) => String(row.source_key));
 
+      const trackingStart = String(windowResult.data.tracking_start);
+      const trackingEnd = String(windowResult.data.tracking_end);
+
+      const expired = expiredD11BCollectionTargets(
+        trackingStart,
+        trackingEnd,
+        now,
+        completedKeys,
+      );
       const due = dueD11BCollectionTargets(
-        String(windowResult.data.tracking_start),
-        String(windowResult.data.tracking_end),
+        trackingStart,
+        trackingEnd,
         now,
         completedKeys,
       );
 
       const results: Record<string, unknown>[] = [];
+      for (const target of expired) {
+        results.push(await recordMissedCheckpoint(db, windowId, target));
+      }
       for (const target of due) {
         results.push(await collectOne(
           db,
@@ -702,6 +804,7 @@ Deno.serve(async (req) => {
       return json(req, {
         ok: results.every((result) => result.ok !== false),
         due_count: due.length,
+        expired_count: expired.length,
         results,
       });
     }
