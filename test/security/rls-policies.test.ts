@@ -18,6 +18,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 
 // ── Test client setup ────────────────────────────────────────────────────────
@@ -26,6 +27,29 @@ const SUPABASE_URL = process.env.VITE_PUBLIC_SUPABASE_URL || 'http://localhost:5
 const ANON_KEY = process.env.VITE_PUBLIC_SUPABASE_ANON_KEY || '';
 
 const anonClient = createClient(SUPABASE_URL, ANON_KEY);
+
+function apiKeyRole(apiKey: string): string | null {
+  if (apiKey.startsWith('sb_publishable_')) return 'anon';
+  if (apiKey.startsWith('sb_secret_')) return 'service_role';
+
+  const parts = apiKey.split('.');
+  if (parts.length !== 3) return null;
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(parts[1], 'base64url').toString('utf8'),
+    ) as { role?: unknown };
+
+    return typeof payload.role === 'string' ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
+const CHART_RESEARCH_MIGRATION = readFileSync(
+  'supabase/migrations/20261005122500_chart_research_observation_substrate_v1.sql',
+  'utf8',
+);
 
 function isAccessDeniedOrHidden(
   error: {
@@ -68,6 +92,14 @@ const CRITICAL_ADMIN_TABLES = [
   'chart_ingest_review_issues',
   'chart_ingest_audit_events',
   'chart_ingest_stage_events',
+  'chart_research_windows',
+  'chart_research_source_runs',
+  'chart_research_observations',
+  'chart_research_model_runs',
+  'chart_research_rank_outputs',
+  'chart_research_stress_runs',
+  'chart_research_validation_results',
+  'chart_research_audit_events',
   'registry_enrichment_suggestions',
   'registry_canonical_write_events',
   'admin_audit_events',
@@ -100,18 +132,18 @@ describe('RLS — Anonymous (no token)', () => {
 
   describe('Admin tables — anonymous cannot read', () => {
     for (const table of CRITICAL_ADMIN_TABLES) {
-      it(`${table}: anonymous select returns 0 or error`, async () => {
-        const { error, count } = await anonClient
+      it(`${table}: anonymous select returns no rows or error`, async () => {
+        const { data, error } = await anonClient
           .from(table)
-          .select('*', { count: 'exact', head: true })
+          .select('*')
           .limit(1);
 
         expect(
-          Boolean(error) || count === 0,
+          Boolean(error) || (Array.isArray(data) && data.length === 0),
         ).toBe(true);
 
         if (!error) {
-          expect(count).toBe(0);
+          expect(data).toEqual([]);
         }
       });
     }
@@ -269,12 +301,27 @@ describe('RLS — Anonymous (no token)', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('RLS — Structural verification', () => {
-  it('anon client is configured with anon key (not service_role)', () => {
-    // The anon key should be set and not be the service_role key
+  it('chart research substrate has no publication-table mutation authority', () => {
+    expect(CHART_RESEARCH_MIGRATION).not.toMatch(
+      /\b(?:insert\s+into|update|delete\s+from)\s+public\.wk_chart_(?:editions|entries)_v2\b/i,
+    );
+
+    expect(CHART_RESEARCH_MIGRATION).toContain(
+      'chart_research_observations_append_only',
+    );
+    expect(CHART_RESEARCH_MIGRATION).toContain(
+      'revoke all on table',
+    );
+    expect(CHART_RESEARCH_MIGRATION).toContain(
+      'from public, anon, authenticated, service_role',
+    );
+  });
+
+  it('anon client is configured with a non-privileged API key', () => {
     expect(ANON_KEY).toBeTruthy();
-    // Service role keys start with 'eyJ...' and are much longer
-    // Anon keys are also JWTs but shorter
     expect(ANON_KEY.length).toBeGreaterThan(20);
+    expect(ANON_KEY.startsWith('sb_secret_')).toBe(false);
+    expect(apiKeyRole(ANON_KEY)).toBe('anon');
   });
 
   it('anon client can connect to Supabase', async () => {
