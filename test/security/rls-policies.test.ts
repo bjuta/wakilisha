@@ -132,18 +132,18 @@ describe('RLS — Anonymous (no token)', () => {
 
   describe('Admin tables — anonymous cannot read', () => {
     for (const table of CRITICAL_ADMIN_TABLES) {
-      it(`${table}: anonymous select returns 0 or error`, async () => {
-        const { error, count } = await anonClient
+      it(`${table}: anonymous select returns no rows or error`, async () => {
+        const { data, error } = await anonClient
           .from(table)
-          .select('*', { count: 'exact', head: true })
+          .select('*')
           .limit(1);
 
         expect(
-          Boolean(error) || count === 0,
+          Boolean(error) || (Array.isArray(data) && data.length === 0),
         ).toBe(true);
 
         if (!error) {
-          expect(count).toBe(0);
+          expect(data).toEqual([]);
         }
       });
     }
