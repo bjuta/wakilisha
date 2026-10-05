@@ -40,46 +40,25 @@ begin
     end if;
   end loop;
 
-  if not has_table_privilege(
-       'service_role',
-       'public.chart_research_windows',
-       'SELECT,INSERT,UPDATE'
-     )
-     or not has_table_privilege(
-       'service_role',
-       'public.chart_research_source_runs',
-       'SELECT,INSERT,UPDATE'
-     )
-     or not has_table_privilege(
-       'service_role',
-       'public.chart_research_observations',
-       'SELECT,INSERT'
-     )
-     or not has_table_privilege(
-       'service_role',
-       'public.chart_research_model_runs',
-       'SELECT,INSERT,UPDATE'
-     )
-     or not has_table_privilege(
-       'service_role',
-       'public.chart_research_rank_outputs',
-       'SELECT,INSERT'
-     )
-     or not has_table_privilege(
-       'service_role',
-       'public.chart_research_stress_runs',
-       'SELECT,INSERT,UPDATE'
-     )
-     or not has_table_privilege(
-       'service_role',
-       'public.chart_research_validation_results',
-       'SELECT,INSERT'
-     )
-     or not has_table_privilege(
-       'service_role',
-       'public.chart_research_audit_events',
-       'SELECT'
-     )
+  if not has_table_privilege('service_role','public.chart_research_windows','SELECT')
+     or not has_table_privilege('service_role','public.chart_research_windows','INSERT')
+     or not has_table_privilege('service_role','public.chart_research_windows','UPDATE')
+     or not has_table_privilege('service_role','public.chart_research_source_runs','SELECT')
+     or not has_table_privilege('service_role','public.chart_research_source_runs','INSERT')
+     or not has_table_privilege('service_role','public.chart_research_source_runs','UPDATE')
+     or not has_table_privilege('service_role','public.chart_research_observations','SELECT')
+     or not has_table_privilege('service_role','public.chart_research_observations','INSERT')
+     or not has_table_privilege('service_role','public.chart_research_model_runs','SELECT')
+     or not has_table_privilege('service_role','public.chart_research_model_runs','INSERT')
+     or not has_table_privilege('service_role','public.chart_research_model_runs','UPDATE')
+     or not has_table_privilege('service_role','public.chart_research_rank_outputs','SELECT')
+     or not has_table_privilege('service_role','public.chart_research_rank_outputs','INSERT')
+     or not has_table_privilege('service_role','public.chart_research_stress_runs','SELECT')
+     or not has_table_privilege('service_role','public.chart_research_stress_runs','INSERT')
+     or not has_table_privilege('service_role','public.chart_research_stress_runs','UPDATE')
+     or not has_table_privilege('service_role','public.chart_research_validation_results','SELECT')
+     or not has_table_privilege('service_role','public.chart_research_validation_results','INSERT')
+     or not has_table_privilege('service_role','public.chart_research_audit_events','SELECT')
   then
     raise exception
       'CHART_RESEARCH_SUBSTRATE_FAIL: service authority incomplete';
