@@ -23,12 +23,13 @@ describe("D11B collection schedule", () => {
     ]);
   });
 
-  it("freezes Audiomack Wednesday 18:00 UTC", () => {
+  it("freezes Audiomack Wednesday 18:00-18:30 UTC", () => {
     const schedule = d11bCollectionSchedule(START, END);
     expect(schedule.find((item) => item.source === "audiomack")).toEqual({
       source: "audiomack",
       sourceKey: "audiomack_weekly100_ke",
       dueAt: "2026-09-09T18:00:00.000Z",
+      expiresAt: "2026-09-09T18:30:00.000Z",
     });
   });
 
@@ -59,6 +60,57 @@ describe("D11B collection schedule", () => {
       "apple_top100_ke:2026-09-09",
       "audiomack_weekly100_ke",
     ]);
+  });
+
+  it("expires current-only targets instead of backfilling them", async () => {
+    const { expiredD11BCollectionTargets } = await import(
+      "../../supabase/functions/chart-research-collect/schedule"
+    );
+
+    expect(
+      dueD11BCollectionTargets(
+        START,
+        END,
+        "2026-09-09T18:30:00.000Z",
+      ).some((item) => item.source === "audiomack"),
+    ).toBe(true);
+
+    expect(
+      dueD11BCollectionTargets(
+        START,
+        END,
+        "2026-09-09T18:30:00.001Z",
+      ).some((item) => item.source === "audiomack"),
+    ).toBe(false);
+
+    expect(
+      expiredD11BCollectionTargets(
+        START,
+        END,
+        "2026-09-09T18:30:00.001Z",
+      ).some((item) => item.source === "audiomack"),
+    ).toBe(true);
+  });
+
+  it("never expires YouTube exact-period retrieval", async () => {
+    const { expiredD11BCollectionTargets } = await import(
+      "../../supabase/functions/chart-research-collect/schedule"
+    );
+
+    const expired = expiredD11BCollectionTargets(
+      START,
+      END,
+      "2026-10-01T00:00:00.000Z",
+    );
+
+    expect(expired.some((item) => item.source === "youtube")).toBe(false);
+    expect(
+      dueD11BCollectionTargets(
+        START,
+        END,
+        "2026-10-01T00:00:00.000Z",
+      ).some((item) => item.source === "youtube"),
+    ).toBe(true);
   });
 
   it("does not make YouTube due before the frozen Monday checkpoint", () => {
