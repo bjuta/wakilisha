@@ -466,6 +466,9 @@ create index chart_research_model_runs_window_idx
 create index chart_research_rank_outputs_run_rank_idx
   on public.chart_research_rank_outputs(model_run_id, rank_estimate);
 
+create index chart_research_rank_outputs_track_idx
+  on public.chart_research_rank_outputs(canonical_track_id);
+
 create index chart_research_stress_runs_model_idx
   on public.chart_research_stress_runs(base_model_run_id, stress_type);
 
