@@ -11,7 +11,9 @@ import {
   rankingOutputHash,
 } from "../../scripts/research/d11b-threshold-calibration/metrics";
 import {
+  coordinatedProviderSpike,
   coordinatedSourceSpike,
+  deleteProviderSource,
   deleteSource,
   injectOrganicTrackFlood,
   maskDepth,
@@ -310,6 +312,89 @@ describe("D11B calibration stress transforms", () => {
       ],
     },
   ]);
+
+  it("provider-level Apple deletion removes every Apple checkpoint together", () => {
+    const appleComplete = input([
+      {
+        sourceKey: "youtube_weekly_ke",
+        depth: 2,
+        rows: [
+          { canonicalTrackId: "a", rank: 1 },
+          { canonicalTrackId: "b", rank: 2 },
+        ],
+      },
+      {
+        sourceKey: "audiomack_weekly100_ke",
+        depth: 2,
+        rows: [
+          { canonicalTrackId: "b", rank: 1 },
+          { canonicalTrackId: "a", rank: 2 },
+        ],
+      },
+      ...APPLE_DAYS.map((sourceKey) => ({
+        sourceKey,
+        depth: 2,
+        rows: [
+          { canonicalTrackId: "a", rank: 1 },
+          { canonicalTrackId: "b", rank: 2 },
+        ],
+      })),
+    ]);
+
+    const stressed = deleteProviderSource(appleComplete, "apple");
+
+    expect(
+      stressed.rankings.some((ranking) =>
+        ranking.sourceKey.startsWith("apple_top100_ke:")
+      ),
+    ).toBe(false);
+    expect(
+      stressed.expectedSourceKeys.filter((sourceKey) =>
+        sourceKey.startsWith("apple_top100_ke:")
+      ),
+    ).toHaveLength(7);
+
+    const row = runM1(stressed)
+      .find((candidate) => candidate.canonicalTrackId === "a")!;
+    expect(row.upper!).toBeGreaterThan(row.lower!);
+  });
+
+  it("coordinated provider spikes treat all Apple checkpoints as one provider source", () => {
+    const appleComplete = input([
+      {
+        sourceKey: "youtube_weekly_ke",
+        depth: 2,
+        rows: [
+          { canonicalTrackId: "a", rank: 1 },
+          { canonicalTrackId: "b", rank: 2 },
+        ],
+      },
+      ...APPLE_DAYS.map((sourceKey) => ({
+        sourceKey,
+        depth: 2,
+        rows: [
+          { canonicalTrackId: "a", rank: 1 },
+          { canonicalTrackId: "b", rank: 2 },
+        ],
+      })),
+    ]);
+
+    const stressed = coordinatedProviderSpike(
+      appleComplete,
+      ["youtube", "apple"],
+      "b",
+      1,
+    );
+
+    expect(
+      stressed.rankings
+        .filter((ranking) =>
+          ranking.sourceKey === "youtube_weekly_ke" ||
+          ranking.sourceKey.startsWith("apple_top100_ke:")
+        )
+        .every((ranking) => ranking.rows[0].canonicalTrackId === "b"),
+    ).toBe(true);
+  });
 
   it("source deletion preserves expected-source missingness", () => {
     const stressed = deleteSource(base, "youtube_weekly_ke");
@@ -628,6 +713,42 @@ describe("D11B calibration orchestration authority", () => {
     expect(first.models.map((model) => model.outputHash))
       .toEqual(second.models.map((model) => model.outputHash));
     expect(first.reportHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("uses the three-provider source constitution for deletion and pair attacks", () => {
+    const report = buildCalibrationReport(calibrationInput);
+
+    const deletions = report.stresses.filter((stress) =>
+      stress.stressType === "source_deletion" &&
+      stress.modelId === "M1"
+    );
+    expect(deletions.map((stress) => stress.parameters.provider))
+      .toEqual(["youtube", "audiomack", "apple"]);
+
+    const pairAttacks = report.stresses.filter((stress) =>
+      stress.modelId === "M1" &&
+      stress.parameters.attack === "D09-A3-coordinated-two-source-spike"
+    );
+    expect(pairAttacks.map((stress) => stress.parameters.providers))
+      .toEqual([
+        ["youtube", "audiomack"],
+        ["youtube", "apple"],
+        ["audiomack", "apple"],
+      ]);
+  });
+
+  it("records the organic multi-track demand negative control separately", () => {
+    const report = buildCalibrationReport(calibrationInput);
+    const controls = report.stresses.filter((stress) =>
+      stress.modelId === "M1" &&
+      stress.parameters.negativeControl === true
+    );
+
+    expect(controls).toHaveLength(1);
+    expect(controls[0].parameters.scenario)
+      .toBe("D09-organic-artist-release-flood");
+    expect(controls[0].parameters.expectedPolicy)
+      .toContain("no concentration penalty");
   });
 
   it("records source-deletion, censoring, identity and integrity stress families", () => {
