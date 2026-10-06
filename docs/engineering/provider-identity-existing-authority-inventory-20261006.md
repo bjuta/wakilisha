@@ -212,3 +212,131 @@ This inventory is documentation-only.
 - Supabase Edge Function deploy needed: **No**
 - Production Finish update needed: **No**
 - Production data mutation: **No**
+
+
+## 11. Read-only Production audit — 6 October 2026
+
+Production project: `pgzizndxdyhqmtyywjmt`.
+
+This audit performed no mutation.
+
+### 11.1 Live evidence and canonical-link populations
+
+`provider_entity_links` currently contains:
+
+- Apple Music Track evidence: 104 confirmed, 2 superseded;
+- YouTube Track evidence: 101 confirmed;
+- Spotify Track evidence: 4 confirmed;
+- SoundCloud Track evidence: 1 confirmed.
+
+`provider_field_observations` currently contains:
+
+- Apple Music Track observations: 978;
+- YouTube Track observations: 128;
+- Spotify Track observations: 22;
+- SoundCloud Track observations: 3.
+
+`registry_track_provider_links` currently contains:
+
+- Apple Music: 328 `matched` rows with `match_method='exact_title_artist'`;
+- Apple Music: 4 `needs_review` rows with `match_method='fuzzy_title_artist'`;
+- no current canonical Track-provider rows for YouTube, Spotify, SoundCloud, Audiomack, Boomplay, or Mdundo.
+
+`registry_external_identifier_assertions` currently contains:
+
+- ISRC: 209 candidate assertions;
+- MusicBrainz: 1 candidate assertion.
+
+`registry_provider_sources` currently contains zero rows.
+
+### 11.2 Current direct table privileges
+
+The live audit confirms a materially different write posture across the authority layers.
+
+#### `registry_external_identifier_assertions`
+
+- anon: no access;
+- authenticated: no direct access;
+- service_role: SELECT only;
+- no direct INSERT/UPDATE/DELETE for anon/authenticated/service_role.
+
+This is aligned with typed governed admission.
+
+#### `registry_track_provider_links`
+
+- anon/authenticated/service_role: SELECT;
+- no direct INSERT/UPDATE/DELETE for those roles.
+
+This is aligned with governed canonical provider-link admission.
+
+#### `provider_entity_links`
+
+- authenticated: SELECT only;
+- service_role: SELECT/INSERT/UPDATE/DELETE.
+
+Because this table is evidence/review bookkeeping, service-role mutation is not automatically a canonical-authority violation, but every writer must remain explicitly classified and bounded.
+
+#### `provider_field_observations`
+
+- authenticated: SELECT only;
+- service_role: SELECT/INSERT/UPDATE/DELETE.
+
+This remains an evidence surface, not canonical identity.
+
+#### `registry_provider_sources`
+
+- authenticated: SELECT/INSERT/UPDATE/DELETE;
+- service_role: SELECT/INSERT/UPDATE/DELETE;
+- table currently empty.
+
+This is the strongest live privilege debt found by the first #1163 audit.
+
+Repository search found no current application-level direct writer that obviously requires authenticated DML on this table. The privilege must therefore be treated as **candidate retirement debt**, subject to exact dependency proof before any revocation migration is proposed.
+
+#### `registry_identity_lineage`
+
+- anon/authenticated: no direct access;
+- service_role: direct table privileges are present;
+- append-only triggers reject UPDATE/DELETE.
+
+Insert authority and the exact current lineage writer paths still require writer-inventory reconciliation. Do not alter this table in #1163 architecture phase.
+
+### 11.3 Current writer findings
+
+Repository search confirms:
+
+- Track Intake workflow finalization intentionally inserts `provider_entity_links` only to preserve provider evidence/navigation after proving canonical provider-link authority;
+- permanent verifiers explicitly forbid Track Intake finalization from writing `registry_track_provider_links` directly;
+- chart playback provider admission writes canonical provider links inside the accepted typed Registry operation/executor;
+- an older `phase9-apple-music-chart-enrichment.ts` script contains direct provider-link SQL and must be classified as current, historical, or retired before implementation;
+- legacy replay-baseline migrations contain historical direct writers and are not current runtime authority;
+- current architecture documentation already records `provider_entity_links` as evidence bookkeeping and canonical provider identity as `registry_track_provider_links`.
+
+### 11.4 First collision matrix
+
+| Collision / debt | Evidence | Current decision |
+| --- | --- | --- |
+| Evidence links exist for YouTube/Spotify/SoundCloud but canonical provider links do not | live Production counts | Expected distinction, but reconciliation/admission path must be shared rather than consumer-specific |
+| Apple canonical links rely heavily on historical `exact_title_artist` method | 328 matched rows | Preserve history; future auto-resolution policy may be stricter without rewriting historical accepted evidence |
+| External identifier ledger is under-populated relative to provider evidence | 209 ISRC candidates / 1 MusicBrainz candidate | Build promotion/reconciliation around existing ledger, not a replacement table |
+| `registry_provider_sources` has broad authenticated DML while empty | live privileges + zero rows | Candidate authority contraction after dependency proof |
+| Evidence tables retain service-role write authority | live privileges | Audit writer allowlist; evidence writes are acceptable only through bounded provider workflows |
+| Canonical Track provider binding is Track-only | schema | Semantic-gap analysis required before any Release/Artist provider-binding schema |
+| Provider vocabulary is currently sparse and inconsistent with desired Tier 1 coverage | live rows only Apple/YouTube/Spotify/SoundCloud | Define provider-key/capability vocabulary before adapter expansion |
+| Research identity coverage cannot be solved by fuzzy fallback | #1161/#1162 evidence | Provider Identity Control Plane must expose strong resolution/read snapshot; D11B remains consumer only |
+
+## 12. Architecture Direction After Live Audit
+
+The first live audit **does not justify a new generic identity table**.
+
+Instead, the next design work should focus on:
+
+1. canonical provider/identifier vocabulary;
+2. exact writer allowlist for evidence surfaces;
+3. shared reconciliation policy over existing evidence + identifier assertions + canonical links + lineage;
+4. read-only resolution/snapshot contract;
+5. provider adapter capability contract;
+6. authority contraction for stale direct privileges;
+7. only then any schema gap that remains proven.
+
+The biggest immediate architecture risk is not missing storage. It is **multiple representations of provider evidence with insufficiently explicit promotion rules between observation, evidence, assertion, and canonical binding**.
