@@ -133,6 +133,31 @@ describe("Provider Identity candidate evidence", () => {
     expect(candidate.evidenceClass).toBe("metadata_similarity");
   });
 
+  it("is consumed by chart playback enrichment without similarity auto-admission", () => {
+    const source = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/functions/run-chart-playback-enrichment/index.ts",
+      ),
+      "utf8",
+    );
+
+    expect(source).toContain("classifyAppleMusicCandidateV1");
+    expect(source).toContain('candidate.disposition === "auto_accept_candidate"');
+    expect(source).toContain('"accepted"');
+    expect(source).toContain('"needs_review"');
+    expect(source).toContain(
+      'provider_candidate_evidence_class: match.evidenceClass',
+    );
+
+    expect(source).not.toMatch(/function scoreSearchMatch\s*\(/);
+    expect(source).not.toMatch(/function scoreArtistMatch\s*\(/);
+    expect(source).not.toMatch(/function searchTermsForItem\s*\(/);
+    expect(source).not.toContain(
+      'status: best.confidence >= minAutoAccept ? "accepted" : "needs_review"',
+    );
+  });
+
   it("contains no database client or canonical mutation path", () => {
     const source = fs.readFileSync(
       path.resolve(
