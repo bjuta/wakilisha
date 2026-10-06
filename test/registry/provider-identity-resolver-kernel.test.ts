@@ -244,6 +244,68 @@ describe("Provider Identity resolver kernel", () => {
     expect(retired.canonicalTrackId).toBeNull();
   });
 
+  it("is the canonical exact-match kernel consumed by chart ingest", () => {
+    const source = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "supabase/functions/chart-ingest-api/index.ts",
+      ),
+      "utf8",
+    );
+
+    expect(source).toContain('resolveTrackIdentityV1');
+    expect(source).toContain('from "../_shared/provider-identity.ts"');
+    expect(source).toContain('trackIdsByIsrc,');
+    expect(source).toContain('providerBindingsByKey: providerLinkByAlias');
+
+    // Exact-match normalization is owned by the shared primitive now.
+    expect(source).not.toMatch(/function normalizeProviderKey\s*\(/);
+    expect(source).not.toMatch(/function normalizeIsrc\s*\(/);
+    expect(source).not.toMatch(/function compactIdentityPart\s*\(/);
+  });
+
+  it("preserves chart-ingest exact-match compatibility states", () => {
+    const noMatch = resolveTrackIdentityV1({
+      isrc: "KE-ABC-26-00001",
+      providerIdsJson: { youtube: ["video-1"] },
+    });
+    expect(noMatch).toMatchObject({
+      state: "unresolved",
+      canonicalTrackId: null,
+      matchMethod: "no_match",
+      confidence: 0,
+    });
+
+    const exact = resolveTrackIdentityV1({
+      isrc: "KE-ABC-26-00001",
+      trackIdsByIsrc: new Map([
+        ["KEABC2600001", ["track-a"]],
+      ]),
+    });
+    expect(exact).toMatchObject({
+      state: "deterministic_candidate",
+      canonicalTrackId: "track-a",
+      matchMethod: "isrc",
+      confidence: 100,
+    });
+
+    const conflict = resolveTrackIdentityV1({
+      isrc: "KE-ABC-26-00001",
+      providerIdsJson: { spotify: ["SPOT-1"] },
+      trackIdsByIsrc: new Map([
+        ["KEABC2600001", ["track-a"]],
+      ]),
+      providerBindingsByKey: new Map([
+        ["spotify:spot-1", { trackId: "track-b", confidence: 1 }],
+      ]),
+    });
+    expect(conflict).toMatchObject({
+      state: "quarantined_conflict",
+      canonicalTrackId: null,
+      candidateTrackIds: ["track-a", "track-b"],
+    });
+  });
+
   it("contains no database client or canonical mutation road", () => {
     const source = fs.readFileSync(
       path.resolve(
