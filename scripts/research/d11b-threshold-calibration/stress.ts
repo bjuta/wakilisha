@@ -173,31 +173,39 @@ function promoteTrackInRanking(
     throw new Error("invalid_spike_target_rank");
   }
 
-  const ordered = [...ranking.rows].sort((a, b) => a.rank - b.rank);
-  const withoutTarget = ordered.filter(
-    (row) => row.canonicalTrackId !== canonicalTrackId,
-  );
-
-  const existing = ordered.find(
+  const existing = ranking.rows.find(
     (row) => row.canonicalTrackId === canonicalTrackId,
   );
+  const existingRank = existing?.rank ?? null;
 
-  const target = existing ?? {
+  const shifted = ranking.rows
+    .filter((row) => row.canonicalTrackId !== canonicalTrackId)
+    .map((row) => {
+      let rank = row.rank;
+
+      if (existingRank === null) {
+        if (rank >= targetRank) rank += 1;
+      } else if (targetRank < existingRank) {
+        if (rank >= targetRank && rank < existingRank) rank += 1;
+      } else if (targetRank > existingRank) {
+        if (rank > existingRank && rank <= targetRank) rank -= 1;
+      }
+
+      return {
+        canonicalTrackId: row.canonicalTrackId,
+        rank,
+      };
+    })
+    .filter((row) => row.rank <= ranking.depth);
+
+  shifted.push({
     canonicalTrackId,
     rank: targetRank,
-  };
-
-  const insertionIndex = Math.min(targetRank - 1, withoutTarget.length);
-  withoutTarget.splice(insertionIndex, 0, target);
+  });
 
   return {
     ...ranking,
-    rows: withoutTarget
-      .slice(0, ranking.depth)
-      .map((row, index) => ({
-        canonicalTrackId: row.canonicalTrackId,
-        rank: index + 1,
-      })),
+    rows: shifted.sort((a, b) => a.rank - b.rank),
   };
 }
 
