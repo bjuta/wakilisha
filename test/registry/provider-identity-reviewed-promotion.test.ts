@@ -40,7 +40,7 @@ describe("Provider Identity reviewed candidate promotion", () => {
 
   it("stages a fail-closed automatic-admission guard without a second canonical writer", () => {
     const wip = read(
-      "docs/engineering/work-in-progress/provider-identity-chart-playback-strong-evidence-guard-v1.sql",
+      "supabase/migrations/20261006175212_provider_identity_chart_playback_strong_evidence_guard_v1.sql",
     );
     const verifier = read(
       "scripts/control-plane/verify-provider-identity-chart-playback-strong-evidence.sql",
