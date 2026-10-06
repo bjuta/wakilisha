@@ -497,3 +497,121 @@ A provider can support some capabilities without supporting all of them.
 This capability contract may initially live as versioned code/config if existing
 tables cannot represent it cleanly. A new database table is not automatically
 earned.
+
+
+## 16. Local reconciliation and provider-policy debt matrix
+
+This section classifies where provider observation, identity candidate generation,
+canonical resolution, and mutation policy currently live in runtime/repository
+code.
+
+The objective is not to delete feature logic immediately. It is to assign each
+responsibility to its durable owner before implementation.
+
+| Current surface | Current behavior | Jurisdiction finding | #1163 disposition |
+| --- | --- | --- | --- |
+| `chart-provider-fetch` | Authenticated `manage_ingest` provider boundary. Reads provider credentials server-side, fetches Spotify/Apple Music, returns normalized provider data, contains no Registry authority. | Correct adapter/fetch boundary. Provider set is too narrow, but duty separation is sound. | **KEEP / GENERALIZE THROUGH SHARED ADAPTER CONTRACT.** Do not add reconciliation or canonical DML. |
+| D11B `chart-research-collect` adapters | Observe Apple Music, YouTube Charts and Audiomack under research-specific timing/source contracts. | Correct research-observation boundary, but provider clients/capability declarations should converge with the shared adapter vocabulary where semantics overlap. | **KEEP RESEARCH SEMANTICS; REUSE SHARED PROVIDER CLIENT/CAPABILITY PRIMITIVES.** D11B remains a consumer, not identity owner. |
+| `provider-intake-api` | Apple Music / Spotify provider inspection and candidate metadata, including provider IDs and ISRC where available. Existing permanent tests forbid direct canonical provider/evidence-table DML from the function. | Mostly correct observation/candidate-discovery boundary. Any local similarity/ranking logic must remain candidate-only. | **KEEP / AUDIT MATCH POLICY / ALIGN ENVELOPE.** Reuse provider adapter contract; no canonical mutation authority. |
+| `registry-discography-provider-fetch` | Provider-side discography/catalog fetch with provider identifiers and ISRC evidence. | Observation/enrichment boundary. | **KEEP / ALIGN ENVELOPE.** Canonical decisions remain in Discography reviewed Registry operations. |
+| `chart-ingest-api` canonical matching stage | Locally normalizes ISRC and provider IDs; reads active Registry Tracks and `registry_track_provider_links`; nominates candidates by exact ISRC and already-matched provider identity; multiple canonical candidates fail closed; no title/fuzzy match is used in this canonical stage. | Strong provider-neutral reconciliation behavior already exists but is feature-local. | **REUSE / EXTRACT INTO SHARED RESOLVER.** Chart ingest should consume the shared resolution result instead of owning a parallel exact-resolution implementation. Preserve its fail-closed semantics. |
+| `run-chart-playback-enrichment` candidate matching | Apple-specific provider search with title/artist scoring, ISRC boost, confidence thresholds, and `isrc` / `exact_title_artist` / `fuzzy_title_artist` candidate methods. Canonical write boundary is already governed through typed provider-link authority. | Write authority is correctly converged; **candidate/matching policy remains feature/provider-specific**. | **KEEP GOVERNED WRITE BOUNDARY; MOVE MATCH POLICY UPSTREAM.** Search/similarity becomes candidate discovery; shared reconciliation decides whether evidence is strong enough for canonical admission/review. |
+| `scripts/registry/phase9-apple-music-chart-enrichment.ts` | Historical/manual Apple enrichment script with ISRC/search/fuzzy matching and direct SQL against `registry_track_provider_links`. Package script remains present, while the script itself directs operators to the newer Admin Charts Edge Function path. | Competing executable road with older direct-write semantics. | **CANDIDATE RETIRE.** Prove no accepted operational dependency, remove package entry/script or permanently neuter write mode in a bounded retirement slice. Do not use it as Provider Identity implementation. |
+| Track Intake provider-evidence functions | Three authenticated-only functions write `provider_entity_links` as human-reviewed evidence/finalization bookkeeping. Service role cannot execute them. Finalization separately proves canonical provider-link authority. | Correct reviewed evidence workflow; not a general reconciliation service. | **KEEP.** Align provider vocabulary/snapshot reads later, but do not broaden these functions into generic Provider Identity writers. |
+| `registry.track.provider_link.admit/v1` / admin broker | One governed canonical Track-provider binding with evidence, exact grant, operation journal, canonical write event and verifier. | Correct canonical mutation boundary. | **KEEP AS TRACK CANONICAL BINDING AUTHORITY.** Future automation may only reach it through a separately reviewed broker/operation contract, never direct DML. |
+| `registry.external_identifier_assertion.admit/v1` | Governed candidate assertion admission; external identifiers can conflict and are not globally unique canonical IDs. | Correct provider-neutral assertion primitive. | **KEEP / EXPAND USAGE, NOT SCHEMA BY DEFAULT.** Promotion policy should feed this ledger where an external identifier assertion is the fact being established. |
+| `provider_entity_links` | Evidence/review bookkeeping used by Track Intake and containing Apple/YouTube/Spotify/SoundCloud provider evidence. | Useful evidence surface but visually easy for callers to mistake for canonical identity. | **KEEP WITH EXPLICIT NON-CANONICAL CONTRACT.** Audit all readers; canonical consumers must not infer truth solely from a confirmed evidence row. |
+| `registry_provider_sources` | Empty entity-linked source-evidence table with reviewed-user INSERT policy and no discovered current writer. | Purpose overlaps conceptually with provider evidence but current operational value is unproven. | **CANDIDATE CONTRACT / RETIREMENT REVIEW.** Do not repurpose it as capability registry or external-object table without a real lifecycle need. |
+| `provider_sources` | Import/source configuration catalogue with a hard-coded provider-kind constraint. | Distinct from identity evidence, but vocabulary is stale relative to active provider surfaces. | **KEEP AS IMPORT CONFIG.** Replace/centralize hard-coded provider vocabulary only after shared provider-key contract is implemented. |
+| `registry_identity_lineage` | Append-only merge/split/supersede/retire history. | Correct current-successor authority. | **KEEP.** Shared resolver must consume it before returning current canonical identity. |
+| MIZIZI | Audits accepted Registry/projection invariants and performs governed deterministic repairs/review escalation. | Correct stewardship layer. | **KEEP DOWNSTREAM.** May consume resolution/evidence and emit contradictions/findings, but must not become provider search/matching/reconciliation authority. |
+
+### 16.1 Shared resolver responsibility earned by the audit
+
+A shared reconciliation component is now **semantically earned**, even though a
+new persistence table is not.
+
+The reusable resolver should centralize logic currently repeated or feature-local:
+
+1. normalize provider keys and provider object identifiers;
+2. normalize reviewed identifier schemes such as ISRC;
+3. read already accepted canonical provider bindings;
+4. read external identifier assertions and canonical hot-path identifiers;
+5. resolve current Registry lineage;
+6. distinguish zero, one, and multiple canonical candidates;
+7. preserve evidence provenance and reasons;
+8. produce a versioned resolution state without directly mutating Registry.
+
+Minimum result states:
+
+- `resolved_existing_authority`;
+- `deterministic_candidate`;
+- `review_required`;
+- `unresolved`;
+- `quarantined_conflict`;
+- `superseded_external_reference`.
+
+The resolver itself does **not** gain unrestricted canonical write authority.
+
+### 16.2 Candidate-generation responsibility
+
+Provider search and similarity logic remains useful, but has a narrower owner.
+
+Candidate generation may use:
+
+- title / artist normalization;
+- duration;
+- release date;
+- artwork or contextual metadata;
+- provider search ranking;
+- source co-occurrence.
+
+Its output is evidence/candidates only.
+
+The Apple-specific scoring currently inside
+`run-chart-playback-enrichment` is therefore not discarded. It should be
+refactored into a provider adapter/candidate generator whose output is consumed
+by the shared reconciliation policy.
+
+### 16.3 Automatic resolution policy boundary
+
+The architecture audit does **not** freeze an automatic-resolution threshold in
+this documentation PR.
+
+Future deterministic automatic resolution requires a separately reviewed policy
+that identifies which evidence combinations are sufficiently authoritative.
+
+Until then:
+
+- existing accepted canonical provider links remain canonical historical/current
+  authority according to their accepted state;
+- exact already-governed provider identity can resolve directly;
+- strong identifier evidence may produce a deterministic candidate;
+- similarity-only evidence cannot create canonical truth;
+- ambiguity fails closed to review/unresolved.
+
+Historical Apple links admitted under earlier `exact_title_artist` policy are
+not silently invalidated by a stricter future policy.
+
+### 16.4 Retirement candidate: Phase 9 Apple enrichment script
+
+Repository search confirms
+`scripts/registry/phase9-apple-music-chart-enrichment.ts` remains executable via:
+
+`registry:phase9:apple-music-chart-enrichment`
+
+The script itself identifies Admin Charts ->
+`run-chart-playback-enrichment` as the preferred path.
+
+Because the old script still contains direct
+`registry_track_provider_links` SQL, #1163 classifies it as a **retirement
+candidate**.
+
+Retirement requires proof that:
+
+1. no current automation/workflow invokes the package script;
+2. no documented operational recovery path still depends on it;
+3. the current Edge Function path covers its accepted live responsibilities;
+4. any useful diagnostic/read-only capability is preserved elsewhere.
+
+Do not delete it merely because a newer path exists.
