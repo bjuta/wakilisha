@@ -1,4 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  appleMusicSearchTermsV1,
+  classifyAppleMusicCandidateV1,
+  scoreAppleMusicCandidateV1,
+  type ProviderCandidateDispositionV1,
+  type ProviderCandidateEvidenceClassV1,
+} from "../_shared/provider-candidate-evidence.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -44,6 +51,8 @@ type AppleMatchResult = {
   song: AppleSong;
   confidence: number;
   method: "isrc" | "exact_title_artist" | "fuzzy_title_artist";
+  evidenceClass: ProviderCandidateEvidenceClassV1;
+  disposition: ProviderCandidateDispositionV1;
   status: "accepted" | "needs_review";
   reason: string;
 };
@@ -99,76 +108,6 @@ async function createAppleMusicJWT(privateKey: string, teamId: string, keyId: st
   return `${signingInput}.${base64UrlFromBytes(new Uint8Array(signature))}`;
 }
 
-function normalizeText(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/\([^)]*(feat|ft|with)[^)]*\)/gi, "")
-    .replace(/\[[^\]]*(feat|ft|with)[^\]]*\]/gi, "")
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function normalizeIsrc(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const normalized = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  return normalized.length >= 8 ? normalized : null;
-}
-
-function splitArtistNames(value: string): string[] {
-  return value
-    .split(/,|&|\bfeat\.?\b|\bft\.?\b|\bwith\b|\bx\b/gi)
-    .map((part) => normalizeText(part))
-    .filter(Boolean);
-}
-
-function scoreArtistMatch(entryArtistRaw: string, songArtistRaw: string): number {
-  const entryArtist = normalizeText(entryArtistRaw);
-  const songArtist = normalizeText(songArtistRaw);
-  const entryArtists = splitArtistNames(entryArtistRaw);
-  const songArtists = splitArtistNames(songArtistRaw);
-
-  if (!entryArtist || !songArtist) return 0;
-  if (entryArtist === songArtist) return 0.35;
-
-  for (const entryPart of entryArtists) {
-    for (const songPart of songArtists) {
-      if (entryPart === songPart) return 0.35;
-      if (entryPart.includes(songPart) || songPart.includes(entryPart)) return 0.30;
-    }
-  }
-
-  if (entryArtist.includes(songArtist) || songArtist.includes(entryArtist)) return 0.24;
-
-  return 0;
-}
-
-function strippedVersionTitle(title: string): string {
-  const normalized = title.trim();
-  const stripped = normalized
-    .replace(/\s[-–—:]\s*(home\s+session|live\s+session|acoustic\s+session|session|home\s+version|live|acoustic)$/i, "")
-    .replace(/\s+\((home\s+session|live\s+session|acoustic\s+session|session|home\s+version|live|acoustic)\)$/i, "")
-    .replace(/\s+\[(home\s+session|live\s+session|acoustic\s+session|session|home\s+version|live|acoustic)\]$/i, "")
-    .trim();
-
-  return stripped && stripped !== normalized ? stripped : normalized;
-}
-
-function searchTermsForItem(item: QueuedEnrichmentItem): string[] {
-  const terms = new Set<string>();
-  const title = item.track_title.trim();
-  const artist = item.artist_name?.trim() ?? "";
-  const full = `${title} ${artist}`.trim();
-  const strippedTitle = strippedVersionTitle(title);
-  const stripped = `${strippedTitle} ${artist}`.trim();
-
-  if (full) terms.add(full);
-  if (stripped && stripped !== full) terms.add(stripped);
-
-  return [...terms];
-}
-
 function appleArtworkUrl(song: AppleSong, size = 600): string | null {
   const url = song.attributes?.artwork?.url;
   if (!url) return null;
@@ -185,23 +124,6 @@ function appleReleaseId(song: AppleSong): string | null {
 
 function appleArtistIds(song: AppleSong): string[] {
   return song.relationships?.artists?.data?.map((artist) => artist.id).filter(Boolean) ?? [];
-}
-
-function scoreSearchMatch(item: QueuedEnrichmentItem, song: AppleSong): number {
-  const itemTitle = normalizeText(item.track_title);
-  const songTitle = normalizeText(song.attributes?.name ?? "");
-  let score = 0;
-
-  if (itemTitle && songTitle && itemTitle === songTitle) score += 0.58;
-  else if (itemTitle && songTitle && (itemTitle.includes(songTitle) || songTitle.includes(itemTitle))) score += 0.42;
-
-  score += scoreArtistMatch(item.artist_name ?? "", song.attributes?.artistName ?? "");
-
-  const itemIsrc = normalizeIsrc(item.isrc);
-  const songIsrc = normalizeIsrc(song.attributes?.isrc);
-  if (itemIsrc && songIsrc && itemIsrc === songIsrc) score = Math.max(score, 0.99);
-
-  return Math.min(Number(score.toFixed(4)), 1);
 }
 
 async function appleRequest<T>(path: string, token: string): Promise<T> {
@@ -226,7 +148,12 @@ async function searchAppleSong(
   minAutoAccept: number,
   token: string,
 ): Promise<AppleMatchResult | null> {
-  const terms = searchTermsForItem(item);
+  const candidateInput = {
+    trackTitle: item.track_title,
+    artistName: item.artist_name,
+    isrc: item.isrc,
+  };
+  const terms = appleMusicSearchTermsV1(candidateInput);
   if (terms.length === 0) return null;
 
   const ranked: Array<{ song: AppleSong; confidence: number; term: string }> = [];
@@ -245,7 +172,7 @@ async function searchAppleSong(
     for (const song of payload.results?.songs?.data ?? []) {
       ranked.push({
         song,
-        confidence: scoreSearchMatch(item, song),
+        confidence: scoreAppleMusicCandidateV1(candidateInput, song),
         term,
       });
     }
@@ -253,23 +180,29 @@ async function searchAppleSong(
 
   ranked.sort((a, b) => b.confidence - a.confidence);
   const best = ranked[0];
+  if (!best) return null;
 
-  if (!best || best.confidence < 0.72) return null;
+  const candidate = classifyAppleMusicCandidateV1({
+    input: candidateInput,
+    song: best.song,
+    confidence: best.confidence,
+    searchTerm: best.term,
+    minAutoAccept,
+  });
 
-  const itemIsrc = normalizeIsrc(item.isrc);
-  const songIsrc = normalizeIsrc(best.song.attributes?.isrc);
-  const method = itemIsrc && songIsrc && itemIsrc === songIsrc
-    ? "isrc"
-    : best.confidence >= 0.9
-      ? "exact_title_artist"
-      : "fuzzy_title_artist";
+  if (candidate.disposition === "reject_candidate") return null;
 
   return {
     song: best.song,
-    confidence: Number(best.confidence.toFixed(4)),
-    method,
-    status: best.confidence >= minAutoAccept ? "accepted" : "needs_review",
-    reason: `Apple search best match confidence ${best.confidence.toFixed(2)} via "${best.term}"`,
+    confidence: candidate.confidence,
+    method: candidate.method,
+    evidenceClass: candidate.evidenceClass,
+    disposition: candidate.disposition,
+    status:
+      candidate.disposition === "auto_accept_candidate"
+        ? "accepted"
+        : "needs_review",
+    reason: candidate.reasons.join("; "),
   };
 }
 
@@ -759,7 +692,7 @@ async function processAppleMatching(
           .from("wk_chart_playback_enrichment_items")
           .update({
             status: "not_found",
-            error_message: "No safe Apple Music title/artist match",
+            error_message: "No reviewable Apple Music candidate",
           })
           .eq("id", itemId);
 
@@ -788,6 +721,9 @@ async function processAppleMatching(
           ...(item.metadata && typeof item.metadata === "object" ? item.metadata : {}),
           phase: "apple_matching",
           apple_reason: match.reason,
+          provider_candidate_contract: "provider-candidate-evidence-v1",
+          provider_candidate_evidence_class: match.evidenceClass,
+          provider_candidate_disposition: match.disposition,
           apple_artist_name: attrs.artistName ?? null,
           apple_title: attrs.name ?? null,
           apple_album_name: attrs.albumName ?? null,
