@@ -8,6 +8,11 @@ export interface CalibrationSourceRun {
   id: string;
   sourceKey: D11BSourceKey;
   chartDepth: number | null;
+  fetchStatus?: string | null;
+  parseStatus?: string | null;
+  healthState?: string | null;
+  failureReason?: string | null;
+  rowCount?: number | null;
 }
 
 export interface CalibrationObservation {
@@ -25,6 +30,17 @@ export interface ExternalIdentityResolution {
   authority: string;
 }
 
+export interface CalibrationSourceCoverage {
+  sourceKey: D11BSourceKey;
+  observedRows: number;
+  nativeResolvedRows: number;
+  externalResolvedRows: number;
+  effectiveResolvedRows: number;
+  quarantinedRows: number;
+  usableModelRows: number;
+  effectiveResolvedShare: number | null;
+}
+
 export interface CalibrationInputReceipt {
   modelInput: D11BModelInput;
   observationCount: number;
@@ -32,8 +48,10 @@ export interface CalibrationInputReceipt {
   unresolvedObservationCount: number;
   quarantinedObservationCount: number;
   externalResolutionCount: number;
+  effectiveResolvedObservationCount: number;
   admittedSourceRunCount: number;
   expectedSourceCount: number;
+  sourceCoverage: CalibrationSourceCoverage[];
 }
 
 export function buildCalibrationModelInput(args: {
@@ -141,6 +159,52 @@ export function buildCalibrationModelInput(args: {
     };
   });
 
+  const sourceCoverage: CalibrationSourceCoverage[] =
+    admittedRuns.map((run, index) => {
+      const sourceRows = observationsByRun.get(run.id) ?? [];
+      const usableModelRows = rankings[index]?.rows.length ?? 0;
+
+      let nativeResolvedRows = 0;
+      let externalResolvedRows = 0;
+      let quarantinedRows = 0;
+
+      for (const observation of sourceRows) {
+        if (
+          observation.identityStatus === "resolved" &&
+          observation.canonicalTrackId
+        ) {
+          nativeResolvedRows++;
+          continue;
+        }
+
+        if (observation.identityStatus === "quarantined") {
+          quarantinedRows++;
+          continue;
+        }
+
+        if (external.has(observation.providerRowKey)) {
+          externalResolvedRows++;
+        }
+      }
+
+      const effectiveResolvedRows =
+        nativeResolvedRows + externalResolvedRows;
+
+      return {
+        sourceKey: run.sourceKey,
+        observedRows: sourceRows.length,
+        nativeResolvedRows,
+        externalResolvedRows,
+        effectiveResolvedRows,
+        quarantinedRows,
+        usableModelRows,
+        effectiveResolvedShare:
+          sourceRows.length > 0
+            ? effectiveResolvedRows / sourceRows.length
+            : null,
+      };
+    });
+
   return {
     modelInput: {
       expectedSourceKeys: [...args.expectedSourceKeys],
@@ -151,7 +215,10 @@ export function buildCalibrationModelInput(args: {
     unresolvedObservationCount,
     quarantinedObservationCount,
     externalResolutionCount,
+    effectiveResolvedObservationCount:
+      resolvedObservationCount + externalResolutionCount,
     admittedSourceRunCount: admittedRuns.length,
     expectedSourceCount: args.expectedSourceKeys.length,
+    sourceCoverage,
   };
 }
