@@ -38,6 +38,43 @@ describe("Provider Identity reviewed candidate promotion", () => {
     );
   });
 
+  it("stages a fail-closed automatic-admission guard without a second canonical writer", () => {
+    const wip = read(
+      "docs/engineering/work-in-progress/provider-identity-chart-playback-strong-evidence-guard-v1.sql",
+    );
+    const verifier = read(
+      "scripts/control-plane/verify-provider-identity-chart-playback-strong-evidence.sql",
+    );
+
+    expect(wip).toContain(
+      "require_registry_chart_playback_provider_strong_identity_v1",
+    );
+    expect(wip).toContain("match_method,''))<>'isrc'");
+    expect(wip).toContain("auto_accept");
+    expect(wip).toContain("^[A-Z0-9]{12}$");
+    expect(wip).toContain("v_input_isrc<>v_provider_isrc");
+    expect(wip).toContain(
+      "perform\n    platform_private.require_registry_chart_playback_provider_strong_identity_v1",
+    );
+
+    expect(verifier).toContain(
+      "PROVIDER_IDENTITY_CHART_PLAYBACK_STRONG_EVIDENCE_GUARD=PASS",
+    );
+    expect(verifier).toContain(
+      "require_registry_chart_playback_provider_strong_identity_v1",
+    );
+
+    expect(wip).not.toMatch(
+      /insert\s+into\s+public\.registry_track_provider_links/i,
+    );
+    expect(wip).not.toMatch(
+      /update\s+public\.registry_track_provider_links/i,
+    );
+    expect(wip).not.toMatch(
+      /delete\s+from\s+public\.registry_track_provider_links/i,
+    );
+  });
+
   it("keeps chart-only operators out of reviewed canonical promotion", () => {
     const roles = read("src/services/userRoles.ts");
 
