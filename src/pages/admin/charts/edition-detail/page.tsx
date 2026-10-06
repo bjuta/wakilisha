@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { useAdminUser } from "@/hooks/useAdminUser";
+import { upsertTrackProviderLink } from "@/services/registry/providerLinks";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { AdminChartsPageHeader } from "../components/AdminChartsPageHeader";
@@ -47,9 +49,16 @@ interface PlaybackEnrichmentItemRow {
   status: string;
   match_method: string | null;
   confidence: number | null;
+  auto_accept: boolean;
+  registry_track_id: string | null;
+  provider: string;
+  storefront: string;
   provider_track_id: string | null;
   provider_url: string | null;
   preview_url: string | null;
+  artwork_url: string | null;
+  raw_match_payload: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
   error_message: string | null;
 }
 
@@ -127,6 +136,7 @@ function KpiCard({ label, value, icon, accent = "muted" }: {
 export default function AdminChartsEditionDetailPage() {
   const { editionId } = useParams<{ editionId: string }>();
   const navigate = useNavigate();
+  const adminUser = useAdminUser();
 
   const [edition, setEdition] = useState<WkChartEditionV2Row | null>(null);
   const [entries, setEntries] = useState<WkChartEntryV2Row[]>([]);
@@ -139,6 +149,7 @@ export default function AdminChartsEditionDetailPage() {
   const [playbackItems, setPlaybackItems] = useState<PlaybackEnrichmentItemRow[]>([]);
   const [playbackLoading, setPlaybackLoading] = useState(false);
   const [playbackBusy, setPlaybackBusy] = useState<"dry" | "write" | null>(null);
+  const [playbackReviewingId, setPlaybackReviewingId] = useState<string | null>(null);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   const loadEdition = useCallback(async () => {
@@ -220,7 +231,7 @@ export default function AdminChartsEditionDetailPage() {
 
       const { data: itemData, error: itemErr } = await supabase
         .from("wk_chart_playback_enrichment_items")
-        .select("id, rank, track_title, artist_name, status, match_method, confidence, provider_track_id, provider_url, preview_url, error_message")
+        .select("id, rank, track_title, artist_name, status, match_method, confidence, auto_accept, registry_track_id, provider, storefront, provider_track_id, provider_url, preview_url, artwork_url, raw_match_payload, metadata, error_message")
         .eq("run_id", latestRun.id)
         .order("rank", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true })
@@ -264,6 +275,127 @@ export default function AdminChartsEditionDetailPage() {
       setPlaybackBusy(null);
     }
   }, [edition?.chart_size, editionId, entries.length, loadPlaybackEnrichment]);
+
+
+  const reviewPlaybackCandidate = useCallback(async (item: PlaybackEnrichmentItemRow) => {
+    if (!adminUser.can("manage_registry")) {
+      setPlaybackError("manage_registry is required to approve provider identity.");
+      return;
+    }
+
+    if (
+      item.status !== "needs_review" ||
+      !item.registry_track_id ||
+      !item.provider_track_id
+    ) {
+      setPlaybackError("This provider candidate is not reviewable.");
+      return;
+    }
+
+    const rawPayload =
+      item.raw_match_payload && typeof item.raw_match_payload === "object"
+        ? item.raw_match_payload
+        : {};
+    const attributes =
+      rawPayload.attributes && typeof rawPayload.attributes === "object"
+        ? rawPayload.attributes as Record<string, unknown>
+        : {};
+    const relationships =
+      rawPayload.relationships && typeof rawPayload.relationships === "object"
+        ? rawPayload.relationships as Record<string, unknown>
+        : {};
+    const albumData =
+      relationships.albums && typeof relationships.albums === "object"
+        ? (relationships.albums as Record<string, unknown>).data
+        : null;
+    const artistData =
+      relationships.artists && typeof relationships.artists === "object"
+        ? (relationships.artists as Record<string, unknown>).data
+        : null;
+
+    const providerReleaseId =
+      Array.isArray(albumData) &&
+      albumData[0] &&
+      typeof albumData[0] === "object" &&
+      typeof (albumData[0] as Record<string, unknown>).id === "string"
+        ? String((albumData[0] as Record<string, unknown>).id)
+        : null;
+
+    const providerArtistIds = Array.isArray(artistData)
+      ? artistData
+          .map((artist) =>
+            artist &&
+            typeof artist === "object" &&
+            typeof (artist as Record<string, unknown>).id === "string"
+              ? String((artist as Record<string, unknown>).id)
+              : "",
+          )
+          .filter(Boolean)
+      : [];
+
+    const isrc =
+      typeof attributes.isrc === "string" ? attributes.isrc : null;
+    const durationMs =
+      typeof attributes.durationInMillis === "number"
+        ? attributes.durationInMillis
+        : null;
+
+    setPlaybackReviewingId(item.id);
+    setPlaybackError(null);
+
+    try {
+      const admitted = await upsertTrackProviderLink({
+        trackId: item.registry_track_id,
+        providerKey: item.provider || "apple_music",
+        providerTrackId: item.provider_track_id,
+        providerReleaseId,
+        providerArtistIds,
+        isrc,
+        previewUrl: item.preview_url,
+        artworkUrl: item.artwork_url,
+        durationMs,
+        storefront: item.storefront,
+        matchMethod: "manual",
+        matchConfidence: item.confidence ?? 0,
+        matchStatus: "matched",
+        rawPayload,
+      });
+
+      const reviewedAt = new Date().toISOString();
+      const { error: stageError } = await supabase
+        .from("wk_chart_playback_enrichment_items")
+        .update({
+          status: "matched",
+          match_method: "manual",
+          auto_accept: false,
+          metadata: {
+            ...(item.metadata ?? {}),
+            provider_identity_review: {
+              authority: "admin_admit_registry_track_provider_link_v1",
+              provider_link_id: admitted.id,
+              reviewed_by: adminUser.id,
+              reviewed_at: reviewedAt,
+            },
+          },
+        })
+        .eq("id", item.id)
+        .eq("status", "needs_review");
+
+      if (stageError) {
+        throw new Error(
+          `Provider link admitted but staging review update failed: ${stageError.message}`,
+        );
+      }
+
+      await loadPlaybackEnrichment();
+    } catch (err: unknown) {
+      setPlaybackError(
+        err instanceof Error ? err.message : "Provider identity review failed",
+      );
+    } finally {
+      setPlaybackReviewingId(null);
+    }
+  }, [adminUser, loadPlaybackEnrichment]);
 
   useEffect(() => {
     loadEdition();
@@ -470,12 +602,13 @@ export default function AdminChartsEditionDetailPage() {
                     <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2">Confidence</th>
                     <th className="px-3 py-2">Provider</th>
+                    <th className="px-3 py-2">Review</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-wk-border">
                   {playbackItems.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-3 py-6 text-center text-wk-text-muted">
+                      <td colSpan={6} className="px-3 py-6 text-center text-wk-text-muted">
                         {playbackLoading ? "Loading playback items…" : "No playback items yet."}
                       </td>
                     </tr>
@@ -503,6 +636,31 @@ export default function AdminChartsEditionDetailPage() {
                               </a>
                             )}
                           </div>
+                        ) : (
+                          <span className="text-wk-text-muted">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {item.status === "needs_review" ? (
+                          adminUser.can("manage_registry") ? (
+                            <button
+                              type="button"
+                              onClick={() => reviewPlaybackCandidate(item)}
+                              disabled={playbackReviewingId !== null}
+                              className="wk-button wk-button-secondary wk-button-sm whitespace-nowrap"
+                            >
+                              <WkIcon name="BadgeCheck" size={12} />
+                              {playbackReviewingId === item.id ? "Approving…" : "Approve Link"}
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-wk-warning">
+                              Registry review required
+                            </span>
+                          )
+                        ) : item.status === "matched" && item.match_method === "manual" ? (
+                          <span className="text-[10px] font-semibold text-wk-success">
+                            Reviewed
+                          </span>
                         ) : (
                           <span className="text-wk-text-muted">—</span>
                         )}
