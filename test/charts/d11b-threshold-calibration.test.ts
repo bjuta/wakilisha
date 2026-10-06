@@ -720,6 +720,55 @@ describe("D11B calibration orchestration authority", () => {
     expect(report.confirmatory).toBe(false);
   });
 
+  it("runs primary M6 with deterministic covariance-based rank uncertainty", () => {
+    const report = buildCalibrationReport(calibrationInput);
+    const m6 = report.models.find((model) => model.modelId === "M6")!;
+    const uncertainty = m6.diagnostics.uncertainty as {
+      version: string;
+      seedHash: string;
+      drawCount: number;
+      covarianceState: string;
+      covarianceMethod: string;
+      informationCholeskyMinDiagonal: number | null;
+    };
+    const sensitivity = m6.diagnostics.npseudoSensitivity as Array<{
+      npseudo: number;
+      state: string;
+      converged?: boolean;
+    }>;
+
+    expect(uncertainty.version).toBe("M6-rank-uncertainty-v1");
+    expect(uncertainty.seedHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(uncertainty.drawCount).toBe(2000);
+    expect(uncertainty.covarianceState).toBe("valid");
+    expect(uncertainty.covarianceMethod)
+      .toBe("inverse-observed-information-fixed-ghost-via-cholesky");
+    expect(uncertainty.informationCholeskyMinDiagonal)
+      .toBeGreaterThan(0);
+
+    expect(m6.rows.every((row) =>
+      Number.isInteger(row.rankIntervalLower) &&
+      Number.isInteger(row.rankIntervalUpper) &&
+      row.rankIntervalLower! >= 1 &&
+      row.rankIntervalUpper! >= row.rankIntervalLower! &&
+      typeof row.top10Probability === "number" &&
+      row.top10Probability >= 0 &&
+      row.top10Probability <= 1 &&
+      typeof row.top40Probability === "number" &&
+      row.top40Probability >= 0 &&
+      row.top40Probability <= 1
+    )).toBe(true);
+
+    expect(sensitivity.map((item) => item.npseudo))
+      .toEqual([0, 0.25, 0.5, 1]);
+    expect(
+      sensitivity.find((item) => item.npseudo === 0.5),
+    ).toMatchObject({
+      state: "completed",
+      converged: true,
+    });
+  });
+
   it("keeps every L036 proposal unresolved before complete calibration evidence", () => {
     const report = buildCalibrationReport(calibrationInput);
 
