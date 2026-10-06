@@ -23,6 +23,10 @@ export interface RankedModelRow {
   score: number;
   lower?: number;
   upper?: number;
+  rankIntervalLower?: number;
+  rankIntervalUpper?: number;
+  top10Probability?: number;
+  top40Probability?: number;
 }
 
 export interface PlackettLuceFit {
@@ -32,6 +36,7 @@ export interface PlackettLuceFit {
   maxLogWorthDelta: number;
   logWorthByTrack: Record<string, number>;
   normalizedWorthByTrack: Record<string, number>;
+  referenceRelativeWorthByTrack: Record<string, number>;
 }
 
 const YOUTUBE = "youtube_weekly_ke";
@@ -287,7 +292,7 @@ export function runM4(input: D11BModelInput): RankedModelRow[] {
   return rankWithCompetition(scored);
 }
 
-function weightedRankingAuthority(sourceKey: D11BSourceKey): number {
+export function m6RankingWeight(sourceKey: D11BSourceKey): number {
   return isApple(sourceKey) ? 1 / 7 : 1;
 }
 
@@ -320,6 +325,7 @@ export function fitM6(
       maxLogWorthDelta: 0,
       logWorthByTrack: {},
       normalizedWorthByTrack: {},
+      referenceRelativeWorthByTrack: {},
     };
   }
 
@@ -328,7 +334,7 @@ export function fitM6(
 
   const rankings = input.rankings
     .map((ranking) => ({
-      weight: weightedRankingAuthority(ranking.sourceKey),
+      weight: m6RankingWeight(ranking.sourceKey),
       indices: [...ranking.rows]
         .sort((a, b) => a.rank - b.rank)
         .map((row) => trackIndex.get(row.canonicalTrackId))
@@ -402,6 +408,10 @@ export function fitM6(
     ]),
   );
 
+  const referenceRelativeWorthByTrack = Object.fromEntries(
+    tracks.map((track, index) => [track, theta[index]]),
+  );
+
   const totalWorth = theta.reduce((sum, value) => sum + value, 0);
   const normalizedWorthByTrack = Object.fromEntries(
     tracks.map((track, index) => [track, theta[index] / totalWorth]),
@@ -421,5 +431,6 @@ export function fitM6(
     maxLogWorthDelta,
     logWorthByTrack,
     normalizedWorthByTrack,
+    referenceRelativeWorthByTrack,
   };
 }
