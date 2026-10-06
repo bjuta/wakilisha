@@ -85,6 +85,31 @@ describe("Provider Identity candidate evidence", () => {
     });
   });
 
+  it("does not treat malformed equal identifier strings as strong ISRC evidence", () => {
+    const candidate = classifyAppleMusicCandidateV1({
+      input: {
+        trackTitle: "Example Song",
+        artistName: "Example Artist",
+        isrc: "ABC123",
+      },
+      song: {
+        id: "apple-short-id",
+        attributes: {
+          name: "Example Song",
+          artistName: "Example Artist",
+          isrc: "ABC123",
+        },
+      },
+      confidence: 0.99,
+      searchTerm: "Example Song Example Artist",
+      minAutoAccept: 0.9,
+    });
+
+    expect(candidate.evidenceClass).toBe("metadata_similarity");
+    expect(candidate.disposition).toBe("review_candidate");
+    expect(candidate.method).toBe("exact_title_artist");
+  });
+
   it("never auto-accepts similarity-only evidence even above the old threshold", () => {
     const candidate = classifyAppleMusicCandidateV1({
       input: {
