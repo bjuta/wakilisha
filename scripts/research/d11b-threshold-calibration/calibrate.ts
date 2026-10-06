@@ -16,13 +16,15 @@ import {
   type RankComparisonMetrics,
 } from "./metrics";
 import {
-  coordinatedSourceSpike,
-  deleteSource,
+  coordinatedProviderSpike,
+  deleteProviderSource,
+  injectOrganicTrackFlood,
   maskDepth,
   removeCanonicalIdentities,
-  singleSourceSpike,
+  spikeProviderSource,
   splitCanonicalIdentity,
   thresholdEdgeSwap,
+  type D11BProviderSource,
 } from "./stress";
 
 export const D11B_CALIBRATION_SPEC_VERSION =
@@ -178,6 +180,46 @@ function capturedSourceKeys(input: D11BModelInput): D11BSourceKey[] {
   return input.rankings.map((ranking) => ranking.sourceKey);
 }
 
+function capturedProviders(
+  input: D11BModelInput,
+): D11BProviderSource[] {
+  const providers: D11BProviderSource[] = [];
+  if (
+    input.rankings.some((ranking) =>
+      ranking.sourceKey === "youtube_weekly_ke"
+    )
+  ) {
+    providers.push("youtube");
+  }
+  if (
+    input.rankings.some((ranking) =>
+      ranking.sourceKey === "audiomack_weekly100_ke"
+    )
+  ) {
+    providers.push("audiomack");
+  }
+  if (
+    input.rankings.some((ranking) =>
+      ranking.sourceKey.startsWith("apple_top100_ke:")
+    )
+  ) {
+    providers.push("apple");
+  }
+  return providers;
+}
+
+function providerPairs(
+  providers: D11BProviderSource[],
+): Array<[D11BProviderSource, D11BProviderSource]> {
+  const pairs: Array<[D11BProviderSource, D11BProviderSource]> = [];
+  for (let i = 0; i < providers.length; i++) {
+    for (let j = i + 1; j < providers.length; j++) {
+      pairs.push([providers[i], providers[j]]);
+    }
+  }
+  return pairs;
+}
+
 function candidateIdentityTargets(
   baseline: ModelResult[],
 ): string[] {
@@ -298,13 +340,18 @@ export function buildCalibrationReport(
   const baseline = allModels(input);
   const stresses: StressResult[] = [];
 
-  for (const sourceKey of capturedSourceKeys(input)) {
+  const providers = capturedProviders(input);
+
+  for (const provider of providers) {
     stresses.push(...stressAcrossModels({
       baseline,
-      stressedInput: deleteSource(input, sourceKey),
-      stressId: `source-deletion:${sourceKey}`,
+      stressedInput: deleteProviderSource(input, provider),
+      stressId: `source-deletion:${provider}`,
       stressType: "source_deletion",
-      parameters: { sourceKey },
+      parameters: {
+        provider,
+        deletionScope: "qualified-provider-source",
+      },
     }));
   }
 
@@ -365,43 +412,74 @@ export function buildCalibrationReport(
   }
 
   const attackTrack = attackCandidate(baseline);
-  const sources = capturedSourceKeys(input);
-  if (attackTrack && sources.length > 0) {
-    stresses.push(...stressAcrossModels({
-      baseline,
-      stressedInput: singleSourceSpike(
-        input,
-        sources[0],
-        attackTrack,
-        1,
-      ),
-      stressId: `attack-single-source:${sources[0]}:${attackTrack}`,
-      stressType: "integrity_attack",
-      parameters: {
-        attack: "D09-A1-single-source-jump",
-        sourceKey: sources[0],
-        canonicalTrackId: attackTrack,
-        targetRank: 1,
-      },
-    }));
+
+  if (attackTrack) {
+    for (const provider of providers) {
+      stresses.push(...stressAcrossModels({
+        baseline,
+        stressedInput: spikeProviderSource(
+          input,
+          provider,
+          attackTrack,
+          1,
+        ),
+        stressId: `attack-single-source:${provider}:${attackTrack}`,
+        stressType: "integrity_attack",
+        parameters: {
+          attack: "D09-A1-single-source-jump",
+          provider,
+          canonicalTrackId: attackTrack,
+          targetRank: 1,
+        },
+      }));
+    }
+
+    for (const pair of providerPairs(providers)) {
+      stresses.push(...stressAcrossModels({
+        baseline,
+        stressedInput: coordinatedProviderSpike(
+          input,
+          pair,
+          attackTrack,
+          1,
+        ),
+        stressId:
+          `attack-coordinated-two-source:${pair.join("+")}:${attackTrack}`,
+        stressType: "integrity_attack",
+        parameters: {
+          attack: "D09-A3-coordinated-two-source-spike",
+          providers: pair,
+          canonicalTrackId: attackTrack,
+          targetRank: 1,
+        },
+      }));
+    }
   }
 
-  if (attackTrack && sources.length >= 2) {
+  const sourceKeys = capturedSourceKeys(input);
+  if (sourceKeys.length > 0) {
+    const organicTrackIds = [
+      "organic-flood-1",
+      "organic-flood-2",
+      "organic-flood-3",
+      "organic-flood-4",
+    ];
     stresses.push(...stressAcrossModels({
       baseline,
-      stressedInput: coordinatedSourceSpike(
+      stressedInput: injectOrganicTrackFlood(
         input,
-        sources.slice(0, 2),
-        attackTrack,
+        sourceKeys,
+        organicTrackIds,
         1,
       ),
-      stressId: `attack-coordinated-two-source:${attackTrack}`,
+      stressId: "negative-control:organic-multi-track-demand",
       stressType: "integrity_attack",
       parameters: {
-        attack: "D09-A3-coordinated-two-source-spike",
-        sourceKeys: sources.slice(0, 2),
-        canonicalTrackId: attackTrack,
-        targetRank: 1,
+        negativeControl: true,
+        scenario: "D09-organic-artist-release-flood",
+        canonicalTrackIds: organicTrackIds,
+        expectedPolicy:
+          "valid corroborated demand remains measurable; no concentration penalty",
       },
     }));
   }
