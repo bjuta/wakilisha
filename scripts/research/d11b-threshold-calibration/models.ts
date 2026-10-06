@@ -30,6 +30,7 @@ export interface PlackettLuceFit {
   converged: boolean;
   iterations: number;
   maxLogWorthDelta: number;
+  logWorthByTrack: Record<string, number>;
   normalizedWorthByTrack: Record<string, number>;
 }
 
@@ -317,6 +318,7 @@ export function fitM6(
       converged: true,
       iterations: 0,
       maxLogWorthDelta: 0,
+      logWorthByTrack: {},
       normalizedWorthByTrack: {},
     };
   }
@@ -373,18 +375,16 @@ export function fitM6(
       return updated;
     });
 
-    const geometricMean = Math.exp(
-      next.reduce((sum, value) => sum + Math.log(value), 0) / next.length,
-    );
-    const normalized = next.map((value) => value / geometricMean);
-
     maxLogWorthDelta = Math.max(
-      ...normalized.map((value, index) =>
+      ...next.map((value, index) =>
         Math.abs(Math.log(value) - Math.log(theta[index]))
       ),
     );
 
-    theta = normalized;
+    // Do not rescale during fitting: pseudo-rankings compare every real item
+    // with a hypothetical item whose log-worth is fixed at 0 (worth 1).
+    // Rescaling real worths here would change the pseudo-augmented likelihood.
+    theta = next;
     iterations = iteration;
 
     if (maxLogWorthDelta <= tolerance) {
@@ -392,6 +392,15 @@ export function fitM6(
       break;
     }
   }
+
+  const meanLogWorth =
+    theta.reduce((sum, value) => sum + Math.log(value), 0) / theta.length;
+  const logWorthByTrack = Object.fromEntries(
+    tracks.map((track, index) => [
+      track,
+      Math.log(theta[index]) - meanLogWorth,
+    ]),
+  );
 
   const totalWorth = theta.reduce((sum, value) => sum + value, 0);
   const normalizedWorthByTrack = Object.fromEntries(
@@ -410,6 +419,7 @@ export function fitM6(
     converged,
     iterations,
     maxLogWorthDelta,
+    logWorthByTrack,
     normalizedWorthByTrack,
   };
 }
