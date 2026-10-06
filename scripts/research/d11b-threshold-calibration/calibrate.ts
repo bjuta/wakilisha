@@ -16,6 +16,10 @@ import {
   type RankComparisonMetrics,
 } from "./metrics";
 import {
+  M6_RANK_UNCERTAINTY_DRAWS,
+  simulateM6RankUncertainty,
+} from "./m6-uncertainty";
+import {
   coordinatedProviderSpike,
   deleteProviderSource,
   injectOrganicTrackFlood,
@@ -106,9 +110,45 @@ function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function m6SensitivityDiagnostics(
+  input: D11BModelInput,
+  primaryFit: ReturnType<typeof fitM6>,
+): Array<Record<string, unknown>> {
+  return [0, 0.25, 0.5, 1].map((npseudo) => {
+    try {
+      const fit =
+        npseudo === 0.5
+          ? primaryFit
+          : fitM6(input, { npseudo });
+      return {
+        npseudo,
+        state: "completed",
+        converged: fit.converged,
+        iterations: fit.iterations,
+        maxLogWorthDelta: fit.maxLogWorthDelta,
+        outputHash: rankingOutputHash(fit.rows),
+      };
+    } catch (error) {
+      return {
+        npseudo,
+        state: "failed",
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      };
+    }
+  });
+}
+
 function runModel(
   modelId: D11BModelId,
   input: D11BModelInput,
+  options: {
+    modelInputHash?: string;
+    includeM6Uncertainty?: boolean;
+    includeM6Sensitivity?: boolean;
+  } = {},
 ): ModelResult {
   if (modelId === "M1") {
     const rows = runM1(input);
@@ -144,23 +184,85 @@ function runModel(
   }
 
   const fit = fitM6(input);
+
+  if (options.includeM6Uncertainty && !fit.converged) {
+    throw new Error("m6_primary_fit_not_converged");
+  }
+
+  let rows = fit.rows;
+  const diagnostics: Record<string, unknown> = {
+    converged: fit.converged,
+    iterations: fit.iterations,
+    maxLogWorthDelta: fit.maxLogWorthDelta,
+    npseudo: 0.5,
+  };
+
+  if (options.includeM6Uncertainty) {
+    if (!options.modelInputHash) {
+      throw new Error("m6_uncertainty_input_hash_required");
+    }
+
+    const uncertainty = simulateM6RankUncertainty({
+      input,
+      fit,
+      modelInputHash: options.modelInputHash,
+      npseudo: 0.5,
+      draws: M6_RANK_UNCERTAINTY_DRAWS,
+    });
+
+    rows = fit.rows.map((row) => {
+      const track = uncertainty.byTrack[row.canonicalTrackId];
+      if (!track) {
+        throw new Error(
+          `m6_uncertainty_missing_track:${row.canonicalTrackId}`,
+        );
+      }
+      return {
+        ...row,
+        rankIntervalLower: track.rankIntervalLower,
+        rankIntervalUpper: track.rankIntervalUpper,
+        top10Probability: track.top10Probability,
+        top40Probability: track.top40Probability,
+      };
+    });
+
+    diagnostics.uncertainty = {
+      version: uncertainty.version,
+      seedHash: uncertainty.seedHash,
+      drawCount: uncertainty.drawCount,
+      covarianceState: uncertainty.covarianceState,
+      covarianceMethod: uncertainty.covarianceMethod,
+      informationCholeskyMinDiagonal:
+        uncertainty.informationCholeskyMinDiagonal,
+    };
+  }
+
+  if (options.includeM6Sensitivity) {
+    diagnostics.npseudoSensitivity =
+      m6SensitivityDiagnostics(input, fit);
+  }
+
   return {
     modelId,
     modelVersion: D11B_MODEL_VERSIONS.M6,
-    rows: fit.rows,
-    outputHash: rankingOutputHash(fit.rows),
-    diagnostics: {
-      converged: fit.converged,
-      iterations: fit.iterations,
-      maxLogWorthDelta: fit.maxLogWorthDelta,
-      npseudo: 0.5,
-    },
+    rows,
+    outputHash: rankingOutputHash(rows),
+    diagnostics,
   };
 }
 
-function allModels(input: D11BModelInput): ModelResult[] {
+function allModels(
+  input: D11BModelInput,
+  inputHash: string,
+): ModelResult[] {
   return (["M1", "M2", "M4", "M6"] as const)
-    .map((modelId) => runModel(modelId, input));
+    .map((modelId) =>
+      runModel(modelId, input, {
+        modelInputHash: inputHash,
+        includeM6Uncertainty: modelId === "M6",
+        includeM6Sensitivity: modelId === "M6",
+      })
+    );
 }
 
 function stressAcrossModels(args: {
@@ -171,7 +273,14 @@ function stressAcrossModels(args: {
   parameters: Record<string, unknown>;
 }): StressResult[] {
   return args.baseline.map((base) => {
-    const stressed = runModel(base.modelId, args.stressedInput);
+    const stressed = runModel(
+      base.modelId,
+      args.stressedInput,
+      {
+        includeM6Uncertainty: false,
+        includeM6Sensitivity: false,
+      },
+    );
     return {
       stressId: args.stressId,
       stressType: args.stressType,
@@ -344,7 +453,7 @@ export function buildCalibrationReport(
   input: D11BModelInput,
 ): CalibrationReport {
   const inputHash = sha256(canonicalJson(input));
-  const baseline = allModels(input);
+  const baseline = allModels(input, inputHash);
   const stresses: StressResult[] = [];
   const stressGaps: StressGap[] = [];
 
