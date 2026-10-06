@@ -23,6 +23,9 @@ import {
 import {
   buildCalibrationModelInput,
 } from "../../scripts/research/d11b-threshold-calibration/input";
+import {
+  buildCalibrationReport,
+} from "../../scripts/research/d11b-threshold-calibration/calibrate";
 
 const APPLE_DAYS = Array.from(
   { length: 7 },
@@ -553,5 +556,100 @@ describe("D11B calibration identity input authority", () => {
     expect(receipt.expectedSourceCount).toBe(2);
     expect(receipt.modelInput.rankings.map((ranking) => ranking.sourceKey))
       .toEqual(["youtube_weekly_ke"]);
+  });
+});
+
+
+describe("D11B calibration orchestration authority", () => {
+  const calibrationInput = input([
+    {
+      sourceKey: "youtube_weekly_ke",
+      depth: 4,
+      rows: [
+        { canonicalTrackId: "a", rank: 1 },
+        { canonicalTrackId: "b", rank: 2 },
+        { canonicalTrackId: "c", rank: 3 },
+        { canonicalTrackId: "d", rank: 4 },
+      ],
+    },
+    {
+      sourceKey: "audiomack_weekly100_ke",
+      depth: 4,
+      rows: [
+        { canonicalTrackId: "b", rank: 1 },
+        { canonicalTrackId: "a", rank: 2 },
+        { canonicalTrackId: "d", rank: 3 },
+        { canonicalTrackId: "c", rank: 4 },
+      ],
+    },
+    {
+      sourceKey: APPLE_DAYS[0],
+      depth: 4,
+      rows: [
+        { canonicalTrackId: "a", rank: 1 },
+        { canonicalTrackId: "c", rank: 2 },
+        { canonicalTrackId: "b", rank: 3 },
+        { canonicalTrackId: "d", rank: 4 },
+      ],
+    },
+  ]);
+
+  it("emits all frozen models but no winner", () => {
+    const report = buildCalibrationReport(calibrationInput);
+
+    expect(report.models.map((model) => model.modelId))
+      .toEqual(["M1", "M2", "M4", "M6"]);
+    expect(report.winner).toBeNull();
+    expect(report.confirmatory).toBe(false);
+  });
+
+  it("keeps every L036 proposal unresolved before complete calibration evidence", () => {
+    const report = buildCalibrationReport(calibrationInput);
+
+    expect(report.thresholdProposals.length).toBeGreaterThan(0);
+    expect(
+      report.thresholdProposals.every((proposal) =>
+        proposal.status === "UNRESOLVED"
+      ),
+    ).toBe(true);
+
+    const serialized = JSON.stringify(report.thresholdProposals);
+    expect(serialized).not.toMatch(
+      /"green"\s*:|"amber"\s*:|"red"\s*:|"threshold"\s*:\s*\d/i,
+    );
+  });
+
+  it("produces deterministic report and model-output hashes", () => {
+    const first = buildCalibrationReport(calibrationInput);
+    const second = buildCalibrationReport(calibrationInput);
+
+    expect(first.reportHash).toBe(second.reportHash);
+    expect(first.inputHash).toBe(second.inputHash);
+    expect(first.models.map((model) => model.outputHash))
+      .toEqual(second.models.map((model) => model.outputHash));
+    expect(first.reportHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("records source-deletion, censoring, identity and integrity stress families", () => {
+    const report = buildCalibrationReport(calibrationInput);
+    const types = new Set(report.stresses.map((stress) => stress.stressType));
+
+    expect(types).toEqual(new Set([
+      "source_deletion",
+      "censoring_mask",
+      "identity_perturbation",
+      "integrity_attack",
+    ]));
+
+    expect(
+      report.stresses.some((stress) =>
+        stress.parameters.attack === "D09-A1-single-source-jump"
+      ),
+    ).toBe(true);
+    expect(
+      report.stresses.some((stress) =>
+        stress.parameters.attack === "D09-A3-coordinated-two-source-spike"
+      ),
+    ).toBe(true);
   });
 });
