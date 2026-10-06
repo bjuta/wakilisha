@@ -112,6 +112,26 @@ export function canonicalRankingJson(rows: RankedModelRow[]): string {
         ...(row.upper === undefined
           ? {}
           : { upper: Number(row.upper.toPrecision(15)) }),
+        ...(row.rankIntervalLower === undefined
+          ? {}
+          : { rankIntervalLower: row.rankIntervalLower }),
+        ...(row.rankIntervalUpper === undefined
+          ? {}
+          : { rankIntervalUpper: row.rankIntervalUpper }),
+        ...(row.top10Probability === undefined
+          ? {}
+          : {
+              top10Probability: Number(
+                row.top10Probability.toPrecision(15),
+              ),
+            }),
+        ...(row.top40Probability === undefined
+          ? {}
+          : {
+              top40Probability: Number(
+                row.top40Probability.toPrecision(15),
+              ),
+            }),
       })),
   );
 }
