@@ -10,6 +10,16 @@ import {
   compareRankings,
   rankingOutputHash,
 } from "../../scripts/research/d11b-threshold-calibration/metrics";
+import {
+  coordinatedSourceSpike,
+  deleteSource,
+  injectOrganicTrackFlood,
+  maskDepth,
+  removeCanonicalIdentities,
+  singleSourceSpike,
+  splitCanonicalIdentity,
+  thresholdEdgeSwap,
+} from "../../scripts/research/d11b-threshold-calibration/stress";
 
 const APPLE_DAYS = Array.from(
   { length: 7 },
@@ -251,5 +261,168 @@ describe("D11B calibration metrics", () => {
 
     expect(rankingOutputHash(a)).toBe(rankingOutputHash(b));
     expect(rankingOutputHash(a)).toMatch(/^[a-f0-9]{64}$/);
+  });
+});
+
+
+describe("D11B calibration stress transforms", () => {
+  const base = input([
+    {
+      sourceKey: "youtube_weekly_ke",
+      depth: 4,
+      rows: [
+        { canonicalTrackId: "a", rank: 1 },
+        { canonicalTrackId: "b", rank: 2 },
+        { canonicalTrackId: "c", rank: 3 },
+        { canonicalTrackId: "d", rank: 4 },
+      ],
+    },
+    {
+      sourceKey: "audiomack_weekly100_ke",
+      depth: 4,
+      rows: [
+        { canonicalTrackId: "b", rank: 1 },
+        { canonicalTrackId: "a", rank: 2 },
+        { canonicalTrackId: "d", rank: 3 },
+        { canonicalTrackId: "c", rank: 4 },
+      ],
+    },
+    {
+      sourceKey: APPLE_DAYS[0],
+      depth: 4,
+      rows: [
+        { canonicalTrackId: "a", rank: 1 },
+        { canonicalTrackId: "c", rank: 2 },
+        { canonicalTrackId: "b", rank: 3 },
+        { canonicalTrackId: "d", rank: 4 },
+      ],
+    },
+  ]);
+
+  it("source deletion preserves expected-source missingness", () => {
+    const stressed = deleteSource(base, "youtube_weekly_ke");
+    expect(stressed.expectedSourceKeys).toContain("youtube_weekly_ke");
+    expect(
+      stressed.rankings.some((ranking) =>
+        ranking.sourceKey === "youtube_weekly_ke"
+      ),
+    ).toBe(false);
+
+    const row = runM1(stressed)
+      .find((candidate) => candidate.canonicalTrackId === "a")!;
+    expect(row.upper!).toBeGreaterThan(row.lower!);
+  });
+
+  it("depth masking truncates observation authority instead of zero-filling", () => {
+    const stressed = maskDepth(base, 2);
+    expect(stressed.rankings.every((ranking) => ranking.depth === 2)).toBe(true);
+    expect(
+      stressed.rankings.every((ranking) =>
+        ranking.rows.every((row) => row.rank <= 2)
+      ),
+    ).toBe(true);
+    expect(
+      stressed.rankings.some((ranking) =>
+        ranking.rows.some((row) => row.canonicalTrackId === "d")
+      ),
+    ).toBe(false);
+  });
+
+  it("identity unresolved perturbation removes evidence rather than fuzzy-merging", () => {
+    const stressed = removeCanonicalIdentities(base, ["a"]);
+    expect(
+      stressed.rankings.some((ranking) =>
+        ranking.rows.some((row) => row.canonicalTrackId === "a")
+      ),
+    ).toBe(false);
+  });
+
+  it("identity splitting fragments one canonical signal across synthetic identities", () => {
+    const stressed = splitCanonicalIdentity(base, "a", ["a-split-1", "a-split-2"]);
+    const observed = stressed.rankings.flatMap((ranking) =>
+      ranking.rows.map((row) => row.canonicalTrackId)
+    );
+    expect(observed).not.toContain("a");
+    expect(observed).toContain("a-split-1");
+    expect(observed).toContain("a-split-2");
+  });
+
+  it("single-source spikes do not alter undeclared source rankings", () => {
+    const stressed = singleSourceSpike(
+      base,
+      "youtube_weekly_ke",
+      "d",
+      1,
+    );
+
+    expect(
+      stressed.rankings.find((ranking) =>
+        ranking.sourceKey === "youtube_weekly_ke"
+      )!.rows[0].canonicalTrackId,
+    ).toBe("d");
+
+    expect(
+      stressed.rankings.find((ranking) =>
+        ranking.sourceKey === "audiomack_weekly100_ke"
+      ),
+    ).toEqual(
+      base.rankings.find((ranking) =>
+        ranking.sourceKey === "audiomack_weekly100_ke"
+      ),
+    );
+  });
+
+  it("coordinated spikes affect only the declared source set", () => {
+    const stressed = coordinatedSourceSpike(
+      base,
+      ["youtube_weekly_ke", "audiomack_weekly100_ke"],
+      "d",
+      1,
+    );
+
+    expect(
+      stressed.rankings
+        .filter((ranking) =>
+          ranking.sourceKey === "youtube_weekly_ke" ||
+          ranking.sourceKey === "audiomack_weekly100_ke"
+        )
+        .every((ranking) => ranking.rows[0].canonicalTrackId === "d"),
+    ).toBe(true);
+
+    expect(
+      stressed.rankings.find((ranking) => ranking.sourceKey === APPLE_DAYS[0]),
+    ).toEqual(
+      base.rankings.find((ranking) => ranking.sourceKey === APPLE_DAYS[0]),
+    );
+  });
+
+  it("organic flooding remains valid rank evidence with no concentration penalty", () => {
+    const stressed = injectOrganicTrackFlood(
+      base,
+      ["youtube_weekly_ke", "audiomack_weekly100_ke"],
+      ["flood-1", "flood-2", "flood-3", "flood-4"],
+      1,
+    );
+
+    const rows = runM4(stressed);
+    for (const track of ["flood-1", "flood-2", "flood-3", "flood-4"]) {
+      expect(rows.some((row) => row.canonicalTrackId === track)).toBe(true);
+    }
+  });
+
+  it("threshold-edge perturbation swaps only the declared boundary pair", () => {
+    const stressed = thresholdEdgeSwap(
+      base,
+      "youtube_weekly_ke",
+      2,
+    );
+    const rows = stressed.rankings.find((ranking) =>
+      ranking.sourceKey === "youtube_weekly_ke"
+    )!.rows;
+
+    expect(rows.find((row) => row.rank === 2)!.canonicalTrackId).toBe("c");
+    expect(rows.find((row) => row.rank === 3)!.canonicalTrackId).toBe("b");
+    expect(rows.find((row) => row.rank === 1)!.canonicalTrackId).toBe("a");
+    expect(rows.find((row) => row.rank === 4)!.canonicalTrackId).toBe("d");
   });
 });
