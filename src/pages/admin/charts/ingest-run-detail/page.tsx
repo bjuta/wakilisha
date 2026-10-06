@@ -224,14 +224,9 @@ function PlaybackReadinessPanel({
           {!top10Ready && (
             <div className="rounded-lg border border-wk-border bg-wk-surface-raised p-3">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-wk-text-muted">Run before publishing</p>
-              <code className="mt-2 block whitespace-pre-wrap break-words rounded-md bg-wk-surface px-3 py-2 text-[11px] text-wk-text">
-{`npm run registry:phase9:apple-music-chart-enrichment -- \
-  --run-id=${run.id} \
-  --storefront=ke \
-  --limit=${run.chartSize || readiness.totalEntries || 100} \
-  --min-auto-accept=0.90 \
-  --write`}
-              </code>
+              <p className="mt-2 text-[11px] leading-5 text-wk-text">
+                Return to the chart edition and run Apple Music Playback Enrichment there. Similarity matches stay in review. Exact ISRC matches can proceed automatically.
+              </p>
             </div>
           )}
 

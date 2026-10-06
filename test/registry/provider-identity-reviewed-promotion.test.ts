@@ -85,4 +85,25 @@ describe("Provider Identity reviewed candidate promotion", () => {
       'registry_editor: ["view_dashboard", "view_registry", "manage_registry"',
     );
   });
+  it("retires the legacy Phase 9 direct provider-link write road", () => {
+    const packageJson = read("package.json");
+    const ingestRunPage = read(
+      "src/pages/admin/charts/ingest-run-detail/page.tsx",
+    );
+    const legacyScript = path.resolve(
+      process.cwd(),
+      "scripts/registry/phase9-apple-music-chart-enrichment.ts",
+    );
+
+    expect(packageJson).not.toContain(
+      '"registry:phase9:apple-music-chart-enrichment"',
+    );
+    expect(fs.existsSync(legacyScript)).toBe(false);
+    expect(ingestRunPage).not.toContain(
+      "registry:phase9:apple-music-chart-enrichment",
+    );
+    expect(ingestRunPage).toContain("Apple Music Playback Enrichment");
+    expect(ingestRunPage).toContain("Return to the chart edition");
+  });
+
 });

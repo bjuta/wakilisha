@@ -101,7 +101,6 @@
     "registry:phase7b:apple-music-adapter-test": "tsx scripts/registry/phase7b-apple-music-adapter-test.ts",
     "registry:phase7b:apple-music-probe": "tsx scripts/registry/phase7b-apple-music-probe.ts",
     "registry:phase8b:provider-enrichment": "tsx scripts/registry/phase8b-provider-enrichment-write-test.ts",
-    "registry:phase9:apple-music-chart-enrichment": "tsx scripts/registry/phase9-apple-music-chart-enrichment.ts",
     "build:app": "vite build",
     "seo:prerender": "node scripts/seo/prerender-metadata.mjs",
     "seo:audit": "node scripts/seo/audit-prerender-output.mjs",
