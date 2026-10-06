@@ -60,6 +60,12 @@ export interface StressResult {
   stressedOutputHash: string;
 }
 
+export interface StressGap {
+  stressId: string;
+  reason: string;
+  parameters: Record<string, unknown>;
+}
+
 export interface ThresholdProposal {
   status: "UNRESOLVED";
   metric: string;
@@ -73,6 +79,7 @@ export interface CalibrationReport {
   inputHash: string;
   models: ModelResult[];
   stresses: StressResult[];
+  stressGaps: StressGap[];
   thresholdProposals: ThresholdProposal[];
   winner: null;
   confirmatory: false;
@@ -339,6 +346,7 @@ export function buildCalibrationReport(
   const inputHash = sha256(canonicalJson(input));
   const baseline = allModels(input);
   const stresses: StressResult[] = [];
+  const stressGaps: StressGap[] = [];
 
   const providers = capturedProviders(input);
 
@@ -371,6 +379,27 @@ export function buildCalibrationReport(
       ranking.depth - 1,
       Math.max(1, Math.floor(ranking.depth / 2)),
     );
+    const stressId =
+      `threshold-edge:${ranking.sourceKey}:${boundaryRank}`;
+    const hasAt = ranking.rows.some((row) =>
+      row.rank === boundaryRank
+    );
+    const hasBelow = ranking.rows.some((row) =>
+      row.rank === boundaryRank + 1
+    );
+
+    if (!hasAt || !hasBelow) {
+      stressGaps.push({
+        stressId,
+        reason: "boundary_pair_unavailable_after_identity_filtering",
+        parameters: {
+          sourceKey: ranking.sourceKey,
+          boundaryRank,
+        },
+      });
+      continue;
+    }
+
     stresses.push(...stressAcrossModels({
       baseline,
       stressedInput: thresholdEdgeSwap(
@@ -378,7 +407,7 @@ export function buildCalibrationReport(
         ranking.sourceKey,
         boundaryRank,
       ),
-      stressId: `threshold-edge:${ranking.sourceKey}:${boundaryRank}`,
+      stressId,
       stressType: "censoring_mask",
       parameters: {
         sourceKey: ranking.sourceKey,
@@ -492,6 +521,7 @@ export function buildCalibrationReport(
     inputHash,
     models: baseline,
     stresses,
+    stressGaps,
     thresholdProposals,
     winner: null,
     confirmatory: false,
