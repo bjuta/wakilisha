@@ -1,0 +1,281 @@
+name: D11B Preview Soak Scheduler
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/d11b-preview-soak-scheduler.yml"
+
+  schedule:
+    - cron: "7,17,27,37 18 6-8 10 *"
+    - cron: "7,37 12-18 12 10 *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d11b-preview-soak
+  cancel-in-progress: false
+
+jobs:
+  invoke-d11b-preview-soak:
+    name: invoke D11B Preview soak
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PREVIEW_PROJECT_REF: irgtqkcrufvldrznqcuv
+      PREVIEW_FUNCTION: chart-research-collect
+      RESEARCH_WINDOW_ID: a759d574-aa1c-4037-92b9-abc929a89e0c
+      COLLECTOR_BRANCH: feat/d11b-qualified-source-observation-capture
+      EXPECTED_COLLECTOR_SHA: a45aa2ea61e4418d47f23e037452b1e155459824
+      COLLECTOR_PR: "1158"
+
+    steps:
+      - name: Guard approved 2026 soak dates
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TODAY_UTC="$(date -u +%Y-%m-%d)"
+          case "$TODAY_UTC" in
+            2026-10-06|2026-10-07|2026-10-08|2026-10-12)
+              echo "SOAK_DATE_AUTHORITY=PASS date=$TODAY_UTC"
+              ;;
+            *)
+              echo "STOP: D11B Preview soak is not authorized on $TODAY_UTC."
+              exit 1
+              ;;
+          esac
+
+      - name: Check out exact collector authority
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_COLLECTOR_SHA }}
+          fetch-depth: 0
+
+      - name: Require exact PR and branch authority
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          test "$ACTUAL_HEAD" = "$EXPECTED_COLLECTOR_SHA"
+
+          REMOTE_HEAD="$(
+            git ls-remote origin "refs/heads/$COLLECTOR_BRANCH" |
+              awk '{print $1}'
+          )"
+
+          echo "EXPECTED_COLLECTOR_SHA=$EXPECTED_COLLECTOR_SHA"
+          echo "REMOTE_COLLECTOR_SHA=$REMOTE_HEAD"
+
+          test "$REMOTE_HEAD" = "$EXPECTED_COLLECTOR_SHA" || {
+            echo "STOP: collector branch moved; soak authority is stale."
+            exit 1
+          }
+
+          PR_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/$COLLECTOR_PR")"
+
+          test "$(printf '%s' "$PR_JSON" | jq -r '.state')" = "open" || {
+            echo "STOP: collector PR is no longer open."
+            exit 1
+          }
+
+          test "$(printf '%s' "$PR_JSON" | jq -r '.head.sha')" = "$EXPECTED_COLLECTOR_SHA" || {
+            echo "STOP: collector PR head no longer matches frozen soak authority."
+            exit 1
+          }
+
+          echo "COLLECTOR_PR_AUTHORITY=PASS"
+
+      - name: Require Supabase control-plane access
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN" || {
+            echo "STOP: SUPABASE_ACCESS_TOKEN repository secret is required."
+            exit 1
+          }
+
+      - name: Set up pinned Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+          github-token: ${{ github.token }}
+
+      - name: Redeploy exact collector head to Preview
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COLLECTOR_SHA"
+
+          supabase functions deploy "$PREVIEW_FUNCTION" \
+            --project-ref "$PREVIEW_PROJECT_REF"
+
+          echo "PREVIEW_COLLECTOR_DEPLOY=PASS"
+
+      - name: Resolve and mask Preview service-role JWT
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          KEY_FILE="$(mktemp)"
+          trap 'rm -f "$KEY_FILE"' EXIT
+
+          supabase projects api-keys \
+            --project-ref "$PREVIEW_PROJECT_REF" \
+            -o json > "$KEY_FILE"
+
+          SERVICE_KEY="$(
+            node - "$KEY_FILE" "$PREVIEW_PROJECT_REF" <<'NODE'
+          const fs = require("fs");
+
+          const [path, expectedRef] = process.argv.slice(2);
+          const data = JSON.parse(fs.readFileSync(path, "utf8"));
+          let found = "";
+
+          function visit(value) {
+            if (found) return;
+
+            if (Array.isArray(value)) {
+              for (const child of value) visit(child);
+              return;
+            }
+
+            if (!value || typeof value !== "object") return;
+
+            const label = String(
+              value.name ??
+              value.type ??
+              value.key_type ??
+              value.role ??
+              ""
+            ).toLowerCase();
+
+            const token =
+              value.api_key ??
+              value.key ??
+              value.value ??
+              value.token ??
+              null;
+
+            if (
+              typeof token === "string" &&
+              token.startsWith("eyJ") &&
+              (label.includes("service_role") || label === "service")
+            ) {
+              const parts = token.split(".");
+              if (parts.length !== 3) {
+                throw new Error("Service key is not a JWT.");
+              }
+
+              const payload = JSON.parse(
+                Buffer.from(parts[1], "base64url").toString("utf8"),
+              );
+
+              if (payload.role !== "service_role") {
+                throw new Error(
+                  "Unexpected JWT role: " + String(payload.role),
+                );
+              }
+
+              if (payload.ref !== expectedRef) {
+                throw new Error(
+                  "Unexpected JWT ref: " + String(payload.ref),
+                );
+              }
+
+              found = token;
+              return;
+            }
+
+            for (const child of Object.values(value)) visit(child);
+          }
+
+          visit(data);
+
+          if (!found) {
+            throw new Error("Could not resolve legacy service_role JWT.");
+          }
+
+          process.stdout.write(found);
+          NODE
+          )"
+
+          test -n "$SERVICE_KEY"
+
+          echo "::add-mask::$SERVICE_KEY"
+          echo "PREVIEW_SERVICE_ROLE_KEY=$SERVICE_KEY" >> "$GITHUB_ENV"
+          echo "PREVIEW_SERVICE_ROLE_AUTHORITY=PASS"
+
+      - name: Invoke function-owned D11B clock
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FUNCTION_URL="https://${PREVIEW_PROJECT_REF}.supabase.co/functions/v1/${PREVIEW_FUNCTION}"
+          BODY_FILE="$(mktemp)"
+          trap 'rm -f "$BODY_FILE"' EXIT
+
+          HTTP_CODE="$(
+            curl -sS \
+              -o "$BODY_FILE" \
+              -w '%{http_code}' \
+              -X POST "$FUNCTION_URL" \
+              -H "Authorization: Bearer $PREVIEW_SERVICE_ROLE_KEY" \
+              -H "apikey: $PREVIEW_SERVICE_ROLE_KEY" \
+              -H "Content-Type: application/json" \
+              --data "{
+                \"action\":\"collect_due\",
+                \"windowId\":\"$RESEARCH_WINDOW_ID\"
+              }"
+          )"
+
+          echo "HTTP_CODE=$HTTP_CODE"
+          jq . "$BODY_FILE"
+
+          case "$HTTP_CODE" in
+            2??) ;;
+            *)
+              echo "STOP: Preview collector returned HTTP $HTTP_CODE."
+              exit 1
+              ;;
+          esac
+
+          jq -e 'type == "object"' "$BODY_FILE" >/dev/null
+
+          if jq -e 'has("error")' "$BODY_FILE" >/dev/null; then
+            echo "STOP: collector returned a top-level control-plane error."
+            exit 1
+          fi
+
+          DUE_COUNT="$(jq -r '.due_count // 0' "$BODY_FILE")"
+          EXPIRED_COUNT="$(jq -r '.expired_count // 0' "$BODY_FILE")"
+          RESULT_COUNT="$(jq -r '(.results // []) | length' "$BODY_FILE")"
+          OK="$(jq -r '.ok // false' "$BODY_FILE")"
+
+          {
+            echo "### D11B Preview soak"
+            echo
+            echo "- UTC run: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Collector SHA: $EXPECTED_COLLECTOR_SHA"
+            echo "- Window: $RESEARCH_WINDOW_ID"
+            echo "- due_count: $DUE_COUNT"
+            echo "- expired_count: $EXPIRED_COUNT"
+            echo "- result_count: $RESULT_COUNT"
+            echo "- collector ok: $OK"
+            echo
+            jq . "$BODY_FILE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Source-level failures are research evidence, not workflow-
+          # infrastructure failures. The function itself controls whether they
+          # may be retried or must become terminal missingness.
+          echo "D11B_PREVIEW_SOAK_INVOCATION=PASS"
