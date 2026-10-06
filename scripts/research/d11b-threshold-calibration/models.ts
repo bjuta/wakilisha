@@ -81,8 +81,59 @@ function rankingMap(input: D11BModelInput): Map<string, RankedObservation> {
   return new Map(input.rankings.map((ranking) => [ranking.sourceKey, ranking]));
 }
 
-function normalizedRank(rank: number, depth: number): number {
-  return (depth - rank + 1) / depth;
+type Fraction = {
+  numerator: bigint;
+  denominator: bigint;
+};
+
+function gcd(a: bigint, b: bigint): bigint {
+  let x = a < 0n ? -a : a;
+  let y = b < 0n ? -b : b;
+  while (y !== 0n) {
+    const next = x % y;
+    x = y;
+    y = next;
+  }
+  return x === 0n ? 1n : x;
+}
+
+function fraction(numerator: number | bigint, denominator: number | bigint = 1): Fraction {
+  let n = BigInt(numerator);
+  let d = BigInt(denominator);
+  if (d === 0n) throw new Error("zero_fraction_denominator");
+  if (d < 0n) {
+    n = -n;
+    d = -d;
+  }
+  const divisor = gcd(n, d);
+  return {
+    numerator: n / divisor,
+    denominator: d / divisor,
+  };
+}
+
+function addFraction(a: Fraction, b: Fraction): Fraction {
+  return fraction(
+    a.numerator * b.denominator + b.numerator * a.denominator,
+    a.denominator * b.denominator,
+  );
+}
+
+function multiplyFraction(a: Fraction, b: Fraction): Fraction {
+  return fraction(
+    a.numerator * b.numerator,
+    a.denominator * b.denominator,
+  );
+}
+
+function compareFraction(a: Fraction, b: Fraction): number {
+  const left = a.numerator * b.denominator;
+  const right = b.numerator * a.denominator;
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function fractionNumber(value: Fraction): number {
+  return Number(value.numerator) / Number(value.denominator);
 }
 
 function rankWithCompetition(
@@ -108,37 +159,37 @@ function rankWithCompetition(
   });
 }
 
-function fixedWeightM1(sourceKey: D11BSourceKey): number {
-  if (sourceKey === YOUTUBE || sourceKey === AUDIOMACK) return 1 / 3;
-  if (isApple(sourceKey)) return 1 / 21;
+function fixedWeightM1(sourceKey: D11BSourceKey): Fraction {
+  if (sourceKey === YOUTUBE || sourceKey === AUDIOMACK) return fraction(1, 3);
+  if (isApple(sourceKey)) return fraction(1, 21);
   throw new Error(`unknown_source_key:${sourceKey}`);
 }
 
-function fixedWeightM2(sourceKey: D11BSourceKey): number {
-  if (sourceKey === YOUTUBE) return 1 / 2;
-  if (sourceKey === AUDIOMACK) return 1 / 4;
-  if (isApple(sourceKey)) return 1 / 28;
+function fixedWeightM2(sourceKey: D11BSourceKey): Fraction {
+  if (sourceKey === YOUTUBE) return fraction(1, 2);
+  if (sourceKey === AUDIOMACK) return fraction(1, 4);
+  if (isApple(sourceKey)) return fraction(1, 28);
   throw new Error(`unknown_source_key:${sourceKey}`);
 }
 
 function compositeBounds(
   input: D11BModelInput,
-  weight: (sourceKey: D11BSourceKey) => number,
+  weight: (sourceKey: D11BSourceKey) => Fraction,
 ): RankedModelRow[] {
   assertInput(input);
   const tracks = universe(input);
   const captured = rankingMap(input);
 
   const scored = tracks.map((canonicalTrackId) => {
-    let lower = 0;
-    let upper = 0;
+    let lower = fraction(0);
+    let upper = fraction(0);
 
     for (const sourceKey of input.expectedSourceKeys) {
       const w = weight(sourceKey);
       const ranking = captured.get(sourceKey);
 
       if (!ranking) {
-        upper += w;
+        upper = addFraction(upper, w);
         continue;
       }
 
@@ -147,42 +198,60 @@ function compositeBounds(
       );
 
       if (row) {
-        const q = normalizedRank(row.rank, ranking.depth);
-        lower += w * q;
-        upper += w * q;
+        const q = fraction(
+          ranking.depth - row.rank + 1,
+          ranking.depth,
+        );
+        const contribution = multiplyFraction(w, q);
+        lower = addFraction(lower, contribution);
+        upper = addFraction(upper, contribution);
       } else {
-        upper += w * (1 / ranking.depth);
+        upper = addFraction(
+          upper,
+          multiplyFraction(w, fraction(1, ranking.depth)),
+        );
       }
     }
 
     return {
       canonicalTrackId,
-      score: lower,
-      lower,
-      upper,
+      exactLower: lower,
+      exactUpper: upper,
+      score: fractionNumber(lower),
+      lower: fractionNumber(lower),
+      upper: fractionNumber(upper),
     };
   });
 
   const ordered = [...scored].sort((a, b) => {
-    const lowerDelta = b.lower - a.lower;
-    if (lowerDelta !== 0) return lowerDelta;
-    const upperDelta = b.upper - a.upper;
-    if (upperDelta !== 0) return upperDelta;
+    const lower = compareFraction(b.exactLower, a.exactLower);
+    if (lower !== 0) return lower;
+    const upper = compareFraction(b.exactUpper, a.exactUpper);
+    if (upper !== 0) return upper;
     return a.canonicalTrackId.localeCompare(b.canonicalTrackId);
   });
 
-  let previous: { lower: number; upper: number } | undefined;
+  let previous: { lower: Fraction; upper: Fraction } | undefined;
   let previousRank = 0;
 
   return ordered.map((row, index) => {
     const tied =
       previous !== undefined &&
-      row.lower === previous.lower &&
-      row.upper === previous.upper;
+      compareFraction(row.exactLower, previous.lower) === 0 &&
+      compareFraction(row.exactUpper, previous.upper) === 0;
     const rank = tied ? previousRank : index + 1;
-    previous = { lower: row.lower, upper: row.upper };
+    previous = {
+      lower: row.exactLower,
+      upper: row.exactUpper,
+    };
     previousRank = rank;
-    return { ...row, rank };
+    return {
+      canonicalTrackId: row.canonicalTrackId,
+      rank,
+      score: row.score,
+      lower: row.lower,
+      upper: row.upper,
+    };
   });
 }
 
