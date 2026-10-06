@@ -131,7 +131,8 @@
     "audit:ui-chrome:zero": "node scripts/control-plane/verify-wakilisha-ui-chrome.mjs --require-zero",
     "test:ui-dom": "vitest run test/ui-interactions",
     "test:ui-browser": "node scripts/test/run-ui-browser.mjs",
-    "icons:generate:remixicon": "node scripts/performance/generate-wakilisha-remixicon-compat.mjs"
+    "icons:generate:remixicon": "node scripts/performance/generate-wakilisha-remixicon-compat.mjs",
+    "charts:d11b-calibrate": "tsx scripts/research/d11b-threshold-calibration/replay.ts"
   },
   "type": "module",
   "version": "0.1.0"
