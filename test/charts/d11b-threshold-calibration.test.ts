@@ -205,6 +205,12 @@ describe("D11B frozen model kernels", () => {
       .toBeGreaterThan(fit.normalizedWorthByTrack.b);
     expect(fit.normalizedWorthByTrack.b)
       .toBeGreaterThan(fit.normalizedWorthByTrack.c);
+
+    const meanReportedLogWorth =
+      Object.values(fit.logWorthByTrack)
+        .reduce((sum, value) => sum + value, 0) /
+      Object.keys(fit.logWorthByTrack).length;
+    expect(meanReportedLogWorth).toBeCloseTo(0, 12);
   });
 
   it("keeps M6 primary npseudo fixed while allowing explicit sensitivity fits", () => {
