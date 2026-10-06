@@ -1,6 +1,12 @@
 // ── SHARED BLOCK (Phase A) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { parseChartArtistCredits, type ChartArtistCredit } from "./artistCredit.ts";
+import {
+  compactProviderIdentityPart as compactIdentityPart,
+  normalizeIsrc,
+  normalizeProviderKey,
+  resolveTrackIdentityV1,
+} from "../_shared/provider-identity.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -110,21 +116,6 @@ function normalizeCore(text: string): string { if (!text || !text.trim()) return
 function normalize_title(title: string): string { return normalizeCore(title); }
 function lead_artist_key(full_artist_line: string): string { if (!full_artist_line || !full_artist_line.trim()) return ""; let extracted = full_artist_line; const featSplit = extracted.split(/\s+(?:feat\.|ft\.|featuring)\s+/i); if (featSplit.length > 1) extracted = featSplit[0]; const collabSplit = extracted.split(/\s+(?:x|&)\s+/i); if (collabSplit.length > 1) extracted = collabSplit[0]; const commaSplit = extracted.split(/\s*,\s*/); extracted = commaSplit[0]; return normalizeCore(extracted); }
 function build_normalized_key(title: string, full_artist_line: string): string { const nt = normalize_title(title); const lk = lead_artist_key(full_artist_line); if (!nt || !lk) return ""; return nt+"::"+lk; }
-
-function compactIdentityPart(value: unknown): string {
-  const raw = typeof value === "string" || typeof value === "number" ? String(value) : "";
-  return raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
-function normalizeProviderKey(value: unknown): string {
-  const raw = typeof value === "string" || typeof value === "number" ? String(value) : "";
-  return raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-}
-
-function normalizeIsrc(value: unknown): string {
-  const raw = typeof value === "string" || typeof value === "number" ? String(value) : "";
-  return raw.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "");
-}
 
 function addProviderIdToBag(bag: Record<string, Set<string>>, providerRaw: unknown, idRaw: unknown): void {
   const provider = normalizeProviderKey(providerRaw);
@@ -1522,42 +1513,17 @@ async function handleRunCanonicalMatch(
       continue;
     }
 
-    const trackIds = new Set<string>();
-    const reasons: string[] = [];
-    let method: "isrc" | "provider_id" | "no_match" = "no_match";
-    let confidence = 0;
+    const resolution = resolveTrackIdentityV1({
+      isrc: candidate.isrc,
+      providerIdsJson: candidate.provider_ids_json,
+      trackIdsByIsrc,
+      providerBindingsByKey: providerLinkByAlias,
+    });
 
-    const isrc = normalizeIsrc(candidate.isrc);
-    if (isrc) {
-      const byIsrc = trackIdsByIsrc.get(isrc);
-      if (byIsrc && byIsrc.size > 0) {
-        method = "isrc";
-        confidence = 100;
-        reasons.push(`evidence:isrc:${isrc}`);
-        for (const trackId of byIsrc) trackIds.add(trackId);
-      }
-    }
-
-    const providerIds = candidate.provider_ids_json;
-    if (providerIds && typeof providerIds === "object" && !Array.isArray(providerIds)) {
-      for (const [providerRaw, idsRaw] of Object.entries(providerIds as Record<string, unknown>)) {
-        const provider = normalizeProviderKey(providerRaw);
-        if (!provider) continue;
-        for (const idRaw of Array.isArray(idsRaw) ? idsRaw : [idsRaw]) {
-          const id = compactIdentityPart(idRaw);
-          if (!id) continue;
-          const link = providerLinkByAlias.get(`${provider}:${id}`);
-          if (!link) continue;
-          if (method === "no_match") method = "provider_id";
-          confidence = Math.max(confidence, link.confidence);
-          reasons.push(`evidence:provider:${provider}:${id}`);
-          trackIds.add(link.trackId);
-        }
-      }
-    }
-
-    const sortedTrackIds = [...trackIds].sort();
-    for (const trackId of sortedTrackIds) reasons.push(`candidate_track:${trackId}`);
+    const sortedTrackIds = resolution.candidateTrackIds;
+    const reasons = resolution.reasons;
+    const method = resolution.matchMethod;
+    const confidence = resolution.confidence;
 
     if (sortedTrackIds.length === 0) {
       noMatchCandidateIds.push(candidateId);
