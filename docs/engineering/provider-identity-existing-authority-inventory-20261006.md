@@ -340,3 +340,53 @@ Instead, the next design work should focus on:
 7. only then any schema gap that remains proven.
 
 The biggest immediate architecture risk is not missing storage. It is **multiple representations of provider evidence with insufficiently explicit promotion rules between observation, evidence, assertion, and canonical binding**.
+
+
+## 13. Exact evidence-writer allowlist — Production 6 October 2026
+
+Database-function inspection found exactly three current functions that mutate
+`public.provider_entity_links`:
+
+1. `public.admin_record_registry_track_intake_provider_evidence(...)`
+2. `public.admin_select_registry_track_intake_provider_evidence(...)`
+3. `public.admin_finalize_registry_track_intake_v1(...)`
+
+No current database function was found mutating:
+
+- `public.provider_field_observations`;
+- `public.registry_provider_sources`.
+
+Execution authority for all three `provider_entity_links` writers is:
+
+- anon: **no EXECUTE**;
+- authenticated: **EXECUTE**;
+- service_role: **no EXECUTE**.
+
+This is consistent with Track Intake being a reviewed human workflow.
+
+The allowlist implication is important:
+
+- Track Intake may write provider evidence bookkeeping;
+- it may not directly write canonical `registry_track_provider_links`;
+- canonical provider-link admission remains separately governed;
+- an autonomous Provider Identity worker must not reuse these human-only functions as a hidden service-role write path.
+
+### Candidate authority retirement
+
+Because `registry_provider_sources`:
+
+- currently has zero rows;
+- exposes authenticated direct INSERT/UPDATE/DELETE;
+- has no current database writer discovered by the writer scan;
+- has no current application writer found by repository search;
+
+its broad authenticated DML is now classified as **candidate stale authority**.
+
+This is not yet permission to revoke it. The implementation phase must first prove:
+
+1. no current RPC relies on invoker direct DML;
+2. no frontend/service code relies on direct table writes;
+3. no scheduled/legacy operational job depends on it;
+4. no RLS policy intentionally uses those grants for an active workflow.
+
+Only then may a narrow authority-contraction migration be proposed.
