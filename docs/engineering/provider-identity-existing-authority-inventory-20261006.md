@@ -285,13 +285,21 @@ This remains an evidence surface, not canonical identity.
 
 #### `registry_provider_sources`
 
-- authenticated: SELECT/INSERT/UPDATE/DELETE;
-- service_role: SELECT/INSERT/UPDATE/DELETE;
-- table currently empty.
+Table grants exist for authenticated SELECT/INSERT/UPDATE/DELETE and service-role
+CRUD, but RLS materially narrows authenticated behavior:
 
-This is the strongest live privilege debt found by the first #1163 audit.
+- authenticated SELECT requires `view_registry` or administrator;
+- authenticated INSERT requires `manage_registry` or administrator;
+- no authenticated UPDATE policy exists;
+- no authenticated DELETE policy exists;
+- table currently contains zero rows.
 
-Repository search found no current application-level direct writer that obviously requires authenticated DML on this table. The privilege must therefore be treated as **candidate retirement debt**, subject to exact dependency proof before any revocation migration is proposed.
+The live concern is therefore **not unrestricted authenticated CRUD in practice**.
+It is a direct reviewed-user INSERT path into an empty Registry evidence table for
+which repository/database writer discovery found no current consumer.
+
+This remains **candidate authority-convergence debt**, subject to exact dependency
+proof before any grant/policy change is proposed.
 
 #### `registry_identity_lineage`
 
@@ -376,11 +384,13 @@ The allowlist implication is important:
 Because `registry_provider_sources`:
 
 - currently has zero rows;
-- exposes authenticated direct INSERT/UPDATE/DELETE;
+- permits direct authenticated INSERT only for `manage_registry` / administrator through RLS;
+- has no authenticated UPDATE/DELETE policy despite underlying table grants;
 - has no current database writer discovered by the writer scan;
 - has no current application writer found by repository search;
 
-its broad authenticated DML is now classified as **candidate stale authority**.
+its direct reviewed-user INSERT road is now classified as **candidate stale or
+unneeded authority**.
 
 This is not yet permission to revoke it. The implementation phase must first prove:
 
@@ -390,3 +400,100 @@ This is not yet permission to revoke it. The implementation phase must first pro
 4. no RLS policy intentionally uses those grants for an active workflow.
 
 Only then may a narrow authority-contraction migration be proposed.
+
+
+## 14. Provider-source table separation and vocabulary audit
+
+Two Production tables with similar names have distinct duties and must not be
+collapsed merely for naming consistency.
+
+### `public.provider_sources`
+
+This is an intake/import **source configuration** catalogue.
+
+Current characteristics:
+
+- RLS enabled;
+- authenticated SELECT requires `view_imports` or administrator;
+- authenticated INSERT/UPDATE requires `manage_imports` or administrator;
+- one current row exists with `provider_kind='other'`;
+- the live check constraint currently permits:
+  - `spotify`;
+  - `apple_music`;
+  - `youtube`;
+  - `boomplay`;
+  - `mdundo`;
+  - `chart_import`;
+  - `wordpress_legacy`;
+  - `csv_upload`;
+  - `manual_submission`;
+  - `other`.
+
+It currently excludes `audiomack` and `soundcloud`, even though other current
+WAKILISHA systems use those provider keys.
+
+### `public.registry_provider_sources`
+
+This is Registry **entity-linked provider source evidence**:
+
+- Registry entity type / optional entity UUID;
+- provider and provider object type / ID;
+- provider URL/storefront;
+- raw payload;
+- first-seen / last-seen timestamps;
+- status.
+
+It is not provider configuration and should not become the provider capability
+registry by accident.
+
+### Decision
+
+Keep these duties separate.
+
+#1163 should define one canonical provider-key / capability vocabulary consumed
+by both surfaces without merging their persistence responsibilities.
+
+## 15. Current provider capability fragmentation
+
+Current repository/runtime evidence shows provider capability is split across
+multiple systems rather than one adapter registry.
+
+| Subsystem | Current provider capability observed |
+| --- | --- |
+| `chart-provider-fetch` | Spotify and Apple Music |
+| D11B research collector | Apple Music, YouTube Charts, Audiomack |
+| provider intake / Artist submission | Apple Music and Spotify |
+| playback/product paths | Apple Music, YouTube, SoundCloud |
+| `provider_sources.provider_kind` constraint | Spotify, Apple Music, YouTube, Boomplay, Mdundo plus non-provider import kinds |
+| Production evidence tables | Apple Music, YouTube, Spotify, SoundCloud |
+| canonical Track-provider links | Apple Music only |
+
+Boomplay and Mdundo appear in source/research planning and source vocabulary, but
+the current audit has not yet proven an accepted first-class identity adapter for
+either.
+
+### Architecture consequence
+
+Provider capability must become an explicit shared contract rather than a set of
+hard-coded provider lists scattered across ingestion, research, playback and
+review flows.
+
+The contract should distinguish capabilities such as:
+
+- exact object lookup;
+- search/candidate discovery;
+- chart/ranking observation;
+- catalog metadata;
+- stable Track/Release/Artist IDs;
+- ISRC/UPC exposure;
+- playback;
+- territory/storefront semantics;
+- historical-period retrieval;
+- current-only retrieval;
+- rights/work/contributor evidence.
+
+A provider can support some capabilities without supporting all of them.
+
+This capability contract may initially live as versioned code/config if existing
+tables cannot represent it cleanly. A new database table is not automatically
+earned.
