@@ -28,6 +28,10 @@ import {
 import {
   buildCalibrationReport,
 } from "../../scripts/research/d11b-threshold-calibration/calibrate";
+import {
+  buildCalibrationReplay,
+  type D11BCalibrationSnapshot,
+} from "../../scripts/research/d11b-threshold-calibration/replay";
 
 const APPLE_DAYS = Array.from(
   { length: 7 },
@@ -444,6 +448,34 @@ describe("D11B calibration stress transforms", () => {
     expect(observed).toContain("a-split-2");
   });
 
+  it("stress injection preserves sparse provider ranks instead of compacting them", () => {
+    const sparse = input([
+      {
+        sourceKey: "youtube_weekly_ke",
+        depth: 100,
+        rows: [
+          { canonicalTrackId: "a", rank: 1 },
+          { canonicalTrackId: "b", rank: 50 },
+          { canonicalTrackId: "c", rank: 100 },
+        ],
+      },
+    ]);
+
+    const stressed = singleSourceSpike(
+      sparse,
+      "youtube_weekly_ke",
+      "c",
+      1,
+    );
+    const rows = stressed.rankings[0].rows;
+
+    expect(rows).toEqual([
+      { canonicalTrackId: "c", rank: 1 },
+      { canonicalTrackId: "a", rank: 2 },
+      { canonicalTrackId: "b", rank: 51 },
+    ]);
+  });
+
   it("single-source spikes do not alter undeclared source rankings", () => {
     const stressed = singleSourceSpike(
       base,
@@ -772,5 +804,188 @@ describe("D11B calibration orchestration authority", () => {
         stress.parameters.attack === "D09-A3-coordinated-two-source-spike"
       ),
     ).toBe(true);
+  });
+
+  it("surfaces threshold-edge evidence gaps after sparse identity filtering", () => {
+    const sparse = input([
+      {
+        sourceKey: "youtube_weekly_ke",
+        depth: 100,
+        rows: [
+          { canonicalTrackId: "a", rank: 1 },
+          { canonicalTrackId: "b", rank: 50 },
+          { canonicalTrackId: "c", rank: 100 },
+        ],
+      },
+    ]);
+
+    const report = buildCalibrationReport(sparse);
+    expect(report.stressGaps).toContainEqual({
+      stressId: "threshold-edge:youtube_weekly_ke:50",
+      reason: "boundary_pair_unavailable_after_identity_filtering",
+      parameters: {
+        sourceKey: "youtube_weekly_ke",
+        boundaryRank: 50,
+      },
+    });
+  });
+});
+
+describe("D11B calibration replay authority", () => {
+  function snapshot(args: {
+    expectedSourceKeys?: D11BCalibrationSnapshot["expectedSourceKeys"];
+    sourceRuns?: D11BCalibrationSnapshot["sourceRuns"];
+    observations?: D11BCalibrationSnapshot["observations"];
+    admittedSourceRunIds?: string[];
+    externalIdentityResolutions?: D11BCalibrationSnapshot["externalIdentityResolutions"];
+  } = {}): D11BCalibrationSnapshot {
+    return {
+      snapshotVersion: "d11b-calibration-snapshot-v1",
+      windowId: "window-test",
+      phase: "engineering_pilot",
+      sourcePolicyVersion: "d11b-source-v1",
+      analysisCommit: "test-analysis-commit",
+      expectedSourceKeys: args.expectedSourceKeys ?? [
+        "youtube_weekly_ke",
+      ],
+      sourceRuns: args.sourceRuns ?? [{
+        id: "run-youtube",
+        sourceKey: "youtube_weekly_ke",
+        chartDepth: 100,
+        fetchStatus: "succeeded",
+        parseStatus: "succeeded",
+        healthState: "healthy",
+        rowCount: 2,
+      }],
+      observations: args.observations ?? [
+        {
+          sourceRunId: "run-youtube",
+          providerRowKey: "youtube:a",
+          providerTrackId: "a",
+          rank: 1,
+          identityStatus: "resolved",
+          canonicalTrackId: "track-a",
+        },
+        {
+          sourceRunId: "run-youtube",
+          providerRowKey: "youtube:b",
+          providerTrackId: "b",
+          rank: 2,
+          identityStatus: "resolved",
+          canonicalTrackId: "track-b",
+        },
+      ],
+      admittedSourceRunIds: args.admittedSourceRunIds ?? [
+        "run-youtube",
+      ],
+      externalIdentityResolutions:
+        args.externalIdentityResolutions ?? [],
+      identitySnapshotHash: "identity-snapshot-test",
+    };
+  }
+
+  it("marks incomplete engineering-pilot evidence as partial and non-confirmatory", () => {
+    const replay = buildCalibrationReplay(snapshot({
+      expectedSourceKeys: [
+        "youtube_weekly_ke",
+        "audiomack_weekly100_ke",
+      ],
+    }));
+
+    expect(replay.evidenceCompleteness.completeWindowEvidence).toBe(false);
+    expect(replay.evidenceCompleteness.missingSourceKeys)
+      .toEqual(["audiomack_weekly100_ke"]);
+    expect(replay.readiness.state).toBe("PARTIAL_WINDOW");
+    expect(replay.readiness.confirmatoryAuthority).toBe(false);
+    expect(replay.readiness.l036IdentityThresholdStatus)
+      .toBe("UNRESOLVED");
+    expect(replay.calibrationReport.winner).toBeNull();
+  });
+
+  it("blocks structurally sparse admitted identity evidence without inventing a threshold", () => {
+    const replay = buildCalibrationReplay(snapshot({
+      observations: [{
+        sourceRunId: "run-youtube",
+        providerRowKey: "youtube:a",
+        providerTrackId: "a",
+        rank: 1,
+        identityStatus: "resolved",
+        canonicalTrackId: "track-a",
+      }],
+    }));
+
+    expect(replay.evidenceCompleteness.completeWindowEvidence).toBe(true);
+    expect(replay.readiness.state).toBe("BLOCKED_IDENTITY_STRUCTURE");
+    expect(replay.readiness.reasons)
+      .toContain("fewer_than_two_usable_identity_rows:youtube_weekly_ke");
+    expect(replay.readiness.l036IdentityThresholdStatus)
+      .toBe("UNRESOLVED");
+  });
+
+  it("reports external strong identity coverage separately from native resolution", () => {
+    const replay = buildCalibrationReplay(snapshot({
+      observations: [
+        {
+          sourceRunId: "run-youtube",
+          providerRowKey: "youtube:a",
+          providerTrackId: "a",
+          rank: 1,
+          identityStatus: "unresolved",
+          canonicalTrackId: null,
+        },
+        {
+          sourceRunId: "run-youtube",
+          providerRowKey: "youtube:b",
+          providerTrackId: "b",
+          rank: 2,
+          identityStatus: "resolved",
+          canonicalTrackId: "track-b",
+        },
+      ],
+      externalIdentityResolutions: [{
+        providerRowKey: "youtube:a",
+        canonicalTrackId: "track-a",
+        authority: "exact-provider-id:test",
+      }],
+    }));
+
+    expect(replay.inputReceipt.nativeResolvedObservationCount).toBe(1);
+    expect(replay.inputReceipt.externalResolutionCount).toBe(1);
+    expect(replay.inputReceipt.effectiveResolvedObservationCount).toBe(2);
+    expect(replay.identityCoverage[0]).toMatchObject({
+      nativeResolvedRows: 1,
+      externalResolvedRows: 1,
+      effectiveResolvedRows: 2,
+      usableModelRows: 2,
+    });
+    expect(replay.readiness.state).toBe("CALIBRATION_ONLY");
+  });
+
+  it("produces deterministic snapshot, report and replay hashes", () => {
+    const first = buildCalibrationReplay(snapshot());
+    const second = buildCalibrationReplay(snapshot());
+
+    expect(first.snapshotHash).toBe(second.snapshotHash);
+    expect(first.calibrationReport.reportHash)
+      .toBe(second.calibrationReport.reportHash);
+    expect(first.replayHash).toBe(second.replayHash);
+    expect(first.replayHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("rejects failed source runs from explicit model admission", () => {
+    expect(() => buildCalibrationReplay(snapshot({
+      sourceRuns: [{
+        id: "run-youtube",
+        sourceKey: "youtube_weekly_ke",
+        chartDepth: 100,
+        fetchStatus: "failed",
+        parseStatus: "not_applicable",
+        healthState: "down",
+        rowCount: 0,
+      }],
+      observations: [],
+    }))).toThrow(
+      "admitted_source_fetch_not_succeeded:youtube_weekly_ke",
+    );
   });
 });
