@@ -26,6 +26,77 @@ export function deleteSource(
   return next;
 }
 
+export type D11BProviderSource =
+  | "youtube"
+  | "audiomack"
+  | "apple";
+
+function providerSourceMatches(
+  sourceKey: D11BSourceKey,
+  provider: D11BProviderSource,
+): boolean {
+  if (provider === "youtube") return sourceKey === "youtube_weekly_ke";
+  if (provider === "audiomack") {
+    return sourceKey === "audiomack_weekly100_ke";
+  }
+  return sourceKey.startsWith("apple_top100_ke:");
+}
+
+export function deleteProviderSource(
+  input: D11BModelInput,
+  provider: D11BProviderSource,
+): D11BModelInput {
+  const next = cloneInput(input);
+  next.rankings = next.rankings.filter(
+    (ranking) => !providerSourceMatches(ranking.sourceKey, provider),
+  );
+  return next;
+}
+
+export function spikeProviderSource(
+  input: D11BModelInput,
+  provider: D11BProviderSource,
+  canonicalTrackId: string,
+  targetRank = 1,
+): D11BModelInput {
+  let next = cloneInput(input);
+  const matching = next.rankings
+    .filter((ranking) => providerSourceMatches(ranking.sourceKey, provider))
+    .map((ranking) => ranking.sourceKey);
+
+  if (matching.length === 0) {
+    throw new Error(`provider_source_not_captured:${provider}`);
+  }
+
+  for (const sourceKey of matching) {
+    next = singleSourceSpike(
+      next,
+      sourceKey,
+      canonicalTrackId,
+      targetRank,
+    );
+  }
+  return next;
+}
+
+export function coordinatedProviderSpike(
+  input: D11BModelInput,
+  providers: Iterable<D11BProviderSource>,
+  canonicalTrackId: string,
+  targetRank = 1,
+): D11BModelInput {
+  let next = cloneInput(input);
+  for (const provider of providers) {
+    next = spikeProviderSource(
+      next,
+      provider,
+      canonicalTrackId,
+      targetRank,
+    );
+  }
+  return next;
+}
+
 export function maskDepth(
   input: D11BModelInput,
   maximumDepth: number,
