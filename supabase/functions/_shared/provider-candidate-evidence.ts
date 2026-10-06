@@ -185,7 +185,11 @@ export function classifyAppleMusicCandidateV1(args: {
   const itemIsrc = normalizeIsrc(args.input.isrc);
   const songIsrc = normalizeIsrc(args.song.attributes?.isrc);
   const exactIsrc = Boolean(
-    itemIsrc && songIsrc && itemIsrc === songIsrc,
+    itemIsrc &&
+      songIsrc &&
+      itemIsrc.length === 12 &&
+      songIsrc.length === 12 &&
+      itemIsrc === songIsrc,
   );
 
   let method: ProviderCandidateMethodV1;
