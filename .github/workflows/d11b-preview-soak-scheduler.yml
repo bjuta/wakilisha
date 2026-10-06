@@ -1,6 +1,12 @@
 name: D11B Preview Soak Scheduler
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/d11b-preview-soak-scheduler.yml"
+
   schedule:
     - cron: "7,17,27,37 18 6-8 10 *"
     - cron: "7,37 12-18 12 10 *"
