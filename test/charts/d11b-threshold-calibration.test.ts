@@ -20,6 +20,9 @@ import {
   splitCanonicalIdentity,
   thresholdEdgeSwap,
 } from "../../scripts/research/d11b-threshold-calibration/stress";
+import {
+  buildCalibrationModelInput,
+} from "../../scripts/research/d11b-threshold-calibration/input";
 
 const APPLE_DAYS = Array.from(
   { length: 7 },
@@ -424,5 +427,125 @@ describe("D11B calibration stress transforms", () => {
     expect(rows.find((row) => row.rank === 3)!.canonicalTrackId).toBe("b");
     expect(rows.find((row) => row.rank === 1)!.canonicalTrackId).toBe("a");
     expect(rows.find((row) => row.rank === 4)!.canonicalTrackId).toBe("d");
+  });
+});
+
+
+describe("D11B calibration identity input authority", () => {
+  it("accepts explicit external Registry snapshot mappings for unresolved rows", () => {
+    const receipt = buildCalibrationModelInput({
+      expectedSourceKeys: ["youtube_weekly_ke"],
+      sourceRuns: [{
+        id: "run-youtube",
+        sourceKey: "youtube_weekly_ke",
+        chartDepth: 100,
+      }],
+      observations: [
+        {
+          sourceRunId: "run-youtube",
+          providerRowKey: "youtube:video-a",
+          providerTrackId: "video-a",
+          rank: 1,
+          identityStatus: "unresolved",
+          canonicalTrackId: null,
+        },
+        {
+          sourceRunId: "run-youtube",
+          providerRowKey: "youtube:video-b",
+          providerTrackId: "video-b",
+          rank: 2,
+          identityStatus: "resolved",
+          canonicalTrackId: "track-b",
+        },
+      ],
+      admittedSourceRunIds: ["run-youtube"],
+      externalIdentityResolutions: [{
+        providerRowKey: "youtube:video-a",
+        canonicalTrackId: "track-a",
+        authority: "production-registry-snapshot:test",
+      }],
+    });
+
+    expect(receipt.externalResolutionCount).toBe(1);
+    expect(receipt.resolvedObservationCount).toBe(1);
+    expect(receipt.unresolvedObservationCount).toBe(1);
+    expect(receipt.modelInput.rankings[0].rows).toEqual([
+      { canonicalTrackId: "track-a", rank: 1 },
+      { canonicalTrackId: "track-b", rank: 2 },
+    ]);
+  });
+
+  it("never overrides quarantined identity with an external mapping", () => {
+    const receipt = buildCalibrationModelInput({
+      expectedSourceKeys: ["youtube_weekly_ke"],
+      sourceRuns: [{
+        id: "run-youtube",
+        sourceKey: "youtube_weekly_ke",
+        chartDepth: 100,
+      }],
+      observations: [{
+        sourceRunId: "run-youtube",
+        providerRowKey: "youtube:ambiguous",
+        providerTrackId: "ambiguous",
+        rank: 1,
+        identityStatus: "quarantined",
+        canonicalTrackId: null,
+      }],
+      admittedSourceRunIds: ["run-youtube"],
+      externalIdentityResolutions: [{
+        providerRowKey: "youtube:ambiguous",
+        canonicalTrackId: "track-should-not-enter",
+        authority: "production-registry-snapshot:test",
+      }],
+    });
+
+    expect(receipt.quarantinedObservationCount).toBe(1);
+    expect(receipt.externalResolutionCount).toBe(0);
+    expect(receipt.modelInput.rankings[0].rows).toEqual([]);
+  });
+
+  it("requires source admissibility to be supplied explicitly", () => {
+    const receipt = buildCalibrationModelInput({
+      expectedSourceKeys: [
+        "youtube_weekly_ke",
+        "audiomack_weekly100_ke",
+      ],
+      sourceRuns: [
+        {
+          id: "run-youtube",
+          sourceKey: "youtube_weekly_ke",
+          chartDepth: 100,
+        },
+        {
+          id: "run-audiomack",
+          sourceKey: "audiomack_weekly100_ke",
+          chartDepth: 100,
+        },
+      ],
+      observations: [
+        {
+          sourceRunId: "run-youtube",
+          providerRowKey: "youtube:a",
+          providerTrackId: "a",
+          rank: 1,
+          identityStatus: "resolved",
+          canonicalTrackId: "track-a",
+        },
+        {
+          sourceRunId: "run-audiomack",
+          providerRowKey: "audiomack:a",
+          providerTrackId: "a",
+          rank: 1,
+          identityStatus: "resolved",
+          canonicalTrackId: "track-a",
+        },
+      ],
+      admittedSourceRunIds: ["run-youtube"],
+    });
+
+    expect(receipt.admittedSourceRunCount).toBe(1);
+    expect(receipt.expectedSourceCount).toBe(2);
+    expect(receipt.modelInput.rankings.map((ranking) => ranking.sourceKey))
+      .toEqual(["youtube_weekly_ke"]);
   });
 });
