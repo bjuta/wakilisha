@@ -4474,6 +4474,15 @@ describe("Public Music Identity Track production accepted-state lineage", () => 
     expect(controlPlane).toContain(
       "[66,32,27,12]",
     );
+    expect(controlPlane).toContain(
+      "key === 'active_tracks'",
+    );
+    expect(controlPlane).toContain(
+      "historicalMinimumActiveTracks",
+    );
+    expect(controlPlane).toContain(
+      "fresh post-apply read-only audit completed with dynamic current findings",
+    );
   });
 });
 

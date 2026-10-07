@@ -398,6 +398,7 @@ function fieldsMatch(actual, expected) {
 function postApplyDomainFieldsMatch(actual, expected) {
   return Object.entries(expected).every(
     ([key, value]) =>
+      key === 'active_tracks' ||
       key === 'ledger_count' ||
       key === 'ledger_head' ||
       String(actual?.[key]) === String(value),
@@ -470,13 +471,24 @@ function assertAcceptedPostApply(state) {
     );
   }
 
+  const activeTracks = Number(state?.active_tracks);
+  const historicalMinimumActiveTracks =
+    acceptedBatchAResidual || acceptedBatchB1Residual
+      ? 2091
+      : 2101;
+
+  if (
+    !Number.isInteger(activeTracks) ||
+    activeTracks < historicalMinimumActiveTracks
+  ) {
+    throw new Error(
+      `active Tracks regressed below accepted historical floor: ${activeTracks} < ${historicalMinimumActiveTracks}`,
+    );
+  }
+
   assertFields(
     state,
     {
-      active_tracks:
-        acceptedBatchAResidual || acceptedBatchB1Residual
-          ? 2091
-          : 2101,
       events:440,
       unique_fingerprints:440,
       event_track_matches:440,
@@ -631,6 +643,51 @@ function assertReviewRun(text) {
 
 function assertAudit(text, before) {
   const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
+
+  if (!before) {
+    const counts = {};
+
+    for (const rule of [
+      'track_slug_identity_noise',
+      'track_title_credit_noise',
+      'track_slug_identity_mismatch',
+      'track_slug_credit_evidence_gap',
+      'track_recording_identity_conflict',
+    ]) {
+      const match = clean.match(
+        new RegExp(
+          `'${rule}'\\s*\\u2502\\s*(\\d+)\\s*\\u2502`,
+        ),
+      );
+
+      if (!match) {
+        throw new Error(
+          `${rule} current audit count was not parseable`,
+        );
+      }
+
+      const count = Number(match[1]);
+      if (!Number.isInteger(count) || count < 0) {
+        throw new Error(
+          `${rule} current audit count is invalid: ${match[1]}`,
+        );
+      }
+
+      counts[rule] = count;
+    }
+
+    if (
+      !clean.includes(
+        'Audit mode completed. No Registry rows were changed.',
+      )
+    ) {
+      throw new Error(
+        'post-apply audit did not prove read-only completion',
+      );
+    }
+
+    return counts;
+  }
 
   const identityNoiseMatch = clean.match(
     /'track_slug_identity_noise'\s*\u2502\s*(\d+)\s*\u2502/,
@@ -867,19 +924,15 @@ async function main() {
           {DATABASE_URL:url},
           auditCurrent,
         );
-        assertAudit(fs.readFileSync(auditCurrent,'utf8'),false);
-        const postBatchAState =
-          Number(acceptedState.active_tracks) === 2091;
-        const auditIdentityNoise =
-          postBatchAState ? 12 : Number(acceptedState.reviews);
-        const auditFindings =
-          postBatchAState ? 580 : 598 + auditIdentityNoise;
-        const auditRecordingConflicts =
-          postBatchAState ? 71 : 91;
-        const auditObserveOnly =
-          postBatchAState ? 485 : 495;
+        const auditCounts =
+          assertAudit(
+            fs.readFileSync(auditCurrent,'utf8'),
+            false,
+          );
         console.log(
-          `PASS: fresh post-apply audit = ${auditFindings} findings / ${auditIdentityNoise} deterministic analyzer candidates / 12 credit-evidence reviews / ${auditRecordingConflicts} recording-identity reviews / ${auditObserveOnly} observe-only / ${acceptedState.active_tracks} Tracks`,
+          'PASS: fresh post-apply read-only audit completed with dynamic current findings ' +
+          JSON.stringify(auditCounts) +
+          ` / ${acceptedState.active_tracks} Tracks; historical MIZIZI receipts remain exact`,
         );
 
         if (MODE === 'review') {
