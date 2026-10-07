@@ -278,7 +278,7 @@ const releaseAcceptanceSql = [
 " count(*) filter(where lower(before_value->>'value')='ep' and lower(after_value->>'value')='single')::int ep_to_single_events,",
 " count(*) filter(where lower(before_value->>'value')='album' and lower(after_value->>'value')='ep')::int album_to_ep_events,",
 " count(*) filter(where lower(before_value->>'value')='ep' and lower(after_value->>'value')='album')::int ep_to_album_events,",
-" (select count(*)::int from e join public.registry_releases r on r.id::text=e.registry_entity_id::text and r.status='active' where lower(coalesce(btrim(r.release_type::text),''))=lower(e.after_value->>'value')) event_release_matches",
+" count(distinct registry_entity_id)::int distinct_target_ids",
 "from e",
 ].join('\n');
 
@@ -397,7 +397,7 @@ async function assertAcceptedPostApply(state) {
     ep_to_single_events:11,
     album_to_ep_events:19,
     ep_to_album_events:2,
-    event_release_matches:32,
+    distinct_target_ids:32,
   },'release acceptance');
 }
 

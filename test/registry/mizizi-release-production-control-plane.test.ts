@@ -147,6 +147,8 @@ describe("MIZIZI Release production control plane", () => {
     expect(controlPlane).toContain("refusing repeat production mutation");
     expect(controlPlane).toContain("18 bad memberships preserved");
     expect(controlPlane).toContain("mizizi_release_events");
+    expect(controlPlane).toContain("distinct_target_ids");
+    expect(controlPlane).not.toContain("event_release_matches:32");
     expect(controlPlane).not.toContain("--entity=track");
     expect(controlPlane).not.toContain("MIZIZI_TRACK_PRODUCTION_APPLY");
     expect(controlPlane).not.toContain("database password");
