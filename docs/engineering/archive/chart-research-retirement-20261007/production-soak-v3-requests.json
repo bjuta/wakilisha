@@ -1,0 +1,2090 @@
+[
+  {
+    "method": "GET",
+    "run_id": "0292f01c-d40b-4b4e-a5cb-944b09fa1415",
+    "source": "apple",
+    "request_id": 927,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T00:00:00.609734+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "0292f01c-d40b-4b4e-a5cb-944b09fa1415",
+    "source": "audiomack",
+    "request_id": 930,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T00:00:00.641126+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "0292f01c-d40b-4b4e-a5cb-944b09fa1415",
+    "source": "boomplay",
+    "request_id": 931,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T00:00:00.641494+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "0292f01c-d40b-4b4e-a5cb-944b09fa1415",
+    "source": "mdundo",
+    "request_id": 929,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T00:00:00.640732+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "0292f01c-d40b-4b4e-a5cb-944b09fa1415",
+    "source": "shazam",
+    "request_id": 932,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T00:00:00.641931+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "0292f01c-d40b-4b4e-a5cb-944b09fa1415",
+    "source": "youtube",
+    "request_id": 928,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-11T00:00:00.640203+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "04446786-9046-480d-a84e-413610a27db7",
+    "source": "apple",
+    "request_id": 433,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T06:00:00.856955+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "04446786-9046-480d-a84e-413610a27db7",
+    "source": "audiomack",
+    "request_id": 436,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T06:00:00.886813+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "04446786-9046-480d-a84e-413610a27db7",
+    "source": "boomplay",
+    "request_id": 437,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T06:00:00.890435+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "04446786-9046-480d-a84e-413610a27db7",
+    "source": "mdundo",
+    "request_id": 435,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T06:00:00.886434+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "04446786-9046-480d-a84e-413610a27db7",
+    "source": "shazam",
+    "request_id": 438,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T06:00:00.890883+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "04446786-9046-480d-a84e-413610a27db7",
+    "source": "youtube",
+    "request_id": 434,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-06T06:00:00.885814+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "04e445ff-f810-4331-bb77-5455cc11a811",
+    "source": "apple",
+    "request_id": 381,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-05T18:00:00.685136+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "04e445ff-f810-4331-bb77-5455cc11a811",
+    "source": "audiomack",
+    "request_id": 384,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-05T18:00:00.710489+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "04e445ff-f810-4331-bb77-5455cc11a811",
+    "source": "boomplay",
+    "request_id": 385,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-05T18:00:00.711379+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "04e445ff-f810-4331-bb77-5455cc11a811",
+    "source": "mdundo",
+    "request_id": 383,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-05T18:00:00.707252+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "04e445ff-f810-4331-bb77-5455cc11a811",
+    "source": "shazam",
+    "request_id": 386,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-05T18:00:00.714459+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "04e445ff-f810-4331-bb77-5455cc11a811",
+    "source": "youtube",
+    "request_id": 382,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-05T18:00:00.705157+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "0eede99d-eb73-4a5e-adcd-143b282b0ab0",
+    "source": "apple",
+    "request_id": 407,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T00:00:00.545997+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "0eede99d-eb73-4a5e-adcd-143b282b0ab0",
+    "source": "audiomack",
+    "request_id": 410,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T00:00:00.567454+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "0eede99d-eb73-4a5e-adcd-143b282b0ab0",
+    "source": "boomplay",
+    "request_id": 411,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T00:00:00.5678+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "0eede99d-eb73-4a5e-adcd-143b282b0ab0",
+    "source": "mdundo",
+    "request_id": 409,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T00:00:00.567094+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "0eede99d-eb73-4a5e-adcd-143b282b0ab0",
+    "source": "shazam",
+    "request_id": 412,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T00:00:00.568187+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "0eede99d-eb73-4a5e-adcd-143b282b0ab0",
+    "source": "youtube",
+    "request_id": 408,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-06T00:00:00.566591+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "15d890e4-bf78-4d01-ac5d-6fdf6d47c3d9",
+    "source": "apple",
+    "request_id": 719,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T00:00:00.726958+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "15d890e4-bf78-4d01-ac5d-6fdf6d47c3d9",
+    "source": "audiomack",
+    "request_id": 722,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T00:00:00.760425+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "15d890e4-bf78-4d01-ac5d-6fdf6d47c3d9",
+    "source": "boomplay",
+    "request_id": 723,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T00:00:00.760836+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "15d890e4-bf78-4d01-ac5d-6fdf6d47c3d9",
+    "source": "mdundo",
+    "request_id": 721,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T00:00:00.755737+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "15d890e4-bf78-4d01-ac5d-6fdf6d47c3d9",
+    "source": "shazam",
+    "request_id": 724,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T00:00:00.76121+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "15d890e4-bf78-4d01-ac5d-6fdf6d47c3d9",
+    "source": "youtube",
+    "request_id": 720,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-09T00:00:00.755257+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "1f53f6e5-eee2-4251-8c95-05e862be8889",
+    "source": "apple",
+    "request_id": 667,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T12:00:00.372459+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "1f53f6e5-eee2-4251-8c95-05e862be8889",
+    "source": "audiomack",
+    "request_id": 670,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T12:00:00.389846+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "1f53f6e5-eee2-4251-8c95-05e862be8889",
+    "source": "boomplay",
+    "request_id": 671,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T12:00:00.390277+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "1f53f6e5-eee2-4251-8c95-05e862be8889",
+    "source": "mdundo",
+    "request_id": 669,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T12:00:00.38945+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "1f53f6e5-eee2-4251-8c95-05e862be8889",
+    "source": "shazam",
+    "request_id": 672,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T12:00:00.39063+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "1f53f6e5-eee2-4251-8c95-05e862be8889",
+    "source": "youtube",
+    "request_id": 668,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-08T12:00:00.388933+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "36e42636-65bf-461c-998e-2a526ee34f54",
+    "source": "apple",
+    "request_id": 1083,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T12:00:00.541141+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "36e42636-65bf-461c-998e-2a526ee34f54",
+    "source": "audiomack",
+    "request_id": 1086,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T12:00:00.573203+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "36e42636-65bf-461c-998e-2a526ee34f54",
+    "source": "boomplay",
+    "request_id": 1087,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T12:00:00.573547+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "36e42636-65bf-461c-998e-2a526ee34f54",
+    "source": "mdundo",
+    "request_id": 1085,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T12:00:00.572771+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "36e42636-65bf-461c-998e-2a526ee34f54",
+    "source": "shazam",
+    "request_id": 1088,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T12:00:00.579536+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "36e42636-65bf-461c-998e-2a526ee34f54",
+    "source": "youtube",
+    "request_id": 1084,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-12T12:00:00.572259+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "3b90b762-7180-453c-8083-18bd9ef2f4c6",
+    "source": "apple",
+    "request_id": 563,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T12:00:00.541437+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "3b90b762-7180-453c-8083-18bd9ef2f4c6",
+    "source": "audiomack",
+    "request_id": 566,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T12:00:00.556053+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "3b90b762-7180-453c-8083-18bd9ef2f4c6",
+    "source": "boomplay",
+    "request_id": 567,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T12:00:00.556408+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "3b90b762-7180-453c-8083-18bd9ef2f4c6",
+    "source": "mdundo",
+    "request_id": 565,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T12:00:00.555633+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "3b90b762-7180-453c-8083-18bd9ef2f4c6",
+    "source": "shazam",
+    "request_id": 568,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T12:00:00.556736+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "3b90b762-7180-453c-8083-18bd9ef2f4c6",
+    "source": "youtube",
+    "request_id": 564,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-07T12:00:00.555122+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "48de8378-b0c5-4fc3-a3ca-840a2539d5a3",
+    "source": "apple",
+    "request_id": 511,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T00:00:00.672575+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "48de8378-b0c5-4fc3-a3ca-840a2539d5a3",
+    "source": "audiomack",
+    "request_id": 514,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T00:00:00.710093+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "48de8378-b0c5-4fc3-a3ca-840a2539d5a3",
+    "source": "boomplay",
+    "request_id": 515,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T00:00:00.710482+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "48de8378-b0c5-4fc3-a3ca-840a2539d5a3",
+    "source": "mdundo",
+    "request_id": 513,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T00:00:00.709666+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "48de8378-b0c5-4fc3-a3ca-840a2539d5a3",
+    "source": "shazam",
+    "request_id": 516,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T00:00:00.710816+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "48de8378-b0c5-4fc3-a3ca-840a2539d5a3",
+    "source": "youtube",
+    "request_id": 512,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-07T00:00:00.709139+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "49e609c2-4b50-418f-aece-21938e24a0fa",
+    "source": "apple",
+    "request_id": 849,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T06:00:00.594439+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "49e609c2-4b50-418f-aece-21938e24a0fa",
+    "source": "audiomack",
+    "request_id": 852,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T06:00:00.630317+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "49e609c2-4b50-418f-aece-21938e24a0fa",
+    "source": "boomplay",
+    "request_id": 853,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T06:00:00.631056+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "49e609c2-4b50-418f-aece-21938e24a0fa",
+    "source": "mdundo",
+    "request_id": 851,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T06:00:00.629848+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "49e609c2-4b50-418f-aece-21938e24a0fa",
+    "source": "shazam",
+    "request_id": 854,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T06:00:00.631828+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "49e609c2-4b50-418f-aece-21938e24a0fa",
+    "source": "youtube",
+    "request_id": 850,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-10T06:00:00.62932+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "4e06f28c-b9f6-4f02-ad62-b7f6eebcfa2d",
+    "source": "apple",
+    "request_id": 459,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T12:00:00.518052+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "4e06f28c-b9f6-4f02-ad62-b7f6eebcfa2d",
+    "source": "audiomack",
+    "request_id": 462,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T12:00:00.539368+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "4e06f28c-b9f6-4f02-ad62-b7f6eebcfa2d",
+    "source": "boomplay",
+    "request_id": 463,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T12:00:00.539761+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "4e06f28c-b9f6-4f02-ad62-b7f6eebcfa2d",
+    "source": "mdundo",
+    "request_id": 461,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T12:00:00.53901+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "4e06f28c-b9f6-4f02-ad62-b7f6eebcfa2d",
+    "source": "shazam",
+    "request_id": 464,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T12:00:00.540104+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "4e06f28c-b9f6-4f02-ad62-b7f6eebcfa2d",
+    "source": "youtube",
+    "request_id": 460,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-06T12:00:00.538517+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "6d2190d8-ef71-4e06-b4f7-11be08e53002",
+    "source": "apple",
+    "request_id": 901,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T18:00:00.635239+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "6d2190d8-ef71-4e06-b4f7-11be08e53002",
+    "source": "audiomack",
+    "request_id": 904,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T18:00:00.698249+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "6d2190d8-ef71-4e06-b4f7-11be08e53002",
+    "source": "boomplay",
+    "request_id": 905,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T18:00:00.698848+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "6d2190d8-ef71-4e06-b4f7-11be08e53002",
+    "source": "mdundo",
+    "request_id": 903,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T18:00:00.697606+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "6d2190d8-ef71-4e06-b4f7-11be08e53002",
+    "source": "shazam",
+    "request_id": 906,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T18:00:00.703438+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "6d2190d8-ef71-4e06-b4f7-11be08e53002",
+    "source": "youtube",
+    "request_id": 902,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-10T18:00:00.696862+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "776101d7-785f-426e-b17d-82ce66dc3105",
+    "source": "apple",
+    "request_id": 485,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T18:00:00.643067+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "776101d7-785f-426e-b17d-82ce66dc3105",
+    "source": "audiomack",
+    "request_id": 488,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T18:00:00.663795+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "776101d7-785f-426e-b17d-82ce66dc3105",
+    "source": "boomplay",
+    "request_id": 489,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T18:00:00.664204+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "776101d7-785f-426e-b17d-82ce66dc3105",
+    "source": "mdundo",
+    "request_id": 487,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T18:00:00.663417+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "776101d7-785f-426e-b17d-82ce66dc3105",
+    "source": "shazam",
+    "request_id": 490,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-06T18:00:00.664541+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "776101d7-785f-426e-b17d-82ce66dc3105",
+    "source": "youtube",
+    "request_id": 486,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-06T18:00:00.662847+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "89a562ae-0f66-4943-b93b-b2a995293c5f",
+    "source": "apple",
+    "request_id": 797,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T18:00:00.673853+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "89a562ae-0f66-4943-b93b-b2a995293c5f",
+    "source": "audiomack",
+    "request_id": 800,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T18:00:00.69957+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "89a562ae-0f66-4943-b93b-b2a995293c5f",
+    "source": "boomplay",
+    "request_id": 801,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T18:00:00.700035+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "89a562ae-0f66-4943-b93b-b2a995293c5f",
+    "source": "mdundo",
+    "request_id": 799,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T18:00:00.699176+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "89a562ae-0f66-4943-b93b-b2a995293c5f",
+    "source": "shazam",
+    "request_id": 802,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T18:00:00.70037+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "89a562ae-0f66-4943-b93b-b2a995293c5f",
+    "source": "youtube",
+    "request_id": 798,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-09T18:00:00.698651+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "8f56647b-7410-4816-bc68-053c4be2036d",
+    "source": "apple",
+    "request_id": 953,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T06:00:00.571138+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "8f56647b-7410-4816-bc68-053c4be2036d",
+    "source": "audiomack",
+    "request_id": 956,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T06:00:00.593546+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "8f56647b-7410-4816-bc68-053c4be2036d",
+    "source": "boomplay",
+    "request_id": 957,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T06:00:00.593928+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "8f56647b-7410-4816-bc68-053c4be2036d",
+    "source": "mdundo",
+    "request_id": 955,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T06:00:00.593138+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "8f56647b-7410-4816-bc68-053c4be2036d",
+    "source": "shazam",
+    "request_id": 958,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T06:00:00.594294+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "8f56647b-7410-4816-bc68-053c4be2036d",
+    "source": "youtube",
+    "request_id": 954,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-11T06:00:00.592582+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "937a0bce-b93e-4556-9d77-07ce5e2278b9",
+    "source": "apple",
+    "request_id": 823,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T00:00:00.686016+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "937a0bce-b93e-4556-9d77-07ce5e2278b9",
+    "source": "audiomack",
+    "request_id": 826,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T00:00:00.728353+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "937a0bce-b93e-4556-9d77-07ce5e2278b9",
+    "source": "boomplay",
+    "request_id": 827,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T00:00:00.729496+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "937a0bce-b93e-4556-9d77-07ce5e2278b9",
+    "source": "mdundo",
+    "request_id": 825,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T00:00:00.726448+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "937a0bce-b93e-4556-9d77-07ce5e2278b9",
+    "source": "shazam",
+    "request_id": 828,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T00:00:00.730393+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "937a0bce-b93e-4556-9d77-07ce5e2278b9",
+    "source": "youtube",
+    "request_id": 824,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-10T00:00:00.71123+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "9a51bfce-7957-47e7-9b08-96287af26fca",
+    "source": "apple",
+    "request_id": 641,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T06:00:00.761809+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "9a51bfce-7957-47e7-9b08-96287af26fca",
+    "source": "audiomack",
+    "request_id": 644,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T06:00:00.787867+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "9a51bfce-7957-47e7-9b08-96287af26fca",
+    "source": "boomplay",
+    "request_id": 645,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T06:00:00.788472+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "9a51bfce-7957-47e7-9b08-96287af26fca",
+    "source": "mdundo",
+    "request_id": 643,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T06:00:00.787514+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "9a51bfce-7957-47e7-9b08-96287af26fca",
+    "source": "shazam",
+    "request_id": 646,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T06:00:00.788839+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "9a51bfce-7957-47e7-9b08-96287af26fca",
+    "source": "youtube",
+    "request_id": 642,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-08T06:00:00.787029+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "a641c820-2542-4278-bf24-b96e023a1958",
+    "source": "apple",
+    "request_id": 693,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T18:00:00.416537+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "a641c820-2542-4278-bf24-b96e023a1958",
+    "source": "audiomack",
+    "request_id": 696,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T18:00:00.439161+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "a641c820-2542-4278-bf24-b96e023a1958",
+    "source": "boomplay",
+    "request_id": 697,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T18:00:00.439535+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "a641c820-2542-4278-bf24-b96e023a1958",
+    "source": "mdundo",
+    "request_id": 695,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T18:00:00.438757+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "a641c820-2542-4278-bf24-b96e023a1958",
+    "source": "shazam",
+    "request_id": 698,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T18:00:00.439887+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "a641c820-2542-4278-bf24-b96e023a1958",
+    "source": "youtube",
+    "request_id": 694,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-08T18:00:00.438284+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "d2e87f12-6259-4b28-b55a-954ec5be99f4",
+    "source": "apple",
+    "request_id": 355,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-05T17:13:56.625376+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "d2e87f12-6259-4b28-b55a-954ec5be99f4",
+    "source": "audiomack",
+    "request_id": 358,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-05T17:13:56.647222+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "d2e87f12-6259-4b28-b55a-954ec5be99f4",
+    "source": "boomplay",
+    "request_id": 359,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-05T17:13:56.647544+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "d2e87f12-6259-4b28-b55a-954ec5be99f4",
+    "source": "mdundo",
+    "request_id": 357,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-05T17:13:56.646834+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "d2e87f12-6259-4b28-b55a-954ec5be99f4",
+    "source": "shazam",
+    "request_id": 360,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-05T17:13:56.647857+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "d2e87f12-6259-4b28-b55a-954ec5be99f4",
+    "source": "youtube",
+    "request_id": 356,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-05T17:13:56.64637+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "d4d5ea81-5f12-46e0-a5fd-ef6cdadf8fb0",
+    "source": "apple",
+    "request_id": 1005,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T18:00:00.474234+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "d4d5ea81-5f12-46e0-a5fd-ef6cdadf8fb0",
+    "source": "audiomack",
+    "request_id": 1008,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T18:00:00.499643+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "d4d5ea81-5f12-46e0-a5fd-ef6cdadf8fb0",
+    "source": "boomplay",
+    "request_id": 1009,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T18:00:00.500058+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "d4d5ea81-5f12-46e0-a5fd-ef6cdadf8fb0",
+    "source": "mdundo",
+    "request_id": 1007,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T18:00:00.499201+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "d4d5ea81-5f12-46e0-a5fd-ef6cdadf8fb0",
+    "source": "shazam",
+    "request_id": 1010,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T18:00:00.500404+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "d4d5ea81-5f12-46e0-a5fd-ef6cdadf8fb0",
+    "source": "youtube",
+    "request_id": 1006,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-11T18:00:00.493461+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "dadbd04b-25c6-49c6-acfc-96b73d3f71fe",
+    "source": "apple",
+    "request_id": 745,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T06:00:00.567695+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "dadbd04b-25c6-49c6-acfc-96b73d3f71fe",
+    "source": "audiomack",
+    "request_id": 748,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T06:00:00.590344+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "dadbd04b-25c6-49c6-acfc-96b73d3f71fe",
+    "source": "boomplay",
+    "request_id": 749,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T06:00:00.590659+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "dadbd04b-25c6-49c6-acfc-96b73d3f71fe",
+    "source": "mdundo",
+    "request_id": 747,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T06:00:00.589935+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "dadbd04b-25c6-49c6-acfc-96b73d3f71fe",
+    "source": "shazam",
+    "request_id": 750,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T06:00:00.591036+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "dadbd04b-25c6-49c6-acfc-96b73d3f71fe",
+    "source": "youtube",
+    "request_id": 746,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-09T06:00:00.589422+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e0df6819-c806-4d37-a505-075fc3f9fdea",
+    "source": "apple",
+    "request_id": 875,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T12:00:00.704646+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e0df6819-c806-4d37-a505-075fc3f9fdea",
+    "source": "audiomack",
+    "request_id": 878,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T12:00:00.730545+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e0df6819-c806-4d37-a505-075fc3f9fdea",
+    "source": "boomplay",
+    "request_id": 879,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T12:00:00.730929+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e0df6819-c806-4d37-a505-075fc3f9fdea",
+    "source": "mdundo",
+    "request_id": 877,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T12:00:00.730171+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e0df6819-c806-4d37-a505-075fc3f9fdea",
+    "source": "shazam",
+    "request_id": 880,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-10T12:00:00.731274+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "e0df6819-c806-4d37-a505-075fc3f9fdea",
+    "source": "youtube",
+    "request_id": 876,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-10T12:00:00.729612+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e2ee4fea-ad14-465d-8a63-649066275c4e",
+    "source": "apple",
+    "request_id": 537,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T06:00:00.826228+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e2ee4fea-ad14-465d-8a63-649066275c4e",
+    "source": "audiomack",
+    "request_id": 540,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T06:00:00.846447+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e2ee4fea-ad14-465d-8a63-649066275c4e",
+    "source": "boomplay",
+    "request_id": 541,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T06:00:00.846806+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e2ee4fea-ad14-465d-8a63-649066275c4e",
+    "source": "mdundo",
+    "request_id": 539,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T06:00:00.846052+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e2ee4fea-ad14-465d-8a63-649066275c4e",
+    "source": "shazam",
+    "request_id": 542,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T06:00:00.847199+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "e2ee4fea-ad14-465d-8a63-649066275c4e",
+    "source": "youtube",
+    "request_id": 538,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-07T06:00:00.841669+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e3803756-08a6-416c-abfc-1d14d1386b01",
+    "source": "apple",
+    "request_id": 1057,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T06:00:00.622685+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e3803756-08a6-416c-abfc-1d14d1386b01",
+    "source": "audiomack",
+    "request_id": 1060,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T06:00:00.65066+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e3803756-08a6-416c-abfc-1d14d1386b01",
+    "source": "boomplay",
+    "request_id": 1061,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T06:00:00.65105+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e3803756-08a6-416c-abfc-1d14d1386b01",
+    "source": "mdundo",
+    "request_id": 1059,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T06:00:00.650262+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e3803756-08a6-416c-abfc-1d14d1386b01",
+    "source": "shazam",
+    "request_id": 1062,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T06:00:00.651407+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "e3803756-08a6-416c-abfc-1d14d1386b01",
+    "source": "youtube",
+    "request_id": 1058,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-12T06:00:00.649686+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e8b0116a-77be-4bf1-921a-df0256ba346c",
+    "source": "apple",
+    "request_id": 771,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T12:00:00.571211+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e8b0116a-77be-4bf1-921a-df0256ba346c",
+    "source": "audiomack",
+    "request_id": 774,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T12:00:00.604444+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e8b0116a-77be-4bf1-921a-df0256ba346c",
+    "source": "boomplay",
+    "request_id": 775,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T12:00:00.604892+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e8b0116a-77be-4bf1-921a-df0256ba346c",
+    "source": "mdundo",
+    "request_id": 773,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T12:00:00.60307+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "e8b0116a-77be-4bf1-921a-df0256ba346c",
+    "source": "shazam",
+    "request_id": 776,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-09T12:00:00.605408+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "e8b0116a-77be-4bf1-921a-df0256ba346c",
+    "source": "youtube",
+    "request_id": 772,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-09T12:00:00.600814+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "ea0c3d47-2583-4416-be2a-13b11f2c13b8",
+    "source": "apple",
+    "request_id": 1031,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T00:00:00.549359+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "ea0c3d47-2583-4416-be2a-13b11f2c13b8",
+    "source": "audiomack",
+    "request_id": 1034,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T00:00:00.580464+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "ea0c3d47-2583-4416-be2a-13b11f2c13b8",
+    "source": "boomplay",
+    "request_id": 1035,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T00:00:00.580815+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "ea0c3d47-2583-4416-be2a-13b11f2c13b8",
+    "source": "mdundo",
+    "request_id": 1033,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T00:00:00.580033+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "ea0c3d47-2583-4416-be2a-13b11f2c13b8",
+    "source": "shazam",
+    "request_id": 1036,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-12T00:00:00.581241+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "ea0c3d47-2583-4416-be2a-13b11f2c13b8",
+    "source": "youtube",
+    "request_id": 1032,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-12T00:00:00.579468+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "eaf299ec-36a9-4fea-9a76-ba95640213dc",
+    "source": "apple",
+    "request_id": 615,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T00:00:00.766624+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "eaf299ec-36a9-4fea-9a76-ba95640213dc",
+    "source": "audiomack",
+    "request_id": 618,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T00:00:00.791037+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "eaf299ec-36a9-4fea-9a76-ba95640213dc",
+    "source": "boomplay",
+    "request_id": 619,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T00:00:00.79143+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "eaf299ec-36a9-4fea-9a76-ba95640213dc",
+    "source": "mdundo",
+    "request_id": 617,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T00:00:00.790588+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "eaf299ec-36a9-4fea-9a76-ba95640213dc",
+    "source": "shazam",
+    "request_id": 620,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-08T00:00:00.795208+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "eaf299ec-36a9-4fea-9a76-ba95640213dc",
+    "source": "youtube",
+    "request_id": 616,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-08T00:00:00.790073+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "ef62bb16-9d1b-4ef6-b524-f80b3a80f70b",
+    "source": "apple",
+    "request_id": 979,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T12:00:00.782191+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "ef62bb16-9d1b-4ef6-b524-f80b3a80f70b",
+    "source": "audiomack",
+    "request_id": 982,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T12:00:00.800496+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "ef62bb16-9d1b-4ef6-b524-f80b3a80f70b",
+    "source": "boomplay",
+    "request_id": 983,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T12:00:00.80087+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "ef62bb16-9d1b-4ef6-b524-f80b3a80f70b",
+    "source": "mdundo",
+    "request_id": 981,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T12:00:00.800051+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "ef62bb16-9d1b-4ef6-b524-f80b3a80f70b",
+    "source": "shazam",
+    "request_id": 984,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-11T12:00:00.801253+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "ef62bb16-9d1b-4ef6-b524-f80b3a80f70b",
+    "source": "youtube",
+    "request_id": 980,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-11T12:00:00.79939+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "f1a6ce9f-0850-48d7-973e-ce9612544800",
+    "source": "apple",
+    "request_id": 589,
+    "source_url": "https://rss.applemarketingtools.com/api/v2/ke/music/most-played/100/songs.json",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T18:00:00.848875+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "f1a6ce9f-0850-48d7-973e-ce9612544800",
+    "source": "audiomack",
+    "request_id": 592,
+    "source_url": "https://audiomack.com/geo-charts/playlist/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T18:00:00.872457+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "f1a6ce9f-0850-48d7-973e-ce9612544800",
+    "source": "boomplay",
+    "request_id": 593,
+    "source_url": "https://www-isp.boomplay.com/playlists/EQFJCbNTS0vEbeOL9pQjOToi?from=charts",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T18:00:00.873061+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "f1a6ce9f-0850-48d7-973e-ce9612544800",
+    "source": "mdundo",
+    "request_id": 591,
+    "source_url": "https://play.mdundo.com/top-charts/ke",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T18:00:00.872089+00:00"
+  },
+  {
+    "method": "GET",
+    "run_id": "f1a6ce9f-0850-48d7-973e-ce9612544800",
+    "source": "shazam",
+    "request_id": 594,
+    "source_url": "https://www.shazam.com/services/charts/csv/top-200/kenya",
+    "request_body": null,
+    "enqueued_at_utc": "2026-09-07T18:00:00.873433+00:00"
+  },
+  {
+    "method": "POST",
+    "run_id": "f1a6ce9f-0850-48d7-973e-ce9612544800",
+    "source": "youtube",
+    "request_id": 590,
+    "source_url": "https://charts.youtube.com/youtubei/v1/browse?alt=json",
+    "request_body": {
+      "query": "chart_params_type=WEEK&perspective=CHART&flags=viral_video_chart&selected_chart=TRACKS&chart_params_id=weekly:0:0:ke",
+      "context": {
+        "client": {
+          "gl": "US",
+          "hl": "en",
+          "theme": "MUSIC",
+          "clientName": "WEB_MUSIC_ANALYTICS",
+          "clientVersion": "0.2",
+          "experimentIds": [],
+          "experimentsToken": ""
+        },
+        "request": {
+          "internalExperimentFlags": []
+        },
+        "capabilities": {}
+      },
+      "browseId": "FEmusic_analytics_charts_home"
+    },
+    "enqueued_at_utc": "2026-09-07T18:00:00.871561+00:00"
+  }
+]
