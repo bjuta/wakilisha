@@ -8,9 +8,11 @@ import {
   compactProviderIdentityPart,
   isKnownProviderKey,
   normalizeIsrc,
+  normalizeUpc,
   normalizeProviderKey,
   normalizeProviderObjectId,
   providerIdentityAlias,
+  resolveReleaseIdentityV1,
   resolveTrackIdentityV1,
 } from "../../supabase/functions/_shared/provider-identity.ts";
 
@@ -242,6 +244,143 @@ describe("Provider Identity resolver kernel", () => {
 
     expect(retired.state).toBe("superseded_external_reference");
     expect(retired.canonicalTrackId).toBeNull();
+  });
+
+  it("normalizes canonical UPC/EAN shape without inventing identifier validity", () => {
+    expect(normalizeUpc(" 7033-2563-4881 ")).toBe("703325634881");
+    expect(normalizeUpc("12345678")).toBe("12345678");
+    expect(normalizeUpc("12345678901234")).toBe("12345678901234");
+    expect(normalizeUpc("1234")).toBe("");
+    expect(normalizeUpc("UPC-123456789012")).toBe("");
+  });
+
+  it("resolves one exact Release provider identity as existing authority", () => {
+    const result = resolveReleaseIdentityV1({
+      providerIdsJson: { apple_music: ["1868931341"] },
+      releaseIdsByProviderKey: new Map([
+        ["apple_music:1868931341", ["release-a"]],
+      ]),
+    });
+
+    expect(result.state).toBe("resolved_existing_authority");
+    expect(result.canonicalReleaseId).toBe("release-a");
+    expect(result.matchMethod).toBe("provider_id");
+    expect(result.reasons).toContain(
+      "evidence:provider:apple_music:1868931341",
+    );
+  });
+
+  it("nominates one exact UPC Release match as a deterministic candidate", () => {
+    const result = resolveReleaseIdentityV1({
+      upc: "7033-2563-4881",
+      releaseIdsByUpc: new Map([
+        ["703325634881", ["release-a"]],
+      ]),
+    });
+
+    expect(result.state).toBe("deterministic_candidate");
+    expect(result.canonicalReleaseId).toBe("release-a");
+    expect(result.matchMethod).toBe("upc");
+    expect(result.reasons).toContain("evidence:upc:703325634881");
+  });
+
+  it("deduplicates provider and UPC Release evidence that agree", () => {
+    const result = resolveReleaseIdentityV1({
+      providerIdsJson: { apple_music: ["1868931341"] },
+      upc: "703325634881",
+      releaseIdsByProviderKey: new Map([
+        ["apple_music:1868931341", ["release-a"]],
+      ]),
+      releaseIdsByUpc: new Map([
+        ["703325634881", ["release-a"]],
+      ]),
+    });
+
+    expect(result.state).toBe("resolved_existing_authority");
+    expect(result.canonicalReleaseId).toBe("release-a");
+    expect(result.candidateReleaseIds).toEqual(["release-a"]);
+    expect(result.authorityClasses).toEqual(["provider_identity", "upc"]);
+  });
+
+  it("fails closed for duplicated or conflicting strong Release evidence", () => {
+    const duplicated = resolveReleaseIdentityV1({
+      providerIdsJson: { apple_music: ["1868931341"] },
+      releaseIdsByProviderKey: new Map([
+        ["apple_music:1868931341", ["release-a", "release-b"]],
+      ]),
+    });
+
+    expect(duplicated.state).toBe("quarantined_conflict");
+    expect(duplicated.canonicalReleaseId).toBeNull();
+    expect(duplicated.candidateReleaseIds).toEqual([
+      "release-a",
+      "release-b",
+    ]);
+
+    const disagree = resolveReleaseIdentityV1({
+      providerIdsJson: { apple_music: ["1868931341"] },
+      upc: "703325634881",
+      releaseIdsByProviderKey: new Map([
+        ["apple_music:1868931341", ["release-a"]],
+      ]),
+      releaseIdsByUpc: new Map([
+        ["703325634881", ["release-b"]],
+      ]),
+    });
+
+    expect(disagree.state).toBe("quarantined_conflict");
+    expect(disagree.canonicalReleaseId).toBeNull();
+  });
+
+  it("follows Release lineage and fails closed on split lineage", () => {
+    const successor = resolveReleaseIdentityV1({
+      providerIdsJson: { apple_music: ["old-album"] },
+      releaseIdsByProviderKey: new Map([
+        ["apple_music:old-album", ["release-old"]],
+      ]),
+      lineageByReleaseId: new Map([
+        [
+          "release-old",
+          {
+            status: "successor",
+            currentReleaseIds: ["release-current"],
+          },
+        ],
+      ]),
+    });
+
+    expect(successor.state).toBe("resolved_existing_authority");
+    expect(successor.sourceReleaseIds).toEqual(["release-old"]);
+    expect(successor.canonicalReleaseId).toBe("release-current");
+
+    const split = resolveReleaseIdentityV1({
+      upc: "703325634881",
+      releaseIdsByUpc: new Map([
+        ["703325634881", ["release-old"]],
+      ]),
+      lineageByReleaseId: new Map([
+        [
+          "release-old",
+          {
+            status: "split",
+            currentReleaseIds: ["release-a", "release-b"],
+          },
+        ],
+      ]),
+    });
+
+    expect(split.state).toBe("quarantined_conflict");
+    expect(split.canonicalReleaseId).toBeNull();
+  });
+
+  it("keeps Release title/slug similarity outside canonical resolution", () => {
+    const result = resolveReleaseIdentityV1({});
+
+    expect(result.state).toBe("unresolved");
+    expect(result.canonicalReleaseId).toBeNull();
+    expect(result.reasons).toEqual([
+      "No exact Registry Release match from UPC/EAN or provider identity.",
+    ]);
   });
 
   it("is the canonical exact-match kernel consumed by chart ingest", () => {
