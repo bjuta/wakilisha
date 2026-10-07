@@ -1,3 +1,9 @@
+import {
+  normalizeUpc,
+  providerBindingLookupKey,
+  resolveReleaseIdentityV1,
+} from "../_shared/provider-identity.ts";
+
 export interface ExistingAppleRelease {
   id: string;
   slug: string;
@@ -66,53 +72,33 @@ export function resolveExistingAppleRelease(
     normalizedTitle: string;
   },
 ): ExistingAppleRelease | undefined {
-  const appleAlbumId = clean(
-    input.appleAlbumId,
+  const appleAlbumId = clean(input.appleAlbumId);
+  const providerKey = providerBindingLookupKey(
+    "apple_music",
+    appleAlbumId,
   );
+  const providerMatch = maps.byAppleAlbumId.get(appleAlbumId);
+  const upc = normalizeUpc(input.upc);
+  const upcMatch = upc ? maps.byUpc.get(upc) : undefined;
 
-  const upc = clean(input.upc);
+  const result = resolveReleaseIdentityV1({
+    providerIdsJson: appleAlbumId
+      ? { apple_music: [appleAlbumId] }
+      : undefined,
+    upc,
+    releaseIdsByProviderKey: providerMatch
+      ? new Map([[providerKey, [providerMatch.id]]])
+      : undefined,
+    releaseIdsByUpc: upcMatch
+      ? new Map([[upc, [upcMatch.id]]])
+      : undefined,
+  });
 
-  const exactProviderMatch =
-    maps.byAppleAlbumId.get(appleAlbumId);
+  const releaseId = result.canonicalReleaseId;
+  if (!releaseId) return undefined;
 
-  if (exactProviderMatch) {
-    return exactProviderMatch;
-  }
-
-  if (upc) {
-    const exactUpcMatch =
-      maps.byUpc.get(upc);
-
-    if (exactUpcMatch) {
-      return exactUpcMatch;
-    }
-  }
-
-  const candidates = [
-    maps.bySlug.get(input.rawSlug),
-    maps.byTitle.get(
-      input.normalizedTitle,
-    ),
-  ];
-
-  const seen = new Set<string>();
-
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    if (seen.has(candidate.id)) continue;
-
-    seen.add(candidate.id);
-
-    if (
-      releaseMatchesAppleIdentity(
-        candidate,
-        appleAlbumId,
-        input.upc,
-      )
-    ) {
-      return candidate;
-    }
-  }
+  if (providerMatch?.id === releaseId) return providerMatch;
+  if (upcMatch?.id === releaseId) return upcMatch;
 
   return undefined;
 }
