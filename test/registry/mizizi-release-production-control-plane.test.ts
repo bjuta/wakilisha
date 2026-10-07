@@ -58,7 +58,7 @@ describe("MIZIZI Release production control plane", () => {
       "EXPECTED_PROVIDER_PACKAGING_CANDIDATES",
     );
     expect(controlPlane).toContain(
-      "Release provider-packaging audit consistency",
+      "Release live audit consistency",
     );
     expect(controlPlane).toContain(
       "titlePackagingCount !== slugPackagingCount",

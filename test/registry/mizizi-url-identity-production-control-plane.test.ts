@@ -1057,7 +1057,10 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "titlePackaging: slugPackaging",
     );
     expect(controlPlane).toContain(
-      "artistSlug: 91",
+      "Chart canonical Track-slug findings",
+    );
+    expect(controlPlane).toContain(
+      "Current Chart Artist-slug audit count is invalid",
     );
     expect(core).toContain(
       'ruleId: "release_title_provider_packaging"',
