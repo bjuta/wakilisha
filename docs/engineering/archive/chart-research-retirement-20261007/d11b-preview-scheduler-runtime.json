@@ -1,0 +1,53 @@
+{
+  "cron_job": {
+    "jobid": 1,
+    "active": true,
+    "command": "select private.d11b_preview_soak_scheduler_tick();",
+    "jobname": "wakilisha-d11b-preview-soak-db-clock",
+    "database": "postgres",
+    "nodename": "localhost",
+    "nodeport": 5432,
+    "schedule": "*/5 * * * *",
+    "username": "postgres"
+  },
+  "functions": [
+    {
+      "args": "",
+      "name": "d11b_preview_soak_scheduler_tick",
+      "schema": "private",
+      "definition": "CREATE OR REPLACE FUNCTION private.d11b_preview_soak_scheduler_tick()\n RETURNS bigint\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'private', 'vault', 'net', 'cron'\nAS $function$\ndeclare\n  v_token text;\n  v_request_id bigint;\n  v_ends timestamptz;\nbegin\n  perform pg_advisory_xact_lock(\n    hashtext('wakilisha-d11b-preview-soak-db-clock')\n  );\n\n  select ends_at_utc\n  into v_ends\n  from private.d11b_preview_soak_scheduler_control\n  where control_id\n  for update;\n\n  if v_ends is null then\n    raise exception 'D11B Preview scheduler control row is missing.';\n  end if;\n\n  if clock_timestamp() > v_ends then\n    update private.d11b_preview_soak_scheduler_control\n    set\n      state='closed',\n      closed_at_utc=coalesce(closed_at_utc,clock_timestamp()),\n      updated_at_utc=clock_timestamp()\n    where control_id;\n\n    begin\n      perform cron.unschedule('wakilisha-d11b-preview-soak-db-clock');\n    exception\n      when others then null;\n    end;\n\n    return null;\n  end if;\n\n  select decrypted_secret\n  into v_token\n  from vault.decrypted_secrets\n  where name='d11b_preview_soak_scheduler_token'\n  order by created_at desc\n  limit 1;\n\n  if nullif(v_token,'') is null then\n    raise exception 'D11B Preview scheduler token is missing.';\n  end if;\n\n  select net.http_post(\n    url:='https://irgtqkcrufvldrznqcuv.supabase.co/functions/v1/d11b-preview-soak-tick',\n    body:='{}'::jsonb,\n    headers:=jsonb_build_object(\n      'content-type','application/json',\n      'x-wk-scheduler-token',v_token\n    ),\n    timeout_milliseconds:=10000\n  )\n  into v_request_id;\n\n  update private.d11b_preview_soak_scheduler_control\n  set\n    last_request_id=v_request_id,\n    last_invoked_at_utc=clock_timestamp(),\n    updated_at_utc=clock_timestamp()\n  where control_id;\n\n  return v_request_id;\nend\n$function$\n"
+    },
+    {
+      "args": "p_token text",
+      "name": "d11b_preview_soak_scheduler_token_valid_v1",
+      "schema": "public",
+      "definition": "CREATE OR REPLACE FUNCTION public.d11b_preview_soak_scheduler_token_valid_v1(p_token text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'public', 'vault'\nAS $function$\n  select exists(\n    select 1\n    from vault.decrypted_secrets s\n    where s.name='d11b_preview_soak_scheduler_token'\n      and s.decrypted_secret=p_token\n  );\n$function$\n"
+    },
+    {
+      "args": "p_token text",
+      "name": "install_d11b_preview_soak_scheduler_v1",
+      "schema": "public",
+      "definition": "CREATE OR REPLACE FUNCTION public.install_d11b_preview_soak_scheduler_v1(p_token text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'public', 'private', 'vault', 'cron'\nAS $function$\ndeclare\n  v_secret_id uuid;\n  v_job_id bigint;\nbegin\n  if session_user<>'authenticator'\n     or current_user<>'postgres'\n  then\n    raise exception using errcode='42501',\n      message='D11B Preview scheduler installer requires Data API service-role transport.';\n  end if;\n\n  if length(coalesce(p_token,''))<32 then\n    raise exception using errcode='22023',\n      message='D11B Preview scheduler token is too short.';\n  end if;\n\n  select id\n  into v_secret_id\n  from vault.secrets\n  where name='d11b_preview_soak_scheduler_token'\n  order by created_at desc\n  limit 1;\n\n  if v_secret_id is null then\n    v_secret_id:=vault.create_secret(\n      p_token,\n      'd11b_preview_soak_scheduler_token',\n      'Preview-only D11B database scheduler bridge token',\n      null\n    );\n  else\n    perform vault.update_secret(\n      v_secret_id,\n      p_token,\n      'd11b_preview_soak_scheduler_token',\n      'Preview-only D11B database scheduler bridge token',\n      null\n    );\n  end if;\n\n  begin\n    perform cron.unschedule('wakilisha-d11b-preview-soak-db-clock');\n  exception\n    when others then null;\n  end;\n\n  select cron.schedule(\n    'wakilisha-d11b-preview-soak-db-clock',\n    '*/5 * * * *',\n    'select private.d11b_preview_soak_scheduler_tick();'\n  )\n  into v_job_id;\n\n  update private.d11b_preview_soak_scheduler_control\n  set\n    state='running',\n    starts_at_utc=coalesce(starts_at_utc,clock_timestamp()),\n    cron_job_id=v_job_id,\n    updated_at_utc=clock_timestamp(),\n    closed_at_utc=null\n  where control_id;\n\n  return jsonb_build_object(\n    'installed',true,\n    'cron_job_id',v_job_id,\n    'window_id','a759d574-aa1c-4037-92b9-abc929a89e0c',\n    'ends_at_utc','2026-10-12T18:35:00Z'\n  );\nend\n$function$\n"
+    }
+  ],
+  "extensions": [
+    {
+      "name": "pg_cron",
+      "version": "1.6.4"
+    },
+    {
+      "name": "pg_net",
+      "version": "0.20.4"
+    },
+    {
+      "name": "supabase_vault",
+      "version": "0.3.1"
+    }
+  ],
+  "vault_secret_metadata": [
+    {
+      "name": "d11b_preview_soak_scheduler_token",
+      "created_at": "2026-10-07T05:57:51.23148+00:00"
+    }
+  ]
+}
