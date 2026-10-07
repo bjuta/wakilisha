@@ -166,7 +166,7 @@ describe(
     );
 
     it(
-      "allows legacy fallback when provider identity is absent",
+      "does not promote legacy title or slug similarity into canonical identity",
       () => {
         const legacy = release({
           id: "legacy-release",
@@ -187,8 +187,8 @@ describe(
               normalizedTitle:
                 "balance - single",
             },
-          )?.id,
-        ).toBe("legacy-release");
+          ),
+        ).toBeUndefined();
       },
     );
   },
