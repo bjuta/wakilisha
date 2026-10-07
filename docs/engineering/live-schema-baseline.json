@@ -1,16 +1,14 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-07T10:31:30Z",
-  "typesSha256": "c96572dd6b0a6b73ab0b0ce013b62a91b4f189a6bc9bad7bbcba3fc2df3d6d4e",
+  "generatedAt": "2026-10-07T14:39:53Z",
+  "typesSha256": "aff99aab1f261c8b370280a78460cbd05c525b7f9082a57dc9379a1c2c95cfaa",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 208,
   "latestMigration": "20261007075400_chart_research_programme_retirement_v1.sql",
   "schemaSeal": {
-    "mode": "preview",
-    "sourceProjectRef": "mxmqzkssfghbfqnunlby",
-    "migrationHead": "20261007075400",
-    "baseMainSha": "e487d6bea21d3c6296839150f822dbac91c1ce11",
-    "previewBranchId": "228495a7-eac6-4df8-ad47-9481fde32074"
+    "mode": "production",
+    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
+    "migrationHead": "20261007075400"
   }
 }
