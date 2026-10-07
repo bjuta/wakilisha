@@ -44,10 +44,11 @@ jobs:
           version: 2.107.0
           github-token: ${{ github.token }}
 
-      - name: Generate canonical public plus editorial types
+      - name: Generate canonical Production types and baseline
         shell: bash
         run: |
           set -euo pipefail
+
           supabase gen types typescript             --project-id "$PROD_REF"             --schema public,editorial             > src/types/database.types.ts
 
           grep -F 'editorial: {' src/types/database.types.ts
@@ -58,24 +59,22 @@ jobs:
           TYPES_SHA256="$(sha256sum src/types/database.types.ts | awk '{print $1}')"
           GENERATED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
-          node - "$TYPES_SHA256" "$GENERATED_AT" <<'NODE'
-const fs = require("fs");
-const [typesSha256, generatedAt] = process.argv.slice(2);
-const path = "docs/engineering/live-schema-baseline.json";
-const data = JSON.parse(fs.readFileSync(path, "utf8"));
-
-data.generatedAt = generatedAt;
-data.typesSha256 = typesSha256;
-data.migrationCount = 208;
-data.latestMigration = "20261007075400_chart_research_programme_retirement_v1.sql";
-data.schemaSeal = {
-  mode: "production",
-  sourceProjectRef: "pgzizndxdyhqmtyywjmt",
-  migrationHead: "20261007075400",
-};
-
-fs.writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
-NODE
+          node -e '
+            const fs = require("fs");
+            const [typesSha256, generatedAt] = process.argv.slice(1);
+            const path = "docs/engineering/live-schema-baseline.json";
+            const data = JSON.parse(fs.readFileSync(path, "utf8"));
+            data.generatedAt = generatedAt;
+            data.typesSha256 = typesSha256;
+            data.migrationCount = 208;
+            data.latestMigration = "20261007075400_chart_research_programme_retirement_v1.sql";
+            data.schemaSeal = {
+              mode: "production",
+              sourceProjectRef: "pgzizndxdyhqmtyywjmt",
+              migrationHead: "20261007075400"
+            };
+            fs.writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
+          ' "$TYPES_SHA256" "$GENERATED_AT"
 
           git diff --check
           node scripts/control-plane/verify-repository-schema-snapshot.mjs --pending-count 0
@@ -83,7 +82,7 @@ NODE
           echo "TYPES_SHA256=$TYPES_SHA256"
           echo "TYPE_RESEAL_GENERATION=PASS"
 
-      - name: Commit generated types only
+      - name: Commit canonical Production schema seal
         shell: bash
         run: |
           set -euo pipefail
@@ -91,23 +90,11 @@ NODE
           CHANGED="$(
             git status --short |
               awk '{print $2}' |
-              grep -v '^.github/workflows/reseal-production-database-types.yml          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add \
-            docs/engineering/live-schema-baseline.json \
-            src/types/database.types.ts
-          git commit -m "chore(db): seal Production database schema"
-          git push origin HEAD:fix/chart-research-retirement-production-types-seal
-
-          echo "TYPE_RESEAL_COMMIT=PASS"
- |
               sort
           )"
 
           EXPECTED="$(
-            printf '%s\n%s\n' \
-              'docs/engineering/live-schema-baseline.json' \
-              'src/types/database.types.ts' |
+            printf '%s\n%s\n'               'docs/engineering/live-schema-baseline.json'               'src/types/database.types.ts' |
               sort
           )"
 
@@ -116,8 +103,9 @@ NODE
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add src/types/database.types.ts
-          git commit -m "chore(db): reseal Production database types"
+          git add             docs/engineering/live-schema-baseline.json             src/types/database.types.ts
+
+          git commit -m "chore(db): seal Production database schema"
           git push origin HEAD:fix/chart-research-retirement-production-types-seal
 
           echo "TYPE_RESEAL_COMMIT=PASS"
