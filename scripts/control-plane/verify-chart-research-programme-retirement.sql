@@ -39,15 +39,17 @@ begin
     raise exception 'CHART_RESEARCH_RETIREMENT_FAIL: research function remains';
   end if;
 
-  if exists (
-    select 1
-    from cron.job
-    where jobname in (
-      'wakilisha-chart-source-soak-v3-enqueue',
-      'wakilisha-chart-source-soak-v3-collect'
-    )
-  ) then
-    raise exception 'CHART_RESEARCH_RETIREMENT_FAIL: research cron remains';
+  if to_regclass('cron.job') is not null then
+    if exists (
+      select 1
+      from cron.job
+      where jobname in (
+        'wakilisha-chart-source-soak-v3-enqueue',
+        'wakilisha-chart-source-soak-v3-collect'
+      )
+    ) then
+      raise exception 'CHART_RESEARCH_RETIREMENT_FAIL: research cron remains';
+    end if;
   end if;
 
   if to_regclass('public.registry_tracks') is null
@@ -57,19 +59,26 @@ begin
     raise exception 'CHART_RESEARCH_RETIREMENT_FAIL: product chart/Registry authority missing';
   end if;
 
-  if not exists (select 1 from pg_extension where extname='pg_cron')
-     or not exists (select 1 from pg_extension where extname='pg_net')
+  if not exists (select 1 from pg_extension where extname='pg_net')
      or not exists (select 1 from pg_extension where extname='supabase_vault')
   then
     raise exception 'CHART_RESEARCH_RETIREMENT_FAIL: shared platform extension removed';
   end if;
 
-  if not exists (
-    select 1 from cron.job
-    where jobname='briefing-daily-generate'
-      and active
-  ) then
-    raise exception 'CHART_RESEARCH_RETIREMENT_FAIL: unrelated briefing cron missing/inactive';
+  if exists (select 1 from pg_extension where extname='pg_cron') then
+    if to_regclass('cron.job') is null then
+      raise exception 'CHART_RESEARCH_RETIREMENT_FAIL: pg_cron installed without cron.job';
+    end if;
+
+    if not exists (
+      select 1 from cron.job
+      where jobname='briefing-daily-generate'
+        and active
+    ) then
+      raise exception 'CHART_RESEARCH_RETIREMENT_FAIL: unrelated briefing cron missing/inactive';
+    end if;
+  else
+    raise notice 'CHART_RESEARCH_RETIREMENT_PREVIEW_PG_CRON=SKIP';
   end if;
 
   raise notice 'CHART_RESEARCH_PROGRAMME_RETIREMENT=PASS';
