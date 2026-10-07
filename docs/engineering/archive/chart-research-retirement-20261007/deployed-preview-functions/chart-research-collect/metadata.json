@@ -1,0 +1,11 @@
+{
+  "id": "b0f13c40-ab42-4929-9efa-284580dd383e",
+  "slug": "chart-research-collect",
+  "name": "chart-research-collect",
+  "status": "ACTIVE",
+  "version": 5,
+  "created_at": 1791219015538,
+  "updated_at": 1791352865230,
+  "verify_jwt": true,
+  "ezbr_sha256": "03a659824fe5d357048f6ed1eb12d2bbc09e74748ec1dbdd81ea6e2df8cb2bc9"
+}

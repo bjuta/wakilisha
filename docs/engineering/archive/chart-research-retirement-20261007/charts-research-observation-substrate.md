@@ -1,3 +1,7 @@
+> **ARCHIVED — NOT CURRENT PRODUCT AUTHORITY**
+>
+> This document describes the retired pre-launch chart research substrate. The active D11/D11B programme was discontinued on 7 October 2026 under #1174. It is preserved for historical provenance only.
+
 # WAKILISHA 100 research observation substrate
 
 Issue: #1153

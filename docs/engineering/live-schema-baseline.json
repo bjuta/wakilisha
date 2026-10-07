@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-06T18:30:51Z",
-  "typesSha256": "2a304f3f17b13903c166f91cbf626870bfc6bfa59881b3cbf002777614e9992e",
+  "generatedAt": "2026-10-07T10:31:30Z",
+  "typesSha256": "c96572dd6b0a6b73ab0b0ce013b62a91b4f189a6bc9bad7bbcba3fc2df3d6d4e",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 207,
-  "latestMigration": "20261006175212_provider_identity_chart_playback_strong_evidence_guard_v1.sql",
+  "migrationCount": 208,
+  "latestMigration": "20261007075400_chart_research_programme_retirement_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "ldfcfcoxziftoerbqajh",
-    "migrationHead": "20261006175212",
-    "baseMainSha": "98dfbd9f45b51e639fe52d6693fd01e71d3b7ff4",
-    "previewBranchId": "fb15ceb0-951e-49f8-a27e-24d843dbe0d6"
+    "sourceProjectRef": "mxmqzkssfghbfqnunlby",
+    "migrationHead": "20261007075400",
+    "baseMainSha": "e487d6bea21d3c6296839150f822dbac91c1ce11",
+    "previewBranchId": "228495a7-eac6-4df8-ad47-9481fde32074"
   }
 }

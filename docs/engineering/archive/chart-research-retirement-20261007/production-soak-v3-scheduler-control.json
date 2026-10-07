@@ -1,0 +1,16 @@
+[
+  {
+    "state": "closed",
+    "control_id": true,
+    "ends_at_utc": "2026-09-12T18:00:00+00:00",
+    "last_run_id": "36e42636-65bf-461c-998e-2a526ee34f54",
+    "first_run_id": "04e445ff-f810-4331-bb77-5455cc11a811",
+    "closed_at_utc": "2026-09-12T18:00:00.532658+00:00",
+    "collect_job_id": 3,
+    "created_at_utc": "2026-09-05T17:31:26.471688+00:00",
+    "enqueue_job_id": 2,
+    "started_at_utc": "2026-09-05T18:00:00+00:00",
+    "updated_at_utc": "2026-09-12T18:05:00.516563+00:00",
+    "last_scheduled_for_utc": "2026-09-12T12:00:00+00:00"
+  }
+]
