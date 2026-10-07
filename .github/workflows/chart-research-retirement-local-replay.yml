@@ -1,6 +1,7 @@
 name: Chart Research Retirement Local Replay
 
 on:
+  pull_request:
   push:
     branches:
       - chore/retire-active-chart-research-programme
