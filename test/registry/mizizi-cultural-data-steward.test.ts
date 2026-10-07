@@ -4731,3 +4731,84 @@ describe("Public Music Identity reviewed duplicate authority V1 verifier", () =>
     );
   });
 });
+describe("Track semantic writer convergence", () => {
+  it("binds reviewed Discography Track identity to semantic credits and strong provider evidence", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20261007181711_public_music_identity_track_semantic_writer_convergence_v1.sql",
+      "utf8",
+    );
+    const verifier = readFileSync(
+      "scripts/control-plane/verify-registry-discography-authority.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "registry_track_semantic_title_v1",
+    );
+    expect(migration).toContain(
+      "registry_discography_track_semantic_slug_v1",
+    );
+    expect(migration).toContain(
+      "registry_discography_track_artist_desired_v1",
+    );
+    expect(migration).toContain(
+      "reviewed_provider_track_semantic_identity",
+    );
+    expect(migration).toContain(
+      "'plan_version',4",
+    );
+    expect(migration).toContain(
+      "'planner_version',4",
+    );
+
+    expect(migration).toContain(
+      "registry_track_provider_links",
+    );
+    expect(migration).toContain(
+      "link.match_status='matched'",
+    );
+    expect(migration).toContain(
+      "registry_external_identifier_assertions",
+    );
+    expect(migration).toContain(
+      "resolve_registry_identity_lineage_v1",
+    );
+    expect(migration).toContain(
+      "assertion.assertion_status='accepted'",
+    );
+
+    const resolverStart = migration.indexOf(
+      "create or replace function\nplatform_private.registry_discography_resolve_track_v1",
+    );
+    const resolverEnd = migration.indexOf(
+      "\nrevoke all on function\n  platform_private.registry_discography_resolve_track_v1",
+      resolverStart,
+    );
+    const resolver = migration.slice(
+      resolverStart,
+      resolverEnd,
+    );
+
+    expect(resolverStart).toBeGreaterThan(-1);
+    expect(resolverEnd).toBeGreaterThan(resolverStart);
+    expect(resolver).not.toContain(
+      "track.slug",
+    );
+    expect(resolver).not.toContain(
+      "track.normalized_title",
+    );
+    expect(resolver).not.toContain(
+      "registry_track_creation_slug_v1",
+    );
+
+    expect(verifier).toContain(
+      "Discography semantic Track title authority drifted",
+    );
+    expect(verifier).toContain(
+      "Discography Track strong-evidence authority drifted",
+    );
+    expect(verifier).toContain(
+      "Discography Track resolver regained weak slug/title canonical resolution",
+    );
+  });
+});

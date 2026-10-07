@@ -1,14 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-07T17:50:23Z",
+  "generatedAt": "2026-10-07T19:14:15Z",
   "typesSha256": "aff99aab1f261c8b370280a78460cbd05c525b7f9082a57dc9379a1c2c95cfaa",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 210,
-  "latestMigration": "20261007165822_provider_identity_artist_strong_evidence_resolver_v1.sql",
+  "migrationCount": 211,
+  "latestMigration": "20261007181711_public_music_identity_track_semantic_writer_convergence_v1.sql",
   "schemaSeal": {
-    "mode": "production",
-    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
-    "migrationHead": "20261007165822"
+    "mode": "preview",
+    "sourceProjectRef": "sosqkwmnrhcexazfcjnr",
+    "migrationHead": "20261007181711",
+    "baseMainSha": "977413686b4dd17bf5ce61432cc042d962e2f200",
+    "previewBranchId": "d0a378e9-1def-4702-ad0d-64e28c8f88e1"
   }
 }
