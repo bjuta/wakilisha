@@ -184,6 +184,27 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "tracks: 2091",
     );
     expect(currentControlPlane).toContain(
+      "Track audit corpus regressed below accepted historical floor",
+    );
+    expect(currentControlPlane).toContain(
+      "findings.slugNoise +",
+    );
+    expect(currentControlPlane).toContain(
+      "findings.titleNoise + findings.mismatch",
+    );
+    expect(currentControlPlane).toContain(
+      "Release audit corpus regressed below accepted historical floor",
+    );
+    expect(currentControlPlane).toContain(
+      "Release URL-identity findings",
+    );
+    expect(currentControlPlane).toContain(
+      "Chart audit corpus regressed below accepted historical floor",
+    );
+    expect(currentControlPlane).toContain(
+      "Chart canonical Track-slug findings",
+    );
+    expect(currentControlPlane).toContain(
       "public_music_identity_batch_a_safe_slug",
     );
     expect(currentControlPlane).toContain(
