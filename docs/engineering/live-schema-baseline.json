@@ -1,16 +1,14 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-07T17:35:33Z",
+  "generatedAt": "2026-10-07T17:50:23Z",
   "typesSha256": "aff99aab1f261c8b370280a78460cbd05c525b7f9082a57dc9379a1c2c95cfaa",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 210,
   "latestMigration": "20261007165822_provider_identity_artist_strong_evidence_resolver_v1.sql",
   "schemaSeal": {
-    "mode": "preview",
-    "sourceProjectRef": "jqfrwxciiheheeawymjs",
-    "migrationHead": "20261007165822",
-    "baseMainSha": "550013651de5adc67546516870ad30a7ca334bae",
-    "previewBranchId": "e7ac47ae-8b23-4b64-84c6-511c482e0334"
+    "mode": "production",
+    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
+    "migrationHead": "20261007165822"
   }
 }
