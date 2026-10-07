@@ -55,7 +55,32 @@ jobs:
           ! grep -F 'chart_research_windows' src/types/database.types.ts
           ! grep -F 'chart_research_observations' src/types/database.types.ts
 
+          TYPES_SHA256="$(sha256sum src/types/database.types.ts | awk '{print $1}')"
+          GENERATED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+          node - "$TYPES_SHA256" "$GENERATED_AT" <<'NODE'
+const fs = require("fs");
+const [typesSha256, generatedAt] = process.argv.slice(2);
+const path = "docs/engineering/live-schema-baseline.json";
+const data = JSON.parse(fs.readFileSync(path, "utf8"));
+
+data.generatedAt = generatedAt;
+data.typesSha256 = typesSha256;
+data.migrationCount = 208;
+data.latestMigration = "20261007075400_chart_research_programme_retirement_v1.sql";
+data.schemaSeal = {
+  mode: "production",
+  sourceProjectRef: "pgzizndxdyhqmtyywjmt",
+  migrationHead: "20261007075400",
+};
+
+fs.writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
+NODE
+
           git diff --check
+          node scripts/control-plane/verify-repository-schema-snapshot.mjs --pending-count 0
+
+          echo "TYPES_SHA256=$TYPES_SHA256"
           echo "TYPE_RESEAL_GENERATION=PASS"
 
       - name: Commit generated types only
@@ -66,11 +91,27 @@ jobs:
           CHANGED="$(
             git status --short |
               awk '{print $2}' |
-              grep -v '^.github/workflows/reseal-production-database-types.yml$' |
+              grep -v '^.github/workflows/reseal-production-database-types.yml          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            docs/engineering/live-schema-baseline.json \
+            src/types/database.types.ts
+          git commit -m "chore(db): seal Production database schema"
+          git push origin HEAD:fix/chart-research-retirement-production-types-seal
+
+          echo "TYPE_RESEAL_COMMIT=PASS"
+ |
               sort
           )"
 
-          test "$CHANGED" = "src/types/database.types.ts"
+          EXPECTED="$(
+            printf '%s\n%s\n' \
+              'docs/engineering/live-schema-baseline.json' \
+              'src/types/database.types.ts' |
+              sort
+          )"
+
+          test "$CHANGED" = "$EXPECTED"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
