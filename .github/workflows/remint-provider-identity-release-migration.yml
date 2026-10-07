@@ -26,13 +26,14 @@ jobs:
           fetch-depth: 0
           ref: feat/provider-identity-release-strong-evidence-resolver
 
-      - name: Require exact rebase head
+      - name: Require exact rebased authority
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "50894865632253d18af927b815aaad8c4e107329"
           git fetch origin main
           test "$(git rev-parse origin/main)" = "7b55c59b9ca9f289c6f01677817cbfc4bde12033"
+          test "$(git merge-base HEAD origin/main)" = "7b55c59b9ca9f289c6f01677817cbfc4bde12033"
+          test "$(git hash-object supabase/migrations/20261007054605_provider_identity_release_strong_evidence_resolver_v1.sql)" = "24a92421dd882d0ef432adfd44e30981057b6980"
           echo "RELEASE_REMINT_BASE=PASS"
 
       - name: Set up pinned Supabase CLI
