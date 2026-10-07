@@ -20,6 +20,7 @@ jobs:
     timeout-minutes: 15
     env:
       PROD_REF: pgzizndxdyhqmtyywjmt
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
     steps:
       - name: Check out branch
