@@ -98,5 +98,6 @@ jobs:
           test "$REMAINS" = "0"
 
           echo "MIGRATION_SHA256=$(sha256sum supabase/migrations/20261007075400_chart_research_programme_retirement_v1.sql | awk '{print $1}')"
+          echo "TYPES_SHA256=$(sha256sum src/types/database.types.ts | awk '{print $1}')"
           echo "SUPABASE_CLI=$(supabase --version | tail -1 | tr -d '[:space:]')"
           echo "WK_CHART_RESEARCH_RETIREMENT_LOCAL_REPLAY_PASS"
