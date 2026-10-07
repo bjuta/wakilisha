@@ -1,0 +1,81 @@
+name: Reseal Production Database Types
+
+on:
+  push:
+    branches:
+      - fix/chart-research-retirement-production-types-seal
+    paths:
+      - .github/workflows/reseal-production-database-types.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reseal-production-database-types
+  cancel-in-progress: false
+
+jobs:
+  reseal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROD_REF: pgzizndxdyhqmtyywjmt
+
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/chart-research-retirement-production-types-seal
+
+      - name: Require exact Production-retirement base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git merge-base HEAD origin/main)" = "c30a0e89bd5c81b0047a7de98cb08aecd0c8be08"
+          test "$(git rev-parse origin/main)" = "c30a0e89bd5c81b0047a7de98cb08aecd0c8be08"
+          echo "TYPE_RESEAL_BASE=PASS"
+
+      - name: Set up pinned Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+          github-token: ${{ github.token }}
+
+      - name: Generate canonical public plus editorial types
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase gen types typescript             --project-id "$PROD_REF"             --schema public,editorial             > src/types/database.types.ts
+
+          grep -F 'editorial: {' src/types/database.types.ts
+          grep -F 'public: {' src/types/database.types.ts
+          ! grep -F 'chart_research_windows' src/types/database.types.ts
+          ! grep -F 'chart_research_observations' src/types/database.types.ts
+
+          git diff --check
+          echo "TYPE_RESEAL_GENERATION=PASS"
+
+      - name: Commit generated types only
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CHANGED="$(
+            git status --short |
+              awk '{print $2}' |
+              grep -v '^.github/workflows/reseal-production-database-types.yml$' |
+              sort
+          )"
+
+          test "$CHANGED" = "src/types/database.types.ts"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add src/types/database.types.ts
+          git commit -m "chore(db): reseal Production database types"
+          git push origin HEAD:fix/chart-research-retirement-production-types-seal
+
+          echo "TYPE_RESEAL_COMMIT=PASS"
