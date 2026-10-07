@@ -64,10 +64,19 @@ describe("MIZIZI Release production control plane", () => {
       "titlePackagingCount !== slugPackagingCount",
     );
     expect(controlPlane).toContain(
-      "findings:titlePackagingCount + slugPackagingCount",
+      "titlePackagingCount +",
     );
     expect(controlPlane).toContain(
-      "(findings !== 0 || observedFindings !== 0)",
+      "slugPackagingCount +",
+    );
+    expect(controlPlane).toContain(
+      "taxonomyCount",
+    );
+    expect(controlPlane).toContain(
+      "release_taxonomy_drift",
+    );
+    expect(controlPlane).toContain(
+      "taxonomy ? Number(taxonomy[1]) : 0",
     );
     expect(controlPlane).toContain(
       "titlePackaging ? Number(titlePackaging[1]) : 0",
@@ -107,6 +116,24 @@ describe("MIZIZI Release production control plane", () => {
     expect(controlPlane).toContain("POST_APPLY_BASELINE");
     expect(controlPlane).toContain(
       "POST_APPLY_CROSS_PROGRAMME_REVIEW_FIELDS",
+    );
+    expect(controlPlane).toContain(
+      "POST_APPLY_LIVE_CORPUS_FIELDS",
+    );
+    expect(controlPlane).toContain(
+      "'active_releases'",
+    );
+    expect(controlPlane).toContain(
+      "'taxonomy_candidates'",
+    );
+    expect(controlPlane).toContain(
+      "activeReleases<PRE_APPLY_BASELINE.active_releases",
+    );
+    expect(controlPlane).toContain(
+      "Release audit corpus regressed below accepted historical floor",
+    );
+    expect(controlPlane).toContain(
+      "Release live audit consistency",
     );
     expect(controlPlane).toContain(
       "'open_mizizi_release_reviews'",
