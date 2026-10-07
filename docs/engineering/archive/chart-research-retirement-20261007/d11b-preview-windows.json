@@ -1,0 +1,52 @@
+[
+  {
+    "id": "a1deaeaf-8a58-4729-af84-6c2b1a2f18a7",
+    "notes": "Engineering pilot only. Not D11B qualification authority until L034-L037 freeze.\nInvalidated 2026-10-05: engineering pilot exposed prohibited historical backfill semantics for current-only Apple/Audiomack surfaces. Retained for audit; not qualification evidence.",
+    "phase": "engineering_pilot",
+    "created_at": "2026-10-05T17:01:15.484832+00:00",
+    "updated_at": "2026-10-05T17:07:08.709287+00:00",
+    "freeze_hash": null,
+    "tracking_end": "2026-10-02T00:00:00+00:00",
+    "tracking_start": "2026-09-25T00:00:00+00:00",
+    "collection_state": "invalidated",
+    "protocol_version": "d11b-launch-qualification-v1",
+    "expected_source_keys": [
+      "youtube_weekly_ke",
+      "audiomack_weekly100_ke",
+      "apple_top100_ke:2026-09-25",
+      "apple_top100_ke:2026-09-26",
+      "apple_top100_ke:2026-09-27",
+      "apple_top100_ke:2026-09-28",
+      "apple_top100_ke:2026-09-29",
+      "apple_top100_ke:2026-09-30",
+      "apple_top100_ke:2026-10-01"
+    ],
+    "registry_snapshot_ref": null,
+    "source_constitution_version": "d11b-source-v1"
+  },
+  {
+    "id": "a759d574-aa1c-4037-92b9-abc929a89e0c",
+    "notes": "Engineering pilot only. Not D11B qualification authority until L034-L037 freeze.",
+    "phase": "engineering_pilot",
+    "created_at": "2026-10-05T17:17:48.081767+00:00",
+    "updated_at": "2026-10-05T17:17:48.081767+00:00",
+    "freeze_hash": null,
+    "tracking_end": "2026-10-09T00:00:00+00:00",
+    "tracking_start": "2026-10-02T00:00:00+00:00",
+    "collection_state": "collecting",
+    "protocol_version": "d11b-launch-qualification-v1",
+    "expected_source_keys": [
+      "youtube_weekly_ke",
+      "audiomack_weekly100_ke",
+      "apple_top100_ke:2026-10-02",
+      "apple_top100_ke:2026-10-03",
+      "apple_top100_ke:2026-10-04",
+      "apple_top100_ke:2026-10-05",
+      "apple_top100_ke:2026-10-06",
+      "apple_top100_ke:2026-10-07",
+      "apple_top100_ke:2026-10-08"
+    ],
+    "registry_snapshot_ref": null,
+    "source_constitution_version": "d11b-source-v1"
+  }
+]
