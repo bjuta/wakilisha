@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  critical:
-    name: critical
+  critical-core:
+    name: critical-core
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -70,12 +70,6 @@ jobs:
 
       - name: Run WAKILISHA DOM interaction contracts
         run: npm run test:ui-dom
-
-      - name: Install Chromium and WebKit for critical interaction acceptance
-        run: npx playwright install --with-deps chromium webkit
-
-      - name: Run WAKILISHA real-browser interaction acceptance
-        run: npm run test:ui-browser
 
       - name: Enforce migration replay contract
         run: node scripts/control-plane/verify-migration-replay-contract.mjs
@@ -207,3 +201,47 @@ jobs:
 
       - name: Build application
         run: npm run performance:audit && npm run build:app
+
+  critical-browser:
+    name: critical-browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Run WAKILISHA real-browser interaction acceptance
+        run: npm run test:ui-browser
+
+  critical:
+    name: critical
+    if: ${{ always() }}
+    needs:
+      - critical-core
+      - critical-browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Require all critical control planes
+        env:
+          CORE_RESULT: ${{ needs.critical-core.result }}
+          BROWSER_RESULT: ${{ needs.critical-browser.result }}
+        run: |
+          echo "critical-core=$CORE_RESULT"
+          echo "critical-browser=$BROWSER_RESULT"
+          test "$CORE_RESULT" = "success"
+          test "$BROWSER_RESULT" = "success"
