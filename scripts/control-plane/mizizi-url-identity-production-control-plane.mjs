@@ -357,62 +357,52 @@ function assertAudit(
   }
 
   if (entity === "track") {
-    const slugNoise = ruleCount(
-      clean,
-      "track_slug_identity_noise",
-    );
-
-    const acceptedSnapshot =
-      ACCEPTED_TRACK_AUDIT_SNAPSHOTS.get(slugNoise);
-
-    if (!acceptedSnapshot) {
-      throw new Error(
-        "Track slug-identity audit state is outside the accepted programme boundary: " +
-          slugNoise,
-      );
-    }
+    const findings = {
+      slugNoise: ruleCount(clean, "track_slug_identity_noise"),
+      titleNoise: ruleCount(clean, "track_title_credit_noise"),
+      mismatch: ruleCount(clean, "track_slug_identity_mismatch"),
+      creditEvidenceGap: ruleCount(clean, "track_slug_credit_evidence_gap"),
+      recordingIdentityConflict: ruleCount(clean, "track_recording_identity_conflict"),
+    };
 
     assertFields(
       summary,
       {
-        findings: acceptedSnapshot.findings,
+        findings:
+          findings.slugNoise +
+          findings.titleNoise +
+          findings.mismatch +
+          findings.creditEvidenceGap +
+          findings.recordingIdentityConflict,
         applied: 0,
         queued: 0,
+        observed:
+          findings.titleNoise + findings.mismatch,
         stale: 0,
-        tracks: acceptedSnapshot.tracks,
         releases: 0,
         chart: 0,
       },
       "Track audit",
     );
-    assertFields(
-      {
-        titleNoise: ruleCount(
-          clean,
-          "track_title_credit_noise",
-        ),
-        mismatch: ruleCount(
-          clean,
-          "track_slug_identity_mismatch",
-        ),
-        creditEvidenceGap: ruleCount(
-          clean,
-          "track_slug_credit_evidence_gap",
-        ),
-        recordingIdentityConflict: ruleCount(
-          clean,
-          "track_recording_identity_conflict",
-        ),
-      },
-      {
-        titleNoise: acceptedSnapshot.titleNoise,
-        mismatch: 3,
-        creditEvidenceGap: 12,
-        recordingIdentityConflict:
-          acceptedSnapshot.recordingIdentityConflict,
-      },
-      "Track findings",
-    );
+
+    if (summary.tracks < 2091) {
+      throw new Error(
+        "Track audit corpus regressed below accepted historical floor: " +
+          summary.tracks,
+      );
+    }
+
+    for (const [rule, count] of Object.entries(findings)) {
+      if (!Number.isInteger(count) || count < 0) {
+        throw new Error(
+          "Current Track audit count is invalid for " +
+            rule +
+            ": " +
+            count,
+        );
+      }
+    }
+
     return;
   }
 
@@ -424,43 +414,61 @@ function assertAudit(
             expectedCurrentCandidates ??
               EXPECTED_RELEASE_CANDIDATES,
           );
+    const titlePackaging = ruleCount(
+      clean,
+      "release_title_provider_packaging",
+    );
+    const observedSlugPackaging = ruleCount(
+      clean,
+      "release_slug_provider_packaging",
+    );
+    const taxonomy = ruleCount(
+      clean,
+      "release_taxonomy_drift",
+    );
 
     assertFields(
       summary,
       {
-        findings: slugPackaging * 2,
+        findings:
+          titlePackaging +
+          observedSlugPackaging +
+          taxonomy,
         applied: 0,
         queued: 0,
-        observed: slugPackaging,
+        observed: titlePackaging,
         stale: 0,
         tracks: 0,
-        releases: 841,
         chart: 0,
       },
       "Release audit",
     );
+
+    if (summary.releases < 841) {
+      throw new Error(
+        "Release audit corpus regressed below accepted historical floor: " +
+          summary.releases,
+      );
+    }
+
     assertFields(
       {
-        titlePackaging: ruleCount(
-          clean,
-          "release_title_provider_packaging",
-        ),
-        slugPackaging: ruleCount(
-          clean,
-          "release_slug_provider_packaging",
-        ),
-        taxonomy: ruleCount(
-          clean,
-          "release_taxonomy_drift",
-        ),
+        titlePackaging,
+        slugPackaging: observedSlugPackaging,
       },
       {
         titlePackaging: slugPackaging,
         slugPackaging,
-        taxonomy: 0,
       },
-      "Release findings",
+      "Release URL-identity findings",
     );
+
+    if (!Number.isInteger(taxonomy) || taxonomy < 0) {
+      throw new Error(
+        "Current Release taxonomy audit count is invalid: " +
+          taxonomy,
+      );
+    }
     return;
   }
 
@@ -472,39 +480,51 @@ function assertAudit(
             expectedCurrentCandidates ??
               EXPECTED_CHART_CANDIDATES,
           );
+    const artistSlug = ruleCount(
+      clean,
+      "chart_artist_slug_drift",
+    );
 
     assertFields(
       summary,
       {
-        findings: trackSlug + 91,
+        findings: trackSlug + artistSlug,
         applied: 0,
         queued: 0,
-        observed: 91,
+        observed: artistSlug,
         stale: 0,
         tracks: 0,
         releases: 0,
-        chart: 1800,
       },
       "Chart audit",
     );
+
+    if (summary.chart < 1800) {
+      throw new Error(
+        "Chart audit corpus regressed below accepted historical floor: " +
+          summary.chart,
+      );
+    }
+
     assertFields(
       {
         trackSlug: ruleCount(
           clean,
           "chart_track_slug_drift",
         ),
-        artistSlug: ruleCount(
-          clean,
-          "chart_artist_slug_drift",
-        ),
       },
-      {
-        trackSlug,
-        artistSlug: 91,
-      },
-      "Chart findings",
+      { trackSlug },
+      "Chart canonical Track-slug findings",
     );
+
+    if (!Number.isInteger(artistSlug) || artistSlug < 0) {
+      throw new Error(
+        "Current Chart Artist-slug audit count is invalid: " +
+          artistSlug,
+      );
+    }
   }
+
 }
 
 

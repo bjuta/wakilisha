@@ -566,6 +566,131 @@ begin
     raise exception 'Track creation still duplicates Artist scope inside Track slug identity';
   end if;
 
+  if to_regprocedure(
+       'platform_private.registry_track_semantic_title_v1(text,text[])'
+     ) is null
+     or to_regprocedure(
+       'platform_private.registry_discography_track_semantic_slug_v1(uuid,uuid,jsonb)'
+     ) is null
+  then
+    raise exception 'Discography semantic Track identity helpers are missing';
+  end if;
+
+  if public.wk_slugify_text(
+       platform_private.registry_track_semantic_title_v1(
+         'FICHA WHITE (feat. Jovie Jovv, Shappaman & KXOBIE)',
+         array['Jovie Jovv','Shappaman','KXOBIE']::text[]
+       )
+     )<>'ficha-white'
+     or public.wk_slugify_text(
+          platform_private.registry_track_semantic_title_v1(
+            'Song ft. Artist B',
+            '{}'::text[]
+          )
+        )<>'song-ft-artist-b'
+     or public.wk_slugify_text(
+          platform_private.registry_track_semantic_title_v1(
+            'Road to Ft. Lauderdale',
+            array['Someone Else']::text[]
+          )
+        )<>'road-to-ft-lauderdale'
+     or public.wk_slugify_text(
+          platform_private.registry_track_semantic_title_v1(
+            'Nana (feat. Joeboy, King Promise & Bien) [Remix]',
+            array['Joeboy','King Promise','Bien']::text[]
+          )
+        )<>'nana-remix'
+  then
+    raise exception 'Discography semantic Track title authority drifted';
+  end if;
+
+  select lower(
+    pg_get_functiondef(
+      to_regprocedure(
+        'platform_private.registry_discography_track_semantic_slug_v1(uuid,uuid,jsonb)'
+      )
+    )
+  ) into v_definition;
+
+  if position('registry_discography_track_artist_desired_v1' in v_definition)=0
+     or position('is_featured' in v_definition)=0
+     or position('registry_track_semantic_title_v1' in v_definition)=0
+  then
+    raise exception 'Discography semantic Track slug drifted from frozen credit semantics';
+  end if;
+
+  select lower(
+    pg_get_functiondef(
+      to_regprocedure(
+        'platform_private.registry_discography_resolve_track_v1(uuid,jsonb)'
+      )
+    )
+  ) into v_definition;
+
+  if position('registry_track_provider_links' in v_definition)=0
+     or position('match_status=''matched''' in v_definition)=0
+     or position('apple_music_track_id' in v_definition)=0
+     or position('registry_identity_canonical_isrc_v1' in v_definition)=0
+     or position('registry_external_identifier_assertions' in v_definition)=0
+     or position('resolve_registry_identity_lineage_v1' in v_definition)=0
+     or position('assertion_status=''accepted''' in v_definition)=0
+  then
+    raise exception 'Discography Track strong-evidence authority drifted';
+  end if;
+
+  if position('track.slug' in v_definition)>0
+     or position('track.normalized_title' in v_definition)>0
+     or position('registry_track_creation_slug_v1' in v_definition)>0
+  then
+    raise exception 'Discography Track resolver regained weak slug/title canonical resolution';
+  end if;
+
+  select lower(
+    pg_get_functiondef(
+      to_regprocedure(
+        'platform_private.registry_discography_build_frozen_plan_v1(uuid,uuid,uuid,jsonb)'
+      )
+    )
+  ) into v_definition;
+
+  if position('registry_discography_track_semantic_slug_v1' in v_definition)=0
+     or position('reviewed_provider_track_semantic_identity' in v_definition)=0
+     or position('''plan_version'',4' in v_definition)=0
+  then
+    raise exception 'Discography reviewed planner drifted from semantic Track identity V4';
+  end if;
+
+  select lower(
+    pg_get_functiondef(
+      to_regprocedure(
+        'platform_private.freeze_registry_discography_review_plan_v1(uuid,uuid,jsonb)'
+      )
+    )
+  ) into v_definition;
+
+  if position('''planner_version'',4' in v_definition)=0
+     or position('active_ingest_v2' in v_definition)=0
+  then
+    raise exception 'Discography semantic Track planner fingerprint drifted';
+  end if;
+
+  foreach v_role in array array['public','anon','authenticated','service_role']
+  loop
+    if has_function_privilege(
+         v_role,
+         'platform_private.registry_track_semantic_title_v1(text,text[])',
+         'EXECUTE'
+       )
+       or has_function_privilege(
+         v_role,
+         'platform_private.registry_discography_track_semantic_slug_v1(uuid,uuid,jsonb)',
+         'EXECUTE'
+       )
+    then
+      raise exception 'Discography semantic Track helper leaked EXECUTE to role %',v_role;
+    end if;
+  end loop;
+
   select pg_get_functiondef(
     to_regprocedure(
       'platform_private.registry_release_creation_slug_v1(text,uuid)'

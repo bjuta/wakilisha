@@ -163,12 +163,25 @@ if (
   fail("mobile WebKit project is not scoped to viewport integrity");
 }
 
-if (
-  !workflow.includes(
+const criticalBrowserRuntimeProvisioned =
+  workflow.includes(
     "npx playwright install --with-deps chromium webkit",
-  )
-) {
-  fail("critical CI does not install Chromium and WebKit");
+  ) ||
+  (
+    workflow.includes(
+      "image: mcr.microsoft.com/playwright:v1.63.0-noble",
+    ) &&
+    workflow.includes("name: critical-browser") &&
+    workflow.includes(
+      "Run WAKILISHA real-browser interaction acceptance",
+    ) &&
+    workflow.includes("run: npm run test:ui-browser")
+  );
+
+if (!criticalBrowserRuntimeProvisioned) {
+  fail(
+    "critical CI does not provision Chromium and WebKit acceptance authority",
+  );
 }
 
 console.log(

@@ -184,6 +184,27 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "tracks: 2091",
     );
     expect(currentControlPlane).toContain(
+      "Track audit corpus regressed below accepted historical floor",
+    );
+    expect(currentControlPlane).toContain(
+      "findings.slugNoise +",
+    );
+    expect(currentControlPlane).toContain(
+      "findings.titleNoise + findings.mismatch",
+    );
+    expect(currentControlPlane).toContain(
+      "Release audit corpus regressed below accepted historical floor",
+    );
+    expect(currentControlPlane).toContain(
+      "Release URL-identity findings",
+    );
+    expect(currentControlPlane).toContain(
+      "Chart audit corpus regressed below accepted historical floor",
+    );
+    expect(currentControlPlane).toContain(
+      "Chart canonical Track-slug findings",
+    );
+    expect(currentControlPlane).toContain(
       "public_music_identity_batch_a_safe_slug",
     );
     expect(currentControlPlane).toContain(
@@ -1036,7 +1057,10 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "titlePackaging: slugPackaging",
     );
     expect(controlPlane).toContain(
-      "artistSlug: 91",
+      "Chart canonical Track-slug findings",
+    );
+    expect(controlPlane).toContain(
+      "Current Chart Artist-slug audit count is invalid",
     );
     expect(core).toContain(
       'ruleId: "release_title_provider_packaging"',

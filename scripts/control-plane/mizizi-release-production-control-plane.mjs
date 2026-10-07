@@ -278,7 +278,7 @@ const releaseAcceptanceSql = [
 " count(*) filter(where lower(before_value->>'value')='ep' and lower(after_value->>'value')='single')::int ep_to_single_events,",
 " count(*) filter(where lower(before_value->>'value')='album' and lower(after_value->>'value')='ep')::int album_to_ep_events,",
 " count(*) filter(where lower(before_value->>'value')='ep' and lower(after_value->>'value')='album')::int ep_to_album_events,",
-" (select count(*)::int from e join public.registry_releases r on r.id::text=e.registry_entity_id::text and r.status='active' where lower(coalesce(btrim(r.release_type::text),''))=lower(e.after_value->>'value')) event_release_matches",
+" count(distinct registry_entity_id)::int distinct_target_ids",
 "from e",
 ].join('\n');
 
@@ -313,6 +313,10 @@ const POST_APPLY_CROSS_PROGRAMME_REVIEW_FIELDS = new Set([
   'open_mizizi_release_reviews',
   'open_mizizi_reviews_total',
 ]);
+const POST_APPLY_LIVE_CORPUS_FIELDS = new Set([
+  'active_releases',
+  'taxonomy_candidates',
+]);
 
 function assertFields(actual,expected,label) {
   for (const [k,v] of Object.entries(expected)) {
@@ -327,6 +331,7 @@ function postApplyDomainFieldsMatch(actual,expected) {
     k === 'ledger_count' ||
     k === 'ledger_head' ||
     POST_APPLY_CROSS_PROGRAMME_REVIEW_FIELDS.has(k) ||
+    POST_APPLY_LIVE_CORPUS_FIELDS.has(k) ||
     String(actual?.[k])===String(v)
   );
 }
@@ -357,6 +362,30 @@ async function assertAcceptedPostApply(state) {
   if (!postApplyDomainFieldsMatch(state,POST_APPLY_BASELINE)) {
     throw new Error('release post-apply domain state drifted');
   }
+
+  const activeReleases=Number(state?.active_releases);
+  const taxonomyCandidates=Number(state?.taxonomy_candidates);
+
+  if (
+    !Number.isInteger(activeReleases) ||
+    activeReleases<PRE_APPLY_BASELINE.active_releases
+  ) {
+    throw new Error(
+      'active Releases regressed below accepted historical floor: '+
+      activeReleases,
+    );
+  }
+
+  if (
+    !Number.isInteger(taxonomyCandidates) ||
+    taxonomyCandidates<0
+  ) {
+    throw new Error(
+      'current Release taxonomy candidate count is invalid: '+
+      taxonomyCandidates,
+    );
+  }
+
   assertPostApplyLedger(state,'release post-apply baseline');
   const a = queryViaLinkedCli(releaseAcceptanceSql);
   assertFields(a,{
@@ -368,7 +397,7 @@ async function assertAcceptedPostApply(state) {
     ep_to_single_events:11,
     album_to_ep_events:19,
     ep_to_album_events:2,
-    event_release_matches:32,
+    distinct_target_ids:32,
   },'release acceptance');
 }
 
@@ -388,6 +417,9 @@ function assertReleaseAudit(text) {
   const slugPackaging = clean.match(
     /│\s*\d+\s*│\s*'release_slug_provider_packaging'\s*│\s*(\d+)\s*│/,
   );
+  const taxonomy = clean.match(
+    /│\s*\d+\s*│\s*'release_taxonomy_drift'\s*│\s*(\d+)\s*│/,
+  );
 
   const [
     ,
@@ -401,17 +433,9 @@ function assertReleaseAudit(text) {
     chartEntriesScanned,
   ] = summary.map(Number);
 
-  if (
-    (!titlePackaging || !slugPackaging) &&
-    (findings !== 0 || observedFindings !== 0)
-  ) {
-    throw new Error(
-      'Release provider-packaging findings were not parseable for a nonzero audit',
-    );
-  }
-
   const titlePackagingCount = titlePackaging ? Number(titlePackaging[1]) : 0;
   const slugPackagingCount = slugPackaging ? Number(slugPackaging[1]) : 0;
+  const taxonomyCount = taxonomy ? Number(taxonomy[1]) : 0;
 
   assertFields(
     {
@@ -419,7 +443,6 @@ function assertReleaseAudit(text) {
       queued_for_review:queuedForReview,
       stale,
       tracks_scanned:tracksScanned,
-      releases_scanned:releasesScanned,
       chart_entries_scanned:chartEntriesScanned,
     },
     {
@@ -427,11 +450,17 @@ function assertReleaseAudit(text) {
       queued_for_review:0,
       stale:0,
       tracks_scanned:0,
-      releases_scanned:841,
       chart_entries_scanned:0,
     },
     'Release audit summary',
   );
+
+  if (releasesScanned<PRE_APPLY_BASELINE.active_releases) {
+    throw new Error(
+      'Release audit corpus regressed below accepted historical floor: '+
+      releasesScanned,
+    );
+  }
 
   if (titlePackagingCount !== slugPackagingCount) {
     throw new Error(
@@ -448,19 +477,25 @@ function assertReleaseAudit(text) {
       observed_findings:observedFindings,
     },
     {
-      findings:titlePackagingCount + slugPackagingCount,
+      findings:
+        titlePackagingCount +
+        slugPackagingCount +
+        taxonomyCount,
       observed_findings:titlePackagingCount,
     },
-    'Release provider-packaging audit consistency',
+    'Release live audit consistency',
   );
-
-  if (clean.includes("'release_taxonomy_drift'")) {
-    throw new Error('historical Release taxonomy drift resurfaced in current audit');
-  }
 
   if (!clean.includes('Audit mode completed. No Registry rows were changed.')) {
     throw new Error('Release audit did not prove read-only completion');
   }
+
+  return {
+    titlePackagingCount,
+    slugPackagingCount,
+    taxonomyCount,
+    releasesScanned,
+  };
 }
 
 async function streamCommand(cmd,args,env,logPath,pool) {

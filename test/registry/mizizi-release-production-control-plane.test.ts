@@ -58,16 +58,25 @@ describe("MIZIZI Release production control plane", () => {
       "EXPECTED_PROVIDER_PACKAGING_CANDIDATES",
     );
     expect(controlPlane).toContain(
-      "Release provider-packaging audit consistency",
+      "Release live audit consistency",
     );
     expect(controlPlane).toContain(
       "titlePackagingCount !== slugPackagingCount",
     );
     expect(controlPlane).toContain(
-      "findings:titlePackagingCount + slugPackagingCount",
+      "titlePackagingCount +",
     );
     expect(controlPlane).toContain(
-      "(findings !== 0 || observedFindings !== 0)",
+      "slugPackagingCount +",
+    );
+    expect(controlPlane).toContain(
+      "taxonomyCount",
+    );
+    expect(controlPlane).toContain(
+      "release_taxonomy_drift",
+    );
+    expect(controlPlane).toContain(
+      "taxonomy ? Number(taxonomy[1]) : 0",
     );
     expect(controlPlane).toContain(
       "titlePackaging ? Number(titlePackaging[1]) : 0",
@@ -109,6 +118,24 @@ describe("MIZIZI Release production control plane", () => {
       "POST_APPLY_CROSS_PROGRAMME_REVIEW_FIELDS",
     );
     expect(controlPlane).toContain(
+      "POST_APPLY_LIVE_CORPUS_FIELDS",
+    );
+    expect(controlPlane).toContain(
+      "'active_releases'",
+    );
+    expect(controlPlane).toContain(
+      "'taxonomy_candidates'",
+    );
+    expect(controlPlane).toContain(
+      "activeReleases<PRE_APPLY_BASELINE.active_releases",
+    );
+    expect(controlPlane).toContain(
+      "Release audit corpus regressed below accepted historical floor",
+    );
+    expect(controlPlane).toContain(
+      "Release live audit consistency",
+    );
+    expect(controlPlane).toContain(
       "'open_mizizi_release_reviews'",
     );
     expect(controlPlane).toContain(
@@ -120,6 +147,8 @@ describe("MIZIZI Release production control plane", () => {
     expect(controlPlane).toContain("refusing repeat production mutation");
     expect(controlPlane).toContain("18 bad memberships preserved");
     expect(controlPlane).toContain("mizizi_release_events");
+    expect(controlPlane).toContain("distinct_target_ids");
+    expect(controlPlane).not.toContain("event_release_matches:32");
     expect(controlPlane).not.toContain("--entity=track");
     expect(controlPlane).not.toContain("MIZIZI_TRACK_PRODUCTION_APPLY");
     expect(controlPlane).not.toContain("database password");

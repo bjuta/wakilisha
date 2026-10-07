@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20261007181711_public_music_identity_track_semantic_writer_convergence_v1.sql",
+  "migration_sha256": "46afeac4626f9ebfb252b834e48c18dff8f1fdd2c200a5989534be722a58dd95",
+  "base_main_sha": "977413686b4dd17bf5ce61432cc042d962e2f200",
+  "preview_project_ref": "sosqkwmnrhcexazfcjnr",
+  "preview_branch_id": "d0a378e9-1def-4702-ad0d-64e28c8f88e1",
+  "preview_migration_head": "20261007181711",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-registry-discography-authority.sql",
+  "schema_types_sha256": "aff99aab1f261c8b370280a78460cbd05c525b7f9082a57dc9379a1c2c95cfaa",
+  "schema_migration_count": 211,
+  "schema_migration_head": "20261007181711",
+  "verified_at": "2026-10-07T19:14:15.558Z"
+}
