@@ -1000,3 +1000,275 @@ export function resolveReleaseIdentityV1(
     authorityClasses: [...authorityClasses].sort(),
   };
 }
+
+export type ArtistIdBucketV1 = readonly string[] | ReadonlySet<string>;
+
+export type ArtistIdIndexV1 =
+  | ReadonlyMap<string, ArtistIdBucketV1>
+  | Readonly<Record<string, ArtistIdBucketV1>>;
+
+export type ArtistLineageResolutionV1 = {
+  status:
+    | "current"
+    | "successor"
+    | "split"
+    | "retired"
+    | "missing"
+    | "cycle"
+    | "ambiguous"
+    | string;
+  currentArtistIds?: readonly string[];
+};
+
+export type ArtistLineageIndexV1 =
+  | ReadonlyMap<string, ArtistLineageResolutionV1>
+  | Readonly<Record<string, ArtistLineageResolutionV1>>;
+
+export type ResolveArtistIdentityInputV1 = {
+  providerIdsJson?: unknown;
+  artistIdsByProviderKey?: ArtistIdIndexV1;
+  lineageByArtistId?: ArtistLineageIndexV1;
+};
+
+export type ArtistIdentityResolutionV1 = {
+  contractVersion: typeof PROVIDER_IDENTITY_CONTRACT_VERSION;
+  state: TrackResolutionStateV1;
+  canonicalArtistId: string | null;
+  sourceArtistIds: string[];
+  candidateArtistIds: string[];
+  matchMethod: "provider_id" | "no_match";
+  confidence: number;
+  reasons: string[];
+  authorityClasses: Array<"provider_identity">;
+};
+
+function artistLineageResult(
+  sourceArtistId: string,
+  lineageByArtistId: ArtistLineageIndexV1 | undefined,
+): {
+  kind: "current" | "retired" | "review" | "conflict";
+  currentArtistIds: string[];
+  reason?: string;
+} {
+  const lineage = indexGet(lineageByArtistId, sourceArtistId);
+  if (!lineage) {
+    return {
+      kind: "current",
+      currentArtistIds: [sourceArtistId],
+    };
+  }
+
+  const currentArtistIds = [
+    ...new Set(
+      (lineage.currentArtistIds ?? [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  ].sort();
+
+  if (
+    (lineage.status === "current" || lineage.status === "successor") &&
+    currentArtistIds.length === 1
+  ) {
+    return {
+      kind: "current",
+      currentArtistIds,
+      reason:
+        currentArtistIds[0] === sourceArtistId
+          ? undefined
+          : `lineage:${sourceArtistId}->${currentArtistIds[0]}`,
+    };
+  }
+
+  if (lineage.status === "current" && currentArtistIds.length === 0) {
+    return {
+      kind: "current",
+      currentArtistIds: [sourceArtistId],
+    };
+  }
+
+  if (lineage.status === "retired" && currentArtistIds.length === 0) {
+    return {
+      kind: "retired",
+      currentArtistIds: [],
+      reason: `lineage:${sourceArtistId}:retired`,
+    };
+  }
+
+  if (lineage.status === "missing") {
+    return {
+      kind: "review",
+      currentArtistIds: [],
+      reason: `lineage:${sourceArtistId}:missing`,
+    };
+  }
+
+  return {
+    kind: "conflict",
+    currentArtistIds,
+    reason: `lineage:${sourceArtistId}:${lineage.status || "ambiguous"}`,
+  };
+}
+
+export function resolveArtistIdentityV1(
+  input: ResolveArtistIdentityInputV1,
+): ArtistIdentityResolutionV1 {
+  const sourceArtistIds = new Set<string>();
+  const reasons: string[] = [];
+
+  const providerIds = normalizedProviderIdsFromJson(input.providerIdsJson);
+  for (const [provider, ids] of Object.entries(providerIds)) {
+    for (const id of ids) {
+      const bindingKey = providerBindingLookupKey(provider, id);
+      const artistIds = bucketValues(
+        indexGet(input.artistIdsByProviderKey, bindingKey),
+      );
+      if (artistIds.length === 0) continue;
+
+      reasons.push(`evidence:provider:${provider}:${id}`);
+      for (const artistId of artistIds) sourceArtistIds.add(artistId);
+    }
+  }
+
+  const sortedSourceArtistIds = [...sourceArtistIds].sort();
+
+  if (sortedSourceArtistIds.length === 0) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "unresolved",
+      canonicalArtistId: null,
+      sourceArtistIds: [],
+      candidateArtistIds: [],
+      matchMethod: "no_match",
+      confidence: 0,
+      reasons: [
+        "No exact Registry Artist match from provider identity.",
+      ],
+      authorityClasses: [],
+    };
+  }
+
+  const candidateArtistIds = new Set<string>();
+  let retiredCount = 0;
+  let reviewCount = 0;
+  let conflictCount = 0;
+
+  for (const sourceArtistId of sortedSourceArtistIds) {
+    const lineage = artistLineageResult(
+      sourceArtistId,
+      input.lineageByArtistId,
+    );
+
+    if (lineage.reason) reasons.push(lineage.reason);
+
+    if (lineage.kind === "retired") {
+      retiredCount++;
+      continue;
+    }
+    if (lineage.kind === "review") {
+      reviewCount++;
+      continue;
+    }
+    if (lineage.kind === "conflict") {
+      conflictCount++;
+      continue;
+    }
+
+    for (const currentArtistId of lineage.currentArtistIds) {
+      candidateArtistIds.add(currentArtistId);
+    }
+  }
+
+  const sortedCandidateArtistIds = [...candidateArtistIds].sort();
+  for (const artistId of sortedCandidateArtistIds) {
+    reasons.push(`candidate_artist:${artistId}`);
+  }
+
+  if (conflictCount > 0) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "quarantined_conflict",
+      canonicalArtistId: null,
+      sourceArtistIds: sortedSourceArtistIds,
+      candidateArtistIds: sortedCandidateArtistIds,
+      matchMethod: "provider_id",
+      confidence: 100,
+      reasons,
+      authorityClasses: ["provider_identity"],
+    };
+  }
+
+  if (
+    retiredCount > 0 &&
+    (sortedCandidateArtistIds.length > 0 || reviewCount > 0)
+  ) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "quarantined_conflict",
+      canonicalArtistId: null,
+      sourceArtistIds: sortedSourceArtistIds,
+      candidateArtistIds: sortedCandidateArtistIds,
+      matchMethod: "provider_id",
+      confidence: 100,
+      reasons,
+      authorityClasses: ["provider_identity"],
+    };
+  }
+
+  if (
+    retiredCount === sortedSourceArtistIds.length &&
+    sortedCandidateArtistIds.length === 0
+  ) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "superseded_external_reference",
+      canonicalArtistId: null,
+      sourceArtistIds: sortedSourceArtistIds,
+      candidateArtistIds: [],
+      matchMethod: "provider_id",
+      confidence: 100,
+      reasons,
+      authorityClasses: ["provider_identity"],
+    };
+  }
+
+  if (reviewCount > 0) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "review_required",
+      canonicalArtistId: null,
+      sourceArtistIds: sortedSourceArtistIds,
+      candidateArtistIds: sortedCandidateArtistIds,
+      matchMethod: "provider_id",
+      confidence: 100,
+      reasons,
+      authorityClasses: ["provider_identity"],
+    };
+  }
+
+  if (sortedCandidateArtistIds.length !== 1) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "quarantined_conflict",
+      canonicalArtistId: null,
+      sourceArtistIds: sortedSourceArtistIds,
+      candidateArtistIds: sortedCandidateArtistIds,
+      matchMethod: "provider_id",
+      confidence: 100,
+      reasons,
+      authorityClasses: ["provider_identity"],
+    };
+  }
+
+  return {
+    contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+    state: "resolved_existing_authority",
+    canonicalArtistId: sortedCandidateArtistIds[0],
+    sourceArtistIds: sortedSourceArtistIds,
+    candidateArtistIds: sortedCandidateArtistIds,
+    matchMethod: "provider_id",
+    confidence: 100,
+    reasons,
+    authorityClasses: ["provider_identity"],
+  };
+}

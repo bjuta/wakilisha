@@ -300,6 +300,7 @@ begin
     'platform_private.registry_release_track_set_v1(uuid)',
     'platform_private.registry_track_artist_credit_set_v1(uuid)',
     'platform_private.registry_discography_set_fingerprint_v1(jsonb)',
+    'platform_private.registry_discography_resolve_artist_provider_credit_v1(text,text,text)',
     'platform_private.issue_registry_discography_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,integer)',
     'platform_private.registry_discography_observation_fingerprint_v1(jsonb)',
     'platform_private.registry_discography_validate_observation_v1(uuid,jsonb,text)',
@@ -377,10 +378,58 @@ begin
        'platform_private.registry_discography_resolve_artist_credit_v1(text)'
      ) is null
      or to_regprocedure(
+       'platform_private.registry_discography_resolve_artist_provider_credit_v1(text,text,text)'
+     ) is null
+     or to_regprocedure(
        'platform_private.registry_discography_title_feature_credit_includes_artist_v1(text,text)'
      ) is null
   then
-    raise exception 'Discography credited-name identity helpers are missing';
+    raise exception 'Discography credited-name/provider identity helpers are missing';
+  end if;
+
+  select regexp_replace(
+    lower(
+      pg_get_functiondef(
+        to_regprocedure(
+          'platform_private.registry_discography_resolve_artist_provider_credit_v1(text,text,text)'
+        )
+      )
+    ),
+    '[[:space:]]+',
+    ' ',
+    'g'
+  ) into v_definition;
+
+  if position('apple_music_id' in v_definition)=0
+     or position('registry_external_identifier_assertions' in v_definition)=0
+     or position('resolve_registry_identity_lineage_v1' in v_definition)=0
+     or position('provider_unresolved' in v_definition)=0
+     or position('provider_identity' in v_definition)=0
+     or position('registry_discography_resolve_artist_name_v1' in v_definition)>0
+     or position('registry_artist_aliases' in v_definition)>0
+  then
+    raise exception 'Discography strong provider Artist identity authority drifted';
+  end if;
+
+  select regexp_replace(
+    lower(
+      pg_get_functiondef(
+        to_regprocedure(
+          'platform_private.registry_discography_release_artist_desired_v1(uuid,uuid,jsonb,jsonb)'
+        )
+      )
+    ),
+    '[[:space:]]+',
+    ' ',
+    'g'
+  ) into v_definition;
+
+  if position('registry_discography_resolve_artist_provider_credit_v1' in v_definition)=0
+     or position('apple_music_artist_id' in v_definition)=0
+     or position('v_related_provider_id is not null' in v_definition)=0
+     or position('registry_discography_resolve_artist_credit_v1' in v_definition)=0
+  then
+    raise exception 'Discography Release Artist provider-first/name-only separation drifted';
   end if;
 
   select pg_get_functiondef(
@@ -584,6 +633,7 @@ begin
   end if;
 
   foreach v_signature in array array[
+    'platform_private.registry_discography_resolve_artist_provider_credit_v1(text,text,text)',
     'platform_private.issue_registry_discography_user_execution_grant_v1(uuid,text,text,uuid,jsonb,text,integer)',
     'platform_private.registry_discography_observation_fingerprint_v1(jsonb)',
     'platform_private.registry_discography_validate_observation_v1(uuid,jsonb,text)',

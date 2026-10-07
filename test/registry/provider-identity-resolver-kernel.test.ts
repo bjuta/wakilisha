@@ -12,6 +12,7 @@ import {
   normalizeProviderKey,
   normalizeProviderObjectId,
   providerIdentityAlias,
+  resolveArtistIdentityV1,
   resolveReleaseIdentityV1,
   resolveTrackIdentityV1,
 } from "../../supabase/functions/_shared/provider-identity.ts";
@@ -380,6 +381,122 @@ describe("Provider Identity resolver kernel", () => {
     expect(result.canonicalReleaseId).toBeNull();
     expect(result.reasons).toEqual([
       "No exact Registry Release match from UPC/EAN or provider identity.",
+    ]);
+  });
+
+  it("resolves one exact Artist provider identity as existing authority", () => {
+    const result = resolveArtistIdentityV1({
+      providerIdsJson: { apple_music: ["artist-apple-1"] },
+      artistIdsByProviderKey: new Map([
+        ["apple_music:artist-apple-1", ["artist-a"]],
+      ]),
+    });
+
+    expect(result.state).toBe("resolved_existing_authority");
+    expect(result.canonicalArtistId).toBe("artist-a");
+    expect(result.matchMethod).toBe("provider_id");
+    expect(result.confidence).toBe(100);
+    expect(result.reasons).toContain(
+      "evidence:provider:apple_music:artist-apple-1",
+    );
+  });
+
+  it("deduplicates cross-provider Artist evidence that agrees", () => {
+    const result = resolveArtistIdentityV1({
+      providerIdsJson: {
+        apple_music: ["artist-apple-1"],
+        spotify: ["artist-spotify-1"],
+      },
+      artistIdsByProviderKey: new Map([
+        ["apple_music:artist-apple-1", ["artist-a"]],
+        ["spotify:artist-spotify-1", ["artist-a"]],
+      ]),
+    });
+
+    expect(result.state).toBe("resolved_existing_authority");
+    expect(result.canonicalArtistId).toBe("artist-a");
+    expect(result.candidateArtistIds).toEqual(["artist-a"]);
+    expect(result.authorityClasses).toEqual(["provider_identity"]);
+  });
+
+  it("fails closed for duplicated or conflicting strong Artist evidence", () => {
+    const duplicated = resolveArtistIdentityV1({
+      providerIdsJson: { apple_music: ["artist-apple-1"] },
+      artistIdsByProviderKey: new Map([
+        ["apple_music:artist-apple-1", ["artist-a", "artist-b"]],
+      ]),
+    });
+
+    expect(duplicated.state).toBe("quarantined_conflict");
+    expect(duplicated.canonicalArtistId).toBeNull();
+    expect(duplicated.candidateArtistIds).toEqual([
+      "artist-a",
+      "artist-b",
+    ]);
+
+    const disagree = resolveArtistIdentityV1({
+      providerIdsJson: {
+        apple_music: ["artist-apple-1"],
+        spotify: ["artist-spotify-1"],
+      },
+      artistIdsByProviderKey: new Map([
+        ["apple_music:artist-apple-1", ["artist-a"]],
+        ["spotify:artist-spotify-1", ["artist-b"]],
+      ]),
+    });
+
+    expect(disagree.state).toBe("quarantined_conflict");
+    expect(disagree.canonicalArtistId).toBeNull();
+  });
+
+  it("follows Artist lineage and fails closed on split lineage", () => {
+    const successor = resolveArtistIdentityV1({
+      providerIdsJson: { apple_music: ["artist-old"] },
+      artistIdsByProviderKey: new Map([
+        ["apple_music:artist-old", ["artist-source"]],
+      ]),
+      lineageByArtistId: new Map([
+        [
+          "artist-source",
+          {
+            status: "successor",
+            currentArtistIds: ["artist-current"],
+          },
+        ],
+      ]),
+    });
+
+    expect(successor.state).toBe("resolved_existing_authority");
+    expect(successor.sourceArtistIds).toEqual(["artist-source"]);
+    expect(successor.canonicalArtistId).toBe("artist-current");
+
+    const split = resolveArtistIdentityV1({
+      providerIdsJson: { apple_music: ["artist-old"] },
+      artistIdsByProviderKey: new Map([
+        ["apple_music:artist-old", ["artist-source"]],
+      ]),
+      lineageByArtistId: new Map([
+        [
+          "artist-source",
+          {
+            status: "split",
+            currentArtistIds: ["artist-a", "artist-b"],
+          },
+        ],
+      ]),
+    });
+
+    expect(split.state).toBe("quarantined_conflict");
+    expect(split.canonicalArtistId).toBeNull();
+  });
+
+  it("keeps Artist name or alias evidence outside provider identity resolution", () => {
+    const result = resolveArtistIdentityV1({});
+
+    expect(result.state).toBe("unresolved");
+    expect(result.canonicalArtistId).toBeNull();
+    expect(result.reasons).toEqual([
+      "No exact Registry Artist match from provider identity.",
     ]);
   });
 
