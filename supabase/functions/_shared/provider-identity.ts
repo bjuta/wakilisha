@@ -281,6 +281,14 @@ export function normalizeIsrc(value: unknown): string {
     .replace(/[^A-Z0-9]+/g, "");
 }
 
+export function normalizeUpc(value: unknown): string {
+  const normalized = scalarText(value)
+    .trim()
+    .replace(/[-\s]+/g, "");
+
+  return /^[0-9]{8,14}$/.test(normalized) ? normalized : "";
+}
+
 export function providerBindingLookupKey(
   providerRaw: unknown,
   providerObjectIdRaw: unknown,
@@ -505,6 +513,49 @@ function lineageResult(
   };
 }
 
+export type ReleaseIdBucketV1 = readonly string[] | ReadonlySet<string>;
+
+export type ReleaseIdIndexV1 =
+  | ReadonlyMap<string, ReleaseIdBucketV1>
+  | Readonly<Record<string, ReleaseIdBucketV1>>;
+
+export type ReleaseLineageResolutionV1 = {
+  status:
+    | "current"
+    | "successor"
+    | "split"
+    | "retired"
+    | "missing"
+    | "cycle"
+    | "ambiguous"
+    | string;
+  currentReleaseIds?: readonly string[];
+};
+
+export type ReleaseLineageIndexV1 =
+  | ReadonlyMap<string, ReleaseLineageResolutionV1>
+  | Readonly<Record<string, ReleaseLineageResolutionV1>>;
+
+export type ResolveReleaseIdentityInputV1 = {
+  upc?: unknown;
+  providerIdsJson?: unknown;
+  releaseIdsByUpc?: ReleaseIdIndexV1;
+  releaseIdsByProviderKey?: ReleaseIdIndexV1;
+  lineageByReleaseId?: ReleaseLineageIndexV1;
+};
+
+export type ReleaseIdentityResolutionV1 = {
+  contractVersion: typeof PROVIDER_IDENTITY_CONTRACT_VERSION;
+  state: TrackResolutionStateV1;
+  canonicalReleaseId: string | null;
+  sourceReleaseIds: string[];
+  candidateReleaseIds: string[];
+  matchMethod: "upc" | "provider_id" | "no_match";
+  confidence: number;
+  reasons: string[];
+  authorityClasses: Array<"provider_identity" | "upc">;
+};
+
 export function resolveTrackIdentityV1(
   input: ResolveTrackIdentityInputV1,
 ): TrackIdentityResolutionV1 {
@@ -689,6 +740,260 @@ export function resolveTrackIdentityV1(
     canonicalTrackId: sortedCandidateTrackIds[0],
     sourceTrackIds: sortedSourceTrackIds,
     candidateTrackIds: sortedCandidateTrackIds,
+    matchMethod,
+    confidence,
+    reasons,
+    authorityClasses: [...authorityClasses].sort(),
+  };
+}
+
+
+function releaseLineageResult(
+  sourceReleaseId: string,
+  lineageByReleaseId: ReleaseLineageIndexV1 | undefined,
+): {
+  kind: "current" | "retired" | "review" | "conflict";
+  currentReleaseIds: string[];
+  reason?: string;
+} {
+  const lineage = indexGet(lineageByReleaseId, sourceReleaseId);
+  if (!lineage) {
+    return {
+      kind: "current",
+      currentReleaseIds: [sourceReleaseId],
+    };
+  }
+
+  const currentReleaseIds = [
+    ...new Set(
+      (lineage.currentReleaseIds ?? [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  ].sort();
+
+  if (
+    (lineage.status === "current" || lineage.status === "successor") &&
+    currentReleaseIds.length === 1
+  ) {
+    return {
+      kind: "current",
+      currentReleaseIds,
+      reason:
+        currentReleaseIds[0] === sourceReleaseId
+          ? undefined
+          : `lineage:${sourceReleaseId}->${currentReleaseIds[0]}`,
+    };
+  }
+
+  if (lineage.status === "current" && currentReleaseIds.length === 0) {
+    return {
+      kind: "current",
+      currentReleaseIds: [sourceReleaseId],
+    };
+  }
+
+  if (lineage.status === "retired" && currentReleaseIds.length === 0) {
+    return {
+      kind: "retired",
+      currentReleaseIds: [],
+      reason: `lineage:${sourceReleaseId}:retired`,
+    };
+  }
+
+  if (lineage.status === "missing") {
+    return {
+      kind: "review",
+      currentReleaseIds: [],
+      reason: `lineage:${sourceReleaseId}:missing`,
+    };
+  }
+
+  return {
+    kind: "conflict",
+    currentReleaseIds,
+    reason: `lineage:${sourceReleaseId}:${lineage.status || "ambiguous"}`,
+  };
+}
+
+export function resolveReleaseIdentityV1(
+  input: ResolveReleaseIdentityInputV1,
+): ReleaseIdentityResolutionV1 {
+  const sourceReleaseIds = new Set<string>();
+  const reasons: string[] = [];
+  const authorityClasses = new Set<"provider_identity" | "upc">();
+  let matchMethod: "upc" | "provider_id" | "no_match" = "no_match";
+  let confidence = 0;
+
+  const upc = normalizeUpc(input.upc);
+  if (upc) {
+    const releaseIds = bucketValues(
+      indexGet(input.releaseIdsByUpc, upc),
+    );
+    if (releaseIds.length > 0) {
+      matchMethod = "upc";
+      confidence = 100;
+      authorityClasses.add("upc");
+      reasons.push(`evidence:upc:${upc}`);
+      for (const releaseId of releaseIds) sourceReleaseIds.add(releaseId);
+    }
+  }
+
+  const providerIds = normalizedProviderIdsFromJson(input.providerIdsJson);
+  for (const [provider, ids] of Object.entries(providerIds)) {
+    for (const id of ids) {
+      const bindingKey = providerBindingLookupKey(provider, id);
+      const releaseIds = bucketValues(
+        indexGet(input.releaseIdsByProviderKey, bindingKey),
+      );
+      if (releaseIds.length === 0) continue;
+
+      if (matchMethod === "no_match") matchMethod = "provider_id";
+      confidence = 100;
+      authorityClasses.add("provider_identity");
+      reasons.push(`evidence:provider:${provider}:${id}`);
+      for (const releaseId of releaseIds) sourceReleaseIds.add(releaseId);
+    }
+  }
+
+  const sortedSourceReleaseIds = [...sourceReleaseIds].sort();
+
+  if (sortedSourceReleaseIds.length === 0) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "unresolved",
+      canonicalReleaseId: null,
+      sourceReleaseIds: [],
+      candidateReleaseIds: [],
+      matchMethod: "no_match",
+      confidence: 0,
+      reasons: [
+        "No exact Registry Release match from UPC/EAN or provider identity.",
+      ],
+      authorityClasses: [],
+    };
+  }
+
+  const candidateReleaseIds = new Set<string>();
+  let retiredCount = 0;
+  let reviewCount = 0;
+  let conflictCount = 0;
+
+  for (const sourceReleaseId of sortedSourceReleaseIds) {
+    const lineage = releaseLineageResult(
+      sourceReleaseId,
+      input.lineageByReleaseId,
+    );
+
+    if (lineage.reason) reasons.push(lineage.reason);
+
+    if (lineage.kind === "retired") {
+      retiredCount++;
+      continue;
+    }
+    if (lineage.kind === "review") {
+      reviewCount++;
+      continue;
+    }
+    if (lineage.kind === "conflict") {
+      conflictCount++;
+      continue;
+    }
+
+    for (const currentReleaseId of lineage.currentReleaseIds) {
+      candidateReleaseIds.add(currentReleaseId);
+    }
+  }
+
+  const sortedCandidateReleaseIds = [...candidateReleaseIds].sort();
+  for (const releaseId of sortedCandidateReleaseIds) {
+    reasons.push(`candidate_release:${releaseId}`);
+  }
+
+  if (conflictCount > 0) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "quarantined_conflict",
+      canonicalReleaseId: null,
+      sourceReleaseIds: sortedSourceReleaseIds,
+      candidateReleaseIds: sortedCandidateReleaseIds,
+      matchMethod,
+      confidence,
+      reasons,
+      authorityClasses: [...authorityClasses].sort(),
+    };
+  }
+
+  if (
+    retiredCount > 0 &&
+    (sortedCandidateReleaseIds.length > 0 || reviewCount > 0)
+  ) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "quarantined_conflict",
+      canonicalReleaseId: null,
+      sourceReleaseIds: sortedSourceReleaseIds,
+      candidateReleaseIds: sortedCandidateReleaseIds,
+      matchMethod,
+      confidence,
+      reasons,
+      authorityClasses: [...authorityClasses].sort(),
+    };
+  }
+
+  if (
+    retiredCount === sortedSourceReleaseIds.length &&
+    sortedCandidateReleaseIds.length === 0
+  ) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "superseded_external_reference",
+      canonicalReleaseId: null,
+      sourceReleaseIds: sortedSourceReleaseIds,
+      candidateReleaseIds: [],
+      matchMethod,
+      confidence,
+      reasons,
+      authorityClasses: [...authorityClasses].sort(),
+    };
+  }
+
+  if (reviewCount > 0) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "review_required",
+      canonicalReleaseId: null,
+      sourceReleaseIds: sortedSourceReleaseIds,
+      candidateReleaseIds: sortedCandidateReleaseIds,
+      matchMethod,
+      confidence,
+      reasons,
+      authorityClasses: [...authorityClasses].sort(),
+    };
+  }
+
+  if (sortedCandidateReleaseIds.length !== 1) {
+    return {
+      contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+      state: "quarantined_conflict",
+      canonicalReleaseId: null,
+      sourceReleaseIds: sortedSourceReleaseIds,
+      candidateReleaseIds: sortedCandidateReleaseIds,
+      matchMethod,
+      confidence,
+      reasons,
+      authorityClasses: [...authorityClasses].sort(),
+    };
+  }
+
+  return {
+    contractVersion: PROVIDER_IDENTITY_CONTRACT_VERSION,
+    state: authorityClasses.has("provider_identity")
+      ? "resolved_existing_authority"
+      : "deterministic_candidate",
+    canonicalReleaseId: sortedCandidateReleaseIds[0],
+    sourceReleaseIds: sortedSourceReleaseIds,
+    candidateReleaseIds: sortedCandidateReleaseIds,
     matchMethod,
     confidence,
     reasons,
