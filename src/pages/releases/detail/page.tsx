@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkButton } from "@/components/design-system/primitives/Button";
@@ -45,48 +45,56 @@ export default function ReleaseDetail() {
 
   const { ref: artistRef, revealed: artistRevealed } = useScrollReveal<HTMLDivElement>(0.1);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    let alive = true;
     if (!artistSlug || !releaseSlug) {
       setStatus("error");
       setError("We need an artist and release before we can open this shelf.");
       return;
     }
+
     setStatus("loading");
     setError(null);
-    try {
-      const [data, allReleases] = await Promise.all([
-        getRelease(artistSlug, releaseSlug),
-        listReleases(),
-      ]);
-      if (data) {
+    setRelease(null);
+    setRelated([]);
+
+    // The canonical Release aggregate owns the primary paint. The complete
+    // catalog is optional related-content discovery, never a render gate.
+    getRelease(artistSlug, releaseSlug)
+      .then((data) => {
+        if (!alive) return;
+        if (!data) {
+          setStatus("error");
+          setError("We do not have this release page ready yet.");
+          return;
+        }
         if (data.trackCount <= 1) {
           setStatus("error");
           setError("This single lives on its Track page.");
           return;
         }
-
         setRelease(data);
-        const rel = allReleases
-          .filter((r) => r.slug !== releaseSlug && (r.artist === data.artist || r.labelName === data.labelName || r.releaseType === data.releaseType))
-          .slice(0, 4);
-        setRelated(rel);
         setStatus("ready");
-        return;
-      }
-    } catch (err) {
-      console.error("Release fetch failed:", err);
-    }
-    setStatus("error");
-    setError("We do not have this release page ready yet.");
-  }, [artistSlug, releaseSlug]);
+        // A failure or slow full Registry catalogue must never conceal an
+        // otherwise valid Release, its real Track list, or provenance.
+        void listReleases()
+          .then((allReleases) => {
+            if (!alive) return;
+            setRelated(allReleases
+              .filter((r) => r.slug !== releaseSlug && (r.artist === data.artist || r.labelName === data.labelName || r.releaseType === data.releaseType))
+              .slice(0, 4));
+          })
+          .catch((error) => console.warn("Related Release discovery unavailable:", error));
+      })
+      .catch((error) => {
+        if (!alive) return;
+        console.error("Release fetch failed:", error);
+        setStatus("error");
+        setError("We do not have this release page ready yet.");
+      });
 
-  useEffect(() => {
-    let alive = true;
-    load().then(() => {
-      if (!alive) return;
-    });
     return () => { alive = false; };
-  }, [load]);
+  }, [artistSlug, releaseSlug]);
 
   if (status === "loading") {
     return (
