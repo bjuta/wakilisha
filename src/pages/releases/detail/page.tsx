@@ -8,7 +8,7 @@ import type { MusicAlbumSchema } from "@/components/seo/SchemaOrg";
 import { buildReleaseSchemaArtists } from "@/services/publicContent/releaseStructuredData";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
-import { getRelease, listReleases, releaseUrl, slugify, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
+import { getRelease, listReleases, releaseUrl, type PublicReleaseDetail, type PublicRelease } from "@/services/publicContent/client";
 import { buildReleaseSeoDescription, releaseEmptyStateCopy } from "@/services/cultureContext/releaseAdapters";
 import ReleaseDetailHero from "./components/ReleaseDetailHero";
 import ReleaseTracklist from "./components/ReleaseTracklist";
@@ -114,6 +114,12 @@ export default function ReleaseDetail() {
       </main>
     );
   }
+
+  // Only an active Registry Artist identity may own a public profile link.
+  // Display names and unresolved text-only credits are not route authority.
+  const canonicalPrimaryArtist = release.artists.find(
+    (artist) => artist.isPrimary && artist.artistId && artist.artistType && artist.slug,
+  );
 
   const minutes = release.totalDuration ? Math.round(release.totalDuration / 60) : release.trackCount * 3;
   const chartStats = release.chartStats;
@@ -307,13 +313,15 @@ export default function ReleaseDetail() {
                       Start here if this release put you on.
                     </div>
                   </div>
-                  <Link
-                    to={`/artists/${slugify(release.artist)}`}
-                    className="inline-flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-2.5 text-[13px] font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap"
-                  >
-                    View artist
-                    <WkIcon name="ArrowUpRight" size={13} />
-                  </Link>
+                  {canonicalPrimaryArtist && (
+                    <Link
+                      to={`/artists/${canonicalPrimaryArtist.slug}`}
+                      className="inline-flex items-center gap-2 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-2.5 text-[13px] font-bold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] transition-colors whitespace-nowrap"
+                    >
+                      View artist
+                      <WkIcon name="ArrowUpRight" size={13} />
+                    </Link>
+                  )}
                 </div>
               </section>
             </div>
