@@ -19,5 +19,10 @@ describe("public Artist aliases and Recording route authority", () => {
     expect(search).not.toContain("slugify(entry.artist)");
     expect(chart).not.toContain("slugify(track.artist)");
     expect(chart).toContain("artistSlug ? [artistSlug] : []");
+    expect(search).toContain("entry.artistSlug");
+    const chartSearch = readFileSync("src/hooks/useChartSearchData.ts", "utf8");
+    expect(chartSearch).toContain("mainArtistSlugByTrack");
+    expect(chartSearch).toContain('from("registry_track_artists")');
+    expect(chartSearch).toContain('from("registry_artists")');
   });
 });
