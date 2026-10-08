@@ -22,7 +22,7 @@ describe("public Artist discography batching authority", () => {
     expect(handler).toContain("primaryByRelease");
     expect(handler).toContain("credit.is_primary");
     expect(handler).toContain('order("disc_number").order("track_number")');
-    expect(handler).toContain("tracks: tracks");
+    expect(handler).toContain("trackCount: tracks.length");
     expect(handler).toContain("appearsOn");
   });
 });
