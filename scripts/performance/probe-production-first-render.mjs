@@ -22,6 +22,10 @@ for (const url of targets) {
     const page = await context.newPage();
     const responses = [];
     const failures = [];
+    const runtimeErrors = [];
+    const snapshots = [];
+    page.on("pageerror", (e) => runtimeErrors.push(String(e).slice(0, 500)));
+    page.on("console", (msg) => { if (msg.type() === "error") runtimeErrors.push(msg.text().slice(0, 500)); });
     page.on("response", (r) => {
       if (r.url().includes("wakilisha.africa") || r.url().includes("supabase.co")) {
         responses.push({ status: r.status(), url: r.url().slice(0, 240), resourceType: r.request().resourceType() });
@@ -42,7 +46,14 @@ for (const url of targets) {
     let error = null;
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(4000);
+      await page.waitForTimeout(2000);
+      snapshots.push(await page.evaluate(() => ({ at: Math.round(performance.now()), text: (document.querySelector("#root")?.innerText || "").slice(0, 220), len: document.querySelector("#root")?.innerText?.length || 0 })));
+      await page.waitForTimeout(2000);
+      snapshots.push(await page.evaluate(() => ({ at: Math.round(performance.now()), text: (document.querySelector("#root")?.innerText || "").slice(0, 220), len: document.querySelector("#root")?.innerText?.length || 0 })));
+      if (snapshots.at(-1)?.len < 300) {
+        await page.waitForTimeout(4000);
+        snapshots.push(await page.evaluate(() => ({ at: Math.round(performance.now()), text: (document.querySelector("#root")?.innerText || "").slice(0, 220), len: document.querySelector("#root")?.innerText?.length || 0 })));
+      }
     } catch (e) { error = String(e); }
     const timings = await page.evaluate(() => {
       const nav = performance.getEntriesByType("navigation")[0];
@@ -55,7 +66,9 @@ for (const url of targets) {
         const k = r.initiatorType || "other";
         byType[k] = (byType[k] || 0) + 1;
       }
+      const slowResources = resources.filter((r) => /supabase\\.co|wakilisha\\.africa/.test(r.name)).map((r) => ({ path: (() => { try { const u = new URL(r.name); return u.host + u.pathname; } catch { return r.name.slice(0, 100); } })(), ms: Math.round(r.duration), start: Math.round(r.startTime), type: r.initiatorType })).sort((a, b) => b.ms - a.ms).slice(0, 12);
       return {
+        slowResources,
         ttfb: nav ? Math.round(nav.responseStart - nav.requestStart) : null,
         responseEnd: nav ? Math.round(nav.responseEnd) : null,
         domContentLoaded: nav ? Math.round(nav.domContentLoadedEventEnd) : null,
@@ -68,7 +81,7 @@ for (const url of targets) {
         rootTextLength: document.getElementById("root")?.innerText?.length || 0,
       };
     }).catch(() => ({}));
-    const result = { url, profile, error, ...timings, failingRequests: failures.slice(0, 10),
+    const result = { url, profile, error, snapshots, runtimeErrors: runtimeErrors.slice(0, 10), ...timings, failingRequests: failures.slice(0, 10),
       httpErrors: responses.filter((r) => r.status >= 400).slice(0, 10),
       apiResponses: responses.filter((r) => /supabase.co|\/api\//.test(r.url)).slice(0, 15) };
     output.push(result);
