@@ -1909,8 +1909,11 @@ Deno.serve(async (req) => {
       if (urlArtistSlug) { const { data: releaseArtist } = await supabase.from("registry_release_artists").select("artist_slug").eq("release_id", String(release.id)).eq("artist_slug", urlArtistSlug).eq("is_primary", true).eq("status", "active").maybeSingle(); if (!releaseArtist) return jsonResponse({ data: null, meta: { reason: "release_not_found_for_artist" } }, origin, 404); }
       const releaseId = String(release.id);
       const releaseMeta = (release.metadata || {}) as Record<string, unknown>;
-      const { data: releaseTracks } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", releaseId).eq("status", "active").order("track_number", { ascending: true });
-      const { data: releaseArtists } = await supabase.from("registry_release_artists").select("artist_id, artist_name_text, display_credit, is_primary, is_featured, artist_slug, credit_order").eq("release_id", releaseId).eq("status", "active").order("credit_order", { ascending: true }).limit(20);
+      // Track membership and Release Artist credits are independent canonical reads.
+      const [{ data: releaseTracks }, { data: releaseArtists }] = await Promise.all([
+        supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", releaseId).eq("status", "active").order("track_number", { ascending: true }),
+        supabase.from("registry_release_artists").select("artist_id, artist_name_text, display_credit, is_primary, is_featured, artist_slug, credit_order").eq("release_id", releaseId).eq("status", "active").order("credit_order", { ascending: true }).limit(20),
+      ]);
       const releaseArtistIds = [...new Set(
         (releaseArtists ?? [])
           .map((row: any) => String(row.artist_id || "").trim())
@@ -1970,9 +1973,12 @@ Deno.serve(async (req) => {
       let trackList: any[] = [];
       if (releaseTracks && releaseTracks.length > 0) {
         const trackIds = releaseTracks.map((rt: any) => String(rt.track_id));
-        const { data: tracks } = await supabase.from("registry_tracks").select("id, slug, title, duration_ms, track_number, artwork_url, preview_url, metadata").in("id", trackIds).eq("status", "active");
+        // Track entities and their ordered credits do not depend on one another.
+        const [{ data: tracks }, { data: trackArtistRows }] = await Promise.all([
+          supabase.from("registry_tracks").select("id, slug, title, duration_ms, track_number, artwork_url, preview_url, metadata").in("id", trackIds).eq("status", "active"),
+          supabase.from("registry_track_artists").select("track_id, artist_name_text, display_credit, artist_slug, is_primary, is_featured, credit_order").in("track_id", trackIds).eq("status", "active").order("credit_order", { ascending: true }),
+        ]);
         const trackById = new Map((tracks ?? []).map((t: any) => [String(t.id), t]));
-        const { data: trackArtistRows } = await supabase.from("registry_track_artists").select("track_id, artist_name_text, display_credit, artist_slug, is_primary, is_featured, credit_order").in("track_id", trackIds).eq("status", "active").order("credit_order", { ascending: true });
         const artistsByTrackId = new Map<string, Array<{ name: string; slug: string; isPrimary: boolean; isFeatured: boolean }>>();
         for (const ta of (trackArtistRows ?? [])) { const tid = String(ta.track_id); if (!artistsByTrackId.has(tid)) artistsByTrackId.set(tid, []); artistsByTrackId.get(tid)!.push({ name: String(ta.display_credit || ta.artist_name_text || ta.artist_slug || ""), slug: String(ta.artist_slug || ""), isPrimary: Boolean(ta.is_primary), isFeatured: Boolean(ta.is_featured) }); }
         for (const ta of (trackArtistRows ?? [])) {
