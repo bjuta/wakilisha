@@ -78,12 +78,13 @@ begin
   v_current_fingerprint:=
     platform_private.registry_subject_state_fingerprint('track',p_track_id);
 
-  if v_current_fingerprint<>p_expected_track_state_fingerprint then
+  if v_current_fingerprint is distinct from p_expected_track_state_fingerprint then
     raise exception using errcode='40001',
       message='WK_STALE_TRACK_IDENTITY: Track state changed before review materialization.';
   end if;
 
-  if v_track.slug !~ '(^|-)(feat|ft|featuring)(-|$)' then
+  if v_track.slug is null
+     or v_track.slug !~ '(^|-)(feat|ft|featuring)(-|$)' then
     raise exception using errcode='23514',
       message='Track is outside feature-bearing semantic-debt review materialization.';
   end if;
