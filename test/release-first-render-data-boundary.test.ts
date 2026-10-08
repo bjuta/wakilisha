@@ -10,5 +10,6 @@ describe("Release first render public data boundary", () => {
     expect(method).toContain("if (!result.release)");
     expect(method).toContain("result.release.musicProvenance");
     expect(method).toContain("encodeURIComponent(artistSlug)");
+    expect(method).toContain("return registryRelease ? await enrichReleaseMedia(registryRelease)");
   });
 });
