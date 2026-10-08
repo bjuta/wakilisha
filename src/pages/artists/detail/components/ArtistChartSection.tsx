@@ -5,7 +5,6 @@ import { usePlayer } from "@/context/PlayerContext";
 import { getTrack } from "@/services/publicApi/client";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { trackUrl } from "@/utils/trackUrl";
-import { slugify } from "@/services/publicContent/client";
 
 interface ChartEntry {
   rank: number;
@@ -397,7 +396,7 @@ function TrackChartRow({
           <div className="flex items-center gap-2 mb-0.5">
             {trackSlug ? (
               <Link
-                to={trackUrl(track.slug, [slugify(track.artist)])}
+                to={trackUrl(track.slug, artistSlug ? [artistSlug] : [])}
                 onClick={(e) => e.stopPropagation()}
                 className="truncate text-[14px] md:text-[15px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors"
               >
