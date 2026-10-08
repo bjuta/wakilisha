@@ -391,7 +391,7 @@ export default function Search() {
                         <div className="w-6 text-right text-[14px] font-black text-[var(--wk-brand)]">{entry.rank}</div>
                         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]"><img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" /></div>
                         <div className="min-w-0 flex-1">
-                          <span className="text-[13px] font-bold text-[var(--wk-text)]">{highlight(entry.title, query)}</span>
+                          {entry.artistSlug ? <Link to={trackUrl(entry.slug, [entry.artistSlug])} onClick={() => handleResultClick("chart_entry", entry.slug, idx + 1)} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(entry.title, query)}</Link> : <span className="text-[13px] font-bold text-[var(--wk-text)]">{highlight(entry.title, query)}</span>}
                           <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(entry.artist, query)}</div>
                           {entry.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(entry.contextText, query)}</p>}
                         </div>
@@ -399,7 +399,7 @@ export default function Search() {
                           registryTrackId={entry.canonicalTrackId}
                           trackTitle={entry.title}
                           artistName={entry.artist}
-                          artistSlug={""}
+                          artistSlug={entry.artistSlug || undefined}
                           artworkUrl={entry.artworkUrl}
                           trackSlug={entry.slug}
                         />
