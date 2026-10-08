@@ -267,6 +267,11 @@ export default function ArtistDetail() {
         fullResolved = true;
         setArtist(full);
         setStatus("ready");
+        // Discography "appears on" is supplemental and can be very slow.
+        // Do not compete with the primary Artist profile response for bandwidth.
+        getArtistAppearsOn(slug)
+          .then((items) => { if (alive) setAppearsOn(items); })
+          .catch(() => { if (alive) setAppearsOn([]); });
       })
       .catch((err) => {
         if (!alive) return;
@@ -274,9 +279,6 @@ export default function ArtistDetail() {
         if (!coreResolved) setStatus("error");
       });
 
-    getArtistAppearsOn(slug)
-      .then((items) => { if (alive) setAppearsOn(items); })
-      .catch(() => { if (alive) setAppearsOn([]); });
     getArtistRegisteredGenres(slug)
       .then((genres) => { if (alive) setRegisteredGenres(genres); })
       .catch(() => { if (alive) setRegisteredGenres([]); });
