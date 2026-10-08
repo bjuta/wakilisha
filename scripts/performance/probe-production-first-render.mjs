@@ -8,7 +8,7 @@ const targets = [
   "https://wakilisha.africa/artists/lil-maina",
   "https://wakilisha.africa/releases/munishi/munishi-vol-3",
 ];
-// Recheck live Production after Edge v99; frontend deploy state remains independent.
+// Recheck live Production after approved frontend deployment at 17460ae8.
 const browser = await chromium.launch({ headless: true });
 const output = [];
 for (const url of targets) {
