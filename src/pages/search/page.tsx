@@ -5,7 +5,6 @@ import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { ArtistCard } from "@/components/design-system/registry/ArtistCard";
 import { ReleaseCard } from "@/components/design-system/registry/ReleaseCard";
-import { slugify } from "@/services/publicContent/client";
 import { useArtistSearchSuggestions } from "@/hooks/useArtistSearchSuggestions";
 import {
   usePublicRegistrySearch,
@@ -356,7 +355,7 @@ export default function Search() {
                             <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" />
                           </PlayableArtwork>
                           <div className="min-w-0 flex-1">
-                            <Link to={trackUrl(track.slug, [track.artistSlug || slugify(track.artist)])} onClick={() => handleResultClick("track", track.slug, idx + 1)} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(track.title, query)}</Link>
+                            {track.artistSlug ? <Link to={trackUrl(track.slug, [track.artistSlug])} onClick={() => handleResultClick("track", track.slug, idx + 1)} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(track.title, query)}</Link> : <span className="text-[13px] font-bold text-[var(--wk-text)]">{highlight(track.title, query)}</span>}
                             {meta && <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(meta, query)}</div>}
                             {track.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(track.contextText, query)}</p>}
                           </div>
@@ -392,7 +391,7 @@ export default function Search() {
                         <div className="w-6 text-right text-[14px] font-black text-[var(--wk-brand)]">{entry.rank}</div>
                         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]"><img src={entry.artworkUrl} alt="" className="h-full w-full object-cover" /></div>
                         <div className="min-w-0 flex-1">
-                          <Link to={trackUrl(entry.slug, [slugify(entry.artist)])} onClick={() => handleResultClick("chart_entry", entry.slug, idx + 1)} className="text-[13px] font-bold text-[var(--wk-text)] hover:underline">{highlight(entry.title, query)}</Link>
+                          <span className="text-[13px] font-bold text-[var(--wk-text)]">{highlight(entry.title, query)}</span>
                           <div className="text-[11px] text-[var(--wk-text-muted)]">{highlight(entry.artist, query)}</div>
                           {entry.contextText && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[var(--wk-text-soft)]">{highlight(entry.contextText, query)}</p>}
                         </div>
@@ -400,7 +399,7 @@ export default function Search() {
                           registryTrackId={entry.canonicalTrackId}
                           trackTitle={entry.title}
                           artistName={entry.artist}
-                          artistSlug={slugify(entry.artist)}
+                          artistSlug={""}
                           artworkUrl={entry.artworkUrl}
                           trackSlug={entry.slug}
                         />
