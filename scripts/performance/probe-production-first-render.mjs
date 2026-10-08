@@ -33,6 +33,34 @@ for (const url of targets) {
       }
     });
     page.on("requestfailed", (r) => failures.push({ url: r.url().slice(0, 240), failure: r.failure() }));
+    const releaseNetwork = [];
+    if (url.includes("/releases/")) {
+      page.on("request", (request) => {
+        if (!request.url().includes("/functions/v1/public-content-read/releases/")) return;
+        releaseNetwork.push({ endpoint: new URL(request.url()).pathname, startAt: Date.now(), status: null, responseAt: null, doneAt: null });
+      });
+      page.on("response", (response) => {
+        if (!response.url().includes("/functions/v1/public-content-read/releases/")) return;
+        const record = [...releaseNetwork].reverse().find((item) => item.status === null);
+        if (record) { record.status = response.status(); record.responseAt = Date.now(); }
+      });
+      page.on("requestfinished", (request) => {
+        if (!request.url().includes("/functions/v1/public-content-read/releases/")) return;
+        const record = [...releaseNetwork].reverse().find((item) => item.doneAt === null);
+        if (record) record.doneAt = Date.now();
+      });
+    }
+    const releasePaintSnapshots = [];
+    const takeReleaseSnapshot = async (label) => {
+      if (!url.includes("/releases/")) return;
+      releasePaintSnapshots.push(await page.evaluate((label) => ({
+        label, at: Math.round(performance.now()),
+        rootChars: document.querySelector("#root")?.innerText?.length || 0,
+        releaseTitleVisible: (document.querySelector("#root")?.innerText || "").includes("Munishi, Vol. 3"),
+        releaseLoadingVisible: /Opening release|LOADING RELEASE/i.test(document.querySelector("#root")?.innerText || ""),
+        trackListVisible: (document.querySelector("#root")?.innerText || "").includes("12 tracks"),
+      }), label));
+    };
     await page.addInitScript(() => {
       window.__wkPerf = { lcp: [], longTasks: [] };
       try {
@@ -48,11 +76,14 @@ for (const url of targets) {
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
       await page.waitForTimeout(2000);
+      await takeReleaseSnapshot("first");
       snapshots.push(await page.evaluate(() => ({ at: Math.round(performance.now()), text: (document.querySelector("#root")?.innerText || "").slice(0, 220), len: document.querySelector("#root")?.innerText?.length || 0 })));
       await page.waitForTimeout(2000);
       snapshots.push(await page.evaluate(() => ({ at: Math.round(performance.now()), text: (document.querySelector("#root")?.innerText || "").slice(0, 220), len: document.querySelector("#root")?.innerText?.length || 0 })));
+      await takeReleaseSnapshot("second");
       if (snapshots.at(-1)?.len < 300) {
         await page.waitForTimeout(4000);
+        await takeReleaseSnapshot("extended");
         snapshots.push(await page.evaluate(() => ({ at: Math.round(performance.now()), text: (document.querySelector("#root")?.innerText || "").slice(0, 220), len: document.querySelector("#root")?.innerText?.length || 0 })));
       }
     } catch (e) { error = String(e); }
@@ -82,7 +113,7 @@ for (const url of targets) {
         rootTextLength: document.getElementById("root")?.innerText?.length || 0,
       };
     }).catch(() => ({}));
-    const result = { url, profile, error, snapshots, runtimeErrors: runtimeErrors.slice(0, 10), ...timings, failingRequests: failures.slice(0, 10),
+    const result = { url, profile, error, snapshots, releaseNetwork: releaseNetwork.map((r) => ({ ...r, totalMs: r.doneAt && r.startAt ? r.doneAt - r.startAt : null })), releasePaintSnapshots, runtimeErrors: runtimeErrors.slice(0, 10), ...timings, failingRequests: failures.slice(0, 10),
       httpErrors: responses.filter((r) => r.status >= 400).slice(0, 10),
       apiResponses: responses.filter((r) => /supabase.co|\/api\//.test(r.url)).slice(0, 15) };
     output.push(result);
