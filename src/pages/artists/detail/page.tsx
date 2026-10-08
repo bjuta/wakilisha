@@ -211,7 +211,7 @@ export default function ArtistDetail() {
   const [appearsOn, setAppearsOn] = useState<RegistryAppearsOnRelease[]>([]);
   const [relationships, setRelationships] = useState<PublicArtistRelationship[]>([]);
   const [artistAuthority, setArtistAuthority] = useState<ArtistPublicAuthority | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "core" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [postsRevision, setPostsRevision] = useState(0);
   const [activeTab, setActiveTab] =
@@ -233,36 +233,53 @@ export default function ArtistDetail() {
 
     clearDiscographyCache(slug);
 
-    Promise.all([
-      getArtist(slug),
-      getArtistAppearsOn(slug).catch(() => [] as RegistryAppearsOnRelease[]),
-      getArtistRegisteredGenres(slug),
-    ])
-      .then(([data, registryAppearsOn, genres]) => {
+    let fullResolved = false;
+    let coreResolved = false;
+    // Real Registry identity is fast, even when full Discography or provenance
+    // needs longer. Never present empty music collections as complete.
+    getArtist(slug, { core: true })
+      .then((core) => {
+        if (!alive || fullResolved || !core) return;
+        if (core.slug && core.slug !== slug) {
+          navigate(`/artists/${core.slug}`, { replace: true });
+          return;
+        }
+        coreResolved = true;
+        setArtist(core);
+        setStatus("core");
+      })
+      .catch(() => { /* Full profile remains the existing fallback. */ });
+
+    getArtist(slug)
+      .then((full) => {
         if (!alive) return;
-        if (!data) {
-          setStatus("error");
-          setError("Artist not found.");
+        if (!full) {
+          if (!coreResolved) {
+            setStatus("error");
+            setError("Artist not found.");
+          }
           return;
         }
-
-        // A reviewed alias is an inbound lookup, never the public profile URL.
-        // Re-enter via the canonical Artist route before loading dependent sections.
-        if (data.slug && data.slug !== slug) {
-          navigate(`/artists/${data.slug}`, { replace: true });
+        if (full.slug && full.slug !== slug) {
+          navigate(`/artists/${full.slug}`, { replace: true });
           return;
         }
-
-        setAppearsOn(registryAppearsOn);
-        setArtist(data);
-        setRegisteredGenres(genres);
+        fullResolved = true;
+        setArtist(full);
         setStatus("ready");
       })
       .catch((err) => {
         if (!alive) return;
         setError(err instanceof Error ? err.message : "Could not load artist.");
-        setStatus("error");
+        if (!coreResolved) setStatus("error");
       });
+
+    getArtistAppearsOn(slug)
+      .then((items) => { if (alive) setAppearsOn(items); })
+      .catch(() => { if (alive) setAppearsOn([]); });
+    getArtistRegisteredGenres(slug)
+      .then((genres) => { if (alive) setRegisteredGenres(genres); })
+      .catch(() => { if (alive) setRegisteredGenres([]); });
     return () => { alive = false; };
   }, [slug, navigate]);
 
@@ -315,6 +332,37 @@ export default function ArtistDetail() {
           profileImageUrl={prerenderedArtistHeroSource}
           bio=""
         />
+      </div>
+    );
+  }
+
+  if (status === "core" && artist) {
+    return (
+      <div className="wk-app-shell">
+        <MetaTags
+          title={`${artist.name} on WAKILISHA`}
+          description={artist.bio || `Explore ${artist.name} on WAKILISHA.`}
+          imageUrl={artist.profileImageUrl || artist.imageUrl}
+          type="website"
+        />
+        <ArtistDetailHero
+          name={artist.name}
+          artistId={artist.id}
+          slug={artist.slug}
+          userId={!user.loading ? user.id : undefined}
+          imageUrl={artist.imageUrl}
+          profileImageUrl={artist.profileImageUrl || artist.imageUrl}
+          bio={cleanBioExcerpt(artist.fullBio || artist.bio)}
+          artistType={artist.artistType}
+          country={artist.country}
+          spotifyUrl={artist.spotifyUrl}
+          showMusicStats={false}
+        />
+        {error && (
+          <p role="alert" className="wk-container px-6 py-8 text-sm text-[var(--wk-text-muted)]">
+            Music details are temporarily unavailable. The Artist identity shown above is verified.
+          </p>
+        )}
       </div>
     );
   }
