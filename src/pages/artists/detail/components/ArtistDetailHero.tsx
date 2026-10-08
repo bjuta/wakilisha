@@ -21,6 +21,7 @@ export interface ArtistDetailHeroProps {
   trackCount?: number;
   releaseCount?: number;
   chartEntryCount?: number;
+  showMusicStats?: boolean;
   loading?: boolean;
 }
 
@@ -40,6 +41,7 @@ export function ArtistDetailHero({
   trackCount = 0,
   releaseCount = 0,
   chartEntryCount = 0,
+  showMusicStats = true,
   loading = false,
 }: ArtistDetailHeroProps) {
   const [shareOpen, setShareOpen] = useState(false);
@@ -246,7 +248,7 @@ export function ArtistDetailHero({
                 )}
               </div>
 
-              <div className="hero-text-reveal hero-text-reveal-d3 mb-5 hidden md:flex flex-wrap items-center gap-3 text-[12px] font-bold text-white/70">
+              {showMusicStats && <div className="hero-text-reveal hero-text-reveal-d3 mb-5 hidden md:flex flex-wrap items-center gap-3 text-[12px] font-bold text-white/70">
                 <span>{trackCount.toLocaleString()} tracks</span>
                 <span className="text-white/35">·</span>
                 <span>{releaseCount.toLocaleString()} releases</span>
@@ -256,7 +258,7 @@ export function ArtistDetailHero({
                     <span>{chartEntryCount.toLocaleString()} chart moments</span>
                   </>
                 )}
-              </div>
+              </div>}
 
 
 

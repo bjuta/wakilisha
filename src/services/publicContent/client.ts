@@ -1454,8 +1454,9 @@ export async function listArtists(): Promise<PublicArtist[]> {
   return await enrichArtistsMedia(mapped) as PublicArtist[];
 }
 
-export async function getArtist(slug: string): Promise<PublicArtistDetail | null> {
-  const result = await safeApiGet<{ artist: PublicArtistDetail | null }>(`/artists/${slug}`, { artist: null });
+export async function getArtist(slug: string, options: { core?: boolean } = {}): Promise<PublicArtistDetail | null> {
+  const suffix = options.core ? "?view=core" : "";
+  const result = await safeApiGet<{ artist: PublicArtistDetail | null }>(`/artists/${encodeURIComponent(slug)}${suffix}`, { artist: null });
   if (!result.artist) return null;
   const artist = result.artist;
   const mapped = {
@@ -1499,6 +1500,7 @@ export async function getArtist(slug: string): Promise<PublicArtistDetail | null
             groupMembers: [],
           },
   };
+  if (options.core) return mapped as PublicArtistDetail;
   return await enrichArtistMedia(mapped) as PublicArtistDetail;
 }
 
