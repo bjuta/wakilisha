@@ -1859,12 +1859,16 @@ async function getReleaseFromRegistry(artistSlug: string, releaseSlug: string): 
 }
 
 export async function getRelease(artistSlug: string, releaseSlug: string): Promise<PublicReleaseDetail | null> {
-  const registryRelease = await getReleaseFromRegistry(artistSlug, releaseSlug);
-  if (registryRelease) return await enrichReleaseMedia(registryRelease) as PublicReleaseDetail;
-
-  // Last resort: fall back to public API
-  const result = await safeApiGet<{ release: PublicReleaseDetail | null }>(`/releases/${artistSlug}/${releaseSlug}`, { release: null });
-  if (!result.release) return null;
+  // The public Edge read is the canonical page aggregate: ordered Tracks,
+  // active Artist identity, and Recording/Work provenance in one response.
+  // Direct browser Registry reads formerly fanned out into one provenance RPC
+  // per Track and queried private Artist columns (HTTP 401 for visitors).
+  const result = await safeApiGet<{ release: PublicReleaseDetail | null }>(`/releases/${encodeURIComponent(artistSlug)}/${encodeURIComponent(releaseSlug)}`, { release: null });
+  if (!result.release) {
+    // Preserve the legacy availability fallback for transient API failures.
+    const registryRelease = await getReleaseFromRegistry(artistSlug, releaseSlug);
+    return registryRelease ? await enrichReleaseMedia(registryRelease) as PublicReleaseDetail : null;
+  }
   const mapped = {
     ...result.release,
     artworkUrl: image(result.release.artworkUrl, { id: result.release.id, slug: result.release.slug, name: result.release.title, type: "release" }),
