@@ -1407,6 +1407,28 @@ Deno.serve(async (req) => {
       const socialSpotify = String(meta.social_spotify || "");
       const youtubeChannel = String(meta.youtube_channel || "");
       const spotifyImage = String(meta.spotify_image || meta.portrait_image || "");
+      if (url.searchParams.get("view") === "core") {
+        // The public identity must be useful without waiting for Discography,
+        // chart, provenance or related-Artist queries. Use the same exact
+        // active Registry/alias resolution above; never publish draft Artists.
+        const bio = String(meta.tagline || stripHtml(String(artist.bio || "")).split(".")[0] || displayName);
+        const heroImage = String(meta.portrait_image || artist.public_image_url || spotifyImage || "");
+        return jsonResponse({ data: { artist: {
+          id: String(artist.id), slug: String(artist.slug), name: displayName,
+          country: String(meta.country || artist.origin_iso2 || ""),
+          imageUrl: heroImage, profileImageUrl: heroImage, genres: [],
+          trackCount: 0, releaseCount: 0, isChartArtist: false,
+          isRising: false, topChartPosition: null,
+          bio, fullBio: String(artist.bio || ""), artistType: String(artist.artist_type || ""),
+          followerCount: Number(meta.spotify_followers || 0),
+          popularity: Number(meta.spotify_popularity || 0),
+          spotifyUrl: meta.spotify_artist_id ? "https://open.spotify.com/artist/" + meta.spotify_artist_id : socialSpotify,
+          instagram: socialInstagram, youtubeChannel,
+          chartEntries: [], releases: [], topSongs: [], relatedArtists: [], videos: [],
+          musicProvenance: { artistId: String(artist.id), recordingCredits: [], workCredits: [], groupMembers: [] },
+          discographySource: "deferred",
+        } } }, origin);
+      }
       const curatedGenresByArtistId = await fetchCuratedArtistGenresByArtistId(supabase, [String(artist.id)]);
       const curatedGenres = curatedGenresByArtistId.get(String(artist.id)) ?? [];
       const curatedTopSongs = await getTopSongsFromPresentationAuthority(supabase, artist.slug);
