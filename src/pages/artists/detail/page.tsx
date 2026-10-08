@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { MetaTags } from "@/components/seo/MetaTags";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
@@ -193,6 +193,7 @@ function ArtistProfileTabs({
 
 export default function ArtistDetail() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const user = useAuthUser();
   const prerenderedArtistHeroSource =
     getPrerenderedArtistHeroSource(
@@ -245,6 +246,13 @@ export default function ArtistDetail() {
           return;
         }
 
+        // A reviewed alias is an inbound lookup, never the public profile URL.
+        // Re-enter via the canonical Artist route before loading dependent sections.
+        if (data.slug && data.slug !== slug) {
+          navigate(`/artists/${data.slug}`, { replace: true });
+          return;
+        }
+
         setAppearsOn(registryAppearsOn);
         setArtist(data);
         setRegisteredGenres(genres);
@@ -256,7 +264,7 @@ export default function ArtistDetail() {
         setStatus("error");
       });
     return () => { alive = false; };
-  }, [slug]);
+  }, [slug, navigate]);
 
   useEffect(() => {
     let alive = true;
