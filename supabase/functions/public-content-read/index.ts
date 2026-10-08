@@ -1375,7 +1375,31 @@ Deno.serve(async (req) => {
 
     else if (path.startsWith("/artists/")) {
       const slug = path.replace(/^\/artists\//, "").replace(/\/$/, "");
-      const { data: artist } = await supabase.from("registry_artists").select("id, slug, display_name, artist_type, gender, origin_iso2, public_image_url, bio, status, metadata").eq("slug", slug).eq("status", "active").maybeSingle();
+      const artistColumns = "id, slug, display_name, artist_type, gender, origin_iso2, public_image_url, bio, status, metadata";
+      const { data: directArtist, error: directArtistError } = await supabase.from("registry_artists").select(artistColumns).eq("slug", slug).eq("status", "active").maybeSingle();
+      if (directArtistError) return jsonResponse({ error: "Artist resolution unavailable" }, origin, 503);
+      let artist = directArtist;
+      if (!artist) {
+        // Exact accepted alias evidence may resolve to a public canonical Artist.
+        // Never promote an alias into public Artist identity or expose a draft target.
+        const { data: aliases, error: aliasError } = await supabase
+          .from("registry_artist_aliases")
+          .select("canonical_artist_id")
+          .eq("alias_slug", slug)
+          .eq("status", "active")
+          .limit(2);
+        if (aliasError) return jsonResponse({ error: "Artist resolution unavailable" }, origin, 503);
+        if (aliases?.length === 1 && aliases[0].canonical_artist_id) {
+          const { data: canonicalArtist, error: canonicalError } = await supabase
+            .from("registry_artists")
+            .select(artistColumns)
+            .eq("id", aliases[0].canonical_artist_id)
+            .eq("status", "active")
+            .maybeSingle();
+          if (canonicalError) return jsonResponse({ error: "Artist resolution unavailable" }, origin, 503);
+          artist = canonicalArtist;
+        }
+      }
       if (!artist) return jsonResponse({ data: null }, origin, 404);
       const meta = (artist.metadata || {}) as Record<string, unknown>;
       const displayName = String(artist.display_name || "");
@@ -1385,8 +1409,8 @@ Deno.serve(async (req) => {
       const spotifyImage = String(meta.spotify_image || meta.portrait_image || "");
       const curatedGenresByArtistId = await fetchCuratedArtistGenresByArtistId(supabase, [String(artist.id)]);
       const curatedGenres = curatedGenresByArtistId.get(String(artist.id)) ?? [];
-      const curatedTopSongs = await getTopSongsFromPresentationAuthority(supabase, slug);
-      const publicCreditTracks = await getArtistPublicTracksFromCredits(supabase, slug);
+      const curatedTopSongs = await getTopSongsFromPresentationAuthority(supabase, artist.slug);
+      const publicCreditTracks = await getArtistPublicTracksFromCredits(supabase, artist.slug);
       const { data: musicProvenanceRaw, error: musicProvenanceError } =
         await supabase.rpc(
           "get_public_artist_music_provenance_v1",
