@@ -1471,20 +1471,18 @@ Deno.serve(async (req) => {
           discographySource: "deferred",
         } } }, origin);
       }
-      const curatedGenresByArtistId = await fetchCuratedArtistGenresByArtistId(supabase, [String(artist.id)]);
+      // Independent canonical reads must not form a serial network waterfall.
+      // All original authority/error semantics and final response shape remain.
+      const [curatedGenresByArtistId, curatedTopSongs, publicCreditTracks, provenanceResult] = await Promise.all([
+        fetchCuratedArtistGenresByArtistId(supabase, [String(artist.id)]),
+        getTopSongsFromPresentationAuthority(supabase, artist.slug),
+        getArtistPublicTracksFromCredits(supabase, artist.slug),
+        supabase.rpc("get_public_artist_music_provenance_v1", { p_artist_id: artist.id }),
+      ]);
       const curatedGenres = curatedGenresByArtistId.get(String(artist.id)) ?? [];
-      const curatedTopSongs = await getTopSongsFromPresentationAuthority(supabase, artist.slug);
-      const publicCreditTracks = await getArtistPublicTracksFromCredits(supabase, artist.slug);
-      const { data: musicProvenanceRaw, error: musicProvenanceError } =
-        await supabase.rpc(
-          "get_public_artist_music_provenance_v1",
-          { p_artist_id: artist.id },
-        );
+      const { data: musicProvenanceRaw, error: musicProvenanceError } = provenanceResult;
       if (musicProvenanceError) {
-        console.error(
-          "Failed to load public Artist music provenance:",
-          musicProvenanceError.message,
-        );
+        console.error("Failed to load public Artist music provenance:", musicProvenanceError.message);
       }
       const musicProvenance =
         musicProvenanceRaw &&
@@ -1611,9 +1609,13 @@ Deno.serve(async (req) => {
       }
       const metaAlbums = Array.isArray(meta.studio_albums) ? meta.studio_albums as any[] : [];
       const metaEps = Array.isArray(meta.eps_compilations) ? meta.eps_compilations as any[] : [];
-      const releases = await getArtistDiscography(supabase, String(artist.id), displayName, slug, metaAlbums, metaEps);
+      // Discography and initial chart evidence are independent canonical reads.
+      const [releases, chartResult] = await Promise.all([
+        getArtistDiscography(supabase, String(artist.id), displayName, slug, metaAlbums, metaEps),
+        supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").eq("artist_slug", slug).order("rank", { ascending: true }).limit(50),
+      ]);
       const allGenres = curatedGenres;
-      const { data: chartEntriesBySlug } = await supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").eq("artist_slug", slug).order("rank", { ascending: true }).limit(50);
+      const { data: chartEntriesBySlug } = chartResult;
       let chartEntries = chartEntriesBySlug ?? [];
       if (chartEntries.length === 0 && displayName) { const { data: chartEntriesByName } = await supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").ilike("artist_name", displayName).order("rank", { ascending: true }).limit(50); chartEntries = chartEntriesByName ?? []; }
       const chartEntryList = chartEntries.map((e: any) => { const prev = Number(e.previous_rank || 0); const curr = Number(e.rank || 0); let movement: string = String(e.movement || "same"); let movementAmount = 0; if (prev > 0 && curr > 0) { if (curr < prev) { movement = "up"; movementAmount = prev - curr; } else if (curr > prev) { movement = "down"; movementAmount = curr - prev; } } return { rank: curr, title: String(e.track_title || ""), artist: String(e.artist_name || ""), slug: String(e.track_slug || ""), movement, movementAmount, peakPosition: curr, weeksOnChart: 1, artworkUrl: e.artwork_url || "" }; });
