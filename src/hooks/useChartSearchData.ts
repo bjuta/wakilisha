@@ -4,6 +4,7 @@ import { buildChartEntrySearchSnippet } from "@/services/cultureContext/searchAd
 
 export interface ChartSearchItem {
   canonicalTrackId: string | null;
+  artistSlug: string | null;
   slug: string;
   title: string;
   artist: string;
@@ -60,6 +61,39 @@ export function useChartSearchData() {
           return;
         }
 
+        // Chart display strings are never route authority. Bind actual Track UUIDs
+        // to active canonical Artist credits before exposing a Recording link.
+        const trackIds = [...new Set((entries || [])
+          .map((entry) => String(entry.canonical_track_id || ""))
+          .filter(Boolean))];
+        const mainArtistSlugByTrack = new Map<string, string>();
+        for (let offset = 0; offset < trackIds.length; offset += 100) {
+          const { data: credits, error: creditError } = await supabase
+            .from("registry_track_artists")
+            .select("track_id, artist_id, is_primary, credit_order, status")
+            .in("track_id", trackIds.slice(offset, offset + 100))
+            .eq("is_primary", true)
+            .eq("status", "active")
+            .order("credit_order", { ascending: true });
+          if (creditError) throw creditError;
+          const artistIds = [...new Set((credits || [])
+            .map((credit) => String(credit.artist_id || ""))
+            .filter(Boolean))];
+          const { data: artists, error: artistError } = artistIds.length
+            ? await supabase.from("registry_artists")
+                .select("id, slug").in("id", artistIds).eq("status", "active")
+            : { data: [], error: null };
+          if (artistError) throw artistError;
+          const canonicalById = new Map((artists || []).map((artist) => [artist.id, artist.slug]));
+          for (const credit of credits || []) {
+            const canonicalSlug = canonicalById.get(String(credit.artist_id || ""));
+            if (canonicalSlug && !mainArtistSlugByTrack.has(String(credit.track_id))) {
+              mainArtistSlugByTrack.set(String(credit.track_id), canonicalSlug);
+            }
+          }
+        }
+        if (!alive) return;
+
         const mapped: ChartSearchItem[] = (entries || []).map((e) => {
           let movementAmount = 0;
           if (e.previous_rank !== null && e.previous_rank !== undefined && e.previous_rank > 0) {
@@ -68,6 +102,7 @@ export function useChartSearchData() {
 
           const item = {
             canonicalTrackId: e.canonical_track_id || null,
+            artistSlug: mainArtistSlugByTrack.get(String(e.canonical_track_id || "")) || null,
             slug: e.track_slug,
             title: e.track_title,
             artist: e.artist_name || "",
