@@ -8,7 +8,7 @@ const targets = [
   "https://wakilisha.africa/artists/lil-maina",
   "https://wakilisha.africa/releases/munishi/munishi-vol-3",
 ];
-// Recheck live Production after approved frontend deployment at 17460ae8.
+// Recheck live Production after approved Release first-paint frontend deployment at bda74100.
 const browser = await chromium.launch({ headless: true });
 const output = [];
 for (const url of targets) {
