@@ -12,6 +12,11 @@ describe("public Artist aliases and Recording route authority", () => {
     expect(artistHandler).toContain('.eq("status", "active")');
     expect(artistHandler).toContain('if (!artist) return jsonResponse({ data: null }, origin, 404)');
   });
+  it("replaces the inbound alias URL with the canonical Artist profile route", () => {
+    const page = readFileSync("src/pages/artists/detail/page.tsx", "utf8");
+    expect(page).toContain('data.slug !== slug');
+    expect(page).toContain('navigate(`/artists/${data.slug}`, { replace: true })');
+  });
   it("does not derive Search or Artist-chart Recording routes from display names", () => {
     const search = readFileSync("src/pages/search/page.tsx", "utf8");
     const chart = readFileSync("src/pages/artists/detail/components/ArtistChartSection.tsx", "utf8");
