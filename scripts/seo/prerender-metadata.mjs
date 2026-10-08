@@ -378,17 +378,15 @@ async function fetchArticleManifests() {
     };
   }
 
-  try {
-    const response = await fetchWithTimeout(`${apiBase}/magazine?limit=1000`, {
+  let lastError = null;
+  for (let attempt = 1; attempt <= PRERENDER_MANIFEST_RETRY_COUNT; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(`${apiBase}/magazine?limit=1000`, {
       headers: publicContentHeaders(anonKey),
     });
 
     if (!response.ok) {
-      console.warn(`Article manifests skipped: ${response.status} ${response.statusText}`);
-      return {
-        imageByPath: new Map(),
-        metadataByPath: new Map(),
-      };
+      throw new Error(`${response.status} ${response.statusText}`);
     }
 
     const payload = await response.json();
@@ -430,17 +428,19 @@ async function fetchArticleManifests() {
     console.log(`Article image manifest loaded: ${imageByPath.size.toLocaleString()} article images.`);
     console.log(`Article metadata manifest loaded: ${metadataByPath.size.toLocaleString()} article rows.`);
 
-    return {
-      imageByPath,
-      metadataByPath,
-    };
-  } catch (error) {
-    console.warn(`Article manifests skipped: ${error instanceof Error ? error.message : String(error)}`);
-    return {
-      imageByPath: new Map(),
-      metadataByPath: new Map(),
-    };
+    if (imageByPath.size === 0) {
+      throw new Error("Article response contained no preloadable hero image authority");
+    }
+    return { imageByPath, metadataByPath };
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < PRERENDER_MANIFEST_RETRY_COUNT) {
+      console.warn(`Article manifest retry ${attempt}/${PRERENDER_MANIFEST_RETRY_COUNT} failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+      await sleep(attempt * 1000);
+    }
   }
+  throw new Error(`Article prerender manifest unavailable after ${PRERENDER_MANIFEST_RETRY_COUNT} attempt(s); refusing partial SEO output: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
 
 function mergeDbMetadata(model, pagePath) {
