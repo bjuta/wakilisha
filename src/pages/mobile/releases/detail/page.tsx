@@ -444,6 +444,9 @@ export default function MobileReleaseDetail() {
   }
 
   const canUseArtwork = Boolean(release.artworkUrl && !artworkFailed);
+  const canonicalPrimaryArtist = release.artists.find(
+    (artist) => artist.isPrimary && artist.artistId && artist.artistType && artist.slug,
+  );
   const durationLabel = formatDurationLong(release.totalDuration || release.trackCount * 180);
   const initial = release.title.trim()[0]?.toUpperCase() || "W";
 
@@ -591,9 +594,13 @@ export default function MobileReleaseDetail() {
               )}
             </div>
             <div>
-              <Link to={`/artists/${slugify(release.artist)}`} className="text-[14px] font-bold text-[var(--wk-text)] active:opacity-70">
-                {release.artist}
-              </Link>
+              {canonicalPrimaryArtist ? (
+                <Link to={`/artists/${canonicalPrimaryArtist.slug}`} className="text-[14px] font-bold text-[var(--wk-text)] active:opacity-70">
+                  {release.artist}
+                </Link>
+              ) : (
+                <span className="text-[14px] font-bold text-[var(--wk-text)]">{release.artist}</span>
+              )}
               <div className="text-[11px] text-[var(--wk-text-muted)]">{release.year} · {release.trackCount} tracks{release.labelName && release.labelName !== "WAKILISHA Registry" && release.labelName !== "WAKILISHA" ? ` · ${release.labelName}` : ""}</div>
             </div>
           </div>
@@ -838,16 +845,18 @@ export default function MobileReleaseDetail() {
         </section>
 
         {/* Artist link */}
-        <Link
-          to={`/artists/${slugify(release.artist)}`}
-          className="flex items-center justify-between rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-5 py-4 active:bg-[var(--wk-surface-raised)] transition-colors"
-        >
+        {canonicalPrimaryArtist && (
+          <Link
+            to={`/artists/${canonicalPrimaryArtist.slug}`}
+            className="flex items-center justify-between rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-5 py-4 active:bg-[var(--wk-surface-raised)] transition-colors"
+          >
           <div>
             <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-1">Artist</div>
             <div className="text-[15px] font-bold text-[var(--wk-text)]">{release.artist}</div>
           </div>
           <i className="ri-arrow-right-line text-[var(--wk-text-muted)] text-lg" />
-        </Link>
+          </Link>
+        )}
 
         {release.labelName && release.labelName !== "WAKILISHA Registry" && (
           <Link
