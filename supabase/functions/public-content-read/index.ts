@@ -1144,36 +1144,81 @@ Deno.serve(async (req) => {
       const displayName = String(artist.display_name);
       const { data: primaryLinks } = await supabase.from("registry_release_artists").select("release_id").eq("artist_id", artistId).eq("is_primary", true).eq("status", "active");
       const primaryReleaseIds = (primaryLinks ?? []).map((r: any) => String(r.release_id));
-      let ownReleases: ReleaseOut[] = [];
-      if (primaryReleaseIds.length > 0) {
-        const { data: releases } = await supabase.from("registry_releases").select("id, title, slug, release_type, release_date, artwork_url, label_id, metadata").in("id", primaryReleaseIds).in("status", ["active", "draft"]).order("release_date", { ascending: false });
-        const labelMap = await fetchLabelMapForReleases(supabase, releases ?? []);
-        if (releases) {
-          for (const rel of releases as any[]) {
-            const { data: relTracks } = await supabase.from("registry_release_tracks").select("track_id, track_number, disc_number").eq("release_id", rel.id).eq("status", "active").order("disc_number").order("track_number");
-            const trackIds = (relTracks ?? []).map((rt: any) => rt.track_id);
-            let tracks: TrackOut[] = [];
-            if (trackIds.length > 0) {
-              const { data: trackRows } = await supabase.from("registry_tracks").select("id, title, slug, duration_ms, preview_url").in("id", trackIds);
-              const { data: trackArtists } = await supabase.from("registry_track_artists").select("track_id, artist_slug, artist_name_text, is_primary, credit_order").in("track_id", trackIds).eq("status", "active").order("credit_order");
-              const artistsByTrack = new Map<string, string[]>();
-              const primaryArtistSlugByTrack = new Map<string, string>();
-              for (const ta of (trackArtists ?? [])) {
-                const list = artistsByTrack.get(ta.track_id) || [];
-                list.push(ta.artist_name_text);
-                artistsByTrack.set(ta.track_id, list);
-                if (ta.artist_slug && (ta.is_primary || !primaryArtistSlugByTrack.has(ta.track_id))) {
-                  primaryArtistSlugByTrack.set(ta.track_id, String(ta.artist_slug));
-                }
-              }
-              const trackMetaMap = new Map<string, { durationMs: number | null; previewUrl: string | null }>();
-              for (const tr of (trackRows ?? [])) { trackMetaMap.set(tr.id, { durationMs: tr.duration_ms ?? null, previewUrl: tr.preview_url ?? null }); }
-              tracks = (relTracks ?? []).map((rt: any) => { const t = (trackRows ?? []).find((tr: any) => tr.id === rt.track_id); if (!t) return null; const meta = trackMetaMap.get(t.id); const trackArtistsList = artistsByTrack.get(t.id) || []; const nonPageArtist = trackArtistsList.filter((a) => a !== displayName); const artistsStr = nonPageArtist.length > 0 ? nonPageArtist.join(", ") : undefined; return { id: String(t.id), slug: String(t.slug || ""), artistSlug: primaryArtistSlugByTrack.get(t.id) || artistSlug, title: t.title || "", duration: formatDuration(meta?.durationMs ?? null), artists: artistsStr, previewUrl: meta?.previewUrl || undefined }; }).filter(Boolean) as TrackOut[];
-            }
-            const { labelName, genres } = extractLabelAndGenres(rel, labelMap);
-            ownReleases.push({ slug: rel.slug, title: rel.title, releaseType: releaseTypeLabelFromActiveTrackCount(tracks.length) || "Release", year: extractYear(rel.release_date), releaseDate: rel.release_date || "", trackCount: tracks.length, artworkUrl: rel.artwork_url || "", labelName, genres, tracks });
+      // Batch the complete ordered Track/credit graph once for each release set.
+      // Per-Release RPC fan-out previously multiplied network round-trips by
+      // the number of albums and held the entire discography response hostage.
+      const batchDiscographyTracks = async (releaseIds: string[]) => {
+        const ordered = new Map<string, Array<{ track_id: string; track_number: number; disc_number: number }>>();
+        const tracksById = new Map<string, any>();
+        const creditsByTrack = new Map<string, Array<{ artist_slug: string; artist_name_text: string; is_primary: boolean }>>();
+        if (releaseIds.length === 0) return { ordered, tracksById, creditsByTrack };
+        // Bounded IN requests avoid PostgREST URI and row limits for prolific Artists.
+        for (let offset = 0; offset < releaseIds.length; offset += 100) {
+          const batch = releaseIds.slice(offset, offset + 100);
+          const { data: links, error: linksError } = await supabase.from("registry_release_tracks")
+            .select("release_id, track_id, track_number, disc_number")
+            .in("release_id", batch).eq("status", "active")
+            .order("disc_number").order("track_number");
+          if (linksError) throw linksError;
+          for (const row of links ?? []) {
+            const rid = String(row.release_id);
+            if (!ordered.has(rid)) ordered.set(rid, []);
+            ordered.get(rid)!.push({ track_id: String(row.track_id), track_number: Number(row.track_number || 0), disc_number: Number(row.disc_number || 0) });
           }
         }
+        const ids = [...new Set([...ordered.values()].flat().map((row) => row.track_id))];
+        for (let offset = 0; offset < ids.length; offset += 100) {
+          const batch = ids.slice(offset, offset + 100);
+          const [tracksResult, creditsResult] = await Promise.all([
+            supabase.from("registry_tracks").select("id, title, slug, duration_ms, preview_url").in("id", batch),
+            supabase.from("registry_track_artists").select("track_id, artist_slug, artist_name_text, is_primary, credit_order")
+              .in("track_id", batch).eq("status", "active").order("credit_order"),
+          ]);
+          if (tracksResult.error) throw tracksResult.error;
+          if (creditsResult.error) throw creditsResult.error;
+          for (const track of tracksResult.data ?? []) tracksById.set(String(track.id), track);
+          for (const credit of creditsResult.data ?? []) {
+            const id = String(credit.track_id);
+            if (!creditsByTrack.has(id)) creditsByTrack.set(id, []);
+            creditsByTrack.get(id)!.push({ artist_slug: String(credit.artist_slug || ""), artist_name_text: String(credit.artist_name_text || ""), is_primary: Boolean(credit.is_primary) });
+          }
+        }
+        return { ordered, tracksById, creditsByTrack };
+      };
+      const renderDiscographyTracks = (
+        releaseId: string,
+        graph: Awaited<ReturnType<typeof batchDiscographyTracks>>,
+        fallbackArtistSlug: string,
+      ): TrackOut[] => (graph.ordered.get(releaseId) || []).map((link) => {
+        const track = graph.tracksById.get(link.track_id);
+        if (!track) return null;
+        const credits = graph.creditsByTrack.get(link.track_id) || [];
+        const primary = credits.find((credit) => credit.is_primary && credit.artist_slug) || credits.find((credit) => credit.artist_slug);
+        const names = credits.map((credit) => credit.artist_name_text).filter((name) => name && name !== displayName);
+        return {
+          id: String(track.id), slug: String(track.slug || ""),
+          artistSlug: primary?.artist_slug || fallbackArtistSlug,
+          title: String(track.title || ""), duration: formatDuration(track.duration_ms ?? null),
+          artists: names.length ? names.join(", ") : undefined,
+          previewUrl: track.preview_url || undefined,
+        };
+      }).filter(Boolean) as TrackOut[];
+      let ownReleases: ReleaseOut[] = [];
+      if (primaryReleaseIds.length > 0) {
+        const { data: releases, error: releasesError } = await supabase.from("registry_releases")
+          .select("id, title, slug, release_type, release_date, artwork_url, label_id, metadata")
+          .in("id", primaryReleaseIds).in("status", ["active", "draft"])
+          .order("release_date", { ascending: false });
+        if (releasesError) throw releasesError;
+        const [labelMap, graph] = await Promise.all([
+          fetchLabelMapForReleases(supabase, releases ?? []),
+          batchDiscographyTracks((releases ?? []).map((rel: any) => String(rel.id))),
+        ]);
+        ownReleases = (releases ?? []).map((rel: any) => {
+          const tracks = renderDiscographyTracks(String(rel.id), graph, artistSlug);
+          const { labelName, genres } = extractLabelAndGenres(rel, labelMap);
+          return { slug: rel.slug, title: rel.title, releaseType: releaseTypeLabelFromActiveTrackCount(tracks.length) || "Release", year: extractYear(rel.release_date), releaseDate: rel.release_date || "", trackCount: tracks.length, artworkUrl: rel.artwork_url || "", labelName, genres, tracks };
+        });
       }
 
       const featuredReleaseIdsFromBoth = new Set<string>();
@@ -1189,40 +1234,37 @@ Deno.serve(async (req) => {
       let appearsOn: ReleaseOut[] = [];
       if (featuredReleaseIdsFromBoth.size > 0) {
         const featuredReleaseIds = [...featuredReleaseIdsFromBoth];
-        const { data: featuredReleases } = await supabase.from("registry_releases").select("id, title, slug, release_type, release_date, artwork_url, label_id, metadata").in("id", featuredReleaseIds).in("status", ["active", "draft"]).order("release_date", { ascending: false });
-        const featLabelMap = await fetchLabelMapForReleases(supabase, featuredReleases ?? []);
-        if (featuredReleases) {
-          const seenTitles2 = new Set<string>();
-          for (const rel of featuredReleases as any[]) {
-            const titleKey = rel.title.toLowerCase().trim();
-            if (seenTitles2.has(titleKey)) continue;
-            seenTitles2.add(titleKey);
-            const { data: primaryArtistLink } = await supabase.from("registry_release_artists").select("artist_name_text, artist_slug").eq("release_id", rel.id).eq("is_primary", true).eq("status", "active").maybeSingle();
-            const { data: relTrackData } = await supabase.from("registry_release_tracks").select("track_id").eq("release_id", rel.id).eq("status", "active");
-            const releaseTrackIds = (relTrackData ?? []).map((rt: any) => rt.track_id);
-            let tracks: TrackOut[] = [];
-            if (releaseTrackIds.length > 0) {
-              const { data: tRows } = await supabase.from("registry_tracks").select("id, title, slug, duration_ms, preview_url").in("id", releaseTrackIds);
-              const { data: allTrackArtists } = await supabase.from("registry_track_artists").select("track_id, artist_slug, artist_name_text, is_primary, credit_order").in("track_id", releaseTrackIds).eq("status", "active").order("credit_order");
-              const abt = new Map<string, string[]>();
-              const primaryArtistSlugByTrack = new Map<string, string>();
-              for (const ta of (allTrackArtists ?? [])) {
-                const list = abt.get(ta.track_id) || [];
-                list.push(ta.artist_name_text);
-                abt.set(ta.track_id, list);
-                if (ta.artist_slug && (ta.is_primary || !primaryArtistSlugByTrack.has(ta.track_id))) {
-                  primaryArtistSlugByTrack.set(ta.track_id, String(ta.artist_slug));
-                }
-              }
-              const tmm = new Map<string, { durationMs: number | null; previewUrl: string | null }>();
-              for (const tr of (tRows ?? [])) { tmm.set(tr.id, { durationMs: tr.duration_ms ?? null, previewUrl: tr.preview_url ?? null }); }
-              tracks = (tRows ?? []).map((t: any) => { const meta2 = tmm.get(t.id); const tal = abt.get(t.id) || []; const npa = tal.filter((a) => a !== displayName); const as2 = npa.length > 0 ? npa.join(", ") : undefined; return { id: String(t.id), slug: String(t.slug || ""), artistSlug: primaryArtistSlugByTrack.get(t.id) || String(primaryArtistLink?.artist_slug || ""), title: t.title || "", duration: formatDuration(meta2?.durationMs ?? null), artists: as2, previewUrl: meta2?.previewUrl || undefined }; });
-            }
-            const { labelName, genres } = extractLabelAndGenres(rel, featLabelMap);
-            appearsOn.push({ slug: rel.slug, title: rel.title, releaseType: releaseTypeLabelFromActiveTrackCount(tracks.length) || "Release", year: extractYear(rel.release_date), releaseDate: rel.release_date || "", trackCount: tracks.length, artworkUrl: rel.artwork_url || "", artist: primaryArtistLink?.artist_name_text || "Various Artists", labelName, genres, tracks });
-          }
+        const { data: featuredReleases, error: featuredError } = await supabase.from("registry_releases")
+          .select("id, title, slug, release_type, release_date, artwork_url, label_id, metadata")
+          .in("id", featuredReleaseIds).in("status", ["active", "draft"])
+          .order("release_date", { ascending: false });
+        if (featuredError) throw featuredError;
+        const [featLabelMap, graph, primaryRows] = await Promise.all([
+          fetchLabelMapForReleases(supabase, featuredReleases ?? []),
+          batchDiscographyTracks((featuredReleases ?? []).map((rel: any) => String(rel.id))),
+          supabase.from("registry_release_artists")
+            .select("release_id, artist_name_text, artist_slug, credit_order")
+            .in("release_id", featuredReleaseIds).eq("is_primary", true)
+            .eq("status", "active").order("credit_order"),
+        ]);
+        if (primaryRows.error) throw primaryRows.error;
+        const primaryByRelease = new Map<string, { artist_name_text: string; artist_slug: string }>();
+        for (const row of primaryRows.data ?? []) {
+          const id = String(row.release_id);
+          if (!primaryByRelease.has(id)) primaryByRelease.set(id, { artist_name_text: String(row.artist_name_text || ""), artist_slug: String(row.artist_slug || "") });
         }
+        const seenTitles = new Set<string>();
+        appearsOn = (featuredReleases ?? []).flatMap((rel: any) => {
+          const titleKey = String(rel.title || "").toLowerCase().trim();
+          if (seenTitles.has(titleKey)) return [];
+          seenTitles.add(titleKey);
+          const primary = primaryByRelease.get(String(rel.id));
+          const tracks = renderDiscographyTracks(String(rel.id), graph, primary?.artist_slug || "");
+          const { labelName, genres } = extractLabelAndGenres(rel, featLabelMap);
+          return [{ slug: rel.slug, title: rel.title, releaseType: releaseTypeLabelFromActiveTrackCount(tracks.length) || "Release", year: extractYear(rel.release_date), releaseDate: rel.release_date || "", trackCount: tracks.length, artworkUrl: rel.artwork_url || "", artist: primary?.artist_name_text || "Various Artists", labelName, genres, tracks }];
+        });
       }
+
       return jsonResponse({ artist: { id: artistId, slug: artistSlug, name: displayName }, releases: ownReleases, appearsOn }, origin);
     }
 
