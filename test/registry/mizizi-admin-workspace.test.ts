@@ -150,7 +150,7 @@ describe("MIZIZI Admin workspace", () => {
 
   it("gives approved #1094 batch decisions a dedicated one-action view", () => {
     const exact = read("src/pages/admin/review/mizizi/issue1094.tsx");
-    expect(page).toContain('get("task") === "1094-d1-d3"');
+    expect(page).toContain('task === "1094-d1-d3"');
     expect(page).toContain("<Issue1094ExactDecisions />");
     expect(exact).toContain("data-wk-mizizi-1094-decisions");
     expect(exact).toContain("data-wk-1094-record-decisions");
