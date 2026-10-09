@@ -105,20 +105,22 @@ begin
   end if;
 
   if v_resolution_guard_definition not like
-       '%session_user<>''mizizi_executor''%'
+       '%admin_finalize_public_music_identity_track_review_v1%'
      or v_resolution_guard_definition not like
-       '%verifiedOperationId%'
+       '%public_music_identity_track_review_terminal_evidence_v1%'
      or v_resolution_guard_definition not like
        '%decisionId%'
      or v_resolution_guard_definition not like
-       '%operation.verifier_status=''passed''%'
+       '%verifiedOperationId%'
      or v_resolution_guard_definition not like
-       '%execution_grant.plan_payload->>''reviewId''%'
+       '%archiveEventId%'
      or v_resolution_guard_definition not like
-       '%execution_grant.plan_payload->>''decisionId''%'
+       '%stale Community thread pointers%'
+     or v_resolution_guard_definition not like
+       '%unhandled current-pointer surface on the source Track%'
   then
     raise exception
-      'Review resolution is not bound to verified MIZIZI execution and the exact human decision';
+      'Review resolution guard drifted from governed finalizer and terminal-evidence authority';
   end if;
 
   if v_record_definition ~*
