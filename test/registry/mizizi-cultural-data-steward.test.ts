@@ -4487,6 +4487,9 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
     expect(service).toContain(
       "isPublicMusicIdentityTrackReview",
     );
+    expect(service).toContain(
+      'ruleId === "track_recording_identity_conflict"',
+    );
 
     expect(page).toContain(
       "Public Music Identity: governed human decision",
