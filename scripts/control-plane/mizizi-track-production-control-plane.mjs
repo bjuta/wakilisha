@@ -10,7 +10,25 @@ const EXPECTED_MAIN = process.env.MIZIZI_EXPECTED_MAIN_SHA || '';
 const TRIGGER_FILE = process.env.MIZIZI_TRIGGER_FILE || '';
 const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-track-production-control-plane';
 const EXPECTED_FINGERPRINT = '551b29431700536937c26ecb1e396c3cf9314edefd88c589284cf330c9d1bb9a';
-const EXPECTED_REVIEW_INPUT_FINGERPRINT = '6d9fa72f13ce4a5d774a457552e3cd3824475fb8a651473d5999605a3dcc29fb';
+const EXPECTED_REVIEW_INPUT_FINGERPRINT = 'b6a8047ce9adae9cf422f8f787de88832ae6bb3f7307437a2443d2652b40bcc9';
+const EXPECTED_1094_FEATURE_REVIEW_TARGETS = [
+  ['431fbc40-916e-5de2-8278-68b826050f2f','2-left-feet-feat-mwirigi','2-left-feet'],
+  ['e4581038-cfe2-5e64-897f-1e0eb291671a','bombo-feat-maandy','bombo'],
+  ['d7f6fb75-3dba-5965-86ea-cf1a5fd7ce7e','form-imeiva-feat-mr-ke4','form-imeiva'],
+  ['30163529-f5b1-5645-884e-e942378cd0fa','glow-feat-gendi','glow'],
+  ['db0a566e-7e62-526b-8794-831ce14878d7','hakuna-kulala-feat-mercury-ke','hakuna-kulala'],
+  ['84f1919b-83be-5f25-8596-1b28055ba724','hands-in-the-air-feat-shanki-austine','hands-in-the-air'],
+  ['b4be461b-9c7a-5ec8-82e7-e37c5ccc6588','itisha-feat-vinc-on-the-beat','itisha'],
+  ['1cf26df0-5072-5686-80a6-6a53450d41ea','murda-feat-ali-smallz','murda'],
+  ['eb003451-b337-50da-8aba-71ed4809458b','pretty-girl-feat-tuku-kantu','pretty-girl'],
+  ['3a2af997-85b6-5557-8e61-21eb551c28c8','seto-feat-hassanoke','seto'],
+  ['999027a7-4aea-5aa6-8742-a0f8dd78bcfd','sitaki-drinks-feat-kash-kaaria','sitaki-drinks'],
+  ['92d21032-dc76-5518-8b21-82ecd1f1a6ab','waist-line-feat-grandmastatek','waist-line'],
+];
+const EXPECTED_1094_FEATURE_REVIEW_IDS_SQL =
+  EXPECTED_1094_FEATURE_REVIEW_TARGETS
+    .map(([id]) => "'" + id + "'")
+    .join(',');
 const EXPECTED_BLOBS = {
   'scripts/registry/agents/mizizi/run.ts': 'db38946f4800c5f9721a6aaed42838589686dabd',
   'scripts/registry/agents/mizizi/core.ts': 'd57a242b60f517461243f0310c61d1f791362f37',
@@ -333,8 +351,11 @@ select jsonb_build_object(
 const reviewStateSql = `select jsonb_build_object(
  'open_mizizi_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open'),
  'historical_open_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleId'='track_slug_identity_noise'),
+ 'feature_slug_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleVersion'='1.1.0' and source_payload->>'ruleId'='track_slug_identity_noise'),
  'credit_gap_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleVersion'='1.3.0' and source_payload->>'ruleId'='track_slug_credit_evidence_gap'),
  'recording_identity_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleVersion'='1.3.0' and source_payload->>'ruleId'='track_recording_identity_conflict'),
+ 'release_single_reviews',(select count(*)::int from public.registry_review_items where review_type='mizizi_data_hygiene' and status='open' and source_payload->>'ruleVersion'='1.4.0' and source_payload->>'ruleId'='release_single_identity_conflict'),
+ 'active_tracks',(select count(*)::int from public.registry_tracks where status='active'),
  'canonical_events',(select count(*)::int from public.registry_canonical_write_events where actor='mizizi' and registry_entity_type='track'),
  'track_redirects',(select count(*)::int from public.wk_slug_redirects where entity_type='track'),
  'active_capability_grants',(select count(*)::int from platform_private.system_actor_capability_grants where actor_key='mizizi' and status='active' and valid_from<=now() and expires_at>now() and revoked_at is null),
@@ -342,6 +363,26 @@ const reviewStateSql = `select jsonb_build_object(
  'ledger_count',(select count(*)::int from supabase_migrations.schema_migrations),
  'ledger_head',(select max(version) from supabase_migrations.schema_migrations)
 ) state`;
+
+const featureReviewStateSql = `select coalesce(
+ jsonb_agg(
+   jsonb_build_object(
+     'sourceId',source_id,
+     'currentValue',source_payload->>'currentValue',
+     'proposedValue',candidate_payload->>'proposedValue',
+     'status',status,
+     'ruleId',source_payload->>'ruleId',
+     'ruleVersion',source_payload->>'ruleVersion'
+   )
+   order by source_id
+ ),
+ '[]'::jsonb
+) rows
+from public.registry_review_items
+where review_type='mizizi_data_hygiene'
+  and source_id in (${EXPECTED_1094_FEATURE_REVIEW_IDS_SQL})
+  and source_payload->>'ruleId'='track_slug_identity_noise'
+  and source_payload->>'ruleVersion'='1.1.0'`;
 
 function assertFields(actual, expected, label) {
   for (const [k, v] of Object.entries(expected)) if (String(actual?.[k]) !== String(v)) throw new Error(`${label} ${k}=${actual?.[k]} expected ${v}`);
@@ -564,10 +605,11 @@ function assertAcceptedPostApply(state) {
 
 function reviewMaterializationComplete(state) {
   return (
-    Number(state?.open_mizizi_reviews) === 169 &&
-    Number(state?.historical_open_reviews) === 66 &&
+    Number(state?.open_mizizi_reviews) === 160 &&
+    Number(state?.feature_slug_reviews) === 17 &&
     Number(state?.credit_gap_reviews) === 12 &&
-    Number(state?.recording_identity_reviews) === 91
+    Number(state?.recording_identity_reviews) === 91 &&
+    Number(state?.release_single_reviews) === 40
   );
 }
 
@@ -575,28 +617,31 @@ function assertReviewState(state, finalState) {
   assertFields(
     state,
     {
-      historical_open_reviews:66,
+      active_tracks:2122,
       canonical_events:440,
       track_redirects:1148,
+      credit_gap_reviews:12,
+      recording_identity_reviews:91,
+      release_single_reviews:40,
       active_capability_grants:0,
       active_execution_grants:0,
-      ledger_count:179,
-      ledger_head:'20260925050859',
+      ledger_count:212,
+      ledger_head:'20261008180201',
     },
     finalState ? 'review acceptance' : 'review baseline',
   );
 
-  const creditGap = Number(state?.credit_gap_reviews);
-  const identityConflict = Number(state?.recording_identity_reviews);
+  const featureSlug = Number(state?.feature_slug_reviews);
+  const historicalOpen = Number(state?.historical_open_reviews);
   const openReviews = Number(state?.open_mizizi_reviews);
 
   if (finalState) {
     assertFields(
       state,
       {
-        open_mizizi_reviews:169,
-        credit_gap_reviews:12,
-        recording_identity_reviews:91,
+        open_mizizi_reviews:160,
+        historical_open_reviews:17,
+        feature_slug_reviews:17,
       },
       'review acceptance',
     );
@@ -604,41 +649,86 @@ function assertReviewState(state, finalState) {
   }
 
   if (
-    !Number.isInteger(creditGap) ||
-    !Number.isInteger(identityConflict) ||
-    creditGap < 0 ||
-    creditGap > 12 ||
-    identityConflict < 0 ||
-    identityConflict > 91 ||
-    openReviews !== 66 + creditGap + identityConflict
+    !Number.isInteger(featureSlug) ||
+    featureSlug < 5 ||
+    featureSlug > 17 ||
+    historicalOpen !== featureSlug ||
+    openReviews !== 143 + featureSlug
   ) {
     throw new Error(
-      `review baseline is not a resumable subset: open=${openReviews} credit_gap=${creditGap} recording_identity=${identityConflict}`,
+      `#1094 review baseline is not a resumable subset: open=${openReviews} feature_slug=${featureSlug} historical_open=${historicalOpen}`,
+    );
+  }
+}
+
+function assertFeatureReviewRows(rows, complete) {
+  const expected = new Map(
+    EXPECTED_1094_FEATURE_REVIEW_TARGETS.map(
+      ([id,currentValue,proposedValue]) => [
+        id,
+        { currentValue, proposedValue },
+      ],
+    ),
+  );
+  const actualRows = Array.isArray(rows) ? rows : [];
+
+  for (const row of actualRows) {
+    const target = expected.get(String(row?.sourceId || ''));
+    if (!target) {
+      throw new Error(`unexpected #1094 feature review row ${row?.sourceId}`);
+    }
+    assertFields(
+      row,
+      {
+        currentValue:target.currentValue,
+        proposedValue:target.proposedValue,
+        status:'open',
+        ruleId:'track_slug_identity_noise',
+        ruleVersion:'1.1.0',
+      },
+      `#1094 feature review ${row.sourceId}`,
+    );
+  }
+
+  if (complete && actualRows.length !== expected.size) {
+    throw new Error(
+      `#1094 feature review set incomplete: ${actualRows.length}/${expected.size}`,
     );
   }
 }
 
 function assertReviewRun(text) {
   const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
-  for (const [rule,count] of [
-    ['track_recording_identity_conflict',91],
-    ['track_slug_identity_noise',66],
-    ['track_slug_credit_evidence_gap',12],
-  ]) {
-    if (!(new RegExp(`'${rule}'\\s*\\u2502\\s*${count}\\s*\\u2502`)).test(clean)) {
-      throw new Error(`${rule} expected ${count} in review run`);
-    }
-  }
-
-  const summary =
-    /\u2502\s*0\s*\u2502\s*664\s*\u2502\s*0\s*\u2502\s*103\s*\u2502\s*495\s*\u2502\s*0\s*\u2502\s*2101\s*\u2502/;
-
   if (
-    !summary.test(clean) ||
+    !clean.includes('track_slug_identity_noise') ||
     !clean.includes('Review mode completed. No canonical Registry rows were changed.')
   ) {
-    throw new Error('review-mode run summary mismatch');
+    throw new Error('review-mode run did not prove bounded review-only completion');
   }
+}
+
+function assertCurrentAuditReadOnly(text) {
+  const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
+  if (
+    !clean.includes('Audit mode completed. No Registry rows were changed.')
+  ) {
+    throw new Error('current Track audit did not prove read-only completion');
+  }
+  const counts = {};
+  for (const rule of [
+    'track_slug_identity_noise',
+    'track_title_credit_noise',
+    'track_slug_identity_mismatch',
+    'track_slug_credit_evidence_gap',
+    'track_recording_identity_conflict',
+  ]) {
+    const match = clean.match(
+      new RegExp(`'${rule}'\\s*\\u2502\\s*(\\d+)\\s*\\u2502`),
+    );
+    if (!match) throw new Error(`${rule} current audit count was not parseable`);
+    counts[rule] = Number(match[1]);
+  }
+  return counts;
 }
 
 function assertAudit(text, before) {
@@ -796,7 +886,11 @@ async function main() {
             operation:'mizizi_track_production_review',
             confirm:'MIZIZI_TRACK_PRODUCTION_REVIEW',
             expected_input_fingerprint:EXPECTED_REVIEW_INPUT_FINGERPRINT,
-            expected_existing_open_reviews:66,
+            expected_existing_open_reviews:148,
+            expected_existing_feature_slug_reviews:5,
+            expected_new_feature_slug_reviews:12,
+            expected_final_open_reviews:160,
+            expected_final_feature_slug_reviews:17,
             expected_credit_gap_reviews:12,
             expected_recording_identity_reviews:91,
           }
@@ -925,10 +1019,14 @@ async function main() {
           auditCurrent,
         );
         const auditCounts =
-          assertAudit(
-            fs.readFileSync(auditCurrent,'utf8'),
-            false,
-          );
+          MODE === 'review'
+            ? assertCurrentAuditReadOnly(
+                fs.readFileSync(auditCurrent,'utf8'),
+              )
+            : assertAudit(
+                fs.readFileSync(auditCurrent,'utf8'),
+                false,
+              );
         console.log(
           'PASS: fresh post-apply read-only audit completed with dynamic current findings ' +
           JSON.stringify(auditCounts) +
@@ -946,6 +1044,12 @@ async function main() {
 
           const reviewBefore = queryViaLinkedCli(reviewStateSql).state;
           assertReviewState(reviewBefore,false);
+          const featureReviewBefore =
+            queryViaLinkedCli(featureReviewStateSql).rows;
+          assertFeatureReviewRows(
+            featureReviewBefore,
+            reviewMaterializationComplete(reviewBefore),
+          );
           fs.writeFileSync(
             `${ARTIFACT_DIR}/review-state-before.json`,
             JSON.stringify(reviewBefore,null,2)+'\n',
@@ -965,13 +1069,16 @@ async function main() {
             {DATABASE_URL:url},
             reviewLog,
             pool,
-            {events:440,reviews:169,redirects:857},
+            {events:440,reviews:160,redirects:857},
           );
           assertReviewRun(fs.readFileSync(reviewLog,'utf8'));
 
           console.log('\n=== 8. REVIEW-ONLY PRODUCTION ACCEPTANCE ===');
           const reviewAfter = queryViaLinkedCli(reviewStateSql).state;
           assertReviewState(reviewAfter,true);
+          const featureReviewAfter =
+            queryViaLinkedCli(featureReviewStateSql).rows;
+          assertFeatureReviewRows(featureReviewAfter,true);
           const reviewFingerprintAfter = queryViaLinkedCli(fingerprintSql);
           if (reviewFingerprintAfter.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
             throw new Error(
@@ -982,7 +1089,7 @@ async function main() {
             `${ARTIFACT_DIR}/review-state-after.json`,
             JSON.stringify(reviewAfter,null,2)+'\n',
           );
-          console.log('PASS: review materialization exact 12 + 91 = 103 with canonical delta zero');
+          console.log('PASS: #1094 review materialization exact +12 feature-slug reviews with canonical delta zero');
 
           console.log('\n=== 9. FRESH POST-REVIEW READ-ONLY AUDIT ===');
           const postReviewAudit = `${ARTIFACT_DIR}/post-review-audit.txt`;
@@ -992,7 +1099,9 @@ async function main() {
             {DATABASE_URL:url},
             postReviewAudit,
           );
-          assertAudit(fs.readFileSync(postReviewAudit,'utf8'),false);
+          assertCurrentAuditReadOnly(
+            fs.readFileSync(postReviewAudit,'utf8'),
+          );
           console.log('\n=== MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS ===');
           return;
         }
