@@ -1,14 +1,16 @@
 {
   "operation": "mizizi_track_production_review",
   "confirm": "MIZIZI_TRACK_PRODUCTION_REVIEW",
-  "expected_input_fingerprint": "b6a8047ce9adae9cf422f8f787de88832ae6bb3f7307437a2443d2652b40bcc9",
+  "expected_input_fingerprint": "1334585948536c2dafc2ab03b891a7c6f8c1843014ee1506bdbe4f0dc4b1431b",
   "expected_existing_open_reviews": 148,
   "expected_existing_feature_slug_reviews": 5,
-  "expected_new_feature_slug_reviews": 12,
-  "expected_final_open_reviews": 160,
-  "expected_final_feature_slug_reviews": 17,
+  "expected_new_feature_slug_reviews": 0,
+  "expected_existing_recording_identity_reviews": 91,
+  "expected_new_recording_identity_reviews": 3,
+  "expected_final_open_reviews": 151,
+  "expected_final_feature_slug_reviews": 5,
   "expected_credit_gap_reviews": 12,
-  "expected_recording_identity_reviews": 91,
-  "attempt": 5,
-  "reason": "Retry after #1205 separated privileged review verification from the narrow mizizi_executor mutation session"
+  "expected_final_recording_identity_reviews": 94,
+  "attempt": 6,
+  "reason": "Materialize the exact three #1094 synthetic-collision recording reviews after recording duplicate lifecycle Production authority"
 }
