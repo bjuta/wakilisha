@@ -5006,6 +5006,40 @@ describe("Public Music Identity #1094 recording/duplicate lifecycle convergence"
     );
   });
 
+  it("narrowly admits needs_review principal credit for #1094 synthetic peers", () => {
+    const patch = read(
+      "supabase/migrations/20261009181647_public_music_identity_synthetic_review_principal_credit_admission_v1.sql",
+    );
+    const duplicateVerifier = read(
+      "scripts/control-plane/verify-public-music-identity-reviewed-duplicate-authority-v1.sql",
+    );
+
+    expect(patch).toMatch(
+      /where target_credit\.track_id=v_track\.id\s+and \(\s+target_credit\.status='active'\s+or \(\s+v_track\.status='needs_review'\s+and target_credit\.status='needs_review'/,
+    );
+    expect(patch).toContain("peer_credit.status='active'");
+    expect(patch).toContain("perform mizizi_private.assert_executor_v1()");
+    expect(patch).toContain("v_synthetic_peer_count<>1");
+    expect(patch).toContain(
+      "WK_1094_SYNTHETIC_COLLISION_REVIEW_EVIDENCE_DRIFT",
+    );
+    expect(patch).toContain(
+      "WK_1094_SYNTHETIC_REVIEW_CREDIT_ADMISSION_V1_PASS",
+    );
+    expect(patch).not.toMatch(
+      /(?:update|delete\s+from|insert\s+into)\s+public\.(?:registry_tracks|registry_track_artists|registry_release_tracks|wk_chart_entries_v2|wk_slug_redirects)/i,
+    );
+    expect(duplicateVerifier).toContain(
+      "v_review_broker !~ $admission$",
+    );
+    expect(duplicateVerifier).toContain(
+      "target_credit[.]status='needs_review'",
+    );
+    expect(duplicateVerifier).toContain(
+      "peer_credit.status=''active''",
+    );
+  });
+
   it("closes recording-review debt only through verified finalization/reconciliation authority", () => {
     expect(migration).toContain(
       "WK_1094_RECORDING_REVIEW_ONLY_FINALIZES_TRUE_DUPLICATE",

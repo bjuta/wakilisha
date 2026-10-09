@@ -71,6 +71,9 @@ begin
 
   if position('wk_1094_synthetic_collision_review_evidence_drift' in v_review_broker)=0
      or position('track.status=''needs_review''' in v_review_broker)=0
+     or position('target_credit.status=''active''' in v_review_broker)=0
+     or v_review_broker !~ $admission$v_track[.]status='needs_review'[[:space:]]+and[[:space:]]+target_credit[.]status='needs_review'$admission$
+     or position('peer_credit.status=''active''' in v_review_broker)=0
      or position(
           'wk_1094_synthetic_duplicate_decision_review_binding_drift'
           in v_decision_authority
