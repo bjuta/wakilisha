@@ -4957,7 +4957,7 @@ describe("Public Music Identity #1094 recording/duplicate lifecycle convergence"
       "WK_1094_LINKED_RECORDING_REVIEW_CAS_FAILED",
     );
     expect(migration).toContain(
-      "admin_reconcile_public_music_identity_linked_recording_review_v1",
+      "admin_reconcile_public_music_identity_recording_review_v1",
     );
     expect(migration).toContain(
       "WK_1094_RECONCILE_RECORDING_PEER_EVIDENCE_DRIFT",
