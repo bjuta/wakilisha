@@ -2164,6 +2164,47 @@ grant execute on function
   )
 to authenticated;
 
+
+drop policy if exists
+  registry_review_items_admin_update
+on public.registry_review_items;
+
+create policy registry_review_items_admin_update
+on public.registry_review_items
+for update
+to authenticated
+using (
+  public.current_user_has_capability('manage_review_queue')
+  or public.current_user_is_administrator()
+)
+with check (
+  (
+    public.current_user_has_capability('manage_review_queue')
+    or public.current_user_is_administrator()
+  )
+  and not (
+    status='resolved'
+    and review_type='mizizi_data_hygiene'
+    and entity_type='track'
+    and (
+      (
+        source_payload->>'ruleId'='track_slug_identity_noise'
+        and source_payload->>'ruleVersion'='1.1.0'
+      )
+      or
+      (
+        source_payload->>'ruleId'='track_slug_credit_evidence_gap'
+        and source_payload->>'ruleVersion'='1.3.0'
+      )
+      or
+      (
+        source_payload->>'ruleId'='track_recording_identity_conflict'
+        and source_payload->>'ruleVersion'='1.3.0'
+      )
+    )
+  )
+);
+
 do $postflight$
 declare v_new text;
 begin
