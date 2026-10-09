@@ -1932,10 +1932,243 @@ begin
   );
 end
 $finalize$;
+
+create or replace function
+public.admin_reconcile_public_music_identity_linked_recording_review_v1(
+  p_decision_id uuid,
+  p_note text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=pg_catalog,public,platform_private,auth
+as $reconcile$
+declare
+  v_user_id uuid:=auth.uid();
+  v_decision public.registry_canonicalization_decisions%rowtype;
+  v_source public.registry_review_items%rowtype;
+  v_linked public.registry_review_items%rowtype;
+  v_track public.registry_tracks%rowtype;
+  v_linked_id uuid;
+  v_expected_peer_ids jsonb;
+  v_current_peer_ids jsonb;
+  v_now timestamptz:=now();
+begin
+  if v_user_id is null
+     or not (
+       coalesce(public.current_user_has_capability('manage_registry'),false)
+       or coalesce(public.current_user_is_administrator(),false)
+     )
+  then
+    raise exception using errcode='42501',
+      message='WK_1094_RECONCILE_REQUIRES_ADMIN';
+  end if;
+
+  if p_decision_id is null
+     or octet_length(coalesce(p_note,''))>4000
+  then
+    raise exception using errcode='22023',
+      message='WK_1094_RECONCILE_INVALID_ARGUMENTS';
+  end if;
+
+  select decision.*
+  into v_decision
+  from public.registry_canonicalization_decisions decision
+  where decision.id=p_decision_id
+    and decision.entity_type='track'
+    and decision.decision_type='public_music_identity_distinct_recording'
+    and decision.status='recorded'
+    and decision.decided_by is not null
+    and decision.metadata->>'programmeKey'=
+      'public_music_identity_track_actual_zero_v1'
+    and decision.metadata->>'programmeIssue'='1094'
+    and decision.metadata->>'reviewResolved'='true'
+    and decision.metadata->>'finalizerAuthority'=
+      'admin_finalize_public_music_identity_track_review_v1'
+  for update;
+
+  if not found then
+    raise exception using errcode='23514',
+      message='WK_1094_RECONCILE_EXACT_FINALIZED_DECISION_MISSING';
+  end if;
+
+  select review.*
+  into v_source
+  from public.registry_review_items review
+  where review.id=v_decision.review_item_id
+    and review.status='resolved'
+    and review.review_type='mizizi_data_hygiene'
+    and review.entity_type='track'
+    and review.entity_id=v_decision.entity_id
+    and review.source_id=v_decision.entity_id::text
+    and review.resolution_payload->>'decisionId'=v_decision.id::text
+    and review.resolution_payload->>'decisionType'=
+      'public_music_identity_distinct_recording'
+    and review.resolution_payload->>'finalizerAuthority'=
+      'admin_finalize_public_music_identity_track_review_v1'
+  for update;
+
+  if not found then
+    raise exception using errcode='23514',
+      message='WK_1094_RECONCILE_ORIGINAL_FINALIZER_RECEIPT_MISMATCH';
+  end if;
+
+  select track.*
+  into v_track
+  from public.registry_tracks track
+  where track.id=v_decision.entity_id
+    and track.status='active';
+
+  if not found
+     or v_track.slug is distinct from
+        v_decision.after_payload->>'canonicalSlug'
+     or platform_private.registry_subject_state_fingerprint(
+          'track',
+          v_decision.entity_id
+        ) is distinct from
+        v_decision.before_payload->>'trackStateFingerprint'
+  then
+    raise exception using errcode='40001',
+      message='WK_1094_RECONCILE_TRACK_EVIDENCE_DRIFT';
+  end if;
+
+  begin
+    v_linked_id:=
+      nullif(
+        v_decision.after_payload->>'evidenceRecordingIdentityReviewId',
+        ''
+      )::uuid;
+  exception when others then
+    raise exception using errcode='23514',
+      message='WK_1094_RECONCILE_LINKED_ID_MALFORMED';
+  end;
+
+  if v_linked_id is null
+     or v_linked_id=v_source.id
+     or jsonb_typeof(
+          v_decision.after_payload->'evidenceRecordingPeerIds'
+        ) is distinct from 'array'
+  then
+    raise exception using errcode='23514',
+      message='WK_1094_RECONCILE_LINKED_EVIDENCE_MISSING';
+  end if;
+
+  select review.*
+  into v_linked
+  from public.registry_review_items review
+  where review.id=v_linked_id
+    and review.review_type='mizizi_data_hygiene'
+    and review.entity_type='track'
+    and review.entity_id=v_track.id
+    and review.source_id=v_track.id::text
+    and review.source_payload->>'ruleId'='track_recording_identity_conflict'
+    and review.source_payload->>'ruleVersion'='1.3.0'
+  for update;
+
+  if not found then
+    raise exception using errcode='23514',
+      message='WK_1094_RECONCILE_LINKED_REVIEW_DRIFT';
+  end if;
+
+  select coalesce(
+           jsonb_agg(value order by value),
+           '[]'::jsonb
+         )
+  into v_expected_peer_ids
+  from jsonb_array_elements_text(
+    v_decision.after_payload->'evidenceRecordingPeerIds'
+  ) item(value);
+
+  select coalesce(
+           jsonb_agg(to_jsonb(peer->>'id') order by peer->>'id'),
+           '[]'::jsonb
+         )
+  into v_current_peer_ids
+  from jsonb_array_elements(
+    coalesce(
+      v_linked.source_payload#>'{evidence,peers}',
+      '[]'::jsonb
+    )
+  ) peer;
+
+  if v_expected_peer_ids is distinct from v_current_peer_ids then
+    raise exception using errcode='40001',
+      message='WK_1094_RECONCILE_RECORDING_PEER_EVIDENCE_DRIFT';
+  end if;
+
+  if v_linked.status='resolved' then
+    if v_linked.resolution_payload->>'decisionId'=v_decision.id::text
+       and v_linked.resolution_payload->>'sourceSlugReviewId'=v_source.id::text
+    then
+      return jsonb_build_object(
+        'decisionId',v_decision.id,
+        'sourceSlugReviewId',v_source.id,
+        'linkedRecordingReviewId',v_linked.id,
+        'linkedReviewStatus','resolved',
+        'idempotentReplay',true
+      );
+    end if;
+
+    raise exception using errcode='23514',
+      message='WK_1094_RECONCILE_LINKED_REVIEW_ALREADY_RESOLVED_BY_OTHER_AUTHORITY';
+  end if;
+
+  if v_linked.status<>'open' then
+    raise exception using errcode='23514',
+      message='WK_1094_RECONCILE_LINKED_REVIEW_NOT_OPEN';
+  end if;
+
+  update public.registry_review_items
+  set status='resolved',
+      resolution_payload=jsonb_build_object(
+        'decisionId',v_decision.id,
+        'sourceSlugReviewId',v_source.id,
+        'decisionType','public_music_identity_distinct_recording',
+        'finalizerAuthority',
+          'admin_reconcile_public_music_identity_linked_recording_review_v1',
+        'originalFinalizerAuthority',
+          'admin_finalize_public_music_identity_track_review_v1',
+        'finalizedByUserId',v_user_id,
+        'finalizerNote',nullif(btrim(coalesce(p_note,'')),''),
+        'resolvedAt',v_now
+      ),
+      resolved_at=v_now,
+      updated_at=v_now
+  where id=v_linked.id
+    and status='open';
+
+  if not found then
+    raise exception using errcode='40001',
+      message='WK_1094_RECONCILE_LINKED_REVIEW_CAS_FAILED';
+  end if;
+
+  return jsonb_build_object(
+    'decisionId',v_decision.id,
+    'sourceSlugReviewId',v_source.id,
+    'linkedRecordingReviewId',v_linked.id,
+    'linkedReviewStatus','resolved',
+    'idempotentReplay',false
+  );
+end
+$reconcile$;
+
+revoke all on function
+  public.admin_reconcile_public_music_identity_linked_recording_review_v1(
+    uuid,text
+  )
+from public,anon,service_role;
+
+grant execute on function
+  public.admin_reconcile_public_music_identity_linked_recording_review_v1(
+    uuid,text
+  )
+to authenticated;
+
 do $postflight$
 declare v_new text;
 begin
   select pg_get_functiondef('public.admin_finalize_public_music_identity_track_review_v1(uuid,uuid,uuid,uuid,text)'::regprocedure) into v_new;
+  if to_regprocedure('public.admin_reconcile_public_music_identity_linked_recording_review_v1(uuid,text)') is null then raise exception 'WK_1094_RECONCILER_MISSING'; end if;
   if position('WK_1094_LINKED_RECORDING_REVIEW_CAS_FAILED' in v_new)=0
      or position('evidenceRecordingIdentityReviewId' in v_new)=0
      or position('track_recording_identity_conflict' in v_new)=0
