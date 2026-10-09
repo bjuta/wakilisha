@@ -14,6 +14,7 @@ declare v_old text;
 begin
   if to_regprocedure('mizizi_private.queue_public_music_identity_review_v1(text,text,text,text,text,text,text,text,numeric,text,text,jsonb)') is null
      or to_regprocedure('public.admin_record_public_music_identity_track_review_decision_v1(uuid,text,jsonb,text,text)') is null
+     or to_regprocedure('public.admin_preview_registry_track_duplicate_repair(uuid,uuid[])') is null
      or to_regprocedure('public.admin_finalize_public_music_identity_track_review_v1(uuid,uuid,uuid,uuid,text)') is null
      or to_regprocedure('platform_private.public_music_identity_track_review_terminal_evidence_v1(uuid,uuid,uuid,uuid)') is null
   then raise exception 'WK_1094_FINALIZER_DEPENDENCY_MISSING'; end if;
@@ -963,6 +964,168 @@ begin
   return new;
 end
 $guard$;
+
+
+create or replace function public.admin_preview_registry_track_duplicate_repair(
+  p_canonical_track_id uuid,
+  p_duplicate_track_ids uuid[]
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path=pg_catalog,public,platform_private
+as $$
+declare
+  v_duplicate_ids uuid[];
+  v_preview jsonb;
+  v_reviewed_match_count integer:=0;
+  v_duplicate_count integer:=0;
+  v_other_blockers jsonb:='[]'::jsonb;
+begin
+  if not coalesce(public.current_user_has_capability('manage_registry'),false) then
+    raise exception 'insufficient_privilege';
+  end if;
+
+  v_duplicate_ids:=array(
+    select distinct item
+    from unnest(coalesce(p_duplicate_track_ids,'{}'::uuid[])) item
+    where item is not null
+      and item<>p_canonical_track_id
+    order by item
+  );
+
+  v_duplicate_count:=coalesce(cardinality(v_duplicate_ids),0);
+
+  v_preview:=
+    platform_private.admin_preview_registry_track_duplicate_repair_base_v1(
+      p_canonical_track_id,
+      v_duplicate_ids
+    );
+
+  if v_duplicate_count=0 then
+    return v_preview;
+  end if;
+
+  select count(*)::integer
+  into v_reviewed_match_count
+  from unnest(v_duplicate_ids) duplicate_id
+  where exists (
+    select 1
+    from public.registry_canonicalization_decisions decision
+    join public.registry_review_items slug_review
+      on slug_review.id=decision.review_item_id
+    join public.registry_review_items identity_review
+      on identity_review.id::text=
+           decision.before_payload->>'relatedRecordingIdentityReviewId'
+    where decision.entity_type='track'
+      and decision.entity_id=duplicate_id
+      and decision.decision_type='public_music_identity_true_duplicate'
+      and decision.status='recorded'
+      and decision.decided_by is not null
+      and decision.metadata->>'programmeKey'=
+          'public_music_identity_track_actual_zero_v1'
+      and decision.metadata->>'programmeIssue'='1094'
+      and decision.metadata->>'decisionStage'='human_review_recorded'
+      and coalesce(decision.metadata->>'reviewResolved','false')='false'
+      and decision.after_payload->>'canonicalTrackId'=
+          p_canonical_track_id::text
+      and decision.before_payload->>'trackStateFingerprint'=
+          platform_private.registry_subject_state_fingerprint(
+            'track',
+            duplicate_id
+          )
+      and slug_review.review_type='mizizi_data_hygiene'
+      and slug_review.entity_type='track'
+      and slug_review.status='open'
+      and slug_review.source_id=duplicate_id::text
+      and (
+        (
+          slug_review.source_payload->>'ruleId'='track_slug_identity_noise'
+          and slug_review.source_payload->>'ruleVersion'='1.1.0'
+        )
+        or
+        (
+          slug_review.source_payload->>'ruleId'='track_slug_credit_evidence_gap'
+          and slug_review.source_payload->>'ruleVersion'='1.3.0'
+        )
+        or
+        (
+          slug_review.source_payload->>'ruleId'='track_recording_identity_conflict'
+          and slug_review.source_payload->>'ruleVersion'='1.3.0'
+          and slug_review.id=identity_review.id
+        )
+      )
+      and identity_review.review_type='mizizi_data_hygiene'
+      and identity_review.entity_type='track'
+      and identity_review.status='open'
+      and identity_review.source_id=duplicate_id::text
+      and identity_review.source_payload->>'ruleId'=
+          'track_recording_identity_conflict'
+      and identity_review.source_payload->>'ruleVersion'='1.3.0'
+      and exists (
+        select 1
+        from jsonb_array_elements(
+          coalesce(
+            identity_review.source_payload#>'{evidence,peers}',
+            '[]'::jsonb
+          )
+        ) peer
+        where peer->>'id'=p_canonical_track_id::text
+      )
+  );
+
+  v_preview:=jsonb_set(
+    v_preview,
+    '{counts,reviewedHumanDecisionMatches}',
+    to_jsonb(v_reviewed_match_count),
+    true
+  );
+
+  if v_reviewed_match_count<>v_duplicate_count then
+    return v_preview;
+  end if;
+
+  select coalesce(jsonb_agg(value),'[]'::jsonb)
+  into v_other_blockers
+  from jsonb_array_elements(
+    coalesce(v_preview->'blockers','[]'::jsonb)
+  ) blocker(value)
+  where blocker.value<>to_jsonb('not_enough_identity_evidence'::text);
+
+  if jsonb_array_length(v_other_blockers)>0 then
+    return v_preview;
+  end if;
+
+  v_preview:=jsonb_set(
+    v_preview,
+    '{confidenceBucket}',
+    to_jsonb('high'::text),
+    false
+  );
+
+  v_preview:=jsonb_set(
+    v_preview,
+    '{blockers}',
+    '[]'::jsonb,
+    false
+  );
+
+  v_preview:=jsonb_set(
+    v_preview,
+    '{reviewedAuthority}',
+    jsonb_build_object(
+      'programmeKey','public_music_identity_track_actual_zero_v1',
+      'programmeIssue',1094,
+      'decisionType','public_music_identity_true_duplicate',
+      'coverage','all_duplicate_targets'
+    ),
+    true
+  );
+
+  return v_preview;
+end
+$$;
 
 
 create or replace function
