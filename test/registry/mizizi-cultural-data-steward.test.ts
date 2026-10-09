@@ -1346,7 +1346,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       "await queryViaJitPool(pool, reviewStateSql)",
     );
     expect(trackControlPlane).toContain(
-      "await queryViaJitPool(pool, fingerprintSql)",
+      "await fingerprintViaJitPool(pool)",
     );
 
     const reviewCommand =
