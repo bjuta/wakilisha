@@ -8,5 +8,7 @@
   "expected_final_open_reviews": 160,
   "expected_final_feature_slug_reviews": 17,
   "expected_credit_gap_reviews": 12,
-  "expected_recording_identity_reviews": 91
+  "expected_recording_identity_reviews": 91,
+  "attempt": 2,
+  "reason": "Retry after #1197 replaced linked-CLI review-state queries with the existing JIT pool transport"
 }
