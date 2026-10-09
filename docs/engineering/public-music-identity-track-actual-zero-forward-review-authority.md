@@ -27,7 +27,19 @@ The three synthetic collisions `colors-1672b8`, `desire-2a895a`, `ficha-1d71c1` 
 1. Validate broker versioning and executor isolation, a clean 12-candidate review-only run, stale-fingerprint refusal, resolved-review refusal, no-feature and collision refusal, idempotence, and zero canonical mutation in Preview.
 2. Record a genuine linked-Preview replay proof and update generated database types and the preview schema seal via the repository's **existing** recorder. Never invent these artifacts or bypass the migration replay gate.
 3. Human-govern the outstanding 17 open scoped reviews, B1 forward decisions, and three synthetic pairs through existing Registry authorities. Do not auto-resolve human semantic or collaborator-credit ambiguities.
-4. Verify all current pointers, provider identities, redirects, public route continuity, no active feature-noise/synthetic debt, and no open scoped reviews. Run the existing `public-music-identity-track-actual-zero-audit.mjs` in `assert-zero` mode.
+4. Verify all current pointers, provider identities, historical redirect evidence, public route continuity, no active feature-noise/synthetic debt, and no open scoped reviews. Run the existing `public-music-identity-track-actual-zero-audit.mjs` in `assert-zero` mode.
 5. Protected CI, verification SQL and Production acceptance must be complete before merging the full slice or closing #1094 and parent #1068.
 
 No Production mutation or deployment is authorized by code staged here.
+
+## Human authority receipts and execution boundary — 9 October 2026
+
+**Explicit approved instructions (do not re-decide):** the twelve SoFresh 254 clean-slug proposals (#1094 issue-comment 6076248565), preserving every recorded featured credit; and D1/D2/D3 same-recording judgments (#1094 issue-comment 6077120942), retaining the active suffix-bearing Track UUID as survivor of each pair, with later clean-slug canonicalization. These are human intent receipts, not authenticated Registry decisions or Production mutation grants.
+
+**Provider research, not yet authenticated approval:** B1–B12 credit/role findings (#1094 issue-comment 6076785407) and C1–C5 identity/billing findings (#1094 issue-comment 6076846479). They establish supporting evidence and candidates. They do **not** automatically authorize co-primary credit rewrites, retirement, or new recording distinctions. Bind to exact provider/Artist identities and use the existing Admin decision path.
+
+**Seven historical B1 recording decisions:** retain the seven stored `public_music_identity_distinct_recording` decisions whose `after_payload.evidenceRecordingIdentityReviewId` matches still-open recording reviews. No recreation or re-approval of the settled decisions.
+
+**Critical original issue constraint:** #1094 requires **zero new Track/Release redirect rows**, historical redirect evidence unchanged, and no new compatibility service. All accepted duplicate/slug operations must be proved compatible with this boundary before any execution. A proposal to create fresh redirects is NOT accepted by the issue even if it appeared in a previous research comment. Chart/Community/provider pointer continuity, canonical lineage and public route behavior still require verification.
+
+**Release status:** no Preview branch currently provisioned, no actual Preview replay proof, no generated schema seal/types for the proposed SQL, no Production mutation. Stage and test the full implementation through the established deployment workflow before advancing the draft PR. No CI bypass.
