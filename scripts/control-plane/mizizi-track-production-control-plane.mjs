@@ -694,8 +694,8 @@ function assertReviewState(state, finalState) {
       release_single_reviews:40,
       active_capability_grants:0,
       active_execution_grants:0,
-      ledger_count:215,
-      ledger_head:'20261009170330',
+      ledger_count:216,
+      ledger_head:'20261009181647',
     },
     finalState ? 'review acceptance' : 'review baseline',
   );

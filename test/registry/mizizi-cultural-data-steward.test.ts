@@ -1328,7 +1328,10 @@ describe("MIZIZI Cultural Data Steward", () => {
       "open_mizizi_reviews:151",
     );
     expect(trackControlPlane).toContain(
-      "ledger_head:'20261009170330'",
+      "ledger_count:216",
+    );
+    expect(trackControlPlane).toContain(
+      "ledger_head:'20261009181647'",
     );
     expect(trackControlPlane).toContain(
       "MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS",
