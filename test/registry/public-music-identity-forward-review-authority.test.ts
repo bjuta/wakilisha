@@ -33,6 +33,8 @@ describe("#1094 forward feature review materialization", () => {
     expect(migration).toContain("theirs.artist_id=mine.artist_id");
     expect(migration).toContain("public.wk_chart_entries_v2");
     expect(migration).toContain("public.community_threads");
+    expect(migration).toContain("Recording-identity conflict review already owns this Track.");
+    expect(migration).toContain("to_regclass('public.wk_chart_entries_v2')");
   });
 
   it("does not write any canonical Track or pointer surface", () => {
