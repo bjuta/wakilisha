@@ -30,3 +30,21 @@ The migration is an additive authority contract, not a data backfill. The 12 new
 - No Production schema or Registry writes until all gates are independently green and explicitly staged.
 
 The same `scripts/control-plane/verify-public-music-identity-track-review-finalization-v1.sql` gate carries the new admission checks; no standalone verifier family.
+
+## 9 October 2026 — Historical B1 read-only revalidation
+
+A fresh Production **read-only** query isolates exactly seven active feature-bearing Tracks with one resolved scoped slug review and one still-open `track_recording_identity_conflict/1.3.0` review each:
+
+| Current Track slug | Resolved scoped slug reviews | Open recording-identity reviews |
+| --- | ---: | ---: |
+| `freak-it-feat-doc-spot` | 1 | 1 |
+| `furaha-remix-feat-arrow-bwoy-nadia-mukami-kristoff-dogo-janja-exray` | 1 | 1 |
+| `intro-feat-juliani` | 1 | 1 |
+| `ngoma-feat-jedi-keys-bigman-chucho` | 1 | 1 |
+| `siri-feat-xenia-manasseh-mtm-thuo` | 1 | 1 |
+| `steam-feat-kato-change` | 1 | 1 |
+| `vaccine-feat-tugi-mlamba` | 1 | 1 |
+
+This count is **not** a grant to mutate or reopen the seven settled reviews. The next implementation must bind the existing forward open recording review to the historical recorded decision and exact current state, then enforce independent canonical-operation receipts. No such mutation authority has been accepted yet.
+
+The latest protected CI workflow, run `37890381341`, finished with `critical-browser=success` and `critical-core=failure` at `Enforce migration replay contract`. It must remain failing until a real linked Preview ledger and recorded proof exist; changing `live-schema-baseline.json` without that proof is prohibited.
