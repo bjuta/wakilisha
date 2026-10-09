@@ -48,3 +48,7 @@ A fresh Production **read-only** query isolates exactly seven active feature-bea
 This count is **not** a grant to mutate or reopen the seven settled reviews. The next implementation must bind the existing forward open recording review to the historical recorded decision and exact current state, then enforce independent canonical-operation receipts. No such mutation authority has been accepted yet.
 
 The latest protected CI workflow, run `37890381341`, finished with `critical-browser=success` and `critical-core=failure` at `Enforce migration replay contract`. It must remain failing until a real linked Preview ledger and recorded proof exist; changing `live-schema-baseline.json` without that proof is prohibited.
+
+### Verified historical decision linkage
+
+Read-only inspection of `registry_canonicalization_decisions` confirms that **all seven** historical B1 scoped reviews have one `public_music_identity_distinct_recording` decision. For each, `decision.after_payload->>'evidenceRecordingIdentityReviewId'` matches the exact **still-open** `track_recording_identity_conflict` review ID for that Track (7/7 true). The link lives in `after_payload`, **not** in `decision.metadata`; any forward implementation reading `metadata.relatedRecordingIdentityReviewId` would falsely report missing causality. Preserve each immutable recorded decision, its original semantic distinction and peer evidence, and the existing unresolved recording-review lifecycle.
