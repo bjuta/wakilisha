@@ -3,28 +3,24 @@
   "scope": "public_music_identity_batch_a_safe_slug",
   "programme_issue": 1094,
   "confirm": "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_APPLY",
-  "capability_grant_id": "c52081d1-4381-47c8-851a-b769ac2b8242",
-  "expected_candidate_count": 5,
-  "expected_candidate_fingerprint": "363bed8410570611a8cdf43194f7b47a0e0f380877fac342201fc48e2b6576e9",
+  "capability_grant_id": "e973a34d-b63f-4344-9484-a67a50a4ecf5",
+  "expected_candidate_count": 12,
+  "expected_candidate_fingerprint": "d2d87dc10eb09d61f68e68a10232a53cff378fde41d8adcb20384311c6e15d15",
   "expected_operation_key": "registry.track_slug.canonicalize",
   "expected_capability_key": "canonicalize_registry_track_slug",
-  "safe_review_ids": [
-    "740dbe7e-b423-4e69-b479-83dc91a76da2",
-    "74df20a4-1486-42a1-a6fe-e6b625c38728",
-    "e4150d85-72b5-4a4b-895b-59cacc81b658",
-    "78ac6974-e6a8-4759-a2be-ce3fd979ab0b",
-    "d723ff1e-31ad-42ff-9fe0-871c9b9e9b52"
+  "safe_rows": [
+    {"review_id":"00aafb96-d519-45ed-b367-16879ee36bc8","track_id":"d7f6fb75-3dba-5965-86ea-cf1a5fd7ce7e","expected_slug":"form-imeiva"},
+    {"review_id":"09c8fb26-0479-4d83-8c12-6a027b95ae13","track_id":"30163529-f5b1-5645-884e-e942378cd0fa","expected_slug":"glow"},
+    {"review_id":"2405ef35-c37b-459c-9067-35b5cf420a66","track_id":"92d21032-dc76-5518-8b21-82ecd1f1a6ab","expected_slug":"waist-line"},
+    {"review_id":"4981ba5c-6c95-4fc5-bdc8-2902003ec442","track_id":"e4581038-cfe2-5e64-897f-1e0eb291671a","expected_slug":"bombo"},
+    {"review_id":"5bf7e9a7-9dd0-4a45-8f19-1522c4a5de3f","track_id":"1cf26df0-5072-5686-80a6-6a53450d41ea","expected_slug":"murda"},
+    {"review_id":"aa824d02-4bf1-47d7-8f55-debc0f6ef5b6","track_id":"db0a566e-7e62-526b-8794-831ce14878d7","expected_slug":"hakuna-kulala"},
+    {"review_id":"ad2c3640-c421-426b-826a-7956ad6d8294","track_id":"eb003451-b337-50da-8aba-71ed4809458b","expected_slug":"pretty-girl"},
+    {"review_id":"b7d8ed17-e6cc-4d0d-a66d-fc4c18751744","track_id":"b4be461b-9c7a-5ec8-82e7-e37c5ccc6588","expected_slug":"itisha"},
+    {"review_id":"ba7dbd0e-3b13-4892-9626-1db5e790cdd1","track_id":"84f1919b-83be-5f25-8596-1b28055ba724","expected_slug":"hands-in-the-air"},
+    {"review_id":"be1eb7a5-578e-4c2d-9520-ce8ac34d3010","track_id":"999027a7-4aea-5aa6-8742-a0f8dd78bcfd","expected_slug":"sitaki-drinks"},
+    {"review_id":"d69868d3-bd25-4681-9632-b86ce5303a1f","track_id":"3a2af997-85b6-5557-8e61-21eb551c28c8","expected_slug":"seto"},
+    {"review_id":"ec2ead4d-dbb7-481d-96cf-8107cb1b4da8","track_id":"431fbc40-916e-5de2-8278-68b826050f2f","expected_slug":"2-left-feet"}
   ],
-  "duplicate_review_ids": [
-    "4894bfa2-8308-47d3-b502-6670082e0c61",
-    "909afe2e-9f56-4923-ad6a-b9fc50cb4709",
-    "6f52d662-3326-414e-a960-47ea27489564",
-    "fd29049c-03e1-4005-a5dd-c412a5d7581f",
-    "34e1696c-b7e8-45b6-8d0a-6ac7e7a89a76",
-    "40f42e78-dfe4-4450-8693-f8c7f37571eb",
-    "70e36b3f-909e-4470-acfe-8f411dda1a94",
-    "e1e7d310-54aa-421c-97d7-542ef2427608",
-    "d1cfb9fe-d338-455b-b57d-ea3c155560c9",
-    "72df403c-ad7a-46f6-8478-64640ae1600f"
-  ]
+  "prerequisite_resolved_review_ids": []
 }
