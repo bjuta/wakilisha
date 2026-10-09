@@ -19,6 +19,8 @@ begin
      or to_regclass('public.registry_review_items') is null
      or to_regclass('public.registry_tracks') is null
      or to_regclass('public.registry_track_artists') is null
+     or to_regclass('public.wk_chart_entries_v2') is null
+     or to_regclass('public.community_threads') is null
   then
     raise exception 'STOP: exact public music identity review dependencies are missing';
   end if;
@@ -100,6 +102,19 @@ begin
   ) then
     raise exception using errcode='23514',
       message='Existing or historical scoped review must be governed through its own authority.';
+  end if;
+
+  if exists (
+    select 1 from public.registry_review_items r
+    where r.review_type='mizizi_data_hygiene'
+      and r.entity_type='track'
+      and r.source_id=p_track_id::text
+      and r.status='open'
+      and r.source_payload->>'ruleId'='track_recording_identity_conflict'
+      and r.source_payload->>'ruleVersion'='1.3.0'
+  ) then
+    raise exception using errcode='23514',
+      message='Recording-identity conflict review already owns this Track.';
   end if;
 
   select
