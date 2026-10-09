@@ -279,7 +279,19 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "public_music_identity_safe_slug_repair",
     );
     expect(batch).toContain(
-      "Expected 5 recorded safe-slug decisions and 10 fully resolved duplicate reviews.",
+      "trigger.prerequisiteReviewIds.length",
+    );
+    expect(batch).toContain(
+      "trigger.safeRows.length",
+    );
+    expect(batch).toContain(
+      "manifestFingerprint",
+    );
+    expect(batch).toContain(
+      "prerequisite_resolved_review_ids",
+    );
+    expect(batch).toContain(
+      "safe_rows",
     );
     expect(batch).toContain(
       "740dbe7e-b423-4e69-b479-83dc91a76da2",
