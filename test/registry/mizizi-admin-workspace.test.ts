@@ -148,6 +148,21 @@ describe("MIZIZI Admin workspace", () => {
     expect(page).not.toContain('max-h-[calc(92vh-150px)]');
   });
 
+  it("gives approved #1094 batch decisions a dedicated one-action view", () => {
+    const exact = read("src/pages/admin/review/mizizi/issue1094.tsx");
+    expect(page).toContain('get("task") === "1094-d1-d3"');
+    expect(page).toContain("<Issue1094ExactDecisions />");
+    expect(exact).toContain("data-wk-mizizi-1094-decisions");
+    expect(exact).toContain("data-wk-1094-record-decisions");
+    expect(exact).toContain("const checked = await load()");
+    expect(exact).toContain("if (row.recorded) continue");
+    expect(exact).toContain("recordRegistryReviewDecision({");
+    expect(exact).toContain('decisionType: "public_music_identity_true_duplicate"');
+    expect(exact).toContain("expectedTrackStateFingerprint: row.context.trackStateFingerprint");
+    expect(exact).not.toContain("admin_apply_registry_track_duplicate_repair");
+    expect(exact).not.toContain("—");
+  });
+
   it("wires MIZIZI into Admin without replacing audit history", () => {
     expect(lazy).toContain("AdminMiziziWorkspacePage");
     expect(routes).toContain('{ path: "mizizi", element: <AdminMiziziWorkspacePage /> }');

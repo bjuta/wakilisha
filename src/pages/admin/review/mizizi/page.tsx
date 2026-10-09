@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import Issue1094ExactDecisions from "./issue1094";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { Modal } from "@/components/design-system/primitives/Modal";
@@ -384,6 +385,13 @@ async function loadDetail(reviewId: string): Promise<Omit<DetailState, "loading"
 }
 
 export default function AdminMiziziWorkspacePage() {
+  const location = useLocation();
+  return new URLSearchParams(location.search).get("task") === "1094-d1-d3"
+    ? <Issue1094ExactDecisions />
+    : <AdminMiziziWorkspaceContent />;
+}
+
+function AdminMiziziWorkspaceContent() {
   const navigate = useNavigate();
   const [items, setItems] = useState<WorkspaceItem[]>([]);
   const [lane, setLane] = useState<Lane>("needs_decision");
