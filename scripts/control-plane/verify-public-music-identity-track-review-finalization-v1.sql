@@ -156,6 +156,8 @@ begin
      or position('wk_chart_entries_v2' in v_definition)=0
      or position('community_threads' in v_definition)=0
      or position('humanDecisionRequired' in v_definition)=0
+     or position('Recording-identity conflict review already owns this Track.' in v_definition)=0
+     or position('wk_chart_entries_v2' in v_definition)=0
      or v_definition ~* '(update|delete[[:space:]]+from|insert[[:space:]]+into)[[:space:]]+public[.](registry_tracks|wk_chart_entries_v2|community_threads)'
   then
     raise exception 'WK_1094_FORWARD_FEATURE_REVIEW_AUTHORITY_DRIFT';
