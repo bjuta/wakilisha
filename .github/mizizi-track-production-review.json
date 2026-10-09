@@ -9,6 +9,6 @@
   "expected_final_feature_slug_reviews": 17,
   "expected_credit_gap_reviews": 12,
   "expected_recording_identity_reviews": 91,
-  "attempt": 4,
-  "reason": "Retry after #1203 moved restricted-JIT fingerprint hashing into Node without broadening database privileges"
+  "attempt": 5,
+  "reason": "Execute after #1205 separated privileged verification from the narrow Stage C executor"
 }
