@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 
 import {
   linkSupabaseProject,
@@ -26,7 +27,7 @@ const CLOSE_MIGRATION_VERSION = "20260922143000";
 const CLOSE_MIGRATION_NAME =
   "mizizi_url_identity_authority_window_close_v1";
 
-const SAFE_SLUG_ROWS = [
+const LEGACY_SAFE_SLUG_ROWS = [
   {
     reviewId: "740dbe7e-b423-4e69-b479-83dc91a76da2",
     trackId: "9f02ad39-8f78-4c0b-aeff-6e8c5f1a2269",
@@ -54,7 +55,7 @@ const SAFE_SLUG_ROWS = [
   },
 ];
 
-const DUPLICATE_REVIEW_IDS = [
+const LEGACY_PREREQUISITE_REVIEW_IDS = [
   "4894bfa2-8308-47d3-b502-6670082e0c61",
   "909afe2e-9f56-4923-ad6a-b9fc50cb4709",
   "6f52d662-3326-414e-a960-47ea27489564",
@@ -83,6 +84,7 @@ function sqlValues(rows) {
 }
 
 function sqlUuidArray(values) {
+  if (!values.length) return "array[]::uuid[]";
   return (
     "array[" +
     values.map((value) => "'" + value + "'::uuid").join(",") +
@@ -100,6 +102,29 @@ function requireUuid(value, label) {
     throw new Error(label + " must be an exact UUID.");
   }
   return normalized;
+}
+
+function manifestFingerprint(rows) {
+  const normalized = [...rows]
+    .map((row) => ({
+      reviewId: requireUuid(row.reviewId, "safe row reviewId"),
+      trackId: requireUuid(row.trackId, "safe row trackId"),
+      expectedSlug: String(row.expectedSlug || "").trim(),
+    }))
+    .sort((a, b) => a.reviewId.localeCompare(b.reviewId));
+
+  if (
+    normalized.some(
+      (row) =>
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.expectedSlug),
+    )
+  ) {
+    throw new Error("safe row expectedSlug must be one canonical slug.");
+  }
+
+  return createHash("sha256")
+    .update(JSON.stringify(normalized), "utf8")
+    .digest("hex");
 }
 
 function assertReviewedTrigger() {
@@ -120,18 +145,45 @@ function assertReviewedTrigger() {
     fs.readFileSync(TRIGGER_FILE, "utf8"),
   );
 
-  const expectedSafe = SAFE_SLUG_ROWS
+  const manifestRows =
+    Array.isArray(trigger.safe_rows) && trigger.safe_rows.length
+      ? trigger.safe_rows.map((row) => ({
+          reviewId: requireUuid(
+            row.review_id ?? row.reviewId,
+            "safe row reviewId",
+          ),
+          trackId: requireUuid(
+            row.track_id ?? row.trackId,
+            "safe row trackId",
+          ),
+          expectedSlug: String(
+            row.expected_slug ?? row.expectedSlug ?? "",
+          ).trim(),
+        }))
+      : LEGACY_SAFE_SLUG_ROWS;
+
+  const prerequisiteReviewIds =
+    Array.isArray(trigger.prerequisite_resolved_review_ids)
+      ? trigger.prerequisite_resolved_review_ids.map((value) =>
+          requireUuid(value, "prerequisite review id"),
+        )
+      : Array.isArray(trigger.duplicate_review_ids)
+        ? trigger.duplicate_review_ids.map((value) =>
+            requireUuid(value, "legacy prerequisite review id"),
+          )
+        : LEGACY_PREREQUISITE_REVIEW_IDS;
+
+  const expectedSafe = manifestRows
     .map((row) => row.reviewId)
     .sort();
-  const expectedDuplicate = [...DUPLICATE_REVIEW_IDS].sort();
   const actualSafe = Array.isArray(trigger.safe_review_ids)
     ? [...trigger.safe_review_ids].map(String).sort()
-    : [];
-  const actualDuplicate = Array.isArray(
-    trigger.duplicate_review_ids,
-  )
-    ? [...trigger.duplicate_review_ids].map(String).sort()
-    : [];
+    : expectedSafe;
+
+  const expectedFingerprint =
+    Array.isArray(trigger.safe_rows) && trigger.safe_rows.length
+      ? manifestFingerprint(manifestRows)
+      : EXPECTED_CANDIDATE_FINGERPRINT;
 
   if (
     trigger.operation !==
@@ -142,15 +194,13 @@ function assertReviewedTrigger() {
     trigger.confirm !==
       "PUBLIC_MUSIC_IDENTITY_BATCH_A_SAFE_SLUG_APPLY" ||
     Number(trigger.expected_candidate_count) !==
-      SAFE_SLUG_ROWS.length ||
+      manifestRows.length ||
     trigger.expected_candidate_fingerprint !==
-      EXPECTED_CANDIDATE_FINGERPRINT ||
+      expectedFingerprint ||
     trigger.expected_operation_key !== OPERATION_KEY ||
     trigger.expected_capability_key !== CAPABILITY_KEY ||
     JSON.stringify(actualSafe) !==
-      JSON.stringify(expectedSafe) ||
-    JSON.stringify(actualDuplicate) !==
-      JSON.stringify(expectedDuplicate)
+      JSON.stringify(expectedSafe)
   ) {
     throw new Error(
       "Batch A reviewed trigger does not match the exact approved manifest.",
@@ -169,6 +219,8 @@ function assertReviewedTrigger() {
   return {
     ...trigger,
     capability_grant_id: capabilityGrantId,
+    safeRows: manifestRows,
+    prerequisiteReviewIds,
   };
 }
 
@@ -365,10 +417,10 @@ function assertExactMain() {
   }
 }
 
-function batchState() {
-  const safeValues = sqlValues(SAFE_SLUG_ROWS);
+function batchState(safeRows, prerequisiteReviewIds) {
+  const safeValues = sqlValues(safeRows);
   const duplicateReviewIds = sqlUuidArray(
-    DUPLICATE_REVIEW_IDS,
+    prerequisiteReviewIds,
   );
 
   return queryViaLinkedCli(`
@@ -675,15 +727,18 @@ async function main() {
   let restError = null;
 
   try {
-    const before = batchState();
+    const before = batchState(
+      trigger.safeRows,
+      trigger.prerequisiteReviewIds,
+    );
 
     if (
-      Number(before.safe_rows || 0) !== SAFE_SLUG_ROWS.length ||
-      Number(before.safe_ready || 0) !== SAFE_SLUG_ROWS.length ||
+      Number(before.safe_rows || 0) !== trigger.safeRows.length ||
+      Number(before.safe_ready || 0) !== trigger.safeRows.length ||
       Number(before.duplicate_rows || 0) !==
-        DUPLICATE_REVIEW_IDS.length ||
+        trigger.prerequisiteReviewIds.length ||
       Number(before.duplicate_resolved || 0) !==
-        DUPLICATE_REVIEW_IDS.length
+        trigger.prerequisiteReviewIds.length
     ) {
       fs.writeFileSync(
         ARTIFACT_DIR + "/preflight-failed.json",
@@ -692,7 +747,11 @@ async function main() {
 
       throw new Error(
         "Batch A is not ready for MIZIZI safe-slug execution. " +
-          "Expected 5 recorded safe-slug decisions and 10 fully resolved duplicate reviews.",
+          "Expected " +
+          trigger.safeRows.length +
+          " recorded safe-slug decisions and " +
+          trigger.prerequisiteReviewIds.length +
+          " fully resolved prerequisite reviews.",
       );
     }
 
@@ -722,7 +781,7 @@ async function main() {
       safeState.map((row) => [String(row.reviewId), row]),
     );
 
-    for (const row of SAFE_SLUG_ROWS) {
+    for (const row of trigger.safeRows) {
       const stateRow = byReview.get(row.reviewId);
 
       if (
@@ -810,7 +869,7 @@ select
   count(*)::int as canonicalized
 from (
   values
-  ${sqlValues(SAFE_SLUG_ROWS)}
+  ${sqlValues(trigger.safeRows)}
 ) manifest(review_id,track_id,expected_slug)
 join public.registry_tracks track
   on track.id=manifest.track_id
@@ -818,9 +877,9 @@ join public.registry_tracks track
  and track.slug=manifest.expected_slug
 `);
 
-  if (Number(post.canonicalized || 0) !== SAFE_SLUG_ROWS.length) {
+  if (Number(post.canonicalized || 0) !== trigger.safeRows.length) {
     throw new Error(
-      "Batch A postcondition failed: not all five safe-slug Tracks own their approved canonical slug.",
+      "Batch A postcondition failed: not all reviewed safe-slug Tracks own their approved canonical slug.",
     );
   }
 
@@ -836,7 +895,9 @@ join public.registry_tracks track
     "SAFE_SLUG_OPERATIONS=" + operations.length,
   );
   console.log(
-    "NEXT_GATE=authenticated_admin_finalization_for_five_safe_slug_reviews",
+    "NEXT_GATE=authenticated_admin_finalization_for_" +
+      trigger.safeRows.length +
+      "_safe_slug_reviews",
   );
 }
 
