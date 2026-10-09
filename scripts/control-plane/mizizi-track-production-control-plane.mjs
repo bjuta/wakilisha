@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import pg from 'pg';
 
@@ -114,6 +115,19 @@ async function queryViaJitPool(pool, sql) {
     );
   }
   return result.rows[0];
+}
+
+async function fingerprintViaJitPool(pool) {
+  const row = await queryViaJitPool(pool, fingerprintPayloadSql);
+  const payload = String(row?.fingerprint_payload || '');
+  if (!payload) {
+    throw new Error('JIT fingerprint payload query returned no payload.');
+  }
+  return {
+    fingerprint:createHash('sha256')
+      .update(payload,'utf8')
+      .digest('hex'),
+  };
 }
 
 async function waitForDatabaseHealth() {
@@ -306,6 +320,12 @@ const fingerprintSql = `with payload as (
   'redirects',coalesce((select jsonb_agg(to_jsonb(x) order by x.id) from public.wk_slug_redirects x where x.entity_type='track'),'[]'::jsonb)
  ) body
 ) select encode(extensions.digest(convert_to(body::text,'UTF8'),'sha256'),'hex') fingerprint from payload`;
+
+const fingerprintPayloadSql =
+  fingerprintSql.replace(
+    "select encode(extensions.digest(convert_to(body::text,'UTF8'),'sha256'),'hex') fingerprint from payload",
+    "select body::text as fingerprint_payload from payload",
+  );
 
 const baselineSql = `select
  (select count(*)::int from public.registry_tracks where status='active') active_tracks,
@@ -1045,7 +1065,7 @@ async function main() {
 
         if (MODE === 'review') {
           console.log('\n=== 6. REVIEW-ONLY PRODUCTION AUTHORITY ===');
-          const reviewFingerprintBefore = await queryViaJitPool(pool, fingerprintSql);
+          const reviewFingerprintBefore = await fingerprintViaJitPool(pool);
           if (reviewFingerprintBefore.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
             throw new Error(
               `review input fingerprint drift: ${reviewFingerprintBefore.fingerprint}`,
@@ -1089,7 +1109,7 @@ async function main() {
           const featureReviewAfter =
             (await queryViaJitPool(pool, featureReviewStateSql)).rows;
           assertFeatureReviewRows(featureReviewAfter,true);
-          const reviewFingerprintAfter = await queryViaJitPool(pool, fingerprintSql);
+          const reviewFingerprintAfter = await fingerprintViaJitPool(pool);
           if (reviewFingerprintAfter.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
             throw new Error(
               `canonical Registry input changed during review materialization: ${reviewFingerprintAfter.fingerprint}`,
