@@ -12,8 +12,8 @@ const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-track-
 const EXPECTED_FINGERPRINT = '551b29431700536937c26ecb1e396c3cf9314edefd88c589284cf330c9d1bb9a';
 const EXPECTED_REVIEW_INPUT_FINGERPRINT = '6d9fa72f13ce4a5d774a457552e3cd3824475fb8a651473d5999605a3dcc29fb';
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': '0518258a8fa439b06b8f017decb09f3d9da447cf',
-  'scripts/registry/agents/mizizi/core.ts': '412f4c2b11971a675dcea74ee02787887c8cb334',
+  'scripts/registry/agents/mizizi/run.ts': 'db38946f4800c5f9721a6aaed42838589686dabd',
+  'scripts/registry/agents/mizizi/core.ts': 'd57a242b60f517461243f0310c61d1f791362f37',
   'supabase/functions/_shared/registry-track-identity.ts': '7bcab485aecc3cc7b90e2a3154d90dcee81be92c',
 };
 
