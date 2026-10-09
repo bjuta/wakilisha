@@ -11,6 +11,6 @@
   "expected_final_feature_slug_reviews": 5,
   "expected_credit_gap_reviews": 12,
   "expected_final_recording_identity_reviews": 94,
-  "attempt": 8,
-  "reason": "Retry the exact three #1094 synthetic-collision recording reviews after Production needs-review Track-Artist credit read-scope repair"
+  "attempt": 9,
+  "reason": "Retry exact three #1094 synthetic-collision recording reviews after independently verified Production broker principal-credit admission migration 20261009181647 (#1218)"
 }
