@@ -41,7 +41,7 @@ returns uuid
 language plpgsql
 security definer
 set search_path = pg_catalog, public, mizizi_private
-as $$
+as $function$
 declare
   v_review_id uuid;
   v_track public.registry_tracks%rowtype;
@@ -135,19 +135,19 @@ begin
                   regexp_replace(
                     regexp_replace(
                       mizizi_private.normalize_identity_text_v1(peer.title),
-                      '\\([^)]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^)]*\\)',
+                      $regex$\([^)]*\y(feat(uring)?|ft)\.?[[:space:]]+[^)]*\)$regex$,
                       ' ',
                       'gi'
                     ),
-                    '\\[[^]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^]]*\\]',
+                    $regex$\[[^]]*\y(feat(uring)?|ft)\.?[[:space:]]+[^]]*\]$regex$,
                     ' ',
                     'gi'
                   ),
-                  '\\{[^}]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^}]*\\}',
+                  $regex$\{[^}]*\y(feat(uring)?|ft)\.?[[:space:]]+[^}]*\}$regex$,
                   ' ',
                   'gi'
                 ),
-                '[[:space:]]+(-|:)?[[:space:]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+.*$',
+                $regex$[[:space:]]+(-|:)?[[:space:]]*\y(feat(uring)?|ft)\.?[[:space:]]+.*$$regex$,
                 '',
                 'i'
               )
@@ -158,19 +158,19 @@ begin
                   regexp_replace(
                     regexp_replace(
                       mizizi_private.normalize_identity_text_v1(v_track.title),
-                      '\\([^)]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^)]*\\)',
+                      $regex$\([^)]*\y(feat(uring)?|ft)\.?[[:space:]]+[^)]*\)$regex$,
                       ' ',
                       'gi'
                     ),
-                    '\\[[^]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^]]*\\]',
+                    $regex$\[[^]]*\y(feat(uring)?|ft)\.?[[:space:]]+[^]]*\]$regex$,
                     ' ',
                     'gi'
                   ),
-                  '\\{[^}]*\\y(feat(uring)?|ft)\\.?[[:space:]]+[^}]*\\}',
+                  $regex$\{[^}]*\y(feat(uring)?|ft)\.?[[:space:]]+[^}]*\}$regex$,
                   ' ',
                   'gi'
                 ),
-                '[[:space:]]+(-|:)?[[:space:]]*\\y(feat(uring)?|ft)\\.?[[:space:]]+.*$',
+                $regex$[[:space:]]+(-|:)?[[:space:]]*\y(feat(uring)?|ft)\.?[[:space:]]+.*$$regex$,
                 '',
                 'i'
               )
@@ -187,198 +187,14 @@ begin
       from public.registry_tracks peer
       where peer.status='active'
         and peer.id<>v_track.id
+        and left(peer.slug,length(v_track.slug)+1)=v_track.slug||'-'
+        and substring(peer.slug from length(v_track.slug)+2)
+              ~ '^[0-9a-f]{6}$'
         and regexp_replace(
               peer.slug,
-              '-[0-9a-f]{6}
-
-  v_expected_fingerprint :=
-    mizizi_private.finding_fingerprint_v1(
-      p_rule_id,
-      p_rule_version,
-      p_entity_type,
-      p_entity_id,
-      p_field_name,
-      p_current_value,
-      p_proposed_value
-    );
-
-  if v_expected_fingerprint <> p_fingerprint then
-    raise exception using
-      errcode='42501',
-      message='Public Music Identity review fingerprint is not deterministic.';
-  end if;
-
-  select review.id
-  into v_review_id
-  from public.registry_review_items review
-  where review.review_type='mizizi_data_hygiene'
-    and review.status <> 'resolved'
-    and review.entity_type='track'
-    and review.source_id=p_entity_id
-    and review.source_payload->>'ruleId'=p_rule_id
-  order by review.created_at,review.id
-  limit 1
-  for update;
-
-  if found then
-    return v_review_id;
-  end if;
-
-  insert into public.registry_review_items (
-    review_key,
-    entity_type,
-    entity_id,
-    review_type,
-    priority,
-    status,
-    title,
-    summary,
-    source_table,
-    source_id,
-    source_payload,
-    candidate_payload,
-    created_at,
-    updated_at
-  )
-  values (
-    'mizizi:' || p_fingerprint,
-    'track',
-    p_entity_id::uuid,
-    'mizizi_data_hygiene',
-    'high',
-    'open',
-    v_title,
-    btrim(p_reason),
-    'registry_tracks',
-    p_entity_id,
-    jsonb_build_object(
-      'agent','mizizi',
-      'ruleId',p_rule_id,
-      'ruleVersion',p_rule_version,
-      'fieldName',p_field_name,
-      'currentValue',p_current_value,
-      'confidence',p_confidence,
-      'evidence',coalesce(p_evidence,'{}'::jsonb)
-    ),
-    jsonb_build_object(
-      'proposedValue',p_proposed_value,
-      'disposition','review'
-    ),
-    now(),
-    now()
-  )
-  on conflict (review_key)
-  do nothing
-  returning id into v_review_id;
-
-  if v_review_id is null then
-    select review.id
-    into v_review_id
-    from public.registry_review_items review
-    where review.review_key='mizizi:' || p_fingerprint;
-  end if;
-
-  return v_review_id;
-end
-$$;
-
-,
+              '-[0-9a-f]{6}$',
               ''
             )=v_track.slug
-        and peer.slug ~ ('^'||v_track.slug||'-[0-9a-f]{6}
-
-  v_expected_fingerprint :=
-    mizizi_private.finding_fingerprint_v1(
-      p_rule_id,
-      p_rule_version,
-      p_entity_type,
-      p_entity_id,
-      p_field_name,
-      p_current_value,
-      p_proposed_value
-    );
-
-  if v_expected_fingerprint <> p_fingerprint then
-    raise exception using
-      errcode='42501',
-      message='Public Music Identity review fingerprint is not deterministic.';
-  end if;
-
-  select review.id
-  into v_review_id
-  from public.registry_review_items review
-  where review.review_type='mizizi_data_hygiene'
-    and review.status <> 'resolved'
-    and review.entity_type='track'
-    and review.source_id=p_entity_id
-    and review.source_payload->>'ruleId'=p_rule_id
-  order by review.created_at,review.id
-  limit 1
-  for update;
-
-  if found then
-    return v_review_id;
-  end if;
-
-  insert into public.registry_review_items (
-    review_key,
-    entity_type,
-    entity_id,
-    review_type,
-    priority,
-    status,
-    title,
-    summary,
-    source_table,
-    source_id,
-    source_payload,
-    candidate_payload,
-    created_at,
-    updated_at
-  )
-  values (
-    'mizizi:' || p_fingerprint,
-    'track',
-    p_entity_id::uuid,
-    'mizizi_data_hygiene',
-    'high',
-    'open',
-    v_title,
-    btrim(p_reason),
-    'registry_tracks',
-    p_entity_id,
-    jsonb_build_object(
-      'agent','mizizi',
-      'ruleId',p_rule_id,
-      'ruleVersion',p_rule_version,
-      'fieldName',p_field_name,
-      'currentValue',p_current_value,
-      'confidence',p_confidence,
-      'evidence',coalesce(p_evidence,'{}'::jsonb)
-    ),
-    jsonb_build_object(
-      'proposedValue',p_proposed_value,
-      'disposition','review'
-    ),
-    now(),
-    now()
-  )
-  on conflict (review_key)
-  do nothing
-  returning id into v_review_id;
-
-  if v_review_id is null then
-    select review.id
-    into v_review_id
-    from public.registry_review_items review
-    where review.review_key='mizizi:' || p_fingerprint;
-  end if;
-
-  return v_review_id;
-end
-$$;
-
-)
         and mizizi_private.slugify_identity_v1(
               mizizi_private.normalize_identity_text_v1(peer.title)
             )=
@@ -510,7 +326,7 @@ $$;
 
   return v_review_id;
 end
-$$;
+$function$;
 
 
 create or replace function
