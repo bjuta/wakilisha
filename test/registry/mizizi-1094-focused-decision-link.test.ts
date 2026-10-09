@@ -8,7 +8,7 @@ describe("#1094 exact Admin decision shortcut", () => {
   const page = read("src/pages/admin/review/mizizi/issue1094.tsx");
 
   it("opens a dedicated task from the existing lazy Admin route", () => {
-    expect(route).toContain('get("task") === "1094-d1-d3"');
+    expect(route).toContain('task === "1094-d1-d3"');
     expect(route).toContain("<Issue1094ExactDecisions />");
     expect(route).toContain("<AdminMiziziWorkspaceContent />");
     expect(page).toContain("data-wk-mizizi-1094-decisions");
