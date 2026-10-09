@@ -211,6 +211,15 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "EXPECTED_BATCH_A_SAFE_SLUG_CANDIDATE_FINGERPRINT",
     );
     expect(currentControlPlane).toContain(
+      "reviewedBatchASafeRows",
+    );
+    expect(currentControlPlane).toContain(
+      "reviewed Batch A manifest count/fingerprint is not exact",
+    );
+    expect(currentControlPlane).toContain(
+      "dynamicBatchA?.fingerprint",
+    );
+    expect(currentControlPlane).toContain(
       "363bed8410570611a8cdf43194f7b47a0e0f380877fac342201fc48e2b6576e9",
     );
 

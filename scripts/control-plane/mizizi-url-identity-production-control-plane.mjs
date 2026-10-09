@@ -3377,6 +3377,63 @@ function requireUuidList(value, label, expectedCount) {
   return normalized;
 }
 
+function reviewedBatchASafeRows(trigger) {
+  if (
+    trigger.scope !==
+      "public_music_identity_batch_a_safe_slug" ||
+    !Array.isArray(trigger.safe_rows) ||
+    trigger.safe_rows.length === 0
+  ) {
+    return null;
+  }
+
+  const rows = trigger.safe_rows
+    .map((row) => ({
+      reviewId: requireUuid(
+        row.review_id ?? row.reviewId,
+        "safe row reviewId",
+      ),
+      trackId: requireUuid(
+        row.track_id ?? row.trackId,
+        "safe row trackId",
+      ),
+      expectedSlug: String(
+        row.expected_slug ?? row.expectedSlug ?? "",
+      ).trim(),
+    }))
+    .sort((a, b) => a.reviewId.localeCompare(b.reviewId));
+
+  if (
+    rows.some(
+      (row) =>
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(
+          row.expectedSlug,
+        ),
+    )
+  ) {
+    throw new Error(
+      "reviewed Batch A safe-row slug is malformed",
+    );
+  }
+
+  const fingerprint = sha256(
+    JSON.stringify(rows),
+  );
+
+  if (
+    Number(trigger.expected_candidate_count) !==
+      rows.length ||
+    trigger.expected_candidate_fingerprint !==
+      fingerprint
+  ) {
+    throw new Error(
+      "reviewed Batch A manifest count/fingerprint is not exact",
+    );
+  }
+
+  return { rows, fingerprint };
+}
+
 function readReviewedTrigger(path) {
   if (!path || !fs.existsSync(path)) {
     throw new Error(
@@ -3408,11 +3465,17 @@ function readReviewedTrigger(path) {
     );
   }
 
+  const dynamicBatchA =
+    reviewedBatchASafeRows(trigger);
+
   assertFields(
     trigger,
     {
-      expected_candidate_count: scope.expectedCount,
+      expected_candidate_count:
+        dynamicBatchA?.rows.length ??
+        scope.expectedCount,
       expected_candidate_fingerprint:
+        dynamicBatchA?.fingerprint ??
         scope.expectedFingerprint,
       expected_operation_key: scope.operationKey,
       expected_capability_key: scope.capabilityKey,
