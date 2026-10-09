@@ -479,6 +479,57 @@ async function loadTrackFeaturedArtists(
   return byTrack;
 }
 
+async function loadTrackNeedsReviewPrimaryArtistSlugs(
+  pool: ReturnType<typeof createRegistryPool>,
+  trackIds: string[],
+): Promise<Map<string, string[]>> {
+  if (trackIds.length === 0) {
+    return new Map();
+  }
+
+  const result = await pool.query(
+    `
+    select
+      track_id::text,
+      artist_slug
+    from public.registry_track_artists
+    where track_id = any($1::uuid[])
+      and status = 'needs_review'
+      and is_primary is true
+      and nullif(btrim(artist_slug), '') is not null
+    order by
+      track_id,
+      credit_order nulls last,
+      created_at,
+      id
+    `,
+    [trackIds],
+  );
+
+  const byTrack =
+    new Map<string, string[]>();
+
+  for (const row of result.rows) {
+    const trackId =
+      String(row.track_id);
+    const artistSlug =
+      String(row.artist_slug || "");
+    const list =
+      byTrack.get(trackId) || [];
+
+    if (
+      artistSlug &&
+      !list.includes(artistSlug)
+    ) {
+      list.push(artistSlug);
+    }
+
+    byTrack.set(trackId, list);
+  }
+
+  return byTrack;
+}
+
 async function loadTrackPrimaryArtistSlugs(
   pool: ReturnType<typeof createRegistryPool>,
   trackIds: string[],
@@ -1764,12 +1815,27 @@ async function scanTracks(
         pool,
         trackIds,
       );
+    const needsReviewTrackIds =
+      rows
+        .filter(
+          (row) =>
+            row.status === "needs_review",
+        )
+        .map((row) => row.id);
+    const needsReviewPrimaryArtistScopes =
+      await loadTrackNeedsReviewPrimaryArtistSlugs(
+        pool,
+        needsReviewTrackIds,
+      );
     const allPrimaryArtistSlugs = [
       ...new Set(
         [
           ...artistSlugs,
           ...Array.from(
             primaryArtistScopes.values(),
+          ).flat(),
+          ...Array.from(
+            needsReviewPrimaryArtistScopes.values(),
           ).flat(),
         ].filter(Boolean),
       ),
@@ -1816,7 +1882,11 @@ async function scanTracks(
         Array.from(
           new Map(
             (
-              primaryArtistScopes.get(
+              (
+                row.status === "needs_review"
+                  ? needsReviewPrimaryArtistScopes
+                  : primaryArtistScopes
+              ).get(
                 row.id,
               ) || []
             )

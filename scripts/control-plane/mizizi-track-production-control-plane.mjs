@@ -55,7 +55,7 @@ const EXPECTED_1094_RECORDING_REVIEW_IDS_SQL =
     .map(([id]) => "'" + id + "'")
     .join(',');
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': '87742402dc980ce98613b898f75a118d2c57b0be',
+  'scripts/registry/agents/mizizi/run.ts': '7ba43e453eb1d2cfc77d2c8fbb346c1e48f13376',
   'scripts/registry/agents/mizizi/core.ts': 'd57a242b60f517461243f0310c61d1f791362f37',
   'supabase/functions/_shared/registry-track-identity.ts': '7bcab485aecc3cc7b90e2a3154d90dcee81be92c',
 };
@@ -694,8 +694,8 @@ function assertReviewState(state, finalState) {
       release_single_reviews:40,
       active_capability_grants:0,
       active_execution_grants:0,
-      ledger_count:214,
-      ledger_head:'20261009155500',
+      ledger_count:215,
+      ledger_head:'20261009170330',
     },
     finalState ? 'review acceptance' : 'review baseline',
   );
