@@ -163,6 +163,25 @@ describe("MIZIZI Admin workspace", () => {
     expect(exact).not.toContain("—");
   });
 
+  it("routes #1094 repaired decisions to the existing bounded duplicate authority", () => {
+    const repair = read("src/pages/admin/review/mizizi/issue1094RepairGate.tsx");
+    expect(page).toContain('task === "1094-repairs"');
+    expect(page).toContain("<Issue1094RepairGate />");
+    expect(repair).toContain("data-wk-1094-governed-repair-gate");
+    expect(repair).toContain('admin_preview_registry_track_duplicate_repair');
+    expect(repair).toContain('admin_apply_registry_track_duplicate_repair');
+    expect(repair).toContain('reviewedHumanDecisionMatches === 1');
+    expect(repair).toContain('value.confidenceBucket === "high"');
+    expect(repair).toContain('value.blockers.length === 0');
+    expect(repair).toContain("current = await preview(target)");
+    expect(repair).toContain("destructive: true");
+    expect(repair).toContain("p_allow_medium_confidence: false");
+    expect(repair).toContain("DESIRE: blocked");
+    expect(repair).not.toContain("admin_finalize_public_music_identity");
+    expect(repair).not.toContain("service_role");
+    expect(repair).not.toContain("—");
+  });
+
   it("wires MIZIZI into Admin without replacing audit history", () => {
     expect(lazy).toContain("AdminMiziziWorkspacePage");
     expect(routes).toContain('{ path: "mizizi", element: <AdminMiziziWorkspacePage /> }');
