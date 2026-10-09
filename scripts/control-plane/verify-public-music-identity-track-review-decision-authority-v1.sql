@@ -48,6 +48,10 @@ begin
 
   if v_context_definition not like
        '%registry_subject_state_fingerprint%'
+     or v_context_definition not like
+       '%track_recording_identity_conflict%'
+     or v_context_definition not like
+       '%track.status=''needs_review''%'
      or v_record_definition not like
        '%registry_subject_state_fingerprint%'
      or v_record_definition not like
@@ -63,6 +67,10 @@ begin
        '%track_slug_credit_evidence_gap%'
      or v_record_definition not like
        '%track_recording_identity_conflict%'
+     or v_record_definition not like
+       '%Recording-identity review target changed after review creation.%'
+     or v_record_definition not like
+       '%WK_1094_SYNTHETIC_DUPLICATE_DECISION_REVIEW_BINDING_DRIFT%'
   then
     raise exception
       'Public Music Identity review rule boundary drifted';
