@@ -16,7 +16,7 @@ begin
        'platform_private.guard_public_music_identity_track_review_resolution_v1()'
      ) is null
      or to_regprocedure(
-       'public.admin_reconcile_public_music_identity_linked_recording_review_v1(uuid,text)'
+       'public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)'
      ) is null
   then
     raise exception
@@ -39,7 +39,7 @@ begin
   into v_finalizer;
 
   select pg_get_functiondef(
-    'public.admin_reconcile_public_music_identity_linked_recording_review_v1(uuid,text)'::regprocedure
+    'public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)'::regprocedure
   )
   into v_reconciler;
 
@@ -160,17 +160,17 @@ begin
 
   if has_function_privilege(
        'anon',
-       'public.admin_reconcile_public_music_identity_linked_recording_review_v1(uuid,text)',
+       'public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)',
        'EXECUTE'
      )
      or has_function_privilege(
        'service_role',
-       'public.admin_reconcile_public_music_identity_linked_recording_review_v1(uuid,text)',
+       'public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)',
        'EXECUTE'
      )
      or not has_function_privilege(
        'authenticated',
-       'public.admin_reconcile_public_music_identity_linked_recording_review_v1(uuid,text)',
+       'public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)',
        'EXECUTE'
      )
   then
