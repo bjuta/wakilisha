@@ -4959,6 +4959,15 @@ describe("Public Music Identity #1094 recording/duplicate lifecycle convergence"
     expect(runner).toContain(
       '"track_recording_identity_conflict"',
     );
+    expect(runner).toContain(
+      "loadTrackNeedsReviewPrimaryArtistSlugs",
+    );
+    expect(runner).toContain(
+      "status = 'needs_review'",
+    );
+    expect(runner).toContain(
+      'row.status === "needs_review"\n                  ? needsReviewPrimaryArtistScopes\n                  : primaryArtistScopes',
+    );
     expect(readScopeMigration).toContain(
       "using (status in ('active','needs_review'))",
     );
