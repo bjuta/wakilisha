@@ -871,30 +871,37 @@ The Production review path requires a separately reviewed
 `.github/mizizi-track-production-review.json` trigger-file push. PR and manual
 workflow-dispatch runs remain preflight/read-only.
 
-The reviewed trigger binds:
+The current #1094 reviewed trigger binds the later accepted Production boundary:
 
 - exact protected `main`;
 - exact current full-row Track input fingerprint
-  `6d9fa72f13ce4a5d774a457552e3cd3824475fb8a651473d5999605a3dcc29fb`;
-- the existing 66 open historical MIZIZI Track reviews;
-- exactly 12 `track_slug_credit_evidence_gap/1.3.0` review targets;
-- exactly 91 `track_recording_identity_conflict/1.3.0` review targets.
+  `b6a8047ce9adae9cf422f8f787de88832ae6bb3f7307437a2443d2652b40bcc9`;
+- 2,122 active Tracks;
+- 5 pre-existing open `track_slug_identity_noise/1.1.0` reviews;
+- exactly 12 newly approved SoFresh 254 feature-slug review targets, each bound
+  to its exact Track UUID, current slug, and reviewed clean semantic slug;
+- exactly 12 `track_slug_credit_evidence_gap/1.3.0` reviews;
+- exactly 91 `track_recording_identity_conflict/1.3.0` reviews;
+- exactly 40 open `release_single_identity_conflict/1.4.0` reviews that are
+  outside the Track review mutation.
 
-The control plane must accept partial review materialization as resumable state,
-because review-row creation is idempotent. Final acceptance is exactly 169 open
-MIZIZI Track reviews: the preserved 66 historical reviews plus 103 new Slice 3
-review rows.
+The control plane accepts partial #1094 feature-review materialization as
+resumable state because review-row creation is idempotent. Final acceptance is
+exactly 160 open MIZIZI reviews, including 17 open
+`track_slug_identity_noise/1.1.0` reviews: the preserved 5 plus the exact 12
+newly approved cases.
 
 Review materialization must prove all of the following before closure:
 
 - Track canonical write events remain 440;
 - Track redirects remain 1,148;
 - the full-row Track input fingerprint is unchanged;
-- the fresh MIZIZI audit remains 664 findings with 66 deterministic candidates,
-  12 credit-evidence reviews, 91 recording-identity reviews, and 495
-  observe-only findings;
+- all 12 new review rows match the exact approved Track UUID/current-slug/
+  proposed-slug triples;
+- no canonical Registry rows are changed by review mode;
 - standing MIZIZI capability grants remain zero;
 - unconsumed exact MIZIZI execution grants remain zero;
+- migration ledger remains at `20261008180201`;
 - temporary JIT access and role mapping are restored at rest.
 
 
