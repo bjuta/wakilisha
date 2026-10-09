@@ -52,3 +52,13 @@ The latest protected CI workflow, run `37890381341`, finished with `critical-bro
 ### Verified historical decision linkage
 
 Read-only inspection of `registry_canonicalization_decisions` confirms that **all seven** historical B1 scoped reviews have one `public_music_identity_distinct_recording` decision. For each, `decision.after_payload->>'evidenceRecordingIdentityReviewId'` matches the exact **still-open** `track_recording_identity_conflict` review ID for that Track (7/7 true). The link lives in `after_payload`, **not** in `decision.metadata`; any forward implementation reading `metadata.relatedRecordingIdentityReviewId` would falsely report missing causality. Preserve each immutable recorded decision, its original semantic distinction and peer evidence, and the existing unresolved recording-review lifecycle.
+
+## Primitivization and CI consolidation correction — 9 October 2026
+
+The one-off `admin_get_public_music_identity_b1_forward_context_v1` RPC **was removed** before migration acceptance. It was a read-only presentation wrapper for data already owned by the Registry reviews, canonicalization decisions, and state-fingerprint authority—not a new recurring domain capability. No additional public surface is justified merely to expose the seven historical links. Their exact `after_payload.evidenceRecordingIdentityReviewId` match remains part of the read-only audit evidence above.
+
+The separately introduced `test/registry/public-music-identity-forward-review-authority.test.ts` was also **retired**. Its string assertions duplicated the existing SQL verifier. The existing `scripts/control-plane/verify-public-music-identity-track-review-finalization-v1.sql` remains the owner of database authorization and invariant checks.
+
+The sole new Gate A admission RPC remains **provisional and unaccepted**. Its incremental value over the existing `mizizi_private.queue_public_music_identity_review_v1` broker must be evaluated against the fact that the broker is executable exclusively by `mizizi_executor`, not authenticated Admins. Any approved design should preserve that separation and use the existing broker behind its authorized executor whenever feasible; it must not grant human callers MIZIZI executor rights as a shortcut.
+
+The draft PR is an implementation workspace, not release authority. The real Preview replay proof, exact types/schema seal, and full #1094 closure contract are still mandatory.
