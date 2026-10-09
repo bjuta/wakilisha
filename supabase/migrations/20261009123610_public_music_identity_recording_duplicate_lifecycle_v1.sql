@@ -1,8 +1,8 @@
--- #1094: lifecycle finalizer convergence, non-mutating canonical Registry.
+-- #1094: reviewed recording/duplicate lifecycle convergence.
 -- Exact CLI-minted filename: 20261009123610.
--- This migration is deliberately limited to linked distinct-recording
--- finalization. Synthetic duplicate admission remains gated until reviewed
--- authority is implemented and proved; do not deploy this alone as #1094 exit.
+-- Extends review admission, authenticated decision capture, reviewed duplicate
+-- execution evidence, and linked recording-review finalization. The migration
+-- itself performs no canonical Track, credit, release, Chart, or redirect DML.
 begin;
 set local statement_timeout='180s';
 set local lock_timeout='5s';
