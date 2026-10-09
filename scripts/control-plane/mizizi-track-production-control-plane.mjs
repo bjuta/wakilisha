@@ -106,6 +106,16 @@ function queryViaLinkedCli(sql) {
   return payload;
 }
 
+async function queryViaJitPool(pool, sql) {
+  const result = await pool.query(sql);
+  if (result.rowCount !== 1) {
+    throw new Error(
+      'JIT database query did not return exactly one row.',
+    );
+  }
+  return result.rows[0];
+}
+
 async function waitForDatabaseHealth() {
   for (let attempt = 1; attempt <= 36; attempt += 1) {
     try {
@@ -1035,17 +1045,17 @@ async function main() {
 
         if (MODE === 'review') {
           console.log('\n=== 6. REVIEW-ONLY PRODUCTION AUTHORITY ===');
-          const reviewFingerprintBefore = queryViaLinkedCli(fingerprintSql);
+          const reviewFingerprintBefore = await queryViaJitPool(pool, fingerprintSql);
           if (reviewFingerprintBefore.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
             throw new Error(
               `review input fingerprint drift: ${reviewFingerprintBefore.fingerprint}`,
             );
           }
 
-          const reviewBefore = queryViaLinkedCli(reviewStateSql).state;
+          const reviewBefore = (await queryViaJitPool(pool, reviewStateSql)).state;
           assertReviewState(reviewBefore,false);
           const featureReviewBefore =
-            queryViaLinkedCli(featureReviewStateSql).rows;
+            (await queryViaJitPool(pool, featureReviewStateSql)).rows;
           assertFeatureReviewRows(
             featureReviewBefore,
             reviewMaterializationComplete(reviewBefore),
@@ -1074,12 +1084,12 @@ async function main() {
           assertReviewRun(fs.readFileSync(reviewLog,'utf8'));
 
           console.log('\n=== 8. REVIEW-ONLY PRODUCTION ACCEPTANCE ===');
-          const reviewAfter = queryViaLinkedCli(reviewStateSql).state;
+          const reviewAfter = (await queryViaJitPool(pool, reviewStateSql)).state;
           assertReviewState(reviewAfter,true);
           const featureReviewAfter =
-            queryViaLinkedCli(featureReviewStateSql).rows;
+            (await queryViaJitPool(pool, featureReviewStateSql)).rows;
           assertFeatureReviewRows(featureReviewAfter,true);
-          const reviewFingerprintAfter = queryViaLinkedCli(fingerprintSql);
+          const reviewFingerprintAfter = await queryViaJitPool(pool, fingerprintSql);
           if (reviewFingerprintAfter.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
             throw new Error(
               `canonical Registry input changed during review materialization: ${reviewFingerprintAfter.fingerprint}`,
