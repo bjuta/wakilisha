@@ -9,7 +9,7 @@ Status: **Production-observed baseline, not a new mutation authority.** Captured
 - Typed operation: `registry.track_slug.canonicalize`, version 1.
 - On 2026-10-09, **12 operations succeeded and 12 independent operation verifiers passed**. Completion times span **11:46:51.052011 to 11:46:55.480969 UTC**.
 - The associated 12 safe-slug human decisions have resolved Admin review rows (separately confirmed in the earlier #1094 Production census).
-- Current grant census after the run: **1,680 consumed; zero active or other grant statuses**, as observed by grouping `platform_private.registry_execution_grants` by status. This proves execution grants are consumed at capture time; the additional MIZIZI operation-enable and capability-grant-at-rest checks remain required for a complete zero-at-rest assertion.
+- Current grant census after the run: **1,680 consumed; zero active or other grant statuses**, as observed by grouping `platform_private.registry_execution_grants` by status. Independent post-run checks also found `registry.track_slug.canonicalize/v1` disabled, and the system-actor capability grants partitioned into 11 expired / 1 revoked / 0 active. Thus exact grants, broader capability grants, and the typed operation were all at rest at capture time.
 - The run did **not** need a new duplicate executor, redirect writer, or bypassed review resolver.
 
 ### One fully joined example
