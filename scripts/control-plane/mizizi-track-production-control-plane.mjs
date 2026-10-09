@@ -30,7 +30,7 @@ const EXPECTED_1094_FEATURE_REVIEW_IDS_SQL =
     .map(([id]) => "'" + id + "'")
     .join(',');
 const EXPECTED_BLOBS = {
-  'scripts/registry/agents/mizizi/run.ts': 'db38946f4800c5f9721a6aaed42838589686dabd',
+  'scripts/registry/agents/mizizi/run.ts': '87742402dc980ce98613b898f75a118d2c57b0be',
   'scripts/registry/agents/mizizi/core.ts': 'd57a242b60f517461243f0310c61d1f791362f37',
   'supabase/functions/_shared/registry-track-identity.ts': '7bcab485aecc3cc7b90e2a3154d90dcee81be92c',
 };
