@@ -8,5 +8,7 @@
   "expected_final_open_reviews": 160,
   "expected_final_feature_slug_reviews": 17,
   "expected_credit_gap_reviews": 12,
-  "expected_recording_identity_reviews": 91
+  "expected_recording_identity_reviews": 91,
+  "attempt": 2,
+  "reason": "Retry #1094 review materialization after accepted JIT-query transport convergence"
 }
