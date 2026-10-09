@@ -1276,7 +1276,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       "EXPECTED_REVIEW_INPUT_FINGERPRINT",
     );
     expect(trackControlPlane).toContain(
-      "b6a8047ce9adae9cf422f8f787de88832ae6bb3f7307437a2443d2652b40bcc9",
+      "1334585948536c2dafc2ab03b891a7c6f8c1843014ee1506bdbe4f0dc4b1431b",
     );
     expect(trackControlPlane).toContain(
       "mizizi_track_production_review",
@@ -1304,13 +1304,19 @@ describe("MIZIZI Cultural Data Steward", () => {
       ).length,
     ).toBeGreaterThanOrEqual(4);
     expect(trackControlPlane).toContain(
-      "#1094 review materialization exact +12 feature-slug reviews with canonical delta zero",
+      "#1094 review materialization exact +3 synthetic-collision recording reviews with canonical delta zero",
     );
     expect(trackControlPlane).toContain(
       "EXPECTED_1094_FEATURE_REVIEW_TARGETS",
     );
     expect(trackControlPlane).toContain(
+      "EXPECTED_1094_RECORDING_REVIEW_TARGETS",
+    );
+    expect(trackControlPlane).toContain(
       "featureReviewStateSql",
+    );
+    expect(trackControlPlane).toContain(
+      "recordingReviewStateSql",
     );
     expect(trackControlPlane).toContain(
       "feature_slug_reviews",
@@ -1319,10 +1325,10 @@ describe("MIZIZI Cultural Data Steward", () => {
       "release_single_reviews",
     );
     expect(trackControlPlane).toContain(
-      "open_mizizi_reviews:160",
+      "open_mizizi_reviews:151",
     );
     expect(trackControlPlane).toContain(
-      "ledger_head:'20261008180201'",
+      "ledger_head:'20261009123610'",
     );
     expect(trackControlPlane).toContain(
       "MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS",

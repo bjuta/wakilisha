@@ -913,6 +913,35 @@ Review materialization must prove all of the following before closure:
 - temporary JIT access and role mapping are restored at rest.
 
 
+
+### Public Music Identity #1094 recording review checkpoint — 9 October 2026
+
+After Production promotion of
+`20261009123610_public_music_identity_recording_duplicate_lifecycle_v1.sql`,
+the next reviewed Track run is review materialization only.
+
+Fresh Production evidence binds this checkpoint to full-row Track fingerprint
+`1334585948536c2dafc2ab03b891a7c6f8c1843014ee1506bdbe4f0dc4b1431b`,
+2,122 active Tracks, migration head `20261009123610`, and 148 open MIZIZI
+reviews before the run. The open review corpus is 5 Track slug identity reviews,
+12 Track credit-evidence-gap reviews, 91 recording-identity reviews, and 40
+Release single-identity reviews.
+
+The reviewed runner may add only the three exact recording-identity reviews
+for DESIRE, Ficha, and Colors that satisfy the accepted clean-slug plus
+six-hex-suffix structural admission. Final acceptance is 151 open MIZIZI
+reviews and 94 recording-identity reviews, with canonical Track state, write
+events, redirects, and the full-row fingerprint unchanged.
+
+The 12 earlier SoFresh feature-slug reviews are resolved historical receipts
+and must remain resolved. A partial retry may contain 91 through 94
+recording-identity reviews, but completion requires all three exact reviewed
+source Track identities and their exact active peers.
+
+Control-plane code must merge before Production review intent. The later
+Production trigger is a separate protected-main commit that changes exactly
+`.github/mizizi-track-production-review.json`.
+
 ## Forward execution authority — contributor provenance
 
 The binding programme for extending MIZIZI from current Registry identity

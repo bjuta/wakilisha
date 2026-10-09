@@ -10,7 +10,7 @@ const EXPECTED_MAIN = process.env.MIZIZI_EXPECTED_MAIN_SHA || '';
 const TRIGGER_FILE = process.env.MIZIZI_TRIGGER_FILE || '';
 const ARTIFACT_DIR = process.env.MIZIZI_ARTIFACT_DIR || 'artifacts/mizizi-track-production-control-plane';
 const EXPECTED_FINGERPRINT = '551b29431700536937c26ecb1e396c3cf9314edefd88c589284cf330c9d1bb9a';
-const EXPECTED_REVIEW_INPUT_FINGERPRINT = 'b6a8047ce9adae9cf422f8f787de88832ae6bb3f7307437a2443d2652b40bcc9';
+const EXPECTED_REVIEW_INPUT_FINGERPRINT = '1334585948536c2dafc2ab03b891a7c6f8c1843014ee1506bdbe4f0dc4b1431b';
 const EXPECTED_1094_FEATURE_REVIEW_TARGETS = [
   ['431fbc40-916e-5de2-8278-68b826050f2f','2-left-feet-feat-mwirigi','2-left-feet'],
   ['e4581038-cfe2-5e64-897f-1e0eb291671a','bombo-feat-maandy','bombo'],
@@ -27,6 +27,31 @@ const EXPECTED_1094_FEATURE_REVIEW_TARGETS = [
 ];
 const EXPECTED_1094_FEATURE_REVIEW_IDS_SQL =
   EXPECTED_1094_FEATURE_REVIEW_TARGETS
+    .map(([id]) => "'" + id + "'")
+    .join(',');
+
+const EXPECTED_1094_RECORDING_REVIEW_TARGETS = [
+  [
+    'f30846f0-8cf1-4df6-8875-38fa7a763e7b',
+    'desire',
+    'afbe3f47-62af-4b68-8d54-527f04987ebe',
+    'desire-2a895a',
+  ],
+  [
+    'a708a142-dc2b-4fd2-9dbb-d780b666667c',
+    'ficha',
+    '80642d87-769c-4949-8ecd-b3b9f6835486',
+    'ficha-1d71c1',
+  ],
+  [
+    'aa2793e6-ed18-40a7-9654-dfd56769fcbe',
+    'colors',
+    'bec6a6de-3001-44a7-8241-df1cd8b932ac',
+    'colors-1672b8',
+  ],
+];
+const EXPECTED_1094_RECORDING_REVIEW_IDS_SQL =
+  EXPECTED_1094_RECORDING_REVIEW_TARGETS
     .map(([id]) => "'" + id + "'")
     .join(',');
 const EXPECTED_BLOBS = {
@@ -406,6 +431,29 @@ where review_type='mizizi_data_hygiene'
   and source_payload->>'ruleId'='track_slug_identity_noise'
   and source_payload->>'ruleVersion'='1.1.0'`;
 
+const recordingReviewStateSql = `select coalesce(
+ jsonb_agg(
+   jsonb_build_object(
+     'sourceId',source_id,
+     'currentValue',source_payload->>'currentValue',
+     'proposedValue',candidate_payload->>'proposedValue',
+     'status',status,
+     'ruleId',source_payload->>'ruleId',
+     'ruleVersion',source_payload->>'ruleVersion',
+     'canonicalTitleSlug',source_payload#>>'{evidence,canonicalTitleSlug}',
+     'peerId',source_payload#>>'{evidence,peers,0,id}',
+     'peerSlug',source_payload#>>'{evidence,peers,0,slug}'
+   )
+   order by source_id
+ ),
+ '[]'::jsonb
+) rows
+from public.registry_review_items
+where review_type='mizizi_data_hygiene'
+  and source_id in (${EXPECTED_1094_RECORDING_REVIEW_IDS_SQL})
+  and source_payload->>'ruleId'='track_recording_identity_conflict'
+  and source_payload->>'ruleVersion'='1.3.0'`;
+
 function assertFields(actual, expected, label) {
   for (const [k, v] of Object.entries(expected)) if (String(actual?.[k]) !== String(v)) throw new Error(`${label} ${k}=${actual?.[k]} expected ${v}`);
 }
@@ -627,10 +675,10 @@ function assertAcceptedPostApply(state) {
 
 function reviewMaterializationComplete(state) {
   return (
-    Number(state?.open_mizizi_reviews) === 160 &&
-    Number(state?.feature_slug_reviews) === 17 &&
+    Number(state?.open_mizizi_reviews) === 151 &&
+    Number(state?.feature_slug_reviews) === 5 &&
     Number(state?.credit_gap_reviews) === 12 &&
-    Number(state?.recording_identity_reviews) === 91 &&
+    Number(state?.recording_identity_reviews) === 94 &&
     Number(state?.release_single_reviews) === 40
   );
 }
@@ -643,27 +691,28 @@ function assertReviewState(state, finalState) {
       canonical_events:440,
       track_redirects:1148,
       credit_gap_reviews:12,
-      recording_identity_reviews:91,
       release_single_reviews:40,
       active_capability_grants:0,
       active_execution_grants:0,
-      ledger_count:212,
-      ledger_head:'20261008180201',
+      ledger_count:213,
+      ledger_head:'20261009123610',
     },
     finalState ? 'review acceptance' : 'review baseline',
   );
 
   const featureSlug = Number(state?.feature_slug_reviews);
   const historicalOpen = Number(state?.historical_open_reviews);
+  const recordingReviews = Number(state?.recording_identity_reviews);
   const openReviews = Number(state?.open_mizizi_reviews);
 
   if (finalState) {
     assertFields(
       state,
       {
-        open_mizizi_reviews:160,
-        historical_open_reviews:17,
-        feature_slug_reviews:17,
+        open_mizizi_reviews:151,
+        historical_open_reviews:5,
+        feature_slug_reviews:5,
+        recording_identity_reviews:94,
       },
       'review acceptance',
     );
@@ -671,19 +720,20 @@ function assertReviewState(state, finalState) {
   }
 
   if (
-    !Number.isInteger(featureSlug) ||
-    featureSlug < 5 ||
-    featureSlug > 17 ||
-    historicalOpen !== featureSlug ||
-    openReviews !== 143 + featureSlug
+    featureSlug !== 5 ||
+    historicalOpen !== 5 ||
+    !Number.isInteger(recordingReviews) ||
+    recordingReviews < 91 ||
+    recordingReviews > 94 ||
+    openReviews !== 57 + recordingReviews
   ) {
     throw new Error(
-      `#1094 review baseline is not a resumable subset: open=${openReviews} feature_slug=${featureSlug} historical_open=${historicalOpen}`,
+      `#1094 recording-review baseline is not a resumable subset: open=${openReviews} feature_slug=${featureSlug} recording=${recordingReviews} historical_open=${historicalOpen}`,
     );
   }
 }
 
-function assertFeatureReviewRows(rows, complete) {
+function assertHistoricalFeatureReviewRows(rows) {
   const expected = new Map(
     EXPECTED_1094_FEATURE_REVIEW_TARGETS.map(
       ([id,currentValue,proposedValue]) => [
@@ -704,17 +754,56 @@ function assertFeatureReviewRows(rows, complete) {
       {
         currentValue:target.currentValue,
         proposedValue:target.proposedValue,
-        status:'open',
+        status:'resolved',
         ruleId:'track_slug_identity_noise',
         ruleVersion:'1.1.0',
       },
-      `#1094 feature review ${row.sourceId}`,
+      `#1094 historical feature review ${row.sourceId}`,
+    );
+  }
+
+  if (actualRows.length !== expected.size) {
+    throw new Error(
+      `#1094 historical feature review set incomplete: ${actualRows.length}/${expected.size}`,
+    );
+  }
+}
+
+function assertRecordingReviewRows(rows, complete) {
+  const expected = new Map(
+    EXPECTED_1094_RECORDING_REVIEW_TARGETS.map(
+      ([id,canonicalTitleSlug,peerId,peerSlug]) => [
+        id,
+        { canonicalTitleSlug, peerId, peerSlug },
+      ],
+    ),
+  );
+  const actualRows = Array.isArray(rows) ? rows : [];
+
+  for (const row of actualRows) {
+    const target = expected.get(String(row?.sourceId || ''));
+    if (!target) {
+      throw new Error(`unexpected #1094 recording review row ${row?.sourceId}`);
+    }
+    assertFields(
+      row,
+      {
+        currentValue:row.sourceId,
+        proposedValue:'human_review_required',
+        status:'open',
+        ruleId:'track_recording_identity_conflict',
+        ruleVersion:'1.3.0',
+        canonicalTitleSlug:target.canonicalTitleSlug,
+        peerId:target.peerId,
+        peerSlug:target.peerSlug,
+      },
+      `#1094 recording review ${row.sourceId}`,
     );
   }
 
   if (complete && actualRows.length !== expected.size) {
     throw new Error(
-      `#1094 feature review set incomplete: ${actualRows.length}/${expected.size}`,
+      `#1094 recording review set incomplete: ${actualRows.length}/${expected.size}`,
     );
   }
 }
@@ -722,7 +811,7 @@ function assertFeatureReviewRows(rows, complete) {
 function assertReviewRun(text) {
   const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
   if (
-    !clean.includes('track_slug_identity_noise') ||
+    !clean.includes('track_recording_identity_conflict') ||
     !clean.includes('Review mode completed. No canonical Registry rows were changed.')
   ) {
     throw new Error('review-mode run did not prove bounded review-only completion');
@@ -910,11 +999,13 @@ async function main() {
             expected_input_fingerprint:EXPECTED_REVIEW_INPUT_FINGERPRINT,
             expected_existing_open_reviews:148,
             expected_existing_feature_slug_reviews:5,
-            expected_new_feature_slug_reviews:12,
-            expected_final_open_reviews:160,
-            expected_final_feature_slug_reviews:17,
+            expected_new_feature_slug_reviews:0,
+            expected_existing_recording_identity_reviews:91,
+            expected_new_recording_identity_reviews:3,
+            expected_final_open_reviews:151,
+            expected_final_feature_slug_reviews:5,
             expected_credit_gap_reviews:12,
-            expected_recording_identity_reviews:91,
+            expected_final_recording_identity_reviews:94,
           }
         : {
             operation:'mizizi_track_production_apply',
@@ -1042,8 +1133,15 @@ async function main() {
         'feature review rows before',
       )
     ).rows;
-    assertFeatureReviewRows(
-      featureReviewBefore,
+    assertHistoricalFeatureReviewRows(featureReviewBefore);
+    const recordingReviewBefore = (
+      await queryViaLinkedCliWithRetry(
+        recordingReviewStateSql,
+        'recording review rows before',
+      )
+    ).rows;
+    assertRecordingReviewRows(
+      recordingReviewBefore,
       reviewMaterializationComplete(reviewBefore),
     );
     fs.writeFileSync(
@@ -1218,7 +1316,14 @@ async function main() {
               'feature review rows after',
             )
           ).rows;
-          assertFeatureReviewRows(featureReviewAfter,true);
+          assertHistoricalFeatureReviewRows(featureReviewAfter);
+          const recordingReviewAfter = (
+            await queryViaLinkedCliWithRetry(
+              recordingReviewStateSql,
+              'recording review rows after',
+            )
+          ).rows;
+          assertRecordingReviewRows(recordingReviewAfter,true);
           const reviewFingerprintAfter = await queryViaLinkedCliWithRetry(
             fingerprintSql,
             'review fingerprint after',
@@ -1232,7 +1337,7 @@ async function main() {
             `${ARTIFACT_DIR}/review-state-after.json`,
             JSON.stringify(reviewAfter,null,2)+'\n',
           );
-          console.log('PASS: #1094 review materialization exact +12 feature-slug reviews with canonical delta zero');
+          console.log('PASS: #1094 review materialization exact +3 synthetic-collision recording reviews with canonical delta zero');
           console.log('\n=== MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS ===');
           return;
         }
