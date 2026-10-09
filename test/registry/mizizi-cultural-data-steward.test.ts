@@ -1276,6 +1276,9 @@ describe("MIZIZI Cultural Data Steward", () => {
       "EXPECTED_REVIEW_INPUT_FINGERPRINT",
     );
     expect(trackControlPlane).toContain(
+      "extensions.digest",
+    );
+    expect(trackControlPlane).toContain(
       "b6a8047ce9adae9cf422f8f787de88832ae6bb3f7307437a2443d2652b40bcc9",
     );
     expect(trackControlPlane).toContain(
