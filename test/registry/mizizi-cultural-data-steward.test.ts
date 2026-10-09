@@ -827,6 +827,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       );
 
     expect(slugFinding).toMatchObject({
+      ruleVersion: "1.1.0",
       fieldName: "slug",
       proposedValue: "ficha-white",
       disposition:
@@ -1206,6 +1207,12 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(packageJson).toContain(
       '"registry:mizizi:review": "tsx scripts/registry/agents/mizizi/run.ts --mode=review"',
     );
+
+    expect(runner).toContain("previousSlugReviews");
+    expect(runner).toContain("reviewedTrackIds");
+    expect(runner).toContain("feature_credit_marker_in_slug");
+    expect(runner).toContain('finding.ruleVersion === "1.1.0"');
+    expect(runner).toContain("await queueReview(");
 
     const trackGuard =
       runner.indexOf(

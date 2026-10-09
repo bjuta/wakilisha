@@ -1783,6 +1783,26 @@ async function scanTracks(
         trackIds,
       );
 
+    const previousSlugReviews = await pool.query(
+      `
+      select distinct source_id
+      from public.registry_review_items
+      where entity_type='track'
+        and review_type='mizizi_data_hygiene'
+        and source_id=any($1::text[])
+        and source_payload->>'ruleId' in (
+          'track_slug_identity_noise',
+          'track_slug_credit_evidence_gap'
+        )
+      `,
+      [trackIds],
+    );
+    const reviewedTrackIds = new Set<string>(
+      previousSlugReviews.rows.map(
+        (review: { source_id: string }) => review.source_id,
+      ),
+    );
+
     for (const row of rows) {
       const canonicalTitleSlug =
         slugifyIdentity(
@@ -1862,6 +1882,33 @@ async function scanTracks(
           finding.disposition ===
           "observe"
         ) {
+          continue;
+        }
+
+        // Shared broker admission only. No canonical Track mutation.
+        if (
+          finding.ruleId === "track_slug_identity_noise" &&
+          finding.ruleVersion === "1.1.0" &&
+          finding.reason.includes("feature_credit_marker_in_slug")
+        ) {
+          if (!reviewedTrackIds.has(row.id)) {
+            const collision = candidateCollision(
+              finding,
+              row,
+              artistScope,
+              releaseScope,
+            );
+            if (collision) {
+              stats.stale += 1;
+            } else {
+              await queueReview(
+                pool,
+                { ...finding, disposition: "review" },
+              );
+              reviewedTrackIds.add(row.id);
+              stats.queued += 1;
+            }
+          }
           continue;
         }
 

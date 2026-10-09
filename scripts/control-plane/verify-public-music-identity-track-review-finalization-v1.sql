@@ -131,3 +131,20 @@ begin
     'PUBLIC_MUSIC_IDENTITY_TRACK_REVIEW_FINALIZATION_V1_PASS';
 end
 $verify$;
+
+-- #1094: the existing MIZIZI broker, not a new public RPC, owns admission.
+do $wk1094$
+declare v_sql text;
+begin
+  select pg_get_functiondef(
+    'mizizi_private.queue_registry_review_v1(text,text,text,text,text,text,text,text,numeric,text,text,jsonb)'::regprocedure
+  ) into v_sql;
+  if position('WK_1094_HISTORICAL_SCOPED_REVIEW_ALREADY_OWNS_TRACK' in v_sql)=0
+    or position('WK_1094_SEMANTIC_CANDIDATE_DRIFT' in v_sql)=0
+    or position('WK_1094_PROJECTED_TRACK_REQUIRES_HIGHER_EVIDENCE_LANE' in v_sql)=0
+    or v_sql ~* '(update|delete[[:space:]]+from)[[:space:]]+public[.](registry_tracks|registry_track_artists|wk_chart_entries_v2|community_threads)'
+  then
+    raise exception 'WK_1094_REVIEW_BROKER_CONTRACT_DRIFT';
+  end if;
+end
+$wk1094$;
