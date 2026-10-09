@@ -432,6 +432,10 @@ export function isPublicMusicIdentityTrackReview(
       (
         ruleId === "track_slug_credit_evidence_gap" &&
         ruleVersion === "1.3.0"
+      ) ||
+      (
+        ruleId === "track_recording_identity_conflict" &&
+        ruleVersion === "1.3.0"
       )
     )
   );

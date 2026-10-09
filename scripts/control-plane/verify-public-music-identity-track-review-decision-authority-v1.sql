@@ -48,6 +48,10 @@ begin
 
   if v_context_definition not like
        '%registry_subject_state_fingerprint%'
+     or v_context_definition not like
+       '%track_recording_identity_conflict%'
+     or v_context_definition not like
+       '%track.status=''needs_review''%'
      or v_record_definition not like
        '%registry_subject_state_fingerprint%'
      or v_record_definition not like
@@ -63,6 +67,10 @@ begin
        '%track_slug_credit_evidence_gap%'
      or v_record_definition not like
        '%track_recording_identity_conflict%'
+     or v_record_definition not like
+       '%Recording-identity review target changed after review creation.%'
+     or v_record_definition not like
+       '%WK_1094_SYNTHETIC_DUPLICATE_DECISION_REVIEW_BINDING_DRIFT%'
   then
     raise exception
       'Public Music Identity review rule boundary drifted';
@@ -97,20 +105,22 @@ begin
   end if;
 
   if v_resolution_guard_definition not like
-       '%session_user<>''mizizi_executor''%'
+       '%admin_finalize_public_music_identity_track_review_v1%'
      or v_resolution_guard_definition not like
-       '%verifiedOperationId%'
+       '%public_music_identity_track_review_terminal_evidence_v1%'
      or v_resolution_guard_definition not like
        '%decisionId%'
      or v_resolution_guard_definition not like
-       '%operation.verifier_status=''passed''%'
+       '%verifiedOperationId%'
      or v_resolution_guard_definition not like
-       '%execution_grant.plan_payload->>''reviewId''%'
+       '%archiveEventId%'
      or v_resolution_guard_definition not like
-       '%execution_grant.plan_payload->>''decisionId''%'
+       '%stale Community thread pointers%'
+     or v_resolution_guard_definition not like
+       '%unhandled current-pointer surface on the source Track%'
   then
     raise exception
-      'Review resolution is not bound to verified MIZIZI execution and the exact human decision';
+      'Review resolution guard drifted from governed finalizer and terminal-evidence authority';
   end if;
 
   if v_record_definition ~*

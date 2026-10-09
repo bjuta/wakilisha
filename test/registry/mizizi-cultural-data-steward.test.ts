@@ -4475,7 +4475,7 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
       "Human decision capture must not resolve the review",
     );
     expect(verifier).toContain(
-      "Review resolution is not bound to verified MIZIZI execution and the exact human decision",
+      "Review resolution guard drifted from governed finalizer and terminal-evidence authority",
     );
 
     expect(service).toContain(
@@ -4486,6 +4486,9 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
     );
     expect(service).toContain(
       "isPublicMusicIdentityTrackReview",
+    );
+    expect(service).toContain(
+      'ruleId === "track_recording_identity_conflict"',
     );
 
     expect(page).toContain(
@@ -4902,6 +4905,80 @@ describe("Track semantic writer convergence", () => {
     );
     expect(verifier).toContain(
       "Discography Track resolver regained weak slug/title canonical resolution",
+    );
+  });
+});
+
+
+describe("Public Music Identity #1094 recording/duplicate lifecycle convergence", () => {
+  const migration = read(
+    "supabase/migrations/20261009123610_public_music_identity_recording_duplicate_lifecycle_v1.sql",
+  );
+  const runner = read(
+    "scripts/registry/agents/mizizi/run.ts",
+  );
+
+  it("keeps synthetic collision admission review-only until an exact authenticated duplicate decision", () => {
+    expect(migration).toContain(
+      "WK_1094_SYNTHETIC_COLLISION_REVIEW_EVIDENCE_DRIFT",
+    );
+    expect(migration).toContain(
+      "track.status='needs_review'",
+    );
+    expect(migration).toContain(
+      "WK_1094_SYNTHETIC_DUPLICATE_DECISION_REVIEW_BINDING_DRIFT",
+    );
+    expect(migration).toContain(
+      "slug_review.id=identity_review.id",
+    );
+    expect(migration).toContain(
+      "public_music_identity_true_duplicate",
+    );
+
+    expect(runner).toContain(
+      'status: "active" | "needs_review"',
+    );
+    expect(runner).toContain(
+      'row.status === "needs_review"',
+    );
+    expect(runner).toContain(
+      "/^[0-9a-f]{6}$/.test(suffix)",
+    );
+    expect(runner).toContain(
+      '"track_recording_identity_conflict"',
+    );
+  });
+
+  it("closes recording-review debt only through verified finalization/reconciliation authority", () => {
+    expect(migration).toContain(
+      "WK_1094_RECORDING_REVIEW_ONLY_FINALIZES_TRUE_DUPLICATE",
+    );
+    expect(migration).toContain(
+      "WK_1094_LINKED_RECORDING_REVIEW_CAS_FAILED",
+    );
+    expect(migration).toContain(
+      "admin_reconcile_public_music_identity_recording_review_v1",
+    );
+    expect(migration).toContain(
+      "WK_1094_RECONCILE_RECORDING_PEER_EVIDENCE_DRIFT",
+    );
+    expect(migration).toContain(
+      "track_recording_identity_conflict",
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.registry_tracks/i,
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.registry_track_artists/i,
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.registry_release_tracks/i,
+    );
+    expect(migration).not.toMatch(
+      /update\s+public\.wk_chart_entries_v2/i,
+    );
+    expect(migration).not.toContain(
+      "insert into public.wk_slug_redirects",
     );
   });
 });

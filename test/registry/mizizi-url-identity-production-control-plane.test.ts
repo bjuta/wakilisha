@@ -55,7 +55,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
       controlPlane,
     ]) {
       expect(acceptedControlPlane).toContain(
-        "db38946f4800c5f9721a6aaed42838589686dabd",
+        "87742402dc980ce98613b898f75a118d2c57b0be",
       );
     }
 
@@ -469,7 +469,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
       '"scripts/registry/agents/mizizi/run.ts":',
     );
     expect(controlPlane).toContain(
-      '"db38946f4800c5f9721a6aaed42838589686dabd"',
+      '"87742402dc980ce98613b898f75a118d2c57b0be"',
     );
     expect(controlPlane).toContain(
       "executeReleaseResumePlans",

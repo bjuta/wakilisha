@@ -38,6 +38,7 @@ type TrackRow = {
   id: string;
   slug: string;
   title: string;
+  status: "active" | "needs_review";
   updated_at: string;
   primary_artist_slug: string | null;
   primary_artist_name: string | null;
@@ -1666,6 +1667,7 @@ async function scanTracks(
           t.id::text,
           t.slug,
           t.title,
+          t.status,
           t.updated_at::text,
           pa.artist_slug
             as primary_artist_slug,
@@ -1690,7 +1692,7 @@ async function scanTracks(
             ta.id
           limit 1
         ) pa on true
-        where t.status = 'active'
+        where t.status in ('active','needs_review')
           and (
             $1::timestamptz is null
             or t.updated_at >=
@@ -1847,7 +1849,35 @@ async function scanTracks(
                     ),
               ),
           ).values(),
-        );
+        )
+          .filter((candidate) => {
+            if (row.status === "active") {
+              return true;
+            }
+
+            const prefix =
+              row.slug + "-";
+            const suffix =
+              candidate.slug.startsWith(prefix)
+                ? candidate.slug.slice(prefix.length)
+                : "";
+
+            return (
+              /^[0-9a-f]{6}$/.test(suffix) &&
+              candidate.slug ===
+                row.slug + "-" + suffix
+            );
+          });
+
+      // #1094 D-lane: needs_review Tracks are review-only and enter MIZIZI
+      // only for one deterministic clean-slug/synthetic-suffix active peer.
+      // This discovers the conflict; it does not infer duplicate identity.
+      if (
+        row.status === "needs_review" &&
+        recordingIdentityPeers.length !== 1
+      ) {
+        continue;
+      }
 
       const rowFindings =
         analyzeTrackIdentity({
@@ -1867,6 +1897,18 @@ async function scanTracks(
         const finding
         of rowFindings
       ) {
+        if (
+          row.status === "needs_review" &&
+          !(
+            finding.ruleId ===
+              "track_recording_identity_conflict" &&
+            finding.ruleVersion ===
+              "1.3.0"
+          )
+        ) {
+          continue;
+        }
+
         recordFinding(
           stats,
           finding,

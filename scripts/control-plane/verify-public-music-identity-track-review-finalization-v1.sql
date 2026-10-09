@@ -3,6 +3,7 @@ declare
   v_evidence text;
   v_guard text;
   v_finalizer text;
+  v_reconciler text;
   v_policy text;
 begin
   if to_regprocedure(
@@ -13,6 +14,9 @@ begin
      ) is null
      or to_regprocedure(
        'platform_private.guard_public_music_identity_track_review_resolution_v1()'
+     ) is null
+     or to_regprocedure(
+       'public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)'
      ) is null
   then
     raise exception
@@ -34,6 +38,11 @@ begin
   )
   into v_finalizer;
 
+  select pg_get_functiondef(
+    'public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)'::regprocedure
+  )
+  into v_reconciler;
+
   select policy.with_check
   into v_policy
   from pg_policies policy
@@ -46,6 +55,7 @@ begin
      or v_policy not like '%status = ''resolved''%'
      or v_policy not like '%track_slug_identity_noise%'
      or v_policy not like '%track_slug_credit_evidence_gap%'
+     or v_policy not like '%track_recording_identity_conflict%'
   then
     raise exception
       'Authenticated Admin review policy does not block direct #1094 resolution';
@@ -68,6 +78,7 @@ begin
      or v_evidence not like '%track_recording_identity_conflict%'
      or v_evidence not like '%wk_chart_entries_v2%'
      or v_evidence not like '%chart_entry.track_slug is distinct from v_expected_slug%'
+     or v_evidence not like '%WK_1094_RECORDING_REVIEW_ONLY_FINALIZES_TRUE_DUPLICATE%'
   then
     raise exception
       'Terminal evidence binding drifted';
@@ -103,6 +114,36 @@ begin
       'Finalizer write boundary is incomplete';
   end if;
 
+  if v_finalizer not like '%WK_1094_LINKED_RECORDING_REVIEW_CAS_FAILED%'
+     or v_finalizer not like '%evidenceRecordingIdentityReviewId%'
+  then
+    raise exception
+      'Finalizer lost atomic linked recording-review closure';
+  end if;
+
+  if v_reconciler not like '%WK_1094_RECONCILE_TRACK_EVIDENCE_DRIFT%'
+     or v_reconciler not like '%WK_1094_RECONCILE_RECORDING_PEER_EVIDENCE_DRIFT%'
+     or v_reconciler not like '%originalFinalizerAuthority%'
+     or v_reconciler not like '%idempotentReplay%'
+  then
+    raise exception
+      'Historical linked recording-review reconciler lost exact receipt binding';
+  end if;
+
+  if v_reconciler ~*
+       'update[[:space:]]+public\.registry_tracks'
+     or v_reconciler ~*
+       'update[[:space:]]+public\.registry_track_artists'
+     or v_reconciler ~*
+       'update[[:space:]]+public\.registry_release_tracks'
+     or v_reconciler ~*
+       'update[[:space:]]+public\.wk_chart_entries_v2'
+     or v_reconciler like '%wk_slug_redirects%'
+  then
+    raise exception
+      'Historical linked-review reconciler gained canonical mutation authority';
+  end if;
+
   if v_finalizer ~*
        'update[[:space:]]+public\.registry_tracks'
      or v_finalizer ~*
@@ -115,6 +156,26 @@ begin
   then
     raise exception
       'Finalizer gained canonical Registry/Chart/redirect mutation authority';
+  end if;
+
+  if has_function_privilege(
+       'anon',
+       'public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)',
+       'EXECUTE'
+     )
+     or has_function_privilege(
+       'service_role',
+       'public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)',
+       'EXECUTE'
+     )
+     or not has_function_privilege(
+       'authenticated',
+       'public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)',
+       'EXECUTE'
+     )
+  then
+    raise exception
+      'Historical linked-review reconciler grants drifted';
   end if;
 
   if not has_function_privilege(

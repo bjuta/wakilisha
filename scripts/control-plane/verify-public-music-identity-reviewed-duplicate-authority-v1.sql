@@ -4,6 +4,8 @@ do $verify$
 declare
   v_base_hash text;
   v_wrapper text;
+  v_review_broker text;
+  v_decision_authority text;
 begin
   if to_regprocedure(
        'public.admin_preview_registry_track_duplicate_repair(uuid,uuid[])'
@@ -35,6 +37,16 @@ begin
   ))
   into v_wrapper;
 
+  select lower(pg_get_functiondef(
+    'mizizi_private.queue_public_music_identity_review_v1(text,text,text,text,text,text,text,text,numeric,text,text,jsonb)'::regprocedure
+  ))
+  into v_review_broker;
+
+  select lower(pg_get_functiondef(
+    'public.admin_record_public_music_identity_track_review_decision_v1(uuid,text,jsonb,text,text)'::regprocedure
+  ))
+  into v_decision_authority;
+
   if position(
        'admin_preview_registry_track_duplicate_repair_base_v1' in v_wrapper
      )=0
@@ -55,6 +67,19 @@ begin
        '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+(public|platform_private)[.]'
   then
     raise exception 'Reviewed Track duplicate preview gained mutation authority';
+  end if;
+
+  if position('wk_1094_synthetic_collision_review_evidence_drift' in v_review_broker)=0
+     or position('track.status=''needs_review''' in v_review_broker)=0
+     or position(
+          'wk_1094_synthetic_duplicate_decision_review_binding_drift'
+          in v_decision_authority
+        )=0
+     or position('track_recording_identity_conflict' in v_decision_authority)=0
+     or position('slug_review.id=identity_review.id' in v_wrapper)=0
+  then
+    raise exception
+      'Reviewed duplicate authority lost the #1094 synthetic-collision review/decision binding';
   end if;
 
   if has_function_privilege(

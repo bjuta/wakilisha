@@ -20610,6 +20610,10 @@ export type Database = {
         Args: { p_canonical_track_id: string; p_duplicate_track_ids: string[] }
         Returns: Json
       }
+      admin_reconcile_public_music_identity_recording_review_v1: {
+        Args: { p_decision_id: string; p_note?: string }
+        Returns: Json
+      }
       admin_reconcile_registry_track_intake_credit_v1: {
         Args: {
           p_registry_track_id: string
