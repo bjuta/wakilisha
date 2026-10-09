@@ -305,7 +305,7 @@ const fingerprintSql = `with payload as (
   'chart_entries',coalesce((select jsonb_agg(to_jsonb(x) order by x.id) from public.wk_chart_entries_v2 x where x.canonical_track_id is not null),'[]'::jsonb),
   'redirects',coalesce((select jsonb_agg(to_jsonb(x) order by x.id) from public.wk_slug_redirects x where x.entity_type='track'),'[]'::jsonb)
  ) body
-) select encode(digest(convert_to(body::text,'UTF8'),'sha256'),'hex') fingerprint from payload`;
+) select encode(extensions.digest(convert_to(body::text,'UTF8'),'sha256'),'hex') fingerprint from payload`;
 
 const baselineSql = `select
  (select count(*)::int from public.registry_tracks where status='active') active_tracks,
