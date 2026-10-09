@@ -46,6 +46,15 @@ describe("#1094 forward feature review materialization", () => {
     expect(migration).toMatch(/insert\s+into\s+public\.registry_review_items\s*\(/i);
   });
 
+  it("exposes B1 context without reopening settled reviews or mutating canonical identity", () => {
+    expect(migration).toContain("admin_get_public_music_identity_b1_forward_context_v1");
+    expect(migration).toContain("evidenceRecordingIdentityReviewId");
+    expect(migration).toContain("public_music_identity_distinct_recording");
+    expect(migration).toContain("WK_STALE_B1_IDENTITY");
+    expect(migration).toContain("'newDecisionRecorded',false");
+    expect(migration).toContain("'canonicalEntitiesChanged',false");
+  });
+
   it("denies anonymous and service-role execution", () => {
     expect(migration).toContain("from public,anon,service_role;");
     expect(migration).toContain("to authenticated;");
