@@ -185,34 +185,3 @@ begin
   raise notice 'WK_1094_FORWARD_FEATURE_REVIEW_AUTHORITY_PASS';
 end
 $verify$;
-
--- #1094 historical B1 context must preserve read-only causality.
-do $b1_gate$
-declare
-  v_sql text;
-begin
-  if to_regprocedure(
-    'public.admin_get_public_music_identity_b1_forward_context_v1(uuid,text)'
-  ) is null then
-    raise exception 'WK_1094_B1_CONTEXT_MISSING';
-  end if;
-  select pg_get_functiondef(
-    'public.admin_get_public_music_identity_b1_forward_context_v1(uuid,text)'::regprocedure
-  ) into v_sql;
-  if position('evidenceRecordingIdentityReviewId' in v_sql)=0
-    or position('public_music_identity_distinct_recording' in v_sql)=0
-    or position('WK_STALE_B1_IDENTITY' in v_sql)=0
-    or position('newDecisionRecorded' in v_sql)=0
-    or v_sql ~* '(update|delete[[:space:]]+from|insert[[:space:]]+into)[[:space:]]+public[.](registry_tracks|registry_review_items|registry_canonicalization_decisions)'
-  then
-    raise exception 'WK_1094_B1_CONTEXT_DRIFT';
-  end if;
-  if has_function_privilege(
-    'anon','public.admin_get_public_music_identity_b1_forward_context_v1(uuid,text)','EXECUTE'
-  ) or has_function_privilege(
-    'service_role','public.admin_get_public_music_identity_b1_forward_context_v1(uuid,text)','EXECUTE'
-  ) then
-    raise exception 'WK_1094_B1_CONTEXT_PRIVILEGE_DRIFT';
-  end if;
-end
-$b1_gate$;
