@@ -891,6 +891,14 @@ exactly 160 open MIZIZI reviews, including 17 open
 `track_slug_identity_noise/1.1.0` reviews: the preserved 5 plus the exact 12
 newly approved cases.
 
+The Production control plane keeps verification and execution authority separate:
+full-row fingerprints and exact review-row acceptance are read through the
+privileged linked Supabase control plane only while temporary JIT access is
+disabled. The `mizizi_executor` session receives only its accepted column-level
+observation surface plus bounded broker execution; it is restored and disabled
+before final privileged acceptance. The control plane must never widen the
+executor merely to inspect review tables or full canonical rows.
+
 Review materialization must prove all of the following before closure:
 
 - Track canonical write events remain 440;
