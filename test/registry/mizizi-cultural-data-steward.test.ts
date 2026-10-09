@@ -1327,6 +1327,15 @@ describe("MIZIZI Cultural Data Steward", () => {
     expect(trackControlPlane).toContain(
       "MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS",
     );
+    expect(trackControlPlane).toContain(
+      "async function queryViaJitPool",
+    );
+    expect(trackControlPlane).toContain(
+      "await queryViaJitPool(pool, reviewStateSql)",
+    );
+    expect(trackControlPlane).toContain(
+      "await queryViaJitPool(pool, fingerprintSql)",
+    );
 
     const reviewCommand =
       trackControlPlane.indexOf(
