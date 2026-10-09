@@ -1328,7 +1328,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       "open_mizizi_reviews:151",
     );
     expect(trackControlPlane).toContain(
-      "ledger_head:'20261009123610'",
+      "ledger_head:'20261009155500'",
     );
     expect(trackControlPlane).toContain(
       "MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS",
@@ -4923,6 +4923,12 @@ describe("Public Music Identity #1094 recording/duplicate lifecycle convergence"
   const runner = read(
     "scripts/registry/agents/mizizi/run.ts",
   );
+  const readScopeMigration = read(
+    "supabase/migrations/20261009155500_mizizi_track_needs_review_read_scope_v1.sql",
+  );
+  const readScopeVerifier = read(
+    "scripts/control-plane/verify-mizizi-track-needs-review-read-scope-v1.sql",
+  );
 
   it("keeps synthetic collision admission review-only until an exact authenticated duplicate decision", () => {
     expect(migration).toContain(
@@ -4952,6 +4958,21 @@ describe("Public Music Identity #1094 recording/duplicate lifecycle convergence"
     );
     expect(runner).toContain(
       '"track_recording_identity_conflict"',
+    );
+    expect(readScopeMigration).toContain(
+      "using (status in ('active','needs_review'))",
+    );
+    expect(readScopeMigration).not.toMatch(
+      /grant\s+(insert|update|delete)/i,
+    );
+    expect(readScopeMigration).toContain(
+      "created active exact authority",
+    );
+    expect(readScopeVerifier).toContain(
+      "MIZIZI_TRACK_NEEDS_REVIEW_READ_SCOPE_V1_PASS",
+    );
+    expect(readScopeVerifier).toContain(
+      "MIZIZI needs-review discovery widened write authority",
     );
   });
 
