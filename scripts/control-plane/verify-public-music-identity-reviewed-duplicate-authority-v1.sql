@@ -70,13 +70,13 @@ begin
   end if;
 
   if position('wk_1094_synthetic_collision_review_evidence_drift' in v_review_broker)=0
-     or position('track.status = ''needs_review''' in v_review_broker)=0
+     or position('track.status=''needs_review''' in v_review_broker)=0
      or position(
           'wk_1094_synthetic_duplicate_decision_review_binding_drift'
           in v_decision_authority
         )=0
      or position('track_recording_identity_conflict' in v_decision_authority)=0
-     or position('slug_review.id = identity_review.id' in v_wrapper)=0
+     or position('slug_review.id=identity_review.id' in v_wrapper)=0
   then
     raise exception
       'Reviewed duplicate authority lost the #1094 synthetic-collision review/decision binding';
