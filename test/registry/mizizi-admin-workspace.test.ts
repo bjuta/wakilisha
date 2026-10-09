@@ -150,7 +150,7 @@ describe("MIZIZI Admin workspace", () => {
 
   it("gives approved #1094 batch decisions a dedicated one-action view", () => {
     const exact = read("src/pages/admin/review/mizizi/issue1094.tsx");
-    expect(page).toContain('get("task") === "1094-d1-d3"');
+    expect(page).toContain('task === "1094-d1-d3"');
     expect(page).toContain("<Issue1094ExactDecisions />");
     expect(exact).toContain("data-wk-mizizi-1094-decisions");
     expect(exact).toContain("data-wk-1094-record-decisions");
@@ -161,6 +161,25 @@ describe("MIZIZI Admin workspace", () => {
     expect(exact).toContain("expectedTrackStateFingerprint: row.context.trackStateFingerprint");
     expect(exact).not.toContain("admin_apply_registry_track_duplicate_repair");
     expect(exact).not.toContain("—");
+  });
+
+  it("routes #1094 repaired decisions to the existing bounded duplicate authority", () => {
+    const repair = read("src/pages/admin/review/mizizi/issue1094RepairGate.tsx");
+    expect(page).toContain('task === "1094-repairs"');
+    expect(page).toContain("<Issue1094RepairGate />");
+    expect(repair).toContain("data-wk-1094-governed-repair-gate");
+    expect(repair).toContain('admin_preview_registry_track_duplicate_repair');
+    expect(repair).toContain('admin_apply_registry_track_duplicate_repair');
+    expect(repair).toContain('reviewedHumanDecisionMatches === 1');
+    expect(repair).toContain('value.confidenceBucket === "high"');
+    expect(repair).toContain('value.blockers.length === 0');
+    expect(repair).toContain("current = await preview(target)");
+    expect(repair).toContain("destructive: true");
+    expect(repair).toContain("p_allow_medium_confidence: false");
+    expect(repair).toContain("DESIRE: blocked");
+    expect(repair).not.toContain("admin_finalize_public_music_identity");
+    expect(repair).not.toContain("service_role");
+    expect(repair).not.toContain("—");
   });
 
   it("wires MIZIZI into Admin without replacing audit history", () => {
