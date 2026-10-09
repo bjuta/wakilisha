@@ -1,64 +1,33 @@
-# #1094 — actual-zero forward review authority (implementation gate A)
+# Public Music Identity #1094: governed Track review admission
 
-## Status
+**Implementation candidate. Not deployed or accepted.**
 
-**In progress; no Production deployment authorized.** Scope is the 8 October 2026 CLI-named migration `20261008180201_public_music_identity_track_actual_zero_forward_review_authority_v1.sql`.
+## Corrected architectural ownership
 
-The active corpus is **39** current observations (17 open scoped reviews, 7 earlier B1-resolved slugs with forward semantic debt, 12 new structured-feature slugs without a scoped review, 3 synthetic clean-base slug collisions), *not* the original September 39-review opening count. The source-bound decision manifest hash is `8bfc9955215d40389e586eea46a2fa6300bed2e9e9fe958d622a92bcac350e58`.
+No parallel Admin review materialization RPC. Extend the established `mizizi_private.queue_registry_review_v1` broker under its existing `mizizi_executor` authority. The accepted generic broker uses slug rule version `1.2.0`, while the accepted #1094 Admin decision/finalization contract requires `track_slug_identity_noise/1.1.0`. Both ends must change together. The separate `track_slug_credit_evidence_gap/1.3.0` and recording-identity broker remains unchanged.
 
-## Gate A implemented
+The additive, CLI-minted migration `20261008180201_public_music_identity_track_actual_zero_forward_review_authority_v1.sql` changes the existing broker to admit only high-confidence, structurally evidenced Track feature-credit noise at rule version 1.1.0. It leaves the 1.2.0 generic lane intact, preserves MIZIZI-only execution, and does not grant the actor new canonical mutation rights. Repeat submission of the same still-open 1.1.0 finding returns the existing review; changed fingerprints and historical resolved/credit-gap review ownership fail closed.
 
-`admin_materialize_public_music_identity_feature_review_v1(track_id,expected_state_fingerprint)` is an authenticated, `manage_registry`-capability-bound, `SECURITY DEFINER` RPC. It takes a row lock and refuses stale or null fingerprints, non-active Tracks, historical scoped review ownership, missing structured featured/principal credit evidence, unchanged or still-feature-bearing semantic candidates, overlapping active/needs-review Artist routes, and active Chart/Community projections.
+The existing `analyzeTrackIdentity` emits 1.1.0 for `track_slug_identity_noise` findings. In both review and apply modes the MIZIZI runner queues structurally proven feature-slug debt through its existing `queueReview` entrypoint, instead of automatically rewriting an active public identity. The runner reads *all* historical scoped slug/credit reviews (including resolved ones) and refuses duplicate admissions. The broker independently rejects historical review ownership, current recording-review ownership, missing structured featured/principal evidence, stale/current or incorrect semantic candidates, same-Artist route collisions, and current Chart/Community projections.
 
-On successful manual invocation it inserts **only** one open `mizizi_data_hygiene` scoped review, with current slug, proposed semantic slug, normalized structured contributor evidence, caller, and exact state fingerprint. It intentionally does **not** record a human approval, invoke a canonical operation, or alter a Track, credit, Release, Chart, Community, provider link, or redirect. Existing Admin human decision RPC remains the next distinct authority.
+This is review creation only, not human approval, duplicate judgment, automatic canonical repair, or a grant. Continue to use existing `admin_record_public_music_identity_track_review_decision_v1`, MIZIZI mutation operations, independently verified receipts, and finalization.
 
-The migration is an additive authority contract, not a data backfill. The 12 new Tracks must be individually verified against the pinned manifest and materialized by an authorized human/admin. A successful migration does not mean any reviews have been inserted.
+## Current evidence and explicit remaining work
 
-## Required subsequent gates (not implemented in Gate A)
+The 8 October read-only Production census covered **39 current cases**: 17 already-open scoped reviews (5 identity-noise, 12 credit-gap), seven B1-resolved feature-slug Tracks with forward debt and open recording reviews, 12 new feature-bearing Tracks with no scoped review, and three synthetic suffix/clean-base peer collisions. These are *not* the original September 39-review opening count.
 
-1. **Historical B1 forward evidence:** Seven earlier B1 review decisions are immutable. Establish narrow continuation using the existing open `track_recording_identity_conflict/1.3.0` reviews and recorded decision `relatedRecordingIdentityReviewId` before any safe semantic slug correction. Do not reopen or overwrite previous reviews.
-2. **Synthetic base collisions:** `colors-1672b8`, `desire-2a895a`, and `ficha-1d71c1` collide with `needs_review` clean-base peer shells. Their matching Apple ID is supporting evidence, not autonomous identity authority. Materialize bounded human duplicate causality, then use existing `registry.track.duplicate_repair/v1` and `registry.track_slug.canonicalize` only after canonical grant, pointer evidence, receipts, and independent verification. Colors has Chart references on **both** sides.
-3. **Credit-gaps and Route shape:** Keep the 12 existing credit-gap reviews open until credit evidence is resolved; a single primary Artist is **not** a universal invariant. Do not invent canonical identities for missing named collaborator credits or Release-level role contradictions.
+The twelve new candidates have structured featured and principal evidence, a changed semantic candidate under the accepted writer, zero Chart/Community projections and zero same-Artist target route collisions. An authorized MIZIZI review run must still prove the exact expected admissions and zero canonical changes; no Production review was created in this implementation work.
 
-## Acceptance requirements
+All seven historical B1 decisions are `public_music_identity_distinct_recording`, with exact open recording review IDs in `after_payload.evidenceRecordingIdentityReviewId` (7/7 match). Do not reopen their resolved scoped slug reviews. Recording review causality must be reconciled with their stored semantic-distinction and peer evidence before any forward canonical operation.
 
-- Fresh 39-row census and full v2 manifest rebind before any action.
-- Static Vitest and existing permanent SQL verifier pass.
-- Clean baseline schema replay plus additive migration replay in disposable Preview.
-- Negative caller, stale fingerprint, review history, collision, credit, and pointer tests.
-- Protected CI and exact schema seal.
-- No Production schema or Registry writes until all gates are independently green and explicitly staged.
+The three synthetic collisions `colors-1672b8`, `desire-2a895a`, `ficha-1d71c1` each have a `needs_review` clean-base shell and matching Apple Music Track ID. Earlier identity evidence associated the corresponding Apple Music Track IDs, but direct current provider-link coverage is asymmetric: the active Colors Track has no Apple link while its clean-base peer does, and the DESIRE and Ficha clean-base peers have no Apple links while their active counterparts do. Absence of a direct link must not be reinterpreted as a different recording. Provider identity still requires reviewed provenance and a human duplicate decision. Use only the accepted `registry.track.duplicate_repair/v1` and `registry.track_slug.canonicalize` authority after a bound human decision, exact grant, route-peer review, and independent Chart/Community/provider/Release/redirect receipt verification. Colors has current Chart pointers on both identities (9 active synthetic + 8 clean-base peer); DESIRE has 17 active Chart pointers and one Community thread, and Ficha has six active Chart pointers. These surfaces must be reconciled by the accepted engines, not overwritten directly.
 
-The same `scripts/control-plane/verify-public-music-identity-track-review-finalization-v1.sql` gate carries the new admission checks; no standalone verifier family.
+## Exit gates
 
-## 9 October 2026 — Historical B1 read-only revalidation
+1. Validate broker versioning and executor isolation, a clean 12-candidate review-only run, stale-fingerprint refusal, resolved-review refusal, no-feature and collision refusal, idempotence, and zero canonical mutation in Preview.
+2. Record a genuine linked-Preview replay proof and update generated database types and the preview schema seal via the repository's **existing** recorder. Never invent these artifacts or bypass the migration replay gate.
+3. Human-govern the outstanding 17 open scoped reviews, B1 forward decisions, and three synthetic pairs through existing Registry authorities. Do not auto-resolve human semantic or collaborator-credit ambiguities.
+4. Verify all current pointers, provider identities, redirects, public route continuity, no active feature-noise/synthetic debt, and no open scoped reviews. Run the existing `public-music-identity-track-actual-zero-audit.mjs` in `assert-zero` mode.
+5. Protected CI, verification SQL and Production acceptance must be complete before merging the full slice or closing #1094 and parent #1068.
 
-A fresh Production **read-only** query isolates exactly seven active feature-bearing Tracks with one resolved scoped slug review and one still-open `track_recording_identity_conflict/1.3.0` review each:
-
-| Current Track slug | Resolved scoped slug reviews | Open recording-identity reviews |
-| --- | ---: | ---: |
-| `freak-it-feat-doc-spot` | 1 | 1 |
-| `furaha-remix-feat-arrow-bwoy-nadia-mukami-kristoff-dogo-janja-exray` | 1 | 1 |
-| `intro-feat-juliani` | 1 | 1 |
-| `ngoma-feat-jedi-keys-bigman-chucho` | 1 | 1 |
-| `siri-feat-xenia-manasseh-mtm-thuo` | 1 | 1 |
-| `steam-feat-kato-change` | 1 | 1 |
-| `vaccine-feat-tugi-mlamba` | 1 | 1 |
-
-This count is **not** a grant to mutate or reopen the seven settled reviews. The next implementation must bind the existing forward open recording review to the historical recorded decision and exact current state, then enforce independent canonical-operation receipts. No such mutation authority has been accepted yet.
-
-The latest protected CI workflow, run `37890381341`, finished with `critical-browser=success` and `critical-core=failure` at `Enforce migration replay contract`. It must remain failing until a real linked Preview ledger and recorded proof exist; changing `live-schema-baseline.json` without that proof is prohibited.
-
-### Verified historical decision linkage
-
-Read-only inspection of `registry_canonicalization_decisions` confirms that **all seven** historical B1 scoped reviews have one `public_music_identity_distinct_recording` decision. For each, `decision.after_payload->>'evidenceRecordingIdentityReviewId'` matches the exact **still-open** `track_recording_identity_conflict` review ID for that Track (7/7 true). The link lives in `after_payload`, **not** in `decision.metadata`; any forward implementation reading `metadata.relatedRecordingIdentityReviewId` would falsely report missing causality. Preserve each immutable recorded decision, its original semantic distinction and peer evidence, and the existing unresolved recording-review lifecycle.
-
-## Primitivization and CI consolidation correction — 9 October 2026
-
-The one-off `admin_get_public_music_identity_b1_forward_context_v1` RPC **was removed** before migration acceptance. It was a read-only presentation wrapper for data already owned by the Registry reviews, canonicalization decisions, and state-fingerprint authority—not a new recurring domain capability. No additional public surface is justified merely to expose the seven historical links. Their exact `after_payload.evidenceRecordingIdentityReviewId` match remains part of the read-only audit evidence above.
-
-The separately introduced `test/registry/public-music-identity-forward-review-authority.test.ts` was also **retired**. Its string assertions duplicated the existing SQL verifier. The existing `scripts/control-plane/verify-public-music-identity-track-review-finalization-v1.sql` remains the owner of database authorization and invariant checks.
-
-The sole new Gate A admission RPC remains **provisional and unaccepted**. Its incremental value over the existing `mizizi_private.queue_public_music_identity_review_v1` broker must be evaluated against the fact that the broker is executable exclusively by `mizizi_executor`, not authenticated Admins. Any approved design should preserve that separation and use the existing broker behind its authorized executor whenever feasible; it must not grant human callers MIZIZI executor rights as a shortcut.
-
-The draft PR is an implementation workspace, not release authority. The real Preview replay proof, exact types/schema seal, and full #1094 closure contract are still mandatory.
+No Production mutation or deployment is authorized by code staged here.

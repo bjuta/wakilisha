@@ -132,56 +132,19 @@ begin
 end
 $verify$;
 
--- #1094 forward feature-review admission extension.
--- #1094 permanent static authority verifier: forward feature review admission.
-do $verify$
-declare
-  v_definition text;
+-- #1094: the existing MIZIZI broker, not a new public RPC, owns admission.
+do $wk1094$
+declare v_sql text;
 begin
-  if to_regprocedure(
-    'public.admin_materialize_public_music_identity_feature_review_v1(uuid,text)'
-  ) is null then
-    raise exception 'WK_1094_FORWARD_FEATURE_REVIEW_AUTHORITY_MISSING';
-  end if;
-
   select pg_get_functiondef(
-    'public.admin_materialize_public_music_identity_feature_review_v1(uuid,text)'::regprocedure
-  ) into v_definition;
-
-  if position('registry_subject_state_fingerprint' in v_definition)=0
-     or position('manage_registry' in v_definition)=0
-     or position('registry_track_semantic_title_v1' in v_definition)=0
-     or position('Existing or historical scoped review' in v_definition)=0
-     or position('registry_review_items' in v_definition)=0
-     or position('wk_chart_entries_v2' in v_definition)=0
-     or position('community_threads' in v_definition)=0
-     or position('humanDecisionRequired' in v_definition)=0
-     or position('Recording-identity conflict review already owns this Track.' in v_definition)=0
-     or position('wk_chart_entries_v2' in v_definition)=0
-     or v_definition ~* '(update|delete[[:space:]]+from|insert[[:space:]]+into)[[:space:]]+public[.](registry_tracks|wk_chart_entries_v2|community_threads)'
+    'mizizi_private.queue_registry_review_v1(text,text,text,text,text,text,text,text,numeric,text,text,jsonb)'::regprocedure
+  ) into v_sql;
+  if position('WK_1094_HISTORICAL_SCOPED_REVIEW_ALREADY_OWNS_TRACK' in v_sql)=0
+    or position('WK_1094_SEMANTIC_CANDIDATE_DRIFT' in v_sql)=0
+    or position('WK_1094_PROJECTED_TRACK_REQUIRES_HIGHER_EVIDENCE_LANE' in v_sql)=0
+    or v_sql ~* '(update|delete[[:space:]]+from)[[:space:]]+public[.](registry_tracks|registry_track_artists|wk_chart_entries_v2|community_threads)'
   then
-    raise exception 'WK_1094_FORWARD_FEATURE_REVIEW_AUTHORITY_DRIFT';
+    raise exception 'WK_1094_REVIEW_BROKER_CONTRACT_DRIFT';
   end if;
-
-  if has_function_privilege(
-       'anon',
-       'public.admin_materialize_public_music_identity_feature_review_v1(uuid,text)',
-       'EXECUTE'
-     )
-     or has_function_privilege(
-       'service_role',
-       'public.admin_materialize_public_music_identity_feature_review_v1(uuid,text)',
-       'EXECUTE'
-     )
-     or not has_function_privilege(
-       'authenticated',
-       'public.admin_materialize_public_music_identity_feature_review_v1(uuid,text)',
-       'EXECUTE'
-     )
-  then
-    raise exception 'WK_1094_FORWARD_FEATURE_REVIEW_EXECUTE_BOUNDARY_DRIFT';
-  end if;
-
-  raise notice 'WK_1094_FORWARD_FEATURE_REVIEW_AUTHORITY_PASS';
 end
-$verify$;
+$wk1094$;

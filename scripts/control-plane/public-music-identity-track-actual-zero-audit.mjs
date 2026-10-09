@@ -144,7 +144,22 @@ synthetic_suffix_active as (
           'trackId',peer.id,
           'title',peer.title,
           'slug',peer.slug,
-          'status',peer.status
+          'status',peer.status,
+        'chartPointerCount',(
+          select count(*) from public.wk_chart_entries_v2 ce
+          where ce.canonical_track_id=peer.id::text
+        ),
+        'communityPointerCount',(
+          select count(*) from public.community_threads ct
+          where ct.entity_type='track' and ct.entity_id=peer.id::text
+        ),
+        'appleProviderIds',coalesce((
+          select jsonb_agg(distinct l.provider_track_id)
+          from public.registry_track_provider_links l
+          where l.track_id=peer.id
+            and l.provider_key='apple_music'
+            and nullif(l.provider_track_id,'') is not null
+        ),'[]'::jsonb)
         )
         order by peer.id::text
       )
@@ -278,7 +293,22 @@ select
         'isrc',synthetic.isrc,
         'primaryArtistCount',synthetic.primary_artist_count,
         'primaryArtistSlug',synthetic.primary_artist_slug,
-        'sameBaseTracks',synthetic.same_base_tracks
+        'sameBaseTracks',synthetic.same_base_tracks,
+        'chartPointerCount',(
+          select count(*) from public.wk_chart_entries_v2 ce
+          where ce.canonical_track_id=synthetic.id::text
+        ),
+        'communityPointerCount',(
+          select count(*) from public.community_threads ct
+          where ct.entity_type='track' and ct.entity_id=synthetic.id::text
+        ),
+        'appleProviderIds',coalesce((
+          select jsonb_agg(distinct l.provider_track_id)
+          from public.registry_track_provider_links l
+          where l.track_id=synthetic.id
+            and l.provider_key='apple_music'
+            and nullif(l.provider_track_id,'') is not null
+        ),'[]'::jsonb)
       )
       order by
         synthetic.primary_artist_slug nulls last,
@@ -286,7 +316,48 @@ select
         synthetic.id
     )
     from synthetic_suffix_active synthetic
-  ),'[]'::jsonb)::text as synthetic_suffix_route_payload
+
+  ),'[]'::jsonb)::text as synthetic_suffix_route_payload,
+  coalesce((
+    select jsonb_agg(
+      jsonb_build_object(
+        'trackId',dirty.id,
+        'slug',dirty.slug,
+        'recordingReviewId',recording.id,
+        'historicalDecisionId',(
+          select decision.id
+          from public.registry_canonicalization_decisions decision
+          join public.registry_review_items scoped
+            on scoped.id=decision.review_item_id
+          where scoped.source_id=dirty.id::text
+            and scoped.status='resolved'
+            and scoped.review_type='mizizi_data_hygiene'
+            and scoped.source_payload->>'ruleId' in (
+              'track_slug_identity_noise','track_slug_credit_evidence_gap'
+            )
+            and decision.status='recorded'
+            and decision.decision_type='public_music_identity_distinct_recording'
+            and decision.metadata->>'programmeKey'='public_music_identity_track_actual_zero_v1'
+            and decision.after_payload->>'evidenceRecordingIdentityReviewId'=recording.id::text
+          order by decision.created_at desc,decision.id desc
+          limit 1
+        )
+      ) order by dirty.slug,dirty.id
+    )
+    from dirty_active dirty
+    join public.registry_review_items recording
+      on recording.source_id=dirty.id::text
+     and recording.entity_type='track'
+     and recording.review_type='mizizi_data_hygiene'
+     and recording.status='open'
+     and recording.source_payload->>'ruleId'='track_recording_identity_conflict'
+     and recording.source_payload->>'ruleVersion'='1.3.0'
+    where exists (
+      select 1 from scoped_reviews scoped
+      where scoped.track_id=dirty.id
+        and scoped.status='resolved'
+    )
+  ),'[]'::jsonb)::text as b1_forward_linkage_payload
 `);
 }
 
@@ -305,6 +376,12 @@ function main() {
   const syntheticSuffixRoutes = parseRows(
     row.synthetic_suffix_route_payload,
   );
+  const b1ForwardLinkages = parseRows(
+    row.b1_forward_linkage_payload,
+  );
+  const b1UnlinkedCount = b1ForwardLinkages.filter(
+    (entry) => !entry.historicalDecisionId,
+  ).length;
 
   const result = {
     mode: MODE,
@@ -333,6 +410,8 @@ function main() {
     ),
     dirtyRoutes,
     syntheticSuffixRoutes,
+    b1ForwardLinkages,
+    b1UnlinkedCount,
   };
 
   fs.writeFileSync(
@@ -380,6 +459,12 @@ function main() {
     );
   }
 
+  console.log("B1_FORWARD_LINKAGE_COUNT=" + b1ForwardLinkages.length);
+  console.log("B1_UNLINKED_COUNT=" + b1UnlinkedCount);
+  for (const linkage of b1ForwardLinkages) {
+    console.log("B1_FORWARD_LINKAGE " + JSON.stringify(linkage));
+  }
+
   for (const route of syntheticSuffixRoutes) {
     console.log(
       "SYNTHETIC_PUBLIC_TRACK_ROUTE " +
@@ -394,6 +479,7 @@ function main() {
       result.openCreditGap !== 0 ||
       result.activeFeatureSlugCount !== 0 ||
       result.activeFeatureSlugOutsideOpenScope !== 0 ||
+      result.b1UnlinkedCount !== 0 ||
       result.activeSyntheticSuffixCount !== 0
     ) {
       throw new Error(

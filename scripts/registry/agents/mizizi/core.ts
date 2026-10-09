@@ -980,6 +980,7 @@ export function analyzeTrackIdentity(input: TrackIdentityInput): MiziziFinding[]
   ) {
     findings.push(makeFinding({
       ruleId: "track_slug_identity_noise",
+      ruleVersion: "1.1.0",
       entityType: "track",
       entityId: input.id,
       fieldName: "slug",
