@@ -1854,7 +1854,7 @@ end
 $finalize$;
 
 create or replace function
-public.admin_reconcile_public_music_identity_linked_recording_review_v1(
+public.admin_reconcile_public_music_identity_recording_review_v1(
   p_decision_id uuid,
   p_note text default null
 )
@@ -2045,7 +2045,7 @@ begin
         'sourceSlugReviewId',v_source.id,
         'decisionType','public_music_identity_distinct_recording',
         'finalizerAuthority',
-          'admin_reconcile_public_music_identity_linked_recording_review_v1',
+          'admin_reconcile_public_music_identity_recording_review_v1',
         'originalFinalizerAuthority',
           'admin_finalize_public_music_identity_track_review_v1',
         'finalizedByUserId',v_user_id,
@@ -2073,13 +2073,13 @@ end
 $reconcile$;
 
 revoke all on function
-  public.admin_reconcile_public_music_identity_linked_recording_review_v1(
+  public.admin_reconcile_public_music_identity_recording_review_v1(
     uuid,text
   )
 from public,anon,service_role;
 
 grant execute on function
-  public.admin_reconcile_public_music_identity_linked_recording_review_v1(
+  public.admin_reconcile_public_music_identity_recording_review_v1(
     uuid,text
   )
 to authenticated;
@@ -2129,7 +2129,7 @@ do $postflight$
 declare v_new text;
 begin
   select pg_get_functiondef('public.admin_finalize_public_music_identity_track_review_v1(uuid,uuid,uuid,uuid,text)'::regprocedure) into v_new;
-  if to_regprocedure('public.admin_reconcile_public_music_identity_linked_recording_review_v1(uuid,text)') is null then raise exception 'WK_1094_RECONCILER_MISSING'; end if;
+  if to_regprocedure('public.admin_reconcile_public_music_identity_recording_review_v1(uuid,text)') is null then raise exception 'WK_1094_RECONCILER_MISSING'; end if;
   if position('WK_1094_LINKED_RECORDING_REVIEW_CAS_FAILED' in v_new)=0
      or position('evidenceRecordingIdentityReviewId' in v_new)=0
      or position('track_recording_identity_conflict' in v_new)=0
