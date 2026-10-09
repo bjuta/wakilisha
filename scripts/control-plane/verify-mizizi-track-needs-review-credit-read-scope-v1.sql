@@ -20,9 +20,6 @@ begin
        'mizizi_executor','public.registry_track_artists','track_id','SELECT'
      )
      or not has_column_privilege(
-       'mizizi_executor','public.registry_track_artists','artist_id','SELECT'
-     )
-     or not has_column_privilege(
        'mizizi_executor','public.registry_track_artists','artist_slug','SELECT'
      )
      or not has_column_privilege(
@@ -31,9 +28,21 @@ begin
      or not has_column_privilege(
        'mizizi_executor','public.registry_track_artists','is_primary','SELECT'
      )
+     or not has_column_privilege(
+       'mizizi_executor','public.registry_track_artists','credit_order','SELECT'
+     )
+     or not has_column_privilege(
+       'mizizi_executor','public.registry_track_artists','created_at','SELECT'
+     )
+     or not has_column_privilege(
+       'mizizi_executor','public.registry_track_artists','id','SELECT'
+     )
+     or has_column_privilege(
+       'mizizi_executor','public.registry_track_artists','artist_id','SELECT'
+     )
   then
     raise exception
-      'MIZIZI Track-Artist read columns drifted';
+      'MIZIZI Track-Artist bounded read columns drifted';
   end if;
 
   if has_table_privilege(
