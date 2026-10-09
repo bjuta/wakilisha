@@ -51,3 +51,11 @@ The next implementation must admit these exact synthetic collision cases through
 6. Only label a class `COMPLETE` after its independently verified journal, finalizer, pointer audit, and zero-at-rest evidence are all present.
 
 Source: live read-only Production queries performed 2026-10-09 in this implementation session. No Registry writes were made to create this document.
+
+## 9 October 2026 follow-up: synthetic-review admission failure
+
+Protected-main reviewed MIZIZI Track review attempt #1217, Actions run `37967989910`, failed during the review-only broker call with `Recording-identity conflict is no longer live.` Its preflight and independent audit completed; the JIT database transport was restored to zero at rest. No new synthetic-pair review or canonical Track repair was completed.
+
+Direct read-only Production evidence for D1 DESIRE, D2 Ficha, and D3 Colors confirms the exact narrow defect. Each clean-base peer is `needs_review`; its principal Artist credit is also `needs_review`. The corresponding approved synthetic-suffix survivor remains `active`, with matching `active` principal credit. The former broker predicate required `target_credit.status='active'` for the source peer, so the old predicate fails all three. A narrowly conditioned `needs_review` source-credit allowance, only when the source Track is itself `needs_review`, matches all three without relaxing the active survivor, exact same-Artist, matching-title, and one-synthetic-peer requirements.
+
+CLI-minted candidate: `20261009181647_public_music_identity_synthetic_review_principal_credit_admission_v1.sql`. The candidate replaces only the already-accepted private review broker's function definition, retains MIZIZI executor assertion, and performs no review or canonical Registry mutation upon migration apply. Its permanent verifier is the existing reviewed-duplicate verifier. All three D decisions still require authenticated Admin capture, exact duplicate operation grants, independent verification, finalization, and a separate clean-slug canonicalization. A successful review admission is **not** a completed duplicate repair.

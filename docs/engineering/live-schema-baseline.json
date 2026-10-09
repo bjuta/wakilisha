@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-09T17:04:54Z",
+  "generatedAt": "2026-10-09T18:35:41Z",
   "typesSha256": "5063d1bafc6fd6e6c020fdd01dc35bbc6b5b07a69df4ed6fe415bd18fbf3a968",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 215,
-  "latestMigration": "20261009170330_mizizi_track_artist_needs_review_read_scope_v1.sql",
+  "migrationCount": 216,
+  "latestMigration": "20261009181647_public_music_identity_synthetic_review_principal_credit_admission_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "oytnwhjztzguznbzyybg",
-    "migrationHead": "20261009170330",
-    "baseMainSha": "d14bae411434e861a88dc3d2d5bb725af58a0d4b",
-    "previewBranchId": "48d8573c-245e-40c0-89c2-3a0b11e6d5dd"
+    "sourceProjectRef": "nkgfoppunmnkcumalxqp",
+    "migrationHead": "20261009181647",
+    "baseMainSha": "1625bbfb08338e3683ecf351a494f61830c0bddc",
+    "previewBranchId": "8c0affc1-b43b-44ac-b2eb-66715ed40252"
   }
 }
