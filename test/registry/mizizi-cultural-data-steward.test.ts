@@ -4475,7 +4475,7 @@ describe("Public Music Identity #1094 human decision lifecycle", () => {
       "Human decision capture must not resolve the review",
     );
     expect(verifier).toContain(
-      "Review resolution is not bound to verified MIZIZI execution and the exact human decision",
+      "Review resolution guard drifted from governed finalizer and terminal-evidence authority",
     );
 
     expect(service).toContain(
