@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import pg from 'pg';
 
@@ -107,27 +106,26 @@ function queryViaLinkedCli(sql) {
   return payload;
 }
 
-async function queryViaJitPool(pool, sql) {
-  const result = await pool.query(sql);
-  if (result.rowCount !== 1) {
-    throw new Error(
-      'JIT database query did not return exactly one row.',
-    );
-  }
-  return result.rows[0];
-}
+async function queryViaLinkedCliWithRetry(sql, label) {
+  const attempts = 8;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return queryViaLinkedCli(sql);
+    } catch (error) {
+      const message = String(error?.message || error).toLowerCase();
+      const transient =
+        isTransientJitError(error) ||
+        message.includes('failed to connect as temp role') ||
+        message.includes('ssl connection is required');
 
-async function fingerprintViaJitPool(pool) {
-  const row = await queryViaJitPool(pool, fingerprintPayloadSql);
-  const payload = String(row?.fingerprint_payload || '');
-  if (!payload) {
-    throw new Error('JIT fingerprint payload query returned no payload.');
+      if (!transient || attempt === attempts) throw error;
+      console.log(
+        `Linked CLI ${label} not ready on attempt ${attempt}/${attempts}; retrying transient login transport`,
+      );
+      await sleep(5000);
+    }
   }
-  return {
-    fingerprint:createHash('sha256')
-      .update(payload,'utf8')
-      .digest('hex'),
-  };
+  throw new Error(`linked CLI ${label} retry budget exhausted`);
 }
 
 async function waitForDatabaseHealth() {
@@ -320,12 +318,6 @@ const fingerprintSql = `with payload as (
   'redirects',coalesce((select jsonb_agg(to_jsonb(x) order by x.id) from public.wk_slug_redirects x where x.entity_type='track'),'[]'::jsonb)
  ) body
 ) select encode(extensions.digest(convert_to(body::text,'UTF8'),'sha256'),'hex') fingerprint from payload`;
-
-const fingerprintPayloadSql =
-  fingerprintSql.replace(
-    "select encode(extensions.digest(convert_to(body::text,'UTF8'),'sha256'),'hex') fingerprint from payload",
-    "select body::text as fingerprint_payload from payload",
-  );
 
 const baselineSql = `select
  (select count(*)::int from public.registry_tracks where status='active') active_tracks,
@@ -991,9 +983,121 @@ async function main() {
 
   const transportRole = resolveMiziziTransportRole();
 
+  let reviewBefore = null;
+  let reviewBaseline = null;
+  let reviewAcceptedState = null;
+  if (MODE === 'review') {
+    if (originalState !== 'disabled') {
+      throw new Error(
+        `#1094 review requires production temporary access disabled at entry; found ${originalState}`,
+      );
+    }
+
+    console.log('\n=== 2B. PRIVILEGED #1094 REVIEW PRECONDITION SNAPSHOT ===');
+    reviewBaseline = await queryViaLinkedCliWithRetry(
+      baselineSql,
+      'review baseline',
+    );
+    const reviewProductionState = classifyTrackProductionState(reviewBaseline);
+    if (![
+      'post_apply',
+      'post_track_zero',
+      'post_primary_followup',
+      'post_batch_a',
+      'post_batch_b1',
+    ].includes(reviewProductionState)) {
+      throw new Error(
+        `#1094 review baseline is not an accepted post-apply state: ${reviewProductionState}`,
+      );
+    }
+
+    reviewAcceptedState = (
+      await queryViaLinkedCliWithRetry(
+        acceptanceSql,
+        'review historical acceptance',
+      )
+    ).state;
+    assertAcceptedPostApply(reviewAcceptedState);
+
+    const reviewFingerprintBefore = await queryViaLinkedCliWithRetry(
+      fingerprintSql,
+      'review fingerprint before',
+    );
+    if (reviewFingerprintBefore.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
+      throw new Error(
+        `review input fingerprint drift: ${reviewFingerprintBefore.fingerprint}`,
+      );
+    }
+
+    reviewBefore = (
+      await queryViaLinkedCliWithRetry(
+        reviewStateSql,
+        'review state before',
+      )
+    ).state;
+    assertReviewState(reviewBefore,false);
+    const featureReviewBefore = (
+      await queryViaLinkedCliWithRetry(
+        featureReviewStateSql,
+        'feature review rows before',
+      )
+    ).rows;
+    assertFeatureReviewRows(
+      featureReviewBefore,
+      reviewMaterializationComplete(reviewBefore),
+    );
+    fs.writeFileSync(
+      `${ARTIFACT_DIR}/review-state-before.json`,
+      JSON.stringify(reviewBefore,null,2)+'\n',
+    );
+
+    if (reviewMaterializationComplete(reviewBefore)) {
+      console.log('PASS: review materialization was already complete; no executor session required');
+      console.log('\n=== MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS ===');
+      return;
+    }
+  }
+
   let existing = null;
   let originalRoles = [];
   let mappingChanged = false;
+  let pool = null;
+  let jitRestored = false;
+
+  const restoreJitState = async () => {
+    if (jitRestored) return;
+    const cleanupErrors = [];
+
+    if (pool) {
+      await pool.end().catch(error => {
+        cleanupErrors.push(`pool cleanup failed: ${error?.message || error}`);
+      });
+      pool = null;
+    }
+
+    if (mappingChanged) {
+      try {
+        if (existing) {
+          await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,roles:originalRoles});
+        } else {
+          await api('DELETE',`/v1/projects/${PROJECT_REF}/database/jit/${userId}`);
+        }
+        mappingChanged = false;
+      } catch (error) {
+        cleanupErrors.push(`mapping cleanup failed: ${error?.message || error}`);
+      }
+    }
+
+    try {
+      await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'disabled'});
+    } catch (error) {
+      cleanupErrors.push(`temporary-access cleanup failed: ${error?.message || error}`);
+    }
+
+    if (cleanupErrors.length) throw new Error(cleanupErrors.join('; '));
+    jitRestored = true;
+    console.log('PASS: JIT mapping restored and production temporary access disabled at rest');
+  };
   try {
     const list = rowsFromJitList(await api('GET',`/v1/projects/${PROJECT_REF}/database/jit/list`));
     existing = list.find(x => String(x.user_id || x.id || x.gotrue_id || '') === userId) || null;
@@ -1010,10 +1114,13 @@ async function main() {
 
     const url = databaseUrl(transportRole);
     console.log(`::add-mask::${url}`);
-    const pool = await createJitPoolWithRetry(url,transportRole);
+    pool = await createJitPoolWithRetry(url,transportRole);
     try {
       console.log('\n=== 3. PRODUCTION TRACK STATE ===');
-      const baseline = queryViaLinkedCli(baselineSql);
+      const baseline =
+        MODE === 'review'
+          ? reviewBaseline
+          : queryViaLinkedCli(baselineSql);
       const productionState = classifyTrackProductionState(baseline);
       if (productionState === 'unexpected') {
         throw new Error(
@@ -1032,7 +1139,10 @@ async function main() {
         console.log('PASS: accepted historical Track post-apply baseline detected');
 
         console.log('\n=== 4. EXACT POST-APPLY ACCEPTANCE ===');
-        const acceptedState = queryViaLinkedCli(acceptanceSql).state;
+        const acceptedState =
+          MODE === 'review'
+            ? reviewAcceptedState
+            : queryViaLinkedCli(acceptanceSql).state;
         assertAcceptedPostApply(acceptedState);
         fs.writeFileSync(
           `${ARTIFACT_DIR}/state-after.json`,
@@ -1065,30 +1175,8 @@ async function main() {
 
         if (MODE === 'review') {
           console.log('\n=== 6. REVIEW-ONLY PRODUCTION AUTHORITY ===');
-          const reviewFingerprintBefore = await fingerprintViaJitPool(pool);
-          if (reviewFingerprintBefore.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
-            throw new Error(
-              `review input fingerprint drift: ${reviewFingerprintBefore.fingerprint}`,
-            );
-          }
-
-          const reviewBefore = (await queryViaJitPool(pool, reviewStateSql)).state;
-          assertReviewState(reviewBefore,false);
-          const featureReviewBefore =
-            (await queryViaJitPool(pool, featureReviewStateSql)).rows;
-          assertFeatureReviewRows(
-            featureReviewBefore,
-            reviewMaterializationComplete(reviewBefore),
-          );
-          fs.writeFileSync(
-            `${ARTIFACT_DIR}/review-state-before.json`,
-            JSON.stringify(reviewBefore,null,2)+'\n',
-          );
-
-          if (reviewMaterializationComplete(reviewBefore)) {
-            console.log('PASS: review materialization was already complete; no duplicate runner execution required');
-            console.log('\n=== MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS ===');
-            return;
+          if (!reviewBefore) {
+            throw new Error('#1094 privileged precondition snapshot is missing');
           }
 
           console.log('\n=== 7. REAL MIZIZI REVIEW MATERIALIZATION - PRODUCTION ===');
@@ -1098,30 +1186,11 @@ async function main() {
             ['run','registry:mizizi:review','--','--entity=track','--limit=0'],
             {DATABASE_URL:url},
             reviewLog,
-            pool,
-            {events:440,reviews:160,redirects:857},
+            null,
           );
           assertReviewRun(fs.readFileSync(reviewLog,'utf8'));
 
-          console.log('\n=== 8. REVIEW-ONLY PRODUCTION ACCEPTANCE ===');
-          const reviewAfter = (await queryViaJitPool(pool, reviewStateSql)).state;
-          assertReviewState(reviewAfter,true);
-          const featureReviewAfter =
-            (await queryViaJitPool(pool, featureReviewStateSql)).rows;
-          assertFeatureReviewRows(featureReviewAfter,true);
-          const reviewFingerprintAfter = await fingerprintViaJitPool(pool);
-          if (reviewFingerprintAfter.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
-            throw new Error(
-              `canonical Registry input changed during review materialization: ${reviewFingerprintAfter.fingerprint}`,
-            );
-          }
-          fs.writeFileSync(
-            `${ARTIFACT_DIR}/review-state-after.json`,
-            JSON.stringify(reviewAfter,null,2)+'\n',
-          );
-          console.log('PASS: #1094 review materialization exact +12 feature-slug reviews with canonical delta zero');
-
-          console.log('\n=== 9. FRESH POST-REVIEW READ-ONLY AUDIT ===');
+          console.log('\n=== 8. FRESH POST-REVIEW READ-ONLY AUDIT ===');
           const postReviewAudit = `${ARTIFACT_DIR}/post-review-audit.txt`;
           await streamCommand(
             'npm',
@@ -1132,6 +1201,38 @@ async function main() {
           assertCurrentAuditReadOnly(
             fs.readFileSync(postReviewAudit,'utf8'),
           );
+
+          console.log('\n=== 9. RESTORE NARROW EXECUTOR + PRIVILEGED ACCEPTANCE ===');
+          await restoreJitState();
+
+          const reviewAfter = (
+            await queryViaLinkedCliWithRetry(
+              reviewStateSql,
+              'review state after',
+            )
+          ).state;
+          assertReviewState(reviewAfter,true);
+          const featureReviewAfter = (
+            await queryViaLinkedCliWithRetry(
+              featureReviewStateSql,
+              'feature review rows after',
+            )
+          ).rows;
+          assertFeatureReviewRows(featureReviewAfter,true);
+          const reviewFingerprintAfter = await queryViaLinkedCliWithRetry(
+            fingerprintSql,
+            'review fingerprint after',
+          );
+          if (reviewFingerprintAfter.fingerprint !== EXPECTED_REVIEW_INPUT_FINGERPRINT) {
+            throw new Error(
+              `canonical Registry input changed during review materialization: ${reviewFingerprintAfter.fingerprint}`,
+            );
+          }
+          fs.writeFileSync(
+            `${ARTIFACT_DIR}/review-state-after.json`,
+            JSON.stringify(reviewAfter,null,2)+'\n',
+          );
+          console.log('PASS: #1094 review materialization exact +12 feature-slug reviews with canonical delta zero');
           console.log('\n=== MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS ===');
           return;
         }
@@ -1177,31 +1278,13 @@ async function main() {
       assertAudit(fs.readFileSync(auditAfter,'utf8'),false);
       console.log('\n=== MIZIZI HISTORICAL TRACK PRODUCTION APPLY PASS ===');
     } finally {
-      await pool.end().catch(()=>{});
-    }
-  } finally {
-    const cleanupErrors = [];
-
-    if (mappingChanged) {
-      try {
-        if (existing) {
-          await api('PUT',`/v1/projects/${PROJECT_REF}/database/jit`,{user_id:userId,roles:originalRoles});
-        } else {
-          await api('DELETE',`/v1/projects/${PROJECT_REF}/database/jit/${userId}`);
-        }
-      } catch (error) {
-        cleanupErrors.push(`mapping cleanup failed: ${error?.message || error}`);
+      if (pool) {
+        await pool.end().catch(()=>{});
+        pool = null;
       }
     }
-
-    try {
-      await api('PUT',`/v1/projects/${PROJECT_REF}/jit-access`,{state:'disabled'});
-    } catch (error) {
-      cleanupErrors.push(`temporary-access cleanup failed: ${error?.message || error}`);
-    }
-
-    if (cleanupErrors.length) throw new Error(cleanupErrors.join('; '));
-    console.log('PASS: JIT mapping restored and production temporary access disabled at rest');
+  } finally {
+    await restoreJitState();
   }
 }
 

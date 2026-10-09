@@ -1276,18 +1276,6 @@ describe("MIZIZI Cultural Data Steward", () => {
       "EXPECTED_REVIEW_INPUT_FINGERPRINT",
     );
     expect(trackControlPlane).toContain(
-      "extensions.digest",
-    );
-    expect(trackControlPlane).toContain(
-      "fingerprintViaJitPool",
-    );
-    expect(trackControlPlane).toContain(
-      "fingerprintPayloadSql",
-    );
-    expect(trackControlPlane).toContain(
-      "createHash('sha256')",
-    );
-    expect(trackControlPlane).toContain(
       "b6a8047ce9adae9cf422f8f787de88832ae6bb3f7307437a2443d2652b40bcc9",
     );
     expect(trackControlPlane).toContain(
@@ -1340,14 +1328,64 @@ describe("MIZIZI Cultural Data Steward", () => {
       "MIZIZI PUBLIC MUSIC IDENTITY REVIEW MATERIALIZATION PASS",
     );
     expect(trackControlPlane).toContain(
+      "PRIVILEGED #1094 REVIEW PRECONDITION SNAPSHOT",
+    );
+    expect(trackControlPlane).toContain(
+      "queryViaLinkedCliWithRetry",
+    );
+    expect(trackControlPlane).toContain(
+      "'review state before'",
+    );
+    expect(trackControlPlane).toContain(
+      "'review state after'",
+    );
+    expect(trackControlPlane).toContain(
+      "'review fingerprint before'",
+    );
+    expect(trackControlPlane).toContain(
+      "'review fingerprint after'",
+    );
+    expect(trackControlPlane).toContain(
+      "await restoreJitState()",
+    );
+    expect(trackControlPlane).toContain(
+      "production temporary access disabled at entry",
+    );
+    expect(trackControlPlane).not.toContain(
+      "fingerprintViaJitPool",
+    );
+    expect(trackControlPlane).not.toContain(
+      "queryViaJitPool(pool, reviewStateSql)",
+    );
+    expect(trackControlPlane).toContain(
+      "MODE === 'review'\n          ? reviewBaseline",
+    );
+    expect(trackControlPlane).toContain(
+      "MODE === 'review'\n            ? reviewAcceptedState",
+    );
+    expect(trackControlPlane).not.toContain(
       "async function queryViaJitPool",
     );
-    expect(trackControlPlane).toContain(
-      "await queryViaJitPool(pool, reviewStateSql)",
-    );
-    expect(trackControlPlane).toContain(
-      "await fingerprintViaJitPool(pool)",
-    );
+    const reviewSnapshot =
+      trackControlPlane.indexOf(
+        "PRIVILEGED #1094 REVIEW PRECONDITION SNAPSHOT",
+      );
+    const jitEnable =
+      trackControlPlane.indexOf(
+        "/jit-access`,{state:'enabled'}",
+      );
+    const restore =
+      trackControlPlane.indexOf(
+        "await restoreJitState()",
+      );
+    const postReviewVerification =
+      trackControlPlane.indexOf(
+        "'review state after'",
+      );
+    expect(reviewSnapshot).toBeGreaterThan(-1);
+    expect(jitEnable).toBeGreaterThan(reviewSnapshot);
+    expect(restore).toBeGreaterThan(jitEnable);
+    expect(postReviewVerification).toBeGreaterThan(restore);
 
     const reviewCommand =
       trackControlPlane.indexOf(
