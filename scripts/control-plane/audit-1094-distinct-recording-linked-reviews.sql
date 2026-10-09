@@ -14,11 +14,14 @@ with reviewed as (
     d.metadata->>'reviewResolved' decision_finalized,
     r.resolution_payload->>'finalizerAuthority' finalizer,
     (r.resolution_payload->>'decisionId'=d.id::text) exact_receipt,
+    (t.slug=d.after_payload->>'canonicalSlug') canonical_slug_unchanged,
+    (d.before_payload->>'trackStateFingerprint'=platform_private.registry_subject_state_fingerprint('track',d.entity_id)) state_fingerprint_unchanged,
     (rr.entity_id=d.entity_id and rr.source_id=d.entity_id::text
      and rr.source_payload->>'ruleId'='track_recording_identity_conflict'
      and rr.source_payload->>'ruleVersion'='1.3.0') correct_linked_review
   from public.registry_canonicalization_decisions d
   join public.registry_review_items r on r.id=d.review_item_id
+  join public.registry_tracks t on t.id=d.entity_id
   left join public.registry_review_items rr
     on rr.id::text=d.after_payload->>'evidenceRecordingIdentityReviewId'
   where d.decision_type='public_music_identity_distinct_recording'
@@ -28,7 +31,8 @@ with reviewed as (
 select
   decision_id, track_id, source_review_id, linked_review_id,
   source_review_status, linked_review_status, decision_status,
-  decision_finalized, finalizer, exact_receipt, correct_linked_review
+  decision_finalized, finalizer, exact_receipt, correct_linked_review,
+  canonical_slug_unchanged, state_fingerprint_unchanged
 from reviewed order by decision_id;
 
 -- The final actual-zero gate, after authenticated reconciliation and verification:
