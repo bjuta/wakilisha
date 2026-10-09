@@ -1279,6 +1279,15 @@ describe("MIZIZI Cultural Data Steward", () => {
       "extensions.digest",
     );
     expect(trackControlPlane).toContain(
+      "fingerprintViaJitPool",
+    );
+    expect(trackControlPlane).toContain(
+      "fingerprintPayloadSql",
+    );
+    expect(trackControlPlane).toContain(
+      "createHash('sha256')",
+    );
+    expect(trackControlPlane).toContain(
       "b6a8047ce9adae9cf422f8f787de88832ae6bb3f7307437a2443d2652b40bcc9",
     );
     expect(trackControlPlane).toContain(
@@ -1337,7 +1346,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       "await queryViaJitPool(pool, reviewStateSql)",
     );
     expect(trackControlPlane).toContain(
-      "await queryViaJitPool(pool, fingerprintSql)",
+      "await fingerprintViaJitPool(pool)",
     );
 
     const reviewCommand =
