@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 /**
  * Headquarters-to-platform-private jobs compatibility boundary.
  *
@@ -23,7 +25,7 @@ export type HeadquartersJobBinding = Readonly<{
   boundWorkspaceId: string;
   currentCaseRevision: number;
   expectedCaseRevision: number;
-  caseState: "open" | "held" | "done_for_now" | "closed";
+  caseState: "open" | "in_progress" | "held" | "done_for_now" | "closed";
   currentStage: string;
   activeWriteHold: boolean;
   bindingVerifiedAt: string;
@@ -39,6 +41,21 @@ export type HeadquartersJobRequest = Readonly<{
   operation: "read_only_research";
   reason: string;
 }>;
+
+/** PostgreSQL gateway recomputes these same UTF-8 bytes independently. */
+export function fingerprintHeadquartersResearchRequestV1(
+  request: Pick<HeadquartersJobRequest, "caseId" | "workspaceId" | "expectedRevision" | "reason">,
+): string {
+  if (!request || !UUID.test(request.caseId) || !UUID.test(request.workspaceId) ||
+      !Number.isSafeInteger(request.expectedRevision) || request.expectedRevision < 1 ||
+      typeof request.reason !== "string" || request.reason.trim().length < 8 ||
+      request.reason.length > 2000) {
+    throw new Error("MIZIZI_JOB_INVALID_FINGERPRINT_INPUT");
+  }
+  const canonical = [request.caseId.toLowerCase(), request.workspaceId.toLowerCase(),
+    String(request.expectedRevision), "read_only_research", request.reason.trim()].join("\n");
+  return createHash("sha256").update(canonical, "utf8").digest("hex");
+}
 
 export type HeadquartersSharedJobPlan = Readonly<{
   commandType: typeof MIZIZI_CASE_COMMAND;
@@ -87,7 +104,7 @@ export function planHeadquartersSharedJob(
       binding.expectedCaseRevision !== request.expectedRevision) {
     throw new Error("MIZIZI_JOB_STALE_CASE_REVISION");
   }
-  if (binding.caseState !== "open" || binding.currentStage !== "research") {
+  if (!["open", "in_progress"].includes(binding.caseState) || binding.currentStage !== "research") {
     throw new Error("MIZIZI_JOB_CASE_NOT_ADMISSIBLE");
   }
   if (request.operation !== "read_only_research" || request.principalKey !== "system:mizizi" ||
@@ -96,6 +113,9 @@ export function planHeadquartersSharedJob(
       request.reason.length > 2000 ||
       !Number.isFinite(Date.parse(binding.bindingVerifiedAt))) {
     throw new Error("MIZIZI_JOB_INVALID_COMMAND");
+  }
+  if (request.requestFingerprint !== fingerprintHeadquartersResearchRequestV1(request)) {
+    throw new Error("MIZIZI_JOB_FINGERPRINT_MISMATCH");
   }
 
   return Object.freeze({
@@ -165,6 +185,9 @@ function validateResearchJobRequestV1(request: HeadquartersJobRequest): void {
       typeof request.reason !== "string" ||
       request.reason.trim().length < 8 || request.reason.length > 2000) {
     throw new Error("MIZIZI_JOB_INVALID_COMMAND");
+  }
+  if (request.requestFingerprint !== fingerprintHeadquartersResearchRequestV1(request)) {
+    throw new Error("MIZIZI_JOB_FINGERPRINT_MISMATCH");
   }
 }
 

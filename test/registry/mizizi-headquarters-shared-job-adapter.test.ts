@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { planHeadquartersSharedJob, admitResearchJobViaTrustedGatewayV1 } from "../../scripts/registry/agents/mizizi/runtime/shared-job-adapter";
+import { planHeadquartersSharedJob, admitResearchJobViaTrustedGatewayV1,
+  fingerprintHeadquartersResearchRequestV1 } from "../../scripts/registry/agents/mizizi/runtime/shared-job-adapter";
 
 const CASE = "11111111-1111-4111-8111-111111111111";
 const WORKSPACE = "22222222-2222-4222-8222-222222222222";
 const OTHER = "33333333-3333-4333-8333-333333333333";
-const request = {
+const requestBase = {
   caseId: CASE, workspaceId: WORKSPACE, expectedRevision: 4,
   principalKey: "system:mizizi", idempotencyKey: "mizizi:case:research:4",
-  requestFingerprint: "a".repeat(64),
   operation: "read_only_research" as const,
   reason: "Collect independent source evidence",
 };
+const request = { ...requestBase,
+  requestFingerprint: fingerprintHeadquartersResearchRequestV1(requestBase) };
 const binding = {
   caseId: CASE, workspaceId: WORKSPACE, resourceId: CASE,
   resourceKind: "mizizi_case" as const, boundCaseId: CASE,
@@ -46,6 +48,10 @@ describe("MIZIZI shared typed-job compatibility planner", () => {
   ])("refuses stale, held, or non-research cases: %j", (change) => {
     expect(() => planHeadquartersSharedJob(request, { ...binding, ...change } as typeof binding)).toThrow();
   });
+  it("accepts the actual DB02 start_research state while retaining CAS", () => {
+    const updated = { ...binding, caseState: "in_progress" as const };
+    expect(planHeadquartersSharedJob(request, updated).jobKey).toBe("research:4");
+  });
   it("permits read-only research while Hold Writes is active", () => {
     expect(planHeadquartersSharedJob(request, { ...binding, activeWriteHold: true }).inputPayload.operation)
       .toBe("read_only_research");
@@ -53,6 +59,7 @@ describe("MIZIZI shared typed-job compatibility planner", () => {
   it.each([
     { principalKey: "service:service_role" }, { requestFingerprint: "abc" },
     { idempotencyKey: "bad" }, { operation: "publish" },
+    { requestFingerprint: "a".repeat(64) },
     { reason: "" }, { caseId: "invalid" },
     { expectedRevision: 0 },
   ])("refuses invalid shared command inputs: %j", (change) => {
@@ -75,7 +82,7 @@ describe("MIZIZI trusted shared-job gateway caller", () => {
       expect(sql).not.toMatch(/insert into|update\s+platform_private/i);
       expect(sql).toContain("$7::text");
       expect(values).toEqual([CASE, WORKSPACE, 4, "system:mizizi",
-        "mizizi:case:research:4", "a".repeat(64), request.reason]);
+        "mizizi:case:research:4", request.requestFingerprint, request.reason]);
       return { rows: [ok as unknown as T], rowCount: 1 };
     }};
     expect(await admitResearchJobViaTrustedGatewayV1(executor, request)).toMatchObject({
@@ -94,6 +101,7 @@ describe("MIZIZI trusted shared-job gateway caller", () => {
       { operation: "write" }, { requestFingerprint: "invalid" },
       { caseId: "bad" }, { workspaceId: "bad" }, { expectedRevision: 0 },
       { idempotencyKey: "short" }, { reason: "" },
+      { requestFingerprint: "a".repeat(64) },
     ]) {
       await expect(admitResearchJobViaTrustedGatewayV1(executor,
         { ...request, ...change } as typeof request)).rejects.toThrow();
