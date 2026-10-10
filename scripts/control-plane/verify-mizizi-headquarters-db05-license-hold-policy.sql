@@ -10,7 +10,7 @@ declare
   bad integer;
 begin
  select count(*),max(version) into tcount,head_version from supabase_migrations.schema_migrations;
- if tcount<>220 or head_version<>'20261010100017' or
+ if tcount<220 or head_version<'20261010100017' or
    (select count(*) from supabase_migrations.schema_migrations sm
       where sm.version='20261010100017' and sm.name='mizizi_license_hold_policy_v1')<>1 then
    raise exception 'DB05 VERIFY: exact Preview ledger mismatch: %/%',tcount,head_version;

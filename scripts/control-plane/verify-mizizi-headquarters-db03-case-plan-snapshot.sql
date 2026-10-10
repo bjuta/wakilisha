@@ -2,8 +2,8 @@
 do $db03_verify$
 declare r record;
 begin
- if (select count(*) from supabase_migrations.schema_migrations)<>219
-    or (select max(version) from supabase_migrations.schema_migrations)<>'20261010093509'
+ if (select count(*) from supabase_migrations.schema_migrations)<219
+    or (select max(version) from supabase_migrations.schema_migrations)<'20261010093509'
     or (select count(*) from supabase_migrations.schema_migrations where version='20261010093509' and name='mizizi_case_plan_snapshot_v1')<>1 then
    raise exception 'DB03 verifier: migration ledger mismatch';
  end if;

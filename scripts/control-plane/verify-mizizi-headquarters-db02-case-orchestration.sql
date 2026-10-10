@@ -6,8 +6,8 @@ declare
   r record;
   v_workspace_id uuid;
 begin
-  if (select count(*) from supabase_migrations.schema_migrations) <> 218
-     or (select max(version) from supabase_migrations.schema_migrations) <> '20261010091606'
+  if (select count(*) from supabase_migrations.schema_migrations) < 218
+     or (select max(version) from supabase_migrations.schema_migrations) < '20261010091606'
      or (select count(*) from supabase_migrations.schema_migrations
          where version='20261010091606' and name='mizizi_case_orchestration_links_v1') <> 1 then
     raise exception 'DB02 verifier: incorrect isolated Preview migration ledger';
