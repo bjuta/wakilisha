@@ -182,6 +182,23 @@ describe("MIZIZI Admin workspace", () => {
     expect(repair).not.toContain("—");
   });
 
+  it("keeps the #1094 Ficha and Colors finalization bound to exact receipts", () => {
+    const finalizer = read("src/pages/admin/review/mizizi/issue1094Finalize.tsx");
+    expect(page).toContain('task === "1094-finalize"');
+    expect(page).toContain("<Issue1094Finalize />");
+    expect(finalizer).toContain("data-wk-1094-finalization");
+    expect(finalizer).toContain("data-wk-1094-finalize-exact");
+    expect(finalizer).toContain("admin_finalize_public_music_identity_track_review_v1");
+    expect(finalizer).toContain("p_verified_operation_id: item.operation");
+    expect(finalizer).toContain("p_archive_event_id: null");
+    expect(finalizer).toContain("isExpectedResolution(review, item)");
+    expect(finalizer).toContain("const after = verifyReview(await current(item), item)");
+    expect(finalizer).toContain("DESIRE stays open");
+    expect(finalizer).not.toContain("admin_apply_registry_track_duplicate_repair");
+    expect(finalizer).not.toContain("service_role");
+    expect(finalizer).not.toContain("—");
+  });
+
   it("wires MIZIZI into Admin without replacing audit history", () => {
     expect(lazy).toContain("AdminMiziziWorkspacePage");
     expect(routes).toContain('{ path: "mizizi", element: <AdminMiziziWorkspacePage /> }');
