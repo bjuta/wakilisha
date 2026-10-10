@@ -216,7 +216,7 @@ describe("MIZIZI Admin workspace", () => {
     expect(allReviews).toContain('item.id.toLowerCase() !== linkedReviewId.toLowerCase()');
     expect(allReviews).toContain('openItem(item)');
     expect(allReviews).toContain('<RegistryDecisionModal');
-    expect(allReviews).toContain("That review is not open for a new decision.");
+    expect(allReviews).toContain("This review is not open for a new decision.");
     expect(service).toContain('reviewId?: string');
     expect(service).toContain('.eq("id", filters.reviewId)');
     expect(service).toContain("Invalid Registry review reference");
