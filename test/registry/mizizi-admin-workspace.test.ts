@@ -207,4 +207,20 @@ describe("MIZIZI Admin workspace", () => {
     expect(search).toContain('id: "mizizi"');
     expect(search).toContain('path: "/admin/review/mizizi"');
   });
+
+  it("retains a Headquarters review reference within the existing authorized decision flow", () => {
+    const allReviews = read("src/pages/admin/review/queue/page.tsx");
+    expect(allReviews).toContain('new URLSearchParams(location.search).get("review")');
+    expect(allReviews).toContain('loadRegistryReviewItems({ reviewId: linkedReviewId, limit: 1 })');
+    expect(allReviews).toContain('item.status !== "open"');
+    expect(allReviews).toContain('item.id.toLowerCase() !== linkedReviewId.toLowerCase()');
+    expect(allReviews).toContain('openItem(item)');
+    expect(allReviews).toContain('<RegistryDecisionModal');
+    expect(allReviews).toContain("That review is not open for a new decision.");
+    expect(service).toContain('reviewId?: string');
+    expect(service).toContain('.eq("id", filters.reviewId)');
+    expect(service).toContain("Invalid Registry review reference");
+    expect(allReviews).not.toContain("supabase.from(\"mizizi_private.cases\")");
+  });
+
 });
