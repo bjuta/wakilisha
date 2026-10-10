@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20261010161101_mizizi_case_resource_jobs_bridge_v1.sql",
+  "migration_sha256": "e3a75e571081186215591365d83790b0b3b9466af93e23ffa7536f105deecdf5",
+  "base_main_sha": "cff8e57222ac735b5c2e8c3b7a17ee50c49da3dd",
+  "preview_project_ref": "nkgfoppunmnkcumalxqp",
+  "preview_branch_id": "8c0affc1-b43b-44ac-b2eb-66715ed40252",
+  "preview_migration_head": "20261010161101",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-headquarters-case-resource-jobs-bridge.sql",
+  "schema_types_sha256": "5063d1bafc6fd6e6c020fdd01dc35bbc6b5b07a69df4ed6fe415bd18fbf3a968",
+  "schema_migration_count": 222,
+  "schema_migration_head": "20261010161101",
+  "verified_at": "2026-10-10T16:59:02.630Z"
+}

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { Modal } from "@/components/design-system/primitives/Modal";
@@ -178,6 +178,9 @@ function toneClass(tone: ReadinessTone): string {
 
 export default function AdminReviewQueuePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const linkedReviewId = new URLSearchParams(location.search).get("review");
+  const [linkedReviewError, setLinkedReviewError] = useState("");
   const [state, setState] = useState<LoadState>("loading");
   const [data, setData] = useState<ReviewCommandCenterData | null>(null);
   const [error, setError] = useState("");
@@ -206,7 +209,7 @@ export default function AdminReviewQueuePage() {
     return data.totals.registryReviewItems + data.totals.openDecisions + data.totals.reviewArtifacts + data.totals.stagingNeedsReview + data.totals.blockedStaging + data.totals.unknownFields;
   }, [data]);
 
-  const openItem = (item: RegistryReviewItemRow) => {
+  const openItem = useCallback((item: RegistryReviewItemRow) => {
     setSelectedItem(item);
 
     if (!isPublicMusicIdentityTrackReview(item)) {
@@ -242,7 +245,32 @@ export default function AdminReviewQueuePage() {
               : "Could not load current Track review context.",
         }));
       });
-  };
+  }, []);
+
+  useEffect(() => {
+    if (linkedReviewId === null) { setLinkedReviewError(""); return; }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(linkedReviewId)) {
+      setLinkedReviewError("That review reference is invalid.");
+      return;
+    }
+    let active = true;
+    void loadRegistryReviewItems({ reviewId: linkedReviewId, limit: 1 }).then(({ rows }) => {
+      if (!active) return;
+      const item = rows[0];
+      if (rows.length !== 1 || !item || item.id.toLowerCase() !== linkedReviewId.toLowerCase()) {
+        setLinkedReviewError("That review is no longer available.");
+        return;
+      }
+      if (item.status !== "open") {
+        setLinkedReviewError("This review is not open for a new decision.");
+        return;
+      }
+      setLinkedReviewError("");
+      setPanel("registry");
+      openItem(item);
+    }).catch(() => { if (active) setLinkedReviewError("That review could not be opened."); });
+    return () => { active = false; };
+  }, [linkedReviewId, openItem]);
 
   const closeItem = () => {
     if (decision.submitting) return;
@@ -405,6 +433,7 @@ export default function AdminReviewQueuePage() {
 
   return (
     <div className="space-y-6">
+      {linkedReviewError ? <p role="alert" className="rounded-xl bg-wk-warning-soft p-4 text-[13px] text-wk-warning">{linkedReviewError}</p> : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Review</div>

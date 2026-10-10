@@ -122,6 +122,7 @@ export type RegistryReviewFilters = {
   entityType?: string;
   offset?: number;
   limit?: number;
+  reviewId?: string;
 };
 
 export type RegistryReviewPage = {
@@ -374,11 +375,15 @@ async function loadRegistryReviewSummary(): Promise<RegistryReviewSummaryRow[]> 
 export async function loadRegistryReviewItems(filters: RegistryReviewFilters = {}): Promise<RegistryReviewPage> {
   const limit = Math.max(1, Math.min(Number(filters.limit ?? 18), 100));
   const offset = Math.max(0, Number(filters.offset ?? 0));
+  if (filters.reviewId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.reviewId)) {
+    throw new TypeError("Invalid Registry review reference");
+  }
   let query = supabase
     .from("registry_review_items")
     .select(registryReviewSelect, { count: "exact" })
     .order("updated_at", { ascending: false });
 
+  if (filters.reviewId) query = query.eq("id", filters.reviewId);
   if (filters.status) query = query.eq("status", filters.status);
   if (filters.reviewType) query = query.eq("review_type", filters.reviewType);
   if (filters.priority) query = query.eq("priority", filters.priority);
