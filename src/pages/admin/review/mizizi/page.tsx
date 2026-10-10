@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { MiziziHeadquartersBrief } from "./MiziziHeadquartersBrief";
 import Issue1094ExactDecisions from "./issue1094";
 import Issue1094RepairGate from "./issue1094RepairGate";
 import Issue1094Finalize from "./issue1094Finalize";
@@ -675,7 +676,7 @@ function AdminMiziziWorkspaceContent() {
           <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Music Registry</div>
           <h1 className="text-[26px] font-black tracking-tight text-wk-text">MIZIZI</h1>
           <p className="mt-1 max-w-3xl text-[13px] leading-6 text-wk-text-muted">
-            Work through music identity and contribution provenance issues that need a human decision. Old review history stays out of the way.
+            Review the music Registry’s open work, decisions, and history.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -691,6 +692,7 @@ function AdminMiziziWorkspaceContent() {
       </div>
 
       <WkWorkflowRail steps={WORKFLOW_STEPS} ariaLabel="MIZIZI workflow" />
+      <MiziziHeadquartersBrief />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Needs a decision" value={counts.needsDecision} help="MIZIZI found the issue. You choose the outcome." />
@@ -703,7 +705,7 @@ function AdminMiziziWorkspaceContent() {
         <div className="border-b border-wk-border p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2 className="text-[15px] font-black text-wk-text">Current work</h2>
+              <h2 className="text-[15px] font-black text-wk-text">Track Identity Reviews</h2>
               <p className="mt-1 text-[12px] text-wk-text-muted">Only active MIZIZI Track identity reviews are shown here.</p>
             </div>
             <label className="block w-full max-w-sm">
