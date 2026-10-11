@@ -5,7 +5,7 @@ import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { supabase } from "@/lib/supabase";
-import { selectOperatorReviewPageV1, type OperatorStatusV1 } from "@/services/operatorReviewSelection";
+import { OPERATOR_REVIEW_PAGE_SIZE, selectOperatorReviewPageV1, type OperatorStatusV1 } from "@/services/operatorReviewSelection";
 import type { HeadquartersQueueV2, QueueReviewV2 } from "@/services/miziziHeadquartersBrief";
 import { projectRecordedCaseSubject } from "@/services/miziziRecordedCaseSubject";
 
@@ -160,7 +160,11 @@ export function MiziziEvidenceWorkbench({
         </div>
         {selected && !selection.items.some((item) => item.id === selected.id) ? (
           <button type="button" onClick={() => {
-            setStatus(selected.status); setWorkstream(selected.workstream); setQuery(""); setPage(1);
+            const sameStream = queue.items.filter((item) =>
+              item.status === selected.status && item.workstream === selected.workstream);
+            const position = sameStream.findIndex((item) => item.id === selected.id);
+            setStatus(selected.status); setWorkstream(selected.workstream); setQuery("");
+            setPage(position >= 0 ? Math.floor(position / OPERATOR_REVIEW_PAGE_SIZE) + 1 : 1);
           }}
             className="flex w-full items-center justify-between gap-3 border-b border-wk-border bg-wk-brand-soft px-4 py-3 text-left text-[12px] font-semibold text-wk-text focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand">
             <span>Selected case is outside the current filters</span>
