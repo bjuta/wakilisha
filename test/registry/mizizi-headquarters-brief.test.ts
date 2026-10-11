@@ -199,6 +199,21 @@ describe("Headquarters in-place review inspection", () => {
     expect(selectReviewForInspectionV1([candidate], "1234")).toBeNull();
     expect(selectReviewForInspectionV1([candidate], "4d2d4ad9-271e-4862-822b-6395cf271918")).toBeNull();
   });
+  it("keeps bounded sessions review-only with explicit skip and Done for Now", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
+    expect(source).toContain("function OperatorReviewSession(");
+    expect(source).toContain("5 minutes");
+    expect(source).toContain("15 minutes");
+    expect(source).toContain("60 minutes");
+    expect(source).toContain("Skip for Now");
+    expect(source).toContain("Done for Now");
+    expect(source).toContain('queue.items.filter((item) => item.status === "open")');
+    expect(source).toContain("onInspect(nextReview.id)");
+    expect(source).toContain("Skips are not decisions");
+    expect(source).not.toContain("localStorage");
+    expect(source).not.toContain("Approve Review");
+  });
+
   it("uses WAKILISHA Inspector, not browser-native dialogs or autonomous decisions", () => {
     const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
     expect(source).toContain("<WkInspector");
