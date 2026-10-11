@@ -71,7 +71,7 @@ export function MiziziEvidenceWorkbench({
 }: {
   queue: HeadquartersQueueV2;
   selectedId: string | null;
-  onSelectedIdChange: (id: string) => void;
+  onSelectedIdChange: (id: string | null) => void;
 }) {
   const [status, setStatus] = useState<OperatorStatusV1>("open");
   const [workstream, setWorkstream] = useState("");
@@ -86,7 +86,8 @@ export function MiziziEvidenceWorkbench({
   const selected = queue.items.find((item) => item.id === selectedId) ?? null;
 
   useEffect(() => {
-    if (selected && selection.items.some((item) => item.id === selected.id)) return;
+    // Preserve a deep-linked/session-selected claim even if it is outside the current list page.
+    if (selected) return;
     const first = selection.items[0];
     if (first) onSelectedIdChange(first.id);
   }, [selection.items, selected, onSelectedIdChange]);
@@ -135,7 +136,7 @@ export function MiziziEvidenceWorkbench({
             </p>
           </div>
           <WkSearchField ariaLabel="Find a Registry claim" value={query}
-            onChange={(value) => { setQuery(value); setPage(1); }}
+            onChange={(value) => { setQuery(value); setPage(1); onSelectedIdChange(null); }}
             placeholder="Search claims, types, references" />
           <div className="grid grid-cols-2 gap-2">
             <WkSelect ariaLabel="Claim status" value={status}
@@ -143,13 +144,13 @@ export function MiziziEvidenceWorkbench({
                 { value: "all", label: "All statuses" }, { value: "other", label: "Other" }]}
               onChange={(value) => {
                 if (["open", "resolved", "all", "other"].includes(value)) {
-                  setStatus(value as OperatorStatusV1); setPage(1);
+                  setStatus(value as OperatorStatusV1); setPage(1); onSelectedIdChange(null);
                 }
               }} />
             <WkSelect ariaLabel="Claim workstream" value={workstream}
               options={[{ value: "", label: "All workstreams" },
                 ...queue.workstreams.map((group) => ({ value: group.key, label: group.label }))]}
-              onChange={(value) => { setWorkstream(value); setPage(1); }} />
+              onChange={(value) => { setWorkstream(value); setPage(1); onSelectedIdChange(null); }} />
           </div>
           <p className="text-[11px] tabular-nums text-wk-text-muted">
             {selection.total.toLocaleString()} matching · {selection.start}–{selection.end} shown
@@ -177,11 +178,11 @@ export function MiziziEvidenceWorkbench({
         </div>
         <div className="flex items-center justify-between gap-2 border-t border-wk-border px-3 py-3">
           <WkButton variant="ghost" className="wk-button-sm" disabled={selection.currentPage <= 1}
-            onClick={() => setPage(Math.max(1, selection.currentPage - 1))}>Previous</WkButton>
+            onClick={() => { setPage(Math.max(1, selection.currentPage - 1)); onSelectedIdChange(null); }}>Previous</WkButton>
           <span className="text-[12px] tabular-nums text-wk-text-muted">{selection.currentPage} / {selection.totalPages}</span>
           <WkButton variant="ghost" className="wk-button-sm"
             disabled={selection.currentPage >= selection.totalPages}
-            onClick={() => setPage(Math.min(selection.totalPages, selection.currentPage + 1))}>Next</WkButton>
+            onClick={() => { setPage(Math.min(selection.totalPages, selection.currentPage + 1)); onSelectedIdChange(null); }}>Next</WkButton>
         </div>
       </div>
       <div className="min-w-0 px-5 py-6 sm:px-7 sm:py-8">
