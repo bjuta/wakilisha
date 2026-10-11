@@ -61,6 +61,8 @@ describe("Cores bounded read-only evidence projection", () => {
     expect(source).toContain('new Set(pageIds)');
     expect(source).toContain('row.title !== review.title');
     expect(source).toContain("projectRecordedCaseSubject(row.source_payload, review.title)");
+    expect(source).toContain('detail.value?.id === selected?.id');
+    expect(source).toContain("detailIsLoading");
     expect(source).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);
   });
   it("only calls exact #1094 receipt verifier for known records", () => {

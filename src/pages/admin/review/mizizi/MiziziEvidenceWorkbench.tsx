@@ -173,7 +173,11 @@ export function MiziziEvidenceWorkbench({
     return () => { active = false; };
   }, [selected?.id, selected?.sourceStatus]);
 
-  const fact = detail.kind === "ready" ? detail.value : undefined;
+  // Never render a previous review's payload under the currently selected case.
+  const fact = detail.kind === "ready" && detail.value?.id === selected?.id
+    ? detail.value : undefined;
+  const detailIsLoading = detail.kind === "loading" ||
+    (detail.kind === "ready" && detail.value?.id !== selected?.id);
   const source = asRecord(fact?.source_payload);
   const evidence = asRecord(source.evidence);
   const resolution = asRecord(fact?.resolution_payload);
@@ -292,7 +296,7 @@ export function MiziziEvidenceWorkbench({
                 ) : null}
               </div>
             ) : null}
-            {detail.kind === "loading" ? (
+            {detailIsLoading ? (
               <p role="status" className="mt-6 text-[13px] text-wk-text-muted">Reading the current Registry evidence…</p>
             ) : detail.kind === "error" || !fact ? (
               <div role="alert" className="mt-6 rounded-xl border border-wk-danger/30 p-4 text-[13px] text-wk-danger">
