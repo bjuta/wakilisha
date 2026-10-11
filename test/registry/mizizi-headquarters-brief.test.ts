@@ -292,9 +292,9 @@ describe("Headquarters #1094 live receipt convergence", () => {
     expect(source).toContain("Inspect open review");
     expect(source).toContain("Decision recorded");
     expect(source).toContain("Verified complete");
-    expect(source).not.toMatch(/<select\\b|<input\\b|<dialog\\b/);
+    expect(source).not.toMatch(/<select\b|<input\b|<dialog\b/);
     expect(service).toContain('from("registry_review_items")');
     expect(service).toContain('from("registry_canonicalization_decisions")');
-    expect(service).not.toMatch(/\\.(insert|update|upsert|delete|rpc)\\(/);
+    expect(service).not.toMatch(/\.(insert|update|upsert|delete|rpc)\(/);
   });
 });
