@@ -7,6 +7,7 @@ import Issue1094Finalize from "./issue1094Finalize";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkTabs } from "@/components/design-system/primitives/Tabs";
+import { WkButton } from "@/components/design-system/primitives/Button";
 import { Modal } from "@/components/design-system/primitives/Modal";
 import {
   WkWorkflowRail,
@@ -406,6 +407,7 @@ function AdminMiziziWorkspaceContent() {
   const [items, setItems] = useState<WorkspaceItem[]>([]);
   const [lane, setLane] = useState<Lane>("needs_decision");
   const [search, setSearch] = useState("");
+  const [decisionPage, setDecisionPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [selected, setSelected] = useState<WorkspaceItem | null>(null);
@@ -464,6 +466,13 @@ function AdminMiziziWorkspaceContent() {
       ].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
   }, [items, lane, search]);
+
+  // Keep the governed decision path bounded. Changing a filter starts at page one.
+  useEffect(() => { setDecisionPage(1); }, [lane, search]);
+  const decisionPageCount = Math.max(1, Math.ceil(visibleItems.length / 15));
+  const currentDecisionPage = Math.min(decisionPage, decisionPageCount);
+  const decisionPageStart = (currentDecisionPage - 1) * 15;
+  const pagedItems = visibleItems.slice(decisionPageStart, decisionPageStart + 15);
 
   const openReview = useCallback(async (item: WorkspaceItem) => {
     setSelected(item);
@@ -764,7 +773,7 @@ function AdminMiziziWorkspaceContent() {
           </div>
         ) : visibleItems.length ? (
           <div className="divide-y divide-wk-border">
-            {visibleItems.map((item) => (
+            {pagedItems.map((item) => (
               <MiziziRow key={item.review.id} item={item} onOpen={() => void openReview(item)} />
             ))}
           </div>
@@ -775,6 +784,28 @@ function AdminMiziziWorkspaceContent() {
             <p className="mt-1 text-[12px] text-wk-text-muted">Change the filter or search for another Track.</p>
           </div>
         )}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-wk-border bg-wk-surface px-4 py-3" data-wk-mizizi-decision-pagination>
+        <span className="text-[12px] tabular-nums text-wk-text-muted" aria-live="polite">
+          {visibleItems.length
+            ? `${(decisionPageStart + 1).toLocaleString()}–${Math.min(decisionPageStart + 15, visibleItems.length).toLocaleString()} of ${visibleItems.length.toLocaleString()} reviews`
+            : "No reviews in this view"}
+        </span>
+        <div className="flex items-center gap-2">
+          <WkButton variant="ghost" className="wk-button-sm"
+            disabled={currentDecisionPage <= 1}
+            onClick={() => setDecisionPage(Math.max(1, currentDecisionPage - 1))}>
+            Previous
+          </WkButton>
+          <span className="text-[12px] tabular-nums text-wk-text-muted">
+            {currentDecisionPage} / {decisionPageCount}
+          </span>
+          <WkButton variant="ghost" className="wk-button-sm"
+            disabled={currentDecisionPage >= decisionPageCount}
+            onClick={() => setDecisionPage(Math.min(decisionPageCount, currentDecisionPage + 1))}>
+            Next
+          </WkButton>
+        </div>
+      </div>
       </WkSurface>
 
       <ProvenanceReviewSection
