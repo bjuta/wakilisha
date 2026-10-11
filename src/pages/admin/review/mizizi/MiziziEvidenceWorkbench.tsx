@@ -7,7 +7,8 @@ import { WkSelect } from "@/components/design-system/primitives/Select";
 import { supabase } from "@/lib/supabase";
 import { OPERATOR_REVIEW_PAGE_SIZE, selectOperatorReviewPageV1, type OperatorStatusV1 } from "@/services/operatorReviewSelection";
 import type { HeadquartersQueueV2, QueueReviewV2 } from "@/services/miziziHeadquartersBrief";
-import { projectRecordedCaseSubject } from "@/services/miziziRecordedCaseSubject";
+import { projectRecordedCaseSubject, type RecordedCaseSubject } from "@/services/miziziRecordedCaseSubject";
+import { ISSUE_1094_CASES, loadIssue1094Brief, type Issue1094BriefRow } from "@/services/miziziIssue1094Brief";
 
 type CaseFact = {
   id: string;
@@ -80,11 +81,68 @@ export function MiziziEvidenceWorkbench({
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<{ kind: "loading" | "error" | "ready"; value?: CaseFact }>({ kind: "loading" });
   const [showReference, setShowReference] = useState(false);
+  const [pageSubjects, setPageSubjects] = useState<{
+    pageKey: string;
+    subjects: Readonly<Record<string, RecordedCaseSubject>>;
+  }>({ pageKey: "", subjects: {} });
+  const [verifiedDecision, setVerifiedDecision] = useState<{
+    reviewId: string;
+    status: "loading" | "verified" | "unverified";
+    item?: Issue1094BriefRow;
+  } | null>(null);
 
   const selection = useMemo(() => selectOperatorReviewPageV1(queue.items, {
     status, workstream, search: query, page,
   }), [queue.items, status, workstream, query, page]);
   const selected = queue.items.find((item) => item.id === selectedId) ?? null;
+  const pageKey = selection.items.map((item) => item.id).join(",");
+
+  // One bounded authenticated read for the visible page, never 301 per-item requests.
+  // A missing, stale or inaccessible source falls back to the unchanged Registry title.
+  useEffect(() => {
+    let active = true;
+    setPageSubjects({ pageKey, subjects: {} });
+    const pageIds = pageKey ? pageKey.split(",") : [];
+    if (pageIds.length === 0) return () => { active = false; };
+    void supabase.from("registry_review_items")
+      .select("id,title,source_payload")
+      .in("id", pageIds)
+      .then(({ data, error }) => {
+        if (!active || error || !data || !Array.isArray(data)) return;
+        const permitted = new Set(pageIds);
+        const subjects: Record<string, RecordedCaseSubject> = {};
+        for (const row of data) {
+          if (!row || typeof row.id !== "string" || !permitted.has(row.id) || row.id in subjects) {
+            return; // Never display an unexpected or ambiguous row.
+          }
+          const review = selection.items.find((item) => item.id === row.id);
+          if (!review || row.title !== review.title) continue; // Avoid changed snapshot labels.
+          subjects[row.id] = projectRecordedCaseSubject(row.source_payload, review.title);
+        }
+        setPageSubjects({ pageKey, subjects });
+      });
+    return () => { active = false; };
+  }, [pageKey, selection.items]);
+
+  useEffect(() => {
+    const reviewId = selected?.id;
+    let active = true;
+    if (!reviewId || !ISSUE_1094_CASES.some((item) => item.reviewId === reviewId)) {
+      setVerifiedDecision(null);
+      return () => { active = false; };
+    }
+    setVerifiedDecision({ reviewId, status: "loading" });
+    void loadIssue1094Brief().then((items) => {
+      if (!active) return;
+      const matched = items.find((item) => item.reviewId === reviewId);
+      setVerifiedDecision(matched?.status === "blocked" || matched?.status === "completed"
+        ? { reviewId, status: "verified", item: matched }
+        : { reviewId, status: "unverified" });
+    }, () => {
+      if (active) setVerifiedDecision({ reviewId, status: "unverified" });
+    });
+    return () => { active = false; };
+  }, [selected?.id]);
 
   useEffect(() => {
     // Preserve a deep-linked/session-selected claim even if it is outside the current list page.
@@ -123,6 +181,8 @@ export function MiziziEvidenceWorkbench({
   const peers = Array.isArray(evidence.peers) ? evidence.peers.slice(0, 8) : [];
   const evidencePairs = Object.entries(evidence).filter(([key, value]) =>
     key !== "peers" && (textOf(value) !== null)).slice(0, 9);
+  const exactDecision = verifiedDecision?.reviewId === selected?.id && verifiedDecision.status === "verified"
+    ? verifiedDecision.item : undefined;
   const changeSelection = (id: string) => {
     if (queue.items.some((item) => item.id === id)) onSelectedIdChange(id);
   };
@@ -181,9 +241,19 @@ export function MiziziEvidenceWorkbench({
                     ? "border-l-wk-brand bg-wk-brand-soft"
                     : "border-l-transparent hover:bg-wk-surface-raised"
                 }`}>
-                <span className="block text-[13px] font-semibold leading-5 text-wk-text">{item.title}</span>
+                <span className="block text-[13px] font-semibold leading-5 text-wk-text">
+                  {pageSubjects.pageKey === pageKey && pageSubjects.subjects[item.id]?.specific
+                    ? pageSubjects.subjects[item.id].title
+                    : item.id === selected?.id && fact && recordedSubject.specific
+                      ? recordedSubject.title : item.title}
+                </span>
                 <span className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-wk-text-muted">
-                  <span>{item.workstreamLabel}</span><CaseStatus status={item.status} />
+                  <span className="min-w-0 truncate">
+                    {pageSubjects.pageKey === pageKey && pageSubjects.subjects[item.id]?.artistReference
+                      ? `Artist ref: ${pageSubjects.subjects[item.id].artistReference}`
+                      : item.workstreamLabel}
+                  </span>
+                  <CaseStatus status={item.status} />
                 </span>
               </button>
             </div>
@@ -271,6 +341,21 @@ export function MiziziEvidenceWorkbench({
                   <aside className="min-w-0 space-y-5">
                     <section className="rounded-xl border border-wk-border bg-wk-surface-raised p-4">
                       <h4 className="text-[13px] font-black text-wk-text">Disposition</h4>
+                      {exactDecision?.status === "blocked" && selected.status === "open" ? (
+                        <div role="status" className="mt-3 space-y-2">
+                          <p className="text-[13px] font-bold text-wk-text">Human decision recorded · Blocked</p>
+                          <p className="text-[12px] leading-5 text-wk-text-muted">{exactDecision.summary}</p>
+                        </div>
+                      ) : exactDecision?.status === "completed" && selected.status === "resolved" ? (
+                        <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
+                          Verified complete against the existing decision and operation receipts. No repair needs repeating.
+                        </p>
+                      ) : null}
+                      {verifiedDecision?.reviewId === selected.id && verifiedDecision.status === "unverified" ? (
+                        <p role="status" className="mt-3 text-[12px] leading-5 text-wk-text-muted">
+                          Earlier #1094 decision evidence could not be independently verified. Check the governed record.
+                        </p>
+                      ) : null}
                       <p className="mt-2 text-[13px] leading-5 text-wk-text">
                         {selected.status === "open"
                           ? "This review is open. No new decision will be made here."
@@ -296,7 +381,9 @@ export function MiziziEvidenceWorkbench({
                     <section className="border-t border-wk-border pt-4">
                       <h4 className="text-[13px] font-black text-wk-text">Next Step</h4>
                       <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
-                        A governed review is required before any decision or repair. This view cannot mutate Registry records.
+                        {exactDecision?.status === "blocked"
+                          ? "A human duplicate decision is already recorded. The archived-credit blocker needs separate governed reconciliation; this view cannot mutate Registry records."
+                          : "A governed review is required before any new decision or repair. This view cannot mutate Registry records."}
                       </p>
                       <Link to={`/admin/review/queue?review=${encodeURIComponent(selected.id)}`}
                         className="wk-button wk-button-primary wk-button-sm mt-3 inline-flex">

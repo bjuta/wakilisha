@@ -50,3 +50,25 @@ describe("MIZIZI source-bound case identity", () => {
     }, "Original case title").title).toBe("Original case title");
   });
 });
+
+describe("Cores bounded read-only evidence projection", () => {
+  it("enriches only selected page items and rejects unknown or changed records", () => {
+    const source = require("node:fs").readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx","utf8");
+    expect(source).toContain('const pageKey = selection.items.map((item) => item.id).join(",")');
+    expect(source).toContain('.select("id,title,source_payload")');
+    expect(source).toContain('.in("id", pageIds)');
+    expect(source).toContain('new Set(pageIds)');
+    expect(source).toContain('row.title !== review.title');
+    expect(source).toContain("projectRecordedCaseSubject(row.source_payload, review.title)");
+    expect(source).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);
+  });
+  it("only calls exact #1094 receipt verifier for known records", () => {
+    const source = require("node:fs").readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx","utf8");
+    expect(source).toContain("ISSUE_1094_CASES.some");
+    expect(source).toContain("loadIssue1094Brief()");
+    expect(source).toContain("Human decision recorded · Blocked");
+    expect(source).toContain("archived-credit blocker");
+    expect(source).toContain('status: "unverified"');
+  });
+});
+
