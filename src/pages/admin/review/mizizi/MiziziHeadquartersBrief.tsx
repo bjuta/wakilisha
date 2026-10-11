@@ -171,7 +171,7 @@ function OperatorReviewSession({
                 <p className="mt-1 text-[12px] text-wk-text-muted">{nextReview.workstreamLabel}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <WkButton variant="secondary" className="wk-button-sm" onClick={() => onInspect(nextReview.id)}>
+                <WkButton variant="soft" className="wk-button-sm" onClick={() => onInspect(nextReview.id)}>
                   Inspect Review
                 </WkButton>
                 <WkButton
@@ -214,7 +214,7 @@ function OperatorReviewSession({
             />
           </div>
           <WkButton
-            variant="secondary"
+            variant="soft"
             className="wk-button-sm"
             disabled={openReviews.length === 0}
             onClick={() => { setSkipped([]); setActive(true); }}
@@ -297,7 +297,13 @@ function Issue1094WorthKnowing({ revision }: { revision: number }) {
   );
 }
 
-export function MiziziHeadquartersBrief() {
+export function MiziziHeadquartersBrief({
+  view = "brief",
+  onShowReviews = () => {},
+}: {
+  view?: "brief" | "reviews";
+  onShowReviews?: () => void;
+}) {
   const [revision, setRevision] = useState(0);
   const [tab, setTab] = useState<Tab>("open");
   const [inspectedId, setInspectedId] = useState<string | null>(null);
@@ -317,83 +323,154 @@ export function MiziziHeadquartersBrief() {
     return () => { active = false; };
   }, [revision]);
 
-  const inspectedReview = state.kind === "ready"
-    ? selectReviewForInspectionV1(state.queue.items, inspectedId)
+  const queue = state.kind === "ready" ? state.queue : null;
+  const inspectedReview = queue
+    ? selectReviewForInspectionV1(queue.items, inspectedId)
     : null;
+  const refresh = () => {
+    setInspectedId(null);
+    setRevision((value) => value + 1);
+  };
 
   return (
-    <section aria-label="Headquarters Brief" data-wk-mizizi-headquarters-brief>
-      <WkSurface className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-wk-border px-4 py-4 sm:px-5">
-          <div>
-            <h2 className="text-[17px] font-black tracking-tight text-wk-text">Headquarters Brief</h2>
-            <p className="mt-1 text-[12px] text-wk-text-muted">Work that needs attention across the music Registry.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <WkButton
-              variant="ghost"
-              className="wk-button-sm"
-              disabled={state.kind === "loading"}
-              onClick={() => { setInspectedId(null); setRevision((value) => value + 1); }}
-            >
-              <WkIcon name="RefreshCcw" size={14} />
-              Refresh
-            </WkButton>
-            <Link to="/admin/review/queue" className="wk-button wk-button-secondary wk-button-sm">
-              All Reviews <WkIcon name="ArrowRight" size={13} />
-            </Link>
-          </div>
-        </div>
-        {state.kind === "loading" ? (
-          <div role="status" className="space-y-3 p-5">
-            <div className="h-16 animate-pulse rounded-xl bg-wk-surface-raised" />
-            <div className="h-16 animate-pulse rounded-xl bg-wk-surface-raised" />
-          </div>
-        ) : state.kind === "error" ? (
-          <div role="alert" className="p-5 text-[13px] text-wk-danger">
-            We couldn’t load the review list. Try again.
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 sm:p-5">
-              <div className="rounded-xl bg-wk-surface-raised p-4">
-                <div className="text-[27px] font-black tabular-nums text-wk-text">{state.queue.open.toLocaleString()}</div>
-                <div className="mt-1 text-[12px] font-semibold text-wk-text">Open Reviews</div>
+    <section aria-label={view === "brief" ? "Headquarters Brief" : "Browse Registry reviews"}
+      data-wk-mizizi-headquarters-brief
+      className="space-y-5">
+      {state.kind === "loading" ? (
+        <WkSurface className="space-y-4 p-5" role="status">
+          <div className="h-10 max-w-md animate-pulse rounded-xl bg-wk-surface-raised" />
+          <div className="h-24 animate-pulse rounded-xl bg-wk-surface-raised" />
+          <div className="h-16 animate-pulse rounded-xl bg-wk-surface-raised" />
+        </WkSurface>
+      ) : state.kind === "error" ? (
+        <WkSurface className="p-5">
+          <p role="alert" className="text-[13px] text-wk-danger">
+            We couldn’t load the Registry reviews.
+          </p>
+          <WkButton variant="soft" className="wk-button-sm mt-3" onClick={refresh}>
+            <WkIcon name="RefreshCcw" size={14} /> Try Again
+          </WkButton>
+        </WkSurface>
+      ) : null}
+
+      {queue && view === "brief" ? (
+        <>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(310px,0.9fr)]">
+            <WkSurface className="overflow-hidden p-0">
+              <div className="border-b border-wk-border px-5 py-6 sm:px-7 sm:py-7">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-wk-brand">
+                    Headquarters Brief
+                  </p>
+                  <WkButton variant="ghost" className="wk-button-sm" onClick={refresh}>
+                    <WkIcon name="RefreshCcw" size={14} /> Refresh
+                  </WkButton>
+                </div>
+                <h2 className="mt-4 max-w-2xl text-[clamp(24px,3vw,37px)] font-black leading-tight tracking-tight text-wk-text">
+                  {queue.open.toLocaleString()} reviews need attention.
+                </h2>
+                <p className="mt-3 max-w-xl text-[13px] leading-6 text-wk-text-muted">
+                  {queue.resolved.toLocaleString()} reviews are resolved. Choose where to focus, or make time for a few reviews.
+                </p>
+                <div className="mt-5">
+                  <WkButton className="wk-button-sm" onClick={onShowReviews}>
+                    Browse Open Reviews <WkIcon name="ArrowRight" size={14} />
+                  </WkButton>
+                </div>
               </div>
-              <div className="rounded-xl bg-wk-surface-raised p-4">
-                <div className="text-[27px] font-black tabular-nums text-wk-text">{state.queue.resolved.toLocaleString()}</div>
-                <div className="mt-1 text-[12px] font-semibold text-wk-text">Resolved Reviews</div>
-              </div>
-              <div className="col-span-2 rounded-xl bg-wk-surface-raised p-4 sm:col-span-1">
-                <div className="text-[27px] font-black tabular-nums text-wk-text">{state.queue.total.toLocaleString()}</div>
-                <div className="mt-1 text-[12px] font-semibold text-wk-text">All Review Records</div>
-              </div>
-            </div>
-            <div className="border-t border-wk-border px-4 py-4 sm:px-5">
-              <h3 className="text-[14px] font-black text-wk-text">Workstreams</h3>
-              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {state.queue.workstreams.map((group) => (
-                  <div key={group.key} className="rounded-xl border border-wk-border bg-wk-surface-raised px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-[12px] font-semibold text-wk-text">{group.label}</p>
-                      <span className="text-[15px] font-black tabular-nums text-wk-text">{group.open.toLocaleString()}</span>
-                    </div>
-                    <p className="mt-1 text-[11px] text-wk-text-muted">Open</p>
-                    {group.subjects.length > 0 ? (
-                      <p className="mt-2 text-[11px] text-wk-text-muted">
-                        {group.subjects.map((part) => `${part.open} ${part.label}`).join(" · ")}
-                      </p>
-                    ) : null}
+              <div className="grid grid-cols-3 border-b border-wk-border" aria-label="Review inventory">
+                {([
+                  ["Open", queue.open],
+                  ["Resolved", queue.resolved],
+                  ["All Reviews", queue.total],
+                ] as const).map(([label, value]) => (
+                  <div key={label} className="border-r border-wk-border px-4 py-4 last:border-r-0 sm:px-6">
+                    <p className="text-[clamp(20px,2.6vw,29px)] font-black tabular-nums text-wk-text">
+                      {value.toLocaleString()}
+                    </p>
+                    <p className="mt-1 text-[11px] font-semibold text-wk-text-muted">{label}</p>
                   </div>
                 ))}
               </div>
-              {state.queue.other > 0 ? (
-                <p className="mt-3 text-[12px] text-wk-text-muted">
-                  {state.queue.other.toLocaleString()} reviews have another status.
+              <div className="px-5 py-5 sm:px-7">
+                <h3 className="text-[14px] font-black text-wk-text">Where Attention Is Needed</h3>
+                <div className="mt-3 divide-y divide-wk-border">
+                  {queue.workstreams.filter((group) => group.open > 0).map((group) => (
+                    <div key={group.key} className="flex items-start justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-wk-text">{group.label}</p>
+                        {group.subjects.length ? (
+                          <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">
+                            {group.subjects.map((part) => `${part.open} ${part.label}`).join(" · ")}
+                          </p>
+                        ) : null}
+                      </div>
+                      <span className="shrink-0 text-[17px] font-black tabular-nums text-wk-text">
+                        {group.open.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {queue.other > 0 ? (
+                  <p className="mt-3 text-[12px] text-wk-text-muted">
+                    {queue.other.toLocaleString()} reviews have another status.
+                  </p>
+                ) : null}
+              </div>
+            </WkSurface>
+
+            <WkSurface className="self-start overflow-hidden p-0">
+              <OperatorReviewSession queue={queue} onInspect={setInspectedId} />
+            </WkSurface>
+          </div>
+
+          <WkSurface className="overflow-hidden p-0">
+            <Issue1094WorthKnowing revision={revision} />
+          </WkSurface>
+
+          <WkSurface className="overflow-hidden p-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-wk-border px-5 py-4">
+              <div>
+                <h3 className="text-[14px] font-black text-wk-text">Recent Reviews</h3>
+                <p className="mt-1 text-[12px] text-wk-text-muted">
+                  A short look at the latest work. The complete list is under Reviews.
                 </p>
-              ) : null}
+              </div>
+              <WkButton variant="ghost" className="wk-button-sm" onClick={onShowReviews}>
+                All Reviews <WkIcon name="ArrowRight" size={13} />
+              </WkButton>
             </div>
-            <div className="border-t border-wk-border px-4 pt-4 sm:px-5">
+            <div className="px-3 pb-3 sm:px-4">
+              <ReviewPreview items={queue.recentOpen.slice(0, 4)} onInspect={setInspectedId} />
+            </div>
+          </WkSurface>
+        </>
+      ) : null}
+
+      {queue && view === "reviews" ? (
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(295px,0.9fr)]">
+          <WkSurface className="overflow-hidden p-0">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-wk-border px-5 py-5">
+              <div>
+                <h2 className="text-[19px] font-black tracking-tight text-wk-text">Reviews</h2>
+                <p className="mt-1 text-[12px] text-wk-text-muted">
+                  Search and inspect every Registry review before opening its governed decision path.
+                </p>
+              </div>
+              <WkButton variant="ghost" className="wk-button-sm" onClick={refresh}>
+                <WkIcon name="RefreshCcw" size={14} /> Refresh
+              </WkButton>
+            </div>
+            <OperatorReviewExplorer queue={queue} onInspect={setInspectedId} />
+          </WkSurface>
+          <WkSurface className="overflow-hidden p-0">
+            <div className="border-b border-wk-border px-4 py-4">
+              <h3 className="text-[14px] font-black text-wk-text">Review History</h3>
+              <p className="mt-1 text-[12px] text-wk-text-muted">
+                Recently updated reviews, without opening another decision.
+              </p>
+            </div>
+            <div className="px-3 pt-2">
               <WkTabs
                 items={TABS}
                 value={tab}
@@ -402,22 +479,20 @@ export function MiziziHeadquartersBrief() {
                 tabListClassName="overflow-x-auto"
               >
                 <ReviewPreview
-                  items={tab === "open" ? state.queue.recentOpen : state.queue.recentResolved}
+                  items={tab === "open" ? queue.recentOpen.slice(0, 5) : queue.recentResolved.slice(0, 5)}
                   onInspect={setInspectedId}
                 />
               </WkTabs>
             </div>
-            <Issue1094WorthKnowing revision={revision} />
-            <OperatorReviewSession queue={state.queue} onInspect={setInspectedId} />
-            <OperatorReviewExplorer queue={state.queue} onInspect={setInspectedId} />
-            <div className="border-t border-wk-border px-4 py-3 sm:px-5">
-              <Link to="/admin/review/queue" className="text-[12px] font-semibold text-wk-brand hover:underline">
-                View the full review queue
+            <div className="border-t border-wk-border px-4 py-3">
+              <Link to="/admin/review/queue" className="inline-flex items-center gap-2 text-[12px] font-semibold text-wk-brand hover:underline">
+                Open Full Review Queue <WkIcon name="ArrowRight" size={13} />
               </Link>
             </div>
-          </>
-        )}
-      </WkSurface>
+          </WkSurface>
+        </div>
+      ) : null}
+
       <WkInspector
         open={Boolean(inspectedReview)}
         onClose={() => setInspectedId(null)}
