@@ -7,6 +7,7 @@ import {
 import type { RegistryQueueFactV2, RegistryQueuePageV2 } from "../../src/services/miziziHeadquartersBrief";
 import { readFileSync } from "node:fs";
 import { selectOperatorReviewPageV1, selectReviewForInspectionV1 } from "../../src/services/operatorReviewSelection";
+import { ISSUE_1094_CASES, projectIssue1094Brief, type Issue1094ReviewFact, type Issue1094DecisionFact } from "../../src/services/miziziIssue1094Brief";
 
 vi.mock("@/lib/supabase", () => ({
   supabase: { from: () => { throw new Error("Unexpected live database access in unit test"); } },
@@ -221,5 +222,79 @@ describe("Headquarters in-place review inspection", () => {
     expect(source).toContain("Open Review Queue");
     expect(source).not.toMatch(/<dialog\b|<select\b|<input\b|<textarea\b/);
     expect(source).not.toContain("Approve Review");
+  });
+});
+
+describe("Headquarters #1094 live receipt convergence", () => {
+  const [desire, ficha, colors] = ISSUE_1094_CASES;
+  const review = (target: typeof ISSUE_1094_CASES[number], status: string): Issue1094ReviewFact => ({
+    id: target.reviewId,
+    status,
+    source_id: target.duplicateId,
+    source_payload: { ruleId: "track_recording_identity_conflict", ruleVersion: "1.3.0" },
+    resolution_payload: status === "resolved" ? {
+      decisionId: target.decisionId,
+      verifiedOperationId: target.operationId,
+      canonicalTrackId: target.survivorId,
+      sourceTrackId: target.duplicateId,
+      finalizerAuthority: "admin_finalize_public_music_identity_track_review_v1",
+    } : {},
+  });
+  const decision: Issue1094DecisionFact = {
+    id: desire.decisionId,
+    review_item_id: desire.reviewId,
+    status: "recorded",
+    decision_type: "public_music_identity_true_duplicate",
+    after_payload: { canonicalTrackId: desire.survivorId },
+  };
+  const facts = () => [review(desire, "open"), review(ficha, "resolved"), review(colors, "resolved")];
+
+  it("shows recorded human decision and open DESIRE blocker beside exact verified Ficha and Colors receipts", () => {
+    const projected = projectIssue1094Brief(facts(), [decision]);
+    expect(projected.map(({ key, status }) => [key, status])).toEqual([
+      ["desire", "blocked"], ["ficha", "completed"], ["colors", "completed"],
+    ]);
+    expect(projected[0].summary).toMatch(/decision recorded.*review remains open.*Lilmaina/i);
+    expect(projected[1].operationId).toBe(ficha.operationId);
+    expect(projected[2].operationId).toBe(colors.operationId);
+    expect(projected[1].summary).toContain("No repair needs repeating");
+  });
+
+  it("does not invent a DESIRE decision if the authenticated decision is absent or conflicting", () => {
+    expect(projectIssue1094Brief(facts(), [])[0].status).toBe("unverified");
+    expect(projectIssue1094Brief(facts(), [decision, decision])[0].status).toBe("unverified");
+    expect(projectIssue1094Brief(facts(), [{ ...decision, after_payload: { canonicalTrackId: ficha.survivorId } }])[0].status).toBe("unverified");
+    expect(projectIssue1094Brief(facts(), [{ ...decision, status: "pending" }])[0].status).toBe("unverified");
+    expect(projectIssue1094Brief([review(desire, "resolved"), ...facts().slice(1)], [decision])[0].status).toBe("unverified");
+  });
+
+  it("refuses to claim resolution when operation, decision, source or authority changes", () => {
+    const changed = facts();
+    const wrongReceipt = {
+      ...changed[1],
+      resolution_payload: { ...changed[1].resolution_payload, verifiedOperationId: colors.operationId },
+    };
+    expect(projectIssue1094Brief([changed[0], wrongReceipt, changed[2]], [decision])[1].status).toBe("unverified");
+    expect(projectIssue1094Brief([changed[0], { ...changed[1], source_id: desire.duplicateId }, changed[2]], [decision])[1].status).toBe("unverified");
+    expect(projectIssue1094Brief([changed[0], { ...changed[1], status: "open" }, changed[2]], [decision])[1].status).toBe("unverified");
+    expect(projectIssue1094Brief([changed[0], { ...changed[1], resolution_payload: { ...changed[1].resolution_payload, finalizerAuthority: "unknown" } }, changed[2]], [decision])[1].status).toBe("unverified");
+  });
+
+  it("never silently treats a missing or duplicate review as a verified completion", () => {
+    expect(projectIssue1094Brief([review(desire, "open")], [decision]).map(({ status }) => status)).toEqual(["blocked", "unverified", "unverified"]);
+    expect(() => projectIssue1094Brief([...facts(), review(desire, "open")], [decision])).toThrow(/Duplicate/);
+  });
+
+  it("uses one WAKILISHA Headquarters view with no new write authority or prototype numbers", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
+    const service = readFileSync("src/services/miziziIssue1094Brief.ts", "utf8");
+    expect(source).toContain("Issue1094WorthKnowing revision={revision}");
+    expect(source).toContain("Inspect open review");
+    expect(source).toContain("Decision recorded");
+    expect(source).toContain("Verified complete");
+    expect(source).not.toMatch(/<select\\b|<input\\b|<dialog\\b/);
+    expect(service).toContain('from("registry_review_items")');
+    expect(service).toContain('from("registry_canonicalization_decisions")');
+    expect(service).not.toMatch(/\\.(insert|update|upsert|delete|rpc)\\(/);
   });
 });
