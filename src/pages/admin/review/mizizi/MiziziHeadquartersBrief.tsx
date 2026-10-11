@@ -232,6 +232,7 @@ function OperatorReviewSession({
  * An unavailable record is unknown, never silently presented as complete.
  */
 function Issue1094WorthKnowing({ revision }: { revision: number }) {
+  const [expandedReceipt, setExpandedReceipt] = useState<string | null>(null);
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "error" }
@@ -274,14 +275,26 @@ function Issue1094WorthKnowing({ revision }: { revision: number }) {
               </div>
               <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">{item.summary}</p>
               {item.status !== "unverified" ? (
-                <dl className="mt-3 space-y-1 text-[11px] text-wk-text-muted">
-                  <div><dt className="inline font-semibold">Decision: </dt>
-                    <dd className="inline break-all font-mono">{item.decisionId}</dd></div>
-                  {item.status === "completed" && item.operationId ? (
-                    <div><dt className="inline font-semibold">Operation: </dt>
-                      <dd className="inline break-all font-mono">{item.operationId}</dd></div>
+                <>
+                  <WkButton
+                    variant="ghost"
+                    className="wk-button-sm mt-3"
+                    onClick={() => setExpandedReceipt((current) =>
+                      current === item.reviewId ? null : item.reviewId)}
+                  >
+                    {expandedReceipt === item.reviewId ? "Hide Receipt" : "Show Receipt"}
+                  </WkButton>
+                  {expandedReceipt === item.reviewId ? (
+                    <dl className="mt-3 space-y-1 text-[11px] text-wk-text-muted">
+                      <div><dt className="inline font-semibold">Decision: </dt>
+                        <dd className="inline break-all font-mono">{item.decisionId}</dd></div>
+                      {item.status === "completed" && item.operationId ? (
+                        <div><dt className="inline font-semibold">Operation: </dt>
+                          <dd className="inline break-all font-mono">{item.operationId}</dd></div>
+                      ) : null}
+                    </dl>
                   ) : null}
-                </dl>
+                </>
               ) : null}
               {item.status === "blocked" ? (
                 <Link className="mt-3 inline-flex text-[12px] font-semibold text-wk-brand hover:underline"
