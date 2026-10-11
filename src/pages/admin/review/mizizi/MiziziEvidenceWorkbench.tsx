@@ -7,6 +7,7 @@ import { WkSelect } from "@/components/design-system/primitives/Select";
 import { supabase } from "@/lib/supabase";
 import { selectOperatorReviewPageV1, type OperatorStatusV1 } from "@/services/operatorReviewSelection";
 import type { HeadquartersQueueV2, QueueReviewV2 } from "@/services/miziziHeadquartersBrief";
+import { projectRecordedCaseSubject } from "@/services/miziziRecordedCaseSubject";
 
 type CaseFact = {
   id: string;
@@ -118,6 +119,7 @@ export function MiziziEvidenceWorkbench({
   const source = asRecord(fact?.source_payload);
   const evidence = asRecord(source.evidence);
   const resolution = asRecord(fact?.resolution_payload);
+  const recordedSubject = projectRecordedCaseSubject(fact?.source_payload, selected?.title ?? "");
   const peers = Array.isArray(evidence.peers) ? evidence.peers.slice(0, 8) : [];
   const evidencePairs = Object.entries(evidence).filter(([key, value]) =>
     key !== "peers" && (textOf(value) !== null)).slice(0, 9);
@@ -197,8 +199,16 @@ export function MiziziEvidenceWorkbench({
               <CaseStatus status={selected.status} />
             </div>
             <h3 className="mt-3 max-w-3xl text-[clamp(22px,2.6vw,31px)] font-black leading-tight tracking-tight text-wk-text">
-              {selected.title}
+              {recordedSubject.title}
             </h3>
+            {fact && recordedSubject.specific ? (
+              <div className="mt-2 space-y-1 text-[12px] leading-5 text-wk-text-muted">
+                <p>{selected.title}</p>
+                {recordedSubject.artistReference ? (
+                  <p>Recorded primary-artist reference: <span className="font-semibold text-wk-text">{recordedSubject.artistReference}</span></p>
+                ) : null}
+              </div>
+            ) : null}
             {detail.kind === "loading" ? (
               <p role="status" className="mt-6 text-[13px] text-wk-text-muted">Reading the current Registry evidence…</p>
             ) : detail.kind === "error" || !fact ? (
@@ -219,6 +229,7 @@ export function MiziziEvidenceWorkbench({
                     <dl className="mt-3 rounded-xl border border-wk-border px-4">
                       <Fact name="Rule" value={source.ruleId} />
                       <Fact name="Affected field" value={source.fieldName} />
+                      {recordedSubject.artistReference ? <Fact name="Recorded primary-artist reference" value={recordedSubject.artistReference} /> : null}
                       <Fact name="Current value" value={source.currentValue} />
                       {evidencePairs.map(([name, value]) =>
                         <Fact key={name} name={words(name)} value={value} />)}
@@ -235,7 +246,7 @@ export function MiziziEvidenceWorkbench({
                                   {readable(peer.title || peer.trackTitle || peer.slug || peer.id)}
                                 </p>
                                 <p className="mt-1 break-words text-[11px] text-wk-text-muted">
-                                  {readable(peer.artistName || peer.primaryArtistName || peer.isrc)}
+                                  {readable(peer.artistName || peer.primaryArtistName || peer.sharedPrimaryArtistSlug || peer.isrc)}
                                 </p>
                               </div>
                             );
