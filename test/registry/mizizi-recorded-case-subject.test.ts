@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { projectRecordedCaseSubject } from "../../src/services/miziziRecordedCaseSubject";
 
 describe("MIZIZI source-bound case identity", () => {
@@ -53,7 +54,7 @@ describe("MIZIZI source-bound case identity", () => {
 
 describe("Cores bounded read-only evidence projection", () => {
   it("enriches only selected page items and rejects unknown or changed records", () => {
-    const source = require("node:fs").readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx","utf8");
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx","utf8");
     expect(source).toContain('const pageKey = selection.items.map((item) => item.id).join(",")');
     expect(source).toContain('.select("id,title,source_payload")');
     expect(source).toContain('.in("id", pageIds)');
@@ -63,7 +64,7 @@ describe("Cores bounded read-only evidence projection", () => {
     expect(source).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);
   });
   it("only calls exact #1094 receipt verifier for known records", () => {
-    const source = require("node:fs").readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx","utf8");
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx","utf8");
     expect(source).toContain("ISSUE_1094_CASES.some");
     expect(source).toContain("loadIssue1094Brief()");
     expect(source).toContain("Human decision recorded · Blocked");
