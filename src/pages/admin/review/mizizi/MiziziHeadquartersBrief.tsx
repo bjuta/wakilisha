@@ -248,7 +248,7 @@ function Issue1094WorthKnowing({ revision }: { revision: number }) {
   }, [revision]);
 
   return (
-    <div className="border-t border-wk-border px-4 py-5 sm:px-5" aria-label="Worth Knowing">
+    <div aria-label="Worth Knowing">
       <h3 className="text-[14px] font-black text-wk-text">Worth Knowing</h3>
       <p className="mt-1 text-[12px] text-wk-text-muted">
         Three recording decisions from the existing Registry record. Nothing is changed here.
@@ -262,9 +262,9 @@ function Issue1094WorthKnowing({ revision }: { revision: number }) {
           The #1094 records could not be verified. Use Refresh to try again.
         </p>
       ) : (
-        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        <div className="mt-4 divide-y divide-wk-border border-y border-wk-border">
           {state.items.map((item) => (
-            <div key={item.reviewId} className="rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+            <article key={item.reviewId} className="py-5 first:pt-4 last:pb-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className="text-[13px] font-bold text-wk-text">{item.title}</h4>
                 <span className="text-[11px] font-semibold text-wk-text-muted">
@@ -301,7 +301,7 @@ function Issue1094WorthKnowing({ revision }: { revision: number }) {
                   Inspect open review <WkIcon name="ArrowRight" size={13} />
                 </Link>
               ) : null}
-            </div>
+            </article>
           ))}
         </div>
       )}
