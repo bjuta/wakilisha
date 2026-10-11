@@ -78,7 +78,7 @@ export function projectIssue1094Brief(
     if (reviewed.has(review.id)) throw new TypeError("Duplicate #1094 Registry review");
     reviewed.set(review.id, review);
   }
-  return ISSUE_1094_CASES.map((target) => {
+  return ISSUE_1094_CASES.map((target): Issue1094BriefRow => {
     const base = {
       key: target.key,
       title: target.title,
