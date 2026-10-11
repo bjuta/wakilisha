@@ -8,6 +8,8 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkTabs } from "@/components/design-system/primitives/Tabs";
 import { WkButton } from "@/components/design-system/primitives/Button";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { Input, Label, TextArea as AriaTextArea, TextField as AriaTextField } from "react-aria-components";
 import { Modal } from "@/components/design-system/primitives/Modal";
 import {
   WkWorkflowRail,
@@ -732,15 +734,16 @@ function AdminMiziziWorkspaceContent() {
               <h2 className="text-[15px] font-black text-wk-text">Track Identity Reviews</h2>
               <p className="mt-1 text-[12px] text-wk-text-muted">Only active MIZIZI Track identity reviews are shown here.</p>
             </div>
-            <label className="block w-full max-w-sm">
+            <div className="w-full max-w-sm">
               <span className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">Search</span>
-              <input
+              <WkSearchField
+                ariaLabel="Search Track identity reviews"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={setSearch}
                 placeholder="Track, artist, or slug"
-                className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text"
+                className="mt-1"
               />
-            </label>
+            </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             {LANES.map((item) => (
@@ -1396,20 +1399,21 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** The governed review forms use WAKILISHA-styled, accessible React Aria controls. */
 function TextField({ label, value, placeholder, onChange }: { label: string; value: string; placeholder: string; onChange: (value: string) => void }) {
   return (
-    <label className="block">
-      <span className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text" />
-    </label>
+    <AriaTextField aria-label={label} value={value} onChange={onChange} className="block">
+      <Label className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">{label}</Label>
+      <Input placeholder={placeholder} className="wk-input mt-1 w-full rounded-xl border-wk-border bg-wk-surface text-[13px] text-wk-text" />
+    </AriaTextField>
   );
 }
 
 function TextArea({ label, value, placeholder, onChange }: { label: string; value: string; placeholder: string; onChange: (value: string) => void }) {
   return (
-    <label className="block">
-      <span className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">{label}</span>
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} rows={3} className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text" />
-    </label>
+    <AriaTextField aria-label={label} value={value} onChange={onChange} className="block">
+      <Label className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">{label}</Label>
+      <AriaTextArea placeholder={placeholder} rows={3} className="wk-input mt-1 w-full rounded-xl border-wk-border bg-wk-surface text-[13px] text-wk-text" />
+    </AriaTextField>
   );
 }
