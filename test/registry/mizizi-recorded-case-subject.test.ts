@@ -75,3 +75,28 @@ describe("Cores bounded read-only evidence projection", () => {
   });
 });
 
+
+
+describe("MIZIZI recorded Release public identity references", () => {
+  it("shows a recorded public-identity slug without inventing a Release title", () => {
+    expect(projectRecordedCaseSubject({
+      fieldName: "public_identity",
+      currentValue: "roses-feat-tellaman-remix",
+      ruleId: "single_public_identity_conflict",
+    }, "MIZIZI found a Single public-identity conflict")).toEqual({
+      title: "Public identity · roses-feat-tellaman-remix",
+      artistReference: null,
+      specific: true,
+    });
+  });
+
+  it("does not display unverified or unsafe public identity values", () => {
+    for (const payload of [
+      { fieldName: "recording_identity", currentValue: "roses-feat-tellaman-remix" },
+      { fieldName: "public_identity", currentValue: "https://example.com/unknown" },
+      { fieldName: "public_identity", currentValue: "x".repeat(200) },
+    ]) {
+      expect(projectRecordedCaseSubject(payload, "Original review").title).toBe("Original review");
+    }
+  });
+});

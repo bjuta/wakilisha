@@ -38,13 +38,21 @@ export function projectRecordedCaseSubject(
   const fallbackRecordedTitle = canonicalSlug && asSlug(canonicalSlug)
     ? canonicalSlug.replace(/[_-]+/g, " ").replace(/\b[a-z]/g, (c) => c.toUpperCase())
     : null;
+  // Other MIZIZI cases provide only a recorded Release public-identity slug.
+  // Show its exact reference as such; never present the slug as a verified
+  // recording or artist title and never infer missing peer relationships.
+  const publicIdentity = readableString(source.fieldName) === "public_identity"
+    ? readableString(source.currentValue) : null;
+  const publicIdentitySlug = publicIdentity &&
+    /^[a-z0-9][a-z0-9_-]{0,118}$/i.test(publicIdentity)
+    ? publicIdentity : null;
   const artistReference = matchingPeer
     ? readableString(matchingPeer.sharedPrimaryArtistSlug)
     : null;
 
   return {
-    title: peerTitle || fallbackRecordedTitle || fallbackTitle,
+    title: peerTitle || fallbackRecordedTitle || (publicIdentitySlug ? `Public identity · ${publicIdentitySlug}` : fallbackTitle),
     artistReference,
-    specific: Boolean(peerTitle || fallbackRecordedTitle),
+    specific: Boolean(peerTitle || fallbackRecordedTitle || publicIdentitySlug),
   };
 }
