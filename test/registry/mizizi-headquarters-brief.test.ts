@@ -55,8 +55,8 @@ describe("MIZIZI product-led workspace layout", () => {
     expect(source).toContain("<WkTabs");
     expect(source).toContain("<WkInspector");
     expect(source).toContain("<WkButton");
-    expect(source).not.toMatch(/<select\\b|<dialog\\b|<input\\b|<textarea\\b/);
-    expect(source).not.toMatch(/#84C241|#E5AC43|#170F0A|#21170F|<canvas\\b|M\\.CLIENTS/);
+    expect(source).not.toMatch(/<select\b|<dialog\b|<input\b|<textarea\b/);
+    expect(source).not.toMatch(/#84C241|#E5AC43|#170F0A|#21170F|<canvas\b|M\.CLIENTS/);
   });
 });
 
