@@ -26,16 +26,17 @@ const mkPage = (rows: RegistryQueueFactV2[], total = rows.length, offset = 0): R
   rows, total, offset, limit: HEADQUARTERS_QUEUE_PAGE_SIZE,
 });
 
-describe("MIZIZI product-led workspace layout", () => {
-  it("separates the brief, Registry reviews, and governed decisions", () => {
+describe("MIZIZI reference-inspired, live-data operational workspace", () => {
+  it("keeps Brief, Field, Cores, History and governed Decision Work distinct", () => {
     const page = readFileSync("src/pages/admin/review/mizizi/page.tsx", "utf8");
-    expect(page).toContain('useState<"brief" | "reviews" | "decisions">("brief")');
-    expect(page).toContain('label: "Brief"');
-    expect(page).toContain('label: "Reviews"');
-    expect(page).toContain('label: "Decision Work"');
+    expect(page).toContain('useState<"brief" | "field" | "cores" | "history" | "decisions">("brief")');
+    for (const label of ["Brief", "Field", "Cores", "History", "Decision Work"]) {
+      expect(page).toContain(`label: "${label}"`);
+    }
     expect(page).toContain('workspaceView === "decisions"');
     expect(page).toContain('view={workspaceView}');
-    expect(page).toContain('onShowReviews={() => setWorkspaceView("reviews")}');
+    expect(page).toContain('onShowCases={() => setWorkspaceView("cores")}');
+    expect(page).toContain("selectedId={selectedCaseId}");
     expect(page).toContain("data-wk-mizizi-decision-pagination");
     expect(page).toContain("visibleItems.slice(decisionPageStart, decisionPageStart + 15)");
     expect(page).toContain("pagedItems.map");
@@ -45,22 +46,39 @@ describe("MIZIZI product-led workspace layout", () => {
     expect(page).not.toMatch(/<(?:input|textarea|select)\b/);
   });
 
-  it("keeps the landing brief short, the full queue intentional, and receipts behind disclosure", () => {
+  it("uses the reference's useful interactions, not its fabricated data or visual language", () => {
     const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
     expect(source).toContain('view === "brief"');
-    expect(source).toContain('view === "reviews"');
-    expect(source).toContain("Browse Open Reviews");
-    expect(source).toContain("Where Attention Is Needed");
+    expect(source).toContain('view === "field"');
+    expect(source).toContain('view === "cores"');
+    expect(source).toContain('view === "history"');
+    expect(source).toContain("How long do you have?");
+    expect(source).toContain("Five minutes");
+    expect(source).toContain("Fifteen minutes");
+    expect(source).toContain("An hour");
+    expect(source).toContain("<MiziziEvidenceWorkbench");
+    expect(source).toContain("Issue1094WorthKnowing revision={revision}");
     expect(source).toContain("queue.recentOpen.slice(0, 4)");
     expect(source).toContain("OperatorReviewExplorer queue={queue}");
     expect(source).toContain("Show Receipt");
     expect(source).toContain("expandedReceipt === item.reviewId");
     expect(source).toContain("<WkSurface");
     expect(source).toContain("<WkTabs");
-    expect(source).toContain("<WkInspector");
     expect(source).toContain("<WkButton");
     expect(source).not.toMatch(/<select\b|<dialog\b|<input\b|<textarea\b/);
     expect(source).not.toMatch(/#84C241|#E5AC43|#170F0A|#21170F|<canvas\b|M\.CLIENTS/);
+  });
+
+  it("requires a selected authorized case and never fabricates evidence or writes", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx", "utf8");
+    expect(source).toContain('queue.items.some((item) => item.id === id)');
+    expect(source).toContain('.from("registry_review_items")');
+    expect(source).toContain('.eq("id", selected.id).single()');
+    expect(source).toContain("Current evidence is unavailable or changed");
+    expect(source).toContain("No new decision will be made here");
+    expect(source).toContain("Open Governed Review");
+    expect(source).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);
+    expect(source).not.toMatch(/#84C241|#E5AC43|#170F0A|M\.CLIENTS/);
   });
 });
 
