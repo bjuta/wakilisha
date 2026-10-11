@@ -181,7 +181,7 @@ export function MiziziEvidenceWorkbench({
   const peers = Array.isArray(evidence.peers) ? evidence.peers.slice(0, 8) : [];
   const evidencePairs = Object.entries(evidence).filter(([key, value]) =>
     key !== "peers" && (textOf(value) !== null)).slice(0, 9);
-  const exactDecision = verifiedDecision?.reviewId === selected?.id && verifiedDecision.status === "verified"
+  const exactDecision = verifiedDecision && selected && verifiedDecision.reviewId === selected.id && verifiedDecision.status === "verified"
     ? verifiedDecision.item : undefined;
   const changeSelection = (id: string) => {
     if (queue.items.some((item) => item.id === id)) onSelectedIdChange(id);
