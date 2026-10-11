@@ -5,12 +5,13 @@
   "preview_project_ref": "nkgfoppunmnkcumalxqp",
   "preview_branch_id": "8c0affc1-b43b-44ac-b2eb-66715ed40252",
   "preview_migration_head": "20261010093509",
-  "baseline_replay": "pending",
+  "baseline_replay": "pass",
   "candidate_apply": "pass",
   "verifier": "pass",
   "verifier_file": "scripts/control-plane/verify-mizizi-headquarters-db03-case-plan-snapshot.sql",
   "schema_types_sha256": "5063d1bafc6fd6e6c020fdd01dc35bbc6b5b07a69df4ed6fe415bd18fbf3a968",
   "schema_migration_count": 221,
   "schema_migration_head": "20261010122222",
-  "verified_at": "2026-10-10T15:21:55.121Z"
+  "verified_at": "2026-10-10T15:21:55.121Z",
+  "baseline_replay_evidence": "docs/engineering/mizizi-headquarters-clean-local-replay-acceptance-20261011.md"
 }
