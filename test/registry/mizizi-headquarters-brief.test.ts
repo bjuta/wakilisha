@@ -26,6 +26,40 @@ const mkPage = (rows: RegistryQueueFactV2[], total = rows.length, offset = 0): R
   rows, total, offset, limit: HEADQUARTERS_QUEUE_PAGE_SIZE,
 });
 
+describe("MIZIZI product-led workspace layout", () => {
+  it("separates the brief, Registry reviews, and governed decisions", () => {
+    const page = readFileSync("src/pages/admin/review/mizizi/page.tsx", "utf8");
+    expect(page).toContain('useState<"brief" | "reviews" | "decisions">("brief")');
+    expect(page).toContain('label: "Brief"');
+    expect(page).toContain('label: "Reviews"');
+    expect(page).toContain('label: "Decision Work"');
+    expect(page).toContain('workspaceView === "decisions"');
+    expect(page).toContain('view={workspaceView}');
+    expect(page).toContain('onShowReviews={() => setWorkspaceView("reviews")}');
+    expect(page).toContain("data-wk-mizizi-decision-pagination");
+    expect(page).toContain("visibleItems.slice(decisionPageStart, decisionPageStart + 15)");
+    expect(page).toContain("pagedItems.map");
+  });
+
+  it("keeps the landing brief short, the full queue intentional, and receipts behind disclosure", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
+    expect(source).toContain('view === "brief"');
+    expect(source).toContain('view === "reviews"');
+    expect(source).toContain("Browse Open Reviews");
+    expect(source).toContain("Where Attention Is Needed");
+    expect(source).toContain("queue.recentOpen.slice(0, 4)");
+    expect(source).toContain("OperatorReviewExplorer queue={queue}");
+    expect(source).toContain("Show Receipt");
+    expect(source).toContain("expandedReceipt === item.reviewId");
+    expect(source).toContain("<WkSurface");
+    expect(source).toContain("<WkTabs");
+    expect(source).toContain("<WkInspector");
+    expect(source).toContain("<WkButton");
+    expect(source).not.toMatch(/<select\\b|<dialog\\b|<input\\b|<textarea\\b/);
+    expect(source).not.toMatch(/#84C241|#E5AC43|#170F0A|#21170F|<canvas\\b|M\\.CLIENTS/);
+  });
+});
+
 describe("Headquarters complete Registry review inventory", () => {
   it("accounts for all 301 known review records in the accepted corpus shape", () => {
     const rows = Array.from({ length: 301 }, (_, i): RegistryQueueFactV2 => {
