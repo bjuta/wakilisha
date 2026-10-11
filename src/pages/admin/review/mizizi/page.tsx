@@ -6,6 +6,7 @@ import Issue1094RepairGate from "./issue1094RepairGate";
 import Issue1094Finalize from "./issue1094Finalize";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { WkTabs } from "@/components/design-system/primitives/Tabs";
 import { Modal } from "@/components/design-system/primitives/Modal";
 import {
   WkWorkflowRail,
@@ -401,6 +402,7 @@ export default function AdminMiziziWorkspacePage() {
 
 function AdminMiziziWorkspaceContent() {
   const navigate = useNavigate();
+  const [workspaceView, setWorkspaceView] = useState<"brief" | "reviews" | "decisions">("brief");
   const [items, setItems] = useState<WorkspaceItem[]>([]);
   const [lane, setLane] = useState<Lane>("needs_decision");
   const [search, setSearch] = useState("");
@@ -436,8 +438,8 @@ function AdminMiziziWorkspaceContent() {
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (workspaceView === "decisions") void refresh();
+  }, [refresh, workspaceView]);
 
   const counts = useMemo(() => ({
     needsDecision: items.filter((item) => laneFor(item) === "needs_decision").length,
@@ -684,15 +686,28 @@ function AdminMiziziWorkspaceContent() {
             <WkIcon name="GitPullRequest" size={14} />
             All Reviews
           </button>
-          <button type="button" onClick={() => void refresh()} disabled={loading} className="wk-button wk-button-secondary wk-button-sm">
+          {workspaceView === "decisions" ? <button type="button" onClick={() => void refresh()} disabled={loading} className="wk-button wk-button-secondary wk-button-sm">
             <WkIcon name={loading ? "Loader2" : "RefreshCcw"} size={14} className={loading ? "animate-spin" : ""} />
             Refresh
-          </button>
+          </button> : null}
         </div>
       </div>
 
-      <WkWorkflowRail steps={WORKFLOW_STEPS} ariaLabel="MIZIZI workflow" />
-      <MiziziHeadquartersBrief />
+      <WkTabs
+        items={[
+          { id: "brief", label: "Brief" },
+          { id: "reviews", label: "Reviews" },
+          { id: "decisions", label: "Decision Work" },
+        ] as const}
+        value={workspaceView}
+        onChange={setWorkspaceView}
+        ariaLabel="MIZIZI workspace sections"
+        tabListClassName="border-b border-wk-border overflow-x-auto"
+        panelClassName="pt-5"
+      >
+        {workspaceView === "decisions" ? (
+          <div className="space-y-6">
+            <WkWorkflowRail steps={WORKFLOW_STEPS} ariaLabel="MIZIZI workflow" />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Needs a decision" value={counts.needsDecision} help="MIZIZI found the issue. You choose the outcome." />
@@ -766,6 +781,14 @@ function AdminMiziziWorkspaceContent() {
         reviews={provenanceReviews}
         onOpen={(review) => void openProvenanceReview(review)}
       />
+          </div>
+        ) : (
+          <MiziziHeadquartersBrief
+            view={workspaceView}
+            onShowReviews={() => setWorkspaceView("reviews")}
+          />
+        )}
+      </WkTabs>
 
       {selectedProvenance ? (
         <ProvenanceDecisionModal
