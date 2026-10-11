@@ -57,10 +57,11 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(source).toContain("Fifteen minutes");
     expect(source).toContain("An hour");
     expect(source).toContain("<MiziziEvidenceWorkbench");
-    expect(source).toContain("Issue1094WorthKnowing revision={revision}");
+    expect(source).toContain("Issue1094WorthKnowing revision={revision} onInspect={inspect}");
     expect(source).toContain("queue.recentOpen.slice(0, 4)");
     expect(source).toContain("OperatorReviewExplorer queue={queue}");
     expect(source).toContain("Show Receipt");
+    expect(source).toContain("View Evidence in Cores");
     expect(source).toContain("expandedReceipt === item.reviewId");
     expect(source).toContain("<WkSurface");
     expect(source).toContain("<WkTabs");
@@ -344,7 +345,7 @@ describe("Headquarters #1094 live receipt convergence", () => {
   it("uses one WAKILISHA Headquarters view with no new write authority or prototype numbers", () => {
     const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
     const service = readFileSync("src/services/miziziIssue1094Brief.ts", "utf8");
-    expect(source).toContain("Issue1094WorthKnowing revision={revision}");
+    expect(source).toContain("Issue1094WorthKnowing revision={revision} onInspect={inspect}");
     expect(source).toContain("Inspect open review");
     expect(source).toContain("Decision recorded");
     expect(source).toContain("Verified complete");

@@ -158,6 +158,15 @@ export function MiziziEvidenceWorkbench({
             {selection.total.toLocaleString()} matching · {selection.start}–{selection.end} shown
           </p>
         </div>
+        {selected && !selection.items.some((item) => item.id === selected.id) ? (
+          <button type="button" onClick={() => {
+            setStatus(selected.status); setWorkstream(selected.workstream); setQuery(""); setPage(1);
+          }}
+            className="flex w-full items-center justify-between gap-3 border-b border-wk-border bg-wk-brand-soft px-4 py-3 text-left text-[12px] font-semibold text-wk-text focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand">
+            <span>Selected case is outside the current filters</span>
+            <span className="shrink-0 text-wk-brand">Show in list</span>
+          </button>
+        ) : null}
         <div role="list" aria-label="Registry claims" className="max-h-[450px] overflow-y-auto lg:max-h-[min(68vh,800px)]">
           {selection.items.length ? selection.items.map((item) => (
             <div role="listitem" key={item.id} className="border-b border-wk-border last:border-b-0">

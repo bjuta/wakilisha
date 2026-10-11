@@ -230,7 +230,7 @@ function OperatorReviewSession({
 /** Verifies accepted #1094 records from the current authenticated Registry read.
  * An unavailable record is unknown, never silently presented as complete.
  */
-function Issue1094WorthKnowing({ revision }: { revision: number }) {
+function Issue1094WorthKnowing({ revision, onInspect }: { revision: number; onInspect: (id: string) => void }) {
   const [expandedReceipt, setExpandedReceipt] = useState<string | null>(null);
   const [state, setState] = useState<
     | { kind: "loading" }
@@ -273,6 +273,12 @@ function Issue1094WorthKnowing({ revision }: { revision: number }) {
                 </span>
               </div>
               <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">{item.summary}</p>
+              {item.status !== "unverified" ? (
+                <WkButton variant="soft" className="wk-button-sm mt-3"
+                  onClick={() => onInspect(item.reviewId)}>
+                  View Evidence in Cores <WkIcon name="ArrowRight" size={13} />
+                </WkButton>
+              ) : null}
               {item.status !== "unverified" ? (
                 <>
                   <WkButton
@@ -406,7 +412,7 @@ export function MiziziHeadquartersBrief({
 
           <div className="grid items-start gap-8 border-t border-wk-border pt-7 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.95fr)]">
             <section className="min-w-0">
-              <Issue1094WorthKnowing revision={revision} />
+              <Issue1094WorthKnowing revision={revision} onInspect={inspect} />
             </section>
             <section className="min-w-0">
               <div className="flex flex-wrap items-center justify-between gap-3">
