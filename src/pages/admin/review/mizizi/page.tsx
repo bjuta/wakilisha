@@ -405,7 +405,7 @@ export default function AdminMiziziWorkspacePage() {
 
 function AdminMiziziWorkspaceContent() {
   const navigate = useNavigate();
-  const [workspaceView, setWorkspaceView] = useState<"brief" | "reviews" | "decisions">("brief");
+  const [workspaceView, setWorkspaceView] = useState<"brief" | "field" | "cores" | "history" | "decisions">("brief");
   const [items, setItems] = useState<WorkspaceItem[]>([]);
   const [lane, setLane] = useState<Lane>("needs_decision");
   const [search, setSearch] = useState("");
@@ -707,7 +707,9 @@ function AdminMiziziWorkspaceContent() {
       <WkTabs
         items={[
           { id: "brief", label: "Brief" },
-          { id: "reviews", label: "Reviews" },
+          { id: "field", label: "Field" },
+          { id: "cores", label: "Cores" },
+          { id: "history", label: "History" },
           { id: "decisions", label: "Decision Work" },
         ] as const}
         value={workspaceView}
@@ -819,7 +821,8 @@ function AdminMiziziWorkspaceContent() {
         ) : (
           <MiziziHeadquartersBrief
             view={workspaceView}
-            onShowReviews={() => setWorkspaceView("reviews")}
+            onShowReviews={() => setWorkspaceView("cores")}
+            onShowCases={() => setWorkspaceView("cores")}
           />
         )}
       </WkTabs>
