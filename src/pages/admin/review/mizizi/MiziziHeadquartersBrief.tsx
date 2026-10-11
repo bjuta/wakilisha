@@ -8,6 +8,7 @@ import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkInspector } from "@/components/design-system/primitives/Inspector";
 import { selectOperatorReviewPageV1, selectReviewForInspectionV1, type OperatorStatusV1 } from "@/services/operatorReviewSelection";
 import { WkIcon } from "@/components/design-system/Icon";
+import { loadIssue1094Brief, type Issue1094BriefRow } from "@/services/miziziIssue1094Brief";
 import {
   loadHeadquartersQueueV2,
   type HeadquartersQueueV2,
@@ -227,6 +228,75 @@ function OperatorReviewSession({
   );
 }
 
+/** Verifies accepted #1094 records from the current authenticated Registry read.
+ * An unavailable record is unknown, never silently presented as complete.
+ */
+function Issue1094WorthKnowing({ revision }: { revision: number }) {
+  const [state, setState] = useState<
+    | { kind: "loading" }
+    | { kind: "error" }
+    | { kind: "ready"; items: readonly Issue1094BriefRow[] }
+  >({ kind: "loading" });
+  useEffect(() => {
+    let active = true;
+    setState({ kind: "loading" });
+    void loadIssue1094Brief().then(
+      (items) => { if (active) setState({ kind: "ready", items }); },
+      () => { if (active) setState({ kind: "error" }); },
+    );
+    return () => { active = false; };
+  }, [revision]);
+
+  return (
+    <div className="border-t border-wk-border px-4 py-5 sm:px-5" aria-label="Worth Knowing">
+      <h3 className="text-[14px] font-black text-wk-text">Worth Knowing</h3>
+      <p className="mt-1 text-[12px] text-wk-text-muted">
+        Three recording decisions from the existing Registry record. Nothing is changed here.
+      </p>
+      {state.kind === "loading" ? (
+        <p role="status" className="mt-3 text-[12px] text-wk-text-muted">
+          Checking decision and operation receipts…
+        </p>
+      ) : state.kind === "error" ? (
+        <p role="alert" className="mt-3 text-[12px] text-wk-danger">
+          The #1094 records could not be verified. Use Refresh to try again.
+        </p>
+      ) : (
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          {state.items.map((item) => (
+            <div key={item.reviewId} className="rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-[13px] font-bold text-wk-text">{item.title}</h4>
+                <span className="text-[11px] font-semibold text-wk-text-muted">
+                  {item.status === "completed" ? "Verified complete" :
+                    item.status === "blocked" ? "Decision recorded · blocked" : "Needs verification"}
+                </span>
+              </div>
+              <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">{item.summary}</p>
+              {item.status !== "unverified" ? (
+                <dl className="mt-3 space-y-1 text-[11px] text-wk-text-muted">
+                  <div><dt className="inline font-semibold">Decision: </dt>
+                    <dd className="inline break-all font-mono">{item.decisionId}</dd></div>
+                  {item.status === "completed" && item.operationId ? (
+                    <div><dt className="inline font-semibold">Operation: </dt>
+                      <dd className="inline break-all font-mono">{item.operationId}</dd></div>
+                  ) : null}
+                </dl>
+              ) : null}
+              {item.status === "blocked" ? (
+                <Link className="mt-3 inline-flex text-[12px] font-semibold text-wk-brand hover:underline"
+                  to={`/admin/review/queue?review=${encodeURIComponent(item.reviewId)}`}>
+                  Inspect open review <WkIcon name="ArrowRight" size={13} />
+                </Link>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MiziziHeadquartersBrief() {
   const [revision, setRevision] = useState(0);
   const [tab, setTab] = useState<Tab>("open");
@@ -337,6 +407,7 @@ export function MiziziHeadquartersBrief() {
                 />
               </WkTabs>
             </div>
+            <Issue1094WorthKnowing revision={revision} />
             <OperatorReviewSession queue={state.queue} onInspect={setInspectedId} />
             <OperatorReviewExplorer queue={state.queue} onInspect={setInspectedId} />
             <div className="border-t border-wk-border px-4 py-3 sm:px-5">
