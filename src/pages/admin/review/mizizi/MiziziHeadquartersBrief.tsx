@@ -140,91 +140,90 @@ function OperatorReviewExplorer({ queue, onInspect }: { queue: HeadquartersQueue
 /** One-review-at-a-time work session over the existing authorized review snapshot.
  * Skipping is local to the session; decisions remain exclusively in Registry authority.
  */
+/** HTML-inspired three entry points, backed only by the current authenticated queue.
+ * A session is a local reading aid, not a clock, approval or decision ledger.
+ */
 function OperatorReviewSession({
   queue, onInspect,
 }: { queue: HeadquartersQueueV2; onInspect: (id: string) => void }) {
-  const [minutes, setMinutes] = useState("15");
-  const [active, setActive] = useState(false);
+  const [minutes, setMinutes] = useState<"5" | "15" | "60" | null>(null);
   const [skipped, setSkipped] = useState<readonly string[]>([]);
   const openReviews = queue.items.filter((item) => item.status === "open");
-  const nextReview = openReviews.find((item) => !skipped.includes(item.id)) ?? null;
-  const finish = () => {
-    setActive(false);
-    setSkipped([]);
-  };
-
+  const cap = minutes === "5" ? 3 : minutes === "15" ? 8 : 24;
+  const sessionItems = openReviews.slice(0, cap);
+  const nextReview = sessionItems.find((item) => !skipped.includes(item.id)) ?? null;
+  const finish = () => { setMinutes(null); setSkipped([]); };
   return (
-    <div className="border-t border-wk-border px-4 py-5 sm:px-5" aria-label="Review session">
-      <h3 className="text-[14px] font-black text-wk-text">Make Time for Reviews</h3>
-      <p className="mt-1 text-[12px] text-wk-text-muted">
-        Work through one open review at a time. Your time choice is a guide, not a countdown.
-      </p>
-      {active ? (
-        <div className="mt-3 space-y-3 rounded-xl border border-wk-border bg-wk-surface-raised p-4">
-          <p className="text-[12px] text-wk-text-muted">
-            {minutes} minute session · {openReviews.length} currently open · {skipped.length} skipped for this session
+    <section aria-label="Make time for reviews" className="min-w-0">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h3 className="text-[clamp(19px,2.4vw,27px)] font-black tracking-tight text-wk-text">
+            How long do you have?
+          </h3>
+          <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
+            Focus on one real open review at a time. Skipping never records a decision.
+          </p>
+        </div>
+        <span className="text-[12px] tabular-nums text-wk-text-muted">
+          {openReviews.length.toLocaleString()} open reviews
+        </span>
+      </div>
+      {minutes === null ? (
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {([
+            { value: "5", title: "Five minutes", maximum: 3, description: "Start with three open reviews. Keep the session small." },
+            { value: "15", title: "Fifteen minutes", maximum: 8, description: "Work through a focused set of eight open reviews." },
+            { value: "60", title: "An hour", maximum: 24, description: "Inspect up to 24 reviews at your own pace." },
+          ] as const).map((choice, i) => (
+            <button type="button" key={choice.value} disabled={openReviews.length === 0}
+              onClick={() => { setMinutes(choice.value); setSkipped([]); }}
+              className={`group flex min-h-[168px] flex-col justify-between rounded-2xl border p-5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand disabled:cursor-not-allowed disabled:opacity-40 ${
+                i === 0
+                  ? "border-wk-brand/30 bg-wk-brand-soft hover:border-wk-brand"
+                  : "border-wk-border bg-wk-surface hover:border-wk-brand/40 hover:bg-wk-surface-raised"
+              }`}>
+              <span>
+                <strong className="block text-[22px] font-black tracking-tight text-wk-text">{choice.title}</strong>
+                <span className="mt-3 block text-[13px] leading-5 text-wk-text-muted">{choice.description}</span>
+              </span>
+              <span className="mt-4 flex items-center justify-between gap-3 text-[12px] font-bold text-wk-text">
+                Start session <span className="flex items-center gap-1 text-wk-text-muted">Up to {Math.min(openReviews.length, choice.maximum)} cases <WkIcon name="ArrowRight" size={14} /></span>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-2xl border border-wk-border bg-wk-surface p-5" data-wk-mizizi-session>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[12px] font-bold text-wk-brand">{minutes}-minute review session</p>
+            <WkButton variant="ghost" className="wk-button-sm" onClick={finish}>Done for Now</WkButton>
+          </div>
+          <p className="mt-1 text-[12px] text-wk-text-muted">
+            {skipped.length} skipped · Up to {sessionItems.length} in this session · No changes saved
           </p>
           {nextReview ? (
-            <>
-              <div>
-                <p className="text-[13px] font-semibold text-wk-text">{nextReview.title}</p>
-                <p className="mt-1 text-[12px] text-wk-text-muted">{nextReview.workstreamLabel}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <WkButton variant="soft" className="wk-button-sm" onClick={() => onInspect(nextReview.id)}>
-                  Inspect Review
+            <div className="mt-5">
+              <p className="text-[11px] font-semibold text-wk-text-muted">{nextReview.workstreamLabel}</p>
+              <h4 className="mt-2 text-[20px] font-black tracking-tight text-wk-text">{nextReview.title}</h4>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <WkButton className="wk-button-sm" onClick={() => onInspect(nextReview.id)}>
+                  Open its Core <WkIcon name="ArrowRight" size={14} />
                 </WkButton>
-                <WkButton
-                  variant="ghost"
-                  className="wk-button-sm"
+                <WkButton variant="ghost" className="wk-button-sm"
                   onClick={() => setSkipped((current) =>
-                    current.includes(nextReview.id) ? current : [...current, nextReview.id])}
-                >
+                    current.includes(nextReview.id) ? current : [...current, nextReview.id])}>
                   Skip for Now
                 </WkButton>
               </div>
-            </>
+            </div>
           ) : (
-            <p role="status" className="text-[13px] text-wk-text">
-              No more open reviews in this session. Skipped reviews remain open.
+            <p role="status" className="mt-5 text-[13px] text-wk-text">
+              That is everything in this session. The Registry reviews remain unchanged.
             </p>
           )}
-          <WkButton variant="ghost" className="wk-button-sm" onClick={finish}>
-            Done for Now
-          </WkButton>
-          <p className="text-[11px] text-wk-text-muted">
-            Skips are not decisions. Only decisions recorded in the review queue are saved.
-            Reopen a session to see the current review list.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-3 flex flex-wrap items-end gap-3">
-          <div className="w-full sm:w-44">
-            <WkSelect
-              ariaLabel="Approximate review time"
-              value={minutes}
-              options={[
-                { value: "5", label: "5 minutes" },
-                { value: "15", label: "15 minutes" },
-                { value: "60", label: "60 minutes" },
-              ]}
-              onChange={(value) => {
-                if (value === "5" || value === "15" || value === "60") setMinutes(value);
-              }}
-            />
-          </div>
-          <WkButton
-            variant="soft"
-            className="wk-button-sm"
-            disabled={openReviews.length === 0}
-            onClick={() => { setSkipped([]); setActive(true); }}
-          >
-            Start Review Session
-          </WkButton>
-          <span className="text-[12px] text-wk-text-muted">{openReviews.length} open reviews available</span>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
