@@ -135,6 +135,98 @@ function OperatorReviewExplorer({ queue, onInspect }: { queue: HeadquartersQueue
   );
 }
 
+
+/** One-review-at-a-time work session over the existing authorized review snapshot.
+ * Skipping is local to the session; decisions remain exclusively in Registry authority.
+ */
+function OperatorReviewSession({
+  queue, onInspect,
+}: { queue: HeadquartersQueueV2; onInspect: (id: string) => void }) {
+  const [minutes, setMinutes] = useState("15");
+  const [active, setActive] = useState(false);
+  const [skipped, setSkipped] = useState<readonly string[]>([]);
+  const openReviews = queue.items.filter((item) => item.status === "open");
+  const nextReview = openReviews.find((item) => !skipped.includes(item.id)) ?? null;
+  const finish = () => {
+    setActive(false);
+    setSkipped([]);
+  };
+
+  return (
+    <div className="border-t border-wk-border px-4 py-5 sm:px-5" aria-label="Review session">
+      <h3 className="text-[14px] font-black text-wk-text">Make Time for Reviews</h3>
+      <p className="mt-1 text-[12px] text-wk-text-muted">
+        Work through one open review at a time. Your time choice is a guide, not a countdown.
+      </p>
+      {active ? (
+        <div className="mt-3 space-y-3 rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+          <p className="text-[12px] text-wk-text-muted">
+            {minutes} minute session · {openReviews.length} currently open · {skipped.length} skipped for this session
+          </p>
+          {nextReview ? (
+            <>
+              <div>
+                <p className="text-[13px] font-semibold text-wk-text">{nextReview.title}</p>
+                <p className="mt-1 text-[12px] text-wk-text-muted">{nextReview.workstreamLabel}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <WkButton variant="secondary" className="wk-button-sm" onClick={() => onInspect(nextReview.id)}>
+                  Inspect Review
+                </WkButton>
+                <WkButton
+                  variant="ghost"
+                  className="wk-button-sm"
+                  onClick={() => setSkipped((current) =>
+                    current.includes(nextReview.id) ? current : [...current, nextReview.id])}
+                >
+                  Skip for Now
+                </WkButton>
+              </div>
+            </>
+          ) : (
+            <p role="status" className="text-[13px] text-wk-text">
+              No more open reviews in this session. Skipped reviews remain open.
+            </p>
+          )}
+          <WkButton variant="ghost" className="wk-button-sm" onClick={finish}>
+            Done for Now
+          </WkButton>
+          <p className="text-[11px] text-wk-text-muted">
+            Skips are not decisions. Only decisions recorded in the review queue are saved.
+            Reopen a session to see the current review list.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <div className="w-full sm:w-44">
+            <WkSelect
+              ariaLabel="Approximate review time"
+              value={minutes}
+              options={[
+                { value: "5", label: "5 minutes" },
+                { value: "15", label: "15 minutes" },
+                { value: "60", label: "60 minutes" },
+              ]}
+              onChange={(value) => {
+                if (value === "5" || value === "15" || value === "60") setMinutes(value);
+              }}
+            />
+          </div>
+          <WkButton
+            variant="secondary"
+            className="wk-button-sm"
+            disabled={openReviews.length === 0}
+            onClick={() => { setSkipped([]); setActive(true); }}
+          >
+            Start Review Session
+          </WkButton>
+          <span className="text-[12px] text-wk-text-muted">{openReviews.length} open reviews available</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MiziziHeadquartersBrief() {
   const [revision, setRevision] = useState(0);
   const [tab, setTab] = useState<Tab>("open");
@@ -245,6 +337,7 @@ export function MiziziHeadquartersBrief() {
                 />
               </WkTabs>
             </div>
+            <OperatorReviewSession queue={state.queue} onInspect={setInspectedId} />
             <OperatorReviewExplorer queue={state.queue} onInspect={setInspectedId} />
             <div className="border-t border-wk-border px-4 py-3 sm:px-5">
               <Link to="/admin/review/queue" className="text-[12px] font-semibold text-wk-brand hover:underline">
