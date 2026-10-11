@@ -107,10 +107,10 @@ describe(
           "utf8",
         );
         expect(recorder).toMatch(
-          /baseline_replay:\\s*"pending"/,
+          /baseline_replay:\s*"pending"/,
         );
         expect(recorder).not.toMatch(
-          /baseline_replay:\\s*"pass"/,
+          /baseline_replay:\s*"pass"/,
         );
       },
     );
