@@ -5,13 +5,15 @@
   "preview_project_ref": "nkgfoppunmnkcumalxqp",
   "preview_branch_id": "8c0affc1-b43b-44ac-b2eb-66715ed40252",
   "preview_migration_head": "20261011095852",
-  "baseline_replay": "pending",
-  "candidate_apply": "pending",
-  "verifier": "pending",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
   "verifier_file": "scripts/control-plane/verify-mizizi-case-research-conflict-target-repair-v1.sql",
   "schema_types_sha256": "5063d1bafc6fd6e6c020fdd01dc35bbc6b5b07a69df4ed6fe415bd18fbf3a968",
   "schema_migration_count": 224,
   "schema_migration_head": "20261011095852",
-  "verified_at": "2026-10-11T09:58:52.000Z",
-  "local_acceptance_evidence": "docs/engineering/mizizi-case-research-forward-repair-local-acceptance-20261011.md"
+  "verified_at": "2026-10-11T10:07:00.000Z",
+  "local_acceptance_evidence": "docs/engineering/mizizi-case-research-forward-repair-local-acceptance-20261011.md",
+  "baseline_replay_evidence": "docs/engineering/mizizi-headquarters-clean-local-replay-acceptance-20261011.md",
+  "local_forward_replay_evidence": "docs/engineering/mizizi-case-research-forward-repair-local-acceptance-20261011.md"
 }
