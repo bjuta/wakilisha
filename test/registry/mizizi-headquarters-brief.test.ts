@@ -39,6 +39,10 @@ describe("MIZIZI product-led workspace layout", () => {
     expect(page).toContain("data-wk-mizizi-decision-pagination");
     expect(page).toContain("visibleItems.slice(decisionPageStart, decisionPageStart + 15)");
     expect(page).toContain("pagedItems.map");
+    expect(page).toContain("<WkSearchField");
+    expect(page).toContain("<AriaTextArea");
+    expect(page).toContain("<AriaTextField");
+    expect(page).not.toMatch(/<(?:input|textarea|select)\b/);
   });
 
   it("keeps the landing brief short, the full queue intentional, and receipts behind disclosure", () => {
