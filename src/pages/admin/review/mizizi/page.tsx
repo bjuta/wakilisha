@@ -406,6 +406,7 @@ export default function AdminMiziziWorkspacePage() {
 function AdminMiziziWorkspaceContent() {
   const navigate = useNavigate();
   const [workspaceView, setWorkspaceView] = useState<"brief" | "field" | "cores" | "history" | "decisions">("brief");
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [items, setItems] = useState<WorkspaceItem[]>([]);
   const [lane, setLane] = useState<Lane>("needs_decision");
   const [search, setSearch] = useState("");
@@ -823,6 +824,8 @@ function AdminMiziziWorkspaceContent() {
             view={workspaceView}
             onShowReviews={() => setWorkspaceView("cores")}
             onShowCases={() => setWorkspaceView("cores")}
+            selectedId={selectedCaseId}
+            onSelectedIdChange={setSelectedCaseId}
           />
         )}
       </WkTabs>
