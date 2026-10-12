@@ -654,3 +654,23 @@
 [data-wk-registry-record-readonly] .wk-release-evidence-title {
   overflow-wrap:anywhere;
 }
+
+/* Contextual guidance should not consume a full metric card or a row of prose. */
+[data-wk-review-desk] .wk-review-desk-overview{
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) max-content;
+}
+[data-wk-review-desk] .wk-review-desk-help-cell{
+  display:flex;align-items:flex-start;justify-content:flex-end;min-width:0;
+}
+[data-wk-review-desk] .wk-review-issue-help{
+  display:flex;align-items:center;padding:8px clamp(16px,2.8vw,35px);
+  background:var(--wk-surface);
+}
+@media(max-width:1060px){
+  [data-wk-review-desk] .wk-review-desk-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+  [data-wk-review-desk] .wk-review-desk-help-cell{grid-column:1/-1}
+}
+@media(max-width:700px){
+  [data-wk-review-desk] .wk-review-desk-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+  [data-wk-review-desk] .wk-review-issue-help{padding:8px 12px}
+}

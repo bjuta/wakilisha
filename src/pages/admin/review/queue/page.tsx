@@ -36,6 +36,7 @@ import {
   sourceDisplay,
 } from "./reviewDeskPresentation";
 import { projectRecordedCaseSubject } from "@/services/miziziRecordedCaseSubject";
+import { WkContextHelp } from "@/components/design-system/primitives/ContextHelp";
 import { supabase } from "@/lib/supabase";
 import "./review-desk.css";
 
@@ -505,9 +506,11 @@ export default function AdminReviewQueuePage() {
           <strong>{formatReviewCount(data.totals.highPriorityRegistryReviewItems)}</strong>
           <p>Open reviews marked high priority by the Registry.</p>
         </div>
-        <div className="wk-review-desk-metric wk-review-desk-metric-note">
-          <WkIcon name="ShieldCheck" size={21} aria-hidden="true" />
-          <p><strong>Human decisions remain governed.</strong> Recording a decision does not directly change a canonical Track or Artist.</p>
+        <div className="wk-review-desk-help-cell">
+          <WkContextHelp label="How Decisions Work" title="Reviews and Registry changes" align="end">
+            Recording a review decision does not change the canonical music record.
+            A separate governed step verifies and applies an accepted change.
+          </WkContextHelp>
         </div>
       </section>
 
@@ -822,10 +825,12 @@ function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }
             </button>
             {expandedIssue === group.key ? (
               <div className="wk-review-issue-contents">
-                <p className="wk-review-issue-explanation">
-                  Each item below is a separate Registry review. This grouping changes only
-                  how records are displayed, never their decisions or source identities.
-                </p>
+                <div className="wk-review-issue-help">
+                  <WkContextHelp label="About This Group" title="Separate reviews, one issue type">
+                    These reviews share a recorded issue type. Each source and decision remains separate.
+                    This list does not authorise a group decision.
+                  </WkContextHelp>
+                </div>
                 {group.items.slice(0, visibleIssueItems[group.key] ?? 6).map(row => (
                   <RegistryReviewRow key={row.id} row={row} compact
                     canonicalTitle={canonicalTitles[row.id]}
@@ -1071,8 +1076,7 @@ function RegistryReadOnlyModal({ item, onClose }: {
             {typeof item.candidate_payload?.proposedValue === "string" ? (
               <div><dt>Proposed Release Slug (Not Approved)</dt><dd className="break-all">{item.candidate_payload.proposedValue || "Not recorded"}</dd></div>
             ) : null}
-            <div><dt>Review Rule</dt><dd>{String(item.source_payload?.ruleId || "Unknown")}</dd></div>
-            <div><dt>Rule Version</dt><dd>{String(item.source_payload?.ruleVersion || "Unknown")}</dd></div>
+
           </dl>
           {reasonCodes.length ? (
             <section className="wk-release-reason-block" aria-label="Recorded conflict reasons">
@@ -1109,6 +1113,8 @@ function RegistryReadOnlyModal({ item, onClose }: {
           {item.entity_type ? <div><dt>Subject</dt><dd>{humanize(item.entity_type)}</dd></div> : null}
           {item.source_table ? <div><dt>Source Table</dt><dd>{item.source_table}</dd></div> : null}
           {item.source_id ? <div><dt>Source ID</dt><dd className="break-all font-mono">{item.source_id}</dd></div> : null}
+          {governedRelease && item.source_payload?.ruleId ? <div><dt>Review Rule</dt><dd>{String(item.source_payload.ruleId)}</dd></div> : null}
+          {governedRelease && item.source_payload?.ruleVersion ? <div><dt>Rule Version</dt><dd>{String(item.source_payload.ruleVersion)}</dd></div> : null}
         </dl>
       </WkDisclosure>
       <div className="wk-review-record-source-section">
@@ -1120,11 +1126,11 @@ function RegistryReadOnlyModal({ item, onClose }: {
           {hasRecordedResolution ? <JsonBlock title="Recorded Resolution" value={item.resolution_payload} /> : null}
         </WkDisclosure>
       </div>
-      <p className="wk-review-record-readonly-footer">
-        {governedRelease
-          ? "This Release review remains open until MIZIZI verifies a governed outcome."
-          : "This is a record inspection. It does not change Registry data."}
-      </p>
+      {!governedRelease ? (
+        <p className="wk-review-record-readonly-footer">
+          This is a record inspection. It does not change Registry data.
+        </p>
+      ) : null}
     </section>
   </Modal>;
 }

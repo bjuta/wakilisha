@@ -8,6 +8,7 @@ import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { Modal } from "@/components/design-system/primitives/Modal";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkContextHelp } from "@/components/design-system/primitives/ContextHelp";
 import { MiziziEvidenceWorkbench } from "./MiziziEvidenceWorkbench";
 import { MiziziReviewField } from "./MiziziReviewField";
 import { MiziziReviewRoots } from "./MiziziReviewRoots";
@@ -94,9 +95,10 @@ function OperatorReviewSession({
       <div className="time-head">
         <div>
           <h2>How long do you have?</h2>
-          <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-            Choose a focused set of real open reviews. Any decision is made later in Cores.
-          </p>
+          <WkContextHelp label="How Focused Reviews Work" title="Review at your own pace">
+            Choose a set of open reviews and inspect each recording. This does not record a decision.
+            You can leave at any time. Open Cores to examine evidence.
+          </WkContextHelp>
         </div>
         <span className="text-[12px] tabular-nums text-wk-text-muted">
           {openReviews.length.toLocaleString()} open reviews

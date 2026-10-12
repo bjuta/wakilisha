@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkContextHelp } from "@/components/design-system/primitives/ContextHelp";
 import { WkStateMark } from "@/components/data-viz/WkStateMark";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import type { HeadquartersQueueV2, QueueReviewV2 } from "@/services/miziziHeadquartersBrief";
@@ -209,10 +210,12 @@ export function MiziziReviewRoots({ queue, onInspect, subjects }: {
           </WkButton>
         ) : null}
       </div>
-      <p className="mz-info-line mt-3">
-        Every connection here means recorded membership in the review inventory, not causation,
-        elapsed work, independent evidence, or rights. This is a snapshot, not a history of actions.
-      </p>
+      <div className="mz-roots-help mt-3">
+        <WkContextHelp label="About the Roots" title="What these connections mean">
+          Connections show recorded review membership only. They do not establish rights,
+          causation, elapsed work, or independent evidence. This is a snapshot, not an action history.
+        </WkContextHelp>
+      </div>
     </section>
   );
 }

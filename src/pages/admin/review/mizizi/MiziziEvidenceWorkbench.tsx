@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkContextHelp } from "@/components/design-system/primitives/ContextHelp";
 import { WkRecordingArtwork } from "@/components/data-viz/WkRecordingArtwork";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import { WkStateMark } from "@/components/data-viz/WkStateMark";
@@ -388,14 +389,19 @@ export function MiziziEvidenceWorkbench({
     {exactDecision?.status === "blocked" && selected.status === "open" ? <WkStateMark state="blocked" label="Previous human decision · Blocked" compact /> : null}
     {exactDecision?.status === "completed" && selected.status === "resolved" ? <WkStateMark state="verified" label="Matching operation verified" compact /> : null}
   </div>
-  <p className="mz-dossier-standing-note">
-    {exactDecision?.status === "blocked" && selected.status === "open" ? exactDecision.summary :
-      exactDecision?.status === "completed" && selected.status === "resolved"
-        ? "Matching decision and operation receipts confirm the repair. No repeat is needed."
-        : selected.status === "open" ? "This review is open. No new decision will be made here."
-        : selected.status === "resolved" ? "The Registry marks this review resolved."
-        : `Registry status: ${selected.sourceStatus}`}
-  </p>
+  {exactDecision?.status === "blocked" && selected.status === "open" ? (
+    <p className="mz-dossier-standing-note">{exactDecision.summary}</p>
+  ) : exactDecision?.status === "completed" && selected.status === "resolved" ? (
+    <p className="mz-dossier-standing-note">Matching decision and operation receipts confirm the repair. No repeat is needed.</p>
+  ) : (
+    <WkContextHelp label="About This Status" title="Registry review status">
+      {selected.status === "open"
+        ? "This review remains open. Use the governed review action to record a decision."
+        : selected.status === "resolved"
+          ? "The Registry records this review as resolved. View its recorded evidence and decision history."
+          : `Recorded Registry status: ${selected.sourceStatus}`}
+    </WkContextHelp>
+  )}
   {verifiedDecision?.reviewId === selected.id && verifiedDecision.status === "unverified" ? (
     <p role="status" className="mt-2 text-[12px] text-wk-text-muted">Earlier decision evidence could not be independently verified. Consult the governed record.</p>
   ) : null}
