@@ -27,7 +27,10 @@ describe("shared source-defined visual status", () => {
     const brief = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
     const cores = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx", "utf8");
     expect(brief).toContain("<WkZonedTimestamp value={queue.readAt} />");
-    expect(cores).toContain("Review opened · Nairobi");
+    expect(cores).toContain("<strong>Review Opened</strong>");
+    expect(cores).toContain('data-wk-mizizi-history-record');
+    const timestamp = readFileSync("src/components/data-viz/WkZonedTimestamp.tsx", "utf8");
+    expect(timestamp).toContain('timeZone = "Africa/Nairobi"');
     expect(cores).toContain("<WkZonedTimestamp value={fact.created_at} />");
     expect(cores).toContain("<WkZonedTimestamp value={fact.updated_at} />");
   });
