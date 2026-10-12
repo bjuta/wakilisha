@@ -74,7 +74,7 @@ describe("All Reviews v2: governed review desk", () => {
     expect(page).toContain('new URLSearchParams(location.search).get("review")');
     expect(page).toContain('loadRegistryReviewItems({ reviewId: linkedRecordId, limit: 1 })');
     expect(page).toContain('data-wk-registry-record-readonly');
-    expect(page).toContain("This is a record inspection. It does not offer a new decision");
+    expect(page).toContain("This is a record inspection. It does not change Registry data.");
     expect(miziziCores).toContain('"record" : "review"');
     expect(page).toContain("That record is no longer available.");
     expect(page).not.toContain('recordRegistryReviewDecision({ item: selectedRecord');
@@ -108,11 +108,33 @@ describe("All Reviews v2: governed review desk", () => {
     expect(page).toContain("if (requiresGovernedSingleReleaseReview(item))");
     expect(page).toContain("if (requiresGovernedSingleReleaseReview(selectedItem))");
     expect(page).toContain("setSelectedRecord(item);");
-    expect(page).toContain("This review cannot be resolved through the generic decision writer.");
-    expect(page).toContain("Release identity conflict");
+    expect(page).toContain("The generic decision form cannot resolve it.");
+    expect(page).toContain("Release Identity Conflict");
     expect(page).toContain("Proposed Release Slug (Not Approved)");
     expect(page).toContain("Recorded Conflict Reasons");
-    expect(page).toContain("Read-only here.");
+    expect(page).toContain("This review stays open.");
+  });
+
+  it("reads the actual Release conflict reasons and styles the portalled modal", () => {
+    expect(page).toContain("item.source_payload?.reasonCodes ?? programmeCandidate.reasonCodes");
+    expect(page).toContain("Recorded Conflict Reasons");
+    expect(page).toContain("reasonCodes.map(reason =>");
+    expect(page).toContain("hasRecordedResolution");
+    expect(page).toContain("Object.keys(item.resolution_payload).length > 0");
+    expect(page).toContain("wk-review-record-meta-facts");
+    expect(css).toContain("[data-wk-registry-record-readonly] .wk-review-record-facts");
+    expect(css).toContain("[data-wk-registry-record-readonly] .wk-review-record-modal-head");
+    expect(css).toContain("[data-wk-registry-record-readonly] .wk-release-reason-block");
+    expect(css).toContain("@media(max-width:600px)");
+  });
+
+  it("labels revision authority when the Track already has a recorded human decision", () => {
+    expect(page).toContain("hasRecordedTrackDecision");
+    expect(page).toContain("A human decision is already recorded for this Track.");
+    expect(page).toContain("Recording another decision will supersede it.");
+    expect(page).toContain("Record Revised Decision");
+    expect(page).toContain("{!publicMusicReview ? (");
+    expect(page).not.toContain('label="Source artist text" value={artistText || "Missing"}');
   });
 
   it("never copies preset verification assertions into human decision notes", () => {

@@ -81,3 +81,17 @@ Owner supplied two desktop screenshots of the expanded Single Releases With Iden
 - The UX change and service guard are covered by permanent `admin-review-desk-v2.test.ts` source contracts already enrolled in protected `test:critical`. The UI must still undergo authenticated operator visual inspection after protected CI.
 
 No SQL, migration, Edge Function, canonical mutation, execution grant, or Production release is authorized by this draft correction. Do not mark the entire Review Desk, MIZIZI Slice 1 or Slice 2/3 accepted until the appropriate governed Release decision contract and signed-in mobile acceptance are verified.
+
+## Owner guarded-modal inspection: 12 October 2026, 19:48 to 19:50 EAT
+
+After protected CI on commit 02ec4b64, the owner supplied one-page queue and expanded desktop screenshots of Public Music Identity Track and guarded Single Release record reading rooms.
+
+**Release safety accepted:** The Release roses-feat-tellaman-remix is inspected in a read-only modal, and the candidate roses-remix is marked not approved. Its review rule is release_single_identity_conflict/1.4.0, the review UUID and the distinct Release UUID are visible, and the modal footer has Close Record only. The queue still counts 225 open, 198 high priority, with 17 distinct loaded Single Release reviews. The guarded writer's safety boundary is working in the inspected case. This does not amount to final mobile or programme closure.
+
+**Remaining visual issue:** The read-only modal loses its facts layout because the existing CSS classes were scoped under the Review Desk ancestor but the modal renders in a portal outside that ancestor. The status label runs into workstream text, the definition list is flat, and raw JSON dominates. The repair uses selectors based on data-wk-registry-record-readonly, independent of the page ancestor, with two-column facts on desktop and one column on small screens.
+
+**Source fact bug:** The sampled Release review records root-level source_payload.reasonCodes with primary_artist_mismatch and community_thread_collision. The first read-only implementation incorrectly read programmeCandidate.reasonCodes, which hid the recorded reasons. Present the root reasons, supporting nested historical reasons only as fallback, without inventing reasons. Suppress empty resolution object rendering: an empty object is not a recorded resolution.
+
+**Existing Track decision clarity:** DESIRE has rule track_recording_identity_conflict/1.3.0, an already recorded Public Music Identity True Duplicate decision, and execution pending. The existing governed Track RPC permits audited supersession, so do not block that authority. When a current decision is recorded, make the revision consequences explicit and label the action Record Revised Decision. Suppress irrelevant generic artist text/slug Missing fields for the Track-specific decision mode; real active credits remain visible. The candidate human_review_required is not approved as a safe slug.
+
+Only modal presentation, accurately exposed read-only source reasons, and clear Track decision revision wording change. Do not modify Registry data, the Track RPC, Single Release refusal, SQL/Edge permissions, grants, or Production. Preserve draft PR release gates and require CI and signed-in desktop and 390px visual acceptance.
