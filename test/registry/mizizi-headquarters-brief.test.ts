@@ -257,6 +257,11 @@ describe("Headquarters complete Registry review inventory", () => {
     expect(source).toContain("<MiziziReviewField");
     expect(field).toContain("<WkSearchField");
     expect(field).toContain('aria-label="Case state key"');
+    expect(field).toContain("absolute inset-x-0 top-0 flex items-start justify-between");
+    expect(field).toContain("max-w-[222px] shrink-0 self-start");
+    expect(field).toContain("Reviewed recording or release");
+    expect(field).toContain("Archived or unknown — not approved");
+    expect(field).toContain("y={pt.y+45}");
     expect(cores).toContain("<WkSearchField");
     expect(cores).toContain('data-wk-edge-filters');
     expect(field + cores).not.toMatch(/<select\b|<input\b|<textarea\b/);
