@@ -381,3 +381,15 @@ describe("Headquarters #1094 live receipt convergence", () => {
     expect(service).not.toMatch(/\.(insert|update|upsert|delete|rpc)\(/);
   });
 });
+
+describe("MIZIZI bounded media and zoned timestamp", () => {
+  it("reads canonical artwork for visible source IDs, not title matches", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx", "utf8");
+    expect(source).toContain('.select("id,title,entity_type,source_id,source_payload")');
+    expect(source).toContain("review.subjectType === row.entity_type");
+    expect(source).toContain("uuid(row.source_id)");
+    expect(source).toContain('.select("id,artwork_url")');
+    expect(source).toContain("<WkRecordingArtwork");
+    expect(source).toContain("<WkZonedTimestamp");
+  });
+});

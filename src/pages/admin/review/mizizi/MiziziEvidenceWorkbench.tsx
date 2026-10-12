@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkRecordingArtwork } from "@/components/data-viz/WkRecordingArtwork";
+import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
 import { WkSelect } from "@/components/design-system/primitives/Select";
@@ -84,7 +86,8 @@ export function MiziziEvidenceWorkbench({
   const [pageSubjects, setPageSubjects] = useState<{
     pageKey: string;
     subjects: Readonly<Record<string, RecordedCaseSubject>>;
-  }>({ pageKey: "", subjects: {} });
+    artwork: Readonly<Record<string, string>>;
+  }>({ pageKey: "", subjects: {}, artwork: {} });
   const [verifiedDecision, setVerifiedDecision] = useState<{
     reviewId: string;
     status: "loading" | "verified" | "unverified";
@@ -101,16 +104,17 @@ export function MiziziEvidenceWorkbench({
   // A missing, stale or inaccessible source falls back to the unchanged Registry title.
   useEffect(() => {
     let active = true;
-    setPageSubjects({ pageKey, subjects: {} });
+    setPageSubjects({ pageKey, subjects: {}, artwork: {} });
     const pageIds = pageKey ? pageKey.split(",") : [];
     if (pageIds.length === 0) return () => { active = false; };
     void supabase.from("registry_review_items")
-      .select("id,title,source_payload")
+      .select("id,title,entity_type,source_id,source_payload")
       .in("id", pageIds)
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (!active || error || !data || !Array.isArray(data)) return;
         const permitted = new Set(pageIds);
         const subjects: Record<string, RecordedCaseSubject> = {};
+        const mediaRows: Array<{ reviewId: string; sourceId: string; kind: "track" | "release" }> = [];
         for (const row of data) {
           if (!row || typeof row.id !== "string" || !permitted.has(row.id) || row.id in subjects) {
             return; // Never display an unexpected or ambiguous row.
@@ -118,8 +122,34 @@ export function MiziziEvidenceWorkbench({
           const review = selection.items.find((item) => item.id === row.id);
           if (!review || row.title !== review.title) continue; // Avoid changed snapshot labels.
           subjects[row.id] = projectRecordedCaseSubject(row.source_payload, review.title);
+          if ((row.entity_type === "track" || row.entity_type === "release") &&
+              review.subjectType === row.entity_type &&
+              typeof row.source_id === "string" && uuid(row.source_id)) {
+            mediaRows.push({ reviewId: row.id, sourceId: row.source_id, kind: row.entity_type });
+          }
         }
-        setPageSubjects({ pageKey, subjects });
+        const artwork: Record<string, string> = {};
+        for (const kind of ["track", "release"] as const) {
+          const batch = mediaRows.filter((item) => item.kind === kind);
+          if (!batch.length) continue;
+          const result = await supabase.from(kind === "track" ? "registry_tracks" : "registry_releases")
+            .select("id,artwork_url").in("id", [...new Set(batch.map((item) => item.sourceId))]);
+          if (!active) return;
+          if (result.error || !result.data) continue;
+          const validIds = new Set(batch.map((item) => item.sourceId));
+          const imageById = new Map<string, string>();
+          for (const image of result.data) {
+            if (image && typeof image.id === "string" && validIds.has(image.id) &&
+                typeof image.artwork_url === "string" && !imageById.has(image.id)) {
+              imageById.set(image.id, image.artwork_url);
+            }
+          }
+          for (const item of batch) {
+            const image = imageById.get(item.sourceId);
+            if (image) artwork[item.reviewId] = image;
+          }
+        }
+        if (active) setPageSubjects({ pageKey, subjects, artwork });
       });
     return () => { active = false; };
   }, [pageKey, selection.items]);
@@ -245,11 +275,18 @@ export function MiziziEvidenceWorkbench({
                     ? "border-l-wk-brand bg-wk-brand-soft"
                     : "border-l-transparent hover:bg-wk-surface-raised"
                 }`}>
-                <span className="block text-[13px] font-semibold leading-5 text-wk-text">
+                <span className="flex min-w-0 items-center gap-3">
+                  <WkRecordingArtwork
+                    url={pageSubjects.pageKey === pageKey ? pageSubjects.artwork[item.id] : null}
+                    title={pageSubjects.pageKey === pageKey ? pageSubjects.subjects[item.id]?.title ?? item.title : item.title}
+                    kind={item.subjectType === "track" ? "track" : item.subjectType === "release" ? "release" : "other"}
+                  />
+                  <span className="min-w-0 flex-1 break-words text-[13px] font-semibold leading-5 text-wk-text">
                   {pageSubjects.pageKey === pageKey && pageSubjects.subjects[item.id]?.specific
                     ? pageSubjects.subjects[item.id].title
                     : item.id === selected?.id && fact && recordedSubject.specific
                       ? recordedSubject.title : item.title}
+                  </span>
                 </span>
                 <span className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-wk-text-muted">
                   <span className="min-w-0 truncate">
@@ -405,7 +442,7 @@ export function MiziziEvidenceWorkbench({
                     <dl className="mt-3 space-y-2 text-[11px] text-wk-text-muted">
                       <div><dt className="font-semibold">Review ID</dt><dd className="break-all font-mono">{selected.id}</dd></div>
                       <div><dt className="font-semibold">Rule version</dt><dd>{readable(source.ruleVersion)}</dd></div>
-                      <div><dt className="font-semibold">Snapshot</dt><dd><DateValue value={queue.readAt} /></dd></div>
+                      <div><dt className="font-semibold">Snapshot (Nairobi)</dt><dd><WkZonedTimestamp value={queue.readAt} /></dd></div>
                     </dl>
                   ) : null}
                 </div>
