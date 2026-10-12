@@ -483,10 +483,12 @@ describe("Headquarters in-place review inspection", () => {
     expect(source).toContain('value: "60", title: "An hour"');
     expect(source).toContain("Skip for Now");
     expect(source).toContain("Done for Now");
-    expect(source).toContain('queue.items.filter((item) => item.status === "open")');
-    expect(source).toContain("onInspect(nextReview.id)");
-    expect(source).toContain("Skipping never records a decision.");
-    expect(source).toContain("No changes saved");
+    expect(source).toContain('queue.items.filter(item => item.status === "open")');
+    expect(source).toContain('queue.items.some(item => item.id === current.id && item.status === "open")');
+    expect(source).toContain("onInspect(id)");
+    expect(source).toContain('panelClassName="mz-session-modal"');
+    expect(source).toContain("No decisions recorded.");
+    expect(source).toContain("sessionItems.map((item, index)");
     expect(source).not.toContain("localStorage");
     expect(source).not.toContain("Approve Review");
   });
