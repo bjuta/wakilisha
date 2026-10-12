@@ -163,11 +163,13 @@ export function MiziziReviewField({
                   : <rect x={pt.x-29} y={pt.y-29} width="58" height="58" rx="5"
                     stroke="currentColor" strokeWidth="2"
                     fill="currentColor" fillOpacity=".10" />}
-                <text x={pt.x} y={pt.y-2} textAnchor="middle" fontSize="11"
-                  fill="currentColor" className="text-wk-text">{label(item.name, 16)}</text>
-                <text x={pt.x} y={pt.y+13} textAnchor="middle" fontSize="9"
+                <text x={pt.x} y={pt.y+45} textAnchor="middle" fontSize="13"
+                  fontWeight="650" fill="currentColor" className="text-wk-text">
+                  {label(item.name, 22)}
+                </text>
+                <text x={pt.x} y={pt.y+60} textAnchor="middle" fontSize="11"
                   fill="currentColor" className="text-wk-text-muted">
-                  {label(item.detail, 24)}
+                  {label(item.detail, 25)}
                 </text>
               </g>;
             })}
