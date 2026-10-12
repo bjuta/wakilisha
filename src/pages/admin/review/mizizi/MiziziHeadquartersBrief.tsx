@@ -12,6 +12,7 @@ import { WkSelect } from "@/components/design-system/primitives/Select";
 import { selectOperatorReviewPageV1, type OperatorStatusV1 } from "@/services/operatorReviewSelection";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MiziziEvidenceWorkbench } from "./MiziziEvidenceWorkbench";
+import { MiziziReviewField } from "./MiziziReviewField";
 import { loadIssue1094Brief, type Issue1094BriefRow } from "@/services/miziziIssue1094Brief";
 import {
   loadHeadquartersQueueV2,
@@ -337,7 +338,6 @@ export function MiziziHeadquartersBrief({
 }) {
   const [revision, setRevision] = useState(0);
   const [tab, setTab] = useState<Tab>("open");
-  const [fieldWorkstream, setFieldWorkstream] = useState<string | null>(null);
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "error" }
@@ -473,56 +473,7 @@ export function MiziziHeadquartersBrief({
       ) : null}
 
       {queue && view === "field" ? (
-        <div className="space-y-5">
-          <header className="border-b border-wk-border pb-5">
-            <h2 className="text-[clamp(25px,3vw,37px)] font-black tracking-tight text-wk-text">The Field</h2>
-            <p className="mt-2 max-w-2xl text-[13px] leading-6 text-wk-text-muted">
-              A real, searchable view of workstream coverage in the current Registry.
-              An artist–recording graph is not shown until its relationships can be verified from live catalogue data.
-            </p>
-          </header>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {queue.workstreams.map((group) => (
-              <button key={group.key} type="button"
-                onClick={() => setFieldWorkstream(group.key === fieldWorkstream ? null : group.key)}
-                aria-pressed={fieldWorkstream === group.key}
-                className={`rounded-2xl border p-5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand ${
-                  fieldWorkstream === group.key
-                    ? "border-wk-brand bg-wk-brand-soft"
-                    : "border-wk-border bg-wk-surface hover:bg-wk-surface-raised"
-                }`}>
-                <h3 className="text-[15px] font-bold text-wk-text">{group.label}</h3>
-                <p className="mt-3 text-[29px] font-black tabular-nums text-wk-text">{group.open.toLocaleString()}
-                  <span className="ml-2 text-[12px] font-normal text-wk-text-muted">open</span>
-                </p>
-                <p className="mt-2 text-[12px] text-wk-text-muted">
-                  {group.resolved.toLocaleString()} resolved
-                </p>
-                <span className="mt-4 block text-[12px] font-semibold text-wk-brand">
-                  {fieldWorkstream === group.key ? "Hide cases" : "Show cases"} <WkIcon name="ArrowRight" size={13} />
-                </span>
-              </button>
-            ))}
-          </div>
-          {fieldWorkstream ? (
-            <WkSurface className="overflow-hidden p-0">
-              <div className="border-b border-wk-border p-4">
-                <h3 className="text-[15px] font-bold text-wk-text">
-                  {queue.workstreams.find((group) => group.key === fieldWorkstream)?.label ?? "Workstream"} · recent open cases
-                </h3>
-              </div>
-              <ReviewPreview items={queue.items.filter((item) =>
-                item.workstream === fieldWorkstream && item.status === "open").slice(0, 8)} onInspect={inspect} />
-              <div className="border-t border-wk-border px-4 py-3">
-                <WkButton className="wk-button-sm" onClick={onShowCases}>
-                  Explore all Cores <WkIcon name="ArrowRight" size={13} />
-                </WkButton>
-              </div>
-            </WkSurface>
-          ) : (
-            <p className="text-[12px] text-wk-text-muted">Choose a workstream to inspect its recorded cases.</p>
-          )}
-        </div>
+        <MiziziReviewField queue={queue} onInspect={inspect} />
       ) : null}
 
       {queue && view === "cores" ? (

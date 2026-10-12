@@ -26,6 +26,26 @@ const mkPage = (rows: RegistryQueueFactV2[], total = rows.length, offset = 0): R
   rows, total, offset, limit: HEADQUARTERS_QUEUE_PAGE_SIZE,
 });
 
+describe("MIZIZI Field interaction shell faithfully follows reference structure", () => {
+  it("uses an uninterrupted viewport with left-edge search/keys and bottom-right zoom only", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziReviewField.tsx", "utf8");
+    expect(source).toContain('data-wk-mizizi-field');
+    expect(source).toContain('<WkSearchField');
+    expect(source).toContain('absolute inset-x-0 top-0');
+    expect(source).toContain('aria-label="Workstream keys and filters"');
+    expect(source).toContain('<WkViewportControls');
+    expect(source).toContain('bottom-4 right-4');
+    expect(source).not.toContain("rounded-2xl");
+  });
+  it("projects ONLY authenticated reviews and recorded workstream membership", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziReviewField.tsx", "utf8");
+    expect(source).toContain('for (const item of queue.items)');
+    expect(source).toContain('byGroup.get(item.workstream)');
+    expect(source).toContain('Connected by review workstream, not by inferred');
+    expect(source).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);
+  });
+});
+
 describe("MIZIZI reference-inspired, live-data operational workspace", () => {
   it("keeps Brief, Field, Cores, History and governed Decision Work distinct", () => {
     const page = readFileSync("src/pages/admin/review/mizizi/page.tsx", "utf8");
