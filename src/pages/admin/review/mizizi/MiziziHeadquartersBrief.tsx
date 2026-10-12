@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkStatusDistribution } from "@/components/data-viz/WkStatusDistribution";
+import { WkStateMark } from "@/components/data-viz/WkStateMark";
+import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import { WkRankedBars } from "@/components/data-viz/WkRankedBars";
 import { WkTabs } from "@/components/design-system/primitives/Tabs";
 import { WkButton } from "@/components/design-system/primitives/Button";
@@ -269,10 +271,13 @@ function Issue1094WorthKnowing({ revision, onInspect }: { revision: number; onIn
             <article key={item.reviewId} className="py-5 first:pt-4 last:pb-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className="text-[13px] font-bold text-wk-text">{item.title}</h4>
-                <span className="text-[11px] font-semibold text-wk-text-muted">
-                  {item.status === "completed" ? "Verified complete" :
+                <WkStateMark
+                  compact
+                  state={item.status === "completed" ? "verified" :
+                    item.status === "blocked" ? "blocked" : "unverified"}
+                  label={item.status === "completed" ? "Verified complete" :
                     item.status === "blocked" ? "Decision recorded · blocked" : "Needs verification"}
-                </span>
+                />
               </div>
               <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">{item.summary}</p>
               {item.status !== "unverified" ? (
@@ -409,7 +414,7 @@ export function MiziziHeadquartersBrief({
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-wk-text-muted">
               <span><strong className="tabular-nums text-wk-text">{queue.total.toLocaleString()}</strong> recorded reviews</span>
               <span><strong className="tabular-nums text-wk-text">{queue.workstreams.length}</strong> workstreams</span>
-              <span>Read at {new Date(queue.readAt).toLocaleString()}</span>
+              <span>Read at <WkZonedTimestamp value={queue.readAt} /></span>
               <WkButton variant="soft" className="wk-button-sm" onClick={onShowCases}>
                 Open the Cores <WkIcon name="ArrowRight" size={14} />
               </WkButton>

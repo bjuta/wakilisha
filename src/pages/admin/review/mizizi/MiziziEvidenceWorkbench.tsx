@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkRecordingArtwork } from "@/components/data-viz/WkRecordingArtwork";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
+import { WkStateMark } from "@/components/data-viz/WkStateMark";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
 import { WkSelect } from "@/components/design-system/primitives/Select";
@@ -46,17 +47,8 @@ function DateValue({ value }: { value: string | null }) {
   return <>{Number.isNaN(date.getTime()) ? "Unknown date" : date.toLocaleString()}</>;
 }
 function CaseStatus({ status }: { status: QueueReviewV2["status"] }) {
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-      status === "open"
-        ? "border-wk-warning/30 bg-wk-warning-soft text-wk-warning"
-        : status === "resolved"
-          ? "border-wk-brand/20 bg-wk-brand-soft text-wk-brand"
-          : "border-wk-border bg-wk-surface-raised text-wk-text-muted"
-    }`}>
-      {status === "other" ? "Other status" : words(status)}
-    </span>
-  );
+  return <WkStateMark compact state={status === "other" ? "unknown" : status}
+    label={status === "other" ? "Other status" : words(status)} />;
 }
 function Fact({ name, value }: { name: string; value: unknown }) {
   return (
@@ -384,7 +376,7 @@ export function MiziziEvidenceWorkbench({
                       <h4 className="text-[13px] font-black text-wk-text">Disposition</h4>
                       {exactDecision?.status === "blocked" && selected.status === "open" ? (
                         <div role="status" className="mt-3 space-y-2">
-                          <p className="text-[13px] font-bold text-wk-text">Human decision recorded · Blocked</p>
+                          <WkStateMark state="blocked" label="Human decision recorded · Blocked" />
                           <p className="text-[12px] leading-5 text-wk-text-muted">{exactDecision.summary}</p>
                         </div>
                       ) : exactDecision?.status === "completed" && selected.status === "resolved" ? (
@@ -414,8 +406,14 @@ export function MiziziEvidenceWorkbench({
                     <section className="border-t border-wk-border pt-4">
                       <h4 className="text-[13px] font-black text-wk-text">History</h4>
                       <dl className="mt-2">
-                        <Fact name="Review opened" value={fact.created_at ? new Date(fact.created_at).toLocaleString() : null} />
-                        <Fact name="Last updated" value={fact.updated_at ? new Date(fact.updated_at).toLocaleString() : null} />
+                        <div className="border-b border-wk-border py-3">
+                          <dt className="text-[11px] font-semibold text-wk-text-muted">Review opened · Nairobi</dt>
+                          <dd className="mt-1 text-[13px] text-wk-text"><WkZonedTimestamp value={fact.created_at} /></dd>
+                        </div>
+                        <div className="border-b border-wk-border py-3">
+                          <dt className="text-[11px] font-semibold text-wk-text-muted">Last updated · Nairobi</dt>
+                          <dd className="mt-1 text-[13px] text-wk-text"><WkZonedTimestamp value={fact.updated_at} /></dd>
+                        </div>
                         <Fact name="Recorded status" value={fact.status} />
                       </dl>
                     </section>
