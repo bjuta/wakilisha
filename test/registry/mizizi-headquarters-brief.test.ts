@@ -281,6 +281,8 @@ describe("Headquarters complete Registry review inventory", () => {
     expect(field).toContain("<WkGraphLegend");
     expect(field).toContain("<WkViewportControls");
     expect(field).toContain("Browse reviews as a list");
+    expect(field).toContain("<WkDisclosure");
+    expect(field).not.toMatch(/<(?:details|summary)\\b/);
     expect(field).toContain("prefers-reduced-motion: reduce");
     expect(field).toContain("readPalette(c)");
     expect(field).toContain("requestAnimationFrame(frame)");

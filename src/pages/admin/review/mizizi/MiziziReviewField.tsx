@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { WkViewportControls } from "@/components/data-viz/WkViewportControls";
 import { WkGraphLegend } from "@/components/data-viz/WkGraphLegend";
 import {
@@ -374,9 +375,10 @@ export function MiziziReviewField({ queue, onInspect }: {
               <p role="status">No recorded review matches this search.</p>}
           </div>
         )}
-        <details>
-          <summary>Browse reviews as a list</summary>
-          <div className="mz-field-access-list" role="list" aria-label="Keyboard-accessible Registry review list">
+        <WkDisclosure summary="Browse reviews as a list"
+          className="mz-field-disclosure" triggerClassName="wk-button wk-button-ghost wk-button-sm"
+          contentClassName="mz-field-access-list">
+          <div role="list" aria-label="Keyboard-accessible Registry review list">
             {cases.filter(item => (filter === "all" || item.status === filter)
               && activeStates[item.status as keyof typeof activeStates] !== false)
               .filter(item => !search.trim() || item.title.toLowerCase().includes(search.trim().toLowerCase()))
@@ -389,7 +391,7 @@ export function MiziziReviewField({ queue, onInspect }: {
               ))}
           </div>
           <p className="mz-info-line">Search for more. This list shows at most 20 matching reviews.</p>
-        </details>
+        </WkDisclosure>
         <p role="status" className="mz-info-line">
           {load === "loading" ? "Loading current Registry credits…" :
             load === "error" ? "The current case graph could not be loaded." :

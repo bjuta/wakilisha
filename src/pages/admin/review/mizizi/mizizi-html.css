@@ -174,9 +174,9 @@
 [data-wk-mizizi-workspace] .mz-field-results button:hover,.mz-port .mz-field-access-list button:hover{color:var(--wk-brand)}
 [data-wk-mizizi-workspace] .mz-field-results button[aria-pressed="true"]{font-weight:700;color:var(--wk-brand)}
 [data-wk-mizizi-workspace] .mz-field-results small{display:block;margin-top:3px;color:var(--wk-text-muted);font-size:11px}
-[data-wk-mizizi-workspace] .mz-field-panel details summary{cursor:pointer;color:var(--wk-brand);font-size:12px;font-weight:700}
-[data-wk-mizizi-workspace] .mz-field-panel details[open]{min-height:0;overflow:hidden}
-[data-wk-mizizi-workspace] .mz-field-panel details[open] .mz-field-access-list{max-height:150px}
+[data-wk-mizizi-workspace] .mz-field-panel .mz-field-disclosure > button {width:100%;min-height:36px;justify-content:center}
+[data-wk-mizizi-workspace] .mz-field-panel .mz-field-disclosure[data-open="true"]{min-height:0;overflow:hidden}
+[data-wk-mizizi-workspace] .mz-field-panel .mz-field-disclosure .mz-field-access-list{max-height:150px;overflow-y:auto}
 [data-wk-mizizi-workspace] [data-wk-graph-legend]{
   position:absolute;right:18px;top:18px;z-index:3;max-width:240px;
   background:var(--wk-surface);border:1px solid var(--wk-border);
