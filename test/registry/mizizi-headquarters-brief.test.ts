@@ -255,7 +255,7 @@ describe("Headquarters complete Registry review inventory", () => {
     expect(source).toContain("<WkButton");
     expect(source).toContain("<MiziziReviewField");
     expect(field).toContain("<WkSearchField");
-    expect(field).toContain('aria-label="Workstream keys and filters"');
+    expect(field).toContain('aria-label="Case state key"');
     expect(cores).toContain("<WkSearchField");
     expect(cores).toContain('data-wk-edge-filters');
     expect(field + cores).not.toMatch(/<select\b|<input\b|<textarea\b/);
