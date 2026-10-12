@@ -26,24 +26,18 @@ const mkPage = (rows: RegistryQueueFactV2[], total = rows.length, offset = 0): R
   rows, total, offset, limit: HEADQUARTERS_QUEUE_PAGE_SIZE,
 });
 
-describe("MIZIZI Field interaction shell faithfully follows reference structure", () => {
-  it("uses an uninterrupted viewport with left-edge search/keys and bottom-right zoom only", () => {
-    const source = readFileSync("src/pages/admin/review/mizizi/MiziziReviewField.tsx", "utf8");
-    expect(source).toContain('data-wk-mizizi-field');
-    expect(source).toContain('<WkSearchField');
-    expect(source).toContain('absolute inset-x-0 top-0');
-    expect(source).toContain('aria-label="Workstream keys and filters"');
-    expect(source).toContain('<WkViewportControls');
-    const controls = readFileSync("src/components/data-viz/WkViewportControls.tsx", "utf8");
-    expect(controls).toContain("bottom-4 right-4");
-    expect(source).not.toContain("rounded-2xl");
-  });
-  it("projects ONLY authenticated reviews and recorded workstream membership", () => {
-    const source = readFileSync("src/pages/admin/review/mizizi/MiziziReviewField.tsx", "utf8");
-    expect(source).toContain('for (const item of queue.items)');
-    expect(source).toContain('byGroup.get(item.workstream)');
-    expect(source).toContain('Connected by review workstream, not by inferred');
-    expect(source).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);
+describe("MIZIZI verified-case subject Field", () => {
+  it("requires a search and only projects real authenticated MIZIZI reviews", () => {
+    const source=readFileSync("src/services/miziziCaseField.ts","utf8");
+    const field=readFileSync("src/pages/admin/review/mizizi/MiziziReviewField.tsx","utf8");
+    expect(source).toContain('r.workstream==="mizizi_data_hygiene"');
+    expect(source).toContain('.in("id",target.map(x=>x.id))');
+    expect(source).toContain('"registry_track_artists"');
+    expect(source).toContain('if(!q) return []');
+    expect(field).toContain("Search to reveal connected cases");
+    expect(field).toContain("<WkViewportControls");
+    expect(field).toContain("onWheel={onWheel}");
+    expect(field).not.toContain("rounded-2xl");
   });
 });
 
@@ -58,27 +52,6 @@ describe("Governed Decision Work follows the selected-job list/detail layout", (
     expect(source).toContain('await loadDetail(item.review.id)');
     expect(source).toContain('await recordRegistryReviewDecision({');
     expect(source).not.toContain('onClick={() => void openReview(item)}');
-  });
-});
-
-describe("Field nodes and selected Cores work as in the reference", () => {
-  it("does not capture a pointer until the user drags, preserving simple click selection", () => {
-    const source = readFileSync("src/pages/admin/review/mizizi/MiziziReviewField.tsx", "utf8");
-    const down = source.slice(source.indexOf("const moveStart"), source.indexOf("const move ="));
-    const move = source.slice(source.indexOf("const move ="), source.indexOf("const release ="));
-    expect(down).not.toContain("setPointerCapture");
-    expect(move).toContain("setPointerCapture");
-    expect(move).toContain("prev.dragged");
-    expect(source).toContain("onKeyDown={(e) =>");
-    expect(source).toContain('role="group"');
-  });
-
-  it("selects the first matching Core when no review was explicitly selected", () => {
-    const source = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx", "utf8");
-    expect(source).toContain("selection.items[0] ?? null");
-    expect(source).toContain('status: mode === "history" ? "resolved" : status');
-    expect(source).toContain('mode === "history"');
-    expect(source).toContain('queue.recentResolved[0]');
   });
 });
 

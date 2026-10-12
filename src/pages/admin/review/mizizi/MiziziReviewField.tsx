@@ -1,249 +1,109 @@
-import { useMemo, useRef, useState, type PointerEvent } from "react";
+import { useEffect,useMemo,useRef,useState,type PointerEvent,type WheelEvent } from "react";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
-import { WkIcon } from "@/components/design-system/Icon";
 import { WkViewportControls } from "@/components/data-viz/WkViewportControls";
-import type { HeadquartersQueueV2, QueueReviewV2 } from "@/services/miziziHeadquartersBrief";
-
-const WIDTH = 1400;
-const HEIGHT = 820;
-const MIN_ZOOM = 0.8;
-const MAX_ZOOM = 4;
-
-type FieldNode = Readonly<{
-  id: string; x: number; y: number;
-  item: QueueReviewV2;
-}>;
-type FieldGroup = Readonly<{
-  key: string; label: string; x: number; y: number; total: number;
-}>;
-type FieldProjection = Readonly<{ groups: readonly FieldGroup[]; nodes: readonly FieldNode[] }>;
-
-function stableAngle(id: string): number {
-  let h = 2166136261;
-  for (const char of id) h = Math.imul(h ^ char.charCodeAt(0), 16777619) >>> 0;
-  return (h / 4294967296) * Math.PI * 2;
-}
-
-/** Registry review -> recorded workstream edge ONLY.
- * Neither spatial position nor workstream link claims artist/credit/ownership provenance.
- */
-export function projectMiziziReviewField(queue: HeadquartersQueueV2): FieldProjection {
-  const groups = queue.workstreams.map((group, index) => ({
-    key: group.key,
-    label: group.label,
-    x: 260 + (index % 3) * 445,
-    y: 310 + (Math.floor(index / 3) * 350) + (index % 2) * 145,
-    total: group.open + group.resolved + group.other,
-  }));
-  const byGroup = new Map(groups.map((g) => [g.key, g]));
-  const indices = new Map<string, number>();
-  const nodes: FieldNode[] = [];
-  for (const item of queue.items) {
-    const group = byGroup.get(item.workstream);
-    if (!group) continue;
-    const index = indices.get(group.key) ?? 0;
-    indices.set(group.key, index + 1);
-    const spiral = index * 2.399963229728653 + stableAngle(item.id) * 0.12;
-    const radius = 30 + Math.sqrt(index + 1) * 16;
-    nodes.push({
-      id: item.id,
-      item,
-      x: group.x + Math.cos(spiral) * radius,
-      y: group.y + Math.sin(spiral) * radius * 0.87,
-    });
-  }
-  return { groups, nodes };
-}
-
-const tones = ["text-wk-brand", "text-wk-warning", "text-wk-text-muted", "text-wk-text"] as const;
-const statusText = { open: "Open", resolved: "Resolved", other: "Other status" } as const;
-
-export function MiziziReviewField({
-  queue,
-  onInspect,
-}: {
-  queue: HeadquartersQueueV2;
-  onInspect: (id: string) => void;
-}) {
-  const projection = useMemo(() => projectMiziziReviewField(queue), [queue]);
-  const [search, setSearch] = useState("");
-  const [workstreams, setWorkstreams] = useState<readonly string[]>(() => queue.workstreams.map((x) => x.key));
-  const [status, setStatus] = useState<"all" | "open" | "resolved">("all");
-  const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1 });
-  const drag = useRef<{ clientX: number; clientY: number; x: number; y: number; dragged: boolean } | null>(null);
-  const suppressNodeClick = useRef(false);
-  const query = search.trim().toLocaleLowerCase();
-  const activeGroups = new Set(workstreams);
-  const matching = projection.nodes.filter(({ item }) => activeGroups.has(item.workstream) &&
-    (status === "all" || item.status === status) &&
-    (!query || [item.title, item.workstreamLabel, item.id, item.subjectType]
-      .some((value) => value.toLocaleLowerCase().includes(query))));
-  const allowed = new Set(matching.map((n) => n.id));
-  const groupIndex = new Map(projection.groups.map((g, index) => [g.key, index]));
-  const groupById = new Map(projection.groups.map((g) => [g.key, g]));
-  const viewWidth = WIDTH / camera.zoom;
-  const viewHeight = HEIGHT / camera.zoom;
-
-  const zoom = (factor: number) => setCamera((current) => {
-    const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, current.zoom * factor));
-    const centerX = current.x + WIDTH / (current.zoom * 2);
-    const centerY = current.y + HEIGHT / (current.zoom * 2);
-    return { zoom: next, x: centerX - WIDTH / (next * 2), y: centerY - HEIGHT / (next * 2) };
-  });
-  const fit = () => setCamera({ x: 0, y: 0, zoom: 1 });
-  const moveStart = (e: PointerEvent<SVGSVGElement>) => {
-    if (e.button !== 0) return;
-    suppressNodeClick.current = false;
-    drag.current = { clientX: e.clientX, clientY: e.clientY, x: camera.x, y: camera.y, dragged: false };
-    // Capture only once a drag starts; eager capture swallows simple node clicks.
+import { loadMiziziCaseSubjects,findMiziziSubjects,type CaseSubject } from "@/services/miziziCaseField";
+import type { HeadquartersQueueV2 } from "@/services/miziziHeadquartersBrief";
+const WIDTH=1100,HEIGHT=700;
+export function MiziziReviewField({queue,onInspect}:{queue:HeadquartersQueueV2;onInspect:(id:string)=>void}) {
+  const [all,setAll]=useState<readonly CaseSubject[]>([]);
+  const [loadState,setLoadState]=useState<"loading"|"ready"|"error">("loading");
+  const [search,setSearch]=useState("");
+  const [chosen,setChosen]=useState<string|null>(null);
+  const [zoom,setZoom]=useState(1);
+  const [origin,setOrigin]=useState({x:0,y:0});
+  const [status,setStatus]=useState<"all"|"open"|"resolved">("all");
+  const drag=useRef<{x:number;y:number;ox:number;oy:number;active:boolean}|null>(null);
+  useEffect(()=>{let alive=true;setLoadState("loading");
+    void loadMiziziCaseSubjects(queue).then(data=>{if(alive){setAll(data);setLoadState("ready");}},
+      ()=>{if(alive)setLoadState("error");});
+    return()=>{alive=false;};},[queue]);
+  const matches=useMemo(()=>findMiziziSubjects(all,search)
+    .filter(x=>status==="all"||x.status===status),[all,search,status]);
+  const selected=matches.find(x=>x.reviewId===chosen)??matches[0]??null;
+  const shiftZoom=(factor:number)=>setZoom(z=>Math.min(4,Math.max(.65,z*factor)));
+  const fit=()=>{setZoom(1);setOrigin({x:0,y:0});};
+  const onWheel=(e:WheelEvent<SVGSVGElement>)=>{
+    if(!search.trim())return;
+    e.preventDefault();shiftZoom(e.deltaY<0?1.08:1/1.08);
   };
-  const move = (e: PointerEvent<SVGSVGElement>) => {
-    const prev = drag.current;
-    if (!prev) return;
-    const bounds = e.currentTarget.getBoundingClientRect();
-    if (!bounds.width || !bounds.height) return;
-    const dx = e.clientX - prev.clientX;
-    const dy = e.clientY - prev.clientY;
-    if (Math.abs(dx) + Math.abs(dy) > 3) prev.dragged = true;
-    if (prev.dragged) {
-      if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      }
-      setCamera((current) => ({
-      ...current,
-      x: prev.x - dx * WIDTH / (bounds.width * current.zoom),
-      y: prev.y - dy * HEIGHT / (bounds.height * current.zoom),
-      }));
-    }
-  };
-  const release = (e: PointerEvent<SVGSVGElement>) => {
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-    suppressNodeClick.current = Boolean(drag.current?.dragged);
-    drag.current = null;
-  };
-
-  return (
-    <section data-wk-mizizi-field aria-label="Registry review Field"
-      className="relative min-h-[590px] h-[min(76vh,850px)] overflow-hidden border-y border-wk-border bg-wk-surface">
-      <svg className="h-full w-full cursor-grab touch-none active:cursor-grabbing"
-        role="group" aria-label={`Registry review landscape, ${matching.length} visible cases grouped by recorded workstream. This is not a map of musical credits.`}
-        viewBox={`${camera.x} ${camera.y} ${viewWidth} ${viewHeight}`}
-        preserveAspectRatio="xMidYMid meet"
-        onPointerDown={moveStart} onPointerMove={move} onPointerUp={release} onPointerCancel={release}>
-        <defs><pattern id="wk-mizizi-field-grid" width="42" height="42" patternUnits="userSpaceOnUse">
-          <path d="M42 0H0V42" fill="none" stroke="currentColor" strokeOpacity=".07" strokeWidth=".7" />
-        </pattern></defs>
-        <rect x="-2000" y="-2000" width="5400" height="5400" fill="url(#wk-mizizi-field-grid)" className="text-wk-text-muted" />
-        {projection.nodes.filter((n) => allowed.has(n.id)).map((node) => {
-          const group = groupById.get(node.item.workstream);
-          return group ? (
-            <line key={`edge-${node.id}`} x1={group.x} y1={group.y} x2={node.x} y2={node.y}
-              stroke="currentColor" strokeOpacity=".12" strokeWidth="1.1"
-              className="text-wk-text-muted" />
-          ) : null;
-        })}
-        {projection.groups.filter((g) => activeGroups.has(g.key)).map((group) => {
-          const color = tones[(groupIndex.get(group.key) ?? 0) % tones.length];
-          return (
-            <g key={group.key} className={color}>
-              <circle cx={group.x} cy={group.y} r="22" fill="currentColor" fillOpacity=".13"
-                stroke="currentColor" strokeWidth="2" />
-              <circle cx={group.x} cy={group.y} r="5.5" fill="currentColor" />
-              <text x={group.x} y={group.y - 38} textAnchor="middle" fontSize="17"
-                fontWeight="700" fill="currentColor">{group.label}</text>
-              <text x={group.x} y={group.y + 46} textAnchor="middle" fontSize="12"
-                fill="currentColor">{group.total.toLocaleString()} reviews</text>
-            </g>
-          );
-        })}
-        {projection.nodes.filter((n) => allowed.has(n.id)).map(({ id, x, y, item }) => (
-          <g key={id} className={item.status === "open" ? "text-wk-warning" :
-            item.status === "resolved" ? "text-wk-brand" : "text-wk-text-muted"}
-            role="button" tabIndex={0}
-            aria-label={`${item.title}; ${statusText[item.status]}; open evidence`}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onInspect(id);
-              }
-            }}
-            onClick={() => { if (!suppressNodeClick.current) onInspect(id); }}>
-            <title>{`${item.title} · ${statusText[item.status]} · ${item.workstreamLabel}`}</title>
-            {item.subjectType === "track" || item.subjectType === "release" ?
-              <rect x={x-4} y={y-4} width="8" height="8" fill="currentColor" stroke="currentColor" strokeWidth=".7" /> :
-              <circle cx={x} cy={y} r="4.5" fill="none" stroke="currentColor" strokeWidth="2" />}
-            <circle cx={x} cy={y} r="13" fill="transparent" stroke="none" />
-          </g>
-        ))}
-      </svg>
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-between gap-4">
-        <div className="pointer-events-auto max-h-[calc(100%-20px)] w-[min(310px,calc(100%-70px))] overflow-auto border-b border-r border-wk-border bg-wk-surface/95 px-4 py-4 backdrop-blur-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <WkIcon name="Network" size={17} className="text-wk-brand" aria-hidden="true" />
-            <h2 className="text-[18px] font-black text-wk-text">The Field</h2>
-          </div>
-          <div className="border-b border-wk-border pb-4">
-            <WkSearchField ariaLabel="Find a review, source or workstream"
-              placeholder="Find a review or source ID" value={search} onChange={setSearch}
-              inputClassName="!rounded-md" />
-            <p className="mt-2 text-[11px] tabular-nums text-wk-text-muted">
-              {matching.length.toLocaleString()} of {queue.total.toLocaleString()} reviews
-            </p>
-            {query ? (
-              <div className="mt-2 max-h-44 overflow-auto border-t border-wk-border" role="list">
-                {matching.slice(0, 8).map(({ item }) => (
-                  <button role="listitem" type="button" key={item.id} onClick={() => onInspect(item.id)}
-                    className="block w-full border-b border-wk-border py-2 text-left text-[12px] text-wk-text hover:text-wk-brand">
-                    <span className="block font-semibold">{item.title}</span>
-                    <span className="text-[11px] text-wk-text-muted">{item.subjectType} · {item.workstreamLabel}</span>
-                  </button>
-                ))}
-                {!matching.length ? <p role="status" className="py-3 text-[12px] text-wk-text-muted">No matching reviews.</p> : null}
-              </div>
-            ) : null}
-          </div>
-          <div className="border-b border-wk-border py-3" aria-label="Filter by review status">
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-wk-text-muted">Status</p>
-            <div className="flex flex-wrap gap-1.5">
-              {(["all","open","resolved"] as const).map((value) => (
-                <button key={value} type="button" aria-pressed={status === value}
-                  onClick={() => setStatus(value)}
-                  className={`border px-2.5 py-1.5 text-[12px] font-semibold ${status === value
-                    ? "border-wk-brand bg-wk-brand-soft text-wk-brand"
-                    : "border-wk-border bg-wk-surface text-wk-text-muted hover:bg-wk-surface-raised"}`}>
-                  {value === "all" ? "All" : statusText[value]}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="pt-3" aria-label="Workstream keys and filters">
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-wk-text-muted">Workstreams</p>
-            {projection.groups.map((group, i) => (
-              <button key={group.key} type="button"
-                aria-pressed={activeGroups.has(group.key)}
-                onClick={() => setWorkstreams((old) => old.includes(group.key)
-                  ? old.filter((key) => key !== group.key) : [...old, group.key])}
-                className={`flex w-full items-center gap-2 border-t border-wk-border py-2 text-left text-[12px] ${activeGroups.has(group.key)
-                  ? "text-wk-text" : "text-wk-text-muted opacity-50"}`}>
-                <span className={`h-2.5 w-2.5 shrink-0 ${tones[i % tones.length].replace("text-","bg-")}`} aria-hidden="true" />
-                <span className="min-w-0 flex-1 leading-4">{group.label}</span>
-                <span className="shrink-0 tabular-nums text-wk-text-muted">{group.total}</span>
-              </button>
-            ))}
-          </div>
+  const start=(e:PointerEvent<SVGSVGElement>)=>{if(e.button!==0)return;
+    drag.current={x:e.clientX,y:e.clientY,ox:origin.x,oy:origin.y,active:false};};
+  const move=(e:PointerEvent<SVGSVGElement>)=>{const d=drag.current;if(!d)return;
+    const r=e.currentTarget.getBoundingClientRect();if(!r.width||!r.height)return;
+    if(Math.abs(e.clientX-d.x)+Math.abs(e.clientY-d.y)>5)d.active=true;
+    if(d.active)setOrigin({x:d.ox-(e.clientX-d.x)*WIDTH/(r.width*zoom),
+      y:d.oy-(e.clientY-d.y)*HEIGHT/(r.height*zoom)});};
+  const nodes=matches.slice(0,24);
+  const center={x:WIDTH/2,y:HEIGHT/2};
+  return <section data-wk-mizizi-field aria-label="MIZIZI case universe"
+    className="relative h-[min(76vh,850px)] min-h-[580px] overflow-hidden border-y border-wk-border bg-wk-surface">
+    <svg className="h-full w-full touch-pan-y" role="group" aria-label="Real MIZIZI cases and recorded credits"
+      viewBox={`${origin.x} ${origin.y} ${WIDTH/zoom} ${HEIGHT/zoom}`}
+      onWheel={onWheel} onPointerDown={start} onPointerMove={move}
+      onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}>
+      <g className="text-wk-text-muted" stroke="currentColor" strokeOpacity=".14">
+        {nodes.map((x,i)=>{const a=i*2.39996,r=110+Math.sqrt(i)*60;
+          return <line key={x.reviewId} x1={center.x} y1={center.y}
+            x2={center.x+Math.cos(a)*r} y2={center.y+Math.sin(a)*r}/>;})}
+      </g>
+      {selected?<g><circle cx={center.x} cy={center.y} r="63" fill="currentColor" fillOpacity=".07"
+        stroke="currentColor" strokeWidth="2" className="text-wk-brand"/>
+        <text x={center.x} y={center.y-5} fontSize="18" textAnchor="middle" fontWeight="700" fill="currentColor"
+          className="text-wk-text">{selected.title.slice(0,24)}</text>
+        <text x={center.x} y={center.y+17} fontSize="12" textAnchor="middle" fill="currentColor"
+          className="text-wk-text-muted">{selected.status==="resolved"?"Resolved case":"Open case"}</text></g>:null}
+      {nodes.map((x,i)=>{const a=i*2.39996,r=110+Math.sqrt(i)*60,
+        px=center.x+Math.cos(a)*r,py=center.y+Math.sin(a)*r;
+        return <g key={x.reviewId} role="button" tabIndex={0}
+          aria-label={`${x.title}, ${x.status}, inspect case`}
+          onClick={()=>{setChosen(x.reviewId);onInspect(x.reviewId);}}
+          onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setChosen(x.reviewId);onInspect(x.reviewId);}}}>
+          <title>{x.title} · {x.status} · {x.isrc??"No recorded ISRC"}</title>
+          <circle cx={px} cy={py} r="16" strokeWidth="2" stroke="currentColor"
+            fill="currentColor" fillOpacity=".14"
+            className={x.status==="resolved"?"text-wk-brand":"text-wk-warning"}/>
+          <text x={px} y={py+29} textAnchor="middle" fontSize="11" fill="currentColor"
+            className="text-wk-text">{x.title.slice(0,26)}</text>
+        </g>;})}
+    </svg>
+    <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-between gap-3">
+      <div className="pointer-events-auto w-[min(320px,78%)] border-b border-r border-wk-border bg-wk-surface/95 p-4">
+        <h2 className="mb-3 text-[17px] font-black text-wk-text">The Field</h2>
+        <WkSearchField ariaLabel="Search real MIZIZI cases by title, artist, or ISRC"
+          placeholder="Artist, recording, ISRC…" value={search} onChange={v=>{setSearch(v);setChosen(null);fit();}}
+          inputClassName="!rounded-md"/>
+        <p className="mt-2 text-[11px] text-wk-text-muted">
+          {loadState==="loading"?"Loading verified cases…":loadState==="error"?"Cases unavailable":
+            search? `${matches.length} matching cases`:"Search to reveal connected cases"}
+        </p>
+        <div className="mt-3 flex gap-1.5" aria-label="Case state filters">
+          {(["all","open","resolved"] as const).map(v=><button key={v} type="button"
+            aria-pressed={status===v} onClick={()=>setStatus(v)}
+            className={`border-b-2 px-2 py-1.5 text-[12px] ${status===v?"border-wk-brand text-wk-text":"border-transparent text-wk-text-muted"}`}>
+            {v==="all"?"All":v==="open"?"Open":"Resolved"}</button>)}
         </div>
-        <div className="pointer-events-auto hidden shrink-0 border-b border-l border-wk-border bg-wk-surface/95 px-4 py-3 text-[11px] text-wk-text-muted backdrop-blur-sm md:block"
-          aria-label="Field visual key">
-          <div className="mb-2 flex items-center gap-2"><span className="h-2 w-2 bg-wk-brand" /> Track or release review</div>
-          <div className="mb-2 flex items-center gap-2"><span className="h-2 w-2 rounded-full border-2 border-wk-text-muted" /> Other review</div>
-          <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full border-2 border-wk-brand" /> Recorded workstream</div>
-        </div>
+        {search&&matches.length>0?<div className="mt-3 max-h-40 overflow-y-auto border-t border-wk-border">
+          {matches.slice(0,6).map(item=><button type="button" key={item.reviewId}
+            onClick={()=>{setChosen(item.reviewId);onInspect(item.reviewId);}}
+            className="block w-full border-b border-wk-border py-2 text-left text-[12px] text-wk-text hover:text-wk-brand">
+            {item.title} <span className="text-wk-text-muted">· {item.status}</span></button>)}
+        </div>:null}
       </div>
-      <div className="absolute bottom-4 left-4 max-w-[min(65%,380px)] border-l-2 border-wk-brand bg-wk-surface/90 px-3 py-2 text-[11px] leading-4 text-wk-text-muted">
-        Connected by review workstream, not by inferred artist or recording credits.
+      <div className="pointer-events-auto hidden border-b border-l border-wk-border bg-wk-surface/95 p-3 text-[11px] md:block"
+        aria-label="Case state key">
+        <p><span className="text-wk-warning">●</span> Open case</p>
+        <p className="mt-2"><span className="text-wk-brand">●</span> Resolved case</p>
       </div>
-      <WkViewportControls onZoomIn={() => zoom(1.25)} onZoomOut={() => zoom(0.8)}
-        onFit={fit} canZoomIn={camera.zoom < MAX_ZOOM} canZoomOut={camera.zoom > MIN_ZOOM} />
-    </section>
-  );
+    </div>
+    {selected?<div className="absolute bottom-4 left-4 max-w-[min(62%,390px)] border-l-2 border-wk-brand bg-wk-surface/95 p-3 text-[12px]">
+      <p className="font-bold text-wk-text">{selected.title}</p>
+      <p className="text-wk-text-muted">{selected.artists.length
+        ?selected.artists.map(a=>a.name+" ("+a.status.replaceAll("_"," ")+")").join(", ")
+        :"No artist credit in this case source"}</p>
+      <button type="button" className="mt-2 font-semibold text-wk-brand"
+        onClick={()=>onInspect(selected.reviewId)}>Inspect case →</button>
+    </div>:null}
+    <WkViewportControls onZoomIn={()=>shiftZoom(1.2)} onZoomOut={()=>shiftZoom(1/1.2)}
+      onFit={fit} canZoomIn={zoom<4} canZoomOut={zoom>.65}/>
+  </section>;
 }
