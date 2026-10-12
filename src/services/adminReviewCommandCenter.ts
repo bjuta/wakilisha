@@ -337,6 +337,9 @@ async function exactCount(table: string, filters: Record<string, string | boolea
   let query = supabase.from(table).select("*", { count: "exact", head: true });
   for (const [key, value] of Object.entries(filters)) query = query.eq(key, value);
   const { count, error } = await query;
+  // Never show a fabricated zero for the authoritative Registry review count.
+  // Legacy migration sample sources may be unavailable in some environments.
+  if (error && table === "registry_review_items") throw error;
   if (error) return 0;
   return count ?? 0;
 }
@@ -555,7 +558,7 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     loadSamples<MediaReviewRow>("registry_media_assets", "id, source_entity, source_record_id, url, source_kind, status, metadata, updated_at", "updated_at", 10),
     loadSamples<PromotionEventRow>("wk_import_promotion_events", "id, target_table, target_record_id, event_type, message, created_at", "created_at", 10),
     loadStagingSummary(),
-    loadRegistryReviewItems({ limit: 18 }),
+    loadRegistryReviewItems({ status: "open", limit: 18 }),
     loadRegistryReviewSummary(),
   ]);
 

@@ -383,7 +383,7 @@ export function MiziziEvidenceWorkbench({
     <p role="status" className="mt-2 text-[12px] text-wk-text-muted">Earlier decision evidence could not be independently verified. Consult the governed record.</p>
   ) : null}
  </div>
- <Link to={`/admin/review/queue?review=${encodeURIComponent(selected.id)}`}
+ <Link to={`/admin/review/queue?${mode === "history" || selected.status === "resolved" ? "record" : "review"}=${encodeURIComponent(selected.id)}`}
   className={`wk-button wk-button-sm mz-dossier-action ${
     mode === "history" || selected.status === "resolved" ? "wk-button-soft" : "wk-button-primary"
   }`}>
