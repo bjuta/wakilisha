@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MiziziHeadquartersBrief } from "./MiziziHeadquartersBrief";
+import "./mizizi-html.css";
 import Issue1094ExactDecisions from "./issue1094";
 import Issue1094RepairGate from "./issue1094RepairGate";
 import Issue1094Finalize from "./issue1094Finalize";
@@ -687,26 +688,31 @@ function AdminMiziziWorkspaceContent() {
   };
 
   return (
-    <div className="space-y-6" data-wk-mizizi-workspace>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Music Registry</div>
-          <h1 className="text-[26px] font-black tracking-tight text-wk-text">MIZIZI</h1>
-          <p className="mt-1 max-w-3xl text-[13px] leading-6 text-wk-text-muted">
-            Review the music Registry’s open work, decisions, and history.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => navigate("/admin/review/queue")} className="wk-button wk-button-ghost wk-button-sm">
-            <WkIcon name="GitPullRequest" size={14} />
+    <div className="mz-port" data-wk-mizizi-workspace>
+      <header className="mz-head">
+        <span className="mz-wordmark" aria-label="MIZIZI by WAKILISHA">
+          <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+            <path d="M1 6h20" stroke="#161A12" strokeWidth="2"/>
+            <path d="M11 6v5M11 11C9 13 6 14 4 19M11 11c2 2 5 3 7 8M11 11v10M7.6 14.5c-.6 1.6-.6 3.2 0 5M14.4 14.5c.6 1.6.6 3.2 0 5"
+              stroke="#557D2A" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+          </svg>
+          MIZIZI <span className="mz-small">by WAKILISHA™</span>
+        </span>
+        <span className="mz-context" title="Current internal Registry authority">Internal Registry</span>
+        <div className="mz-right">
+          <button type="button" onClick={() => navigate("/admin/review/queue")} className="mz-action">
             All Reviews
           </button>
-          {workspaceView === "decisions" ? <button type="button" onClick={() => void refresh()} disabled={loading} className="wk-button wk-button-secondary wk-button-sm">
-            <WkIcon name={loading ? "Loader2" : "RefreshCcw"} size={14} className={loading ? "animate-spin" : ""} />
-            Refresh
-          </button> : null}
+          {workspaceView === "decisions" ? (
+            <button type="button" className="mz-action" onClick={() => void refresh()} disabled={loading}>
+              Refresh
+            </button>
+          ) : null}
+          <span className="mz-readonly" title="The reference design’s simulated Writing toggle is deliberately not connected to backend authority">
+            <span style={{ color: "#84C241" }} aria-hidden="true">●</span> Review Only
+          </span>
         </div>
-      </div>
+      </header>
 
       <WkTabs
         items={[
@@ -719,9 +725,10 @@ function AdminMiziziWorkspaceContent() {
         value={workspaceView}
         onChange={setWorkspaceView}
         ariaLabel="MIZIZI workspace sections"
-        tabListClassName="border-b border-wk-border overflow-x-auto"
-        panelClassName="pt-5"
+        tabListClassName="overflow-x-auto"
+        panelClassName=""
       >
+        <div className="mz-rootband" aria-hidden="true" />
         {workspaceView === "decisions" ? (
           <div className="space-y-6">
             <WkWorkflowRail steps={WORKFLOW_STEPS} ariaLabel="MIZIZI workflow" />

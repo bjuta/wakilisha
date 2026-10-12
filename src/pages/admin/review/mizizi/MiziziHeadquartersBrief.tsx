@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
-import { WkStatusDistribution } from "@/components/data-viz/WkStatusDistribution";
 import { WkStateMark } from "@/components/data-viz/WkStateMark";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
-import { WkRankedBars } from "@/components/data-viz/WkRankedBars";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MiziziEvidenceWorkbench } from "./MiziziEvidenceWorkbench";
@@ -15,6 +13,66 @@ import {
   type HeadquartersQueueV2,
   type QueueReviewV2,
 } from "@/services/miziziHeadquartersBrief";
+
+
+/** The HTML's root-cascade illustration, drawn only from current real review rows.
+ * Decorative branching does NOT assert an overnight processing timeline. */
+function MiziziReviewRoots({ queue }: { queue: HeadquartersQueueV2 }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let raf = 0;
+    const draw = () => {
+      const box = el.getBoundingClientRect();
+      if (!box.width) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      el.width = Math.round(box.width * dpr);
+      el.height = Math.round(box.height * dpr);
+      const ctx = el.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, box.width, box.height);
+      ctx.strokeStyle = "#EFE6D8"; ctx.globalAlpha = .86;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 1); ctx.lineTo(box.width, 1); ctx.stroke();
+      const items = queue.items;
+      if (!items.length) return;
+      const hash = (s: string) => {
+        let n = 2166136261;
+        for (let i = 0; i < s.length; i++) n = Math.imul(n ^ s.charCodeAt(i), 16777619);
+        return n >>> 0;
+      };
+      items.forEach((review, i) => {
+        const seed = hash(review.id);
+        const x = box.width * ((i + .5) / items.length);
+        const height = Math.min(box.height - 6, 32 + (seed % 190));
+        const color = review.status === "resolved" ? "#84C241" :
+          review.status === "open" ? "#E5AC43" : "#B297FF";
+        ctx.strokeStyle = color; ctx.globalAlpha = .38 + (seed % 37) / 100;
+        const stem = 18 + (seed % 36);
+        ctx.lineWidth = .5 + (seed % 3) * .25;
+        ctx.beginPath(); ctx.moveTo(x, 2);
+        ctx.bezierCurveTo(x - 6, stem * .6, x + (seed % 29) - 14, stem, x + (seed % 39) - 19, height);
+        ctx.stroke();
+        const branches = 3 + (seed % 3);
+        for (let j = 1; j <= branches; j++) {
+          const y = height * j / (branches + 1);
+          const b = (j % 2 ? -1 : 1) * (9 + (seed % 12));
+          ctx.beginPath(); ctx.moveTo(x + (seed % 15) - 7, y);
+          ctx.quadraticCurveTo(x + b * .7, y + 12, x + b, Math.min(box.height - 3, y + 22));
+          ctx.stroke();
+        }
+      });
+      ctx.globalAlpha = 1;
+    };
+    const observer = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); });
+    observer.observe(el); draw();
+    return () => { observer.disconnect(); cancelAnimationFrame(raf); };
+  }, [queue]);
+  return <canvas ref={ref} id="growth" role="img"
+    aria-label={"Root illustration of " + queue.total + " current Registry reviews. Green represents resolved, ochre represents open, and purple represents other review states. No timing is inferred."}/>;
+}
 
 function ReviewPreview({ items, onInspect }: { items: readonly QueueReviewV2[]; onInspect?: (id: string) => void }) {
   if (!items.length) {
@@ -61,12 +119,12 @@ function OperatorReviewSession({
   const nextReview = sessionItems.find((item) => !skipped.includes(item.id)) ?? null;
   const finish = () => { setMinutes(null); setSkipped([]); };
   return (
-    <section aria-label="Make time for reviews" className="min-w-0">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section aria-label="Make time for reviews" className="time min-w-0">
+      <div className="time-head">
         <div>
-          <h3 className="text-[clamp(19px,2.4vw,27px)] font-black tracking-tight text-wk-text">
+          <h2>
             How long do you have?
-          </h3>
+          </h2>
           <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
             Focus on one real open review at a time. Skipping never records a decision.
           </p>
@@ -76,7 +134,7 @@ function OperatorReviewSession({
         </span>
       </div>
       {minutes === null ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="choices">
           {([
             { value: "5", title: "Five minutes", maximum: 3, description: "Start with three open reviews. Keep the session small." },
             { value: "15", title: "Fifteen minutes", maximum: 8, description: "Work through a focused set of eight open reviews." },
@@ -84,18 +142,10 @@ function OperatorReviewSession({
           ] as const).map((choice, i) => (
             <button type="button" key={choice.value} disabled={openReviews.length === 0}
               onClick={() => { setMinutes(choice.value); setSkipped([]); }}
-              className={`group flex min-h-[168px] flex-col justify-between rounded-2xl border p-5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand disabled:cursor-not-allowed disabled:opacity-40 ${
-                i === 0
-                  ? "border-wk-brand/30 bg-wk-brand-soft hover:border-wk-brand"
-                  : "border-wk-border bg-wk-surface hover:border-wk-brand/40 hover:bg-wk-surface-raised"
-              }`}>
-              <span>
-                <strong className="block text-[22px] font-black tracking-tight text-wk-text">{choice.title}</strong>
-                <span className="mt-3 block text-[13px] leading-5 text-wk-text-muted">{choice.description}</span>
-              </span>
-              <span className="mt-4 flex items-center justify-between gap-3 text-[12px] font-bold text-wk-text">
-                Start session <span className="flex items-center gap-1 text-wk-text-muted">Up to {Math.min(openReviews.length, choice.maximum)} cases <WkIcon name="ArrowRight" size={14} /></span>
-              </span>
+              className={"choice" + (i === 0 ? " primary" : "")}>
+              <span className="len">{choice.title}</span>
+              <p>{choice.description}</p>
+              <span className="go">Start <span>Up to {Math.min(openReviews.length, choice.maximum)} cases</span></span>
             </button>
           ))}
         </div>
@@ -288,89 +338,53 @@ export function MiziziHeadquartersBrief({
       ) : null}
 
       {queue && view === "brief" ? (
-        <>
-          <header className="border-b border-wk-border pb-7 pt-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-[11px] font-black uppercase tracking-wider text-wk-brand">Headquarters Brief</p>
-              <WkButton variant="ghost" className="wk-button-sm" onClick={refresh}>
-                <WkIcon name="RefreshCcw" size={14} /> Refresh
-              </WkButton>
+        <div className="mz-brief-shell">
+          <header className="night">
+            <div className="night-copy">
+              <p className="when">Current authenticated Registry review inventory · Read at <WkZonedTimestamp value={queue.readAt} /></p>
+              <h1>Across the Registry, <strong>{queue.resolved.toLocaleString()}</strong> reviews are resolved. <em>{queue.open.toLocaleString()} still need attention.</em></h1>
             </div>
-            <h2 className="mt-4 text-[clamp(26px,3.4vw,41px)] font-black tracking-tight text-wk-text">
-              The Registry at a glance
-            </h2>
-            <div className="mt-5">
-              <WkStatusDistribution
-                ariaLabel="Current Registry review states"
-                expectedTotal={queue.total}
-                segments={[
-                  { key: "open", label: "Open", count: queue.open, tone: "open" },
-                  { key: "resolved", label: "Resolved", count: queue.resolved, tone: "resolved" },
-                  ...(queue.other > 0
-                    ? [{ key: "other", label: "Other", count: queue.other, tone: "neutral" } as const]
-                    : []),
-                ]}
-              />
+            <div className="growth-box"><MiziziReviewRoots queue={queue} /></div>
+            <div className="strata">
+              <span><i style={{ background: "#84C241" }} />Resolved <b>{queue.resolved.toLocaleString()}</b></span>
+              <span><i style={{ background: "#E5AC43" }} />Open <b>{queue.open.toLocaleString()}</b></span>
+              {queue.other > 0 ? <span><i style={{ background: "#B297FF" }} />Other <b>{queue.other.toLocaleString()}</b></span> : null}
+              <span className="faint">{queue.total.toLocaleString()} recorded reviews across {queue.workstreams.length} workstreams</span>
             </div>
-            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-wk-text-muted">
-              <span><strong className="tabular-nums text-wk-text">{queue.total.toLocaleString()}</strong> recorded reviews</span>
-              <span><strong className="tabular-nums text-wk-text">{queue.workstreams.length}</strong> workstreams</span>
-              <span>Read at <WkZonedTimestamp value={queue.readAt} /></span>
-              <WkButton variant="soft" className="wk-button-sm" onClick={onShowCases}>
-                Open the Cores <WkIcon name="ArrowRight" size={14} />
-              </WkButton>
-            </div>
+            <p className="mz-info-line mt-3">Each drawn root represents an existing review. This is a snapshot, not a history of actions.</p>
           </header>
-
           <OperatorReviewSession queue={queue} onInspect={inspect} />
-
-          <div className="grid items-start gap-8 border-t border-wk-border pt-7 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.95fr)]">
+          <div className="mz-brief-columns">
             <section className="min-w-0">
+              <div className="sect-head"><h2>Worth Knowing</h2>
+                <button className="link" onClick={onShowCases}>Explore Cores</button>
+              </div>
               <Issue1094WorthKnowing revision={revision} onInspect={inspect} />
             </section>
             <section className="min-w-0">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-[16px] font-black text-wk-text">Where attention is needed</h3>
-                <span className="text-[12px] text-wk-text-muted">Open reviews</span>
+              <div className="sect-head"><h2>Open Reviews</h2>
+                <button className="link" onClick={onShowCases}>All Reviews</button>
               </div>
-              <div className="mt-4 border-y border-wk-border">
-                <WkRankedBars
-                  ariaLabel="Open reviews by workstream"
-                  total={queue.open}
-                  valueLabel="open reviews"
-                  items={queue.workstreams
-                    .filter((group) => group.open > 0)
-                    .map((group) => ({
-                      key: group.key,
-                      label: group.label,
-                      value: group.open,
-                    }))}
-                />
+              <div className="lic-mini">
+                {queue.workstreams.filter(group => group.open > 0).map(group => (
+                  <div className="row" key={group.key} style={{ gridTemplateColumns: "minmax(0,1fr) 60px" }}>
+                    <span>{group.label}</span>
+                    <span className="v">{group.open.toLocaleString()}</span>
+                  </div>
+                ))}
               </div>
-              <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
-                All claims and supporting records can be inspected without recording a decision.
-              </p>
-              <WkButton variant="ghost" className="wk-button-sm mt-3" onClick={onShowCases}>
-                Explore the evidence <WkIcon name="ArrowRight" size={13} />
-              </WkButton>
+              <p className="mt-3 text-[13px] muted">These counts come from the current Registry queue. No licence or automated action is implied.</p>
             </section>
           </div>
-
-          <section className="border-t border-wk-border pt-7">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-[16px] font-black text-wk-text">Recent work</h3>
-                <p className="mt-1 text-[12px] text-wk-text-muted">A small selection from the current Registry, not the full queue.</p>
-              </div>
-              <WkButton variant="ghost" className="wk-button-sm" onClick={onShowCases}>
-                Explore Cores <WkIcon name="ArrowRight" size={13} />
-              </WkButton>
+          <section>
+            <div className="sect-head"><h2>Recent Work</h2>
+              <button className="link" onClick={onShowCases}>Explore Cores</button>
             </div>
-            <div className="mt-3 overflow-hidden rounded-xl border border-wk-border bg-wk-surface">
+            <div style={{ borderTop: "1px solid var(--seam)" }}>
               <ReviewPreview items={queue.recentOpen.slice(0, 4)} onInspect={inspect} />
             </div>
           </section>
-        </>
+        </div>
       ) : null}
 
       {queue && view === "field" ? (

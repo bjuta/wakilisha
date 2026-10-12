@@ -34,11 +34,14 @@ describe("MIZIZI verified-case subject Field", () => {
     expect(source).toContain('.in("id",target.map(x=>x.id))');
     expect(source).toContain('"registry_track_artists"');
     expect(source).toContain('if(!q) return []');
-    expect(field).toContain("Choose a subject to explore");
-    expect(field).toContain("<WkViewportControls");
-    expect(field).toContain('projectMiziziFieldFocus(cases, selectedKey, filter)');
-    expect(field).toContain('addEventListener("wheel", onWheel, { passive: false })');
-    expect(field).not.toContain("rounded-2xl");
+    expect(field).toContain("loadMiziziCaseSubjects(queue)");
+    expect(field).toContain("searchMiziziFieldHits(cases, search, filter)");
+    expect(field).toContain("projectMiziziFieldFocus(cases, chosenKey, filter)");
+    expect(field).toContain('canvas.addEventListener("wheel", wheel, { passive: false })');
+    expect(field).toContain('onPointerDown={down} onPointerMove={move} onPointerUp={up}');
+    expect(field).toContain('if (node?.kind === "artist") centerOn(node.key)');
+    expect(field).toContain("onInspect(node.reviewId)");
+    expect(field).not.toContain("M.CLIENTS");
   });
 });
 
@@ -111,7 +114,11 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(source).toContain("<MiziziReviewField");
     expect(source).toContain("<WkButton");
     expect(source).not.toMatch(/<select\b|<dialog\b|<input\b|<textarea\b/);
-    expect(source).not.toMatch(/#84C241|#E5AC43|#170F0A|#21170F|<canvas\b|M\.CLIENTS/);
+    expect(source).toContain("<MiziziReviewRoots queue={queue} />");
+    expect(source).toContain("queue.items");
+    expect(source).toContain("queue.resolved.toLocaleString()");
+    expect(source).toContain("queue.open.toLocaleString()");
+    expect(source).not.toContain("Northline Audio");
   });
 
   it("requires a selected authorized case and never fabricates evidence or writes", () => {
@@ -130,12 +137,12 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
 describe("Shared visual data primitives — source-aligned, not decorative", () => {
   it("renders status distribution and ranked workstreams from the existing Registry queue", () => {
     const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
-    expect(source).toContain("<WkStatusDistribution");
-    expect(source).toContain("expectedTotal={queue.total}");
-    expect(source).toContain("count: queue.open");
-    expect(source).toContain("count: queue.resolved");
-    expect(source).toContain("<WkRankedBars");
-    expect(source).toContain("total={queue.open}");
+    expect(source).toContain("<MiziziReviewRoots queue={queue}");
+    expect(source).toContain("queue.items");
+    expect(source).toContain("queue.open.toLocaleString()");
+    expect(source).toContain("queue.resolved.toLocaleString()");
+    expect(source).toContain("queue.workstreams.filter(group => group.open > 0)");
+    expect(source).toContain("snapshot, not a history of actions");
   });
 
   it("fails closed on bad metric arithmetic and remains accessible without colour", () => {
@@ -256,13 +263,19 @@ describe("Headquarters complete Registry review inventory", () => {
     expect(source).toContain("<WkButton");
     expect(source).toContain("<MiziziReviewField");
     expect(field).toContain("<WkSearchField");
-    expect(field).toContain('aria-label="Case state key"');
-    expect(field).toContain("absolute inset-x-0 top-0 flex items-start justify-between");
-    expect(field).toContain("max-w-[222px] shrink-0 self-start");
+    const page = readFileSync("src/pages/admin/review/mizizi/page.tsx", "utf8");
+    const css = readFileSync("src/pages/admin/review/mizizi/mizizi-html.css", "utf8");
     expect(field).toContain("Reviewed recording or release");
-    expect(field).toContain("Archived or unknown. Not approved.");
-    expect(field).toContain('className={tone(focused.kind === "artist" ? focused.creditState');
-    expect(field).toContain("y={pt.y+45}");
+    expect(field).toContain('className="field"');
+    expect(field).toContain('id="fieldCanvas"');
+    expect(field).toContain("buildGraph(cases)");
+    expect(field).toContain("Credit links are not rights.");
+    expect(page).toContain('import "./mizizi-html.css"');
+    expect(page).toContain('className="mz-rootband"');
+    expect(css).toContain("--soil-0:#170F0A");
+    expect(css).toContain("--sand:#EFE6D8");
+    expect(css).toContain("[data-wk-mizizi-workspace] .field");
+    expect(css).not.toContain("Northline Audio");
     expect(cores).toContain("<WkSearchField");
     expect(cores).toContain('data-wk-edge-filters');
     expect(field + cores).not.toMatch(/<select\b|<input\b|<textarea\b/);
