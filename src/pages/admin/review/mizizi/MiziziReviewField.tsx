@@ -246,12 +246,16 @@ export function MiziziReviewField({
               No existing MIZIZI review matches this search.
             </p>}
         </div>
-        <div className="pointer-events-auto hidden border-b border-l border-wk-border bg-wk-surface/95 p-3 text-[11px] text-wk-text-muted md:block"
+        <div className="pointer-events-auto hidden max-w-[222px] shrink-0 self-start border-b border-l border-wk-border bg-wk-surface/95 px-3 py-3 text-[11px] leading-5 text-wk-text-muted md:block"
           aria-label="Case state key">
-          <p><span className="text-wk-warning">●</span> Open review or credit needs review</p>
-          <p className="mt-2"><span className="text-wk-brand">●</span> Resolved review or active credit</p>
-          <p className="mt-2">Archived and unknown credits remain separate.</p>
-          <p className="mt-2">Lines show recorded credit relationships only.</p>
+          <p className="font-semibold text-wk-text">Reading the Field</p>
+          <p className="mt-2">○ Artist-credit identity</p>
+          <p>□ Reviewed recording or release</p>
+          <div className="my-2 border-t border-wk-border" aria-hidden="true" />
+          <p><span className="text-wk-warning">●</span> Open / needs review</p>
+          <p><span className="text-wk-brand">●</span> Resolved / active</p>
+          <p>○ Archived or unknown — not approved</p>
+          <p className="mt-2">Lines show recorded credit links, not rights.</p>
         </div>
       </div>
       {focused && (
