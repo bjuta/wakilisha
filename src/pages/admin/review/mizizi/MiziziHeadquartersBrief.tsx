@@ -38,7 +38,16 @@ function ReviewPreview({ items, onInspect }: { items: readonly QueueReviewV2[]; 
               <WkButton variant="ghost" className="wk-button-sm" onClick={() => onInspect(item.id)}>
                 Inspect
               </WkButton>
-            )/** Focused, bounded read-only review sessions modelled on the source HTML.
+            ) : null}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+
+/** Focused, bounded read-only review sessions modelled on the source HTML.
  * No timer, synthetic evidence, unsourced choices or direct writer is created here.
  * A verified human decision is only made inside the governed Core review workflow.
  */
@@ -157,14 +166,6 @@ function OperatorReviewSession({
           )}
         </div>
       </Modal>
-    </section>
-  );
-}
-
-    </p>
-          )}
-        </div>
-      )}
     </section>
   );
 }
