@@ -67,6 +67,11 @@ describe("Flat master/detail history and evidence workspaces", () => {
     expect(shell).not.toContain("rounded-2xl");
     expect(source).toContain("<WkSplitWorkspace");
     expect(source).toContain('data-wk-edge-filters');
+    expect(source).toContain('className="cores"');
+    expect(source).toContain('className="core-pane"');
+    expect(source).toContain('className="core-body"');
+    expect(source).toContain('<RecordedLayer name="Current Value"');
+    expect(source).toContain("They are not independent evidence groups.");
     expect(source).toContain('mode === "history"');
     expect(source).toContain("outbound-delivery ledger");
     expect(source).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);

@@ -59,6 +59,21 @@ function Fact({ name, value }: { name: string; value: unknown }) {
   );
 }
 
+
+/** Each stratum is one actual Registry field, not an independent corroboration.
+ * The prototype's sourced/confirmed strata cannot be asserted without evidence. */
+function RecordedLayer({ name, value, first = false, last = false }: {
+  name: string; value: unknown; first?: boolean; last?: boolean;
+}) {
+  return (
+    <div className={"layer k-raw" + (first ? " first" : " cont") + (last ? " last" : "")}>
+      <span className="camp">{first ? "Registry" : ""}</span>
+      <span className="rock" aria-hidden="true" />
+      <span className="txt"><b>{name}</b><span>{readable(value)}</span></span>
+    </div>
+  );
+}
+
 /** Only reads a review that was already included in the authenticated Registry inventory. */
 export function MiziziEvidenceWorkbench({
   queue,
@@ -218,9 +233,9 @@ export function MiziziEvidenceWorkbench({
     if (queue.items.some((item) => item.id === id)) onSelectedIdChange(id);
   };
   return (
-    <WkSplitWorkspace data-wk-mizizi-evidence-workbench>
-      <div className="min-w-0 border-b border-wk-border lg:border-b-0 lg:border-r">
-        <div className="space-y-3 border-b border-wk-border px-4 py-5">
+    <WkSplitWorkspace data-wk-mizizi-evidence-workbench className="cores">
+      <div className="core-list">
+        <div className="top">
           <div>
             <h2 className="text-[17px] font-black text-wk-text">{mode === "history" ? "History" : "Cores"}</h2>
             <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
@@ -278,7 +293,7 @@ export function MiziziEvidenceWorkbench({
             <span className="shrink-0 text-wk-brand">Show in list</span>
           </button>
         ) : null}
-        <div role="list" aria-label="Registry claims" className="max-h-[450px] overflow-y-auto lg:max-h-[min(68vh,800px)]">
+        <div role="list" aria-label="Registry claims" className="list">
           {selection.items.length ? selection.items.map((item) => (
             <div role="listitem" key={item.id} className="border-b border-wk-border last:border-b-0">
               <button type="button" aria-current={selected?.id === item.id ? "true" : undefined}
@@ -324,7 +339,7 @@ export function MiziziEvidenceWorkbench({
             onClick={() => { setPage(Math.min(selection.totalPages, selection.currentPage + 1)); onSelectedIdChange(null); }}>Next</WkButton>
         </div>
       </div>
-      <div className="min-w-0 px-5 py-6 sm:px-8 sm:py-8">
+      <div className="core-pane">
         {!selected ? (
           <p className="text-[13px] text-wk-text-muted">Select a case to inspect its evidence.</p>
         ) : (
@@ -335,7 +350,7 @@ export function MiziziEvidenceWorkbench({
               </p>
               <CaseStatus status={selected.status} />
             </div>
-            <h3 className="mt-3 max-w-3xl text-[clamp(22px,2.6vw,31px)] font-black leading-tight tracking-tight text-wk-text">
+            <h3 className="claim">
               {recordedSubject.title}
             </h3>
             {fact && recordedSubject.specific ? (
@@ -354,23 +369,34 @@ export function MiziziEvidenceWorkbench({
               </div>
             ) : (
               <>
-                <p className="mt-3 max-w-2xl text-[14px] leading-6 text-wk-text-muted">
+                <p className="verdict">
                   {readable(fact.summary || source.ruleId || selected.title)}
                 </p>
-                <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(230px,0.9fr)]">
+                <div className="core-body">
                   <div className="min-w-0">
                     <h4 className="text-[14px] font-black text-wk-text">Recorded Evidence</h4>
                     <p className="mt-1 text-[12px] text-wk-text-muted">
                       These fields come from the existing Registry review, not an inferred conclusion.
                     </p>
-                    <dl className="mt-3 border-y border-wk-border px-1">
-                      <Fact name="Rule" value={source.ruleId} />
-                      <Fact name="Affected field" value={source.fieldName} />
-                      {recordedSubject.artistReference ? <Fact name="Recorded primary-artist reference" value={recordedSubject.artistReference} /> : null}
-                      <Fact name="Current value" value={source.currentValue} />
-                      {evidencePairs.map(([name, value]) =>
-                        <Fact key={name} name={words(name)} value={value} />)}
-                    </dl>
+                    <div className="sample">
+                      <div className="ground-cap">
+                        <span />
+                        <div className="public">What the Registry records</div>
+                        <span className="faint" style={{ fontSize: 13.5, paddingBottom: 9 }}>Not a public or independently verified claim</span>
+                      </div>
+                      <div className="layers" aria-label="Recorded Registry evidence fields">
+                        <RecordedLayer name="Rule" value={source.ruleId} first />
+                        <RecordedLayer name="Affected Field" value={source.fieldName} />
+                        {recordedSubject.artistReference ? (
+                          <RecordedLayer name="Recorded Primary-Artist Reference" value={recordedSubject.artistReference} />
+                        ) : null}
+                        <RecordedLayer name="Current Value" value={source.currentValue} last={evidencePairs.length === 0} />
+                        {evidencePairs.map(([name, value], index) =>
+                          <RecordedLayer key={name} name={words(name)} value={value}
+                            last={index === evidencePairs.length - 1} />)}
+                      </div>
+                      <p className="count-line">These are recorded fields. They are not independent evidence groups.</p>
+                    </div>
                     {peers.length > 0 ? (
                       <section className="mt-5">
                         <h5 className="text-[13px] font-bold text-wk-text">Recorded Peer Evidence</h5>
@@ -392,7 +418,7 @@ export function MiziziEvidenceWorkbench({
                       </section>
                     ) : null}
                   </div>
-                  <aside className="min-w-0 space-y-5">
+                  <aside className="side">
                     <section className="border-l-[3px] border-wk-brand bg-wk-surface-raised px-4 py-3">
                       <h4 className="text-[13px] font-black text-wk-text">Disposition</h4>
                       {exactDecision?.status === "blocked" && selected.status === "open" ? (
