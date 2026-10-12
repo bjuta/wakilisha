@@ -4,7 +4,8 @@ export function formatWkZonedTimestamp(value: string | null | undefined, zone: s
   if (!Number.isFinite(instant.getTime())) return null;
   try {
     return new Intl.DateTimeFormat("en-KE", {
-      timeZone: zone, dateStyle: "medium", timeStyle: "short", timeZoneName: "short",
+      timeZone: zone, day: "numeric", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", timeZoneName: "short",
     }).format(instant);
   } catch { return null; }
 }
