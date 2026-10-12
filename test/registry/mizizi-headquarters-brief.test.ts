@@ -216,7 +216,7 @@ describe("MIZIZI objective Registry review roots", () => {
       ...queue, items: [queue.items[0], queue.items[0], ...queue.items.slice(2)],
     })).toThrow();
     expect(() => projectMiziziReviewRootsV1({
-      ...queue, workstreams: [{ ...queue.workstreams[0], resolved: 0 }, ...queue.workstreams.slice(1)],
+      ...queue, workstreams: [{ ...queue.workstreams[0], open: queue.workstreams[0].open + 1 }, ...queue.workstreams.slice(1)],
     })).toThrow();
     expect(() => projectMiziziReviewRootsV1({
       ...queue, items: queue.items.map((item, i) => i === 0 ?
