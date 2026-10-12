@@ -59,8 +59,14 @@ describe("All Reviews: source-honest, issue-first presentation", () => {
       row("a5", { title: "Chart provisional label: Nyota — Karun" }),
       row("a6", { priority: "high" }),
     ]);
-    expect(groups).toHaveLength(6);
+    // a1 and a2 share one display bucket, but are not collapsed into one review.
+    // Different state, source table, informative title, or priority each isolates
+    // the remaining records. Five buckets still carry all six immutable IDs.
+    expect(groups).toHaveLength(5);
     expect(groups.every(group => !group.grouped)).toBe(true);
+    expect(groups.map(group => group.items.map(item => item.id))).toEqual([
+      ["a1", "a2"], ["a3"], ["a4"], ["a5"], ["a6"],
+    ]);
     expect(groups.flatMap(group => group.items.map(item => item.id))).toEqual([
       "a1", "a2", "a3", "a4", "a5", "a6",
     ]);
@@ -89,4 +95,27 @@ describe("All Reviews: source-honest, issue-first presentation", () => {
     expect(groups.map(group => group.grouped)).toEqual([false, true, false]);
     expect(groups.flatMap(group => group.items)).toHaveLength(rows.length);
   });
+
+  it("isolates equal-sized loaded groups across statuses and priorities", () => {
+    const rows = [
+      row("open-1"), row("open-2"), row("open-3"),
+      row("high-1", { priority: "high" }),
+      row("high-2", { priority: "high" }),
+      row("high-3", { priority: "high" }),
+      row("resolved-1", { status: "resolved" }),
+      row("resolved-2", { status: "resolved" }),
+      row("resolved-3", { status: "resolved" }),
+    ];
+    const groups = groupLoadedReviewRows(rows);
+    expect(groups).toHaveLength(3);
+    expect(groups.every(group => group.grouped)).toBe(true);
+    expect(groups.map(group => group.items.length)).toEqual([3, 3, 3]);
+    expect(groups.map(group => [group.items[0].status, group.items[0].priority])).toEqual([
+      ["open", "normal"], ["open", "high"], ["resolved", "normal"],
+    ]);
+    const sourceIds = groups.flatMap(group => group.items.map(item => item.id));
+    expect(sourceIds).toEqual(rows.map(item => item.id));
+    expect(new Set(sourceIds).size).toBe(rows.length);
+  });
+
 });
