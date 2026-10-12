@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkStateMark } from "@/components/data-viz/WkStateMark";
+import { WkStatusDistribution } from "@/components/data-viz/WkStatusDistribution";
+import { WkRankedBars } from "@/components/data-viz/WkRankedBars";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -33,7 +35,9 @@ function MiziziReviewRoots({ queue }: { queue: HeadquartersQueueV2 }) {
       if (!ctx) return;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, box.width, box.height);
-      ctx.strokeStyle = "#EFE6D8"; ctx.globalAlpha = .86;
+      const tokens = getComputedStyle(el);
+      const token = (name: string) => tokens.getPropertyValue(name).trim() || "currentColor";
+      ctx.strokeStyle = token("--wk-border-strong"); ctx.globalAlpha = .86;
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(0, 1); ctx.lineTo(box.width, 1); ctx.stroke();
       const items = queue.items;
@@ -47,8 +51,8 @@ function MiziziReviewRoots({ queue }: { queue: HeadquartersQueueV2 }) {
         const seed = hash(review.id);
         const x = box.width * ((i + .5) / items.length);
         const height = Math.min(box.height - 6, 32 + (seed % 190));
-        const color = review.status === "resolved" ? "#84C241" :
-          review.status === "open" ? "#E5AC43" : "#B297FF";
+        const color = review.status === "resolved" ? token("--wk-brand") :
+          review.status === "open" ? token("--wk-warning") : token("--wk-text-muted");
         ctx.strokeStyle = color; ctx.globalAlpha = .38 + (seed % 37) / 100;
         const stem = 18 + (seed % 36);
         ctx.lineWidth = .5 + (seed % 3) * .25;
@@ -68,7 +72,9 @@ function MiziziReviewRoots({ queue }: { queue: HeadquartersQueueV2 }) {
     };
     const observer = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); });
     observer.observe(el); draw();
-    return () => { observer.disconnect(); cancelAnimationFrame(raf); };
+    const theme = new MutationObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); });
+    theme.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
+    return () => { observer.disconnect(); theme.disconnect(); cancelAnimationFrame(raf); };
   }, [queue]);
   return <canvas ref={ref} id="growth" role="img"
     aria-label={"Root illustration of " + queue.total + " current Registry reviews. Green represents resolved, ochre represents open, and purple represents other review states. No timing is inferred."}/>;
@@ -345,11 +351,17 @@ export function MiziziHeadquartersBrief({
               <h1>Across the Registry, <strong>{queue.resolved.toLocaleString()}</strong> reviews are resolved. <em>{queue.open.toLocaleString()} still need attention.</em></h1>
             </div>
             <div className="growth-box"><MiziziReviewRoots queue={queue} /></div>
-            <div className="strata">
-              <span><i style={{ background: "#84C241" }} />Resolved <b>{queue.resolved.toLocaleString()}</b></span>
-              <span><i style={{ background: "#E5AC43" }} />Open <b>{queue.open.toLocaleString()}</b></span>
-              {queue.other > 0 ? <span><i style={{ background: "#B297FF" }} />Other <b>{queue.other.toLocaleString()}</b></span> : null}
-              <span className="faint">{queue.total.toLocaleString()} recorded reviews across {queue.workstreams.length} workstreams</span>
+            <div className="mt-5">
+              <WkStatusDistribution expectedTotal={queue.total}
+                ariaLabel="Current Registry review states"
+                segments={[
+                  { key: "open", label: "Open reviews", count: queue.open, tone: "open" },
+                  { key: "resolved", label: "Resolved reviews", count: queue.resolved, tone: "resolved" },
+                  ...(queue.other > 0 ? [{ key: "other", label: "Other recorded states", count: queue.other, tone: "neutral" } as const] : []),
+                ]} />
+              <p className="mt-3 text-[12px] text-wk-text-muted">
+                {queue.total.toLocaleString()} recorded reviews across {queue.workstreams.length} workstreams
+              </p>
             </div>
             <p className="mz-info-line mt-3">Each drawn root represents an existing review. This is a snapshot, not a history of actions.</p>
           </header>
@@ -357,22 +369,18 @@ export function MiziziHeadquartersBrief({
           <div className="mz-brief-columns">
             <section className="min-w-0">
               <div className="sect-head"><h2>Worth Knowing</h2>
-                <button className="link" onClick={onShowCases}>Explore Cores</button>
+                <WkButton variant="ghost" className="wk-button-sm" onClick={onShowCases}>Explore Cores</WkButton>
               </div>
               <Issue1094WorthKnowing revision={revision} onInspect={inspect} />
             </section>
             <section className="min-w-0">
               <div className="sect-head"><h2>Open Reviews</h2>
-                <button className="link" onClick={onShowCases}>All Reviews</button>
+                <WkButton variant="ghost" className="wk-button-sm" onClick={onShowCases}>All Reviews</WkButton>
               </div>
-              <div className="lic-mini">
-                {queue.workstreams.filter(group => group.open > 0).map(group => (
-                  <div className="row" key={group.key} style={{ gridTemplateColumns: "minmax(0,1fr) 60px" }}>
-                    <span>{group.label}</span>
-                    <span className="v">{group.open.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
+              <WkRankedBars ariaLabel="Open reviews by workstream"
+                items={queue.workstreams.filter(group => group.open > 0).map(group =>
+                  ({ key: group.key, label: group.label, value: group.open }))}
+                total={queue.open} valueLabel="open reviews" />
               <p className="mt-3 text-[13px] muted">These counts come from the current Registry queue. No licence or automated action is implied.</p>
             </section>
           </div>

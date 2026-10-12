@@ -691,25 +691,22 @@ function AdminMiziziWorkspaceContent() {
     <div className="mz-port" data-wk-mizizi-workspace>
       <header className="mz-head">
         <span className="mz-wordmark" aria-label="MIZIZI by WAKILISHA">
-          <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
-            <path d="M1 6h20" stroke="#161A12" strokeWidth="2"/>
-            <path d="M11 6v5M11 11C9 13 6 14 4 19M11 11c2 2 5 3 7 8M11 11v10M7.6 14.5c-.6 1.6-.6 3.2 0 5M14.4 14.5c.6 1.6.6 3.2 0 5"
-              stroke="#557D2A" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
-          </svg>
+          <WkIcon name="GitBranch" size={23} aria-hidden="true" />
           MIZIZI <span className="mz-small">by WAKILISHA™</span>
         </span>
         <span className="mz-context" title="Current internal Registry authority">Internal Registry</span>
         <div className="mz-right">
-          <button type="button" onClick={() => navigate("/admin/review/queue")} className="mz-action">
-            All Reviews
-          </button>
+          <WkButton variant="ghost" className="wk-button-sm"
+            onClick={() => navigate("/admin/review/queue")}>
+            <WkIcon name="ClipboardList" size={14} aria-hidden="true" /> All Reviews
+          </WkButton>
           {workspaceView === "decisions" ? (
-            <button type="button" className="mz-action" onClick={() => void refresh()} disabled={loading}>
-              Refresh
-            </button>
+            <WkButton variant="soft" className="wk-button-sm" onClick={() => void refresh()} disabled={loading}>
+              <WkIcon name="RefreshCcw" size={14} aria-hidden="true" /> Refresh
+            </WkButton>
           ) : null}
-          <span className="mz-readonly" title="The reference design’s simulated Writing toggle is deliberately not connected to backend authority">
-            <span style={{ color: "#84C241" }} aria-hidden="true">●</span> Review Only
+          <span className="mz-readonly" title="Investigation screens do not independently grant write permission">
+            <WkIcon name="Eye" size={14} aria-hidden="true" /> Review workspace
           </span>
         </div>
       </header>

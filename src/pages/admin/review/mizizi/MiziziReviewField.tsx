@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { WkViewportControls } from "@/components/data-viz/WkViewportControls";
+import { WkGraphLegend } from "@/components/data-viz/WkGraphLegend";
 import {
   loadMiziziCaseSubjects, searchMiziziFieldHits, projectMiziziFieldFocus,
   type CaseSubject,
@@ -15,8 +17,20 @@ type GraphNode = { key: string; kind: "artist" | "case"; x: number; y: number;
 type GraphLink = { a: string; b: string; status: CaseSubject["status"] };
 type Camera = { s: number; x: number; y: number };
 type Pointer = { x: number; y: number; sx: number; sy: number; moved: boolean };
-const COLORS = { soil: "#170F0A", sand: "#EFE6D8", faint: "#8F7F6B",
-  line: "#EFE6D8", green: "#84C241", ochre: "#E5AC43" };
+type Palette = { text: string; muted: string; brand: string; warning: string; border: string };
+function readPalette(canvas: HTMLCanvasElement): Palette {
+  const style = getComputedStyle(canvas);
+  const token = (name: string) => style.getPropertyValue(name).trim() || "currentColor";
+  return {
+    text: token("--wk-text"), muted: token("--wk-text-muted"),
+    brand: token("--wk-brand"), warning: token("--wk-warning"),
+    border: token("--wk-border-strong"),
+  };
+}
+function graphStatusColor(status: string, p: Palette): string {
+  return status === "resolved" || status === "active" ? p.brand :
+    status === "open" || status === "needs_review" ? p.warning : p.muted;
+}
 const MIN_ZOOM = .22, MAX_ZOOM = 8;
 const hash = (value: string): number => {
   let n = 2166136261;
@@ -24,8 +38,8 @@ const hash = (value: string): number => {
   return n >>> 0;
 };
 function statusColor(status: string): string {
-  return status === "resolved" || status === "active" ? COLORS.green :
-    status === "open" || status === "needs_review" ? COLORS.ochre : COLORS.faint;
+  return status === "resolved" || status === "active" ? "var(--wk-brand)" :
+    status === "open" || status === "needs_review" ? "var(--wk-warning)" : "var(--wk-text-muted)";
 }
 function statusLabel(status: string): string {
   return status === "resolved" ? "Resolved review" : status === "open" ? "Open review" :
@@ -101,6 +115,8 @@ export function MiziziReviewField({ queue, onInspect }: {
   const [hover, setHover] = useState<string | null>(null);
   const [pointerPos, setPointerPos] = useState({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const anim = useRef<number | null>(null);
+  const [themeRevision, setThemeRevision] = useState(0);
   const pointers = useRef<Map<number, Pointer>>(new Map());
   const pinch = useRef<{ span: number; s: number; x: number; y: number } | null>(null);
   const [activeStates, setActiveStates] = useState({ open: true, resolved: true });
@@ -128,6 +144,14 @@ export function MiziziReviewField({ queue, onInspect }: {
   const hovered = hover ? nodesByKey.get(hover) : undefined;
 
   useEffect(() => {
+    const update = () => setThemeRevision(x => x + 1);
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => () => { if (anim.current !== null) cancelAnimationFrame(anim.current); }, []);
+  useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
     const resize = () => {
@@ -151,6 +175,7 @@ export function MiziziReviewField({ queue, onInspect }: {
     if (!c || !viewport.width) return;
     const ctx = c.getContext("2d");
     if (!ctx) return;
+    const palette = readPalette(c);
     const dpr = c.width / viewport.width;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, viewport.width, viewport.height);
@@ -171,12 +196,13 @@ export function MiziziReviewField({ queue, onInspect }: {
         (p.x > viewport.width + 50 && q.x > viewport.width + 50) ||
         (p.y > viewport.height + 50 && q.y > viewport.height + 50)) return;
       const highlighted = focusKey === a.key || focusKey === b.key;
-      ctx.strokeStyle = highlighted ? "rgba(239,230,216,.72)" :
-        focusKey ? "rgba(239,230,216,.025)" : "rgba(239,230,216,.065)";
+      ctx.strokeStyle = palette.border;
+      ctx.globalAlpha = highlighted ? .9 : focusKey ? .11 : .38;
       ctx.beginPath(); ctx.moveTo(p.x, p.y);
       ctx.quadraticCurveTo((p.x + q.x) / 2, Math.max(p.y, q.y) + 13 * camera.s, q.x, q.y);
       ctx.stroke();
     });
+    ctx.globalAlpha = 1;
     graph.nodes.forEach(node => {
       if (!allowed(node)) return;
       const p = screen(node);
@@ -185,20 +211,20 @@ export function MiziziReviewField({ queue, onInspect }: {
       ctx.globalAlpha = focusKey && !highlighted ? .15 : 1;
       if (node.kind === "case") {
         const size = Math.max(3, Math.min(7, 3.6 * camera.s));
-        ctx.fillStyle = statusColor(node.status);
+        ctx.fillStyle = graphStatusColor(node.status, palette);
         ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
       } else {
         const size = Math.max(3, Math.min(8, 3.2 * camera.s));
         ctx.lineWidth = node.status === "needs_review" ? 1.9 : 1.15;
-        ctx.strokeStyle = COLORS.sand;
+        ctx.strokeStyle = palette.text;
         ctx.beginPath(); ctx.arc(p.x, p.y, size, 0, Math.PI * 2); ctx.stroke();
         if (node.status === "needs_review") {
-          ctx.beginPath(); ctx.strokeStyle = COLORS.ochre;
+          ctx.beginPath(); ctx.strokeStyle = palette.warning;
           ctx.arc(p.x, p.y, size + 2, 0, Math.PI * 2); ctx.stroke();
         }
       }
       if (highlighted || camera.s > 1.65 && node.kind === "artist") {
-        ctx.fillStyle = COLORS.sand; ctx.globalAlpha = 1;
+        ctx.fillStyle = palette.text; ctx.globalAlpha = 1;
         ctx.font = "600 12px Archivo, Arial, sans-serif";
         ctx.fillText(node.name.length > 32 ? node.name.slice(0, 31) + "…" : node.name,
           p.x + 11, p.y + 4);
@@ -207,10 +233,10 @@ export function MiziziReviewField({ queue, onInspect }: {
     ctx.globalAlpha = 1;
     if (hovered) {
       const p = screen(hovered);
-      ctx.beginPath(); ctx.strokeStyle = COLORS.sand; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.strokeStyle = palette.brand; ctx.lineWidth = 1.5;
       ctx.arc(p.x, p.y, 13, 0, Math.PI * 2); ctx.stroke();
     }
-  }, [graph, camera, viewport, hovered, chosenKey, nodesByKey, allowed]);
+  }, [graph, camera, viewport, hovered, chosenKey, nodesByKey, allowed, themeRevision]);
 
   const findNear = (x: number, y: number): GraphNode | null => {
     let best: GraphNode | null = null, min = 13 * 13;
@@ -222,7 +248,21 @@ export function MiziziReviewField({ queue, onInspect }: {
     }
     return best;
   };
-  const fit = () => setCamera(fitTo(graph.nodes, viewport.width, viewport.height));
+  const moveCamera = (target: Camera) => {
+    if (anim.current !== null) cancelAnimationFrame(anim.current);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setCamera(target); anim.current = null; return;
+    }
+    const start = camera, began = performance.now();
+    const frame = (now: number) => {
+      const t = Math.min(1, (now - began) / 310), ease = 1 - Math.pow(1 - t, 3);
+      setCamera({ s: start.s + (target.s - start.s) * ease,
+        x: start.x + (target.x - start.x) * ease, y: start.y + (target.y - start.y) * ease });
+      anim.current = t < 1 ? requestAnimationFrame(frame) : null;
+    };
+    anim.current = requestAnimationFrame(frame);
+  };
+  const fit = () => moveCamera(fitTo(graph.nodes, viewport.width, viewport.height));
   const zoomAt = (x: number, y: number, factor: number) =>
     setCamera(current => {
       const s = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, current.s * factor));
@@ -232,10 +272,10 @@ export function MiziziReviewField({ queue, onInspect }: {
   const centerOn = (key: string) => {
     const n = nodesByKey.get(key);
     setChosen(key); setHover(null);
-    if (n) setCamera(current => {
-      const s = Math.max(current.s, 1.55);
-      return { s, x: viewport.width * .58 - n.x * s, y: viewport.height * .51 - n.y * s };
-    });
+    if (n) {
+      const s = Math.max(camera.s, 1.55);
+      moveCamera({ s, x: viewport.width * .58 - n.x * s, y: viewport.height * .51 - n.y * s });
+    }
   };
   const localPoint = (e: PointerEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -306,7 +346,8 @@ export function MiziziReviewField({ queue, onInspect }: {
         <h2>The Field</h2>
         <p>Explore recorded credits and reviews. Lines connect exact Registry IDs. Scroll to zoom, drag to move.</p>
         <WkSearchField ariaLabel="Find a recorded artist credit, recording, release, or ISRC"
-          placeholder="Find an artist, recording, or ISRC" value={search}
+          className="wk-mizizi-search" inputClassName="h-11"
+          placeholder="Search artist, recording, or ISRC" value={search}
           onChange={value => { setSearch(value); setChosen(null); }} />
         <div className="chips" aria-label="Recorded case state filters">
           {(["open", "resolved"] as const).map(state => (
@@ -333,6 +374,22 @@ export function MiziziReviewField({ queue, onInspect }: {
               <p role="status">No recorded review matches this search.</p>}
           </div>
         )}
+        <details>
+          <summary>Browse reviews as a list</summary>
+          <div className="mz-field-access-list" role="list" aria-label="Keyboard-accessible Registry review list">
+            {cases.filter(item => (filter === "all" || item.status === filter)
+              && activeStates[item.status as keyof typeof activeStates] !== false)
+              .filter(item => !search.trim() || item.title.toLowerCase().includes(search.trim().toLowerCase()))
+              .slice(0, 20).map(item => (
+                <div role="listitem" key={item.reviewId}>
+                  <button type="button" onClick={() => onInspect(item.reviewId)}>
+                    {item.title} ({statusLabel(item.status)})
+                  </button>
+                </div>
+              ))}
+          </div>
+          <p className="mz-info-line">Search for more. This list shows at most 20 matching reviews.</p>
+        </details>
         <p role="status" className="mz-info-line">
           {load === "loading" ? "Loading current Registry credits…" :
             load === "error" ? "The current case graph could not be loaded." :
@@ -340,13 +397,21 @@ export function MiziziReviewField({ queue, onInspect }: {
                 graph.nodes.filter(n => n.kind === "artist").length + " distinct credited artist IDs"}
         </p>
       </div>
-      <div className="field-legend" aria-label="Graph key">
-        <span>Reviewed recording or release <svg width="8" height="8" aria-hidden="true"><rect width="8" height="8" fill="#EFE6D8"/></svg></span>
-        <span>Recorded artist credit <svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="none" stroke="#EFE6D8" strokeWidth="1.5"/></svg></span>
-        <span>Open review <svg width="10" height="10" aria-hidden="true"><rect width="10" height="10" fill="#E5AC43"/></svg></span>
-        <span>Resolved review <svg width="10" height="10" aria-hidden="true"><rect width="10" height="10" fill="#84C241"/></svg></span>
-        <span>Credit links are not rights.</span>
-      </div>
+      <WkGraphLegend title="Graph key" items={[
+        { id: "recording", label: "Reviewed recording or release", shape: "square" },
+        { id: "artist", label: "Recorded artist credit", shape: "ring",
+          count: graph.nodes.filter(node => node.kind === "artist").length },
+        { id: "open", label: "Open review", shape: "square", tone: "warning",
+          count: counts.open, visible: activeStates.open, toggleable: true },
+        { id: "resolved", label: "Resolved review", shape: "square", tone: "brand",
+          count: counts.resolved, visible: activeStates.resolved, toggleable: true },
+        { id: "link", label: "Recorded credit link", shape: "line",
+          count: graph.links.length },
+      ]} onToggle={id => {
+        if (id === "open" || id === "resolved") {
+          setActiveStates(current => ({ ...current, [id]: !current[id] }));
+        }
+      }} footer="Credit links are not rights. Only recorded relationships appear." />
       {hovered && (
         <div role="status" className="mz-field-tooltip" style={{
           left: Math.max(10, Math.min(pointerPos.x + 15, viewport.width - 290)),
@@ -364,11 +429,13 @@ export function MiziziReviewField({ queue, onInspect }: {
             focused.credits.length + " recorded artist credits"}</p>
         {focused.kind === "case" && <button onClick={() => onInspect(focused.record.reviewId)}>Inspect Case</button>}
       </div>}
-      <div className="zoom">
-        <button type="button" onClick={() => zoomAt(viewport.width / 2, viewport.height / 2, 1.3)} aria-label="Zoom in">+</button>
-        <button type="button" onClick={() => zoomAt(viewport.width / 2, viewport.height / 2, 1 / 1.3)} aria-label="Zoom out">−</button>
-        <button type="button" style={{ fontSize: 13, width: 44 }} onClick={() => { setChosen(null); fit(); }} aria-label="Fit to screen">Fit</button>
-      </div>
+      <WkViewportControls
+        onZoomIn={() => zoomAt(viewport.width / 2, viewport.height / 2, 1.3)}
+        onZoomOut={() => zoomAt(viewport.width / 2, viewport.height / 2, 1 / 1.3)}
+        onFit={() => { setChosen(null); fit(); }}
+        canZoomIn={graph.nodes.length > 0 && camera.s < MAX_ZOOM}
+        canZoomOut={graph.nodes.length > 0 && camera.s > MIN_ZOOM}
+      />
     </section>
   );
 }
