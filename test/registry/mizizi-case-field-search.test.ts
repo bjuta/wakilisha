@@ -55,6 +55,30 @@ describe("MIZIZI Field uses genuine source relationships and deliberate selectio
       if (focus?.kind === "artist") expect(focus.related.map(c => c.reviewId)).toEqual([desire.reviewId]);
     }
   });
+  it("counts actual same-ID Lilmaina credits across name variants", () => {
+    // Real reviewed recording Kionjo: recorded alias 'Lil Maina' shares artist ID
+    // with DESIRE's 'Lilmaina', but its display name does not match the text query.
+    const kionjo: CaseSubject = {
+      reviewId: "827b82af-1bb4-4b82-abb0-80a9f7a1c2dc",
+      sourceId: "d1890830-5e25-4c39-843e-bf5934b9dab7",
+      kind: "track", title: "Kionjo (feat. Lilmaina)",
+      isrc: "QMDA62554676", status: "open", workstream: "mizizi_data_hygiene",
+      artists: [{
+        id: "9391d458-3f8c-4f1a-a42b-1faf2eb50fd4",
+        name: "Lil Maina", slug: "lil-maina", status: "active",
+      }],
+    };
+    const inputs = [desire, kionjo];
+    const sameId = searchMiziziFieldHits(inputs, "Lilmaina")
+      .find(hit => hit.key === "artist:9391d458-3f8c-4f1a-a42b-1faf2eb50fd4");
+    expect(sameId?.linkedCases).toBe(2);
+    expect(sameId?.subtitle).toContain("2 linked reviews");
+    const selected = projectMiziziFieldFocus(inputs, sameId!.key);
+    expect(selected?.kind).toBe("artist");
+    if (selected?.kind === "artist") expect(selected.related).toHaveLength(2);
+    expect(searchMiziziFieldHits(inputs, "Lilmaina")
+      .some(hit => hit.key === "artist:6056976b-9394-4780-8fc4-21610f6d3fa9")).toBe(true);
+  });
   it("maintains the open or resolved review filter without mislabelling archived credits", () => {
     expect(searchMiziziFieldHits(fixtures, "Ficha", "open")).toHaveLength(0);
     expect(searchMiziziFieldHits(fixtures, "Ficha", "resolved")).toHaveLength(1);
