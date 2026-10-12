@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { WkIcon } from "@/components/design-system/Icon";
 import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { WkViewportControls } from "@/components/data-viz/WkViewportControls";
 import { WkGraphLegend } from "@/components/data-viz/WkGraphLegend";
@@ -203,19 +204,21 @@ export function MiziziReviewField({ queue, onInspect }: {
         (p.x > viewport.width + 50 && q.x > viewport.width + 50) ||
         (p.y > viewport.height + 50 && q.y > viewport.height + 50)) return;
       const highlighted = focusKey === a.key || focusKey === b.key;
-      ctx.strokeStyle = palette.border;
-      ctx.globalAlpha = highlighted ? .9 : focusKey ? .11 : .38;
+      ctx.strokeStyle = highlighted ? palette.brand : palette.border;
+      ctx.lineWidth = highlighted ? 1.8 : 1;
+      ctx.globalAlpha = highlighted ? .95 : focusKey ? .08 : .44;
       ctx.beginPath(); ctx.moveTo(p.x, p.y);
       ctx.quadraticCurveTo((p.x + q.x) / 2, Math.max(p.y, q.y) + 13 * camera.s, q.x, q.y);
       ctx.stroke();
     });
     ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
     graph.nodes.forEach(node => {
       if (!allowed(node)) return;
       const p = screen(node);
       if (p.x < -80 || p.x > viewport.width + 80 || p.y < -80 || p.y > viewport.height + 80) return;
       const highlighted = node.key === focusKey || focusLinks.has(node.key);
-      ctx.globalAlpha = focusKey && !highlighted ? .15 : 1;
+      ctx.globalAlpha = focusKey && !highlighted ? .32 : 1;
       if (node.kind === "case") {
         const size = Math.max(3, Math.min(7, 3.6 * camera.s));
         ctx.fillStyle = graphStatusColor(node.status, palette);
@@ -492,8 +495,17 @@ export function MiziziReviewField({ queue, onInspect }: {
                 {focused.credits.map(credit => (
                   <div role="listitem" key={credit.id}>
                     <button type="button" className="mz-field-artifact-trigger"
+                      aria-label={"Explore artist credit " + credit.name}
                       onClick={() => centerOn("artist:" + credit.id)}>
-                      {credit.name} <span className="ml-auto text-[11px] text-wk-text-muted">{credit.status}</span>
+                      <span className="min-w-0 flex-1">
+                        <strong className="block break-words text-[13px] font-semibold text-wk-text">{credit.name}</strong>
+                        <span className="block text-[11px] text-wk-text-muted">
+                          Artist credit · {credit.status}
+                        </span>
+                      </span>
+                      <span className="mz-field-artifact-arrow" aria-hidden="true">
+                        <WkIcon name="ChevronRight" size={17} />
+                      </span>
                     </button>
                   </div>
                 ))}

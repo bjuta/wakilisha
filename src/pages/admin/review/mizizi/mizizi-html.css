@@ -616,3 +616,49 @@
   [data-wk-mizizi-workspace] .mz-root-subjects{padding:0 10px 10px}
   [data-wk-mizizi-workspace] .mz-root-subject-title{flex-wrap:wrap}
 }
+
+/* Acceptance correction: credits are navigable records, not passive metadata. */
+[data-wk-mizizi-workspace] .mz-field-artifacts [role="listitem"]{
+  min-width:0;
+}
+[data-wk-mizizi-workspace] .mz-field-artifact-arrow{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;flex:none;
+  border:1px solid var(--wk-border);border-radius:8px;
+  background:var(--wk-surface);color:var(--wk-text-muted);
+}
+[data-wk-mizizi-workspace] .mz-field-artifact-trigger:hover .mz-field-artifact-arrow,
+[data-wk-mizizi-workspace] .mz-field-artifact-trigger:focus-visible .mz-field-artifact-arrow{
+  border-color:var(--wk-brand);color:var(--wk-brand);
+}
+/* Review marks carry both a visible 10px status mark and a usable pointer target. */
+[data-wk-mizizi-workspace] .mz-root-leaves button.mz-root-leaf{
+  position:relative;min-width:28px;min-height:28px;
+  width:28px;height:28px;
+  padding:0;border:0;border-radius:6px;
+  background:transparent;transform:none;
+}
+[data-wk-mizizi-workspace] .mz-root-leaves button.mz-root-leaf::before{
+  content:"";position:absolute;left:9px;top:9px;
+  width:10px;height:10px;border:1px solid currentColor;
+  border-radius:2px;background:currentColor;
+}
+[data-wk-mizizi-workspace] .mz-root-leaves button.mz-root-leaf-resolved::before{
+  border-radius:50%;
+}
+[data-wk-mizizi-workspace] .mz-root-leaves button.mz-root-leaf-other::before{
+  background:transparent;transform:rotate(45deg);
+}
+[data-wk-mizizi-workspace] .mz-root-leaves button.mz-root-leaf:hover,
+[data-wk-mizizi-workspace] .mz-root-leaves button.mz-root-leaf[aria-pressed="true"]{
+  transform:none;outline:2px solid var(--wk-text);
+  outline-offset:0;
+}
+@media(pointer:coarse){
+  [data-wk-mizizi-workspace] .mz-root-leaves button.mz-root-leaf{
+    width:34px;height:34px;min-width:34px;min-height:34px;
+  }
+  [data-wk-mizizi-workspace] .mz-root-leaves button.mz-root-leaf::before{
+    left:12px;top:12px;
+  }
+}

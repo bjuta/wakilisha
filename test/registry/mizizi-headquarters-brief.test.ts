@@ -48,6 +48,9 @@ describe("MIZIZI verified-case subject Field", () => {
     expect(field).toContain("credit.id === focused.artistId");
     expect(field).toContain('onInspect(record.reviewId)');
     expect(field).toContain('centerOn("artist:" + credit.id)');
+    expect(field).toContain('aria-label={"Explore artist credit " + credit.name}');
+    expect(field).toContain('className="mz-field-artifact-arrow"');
+    expect(field).toContain('ctx.lineWidth = highlighted ? 1.8 : 1');
     expect(field).not.toContain("M.CLIENTS");
   });
 });
@@ -149,6 +152,11 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(source).toContain("Current evidence is unavailable or changed");
     expect(source).toContain("No new decision will be made here");
     expect(source).toContain("Open Governed Review");
+    expect(source).toContain("View Governed Record");
+    expect(source).toContain('mode === "history" || selected.status === "resolved"');
+    expect(source).toContain("Related Source Records");
+    expect(source).toContain("does not establish independent corroboration.");
+    expect(source).not.toContain("Recorded Peer Evidence");
     expect(source).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);
     expect(source).not.toMatch(/#84C241|#E5AC43|#170F0A|M\.CLIENTS/);
   });
@@ -189,6 +197,9 @@ describe("Shared visual data primitives — source-aligned, not decorative", () 
     expect(rootsUi).toContain("snapshot, not a history of actions");
     const css = readFileSync("src/pages/admin/review/mizizi/mizizi-html.css", "utf8");
     expect(css).toContain(".mz-roots-tree");
+    expect(css).toContain(".mz-root-leaves button.mz-root-leaf::before");
+    expect(css).toContain("@media(pointer:coarse)");
+    expect(css).toContain(".mz-field-artifact-arrow");
     expect(css).toContain(".mz-dossier-standing");
     expect(css).toContain(".mz-dossier-facts");
     expect(css).toContain(".mz-dossier-timeline");

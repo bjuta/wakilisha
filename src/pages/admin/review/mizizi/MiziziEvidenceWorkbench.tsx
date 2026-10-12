@@ -384,8 +384,11 @@ export function MiziziEvidenceWorkbench({
   ) : null}
  </div>
  <Link to={`/admin/review/queue?review=${encodeURIComponent(selected.id)}`}
-  className="wk-button wk-button-primary wk-button-sm mz-dossier-action">
-  Open Governed Review <WkIcon name="ArrowUpRight" size={15} />
+  className={`wk-button wk-button-sm mz-dossier-action ${
+    mode === "history" || selected.status === "resolved" ? "wk-button-soft" : "wk-button-primary"
+  }`}>
+  {mode === "history" || selected.status === "resolved" ? "View Governed Record" : "Open Governed Review"}
+  <WkIcon name="ArrowUpRight" size={15} />
 </Link>
 </section>
                 {mode === "history" ? (
@@ -444,8 +447,9 @@ export function MiziziEvidenceWorkbench({
   {evidencePairs.map(([name, value]) => <RecordedFact key={name} name={words(name)} value={value} />)}
 </dl>
                       {peers.length > 0 ? (
-  <section className="mz-dossier-peers" aria-label="Recorded peer evidence">
-    <h5>Recorded Peer Evidence</h5>
+  <section className="mz-dossier-peers" aria-label="Related source records">
+    <h5>Related Source Records</h5>
+    <p className="mt-1 text-[12px] text-wk-text-muted">Recorded alongside this review. This list does not establish independent corroboration.</p>
     <div className="mz-dossier-peer-grid">
       {peers.map((raw,i) => {
         const peer = asRecord(raw);
