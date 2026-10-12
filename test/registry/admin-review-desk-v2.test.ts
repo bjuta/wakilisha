@@ -51,6 +51,11 @@ describe("All Reviews v2: governed review desk", () => {
     expect(page).toContain('id={"review-preview-" + row.id}');
     expect(page).toContain("Review Evidence and Decide");
     expect(page).toContain("groupLoadedReviewRows(rows)");
+    expect(page).toContain("singleReleaseIdentityIssue(row)");
+    expect(page).toContain("groupableReviewIssue(row)");
+    expect(page).toContain("Current Release Slug");
+    expect(page).toContain("Proposed Release Slug");
+    expect(page).toContain("Recorded Issue Title");
     expect(page).toContain("data-wk-review-issue-group={group.key}");
     expect(page).toContain("Each item below is a separate Registry review.");
     expect(page).toContain("group.items.slice(0, visibleIssueItems[group.key] ?? 6)");

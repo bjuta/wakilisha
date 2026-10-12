@@ -9,7 +9,26 @@ export function genericChartIssue(item: RegistryReviewItemRow): boolean {
     .test(item.title?.trim() ?? "") && Boolean(item.source_table);
 }
 
+/**
+ * The specific, source-governed Single Release review template. A shared title
+ * alone is not enough. Revisions, entity kinds and unrelated MIZIZI cases must
+ * remain separate even if their public headings look similar.
+ */
+export function singleReleaseIdentityIssue(item: RegistryReviewItemRow): boolean {
+  return item.review_type === "mizizi_data_hygiene"
+    && item.entity_type === "release"
+    && item.source_table === "registry_releases"
+    && item.source_payload?.ruleId === "release_single_identity_conflict"
+    && item.source_payload?.ruleVersion === "1.4.0"
+    && item.title?.trim() === "MIZIZI found a Single public-identity conflict";
+}
+
+export function groupableReviewIssue(item: RegistryReviewItemRow): boolean {
+  return genericChartIssue(item) || singleReleaseIdentityIssue(item);
+}
+
 export function chartIssueHeading(item: RegistryReviewItemRow): string {
+  if (singleReleaseIdentityIssue(item)) return "Single Releases With Identity Conflicts";
   switch (item.source_table) {
     case "wkcharts_track_label_missing_reference_queue":
       return "Chart tracks missing label references";
@@ -25,6 +44,16 @@ export function chartIssueHeading(item: RegistryReviewItemRow): string {
 }
 
 export function sourceDisplay(item: RegistryReviewItemRow): string {
+  if (singleReleaseIdentityIssue(item)) {
+    const source = item.source_payload ?? {};
+    const candidate = source.programmeCandidate;
+    const programme = candidate && typeof candidate === "object" && !Array.isArray(candidate)
+      ? candidate as Record<string, unknown> : {};
+    const slug = [programme.current_release_slug, source.currentValue]
+      .find(value => typeof value === "string" && value.trim());
+    if (typeof slug === "string") return "Current release slug: " + slug.trim();
+    return "Release ID: " + (item.source_id?.trim() || item.id);
+  }
   const raw = item.candidate_payload?.evidence;
   const evidence = raw && typeof raw === "object" && !Array.isArray(raw)
     ? raw as Record<string, unknown> : {};
@@ -48,8 +77,12 @@ export type LoadedReviewGroup = {
 /** Never remove, merge or reinterpret source IDs when grouping identical labels. */
 export function groupLoadedReviewRows(rows: readonly RegistryReviewItemRow[]): LoadedReviewGroup[] {
   const bucket = new Map<string, RegistryReviewItemRow[]>();
-  const keyFor = (row: RegistryReviewItemRow) => genericChartIssue(row)
-    ? ["issue", row.review_type, row.source_table, row.title, row.status, row.priority].join("::")
+  const keyFor = (row: RegistryReviewItemRow) => groupableReviewIssue(row)
+    ? [
+        "issue", row.review_type, row.entity_type, row.source_table,
+        row.source_payload?.ruleId ?? "", row.source_payload?.ruleVersion ?? "",
+        row.title, row.status, row.priority,
+      ].join("::")
     : "review::" + row.id;
   for (const row of rows) {
     const key = keyFor(row);
@@ -64,7 +97,7 @@ export function groupLoadedReviewRows(rows: readonly RegistryReviewItemRow[]): L
     if (seen.has(key)) continue;
     seen.add(key);
     const items = bucket.get(key) ?? [row];
-    result.push({ key, items, grouped: genericChartIssue(row) && items.length >= 3 });
+    result.push({ key, items, grouped: groupableReviewIssue(row) && items.length >= 3 });
   }
   return result;
 }

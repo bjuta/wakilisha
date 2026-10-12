@@ -3,7 +3,9 @@ import type { RegistryReviewItemRow } from "@/services/adminReviewCommandCenter"
 import {
   chartIssueHeading,
   genericChartIssue,
+  groupableReviewIssue,
   groupLoadedReviewRows,
+  singleReleaseIdentityIssue,
   sourceDisplay,
 } from "@/pages/admin/review/queue/reviewDeskPresentation";
 
@@ -119,3 +121,91 @@ describe("All Reviews: source-honest, issue-first presentation", () => {
   });
 
 });
+
+function singleReleaseReview(id: string, changes: Partial<RegistryReviewItemRow> = {}): RegistryReviewItemRow {
+  return row(id, {
+    entity_type: "release",
+    entity_id: id,
+    review_type: "mizizi_data_hygiene",
+    priority: "high",
+    title: "MIZIZI found a Single public-identity conflict",
+    summary: "This one-track Release cannot automatically converge to its canonical Track presentation because current Registry or Community identity evidence conflicts.",
+    source_table: "registry_releases",
+    source_id: id,
+    source_payload: {
+      agent: "mizizi",
+      ruleId: "release_single_identity_conflict",
+      ruleVersion: "1.4.0",
+      currentValue: "current-release-" + id,
+      programmeCandidate: {
+        release_id: id,
+        current_release_slug: "current-release-" + id,
+        proposed_release_slug: "proposed-release-" + id,
+      },
+    },
+    candidate_payload: {
+      proposedValue: "proposed-release-" + id,
+      disposition: "review",
+    },
+    ...changes,
+  });
+}
+
+describe("MIZIZI Single identity issue-first display", () => {
+  it("presents an exact recorded issue template as a summary with separate source identities", () => {
+    const reviews = ["release-a", "release-b", "release-c", "release-d"]
+      .map(id => singleReleaseReview(id));
+    const groups = groupLoadedReviewRows(reviews);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].grouped).toBe(true);
+    expect(groups[0].items.map(item => item.id)).toEqual(reviews.map(item => item.id));
+    expect(chartIssueHeading(reviews[0])).toBe("Single Releases With Identity Conflicts");
+    expect(sourceDisplay(reviews[0])).toBe("Current release slug: current-release-release-a");
+    expect(sourceDisplay(reviews[1])).toBe("Current release slug: current-release-release-b");
+    expect(new Set(groups[0].items.map(item => item.source_id)).size).toBe(4);
+  });
+
+  it("never conflates a changed rule/version, priority, status, entity or source table", () => {
+    const reviews = [
+      singleReleaseReview("a"),
+      singleReleaseReview("b"),
+      singleReleaseReview("different-version", {
+        source_payload: { ruleId: "release_single_identity_conflict", ruleVersion: "2.0.0" },
+      }),
+      singleReleaseReview("different-rule", {
+        source_payload: { ruleId: "release_identity_name_conflict", ruleVersion: "1.4.0" },
+      }),
+      singleReleaseReview("other-priority", { priority: "normal" }),
+      singleReleaseReview("resolved", { status: "resolved" }),
+      singleReleaseReview("track", { entity_type: "track" }),
+      singleReleaseReview("other-table", { source_table: "registry_tracks" }),
+      singleReleaseReview("informative-title", { title: "Actual Single review title" }),
+    ];
+    const groups = groupLoadedReviewRows(reviews);
+    expect(groups).toHaveLength(8);
+    expect(groups.every(group => !group.grouped)).toBe(true);
+    expect(groups[0].items.map(item => item.id)).toEqual(["a", "b"]);
+    expect(groups.flatMap(group => group.items.map(item => item.id))).toEqual(
+      reviews.map(item => item.id)
+    );
+    expect(singleReleaseIdentityIssue(reviews[2])).toBe(false);
+    expect(singleReleaseIdentityIssue(reviews[3])).toBe(false);
+    expect(singleReleaseIdentityIssue(reviews[6])).toBe(false);
+    expect(singleReleaseIdentityIssue(reviews[8])).toBe(false);
+    expect(groupableReviewIssue(reviews[0])).toBe(true);
+  });
+
+  it("does not turn a proposed slug into a current slug when source evidence is absent", () => {
+    const unresolved = singleReleaseReview("source-123", {
+      source_payload: {
+        ruleId: "release_single_identity_conflict",
+        ruleVersion: "1.4.0",
+        currentValue: "",
+        programmeCandidate: { proposed_release_slug: "not-approved" },
+      },
+    });
+    expect(singleReleaseIdentityIssue(unresolved)).toBe(true);
+    expect(sourceDisplay(unresolved)).toBe("Release ID: source-123");
+  });
+});
+

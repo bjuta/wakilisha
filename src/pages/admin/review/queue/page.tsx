@@ -29,6 +29,8 @@ import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import {
   chartIssueHeading,
   genericChartIssue,
+  groupableReviewIssue,
+  singleReleaseIdentityIssue,
   groupLoadedReviewRows,
   sourceDisplay,
 } from "./reviewDeskPresentation";
@@ -837,8 +839,8 @@ function RegistryReviewRow({ row, expanded, onToggle, onOpen, onRead, compact = 
   const artistText = candidateString(row, "artistText");
   const artistSlug = candidateString(row, "artistSlug");
   const open = row.status === "open";
-  const reviewedTitle = genericChartIssue(row)
-    ? "Chart source · " + sourceDisplay(row)
+  const reviewedTitle = singleReleaseIdentityIssue(row) || genericChartIssue(row)
+    ? sourceDisplay(row)
     : row.title?.trim() || row.review_key || row.id;
   const recordedSource = [row.source_table, row.source_id || row.entity_id].filter(Boolean).join(" / ");
   return <article className={"wk-review-record" + (compact ? " is-issue-child" : "")}
@@ -884,8 +886,18 @@ function RegistryReviewRow({ row, expanded, onToggle, onOpen, onRead, compact = 
           <div><dt>Review Status</dt><dd>{humanize(row.status || "Unknown")}</dd></div>
           <div><dt>Review Reference</dt><dd className="break-all font-mono">{row.id}</dd></div>
           {recordedSource ? <div><dt>Source Reference</dt><dd className="break-all">{recordedSource}</dd></div> : null}
-          {genericChartIssue(row) ? (
-            <div><dt>Source Issue Template</dt><dd>{row.title}</dd></div>
+          {singleReleaseIdentityIssue(row) ? (
+            <>
+              {typeof row.source_payload?.currentValue === "string" && row.source_payload.currentValue.trim() ? (
+                <div><dt>Current Release Slug</dt><dd className="break-all">{row.source_payload.currentValue}</dd></div>
+              ) : null}
+              {typeof row.candidate_payload?.proposedValue === "string" && row.candidate_payload.proposedValue.trim() ? (
+                <div><dt>Proposed Release Slug</dt><dd className="break-all">{row.candidate_payload.proposedValue}</dd></div>
+              ) : null}
+            </>
+          ) : null}
+          {groupableReviewIssue(row) ? (
+            <div><dt>Recorded Issue Title</dt><dd>{row.title}</dd></div>
           ) : null}
         </dl>
       </div>
