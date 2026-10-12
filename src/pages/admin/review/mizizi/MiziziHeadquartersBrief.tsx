@@ -6,6 +6,7 @@ import { WkStatusDistribution } from "@/components/data-viz/WkStatusDistribution
 import { WkRankedBars } from "@/components/data-viz/WkRankedBars";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import { WkButton } from "@/components/design-system/primitives/Button";
+import { Modal } from "@/components/design-system/primitives/Modal";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MiziziEvidenceWorkbench } from "./MiziziEvidenceWorkbench";
 import { MiziziReviewField } from "./MiziziReviewField";
@@ -37,90 +38,130 @@ function ReviewPreview({ items, onInspect }: { items: readonly QueueReviewV2[]; 
               <WkButton variant="ghost" className="wk-button-sm" onClick={() => onInspect(item.id)}>
                 Inspect
               </WkButton>
-            ) : null}
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-
-/** One-review-at-a-time work session over the existing authorized review snapshot.
- * Skipping is local to the session; decisions remain exclusively in Registry authority.
- */
-/** HTML-inspired three entry points, backed only by the current authenticated queue.
- * A session is a local reading aid, not a clock, approval or decision ledger.
+            )/** Focused, bounded read-only review sessions modelled on the source HTML.
+ * No timer, synthetic evidence, unsourced choices or direct writer is created here.
+ * A verified human decision is only made inside the governed Core review workflow.
  */
 function OperatorReviewSession({
   queue, onInspect,
 }: { queue: HeadquartersQueueV2; onInspect: (id: string) => void }) {
   const [minutes, setMinutes] = useState<"5" | "15" | "60" | null>(null);
+  const [step, setStep] = useState(0);
   const [skipped, setSkipped] = useState<readonly string[]>([]);
-  const openReviews = queue.items.filter((item) => item.status === "open");
-  const cap = minutes === "5" ? 3 : minutes === "15" ? 8 : 24;
-  const sessionItems = openReviews.slice(0, cap);
-  const nextReview = sessionItems.find((item) => !skipped.includes(item.id)) ?? null;
-  const finish = () => { setMinutes(null); setSkipped([]); };
+  const openReviews = useMemo(() => queue.items.filter(item => item.status === "open"), [queue]);
+  const limit = minutes === "5" ? 3 : minutes === "15" ? 8 : 24;
+  const sessionItems = openReviews.slice(0, limit);
+  const current = sessionItems[Math.min(step, sessionItems.length - 1)] ?? null;
+  const finish = () => { setMinutes(null); setStep(0); setSkipped([]); };
+  const start = (duration: "5" | "15" | "60") => {
+    setMinutes(duration); setStep(0); setSkipped([]);
+  };
+  const inspect = () => {
+    if (!current || !queue.items.some(item => item.id === current.id && item.status === "open")) return;
+    const id = current.id;
+    finish();
+    onInspect(id);
+  };
+
   return (
     <section aria-label="Make time for reviews" className="time min-w-0">
       <div className="time-head">
         <div>
-          <h2>
-            How long do you have?
-          </h2>
+          <h2>How long do you have?</h2>
           <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-            Focus on one real open review at a time. Skipping never records a decision.
+            Choose a focused set of real open reviews. Any decision is made later in Cores.
           </p>
         </div>
         <span className="text-[12px] tabular-nums text-wk-text-muted">
           {openReviews.length.toLocaleString()} open reviews
         </span>
       </div>
-      {minutes === null ? (
-        <div className="choices">
-          {([
-            { value: "5", title: "Five minutes", maximum: 3, description: "Start with three open reviews. Keep the session small." },
-            { value: "15", title: "Fifteen minutes", maximum: 8, description: "Work through a focused set of eight open reviews." },
-            { value: "60", title: "An hour", maximum: 24, description: "Inspect up to 24 reviews at your own pace." },
-          ] as const).map((choice, i) => (
-            <button type="button" key={choice.value} disabled={openReviews.length === 0}
-              onClick={() => { setMinutes(choice.value); setSkipped([]); }}
-              className={"choice" + (i === 0 ? " primary" : "")}>
-              <span className="len">{choice.title}</span>
-              <p>{choice.description}</p>
-              <span className="go">Start <span>Up to {Math.min(openReviews.length, choice.maximum)} cases</span></span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="mt-4 rounded-2xl border border-wk-border bg-wk-surface p-5" data-wk-mizizi-session>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[12px] font-bold text-wk-brand">{minutes}-minute review session</p>
-            <WkButton variant="ghost" className="wk-button-sm" onClick={finish}>Done for Now</WkButton>
-          </div>
-          <p className="mt-1 text-[12px] text-wk-text-muted">
-            {skipped.length} skipped · Up to {sessionItems.length} in this session · No changes saved
-          </p>
-          {nextReview ? (
-            <div className="mt-5">
-              <p className="text-[11px] font-semibold text-wk-text-muted">{nextReview.workstreamLabel}</p>
-              <h4 className="mt-2 text-[20px] font-black tracking-tight text-wk-text">{nextReview.title}</h4>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <WkButton className="wk-button-sm" onClick={() => onInspect(nextReview.id)}>
-                  Open its Core <WkIcon name="ArrowRight" size={14} />
-                </WkButton>
-                <WkButton variant="ghost" className="wk-button-sm"
-                  onClick={() => setSkipped((current) =>
-                    current.includes(nextReview.id) ? current : [...current, nextReview.id])}>
-                  Skip for Now
-                </WkButton>
-              </div>
-            </div>
-          ) : (
-            <p role="status" className="mt-5 text-[13px] text-wk-text">
-              That is everything in this session. The Registry reviews remain unchanged.
+      <div className="choices">
+        {([
+          { value: "5", title: "Five minutes", maximum: 3, description: "Three questions to inspect, at your own pace." },
+          { value: "15", title: "Fifteen minutes", maximum: 8, description: "Eight reviews in a focused session." },
+          { value: "60", title: "An hour", maximum: 24, description: "Up to 24 reviews for a deeper pass." },
+        ] as const).map((choice, i) => (
+          <button type="button" key={choice.value} disabled={openReviews.length === 0}
+            onClick={() => start(choice.value)}
+            className={"choice" + (i === 0 ? " primary" : "")}>
+            <span className="len">{choice.title}</span>
+            <p>{choice.description}</p>
+            <span className="go">Start <span>Up to {Math.min(openReviews.length, choice.maximum)} reviews</span></span>
+          </button>
+        ))}
+      </div>
+      <Modal open={minutes !== null} onClose={finish} showClose={false} title="Review session"
+        maxWidth="5xl" panelClassName="mz-session-modal" bodyClassName="mz-session-body"
+        footer={minutes !== null ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[12px] text-wk-text-muted">
+              {skipped.length} skipped in this session. No decisions recorded.
             </p>
+            <div className="flex flex-wrap gap-2">
+              <WkButton variant="ghost" className="wk-button-sm"
+                disabled={step === 0} onClick={() => setStep(value => Math.max(0, value - 1))}>Previous</WkButton>
+              <WkButton variant="soft" className="wk-button-sm"
+                disabled={step + 1 >= sessionItems.length}
+                onClick={() => setStep(value => Math.min(sessionItems.length - 1, value + 1))}>Next</WkButton>
+            </div>
+          </div>
+        ) : null}>
+        <div data-wk-mizizi-session aria-label="Focused review session">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <WkButton variant="ghost" className="wk-button-sm" onClick={finish}>
+              Done for Now <span aria-hidden="true">×</span>
+            </WkButton>
+            <span className="text-[12px] tabular-nums text-wk-text-muted">
+              {minutes}-minute selection · {current ? step + 1 : 0} of {sessionItems.length}
+            </span>
+          </div>
+          <div className="mz-session-progress" aria-label="Review session progress">
+            {sessionItems.map((item, index) => (
+              <span key={item.id} className={index === step ? "is-current" :
+                index < step ? "is-seen" : ""} />
+            ))}
+          </div>
+          {current ? (
+            <article className="mz-session-question" key={current.id}>
+              <p className="text-[12px] text-wk-brand">{current.workstreamLabel}</p>
+              <h3 className="mt-3 break-words text-[clamp(24px,3.6vw,38px)] font-bold leading-tight text-wk-text">
+                {current.title}
+              </h3>
+              <p className="mt-3 max-w-[64ch] text-[14px] leading-6 text-wk-text-muted">
+                Inspect the recorded issue and its evidence before choosing an outcome.
+                MIZIZI has not made a decision for you.
+              </p>
+              <div className="mz-session-facts">
+                <div><span>Subject</span><strong>{current.subjectType}</strong></div>
+                <div><span>Recorded status</span><strong>{current.sourceStatus}</strong></div>
+                <div><span>Workstream</span><strong>{current.workstreamLabel}</strong></div>
+                <div><span>Review reference</span><strong className="break-all font-mono text-[12px]">{current.id}</strong></div>
+              </div>
+              <p className="mt-4 text-[12px] text-wk-text-muted">
+                A reviewed source, comparison, or decision choice appears only when its authoritative Core evidence is available.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <WkButton onClick={inspect}>Inspect evidence in Cores <WkIcon name="ArrowRight" size={14}/></WkButton>
+                <WkButton variant="ghost" disabled={step + 1 >= sessionItems.length}
+                  onClick={() => {
+                    setSkipped(ids => ids.includes(current.id) ? ids : [...ids, current.id]);
+                    setStep(value => Math.min(value + 1, sessionItems.length - 1));
+                  }}>Skip for Now</WkButton>
+              </div>
+            </article>
+          ) : (
+            <p role="status" className="py-10 text-[13px] text-wk-text-muted">
+              No open review is available for this session.
+            </p>
+          )}
+        </div>
+      </Modal>
+    </section>
+  );
+}
+
+    </p>
           )}
         </div>
       )}

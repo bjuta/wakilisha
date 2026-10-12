@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkStateMark } from "@/components/data-viz/WkStateMark";
+import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import type { HeadquartersQueueV2, QueueReviewV2 } from "@/services/miziziHeadquartersBrief";
 import { projectMiziziReviewRootsV1 } from "@/services/miziziReviewRoots";
 
@@ -17,6 +18,9 @@ export function MiziziReviewRoots({ queue, onInspect }: {
     catch { return null; }
   }, [queue]);
   const [selection, setSelection] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(8);
   if (!roots) {
     return <p role="alert" className="rounded-xl border border-wk-border p-5 text-[13px] text-wk-danger">
       The Registry review relationships could not be reconciled. No roots are shown.
@@ -28,6 +32,19 @@ export function MiziziReviewRoots({ queue, onInspect }: {
     </div>;
   }
   const chosen = roots.workstreams.find(group => group.key === selection) ?? roots.workstreams[0];
+  const matchingReviews = selectedSubject ?
+    chosen.reviews.filter(review => review.subjectType === selectedSubject) : chosen.reviews;
+  const selectedReview = matchingReviews.find(review => review.id === selectedReviewId) ?? null;
+  const chooseWorkstream = (key: string) => {
+    setSelection(key); setSelectedSubject(null); setSelectedReviewId(null); setVisibleCount(8);
+  };
+  const chooseSubject = (key: string, subject: string) => {
+    setSelection(key); setSelectedSubject(current => current === subject && key === chosen.key ? null : subject);
+    setSelectedReviewId(null); setVisibleCount(8);
+  };
+  const chooseReview = (key: string, subject: string, id: string) => {
+    setSelection(key); setSelectedSubject(subject); setSelectedReviewId(id);
+  };
   const statusName = (review: QueueReviewV2): string =>
     review.status === "other" ? review.sourceStatus : review.status;
 
@@ -54,7 +71,7 @@ export function MiziziReviewRoots({ queue, onInspect }: {
             <button type="button"
               className="mz-root-workstream"
               aria-pressed={chosen.key === group.key}
-              onClick={() => setSelection(group.key)}>
+              onClick={() => chooseWorkstream(group.key)}>
               <span className="min-w-0 font-semibold text-wk-text">{group.label}</span>
               <span className="shrink-0 tabular-nums text-wk-text-muted">{group.total} reviews</span>
               <WkIcon name="ChevronRight" size={16} aria-hidden="true" />
@@ -62,13 +79,20 @@ export function MiziziReviewRoots({ queue, onInspect }: {
             <div className="mz-root-subjects">
               {group.subjects.map(subject => (
                 <div className="mz-root-subject" key={subject.name}>
-                  <div className="mz-root-subject-title">
+                  <button type="button" className="mz-root-subject-title"
+                    aria-pressed={chosen.key === group.key && selectedSubject === subject.name}
+                    onClick={() => chooseSubject(group.key, subject.name)}>
                     <span className="font-semibold text-wk-text">{subject.name}</span>
                     <span className="tabular-nums text-wk-text-muted">{subject.reviews.length}</span>
-                  </div>
-                  <div className="mz-root-leaves" aria-hidden="true">
+                  </button>
+                  <div className="mz-root-leaves" role="group"
+                    aria-label={group.label + ", " + subject.name + ": recorded reviews"}>
                     {subject.reviews.map(review => (
-                      <span key={review.id} data-wk-root-review={review.id}
+                      <button key={review.id} type="button" data-wk-root-review={review.id}
+                        title={review.title + " · " + statusName(review)}
+                        aria-label={"Inspect " + review.title + ", " + statusName(review)}
+                        aria-pressed={selectedReviewId === review.id && chosen.key === group.key}
+                        onClick={() => chooseReview(group.key, subject.name, review.id)}
                         className={"mz-root-leaf mz-root-leaf-" + review.status} />
                     ))}
                   </div>
@@ -92,16 +116,40 @@ export function MiziziReviewRoots({ queue, onInspect }: {
       <div className="mz-roots-inspection" aria-live="polite">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-[14px] font-bold text-wk-text">
-            {chosen.label} <span className="font-normal text-wk-text-muted">· {chosen.total} recorded reviews</span>
+            {chosen.label}{selectedSubject ? " · " + selectedSubject : ""}
+            <span className="font-normal text-wk-text-muted">
+              {" · " + matchingReviews.length + " recorded reviews"}
+            </span>
           </h3>
           <div className="flex flex-wrap gap-3 text-[11px] tabular-nums text-wk-text-muted">
             <span>Open {chosen.open}</span><span>Resolved {chosen.resolved}</span>
             {chosen.other > 0 ? <span>Other {chosen.other}</span> : null}
           </div>
         </div>
-        <p className="mb-2 text-[12px] text-wk-text-muted">Recent reviews in this workstream</p>
+        {selectedReview ? (
+          <article className="mz-root-selected" aria-live="polite" data-wk-root-selected={selectedReview.id}>
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="mb-1 text-[11px] text-wk-text-muted">Selected Registry review · {selectedReview.subjectType}</p>
+                <h4 className="break-words text-[16px] font-bold text-wk-text">{selectedReview.title}</h4>
+              </div>
+              <WkStateMark compact state={selectedReview.status === "resolved" ? "resolved" :
+                selectedReview.status === "open" ? "open" : "unknown"} label={statusName(selectedReview)} />
+            </div>
+            <p className="mt-2 break-all font-mono text-[11px] text-wk-text-muted">{selectedReview.id}</p>
+            {selectedReview.updatedAt ? <p className="mt-1 text-[11px] text-wk-text-muted">Recorded update: <WkZonedTimestamp value={selectedReview.updatedAt} /></p> : null}
+            <p className="mt-2 text-[12px] text-wk-text-muted">Explore this recorded review here before opening its evidence in Cores.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <WkButton variant="soft" className="wk-button-sm"
+                onClick={() => onInspect(selectedReview.id)}>Inspect in Cores <WkIcon name="ArrowRight" size={13} /></WkButton>
+              <WkButton variant="ghost" className="wk-button-sm"
+                onClick={() => setSelectedReviewId(null)}>Close detail</WkButton>
+            </div>
+          </article>
+        ) : null}
+        <p className="mb-2 text-[12px] text-wk-text-muted">Browse recorded reviews in this branch</p>
         <ul className="mz-roots-review-list">
-          {chosen.reviews.slice(0, 4).map(review => (
+          {matchingReviews.slice(0, visibleCount).map(review => (
             <li key={review.id}>
               <span className="min-w-0">
                 <span className="block truncate text-[12px] font-semibold text-wk-text">{review.title}</span>
@@ -111,16 +159,17 @@ export function MiziziReviewRoots({ queue, onInspect }: {
                 review.status === "open" ? "open" : "unknown"}
                 label={statusName(review)} compact />
               <WkButton variant="ghost" className="wk-button-sm shrink-0"
-                onClick={() => onInspect(review.id)}>
-                Inspect
+                onClick={() => { setSelectedReviewId(review.id); setSelectedSubject(review.subjectType); }}>
+                Explore
               </WkButton>
             </li>
           ))}
         </ul>
-        {chosen.reviews.length > 4 ? (
-          <p className="mt-2 text-[11px] text-wk-text-muted">
-            Showing 4 of {chosen.total} reviews. Explore Cores for the complete authenticated list.
-          </p>
+        {matchingReviews.length > visibleCount ? (
+          <WkButton variant="ghost" className="wk-button-sm mt-3"
+            onClick={() => setVisibleCount(count => Math.min(count + 8, matchingReviews.length))}>
+            Show more reviews ({Math.min(visibleCount, matchingReviews.length)} of {matchingReviews.length})
+          </WkButton>
         ) : null}
       </div>
       <p className="mz-info-line mt-3">

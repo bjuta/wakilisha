@@ -53,16 +53,17 @@ export function WkPasswordField({
       isDisabled={disabled}
       isRequired={required}
       name={name}
-      className={`relative ${className}`.trim()}
+      className={`relative min-w-0 w-full ${className}`.trim()}
     >
       <Input
         type={revealed ? "text" : "password"}
+        data-wk-password-input
         autoFocus={autoFocus}
         autoComplete={autoComplete}
         minLength={minLength}
         placeholder={placeholder}
         style={inputStyle}
-        className={`wk-input w-full rounded-xl border-wk-border bg-wk-surface pr-11 text-[13px] text-wk-text ${inputClassName}`.trim()}
+        className={`wk-input w-full min-w-0 rounded-xl border-wk-border bg-wk-surface pr-11 text-[13px] text-wk-text ${inputClassName}`.trim()}
       />
       <Button
         type="button"
@@ -106,7 +107,7 @@ export function WkSearchField({
       isDisabled={disabled}
       isRequired={required}
       name={name}
-      className={`relative ${className}`.trim()}
+      className={`relative min-w-0 w-full ${className}`.trim()}
     >
       <i
         aria-hidden="true"
@@ -114,6 +115,7 @@ export function WkSearchField({
       />
       <Input
         type="text"
+        data-wk-search-input
         role="searchbox"
         enterKeyHint="search"
         autoFocus={autoFocus}

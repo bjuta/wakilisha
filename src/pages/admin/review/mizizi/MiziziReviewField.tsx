@@ -111,6 +111,7 @@ export function MiziziReviewField({ queue, onInspect }: {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "open" | "resolved">("all");
   const [chosen, setChosen] = useState<string | null>(null);
+  const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [camera, setCamera] = useState<Camera>({ s: 1, x: 0, y: 0 });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [hover, setHover] = useState<string | null>(null);
@@ -133,9 +134,14 @@ export function MiziziReviewField({ queue, onInspect }: {
   const graph = useMemo(() => buildGraph(cases), [cases]);
   const nodesByKey = useMemo(() => new Map(graph.nodes.map(n => [n.key, n])), [graph]);
   const matches = useMemo(() => searchMiziziFieldHits(cases, search, filter), [cases, search, filter]);
-  const chosenKey = chosen && matches.some(h => h.key === chosen) ? chosen :
-    matches.length === 1 ? matches[0].key : null;
+  // Deliberate selection is independent of the current search query. A canvas
+  // artist, an exact search result and a linked recording all retain their own
+  // source-ID identity, even when the search field is cleared.
+  const chosenKey = chosen && nodesByKey.has(chosen) ? chosen : null;
   const focused = chosenKey ? projectMiziziFieldFocus(cases, chosenKey, filter) : null;
+  const relatedReviews = focused?.kind === "artist" ? [...focused.related].sort(
+    (a, b) => a.title.localeCompare(b.title) || a.reviewId.localeCompare(b.reviewId)
+  ) : [];
   const counts = { open: cases.filter(r => r.status === "open").length,
     resolved: cases.filter(r => r.status === "resolved").length };
   const allowed = useCallback((node: GraphNode): boolean =>
@@ -272,7 +278,7 @@ export function MiziziReviewField({ queue, onInspect }: {
     });
   const centerOn = (key: string) => {
     const n = nodesByKey.get(key);
-    setChosen(key); setHover(null);
+    setChosen(key); setExpandedRecord(null); setHover(null);
     if (n) {
       const s = Math.max(camera.s, 1.55);
       moveCamera({ s, x: viewport.width * .58 - n.x * s, y: viewport.height * .51 - n.y * s });
@@ -320,9 +326,8 @@ export function MiziziReviewField({ queue, onInspect }: {
     if (pointers.current.size < 2) pinch.current = null;
     if (!drag || drag.moved) return;
     const node = findNear(p.x, p.y);
-    if (node?.kind === "artist") centerOn(node.key);
-    else if (node?.reviewId) onInspect(node.reviewId);
-    else setChosen(null);
+    if (node?.kind === "artist" || node?.kind === "case") centerOn(node.key);
+    else { setChosen(null); setExpandedRecord(null); }
   };
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -349,7 +354,7 @@ export function MiziziReviewField({ queue, onInspect }: {
         <WkSearchField ariaLabel="Find a recorded artist credit, recording, release, or ISRC"
           className="wk-mizizi-search" inputClassName="h-11"
           placeholder="Search artist, recording, or ISRC" value={search}
-          onChange={value => { setSearch(value); setChosen(null); }} />
+          onChange={value => { setSearch(value); setChosen(null); setExpandedRecord(null); }} />
         <div className="chips" aria-label="Recorded case state filters">
           {(["open", "resolved"] as const).map(state => (
             <button key={state} type="button" className="chip"
@@ -363,7 +368,7 @@ export function MiziziReviewField({ queue, onInspect }: {
         <div className="chips" aria-label="Search result state">
           {(["all", "open", "resolved"] as const).map(value =>
             <button type="button" className="chip" key={value} aria-pressed={filter === value}
-              onClick={() => { setFilter(value); setChosen(null); }}>
+              onClick={() => { setFilter(value); setChosen(null); setExpandedRecord(null); }}>
               {value === "all" ? "All reviews" : value === "open" ? "Open" : "Resolved"}
             </button>)}
         </div>
@@ -421,16 +426,84 @@ export function MiziziReviewField({ queue, onInspect }: {
         }}>
           <strong>{hovered.name}</strong>
           <div>{hovered.kind === "case" ? statusLabel(hovered.status) : statusLabel(hovered.status) + " · artist credit"}</div>
-          <div>{hovered.kind === "case" ? "Click to inspect its Core" : "Click to explore linked reviews"}</div>
+          <div>{hovered.kind === "case" ? "Click to expand recorded credits" : "Click to explore linked reviews"}</div>
         </div>
       )}
-      {focused && <div className="mz-field-detail" aria-live="polite">
-        <strong>{focused.name}</strong>
-        <p className="mz-info-line">{focused.kind === "artist"
-          ? focused.related.length + " linked MIZIZI reviews" :
-            focused.credits.length + " recorded artist credits"}</p>
-        {focused.kind === "case" && <button onClick={() => onInspect(focused.record.reviewId)}>Inspect Case</button>}
-      </div>}
+      {focused && (
+        <aside className="mz-field-detail" aria-label="Selected Registry entity" aria-live="polite">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="mb-1 text-[11px] font-semibold text-wk-text-muted">
+                {focused.kind === "artist" ? "Recorded artist credit" : focused.record.kind === "track" ? "Recording review" : "Release review"}
+              </p>
+              <h3 className="break-words text-[17px] font-bold leading-5 text-wk-text">{focused.name}</h3>
+            </div>
+            <button type="button" aria-label="Close selected entity"
+              className="wk-button wk-button-ghost wk-button-sm" onClick={() => { setChosen(null); setExpandedRecord(null); }}>
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          {focused.kind === "artist" ? (
+            <>
+              <p className="mt-2 text-[12px] text-wk-text-muted">
+                Exact artist credit ID. {relatedReviews.length} related review{relatedReviews.length === 1 ? "" : "s"}.
+                A credit link does not establish rights or merge identities.
+              </p>
+              <p className="mt-2 break-all font-mono text-[10px] text-wk-text-muted">{focused.artistId}</p>
+              <div className="mz-field-artifacts" role="list" aria-label="Recordings and releases linked to this artist credit">
+                {relatedReviews.map(record => {
+                  const open = expandedRecord === record.reviewId;
+                  const linkCredit = record.artists.find(credit => credit.id === focused.artistId);
+                  return (
+                    <div role="listitem" key={record.reviewId} className="mz-field-artifact">
+                      <button type="button" aria-expanded={open}
+                        aria-label={(open ? "Collapse " : "Expand ") + record.title}
+                        onClick={() => setExpandedRecord(current => current === record.reviewId ? null : record.reviewId)}
+                        className="mz-field-artifact-trigger">
+                        <span className="min-w-0 flex-1">
+                          <strong className="block break-words text-[12px] text-wk-text">{record.title}</strong>
+                          <span className="text-[11px] text-wk-text-muted">
+                            {record.kind === "track" ? "Recording" : "Release"} · {statusLabel(record.status)}
+                          </span>
+                        </span>
+                        <span aria-hidden="true">{open ? "−" : "+"}</span>
+                      </button>
+                      {open && (
+                        <div className="mz-field-artifact-body">
+                          <p>{linkCredit?.name ?? focused.name} · {linkCredit?.status ?? "Recorded credit"}</p>
+                          {record.isrc ? <p>ISRC {record.isrc}</p> : null}
+                          <p className="break-all font-mono text-[10px]">{record.reviewId}</p>
+                          <button type="button" className="wk-button wk-button-soft wk-button-sm"
+                            onClick={() => onInspect(record.reviewId)}>Inspect in Cores</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 text-[12px] text-wk-text-muted">
+                {statusLabel(focused.record.status)} · {focused.credits.length} recorded credit{focused.credits.length === 1 ? "" : "s"}
+              </p>
+              {focused.record.isrc ? <p className="mt-2 text-[12px] text-wk-text-muted">ISRC {focused.record.isrc}</p> : null}
+              <div role="list" className="mz-field-artifacts" aria-label="Artist credits on this recording">
+                {focused.credits.map(credit => (
+                  <div role="listitem" key={credit.id}>
+                    <button type="button" className="mz-field-artifact-trigger"
+                      onClick={() => centerOn("artist:" + credit.id)}>
+                      {credit.name} <span className="ml-auto text-[11px] text-wk-text-muted">{credit.status}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className="wk-button wk-button-soft wk-button-sm mt-3"
+                onClick={() => onInspect(focused.record.reviewId)}>Inspect in Cores</button>
+            </>
+          )}
+        </aside>
+      )}
       <WkViewportControls
         onZoomIn={() => zoomAt(viewport.width / 2, viewport.height / 2, 1.3)}
         onZoomOut={() => zoomAt(viewport.width / 2, viewport.height / 2, 1 / 1.3)}
