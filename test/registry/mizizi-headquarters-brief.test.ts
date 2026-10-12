@@ -47,6 +47,20 @@ describe("MIZIZI Field interaction shell faithfully follows reference structure"
   });
 });
 
+describe("Flat master/detail history and evidence workspaces", () => {
+  it("uses one shared divider-based split with compact edge selectors", () => {
+    const shell = readFileSync("src/components/data-viz/WkSplitWorkspace.tsx", "utf8");
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx", "utf8");
+    expect(shell).toContain("lg:grid-cols-[360px_minmax(0,1fr)]");
+    expect(shell).not.toContain("rounded-2xl");
+    expect(source).toContain("<WkSplitWorkspace");
+    expect(source).toContain('data-wk-edge-filters');
+    expect(source).toContain('mode === "history"');
+    expect(source).toContain("outbound-delivery ledger");
+    expect(source).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);
+  });
+});
+
 describe("MIZIZI reference-inspired, live-data operational workspace", () => {
   it("keeps Brief, Field, Cores, History and governed Decision Work distinct", () => {
     const page = readFileSync("src/pages/admin/review/mizizi/page.tsx", "utf8");
@@ -80,7 +94,7 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(source).toContain("<MiziziEvidenceWorkbench");
     expect(source).toContain("Issue1094WorthKnowing revision={revision} onInspect={inspect}");
     expect(source).toContain("queue.recentOpen.slice(0, 4)");
-    expect(source).toContain("OperatorReviewExplorer queue={queue}");
+    expect(source).toContain('<MiziziEvidenceWorkbench mode="history"');
     expect(source).toContain("Show Receipt");
     expect(source).toContain("View Evidence in Cores");
     expect(source).toContain("expandedReceipt === item.reviewId");

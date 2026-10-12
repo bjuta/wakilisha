@@ -4,9 +4,9 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkRecordingArtwork } from "@/components/data-viz/WkRecordingArtwork";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import { WkStateMark } from "@/components/data-viz/WkStateMark";
+import { WkSplitWorkspace } from "@/components/data-viz/WkSplitWorkspace";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
-import { WkSelect } from "@/components/design-system/primitives/Select";
 import { supabase } from "@/lib/supabase";
 import { OPERATOR_REVIEW_PAGE_SIZE, selectOperatorReviewPageV1, type OperatorStatusV1 } from "@/services/operatorReviewSelection";
 import type { HeadquartersQueueV2, QueueReviewV2 } from "@/services/miziziHeadquartersBrief";
@@ -64,12 +64,14 @@ export function MiziziEvidenceWorkbench({
   queue,
   selectedId,
   onSelectedIdChange,
+  mode = "cores",
 }: {
   queue: HeadquartersQueueV2;
   selectedId: string | null;
   onSelectedIdChange: (id: string | null) => void;
+  mode?: "cores" | "history";
 }) {
-  const [status, setStatus] = useState<OperatorStatusV1>("open");
+  const [status, setStatus] = useState<OperatorStatusV1>(mode === "history" ? "resolved" : "open");
   const [workstream, setWorkstream] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -89,7 +91,9 @@ export function MiziziEvidenceWorkbench({
   const selection = useMemo(() => selectOperatorReviewPageV1(queue.items, {
     status, workstream, search: query, page,
   }), [queue.items, status, workstream, query, page]);
-  const selected = queue.items.find((item) => item.id === selectedId) ?? null;
+  const selected = queue.items.find((item) => item.id === selectedId &&
+    (mode !== "history" || item.status === "resolved"))
+    ?? (mode === "history" ? queue.recentResolved[0] ?? null : null);
   const pageKey = selection.items.map((item) => item.id).join(",");
 
   // One bounded authenticated read for the visible page, never 301 per-item requests.
@@ -213,32 +217,47 @@ export function MiziziEvidenceWorkbench({
     if (queue.items.some((item) => item.id === id)) onSelectedIdChange(id);
   };
   return (
-    <div className="grid min-w-0 overflow-hidden rounded-2xl border border-wk-border bg-wk-surface lg:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.45fr)]"
-      data-wk-mizizi-evidence-workbench>
+    <WkSplitWorkspace data-wk-mizizi-evidence-workbench>
       <div className="min-w-0 border-b border-wk-border lg:border-b-0 lg:border-r">
         <div className="space-y-3 border-b border-wk-border px-4 py-5">
           <div>
-            <h2 className="text-[17px] font-black text-wk-text">Cores</h2>
+            <h2 className="text-[17px] font-black text-wk-text">{mode === "history" ? "History" : "Cores"}</h2>
             <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-              A claim, its recorded evidence and its current disposition.
+              {mode === "history" ? "Recorded review outcomes and receipts, not an outbound-delivery ledger." : "A claim, its recorded evidence and its current disposition."}
             </p>
           </div>
           <WkSearchField ariaLabel="Find a Registry claim" value={query}
             onChange={(value) => { setQuery(value); setPage(1); onSelectedIdChange(null); }}
             placeholder="Search claims, types, references" />
-          <div className="grid grid-cols-2 gap-2">
-            <WkSelect ariaLabel="Claim status" value={status}
-              options={[{ value: "open", label: "Open" }, { value: "resolved", label: "Resolved" },
-                { value: "all", label: "All statuses" }, { value: "other", label: "Other" }]}
-              onChange={(value) => {
-                if (["open", "resolved", "all", "other"].includes(value)) {
-                  setStatus(value as OperatorStatusV1); setPage(1); onSelectedIdChange(null);
-                }
-              }} />
-            <WkSelect ariaLabel="Claim workstream" value={workstream}
-              options={[{ value: "", label: "All workstreams" },
-                ...queue.workstreams.map((group) => ({ value: group.key, label: group.label }))]}
-              onChange={(value) => { setWorkstream(value); setPage(1); onSelectedIdChange(null); }} />
+          <div className="border-t border-wk-border pt-2" data-wk-edge-filters>
+            <div className="flex flex-wrap gap-1" aria-label="Filter by review status">
+              {(["open", "resolved", "all", "other"] as const).map((value) => (
+                <button key={value} type="button" aria-pressed={status === value}
+                  onClick={() => { setStatus(value); setPage(1); onSelectedIdChange(null); }}
+                  className={`border-b-2 px-2 py-2 text-[12px] font-semibold ${status === value
+                    ? "border-wk-brand text-wk-text"
+                    : "border-transparent text-wk-text-muted hover:text-wk-text"}`}>
+                  {value === "all" ? "All" : value === "other" ? "Other" : words(value)}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1" aria-label="Filter by workstream">
+              <button type="button" aria-pressed={workstream === ""}
+                onClick={() => { setWorkstream(""); setPage(1); onSelectedIdChange(null); }}
+                className={`border px-2 py-1.5 text-[11px] font-semibold ${workstream === ""
+                  ? "border-wk-brand text-wk-brand" : "border-wk-border text-wk-text-muted"}`}>
+                All work
+              </button>
+              {queue.workstreams.map((group) => (
+                <button key={group.key} type="button"
+                  aria-pressed={workstream === group.key}
+                  onClick={() => { setWorkstream(group.key); setPage(1); onSelectedIdChange(null); }}
+                  className={`border px-2 py-1.5 text-[11px] font-semibold ${workstream === group.key
+                    ? "border-wk-brand text-wk-brand" : "border-wk-border text-wk-text-muted"}`}>
+                  {group.label}
+                </button>
+              ))}
+            </div>
           </div>
           <p className="text-[11px] tabular-nums text-wk-text-muted">
             {selection.total.toLocaleString()} matching · {selection.start}–{selection.end} shown
@@ -303,7 +322,7 @@ export function MiziziEvidenceWorkbench({
             onClick={() => { setPage(Math.min(selection.totalPages, selection.currentPage + 1)); onSelectedIdChange(null); }}>Next</WkButton>
         </div>
       </div>
-      <div className="min-w-0 px-5 py-6 sm:px-7 sm:py-8">
+      <div className="min-w-0 px-5 py-6 sm:px-8 sm:py-8">
         {!selected ? (
           <p className="text-[13px] text-wk-text-muted">Select a case to inspect its evidence.</p>
         ) : (
@@ -342,7 +361,7 @@ export function MiziziEvidenceWorkbench({
                     <p className="mt-1 text-[12px] text-wk-text-muted">
                       These fields come from the existing Registry review, not an inferred conclusion.
                     </p>
-                    <dl className="mt-3 rounded-xl border border-wk-border px-4">
+                    <dl className="mt-3 border-y border-wk-border px-1">
                       <Fact name="Rule" value={source.ruleId} />
                       <Fact name="Affected field" value={source.fieldName} />
                       {recordedSubject.artistReference ? <Fact name="Recorded primary-artist reference" value={recordedSubject.artistReference} /> : null}
@@ -357,7 +376,7 @@ export function MiziziEvidenceWorkbench({
                           {peers.map((raw, i) => {
                             const peer = asRecord(raw);
                             return (
-                              <div key={String(peer.id ?? i)} className="min-w-0 rounded-xl border border-wk-border bg-wk-surface-raised p-3">
+                              <div key={String(peer.id ?? i)} className="min-w-0 border-b border-wk-border py-3">
                                 <p className="break-words text-[13px] font-semibold text-wk-text">
                                   {readable(peer.title || peer.trackTitle || peer.slug || peer.id)}
                                 </p>
@@ -372,7 +391,7 @@ export function MiziziEvidenceWorkbench({
                     ) : null}
                   </div>
                   <aside className="min-w-0 space-y-5">
-                    <section className="rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+                    <section className="border-l-[3px] border-wk-brand bg-wk-surface-raised px-4 py-3">
                       <h4 className="text-[13px] font-black text-wk-text">Disposition</h4>
                       {exactDecision?.status === "blocked" && selected.status === "open" ? (
                         <div role="status" className="mt-3 space-y-2">
@@ -449,6 +468,6 @@ export function MiziziEvidenceWorkbench({
           </>
         )}
       </div>
-    </div>
+    </WkSplitWorkspace>
   );
 }

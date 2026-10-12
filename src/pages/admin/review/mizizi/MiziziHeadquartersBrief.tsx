@@ -5,11 +5,7 @@ import { WkStatusDistribution } from "@/components/data-viz/WkStatusDistribution
 import { WkStateMark } from "@/components/data-viz/WkStateMark";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import { WkRankedBars } from "@/components/data-viz/WkRankedBars";
-import { WkTabs } from "@/components/design-system/primitives/Tabs";
 import { WkButton } from "@/components/design-system/primitives/Button";
-import { WkSearchField } from "@/components/design-system/primitives/Field";
-import { WkSelect } from "@/components/design-system/primitives/Select";
-import { selectOperatorReviewPageV1, type OperatorStatusV1 } from "@/services/operatorReviewSelection";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MiziziEvidenceWorkbench } from "./MiziziEvidenceWorkbench";
 import { MiziziReviewField } from "./MiziziReviewField";
@@ -19,13 +15,6 @@ import {
   type HeadquartersQueueV2,
   type QueueReviewV2,
 } from "@/services/miziziHeadquartersBrief";
-
-const TABS = [
-  { id: "open", label: "Open Reviews" },
-  { id: "resolved", label: "Review History" },
-] as const;
-
-type Tab = "open" | "resolved";
 
 function ReviewPreview({ items, onInspect }: { items: readonly QueueReviewV2[]; onInspect?: (id: string) => void }) {
   if (!items.length) {
@@ -51,93 +40,6 @@ function ReviewPreview({ items, onInspect }: { items: readonly QueueReviewV2[]; 
         </li>
       ))}
     </ul>
-  );
-}
-
-
-/** Browse the existing queue without duplicating or adjudicating a Registry review. */
-function OperatorReviewExplorer({ queue, onInspect }: { queue: HeadquartersQueueV2; onInspect: (id: string) => void }) {
-  const [status, setStatus] = useState<OperatorStatusV1>("open");
-  const [workstream, setWorkstream] = useState("");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const selection = useMemo(() => selectOperatorReviewPageV1(queue.items, {
-    status, workstream, search, page,
-  }), [queue.items, status, workstream, search, page]);
-  const statusOptions = [
-    { value: "open", label: "Open" },
-    { value: "resolved", label: "Resolved" },
-    { value: "other", label: "Other" },
-    { value: "all", label: "All Statuses" },
-  ];
-  const workstreamOptions = [
-    { value: "", label: "All Workstreams" },
-    ...queue.workstreams.map((group) => ({ value: group.key, label: group.label })),
-  ];
-  const updateStatus = (value: string) => {
-    if (value === "open" || value === "resolved" || value === "other" || value === "all") {
-      setStatus(value);
-      setPage(1);
-    }
-  };
-  return (
-    <div className="border-t border-wk-border px-4 py-5 sm:px-5" aria-label="Browse Registry reviews">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-[14px] font-black text-wk-text">Browse Reviews</h3>
-        <span className="text-[12px] tabular-nums text-wk-text-muted">
-          {selection.total.toLocaleString()} matching
-        </span>
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,180px)_minmax(0,200px)]">
-        <WkSearchField
-          ariaLabel="Search reviews"
-          placeholder="Search reviews"
-          value={search}
-          onChange={(value) => { setSearch(value); setPage(1); }}
-        />
-        <WkSelect
-          ariaLabel="Review status"
-          value={status}
-          options={statusOptions}
-          onChange={updateStatus}
-        />
-        <WkSelect
-          ariaLabel="Review workstream"
-          value={workstream}
-          options={workstreamOptions}
-          onChange={(value) => { setWorkstream(value); setPage(1); }}
-        />
-      </div>
-      {selection.total === 0 ? (
-        <p role="status" className="mt-4 rounded-xl bg-wk-surface-raised p-4 text-[13px] text-wk-text-muted">
-          No reviews match these filters.
-        </p>
-      ) : (
-        <div className="mt-4 overflow-hidden rounded-xl border border-wk-border">
-          <ReviewPreview items={selection.items} onInspect={onInspect} />
-        </div>
-      )}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <span className="text-[12px] tabular-nums text-wk-text-muted" aria-live="polite">
-          {selection.start.toLocaleString()}–{selection.end.toLocaleString()} of {selection.total.toLocaleString()}
-        </span>
-        <div className="flex items-center gap-2">
-          <WkButton variant="ghost" className="wk-button-sm"
-            disabled={selection.currentPage <= 1}
-            onClick={() => setPage(Math.max(1, selection.currentPage - 1))}>
-            Previous
-          </WkButton>
-          <span className="text-[12px] tabular-nums text-wk-text-muted">
-            {selection.currentPage} / {selection.totalPages}
-          </span>
-          <WkButton variant="ghost" className="wk-button-sm"
-            disabled={selection.currentPage >= selection.totalPages}
-            onClick={() => setPage(Math.min(selection.totalPages, selection.currentPage + 1))}>
-            Next
-          </WkButton>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -337,7 +239,6 @@ export function MiziziHeadquartersBrief({
   onSelectedIdChange?: (id: string | null) => void;
 }) {
   const [revision, setRevision] = useState(0);
-  const [tab, setTab] = useState<Tab>("open");
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "error" }
@@ -485,31 +386,8 @@ export function MiziziHeadquartersBrief({
       ) : null}
 
       {queue && view === "history" ? (
-        <div className="space-y-4">
-          <header className="border-b border-wk-border pb-5">
-            <h2 className="text-[clamp(25px,3vw,37px)] font-black tracking-tight text-wk-text">History</h2>
-            <p className="mt-2 max-w-2xl text-[13px] leading-6 text-wk-text-muted">
-              Recorded Registry review outcomes. This is not an outbound delivery ledger:
-              deliveries are shown only when verified integration receipts exist.
-            </p>
-          </header>
-          <WkSurface className="overflow-hidden p-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-wk-border px-4 py-4">
-              <h3 className="text-[15px] font-bold text-wk-text">Recent review records</h3>
-              <span className="text-[12px] text-wk-text-muted">
-                {queue.resolved.toLocaleString()} resolved overall
-              </span>
-            </div>
-            <div className="px-3 pt-3 sm:px-4">
-              <WkTabs items={TABS} value={tab} onChange={setTab}
-                ariaLabel="History status" tabListClassName="overflow-x-auto">
-                <ReviewPreview items={tab === "open" ? queue.recentOpen : queue.recentResolved}
-                  onInspect={inspect} />
-              </WkTabs>
-            </div>
-            <OperatorReviewExplorer queue={queue} onInspect={inspect} />
-          </WkSurface>
-        </div>
+        <MiziziEvidenceWorkbench mode="history" queue={queue} selectedId={selectedId}
+          onSelectedIdChange={onSelectedIdChange} />
       ) : null}
     </section>
   );
