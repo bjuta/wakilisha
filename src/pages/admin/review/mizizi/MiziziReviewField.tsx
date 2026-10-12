@@ -33,7 +33,8 @@ export function MiziziReviewField({queue,onInspect}:{queue:HeadquartersQueueV2;o
     if(Math.abs(e.clientX-d.x)+Math.abs(e.clientY-d.y)>5)d.active=true;
     if(d.active)setOrigin({x:d.ox-(e.clientX-d.x)*WIDTH/(r.width*zoom),
       y:d.oy-(e.clientY-d.y)*HEIGHT/(r.height*zoom)});};
-  const nodes=matches.slice(0,24);
+  const nodes=matches.filter(x=>x.reviewId!==selected?.reviewId).slice(0,12);
+  const credits=selected?.artists.slice(0,9)??[];
   const center={x:WIDTH/2,y:HEIGHT/2};
   return <section data-wk-mizizi-field aria-label="MIZIZI case universe"
     className="relative h-[min(76vh,850px)] min-h-[580px] overflow-hidden border-y border-wk-border bg-wk-surface">
@@ -41,9 +42,9 @@ export function MiziziReviewField({queue,onInspect}:{queue:HeadquartersQueueV2;o
       viewBox={`${origin.x} ${origin.y} ${WIDTH/zoom} ${HEIGHT/zoom}`}
       onWheel={onWheel} onPointerDown={start} onPointerMove={move}
       onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}>
-      <g className="text-wk-text-muted" stroke="currentColor" strokeOpacity=".14">
-        {nodes.map((x,i)=>{const a=i*2.39996,r=110+Math.sqrt(i)*60;
-          return <line key={x.reviewId} x1={center.x} y1={center.y}
+      <g className="text-wk-text-muted" stroke="currentColor" strokeOpacity=".30">
+        {credits.map((credit,i)=>{const a=i*Math.PI*2/Math.max(1,credits.length)-.8,r=178;
+          return <line key={credit.id+"-"+i} x1={center.x} y1={center.y}
             x2={center.x+Math.cos(a)*r} y2={center.y+Math.sin(a)*r}/>;})}
       </g>
       {selected?<g><circle cx={center.x} cy={center.y} r="63" fill="currentColor" fillOpacity=".07"
@@ -52,7 +53,19 @@ export function MiziziReviewField({queue,onInspect}:{queue:HeadquartersQueueV2;o
           className="text-wk-text">{selected.title.slice(0,24)}</text>
         <text x={center.x} y={center.y+17} fontSize="12" textAnchor="middle" fill="currentColor"
           className="text-wk-text-muted">{selected.status==="resolved"?"Resolved case":"Open case"}</text></g>:null}
-      {nodes.map((x,i)=>{const a=i*2.39996,r=110+Math.sqrt(i)*60,
+      {credits.map((credit,i)=>{const a=i*Math.PI*2/Math.max(1,credits.length)-.8,r=178,
+        px=center.x+Math.cos(a)*r,py=center.y+Math.sin(a)*r;
+        return <g key={credit.id+"-"+i} role="group"
+          aria-label={`Recorded artist credit ${credit.name}, ${credit.status.replaceAll("_"," ")}`}>
+          <circle cx={px} cy={py} r="25" strokeWidth="2" stroke="currentColor"
+            fill="currentColor" fillOpacity=".10"
+            className={credit.status==="needs_review"?"text-wk-warning":"text-wk-brand"}/>
+          <text x={px} y={py-2} textAnchor="middle" fontSize="11" fill="currentColor"
+            className="text-wk-text">{credit.name.slice(0,18)}</text>
+          <text x={px} y={py+13} textAnchor="middle" fontSize="10" fill="currentColor"
+            className="text-wk-text-muted">{credit.status.replaceAll("_"," ").slice(0,20)}</text>
+        </g>;})}
+      {nodes.map((x,i)=>{const a=i*2.39996,r=265+Math.sqrt(i)*47,
         px=center.x+Math.cos(a)*r,py=center.y+Math.sin(a)*r;
         return <g key={x.reviewId} role="button" tabIndex={0}
           aria-label={`${x.title}, ${x.status}, inspect case`}
@@ -91,8 +104,9 @@ export function MiziziReviewField({queue,onInspect}:{queue:HeadquartersQueueV2;o
       </div>
       <div className="pointer-events-auto hidden border-b border-l border-wk-border bg-wk-surface/95 p-3 text-[11px] md:block"
         aria-label="Case state key">
-        <p><span className="text-wk-warning">●</span> Open case</p>
-        <p className="mt-2"><span className="text-wk-brand">●</span> Resolved case</p>
+        <p><span className="text-wk-warning">●</span> Open case or credit needs review</p>
+        <p className="mt-2"><span className="text-wk-brand">●</span> Resolved case or existing credit</p>
+        <p className="mt-2 text-wk-text-muted">Lines connect recorded credits only.</p>
       </div>
     </div>
     {selected?<div className="absolute bottom-4 left-4 max-w-[min(62%,390px)] border-l-2 border-wk-brand bg-wk-surface/95 p-3 text-[12px]">
