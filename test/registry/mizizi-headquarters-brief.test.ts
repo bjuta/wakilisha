@@ -6,6 +6,7 @@ import {
 } from "../../src/services/miziziHeadquartersBrief";
 import type { RegistryQueueFactV2, RegistryQueuePageV2 } from "../../src/services/miziziHeadquartersBrief";
 import { readFileSync } from "node:fs";
+import { projectMiziziReviewRootsV1 } from "../../src/services/miziziReviewRoots";
 import { selectOperatorReviewPageV1, selectReviewForInspectionV1 } from "../../src/services/operatorReviewSelection";
 import { ISSUE_1094_CASES, projectIssue1094Brief, type Issue1094ReviewFact, type Issue1094DecisionFact } from "../../src/services/miziziIssue1094Brief";
 
@@ -119,7 +120,7 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(source).toContain("<MiziziReviewField");
     expect(source).toContain("<WkButton");
     expect(source).not.toMatch(/<select\b|<dialog\b|<input\b|<textarea\b/);
-    expect(source).toContain("<MiziziReviewRoots queue={queue} />");
+    expect(source).toContain("<MiziziReviewRoots queue={queue} onInspect={inspect} />");
     expect(source).toContain("queue.items");
     expect(source).toContain("queue.resolved.toLocaleString()");
     expect(source).toContain("queue.open.toLocaleString()");
@@ -142,16 +143,24 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
 describe("Shared visual data primitives — source-aligned, not decorative", () => {
   it("renders status distribution and ranked workstreams from the existing Registry queue", () => {
     const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
-    expect(source).toContain("<MiziziReviewRoots queue={queue}");
+    const rootsUi = readFileSync("src/pages/admin/review/mizizi/MiziziReviewRoots.tsx", "utf8");
+    expect(source).toContain("<MiziziReviewRoots queue={queue} onInspect={inspect}");
     expect(source).toContain("<WkStatusDistribution");
     expect(source).toContain("<WkRankedBars");
-    expect(source).toContain('token("--wk-brand")');
-    expect(source).toContain('token("--wk-warning")');
+    expect(rootsUi).toContain("projectMiziziReviewRootsV1(queue)");
+    expect(rootsUi).toContain("recorded review");
+    expect(rootsUi).toContain("data-wk-root-review={review.id}");
+    expect(rootsUi).toContain("onInspect(review.id)");
+    expect(rootsUi).not.toContain("Math.random");
+    expect(rootsUi).not.toContain("<canvas");
     expect(source).toContain("queue.items");
     expect(source).toContain("queue.open.toLocaleString()");
     expect(source).toContain("queue.resolved.toLocaleString()");
     expect(source).toContain("queue.workstreams.filter(group => group.open > 0)");
-    expect(source).toContain("snapshot, not a history of actions");
+    expect(rootsUi).toContain("snapshot, not a history of actions");
+    const css = readFileSync("src/pages/admin/review/mizizi/mizizi-html.css", "utf8");
+    expect(css).toContain(".mz-roots-tree");
+    expect(css).not.toContain("#growth");
   });
 
   it("fails closed on bad metric arithmetic and remains accessible without colour", () => {
@@ -166,6 +175,68 @@ describe("Shared visual data primitives — source-aligned, not decorative", () 
     expect(ranked).toContain("data-wk-ranked-bars");
     expect(ranked).toContain('valueLabel = "items"');
     expect(distribution + ranked).not.toMatch(/#84C241|#E5AC43|#170F0A|M\.CLIENTS/);
+  });
+});
+
+
+describe("MIZIZI objective Registry review roots", () => {
+  const rows: RegistryQueueFactV2[] = [
+    REVIEW,
+    { ...REVIEW, id: UUID_B, status: "resolved", entity_type: "release" },
+    { ...REVIEW, id: UUID_C, review_type: "chart_entry_missing_canonical_link",
+      entity_type: "track", status: "open", title: "Missing Chart link" },
+    { ...REVIEW, id: UUID_D, review_type: "future_specialist_queue",
+      entity_type: "recording", status: "awaiting_evidence", title: "Unknown review state" },
+  ];
+  const queue = projectHeadquartersQueueV2([mkPage(rows)], DATE);
+
+  it("plots only real review-to-workstream-to-subject membership with all states", () => {
+    const roots = projectMiziziReviewRootsV1(queue);
+    expect(roots.total).toBe(4);
+    expect(roots.workstreams.map(x => x.key)).toEqual([
+      "chart_entry_missing_canonical_link", "mizizi_data_hygiene", "future_specialist_queue",
+    ]);
+    const music = roots.workstreams.find(x => x.key === "mizizi_data_hygiene");
+    if (!music) throw new Error("Missing recorded music review branch");
+    expect(music).toMatchObject({ total: 2, open: 1, resolved: 1, other: 0 });
+    expect(music.subjects.map(x => [x.name, x.reviews.length])).toEqual([
+      ["release", 1], ["track", 1],
+    ]);
+    expect(music.subjects.flatMap(x => x.reviews.map(r => r.id)).sort())
+      .toEqual([REVIEW.id, UUID_B].sort());
+    expect(roots.workstreams.find(x => x.key === "future_specialist_queue")?.subjects[0].reviews[0].sourceStatus).toBe("awaiting_evidence");
+    expect(roots.workstreams.flatMap(w => w.subjects.flatMap(x => x.reviews)).map(x => x.id).sort())
+      .toEqual(rows.map(x => x.id).sort());
+  });
+
+  it("refuses duplicate, missing, relabelled or contradictory workstream membership", () => {
+    expect(() => projectMiziziReviewRootsV1({ ...queue, open: queue.open + 1 })).toThrow();
+    expect(() => projectMiziziReviewRootsV1({ ...queue, items: queue.items.slice(1) })).toThrow();
+    expect(() => projectMiziziReviewRootsV1({
+      ...queue, items: [queue.items[0], queue.items[0], ...queue.items.slice(2)],
+    })).toThrow();
+    expect(() => projectMiziziReviewRootsV1({
+      ...queue, workstreams: [{ ...queue.workstreams[0], resolved: 0 }, ...queue.workstreams.slice(1)],
+    })).toThrow();
+    expect(() => projectMiziziReviewRootsV1({
+      ...queue, items: queue.items.map((item, i) => i === 0 ?
+        { ...item, subjectType: "unrecorded-bogus-subject" } : item),
+    })).toThrow();
+    expect(() => projectMiziziReviewRootsV1({
+      ...queue, workstreams: queue.workstreams.slice(1),
+    })).toThrow();
+    expect(() => projectMiziziReviewRootsV1({
+      ...queue, items: queue.items.map((item, i) => i === 0 ?
+        { ...item, sourceStatus: "resolved" } : item),
+    })).toThrow();
+  });
+
+  it("makes missing entity types explicitly Unclassified, not an invented entity", () => {
+    const source = { ...REVIEW, entity_type: null };
+    const result = projectHeadquartersQueueV2([mkPage([source])], DATE);
+    expect(result.items[0].subjectType).toBe("Unclassified");
+    expect(projectMiziziReviewRootsV1(result).workstreams[0].subjects[0].name)
+      .toBe("Unclassified");
   });
 });
 

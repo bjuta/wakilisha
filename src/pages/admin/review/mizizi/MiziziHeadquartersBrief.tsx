@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkStateMark } from "@/components/data-viz/WkStateMark";
@@ -9,6 +9,7 @@ import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkIcon } from "@/components/design-system/Icon";
 import { MiziziEvidenceWorkbench } from "./MiziziEvidenceWorkbench";
 import { MiziziReviewField } from "./MiziziReviewField";
+import { MiziziReviewRoots } from "./MiziziReviewRoots";
 import { loadIssue1094Brief, type Issue1094BriefRow } from "@/services/miziziIssue1094Brief";
 import {
   loadHeadquartersQueueV2,
@@ -16,69 +17,6 @@ import {
   type QueueReviewV2,
 } from "@/services/miziziHeadquartersBrief";
 
-
-/** The HTML's root-cascade illustration, drawn only from current real review rows.
- * Decorative branching does NOT assert an overnight processing timeline. */
-function MiziziReviewRoots({ queue }: { queue: HeadquartersQueueV2 }) {
-  const ref = useRef<HTMLCanvasElement | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    let raf = 0;
-    const draw = () => {
-      const box = el.getBoundingClientRect();
-      if (!box.width) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      el.width = Math.round(box.width * dpr);
-      el.height = Math.round(box.height * dpr);
-      const ctx = el.getContext("2d");
-      if (!ctx) return;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, box.width, box.height);
-      const tokens = getComputedStyle(el);
-      const token = (name: string) => tokens.getPropertyValue(name).trim() || "currentColor";
-      ctx.strokeStyle = token("--wk-border-strong"); ctx.globalAlpha = .86;
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(0, 1); ctx.lineTo(box.width, 1); ctx.stroke();
-      const items = queue.items;
-      if (!items.length) return;
-      const hash = (s: string) => {
-        let n = 2166136261;
-        for (let i = 0; i < s.length; i++) n = Math.imul(n ^ s.charCodeAt(i), 16777619);
-        return n >>> 0;
-      };
-      items.forEach((review, i) => {
-        const seed = hash(review.id);
-        const x = box.width * ((i + .5) / items.length);
-        const height = Math.min(box.height - 6, 32 + (seed % 190));
-        const color = review.status === "resolved" ? token("--wk-brand") :
-          review.status === "open" ? token("--wk-warning") : token("--wk-text-muted");
-        ctx.strokeStyle = color; ctx.globalAlpha = .38 + (seed % 37) / 100;
-        const stem = 18 + (seed % 36);
-        ctx.lineWidth = .5 + (seed % 3) * .25;
-        ctx.beginPath(); ctx.moveTo(x, 2);
-        ctx.bezierCurveTo(x - 6, stem * .6, x + (seed % 29) - 14, stem, x + (seed % 39) - 19, height);
-        ctx.stroke();
-        const branches = 3 + (seed % 3);
-        for (let j = 1; j <= branches; j++) {
-          const y = height * j / (branches + 1);
-          const b = (j % 2 ? -1 : 1) * (9 + (seed % 12));
-          ctx.beginPath(); ctx.moveTo(x + (seed % 15) - 7, y);
-          ctx.quadraticCurveTo(x + b * .7, y + 12, x + b, Math.min(box.height - 3, y + 22));
-          ctx.stroke();
-        }
-      });
-      ctx.globalAlpha = 1;
-    };
-    const observer = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); });
-    observer.observe(el); draw();
-    const theme = new MutationObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); });
-    theme.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
-    return () => { observer.disconnect(); theme.disconnect(); cancelAnimationFrame(raf); };
-  }, [queue]);
-  return <canvas ref={ref} id="growth" role="img"
-    aria-label={"Root illustration of " + queue.total + " current Registry reviews. Green represents resolved, ochre represents open, and purple represents other review states. No timing is inferred."}/>;
-}
 
 function ReviewPreview({ items, onInspect }: { items: readonly QueueReviewV2[]; onInspect?: (id: string) => void }) {
   if (!items.length) {
@@ -350,7 +288,7 @@ export function MiziziHeadquartersBrief({
               <p className="when">Current authenticated Registry review inventory · Read at <WkZonedTimestamp value={queue.readAt} /></p>
               <h1>Across the Registry, <strong>{queue.resolved.toLocaleString()}</strong> reviews are resolved. <em>{queue.open.toLocaleString()} still need attention.</em></h1>
             </div>
-            <div className="growth-box"><MiziziReviewRoots queue={queue} /></div>
+            <MiziziReviewRoots queue={queue} onInspect={inspect} />
             <div className="mt-5">
               <WkStatusDistribution expectedTotal={queue.total}
                 ariaLabel="Current Registry review states"
@@ -363,7 +301,6 @@ export function MiziziHeadquartersBrief({
                 {queue.total.toLocaleString()} recorded reviews across {queue.workstreams.length} workstreams
               </p>
             </div>
-            <p className="mz-info-line mt-3">Each drawn root represents an existing review. This is a snapshot, not a history of actions.</p>
           </header>
           <OperatorReviewSession queue={queue} onInspect={inspect} />
           <div className="mz-brief-columns">

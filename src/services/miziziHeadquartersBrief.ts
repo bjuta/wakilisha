@@ -125,7 +125,7 @@ export function projectHeadquartersQueueV2(
         title: row.title?.trim() || "Review",
         workstream: key,
         workstreamLabel: labelForKey(key),
-        subjectType: row.entity_type || "Review",
+        subjectType: typeof row.entity_type === "string" && row.entity_type.trim() ? row.entity_type.trim() : "Unclassified",
         status,
         sourceStatus: row.status,
         updatedAt: row.updated_at,

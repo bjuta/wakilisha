@@ -6,13 +6,13 @@ Source: user-provided `mizizi.html`, SHA256 `ce05b3eb86b3e650292f8f1d3a1e2640e6f
 
 Preserve the source HTML's spatial and interaction principles, not its literal palette. The shipped WAKILISHA colour, typography, spacing and focus primitives take priority. `src/pages/admin/review/mizizi/mizizi-html.css` is now a route-scoped layout adapter using existing `--wk-*` tokens, not the original broad HTML element resets. The supplied HTML is a design reference, not authority for facts, rights or writes.
 
-This checkpoint ports the authenticated admin shell, real-queue Brief, decorative root rendering based on exact current review status, and the Field's connected Canvas representation of authorized MIZIZI review and artist-credit IDs. Case selection and Cores inspection continue through the existing authenticated Registry review path. Original protected History and Decision Work remain distinct.
+This checkpoint ports the authenticated admin shell, real-queue Brief, and the Field's connected Canvas representation of authorized MIZIZI review and artist-credit IDs. The Brief root graphic must be a traceable classification graph, not a decorative status-driven root generator. Case selection and Cores inspection continue through the existing authenticated Registry review path. Original protected History and Decision Work remain distinct.
 
 ## Unchanged authority and explicit exclusions
 
 The reference's client catalogues (Northline, Meridian, Kibo), review metrics, locations of graph clusters, fictional recordings/people, invented overnight activity, example evidence chains, confidence percentages, licence grants, hold toggle, outbound deliveries, and approving or rolling back a batch are *demonstration* content. Do not emit them in live UI or give their interactive mock functions backend authority.
 
-In this first visual checkpoint, graph clusters are positional only and **do not claim actual city/scene geography**, company grouping, rights, or identity merges. A linked credit is not a statement of rights. Root lines represent actual review records, not real event timing or an autonomous agent run. No WebSocket, LLM or live work simulation is added.
+In this first visual checkpoint, graph clusters are positional only and **do not claim actual city/scene geography**, company grouping, rights, or identity merges. A linked credit is not a statement of rights. Every Brief root connector must correspond to an actual review membership edge and every terminal mark to one authorized review ID. Neither a random hash nor a status is sufficient to assert an event, lineage or causal sequence. No WebSocket, LLM or live work simulation is added.
 
 Licences and Deliveries require their own evidenced operational substrate under the existing approved Slice 2/3 boundaries; do not create dummy cards, false completion, or automatic writes to match the screenshot.
 
@@ -44,3 +44,13 @@ Reuse semantic status tokens, accessible graph keys, split workspaces and source
 ### Remaining acceptance
 
 At desktop and 390px, check dark/light contrast, search icon clearance and label legibility, graph navigation, keyboard and screen-reader alternative, trackpad/wheel, touch pinch, reduced motion, source IDs, responsive panes, no CSS leakage, route splitting and protected CI. This first design adaptation does not close the approved Slice 1 operational exit gate or advance Slices 2/3 into Production.
+
+## Objective MIZIZI roots: 12 October 2026 owner correction
+
+**MIZIZI means roots.** The owner rejected the existing random-hash Canvas root illustration as abstract despite authentic review counts. Replace it completely with a source-reconciled membership view: Registry review inventory -> recorded review_type/workstream -> recorded entity_type/subject -> one exact Registry review ID per terminal mark, coloured and shape-coded by its recorded open/resolved/other status. Use the authenticated `HeadquartersQueueV2` read model only; every branch/category is produced by `projectMiziziReviewRootsV1` in `src/services/miziziReviewRoots.ts` and fails closed on count, membership, duplicate ID or source-status conflict.
+
+The root visualization lives in `src/pages/admin/review/mizizi/MiziziReviewRoots.tsx`. The operator can select a workstream and inspect recent authorized members through the existing Cores handler; the grouped diagram is not a new backend authority. The graph remains a snapshot of **categorization**, NOT an operation execution graph or proof that evidence was gathered, verified, published or delivered. No arbitrary curves, seeded random branching, fake elapsed-time animation or fabricated jobs. The mobile view stacks genuine branches, with the same inspect path and accessible status counts. Shapes distinguish state without colour.
+
+Once Slice 1 durable case/admission read evidence is genuinely accessible, extend the existing explicit edge model from reviewed case to immutable event/decision/receipt/operation/verification with source-qualified typed connections; independently authorized public-safe Core projections belong to Slice 2, and outward delivery ACKs/partner receipts belong to Slice 3. Never infer those links from review type, artist-name similarity, timing, or the number of records. No new backend read grants, RPC, SQL migration or deployment was made for this presentation correction.
+
+Acceptance is twofold: **exact source truth** (every mark/branch reconciles to the live authorized read, unknown states never hidden) and **visual comprehension** (a reviewer can answer which workstreams and subjects contain open work, select a real branch, inspect its recorded members, and tell that the picture is not operational runtime history). The pre-existing #1226 exit and PR #1227 draft status remain binding.
