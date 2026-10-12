@@ -110,7 +110,7 @@ export function searchMiziziFieldHits(
   );
 }
 export type MiziziFieldFocus =
-  | Readonly<{kind:"artist";name:string;artistId:string;related:readonly CaseSubject[]}>
+  | Readonly<{kind:"artist";name:string;artistId:string;related:readonly CaseSubject[];creditState:"needs_review"|"active"|"archived"|"unknown"}>
   | Readonly<{kind:"case";name:string;record:CaseSubject;credits:CaseSubject["artists"]}>;
 export function projectMiziziFieldFocus(rows:readonly CaseSubject[],key:string,state:"all"|"open"|"resolved"="all"):MiziziFieldFocus|null {
   if(key.startsWith("case:")){
@@ -120,8 +120,15 @@ export function projectMiziziFieldFocus(rows:readonly CaseSubject[],key:string,s
   if(key.startsWith("artist:")){
     const id=key.slice(7);
     const related=rows.filter(x=>(state==="all"||x.status===state)&&x.artists.some(a=>a.id===id));
-    const credit=related.flatMap(x=>x.artists).find(a=>a.id===id);
-    return credit?{kind:"artist",name:credit.name,artistId:id,related}:null;
+    const credits=related.flatMap(x=>x.artists.filter(a=>a.id===id));
+    const credit=credits[0];
+    // A review-needed credit is not made active by another recording's active credit.
+    // Only unanimously recorded active credits earn the resolved/active colour.
+    const states=credits.map(c=>c.status);
+    const creditState=states.includes("needs_review")?"needs_review":
+      states.length>0&&states.every(s=>s==="active")?"active":
+      states.length>0&&states.every(s=>s==="archived")?"archived":"unknown";
+    return credit?{kind:"artist",name:credit.name,artistId:id,related,creditState}:null;
   }
   return null;
 }

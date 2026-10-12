@@ -52,7 +52,10 @@ describe("MIZIZI Field uses genuine source relationships and deliberate selectio
     for (const hit of hits) {
       const focus = projectMiziziFieldFocus(fixtures, hit.key);
       expect(focus?.kind).toBe("artist");
-      if (focus?.kind === "artist") expect(focus.related.map(c => c.reviewId)).toEqual([desire.reviewId]);
+      if (focus?.kind === "artist") {
+        expect(focus.related.map(c => c.reviewId)).toEqual([desire.reviewId]);
+        expect(focus.creditState).toBe("needs_review");
+      }
     }
   });
   it("counts actual same-ID Lilmaina credits across name variants", () => {
@@ -75,7 +78,10 @@ describe("MIZIZI Field uses genuine source relationships and deliberate selectio
     expect(sameId?.subtitle).toContain("2 linked reviews");
     const selected = projectMiziziFieldFocus(inputs, sameId!.key);
     expect(selected?.kind).toBe("artist");
-    if (selected?.kind === "artist") expect(selected.related).toHaveLength(2);
+    if (selected?.kind === "artist") {
+      expect(selected.related).toHaveLength(2);
+      expect(selected.creditState).toBe("needs_review");
+    }
     expect(searchMiziziFieldHits(inputs, "Lilmaina")
       .some(hit => hit.key === "artist:6056976b-9394-4780-8fc4-21610f6d3fa9")).toBe(true);
   });
@@ -86,6 +92,12 @@ describe("MIZIZI Field uses genuine source relationships and deliberate selectio
     const result = projectMiziziFieldFocus(fixtures, "case:" + ficha.reviewId, "resolved");
     expect(result?.kind).toBe("case");
     if (result?.kind === "case") expect(result.credits[0].status).toBe("archived");
+    const archived = projectMiziziFieldFocus(fixtures, "artist:" + ficha.artists[0].id);
+    if (archived?.kind === "artist") expect(archived.creditState).toBe("archived");
+    else throw new Error("Expected existing archived credit");
+    const active = projectMiziziFieldFocus(fixtures, "artist:" + desire.artists[2].id);
+    if (active?.kind === "artist") expect(active.creditState).toBe("active");
+    else throw new Error("Expected existing active credit");
     expect(projectMiziziFieldFocus(fixtures, "artist:unrecorded")).toBeNull();
   });
 });

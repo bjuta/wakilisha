@@ -138,13 +138,15 @@ export function MiziziReviewField({
             </g>
             <circle cx={X} cy={Y} r="75" stroke="currentColor" strokeWidth="2"
               fill="currentColor" fillOpacity=".08"
-              className={openCase ? tone(openCase.status) : "text-wk-brand"} />
+              className={tone(focused.kind === "artist" ? focused.creditState : openCase?.status ?? "other")} />
             <text x={X} y={Y-10} textAnchor="middle" fontSize="19" fontWeight="700"
               fill="currentColor" className="text-wk-text">{label(focused.name, 22)}</text>
             <text x={X} y={Y+15} textAnchor="middle" fontSize="12"
               fill="currentColor" className="text-wk-text-muted">
-              {focused.kind === "artist" ? "Recorded artist credit" :
-                openCase?.kind === "track" ? "Reviewed recording" : "Reviewed release"}
+              {focused.kind === "artist"
+                ? (focused.creditState === "unknown" ? "Recorded artist credit" :
+                    stateLabel(focused.creditState) + " · artist credit")
+                : openCase?.kind === "track" ? "Reviewed recording" : "Reviewed release"}
             </text>
             {plotted.map((item, i) => {
               const pt = layout(i, plotted.length);
@@ -254,7 +256,7 @@ export function MiziziReviewField({
           <div className="my-2 border-t border-wk-border" aria-hidden="true" />
           <p><span className="text-wk-warning">●</span> Open / needs review</p>
           <p><span className="text-wk-brand">●</span> Resolved / active</p>
-          <p>○ Archived or unknown — not approved</p>
+          <p>○ Archived or unknown. Not approved.</p>
           <p className="mt-2">Lines show recorded credit links, not rights.</p>
         </div>
       </div>
