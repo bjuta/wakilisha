@@ -95,7 +95,7 @@ export function MiziziReviewField({
     if (e.button !== 0) return;
     suppressNodeClick.current = false;
     drag.current = { clientX: e.clientX, clientY: e.clientY, x: camera.x, y: camera.y, dragged: false };
-    e.currentTarget.setPointerCapture(e.pointerId);
+    // Capture only once a drag starts; eager capture swallows simple node clicks.
   };
   const move = (e: PointerEvent<SVGSVGElement>) => {
     const prev = drag.current;
@@ -105,11 +105,16 @@ export function MiziziReviewField({
     const dx = e.clientX - prev.clientX;
     const dy = e.clientY - prev.clientY;
     if (Math.abs(dx) + Math.abs(dy) > 3) prev.dragged = true;
-    if (prev.dragged) setCamera((current) => ({
+    if (prev.dragged) {
+      if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      setCamera((current) => ({
       ...current,
       x: prev.x - dx * WIDTH / (bounds.width * current.zoom),
       y: prev.y - dy * HEIGHT / (bounds.height * current.zoom),
-    }));
+      }));
+    }
   };
   const release = (e: PointerEvent<SVGSVGElement>) => {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
@@ -121,7 +126,7 @@ export function MiziziReviewField({
     <section data-wk-mizizi-field aria-label="Registry review Field"
       className="relative min-h-[590px] h-[min(76vh,850px)] overflow-hidden border-y border-wk-border bg-wk-surface">
       <svg className="h-full w-full cursor-grab touch-none active:cursor-grabbing"
-        role="img" aria-label={`Registry review landscape, ${matching.length} visible cases grouped by recorded workstream. This is not a map of musical credits.`}
+        role="group" aria-label={`Registry review landscape, ${matching.length} visible cases grouped by recorded workstream. This is not a map of musical credits.`}
         viewBox={`${camera.x} ${camera.y} ${viewWidth} ${viewHeight}`}
         preserveAspectRatio="xMidYMid meet"
         onPointerDown={moveStart} onPointerMove={move} onPointerUp={release} onPointerCancel={release}>
@@ -154,8 +159,14 @@ export function MiziziReviewField({
         {projection.nodes.filter((n) => allowed.has(n.id)).map(({ id, x, y, item }) => (
           <g key={id} className={item.status === "open" ? "text-wk-warning" :
             item.status === "resolved" ? "text-wk-brand" : "text-wk-text-muted"}
-            role="button" tabIndex={-1}
+            role="button" tabIndex={0}
             aria-label={`${item.title}; ${statusText[item.status]}; open evidence`}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onInspect(id);
+              }
+            }}
             onClick={() => { if (!suppressNodeClick.current) onInspect(id); }}>
             <title>{`${item.title} · ${statusText[item.status]} · ${item.workstreamLabel}`}</title>
             {item.subjectType === "track" || item.subjectType === "release" ?

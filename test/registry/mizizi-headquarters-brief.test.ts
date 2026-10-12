@@ -61,6 +61,26 @@ describe("Governed Decision Work follows the selected-job list/detail layout", (
   });
 });
 
+describe("Field nodes and selected Cores work as in the reference", () => {
+  it("does not capture a pointer until the user drags, preserving simple click selection", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziReviewField.tsx", "utf8");
+    const down = source.slice(source.indexOf("const moveStart"), source.indexOf("const move ="));
+    const move = source.slice(source.indexOf("const move ="), source.indexOf("const release ="));
+    expect(down).not.toContain("setPointerCapture");
+    expect(move).toContain("setPointerCapture");
+    expect(move).toContain("prev.dragged");
+    expect(source).toContain("onKeyDown={(e) =>");
+    expect(source).toContain('role="group"');
+  });
+
+  it("selects the first matching Core when no review was explicitly selected", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx", "utf8");
+    expect(source).toContain("selection.items[0] ?? null");
+    expect(source).toContain('mode === "history"');
+    expect(source).toContain('queue.recentResolved[0]');
+  });
+});
+
 describe("Flat master/detail history and evidence workspaces", () => {
   it("uses one shared divider-based split with compact edge selectors", () => {
     const shell = readFileSync("src/components/data-viz/WkSplitWorkspace.tsx", "utf8");

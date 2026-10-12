@@ -93,7 +93,8 @@ export function MiziziEvidenceWorkbench({
   }), [queue.items, status, workstream, query, page]);
   const selected = queue.items.find((item) => item.id === selectedId &&
     (mode !== "history" || item.status === "resolved"))
-    ?? (mode === "history" ? queue.recentResolved[0] ?? null : null);
+    ?? (mode === "history" ? selection.items.find((item) => item.status === "resolved")
+      ?? queue.recentResolved[0] ?? null : selection.items[0] ?? null);
   const pageKey = selection.items.map((item) => item.id).join(",");
 
   // One bounded authenticated read for the visible page, never 301 per-item requests.
