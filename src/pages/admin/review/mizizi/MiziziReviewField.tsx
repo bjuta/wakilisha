@@ -182,7 +182,7 @@ export function MiziziReviewField({
           </text>
         </g>}
       </svg>
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-between">
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between">
         <div className="pointer-events-auto flex w-[min(335px,82%)] max-h-[min(74vh,640px)] flex-col border-b border-r border-wk-border bg-wk-surface/95 p-4">
           <h2 className="mb-3 text-[18px] font-black text-wk-text">The Field</h2>
           <WkSearchField ariaLabel="Find an artist, recording, release or ISRC in real MIZIZI cases"
