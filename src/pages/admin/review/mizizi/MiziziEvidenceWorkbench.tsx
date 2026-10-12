@@ -89,8 +89,8 @@ export function MiziziEvidenceWorkbench({
   } | null>(null);
 
   const selection = useMemo(() => selectOperatorReviewPageV1(queue.items, {
-    status, workstream, search: query, page,
-  }), [queue.items, status, workstream, query, page]);
+    status: mode === "history" ? "resolved" : status, workstream, search: query, page,
+  }), [queue.items, status, workstream, query, page, mode]);
   const selected = queue.items.find((item) => item.id === selectedId &&
     (mode !== "history" || item.status === "resolved"))
     ?? (mode === "history" ? selection.items.find((item) => item.status === "resolved")
@@ -232,7 +232,8 @@ export function MiziziEvidenceWorkbench({
             placeholder="Search claims, types, references" />
           <div className="border-t border-wk-border pt-2" data-wk-edge-filters>
             <div className="flex flex-wrap gap-1" aria-label="Filter by review status">
-              {(["open", "resolved", "all", "other"] as const).map((value) => (
+              {(mode === "history" ? ["resolved"] as const :
+                ["open", "resolved", "all", "other"] as const).map((value) => (
                 <button key={value} type="button" aria-pressed={status === value}
                   onClick={() => { setStatus(value); setPage(1); onSelectedIdChange(null); }}
                   className={`border-b-2 px-2 py-2 text-[12px] font-semibold ${status === value

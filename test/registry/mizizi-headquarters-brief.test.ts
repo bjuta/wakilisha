@@ -76,6 +76,7 @@ describe("Field nodes and selected Cores work as in the reference", () => {
   it("selects the first matching Core when no review was explicitly selected", () => {
     const source = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx", "utf8");
     expect(source).toContain("selection.items[0] ?? null");
+    expect(source).toContain('status: mode === "history" ? "resolved" : status');
     expect(source).toContain('mode === "history"');
     expect(source).toContain('queue.recentResolved[0]');
   });
