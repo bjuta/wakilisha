@@ -620,7 +620,10 @@ describe("MIZIZI bounded media and zoned timestamp", () => {
     expect(source).toContain('.select("id,title,entity_type,source_id,source_payload")');
     expect(source).toContain("review.subjectType === row.entity_type");
     expect(source).toContain("uuid(row.source_id)");
-    expect(source).toContain('.select("id,artwork_url")');
+    expect(source).toContain('.select("id,title,artwork_url")');
+    expect(source).toContain("canonical?.title && subjects[item.reviewId]");
+    expect(source).toContain("subjectHeading");
+    expect(source).toContain("The canonical source title outranks any slug-derived review label.");
     expect(source).toContain("<WkRecordingArtwork");
     expect(source).toContain("<WkZonedTimestamp");
   });

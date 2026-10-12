@@ -639,3 +639,18 @@
   .wk-review-job-issue{padding:12px 14px}
   .wk-review-job-head h3{font-size:23px}
 }
+
+/* Evidence first. Technical references remain available without dominating
+   the modal's initial reading sequence. */
+[data-wk-registry-record-readonly] .wk-review-record-issue-summary {
+  display:grid;gap:7px;min-width:0;
+}
+[data-wk-registry-record-readonly] .wk-review-record-issue-summary .wk-review-record-description-text {
+  margin:0;
+}
+[data-wk-registry-record-readonly] .wk-review-record-meta-facts {
+  margin-top:2px;
+}
+[data-wk-registry-record-readonly] .wk-release-evidence-title {
+  overflow-wrap:anywhere;
+}

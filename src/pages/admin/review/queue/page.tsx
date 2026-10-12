@@ -615,6 +615,53 @@ function reviewTypeLabel(value: string): string {
   return value ? humanize(value) : "Unclassified Review";
 }
 
+/** A single bounded, read-only title lookup for the loaded exact source IDs.
+ * The source title is display context, not proof that a proposed slug was accepted.
+ */
+function useLoadedCanonicalTitles(rows: readonly RegistryReviewItemRow[]): Readonly<Record<string, string>> {
+  const [snapshot, setSnapshot] = useState<Readonly<Record<string, string>>>({});
+  useEffect(() => {
+    let active = true;
+    setSnapshot({});
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const eligible = rows.filter(row => row.source_id && uuidPattern.test(row.source_id) &&
+      ((row.entity_type === "release" && row.source_table === "registry_releases") ||
+       (row.entity_type === "track" && row.source_table === "registry_tracks"))).slice(0, 300);
+    const readTitles = async () => {
+      const next: Record<string, string> = {};
+      for (const kind of ["release", "track"] as const) {
+        const group = eligible.filter(row => row.entity_type === kind);
+        if (!group.length) continue;
+        const table = kind === "release" ? "registry_releases" : "registry_tracks";
+        const sourceIds = [...new Set(group.map(row => row.source_id as string))];
+        // Keep each source read bounded even if the review pagination grows.
+        for (let offset = 0; offset < sourceIds.length; offset += 100) {
+          const requested = sourceIds.slice(offset, offset + 100);
+          const { data, error } = await supabase.from(table)
+            .select("id,title").in("id", requested);
+          if (!active) return;
+          if (error || !data) continue;
+          const allowed = new Set(requested);
+          const verified = new Map<string, string>();
+          for (const record of data) {
+            if (!record || !allowed.has(record.id) || verified.has(record.id) ||
+                typeof record.title !== "string" || !record.title.trim()) continue;
+            verified.set(record.id, record.title.trim());
+          }
+          for (const row of group) {
+            const title = verified.get(row.source_id as string);
+            if (title) next[row.id] = title;
+          }
+        }
+      }
+      if (active) setSnapshot(next);
+    };
+    void readTitles().catch(() => { if (active) setSnapshot({}); });
+    return () => { active = false; };
+  }, [rows]);
+  return snapshot;
+}
+
 function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }: {
   initialRows: RegistryReviewItemRow[];
   summary: RegistryReviewSummaryRow[];
@@ -624,6 +671,7 @@ function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }
 }) {
   const [filters, setFilters] = useState<RegistryFilterState>(DEFAULT_REGISTRY_FILTERS);
   const [rows, setRows] = useState<RegistryReviewItemRow[]>(initialRows.filter(row => row.status === "open"));
+  const canonicalTitles = useLoadedCanonicalTitles(rows);
   const [total, setTotal] = useState(
     openTotal
   );
@@ -780,6 +828,7 @@ function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }
                 </p>
                 {group.items.slice(0, visibleIssueItems[group.key] ?? 6).map(row => (
                   <RegistryReviewRow key={row.id} row={row} compact
+                    canonicalTitle={canonicalTitles[row.id]}
                     expanded={expandedId === row.id}
                     onToggle={() => setExpandedId(current => current === row.id ? null : row.id)}
                     onOpen={() => onOpen(row)}
@@ -800,6 +849,7 @@ function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }
           </section>
         ) : group.items.map(row => (
           <RegistryReviewRow key={row.id} row={row}
+            canonicalTitle={canonicalTitles[row.id]}
             expanded={expandedId === row.id}
             onToggle={() => setExpandedId(current => current === row.id ? null : row.id)}
             onOpen={() => onOpen(row)}
@@ -843,7 +893,8 @@ function FilterSelect({ label, value, options, onChange }: {
   </label>;
 }
 
-function RegistryReviewRow({ row, expanded, onToggle, onOpen, onRead, compact = false }: {
+function RegistryReviewRow({ row, canonicalTitle, expanded, onToggle, onOpen, onRead, compact = false }: {
+  canonicalTitle?: string;
   row: RegistryReviewItemRow;
   compact?: boolean;
   expanded: boolean;
@@ -858,10 +909,11 @@ function RegistryReviewRow({ row, expanded, onToggle, onOpen, onRead, compact = 
   const recorded = row.review_type === "mizizi_data_hygiene"
     ? projectRecordedCaseSubject(row.source_payload, row.title ?? "")
     : null;
-  const reviewedTitle = singleReleaseIdentityIssue(row) || genericChartIssue(row)
-    ? sourceDisplay(row)
-    : recorded?.specific ? recorded.title
-      : row.title?.trim() || row.review_key || row.id;
+  const reviewedTitle = canonicalTitle ||
+    (singleReleaseIdentityIssue(row) || genericChartIssue(row)
+      ? sourceDisplay(row)
+      : recorded?.specific ? recorded.title
+        : row.title?.trim() || row.review_key || row.id);
   const recordedSource = [row.source_table, row.source_id || row.entity_id].filter(Boolean).join(" / ");
   return <article className={"wk-review-record" + (compact ? " is-issue-child" : "")}
     data-wk-review-record={row.id}>
@@ -874,8 +926,10 @@ function RegistryReviewRow({ row, expanded, onToggle, onOpen, onRead, compact = 
       <span className="wk-review-record-description">
         <strong className="wk-review-record-title">{reviewedTitle}</strong>
         <span className="wk-review-record-context">
-          {reviewTypeLabel(row.review_type || "")}
-          {row.entity_type ? " · " + humanize(row.entity_type) : ""}
+          {row.entity_type ? humanize(row.entity_type) : reviewTypeLabel(row.review_type || "")}
+          {singleReleaseIdentityIssue(row) && canonicalTitle &&
+           typeof row.source_payload?.currentValue === "string" && row.source_payload.currentValue.trim()
+            ? " · Current slug: " + row.source_payload.currentValue.trim() : ""}
         </span>
         {recorded?.artistReference ? (
           <span className="wk-review-record-context">Recorded artist reference: {recorded.artistReference}</span>
@@ -995,7 +1049,7 @@ function RegistryReadOnlyModal({ item, onClose }: {
     Object.keys(item.resolution_payload).length > 0,
   );
   return <Modal open onClose={onClose}
-    title={canonicalTitle || (governedRelease ? "Release Identity Review" : item.title?.trim() || "Recorded Registry Review")}
+    title={governedRelease ? "Release identity review" : canonicalTitle || item.title?.trim() || "Recorded Registry Review"}
     maxWidth="3xl"
     footer={<button type="button" className="wk-button wk-button-soft wk-button-sm"
       onClick={onClose}>Close Record</button>}>
@@ -1003,9 +1057,9 @@ function RegistryReadOnlyModal({ item, onClose }: {
       {governedRelease ? (
         <section aria-label="Release identity evidence" className="wk-release-evidence">
           <h3 className="wk-release-evidence-title">
-            {canonicalTitle || "Release Identity Conflict"}
+            {canonicalTitle || "Release title unavailable"}
           </h3>
-          {canonicalTitle ? <p className="wk-release-evidence-intro">Recorded Release title · Identity conflict</p> : null}
+          <p className="wk-release-evidence-intro">Recorded Release identity conflict</p>
           <p className="wk-release-evidence-intro">
             The current Release identity conflicts with recorded Registry or Community evidence.
             Inspect each source before a governed MIZIZI decision.
@@ -1038,20 +1092,25 @@ function RegistryReadOnlyModal({ item, onClose }: {
       ) : null}
       <div className="wk-review-record-modal-head" aria-label="Recorded review status">
         <span className="wk-review-record-state is-other">{humanize(item.status || "Unknown")}</span>
-        <span className="text-[12px] text-wk-text-muted">{reviewTypeLabel(item.review_type || "")}</span>
+        {!governedRelease ? <span className="text-[12px] text-wk-text-muted">{reviewTypeLabel(item.review_type || "")}</span> : null}
       </div>
-      <p className="wk-review-record-description-text">
-        {item.summary || "The Registry has not recorded a summary for this review."}
-      </p>
-      <h3 className="wk-review-record-meta-title">Source References</h3>
-      <dl className="wk-review-record-facts wk-review-record-meta-facts">
-        <div><dt>Review Reference</dt><dd className="break-all font-mono">{item.id}</dd></div>
-        <div><dt>Recorded State</dt><dd>{humanize(item.status || "Unknown")}</dd></div>
-        {item.priority ? <div><dt>Priority</dt><dd>{humanize(item.priority)}</dd></div> : null}
-        {item.entity_type ? <div><dt>Subject</dt><dd>{humanize(item.entity_type)}</dd></div> : null}
-        {item.source_table ? <div><dt>Source Table</dt><dd>{item.source_table}</dd></div> : null}
-        {item.source_id ? <div><dt>Source ID</dt><dd className="break-all font-mono">{item.source_id}</dd></div> : null}
-      </dl>
+      <div className="wk-review-record-issue-summary">
+        <h3 className="wk-review-record-meta-title">What needs review</h3>
+        <p className="wk-review-record-description-text">
+          {item.summary || "The Registry has not recorded a summary for this review."}
+        </p>
+      </div>
+      <WkDisclosure summary="Review references" triggerClassName="wk-button wk-button-ghost wk-button-sm"
+        contentClassName="pt-3">
+        <dl className="wk-review-record-facts wk-review-record-meta-facts">
+          <div><dt>Review Reference</dt><dd className="break-all font-mono">{item.id}</dd></div>
+          <div><dt>Recorded State</dt><dd>{humanize(item.status || "Unknown")}</dd></div>
+          {item.priority ? <div><dt>Priority</dt><dd>{humanize(item.priority)}</dd></div> : null}
+          {item.entity_type ? <div><dt>Subject</dt><dd>{humanize(item.entity_type)}</dd></div> : null}
+          {item.source_table ? <div><dt>Source Table</dt><dd>{item.source_table}</dd></div> : null}
+          {item.source_id ? <div><dt>Source ID</dt><dd className="break-all font-mono">{item.source_id}</dd></div> : null}
+        </dl>
+      </WkDisclosure>
       <div className="wk-review-record-source-section">
         <WkDisclosure summary="Read Recorded Source Data"
           triggerClassName="wk-button wk-button-ghost wk-button-sm"

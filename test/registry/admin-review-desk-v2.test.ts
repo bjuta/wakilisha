@@ -109,7 +109,7 @@ describe("All Reviews v2: governed review desk", () => {
     expect(page).toContain("if (requiresGovernedSingleReleaseReview(selectedItem))");
     expect(page).toContain("setSelectedRecord(item);");
     expect(page).toContain("The generic decision form cannot resolve it.");
-    expect(page).toContain("Release Identity Conflict");
+    expect(page).toContain("Release identity review");
     expect(page).toContain("Proposed Release Slug (Not Approved)");
     expect(page).toContain("Recorded Conflict Reasons");
     expect(page).toContain("This review stays open.");
@@ -135,6 +135,21 @@ describe("All Reviews v2: governed review desk", () => {
     expect(page).toContain("Record Revised Decision");
     expect(page).toContain("{!publicMusicReview ? (");
     expect(page).not.toContain('label="Source artist text" value={artistText || "Missing"}');
+  });
+
+  it("reads exact canonical subjects in one bounded queue batch and keeps metadata subordinate", () => {
+    expect(page).toContain("function useLoadedCanonicalTitles(");
+    expect(page).toContain("const canonicalTitles = useLoadedCanonicalTitles(rows);");
+    expect(page).toContain("canonicalTitle={canonicalTitles[row.id]}");
+    expect(page).toContain('row.source_table === "registry_releases"');
+    expect(page).toContain('row.source_table === "registry_tracks"');
+    expect(page).toContain("sourceIds.slice(offset, offset + 100)");
+    expect(page).toContain("const reviewedTitle = canonicalTitle ||");
+    expect(page).toContain("Current slug: ");
+    expect(page).toContain('summary="Review references"');
+    expect(page).toContain("What needs review");
+    expect(page).toContain("The generic decision form cannot resolve it.");
+    expect(css).toContain(".wk-review-record-issue-summary");
   });
 
   it("never copies preset verification assertions into human decision notes", () => {

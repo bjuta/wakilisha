@@ -136,20 +136,33 @@ export function MiziziEvidenceWorkbench({
           const batch = mediaRows.filter((item) => item.kind === kind);
           if (!batch.length) continue;
           const result = await supabase.from(kind === "track" ? "registry_tracks" : "registry_releases")
-            .select("id,artwork_url").in("id", [...new Set(batch.map((item) => item.sourceId))]);
+            .select("id,title,artwork_url").in("id", [...new Set(batch.map((item) => item.sourceId))]);
           if (!active) return;
           if (result.error || !result.data) continue;
           const validIds = new Set(batch.map((item) => item.sourceId));
-          const imageById = new Map<string, string>();
-          for (const image of result.data) {
-            if (image && typeof image.id === "string" && validIds.has(image.id) &&
-                typeof image.artwork_url === "string" && !imageById.has(image.id)) {
-              imageById.set(image.id, image.artwork_url);
-            }
+          const canonicalById = new Map<string, { title: string | null; artwork: string | null }>();
+          for (const record of result.data) {
+            if (!record || typeof record.id !== "string" ||
+                !validIds.has(record.id) || canonicalById.has(record.id)) continue;
+            canonicalById.set(record.id, {
+              title: typeof record.title === "string" && record.title.trim()
+                ? record.title.trim() : null,
+              artwork: typeof record.artwork_url === "string" && record.artwork_url.trim()
+                ? record.artwork_url : null,
+            });
           }
           for (const item of batch) {
-            const image = imageById.get(item.sourceId);
-            if (image) artwork[item.reviewId] = image;
+            const canonical = canonicalById.get(item.sourceId);
+            if (canonical?.artwork) artwork[item.reviewId] = canonical.artwork;
+            // The canonical source title outranks any slug-derived review label.
+            // Keep the recorded artist reference and exact review identity.
+            if (canonical?.title && subjects[item.reviewId]) {
+              subjects[item.reviewId] = {
+                ...subjects[item.reviewId],
+                title: canonical.title,
+                specific: true,
+              };
+            }
           }
         }
         if (active) setPageSubjects({ pageKey, subjects, artwork });
@@ -215,6 +228,10 @@ export function MiziziEvidenceWorkbench({
   const evidence = asRecord(source.evidence);
   const resolution = asRecord(fact?.resolution_payload);
   const recordedSubject = projectRecordedCaseSubject(fact?.source_payload, selected?.title ?? "");
+  const visibleCanonicalSubject = pageSubjects.pageKey === pageKey && selected
+    ? pageSubjects.subjects[selected.id] : undefined;
+  const subjectHeading = visibleCanonicalSubject?.specific
+    ? visibleCanonicalSubject.title : recordedSubject.title;
   const peers = Array.isArray(evidence.peers) ? evidence.peers.slice(0, 8) : [];
   const evidencePairs = Object.entries(evidence).filter(([key, value]) =>
     key !== "peers" && (textOf(value) !== null)).slice(0, 9);
@@ -342,9 +359,9 @@ export function MiziziEvidenceWorkbench({
               <CaseStatus status={selected.status} />
             </div>
             <h3 className="claim">
-              {recordedSubject.title}
+              {subjectHeading}
             </h3>
-            {fact && recordedSubject.specific ? (
+            {fact && (recordedSubject.specific || visibleCanonicalSubject?.specific) ? (
               <div className="mt-2 space-y-1 text-[12px] leading-5 text-wk-text-muted">
                 <p>{selected.title}</p>
                 {recordedSubject.artistReference ? (
