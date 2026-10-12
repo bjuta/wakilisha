@@ -61,7 +61,8 @@ describe("All Reviews v2: governed review desk", () => {
     expect(page).toContain("group.items.slice(0, visibleIssueItems[group.key] ?? 6)");
 
     expect(page).toContain("Read Governed Record");
-    expect(page).toContain('onClick={open ? onOpen : onRead}');
+    expect(page).toContain('onClick={open && !needsReleaseGovernance ? onOpen : onRead}');
+    expect(page).toContain("Inspect Release Evidence");
     expect(page).toContain("recordRegistryReviewDecision({");
     expect(page).toContain("loadPublicMusicIdentityTrackReviewContext(item.id)");
     expect(page).toContain("expectedTrackStateFingerprint");
@@ -94,4 +95,34 @@ describe("All Reviews v2: governed review desk", () => {
     expect(css).not.toContain("!important");
     expect(css).not.toMatch(/#[0-9a-f]{6}/i);
   });
+
+  it("blocks generic decisions on Single Release MIZIZI conflicts in both UI and service", () => {
+    expect(service).toContain('export function requiresGovernedSingleReleaseReview(');
+    expect(service).toContain('item.source_payload?.ruleId === "release_single_identity_conflict"');
+    const writerStart = service.indexOf("export async function recordRegistryReviewDecision(");
+    const guard = service.indexOf("if (requiresGovernedSingleReleaseReview(item))", writerStart);
+    const legacyInsert = service.indexOf('supabase.from("registry_canonicalization_decisions").insert', writerStart);
+    expect(guard).toBeGreaterThan(writerStart);
+    expect(legacyInsert).toBeGreaterThan(guard);
+    expect(service).toContain("The generic review writer cannot record or resolve it.");
+    expect(page).toContain("if (requiresGovernedSingleReleaseReview(item))");
+    expect(page).toContain("if (requiresGovernedSingleReleaseReview(selectedItem))");
+    expect(page).toContain("setSelectedRecord(item);");
+    expect(page).toContain("This review cannot be resolved through the generic decision writer.");
+    expect(page).toContain("Release identity conflict");
+    expect(page).toContain("Proposed Release Slug (Not Approved)");
+    expect(page).toContain("Recorded Conflict Reasons");
+    expect(page).toContain("Read-only here.");
+  });
+
+  it("never copies preset verification assertions into human decision notes", () => {
+    expect(page).toContain('const setPreset = (decisionType: RegistryDecisionType) => {');
+    expect(page).toContain('decisionType, notes: "", message: ""');
+    expect(page).toContain('decisionType: value as RegistryDecisionType, notes: "", message: ""');
+    expect(page).toContain('disabled={decision.submitting || !decision.notes.trim()}');
+    expect(page).toContain('if (!notes) {');
+    expect(page).not.toContain('setPreset("approve_primary_artist", "Verified');
+    expect(page).not.toContain('setPreset("public_music_identity_true_duplicate", "Authoritative evidence');
+  });
+
 });

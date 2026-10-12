@@ -599,8 +599,25 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
   };
 }
 
+/**
+ * MIZIZI Release Single conflicts are review-only until the exact governed
+ * Release resolution contract exists. Never send them through the legacy
+ * generic decision writer, which would mark an unresolved review resolved.
+ * Guard on source rule, not display title or the current rule version.
+ */
+export function requiresGovernedSingleReleaseReview(item: RegistryReviewItemRow): boolean {
+  return item.review_type === "mizizi_data_hygiene"
+    && item.entity_type === "release"
+    && item.source_payload?.ruleId === "release_single_identity_conflict";
+}
+
 export async function recordRegistryReviewDecision(input: RegistryReviewDecisionInput): Promise<void> {
   const item = input.item;
+  if (requiresGovernedSingleReleaseReview(item)) {
+    throw new Error(
+      "This Release identity conflict requires governed MIZIZI resolution. The generic review writer cannot record or resolve it.",
+    );
+  }
   const notes = input.notes.trim();
   let resolutionPayload = {
     decisionType: input.decisionType,
