@@ -962,26 +962,35 @@ function RegistryReviewRow({ row, canonicalTitle, expanded, onToggle, onOpen, on
           <h4>Recorded Issue</h4>
           <p>{row.summary || "This review needs an inspection of its source record."}</p>
         </div>
-        <dl className="wk-review-record-facts">
-          {artistText ? <div><dt>Source Artist</dt><dd>{artistText}</dd></div> : null}
-          {artistSlug ? <div><dt>Recorded Artist Slug</dt><dd>{artistSlug}</dd></div> : null}
-          <div><dt>Review Status</dt><dd>{humanize(row.status || "Unknown")}</dd></div>
-          <div><dt>Review Reference</dt><dd className="break-all font-mono">{row.id}</dd></div>
-          {recordedSource ? <div><dt>Source Reference</dt><dd className="break-all">{recordedSource}</dd></div> : null}
-          {singleReleaseIdentityIssue(row) ? (
-            <>
-              {typeof row.source_payload?.currentValue === "string" && row.source_payload.currentValue.trim() ? (
-                <div><dt>Current Release Slug</dt><dd className="break-all">{row.source_payload.currentValue}</dd></div>
-              ) : null}
-              {typeof row.candidate_payload?.proposedValue === "string" && row.candidate_payload.proposedValue.trim() ? (
-                <div><dt>Proposed Release Slug</dt><dd className="break-all">{row.candidate_payload.proposedValue}</dd></div>
-              ) : null}
-            </>
-          ) : null}
-          {groupableReviewIssue(row) ? (
-            <div><dt>Recorded Issue Title</dt><dd>{row.title}</dd></div>
-          ) : null}
-        </dl>
+        {(artistText || artistSlug || singleReleaseIdentityIssue(row)) ? (
+          <dl className="wk-review-record-facts wk-review-record-decision-facts">
+            {artistText ? <div><dt>Source Artist</dt><dd>{artistText}</dd></div> : null}
+            {artistSlug ? <div><dt>Recorded Artist Slug</dt><dd>{artistSlug}</dd></div> : null}
+            {singleReleaseIdentityIssue(row) ? (
+              <>
+                {typeof row.source_payload?.currentValue === "string" && row.source_payload.currentValue.trim() ? (
+                  <div><dt>Current Release Slug</dt><dd className="break-all">{row.source_payload.currentValue}</dd></div>
+                ) : null}
+                {typeof row.candidate_payload?.proposedValue === "string" && row.candidate_payload.proposedValue.trim() ? (
+                  <div><dt>Proposed Release Slug (Not Approved)</dt><dd className="break-all">{row.candidate_payload.proposedValue}</dd></div>
+                ) : null}
+              </>
+            ) : null}
+          </dl>
+        ) : null}
+        <WkDisclosure summary="Technical references"
+          className="wk-review-record-technical"
+          triggerClassName="wk-button wk-button-ghost wk-button-sm wk-review-record-technical-trigger"
+          contentClassName="wk-review-record-technical-content">
+          <dl className="wk-review-record-facts">
+            <div><dt>Review Status</dt><dd>{humanize(row.status || "Unknown")}</dd></div>
+            <div><dt>Review Reference</dt><dd className="break-all font-mono">{row.id}</dd></div>
+            {recordedSource ? <div><dt>Source Reference</dt><dd className="break-all">{recordedSource}</dd></div> : null}
+            {groupableReviewIssue(row) ? (
+              <div><dt>Recorded Issue Title</dt><dd>{row.title}</dd></div>
+            ) : null}
+          </dl>
+        </WkDisclosure>
       </div>
       <div className="wk-review-record-footer">
         <p>{needsReleaseGovernance

@@ -56,6 +56,13 @@ describe("All Reviews v2: governed review desk", () => {
     expect(page).toContain("Current Release Slug");
     expect(page).toContain("Proposed Release Slug");
     expect(page).toContain("Recorded Issue Title");
+    expect(page).toContain('summary="Technical references"');
+    expect(page).toContain('className="wk-review-record-facts wk-review-record-decision-facts"');
+    expect(page).toContain("Proposed Release Slug (Not Approved)");
+    expect(page).toContain('contentClassName="wk-review-record-technical-content"');
+    expect(css).toContain(".wk-review-record-technical-trigger");
+    expect(css).toContain("overflow-x:visible;flex-wrap:wrap;white-space:normal");
+    expect(page).toContain('onClick={open && !needsReleaseGovernance ? onOpen : onRead}');
     expect(page).toContain("data-wk-review-issue-group={group.key}");
     expect(page).toContain('label="About This Group"');
     expect(page).toContain("group.items.slice(0, visibleIssueItems[group.key] ?? 6)");

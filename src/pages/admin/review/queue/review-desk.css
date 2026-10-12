@@ -674,3 +674,28 @@
   [data-wk-review-desk] .wk-review-desk-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
   [data-wk-review-desk] .wk-review-issue-help{padding:8px 12px}
 }
+
+
+/* Job-first inline inspection: operational values remain visible while UUIDs
+   and repeated status metadata are optional, including on narrow screens. */
+[data-wk-review-desk] .wk-review-record-evidence > div:first-child{min-width:0}
+[data-wk-review-desk] .wk-review-record-evidence > .wk-review-record-technical{grid-column:1/-1}
+[data-wk-review-desk] .wk-review-record-technical{min-width:0;margin-top:2px}
+[data-wk-review-desk] .wk-review-record-technical-trigger{
+  min-height:36px;display:inline-flex;align-items:center;justify-content:flex-start;
+}
+[data-wk-review-desk] .wk-review-record-technical-content{padding-top:9px}
+[data-wk-review-desk] .wk-review-record-decision-facts > div{padding-top:7px}
+@media(max-width:700px){
+  /* All workstream choices remain visible and clickable; no clipped partial chip. */
+  [data-wk-review-desk] .wk-review-types{
+    overflow-x:visible;flex-wrap:wrap;white-space:normal;gap:7px;
+  }
+  [data-wk-review-desk] .wk-review-types button{
+    min-height:38px;white-space:normal;text-align:left;
+  }
+  [data-wk-review-desk] .wk-review-record-technical{margin-top:0}
+  [data-wk-review-desk] .wk-review-record-detail{
+    padding:16px 14px 19px;
+  }
+}
