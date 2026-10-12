@@ -57,7 +57,7 @@ export function MiziziReviewField({
   const selectedKey = chosen && matches.some(item => item.key === chosen) ? chosen :
     matches.length === 1 ? matches[0].key : null;
   const focused = useMemo(() => selectedKey
-    ? projectMiziziFieldFocus(cases, selectedKey) : null, [cases, selectedKey]);
+    ? projectMiziziFieldFocus(cases, selectedKey, filter) : null, [cases, selectedKey, filter]);
   const links = focused?.kind === "artist"
     ? focused.related.map(item => ({
       key: "case:" + item.reviewId, name: item.title,

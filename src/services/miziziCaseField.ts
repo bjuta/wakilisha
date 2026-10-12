@@ -100,14 +100,14 @@ export function searchMiziziFieldHits(
 export type MiziziFieldFocus =
   | Readonly<{kind:"artist";name:string;artistId:string;related:readonly CaseSubject[]}>
   | Readonly<{kind:"case";name:string;record:CaseSubject;credits:CaseSubject["artists"]}>;
-export function projectMiziziFieldFocus(rows:readonly CaseSubject[],key:string):MiziziFieldFocus|null {
+export function projectMiziziFieldFocus(rows:readonly CaseSubject[],key:string,state:"all"|"open"|"resolved"="all"):MiziziFieldFocus|null {
   if(key.startsWith("case:")){
-    const record=rows.find(x=>x.reviewId===key.slice(5));
+    const record=rows.find(x=>x.reviewId===key.slice(5)&&(state==="all"||x.status===state));
     return record?{kind:"case",name:record.title,record,credits:record.artists}:null;
   }
   if(key.startsWith("artist:")){
     const id=key.slice(7);
-    const related=rows.filter(x=>x.artists.some(a=>a.id===id));
+    const related=rows.filter(x=>(state==="all"||x.status===state)&&x.artists.some(a=>a.id===id));
     const credit=related.flatMap(x=>x.artists).find(a=>a.id===id);
     return credit?{kind:"artist",name:credit.name,artistId:id,related}:null;
   }

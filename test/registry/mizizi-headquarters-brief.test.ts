@@ -34,9 +34,10 @@ describe("MIZIZI verified-case subject Field", () => {
     expect(source).toContain('.in("id",target.map(x=>x.id))');
     expect(source).toContain('"registry_track_artists"');
     expect(source).toContain('if(!q) return []');
-    expect(field).toContain("Search to reveal connected cases");
+    expect(field).toContain("Choose a subject to explore");
     expect(field).toContain("<WkViewportControls");
-    expect(field).toContain("onWheel={onWheel}");
+    expect(field).toContain('projectMiziziFieldFocus(cases, selectedKey, filter)');
+    expect(field).toContain('addEventListener("wheel", onWheel, { passive: false })');
     expect(field).not.toContain("rounded-2xl");
   });
 });
