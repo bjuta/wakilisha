@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { WkStatusDistribution } from "@/components/data-viz/WkStatusDistribution";
+import { WkRankedBars } from "@/components/data-viz/WkRankedBars";
 import { WkTabs } from "@/components/design-system/primitives/Tabs";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
@@ -388,16 +390,22 @@ export function MiziziHeadquartersBrief({
                 <WkIcon name="RefreshCcw" size={14} /> Refresh
               </WkButton>
             </div>
-            <h2 className="mt-5 max-w-4xl text-[clamp(29px,4.2vw,53px)] font-black leading-[1.09] tracking-tight text-wk-text">
-              {queue.open.toLocaleString()} reviews are open.
-              <span className="block font-semibold text-wk-text-muted">
-                {queue.resolved.toLocaleString()} are resolved.
-              </span>
+            <h2 className="mt-4 text-[clamp(26px,3.4vw,41px)] font-black tracking-tight text-wk-text">
+              The Registry at a glance
             </h2>
-            <p className="mt-4 max-w-2xl text-[14px] leading-6 text-wk-text-muted">
-              This is the current authenticated Registry review snapshot, not a simulated overnight run.
-              MIZIZI surfaces evidence; people make governed decisions.
-            </p>
+            <div className="mt-5">
+              <WkStatusDistribution
+                ariaLabel="Current Registry review states"
+                expectedTotal={queue.total}
+                segments={[
+                  { key: "open", label: "Open", count: queue.open, tone: "open" },
+                  { key: "resolved", label: "Resolved", count: queue.resolved, tone: "resolved" },
+                  ...(queue.other > 0
+                    ? [{ key: "other", label: "Other", count: queue.other, tone: "neutral" } as const]
+                    : []),
+                ]}
+              />
+            </div>
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-wk-text-muted">
               <span><strong className="tabular-nums text-wk-text">{queue.total.toLocaleString()}</strong> recorded reviews</span>
               <span><strong className="tabular-nums text-wk-text">{queue.workstreams.length}</strong> workstreams</span>
@@ -419,18 +427,19 @@ export function MiziziHeadquartersBrief({
                 <h3 className="text-[16px] font-black text-wk-text">Where attention is needed</h3>
                 <span className="text-[12px] text-wk-text-muted">Open reviews</span>
               </div>
-              <div className="mt-4 divide-y divide-wk-border border-y border-wk-border">
-                {queue.workstreams.filter((group) => group.open > 0).map((group) => (
-                  <div key={group.key} className="flex items-start justify-between gap-4 py-4">
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-wk-text">{group.label}</p>
-                      <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">
-                        {group.subjects.map((part) => `${part.open} ${part.label}`).join(" · ") || "No subject distribution recorded"}
-                      </p>
-                    </div>
-                    <span className="text-[19px] font-black tabular-nums text-wk-text">{group.open.toLocaleString()}</span>
-                  </div>
-                ))}
+              <div className="mt-4 border-y border-wk-border">
+                <WkRankedBars
+                  ariaLabel="Open reviews by workstream"
+                  total={queue.open}
+                  valueLabel="open reviews"
+                  items={queue.workstreams
+                    .filter((group) => group.open > 0)
+                    .map((group) => ({
+                      key: group.key,
+                      label: group.label,
+                      value: group.open,
+                    }))}
+                />
               </div>
               <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
                 All claims and supporting records can be inspected without recording a decision.

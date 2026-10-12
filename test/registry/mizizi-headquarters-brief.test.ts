@@ -83,6 +83,32 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
   });
 });
 
+describe("Shared visual data primitives — source-aligned, not decorative", () => {
+  it("renders status distribution and ranked workstreams from the existing Registry queue", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
+    expect(source).toContain("<WkStatusDistribution");
+    expect(source).toContain("expectedTotal={queue.total}");
+    expect(source).toContain("count: queue.open");
+    expect(source).toContain("count: queue.resolved");
+    expect(source).toContain("<WkRankedBars");
+    expect(source).toContain("total={queue.open}");
+  });
+
+  it("fails closed on bad metric arithmetic and remains accessible without colour", () => {
+    const distribution = readFileSync("src/components/data-viz/WkStatusDistribution.tsx", "utf8");
+    const ranked = readFileSync("src/components/data-viz/WkRankedBars.tsx", "utf8");
+    expect(distribution).toContain("Number.isSafeInteger");
+    expect(distribution).toContain("total !== expectedTotal");
+    expect(distribution).toContain("aria-label={ariaLabel}");
+    expect(distribution).toContain("className=\"sr-only\"");
+    expect(distribution).toContain("data-wk-status-distribution");
+    expect(ranked).toContain("Number.isSafeInteger");
+    expect(ranked).toContain("data-wk-ranked-bars");
+    expect(ranked).toContain('valueLabel = "items"');
+    expect(distribution + ranked).not.toMatch(/#84C241|#E5AC43|#170F0A|M\.CLIENTS/);
+  });
+});
+
 describe("Headquarters complete Registry review inventory", () => {
   it("accounts for all 301 known review records in the accepted corpus shape", () => {
     const rows = Array.from({ length: 301 }, (_, i): RegistryQueueFactV2 => {
