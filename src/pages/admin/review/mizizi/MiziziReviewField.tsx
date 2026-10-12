@@ -204,7 +204,7 @@ export function MiziziReviewField({ queue, onInspect }: {
         (p.x > viewport.width + 50 && q.x > viewport.width + 50) ||
         (p.y > viewport.height + 50 && q.y > viewport.height + 50)) return;
       const highlighted = focusKey === a.key || focusKey === b.key;
-      ctx.strokeStyle = highlighted ? palette.brand : palette.border;
+      ctx.strokeStyle = highlighted ? palette.text : palette.border;
       ctx.lineWidth = highlighted ? 1.8 : 1;
       ctx.globalAlpha = highlighted ? .95 : focusKey ? .08 : .44;
       ctx.beginPath(); ctx.moveTo(p.x, p.y);

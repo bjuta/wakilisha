@@ -51,6 +51,8 @@ describe("MIZIZI verified-case subject Field", () => {
     expect(field).toContain('aria-label={"Explore artist credit " + credit.name}');
     expect(field).toContain('className="mz-field-artifact-arrow"');
     expect(field).toContain('ctx.lineWidth = highlighted ? 1.8 : 1');
+    expect(field).toContain("ctx.strokeStyle = highlighted ? palette.text : palette.border");
+    expect(field).not.toContain("ctx.strokeStyle = highlighted ? palette.brand");
     expect(field).not.toContain("M.CLIENTS");
   });
 });
