@@ -21,6 +21,7 @@ export function MiziziReviewRoots({ queue, onInspect }: {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(8);
+  const [visibleMarks, setVisibleMarks] = useState(24);
   if (!roots) {
     return <p role="alert" className="rounded-xl border border-wk-border p-5 text-[13px] text-wk-danger">
       The Registry review relationships could not be reconciled. No roots are shown.
@@ -36,11 +37,11 @@ export function MiziziReviewRoots({ queue, onInspect }: {
     chosen.reviews.filter(review => review.subjectType === selectedSubject) : chosen.reviews;
   const selectedReview = matchingReviews.find(review => review.id === selectedReviewId) ?? null;
   const chooseWorkstream = (key: string) => {
-    setSelection(key); setSelectedSubject(null); setSelectedReviewId(null); setVisibleCount(8);
+    setSelection(key); setSelectedSubject(null); setSelectedReviewId(null); setVisibleCount(8); setVisibleMarks(24);
   };
   const chooseSubject = (key: string, subject: string) => {
     setSelection(key); setSelectedSubject(current => current === subject && key === chosen.key ? null : subject);
-    setSelectedReviewId(null); setVisibleCount(8);
+    setSelectedReviewId(null); setVisibleCount(8); setVisibleMarks(24);
   };
   const chooseReview = (key: string, subject: string, id: string) => {
     setSelection(key); setSelectedSubject(subject); setSelectedReviewId(id);
@@ -68,42 +69,59 @@ export function MiziziReviewRoots({ queue, onInspect }: {
       <div className="mz-roots-tree">
         {roots.workstreams.map(group => (
           <section key={group.key} className={"mz-root-branch " + (chosen.key === group.key ? "is-active" : "")}>
-            <button type="button"
-              className="mz-root-workstream"
+            <button type="button" className="mz-root-workstream"
+              aria-expanded={chosen.key === group.key}
               aria-pressed={chosen.key === group.key}
               onClick={() => chooseWorkstream(group.key)}>
               <span className="min-w-0 font-semibold text-wk-text">{group.label}</span>
-              <span className="shrink-0 tabular-nums text-wk-text-muted">{group.total} reviews</span>
-              <WkIcon name="ChevronRight" size={16} aria-hidden="true" />
+              <span className="mz-root-branch-counts">
+                <strong>{group.total} reviews</strong>
+                <span>{group.open} open · {group.resolved} resolved{group.other ? " · " + group.other + " other" : ""}</span>
+              </span>
+              <WkIcon name={chosen.key === group.key ? "ChevronDown" : "ChevronRight"} size={16} aria-hidden="true" />
             </button>
-            <div className="mz-root-subjects">
-              {group.subjects.map(subject => (
-                <div className="mz-root-subject" key={subject.name}>
-                  <button type="button" className="mz-root-subject-title"
-                    aria-pressed={chosen.key === group.key && selectedSubject === subject.name}
-                    onClick={() => chooseSubject(group.key, subject.name)}>
-                    <span className="font-semibold text-wk-text">{subject.name}</span>
-                    <span className="tabular-nums text-wk-text-muted">{subject.reviews.length}</span>
-                  </button>
-                  <div className="mz-root-leaves" role="group"
-                    aria-label={group.label + ", " + subject.name + ": recorded reviews"}>
-                    {subject.reviews.map(review => (
-                      <button key={review.id} type="button" data-wk-root-review={review.id}
-                        title={review.title + " · " + statusName(review)}
-                        aria-label={"Inspect " + review.title + ", " + statusName(review)}
-                        aria-pressed={selectedReviewId === review.id && chosen.key === group.key}
-                        onClick={() => chooseReview(group.key, subject.name, review.id)}
-                        className={"mz-root-leaf mz-root-leaf-" + review.status} />
-                    ))}
+            {chosen.key === group.key ? (
+              <div className="mz-root-subjects">
+                {group.subjects.map(subject => (
+                  <div className="mz-root-subject" key={subject.name}>
+                    <button type="button" className="mz-root-subject-title"
+                      aria-expanded={selectedSubject === subject.name}
+                      aria-pressed={selectedSubject === subject.name}
+                      onClick={() => chooseSubject(group.key, subject.name)}>
+                      <span className="min-w-0 font-semibold text-wk-text">{subject.name}</span>
+                      <span className="tabular-nums text-wk-text-muted">
+                        {subject.open} open · {subject.resolved} resolved · {subject.reviews.length} total
+                      </span>
+                      <WkIcon name={selectedSubject === subject.name ? "ChevronDown" : "ChevronRight"} size={14} aria-hidden="true" />
+                    </button>
+                    {selectedSubject === subject.name ? (
+                      <div className="mz-root-subject-expanded">
+                        <p className="mb-3 text-[12px] text-wk-text-muted">
+                          Select a review to see its record. These are the exact reviews in this subject.
+                        </p>
+                        <div className="mz-root-leaves" role="group"
+                          aria-label={group.label + ", " + subject.name + ": recorded reviews"}>
+                          {subject.reviews.slice(0, visibleMarks).map(review => (
+                            <button key={review.id} type="button" data-wk-root-review={review.id}
+                              title={review.title + " · " + statusName(review)}
+                              aria-label={"Inspect " + review.title + ", " + statusName(review)}
+                              aria-pressed={selectedReviewId === review.id && chosen.key === group.key}
+                              onClick={() => chooseReview(group.key, subject.name, review.id)}
+                              className={"mz-root-leaf mz-root-leaf-" + review.status} />
+                          ))}
+                        </div>
+                        {subject.reviews.length > visibleMarks ? (
+                          <WkButton variant="ghost" className="wk-button-sm mt-3"
+                            onClick={() => setVisibleMarks(count => Math.min(count + 24, subject.reviews.length))}>
+                            Show More Review Marks ({Math.min(visibleMarks, subject.reviews.length)} of {subject.reviews.length})
+                          </WkButton>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
-                  <p className="mz-root-status-counts">
-                    <span>Open {subject.open}</span>
-                    <span>Resolved {subject.resolved}</span>
-                    {subject.other ? <span>Other {subject.other}</span> : null}
-                  </p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : null}
           </section>
         ))}
       </div>
@@ -111,7 +129,7 @@ export function MiziziReviewRoots({ queue, onInspect }: {
         <span><i className="mz-root-leaf mz-root-leaf-open" /> Open</span>
         <span><i className="mz-root-leaf mz-root-leaf-resolved" /> Resolved</span>
         <span><i className="mz-root-leaf mz-root-leaf-other" /> Other recorded state</span>
-        <span className="ml-auto text-wk-text-muted">One mark = one review</span>
+        <span className="ml-auto text-wk-text-muted">Each visible mark is one review</span>
       </div>
       <div className="mz-roots-inspection" aria-live="polite">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

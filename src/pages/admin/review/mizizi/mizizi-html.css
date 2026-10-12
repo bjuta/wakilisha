@@ -287,44 +287,127 @@
 }
 [data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .top{padding:18px;border-bottom:1px solid var(--wk-border)}
 [data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .list{max-height:72vh;overflow:auto}
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .core-pane{padding:clamp(16px,2.6vw,32px);min-width:0}
+[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .core-pane{
+  min-width:0;padding:clamp(24px,3.5vw,54px);
+  background:var(--wk-surface);
+}
 [data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .claim{
-  font:750 clamp(23px,2.8vw,35px)/1.2 var(--wk-font-display, Inter, sans-serif);
+  margin-top:12px;max-width:25ch;
+  font:760 clamp(27px,3.15vw,43px)/1.12 var(--wk-font-display, Inter, sans-serif);
+  letter-spacing:-.035em;color:var(--wk-text);
 }
 [data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .verdict{
-  max-width:70ch;font-size:14px;line-height:1.65;color:var(--wk-text-muted);
+  margin-top:17px;max-width:74ch;font-size:15px;line-height:1.7;
+  color:var(--wk-text-muted);
 }
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .core-body{
-  display:grid;grid-template-columns:minmax(0,1.5fr) minmax(240px,1fr);gap:24px;margin-top:24px;
+[data-wk-mizizi-workspace] .mz-dossier-standing{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  flex-wrap:wrap;margin:28px 0 0;padding:24px 0;
+  border-top:1px solid var(--wk-border);border-bottom:1px solid var(--wk-border);
 }
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .sample{min-width:0}
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .ground-cap{
-  display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:12px 0;
-  border-bottom:2px solid var(--wk-brand);
+[data-wk-mizizi-workspace] .mz-dossier-standing-copy{min-width:0;flex:1 1 320px}
+[data-wk-mizizi-workspace] .mz-dossier-eyebrow{
+  color:var(--wk-text-muted);font-size:11px;font-weight:800;letter-spacing:.08em;
 }
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .ground-cap .public{
-  font-size:13px;font-weight:800;
+[data-wk-mizizi-workspace] .mz-dossier-standing-note{
+  max-width:68ch;margin-top:11px;font-size:13px;line-height:1.65;color:var(--wk-text-muted);
 }
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .layer{
-  display:grid;grid-template-columns:70px 14px minmax(0,1fr);gap:10px;
-  align-items:start;padding:15px 10px;border-bottom:1px solid var(--wk-border);
+[data-wk-mizizi-workspace] .mz-dossier-action{
+  display:inline-flex;align-items:center;gap:9px;min-height:41px;
+  flex:none;
 }
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .layer:nth-child(odd){
-  background:var(--wk-bg-subtle);
+[data-wk-mizizi-workspace] .mz-dossier-content{padding:28px 0 8px;min-width:0}
+[data-wk-mizizi-workspace] .mz-dossier-section-heading{
+  display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:7px 24px;
+  margin-bottom:15px;
 }
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .layer .camp{font-size:11px;color:var(--wk-text-muted)}
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .layer .rock{
-  width:8px;height:8px;margin-top:5px;border:1px solid var(--wk-info);border-radius:3px;
+[data-wk-mizizi-workspace] .mz-dossier-section-heading h4{
+  font:750 clamp(19px,2vw,26px)/1.25 var(--wk-font-display, Inter, sans-serif);
+  color:var(--wk-text);letter-spacing:-.02em;
 }
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .layer .txt{display:flex;flex-direction:column;gap:5px;min-width:0}
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .layer .txt b{font-size:12px}
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .layer .txt span{
-  font-size:13px;line-height:1.5;word-break:break-word;color:var(--wk-text-muted);
+[data-wk-mizizi-workspace] .mz-dossier-section-heading p{
+  color:var(--wk-text-muted);font-size:12px;line-height:1.5;max-width:52ch;
 }
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .count-line{
-  font-size:12px;line-height:1.5;color:var(--wk-text-muted);padding:12px 0;
+[data-wk-mizizi-workspace] .mz-dossier-facts{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px;
+  border-top:1px solid var(--wk-border);
 }
-[data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .side{min-width:0;display:flex;flex-direction:column;gap:20px}
+[data-wk-mizizi-workspace] .mz-dossier-fact{
+  display:grid;grid-template-columns:minmax(92px,38%) minmax(0,1fr);
+  align-items:baseline;gap:10px;
+  padding:16px 0;border-bottom:1px solid var(--wk-border);min-width:0;
+}
+[data-wk-mizizi-workspace] .mz-dossier-fact dt{
+  color:var(--wk-text-muted);font-size:12px;font-weight:600;line-height:1.5;
+}
+[data-wk-mizizi-workspace] .mz-dossier-fact dd{
+  color:var(--wk-text);font-size:13px;line-height:1.5;
+  font-weight:600;overflow-wrap:anywhere;min-width:0;
+}
+[data-wk-mizizi-workspace] .mz-dossier-peer-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,215px),1fr));
+  gap:10px;margin-top:12px;
+}
+[data-wk-mizizi-workspace] .mz-dossier-peers{margin-top:26px}
+[data-wk-mizizi-workspace] .mz-dossier-peers h5,
+[data-wk-mizizi-workspace] .mz-dossier-receipts h5{
+  font-size:14px;font-weight:750;color:var(--wk-text);
+}
+[data-wk-mizizi-workspace] .mz-dossier-peer{
+  min-width:0;border:1px solid var(--wk-border);border-radius:10px;
+  padding:15px;background:var(--wk-bg-subtle);font-size:13px;
+}
+[data-wk-mizizi-workspace] .mz-dossier-brief-history{
+  display:flex;flex-wrap:wrap;gap:10px 40px;
+  margin-top:26px;padding:16px 0;
+  border-top:1px solid var(--wk-border);
+}
+[data-wk-mizizi-workspace] .mz-dossier-brief-history>div{
+  display:grid;gap:6px;min-width:155px;
+}
+[data-wk-mizizi-workspace] .mz-dossier-brief-history span{
+  color:var(--wk-text-muted);font-size:11px;font-weight:700;
+}
+[data-wk-mizizi-workspace] .mz-dossier-brief-history time{
+  color:var(--wk-text);font-size:12px;
+}
+[data-wk-mizizi-workspace] .mz-dossier-timeline{
+  list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,215px),1fr));
+  gap:12px;margin:18px 0 27px;padding:0;
+}
+[data-wk-mizizi-workspace] .mz-dossier-timeline li{
+  display:flex;flex-direction:column;justify-content:space-between;gap:20px;
+  min-height:124px;padding:18px;border:1px solid var(--wk-border);
+  border-radius:12px;background:var(--wk-bg-subtle);
+}
+[data-wk-mizizi-workspace] .mz-dossier-timeline strong{
+  color:var(--wk-text);font-size:15px;font-weight:750;
+}
+[data-wk-mizizi-workspace] .mz-dossier-timeline time{
+  color:var(--wk-text-muted);font-size:12px;line-height:1.55;
+}
+[data-wk-mizizi-workspace] .mz-dossier-receipts{
+  background:var(--wk-surface-raised);border:1px solid var(--wk-border);
+  border-radius:12px;padding:18px;margin:16px 0;
+}
+[data-wk-mizizi-workspace] .mz-dossier-receipts>p{
+  font-size:12px;color:var(--wk-text-muted);margin-top:5px;
+}
+[data-wk-mizizi-workspace] .mz-dossier-receipts dl{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:26px;margin-top:10px;
+}
+[data-wk-mizizi-workspace] .mz-dossier-outcome{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;
+  margin:24px 0;padding:14px 0;border-block:1px solid var(--wk-border);
+  font-size:12px;color:var(--wk-text-muted);
+}
+[data-wk-mizizi-workspace] .mz-dossier-outcome strong{
+  font-size:13px;color:var(--wk-text);font-weight:750;
+}
+[data-wk-mizizi-workspace] .mz-dossier-source-disclosure{
+  border-top:1px solid var(--wk-border);padding:18px 0 8px;
+}
+[data-wk-mizizi-workspace] .mz-dossier-disclosed{margin-top:18px}
 [data-wk-mizizi-workspace] [data-wk-mizizi-decision-workspace]{min-width:0}
 [data-wk-mizizi-workspace] [data-wk-mizizi-decision-workspace] .wk-input {
   min-height:42px;width:100%;min-width:0;
@@ -447,4 +530,89 @@
 }
 @media(prefers-reduced-motion:reduce){
   [data-wk-mizizi-workspace] .mz-root-leaves button.mz-root-leaf{transition:none}
+}
+
+/* The graph's selected subject replaces the legend instead of covering navigation. */
+[data-wk-mizizi-workspace] .field:has(.mz-field-detail) .mz-field-detail{
+  top:18px;bottom:auto;right:18px;left:auto;
+  width:min(382px,calc(100% - 36px));max-height:calc(100% - 100px);
+  padding:18px 20px;box-shadow:0 18px 45px rgba(0,0,0,.1);
+}
+[data-wk-mizizi-workspace] .field:has(.mz-field-detail) [data-wk-viewport-controls]{
+  bottom:18px;right:18px;
+}
+[data-wk-mizizi-workspace] .mz-root-branch::before,
+[data-wk-mizizi-workspace] .mz-root-subject::before{content:none}
+[data-wk-mizizi-workspace] .mz-roots-tree{
+  border-left:0;margin-left:0;padding-left:0;
+}
+[data-wk-mizizi-workspace] .mz-root-subjects{
+  border-left:0;padding-left:0;
+}
+[data-wk-mizizi-workspace] .mz-root-branch.is-active{
+  background:var(--wk-surface);border-color:var(--wk-border-strong);
+}
+@media(max-width:850px){
+  [data-wk-mizizi-workspace] .mz-dossier-facts{grid-template-columns:minmax(0,1fr)}
+  [data-wk-mizizi-workspace] .mz-dossier-receipts dl{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:680px){
+  [data-wk-mizizi-workspace] .field:has(.mz-field-detail) .mz-field-detail{
+    top:auto;bottom:54px;left:10px;right:10px;
+    width:auto;max-height:46%;
+  }
+  [data-wk-mizizi-workspace] .field:has(.mz-field-detail) [data-wk-viewport-controls]{
+    bottom:8px;right:10px;
+  }
+  [data-wk-mizizi-workspace] .mz-dossier-standing{align-items:start;gap:18px}
+  [data-wk-mizizi-workspace] .mz-dossier-action{width:100%;justify-content:center}
+  [data-wk-mizizi-workspace] .mz-dossier-fact{grid-template-columns:minmax(0,1fr);gap:5px;padding:13px 0}
+}
+
+/* Roots are a browseable record hierarchy. Avoid a wall of decorative marks. */
+[data-wk-mizizi-workspace] .mz-root-branch{padding:0;background:var(--wk-surface)}
+[data-wk-mizizi-workspace] .mz-root-branch.is-active{
+  background:var(--wk-surface);border-color:var(--wk-border-strong);
+}
+[data-wk-mizizi-workspace] .mz-root-workstream{
+  min-height:70px;padding:17px 19px;border-radius:12px;
+}
+[data-wk-mizizi-workspace] .mz-root-workstream:focus-visible{
+  outline:2px solid var(--wk-brand);outline-offset:-4px;
+}
+[data-wk-mizizi-workspace] .mz-root-branch-counts{
+  display:flex;flex-direction:column;align-items:flex-end;gap:4px;
+  color:var(--wk-text-muted);font-size:11px;
+}
+[data-wk-mizizi-workspace] .mz-root-branch-counts strong{
+  font-size:12px;color:var(--wk-text);font-weight:750;
+}
+[data-wk-mizizi-workspace] .mz-root-subjects{
+  display:grid;grid-template-columns:minmax(0,1fr);gap:8px;
+  padding:0 16px 17px;
+}
+[data-wk-mizizi-workspace] .mz-root-subject{padding:0;background:var(--wk-bg-subtle)}
+[data-wk-mizizi-workspace] .mz-root-subject-title{
+  display:flex;width:100%;align-items:center;gap:12px;
+  min-height:54px;padding:12px 16px;margin:0;
+}
+[data-wk-mizizi-workspace] .mz-root-subject-title>span:nth-child(2){
+  margin-left:auto;font-size:12px;
+}
+[data-wk-mizizi-workspace] .mz-root-subject-expanded{
+  border-top:1px solid var(--wk-border);padding:16px;
+  background:var(--wk-surface);
+}
+[data-wk-mizizi-workspace] .mz-root-leaves{
+  gap:7px;min-height:20px;
+}
+[data-wk-mizizi-workspace] .mz-root-leaves button.mz-root-leaf{
+  width:14px;height:14px;min-width:14px;min-height:14px;
+}
+[data-wk-mizizi-workspace] .mz-root-status-counts{display:none}
+@media(max-width:680px){
+  [data-wk-mizizi-workspace] .mz-root-workstream{align-items:flex-start;padding:14px}
+  [data-wk-mizizi-workspace] .mz-root-branch-counts{max-width:120px;text-align:right}
+  [data-wk-mizizi-workspace] .mz-root-subjects{padding:0 10px 10px}
+  [data-wk-mizizi-workspace] .mz-root-subject-title{flex-wrap:wrap}
 }

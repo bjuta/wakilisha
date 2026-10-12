@@ -7,6 +7,7 @@ import { WkStateMark } from "@/components/data-viz/WkStateMark";
 import { WkSplitWorkspace } from "@/components/data-viz/WkSplitWorkspace";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { supabase } from "@/lib/supabase";
 import { OPERATOR_REVIEW_PAGE_SIZE, selectOperatorReviewPageV1, type OperatorStatusV1 } from "@/services/operatorReviewSelection";
 import type { HeadquartersQueueV2, QueueReviewV2 } from "@/services/miziziHeadquartersBrief";
@@ -60,18 +61,8 @@ function Fact({ name, value }: { name: string; value: unknown }) {
 }
 
 
-/** Each stratum is one actual Registry field, not an independent corroboration.
- * The prototype's sourced/confirmed strata cannot be asserted without evidence. */
-function RecordedLayer({ name, value, first = false, last = false }: {
-  name: string; value: unknown; first?: boolean; last?: boolean;
-}) {
-  return (
-    <div className={"layer k-raw" + (first ? " first" : " cont") + (last ? " last" : "")}>
-      <span className="camp">{first ? "Registry" : ""}</span>
-      <span className="rock" aria-hidden="true" />
-      <span className="txt"><b>{name}</b><span>{readable(value)}</span></span>
-    </div>
-  );
+function RecordedFact({ name, value }: { name: string; value: unknown }) {
+  return <div className="mz-dossier-fact"><dt>{name}</dt><dd>{readable(value)}</dd></div>;
 }
 
 /** Only reads a review that was already included in the authenticated Registry inventory. */
@@ -298,10 +289,10 @@ export function MiziziEvidenceWorkbench({
             <div role="listitem" key={item.id} className="border-b border-wk-border last:border-b-0">
               <button type="button" aria-current={selected?.id === item.id ? "true" : undefined}
                 onClick={() => changeSelection(item.id)}
-                className={`w-full border-l-[3px] px-4 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-wk-brand ${
+                className={`w-full px-4 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-wk-brand ${
                   selected?.id === item.id
-                    ? "border-l-wk-brand bg-wk-brand-soft"
-                    : "border-l-transparent hover:bg-wk-surface-raised"
+                    ? "bg-wk-surface-raised shadow-[inset_3px_0_0_var(--wk-brand)]"
+                    : "hover:bg-wk-surface-raised"
                 }`}>
                 <span className="flex min-w-0 items-center gap-3">
                   <WkRecordingArtwork
@@ -345,7 +336,7 @@ export function MiziziEvidenceWorkbench({
         ) : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-[11px] font-black uppercase tracking-wider text-wk-brand">
+              <p className="text-[12px] font-semibold text-wk-text-muted">
                 {selected.workstreamLabel}
               </p>
               <CaseStatus status={selected.status} />
@@ -372,112 +363,107 @@ export function MiziziEvidenceWorkbench({
                 <p className="verdict">
                   {readable(fact.summary || source.ruleId || selected.title)}
                 </p>
-                <div className="core-body">
-                  <div className="min-w-0">
-                    <h4 className="text-[14px] font-black text-wk-text">Recorded Evidence</h4>
-                    <p className="mt-1 text-[12px] text-wk-text-muted">
-                      These fields come from the existing Registry review, not an inferred conclusion.
-                    </p>
-                    <div className="sample">
-                      <div className="ground-cap">
-                        <span />
-                        <div className="public">What the Registry records</div>
-                        <span className="faint" style={{ fontSize: 13.5, paddingBottom: 9 }}>Not a public or independently verified claim</span>
-                      </div>
-                      <div className="layers" aria-label="Recorded Registry evidence fields">
-                        <RecordedLayer name="Rule" value={source.ruleId} first />
-                        <RecordedLayer name="Affected Field" value={source.fieldName} />
-                        {recordedSubject.artistReference ? (
-                          <RecordedLayer name="Recorded Primary-Artist Reference" value={recordedSubject.artistReference} />
-                        ) : null}
-                        <RecordedLayer name="Current Value" value={source.currentValue} last={evidencePairs.length === 0} />
-                        {evidencePairs.map(([name, value], index) =>
-                          <RecordedLayer key={name} name={words(name)} value={value}
-                            last={index === evidencePairs.length - 1} />)}
-                      </div>
-                      <p className="count-line">These are recorded fields. They are not independent evidence groups.</p>
-                    </div>
-                    {peers.length > 0 ? (
-                      <section className="mt-5">
-                        <h5 className="text-[13px] font-bold text-wk-text">Recorded Peer Evidence</h5>
-                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                          {peers.map((raw, i) => {
-                            const peer = asRecord(raw);
-                            return (
-                              <div key={String(peer.id ?? i)} className="min-w-0 border-b border-wk-border py-3">
-                                <p className="break-words text-[13px] font-semibold text-wk-text">
-                                  {readable(peer.title || peer.trackTitle || peer.slug || peer.id)}
-                                </p>
-                                <p className="mt-1 break-words text-[11px] text-wk-text-muted">
-                                  {readable(peer.artistName || peer.primaryArtistName || peer.sharedPrimaryArtistSlug || peer.isrc)}
-                                </p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    ) : null}
-                  </div>
-                  <aside className="side">
-                    <section className="border-l-[3px] border-wk-brand bg-wk-surface-raised px-4 py-3">
-                      <h4 className="text-[13px] font-black text-wk-text">Disposition</h4>
-                      {exactDecision?.status === "blocked" && selected.status === "open" ? (
-                        <div role="status" className="mt-3 space-y-2">
-                          <WkStateMark state="blocked" label="Human decision recorded · Blocked" />
-                          <p className="text-[12px] leading-5 text-wk-text-muted">{exactDecision.summary}</p>
-                        </div>
-                      ) : exactDecision?.status === "completed" && selected.status === "resolved" ? (
-                        <p className="mt-3 text-[12px] leading-5 text-wk-text-muted">
-                          Verified complete against the existing decision and operation receipts. No repair needs repeating.
-                        </p>
-                      ) : null}
-                      {verifiedDecision?.reviewId === selected.id && verifiedDecision.status === "unverified" ? (
-                        <p role="status" className="mt-3 text-[12px] leading-5 text-wk-text-muted">
-                          Earlier #1094 decision evidence could not be independently verified. Check the governed record.
-                        </p>
-                      ) : null}
-                      <p className="mt-2 text-[13px] leading-5 text-wk-text">
-                        {selected.status === "open"
-                          ? "This review is open. No new decision will be made here."
-                          : selected.status === "resolved"
-                            ? "The Registry marks this review resolved."
-                            : `Registry status: ${selected.sourceStatus}`}
-                      </p>
+                <section className="mz-dossier-standing" aria-label="Current Registry standing">
+ <div className="mz-dossier-standing-copy">
+  <h4 className="mz-dossier-eyebrow">Current Standing</h4>
+  <div className="mt-2 flex flex-wrap items-center gap-2">
+    <CaseStatus status={selected.status} />
+    {exactDecision?.status === "blocked" && selected.status === "open" ? <WkStateMark state="blocked" label="Previous human decision · Blocked" compact /> : null}
+    {exactDecision?.status === "completed" && selected.status === "resolved" ? <WkStateMark state="verified" label="Matching operation verified" compact /> : null}
+  </div>
+  <p className="mz-dossier-standing-note">
+    {exactDecision?.status === "blocked" && selected.status === "open" ? exactDecision.summary :
+      exactDecision?.status === "completed" && selected.status === "resolved"
+        ? "Matching decision and operation receipts confirm the repair. No repeat is needed."
+        : selected.status === "open" ? "This review is open. No new decision will be made here."
+        : selected.status === "resolved" ? "The Registry marks this review resolved."
+        : `Registry status: ${selected.sourceStatus}`}
+  </p>
+  {verifiedDecision?.reviewId === selected.id && verifiedDecision.status === "unverified" ? (
+    <p role="status" className="mt-2 text-[12px] text-wk-text-muted">Earlier decision evidence could not be independently verified. Consult the governed record.</p>
+  ) : null}
+ </div>
+ <Link to={`/admin/review/queue?review=${encodeURIComponent(selected.id)}`}
+  className="wk-button wk-button-primary wk-button-sm mz-dossier-action">
+  Open Governed Review <WkIcon name="ArrowUpRight" size={15} />
+</Link>
+</section>
+                {mode === "history" ? (
+                  <div className="mz-dossier-content" data-wk-mizizi-history-record>
+                    <section className="mz-dossier-history" aria-label="Recorded history">
+                      <header className="mz-dossier-section-heading">
+                        <h4>Recorded History</h4>
+                        <p>Only recorded dates and existing references appear here.</p>
+                      </header>
+                      <ol className="mz-dossier-timeline">
+  <li><strong>Review Opened</strong><WkZonedTimestamp value={fact.created_at} /></li>
+  {fact.updated_at && fact.updated_at !== fact.created_at ? (
+    <li><strong>Record Last Updated</strong><WkZonedTimestamp value={fact.updated_at} /></li>
+  ) : null}
+</ol>
                       {selected.status === "resolved" ? (
-                        <dl className="mt-3">
-                          <Fact name="Decision receipt" value={resolution.decisionId} />
-                          <Fact name="Verified operation" value={resolution.verifiedOperationId} />
-                        </dl>
+                        <section className="mz-dossier-receipts" aria-label="Resolution references">
+                          <h5>Resolution References</h5>
+                          <p>Recorded Registry fields. Not inferred delivery receipts.</p>
+                          <dl>
+                            <Fact name="Decision Receipt" value={resolution.decisionId} />
+                            <Fact name="Verified Operation" value={resolution.verifiedOperationId} />
+                          </dl>
+                        </section>
                       ) : null}
+                      <div className="mz-dossier-outcome">
+                        <span>Recorded Status</span><strong>{readable(fact.status)}</strong>
+                      </div>
                     </section>
-                    <section className="border-t border-wk-border pt-4">
-                      <h4 className="text-[13px] font-black text-wk-text">History</h4>
-                      <dl className="mt-2">
-                        <div className="border-b border-wk-border py-3">
-                          <dt className="text-[11px] font-semibold text-wk-text-muted">Review opened · Nairobi</dt>
-                          <dd className="mt-1 text-[13px] text-wk-text"><WkZonedTimestamp value={fact.created_at} /></dd>
-                        </div>
-                        <div className="border-b border-wk-border py-3">
-                          <dt className="text-[11px] font-semibold text-wk-text-muted">Last updated · Nairobi</dt>
-                          <dd className="mt-1 text-[13px] text-wk-text"><WkZonedTimestamp value={fact.updated_at} /></dd>
-                        </div>
-                        <Fact name="Recorded status" value={fact.status} />
-                      </dl>
+                    <WkDisclosure summary="Read Original Review Evidence"
+                      className="mz-dossier-source-disclosure"
+                      triggerClassName="wk-button wk-button-ghost wk-button-sm"
+                      contentClassName="mz-dossier-disclosed">
+                      <p className="mb-3 text-[12px] text-wk-text-muted">Source fields from this review, not independent evidence groups.</p>
+                      <dl className="mz-dossier-facts" aria-label="Recorded Registry evidence fields">
+  <RecordedFact name="Rule" value={source.ruleId} />
+  <RecordedFact name="Affected Field" value={source.fieldName} />
+  {recordedSubject.artistReference ? <RecordedFact name="Recorded Artist Reference" value={recordedSubject.artistReference} /> : null}
+  <RecordedFact name="Current Value" value={source.currentValue} />
+  {evidencePairs.map(([name, value]) => <RecordedFact key={name} name={words(name)} value={value} />)}
+</dl>
+                    </WkDisclosure>
+                  </div>
+                ) : (
+                  <div className="mz-dossier-content" data-wk-mizizi-core-evidence>
+                    <section className="mz-dossier-evidence" aria-label="Recorded evidence">
+                      <header className="mz-dossier-section-heading">
+                        <h4>What the Registry Found</h4>
+                        <p>Recorded case fields. No independent verification is implied.</p>
+                      </header>
+                      <dl className="mz-dossier-facts" aria-label="Recorded Registry evidence fields">
+  <RecordedFact name="Rule" value={source.ruleId} />
+  <RecordedFact name="Affected Field" value={source.fieldName} />
+  {recordedSubject.artistReference ? <RecordedFact name="Recorded Artist Reference" value={recordedSubject.artistReference} /> : null}
+  <RecordedFact name="Current Value" value={source.currentValue} />
+  {evidencePairs.map(([name, value]) => <RecordedFact key={name} name={words(name)} value={value} />)}
+</dl>
+                      {peers.length > 0 ? (
+  <section className="mz-dossier-peers" aria-label="Recorded peer evidence">
+    <h5>Recorded Peer Evidence</h5>
+    <div className="mz-dossier-peer-grid">
+      {peers.map((raw,i) => {
+        const peer = asRecord(raw);
+        return <article key={String(peer.id ?? i)} className="mz-dossier-peer">
+          <p className="font-semibold text-wk-text">{readable(peer.title || peer.trackTitle || peer.slug || peer.id)}</p>
+          <p className="mt-1 text-[12px] text-wk-text-muted">{readable(peer.artistName || peer.primaryArtistName || peer.sharedPrimaryArtistSlug || peer.isrc)}</p>
+        </article>;
+      })}
+    </div>
+  </section>
+) : null}
                     </section>
-                    <section className="border-t border-wk-border pt-4">
-                      <h4 className="text-[13px] font-black text-wk-text">Next Step</h4>
-                      <p className="mt-2 text-[12px] leading-5 text-wk-text-muted">
-                        {exactDecision?.status === "blocked"
-                          ? "A human duplicate decision is already recorded. The archived-credit blocker needs separate governed reconciliation; this view cannot mutate Registry records."
-                          : "A governed review is required before any new decision or repair. This view cannot mutate Registry records."}
-                      </p>
-                      <Link to={`/admin/review/queue?review=${encodeURIComponent(selected.id)}`}
-                        className="wk-button wk-button-primary wk-button-sm mt-3 inline-flex">
-                        Open Governed Review <WkIcon name="ArrowRight" size={13} />
-                      </Link>
+                    <section className="mz-dossier-brief-history" aria-label="Review dates">
+                      <div><span>Opened</span><WkZonedTimestamp value={fact.created_at} /></div>
+                      <div><span>Last Updated</span><WkZonedTimestamp value={fact.updated_at} /></div>
                     </section>
-                  </aside>
-                </div>
+                  </div>
+                )}
                 <div className="mt-6 border-t border-wk-border pt-3">
                   <WkButton variant="ghost" className="wk-button-sm"
                     onClick={() => setShowReference((value) => !value)}>
