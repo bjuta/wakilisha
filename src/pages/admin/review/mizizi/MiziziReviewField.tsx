@@ -71,6 +71,7 @@ export function MiziziReviewField({
   const [status, setStatus] = useState<"all" | "open" | "resolved">("all");
   const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1 });
   const drag = useRef<{ clientX: number; clientY: number; x: number; y: number; dragged: boolean } | null>(null);
+  const suppressNodeClick = useRef(false);
   const query = search.trim().toLocaleLowerCase();
   const activeGroups = new Set(workstreams);
   const matching = projection.nodes.filter(({ item }) => activeGroups.has(item.workstream) &&
@@ -92,6 +93,7 @@ export function MiziziReviewField({
   const fit = () => setCamera({ x: 0, y: 0, zoom: 1 });
   const moveStart = (e: PointerEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
+    suppressNodeClick.current = false;
     drag.current = { clientX: e.clientX, clientY: e.clientY, x: camera.x, y: camera.y, dragged: false };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -111,6 +113,7 @@ export function MiziziReviewField({
   };
   const release = (e: PointerEvent<SVGSVGElement>) => {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    suppressNodeClick.current = Boolean(drag.current?.dragged);
     drag.current = null;
   };
 
@@ -153,7 +156,7 @@ export function MiziziReviewField({
             item.status === "resolved" ? "text-wk-brand" : "text-wk-text-muted"}
             role="button" tabIndex={-1}
             aria-label={`${item.title}; ${statusText[item.status]}; open evidence`}
-            onClick={() => { if (!drag.current?.dragged) onInspect(id); }}>
+            onClick={() => { if (!suppressNodeClick.current) onInspect(id); }}>
             <title>{`${item.title} · ${statusText[item.status]} · ${item.workstreamLabel}`}</title>
             {item.subjectType === "track" || item.subjectType === "release" ?
               <rect x={x-4} y={y-4} width="8" height="8" fill="currentColor" stroke="currentColor" strokeWidth=".7" /> :
