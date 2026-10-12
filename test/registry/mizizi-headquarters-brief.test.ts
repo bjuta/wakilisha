@@ -152,7 +152,7 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(source).toContain('.from("registry_review_items")');
     expect(source).toContain('.eq("id", selected.id).single()');
     expect(source).toContain("Current evidence is unavailable or changed");
-    expect(source).toContain("No new decision will be made here");
+    expect(source).toContain("This review remains open. Use the governed review action to record a decision.");
     expect(source).toContain("Open Governed Review");
     expect(source).toContain("View Governed Record");
     expect(source).toContain('mode === "history" || selected.status === "resolved"');
@@ -196,7 +196,8 @@ describe("Shared visual data primitives — source-aligned, not decorative", () 
     expect(source).toContain("setSkipped(ids =>");
     expect(source).toContain("onInspect(id)");
     expect(source).not.toContain("Recorded: Three groups.");
-    expect(rootsUi).toContain("snapshot, not a history of actions");
+    expect(rootsUi).toContain('label="About the Roots"');
+    expect(rootsUi).toContain("This is a snapshot, not an action history.");
     const css = readFileSync("src/pages/admin/review/mizizi/mizizi-html.css", "utf8");
     expect(css).toContain(".mz-roots-tree");
     expect(css).toContain(".mz-root-leaves button.mz-root-leaf::before");
@@ -533,7 +534,8 @@ describe("Headquarters in-place review inspection", () => {
     expect(source).toContain("<MiziziEvidenceWorkbench");
     expect(cores).toContain("<WkSplitWorkspace");
     expect(cores).toContain("Open Governed Review");
-    expect(cores).toContain("No new decision will be made here");
+    expect(cores).toContain('label="About This Status"');
+    expect(cores).toContain("This review remains open. Use the governed review action to record a decision.");
     expect(source + cores).not.toMatch(/<dialog\b|<select\b|<input\b|<textarea\b/);
     expect(source + cores).not.toContain("Approve Review");
     expect(cores).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);

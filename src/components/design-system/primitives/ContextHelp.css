@@ -37,3 +37,22 @@
 @media(prefers-reduced-motion:reduce){
   .wk-context-help-trigger,.wk-context-help-close{transition:none}
 }
+
+/* A touch-sized help note stays within the phone viewport, even when its
+   trigger sits inside an overflow-clipped review workspace. */
+@media(max-width:700px){
+  .wk-context-help-panel,
+  .wk-context-help-panel.is-start,
+  .wk-context-help-panel.is-end{
+    position:fixed;
+    left:14px;
+    right:14px;
+    top:auto;
+    bottom:calc(14px + env(safe-area-inset-bottom));
+    width:auto;
+    max-width:none;
+    max-height:min(65dvh,420px);
+    overflow-y:auto;
+    z-index:var(--wk-z-modal,100);
+  }
+}
