@@ -368,7 +368,8 @@ describe("Headquarters in-place review inspection", () => {
     expect(source).toContain("Done for Now");
     expect(source).toContain('queue.items.filter((item) => item.status === "open")');
     expect(source).toContain("onInspect(nextReview.id)");
-    expect(source).toContain("Skips are not decisions");
+    expect(source).toContain("Skipping never records a decision.");
+    expect(source).toContain("No changes saved");
     expect(source).not.toContain("localStorage");
     expect(source).not.toContain("Approve Review");
   });
