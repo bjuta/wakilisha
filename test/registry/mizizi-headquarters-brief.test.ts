@@ -47,6 +47,20 @@ describe("MIZIZI Field interaction shell faithfully follows reference structure"
   });
 });
 
+describe("Governed Decision Work follows the selected-job list/detail layout", () => {
+  it("keeps decision writes behind the current evidence-loading modal", () => {
+    const source = readFileSync("src/pages/admin/review/mizizi/page.tsx", "utf8");
+    expect(source).toContain('<WkSplitWorkspace data-wk-mizizi-decision-workspace>');
+    expect(source).toContain('data-wk-mizizi-decision-pagination');
+    expect(source).toContain('focusedDecision.review.title');
+    expect(source).toContain("Recorded route comparison · Proposed, not applied");
+    expect(source).toContain("onClick={() => void openReview(focusedDecision)}");
+    expect(source).toContain('await loadDetail(item.review.id)');
+    expect(source).toContain('await recordRegistryReviewDecision({');
+    expect(source).not.toContain('onClick={() => void openReview(item)}');
+  });
+});
+
 describe("Flat master/detail history and evidence workspaces", () => {
   it("uses one shared divider-based split with compact edge selectors", () => {
     const shell = readFileSync("src/components/data-viz/WkSplitWorkspace.tsx", "utf8");

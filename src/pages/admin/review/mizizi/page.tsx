@@ -5,6 +5,7 @@ import Issue1094ExactDecisions from "./issue1094";
 import Issue1094RepairGate from "./issue1094RepairGate";
 import Issue1094Finalize from "./issue1094Finalize";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkSplitWorkspace } from "@/components/data-viz/WkSplitWorkspace";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkTabs } from "@/components/design-system/primitives/Tabs";
 import { WkButton } from "@/components/design-system/primitives/Button";
@@ -411,6 +412,7 @@ function AdminMiziziWorkspaceContent() {
   const [lane, setLane] = useState<Lane>("needs_decision");
   const [search, setSearch] = useState("");
   const [decisionPage, setDecisionPage] = useState(1);
+  const [focusedReviewId, setFocusedReviewId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [selected, setSelected] = useState<WorkspaceItem | null>(null);
@@ -476,6 +478,7 @@ function AdminMiziziWorkspaceContent() {
   const currentDecisionPage = Math.min(decisionPage, decisionPageCount);
   const decisionPageStart = (currentDecisionPage - 1) * 15;
   const pagedItems = visibleItems.slice(decisionPageStart, decisionPageStart + 15);
+  const focusedDecision = pagedItems.find((item) => item.review.id === focusedReviewId) ?? pagedItems[0] ?? null;
 
   const openReview = useCallback(async (item: WorkspaceItem) => {
     setSelected(item);
@@ -730,89 +733,124 @@ function AdminMiziziWorkspaceContent() {
         <SummaryCard label="Needs research" value={counts.research} help="These stay open until better evidence arrives." />
       </div>
 
-      <WkSurface className="overflow-hidden p-0">
-        <div className="border-b border-wk-border p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-[15px] font-black text-wk-text">Track Identity Reviews</h2>
-              <p className="mt-1 text-[12px] text-wk-text-muted">Only active MIZIZI Track identity reviews are shown here.</p>
+      <WkSplitWorkspace data-wk-mizizi-decision-workspace>
+        <div className="min-w-0 border-b border-wk-border lg:border-b-0 lg:border-r">
+          <header className="border-b border-wk-border px-4 py-4">
+            <h2 className="text-[17px] font-black text-wk-text">Decision Work</h2>
+            <p className="mt-1 text-[12px] text-wk-text-muted">
+              Select a review to inspect its proposed change.
+            </p>
+            <WkSearchField ariaLabel="Search Track identity reviews"
+              value={search} onChange={setSearch}
+              placeholder="Track, artist, or slug" className="mt-4"
+              inputClassName="!rounded-md" />
+            <div className="mt-3 flex flex-wrap gap-1" aria-label="Decision lanes">
+              {LANES.map((item) => (
+                <button key={item.key} type="button" aria-pressed={lane === item.key}
+                  onClick={() => setLane(item.key)}
+                  className={`border-b-2 px-2.5 py-2 text-[12px] font-semibold ${lane === item.key
+                    ? "border-wk-brand text-wk-text"
+                    : "border-transparent text-wk-text-muted hover:text-wk-text"}`}>
+                  {item.label}
+                </button>
+              ))}
             </div>
-            <div className="w-full max-w-sm">
-              <span className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">Search</span>
-              <WkSearchField
-                ariaLabel="Search Track identity reviews"
-                value={search}
-                onChange={setSearch}
-                placeholder="Track, artist, or slug"
-                className="mt-1"
-              />
+            <p className="mt-2 text-[11px] tabular-nums text-wk-text-muted">
+              {visibleItems.length.toLocaleString()} recorded reviews match
+            </p>
+          </header>
+          {pageError ? (
+            <p role="alert" className="p-5 text-[13px] text-wk-danger">{pageError}</p>
+          ) : loading ? (
+            <p role="status" className="p-5 text-[13px] text-wk-text-muted">Loading governed reviews…</p>
+          ) : pagedItems.length ? (
+            <div role="list" aria-label="Track identity review selection">
+              {pagedItems.map((item) => (
+                <div role="listitem" key={item.review.id}>
+                  <MiziziRow item={item} selected={focusedDecision?.review.id === item.review.id}
+                    onSelect={() => setFocusedReviewId(item.review.id)} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="p-5 text-[13px] text-wk-text-muted">No reviews match these filters.</p>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-wk-border px-3 py-3"
+            data-wk-mizizi-decision-pagination>
+            <span className="text-[11px] tabular-nums text-wk-text-muted" aria-live="polite">
+              {visibleItems.length
+                ? `${(decisionPageStart + 1).toLocaleString()}–${Math.min(decisionPageStart + 15, visibleItems.length).toLocaleString()} of ${visibleItems.length.toLocaleString()}`
+                : "No matching reviews"}
+            </span>
+            <div className="flex items-center gap-2">
+              <WkButton variant="ghost" className="wk-button-sm"
+                disabled={currentDecisionPage <= 1}
+                onClick={() => setDecisionPage(Math.max(1, currentDecisionPage - 1))}>Previous</WkButton>
+              <span className="text-[12px] tabular-nums text-wk-text-muted">
+                {currentDecisionPage} / {decisionPageCount}
+              </span>
+              <WkButton variant="ghost" className="wk-button-sm"
+                disabled={currentDecisionPage >= decisionPageCount}
+                onClick={() => setDecisionPage(Math.min(decisionPageCount, currentDecisionPage + 1))}>Next</WkButton>
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {LANES.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setLane(item.key)}
-                className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors ${
-                  lane === item.key
-                    ? "border-wk-brand bg-wk-brand-soft text-wk-brand"
-                    : "border-wk-border bg-wk-surface text-wk-text-muted hover:bg-wk-surface-raised"
-                }`}
-              >
-                {item.label}
+        </div>
+        <section className="min-w-0 px-5 py-6 sm:px-8 sm:py-8" aria-label="Selected decision evidence">
+          {focusedDecision && !pageError && !loading ? (
+            <>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-wk-brand">
+                Music identity · Governed review
+              </p>
+              <h3 className="mt-2 text-[clamp(23px,2.8vw,34px)] font-black leading-tight text-wk-text">
+                {focusedDecision.review.title || "Track review"}
+              </h3>
+              <p className="mt-2 text-[13px] text-wk-text-muted">
+                {humanizeSlug(artistScope(focusedDecision.review))}
+              </p>
+              {focusedDecision.review.summary ? (
+                <p className="mt-5 max-w-2xl border-l-2 border-wk-brand pl-4 text-[13px] leading-6 text-wk-text">
+                  {focusedDecision.review.summary}
+                </p>
+              ) : null}
+              <div className="mt-7 border-y border-wk-border">
+                <h4 className="py-3 text-[12px] font-bold uppercase tracking-wide text-wk-text-muted">
+                  Recorded route comparison · Proposed, not applied
+                </h4>
+                <dl className="grid gap-0 sm:grid-cols-2">
+                  <div className="border-t border-wk-border py-4 sm:border-r sm:pr-5">
+                    <dt className="text-[11px] text-wk-text-muted">Current route</dt>
+                    <dd className="mt-2 break-all text-[16px] font-semibold text-wk-text">
+                      {currentSlug(focusedDecision.review) || "No current route recorded"}
+                    </dd>
+                  </div>
+                  <div className="border-t border-wk-border py-4 sm:pl-5">
+                    <dt className="text-[11px] text-wk-text-muted">Proposed route</dt>
+                    <dd className="mt-2 break-all text-[16px] font-semibold text-wk-text">
+                      {proposedSlug(focusedDecision.review) || "Not yet proposed"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+              <dl className="mt-5 grid gap-y-3 text-[12px] sm:grid-cols-2">
+                <div><dt className="text-wk-text-muted">Review lane</dt><dd className="mt-1 font-semibold text-wk-text">{laneFor(focusedDecision).replace(/_/g, " ")}</dd></div>
+                <div><dt className="text-wk-text-muted">Recorded decision</dt><dd className="mt-1 font-semibold text-wk-text">{decisionLabel(focusedDecision.decision?.decision_type)}</dd></div>
+              </dl>
+              <button type="button" onClick={() => void openReview(focusedDecision)}
+                className="wk-button wk-button-primary mt-7 inline-flex">
+                Inspect evidence and decide <WkIcon name="ArrowRight" size={14} />
               </button>
-            ))}
-          </div>
-        </div>
-
-        {pageError ? (
-          <div className="p-8 text-center">
-            <div className="text-[13px] font-bold text-wk-danger">MIZIZI could not load.</div>
-            <p className="mt-1 text-[12px] text-wk-text-muted">{pageError}</p>
-          </div>
-        ) : loading ? (
-          <div className="space-y-3 p-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-28 animate-pulse rounded-xl bg-wk-surface-raised" />
-            ))}
-          </div>
-        ) : visibleItems.length ? (
-          <div className="divide-y divide-wk-border">
-            {pagedItems.map((item) => (
-              <MiziziRow key={item.review.id} item={item} onOpen={() => void openReview(item)} />
-            ))}
-          </div>
-        ) : (
-          <div className="p-10 text-center">
-            <WkIcon name="Inbox" size={24} className="mx-auto text-wk-text-faint" />
-            <div className="mt-3 text-[13px] font-bold text-wk-text">Nothing in this view</div>
-            <p className="mt-1 text-[12px] text-wk-text-muted">Change the filter or search for another Track.</p>
-          </div>
-        )}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-wk-border bg-wk-surface px-4 py-3" data-wk-mizizi-decision-pagination>
-        <span className="text-[12px] tabular-nums text-wk-text-muted" aria-live="polite">
-          {visibleItems.length
-            ? `${(decisionPageStart + 1).toLocaleString()}–${Math.min(decisionPageStart + 15, visibleItems.length).toLocaleString()} of ${visibleItems.length.toLocaleString()} reviews`
-            : "No reviews in this view"}
-        </span>
-        <div className="flex items-center gap-2">
-          <WkButton variant="ghost" className="wk-button-sm"
-            disabled={currentDecisionPage <= 1}
-            onClick={() => setDecisionPage(Math.max(1, currentDecisionPage - 1))}>
-            Previous
-          </WkButton>
-          <span className="text-[12px] tabular-nums text-wk-text-muted">
-            {currentDecisionPage} / {decisionPageCount}
-          </span>
-          <WkButton variant="ghost" className="wk-button-sm"
-            disabled={currentDecisionPage >= decisionPageCount}
-            onClick={() => setDecisionPage(Math.min(decisionPageCount, currentDecisionPage + 1))}>
-            Next
-          </WkButton>
-        </div>
-      </div>
-      </WkSurface>
+              <p className="mt-3 text-[11px] leading-5 text-wk-text-muted">
+                Opening the governed decision form rechecks current evidence. Selecting a row makes no change.
+              </p>
+            </>
+          ) : (
+            <p className="text-[13px] text-wk-text-muted">
+              {pageError ? "Restore the review connection to inspect a decision." :
+                loading ? "Loading decision evidence…" : "Choose a review from the list."}
+            </p>
+          )}
+        </section>
+      </WkSplitWorkspace>
 
       <ProvenanceReviewSection
         reviews={provenanceReviews}
@@ -1167,44 +1205,31 @@ function ProvenanceDecisionModal({
 
 function SummaryCard({ label, value, help }: { label: string; value: number; help: string }) {
   return (
-    <WkSurface className="p-4">
-      <div className="text-[26px] font-black tracking-tight text-wk-text">{new Intl.NumberFormat().format(value)}</div>
-      <div className="mt-1 text-[12px] font-bold text-wk-text">{label}</div>
-      <p className="mt-1 text-[11px] leading-5 text-wk-text-muted">{help}</p>
-    </WkSurface>
+    <div className="border-b border-r border-wk-border px-4 py-3" title={help}>
+      <div className="text-[25px] font-black tabular-nums text-wk-text">{new Intl.NumberFormat().format(value)}</div>
+      <div className="mt-1 text-[12px] font-semibold text-wk-text-muted">{label}</div>
+    </div>
   );
 }
 
-function MiziziRow({ item, onOpen }: { item: WorkspaceItem; onOpen: () => void }) {
+function MiziziRow({
+  item, selected, onSelect,
+}: { item: WorkspaceItem; selected: boolean; onSelect: () => void }) {
   const review = item.review;
-  const hasCreditIssue = ruleId(review) === "track_slug_credit_evidence_gap";
-
+  const credit = ruleId(review) === "track_slug_credit_evidence_gap";
   return (
-    <div className="p-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-[14px] font-black text-wk-text">{review.title || "Track review"}</h3>
-            <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-wk-text-muted">
-              {decisionLabel(item.decision?.decision_type)}
-            </span>
-            {hasCreditIssue ? (
-              <span className="rounded-full bg-wk-warning-soft px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-wk-warning">Credits</span>
-            ) : null}
-          </div>
-          <div className="mt-2 text-[12px] text-wk-text-muted">{humanizeSlug(artistScope(review))}</div>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-            <code className="rounded bg-wk-surface-raised px-2 py-1 text-wk-text-muted">{currentSlug(review) || "No current slug"}</code>
-            <WkIcon name="ArrowRight" size={12} className="text-wk-text-faint" />
-            <code className="rounded bg-wk-brand-soft px-2 py-1 text-wk-brand">{proposedSlug(review) || "Needs a clean slug"}</code>
-          </div>
-        </div>
-        <button type="button" onClick={onOpen} className="wk-button wk-button-primary wk-button-sm shrink-0">
-          Review
-          <WkIcon name="ArrowRight" size={13} />
-        </button>
-      </div>
-    </div>
+    <button type="button" aria-current={selected ? "true" : undefined}
+      onClick={onSelect}
+      className={`block w-full border-b border-l-[3px] border-wk-border px-4 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-wk-brand ${selected
+        ? "border-l-wk-brand bg-wk-brand-soft"
+        : "border-l-transparent hover:bg-wk-surface-raised"}`}>
+      <span className="block text-[13px] font-semibold leading-5 text-wk-text">{review.title || "Track review"}</span>
+      <span className="mt-1 block truncate text-[12px] text-wk-text-muted">{humanizeSlug(artistScope(review))}</span>
+      <span className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-wk-text-muted">
+        <span>{decisionLabel(item.decision?.decision_type)}</span>
+        {credit ? <span className="border-l border-wk-warning pl-2 text-wk-warning">Credits</span> : null}
+      </span>
+    </button>
   );
 }
 
