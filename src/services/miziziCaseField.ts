@@ -85,6 +85,18 @@ export function searchMiziziFieldHits(
       artists.set(credit.id,item);
     }
   }
+  // The query discovers artist IDs via a matching name/slug, but the displayed
+  // relationship count must include ALL authorised reviewed credits under that
+  // exact ID, including name variants (e.g. Lilmaina / Lil Maina). Never merge IDs.
+  for(const row of rows){
+    if(state!=="all"&&row.status!==state)continue;
+    for(const credit of row.artists){
+      const matched=artists.get(credit.id);
+      if(!matched)continue;
+      matched.ids.add(row.reviewId);
+      matched.review ||= credit.status==="needs_review";
+    }
+  }
   const artistHits:MiziziFieldHit[]=[...artists].map(([id,x])=>({
     key:"artist:"+id,kind:"artist",label:x.name,linkedCases:x.ids.size,
     subtitle:"Artist credit"+(x.slug?" · "+x.slug:"")+
