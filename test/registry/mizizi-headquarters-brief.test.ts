@@ -34,7 +34,8 @@ describe("MIZIZI Field interaction shell faithfully follows reference structure"
     expect(source).toContain('absolute inset-x-0 top-0');
     expect(source).toContain('aria-label="Workstream keys and filters"');
     expect(source).toContain('<WkViewportControls');
-    expect(source).toContain('bottom-4 right-4');
+    const controls = readFileSync("src/components/data-viz/WkViewportControls.tsx", "utf8");
+    expect(controls).toContain("bottom-4 right-4");
     expect(source).not.toContain("rounded-2xl");
   });
   it("projects ONLY authenticated reviews and recorded workstream membership", () => {
