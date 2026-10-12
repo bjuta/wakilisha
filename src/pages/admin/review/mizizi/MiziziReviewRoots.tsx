@@ -5,13 +5,16 @@ import { WkStateMark } from "@/components/data-viz/WkStateMark";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import type { HeadquartersQueueV2, QueueReviewV2 } from "@/services/miziziHeadquartersBrief";
 import { projectMiziziReviewRootsV1 } from "@/services/miziziReviewRoots";
+import type { CaseSubject } from "@/services/miziziCaseField";
+import { reviewJobDisplay } from "@/services/reviewJobDisplay";
 
 /** The Registry's real classification roots: source review -> workstream -> entity type.
  * Leaf marks are review records, NOT operations or lines of independent evidence.
  */
-export function MiziziReviewRoots({ queue, onInspect }: {
+export function MiziziReviewRoots({ queue, onInspect, subjects }: {
   queue: HeadquartersQueueV2;
   onInspect: (reviewId: string) => void;
+  subjects: ReadonlyMap<string, CaseSubject>;
 }) {
   const roots = useMemo(() => {
     try { return projectMiziziReviewRootsV1(queue); }
@@ -149,7 +152,17 @@ export function MiziziReviewRoots({ queue, onInspect }: {
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="mb-1 text-[11px] text-wk-text-muted">Selected Registry review · {selectedReview.subjectType}</p>
-                <h4 className="break-words text-[16px] font-bold text-wk-text">{selectedReview.title}</h4>
+                <h4 className="break-words text-[16px] font-bold text-wk-text">
+                   {reviewJobDisplay(selectedReview, subjects.get(selectedReview.id)).title}
+                 </h4>
+                 <p className="mt-1 text-[12px] text-wk-text-muted">
+                   {reviewJobDisplay(selectedReview, subjects.get(selectedReview.id)).issue}
+                 </p>
+                 {reviewJobDisplay(selectedReview, subjects.get(selectedReview.id)).credits.length ? (
+                   <p className="mt-1 text-[12px] text-wk-text-muted">
+                     Recorded credits: {reviewJobDisplay(selectedReview, subjects.get(selectedReview.id)).credits.join(", ")}
+                   </p>
+                 ) : null}
               </div>
               <WkStateMark compact state={selectedReview.status === "resolved" ? "resolved" :
                 selectedReview.status === "open" ? "open" : "unknown"} label={statusName(selectedReview)} />
@@ -170,8 +183,14 @@ export function MiziziReviewRoots({ queue, onInspect }: {
           {matchingReviews.slice(0, visibleCount).map(review => (
             <li key={review.id}>
               <span className="min-w-0">
-                <span className="block truncate text-[12px] font-semibold text-wk-text">{review.title}</span>
-                <span className="text-[11px] text-wk-text-muted">{review.subjectType}</span>
+                <span className="block truncate text-[12px] font-semibold text-wk-text">
+                  {reviewJobDisplay(review, subjects.get(review.id)).title}
+                </span>
+                <span className="text-[11px] text-wk-text-muted">
+                  {reviewJobDisplay(review, subjects.get(review.id)).type}
+                  {reviewJobDisplay(review, subjects.get(review.id)).credits.length
+                    ? " · " + reviewJobDisplay(review, subjects.get(review.id)).credits.join(", ") : ""}
+                </span>
               </span>
               <WkStateMark state={review.status === "resolved" ? "resolved" :
                 review.status === "open" ? "open" : "unknown"}

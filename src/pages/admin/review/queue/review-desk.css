@@ -613,3 +613,29 @@
     padding:12px;
   }
 }
+
+/* The subject and the decision problem lead the governed review dialog. */
+.wk-review-job-head{display:grid;gap:8px;margin-bottom:17px;min-width:0}
+.wk-review-job-kicker{font-size:11px;font-weight:750;color:var(--wk-text-muted)}
+.wk-review-job-head h3{
+  font:760 clamp(23px,2.6vw,30px)/1.2 var(--wk-font-display,Inter,sans-serif);
+  letter-spacing:-.026em;color:var(--wk-text);overflow-wrap:anywhere;
+}
+.wk-review-job-head>p:not(.wk-review-job-kicker){
+  font-size:12px;line-height:1.6;color:var(--wk-text-muted);
+}
+.wk-review-job-issue {
+  display:grid;gap:7px;margin-top:12px;padding:15px 18px;
+  border:1px solid var(--wk-border);border-radius:11px;background:var(--wk-bg-subtle);
+}
+.wk-review-job-issue h4{font-size:11px;font-weight:750;color:var(--wk-text-muted)}
+.wk-review-job-issue p{font-size:13px;line-height:1.65;color:var(--wk-text)}
+.wk-review-job-standing {
+  display:flex;gap:7px;flex-wrap:wrap;margin:0 0 16px;
+  font-size:12px;line-height:1.6;color:var(--wk-text-muted);
+}
+.wk-review-job-standing strong{color:var(--wk-text);font-weight:740}
+@media(max-width:600px){
+  .wk-review-job-issue{padding:12px 14px}
+  .wk-review-job-head h3{font-size:23px}
+}

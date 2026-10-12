@@ -11,6 +11,8 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { MiziziEvidenceWorkbench } from "./MiziziEvidenceWorkbench";
 import { MiziziReviewField } from "./MiziziReviewField";
 import { MiziziReviewRoots } from "./MiziziReviewRoots";
+import { loadMiziziCaseSubjects, type CaseSubject } from "@/services/miziziCaseField";
+import { reviewJobDisplay } from "@/services/reviewJobDisplay";
 import { loadIssue1094Brief, type Issue1094BriefRow } from "@/services/miziziIssue1094Brief";
 import {
   loadHeadquartersQueueV2,
@@ -19,17 +21,27 @@ import {
 } from "@/services/miziziHeadquartersBrief";
 
 
-function ReviewPreview({ items, onInspect }: { items: readonly QueueReviewV2[]; onInspect?: (id: string) => void }) {
+function ReviewPreview({ items, onInspect, subjects }: {
+  items: readonly QueueReviewV2[];
+  onInspect?: (id: string) => void;
+  subjects: ReadonlyMap<string, CaseSubject>;
+}) {
   if (!items.length) {
     return <p className="px-4 py-6 text-[13px] text-wk-text-muted">No reviews to show.</p>;
   }
   return (
     <ul className="divide-y divide-wk-border">
-      {items.map((item) => (
+      {items.map((item) => {
+        const job = reviewJobDisplay(item, subjects.get(item.id));
+        return (
         <li key={item.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
-            <p className="break-words text-[13px] font-semibold text-wk-text">{item.title}</p>
-            <p className="mt-1 text-[11px] text-wk-text-muted">{item.workstreamLabel}</p>
+            <p className="break-words text-[13px] font-semibold text-wk-text">{job.title}</p>
+            <p className="mt-1 text-[11px] text-wk-text-muted">
+              {job.type}{job.credits.length ? " · " + job.credits.join(", ") : ""}
+              {job.isrc ? " · ISRC " + job.isrc : ""}
+            </p>
+            <p className="mt-1 text-[11px] text-wk-text-muted">{job.issue}</p>
           </div>
           <div className="flex shrink-0 items-center gap-3 text-[11px] text-wk-text-muted">
             <span>{item.subjectType}</span>
@@ -41,7 +53,7 @@ function ReviewPreview({ items, onInspect }: { items: readonly QueueReviewV2[]; 
             ) : null}
           </div>
         </li>
-      ))}
+      ); })}
     </ul>
   );
 }
@@ -52,8 +64,12 @@ function ReviewPreview({ items, onInspect }: { items: readonly QueueReviewV2[]; 
  * A verified human decision is only made inside the governed Core review workflow.
  */
 function OperatorReviewSession({
-  queue, onInspect,
-}: { queue: HeadquartersQueueV2; onInspect: (id: string) => void }) {
+  queue, onInspect, subjects,
+}: {
+  queue: HeadquartersQueueV2;
+  onInspect: (id: string) => void;
+  subjects: ReadonlyMap<string, CaseSubject>;
+}) {
   const [minutes, setMinutes] = useState<"5" | "15" | "60" | null>(null);
   const [step, setStep] = useState(0);
   const [skipped, setSkipped] = useState<readonly string[]>([]);
@@ -61,6 +77,7 @@ function OperatorReviewSession({
   const limit = minutes === "5" ? 3 : minutes === "15" ? 8 : 24;
   const sessionItems = openReviews.slice(0, limit);
   const current = sessionItems[Math.min(step, sessionItems.length - 1)] ?? null;
+  const job = current ? reviewJobDisplay(current, subjects.get(current.id)) : null;
   const finish = () => { setMinutes(null); setStep(0); setSkipped([]); };
   const start = (duration: "5" | "15" | "60") => {
     setMinutes(duration); setStep(0); setSkipped([]);
@@ -133,23 +150,29 @@ function OperatorReviewSession({
           </div>
           {current ? (
             <article className="mz-session-question" key={current.id}>
-              <p className="text-[12px] text-wk-brand">{current.workstreamLabel}</p>
-              <h3 className="mt-3 break-words text-[clamp(24px,3.6vw,38px)] font-bold leading-tight text-wk-text">
-                {current.title}
+              <p className="text-[12px] font-semibold text-wk-text-muted">{job?.type} to review</p>
+              <h3 className="mt-2 break-words text-[clamp(24px,3.6vw,38px)] font-bold leading-tight text-wk-text">
+                {job?.title}
               </h3>
-              <p className="mt-3 max-w-[64ch] text-[14px] leading-6 text-wk-text-muted">
-                Inspect the recorded issue and its evidence before choosing an outcome.
-                MIZIZI has not made a decision for you.
-              </p>
-              <div className="mz-session-facts">
-                <div><span>Subject</span><strong>{current.subjectType}</strong></div>
-                <div><span>Recorded status</span><strong>{current.sourceStatus}</strong></div>
-                <div><span>Workstream</span><strong>{current.workstreamLabel}</strong></div>
-                <div><span>Review reference</span><strong className="break-all font-mono text-[12px]">{current.id}</strong></div>
+              {job?.credits.length ? (
+                <p className="mt-2 text-[14px] font-medium text-wk-text">
+                  Recorded artist credits: {job.credits.join(", ")}
+                </p>
+              ) : null}
+              {job?.isrc ? <p className="mt-1 text-[12px] text-wk-text-muted">ISRC {job.isrc}</p> : null}
+              <section className="mz-session-job-issue" aria-label="Recorded issue">
+                <h4>What Needs Review</h4>
+                <p>{current.title}</p>
+              </section>
+              <div className="mz-session-job-bottom">
+                <span>Current state: <strong>{current.sourceStatus}</strong></span>
+                <span>Review ID: <code>{current.id}</code></span>
               </div>
-              <p className="mt-4 text-[12px] text-wk-text-muted">
-                A reviewed source, comparison, or decision choice appears only when its authoritative Core evidence is available.
-              </p>
+              {!job?.sourced && (current.subjectType === "track" || current.subjectType === "release") ? (
+                <p role="status" className="mt-3 text-[12px] text-wk-text-muted">
+                  The Registry source name is unavailable. Inspect Cores before deciding.
+                </p>
+              ) : null}
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <WkButton onClick={inspect}>Inspect evidence in Cores <WkIcon name="ArrowRight" size={14}/></WkButton>
                 <WkButton variant="ghost" disabled={step + 1 >= sessionItems.length}
@@ -292,6 +315,19 @@ export function MiziziHeadquartersBrief({
   }, [revision]);
 
   const queue = state.kind === "ready" ? state.queue : null;
+  const [caseSubjects, setCaseSubjects] = useState<ReadonlyMap<string, CaseSubject>>(new Map());
+  const [subjectReadError, setSubjectReadError] = useState(false);
+  useEffect(() => {
+    if (!queue || view !== "brief") return;
+    let active = true;
+    setCaseSubjects(new Map());
+    setSubjectReadError(false);
+    void loadMiziziCaseSubjects(queue).then(
+      rows => { if (active) setCaseSubjects(new Map(rows.map(row => [row.reviewId, row]))); },
+      () => { if (active) setSubjectReadError(true); },
+    );
+    return () => { active = false; };
+  }, [queue, view]);
   const inspect = (id: string) => {
     if (!queue?.items.some((item) => item.id === id)) return;
     onSelectedIdChange(id);
@@ -330,7 +366,7 @@ export function MiziziHeadquartersBrief({
               <p className="when">Current authenticated Registry review inventory · Read at <WkZonedTimestamp value={queue.readAt} /></p>
               <h1>Across the Registry, <strong>{queue.resolved.toLocaleString()}</strong> reviews are resolved. <em>{queue.open.toLocaleString()} still need attention.</em></h1>
             </div>
-            <MiziziReviewRoots queue={queue} onInspect={inspect} />
+            <MiziziReviewRoots queue={queue} onInspect={inspect} subjects={caseSubjects} />
             <div className="mt-5">
               <WkStatusDistribution expectedTotal={queue.total}
                 ariaLabel="Current Registry review states"
@@ -344,7 +380,12 @@ export function MiziziHeadquartersBrief({
               </p>
             </div>
           </header>
-          <OperatorReviewSession queue={queue} onInspect={inspect} />
+          {subjectReadError ? (
+             <p role="status" className="text-[12px] text-wk-text-muted">
+               Some source names are unavailable. Reviews remain accessible in Cores.
+             </p>
+           ) : null}
+           <OperatorReviewSession queue={queue} onInspect={inspect} subjects={caseSubjects} />
           <div className="mz-brief-columns">
             <section className="min-w-0">
               <div className="sect-head"><h2>Worth Knowing</h2>
@@ -368,7 +409,7 @@ export function MiziziHeadquartersBrief({
               <button className="link" onClick={onShowCases}>Explore Cores</button>
             </div>
             <div style={{ borderTop: "1px solid var(--seam)" }}>
-              <ReviewPreview items={queue.recentOpen.slice(0, 4)} onInspect={inspect} />
+              <ReviewPreview items={queue.recentOpen.slice(0, 4)} onInspect={inspect} subjects={caseSubjects} />
             </div>
           </section>
         </div>

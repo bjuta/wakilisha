@@ -662,3 +662,22 @@
     left:12px;top:12px;
   }
 }
+
+/* The recording or Release is the job. A category is never its headline. */
+.mz-session-job-issue {
+  display:grid;gap:8px;margin-top:25px;padding:18px 20px;
+  border:1px solid var(--wk-border);border-radius:12px;
+  background:var(--wk-bg-subtle);
+}
+.mz-session-job-issue h4 {
+  font-size:11px;letter-spacing:.035em;font-weight:760;color:var(--wk-text-muted);
+}
+.mz-session-job-issue p {font-size:14px;line-height:1.65;color:var(--wk-text);overflow-wrap:anywhere}
+.mz-session-job-bottom {
+  display:flex;flex-wrap:wrap;gap:8px 25px;margin-top:15px;
+  color:var(--wk-text-muted);font-size:12px;line-height:1.6;
+}
+.mz-session-job-bottom code {font-size:11px;overflow-wrap:anywhere}
+@media(max-width:680px){
+  .mz-session-job-issue{padding:13px 14px;margin-top:17px}
+}
