@@ -134,7 +134,7 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(source).toContain("View Evidence in Cores");
     expect(source).toContain("expandedReceipt === item.reviewId");
     expect(source).toContain("<WkSurface");
-    expect(source).toContain("<WkTabs");
+    expect(source).toContain("<MiziziReviewField");
     expect(source).toContain("<WkButton");
     expect(source).not.toMatch(/<select\b|<dialog\b|<input\b|<textarea\b/);
     expect(source).not.toMatch(/#84C241|#E5AC43|#170F0A|#21170F|<canvas\b|M\.CLIENTS/);
@@ -276,11 +276,16 @@ describe("Headquarters complete Registry review inventory", () => {
 
   it("uses the existing WAKILISHA custom UI components and keeps internal explanation out of copy", () => {
     const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
-    expect(source).toContain("<WkTabs");
+    const field = readFileSync("src/pages/admin/review/mizizi/MiziziReviewField.tsx", "utf8");
+    const cores = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx", "utf8");
     expect(source).toContain("<WkSurface");
     expect(source).toContain("<WkButton");
-    expect(source).toContain("<WkSearchField");
-    expect(source).toContain("<WkSelect");
+    expect(source).toContain("<MiziziReviewField");
+    expect(field).toContain("<WkSearchField");
+    expect(field).toContain('aria-label="Workstream keys and filters"');
+    expect(cores).toContain("<WkSearchField");
+    expect(cores).toContain('data-wk-edge-filters');
+    expect(field + cores).not.toMatch(/<select\b|<input\b|<textarea\b/);
     expect(source).not.toMatch(/<select\b|<input\b|<textarea\b/);
     expect(source).not.toMatch(/DB02|SQL|migration|contract|canonical DML|verifier|schema|—/);
   });
@@ -356,9 +361,9 @@ describe("Headquarters in-place review inspection", () => {
   it("keeps bounded sessions review-only with explicit skip and Done for Now", () => {
     const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
     expect(source).toContain("function OperatorReviewSession(");
-    expect(source).toContain("5 minutes");
-    expect(source).toContain("15 minutes");
-    expect(source).toContain("60 minutes");
+    expect(source).toContain('value: "5", title: "Five minutes"');
+    expect(source).toContain('value: "15", title: "Fifteen minutes"');
+    expect(source).toContain('value: "60", title: "An hour"');
     expect(source).toContain("Skip for Now");
     expect(source).toContain("Done for Now");
     expect(source).toContain('queue.items.filter((item) => item.status === "open")');
@@ -368,13 +373,19 @@ describe("Headquarters in-place review inspection", () => {
     expect(source).not.toContain("Approve Review");
   });
 
-  it("uses WAKILISHA Inspector, not browser-native dialogs or autonomous decisions", () => {
+  it("opens only authorized reviews in custom Cores, never browser-native or automatic decisions", () => {
     const source = readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx", "utf8");
-    expect(source).toContain("<WkInspector");
-    expect(source).toContain("selectReviewForInspectionV1");
-    expect(source).toContain("Open Review Queue");
-    expect(source).not.toMatch(/<dialog\b|<select\b|<input\b|<textarea\b/);
-    expect(source).not.toContain("Approve Review");
+    const cores = readFileSync("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx", "utf8");
+    expect(source).toContain('queue?.items.some((item) => item.id === id)');
+    expect(source).toContain("onSelectedIdChange(id)");
+    expect(source).toContain("onShowCases()");
+    expect(source).toContain("<MiziziEvidenceWorkbench");
+    expect(cores).toContain("<WkSplitWorkspace");
+    expect(cores).toContain("Open Governed Review");
+    expect(cores).toContain("No new decision will be made here");
+    expect(source + cores).not.toMatch(/<dialog\b|<select\b|<input\b|<textarea\b/);
+    expect(source + cores).not.toContain("Approve Review");
+    expect(cores).not.toMatch(/\.(?:insert|update|upsert|delete|rpc)\s*\(/);
   });
 });
 
