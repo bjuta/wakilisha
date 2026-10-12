@@ -46,8 +46,10 @@ describe("MIZIZI job-first, source-bound review presentation", () => {
     expect(queue).toContain("title={jobTitle}");
     expect(queue).toContain("Source IDs and Recorded Data");
     expect(queue).toContain('useCanonicalReviewTitle(item)');
-    expect(queue).toContain('supabase.from("registry_tracks").select("id,title")');
-    expect(queue).toContain('supabase.from("registry_releases").select("id,title")');
+    expect(queue).toContain('supabase.from("registry_tracks")');
+    expect(queue).toContain('.select("id,title").eq("id", sourceId).maybeSingle()');
+    expect(queue).toContain('supabase.from("registry_releases")');
+    expect(queue).toContain('.select("id,title").eq("id", sourceId).maybeSingle()');
     expect(queue).toContain("What Needs Review");
     expect(queue).not.toContain('<FieldPill label="Review type"');
   });
