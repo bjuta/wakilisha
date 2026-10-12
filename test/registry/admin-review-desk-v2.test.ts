@@ -8,6 +8,7 @@ describe("All Reviews v2: governed review desk", () => {
   const service = read("src/services/adminReviewCommandCenter.ts");
   const miziziCores = read("src/pages/admin/review/mizizi/MiziziEvidenceWorkbench.tsx");
   const css = read("src/pages/admin/review/queue/review-desk.css");
+  const presentation = read("src/pages/admin/review/queue/reviewDeskPresentation.ts");
 
   it("makes active Registry work the primary reading surface", () => {
     expect(page).toContain("data-wk-review-desk");
@@ -49,6 +50,11 @@ describe("All Reviews v2: governed review desk", () => {
     expect(page).toContain('aria-expanded={expanded}');
     expect(page).toContain('id={"review-preview-" + row.id}');
     expect(page).toContain("Review Evidence and Decide");
+    expect(page).toContain("groupLoadedReviewRows(rows)");
+    expect(page).toContain("data-wk-review-issue-group={group.key}");
+    expect(page).toContain("Each item below is a separate Registry review.");
+    expect(page).toContain("group.items.slice(0, visibleIssueItems[group.key] ?? 6)");
+
     expect(page).toContain("Read Governed Record");
     expect(page).toContain('onClick={open ? onOpen : onRead}');
     expect(page).toContain("recordRegistryReviewDecision({");
@@ -74,6 +80,11 @@ describe("All Reviews v2: governed review desk", () => {
     expect(css).toContain(".wk-review-record-detail");
     expect(css).toContain(".wk-review-record-facts");
     expect(css).toContain("@media(max-width:700px)");
+    expect(css).toContain(".wk-review-issue-trigger");
+    expect(css).toContain("padding-top:70px");
+    expect(css).toContain("grid-template-columns:repeat(2,minmax(0,1fr))");
+    expect(presentation).toContain("genericChartIssue");
+    expect(presentation).toContain("sourceDisplay");
     expect(css).toContain("prefers-reduced-motion:reduce");
     expect(css).not.toContain("!important");
     expect(css).not.toMatch(/#[0-9a-f]{6}/i);

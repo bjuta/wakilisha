@@ -26,6 +26,12 @@ import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
 import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
+import {
+  chartIssueHeading,
+  genericChartIssue,
+  groupLoadedReviewRows,
+  sourceDisplay,
+} from "./reviewDeskPresentation";
 import "./review-desk.css";
 
 
@@ -606,6 +612,8 @@ function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }
   );
   const [offset, setOffset] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIssue, setExpandedIssue] = useState<string | null>(null);
+  const [visibleIssueItems, setVisibleIssueItems] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const requestVersion = useRef(0);
@@ -622,7 +630,11 @@ function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }
         : page.rows);
       setTotal(page.total);
       setOffset(page.offset);
-      if (mode === "replace") setExpandedId(null);
+      if (mode === "replace") {
+        setExpandedId(null);
+        setExpandedIssue(null);
+        setVisibleIssueItems({});
+      }
     } catch (err) {
       if (version === requestVersion.current)
         setMessage(err instanceof Error ? err.message : "Could not load reviews.");
@@ -642,6 +654,8 @@ function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }
       setTotal(openTotal);
       setOffset(0);
       setExpandedId(null);
+      setExpandedIssue(null);
+      setVisibleIssueItems({});
     }
     // The authoritative snapshot changes after an actual governed decision.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -667,6 +681,7 @@ function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }
       return map;
     }, new Map<string, number>())].sort((a, b) => b[1] - a[1]);
   const activeTypeCount = types.find(([key]) => key === filters.reviewType)?.[1] ?? 0;
+  const displayGroups = groupLoadedReviewRows(rows);
 
   return (
     <div className="wk-review-queue" data-wk-registry-review-panel>
@@ -718,13 +733,61 @@ function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }
         {message ? <p role="alert" className="text-[12px] text-wk-warning">{message}</p> : null}
       </div>
       <div className="wk-review-queue-list">
-        {rows.length ? rows.map(row => (
+        {rows.length ? displayGroups.map(group => group.grouped ? (
+          <section key={group.key} className="wk-review-issue-group"
+            aria-label={chartIssueHeading(group.items[0])}
+            data-wk-review-issue-group={group.key}>
+            <button type="button" className="wk-review-issue-trigger"
+              aria-expanded={expandedIssue === group.key}
+              onClick={() => {
+                setExpandedIssue(current => current === group.key ? null : group.key);
+                setExpandedId(null);
+              }}>
+              <span className="wk-review-issue-icon" aria-hidden="true">
+                <WkIcon name="Layers3" size={20} />
+              </span>
+              <span className="wk-review-issue-copy">
+                <strong>{chartIssueHeading(group.items[0])}</strong>
+                <span>{group.items[0].summary || "The source rows share one recorded issue type."}</span>
+                <small>{formatReviewCount(group.items.length)} distinct source records loaded · {humanize(group.items[0].status || "Unknown")} · Individual review required</small>
+              </span>
+              <span className="wk-review-issue-count" aria-hidden="true">{group.items.length}</span>
+              <WkIcon name={expandedIssue === group.key ? "ChevronUp" : "ChevronDown"}
+                size={19} aria-hidden="true" />
+            </button>
+            {expandedIssue === group.key ? (
+              <div className="wk-review-issue-contents">
+                <p className="wk-review-issue-explanation">
+                  Each item below is a separate Registry review. This grouping changes only
+                  how records are displayed, never their decisions or source identities.
+                </p>
+                {group.items.slice(0, visibleIssueItems[group.key] ?? 6).map(row => (
+                  <RegistryReviewRow key={row.id} row={row} compact
+                    expanded={expandedId === row.id}
+                    onToggle={() => setExpandedId(current => current === row.id ? null : row.id)}
+                    onOpen={() => onOpen(row)}
+                    onRead={() => onRead(row)} />
+                ))}
+                {group.items.length > (visibleIssueItems[group.key] ?? 6) ? (
+                  <button type="button" className="wk-button wk-button-soft wk-button-sm wk-review-issue-more"
+                    onClick={() => setVisibleIssueItems(current => ({
+                      ...current,
+                      [group.key]: Math.min(group.items.length, (current[group.key] ?? 6) + 6),
+                    }))}>
+                    Show more individual records ({Math.min(group.items.length, visibleIssueItems[group.key] ?? 6)} of {group.items.length})
+                    <WkIcon name="ChevronDown" size={14} />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : group.items.map(row => (
           <RegistryReviewRow key={row.id} row={row}
             expanded={expandedId === row.id}
             onToggle={() => setExpandedId(current => current === row.id ? null : row.id)}
             onOpen={() => onOpen(row)}
             onRead={() => onRead(row)} />
-        )) : !loading ? (
+        ))) : !loading ? (
           <div className="wk-review-queue-empty" role="status">
             <WkIcon name="Inbox" size={26} aria-hidden="true" />
             <h3>No matching reviews</h3>
@@ -763,8 +826,9 @@ function FilterSelect({ label, value, options, onChange }: {
   </label>;
 }
 
-function RegistryReviewRow({ row, expanded, onToggle, onOpen, onRead }: {
+function RegistryReviewRow({ row, expanded, onToggle, onOpen, onRead, compact = false }: {
   row: RegistryReviewItemRow;
+  compact?: boolean;
   expanded: boolean;
   onToggle: () => void;
   onOpen: () => void;
@@ -773,9 +837,12 @@ function RegistryReviewRow({ row, expanded, onToggle, onOpen, onRead }: {
   const artistText = candidateString(row, "artistText");
   const artistSlug = candidateString(row, "artistSlug");
   const open = row.status === "open";
-  const reviewedTitle = row.title?.trim() || row.review_key || row.id;
+  const reviewedTitle = genericChartIssue(row)
+    ? "Chart source · " + sourceDisplay(row)
+    : row.title?.trim() || row.review_key || row.id;
   const recordedSource = [row.source_table, row.source_id || row.entity_id].filter(Boolean).join(" / ");
-  return <article className="wk-review-record" data-wk-review-record={row.id}>
+  return <article className={"wk-review-record" + (compact ? " is-issue-child" : "")}
+    data-wk-review-record={row.id}>
     <button type="button" className="wk-review-record-main"
       aria-expanded={expanded} aria-controls={"review-preview-" + row.id}
       onClick={onToggle}>
@@ -788,7 +855,8 @@ function RegistryReviewRow({ row, expanded, onToggle, onOpen, onRead }: {
           {reviewTypeLabel(row.review_type || "")}
           {row.entity_type ? " · " + humanize(row.entity_type) : ""}
         </span>
-        {row.summary ? <span className="wk-review-record-summary">{row.summary}</span> : null}
+        {!compact && row.summary
+          ? <span className="wk-review-record-summary">{row.summary}</span> : null}
       </span>
       <span className="wk-review-record-meta">
         {row.priority === "high" ? <span className="wk-review-record-priority">High Priority</span> : null}
@@ -816,6 +884,9 @@ function RegistryReviewRow({ row, expanded, onToggle, onOpen, onRead }: {
           <div><dt>Review Status</dt><dd>{humanize(row.status || "Unknown")}</dd></div>
           <div><dt>Review Reference</dt><dd className="break-all font-mono">{row.id}</dd></div>
           {recordedSource ? <div><dt>Source Reference</dt><dd className="break-all">{recordedSource}</dd></div> : null}
+          {genericChartIssue(row) ? (
+            <div><dt>Source Issue Template</dt><dd>{row.title}</dd></div>
+          ) : null}
         </dl>
       </div>
       <div className="wk-review-record-footer">
