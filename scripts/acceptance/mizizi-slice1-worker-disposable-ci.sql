@@ -227,7 +227,6 @@ DECLARE v_denied boolean;
 BEGIN
  -- Direct policy function used by both existing canonical Registry admission
  -- triggers; test both matching and unrelated Registry operation families.
- FOREACH v_denied IN ARRAY ARRAY[true] LOOP EXIT; END LOOP;
  v_denied:=false;
  BEGIN
    PERFORM mizizi_private.assert_registry_admission_not_held_v1(
@@ -320,6 +319,52 @@ BEGIN
  IF (SELECT count(*) FROM platform_private.registry_execution_grants
      WHERE status='active')<>0
  THEN RAISE EXCEPTION 'CI_DB05_H40_RELEASE_AUTO_CREATED_GRANT'; END IF;
+
+ -- Separate global and exact-operation scopes must have different blast radii.
+ INSERT INTO mizizi_private.write_holds
+   (hold_key,scope_kind,status,hold_reason,held_by_actor_key)
+ VALUES ('wk-ci-global-'||substr(md5(gen_random_uuid()::text),1,12),
+   'global','active','Disposable global scope authority acceptance.','system:mizizi')
+ RETURNING id INTO STRICT v_hold_id;
+ v_rejected:=false;
+ BEGIN
+   PERFORM mizizi_private.assert_registry_admission_not_held_v1(
+     'registry.artist.create',1);
+ EXCEPTION WHEN SQLSTATE '42501' THEN v_rejected:=true; END;
+ IF NOT v_rejected THEN RAISE EXCEPTION 'CI_DB05_GLOBAL_SCOPE_NOT_ENFORCED'; END IF;
+ UPDATE mizizi_private.write_holds SET status='released',revision=2,
+   released_at=clock_timestamp(),released_by_actor_key='system:mizizi',
+   release_reason='Disposable global scope release with audit history.'
+ WHERE id=v_hold_id AND revision=1;
+ INSERT INTO mizizi_private.write_holds
+   (hold_key,scope_kind,workspace_id,operation_key,operation_version,
+    status,hold_reason,held_by_actor_key)
+ VALUES ('wk-ci-operation-'||substr(md5(gen_random_uuid()::text),1,12),
+   'operation',current_setting('wk.ci.ws')::uuid,
+   'registry.artist.merge',1,'active',
+   'Disposable operation-only policy scope acceptance.','system:mizizi')
+ RETURNING id INTO STRICT v_hold_id;
+ v_rejected:=false;
+ BEGIN
+   PERFORM mizizi_private.assert_registry_admission_not_held_v1(
+     'registry.artist.merge',1);
+ EXCEPTION WHEN SQLSTATE '42501' THEN v_rejected:=true; END;
+ IF NOT v_rejected THEN RAISE EXCEPTION 'CI_DB05_OPERATION_SCOPE_NOT_ENFORCED'; END IF;
+ PERFORM mizizi_private.assert_registry_admission_not_held_v1(
+   'registry.artist.create',1);
+ UPDATE mizizi_private.write_holds SET status='released',revision=2,
+   released_at=clock_timestamp(),released_by_actor_key='system:mizizi',
+   release_reason='Disposable operation-only scope release with journal.'
+ WHERE id=v_hold_id AND revision=1;
+ IF (SELECT count(*) FROM mizizi_private.write_holds
+   WHERE status='active')<>0
+ OR (SELECT count(*) FROM mizizi_private.write_hold_events
+   WHERE event_kind='hold_started')<>3
+ OR (SELECT count(*) FROM mizizi_private.write_hold_events
+   WHERE event_kind='hold_released')<>3
+ THEN RAISE EXCEPTION 'CI_DB05_SCOPE_JOURNAL_OR_ACTIVE_HOLD_DRIFT'; END IF;
+ RAISE NOTICE 'CI_DB05_GLOBAL_WORKSPACE_OPERATION_SCOPE=PASS';
+
  RAISE NOTICE 'CI_DB05_H40_RELEASE_JOURNAL_AND_NO_STANDING_GRANT=PASS';
  RAISE NOTICE 'CI_DB05_H38_GENUINE_STALE_GRANTED_WRITER=NOT_RUN';
  RAISE NOTICE 'CI_DB05_H39_TWO_AUTHENTICATED_OPERATOR_RELEASES=NOT_RUN';
