@@ -199,5 +199,131 @@ BEGIN
  RAISE NOTICE 'CI_W31_TRUE_CONCURRENT_DB_SESSIONS=NOT_RUN';
  RAISE NOTICE 'CI_REAL_JWT_OR_OPERATOR_BROWSER=NOT_RUN';
 END $terminal_receipts$;
+
+-- DB05 governance holds tested in the SAME disposable rollback transaction.
+-- These are database admission-barrier proofs, NOT authenticated operator JWT,
+-- genuine pre-existing reviewed grants, or signed-in stale-browser acceptance.
+DO $wk_hold_created$
+DECLARE v_hold_id uuid;
+BEGIN
+ INSERT INTO mizizi_private.write_holds
+   (hold_key,scope_kind,workspace_id,status,hold_reason,held_by_actor_key)
+ VALUES ('wk-ci-hold-'||substr(md5(gen_random_uuid()::text),1,12),
+   'workspace',current_setting('wk.ci.ws')::uuid,'active',
+   'Disposable SQL-only workspace hold test, not a human instruction.',
+   'system:mizizi')
+ RETURNING id INTO STRICT v_hold_id;
+ PERFORM set_config('wk.ci.hold',v_hold_id::text,true);
+ IF (SELECT count(*) FROM mizizi_private.write_holds
+      WHERE id=v_hold_id AND status='active' AND revision=1)<>1
+    OR (SELECT count(*) FROM mizizi_private.write_hold_events
+      WHERE hold_id=v_hold_id AND revision=1 AND event_kind='hold_started')<>1
+ THEN RAISE EXCEPTION 'CI_DB05_H36_HOLD_OR_EVENT_NOT_RECORDED'; END IF;
+ RAISE NOTICE 'CI_DB05_H36_TRANSACTIONAL_HOLD_AND_HISTORY=PASS';
+END $wk_hold_created$;
+
+DO $wk_hold_denials$
+DECLARE v_denied boolean;
+BEGIN
+ -- Direct policy function used by both existing canonical Registry admission
+ -- triggers; test both matching and unrelated Registry operation families.
+ FOREACH v_denied IN ARRAY ARRAY[true] LOOP EXIT; END LOOP;
+ v_denied:=false;
+ BEGIN
+   PERFORM mizizi_private.assert_registry_admission_not_held_v1(
+     'registry.artist.merge',1);
+ EXCEPTION WHEN SQLSTATE '42501' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'CI_DB05_H37_MERGE_ADMITTED_UNDER_HOLD'; END IF;
+ v_denied:=false;
+ BEGIN
+   PERFORM mizizi_private.assert_registry_admission_not_held_v1(
+     'registry.artist.create',1);
+ EXCEPTION WHEN SQLSTATE '42501' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'CI_DB05_H37_CREATE_ADMITTED_UNDER_HOLD'; END IF;
+ RAISE NOTICE 'CI_DB05_H37_SCOPE_HOLD_POLICY_DENIAL=PASS';
+
+ -- Exercise actual BEFORE INSERT gates. The candidate rows are intentionally
+ -- not a reviewed plan and can never commit; this proves the hold gate fires
+ -- before any downstream FK/review admission. It does not simulate a grant.
+ v_denied:=false;
+ BEGIN
+   INSERT INTO platform_private.registry_execution_grants(
+     actor_key,capability_key,operation_key,operation_version,
+     plan_payload,plan_fingerprint,target_set_fingerprint,max_rows,
+     idempotency_key,status,issued_at,expires_at,
+     issued_by_principal_key,policy_ruleset_version)
+   VALUES ('mizizi','merge_registry_artist','registry.artist.merge',1,
+     '{}'::jsonb,repeat('a',64),repeat('b',64),1,
+     'wk-ci-hold-denied', 'active', now(),now()+interval '2 minutes',
+     'policy:ci_test','mizizi_ci_v1');
+ EXCEPTION WHEN SQLSTATE '42501' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'CI_DB05_H37_GRANT_TRIGGER_NOT_DENIED'; END IF;
+
+ v_denied:=false;
+ BEGIN
+   INSERT INTO platform_private.registry_mutation_operations(
+     execution_grant_id,actor_key,capability_key,operation_key,
+     operation_version,principal_key,plan_fingerprint,
+     target_set_fingerprint,max_rows,affected_rows,status,verifier_status,
+     result_payload)
+   VALUES (gen_random_uuid(),'mizizi','merge_registry_artist',
+     'registry.artist.merge',1,'system:mizizi',repeat('a',64),repeat('b',64),
+     1,0,'authorized','pending','{}'::jsonb);
+ EXCEPTION WHEN SQLSTATE '42501' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'CI_DB05_H37_MUTATION_TRIGGER_NOT_DENIED'; END IF;
+
+ IF (SELECT count(*) FROM platform_private.registry_execution_grants
+      WHERE status='active')<>0
+   OR (SELECT count(*) FROM platform_private.registry_mutation_operations
+      WHERE status IN ('authorized','executing'))<>0
+ THEN RAISE EXCEPTION 'CI_DB05_H37_DENIED_ADMISSION_PERSISTED'; END IF;
+ RAISE NOTICE 'CI_DB05_H37_BOTH_CANONICAL_ADMISSION_TRIGGERS_DENIED=PASS';
+END $wk_hold_denials$;
+
+-- Read-only shared research remains explicitly allowed while Hold Writes
+-- fences new Registry mutation admission. A dead-letter job is not claimed.
+SET SESSION AUTHORIZATION service_role;
+SELECT set_config('request.jwt.claim.role','service_role',true);
+DO $wk_hold_read$
+DECLARE v_count integer;
+BEGIN
+ SELECT count(*) INTO v_count
+ FROM public.mizizi_claim_case_research_jobs_v1('wk-hold-readonly',1,30);
+ IF v_count<>0 THEN RAISE EXCEPTION 'CI_DB05_UNEXPECTED_RESEARCH_JOB_CLAIM'; END IF;
+ RAISE NOTICE 'CI_DB05_RESEARCH_CLAIM_RPC_REMAINS_AVAILABLE=PASS';
+END $wk_hold_read$;
+SET SESSION AUTHORIZATION DEFAULT;
+
+DO $wk_hold_release$
+DECLARE v_hold_id uuid:=current_setting('wk.ci.hold')::uuid;
+  v_rejected boolean:=false;
+BEGIN
+ UPDATE mizizi_private.write_holds SET status='released',revision=revision+1,
+   released_at=clock_timestamp(),released_by_actor_key='system:mizizi',
+   release_reason='Disposable SQL-only Hold Writes release acceptance.'
+ WHERE id=v_hold_id AND status='active' AND revision=1;
+ IF NOT FOUND THEN RAISE EXCEPTION 'CI_DB05_H40_HOLD_RELEASE_FAILED'; END IF;
+ IF (SELECT count(*) FROM mizizi_private.write_hold_events WHERE hold_id=v_hold_id)<>2
+    OR (SELECT count(*) FROM mizizi_private.write_hold_events
+        WHERE hold_id=v_hold_id AND event_kind='hold_released' AND revision=2)<>1
+ THEN RAISE EXCEPTION 'CI_DB05_H40_DOUBLE_OR_MISSING_EVENT'; END IF;
+ -- Existing immutable history cannot be edited, and duplicate release is
+ -- forbidden even though it is the same local synthetic supervisor identity.
+ BEGIN
+   UPDATE mizizi_private.write_holds SET status='released',revision=revision+1,
+     released_at=clock_timestamp(),released_by_actor_key='system:mizizi',
+     release_reason='Duplicate stale release must be refused.'
+   WHERE id=v_hold_id;
+ EXCEPTION WHEN SQLSTATE '23514' THEN v_rejected:=true; END;
+ IF NOT v_rejected THEN RAISE EXCEPTION 'CI_DB05_H40_DUPLICATE_RELEASE_ACCEPTED'; END IF;
+ PERFORM mizizi_private.assert_registry_admission_not_held_v1('registry.artist.merge',1);
+ IF (SELECT count(*) FROM platform_private.registry_execution_grants
+     WHERE status='active')<>0
+ THEN RAISE EXCEPTION 'CI_DB05_H40_RELEASE_AUTO_CREATED_GRANT'; END IF;
+ RAISE NOTICE 'CI_DB05_H40_RELEASE_JOURNAL_AND_NO_STANDING_GRANT=PASS';
+ RAISE NOTICE 'CI_DB05_H38_GENUINE_STALE_GRANTED_WRITER=NOT_RUN';
+ RAISE NOTICE 'CI_DB05_H39_TWO_AUTHENTICATED_OPERATOR_RELEASES=NOT_RUN';
+END $wk_hold_release$;
+
 ROLLBACK;
 \echo WK_CI_DISPOSABLE_WORKER_SQL_ROLLBACK=PASS
