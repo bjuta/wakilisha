@@ -10,6 +10,7 @@ on:
       - "scripts/acceptance/mizizi-slice1-worker-parallel-setup-ci.sql"
       - "scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh"
       - "scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs"
+      - "scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql"
       - "supabase/migrations/**"
       - "scripts/registry/agents/mizizi/runtime/**"
 
@@ -56,6 +57,14 @@ jobs:
         run: |
           supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
           echo "WK_CI_LOCAL_MIGRATION_REPLAY_FINISHED=PASS"
+
+      - name: Verify exact HTTP 409 operator RPC and sealed ACLs
+        shell: bash
+        run: |
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql
 
       - name: Execute six actual worker lease and recovery SQL probes
         shell: bash
@@ -114,6 +123,14 @@ jobs:
         run: |
           supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
           echo "WK_CI_LOCAL_GOTRUE_REST_MIGRATION_REPLAY=PASS"
+
+      - name: Verify exact HTTP 409 operator RPC and sealed ACLs
+        shell: bash
+        run: |
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql
 
       - name: Exercise genuine JWT operator bootstrap, case and competing hold RPCs
         shell: bash
