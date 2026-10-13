@@ -63,12 +63,13 @@ describe("MIZIZI opt-in real JIT review-to-case dispatch",()=>{
    await expect(dispatch({...finding,ruleVersion:"1.4.0"},{})).rejects.toThrow();
    expect(q).toHaveBeenCalledTimes(1);
  });
- it("the legacy runner defaults off; explicit bounded review mode and real JIT are mandatory",()=>{
+ it("the protected legacy runner stays unchanged; this integration lives in a separate opt-in CLI",()=>{
    const run=readFileSync("scripts/registry/agents/mizizi/run.ts","utf8");
-   expect(run).toContain('argValue("headquarters-case-mode", "off")');
-   expect(run).toContain('mode !== "review" || entity !== "track" || limit < 1 || limit > 25');
-   expect(run).toContain("MIZIZI_HEADQUARTERS_REVIEW_CASE_ONLY");
-   expect(run).toContain("createTrustedHeadquartersReviewDispatcherV1");
-   expect(run).toContain("MIZIZI_HEADQUARTERS_REVIEW_CASE_RECEIPT=");
+   expect(run).not.toContain("createTrustedHeadquartersReviewDispatcherV1");
+   expect(run).not.toContain("headquarters-case-mode");
+   const cli=readFileSync("scripts/registry/agents/mizizi/runtime/run-review-case-admission.ts","utf8");
+   expect(cli).toContain("createTrustedHeadquartersReviewDispatcherV1");
+   expect(cli).toContain("MIZIZI_JIT_REVIEW_CASE_ONLY");
+   expect(cli).not.toMatch(/execute_stewardship_operation|issue_stewardship_execution_grant/);
  });
 });

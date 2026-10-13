@@ -19,7 +19,6 @@ import {
   createRegistryPool,
   hasTable,
 } from "../../phase1-db";
-import { createTrustedHeadquartersReviewDispatcherV1 } from "./runtime/trusted-headquarters-review-dispatch";
 
 type EntityScope = "track" | "release" | "chart" | "evidence" | "provenance" | "all";
 type RunMode = "audit" | "review" | "apply";
@@ -33,8 +32,6 @@ type Options = {
   shardCount: number;
   shardIndex: number;
   sendStandup: boolean;
-  headquartersCaseMode: "off" | "review_case_only";
-  headquartersWorkspaceId: string | null;
 };
 
 type TrackRow = {
@@ -110,10 +107,6 @@ type RunStats = {
 };
 
 const MAX_SAMPLE_FINDINGS = 30;
-let trustedHeadquartersReviewDispatcher:
-  | ((finding: Readonly<MiziziFinding>, extraEvidence: Record<string,unknown>) =>
-      Promise<Readonly<{reviewItemId:string;caseId:string;receiptLinkId:string;caseRevision:number}>>)
-  | null = null;
 
 function newStats(): RunStats {
   return {
@@ -209,23 +202,6 @@ function parseOptions(): Options {
       "false",
     ).trim().toLowerCase() ===
       "true";
-  const headquartersCaseMode = argValue("headquarters-case-mode", "off");
-  const headquartersWorkspaceId = argValue("headquarters-workspace-id", "").trim() || null;
-  if (headquartersCaseMode !== "off" && headquartersCaseMode !== "review_case_only") {
-    throw new Error("Unknown bounded Headquarters case mode");
-  }
-  if (headquartersCaseMode === "review_case_only" && (
-    mode !== "review" || entity !== "track" || limit < 1 || limit > 25 ||
-    shardCount !== 1 || shardIndex !== 0 || sendStandup ||
-    !headquartersWorkspaceId ||
-    !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(headquartersWorkspaceId) ||
-    argValue("confirm-headquarters", "") !== "MIZIZI_HEADQUARTERS_REVIEW_CASE_ONLY"
-  )) {
-    throw new Error("Headquarters case mode requires reviewed track-only bounded one-shard review and explicit confirmation");
-  }
-  if (headquartersCaseMode === "off" && headquartersWorkspaceId !== null) {
-    throw new Error("Headquarters workspace cannot be supplied when its review-case mode is off");
-  }
 
   if (!["audit", "review", "apply"].includes(mode)) {
     throw new Error(
@@ -322,8 +298,6 @@ function parseOptions(): Options {
     shardCount,
     shardIndex,
     sendStandup,
-    headquartersCaseMode: headquartersCaseMode as "off" | "review_case_only",
-    headquartersWorkspaceId,
   };
 }
 
@@ -375,18 +349,6 @@ async function queueReview(
     throw new Error(
       "MIZIZI review broker does not accept this finding type.",
     );
-  }
-
-  if (trustedHeadquartersReviewDispatcher) {
-    // This opt-in uses the already-approved JIT review+case gateway ONCE,
-    // not the legacy broker followed by a second, duplicating review.
-    // Any unsupported rule stops; it is never silently downgraded.
-    const receipt = await trustedHeadquartersReviewDispatcher(finding, extraEvidence);
-    console.log(
-      "MIZIZI_HEADQUARTERS_REVIEW_CASE_RECEIPT=" +
-      JSON.stringify(receipt),
-    );
-    return;
   }
 
   const reviewBroker =
@@ -2861,17 +2823,6 @@ async function main(): Promise<void> {
 
   try {
     await pool.query("select 1");
-    if (options.headquartersCaseMode === "review_case_only") {
-      // The connected PG session must genuinely log in as the *narrow*
-      // executor; SET ROLE from postgres cannot satisfy session_user.
-      trustedHeadquartersReviewDispatcher =
-        await createTrustedHeadquartersReviewDispatcherV1(
-          (queryText,values) => pool.query(queryText, [...values]),
-          options.headquartersWorkspaceId!,
-          MIZIZI_RULESET_VERSION,
-        );
-      console.log("MIZIZI_HEADQUARTERS_JIT_REVIEW_CASE=READY");
-    }
     await assertRequiredTables(
       pool,
     );
