@@ -19,6 +19,11 @@ export type ReadOnlyResearchResultV1=Readonly<{
  sourceReferences:readonly string[];
 }>;
 export type ResearchJobHandlerV1=(job:ResearchJobV1)=>Promise<ReadOnlyResearchResultV1>;
+/** Independent source authority, supplied only by a trusted server-side reader.
+ * A model or research callback cannot vouch for its own source identities. */
+export type ResearchSourceVerifierV1=(
+ job:ResearchJobV1,sourceReferences:readonly string[],
+)=>Promise<boolean>;
 export type WorkerCycleResultV1=Readonly<{
  contract:typeof RESEARCH_WORKER_CYCLE_CONTRACT;
  recovered:number;claimed:number;succeeded:number;failed:number;
@@ -58,7 +63,9 @@ function validateClaim(raw:unknown,nowMs:number):ResearchJobV1{
  return Object.freeze({jobId,receiptId,caseId,workspaceId,expectedRevision,
    attempt,maxAttempts,leaseExpiresAt:new Date(expires).toISOString()});
 }
-function validatedResult(value:unknown,job:ResearchJobV1):Readonly<Record<string,unknown>>{
+async function validatedResult(
+ value:unknown,job:ResearchJobV1,verifySources?:ResearchSourceVerifierV1,
+):Promise<Readonly<Record<string,unknown>>>{
  const result=record(value);
  if(result.contract!=="mizizi.read_only_research_result.v1"||
     uuid(result.caseId)!==job.caseId||
@@ -67,12 +74,23 @@ function validatedResult(value:unknown,job:ResearchJobV1):Readonly<Record<string
     result.sourceReferences.some((s:unknown)=>typeof s!=="string"||!UUID.test(s))||
     (result.status==="evidence_recorded"&&result.sourceReferences.length===0))
    throw new TypeError("MIZIZI_WORKER_UNVERIFIED_RESEARCH_RESULT");
- // Whitelist the result. Never forward a researcher's arbitrary raw payload.
- // Source IDs are assertions by the injected researcher, not provenance proof.
+ // Result fields must remain bounded and never forward a researcher's
+ // arbitrary payload or source notes. A bare UUID is NOT source authority.
+ const sourceReferences=(result.sourceReferences as string[]).map(s=>s.toLowerCase());
+ if(new Set(sourceReferences).size!==sourceReferences.length||
+    (result.status==="insufficient_evidence"&&sourceReferences.length!==0))
+   throw new TypeError("MIZIZI_WORKER_UNVERIFIED_RESEARCH_RESULT");
  const safe={contract:result.contract,caseId:job.caseId,status:result.status,
-   sourceReferences:result.sourceReferences.map((s:string)=>s.toLowerCase())};
+   sourceReferences};
  if(new TextEncoder().encode(JSON.stringify(safe)).length>8192)
    throw new TypeError("MIZIZI_WORKER_RESULT_TOO_LARGE");
+ if(result.status==="evidence_recorded"){
+   if(typeof verifySources!=="function")
+     throw new TypeError("MIZIZI_WORKER_SOURCE_VERIFIER_REQUIRED");
+   const verified=await verifySources(job,Object.freeze([...sourceReferences]));
+   if(verified!==true)
+     throw new TypeError("MIZIZI_WORKER_SOURCE_PROVENANCE_UNVERIFIED");
+ }
  return Object.freeze(safe);
 }
 /**
@@ -82,6 +100,7 @@ function validatedResult(value:unknown,job:ResearchJobV1):Readonly<Record<string
  */
 export async function runResearchWorkerCycleV1(input:Readonly<{
  rpc:WorkerRpc;research:ResearchJobHandlerV1;workerId:string;
+ verifySources?:ResearchSourceVerifierV1;
  limit?:number;leaseSeconds?:number;retryDelaySeconds?:number;now?:()=>number;
 }>):Promise<WorkerCycleResultV1>{
  const {rpc,research,workerId}=input||{} as typeof input;
@@ -111,7 +130,7 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
  for(const job of jobs){
    let researchResult:Readonly<Record<string,unknown>>;
    try{
-     researchResult=validatedResult(await research(job),job);
+     researchResult=await validatedResult(await research(job),job,input.verifySources);
    }catch(error){
      const failedReceipt=record(confirmed(await rpc("mizizi_fail_case_research_job_v1",{
        p_job_id:job.jobId,p_worker_id:workerId,
@@ -119,7 +138,10 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
        p_retryable:true,p_retry_delay_seconds:retryDelay,
      }),"FAIL"));
      if(uuid(failedReceipt.job_id)!==job.jobId||uuid(failedReceipt.case_id)!==job.caseId||
-       !["retry_wait","dead_letter"].includes(String(failedReceipt.job_status)))
+       !uuid(failedReceipt.outbox_event_id)||
+       !["retry_wait","dead_letter"].includes(String(failedReceipt.job_status))||
+       (failedReceipt.job_status==="retry_wait"&&failedReceipt.command_receipt_status!=="accepted")||
+       (failedReceipt.job_status==="dead_letter"&&failedReceipt.command_receipt_status!=="failed"))
        throw new TypeError("MIZIZI_WORKER_UNTRUSTED_FAILURE_RECEIPT");
      failed++;
      continue;
