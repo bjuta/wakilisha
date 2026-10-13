@@ -36,7 +36,7 @@ export async function verifyH38ExactGrantedWriterV1({sql,db,operator}){
  // The product public command remains unchanged; the shim does not execute it.
  sql([
 "CREATE FUNCTION public.wk_ci_h38_issue_exact_grant_v1(",
-" p_source_artist_id uuid,p_canonical_artist_id uuid",
+" p_source_artist_id uuid,p_canonical_artist_id uuid,p_note text",
 ") RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER",
 "SET search_path=pg_catalog,public,platform_private,auth",
 "AS $wk_h38$",
@@ -45,12 +45,12 @@ export async function verifyH38ExactGrantedWriterV1({sql,db,operator}){
 " v_uid:=platform_private.registry_artist_merge_admin_current_user_v1();",
 " v_evidence:=platform_private.record_registry_artist_merge_evidence_v1(",
 "  p_source_artist_id,p_canonical_artist_id,",
-"  'H38 disposable reviewed writer fixture.',true,'duplicate_record');",
+"  p_note,true,'duplicate_record');",
 " RETURN platform_private.issue_registry_artist_merge_grant_v1(v_evidence);",
 "END $wk_h38$;",
-"REVOKE ALL ON FUNCTION public.wk_ci_h38_issue_exact_grant_v1(uuid,uuid)",
+"REVOKE ALL ON FUNCTION public.wk_ci_h38_issue_exact_grant_v1(uuid,uuid,text)",
 " FROM public,anon,authenticated,service_role;",
-"GRANT EXECUTE ON FUNCTION public.wk_ci_h38_issue_exact_grant_v1(uuid,uuid)",
+"GRANT EXECUTE ON FUNCTION public.wk_ci_h38_issue_exact_grant_v1(uuid,uuid,text)",
 " TO authenticated;",
 "NOTIFY pgrst, 'reload schema';"
 ].join("\n"),db);
@@ -59,6 +59,7 @@ export async function verifyH38ExactGrantedWriterV1({sql,db,operator}){
  for(let attempt=0;attempt<15;attempt++){
   grantResult=await operator.user.rpc("wk_ci_h38_issue_exact_grant_v1",{
    p_source_artist_id:source,p_canonical_artist_id:canonical,
+   p_note:"H38 disposable reviewed writer fixture.",
   });
   if(!grantResult.error||!["PGRST202","PGRST301"].includes(
      String(grantResult.error.code||"")))break;
@@ -119,20 +120,55 @@ export async function verifyH38ExactGrantedWriterV1({sql,db,operator}){
  }),"STOP_H38_AUTH_HOLD_RELEASE");
  check(released.status==="released"&&released.revision===2,
   "STOP_H38_HOLD_RELEASE_NOT_SEALED");
- const applied=await operator.user.rpc("admin_safe_merge_registry_artists",mergeArgs);
- resultOk(applied,"STOP_H38_SAME_AUTHORISED_GRANT_CANNOT_RESUME_POST_RELEASE");
+ // The temporal Hold Writes fence remains effective after release.
+ const staleAfterRelease=await operator.user.rpc("admin_safe_merge_registry_artists",mergeArgs);
+ check(staleAfterRelease.error?.code==="42501",
+  "STOP_H40_RELEASE_REVIVED_OLD_GRANT_"+
+  String(staleAfterRelease.error?.code||"NONE").replace(/[^A-Za-z0-9_]/g,""));
+ const stillBlocked=sql("SELECT (SELECT count(*) FROM platform_private.registry_mutation_operations "+
+  "WHERE execution_grant_id='"+grantId+"'::uuid)::text||'|'||"+
+  "(SELECT count(*) FROM public.registry_artists "+
+  "WHERE id='"+source+"'::uuid AND status='active')::text;",db);
+ check(stillBlocked==="0|1","STOP_H40_RELEASED_HOLD_ALLOWED_STALE_CANONICAL_WRITE");
+ console.log("WK_H40_POST_RELEASE_STALE_GRANT_CANNOT_REACQUIRE_AUTHORITY=PASS");
+
+ // A separate, freshly reviewed plan must create a DIFFERENT exact grant.
+ const newNote="New independently reviewed H38 post-hold grant.";
+ const freshResponse=await operator.user.rpc("wk_ci_h38_issue_exact_grant_v1",{
+  p_source_artist_id:source,p_canonical_artist_id:canonical,p_note:newNote,
+ });
+ const freshId=resultOk(freshResponse,"STOP_H40_NEW_POSTHOLD_GRANT_ISSUER");
+ check(UUID.test(freshId||"")&&freshId!==grantId,
+  "STOP_H40_REUSED_OLD_GRANT_ID");
+ const afterFresh=sql("SELECT count(*) FROM platform_private.registry_execution_grants "+
+  "WHERE id='"+freshId+"'::uuid AND status='active' AND "+
+  "issued_at>(SELECT held_at FROM mizizi_private.write_holds "+
+  "WHERE id='"+held.holdId+"'::uuid);",db);
+ check(afterFresh==="1","STOP_H40_NEW_GRANT_NOT_ISSUED_AFTER_HOLD");
+ const freshMerge={...mergeArgs,p_note:newNote};
+ const applied=await operator.user.rpc("admin_safe_merge_registry_artists",freshMerge);
+ resultOk(applied,"STOP_H40_NEW_REVIEWED_GRANT_CANNOT_EXECUTE");
  const verified=sql("SELECT "+
   "(SELECT count(*) FROM platform_private.registry_execution_grants WHERE id='"+
-  grantId+"'::uuid AND status='consumed')::text||'|'||"+
+  freshId+"'::uuid AND status='consumed')::text||'|'||"+
   "(SELECT count(*) FROM platform_private.registry_mutation_operations "+
-  " WHERE execution_grant_id='"+grantId+"'::uuid AND status='succeeded' "+
+  " WHERE execution_grant_id='"+freshId+"'::uuid AND status='succeeded' "+
   " AND verifier_status='passed')::text||'|'||"+
+  "(SELECT count(*) FROM platform_private.registry_mutation_operations "+
+  " WHERE execution_grant_id='"+grantId+"'::uuid)::text||'|'||"+
   "(SELECT count(*) FROM mizizi_private.write_hold_events "+
-  " WHERE hold_id='"+held.holdId+"'::uuid AND event_kind='hold_released')::text||'|'||"+
-  "(SELECT count(*) FROM mizizi_private.write_holds "+
-  " WHERE id='"+held.holdId+"'::uuid AND status='released')::text;",db);
- check(verified==="1|1|1|1",
-  "STOP_H38_EXACT_PREEXISTING_GRANT_DID_NOT_COMPLETE_AFTER_RELEASE");
- console.log("WK_H38_SAME_VALID_GRANT_EXECUTED_AND_INDEPENDENTLY_VERIFIED_POST_RELEASE=PASS");
+  " WHERE hold_id='"+held.holdId+"'::uuid AND event_kind='hold_released')::text;",db);
+ check(verified==="1|1|0|1",
+  "STOP_H40_POSTHOLD_NEW_GRANT_NOT_INDEPENDENTLY_VERIFIED");
+ console.log("WK_H40_FRESH_SEPARATE_GRANT_REQUIRED_AND_VERIFIED=PASS");
+
+ // Fixture cleanup only. No production pathway or grant revocation claimed.
+ sql("UPDATE platform_private.registry_execution_grants SET status='revoked',"+
+  "revoked_at=clock_timestamp(),revoked_by_user_id='"+operator.id+"'::uuid,"+
+  "revoke_reason='Disposable H38 superseded grant retired after verification.',"+
+  "updated_at=clock_timestamp() WHERE id='"+grantId+"'::uuid AND status='active';",db);
+ check(sql("SELECT count(*) FROM platform_private.registry_execution_grants "+
+  "WHERE status='active';",db)==="0","STOP_H40_DISPOSABLE_ACTIVE_GRANT_REMAINS");
+ console.log("WK_H38_DISPOSABLE_ISSUER_GRANT_CLEANUP=PASS");
  console.log("WK_H38_ALL_ARTISTS_AND_SHIM=DISPOSABLE_LOCAL_ONLY");
 }
