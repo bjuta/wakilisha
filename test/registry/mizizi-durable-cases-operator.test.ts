@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { buildRedactedHeadquartersAuditV1 } from "../../src/services/miziziRedactedAudit";
 import { describe, it, expect, vi } from "vitest";
 import {
   beginMiziziCaseResearchV1,
@@ -137,4 +138,59 @@ describe("Authenticated durable Headquarters read and governed commands",()=>{
   const rpc:HeadquartersRpc=vi.fn(async()=>({data:null,error:{message:"42501 denied"}}));
   await expect(loadDurableHeadquartersCasesV1(rpc)).rejects.toThrow(/42501/);
  });
+ it("exports a complete authenticated journal and redacts source and actor details",async()=>{
+  const event={eventId:"11111111-1111-4111-8111-111111111111",revision:1,type:"case_created",
+    previousState:null,state:"open",previousStage:null,stage:"triage",
+    reason:"PRIVATE_SOURCE: confidential reviewed evidence",actorKey:`user:${subjectId}`,
+    recordedAt:"2026-10-13T07:00:00Z"};
+  const rpc:HeadquartersRpc=vi.fn(async name=>({
+    data:name==="admin_mizizi_cases_v1"?[{...recorded,claimKey:"PRIVATE_SOURCE: claim evidence"}]:
+      name==="admin_mizizi_list_workspace_holds_v1"?[{...hold,reason:"PRIVATE_SOURCE: private hold"}]:
+      name==="admin_mizizi_case_events_v1"?[event]:null,
+    error:null,
+  }));
+  const raw=await buildRedactedHeadquartersAuditV1(rpc);
+  const audit=JSON.parse(raw);
+  expect(audit.caseCount).toBe(1);
+  expect(audit.cases[0].events[0]).toMatchObject({revision:1,actorClass:"operator"});
+  expect(audit.cases[0].linkedReceiptCount).toBe(1);
+  expect(audit.holds).toHaveLength(1);
+  expect(raw).not.toContain("PRIVATE_SOURCE");
+  expect(raw).not.toContain(subjectId);
+  expect(raw).not.toContain(reviewId);
+  expect(raw).not.toContain(workspaceId);
+  expect(raw).not.toContain(hold.holdKey);
+  expect(rpc).toHaveBeenCalledTimes(5);
+ });
+ it("refuses a partial audit when a journal has missing revisions",async()=>{
+  const rpc:HeadquartersRpc=vi.fn(async name=>({data:
+    name==="admin_mizizi_cases_v1"?[{...recorded,caseRevision:2}]:
+      name==="admin_mizizi_list_workspace_holds_v1"?[]:[],error:null}));
+  await expect(buildRedactedHeadquartersAuditV1(rpc)).rejects.toThrow(/incomplete/);
+ });
+ it("refuses an audit when a case changes between reads",async()=>{
+  let seen=0;
+  const event={eventId:"11111111-1111-4111-8111-111111111111",revision:1,type:"case_created",
+    previousState:null,state:"open",previousStage:null,stage:"triage",
+    reason:"Source review initially recorded",actorKey:"system:mizizi",
+    recordedAt:"2026-10-13T07:00:00Z"};
+  const rpc:HeadquartersRpc=vi.fn(async name=>({data:
+    name==="admin_mizizi_cases_v1"?[{...recorded,caseRevision:++seen}]:
+      name==="admin_mizizi_list_workspace_holds_v1"?[]:[event],error:null}));
+  await expect(buildRedactedHeadquartersAuditV1(rpc)).rejects.toThrow(/changed/);
+ });
+ it("does not export a possibly truncated hold ledger",async()=>{
+  const holds=Array.from({length:100},(_,i)=>({...hold,holdId:
+    `${String(i).padStart(8,"0")}-eeee-4eee-eeee-eeeeeeeeeeee`}));
+  const rpc:HeadquartersRpc=vi.fn(async name=>({data:
+    name==="admin_mizizi_cases_v1"?[]:holds,error:null}));
+  await expect(buildRedactedHeadquartersAuditV1(rpc)).rejects.toThrow(/hold ledger/);
+ });
+ it("keeps the redacted download behind an authorized case view",()=>{
+  const panel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
+  expect(panel).toContain('state.kind==="ready" ? <WkButton');
+  expect(panel).toContain("Export Redacted Audit");
+  expect(panel).toContain("No file was exported.");
+ });
+
 });
