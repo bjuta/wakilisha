@@ -6,9 +6,9 @@ declare n integer; head text; v_signature text; fn regprocedure;
 begin
  select count(*),max(version) into n,head
  from supabase_migrations.schema_migrations;
- if n<227 or head<'20261013190100'
+ if n<227 or head<'20261013184040'
    or (select count(*) from supabase_migrations.schema_migrations sm
-      where sm.version='20261013190100' and
+      where sm.version='20261013184040' and
        sm.name='mizizi_headquarters_stale_conflict_http_v1')<>1
  then raise exception 'MIZIZI 227 verifier migration ledger mismatch'; end if;
  foreach v_signature in array array[
