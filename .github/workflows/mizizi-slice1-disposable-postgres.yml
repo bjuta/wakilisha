@@ -9,6 +9,7 @@ on:
       - "scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh"
       - "scripts/acceptance/mizizi-slice1-worker-parallel-setup-ci.sql"
       - "scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh"
+      - "scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs"
       - "supabase/migrations/**"
       - "scripts/registry/agents/mizizi/runtime/**"
 
@@ -72,3 +73,57 @@ jobs:
           test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
           test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
           echo "WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS"
+
+  disposable-operator-jwt:
+    name: disposable-operator-jwt
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Prove no remote Supabase target can be used
+        shell: bash
+        run: |
+          test ! -e supabase/.temp/project-ref
+          test -z "$(printenv SUPABASE_PROJECT_REF || true)"
+          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
+          test -f supabase/config.toml
+          node --check scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs
+          echo "WK_CI_AUTH_NO_REMOTE_TARGET=PASS"
+
+      - name: Install pinned local Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+
+      - name: Install Node dependencies for genuine HTTP Supabase Auth client
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install exact package-lock dependencies
+        shell: bash
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Start disposable local database, Auth and REST gateway
+        shell: bash
+        run: |
+          supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          echo "WK_CI_LOCAL_GOTRUE_REST_MIGRATION_REPLAY=PASS"
+
+      - name: Exercise genuine JWT operator bootstrap, case and competing hold RPCs
+        shell: bash
+        run: node scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs
+
+      - name: Destroy all disposable local Auth and database volumes
+        if: always()
+        shell: bash
+        run: |
+          supabase stop --no-backup
+          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
+          echo "WK_CI_LOCAL_AUTH_USERS_MEMBERSHIPS_AND_VOLUMES_DESTROYED=PASS"
