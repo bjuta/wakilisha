@@ -13,6 +13,7 @@ on:
       - "scripts/acceptance/mizizi-slice1-real-browser-ci.mjs"
       - "scripts/acceptance/mizizi-slice1-h38-real-grant-ci.mjs"
       - "scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql"
+      - "scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql"
       - "supabase/migrations/**"
       - "scripts/registry/agents/mizizi/runtime/**"
 
@@ -67,6 +68,8 @@ jobs:
           test -n "$DB"
           docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
             < scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql
 
       - name: Execute six actual worker lease and recovery SQL probes
         shell: bash
@@ -139,6 +142,8 @@ jobs:
           test -n "$DB"
           docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
             < scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql
 
       - name: Exercise genuine JWT operator bootstrap, case and competing hold RPCs
         shell: bash
