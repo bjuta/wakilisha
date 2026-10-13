@@ -89,7 +89,7 @@ A permanent independent read-only worker verifier subsequently returned `MIZIZI_
 
 The previously accepted local migration 225 used source SHA-256 `a9eb37336a309cb4eac3645cc79fe5a7c5df323fbbb65eed13fdc22396e495ef`. Its PostgreSQL identity preflight required direct `postgres` login. The final Preview-applied migration changed only this guard to permit `session_user='cli_login_postgres'` *when* the effective role is still `postgres` and PostgreSQL confirms SET membership. The prior local proof does not constitute a byte-identical final-source replay. This limitation must remain explicit.
 
-Still pending (do not mark PASS):
+Outstanding gates at initial Preview acceptance (later closures are recorded in the follow-up below):
 
 1. Permanent source, SQL verifier and focused tests integrated into draft PR #1227, final amended migration replay evidence and matching migration replay proof; updated schema types and snapshot seal; protected CI.
 2. Actual signed-in `authenticated` user JWT denial over HTTPS; `anon` denial and positive `service_role` HTTPS/JWT acceptance have PASSED and must not be repeated.
@@ -97,3 +97,31 @@ Still pending (do not mark PASS):
 4. Signed-in Headquarters operator acceptance, scoped production rollout, then separately audited Production/Edge/frontend promotion if required. PR is draft and unmerged; **no Production change authorized**.
 
 Do not retry migration 225 in Preview, rerun accepted executor authentication, or merge PR #1227 based solely on this gate.
+
+## Subsequent acceptance — 13 October 2026 (source commit, protected CI, final-byte local transaction replay)
+
+**Authoritative source:** committed draft PR head `bb338a98099d39a5df6347e8893d1fa8d2607b98`. The committed migration has SHA-256 `6b2f3b916550ed53b94f838290ad044941b6294b69dff69bdd75ef8791df7a6a`. This section supersedes the initial outstanding-gates inventory above without erasing its historical state.
+
+**Repository and CI:** Owner Mac completed 55/55 focused Vitest tests across four suites, committed eight scoped files and pushed to the draft PR. [GitHub Critical Control Plane run #38377822444](https://github.com/bjuta/wakilisha/actions/runs/38377822444) completed successfully on this exact SHA: `critical-core`, `critical-browser` (97 browser tests), and aggregate `critical` all passed. The migration replay contract, repository schema seal and live migration-history checks were green. No merge or Production promotion followed.
+
+**Final amended migration delta replay: PASS, with transactional rollback.** The owner executed the SHA-256-pinned local-only runner `wk_mizizi_final_225_local_transaction_replay_20261013.sh` (runner SHA-256 `3e17c070e30ca0c51769a6437e72440eee6e69ba7a3d0beeba0a922154ca6296`). It verified the exact approved source and local authority, temporarily reconstructed the 224 predecessor inside one PostgreSQL transaction, executed the **final committed amended migration** and the permanent SQL verifier, then `ROLLBACK` restored the previously accepted local 225 installation. The pre/post catalog fingerprint and ledger matched. Observed owner-Mac markers:
+
+```text
+FINAL_225_REPO_SOURCE_AND_LOCAL_IDENTITY=PASS
+FINAL_225_INSTALLED_LOCAL_BASELINE=PASS
+FINAL_225_TRANSACTION_ONLY_STREAM=PASS
+MIZIZI_WORKER_TRANSPORT_INDEPENDENT_VERIFIER=PASS
+FINAL_225_AMENDED_SOURCE_EXECUTED_AND_VERIFIED=PASS
+FINAL_225_LOCAL_ROLLBACK_RESTORED=PASS
+FINAL_225_LOCAL_CATALOG_AND_LEDGER_UNCHANGED=225|20261013071022
+FINAL_225_TRANSACTIONAL_REPLAY=PASS
+FINAL_FULL_CLEAN_REPLAY=NOT_RUN
+PREVIEW_SQL_APPLY=NOT_RUN
+PRODUCTION_SQL_APPLY=NOT_RUN
+GIT_COMMIT=NOT_RUN
+```
+
+**Evidence boundary:** This is a real PostgreSQL **final-source transactional delta replay** and independent SQL verification. It is **not** a fresh clean 216→225 migration-history replay; the earlier historical clean 216→223 and local 224/225 evidence remains separate and must not be relabelled. The source deployed to Preview and the source in the draft PR are byte-matched by the committed SHA-256. PostgreSQL rollback preserved the local installed state, and the replay made no Preview/Production SQL or Git mutation.
+
+**Still OPEN:** actual signed-in `authenticated` user JWT denial over HTTPS; authentic Registry-brokered review and source-bound Headquarters case/typed job lifecycle (claim, complete/fail, lease expiry, restart, concurrency and Hold Writes); signed-in operator acceptance. Isolated Preview had zero Auth users, Registry Tracks, reviews, cases and research jobs at the preceding inventory; no test identity or review fixture is assumed to exist. Keep the PR draft/unmerged. Production SQL, Edge and frontend remain untouched.
+

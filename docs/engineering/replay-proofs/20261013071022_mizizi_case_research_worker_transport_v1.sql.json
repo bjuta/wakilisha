@@ -16,5 +16,7 @@
   "baseline_replay_evidence": "docs/engineering/mizizi-headquarters-clean-local-replay-acceptance-20261011.md",
   "prior_local_forward_evidence": "docs/engineering/mizizi-case-research-forward-repair-local-acceptance-20261011.md",
   "preview_forward_apply_and_http_acceptance_evidence": "docs/engineering/mizizi-worker-transport-preview-acceptance-20261013.md",
-  "final_amended_local_replay": "not_run_original_local_225_used_earlier_preflight_sha"
+  "final_amended_local_replay": "pass_transactional_delta_replay_with_rollback",
+  "final_amended_local_replay_evidence": "docs/engineering/mizizi-worker-transport-preview-acceptance-20261013.md",
+  "final_full_clean_replay": "not_run"
 }
