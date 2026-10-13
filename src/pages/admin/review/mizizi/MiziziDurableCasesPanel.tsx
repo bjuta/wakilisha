@@ -1,3 +1,4 @@
+import { buildRedactedHeadquartersAuditV1 } from "@/services/miziziRedactedAudit";
 import { useCallback, useEffect, useState } from "react";
 import { TextArea, TextField, Label } from "react-aria-components";
 import { WkButton } from "@/components/design-system/primitives/Button";
@@ -72,11 +73,35 @@ export function MiziziDurableCasesPanel() {
     catch{setNotice("We could not confirm that change. Please check the recorded state before trying again.");}
     finally{setBusy(false);}
   };
+  const downloadRedactedAudit=async()=>{
+    if(busy || state.kind!=="ready")return;
+    setBusy(true);setNotice("Preparing the verified redacted audit…");
+    try {
+      const payload=await buildRedactedHeadquartersAuditV1();
+      const url=URL.createObjectURL(new Blob([payload],{type:"application/json;charset=utf-8"}));
+      try {
+        const anchor=document.createElement("a");
+        anchor.href=url;
+        anchor.download=`wakilisha-mizizi-audit-redacted-${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      } finally {
+        window.setTimeout(()=>URL.revokeObjectURL(url),0);
+      }
+      setNotice("Redacted case and Hold Writes audit prepared.");
+    } catch {
+      setNotice("We could not verify a complete audit. No file was exported.");
+    } finally {setBusy(false);}
+  };
   return <WkSurface className="mt-6 space-y-4 p-5" data-wk-mizizi-durable-cases>
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="text-[18px] font-semibold text-wk-text">Recorded Cases</h2>
         <p className="mt-1 text-[12px] text-wk-text-muted">Actual case, receipt, and Hold Writes records. Registry reviews remain separate.</p></div>
-      <WkButton variant="soft" className="wk-button-sm" onClick={reload} disabled={busy}>Refresh Records</WkButton>
+      <div className="flex flex-wrap items-center gap-2">
+        <WkButton variant="soft" className="wk-button-sm" onClick={reload} disabled={busy}>Refresh Records</WkButton>
+        {state.kind==="ready" ? <WkButton variant="soft" className="wk-button-sm" onClick={()=>void downloadRedactedAudit()} disabled={busy}>Export Redacted Audit</WkButton> : null}
+      </div>
     </header>
     {state.kind==="loading" ? <p role="status" className="text-[13px] text-wk-text-muted">Checking recorded case access…</p> : null}
     {state.kind==="denied" ? <div className="space-y-3" role="status">
