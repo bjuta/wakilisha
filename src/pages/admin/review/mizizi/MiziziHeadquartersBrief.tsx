@@ -1,3 +1,4 @@
+import { MiziziDurableCasesPanel } from "./MiziziDurableCasesPanel";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
@@ -416,6 +417,8 @@ export function MiziziHeadquartersBrief({
           </section>
         </div>
       ) : null}
+
+      {queue && view === "brief" ? <MiziziDurableCasesPanel /> : null}
 
       {queue && view === "field" ? (
         <MiziziReviewField queue={queue} onInspect={inspect} />

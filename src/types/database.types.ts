@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.18"
+    PostgrestVersion: "14.5"
   }
   editorial: {
     Tables: {
@@ -20484,6 +20484,46 @@ export type Database = {
       }
       admin_mark_registry_artist_intake_applied_v1: {
         Args: { p_artist_id: string; p_staging_id: string }
+        Returns: Json
+      }
+      admin_mizizi_begin_case_research_v1: {
+        Args: {
+          p_case_id: string
+          p_expected_revision: number
+          p_reason: string
+        }
+        Returns: Json
+      }
+      admin_mizizi_bootstrap_internal_owner_v1: {
+        Args: { p_reason: string }
+        Returns: string
+      }
+      admin_mizizi_case_events_v1: {
+        Args: { p_case_id: string; p_limit?: number }
+        Returns: Json[]
+      }
+      admin_mizizi_cases_v1: {
+        Args: {
+          p_before_case_id?: string
+          p_before_updated_at?: string
+          p_limit?: number
+        }
+        Returns: Json[]
+      }
+      admin_mizizi_hold_workspace_writes_v1: {
+        Args: { p_hold_key: string; p_reason: string; p_review_after?: string }
+        Returns: Json
+      }
+      admin_mizizi_list_workspace_holds_v1: {
+        Args: { p_limit?: number }
+        Returns: Json[]
+      }
+      admin_mizizi_release_workspace_hold_v1: {
+        Args: {
+          p_expected_revision: number
+          p_hold_id: string
+          p_reason: string
+        }
         Returns: Json
       }
       admin_open_mizizi_release_single_identity_authority_v1: {

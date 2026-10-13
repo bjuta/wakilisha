@@ -112,7 +112,8 @@ export async function admitReviewedCaseResearchV1(
       review, job: null, state: "review_case_admitted"});
   }
 
-  const jobRequest = {
+  try {
+    const jobRequest = {
     caseId: review.caseId,
     workspaceId: input.workspaceId,
     expectedRevision: review.caseRevision,
@@ -126,7 +127,6 @@ export async function admitReviewedCaseResearchV1(
     }),
   };
 
-  try {
     const job = await admitResearchJobViaTrustedGatewayV1(executor, jobRequest);
     if (job.caseId !== review.caseId.toLowerCase() ||
         job.workspaceId !== input.workspaceId.toLowerCase() ||

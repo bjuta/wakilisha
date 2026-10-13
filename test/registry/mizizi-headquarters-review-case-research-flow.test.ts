@@ -6,10 +6,10 @@ import {
 } from "../../scripts/registry/agents/mizizi/runtime/review-case-research-flow";
 
 const workspaceId = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
-const caseId = "dddddddd-dddd-4ddd-dddd-dddddddddddd";
+const caseId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const reviewItemId = "cccccccc-cccc-4ccc-cccc-cccccccccccc";
 const linkId = "eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee";
-const commandId = "ffffffff-ffff-4fff-ffff-ffffffffffff";
+const commandId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 const jobId = "11111111-1111-4111-8111-111111111111";
 const finding: MiziziFinding = {
   entityType: "track", entityId: "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
@@ -114,6 +114,18 @@ describe("MIZIZI trusted review to case to shared research job", () => {
     const x=executorFixture(reviewRow(),{...jobRow(),case_id:"22222222-2222-4222-8222-222222222222"});
     const err=await admitReviewedCaseResearchV1(x,input()).catch(e=>e);
     expect(err).toMatchObject({stage:"research_job",caseId,reviewItemId});
+  });
+
+  it("retains the committed review/case receipt if the case UUID fails stricter research validation", async () => {
+    const invalidUuid = "dddddddd-dddd-4ddd-dddd-dddddddddddd";
+    const x = executorFixture({...reviewRow(), headquarters_case_id: invalidUuid});
+    const err = await admitReviewedCaseResearchV1(x,input()).catch(e=>e);
+    expect(err).toBeInstanceOf(ReviewCaseResearchFlowErrorV1);
+    expect(err).toMatchObject({
+      stage:"research_job",caseId:invalidUuid,reviewItemId,receiptLinkId:linkId,
+    });
+    expect(err.cause.message).toMatch(/INVALID_FINGERPRINT_INPUT/);
+    expect(x.query).toHaveBeenCalledTimes(1);
   });
 
   it("cannot build an idempotency key for an invalid case or stale revision", () => {
