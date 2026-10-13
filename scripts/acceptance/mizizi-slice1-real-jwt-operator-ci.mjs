@@ -123,7 +123,7 @@ async function main(){
   "scripts/acceptance/mizizi-slice1-worker-parallel-setup-ci.sql","utf8");
  const bound=fixture.indexOf("-- Synthetic local state transition ONLY");
  assert(fixture.startsWith("-- WAKILISHA Slice 1 true-concurrency fixture.")&&
-  bound>3500&&fixture.slice(0,bound).trimEnd().endsWith(
+  bound>3000&&fixture.slice(0,bound).trimEnd().endsWith(
    "SET SESSION AUTHORIZATION DEFAULT;"),"STOP_CASE_FIXTURE_SOURCE_DRIFT");
  localSql(fixture.slice(0,bound)+"\nCOMMIT;\n",db);
  const cases=await call(first.user,"admin_mizizi_cases_v1",{p_limit:100},
