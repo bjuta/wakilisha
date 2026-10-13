@@ -10,6 +10,7 @@ on:
       - "scripts/acceptance/mizizi-slice1-worker-parallel-setup-ci.sql"
       - "scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh"
       - "scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs"
+      - "scripts/acceptance/mizizi-slice1-real-browser-ci.mjs"
       - "scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql"
       - "supabase/migrations/**"
       - "scripts/registry/agents/mizizi/runtime/**"
@@ -101,6 +102,7 @@ jobs:
           test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
           test -f supabase/config.toml
           node --check scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs
+          node --check scripts/acceptance/mizizi-slice1-real-browser-ci.mjs
           echo "WK_CI_AUTH_NO_REMOTE_TARGET=PASS"
 
       - name: Install pinned local Supabase CLI
@@ -117,6 +119,10 @@ jobs:
       - name: Install exact package-lock dependencies
         shell: bash
         run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install local headless Chromium browser for genuine operator UI
+        shell: bash
+        run: npx playwright install --with-deps chromium
 
       - name: Start disposable local database, Auth and REST gateway
         shell: bash
