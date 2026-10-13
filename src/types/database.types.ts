@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.18"
   }
   editorial: {
     Tables: {
@@ -24793,6 +24793,42 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      mizizi_claim_case_research_jobs_v1: {
+        Args: {
+          p_lease_seconds?: number
+          p_limit?: number
+          p_worker_id: string
+        }
+        Returns: {
+          attempt_count: number
+          command_receipt_id: string
+          command_type: string
+          input_payload: Json
+          job_id: string
+          job_type: string
+          lease_expires_at: string
+          max_attempts: number
+          resource_id: string
+        }[]
+      }
+      mizizi_complete_case_research_job_v1: {
+        Args: { p_job_id: string; p_result?: Json; p_worker_id: string }
+        Returns: Json
+      }
+      mizizi_fail_case_research_job_v1: {
+        Args: {
+          p_error: string
+          p_job_id: string
+          p_retry_delay_seconds?: number
+          p_retryable?: boolean
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+      mizizi_recover_expired_case_research_jobs_v1: {
+        Args: { p_limit?: number; p_retry_delay_seconds?: number }
+        Returns: number
       }
       move_message_conversation: {
         Args: {

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { planHeadquartersSharedJob, admitResearchJobViaTrustedGatewayV1,
   fingerprintHeadquartersResearchRequestV1 } from "../../scripts/registry/agents/mizizi/runtime/shared-job-adapter";
@@ -129,5 +130,58 @@ describe("MIZIZI trusted shared-job gateway caller", () => {
       await expect(admitResearchJobViaTrustedGatewayV1(executor, request))
         .rejects.toThrow("MIZIZI_JOB_GATEWAY_INCOMPLETE_RECEIPT");
     }
+  });
+});
+
+// Final Preview-deployed worker-transport source, checked alongside the
+// existing shared-job planner. Database and JWT runtime proof remain separate.
+describe("MIZIZI shared research worker transport boundary", () => {
+  const sql = readFileSync(
+    "supabase/migrations/20261013071022_mizizi_case_research_worker_transport_v1.sql", "utf8");
+  const verifier = readFileSync(
+    "scripts/control-plane/verify-mizizi-headquarters-worker-transport.sql", "utf8");
+  const functions = [
+    ["mizizi_claim_case_research_jobs_v1", "text,integer,integer"],
+    ["mizizi_recover_expired_case_research_jobs_v1", "integer,integer"],
+    ["mizizi_complete_case_research_job_v1", "uuid,text,jsonb"],
+    ["mizizi_fail_case_research_job_v1", "uuid,text,text,boolean,integer"],
+  ] as const;
+
+  it("retains exact 224-to-225 guard and effective postgres ownership", () => {
+    expect(sql).toContain("count(*) from supabase_migrations.schema_migrations) <> 224");
+    expect(sql).toContain("20261011095852");
+    expect(sql).toContain("current_user <> 'postgres'");
+    expect(sql).toContain("session_user <> 'cli_login_postgres'");
+    expect(sql).toContain("pg_has_role(session_user, 'postgres', 'SET')");
+    expect(sql).not.toMatch(/\b(?:create|alter)\s+table\b/i);
+    expect(sql).not.toMatch(/\bgrant\s+usage\s+on\s+schema\b/i);
+    expect(sql).not.toMatch(/\bset\s+role\b/i);
+  });
+
+  it("exposes exactly four service-only RPCs with sealed browser-role ACLs", () => {
+    expect((sql.match(/create function public\.mizizi_/g) || [])).toHaveLength(4);
+    expect((sql.match(/security definer\s+set search_path to 'pg_catalog'/g) || [])).toHaveLength(4);
+    expect((sql.match(/coalesce\(auth\.role\(\),'\'\) <> 'service_role'/g) || [])).toHaveLength(4);
+    for (const [name, args] of functions) {
+      const signature = `public.${name}(${args})`;
+      expect(sql).toContain(`create function public.${name}(`);
+      expect(sql).toContain(`revoke all on function ${signature}`);
+      expect(sql).toContain(`grant execute on function ${signature}`);
+      expect(verifier).toContain(`${name}(${args})`);
+    }
+    expect(verifier).toContain("MIZIZI_WORKER_TRANSPORT_INDEPENDENT_VERIFIER=PASS");
+    expect(verifier).toContain("has_function_privilege('authenticated',v_object,'EXECUTE')");
+  });
+
+  it("delegates only to existing typed-case and shared-job authorities", () => {
+    expect(sql).toContain("mizizi_private.claim_case_research_jobs_v1(");
+    expect(sql).toContain("mizizi_private.recover_expired_case_research_jobs_v1(");
+    expect(sql).toContain("platform_private.complete_job(");
+    expect(sql).toContain("platform_private.fail_job(");
+    expect(sql).toContain("j.command_type='mizizi.case_research_v1'");
+    expect(sql).toContain("j.job_type='mizizi.case_research_v1'");
+    expect(sql).toContain("c.revision=(j.input_payload->>'expected_case_revision')::integer");
+    expect(sql).toContain("j.locked_by=p_worker_id");
+    expect(sql).not.toMatch(/\bcreate\s+(?:policy|table)\b/i);
   });
 });
