@@ -158,7 +158,7 @@ async function main(){
   console.error("WK_AUTH_STALE_RPC_ERROR_KIND="+safe(staleAttempt.error?.message?.slice(0,72)));
   console.error("WK_AUTH_STALE_CASE_INDEPENDENT_DB="+safe(current));
  }
- requireDenied(staleAttempt,"40001","STOP_STALE_AUTH_CASE_UPDATE");
+ requireDenied(staleAttempt,"PT409","STOP_STALE_AUTH_CASE_UPDATE");
  console.log("WK_AUTH_REAL_JWT_SOURCE_CASE_RESEARCH_AND_STALE_CAS=PASS");
 
  const holdKey="wk-jwt-local-"+randomUUID();
@@ -178,7 +178,7 @@ async function main(){
   first.user.rpc("admin_mizizi_release_workspace_hold_v1",args),
   second.user.rpc("admin_mizizi_release_workspace_hold_v1",args),
  ]);
- const succeeded=results.filter(x=>!x.error),lost=results.filter(x=>x.error?.code==="40001");
+ const succeeded=results.filter(x=>!x.error),lost=results.filter(x=>x.error?.code==="PT409");
  assert(succeeded.length===1&&lost.length===1&&
   succeeded[0].data?.revision===2,"STOP_TWO_AUTHENTICATED_RELEASE_CAS");
  const settled=await call(second.user,"admin_mizizi_list_workspace_holds_v1",
