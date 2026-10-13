@@ -146,7 +146,7 @@ async function main(){
  const staleAttempt=await second.user.rpc("admin_mizizi_begin_case_research_v1",{
   p_case_id:caseId,p_expected_revision:1,
   p_reason:"Competing stale case revision must be denied."});
- if(staleAttempt.error?.code!=="40001"){
+ if(staleAttempt.error?.code!=="PT409"){
   const current=localSql("SELECT revision::text||'|'||case_state||'|'||"+
    "current_stage||'|'||(SELECT count(*)::text FROM mizizi_private.case_events"+
    " WHERE case_id='"+caseId+"'::uuid) FROM mizizi_private.cases"+
