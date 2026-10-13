@@ -193,6 +193,13 @@ async function main(){
  console.log("WK_AUTH_TWO_REAL_JWTS_H39_CONCURRENT_HOLD_RELEASE_CAS=PASS");
  console.log("WK_AUTH_H36_H40_HOLD_READ_AND_SINGLE_RELEASE=PASS");
 
+ // Reuse the same true signed-in operator and disposable Registry schema:
+ // mint a real exact grant BEFORE an active hold, challenge it through the
+ // unchanged public Artist merge command, and independently verify the result.
+ const {verifyH38ExactGrantedWriterV1}=await import("./mizizi-slice1-h38-real-grant-ci.mjs");
+ await verifyH38ExactGrantedWriterV1({sql:localSql,db,operator:first});
+ console.log("WK_AUTH_H38_PRIOR_EXACT_GRANT_STALE_WRITER=PASS");
+
  // Real Admin Studio browser uses the exact same signed-in disposable users,
  // source-backed case and local Hold Writes history as the validated RPC test.
  const {verifyLocalHeadquartersBrowsersV1}=await import("./mizizi-slice1-real-browser-ci.mjs");
