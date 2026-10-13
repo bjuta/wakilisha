@@ -1,0 +1,58 @@
+name: MIZIZI Slice 1 Disposable PostgreSQL Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/mizizi-slice1-disposable-postgres.yml"
+      - "scripts/acceptance/mizizi-slice1-worker-disposable-ci.sql"
+      - "scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh"
+      - "supabase/migrations/**"
+      - "scripts/registry/agents/mizizi/runtime/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mizizi-slice1-disposable-pg-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  disposable-worker-sql:
+    name: disposable-worker-sql
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Prove there is no linked or credentialed Supabase target
+        shell: bash
+        run: |
+          test ! -e supabase/.temp/project-ref
+          test -z "$(printenv SUPABASE_PROJECT_REF || true)"
+          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
+          test -f supabase/config.toml
+          echo "WK_CI_NO_REMOTE_TARGET=PASS"
+
+      - name: Install pinned Supabase CLI for local-only Docker
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+
+      - name: Start disposable local database and replay migrations
+        shell: bash
+        run: |
+          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          echo "WK_CI_LOCAL_MIGRATION_REPLAY_FINISHED=PASS"
+
+      - name: Execute six actual worker lease and recovery SQL probes
+        shell: bash
+        run: bash scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh
+
+      - name: Stop disposable containers
+        if: always()
+        shell: bash
+        run: supabase stop || true
