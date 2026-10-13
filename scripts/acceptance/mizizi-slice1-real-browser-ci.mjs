@@ -13,7 +13,7 @@ async function signedIn(page,base,identity){
   waitUntil:"domcontentloaded",timeout:45000,
  });
  await page.getByRole("textbox",{name:"Admin email"}).fill(identity.email,{timeout:30000});
- await page.getByRole("textbox",{name:"Password"}).fill(identity.password,{timeout:30000});
+ await page.getByLabel("Password",{exact:true}).fill(identity.password,{timeout:30000});
  await page.getByRole("button",{name:"Enter Admin Studio"}).click();
  await page.locator("[data-wk-mizizi-durable-cases]").waitFor({
   state:"visible",timeout:45000,
@@ -94,8 +94,6 @@ export async function verifyLocalHeadquartersBrowsersV1({
    await signedIn(desk,base,first);
    await signedIn(phone,base,second);
    await desk.getByRole("button",{name:"View Recorded Case Journal"}).click();
-   const journal=desk.getByRole("region",{name:"Immutable case event timeline"});
-   // Component is a section with aria-label, not necessarily a region under all browsers.
    const actual=desk.locator('section[aria-label="Immutable case event timeline"]');
    await actual.getByText("Revision 2").waitFor({timeout:30000});
    await actual.getByText("Revision 1").waitFor({timeout:30000});
