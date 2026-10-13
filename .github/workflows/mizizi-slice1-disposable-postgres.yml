@@ -7,6 +7,8 @@ on:
       - ".github/workflows/mizizi-slice1-disposable-postgres.yml"
       - "scripts/acceptance/mizizi-slice1-worker-disposable-ci.sql"
       - "scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh"
+      - "scripts/acceptance/mizizi-slice1-worker-parallel-setup-ci.sql"
+      - "scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh"
       - "supabase/migrations/**"
       - "scripts/registry/agents/mizizi/runtime/**"
 
@@ -37,6 +39,12 @@ jobs:
           test -f supabase/config.toml
           echo "WK_CI_NO_REMOTE_TARGET=PASS"
 
+      - name: Check acceptance runner syntax
+        shell: bash
+        run: |
+          bash -n scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh
+          bash -n scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh
+
       - name: Install pinned Supabase CLI for local-only Docker
         uses: supabase/setup-cli@v1
         with:
@@ -52,7 +60,15 @@ jobs:
         shell: bash
         run: bash scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh
 
-      - name: Stop disposable containers
+      - name: Execute actual concurrent W31 claim on independent database sessions
+        shell: bash
+        run: bash scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh
+
+      - name: Destroy disposable PostgreSQL containers and all local data volumes
         if: always()
         shell: bash
-        run: supabase stop || true
+        run: |
+          supabase stop --no-backup
+          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
+          echo "WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS"
