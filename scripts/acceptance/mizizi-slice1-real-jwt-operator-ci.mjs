@@ -142,10 +142,23 @@ async function main(){
   "STOP_REAL_JWT_CASE_RESEARCH_STAGE");
  assert(progressed.caseId===caseId&&progressed.revision===2&&
   progressed.stage==="research","STOP_CASE_REVISION_RECEIPT");
- requireDenied(await second.user.rpc("admin_mizizi_begin_case_research_v1",{
+ console.log("WK_AUTH_REAL_JWT_SOURCE_CASE_STAGE2_RECEIPT=PASS");
+ const staleAttempt=await second.user.rpc("admin_mizizi_begin_case_research_v1",{
   p_case_id:caseId,p_expected_revision:1,
-  p_reason:"Competing stale case revision must be denied."}),
-  "40001","STOP_STALE_AUTH_CASE_UPDATE");
+  p_reason:"Competing stale case revision must be denied."});
+ if(staleAttempt.error?.code!=="40001"){
+  const current=localSql("SELECT revision::text||'|'||case_state||'|'||"+
+   "current_stage||'|'||(SELECT count(*)::text FROM mizizi_private.case_events"+
+   " WHERE case_id='"+caseId+"'::uuid) FROM mizizi_private.cases"+
+   " WHERE id='"+caseId+"'::uuid;",db);
+  const safe=(value)=>String(value||"NONE").replace(/[^A-Za-z0-9_.,:-]/g,"_").slice(0,100);
+  console.error("WK_AUTH_STALE_RPC_HTTP_STATUS="+safe(staleAttempt.status));
+  console.error("WK_AUTH_STALE_RPC_ERROR_CODE="+safe(staleAttempt.error?.code));
+  console.error("WK_AUTH_STALE_RPC_ERROR_NAME="+safe(staleAttempt.error?.name));
+  console.error("WK_AUTH_STALE_RPC_ERROR_KIND="+safe(staleAttempt.error?.message?.slice(0,72)));
+  console.error("WK_AUTH_STALE_CASE_INDEPENDENT_DB="+safe(current));
+ }
+ requireDenied(staleAttempt,"40001","STOP_STALE_AUTH_CASE_UPDATE");
  console.log("WK_AUTH_REAL_JWT_SOURCE_CASE_RESEARCH_AND_STALE_CAS=PASS");
 
  const holdKey="wk-jwt-local-"+randomUUID();
