@@ -34,10 +34,13 @@ snapshot() {
        (SELECT count(*) FROM mizizi_private.cases)||'|'||
        (SELECT count(*) FROM mizizi_private.case_events)||'|'||
        (SELECT count(*) FROM mizizi_private.case_receipt_links)||'|'||
-       (SELECT count(*) FROM mizizi_private.write_holds);"
+       (SELECT count(*) FROM mizizi_private.write_holds)||'|'||
+       (SELECT count(*) FROM mizizi_private.write_hold_events)||'|'||
+       (SELECT count(*) FROM platform_private.registry_execution_grants
+        WHERE status='active');"
 }
 BEFORE="$(snapshot)" || { echo 'STOP_LOCAL_PRE_SNAPSHOT_FAILED'; exit 22; }
-[ "$BEFORE" = '226|20261013123758|1|0|0|0|0|0|0|0|0|0|0' ] || {
+[ "$BEFORE" = '226|20261013123758|1|0|0|0|0|0|0|0|0|0|0|0|0' ] || {
   echo 'STOP_LOCAL_NOT_EXACT_EMPTY_MIGRATION_226'; exit 22;
 }
 printf 'WK_CI_BEFORE_SHA256=%s\n' "$(printf %s "$BEFORE" | sha256sum | awk '{print $1}')"
@@ -57,7 +60,13 @@ for proof in \
   CI_W32_LEASE_RECOVERED_ONCE \
   CI_W33_RESTART_REUSES_SAME_JOB \
   CI_W34_STALE_WORKER_COMPLETION_DENIED \
-  CI_W35_SINGLE_DEAD_LETTER_AND_IMMUTABLE_HISTORY
+  CI_W35_SINGLE_DEAD_LETTER_AND_IMMUTABLE_HISTORY \
+  CI_DB05_H36_TRANSACTIONAL_HOLD_AND_HISTORY \
+  CI_DB05_H37_SCOPE_HOLD_POLICY_DENIAL \
+  CI_DB05_H37_BOTH_CANONICAL_ADMISSION_TRIGGERS_DENIED \
+  CI_DB05_RESEARCH_CLAIM_RPC_REMAINS_AVAILABLE \
+  CI_DB05_H40_RELEASE_JOURNAL_AND_NO_STANDING_GRANT \
+  CI_DB05_GLOBAL_WORKSPACE_OPERATION_SCOPE
 do
   [ "$(printf '%s\n' "$SQL_OUTPUT" | grep -Fc "$proof=PASS" || true)" -eq 1 ] || {
     echo "STOP_MISSING_OR_DUPLICATE_DATABASE_PROOF=$proof"; exit 24;
@@ -72,3 +81,5 @@ printf '%s\n' "$SQL_OUTPUT" | grep -Fq 'CI_W31_TRUE_CONCURRENT_DB_SESSIONS=NOT_R
 echo 'WK_CI_REAL_DATABASE_WORKER_6_SCENARIOS=PASS'
 echo 'WK_CI_W31_TRUE_PARALLEL_SESSION_TEST=NOT_RUN'
 echo 'WK_CI_OPERATOR_JWT_AND_BROWSER=NOT_RUN'
+echo 'WK_CI_REAL_DATABASE_DB05_HOLD_POLICY_SUBSET=PASS'
+echo 'WK_CI_H38_REAL_STALE_CANONICAL_WRITE_AND_H39_AUTHENTICATED_RELEASE=NOT_RUN'
