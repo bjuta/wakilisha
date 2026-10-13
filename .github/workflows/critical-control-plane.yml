@@ -85,6 +85,7 @@ jobs:
           npx vitest run \
             test/registry/mizizi-headquarters-review-case-research-flow.test.ts \
             test/registry/mizizi-trusted-headquarters-review-dispatch.test.ts \
+            test/registry/mizizi-exact-case-research-job.test.ts \
             test/registry/mizizi-durable-cases-operator.test.ts
 
       - name: Enforce primitive compounding contract
