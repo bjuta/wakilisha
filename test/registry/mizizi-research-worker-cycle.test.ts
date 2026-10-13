@@ -144,4 +144,50 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
      workerId:"good-worker",now:()=>NOW,...patch} as never)).rejects.toThrow("INVALID_CONFIG");
    expect(calls).toHaveLength(0);
  });
+ it("requires independent provenance validation for evidence-recorded results",async()=>{
+  const evidence={...finding,status:"evidence_recorded" as const,sourceReferences:[EVENT]};
+  const {rpc,calls}=harness();
+  await expect(cycle(rpc,async()=>evidence)).resolves.toMatchObject({failed:1,succeeded:0});
+  expect(calls.map(x=>x.fn)).not.toContain("mizizi_complete_case_research_job_v1");
+  const v=vi.fn(async(job:ResearchJobV1,refs:readonly string[])=>{
+    expect(job.caseId).toBe(CASE);
+    expect(refs).toEqual([EVENT]);
+    return true;
+  });
+  const approved=harness();
+  await expect(cycle(approved.rpc,async()=>evidence,{verifySources:v}))
+    .resolves.toMatchObject({failed:0,succeeded:1});
+  expect(v).toHaveBeenCalledTimes(1);
+  expect(approved.calls.at(-1)?.args.p_result).toEqual(evidence);
+ });
+ it("refuses unverified, duplicate or self-inconsistent evidence without completing jobs",async()=>{
+  const bad=[
+    {...finding,status:"evidence_recorded",sourceReferences:[EVENT]},
+    {...finding,status:"evidence_recorded",sourceReferences:[EVENT,EVENT]},
+    {...finding,sourceReferences:[EVENT]},
+  ];
+  for(const evidence of bad){
+    const {rpc,calls}=harness();
+    await expect(cycle(rpc,async()=>evidence,{verifySources:async()=>false}))
+      .resolves.toMatchObject({failed:1,succeeded:0});
+    expect(calls.map(x=>x.fn)).not.toContain("mizizi_complete_case_research_job_v1");
+  }
+ });
+ it("does not accept forged failure receipts for retry or terminal outcomes",async()=>{
+  for(const patch of [
+    {command_receipt_status:"failed"},
+    {outbox_event_id:"not-a-uuid"},
+    {job_status:"dead_letter",command_receipt_status:"accepted"},
+    {job_status:"unknown"},
+  ]){
+    const {rpc}=harness({failed:{...failed,...patch}});
+    await expect(cycle(rpc,async()=>{throw new Error("bounded");}))
+      .rejects.toThrow();
+  }
+  const {rpc,calls}=harness({failed:{...failed,job_status:"dead_letter",command_receipt_status:"failed"}});
+  await expect(cycle(rpc,async()=>{throw new Error("bounded");}))
+    .resolves.toMatchObject({failed:1,succeeded:0});
+  expect(calls.at(-1)?.fn).toBe("mizizi_fail_case_research_job_v1");
+ });
+
 });
