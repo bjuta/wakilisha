@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { WkContextHelp } from "../../src/components/design-system/primitives/ContextHelp";
 
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 function HelpFixture() {
   return <WkContextHelp label="How Decisions Work" title="Recording a Decision">
@@ -38,6 +38,48 @@ describe("WAKILISHA contextual help", () => {
   it("dismisses when the operator clicks outside", () => {
     render(<div><HelpFixture /><button type="button">Outside</button></div>);
     fireEvent.click(screen.getByRole("button", { name: "How Decisions Work" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Outside" }));
+    expect(screen.queryByRole("region", { name: "Recording a Decision" })).toBeNull();
+  });
+
+  it("portals mobile help next to its trigger and flips ABOVE a low trigger", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 640 });
+    let triggerTop = 540;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains("wk-context-help-trigger")) {
+        return { top: triggerTop, bottom: triggerTop + 40, left: 230, right: 370,
+          width: 140, height: 40, x: 230, y: triggerTop, toJSON: () => ({}) } as DOMRect;
+      }
+      return { top: 0, bottom: 180, left: 0, right: 320,
+        width: 320, height: 180, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    });
+
+    render(<HelpFixture />);
+    const trigger = screen.getByRole("button", { name: "How Decisions Work" });
+    fireEvent.click(trigger);
+    const panel = screen.getByRole("region", { name: "Recording a Decision" });
+    expect(panel.parentElement).toBe(document.body);
+    expect(panel.style.position).toBe("fixed");
+    expect(panel.style.top).toBe("352px");
+    expect(panel.style.left).toBe("56px");
+    expect(panel.style.bottom).toBe("auto");
+    expect(panel.style.visibility).toBe("visible");
+
+    // Scrolling changes the trigger's viewport coordinates; the note tracks it.
+    triggerTop = 90;
+    fireEvent.scroll(window);
+    expect(panel.style.top).toBe("138px");
+    fireEvent.pointerDown(panel);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("closes portalled help when clicking outside, never when clicking its own panel", () => {
+    render(<div><HelpFixture /><button type="button">Outside</button></div>);
+    const trigger = screen.getByRole("button", { name: "How Decisions Work" });
+    fireEvent.click(trigger);
+    fireEvent.pointerDown(screen.getByRole("region", { name: "Recording a Decision" }));
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
     fireEvent.pointerDown(screen.getByRole("button", { name: "Outside" }));
     expect(screen.queryByRole("region", { name: "Recording a Decision" })).toBeNull();
   });
