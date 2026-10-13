@@ -112,7 +112,7 @@ begin
         and standing_grant.expires_at > now()
     );
 end
-$function$
+$function$;
 
 REVOKE ALL ON FUNCTION platform_private.registry_execution_grant_has_current_authority(uuid)
  FROM PUBLIC,anon,authenticated,service_role;
