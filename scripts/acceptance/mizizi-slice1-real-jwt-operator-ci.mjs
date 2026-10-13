@@ -60,9 +60,9 @@ async function main(){
   "(SELECT count(*) FROM mizizi_private.cases)||'|'||"+
   "(SELECT count(*) FROM mizizi_private.write_holds)||'|'||"+
   "(SELECT count(*) FROM public.registry_releases);",db);
- assert(baseline==="226|20261013123758|0|0|0|0|0",
-  "STOP_AUTH_NOT_FRESH_LOCAL_226");
- console.log("WK_AUTH_EMPTY_226_UNLINKED_LOCAL_BASELINE=PASS");
+ assert(baseline==="227|20261013190100|0|0|0|0|0",
+  "STOP_AUTH_NOT_FRESH_LOCAL_227");
+ console.log("WK_AUTH_EMPTY_227_UNLINKED_LOCAL_BASELINE=PASS");
 
  const admin=client(api,values.SERVICE_ROLE_KEY),people=[];
  for(const label of ["first","second"]){
