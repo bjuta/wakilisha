@@ -78,7 +78,10 @@ jobs:
         run: npx vitest run test/control-plane/migration-replay-contract.test.ts
 
       - name: Enforce MIZIZI worker transport contracts
-        run: npx vitest run test/registry/mizizi-headquarters-shared-job-adapter.test.ts
+        run: |
+          npx vitest run \
+            test/registry/mizizi-headquarters-shared-job-adapter.test.ts \
+            test/registry/mizizi-research-worker-cycle.test.ts
 
       - name: Enforce MIZIZI review-to-case/research and operator Data API contracts
         run: |
