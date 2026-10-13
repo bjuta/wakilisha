@@ -1,0 +1,23 @@
+{
+  "migration_file": "supabase/migrations/20261013184040_mizizi_headquarters_stale_conflict_http_v1.sql",
+  "migration_sha256": "6d673827026aa75ce2e22c42f6b51ebae664a0a606aaa3dafa68c60f3a5ebdcd",
+  "base_main_sha": "cff8e57222ac735b5c2e8c3b7a17ee50c49da3dd",
+  "preview_project_ref": "nkgfoppunmnkcumalxqp",
+  "preview_branch_id": "8c0affc1-b43b-44ac-b2eb-66715ed40252",
+  "preview_migration_head": "20261013184040",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql",
+  "schema_types_sha256": "8e8ea281a5e5eb50e06e9c5ac9f53291dc27d285307267aa893ef71c15da09b2",
+  "schema_migration_count": 227,
+  "schema_migration_head": "20261013184040",
+  "verified_at": "2026-10-13T18:44:19.503Z",
+  "baseline_replay_evidence": "https://github.com/bjuta/wakilisha/actions/runs/38447628767",
+  "local_jwt_and_migration_verification": "real_disposable_postgres_replay_GoTrue_two_signed_in_users_PostgREST_conflict_success",
+  "preview_candidate_apply": "isolated_preview_only_success_under_supabase_assigned_version_20261013184040",
+  "preview_independent_verifier": "WK_227_NONRETRYABLE_HTTP409_CAS_ACL_VERIFIED=PASS",
+  "preview_real_operator_browser": "not_run",
+  "production_promotion": "not_run",
+  "note": "Preview service assigned 20261013184040. Unmerged repository migration filename aligned to actual Preview ledger. Signatures and response codes changed; generated database types require no API shape changes."
+}
