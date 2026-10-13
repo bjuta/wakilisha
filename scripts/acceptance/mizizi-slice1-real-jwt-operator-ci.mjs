@@ -75,7 +75,7 @@ async function main(){
   const login=await user.auth.signInWithPassword({email,password});
   assert(!login.error&&login.data.user?.id===created.data.user.id&&
    login.data.session?.access_token,"STOP_LOCAL_GOTRUE_SIGNIN_"+label);
-  people.push({id:created.data.user.id,user});
+  people.push({id:created.data.user.id,user,email,password});
  }
  const first=people[0],second=people[1];
  console.log("WK_AUTH_TWO_GENUINE_SIGNED_IN_LOCAL_USERS=PASS");
@@ -192,6 +192,14 @@ async function main(){
  assert(evidence==="1|0","STOP_DOUBLE_RELEASE_OR_ACTIVE_GRANT");
  console.log("WK_AUTH_TWO_REAL_JWTS_H39_CONCURRENT_HOLD_RELEASE_CAS=PASS");
  console.log("WK_AUTH_H36_H40_HOLD_READ_AND_SINGLE_RELEASE=PASS");
+
+ // Real Admin Studio browser uses the exact same signed-in disposable users,
+ // source-backed case and local Hold Writes history as the validated RPC test.
+ const {verifyLocalHeadquartersBrowsersV1}=await import("./mizizi-slice1-real-browser-ci.mjs");
+ await verifyLocalHeadquartersBrowsersV1({
+  api,anonKey:values.ANON_KEY,first,second,caseId,
+ });
+ console.log("WK_AUTH_DESKTOP_MOBILE_BROWSER_AND_AUDIT=PASS");
 
  // Capability re-evaluation with an unchanged genuine JWT.
  localSql("UPDATE public.user_role_assignments SET expires_at="+
