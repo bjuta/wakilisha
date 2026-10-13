@@ -121,7 +121,8 @@ BEGIN
 END $first_claim$;
 SET SESSION AUTHORIZATION DEFAULT;
 -- Fixture clock only. No live lease or Registry state may be changed.
-UPDATE platform_private.jobs SET lease_expires_at=now()-interval '1 minute'
+UPDATE platform_private.jobs SET locked_at=now()-interval '2 minutes',
+ lease_expires_at=now()-interval '1 minute'
  WHERE id=current_setting('wk.ci.job')::uuid AND status='running'
  AND locked_by='wk-first-worker';
 SET SESSION AUTHORIZATION service_role;
@@ -167,8 +168,8 @@ BEGIN
 END $restart$;
 SET SESSION AUTHORIZATION DEFAULT;
 -- Exhaust attempts in disposable fixture to avoid waiting minutes.
-UPDATE platform_private.jobs SET lease_expires_at=now()-interval '1 minute',
- attempt_count=max_attempts
+UPDATE platform_private.jobs SET locked_at=now()-interval '2 minutes',
+ lease_expires_at=now()-interval '1 minute',attempt_count=max_attempts
  WHERE id=current_setting('wk.ci.job')::uuid AND status='running'
  AND locked_by='wk-restart-worker';
 SET SESSION AUTHORIZATION service_role;
