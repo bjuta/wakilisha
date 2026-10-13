@@ -183,17 +183,17 @@ BEGIN
 END $terminal$;
 SET SESSION AUTHORIZATION DEFAULT;
 DO $terminal_receipts$
-DECLARE job_id uuid:=current_setting('wk.ci.job')::uuid;
+DECLARE v_expected_job uuid:=current_setting('wk.ci.job')::uuid;
 BEGIN
- IF (SELECT count(*) FROM platform_private.jobs WHERE id=job_id
-   AND status='dead_letter' AND locked_by IS NULL AND attempt_count=max_attempts)<>1
- OR (SELECT count(*) FROM platform_private.command_receipts
-   WHERE id=current_setting('wk.ci.receipt')::uuid
-   AND status='failed' AND error_code='job_failed')<>1
- OR (SELECT count(*) FROM platform_private.outbox_events
-   WHERE job_id=job_id AND event_type='mizizi.case_research_v1.failed')<>1
- OR (SELECT count(*) FROM mizizi_private.case_events
-   WHERE case_id=current_setting('wk.ci.case')::uuid)<>2
+ IF (SELECT count(*) FROM platform_private.jobs j WHERE j.id=v_expected_job
+   AND j.status='dead_letter' AND j.locked_by IS NULL AND j.attempt_count=j.max_attempts)<>1
+ OR (SELECT count(*) FROM platform_private.command_receipts r
+   WHERE r.id=current_setting('wk.ci.receipt')::uuid
+   AND r.status='failed' AND r.error_code='job_failed')<>1
+ OR (SELECT count(*) FROM platform_private.outbox_events e
+   WHERE e.job_id=v_expected_job AND e.event_type='mizizi.case_research_v1.failed')<>1
+ OR (SELECT count(*) FROM mizizi_private.case_events ce
+   WHERE ce.case_id=current_setting('wk.ci.case')::uuid)<>2
  THEN RAISE EXCEPTION 'CI_W35_TERMINAL_RECEIPT_OR_CASE_HISTORY_DRIFT'; END IF;
  RAISE NOTICE 'CI_W35_SINGLE_DEAD_LETTER_AND_IMMUTABLE_HISTORY=PASS';
  RAISE NOTICE 'CI_W31_TRUE_CONCURRENT_DB_SESSIONS=NOT_RUN';
