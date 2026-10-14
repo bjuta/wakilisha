@@ -712,5 +712,171 @@ BEGIN
  RAISE NOTICE 'CI_C12_TWO_IMMUTABLE_OBSERVATIONS_ONE_UNCHANGED_REVIEW=PASS';
 END $wk_c12_independent_provenance$;
 
+
+-- A05: real canonical Release packaging-shaped 1.2.0 source, review only.
+WITH source AS (
+ INSERT INTO public.registry_releases(slug,title,normalized_title,status,metadata)
+ VALUES ('wk-ci-a05-single','A05 Disposable Release (Single)',
+   'a05 disposable release single','active','{"ci_only":true}'::jsonb)
+ RETURNING id,slug
+)
+SELECT set_config('wk.a05.id',id::text,true),
+ set_config('wk.a05.slug',slug,true) FROM source;
+SELECT set_config('wk.a05.fp',mizizi_private.finding_fingerprint_v1(
+ 'release_slug_provider_packaging','1.2.0','release',
+ current_setting('wk.a05.id'),'slug',current_setting('wk.a05.slug'),
+ 'wk-ci-a05'),true);
+SET SESSION AUTHORIZATION mizizi_executor;
+DO $wk_a05$
+DECLARE v record;
+BEGIN
+ SELECT * INTO STRICT v FROM mizizi_private.admit_review_case_gateway_v1(
+ current_setting('wk.ci.ws')::uuid,'wk-ci-a05',
+ jsonb_build_object('entityType','release','entityId',current_setting('wk.a05.id'),
+ 'ruleId','release_slug_provider_packaging','ruleVersion','1.2.0',
+ 'fieldName','slug','currentValue',current_setting('wk.a05.slug'),
+ 'proposedValue','wk-ci-a05','fingerprint',current_setting('wk.a05.fp'),
+ 'confidence',1,'severity','high','disposition','review',
+ 'reason','Canonical Release packaging suffix is structural, requires human review.',
+ 'evidence',jsonb_build_object('packagingType','single','ci_only',true)));
+ IF v.outcome<>'created' OR v.headquarters_case_revision<>1
+ OR v.review_item_id IS NULL OR v.receipt_link_id IS NULL
+ THEN RAISE EXCEPTION 'STOP_A05_APPROVED_PACKAGING_SOURCE_NOT_ADMITTED'; END IF;
+ PERFORM set_config('wk.a05.case',v.headquarters_case_id::text,true);
+ PERFORM set_config('wk.a05.review',v.review_item_id::text,true);
+ RAISE NOTICE 'CI_A05_APPROVED_RELEASE_PACKAGING_V1_2_SOURCE_GATEWAY=PASS';
+END $wk_a05$;
+SET SESSION AUTHORIZATION DEFAULT;
+DO $wk_a05_check$
+BEGIN
+ IF (SELECT count(*) FROM public.registry_releases WHERE id=current_setting('wk.a05.id')::uuid
+  AND slug='wk-ci-a05-single' AND status='active')<>1
+ OR (SELECT count(*) FROM mizizi_private.cases WHERE id=current_setting('wk.a05.case')::uuid
+  AND revision=1 AND subject_id=current_setting('wk.a05.id')::uuid
+  AND claim_key='mizizi.release_slug_provider_packaging.slug')<>1
+ OR (SELECT count(*) FROM public.registry_review_items WHERE id=current_setting('wk.a05.review')::uuid
+  AND status='open' AND review_key='mizizi:'||current_setting('wk.a05.fp'))<>1
+ OR (SELECT count(*) FROM mizizi_private.case_receipt_links
+  WHERE case_id=current_setting('wk.a05.case')::uuid AND
+  authority_id=current_setting('wk.a05.review')::uuid)<>1
+ THEN RAISE EXCEPTION 'STOP_A05_CANONICAL_SOURCE_OR_REVIEW_INTEGRITY'; END IF;
+ RAISE NOTICE 'CI_A05_CANONICAL_RELEASE_UNCHANGED_REVIEW_AND_RECEIPT=PASS';
+END $wk_a05_check$;
+
+-- C11: same canonical Track, two different approved rule/claim identities.
+WITH source AS (
+ INSERT INTO public.registry_tracks(slug,title,normalized_title,status,metadata)
+ VALUES ('wk-ci-c11-feat-unverified','C11 Disposable Track',
+ 'c11 disposable track','active','{"ci_only":true}'::jsonb)
+ RETURNING id
+)
+SELECT set_config('wk.c11.id',id::text,true) FROM source;
+SELECT set_config('wk.c11.fp1',mizizi_private.finding_fingerprint_v1(
+ 'track_slug_identity_noise','1.2.0','track',current_setting('wk.c11.id'),
+ 'slug','wk-ci-c11-feat-unverified','wk-ci-c11-clean'),true),
+ set_config('wk.c11.fp2',mizizi_private.finding_fingerprint_v1(
+ 'track_slug_credit_evidence_gap','1.3.0','track',current_setting('wk.c11.id'),
+ 'slug','wk-ci-c11-feat-unverified','wk-ci-c11-credit-check'),true);
+SET SESSION AUTHORIZATION mizizi_executor;
+DO $wk_c11$
+DECLARE v_first record; v_second record;
+BEGIN
+ SELECT * INTO STRICT v_first FROM mizizi_private.admit_review_case_gateway_v1(
+ current_setting('wk.ci.ws')::uuid,'wk-ci-c11',
+ jsonb_build_object('entityType','track','entityId',current_setting('wk.c11.id'),
+ 'ruleId','track_slug_identity_noise','ruleVersion','1.2.0','fieldName','slug',
+ 'currentValue','wk-ci-c11-feat-unverified','proposedValue','wk-ci-c11-clean',
+ 'fingerprint',current_setting('wk.c11.fp1'),'confidence',1,
+ 'severity','high','disposition','review',
+ 'reason','First approved same-source Track slug claim.',
+ 'evidence',jsonb_build_object('ci_only',true)));
+ SELECT * INTO STRICT v_second FROM mizizi_private.admit_review_case_gateway_v1(
+ current_setting('wk.ci.ws')::uuid,'wk-ci-c11',
+ jsonb_build_object('entityType','track','entityId',current_setting('wk.c11.id'),
+ 'ruleId','track_slug_credit_evidence_gap','ruleVersion','1.3.0','fieldName','slug',
+ 'currentValue','wk-ci-c11-feat-unverified','proposedValue','wk-ci-c11-credit-check',
+ 'fingerprint',current_setting('wk.c11.fp2'),'confidence',1,
+ 'severity','high','disposition','review',
+ 'reason','Second approved same-source Track feature-credit claim.',
+ 'evidence',jsonb_build_object('ci_only',true,'gap','unverified credit')));
+ IF v_first.outcome<>'created' OR v_second.outcome<>'created'
+ OR v_first.headquarters_case_id=v_second.headquarters_case_id
+ OR v_first.review_item_id=v_second.review_item_id
+ OR v_first.receipt_link_id=v_second.receipt_link_id
+ OR v_first.headquarters_case_revision<>1 OR v_second.headquarters_case_revision<>1
+ THEN RAISE EXCEPTION 'STOP_C11_DISTINCT_CLAIM_ADMISSION_NOT_INDEPENDENT'; END IF;
+ RAISE NOTICE 'CI_C11_SAME_TRACK_TWO_INDEPENDENT_APPROVED_CLAIMS=PASS';
+END $wk_c11$;
+SET SESSION AUTHORIZATION DEFAULT;
+DO $wk_c11_check$
+BEGIN
+ IF (SELECT count(*) FROM mizizi_private.cases
+  WHERE subject_id=current_setting('wk.c11.id')::uuid AND revision=1
+  AND claim_family_key='track_identity_metadata_review_v1'
+  AND claim_key IN ('mizizi.track_slug_identity_noise.slug',
+                    'mizizi.track_slug_credit_evidence_gap.slug'))<>2
+ OR (SELECT count(*) FROM public.registry_review_items
+  WHERE entity_id=current_setting('wk.c11.id')::uuid AND status='open')<>2
+ OR (SELECT count(*) FROM mizizi_private.case_events e
+   JOIN mizizi_private.cases c ON c.id=e.case_id
+   WHERE c.subject_id=current_setting('wk.c11.id')::uuid)<>2
+ OR (SELECT count(*) FROM mizizi_private.case_receipt_links l
+   JOIN mizizi_private.cases c ON c.id=l.case_id
+   WHERE c.subject_id=current_setting('wk.c11.id')::uuid
+     AND l.relation_type='review_item')<>2
+ OR (SELECT count(*) FROM public.registry_tracks
+  WHERE id=current_setting('wk.c11.id')::uuid AND slug='wk-ci-c11-feat-unverified')<>1
+ THEN RAISE EXCEPTION 'STOP_C11_DISTINCT_CLAIM_LEDGER_POSTCHECK'; END IF;
+ RAISE NOTICE 'CI_C11_TWO_DISTINCT_CASES_REVIEWS_EVENTS_NO_SOURCE_WRITE=PASS';
+END $wk_c11_check$;
+
+-- C13: an observation sourced against an obsolete canonical slug cannot
+-- advance the already recorded C12 case; this is distinct from replaying
+-- a previous hash while the canonical source has not changed.
+UPDATE public.registry_releases SET slug=current_setting('wk.c12.second')
+ WHERE id=current_setting('wk.c12.release')::uuid
+ AND slug=current_setting('wk.c12.slug');
+DO $wk_c13_preflight$
+BEGIN
+ IF (SELECT count(*) FROM public.registry_releases
+ WHERE id=current_setting('wk.c12.release')::uuid
+ AND slug=current_setting('wk.c12.second'))<>1
+ THEN RAISE EXCEPTION 'STOP_C13_CANONICAL_FIXTURE_NOT_CHANGED'; END IF;
+END $wk_c13_preflight$;
+SET SESSION AUTHORIZATION mizizi_executor;
+DO $wk_c13$
+DECLARE denied boolean:=false;
+BEGIN
+ BEGIN
+ PERFORM * FROM mizizi_private.admit_review_case_gateway_v1(
+ current_setting('wk.ci.ws')::uuid,'wk-ci-c12-review',
+ jsonb_build_object('entityType','release','entityId',current_setting('wk.c12.release'),
+ 'ruleId','release_slug_provider_packaging','ruleVersion','1.2.0','fieldName','slug',
+ 'currentValue',current_setting('wk.c12.slug'),'proposedValue',current_setting('wk.c12.first'),
+ 'fingerprint',current_setting('wk.c12.fp1'),'confidence',1,
+ 'severity','high','disposition','review',
+ 'reason','Prior stale observation after the canonical source changed.',
+ 'evidence',jsonb_build_object('ci_only',true)));
+ EXCEPTION WHEN SQLSTATE '40001' THEN denied:=true;
+ END;
+ IF NOT denied THEN RAISE EXCEPTION 'STOP_C13_STALE_CANONICAL_OBSERVATION_ACCEPTED'; END IF;
+ RAISE NOTICE 'CI_C13_CANONICAL_SOURCE_DRIFT_STALE_OBSERVATION_DENIED=PASS';
+END $wk_c13$;
+SET SESSION AUTHORIZATION DEFAULT;
+DO $wk_c13_check$
+BEGIN
+ IF (SELECT count(*) FROM mizizi_private.cases
+  WHERE id=current_setting('wk.c12.case')::uuid AND revision=2
+  AND last_observation_fingerprint=current_setting('wk.c12.fp2'))<>1
+ OR (SELECT count(*) FROM mizizi_private.case_observations
+  WHERE case_id=current_setting('wk.c12.case')::uuid)<>2
+ OR (SELECT count(*) FROM mizizi_private.case_events
+  WHERE case_id=current_setting('wk.c12.case')::uuid)<>2
+ OR (SELECT count(*) FROM public.registry_review_items
+  WHERE id=current_setting('wk.c12.review')::uuid AND status='open')<>1
+ THEN RAISE EXCEPTION 'STOP_C13_REJECTED_STALE_CASE_MUTATED'; END IF;
+ RAISE NOTICE 'CI_C13_STALE_CANONICAL_DENIAL_PRESERVED_EVENT_AND_REVIEW=PASS';
+END $wk_c13_check$;
+
 ROLLBACK;
 \echo WK_CI_DISPOSABLE_WORKER_SQL_ROLLBACK=PASS
