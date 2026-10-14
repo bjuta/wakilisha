@@ -1,6 +1,6 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v14",
+  "version": "2026-10-14-v15",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
@@ -9,7 +9,8 @@
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
     "NOT_VERIFIED_AS_SPECIFIED = no directly traceable execution of the exact scenario was found in the current accepted record. This is not proof of failure.",
-    "No automatic provider connectivity demands for Slice 1. No artificial conversion of a fixture-independent unit assertion into an authenticated/runtime pass."
+    "No automatic provider connectivity demands for Slice 1. No artificial conversion of a fixture-independent unit assertion into an authenticated/runtime pass.",
+    "Owner-approved deferred delivery slice is a scheduling/exit-governance field only, never an evidence status. C17/H37 stay PARTIAL_EVIDENCE and all 40 Production acceptances NOT_RUN until their full original runtime scenarios are actually exercised."
   ],
   "evidence": {
     "worker_pg": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
@@ -304,7 +305,11 @@
       "exact_proof_markers": [
         "CI_C17_UNAUTHORIZED_WORKSPACE_GATEWAY_REJECTED"
       ],
-      "remaining_requirement": "Genuine cross-workspace case ID with authenticated read or transition; random unauthorized workspace ID alone is not sufficient."
+      "remaining_requirement": "Original C17 genuine multi-workspace cross-tenant case-ID behavior moves to Slice 3 by explicit owner approval, but remains PARTIAL_EVIDENCE and Production NOT_RUN until a genuine second workspace and authentic cross-tenant test exist.",
+      "assigned_delivery_slice": "Slice 3",
+      "scope_decision": "OWNER_APPROVED_2026-10-14",
+      "slice1_replacement_gate": "Current single real internal workspace: signed-in O20 nonmember actual source-case/read/journal/stage denial, O24 reviewer versus steward role-based stage denial, C17 unauthorized workspace gateway denial, no case/review/journal mutation, and only one active internal workspace. Requires accepted exact-head local JWT and independent SQL proof. Does not count as two-workspace C17.",
+      "slice3_original_exit_gate": "Authenticated users authorized to different actual workspaces, a real case ID owned by the other workspace, and verified owner-allowed versus foreign-denied read, journal, evidence, transition, search/count and shared-canonical-source paths including revocation/stale-token tests and independent database noninterference."
     },
     {
       "id": "C18",
@@ -510,7 +515,12 @@
       "name": "queued_registry_mutation_held",
       "status": "PARTIAL_EVIDENCE",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "db05_pg_auth_subset"
+      "evidence_group": "db05_pg_auth_subset",
+      "assigned_delivery_slice": "Slice 3",
+      "scope_decision": "OWNER_APPROVED_2026-10-14",
+      "slice1_replacement_gate": "DB05 per-scope hold and exact Registry grant/mutation admission trigger denial; H36 signed-in workspace hold and immutable issue record; H38 genuine pre-issued reviewed Artist merge grant denied during hold with no canonical mutation/success receipt; H40 release CAS and immutable journal, stale grant still denied and a new separately reviewed grant verified, zero standing grants. Read-only queued research cannot substitute for a Registry writer.",
+      "slice3_original_exit_gate": "Real existing-queue typed canonical Registry mutation, genuine frozen reviewed plan/exact grant and worker lease; active Hold Writes at dequeue/retry/resume/execution prevents any canonical write/grant consumption or success receipt, preserves immutable journal, and requires fresh authorization after release including race/expiry/lease recovery tests.",
+      "remaining_requirement": "Original H37 queued canonical Registry writer denied at execution under active Hold moves to Slice 3 by explicit owner approval. Existing H38 direct writer or read-only research job does not pass H37; PARTIAL_EVIDENCE and Production NOT_RUN remain."
     },
     {
       "id": "H38",
@@ -553,7 +563,7 @@
     "critical": "https://github.com/bjuta/wakilisha/actions/runs/38622022711",
     "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38622022580"
   },
-  "last_audit_note": "H36 and H40 now LOCAL_EXECUTED after exact real GoTrue JWT disposable acceptance #38622022580 proved authored workspace hold issuance journal source authority, two signed-in owners competing to release exactly once, immutable revision 1/2 start/release journal and actor/reason equality, zero standing grants/active holds, stale pre-held exact reviewed Artist merge grant rejected during hold and after release, fresh reviewed distinct posthold grant independently verified and consumed, and full data/Auth/Docker cleanup. Independent live isolated Preview read confirms genuine owner browser receipts, issued/released hold revision 2, journal two unique sequences, exact actor/reasons and no active hold/grant; H36/H40 are positive governance lifecycle proofs and do not misrepresent H37 queued canonical writer. Critical #38622022711 and disposable #38622022580 fully SUCCESS on proof source SHA 887426ad; earlier test-only temporal declaration failure corrected before accepting. Original scenario matrix 38 LOCAL_EXECUTED, 2 PARTIAL_EVIDENCE (C17 H37), 0 unspecified; all 40 Production NOT_RUN. Preview 230, Production 216 unchanged, one internal workspace only and read-only mizizi.case_research_v1 sole queued MIZIZI type. The MIZIZI brain and independently earned Licence architecture remain binding; no fake partner, synthetic queued Registry mutator, Production migration, Edge/frontend deploy, standing grant or merge.",
+  "last_audit_note": "Owner explicitly approved moving full original C17 genuine multi-workspace case-ID isolation and H37 genuine queued canonical Registry writer denied during Hold Writes to Slice 3 on 14 October 2026. The binding implementation exit contract and exact code register preserve narrow Slice 1 replacement gates based on actual O20/O24 authenticated nonmember/role tests, C17 denied foreign workspace gateway, DB05 policy and grant/mutation triggers, real signed-in H36/H38/H40 hold/previously issued exact Artist writer/postrelease fresh grant and independent audits. This is a scope decision, not test execution: original C17 and H37 remain PARTIAL_EVIDENCE, the v15 matrix stays 38 LOCAL_EXECUTED / 2 PARTIAL_EVIDENCE, all 40 Production NOT_RUN. Source evidence and protected CI from v14 remain the same; no new tenancy, Registry mutating queue, grant, Production deploy, admin bootstrap or PR merge. Full historical DESIRE/Ficha/Colors and real Production exit remain independently gated.",
   "corpus_evidence": {
     "sources": 32,
     "lanes": 4,
@@ -564,5 +574,41 @@
     "provider_creator_tenant_variety": "NOT_VERIFIED",
     "production_or_preview_mutation": "NONE",
     "source_transaction": "ROLLED_BACK_AND_INDEPENDENTLY_VERIFIED"
-  }
+  },
+  "scope_decisions": [
+    {
+      "decision_id": "OWNER_APPROVED_C17_H37_SLICE3_20261014",
+      "approved_by": "project_owner",
+      "approved_at": "2026-10-14",
+      "decision": "Move execution of original C17 and H37 full scenarios to Slice 3; use exact narrower replacement security gates for Slice 1; do not waive, mark executed, remove or change original forty acceptance IDs.",
+      "source_issue": "https://github.com/bjuta/wakilisha/issues/1226",
+      "source_pr": "https://github.com/bjuta/wakilisha/pull/1227",
+      "contract": "docs/engineering/mizizi-headquarters-implementation-exit-contract-v1-20261010.md",
+      "implementation_register": "docs/engineering/mizizi-headquarters-code-change-register-v1-20261010.md",
+      "affected_original_ids": [
+        "C17",
+        "H37"
+      ],
+      "scope": "Slice 1 retains one existing internal workspace and no queued Registry writer; Slice 3 requires actual legitimate separate tenancy and actual queued canonical execution.",
+      "slice1_current_scope_proof": {
+        "c17": [
+          "CI_C17_UNAUTHORIZED_WORKSPACE_GATEWAY_REJECTED",
+          "WK_AUTH_O20_REAL_SUBSCRIBER_SOURCE_CASE_READ_JOURNAL_AND_WRITE_DENIED",
+          "WK_AUTH_O24_AUTHENTICATED_REVIEWER_READ_ALLOWED_STAGE_DENIED"
+        ],
+        "h37": [
+          "CI_DB05_H37_SCOPE_HOLD_POLICY_DENIAL",
+          "CI_DB05_H37_BOTH_CANONICAL_ADMISSION_TRIGGERS_DENIED",
+          "WK_H38_REAL_AUTH_STALE_EXACT_GRANT_WRITER_DENIED_DURING_HOLD",
+          "WK_H40_POST_RELEASE_STALE_GRANT_CANNOT_REACQUIRE_AUTHORITY",
+          "WK_H40_FRESH_SEPARATE_GRANT_REQUIRED_AND_VERIFIED"
+        ],
+        "last_accepted_runtime_source": "887426ad9baf8f281112c63552906c0200ab5647",
+        "accepted_critical": "https://github.com/bjuta/wakilisha/actions/runs/38622780914",
+        "accepted_disposable": "https://github.com/bjuta/wakilisha/actions/runs/38622780837",
+        "limitations": "These demonstrate the narrow single-workspace permission and SQL/direct-writer hold controls only, never a real foreign-tenant case or queued Registry writer."
+      },
+      "promotion_constraints": "Original C17/H37 remain PARTIAL_EVIDENCE; all 40 Production acceptances remain NOT_RUN. Full historical DESIRE/Ficha/Colors and separate Production release checks are still required. New tenancy, queued Registry writes and earned licences are not authorized for Slice 1."
+    }
+  ]
 }
