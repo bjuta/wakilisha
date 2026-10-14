@@ -1,10 +1,10 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v13",
+  "version": "2026-10-14-v14",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
-  "head": "b25f3779a95297707225c95f32e3df31f23ef0c8",
+  "head": "887426ad9baf8f281112c63552906c0200ab5647",
   "rules": [
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
@@ -29,7 +29,8 @@
     "c18_genuine_auth_race_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38603167807",
     "o25_genuine_browser_stale_revision_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38608980274",
     "source_worker_boundaries_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38611765787",
-    "c13_source_and_prior_observation_fences_migration230_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38619155134"
+    "c13_source_and_prior_observation_fences_migration230_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38619155134",
+    "h36_h40_true_signed_in_hold_release_preview_and_disposable_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38622022580"
   },
   "deployment": {
     "preview": {
@@ -488,14 +489,21 @@
     {
       "id": "H36",
       "name": "workspace_hold_issue",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "db05_pg_auth_subset",
+      "evidence_group": "h36_h40_true_signed_in_hold_release_preview_and_disposable_20261014",
       "preview_acceptance": {
-        "status": "ISSUE_CONFIRMED_SIGNED_IN_PREVIEW",
-        "scope": "actual_authorized_Preview_browser_hold_request_and_independent_persisted_workspace_scoped_hold_start_event",
-        "limit": "H36 stays PARTIAL_EVIDENCE in frozen original classification until the full original DB05 acceptance contract and source-seam writer denial are reconciled."
-      }
+        "status": "ACCEPTED_PREVIEW_POSITIVE_RECEIPT",
+        "scope": "authorized_remote_Preview_DB_signed_in_localhost_Vite_browser_workspace_hold_revision_1_immutable_event_actor_reason_verified_live_SQL",
+        "limit": "No public hosted Preview frontend or canonical queued writer tested"
+      },
+      "exact_proof_markers": [
+        "WK_AUTH_H36_EXACT_SIGNED_IN_WORKSPACE_HOLD_ISSUANCE_JOURNAL",
+        "WK_AUTH_H36_H40_HOLD_READ_AND_SINGLE_RELEASE",
+        "CI_DB05_H36_TRANSACTIONAL_HOLD_AND_HISTORY"
+      ],
+      "execution_scope": "genuine_signed_in_disposable_GoTrue_first_internal_owner_hold_command_and_independent_PostgreSQL_source_workspaces_scope_reason_actor_hold_key_held_at_revision_1_exactly_one_immutable_hold_started_event_and_zero_active_registry_execution_grants;_second_real_signed_in_owner_independently_reads_hold;_genuine_preview_bound_localhost_browser_real_authorized_owner_issued_one_actual_workspace_hold_and_independent_live_Preview_SQL_checked_identical_event_source_fields",
+      "evidence_limit": "H36 positive hold issuance and audit accepted at LOCAL_EXECUTED with additional real signed-in isolated Preview browser/remote Supabase positive receipt; public hosted Preview frontend and Production not tested. H37 queued canonical writer denial is separate and remains unverified."
     },
     {
       "id": "H37",
@@ -521,22 +529,31 @@
     {
       "id": "H40",
       "name": "hold_release_postcheck",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "db05_pg_auth_subset",
+      "evidence_group": "h36_h40_true_signed_in_hold_release_preview_and_disposable_20261014",
       "preview_acceptance": {
-        "status": "RELEASE_AND_POSTCHECK_CONFIRMED_SIGNED_IN_PREVIEW",
-        "scope": "actual_authorized_Preview_browser_hold_release_revision_2_exact_reason_and_immutable_release_event_no_active_registry_execution_grants",
-        "limit": "H40 stays PARTIAL_EVIDENCE in frozen original classification. Postcheck does not prove blocked queued writer during active hold or any Production outcome."
-      }
+        "status": "ACCEPTED_PREVIEW_POSITIVE_RECEIPT",
+        "scope": "same_authorized_Preview_owner_release_revision_2_exact_two_immutable_events_actor_reasons_and_no_active_hold_grants_verified_live_SQL",
+        "limit": "Stale exact grant denial and new authorized grant execution verified in disposable local GoTrue test, not with live Preview grant; H37 separate"
+      },
+      "exact_proof_markers": [
+        "WK_AUTH_H40_SIGNED_IN_RELEASE_ONE_EVENT_CAS_NO_GRANT",
+        "WK_AUTH_TWO_REAL_JWTS_H39_CONCURRENT_HOLD_RELEASE_CAS",
+        "WK_H40_POST_RELEASE_STALE_GRANT_CANNOT_REACQUIRE_AUTHORITY",
+        "WK_H40_FRESH_SEPARATE_GRANT_REQUIRED_AND_VERIFIED",
+        "CI_DB05_H40_RELEASE_JOURNAL_AND_NO_STANDING_GRANT"
+      ],
+      "execution_scope": "two_genuine_GoTrue_authenticated_workspace_owners_compete_on_same_revision_1_hold_release_one_winner_revision_2_one_PT409_stale_denial;_independent_PostgreSQL_exact_immutable_two_events_unique_seqs_correct_held_and_released_actor_reason_temporal_order_zero_active_holds_or_grants;_genuine_earlier_reviewed_exact_registry_artist_merge_grant_rejected_while_held_and_stays_stale_after_release;_only_distinct_freshly_reviewed_grant_may_execute_and_independent_verifier_passes;_isolated_Preview_actual_signed_in_browser_release_revision_2_and_live_SQL_exact_historical_receipts_preserved",
+      "evidence_limit": "H40 positive release, immutable record and postrelease stale-grant fencing accepted with full disposable real JWT source/operation proof and additional isolated Preview signed-in UI positive receipt. No Preview queued-writer test, no public deployed Preview frontend, and no Production acceptance. H37 remains separate."
     }
   ],
-  "verified_execution_sha": "b25f3779a95297707225c95f32e3df31f23ef0c8",
+  "verified_execution_sha": "887426ad9baf8f281112c63552906c0200ab5647",
   "verified_workflows": {
-    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38619155100",
-    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38619155134"
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38622022711",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38622022580"
   },
-  "last_audit_note": "C13 original stale-observation acceptance advanced only after real prior-version reappearance failure reproduced in disposable PostgreSQL on 229 (old A accepted after newer B), canonical forward 230 installed via pinned native Supabase CLI to isolated Preview, and replay-fence repair accepted under exact migration/source/type/archive SHA identity, independent read-only live Preview verifier/ACL check and clean disposable 230 PostgreSQL/GoTrue/browser CI #38619155134. Both protected runs #38619155100 Critical and #38619155134 Disposable fully GREEN on source evidence commit b25f3779; exact C13 old-observation deny, drift deny and no journal/review/grant change markers plus independent rollback and container destruction present. No legitimate new novel observation rejected. Preview now 230, one real owner, zero cases/reviews/observations/active holds/grants, previously released hold intact. Production still 216; all 40 Production acceptances NOT_RUN. Frozen original matrix 36 LOCAL_EXECUTED, 4 PARTIAL_EVIDENCE (C17 H36 H37 H40), 0 unspecified. One-file ledger v13 reconciliation only; PR #1227 remains OPEN/DRAFT/UNMERGED and cannot promote until remaining original and historical gates.",
+  "last_audit_note": "H36 and H40 now LOCAL_EXECUTED after exact real GoTrue JWT disposable acceptance #38622022580 proved authored workspace hold issuance journal source authority, two signed-in owners competing to release exactly once, immutable revision 1/2 start/release journal and actor/reason equality, zero standing grants/active holds, stale pre-held exact reviewed Artist merge grant rejected during hold and after release, fresh reviewed distinct posthold grant independently verified and consumed, and full data/Auth/Docker cleanup. Independent live isolated Preview read confirms genuine owner browser receipts, issued/released hold revision 2, journal two unique sequences, exact actor/reasons and no active hold/grant; H36/H40 are positive governance lifecycle proofs and do not misrepresent H37 queued canonical writer. Critical #38622022711 and disposable #38622022580 fully SUCCESS on proof source SHA 887426ad; earlier test-only temporal declaration failure corrected before accepting. Original scenario matrix 38 LOCAL_EXECUTED, 2 PARTIAL_EVIDENCE (C17 H37), 0 unspecified; all 40 Production NOT_RUN. Preview 230, Production 216 unchanged, one internal workspace only and read-only mizizi.case_research_v1 sole queued MIZIZI type. The MIZIZI brain and independently earned Licence architecture remain binding; no fake partner, synthetic queued Registry mutator, Production migration, Edge/frontend deploy, standing grant or merge.",
   "corpus_evidence": {
     "sources": 32,
     "lanes": 4,
