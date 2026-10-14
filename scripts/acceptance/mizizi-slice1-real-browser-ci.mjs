@@ -159,3 +159,98 @@ export async function verifyLocalHeadquartersBrowsersV1({
   await server.close();
  }
 }
+
+
+/**
+ * O25 genuine stale-browser CAS proof: two independent signed-in browser
+ * clients read revision 1. A separately executed real-JWT race advances the
+ * trusted source-bound case while the mobile browser retains its old form.
+ * Its stale mutation MUST fail at PostgREST and leave the DB journal alone.
+ * Disposable unlinked Supabase + loopback Vite only, never hosted Preview.
+ */
+export async function verifyStaleBrowserTransitionV1({
+ api,anonKey,first,second,caseId,onAdvance,
+}){
+ assert(process.env.GITHUB_ACTIONS==="true"&&
+  process.env.GITHUB_EVENT_NAME==="pull_request"&&
+  api==="http://127.0.0.1:54321"&&anonKey&&
+  first?.email&&first?.password&&second?.email&&second?.password&&
+  /^[0-9a-f-]{36}$/.test(caseId||"")&&typeof onAdvance==="function",
+  "STOP_O25_UNLINKED_LOCAL_AUTH_AND_CALLBACK_REQUIRED");
+ process.env.VITE_PUBLIC_SUPABASE_URL=api;
+ process.env.VITE_PUBLIC_SUPABASE_ANON_KEY=anonKey;
+ const server=await createServer({
+  server:{host:"127.0.0.1",port:0,strictPort:false},logLevel:"error",
+ });
+ let browser;
+ try{
+  await server.listen();
+  const address=server.httpServer?.address();
+  assert(address&&typeof address!=="string"&&address.port>0,
+   "STOP_O25_UNBOUND_LOOPBACK_VITE");
+  const base="http://127.0.0.1:"+address.port;
+  browser=await chromium.launch({headless:true});
+  const desktop=await browser.newContext({viewport:{width:1440,height:900}});
+  const mobile=await browser.newContext({
+   viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true,
+  });
+  try{
+   const desk=await desktop.newPage(),phone=await mobile.newPage();
+   await Promise.all([
+    signedIn(desk,base,first),
+    signedIn(phone,base,second),
+   ]);
+   const caseSelector='article[role="listitem"]';
+   const targetText="Case "+caseId.slice(0,8);
+   const desktopRow=desk.locator(caseSelector).filter({hasText:targetText});
+   const staleRow=phone.locator(caseSelector).filter({hasText:targetText});
+   await desktopRow.waitFor({state:"visible",timeout:30000});
+   await staleRow.waitFor({state:"visible",timeout:30000});
+   for(const row of [desktopRow,staleRow]){
+    assert((await row.innerText()).includes("Revision 1")&&
+     (await row.innerText()).includes("open · triage"),
+     "STOP_O25_TWO_REAL_BROWSERS_DID_NOT_LOAD_REVISION_ONE");
+   }
+   await staleRow.getByRole("button",{name:"Prepare Research"}).click();
+   await staleRow.getByRole("textbox",{name:"Reason to Begin Research"}).fill(
+    "Signed-in stale mobile browser must not override the winning reviewer.");
+   const confirm=staleRow.getByRole("button",{name:"Confirm Research Stage"});
+   assert(await confirm.isEnabled(),"STOP_O25_STALE_FORM_NOT_READY");
+   console.log("WK_O25_TWO_SIGNED_IN_BROWSERS_STALE_REVISION_ONE=PASS");
+
+   // Explicit callback executes the existing two genuine JWT C18
+   // concurrent stage RPCs, preserving the same trusted case and actor facts.
+   const result=await onAdvance();
+   assert(Array.isArray(result)&&result.length===2&&
+    result.filter(x=>!x.error).length===1&&
+    result.filter(x=>x.error?.code==="PT409").length===1,
+    "STOP_O25_REAL_JWT_ADVANCE_NOT_SINGLE_WINNER");
+   const [response]=await Promise.all([
+    phone.waitForResponse(r=>
+     r.url().includes("/rpc/admin_mizizi_begin_case_research_v1"),
+     {timeout:30000}),
+    confirm.click(),
+   ]);
+   const payload=await response.json().catch(()=>null);
+   assert(response.status()===409&&payload?.code==="PT409",
+    "STOP_O25_STALE_BROWSER_MUTATION_NOT_HTTP_409");
+   await phone.getByText(
+    "We could not confirm that change. Please check the recorded state before trying again."
+   ).waitFor({state:"visible",timeout:30000});
+   await phone.getByRole("button",{name:"Refresh Records"}).click();
+   const freshRow=phone.locator(caseSelector).filter({hasText:targetText});
+   await freshRow.getByText("Revision 2",{exact:false}).waitFor({timeout:30000});
+   assert((await freshRow.innerText()).includes("in progress · research"),
+    "STOP_O25_BROWSER_REFRESH_DID_NOT_SHOW_AUTHORIZED_WINNER");
+   assert(await freshRow.getByRole("button",{name:"Prepare Research"}).count()===0,
+    "STOP_O25_COMPLETED_STAGE_STILL_HAS_FRESH_PREPARE_ACTION");
+   console.log("WK_O25_REAL_MOBILE_STALE_BROWSER_HTTP_409_AND_REFRESH=PASS");
+   return result;
+  }finally{
+   await Promise.allSettled([desktop.close(),mobile.close()]);
+  }
+ }finally{
+  if(browser)await browser.close();
+  await server.close();
+ }
+}
