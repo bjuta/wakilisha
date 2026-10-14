@@ -23,18 +23,6 @@ CONTAINER="$DB_NAMES"
 [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER")" = true ] || {
   echo 'STOP_DISPOSABLE_DB_NOT_RUNNING'; exit 21;
 }
-# TEMPORARY CI-ONLY CLI filename minting witness for the C13 forward repair.
-# It creates and immediately removes an EMPTY file on the disposable runner.
-# The next source commit MUST delete this block after capturing the filename.
-MINTED_NAME="mizizi_db02_prior_observation_replay_fence_v1"
-test -z "$(find "$ROOT/supabase/migrations" -maxdepth 1 -type f -name "*_${MINTED_NAME}.sql" -print -quit)"
-supabase migration new "$MINTED_NAME"
-MINTED_FILE="$(find "$ROOT/supabase/migrations" -maxdepth 1 -type f -name "*_${MINTED_NAME}.sql" -print -quit)"
-test -n "$MINTED_FILE" && test -f "$MINTED_FILE" && test ! -s "$MINTED_FILE"
-echo "WK_C13_PINNED_SUPABASE_CLI_MINTED_PATH=${MINTED_FILE#"$ROOT/"}"
-rm -- "$MINTED_FILE"
-test ! -e "$MINTED_FILE"
-echo 'WK_C13_EPHEMERAL_MIGRATION_FILE_REMOVED=PASS'
 echo 'WK_CI_DISPOSABLE_DATABASE_CONTEXT=PASS'
 snapshot() {
   docker exec -i "$CONTAINER" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c \
@@ -57,8 +45,8 @@ snapshot() {
         WHERE status='active');"
 }
 BEFORE="$(snapshot)" || { echo 'STOP_LOCAL_PRE_SNAPSHOT_FAILED'; exit 22; }
-[ "$BEFORE" = '229|20261014134759|1|0|0|0|0|0|0|0|0|0|0|0|0|0' ] || {
-  echo 'STOP_LOCAL_NOT_EXACT_EMPTY_MIGRATION_229'; exit 22;
+[ "$BEFORE" = '230|20261014182214|1|0|0|0|0|0|0|0|0|0|0|0|0|0' ] || {
+  echo 'STOP_LOCAL_NOT_EXACT_EMPTY_MIGRATION_230'; exit 22;
 }
 printf 'WK_CI_BEFORE_SHA256=%s\n' "$(printf %s "$BEFORE" | sha256sum | awk '{print $1}')"
 set +e
@@ -72,6 +60,8 @@ printf 'WK_CI_AFTER_SHA256=%s\n' "$(printf %s "$AFTER" | sha256sum | awk '{print
 echo 'WK_CI_INDEPENDENT_ROLLBACK_SNAPSHOT=PASS'
 [ "$SQL_CODE" -eq 0 ] || { echo 'STOP_LOCAL_SQL_FIRST_ERROR_NO_RETRY'; exit "$SQL_CODE"; }
 for proof in \
+  CI_C13_PRIOR_OBSERVATION_REAPPEARANCE_DENIED \
+  CI_C13_OLD_OBSERVATION_REPLAY_NO_ADDITIONAL_JOURNAL_OR_REVIEW \
   CI_J26_SOURCE_BOUND_CASE_TYPED_RESOURCE_JOB_AND_COMMAND_RECEIPT \
   CI_A05_APPROVED_RELEASE_PACKAGING_V1_2_SOURCE_GATEWAY \
   CI_A05_CANONICAL_RELEASE_UNCHANGED_REVIEW_AND_RECEIPT \
