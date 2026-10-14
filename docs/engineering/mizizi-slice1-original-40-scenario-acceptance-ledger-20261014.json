@@ -1,0 +1,330 @@
+{
+  "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
+  "version": "2026-10-14",
+  "status": "OPEN_NOT_FULLY_VERIFIED",
+  "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
+  "pr": 1227,
+  "head": "ecf1b667d6cefac1b52f4ee33ebc468e65a1ff01",
+  "rules": [
+    "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
+    "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
+    "NOT_VERIFIED_AS_SPECIFIED = no directly traceable execution of the exact scenario was found in the current accepted record. This is not proof of failure.",
+    "No automatic provider connectivity demands for Slice 1. No artificial conversion of a fixture-independent unit assertion into an authenticated/runtime pass."
+  ],
+  "evidence": {
+    "worker_pg": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
+    "real_local_auth_pg": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
+    "db05_pg_auth_subset": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
+    "auth_jwt_subset": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
+    "prior_local_targeted_subset": "Prior locally accepted DB02/DB05 and gateway tests; requires per-scenario mapping before full pass"
+  },
+  "deployment": {
+    "preview": {
+      "migrations": 228,
+      "head": "20261014094213",
+      "single_use_owner_bootstrap": "UNCONSUMED",
+      "signed_in_deployed_browser": "NOT_RUN"
+    },
+    "production": {
+      "migrations": 216,
+      "head": "20261009181647",
+      "write_actions": "NONE",
+      "cohort": {
+        "mizizi_data_hygiene": {
+          "open": 149,
+          "resolved": 75
+        },
+        "other_review_families": {
+          "chart_entry_missing_canonical_link_open": 49,
+          "chart_provisional_label_write_open": 27
+        },
+        "all_review_items": {
+          "open": 225,
+          "resolved": 76
+        }
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "A01",
+      "name": "approved_track_slug_1_1",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "A02",
+      "name": "approved_track_slug_1_2",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "A03",
+      "name": "approved_credit_gap_1_3",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "A04",
+      "name": "approved_recording_conflict_1_3",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "A05",
+      "name": "approved_release_packaging_1_2",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "A06",
+      "name": "unsupported_release_conflict_1_4",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "A07",
+      "name": "archived_source_replay",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "A08",
+      "name": "missing_source_id",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "A09",
+      "name": "fabricated_fingerprint",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "A10",
+      "name": "duplicate_finding_retry",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "C11",
+      "name": "distinct_case_claim",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "C12",
+      "name": "case_observation_update",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "C13",
+      "name": "stale_observation",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "C14",
+      "name": "completed_case_replay",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "C15",
+      "name": "immutable_receipt_edit",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "C16",
+      "name": "immutable_event_edit",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "C17",
+      "name": "cross_workspace_case_id",
+      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "C18",
+      "name": "two_reviewers_same_revision",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "C19",
+      "name": "audit_history_ordering",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "O20",
+      "name": "subscriber_case_read",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "auth_jwt_subset"
+    },
+    {
+      "id": "O21",
+      "name": "unauthenticated_owner_bootstrap",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "auth_jwt_subset"
+    },
+    {
+      "id": "O22",
+      "name": "double_owner_bootstrap",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "auth_jwt_subset"
+    },
+    {
+      "id": "O23",
+      "name": "authorized_stage_transition",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "auth_jwt_subset"
+    },
+    {
+      "id": "O24",
+      "name": "wrong_role_stage_transition",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "auth_jwt_subset"
+    },
+    {
+      "id": "O25",
+      "name": "stale_browser_transition",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "auth_jwt_subset"
+    },
+    {
+      "id": "J26",
+      "name": "research_job_admission",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "J27",
+      "name": "research_job_replay",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "J28",
+      "name": "research_fingerprint_drift",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "prior_local_targeted_subset"
+    },
+    {
+      "id": "W29",
+      "name": "service_worker_first_claim",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W30",
+      "name": "non_service_worker_claim",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W31",
+      "name": "concurrent_claimers",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W32",
+      "name": "lease_timeout_recovery",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W33",
+      "name": "worker_restart_resume",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W34",
+      "name": "stale_lease_completion",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W35",
+      "name": "max_retry_dead_letter",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "H36",
+      "name": "workspace_hold_issue",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "db05_pg_auth_subset"
+    },
+    {
+      "id": "H37",
+      "name": "queued_registry_mutation_held",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "db05_pg_auth_subset"
+    },
+    {
+      "id": "H38",
+      "name": "stale_grant_write_during_hold",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "real_local_auth_pg"
+    },
+    {
+      "id": "H39",
+      "name": "hold_concurrent_release",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "real_local_auth_pg"
+    },
+    {
+      "id": "H40",
+      "name": "hold_release_postcheck",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "db05_pg_auth_subset"
+    }
+  ]
+}
