@@ -1,10 +1,10 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v6",
+  "version": "2026-10-14-v7",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
-  "head": "04bbf7ae9502400ecac3f253d1d51bc8e50c84db",
+  "head": "84b434d2650e6abe021b67ea4840b52d08bd4607",
   "rules": [
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
@@ -23,7 +23,8 @@
     "c14_disposable_pg_terminal_replay_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38572850391",
     "preview_229_verified_and_local_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38586802055",
     "preview_229_verified_and_local_real_jwt_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38586802055",
-    "preview_229_exact_replay_seal": "https://github.com/bjuta/wakilisha/issues/1226#issuecomment-6171515032"
+    "preview_229_exact_replay_seal": "https://github.com/bjuta/wakilisha/issues/1226#issuecomment-6171515032",
+    "o24_real_jwt_reviewer_role_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38592306969"
   },
   "deployment": {
     "preview": {
@@ -299,9 +300,14 @@
     {
       "id": "O24",
       "name": "wrong_role_stage_transition",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "auth_jwt_subset"
+      "evidence_group": "o24_real_jwt_reviewer_role_20261014",
+      "exact_proof_markers": [
+        "WK_AUTH_O24_AUTHENTICATED_REVIEWER_READ_ALLOWED_STAGE_DENIED"
+      ],
+      "execution_scope": "genuine_signed_in_disposable_local_GoTrue_PostgREST_JWT_administrator_with_active_reviewer_only_workspace_membership_reads_actual_source_bound_case_and_immutable_event_but_steward_only_stage_transition_returns_42501;_case_remains_revision_1_open_triage_with_one_event",
+      "evidence_limit": "No hosted Preview operator role membership or Production execution; temporary Auth user and database volumes destroyed by exact-source CI."
     },
     {
       "id": "O25",
@@ -426,12 +432,12 @@
       "evidence_group": "db05_pg_auth_subset"
     }
   ],
-  "verified_execution_sha": "04bbf7ae9502400ecac3f253d1d51bc8e50c84db",
+  "verified_execution_sha": "84b434d2650e6abe021b67ea4840b52d08bd4607",
   "verified_workflows": {
-    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38586801773",
-    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38586802055"
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38592307503",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38592306969"
   },
-  "last_audit_note": "C12 true changed observation, exact replay, forged hash and immutable original review accepted on local PostgreSQL. C14 actual local GoTrue steward authorized done_for_now, stale CAS, Registry review intact and trusted gateway replay denied. CLI-minted migration 229 installed on isolated Preview, read-only schema/ACL verifier passed, public/editorial types and replay proof sealed. All local Docker and Auth users cleaned. ONLY done_for_now terminal branch covered; resolved/closed finalizers, hosted Preview operators/historical D1-D3, broad provider/creator/tenant corpus and Production remain unaccepted. C17 genuine cross-workspace case ID remains PARTIAL under DB01 single-workspace policy. PR remains draft and Slice 1 stays OPEN.",
+  "last_audit_note": "O24 advanced to LOCAL_EXECUTED after genuine third local GoTrue/JWT administrator with reviewer-only workspace membership read the source-backed case and immutable journal, but steward-only stage mutation denied 42501 with revision/stage/event journal unchanged. Exact code HEAD 84b434d all critical/browser, disposable worker and genuine JWT jobs PASS; temporary local Auth/database volumes destroyed. Live isolated Preview readiness independently remains BLOCKED: one confirmed subscriber, expired/revoked prior test administrator role, zero users with both bootstrap capabilities, zero memberships and source reviews/cases; historical DESIRE/Ficha/Colors exist only in Production. Do not reactivate retired test role or consume owner bootstrap without fresh authorized operator and environment/source contract. C17 cross-workspace and ten other partials remain open. All 40 Production acceptances NOT_RUN. PR draft, Production unchanged.",
   "corpus_evidence": {
     "sources": 32,
     "lanes": 4,
