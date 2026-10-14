@@ -1,10 +1,10 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v4",
+  "version": "2026-10-14-v5",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
-  "head": "b0ef7434b1bd3f6864dd391adc74e1a3e1c3f1c0",
+  "head": "05e8dc5197609281ee8d6561a67a7c9b2d8e2c59",
   "rules": [
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
@@ -19,7 +19,8 @@
     "prior_local_targeted_subset": "Prior locally accepted DB02/DB05 and gateway tests; requires per-scenario mapping before full pass",
     "source_case_research_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38550248044",
     "track_32_source_corpus_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38552467759",
-    "real_local_auth_pg_20261014_b0ef7434": "https://github.com/bjuta/wakilisha/actions/runs/38555894907"
+    "real_local_auth_pg_20261014_b0ef7434": "https://github.com/bjuta/wakilisha/actions/runs/38555894907",
+    "c14_disposable_pg_terminal_replay_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38572850391"
   },
   "deployment": {
     "preview": {
@@ -181,9 +182,16 @@
     {
       "id": "C14",
       "name": "completed_case_replay",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "PARTIAL_EVIDENCE",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "c14_disposable_pg_terminal_replay_20261014",
+      "exact_proof_markers": [
+        "CI_C14_SYNTHETIC_DONE_FOR_NOW_TRUSTED_GATEWAY_REPLAY_DENIED",
+        "CI_C14_TERMINAL_REPLAY_PRESERVED_JOURNAL_AND_REVIEW_RECEIPT",
+        "CI_C14_AUTHENTICATED_DURABLE_COMPLETION=NOT_RUN"
+      ],
+      "execution_scope": "disposable_postgres_existing_real_source_case_synthetic_superuser_terminal_state_then_mizizi_executor_session_authorization_gateway_denial",
+      "remaining_requirement": "Complete through an actual authorized durable-case terminal transition and prove exact replay and receipts. This proof only forces a local synthetic done_for_now state; no authenticated durable completion or resolved/closed case finalizer is asserted."
     },
     {
       "id": "C15",
@@ -406,12 +414,12 @@
       "evidence_group": "db05_pg_auth_subset"
     }
   ],
-  "verified_execution_sha": "b0ef7434b1bd3f6864dd391adc74e1a3e1c3f1c0",
+  "verified_execution_sha": "05e8dc5197609281ee8d6561a67a7c9b2d8e2c59",
   "verified_workflows": {
-    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38555894221",
-    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38555894907"
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38572850368",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38572850391"
   },
-  "last_audit_note": "O20/O21/O22 executed via actual local GoTrue/PostgREST with a source-bound case and second owner. Source corpus A01-A04/A07 remains accepted. C12/C14 not verified; C17 still partial and constrained by DB01 one-internal-workspace CHECK. Hosted Preview/operator D1/D2/D3 and broad provider/creator/tenant acceptance remain open.",
+  "last_audit_note": "New C14 source-backed case synthetic done_for_now replay was refused by actual local trusted SQL gateway, with immutable event/review receipt unchanged and independent rollback. Only PARTIAL_EVIDENCE: signed-in durable completion not tested. C12 remains NOT_VERIFIED_AS_SPECIFIED due broker/gateway fingerprint contract gap; C17 cross-workspace case-ID remains partial because DB01 explicitly restricts to one internal workspace. Hosted Preview historical operator browser acceptance and broader varied corpus open.",
   "corpus_evidence": {
     "sources": 32,
     "lanes": 4,
