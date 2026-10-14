@@ -11,6 +11,26 @@
 
 Do not repurpose the temporary three #1094 Admin views into generic orchestration. They remain protected historical acceptance evidence until a separately tested transition retires them. Do not rewrite all older MIZIZI docs or assume September row counts describe current Production.
 
+### 14 October 2026: implementation mapping for continuously learning MIZIZI
+
+This register is a change-ownership guide, **not authorization to build a new “scenario-bank database,” universal policy engine, free-writing agent, second Registry, job queue, evidence ledger or execution grant service**. The finite original 40 scenarios are regression/exit proof; the evolving MIZIZI brain consists of already-owned canonical Registry facts plus typed **claim/evidence memory, dated contradictions, durable observations, recorded investigations, independently adjudicated outcome feedback, versioned family policies and monitored bounded actions**. The prototype `mizizi.html` reports wholly invented large-client and licence metrics; implement **actual counters and receipts** rather than carrying mock numbers into Production.
+
+**Reuse-first ownership and staged additions:**
+
+| Intelligence seam | Use existing authority; smallest future domain extension | Delivery slice / acceptance |
+|---|---|---|
+| Observe/learn about subjects | Registry typed subjects; `platform_private.registry_evidence_assertions`, provider observations and source lineage; DB02 Case/observation receipts and immutable case journal | Slice 1 source-bound lifetime and stale/replay proof; Slice 2 incremental provider/creator observation and drift |
+| Think/investigate without mutating | Existing MIZIZI deterministic rules, `platform_private.jobs` leases, typed bounded read/research broker, captured research/source receipts | Slice 1 durable recovery; Slice 2 lawful source tools, unknown-family hold, contradiction/echo and creator feedback |
+| Evaluate reliably | Independent human review decisions, immutable result/outcome receipts, DB08 `claim_family_policy_versions`, `audit_samples`, `accuracy_windows`, `provider_drift_signals` **only after lived evidence and live-schema collision audit** | Slice 2 shadow + per-family labelled outcomes; Slice 3 stratified prospective holdout, confidence and error-severity-based graduation |
+| Govern earned action | Current `registry_operation_types`, system actor grants, exact target grants, deterministic broker, verifier, DB05 Holds/policy | Slice 1 holds and zero unsafe grants; Slice 3 externally approved finite `stewardship_license` scopes with immediate lapse/revocation and never-licensed negative proof |
+| Deliver and learn consequences | Existing `platform_private.outbox_events`, domain receipts, permission/ACK history; introduce adapter only where current FKs require it | Slice 3 real allowed delivery/ACK or permission refusal; incident/rollback results return to evidence corpus |
+
+**Versioned contract:** new family definitions bind claim semantics, applicable subject/resource and temporal scope, source-use rights, evidence contract, independent-origin/contradiction rules, risk tier, prohibited inferences, permitted operation key+version (if any), bounded human/policy governor, verifier, re-open/drift triggers and explicit unknown fallback. Changes to a family/policy require immutable version, shadow comparison, representative negative tests and independent authorization before grant eligibility. Family definitions do not change model weights or retroactively approve past cases. Every unfamiliar pattern must be recordable as a read/research/hold question even when no write family exists; there is **no wildcard grant family**.
+
+**Proof and scale:** generate property-based adversarial variations of invariants; preserve seeds/minimized failures as permanent regression; independently adjudicate representative real cohorts and out-of-distribution source shifts; load test millions of synthetic observations/jobs as **capacity** evidence only. Measured correctness, source diversity, sampling strata, rights safety and scope-qualified `stewardship_license` reliability require genuine outcome receipts; no automatic promotion from test coverage, nominal percent thresholds or self-labelled MIZIZI outputs. T4 and Never Licensed inferences remain outside autonomous licence graduation irrespective of scores.
+
+**No automatic current-Slice-1 expansion:** DB08, partner/API, public Cores, new mutating queue transport and broad catalogue models remain later-slice, explicitly gated work. C17/H37 must not be “passed” via artificial tenancy or repurposed read-only research jobs. Keep exactly the accepted three delivery slices and one Production exit, with isolated code/release gates only when necessary.
+
 ## 1. Domain / persistence changes (ordered, transactional boundaries)
 
 | ID | Proposed migration stem and **owned schema** | Objects and must-prove invariants |
