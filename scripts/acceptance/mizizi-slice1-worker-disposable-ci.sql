@@ -106,6 +106,14 @@ BEGIN
  BEGIN
   PERFORM * FROM mizizi_private.admit_review_case_gateway_v1(
    current_setting('wk.ci.ws')::uuid,'wk-ci-local-worker',
+   jsonb_set(v_finding,'{entityId}','null'::jsonb));
+ EXCEPTION WHEN SQLSTATE '22023' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_A08_ABSENT_ENTITY_ID_FIELD_ADMITTED'; END IF;
+ RAISE NOTICE 'CI_A08_MISSING_ENTITY_ID_FIELD_REJECTED_AT_BOUNDARY=PASS';
+ v_denied:=false;
+ BEGIN
+  PERFORM * FROM mizizi_private.admit_review_case_gateway_v1(
+   current_setting('wk.ci.ws')::uuid,'wk-ci-local-worker',
    jsonb_set(v_finding,'{fingerprint}',to_jsonb(repeat('f',64))));
  EXCEPTION WHEN SQLSTATE '42501' THEN v_denied:=true; END;
  IF NOT v_denied THEN RAISE EXCEPTION 'STOP_A09_FORGED_SOURCE_FINGERPRINT_ADMITTED'; END IF;
@@ -168,6 +176,9 @@ BEGIN
      WHERE case_id=v_case)<>2
   OR (SELECT count(*) FROM mizizi_private.case_events
      WHERE case_id=v_case AND case_revision IN (1,2))<>2
+  OR (SELECT array_agg(e.case_revision ORDER BY e.event_seq)
+      FROM mizizi_private.case_events e WHERE e.case_id=v_case)
+     IS DISTINCT FROM ARRAY[1,2]::integer[]
   OR (SELECT count(*) FROM mizizi_private.case_receipt_links
      WHERE case_id=v_case AND id=v_link)<>1
  THEN RAISE EXCEPTION 'STOP_C19_EVENT_CHAIN_OR_RECEIPT_PERSISTENCE_DRIFT'; END IF;
