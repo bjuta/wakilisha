@@ -1,4 +1,4 @@
--- Read-only DB05 invariant. Accept exactly the original 228 or additive 229 ledger.
+-- Read-only DB05 invariant. Accept exactly the original 228 or additive 229/230 ledgers.
 -- Same retained authority and ACL checks. No tables modified.
 DO $wk_228$
 DECLARE v_definition text; n integer; latest text;
@@ -6,8 +6,9 @@ BEGIN
  SELECT count(*),max(version) INTO n,latest
  FROM supabase_migrations.schema_migrations;
  IF NOT ((n=228 AND latest='20261014094213')
-      OR (n=229 AND latest='20261014134759')) THEN
-   RAISE EXCEPTION 'STOP_DB05_EXPECTED_228_OR_229_EXACT_LEDGER_REQUIRED';
+      OR (n=229 AND latest='20261014134759')
+      OR (n=230 AND latest='20261014182214')) THEN
+   RAISE EXCEPTION 'STOP_DB05_EXPECTED_228_229_OR_230_EXACT_LEDGER_REQUIRED';
  END IF;
  SELECT pg_get_functiondef(
    'platform_private.registry_execution_grant_has_current_authority(uuid)'::regprocedure)
