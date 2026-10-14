@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.18"
   }
   editorial: {
     Tables: {
@@ -20509,6 +20509,15 @@ export type Database = {
           p_limit?: number
         }
         Returns: Json[]
+      }
+      admin_mizizi_done_for_now_case_v1: {
+        Args: {
+          p_case_id: string
+          p_expected_revision: number
+          p_next_action_at: string
+          p_reason: string
+        }
+        Returns: Json
       }
       admin_mizizi_hold_workspace_writes_v1: {
         Args: { p_hold_key: string; p_reason: string; p_review_after?: string }
