@@ -1,5 +1,5 @@
 -- WAKILISHA Slice 1, CI-only, disposable PostgreSQL service-worker acceptance.
--- Fresh local 227 migration replay only. NEVER on linked, Preview or Production DB.
+-- Fresh local 229 migration replay only. NEVER on linked, Preview or Production DB.
 -- SET SESSION AUTHORIZATION is a local simulator, NOT a real service JWT/JIT login.
 -- One synthetic canonical Release is transaction-scoped; all changes ROLLBACK.
 \set ON_ERROR_STOP on
@@ -10,7 +10,7 @@ DO $guard$
 DECLARE n integer; head text;
 BEGIN
  SELECT count(*),max(version) INTO n,head FROM supabase_migrations.schema_migrations;
- IF n<>228 OR head<>'20261014094213'
+ IF n<>229 OR head<>'20261014134759'
    OR session_user<>'supabase_admin' OR current_user<>'supabase_admin'
    OR NOT (SELECT rolsuper FROM pg_roles WHERE rolname='supabase_admin')
    OR (SELECT count(*) FROM mizizi_private.cases)<>0
@@ -19,7 +19,7 @@ BEGIN
    OR to_regprocedure('public.mizizi_claim_case_research_jobs_v1(text,integer,integer)') IS NULL
    OR to_regprocedure('public.mizizi_recover_expired_case_research_jobs_v1(integer,integer)') IS NULL
    OR to_regprocedure('public.mizizi_complete_case_research_job_v1(uuid,text,jsonb)') IS NULL
- THEN RAISE EXCEPTION 'STOP_CI_WORKER_EXACT_EMPTY_LOCAL_226_REQUIRED'; END IF;
+ THEN RAISE EXCEPTION 'STOP_CI_WORKER_EXACT_EMPTY_LOCAL_229_REQUIRED'; END IF;
 END $guard$;
 SELECT id::text AS wk_workspace FROM mizizi_private.workspaces
  WHERE workspace_key='wakilisha-internal' AND status='active' \gset
@@ -580,6 +580,115 @@ BEGIN
  RAISE NOTICE 'CI_C14_TERMINAL_REPLAY_PRESERVED_JOURNAL_AND_REVIEW_RECEIPT=PASS';
  RAISE NOTICE 'CI_C14_AUTHENTICATED_DURABLE_COMPLETION=NOT_RUN';
 END $wk_c14_independent_terminal_postcheck$;
+
+
+-- C12: same live canonical Release, changed deterministic observation,
+-- one existing Registry human review and immutable receipt, two revisions.
+WITH nonce AS (SELECT substr(md5(gen_random_uuid()::text),1,12) AS suffix),
+ created AS (
+ INSERT INTO public.registry_releases(slug,title,normalized_title,status,metadata)
+ SELECT 'wk-ci-c12-'||suffix,'C12 Disposable Release','c12 disposable release',
+  'active',jsonb_build_object('fixture','c12-local-only')
+ FROM nonce RETURNING id,slug
+)
+SELECT set_config('wk.c12.release',id::text,true),
+ set_config('wk.c12.slug',slug,true),
+ set_config('wk.c12.first',slug||'-accepted',true),
+ set_config('wk.c12.second',slug||'-revised',true)
+FROM created;
+SELECT set_config('wk.c12.fp1',mizizi_private.finding_fingerprint_v1(
+ 'release_slug_provider_packaging','1.2.0','release',
+ current_setting('wk.c12.release')::uuid,'slug',
+ current_setting('wk.c12.slug'),current_setting('wk.c12.first')),true);
+SELECT set_config('wk.c12.fp2',mizizi_private.finding_fingerprint_v1(
+ 'release_slug_provider_packaging','1.2.0','release',
+ current_setting('wk.c12.release')::uuid,'slug',
+ current_setting('wk.c12.slug'),current_setting('wk.c12.second')),true);
+SET SESSION AUTHORIZATION mizizi_executor;
+DO $wk_c12_changed_source$
+DECLARE v_first record;v_changed record;v_repeat record;
+ v_input jsonb;v_new jsonb;v_denied boolean:=false;
+BEGIN
+ v_input:=jsonb_build_object(
+  'entityType','release','entityId',current_setting('wk.c12.release'),
+  'ruleId','release_slug_provider_packaging','ruleVersion','1.2.0',
+  'fieldName','slug','currentValue',current_setting('wk.c12.slug'),
+  'proposedValue',current_setting('wk.c12.first'),
+  'fingerprint',current_setting('wk.c12.fp1'),
+  'confidence',1,'severity','high','disposition','review',
+  'reason','Disposable C12 actual first source observation.',
+  'evidence',jsonb_build_object('fixture','c12-local-only'));
+ SELECT * INTO STRICT v_first FROM mizizi_private.admit_review_case_gateway_v1(
+  current_setting('wk.ci.ws')::uuid,'wk-ci-c12-review',v_input);
+ IF v_first.outcome<>'created' OR v_first.headquarters_case_revision<>1
+ THEN RAISE EXCEPTION 'STOP_C12_FIRST_OBSERVATION_NOT_CREATED'; END IF;
+ PERFORM set_config('wk.c12.case',v_first.headquarters_case_id::text,true);
+ PERFORM set_config('wk.c12.review',v_first.review_item_id::text,true);
+ PERFORM set_config('wk.c12.link',v_first.receipt_link_id::text,true);
+ v_new:=jsonb_set(v_input,'{proposedValue}',to_jsonb(current_setting('wk.c12.second')));
+ v_new:=jsonb_set(v_new,'{fingerprint}',to_jsonb(current_setting('wk.c12.fp2')));
+ SELECT * INTO STRICT v_changed FROM mizizi_private.admit_review_case_gateway_v1(
+  current_setting('wk.ci.ws')::uuid,'wk-ci-c12-review',v_new);
+ IF v_changed.outcome<>'observation_recorded'
+  OR v_changed.headquarters_case_revision<>2
+  OR v_changed.headquarters_case_id<>v_first.headquarters_case_id
+  OR v_changed.review_item_id<>v_first.review_item_id
+  OR v_changed.receipt_link_id<>v_first.receipt_link_id
+ THEN RAISE EXCEPTION 'STOP_C12_CHANGED_FINDING_CASE_REVIEW_BINDING'; END IF;
+ SELECT * INTO STRICT v_repeat FROM mizizi_private.admit_review_case_gateway_v1(
+  current_setting('wk.ci.ws')::uuid,'wk-ci-c12-review',v_new);
+ IF v_repeat.outcome<>'unchanged' OR v_repeat.headquarters_case_revision<>2
+  OR v_repeat.review_item_id<>v_first.review_item_id
+  OR v_repeat.receipt_link_id<>v_first.receipt_link_id
+ THEN RAISE EXCEPTION 'STOP_C12_CHANGED_OBSERVATION_REPLAY_NONIDEMPOTENT'; END IF;
+ BEGIN
+  PERFORM * FROM mizizi_private.admit_review_case_gateway_v1(
+    current_setting('wk.ci.ws')::uuid,'wk-ci-c12-review',
+    jsonb_set(v_new,'{fingerprint}',to_jsonb(repeat('f',64))));
+ EXCEPTION WHEN SQLSTATE '42501' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_C12_FORGED_SECOND_FINGERPRINT'; END IF;
+ RAISE NOTICE 'CI_C12_CHANGED_VERIFIED_OBSERVATION_ONE_CASE_REVIEW_RECEIPT=PASS';
+ RAISE NOTICE 'CI_C12_CHANGED_OBSERVATION_EXACT_REPLAY_AND_FORGED_HASH=PASS';
+END $wk_c12_changed_source$;
+SET SESSION AUTHORIZATION DEFAULT;
+DO $wk_c12_independent_provenance$
+DECLARE v_case uuid:=current_setting('wk.c12.case')::uuid;
+ v_row uuid;v_denied boolean:=false;
+BEGIN
+ IF (SELECT count(*) FROM mizizi_private.cases
+  WHERE id=v_case AND revision=2 AND case_state='open'
+   AND last_observation_fingerprint=current_setting('wk.c12.fp2'))<>1
+ OR (SELECT array_agg(o.case_revision ORDER BY o.case_revision)
+   FROM mizizi_private.case_observations o WHERE o.case_id=v_case)
+    IS DISTINCT FROM ARRAY[1,2]::integer[]
+ OR (SELECT count(*) FROM mizizi_private.case_observations
+   WHERE case_id=v_case AND case_revision=2
+    AND previous_case_revision=1
+    AND previous_observation_fingerprint=current_setting('wk.c12.fp1')
+    AND observation_fingerprint=current_setting('wk.c12.fp2')
+    AND original_review_key='mizizi:'||current_setting('wk.c12.fp1'))<>1
+ OR (SELECT count(*) FROM mizizi_private.case_receipt_links
+   WHERE case_id=v_case AND id=current_setting('wk.c12.link')::uuid)<>1
+ OR (SELECT count(*) FROM public.registry_review_items
+   WHERE id=current_setting('wk.c12.review')::uuid AND status='open'
+    AND review_key='mizizi:'||current_setting('wk.c12.fp1'))<>1
+ OR (SELECT count(*) FROM public.registry_releases
+   WHERE id=current_setting('wk.c12.release')::uuid AND status='active'
+    AND slug=current_setting('wk.c12.slug'))<>1
+ OR (SELECT count(*) FROM mizizi_private.case_events
+    WHERE case_id=v_case)<>2
+ THEN RAISE EXCEPTION 'STOP_C12_PROVENANCE_OR_REGISTRY_MUTATION_DRIFT'; END IF;
+ SELECT id INTO STRICT v_row FROM mizizi_private.case_observations
+  WHERE case_id=v_case AND case_revision=1;
+ BEGIN UPDATE mizizi_private.case_observations SET source_finding_sha256=repeat('1',64)
+   WHERE id=v_row; EXCEPTION WHEN SQLSTATE '23514' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_C12_OBSERVATION_RECEIPT_UPDATE_ALLOWED'; END IF;
+ v_denied:=false;
+ BEGIN DELETE FROM mizizi_private.case_observations WHERE id=v_row;
+ EXCEPTION WHEN SQLSTATE '23514' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_C12_OBSERVATION_RECEIPT_DELETE_ALLOWED'; END IF;
+ RAISE NOTICE 'CI_C12_TWO_IMMUTABLE_OBSERVATIONS_ONE_UNCHANGED_REVIEW=PASS';
+END $wk_c12_independent_provenance$;
 
 ROLLBACK;
 \echo WK_CI_DISPOSABLE_WORKER_SQL_ROLLBACK=PASS

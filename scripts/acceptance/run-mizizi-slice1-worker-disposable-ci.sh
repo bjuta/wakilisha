@@ -38,14 +38,15 @@ snapshot() {
        (SELECT count(*) FROM mizizi_private.cases)||'|'||
        (SELECT count(*) FROM mizizi_private.case_events)||'|'||
        (SELECT count(*) FROM mizizi_private.case_receipt_links)||'|'||
+       (SELECT count(*) FROM mizizi_private.case_observations)||'|'||
        (SELECT count(*) FROM mizizi_private.write_holds)||'|'||
        (SELECT count(*) FROM mizizi_private.write_hold_events)||'|'||
        (SELECT count(*) FROM platform_private.registry_execution_grants
         WHERE status='active');"
 }
 BEFORE="$(snapshot)" || { echo 'STOP_LOCAL_PRE_SNAPSHOT_FAILED'; exit 22; }
-[ "$BEFORE" = '228|20261014094213|1|0|0|0|0|0|0|0|0|0|0|0|0' ] || {
-  echo 'STOP_LOCAL_NOT_EXACT_EMPTY_MIGRATION_226'; exit 22;
+[ "$BEFORE" = '229|20261014134759|1|0|0|0|0|0|0|0|0|0|0|0|0|0' ] || {
+  echo 'STOP_LOCAL_NOT_EXACT_EMPTY_MIGRATION_229'; exit 22;
 }
 printf 'WK_CI_BEFORE_SHA256=%s\n' "$(printf %s "$BEFORE" | sha256sum | awk '{print $1}')"
 set +e
@@ -59,6 +60,9 @@ printf 'WK_CI_AFTER_SHA256=%s\n' "$(printf %s "$AFTER" | sha256sum | awk '{print
 echo 'WK_CI_INDEPENDENT_ROLLBACK_SNAPSHOT=PASS'
 [ "$SQL_CODE" -eq 0 ] || { echo 'STOP_LOCAL_SQL_FIRST_ERROR_NO_RETRY'; exit "$SQL_CODE"; }
 for proof in \
+  CI_C12_CHANGED_VERIFIED_OBSERVATION_ONE_CASE_REVIEW_RECEIPT \
+  CI_C12_CHANGED_OBSERVATION_EXACT_REPLAY_AND_FORGED_HASH \
+  CI_C12_TWO_IMMUTABLE_OBSERVATIONS_ONE_UNCHANGED_REVIEW \
   CI_A06_UNSUPPORTED_RELEASE_RULE_REJECTED \
   CI_A08_MISSING_SOURCE_UUID_REJECTED_BY_LIVE_REGISTRY_BROKER \
   CI_A08_MISSING_ENTITY_ID_FIELD_REJECTED_AT_BOUNDARY \
