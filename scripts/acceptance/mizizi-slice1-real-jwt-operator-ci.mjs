@@ -224,6 +224,25 @@ async function main(){
  assert(progressed.caseId===caseId&&progressed.revision===2&&
   progressed.stage==="research","STOP_CASE_REVISION_RECEIPT");
  console.log("WK_AUTH_REAL_JWT_SOURCE_CASE_STAGE2_RECEIPT=PASS");
+ // O23: independently confirm the authenticated steward changed exactly
+ // one source-backed case, retained the original open Registry review, and
+ // appended one correctly attributed DB02 transition event.
+ const o23State=localSql("SELECT "+
+  "c.revision::text||'|'||c.case_state||'|'||c.current_stage||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.case_events e"+
+  " WHERE e.case_id=c.id)||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.case_events e"+
+  " WHERE e.case_id=c.id AND e.case_revision=2"+
+  " AND e.event_type='case_state_changed' AND e.actor_key='user:"+first.id+"')||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.case_receipt_links l"+
+  " JOIN public.registry_review_items r ON r.id=l.authority_id"+
+  " WHERE l.case_id=c.id AND l.relation_type='review_item'"+
+  " AND r.status='open' AND r.entity_id=c.subject_id"+
+  " AND r.entity_type=c.subject_type)"+
+  " FROM mizizi_private.cases c WHERE c.id='"+caseId+"'::uuid;",db);
+ assert(o23State==="2|in_progress|research|2|1|1",
+  "STOP_O23_SIGNED_IN_STAGE_OR_REGISTRY_REVIEW_DRIFT");
+ console.log("WK_AUTH_O23_SIGNED_IN_STEWARD_STAGE2_REVIEW_AND_JOURNAL=PASS");
  const staleAttempt=await second.user.rpc("admin_mizizi_begin_case_research_v1",{
   p_case_id:caseId,p_expected_revision:1,
   p_reason:"Competing stale case revision must be denied."});
