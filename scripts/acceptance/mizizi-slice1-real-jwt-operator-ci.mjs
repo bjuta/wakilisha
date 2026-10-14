@@ -397,6 +397,90 @@ async function main(){
  console.log(gatewayProof);
  console.log("WK_AUTH_C14_REAL_JWT_DURABLE_TIMEBOX_CAS_AND_REVIEW_INTACT=PASS");
 
+ // C18: two real signed-in reviewers see the same revision before
+ // simultaneously requesting a stage transition. Keep this *additional*
+ // source-backed case after browser and C14 acceptance to preserve the exact
+ // one-case browser/export contract. Disposable local database only.
+ const raceReleaseId=randomUUID();
+ const raceSlug="wk-ci-c18-"+raceReleaseId.slice(0,12);
+ const raceProposed=raceSlug+"-accepted";
+ localSql("INSERT INTO public.registry_releases"+
+  " (id,slug,title,normalized_title,status,metadata) VALUES ('"+
+  raceReleaseId+"'::uuid,'"+raceSlug+
+  "','C18 Disposable Review','c18 disposable review','active',"+
+  "jsonb_build_object('test_fixture','c18-local-only'));",db);
+ const raceFingerprint=localSql(
+  "SELECT mizizi_private.finding_fingerprint_v1("+
+  "'release_slug_provider_packaging','1.2.0','release','"+
+  raceReleaseId+"','slug','"+raceSlug+"','"+raceProposed+"');",db);
+ assert(/^[0-9a-f]{64}$/.test(raceFingerprint),
+  "STOP_C18_APPROVED_SOURCE_FINGERPRINT_MISSING");
+ localSql("BEGIN; SET SESSION AUTHORIZATION mizizi_executor;"+
+  "DO $wk_c18_trusted_source$ DECLARE v_result record; BEGIN "+
+  "SELECT * INTO STRICT v_result FROM mizizi_private.admit_review_case_gateway_v1("+
+  "'"+workspaceId+"'::uuid,'wk-ci-local-worker',jsonb_build_object("+
+  "'entityType','release','entityId','"+raceReleaseId+"',"+
+  "'ruleId','release_slug_provider_packaging','ruleVersion','1.2.0',"+
+  "'fieldName','slug','currentValue','"+raceSlug+"',"+
+  "'proposedValue','"+raceProposed+"','fingerprint','"+raceFingerprint+"',"+
+  "'confidence',1,'severity','high','disposition','review',"+
+  "'reason','Independent source-bound C18 concurrent case claim.',"+
+  "'evidence',jsonb_build_object('fixture','ci-only'))); "+
+  "IF v_result.outcome<>'created' OR v_result.headquarters_case_revision<>1 "+
+  "OR v_result.review_item_id IS NULL OR v_result.receipt_link_id IS NULL "+
+  "THEN RAISE EXCEPTION 'STOP_C18_TRUSTED_SOURCE_ADMISSION'; END IF; "+
+  "END $wk_c18_trusted_source$; "+
+  "SET SESSION AUTHORIZATION DEFAULT; COMMIT;",db);
+ const raceCaseId=localSql("SELECT id::text FROM mizizi_private.cases "+
+  "WHERE workspace_id='"+workspaceId+"'::uuid AND subject_type='release'"+
+  " AND subject_id='"+raceReleaseId+"'::uuid AND revision=1"+
+  " AND case_state='open' AND current_stage='triage';",db);
+ assert(UUID.test(raceCaseId),"STOP_C18_SOURCE_BOUND_CASE_NOT_ADMITTED");
+ const bothBefore=await Promise.all([
+  call(first.user,"admin_mizizi_cases_v1",{p_limit:100},"STOP_C18_FIRST_READ"),
+  call(second.user,"admin_mizizi_cases_v1",{p_limit:100},"STOP_C18_SECOND_READ"),
+ ]);
+ assert(bothBefore.every(rows=>rows.filter(item=>item.caseId===raceCaseId&&
+  item.caseRevision===1&&item.stage==="triage"&&UUID.test(item.reviewId||""))
+  .length===1),"STOP_C18_BOTH_AUTH_OPERATORS_MUST_SEE_REVISION_ONE");
+ console.log("WK_AUTH_C18_TWO_REAL_JWTS_SAME_SOURCE_CASE_REVISION_ONE=PASS");
+ const raceArgs=(reason)=>({p_case_id:raceCaseId,p_expected_revision:1,
+  p_reason:reason});
+ const raceResults=await Promise.all([
+  first.user.rpc("admin_mizizi_begin_case_research_v1",
+   raceArgs("First reviewer concurs that source-backed research should begin.")),
+  second.user.rpc("admin_mizizi_begin_case_research_v1",
+   raceArgs("Second reviewer independently seeks the same case revision.")),
+ ]);
+ const winners=raceResults.filter(x=>!x.error);
+ const losers=raceResults.filter(x=>x.error?.code==="PT409");
+ assert(winners.length===1&&losers.length===1&&
+  winners[0].data?.caseId===raceCaseId&&
+  winners[0].data?.revision===2&&winners[0].data?.stage==="research",
+  "STOP_C18_TWO_REVIEWERS_EXPECT_EXACTLY_ONE_CAS_WINNER_"+
+  raceResults.map(x=>String(x.error?.code||"SUCCESS")
+   .replace(/[^A-Za-z0-9_]/g,"")).join("_"));
+ const winningActor=raceResults[0].error?second.id:first.id;
+ const raceProof=localSql("SELECT "+
+  "c.revision::text||'|'||c.case_state||'|'||c.current_stage||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.case_events e"+
+  " WHERE e.case_id=c.id)||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.case_events e"+
+  " WHERE e.case_id=c.id AND e.case_revision=2"+
+  " AND e.event_type='case_state_changed' AND e.actor_key='user:"+
+  winningActor+"')||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.case_receipt_links l"+
+  " JOIN public.registry_review_items r ON r.id=l.authority_id"+
+  " WHERE l.case_id=c.id AND l.relation_type='review_item'"+
+  " AND r.status='open' AND r.entity_id=c.subject_id"+
+  " AND r.entity_type=c.subject_type)||'|'||"+
+  "(SELECT count(*)::text FROM platform_private.registry_execution_grants"+
+  " WHERE status='active')"+
+  " FROM mizizi_private.cases c WHERE c.id='"+raceCaseId+"'::uuid;",db);
+ assert(raceProof==="2|in_progress|research|2|1|1|0",
+  "STOP_C18_CONCURRENT_CAS_OR_REGISTRY_REVIEW_AUDIT_DRIFT");
+ console.log("WK_AUTH_C18_GENUINE_CONCURRENT_REVIEWERS_SINGLE_CAS_JOURNAL=PASS");
+
  // Capability re-evaluation with an unchanged genuine JWT.
  localSql("UPDATE public.user_role_assignments SET expires_at="+
   "clock_timestamp()-interval '1 second' WHERE user_id='"+
