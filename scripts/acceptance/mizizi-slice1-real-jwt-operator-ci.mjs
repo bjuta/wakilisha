@@ -255,27 +255,30 @@ async function main(){
 
  // C14: separate durable case time-box by the actual signed-in steward.
  // Session-level Done for Now above intentionally made no case mutation.
+ console.log("WK_C14_BEGIN_SIGNED_IN_RUNTIME=PASS");
  const boundedAt=new Date(Date.now()+15*60*1000).toISOString();
  const doneArgs={p_case_id:caseId,p_expected_revision:2,
   p_reason:"Reviewed this source-bound research case and scheduled follow-up.",
   p_next_action_at:boundedAt};
  requireDenied(await subscriber.rpc("admin_mizizi_done_for_now_case_v1",doneArgs),
-  "42501","STOP_C14_NONMEMBER_DURABLE_CASE_COMPLETION");
+  "42501","C14_NONMEMBER");
  requireDenied(await client(api,values.ANON_KEY).rpc(
   "admin_mizizi_done_for_now_case_v1",doneArgs),
-  "42501","STOP_C14_ANON_DURABLE_CASE_COMPLETION");
+  "42501","C14_ANON");
+ console.log("WK_C14_AUTH_PERMISSION_NEGATIVES=PASS");
  const done=await call(first.user,"admin_mizizi_done_for_now_case_v1",
-  doneArgs,"STOP_C14_GENUINE_JWT_DURABLE_COMPLETION");
+  doneArgs,"C14_OPERATOR");
  assert(done.caseId===caseId&&done.revision===3&&
   done.state==="done_for_now"&&done.stage==="research"&&
   Date.parse(done.nextActionAt)===Date.parse(boundedAt),
   "STOP_C14_AUTH_COMPLETION_RECEIPT");
+ console.log("WK_C14_GENUINE_STEWARD_COMPLETED=PASS");
  requireDenied(await second.user.rpc("admin_mizizi_done_for_now_case_v1",doneArgs),
-  "PT409","STOP_C14_REAL_COMPETING_OWNER_STALE_CAS");
+  "PT409","C14_STALE");
  requireDenied(await first.user.rpc("admin_mizizi_begin_case_research_v1",{
   p_case_id:caseId,p_expected_revision:3,
   p_reason:"Completed case cannot silently re-enter research stage."}),
-  "55000","STOP_C14_COMPLETED_CASE_RESEARCH_REOPEN");
+  "55000","C14_REOPEN");
  const afterDone=localSql("SELECT "+
   "(SELECT count(*) FROM mizizi_private.cases WHERE id='"+caseId+
   "'::uuid AND revision=3 AND case_state='done_for_now' AND current_stage='research'"+
@@ -289,22 +292,23 @@ async function main(){
   caseId+"'::uuid AND relation_type='review_item')::text||'|'||"+
   "(SELECT count(*) FROM mizizi_private.case_observations WHERE case_id='"+
   caseId+"'::uuid)::text;",db);
- assert(afterDone==="1|3|1|1|1","STOP_C14_DURABLE_CASE_RECEIPT_OR_REVIEW_DRIFT");
+ assert(afterDone==="1|3|1|1|1","C14_POSTCHECK");
+ console.log("WK_C14_INDEPENDENT_DB_JOURNAL_AND_REVIEW=PASS");
  const releaseSlug=localSql("SELECT r.slug FROM public.registry_releases r"+
   " JOIN mizizi_private.cases c ON c.subject_id=r.id WHERE c.id='"+
   caseId+"'::uuid;",db);
- assert(/^wk-ci-worker-[a-z0-9]{12}$/.test(releaseSlug),"STOP_C14_NOT_CANONICAL_SOURCE_RELEASE");
+ assert(/^wk-ci-worker-[a-z0-9]{12}$/.test(releaseSlug),"C14_RELEASE");
  const proposed=releaseSlug+"-accepted";
  const sourceId=localSql("SELECT subject_id::text FROM mizizi_private.cases"+
   " WHERE id='"+caseId+"'::uuid;",db);
- assert(UUID.test(sourceId),"STOP_C14_SUBJECT_UUID");
+ assert(UUID.test(sourceId),"C14_SUBJECT");
  const workspaceId=localSql("SELECT id::text FROM mizizi_private.workspaces"+
   " WHERE workspace_key='wakilisha-internal' AND status='active';",db);
- assert(UUID.test(workspaceId),"STOP_C14_APPROVED_WORKSPACE_UUID");
+ assert(UUID.test(workspaceId),"C14_WORKSPACE");
  const sourceFP=localSql("SELECT mizizi_private.finding_fingerprint_v1("+
   "'release_slug_provider_packaging','1.2.0','release','"+
   sourceId+"'::uuid,'slug','"+releaseSlug+"','"+proposed+"');",db);
- assert(/^[0-9a-f]{64}$/.test(sourceFP),"STOP_C14_SOURCE_FINGERPRINT");
+ assert(/^[0-9a-f]{64}$/.test(sourceFP),"C14_FINGERPRINT");
  const gatewayProof=localSql(
   "BEGIN; SET SESSION AUTHORIZATION mizizi_executor;"+
   "DO $wk_c14_real_authenticated_case$ DECLARE denied boolean:=false; BEGIN "+
@@ -324,7 +328,7 @@ async function main(){
   " SET SESSION AUTHORIZATION DEFAULT; ROLLBACK;"+
   " SELECT 'WK_AUTH_C14_SIGNED_IN_DURABLE_COMPLETION_TRUSTED_REPLAY_DENIED=PASS';",db);
  assert(gatewayProof==="WK_AUTH_C14_SIGNED_IN_DURABLE_COMPLETION_TRUSTED_REPLAY_DENIED=PASS",
-  "STOP_C14_REPLAY_PROBE_MISSING");
+  "C14_REPLAY");
  console.log(gatewayProof);
  console.log("WK_AUTH_C14_REAL_JWT_DURABLE_TIMEBOX_CAS_AND_REVIEW_INTACT=PASS");
 

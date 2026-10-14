@@ -598,11 +598,11 @@ SELECT set_config('wk.c12.release',id::text,true),
 FROM created;
 SELECT set_config('wk.c12.fp1',mizizi_private.finding_fingerprint_v1(
  'release_slug_provider_packaging','1.2.0','release',
- current_setting('wk.c12.release')::uuid,'slug',
+ current_setting('wk.c12.release'),'slug',
  current_setting('wk.c12.slug'),current_setting('wk.c12.first')),true);
 SELECT set_config('wk.c12.fp2',mizizi_private.finding_fingerprint_v1(
  'release_slug_provider_packaging','1.2.0','release',
- current_setting('wk.c12.release')::uuid,'slug',
+ current_setting('wk.c12.release'),'slug',
  current_setting('wk.c12.slug'),current_setting('wk.c12.second')),true);
 SET SESSION AUTHORIZATION mizizi_executor;
 DO $wk_c12_changed_source$
