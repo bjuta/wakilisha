@@ -125,7 +125,7 @@ BEGIN
  IF jsonb_array_length(v_entries)<>32
   OR (SELECT count(*) FROM public.registry_tracks)<>40
   OR (SELECT count(*) FROM public.registry_artists)<>16
-  OR (SELECT count(*) FROM public.registry_track_artists)<>40
+  OR (SELECT count(*) FROM public.registry_track_artists)<>32
  THEN RAISE EXCEPTION 'STOP_CORPUS_TRACK_ARTIST_FIXTURE_COUNTS'; END IF;
  PERFORM set_config('wk.corpus.findings',v_entries::text,true);
  RAISE NOTICE 'CI_CORPUS_32_DISTINCT_TRACK_SOURCES_AND_STRUCTURED_CREDITS=PASS';
@@ -250,6 +250,9 @@ BEGIN
   OR (SELECT count(*) FROM public.registry_tracks WHERE status='archived')<>1
   OR (SELECT count(*) FROM public.registry_tracks WHERE status='active')<>39
   OR (SELECT count(*) FROM platform_private.jobs)<>0
+  OR (SELECT count(*) FROM jsonb_array_elements(current_setting('wk.corpus.findings')::jsonb) f
+       JOIN public.registry_tracks t ON t.id=(f->>'id')::uuid
+       WHERE f->>'fieldName'='slug' AND t.slug=f->>'currentValue')<>24
  THEN RAISE EXCEPTION 'STOP_CORPUS_SOURCE_CASE_HISTORY_OR_WORKER_RESIDUAL_DRIFT'; END IF;
  IF EXISTS (
   SELECT 1 FROM public.registry_review_items r
