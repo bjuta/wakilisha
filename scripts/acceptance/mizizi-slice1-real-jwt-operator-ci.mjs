@@ -268,6 +268,22 @@ async function main(){
   p_review_after:null},"STOP_REAL_JWT_HOLD");
  assert(hold.status==="active"&&hold.revision===1&&UUID.test(hold.holdId||""),
   "STOP_AUTH_HOLD_RECEIPT");
+ const h36=localSql("SELECT "+
+  "h.revision::text||'|'||h.status||'|'||h.scope_kind||'|'||"+
+  "(h.workspace_id='"+workspaceId+"'::uuid)::text||'|'||"+
+  "(h.held_by_actor_key='user:"+first.id+"')::text||'|'||"+
+  "(h.hold_key='"+holdKey+"')::text||'|'||"+
+  "(h.hold_reason='Genuine signed-in operator sets disposable local Hold Writes.')::text||'|'||"+
+  "(h.held_at IS NOT NULL AND h.released_at IS NULL)::text||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.write_hold_events e WHERE e.hold_id=h.id)||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.write_hold_events e "+
+   "WHERE e.hold_id=h.id AND e.event_kind='hold_started' AND e.revision=1"+
+   " AND e.actor_key='user:"+first.id+"' AND e.reason=h.hold_reason)||'|'||"+
+  "(SELECT count(*)::text FROM platform_private.registry_execution_grants WHERE status='active')"+
+  " FROM mizizi_private.write_holds h WHERE h.id='"+hold.holdId+"'::uuid;",db);
+ assert(h36==="1|active|workspace|true|true|true|true|true|1|1|0",
+  "STOP_H36_SIGNED_IN_SOURCE_SCOPED_HOLD_IMMUTABLE_AUDIT_OR_GRANT_DRIFT");
+ console.log("WK_AUTH_H36_EXACT_SIGNED_IN_WORKSPACE_HOLD_ISSUANCE_JOURNAL=PASS");
  const visible=await call(second.user,"admin_mizizi_list_workspace_holds_v1",
   {p_limit:100},"STOP_SECOND_JWT_HOLD_VIEW");
  assert(visible.some(h=>h.holdId===hold.holdId&&h.status==="active"),
@@ -290,6 +306,27 @@ async function main(){
   "(SELECT count(*) FROM platform_private.registry_execution_grants"+
   " WHERE status='active')::text;",db);
  assert(evidence==="1|0","STOP_DOUBLE_RELEASE_OR_ACTIVE_GRANT");
+ const h40=localSql("SELECT "+
+  "h.revision::text||'|'||h.status||'|'||h.scope_kind||'|'||"+
+  "(h.workspace_id='"+workspaceId+"'::uuid)::text||'|'||"+
+  "(h.held_by_actor_key='user:"+first.id+"')::text||'|'||"+
+  "(h.released_by_actor_key IN ('user:"+first.id+"','user:"+second.id+"'))::text||'|'||"+
+  "(h.held_at IS NOT NULL AND h.released_at>=h.held_at)::text||'|'||"+
+  "(h.release_reason='Reviewed concurrent local Hold Writes release request safely.')::text||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.write_hold_events e WHERE e.hold_id=h.id)||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.write_hold_events e "+
+   "WHERE e.hold_id=h.id AND e.event_kind='hold_started' AND e.revision=1"+
+   " AND e.actor_key='user:"+first.id+"' AND e.reason=h.hold_reason)||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.write_hold_events e "+
+   "WHERE e.hold_id=h.id AND e.event_kind='hold_released' AND e.revision=2"+
+   " AND e.actor_key=h.released_by_actor_key AND e.reason=h.release_reason)||'|'||"+
+  "(SELECT count(DISTINCT e.event_seq)::text FROM mizizi_private.write_hold_events e WHERE e.hold_id=h.id)||'|'||"+
+  "(SELECT count(*)::text FROM mizizi_private.write_holds WHERE status='active')||'|'||"+
+  "(SELECT count(*)::text FROM platform_private.registry_execution_grants WHERE status='active')"+
+  " FROM mizizi_private.write_holds h WHERE h.id='"+hold.holdId+"'::uuid;",db);
+ assert(h40==="2|released|workspace|true|true|true|true|true|2|1|1|2|0|0",
+  "STOP_H40_REAL_SIGNED_IN_CAS_RELEASE_OR_JOURNAL_REASON_OR_GRANT_DRIFT");
+ console.log("WK_AUTH_H40_SIGNED_IN_RELEASE_ONE_EVENT_CAS_NO_GRANT=PASS");
  console.log("WK_AUTH_TWO_REAL_JWTS_H39_CONCURRENT_HOLD_RELEASE_CAS=PASS");
  console.log("WK_AUTH_H36_H40_HOLD_READ_AND_SINGLE_RELEASE=PASS");
 
