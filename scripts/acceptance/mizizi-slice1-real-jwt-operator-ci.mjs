@@ -446,12 +446,19 @@ async function main(){
  console.log("WK_AUTH_C18_TWO_REAL_JWTS_SAME_SOURCE_CASE_REVISION_ONE=PASS");
  const raceArgs=(reason)=>({p_case_id:raceCaseId,p_expected_revision:1,
   p_reason:reason});
- const raceResults=await Promise.all([
-  first.user.rpc("admin_mizizi_begin_case_research_v1",
-   raceArgs("First reviewer concurs that source-backed research should begin.")),
-  second.user.rpc("admin_mizizi_begin_case_research_v1",
-   raceArgs("Second reviewer independently seeks the same case revision.")),
- ]);
+ // O25: Keep two authenticated real browser pages at revision one while
+ // the existing independent C18 concurrent JWT calls advance the same case.
+ const {verifyStaleBrowserTransitionV1}=await import(
+  "./mizizi-slice1-real-browser-ci.mjs");
+ const raceResults=await verifyStaleBrowserTransitionV1({
+  api,anonKey:values.ANON_KEY,first,second,caseId:raceCaseId,
+  onAdvance:()=>Promise.all([
+   first.user.rpc("admin_mizizi_begin_case_research_v1",
+    raceArgs("First reviewer concurs that source-backed research should begin.")),
+   second.user.rpc("admin_mizizi_begin_case_research_v1",
+    raceArgs("Second reviewer independently seeks the same case revision.")),
+  ]),
+ });
  const winners=raceResults.filter(x=>!x.error);
  const losers=raceResults.filter(x=>x.error?.code==="PT409");
  assert(winners.length===1&&losers.length===1&&
@@ -480,6 +487,7 @@ async function main(){
  assert(raceProof==="2|in_progress|research|2|1|1|0",
   "STOP_C18_CONCURRENT_CAS_OR_REGISTRY_REVIEW_AUDIT_DRIFT");
  console.log("WK_AUTH_C18_GENUINE_CONCURRENT_REVIEWERS_SINGLE_CAS_JOURNAL=PASS");
+ console.log("WK_AUTH_O25_STALE_BROWSER_INDEPENDENT_DB_EVENT_NONINTERFERENCE=PASS");
 
  // Capability re-evaluation with an unchanged genuine JWT.
  localSql("UPDATE public.user_role_assignments SET expires_at="+
