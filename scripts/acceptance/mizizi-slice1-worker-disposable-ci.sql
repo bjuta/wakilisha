@@ -519,5 +519,67 @@ BEGIN
  RAISE NOTICE 'CI_DB05_H39_TWO_AUTHENTICATED_OPERATOR_RELEASES=NOT_RUN';
 END $wk_hold_release$;
 
+-- C14 is a trusted-gateway replay negative, NOT an authenticated operator
+-- completion. The durable source-backed case is put into done_for_now only by
+-- this local disposable superuser after all worker and hold assertions finish.
+DO $wk_c14_synthetic_terminal_fixture$
+BEGIN
+ IF (SELECT count(*) FROM mizizi_private.cases c
+      WHERE c.id=current_setting('wk.ci.case')::uuid
+        AND c.revision=2 AND c.case_state='in_progress'
+        AND c.current_stage='research')<>1
+ OR (SELECT count(*) FROM mizizi_private.case_events
+      WHERE case_id=current_setting('wk.ci.case')::uuid)<>2
+ THEN RAISE EXCEPTION 'STOP_C14_EXPECTED_AUTHENTIC_SOURCE_CASE_MISSING'; END IF;
+ UPDATE mizizi_private.cases
+ SET revision=3,case_state='done_for_now',
+   transition_actor_key='system:mizizi',
+   transition_reason='Disposable terminal replay probe; no human decision or closure.'
+ WHERE id=current_setting('wk.ci.case')::uuid AND revision=2;
+ IF NOT FOUND THEN RAISE EXCEPTION 'STOP_C14_SYNTHETIC_TERMINAL_REVISION_NOT_CREATED'; END IF;
+END $wk_c14_synthetic_terminal_fixture$;
+SET SESSION AUTHORIZATION mizizi_executor;
+DO $wk_c14_trusted_gateway_terminal_replay$
+DECLARE v_denied boolean:=false;
+BEGIN
+ BEGIN
+  PERFORM * FROM mizizi_private.admit_review_case_gateway_v1(
+   current_setting('wk.ci.ws')::uuid,'wk-ci-local-worker',
+   jsonb_build_object(
+    'entityType','release','entityId',current_setting('wk.ci.release'),
+    'ruleId','release_slug_provider_packaging','ruleVersion','1.2.0',
+    'fieldName','slug','currentValue',current_setting('wk.ci.slug'),
+    'proposedValue',current_setting('wk.ci.candidate'),
+    'fingerprint',current_setting('wk.ci.fp'),
+    'confidence',1,'severity','high','disposition','review',
+    'reason','Disposable local source-bound worker lease acceptance.',
+    'evidence',jsonb_build_object('fixture','ci-only')));
+ EXCEPTION WHEN SQLSTATE '23514' THEN v_denied:=true; END;
+ IF NOT v_denied THEN
+  RAISE EXCEPTION 'STOP_C14_COMPLETED_CASE_REPLAY_UNEXPECTEDLY_ACCEPTED';
+ END IF;
+ RAISE NOTICE 'CI_C14_SYNTHETIC_DONE_FOR_NOW_TRUSTED_GATEWAY_REPLAY_DENIED=PASS';
+END $wk_c14_trusted_gateway_terminal_replay$;
+SET SESSION AUTHORIZATION DEFAULT;
+DO $wk_c14_independent_terminal_postcheck$
+BEGIN
+ IF (SELECT count(*) FROM mizizi_private.cases
+     WHERE id=current_setting('wk.ci.case')::uuid AND revision=3
+       AND case_state='done_for_now' AND current_stage='research')<>1
+ OR (SELECT array_agg(e.case_revision ORDER BY e.event_seq)
+     FROM mizizi_private.case_events e
+     WHERE e.case_id=current_setting('wk.ci.case')::uuid)
+    IS DISTINCT FROM ARRAY[1,2,3]::integer[]
+ OR (SELECT count(*) FROM mizizi_private.case_receipt_links
+     WHERE case_id=current_setting('wk.ci.case')::uuid
+       AND id=current_setting('wk.ci.link')::uuid
+       AND relation_type='review_item')<>1
+ OR (SELECT count(*) FROM public.registry_review_items
+     WHERE id=current_setting('wk.ci.review')::uuid AND status='open')<>1
+ THEN RAISE EXCEPTION 'STOP_C14_REJECTED_REPLAY_ALTERED_IMMUTABLE_CASE_OR_REVIEW'; END IF;
+ RAISE NOTICE 'CI_C14_TERMINAL_REPLAY_PRESERVED_JOURNAL_AND_REVIEW_RECEIPT=PASS';
+ RAISE NOTICE 'CI_C14_AUTHENTICATED_DURABLE_COMPLETION=NOT_RUN';
+END $wk_c14_independent_terminal_postcheck$;
+
 ROLLBACK;
 \echo WK_CI_DISPOSABLE_WORKER_SQL_ROLLBACK=PASS
