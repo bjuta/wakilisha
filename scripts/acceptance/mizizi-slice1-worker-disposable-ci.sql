@@ -713,6 +713,58 @@ BEGIN
 END $wk_c12_independent_provenance$;
 
 
+
+-- C13: crucial out-of-order replay (NOT the simpler canonical source drift).
+-- A first accepted fingerprint, then a newer different accepted fingerprint;
+-- the first appears again while the canonical Release is STILL unchanged.
+-- A stale old observation must not roll the durable case revision backwards.
+SET SESSION AUTHORIZATION mizizi_executor;
+DO $wk_c13_delayed_old_observation$
+DECLARE v_denied boolean:=false;
+BEGIN
+ BEGIN
+  PERFORM * FROM mizizi_private.admit_review_case_gateway_v1(
+   current_setting('wk.ci.ws')::uuid,'wk-ci-c12-review',
+   jsonb_build_object(
+    'entityType','release','entityId',current_setting('wk.c12.release'),
+    'ruleId','release_slug_provider_packaging','ruleVersion','1.2.0',
+    'fieldName','slug','currentValue',current_setting('wk.c12.slug'),
+    'proposedValue',current_setting('wk.c12.first'),
+    'fingerprint',current_setting('wk.c12.fp1'),
+    'confidence',1,'severity','high','disposition','review',
+    'reason','Delayed earlier observation must not supersede the newer accepted one.',
+    'evidence',jsonb_build_object('ci_only',true,'source_kind','previously_accepted')));
+ EXCEPTION WHEN SQLSTATE '23514' THEN v_denied:=true;
+ END;
+ IF NOT v_denied THEN
+  RAISE EXCEPTION 'STOP_C13_PREVIOUSLY_RECORDED_OLD_FINGERPRINT_REENTERED_CASE';
+ END IF;
+ RAISE NOTICE 'CI_C13_PRIOR_OBSERVATION_REAPPEARANCE_DENIED=PASS';
+END $wk_c13_delayed_old_observation$;
+SET SESSION AUTHORIZATION DEFAULT;
+DO $wk_c13_replay_independent_postcondition$
+BEGIN
+ IF (SELECT count(*) FROM mizizi_private.cases
+      WHERE id=current_setting('wk.c12.case')::uuid
+      AND revision=2 AND case_state='open'
+      AND last_observation_fingerprint=current_setting('wk.c12.fp2'))<>1
+  OR (SELECT count(*) FROM mizizi_private.case_observations
+      WHERE case_id=current_setting('wk.c12.case')::uuid)<>2
+  OR (SELECT count(*) FROM mizizi_private.case_events
+      WHERE case_id=current_setting('wk.c12.case')::uuid)<>2
+  OR (SELECT count(*) FROM public.registry_review_items
+      WHERE id=current_setting('wk.c12.review')::uuid
+      AND status='open' AND review_key='mizizi:'||current_setting('wk.c12.fp1'))<>1
+  OR (SELECT count(*) FROM public.registry_releases
+      WHERE id=current_setting('wk.c12.release')::uuid
+      AND slug=current_setting('wk.c12.slug'))<>1
+  OR (SELECT count(*) FROM platform_private.registry_execution_grants
+      WHERE status='active')<>0
+ THEN RAISE EXCEPTION 'STOP_C13_OLD_OBSERVATION_REPLAY_CHANGED_CASE_OR_REVIEW'; END IF;
+ RAISE NOTICE 'CI_C13_OLD_OBSERVATION_REPLAY_NO_ADDITIONAL_JOURNAL_OR_REVIEW=PASS';
+END $wk_c13_replay_independent_postcondition$;
+
+
 -- A05: real canonical Release packaging-shaped 1.2.0 source, review only.
 WITH source AS (
  INSERT INTO public.registry_releases(slug,title,normalized_title,status,metadata)
