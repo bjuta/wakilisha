@@ -1,5 +1,5 @@
 -- WAKILISHA Slice 1: 32 distinct approved Track-source gateway scenarios.
--- Only fresh, unlinked local 228-migration GitHub CI PostgreSQL may run this.
+-- Only fresh, unlinked local 229-migration GitHub CI PostgreSQL may run this.
 -- Actual source broker and case admission; executor session is LOCAL SIM, not JIT.
 -- No Production, Preview, Auth bootstrap, provider credentials or external ingress.
 -- All fixture artists/tracks/reviews/cases and credentials are ROLLED BACK.
@@ -13,7 +13,7 @@ DECLARE v_count integer; v_head text;
 BEGIN
  SELECT count(*),max(version) INTO v_count,v_head
  FROM supabase_migrations.schema_migrations;
- IF v_count<>228 OR v_head<>'20261014094213'
+ IF v_count<>229 OR v_head<>'20261014134759'
   OR session_user<>'supabase_admin' OR current_user<>'supabase_admin'
   OR NOT (SELECT rolsuper FROM pg_roles WHERE rolname='supabase_admin')
   OR (SELECT count(*) FROM mizizi_private.cases)<>0
@@ -21,7 +21,7 @@ BEGIN
   OR (SELECT count(*) FROM public.registry_releases)<>0
   OR (SELECT count(*) FROM public.registry_review_items)<>0
   OR (SELECT count(*) FROM platform_private.jobs)<>0
- THEN RAISE EXCEPTION 'STOP_CORPUS_NOT_EXACT_EMPTY_DISPOSABLE_228'; END IF;
+ THEN RAISE EXCEPTION 'STOP_CORPUS_NOT_EXACT_EMPTY_DISPOSABLE_229'; END IF;
 END $wk_corpus_guard$;
 
 DO $wk_corpus_setup$
