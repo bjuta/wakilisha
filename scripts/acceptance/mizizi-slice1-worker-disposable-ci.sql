@@ -235,7 +235,29 @@ BEGIN
        AND relation_type='command_receipt'
        AND authority_id=current_setting('wk.ci.receipt')::uuid)<>1
  THEN RAISE EXCEPTION 'STOP_J27_J28_RETRY_ADDED_DUPLICATE_COMMAND_HISTORY'; END IF;
- RAISE NOTICE 'CI_J27_J28_ONE_COMMAND_RECEIPT_ONE_JOB_ONE_OUTBOX=PASS';
+ IF (SELECT count(*) FROM platform_private.command_receipts r
+    WHERE r.id=current_setting('wk.ci.receipt')::uuid
+      AND r.command_type='mizizi.case_research_v1'
+      AND r.principal_key='system:mizizi'
+      AND r.resource_id=current_setting('wk.ci.case')::uuid)<>1
+    OR (SELECT count(*) FROM editorial.resources res
+      WHERE res.id=current_setting('wk.ci.case')::uuid
+        AND res.resource_kind='mizizi_case'
+        AND res.visibility='internal' AND res.lifecycle_state='active')<>1
+    OR (SELECT count(*) FROM mizizi_private.case_resource_bindings b
+      WHERE b.case_id=current_setting('wk.ci.case')::uuid
+        AND b.resource_id=current_setting('wk.ci.case')::uuid
+        AND b.workspace_id=current_setting('wk.ci.ws')::uuid)<>1
+    OR (SELECT count(*) FROM platform_private.jobs j
+      WHERE j.id=current_setting('wk.ci.job')::uuid AND j.status='queued'
+        AND j.job_type='mizizi.case_research_v1'
+        AND j.command_type='mizizi.case_research_v1'
+        AND j.resource_id=current_setting('wk.ci.case')::uuid)<>1
+    OR (SELECT count(*) FROM platform_private.registry_execution_grants
+      WHERE status='active')<>0
+  THEN RAISE EXCEPTION 'STOP_J26_REAL_TYPED_RESEARCH_ADMISSION_AUTHORITY_DRIFT'; END IF;
+  RAISE NOTICE 'CI_J26_SOURCE_BOUND_CASE_TYPED_RESOURCE_JOB_AND_COMMAND_RECEIPT=PASS';
+  RAISE NOTICE 'CI_J27_J28_ONE_COMMAND_RECEIPT_ONE_JOB_ONE_OUTBOX=PASS';
 END $wk_job_evidence_counts$;
 -- First prove non-service role cannot use the worker RPC.
 SET SESSION AUTHORIZATION anon;
