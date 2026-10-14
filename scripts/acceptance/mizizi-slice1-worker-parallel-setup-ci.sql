@@ -11,7 +11,7 @@ DO $guard$
 DECLARE n integer; head text;
 BEGIN
  SELECT count(*),max(version) INTO n,head FROM supabase_migrations.schema_migrations;
- IF n<>228 OR head<>'20261013194500'
+ IF n<>228 OR head<>'20261014094213'
    OR session_user<>'supabase_admin' OR current_user<>'supabase_admin'
    OR NOT (SELECT rolsuper FROM pg_roles WHERE rolname='supabase_admin')
    OR (SELECT count(*) FROM mizizi_private.cases)<>0
