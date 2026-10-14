@@ -1,10 +1,10 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v12",
+  "version": "2026-10-14-v13",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
-  "head": "733cde9061189aa7c2a301f8854eb5d9314da999",
+  "head": "b25f3779a95297707225c95f32e3df31f23ef0c8",
   "rules": [
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
@@ -28,12 +28,13 @@
     "o23_real_jwt_steward_stage_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38595255493",
     "c18_genuine_auth_race_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38603167807",
     "o25_genuine_browser_stale_revision_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38608980274",
-    "source_worker_boundaries_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38611765787"
+    "source_worker_boundaries_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38611765787",
+    "c13_source_and_prior_observation_fences_migration230_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38619155134"
   },
   "deployment": {
     "preview": {
-      "migrations": 229,
-      "head": "20261014134759",
+      "migrations": 230,
+      "head": "20261014182214",
       "single_use_owner_bootstrap": "CONSUMED_ONCE_VERIFIED_20261014",
       "signed_in_deployed_browser": "NOT_RUN",
       "signed_in_localhost_preview_bound_browser": "PARTIAL_ACCEPTED_OWNER_BOOTSTRAP_AND_HOLD_WRITES_LIFECYCLE",
@@ -64,6 +65,15 @@
         "independent_sql": "one_distinct_released_hold_two_distinct_attributed_events_zero_active_holds_zero_active_registry_execution_grants_zero_preview_cases_and_registry_reviews",
         "limitation": "No concurrent queued or previously granted Registry writer tested during this hosted hold; H37 remains PARTIAL_EVIDENCE. Production not exercised.",
         "evidence": "Issue #1226: user screenshots 19:45:15, 19:45:58, 19:46:10 EAT and independent 2026-10-14 Supabase read-only SQL."
+      },
+      "c13_replay_fence": {
+        "migration": "20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql",
+        "native_preview_push": "PASS_OWNER_AUTHORIZED_SINGLE_FORWARD_CLI_2_107_0",
+        "independent_live_sql": "PASS_MIGRATION_230_EXACT_NAME_PRIVATE_GATEWAY_SOURCE_AND_ACL",
+        "schema_seal": "preview_230_exact_generated_types_sha256_2806dd9e7fe3913c067e5945a627db397e2f1b07641447af1c31fb7c0453d6b9",
+        "replay_proof": "docs/engineering/replay-proofs/20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql.json",
+        "browser_runtime": "NO_SOURCE_BACKED_PREVIEW_CASE_OR_REGISTRY_REVIEW_TESTED",
+        "production": "NOT_APPLIED"
       }
     },
     "production": {
@@ -231,19 +241,20 @@
     {
       "id": "C13",
       "name": "stale_observation",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset",
-      "partial_source_drift_evidence": {
-        "status": "PARTIAL_EVIDENCE",
-        "evidence_group": "source_worker_boundaries_20261014",
-        "exact_proof_markers": [
-          "CI_C13_CANONICAL_SOURCE_DRIFT_STALE_OBSERVATION_DENIED",
-          "CI_C13_STALE_CANONICAL_DENIAL_PRESERVED_EVENT_AND_REVIEW"
-        ],
-        "scope": "once_live_canonical_release_slug_changed_old_fingerprint_was_rejected_by_source_broker_with_SQLSTATE_40001;_original_case_revision_observations_review_and_event_chain_unchanged",
-        "remaining_requirement": "Older previously observed fingerprint arriving after newer accepted observation while canonical source remains unchanged must not revert the case fingerprint/revision. Live gateway implementation updates any changed prior fingerprint without checking whether this fingerprint already exists in historical immutable case_observations; code-review indicates an out-of-order replay risk. Requires a fail-closed proof and narrow forward authority repair if reproduced, not a passing claim based on source drift only."
-      }
+      "evidence_group": "c13_source_and_prior_observation_fences_migration230_20261014",
+      "exact_proof_markers": [
+        "CI_C13_CANONICAL_SOURCE_DRIFT_STALE_OBSERVATION_DENIED",
+        "CI_C13_STALE_CANONICAL_DENIAL_PRESERVED_EVENT_AND_REVIEW",
+        "CI_C13_PRIOR_OBSERVATION_REAPPEARANCE_DENIED",
+        "CI_C13_OLD_OBSERVATION_REPLAY_NO_ADDITIONAL_JOURNAL_OR_REVIEW",
+        "WK_DB02_230_OLD_OBSERVATION_REPLAY_FENCE_AND_NARROW_ACL"
+      ],
+      "execution_scope": "fresh_unlinked_disposable_PostgreSQL_full_230_replay_with_source_bound_Release_claim_case_revision_1_then_second_distinct_accepted_observation_revision_2;_older_fingerprint_reappearing_after_newer_observation_while_canonical_source_unchanged_is_rejected_23514_no_new_revision_event_review_or_grant;_source_drift_rejected_40001;_immutable_case_observation_and_source_review_chain_unchanged;_signed_in_real_GoTrue_operator_browser_regression_cleaned_up;_forward_230_migration_applied_native_CLI_to_isolated_Preview_with_read_only_function_source_ACL_and_migration_ledger_verification",
+      "evidence_limit": "LOCAL_EXECUTED original C13 negative cases; isolated Preview has only schema/ACL/owner state verification, no Preview source-backed case fixtures. Does not imply historical Production D1/D2/D3 tested, licenced learning accuracy or Production write authority.",
+      "migration_file": "supabase/migrations/20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql",
+      "forward_replay_proof": "docs/engineering/replay-proofs/20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql.json"
     },
     {
       "id": "C14",
@@ -520,12 +531,12 @@
       }
     }
   ],
-  "verified_execution_sha": "733cde9061189aa7c2a301f8854eb5d9314da999",
+  "verified_execution_sha": "b25f3779a95297707225c95f32e3df31f23ef0c8",
   "verified_workflows": {
-    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38611765778",
-    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38611765787"
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38619155100",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38619155134"
   },
-  "last_audit_note": "A05 C11 J26 advanced to LOCAL_EXECUTED after existing disposable worker SQL runner genuinely admitted packaging-shaped Release v1.2 source review without canonical mutation, two distinct approved claims against SAME Track with independent immutable case/review/receipt chains, and typed read-only research job admission with one resource/command/queued job/outbox, zero Registry grants. Original worker + 32 Track source corpus snapshots rolled back to empty. Source commit 733cde90 all protected CI success: Critical #38611765778; disposable worker/JWT #38611765787; all 7 new markers present in job logs. C13 remains PARTIAL: live canonical source drift rejection (40001) passed with case/review/event noninterference; historical observation fingerprint re-arrival after a different newer observation under unchanged canonical source has NOT been proven fail-closed and gateway source review indicates regression risk. Remaining partial C13 C17 H36 H37 H40. All 40 Production NOT_RUN; original MIZIZI brain/scale/licence docs preserved. No Preview/Production mutation, no SQL/Edge/frontend deployment, no PR merge.",
+  "last_audit_note": "C13 original stale-observation acceptance advanced only after real prior-version reappearance failure reproduced in disposable PostgreSQL on 229 (old A accepted after newer B), canonical forward 230 installed via pinned native Supabase CLI to isolated Preview, and replay-fence repair accepted under exact migration/source/type/archive SHA identity, independent read-only live Preview verifier/ACL check and clean disposable 230 PostgreSQL/GoTrue/browser CI #38619155134. Both protected runs #38619155100 Critical and #38619155134 Disposable fully GREEN on source evidence commit b25f3779; exact C13 old-observation deny, drift deny and no journal/review/grant change markers plus independent rollback and container destruction present. No legitimate new novel observation rejected. Preview now 230, one real owner, zero cases/reviews/observations/active holds/grants, previously released hold intact. Production still 216; all 40 Production acceptances NOT_RUN. Frozen original matrix 36 LOCAL_EXECUTED, 4 PARTIAL_EVIDENCE (C17 H36 H37 H40), 0 unspecified. One-file ledger v13 reconciliation only; PR #1227 remains OPEN/DRAFT/UNMERGED and cannot promote until remaining original and historical gates.",
   "corpus_evidence": {
     "sources": 32,
     "lanes": 4,
