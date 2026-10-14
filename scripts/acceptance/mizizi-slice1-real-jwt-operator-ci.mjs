@@ -60,7 +60,7 @@ async function main(){
   "(SELECT count(*) FROM mizizi_private.cases)||'|'||"+
   "(SELECT count(*) FROM mizizi_private.write_holds)||'|'||"+
   "(SELECT count(*) FROM public.registry_releases);",db);
- assert(baseline==="229|20261014134759|0|0|0|0|0",
+ assert(baseline==="230|20261014182214|0|0|0|0|0",
   "STOP_AUTH_NOT_FRESH_LOCAL_227");
  console.log("WK_AUTH_EMPTY_227_UNLINKED_LOCAL_BASELINE=PASS");
 
