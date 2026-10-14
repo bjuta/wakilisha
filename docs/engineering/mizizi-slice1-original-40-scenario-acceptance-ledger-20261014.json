@@ -1,6 +1,6 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v8",
+  "version": "2026-10-14-v9",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
@@ -31,8 +31,37 @@
     "preview": {
       "migrations": 229,
       "head": "20261014134759",
-      "single_use_owner_bootstrap": "UNCONSUMED",
-      "signed_in_deployed_browser": "NOT_RUN"
+      "single_use_owner_bootstrap": "CONSUMED_ONCE_VERIFIED_20261014",
+      "signed_in_deployed_browser": "NOT_RUN",
+      "signed_in_localhost_preview_bound_browser": "PARTIAL_ACCEPTED_OWNER_BOOTSTRAP_AND_HOLD_WRITES_LIFECYCLE",
+      "hold_writes": {
+        "date": "2026-10-14",
+        "browser_origin": "127.0.0.1:5178",
+        "preview_project_ref": "nkgfoppunmnkcumalxqp",
+        "operator_role": "authenticated_internal_workspace_owner",
+        "hold_id": "efecd5c5-017e-4a23-a912-013b96919e3e",
+        "hold_key": "mizizi:workspace:hold:54dd4d17-373e-4b87-b162-2ba78b420c28",
+        "scope": "workspace",
+        "final_status": "released",
+        "final_revision": 2,
+        "issued_at": "2026-10-14T16:45:13.407838Z",
+        "released_at": "2026-10-14T16:46:09.305804Z",
+        "immutable_events": [
+          {
+            "sequence": 12,
+            "revision": 1,
+            "kind": "hold_started"
+          },
+          {
+            "sequence": 13,
+            "revision": 2,
+            "kind": "hold_released"
+          }
+        ],
+        "independent_sql": "one_distinct_released_hold_two_distinct_attributed_events_zero_active_holds_zero_active_registry_execution_grants_zero_preview_cases_and_registry_reviews",
+        "limitation": "No concurrent queued or previously granted Registry writer tested during this hosted hold; H37 remains PARTIAL_EVIDENCE. Production not exercised.",
+        "evidence": "Issue #1226: user screenshots 19:45:15, 19:45:58, 19:46:10 EAT and independent 2026-10-14 Supabase read-only SQL."
+      }
     },
     "production": {
       "migrations": 216,
@@ -407,7 +436,12 @@
       "name": "workspace_hold_issue",
       "status": "PARTIAL_EVIDENCE",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "db05_pg_auth_subset"
+      "evidence_group": "db05_pg_auth_subset",
+      "preview_acceptance": {
+        "status": "ISSUE_CONFIRMED_SIGNED_IN_PREVIEW",
+        "scope": "actual_authorized_Preview_browser_hold_request_and_independent_persisted_workspace_scoped_hold_start_event",
+        "limit": "H36 stays PARTIAL_EVIDENCE in frozen original classification until the full original DB05 acceptance contract and source-seam writer denial are reconciled."
+      }
     },
     {
       "id": "H37",
@@ -435,7 +469,12 @@
       "name": "hold_release_postcheck",
       "status": "PARTIAL_EVIDENCE",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "db05_pg_auth_subset"
+      "evidence_group": "db05_pg_auth_subset",
+      "preview_acceptance": {
+        "status": "RELEASE_AND_POSTCHECK_CONFIRMED_SIGNED_IN_PREVIEW",
+        "scope": "actual_authorized_Preview_browser_hold_release_revision_2_exact_reason_and_immutable_release_event_no_active_registry_execution_grants",
+        "limit": "H40 stays PARTIAL_EVIDENCE in frozen original classification. Postcheck does not prove blocked queued writer during active hold or any Production outcome."
+      }
     }
   ],
   "verified_execution_sha": "c0e85b5defdeb45a2ea6cda8c31f8b221c3098c1",
@@ -443,7 +482,7 @@
     "critical": "https://github.com/bjuta/wakilisha/actions/runs/38595255489",
     "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38595255493"
   },
-  "last_audit_note": "O23 advanced after genuine signed-in local GoTrue/JWT steward authorized source-bound case revision 1 triage to revision 2 research; independent PostgreSQL affirmed in_progress/research, exactly two events, exactly one actor-attributed state event and one intact original open Registry review linkage. O24 prior wrong-role local JWT proof retained. Exact source c0e85b5 protected Critical Control Plane and disposable Auth/PG workflow SUCCESS; Auth volumes destroyed. Hosted Preview still has zero eligible admin owner, memberships, cases or reviews; old Preview administrator assignment revoked/expired; no verified Preview-bound deployed frontend. Historical DESIRE/Ficha/Colors remain Production-only as verified read-only. The one-time Preview owner bootstrap remains unused. C17 and nine other partially evidenced scenarios remain open. All 40 Production acceptances NOT_RUN, PR draft and unmerged, Production untouched.",
+  "last_audit_note": "Live authenticated, localhost Preview-bound first owner bootstrap and reversible workspace Hold Writes issuance/release verified from 3 owner browser PDF screenshots and independent Supabase SQL. One first-owner membership internal_bootstrap, one held/released workspace-scoped hold, revisions 1 to 2, unique immutable events hold_started and hold_released attributed to same genuinely signed-in owner; zero active holds, Registry execution grants, cases or reviews at final postcheck. This strengthens Preview H36/H40 evidence, but does not prove H37 queued writer denial; original statuses preserved at 30 LOCAL_EXECUTED, 10 PARTIAL_EVIDENCE, all 40 Production acceptance NOT_RUN. Hosted frontend is localhost Vite, not a publicly deployed Preview artifact; signed_in_deployed_browser NOT_RUN remains honest. All other rollout/PR/Production gates unchanged.",
   "corpus_evidence": {
     "sources": 32,
     "lanes": 4,
