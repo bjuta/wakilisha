@@ -60,7 +60,7 @@ async function main(){
   "(SELECT count(*) FROM mizizi_private.cases)||'|'||"+
   "(SELECT count(*) FROM mizizi_private.write_holds)||'|'||"+
   "(SELECT count(*) FROM public.registry_releases);",db);
- assert(baseline==="228|20261014094213|0|0|0|0|0",
+ assert(baseline==="229|20261014134759|0|0|0|0|0",
   "STOP_AUTH_NOT_FRESH_LOCAL_227");
  console.log("WK_AUTH_EMPTY_227_UNLINKED_LOCAL_BASELINE=PASS");
 
@@ -252,6 +252,78 @@ async function main(){
  assert(kept==="1|1|2",
   "STOP_FOCUSED_REVIEW_DONE_FOR_NOW_SILENTLY_CHANGED_CASE_OR_REVIEW");
  console.log("WK_AUTH_REVIEW_DONE_FOR_NOW_NO_REGISTRY_DECISION_OR_CASE_MUTATION=PASS");
+
+ // C14: separate durable case time-box by the actual signed-in steward.
+ // Session-level Done for Now above intentionally made no case mutation.
+ const boundedAt=new Date(Date.now()+15*60*1000).toISOString();
+ const doneArgs={p_case_id:caseId,p_expected_revision:2,
+  p_reason:"Reviewed this source-bound research case and scheduled follow-up.",
+  p_next_action_at:boundedAt};
+ requireDenied(await subscriber.rpc("admin_mizizi_done_for_now_case_v1",doneArgs),
+  "42501","STOP_C14_NONMEMBER_DURABLE_CASE_COMPLETION");
+ requireDenied(await client(api,values.ANON_KEY).rpc(
+  "admin_mizizi_done_for_now_case_v1",doneArgs),
+  "42501","STOP_C14_ANON_DURABLE_CASE_COMPLETION");
+ const done=await call(first.user,"admin_mizizi_done_for_now_case_v1",
+  doneArgs,"STOP_C14_GENUINE_JWT_DURABLE_COMPLETION");
+ assert(done.caseId===caseId&&done.revision===3&&
+  done.state==="done_for_now"&&done.stage==="research"&&
+  Date.parse(done.nextActionAt)===Date.parse(boundedAt),
+  "STOP_C14_AUTH_COMPLETION_RECEIPT");
+ requireDenied(await second.user.rpc("admin_mizizi_done_for_now_case_v1",doneArgs),
+  "PT409","STOP_C14_REAL_COMPETING_OWNER_STALE_CAS");
+ requireDenied(await first.user.rpc("admin_mizizi_begin_case_research_v1",{
+  p_case_id:caseId,p_expected_revision:3,
+  p_reason:"Completed case cannot silently re-enter research stage."}),
+  "55000","STOP_C14_COMPLETED_CASE_RESEARCH_REOPEN");
+ const afterDone=localSql("SELECT "+
+  "(SELECT count(*) FROM mizizi_private.cases WHERE id='"+caseId+
+  "'::uuid AND revision=3 AND case_state='done_for_now' AND current_stage='research'"+
+  " AND next_action_at IS NOT NULL)::text||'|'||"+
+  "(SELECT count(*) FROM mizizi_private.case_events WHERE case_id='"+
+  caseId+"'::uuid)::text||'|'||"+
+  "(SELECT count(*) FROM public.registry_review_items WHERE id=(SELECT authority_id"+
+  " FROM mizizi_private.case_receipt_links WHERE case_id='"+caseId+
+  "'::uuid AND relation_type='review_item' LIMIT 1) AND status='open')::text||'|'||"+
+  "(SELECT count(*) FROM mizizi_private.case_receipt_links WHERE case_id='"+
+  caseId+"'::uuid AND relation_type='review_item')::text||'|'||"+
+  "(SELECT count(*) FROM mizizi_private.case_observations WHERE case_id='"+
+  caseId+"'::uuid)::text;",db);
+ assert(afterDone==="1|3|1|1|1","STOP_C14_DURABLE_CASE_RECEIPT_OR_REVIEW_DRIFT");
+ const releaseSlug=localSql("SELECT r.slug FROM public.registry_releases r"+
+  " JOIN mizizi_private.cases c ON c.subject_id=r.id WHERE c.id='"+
+  caseId+"'::uuid;",db);
+ assert(/^wk-ci-worker-[a-z0-9]{12}$/.test(releaseSlug),"STOP_C14_NOT_CANONICAL_SOURCE_RELEASE");
+ const proposed=releaseSlug+"-accepted";
+ const sourceId=localSql("SELECT subject_id::text FROM mizizi_private.cases"+
+  " WHERE id='"+caseId+"'::uuid;",db);
+ assert(UUID.test(sourceId),"STOP_C14_SUBJECT_UUID");
+ const sourceFP=localSql("SELECT mizizi_private.finding_fingerprint_v1("+
+  "'release_slug_provider_packaging','1.2.0','release','"+
+  sourceId+"'::uuid,'slug','"+releaseSlug+"','"+proposed+"');",db);
+ assert(/^[0-9a-f]{64}$/.test(sourceFP),"STOP_C14_SOURCE_FINGERPRINT");
+ const gatewayProof=localSql(
+  "BEGIN; SET SESSION AUTHORIZATION mizizi_executor;"+
+  "DO $wk_c14_real_authenticated_case$ DECLARE denied boolean:=false; BEGIN "+
+  "BEGIN PERFORM * FROM mizizi_private.admit_review_case_gateway_v1("+
+  "(SELECT id FROM mizizi_private.workspaces WHERE workspace_key='wakilisha-internal'),"+
+  "'wk-ci-local-worker',jsonb_build_object("+
+  "'entityType','release','entityId','"+sourceId+"',"+
+  "'ruleId','release_slug_provider_packaging','ruleVersion','1.2.0',"+
+  "'fieldName','slug','currentValue','"+releaseSlug+"',"+
+  "'proposedValue','"+proposed+"','fingerprint','"+sourceFP+"',"+
+  "'confidence',1,'severity','high','disposition','review',"+
+  "'reason','Disposable local source-bound worker lease acceptance.',"+
+  "'evidence',jsonb_build_object('fixture','ci-only')));"+
+  " EXCEPTION WHEN SQLSTATE '23514' THEN denied:=true; END; "+
+  "IF NOT denied THEN RAISE EXCEPTION 'STOP_C14_REAL_COMPLETED_CASE_GATEWAY_REPLAY_ACCEPTED';"+
+  " END IF; END $wk_c14_real_authenticated_case$;"+
+  " SET SESSION AUTHORIZATION DEFAULT; ROLLBACK;"+
+  " SELECT 'WK_AUTH_C14_SIGNED_IN_DURABLE_COMPLETION_TRUSTED_REPLAY_DENIED=PASS';",db);
+ assert(gatewayProof==="WK_AUTH_C14_SIGNED_IN_DURABLE_COMPLETION_TRUSTED_REPLAY_DENIED=PASS",
+  "STOP_C14_REPLAY_PROBE_MISSING");
+ console.log(gatewayProof);
+ console.log("WK_AUTH_C14_REAL_JWT_DURABLE_TIMEBOX_CAS_AND_REVIEW_INTACT=PASS");
 
  // Capability re-evaluation with an unchanged genuine JWT.
  localSql("UPDATE public.user_role_assignments SET expires_at="+
