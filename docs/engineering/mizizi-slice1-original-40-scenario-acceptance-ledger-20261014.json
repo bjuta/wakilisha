@@ -1,10 +1,10 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v9",
+  "version": "2026-10-14-v10",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
-  "head": "c0e85b5defdeb45a2ea6cda8c31f8b221c3098c1",
+  "head": "b8508a25c9dac347a3d05593d030aa5028eeed3f",
   "rules": [
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
@@ -25,7 +25,8 @@
     "preview_229_verified_and_local_real_jwt_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38586802055",
     "preview_229_exact_replay_seal": "https://github.com/bjuta/wakilisha/issues/1226#issuecomment-6171515032",
     "o24_real_jwt_reviewer_role_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38592306969",
-    "o23_real_jwt_steward_stage_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38595255493"
+    "o23_real_jwt_steward_stage_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38595255493",
+    "c18_genuine_auth_race_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38603167807"
   },
   "deployment": {
     "preview": {
@@ -272,9 +273,15 @@
     {
       "id": "C18",
       "name": "two_reviewers_same_revision",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "c18_genuine_auth_race_20261014",
+      "exact_proof_markers": [
+        "WK_AUTH_C18_TWO_REAL_JWTS_SAME_SOURCE_CASE_REVISION_ONE",
+        "WK_AUTH_C18_GENUINE_CONCURRENT_REVIEWERS_SINGLE_CAS_JOURNAL"
+      ],
+      "execution_scope": "two_distinct_genuine_local_GoTrue_signed_in_administrator_workspace_owners_act_as_competing_reviewers_on_one_new_trusted_gateway_source_backed_approved_release_claim_both_read_revision_one_before_concurrent_PostgREST_begin_research_commands;_exactly_one_revision_two_success_and_one_PT409_rejection;_independent_PostgreSQL_proves_only_two_case_events_one_winning_actor_event_one_unchanged_original_open_Registry_review_receipt_and_zero_active_registry_grants",
+      "evidence_limit": "Trusted source gateway admission uses authorized disposable mizizi_executor local-session simulator; concurrent HUMAN stage commands are genuine GoTrue JWT PostgREST requests. This is not hosted Preview/browser concurrency or Production and it does not fabricate historical Registry decisions. CI cleanup destroys all local data."
     },
     {
       "id": "C19",
@@ -477,12 +484,12 @@
       }
     }
   ],
-  "verified_execution_sha": "c0e85b5defdeb45a2ea6cda8c31f8b221c3098c1",
+  "verified_execution_sha": "b8508a25c9dac347a3d05593d030aa5028eeed3f",
   "verified_workflows": {
-    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38595255489",
-    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38595255493"
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38603167774",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38603167807"
   },
-  "last_audit_note": "Live authenticated, localhost Preview-bound first owner bootstrap and reversible workspace Hold Writes issuance/release verified from 3 owner browser PDF screenshots and independent Supabase SQL. One first-owner membership internal_bootstrap, one held/released workspace-scoped hold, revisions 1 to 2, unique immutable events hold_started and hold_released attributed to same genuinely signed-in owner; zero active holds, Registry execution grants, cases or reviews at final postcheck. This strengthens Preview H36/H40 evidence, but does not prove H37 queued writer denial; original statuses preserved at 30 LOCAL_EXECUTED, 10 PARTIAL_EVIDENCE, all 40 Production acceptance NOT_RUN. Hosted frontend is localhost Vite, not a publicly deployed Preview artifact; signed_in_deployed_browser NOT_RUN remains honest. All other rollout/PR/Production gates unchanged.",
+  "last_audit_note": "Original C18 now LOCAL_EXECUTED after two genuine authenticated local GoTrue administrator/owner operators independently saw the same additional approved, source-bound Registry review case at revision 1 and raced simultaneous PostgREST research transitions. Exactly one success and one PT409 CAS loss; independent SQL proved one actor-attributed revision 2 event, total two immutable case events, one unchanged original open review receipt and zero active execution grants. Source b8508a25 exact-head Critical Control Plane #38603167774 and genuine JWT/disposable PostgreSQL #38603167807 SUCCESS, all Auth users and Docker volumes destroyed. Original C18 is local-only, not hosted or Production. Hosted Preview first owner bootstrap consumed and actual Hold Writes issue/release receipts retained. H37 queued canonical Registry writer remains PARTIAL because the only shared queued MIZIZI command is read-only case research; H38 reviewed direct merge stale grant fence is not a queued-writer substitute. No fake queue, new migration, Preview or Production mutation. All 40 Production acceptance NOT_RUN. Current PR stays OPEN/DRAFT/UNMERGED.",
   "corpus_evidence": {
     "sources": 32,
     "lanes": 4,
