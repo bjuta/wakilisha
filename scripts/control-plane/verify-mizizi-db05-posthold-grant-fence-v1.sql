@@ -4,7 +4,7 @@ DECLARE v_definition text; n integer; latest text;
 BEGIN
  SELECT count(*),max(version) INTO n,latest
  FROM supabase_migrations.schema_migrations;
- IF n<>228 OR latest<>'20261013194500' THEN
+ IF n<>228 OR latest<>'20261014094213' THEN
    RAISE EXCEPTION 'STOP_DB05_228_EXACT_LEDGER_REQUIRED';
  END IF;
  SELECT pg_get_functiondef(
