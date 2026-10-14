@@ -1,10 +1,10 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v2",
+  "version": "2026-10-14-v3",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
-  "head": "d361726dc9584d58336bab485af8e4a770b7e83e",
+  "head": "ee43fd1cb26acec0835956ec367447a6acd1ae8a",
   "rules": [
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
@@ -17,7 +17,8 @@
     "db05_pg_auth_subset": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
     "auth_jwt_subset": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
     "prior_local_targeted_subset": "Prior locally accepted DB02/DB05 and gateway tests; requires per-scenario mapping before full pass",
-    "source_case_research_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38550248044"
+    "source_case_research_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38550248044",
+    "track_32_source_corpus_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38552467759"
   },
   "deployment": {
     "preview": {
@@ -50,30 +51,46 @@
     {
       "id": "A01",
       "name": "approved_track_slug_1_1",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A01_APPROVED_TRACK_SLUG_1_1_EIGHT_SOURCE_GATEWAY_CASES"
+      ],
+      "execution_scope": "local_disposable_postgres_gateway_session_authorization_simulator"
     },
     {
       "id": "A02",
       "name": "approved_track_slug_1_2",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A02_APPROVED_TRACK_SLUG_1_2_EIGHT_SOURCE_GATEWAY_CASES"
+      ],
+      "execution_scope": "local_disposable_postgres_gateway_session_authorization_simulator"
     },
     {
       "id": "A03",
       "name": "approved_credit_gap_1_3",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A03_APPROVED_CREDIT_GAP_1_3_EIGHT_SOURCE_GATEWAY_CASES"
+      ],
+      "execution_scope": "local_disposable_postgres_gateway_session_authorization_simulator"
     },
     {
       "id": "A04",
       "name": "approved_recording_conflict_1_3",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A04_APPROVED_RECORDING_CONFLICT_1_3_EIGHT_SOURCE_GATEWAY_CASES"
+      ],
+      "execution_scope": "local_disposable_postgres_gateway_session_authorization_simulator"
     },
     {
       "id": "A05",
@@ -96,9 +113,13 @@
     {
       "id": "A07",
       "name": "archived_source_replay",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A07_ARCHIVED_CANONICAL_TRACK_REPLAY_DENIED"
+      ],
+      "execution_scope": "local_disposable_postgres_gateway_session_authorization_simulator"
     },
     {
       "id": "A08",
@@ -188,9 +209,13 @@
     {
       "id": "C17",
       "name": "cross_workspace_case_id",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "PARTIAL_EVIDENCE",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_C17_UNAUTHORIZED_WORKSPACE_GATEWAY_REJECTED"
+      ],
+      "remaining_requirement": "Genuine cross-workspace case ID with authenticated read or transition; random unauthorized workspace ID alone is not sufficient."
     },
     {
       "id": "C18",
@@ -368,10 +393,21 @@
       "evidence_group": "db05_pg_auth_subset"
     }
   ],
-  "verified_execution_sha": "d361726dc9584d58336bab485af8e4a770b7e83e",
+  "verified_execution_sha": "ee43fd1cb26acec0835956ec367447a6acd1ae8a",
   "verified_workflows": {
-    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38550248049",
-    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38550248044"
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38552467823",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38552467759"
   },
-  "last_audit_note": "9 additional source/case/job scenarios reached direct disposable SQL execution on accepted PR code head d361726d. Exact individual PASS markers are recorded. Does not prove hosted Preview or Production operator acceptance. Previous local scenario labels remain unchanged."
+  "last_audit_note": "A01–A04 and A07 executed through actual local broker with 32 Track source examples; C17 is workspace-negative partial only; full broad corpus and actual Done for Now remain open.",
+  "corpus_evidence": {
+    "sources": 32,
+    "lanes": 4,
+    "per_lane": 8,
+    "case_review_receipt_chains": 32,
+    "source_track_rows": 40,
+    "jit": "LOCAL_SESSION_AUTHORIZATION_SIMULATOR",
+    "provider_creator_tenant_variety": "NOT_VERIFIED",
+    "production_or_preview_mutation": "NONE",
+    "source_transaction": "ROLLED_BACK_AND_INDEPENDENTLY_VERIFIED"
+  }
 }
