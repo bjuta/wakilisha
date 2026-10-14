@@ -298,6 +298,9 @@ async function main(){
  const sourceId=localSql("SELECT subject_id::text FROM mizizi_private.cases"+
   " WHERE id='"+caseId+"'::uuid;",db);
  assert(UUID.test(sourceId),"STOP_C14_SUBJECT_UUID");
+ const workspaceId=localSql("SELECT id::text FROM mizizi_private.workspaces"+
+  " WHERE workspace_key='wakilisha-internal' AND status='active';",db);
+ assert(UUID.test(workspaceId),"STOP_C14_APPROVED_WORKSPACE_UUID");
  const sourceFP=localSql("SELECT mizizi_private.finding_fingerprint_v1("+
   "'release_slug_provider_packaging','1.2.0','release','"+
   sourceId+"'::uuid,'slug','"+releaseSlug+"','"+proposed+"');",db);
@@ -306,7 +309,7 @@ async function main(){
   "BEGIN; SET SESSION AUTHORIZATION mizizi_executor;"+
   "DO $wk_c14_real_authenticated_case$ DECLARE denied boolean:=false; BEGIN "+
   "BEGIN PERFORM * FROM mizizi_private.admit_review_case_gateway_v1("+
-  "(SELECT id FROM mizizi_private.workspaces WHERE workspace_key='wakilisha-internal'),"+
+  "'"+workspaceId+"'::uuid,"+
   "'wk-ci-local-worker',jsonb_build_object("+
   "'entityType','release','entityId','"+sourceId+"',"+
   "'ruleId','release_slug_provider_packaging','ruleVersion','1.2.0',"+
