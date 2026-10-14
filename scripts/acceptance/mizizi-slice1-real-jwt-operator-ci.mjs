@@ -81,6 +81,11 @@ async function main(){
  console.log("WK_AUTH_TWO_GENUINE_SIGNED_IN_LOCAL_USERS=PASS");
  requireDenied(await client(api,values.ANON_KEY).rpc("admin_mizizi_cases_v1",
   {p_limit:100}),"42501","STOP_ANON_ACCESS");
+ // O21: actual anonymous PostgREST bootstrap call must never acquire an owner.
+ requireDenied(await client(api,values.ANON_KEY).rpc("admin_mizizi_bootstrap_internal_owner_v1",
+  {p_reason:"Anonymous local owner bootstrap must be denied."}),
+  "42501","STOP_O21_ANONYMOUS_BOOTSTRAP");
+ console.log("WK_AUTH_O21_ANONYMOUS_OWNER_BOOTSTRAP_DENIED=PASS");
  requireDenied(await first.user.rpc("admin_mizizi_bootstrap_internal_owner_v1",
   {p_reason:"Unprivileged operator bootstrap must be refused."}),
   "42501","STOP_UNPRIVILEGED_BOOTSTRAP");
@@ -117,6 +122,11 @@ async function main(){
   {p_limit:100},"STOP_SECOND_OWNER_AUTHENTICATED_READ");
  assert(Array.isArray(empty)&&empty.length===0,"STOP_SECOND_AUTH_CASE_BASELINE");
  console.log("WK_AUTH_SECOND_TRUE_JWT_AND_SYNTHETIC_LOCAL_MEMBERSHIP=PASS");
+ // O22: a different genuine signed-in administrator cannot re-bootstrap.
+ requireDenied(await second.user.rpc("admin_mizizi_bootstrap_internal_owner_v1",
+  {p_reason:"Second already authorized owner cannot bootstrap twice."}),
+  "55000","STOP_O22_DIFFERENT_ADMIN_BOOTSTRAP");
+ console.log("WK_AUTH_O22_SECOND_GENUINE_ADMIN_OWNER_BOOTSTRAP_DENIED=PASS");
 
  // Reuse already-accepted broker fixture, commit source/case only, not job.
  const fixture=readFileSync(
@@ -132,6 +142,31 @@ async function main(){
   cases[0].caseRevision===1&&UUID.test(cases[0].reviewId||""),
   "STOP_SOURCE_BOUND_CASE_READ_MISMATCH");
  const caseId=cases[0].caseId;
+ // O20: prove a fresh, actually signed-in subscriber cannot read a REAL
+ // source-backed open case or its immutable event journal. No member grant.
+ const subscriberEmail="wk-local-subscriber-"+randomUUID()+"@example.test";
+ const subscriberPassword=randomBytes(30).toString("base64url");
+ const subscriberCreated=await admin.auth.admin.createUser({
+  email:subscriberEmail,password:subscriberPassword,email_confirm:true});
+ assert(!subscriberCreated.error&&UUID.test(subscriberCreated.data.user?.id||""),
+  "STOP_O20_REAL_GOTRUE_SUBSCRIBER_CREATE");
+ const subscriber=client(api,values.ANON_KEY);
+ const subscriberLogin=await subscriber.auth.signInWithPassword({
+  email:subscriberEmail,password:subscriberPassword});
+ assert(!subscriberLogin.error&&subscriberLogin.data.user?.id===subscriberCreated.data.user.id&&
+  subscriberLogin.data.session?.access_token,"STOP_O20_REAL_SUBSCRIBER_JWT");
+ const nonMember=localSql("SELECT count(*) FROM mizizi_private.workspace_memberships"+
+  " WHERE user_id='"+subscriberCreated.data.user.id+"'::uuid;",db);
+ assert(nonMember==="0","STOP_O20_SUBSCRIBER_UNEXPECTED_WORKSPACE_MEMBERSHIP");
+ requireDenied(await subscriber.rpc("admin_mizizi_cases_v1",{p_limit:100}),
+  "42501","STOP_O20_SUBSCRIBER_CASE_READ");
+ requireDenied(await subscriber.rpc("admin_mizizi_case_events_v1",
+  {p_case_id:caseId,p_limit:100}),"42501","STOP_O20_SUBSCRIBER_CASE_JOURNAL");
+ requireDenied(await subscriber.rpc("admin_mizizi_begin_case_research_v1",
+  {p_case_id:caseId,p_expected_revision:1,
+   p_reason:"Unprivileged subscriber cannot change a source-bound case."}),
+  "42501","STOP_O20_SUBSCRIBER_CASE_TRANSITION");
+ console.log("WK_AUTH_O20_REAL_SUBSCRIBER_SOURCE_CASE_READ_JOURNAL_AND_WRITE_DENIED=PASS");
  const journal=await call(first.user,"admin_mizizi_case_events_v1",
   {p_case_id:caseId,p_limit:100},"STOP_REAL_JWT_EVENT_READ");
  assert(journal.length===1&&journal[0].type==="case_created",
