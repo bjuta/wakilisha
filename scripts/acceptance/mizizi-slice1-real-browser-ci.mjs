@@ -102,6 +102,28 @@ export async function verifyLocalHeadquartersBrowsersV1({
    console.log("WK_BROWSER_TWO_REAL_LOGIN_DESKTOP_MOBILE_DB02_JOURNAL=PASS");
    await mobileOverflow(phone);
    console.log("WK_BROWSER_MOBILE_390PX_NO_DOCUMENT_OVERFLOW=PASS");
+
+   // Original Slice 1 time-box and Done for Now: real authenticated UI.
+   // This exits the bounded review session; it DOES NOT approve the Registry
+   // source or mark a durable case done_for_now. Those are separate authorities.
+   const reviewSession=desk.locator('section[aria-label="Make time for reviews"]');
+   await reviewSession.waitFor({state:"visible",timeout:45000});
+   for(const label of ["Five minutes","Fifteen minutes","An hour"]){
+    const choice=reviewSession.getByRole("button",{name:new RegExp(label)});
+    await choice.waitFor({state:"visible",timeout:30000});
+    assert(await choice.isEnabled(),"STOP_REVIEW_TIMEBOX_CHOICE_DISABLED_"+label.replace(/ /g,"_"));
+   }
+   await reviewSession.getByRole("button",{name:/Five minutes/}).click();
+   const focused=desk.locator('[data-wk-mizizi-session]');
+   await focused.waitFor({state:"visible",timeout:30000});
+   assert((await focused.innerText()).includes("5-minute selection"),
+    "STOP_FOCUSED_SESSION_NOT_BOUNDED_TO_FIVE_MINUTES");
+   await focused.getByRole("button",{name:/Done for Now/}).click();
+   await focused.waitFor({state:"hidden",timeout:30000});
+   await reviewSession.getByRole("button",{name:/Five minutes/}).waitFor({
+    state:"visible",timeout:30000,
+   });
+   console.log("WK_BROWSER_TRUE_FIVE_MINUTE_REVIEW_SESSION_DONE_FOR_NOW_EXIT=PASS");
    const before=await assertDownload(desk,caseId,first.id);
    assert(before.holdCount>=1,
     "STOP_BROWSER_REDACTED_AUDIT_MISSING_PREVIOUS_HOLD");
