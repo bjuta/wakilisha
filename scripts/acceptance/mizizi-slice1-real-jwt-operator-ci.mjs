@@ -167,6 +167,52 @@ async function main(){
    p_reason:"Unprivileged subscriber cannot change a source-bound case."}),
   "42501","STOP_O20_SUBSCRIBER_CASE_TRANSITION");
  console.log("WK_AUTH_O20_REAL_SUBSCRIBER_SOURCE_CASE_READ_JOURNAL_AND_WRITE_DENIED=PASS");
+ // O24: a genuine signed-in administrator with a valid REVIEWER membership
+ // can read this case, but cannot perform a STEWARD-only stage transition.
+ // This is distinct from the subscriber-with-no-membership denial above.
+ const reviewerEmail="wk-local-reviewer-"+randomUUID()+"@example.test";
+ const reviewerPassword=randomBytes(30).toString("base64url");
+ const reviewerCreated=await admin.auth.admin.createUser({
+  email:reviewerEmail,password:reviewerPassword,email_confirm:true});
+ assert(!reviewerCreated.error&&UUID.test(reviewerCreated.data.user?.id||""),
+  "STOP_O24_REAL_GOTRUE_REVIEWER_CREATE");
+ const reviewer=client(api,values.ANON_KEY);
+ const reviewerLogin=await reviewer.auth.signInWithPassword({
+  email:reviewerEmail,password:reviewerPassword});
+ assert(!reviewerLogin.error&&reviewerLogin.data.user?.id===reviewerCreated.data.user.id&&
+  reviewerLogin.data.session?.access_token,"STOP_O24_REAL_REVIEWER_JWT");
+ const reviewerId=reviewerCreated.data.user.id;
+ localSql("BEGIN;\nINSERT INTO public.user_role_assignments("+
+  "user_id,role_key,status,expires_at,notes) VALUES ('"+reviewerId+
+  "'::uuid,'administrator','active',clock_timestamp()+interval '10 minutes',"+
+  "'Disposable local O24 reviewer capability fixture.');\n"+
+  "INSERT INTO mizizi_private.workspace_memberships("+
+  "workspace_id,user_id,member_role,grant_source,granted_by,last_changed_by,"+
+  "change_reason,valid_until) SELECT id,'"+reviewerId+
+  "'::uuid,'reviewer','operator_review','"+first.id+"'::uuid,'"+
+  first.id+"'::uuid,'Local real JWT reviewer must not perform steward transition.',"+
+  "clock_timestamp()+interval '10 minutes' FROM mizizi_private.workspaces"+
+  " WHERE workspace_key='wakilisha-internal' AND status='active';\nCOMMIT;",db);
+ const reviewerVisible=await call(reviewer,"admin_mizizi_cases_v1",
+  {p_limit:100},"STOP_O24_AUTH_REVIEWER_CASE_READ");
+ assert(reviewerVisible.length===1&&reviewerVisible[0].caseId===caseId&&
+  reviewerVisible[0].caseRevision===1,
+  "STOP_O24_REVIEWER_LACKS_REAL_CASE_READ_ACCESS");
+ const reviewerJournal=await call(reviewer,"admin_mizizi_case_events_v1",
+  {p_case_id:caseId,p_limit:100},"STOP_O24_AUTH_REVIEWER_JOURNAL");
+ assert(reviewerJournal.length===1&&reviewerJournal[0].type==="case_created",
+  "STOP_O24_REVIEWER_JOURNAL_NOT_VISIBLE");
+ requireDenied(await reviewer.rpc("admin_mizizi_begin_case_research_v1",{
+  p_case_id:caseId,p_expected_revision:1,
+  p_reason:"Reviewer can inspect evidence but may not start research."}),
+  "42501","STOP_O24_REVIEWER_STAGE_ROLE_BOUNDARY");
+ const reviewerImmutable=localSql("SELECT revision::text||'|'||case_state||'|'||"+
+  "current_stage||'|'||(SELECT count(*)::text FROM mizizi_private.case_events"+
+  " WHERE case_id='"+caseId+"'::uuid) FROM mizizi_private.cases"+
+  " WHERE id='"+caseId+"'::uuid;",db);
+ assert(reviewerImmutable==="1|open|triage|1",
+  "STOP_O24_REVIEWER_DENIAL_CHANGED_CASE_OR_JOURNAL");
+ console.log("WK_AUTH_O24_AUTHENTICATED_REVIEWER_READ_ALLOWED_STAGE_DENIED=PASS");
  const journal=await call(first.user,"admin_mizizi_case_events_v1",
   {p_case_id:caseId,p_limit:100},"STOP_REAL_JWT_EVENT_READ");
  assert(journal.length===1&&journal[0].type==="case_created",
