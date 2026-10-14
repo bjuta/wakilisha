@@ -1,10 +1,10 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v11",
+  "version": "2026-10-14-v12",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
-  "head": "51f9377e64575f04a8d7092450eb3fe282a374f2",
+  "head": "733cde9061189aa7c2a301f8854eb5d9314da999",
   "rules": [
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
@@ -27,7 +27,8 @@
     "o24_real_jwt_reviewer_role_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38592306969",
     "o23_real_jwt_steward_stage_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38595255493",
     "c18_genuine_auth_race_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38603167807",
-    "o25_genuine_browser_stale_revision_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38608980274"
+    "o25_genuine_browser_stale_revision_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38608980274",
+    "source_worker_boundaries_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38611765787"
   },
   "deployment": {
     "preview": {
@@ -133,9 +134,15 @@
     {
       "id": "A05",
       "name": "approved_release_packaging_1_2",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_worker_boundaries_20261014",
+      "exact_proof_markers": [
+        "CI_A05_APPROVED_RELEASE_PACKAGING_V1_2_SOURCE_GATEWAY",
+        "CI_A05_CANONICAL_RELEASE_UNCHANGED_REVIEW_AND_RECEIPT"
+      ],
+      "execution_scope": "genuine_disposable_canonical_release_single_packaging_shape_approved_1_2_rule_source_gateway_human_review_one_case_and_immutable_link;_independent_SQL_confirms_original_canonical_release_slug_not_changed",
+      "evidence_limit": "Transactional disposable local PostgreSQL with narrow mizizi_executor session-role simulator, NOT signed-in hosted Preview, real provider production source, or Production grant. Full original worker/32-Track corpus and independent rollback snapshots passed; no historical D1-D3 review reproduced."
     },
     {
       "id": "A06",
@@ -197,9 +204,15 @@
     {
       "id": "C11",
       "name": "distinct_case_claim",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_worker_boundaries_20261014",
+      "exact_proof_markers": [
+        "CI_C11_SAME_TRACK_TWO_INDEPENDENT_APPROVED_CLAIMS",
+        "CI_C11_TWO_DISTINCT_CASES_REVIEWS_EVENTS_NO_SOURCE_WRITE"
+      ],
+      "execution_scope": "same_live_disposable_canonical_track_two_distinct_approved_claim_keys_track_slug_identity_noise_1_2_and_track_slug_credit_evidence_gap_1_3_create_distinct_case_ids_review_item_ids_and_immutable_receipt_events;_independent_SQL_confirms_source_track_unchanged",
+      "evidence_limit": "Transactional disposable local PostgreSQL with narrow mizizi_executor session-role simulator, NOT signed-in hosted Preview, real provider production source, or Production grant. Full original worker/32-Track corpus and independent rollback snapshots passed; no historical D1-D3 review reproduced."
     },
     {
       "id": "C12",
@@ -220,7 +233,17 @@
       "name": "stale_observation",
       "status": "PARTIAL_EVIDENCE",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "prior_local_targeted_subset",
+      "partial_source_drift_evidence": {
+        "status": "PARTIAL_EVIDENCE",
+        "evidence_group": "source_worker_boundaries_20261014",
+        "exact_proof_markers": [
+          "CI_C13_CANONICAL_SOURCE_DRIFT_STALE_OBSERVATION_DENIED",
+          "CI_C13_STALE_CANONICAL_DENIAL_PRESERVED_EVENT_AND_REVIEW"
+        ],
+        "scope": "once_live_canonical_release_slug_changed_old_fingerprint_was_rejected_by_source_broker_with_SQLSTATE_40001;_original_case_revision_observations_review_and_event_chain_unchanged",
+        "remaining_requirement": "Older previously observed fingerprint arriving after newer accepted observation while canonical source remains unchanged must not revert the case fingerprint/revision. Live gateway implementation updates any changed prior fingerprint without checking whether this fingerprint already exists in historical immutable case_observations; code-review indicates an out-of-order replay risk. Requires a fail-closed proof and narrow forward authority repair if reproduced, not a passing claim based on source drift only."
+      }
     },
     {
       "id": "C14",
@@ -369,9 +392,14 @@
     {
       "id": "J26",
       "name": "research_job_admission",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_worker_boundaries_20261014",
+      "exact_proof_markers": [
+        "CI_J26_SOURCE_BOUND_CASE_TYPED_RESOURCE_JOB_AND_COMMAND_RECEIPT"
+      ],
+      "execution_scope": "actual_disposable_trusted_source_bound_case_revision_2_in_research_admitted_through_existing_mizizi_executor_gateway_to_existing_editorial_mizizi_case_resource_binding_platform_private_command_receipt_queued_job_and_outbox;_independent_SQL_confirms_exact_authority_identity_and_zero_active_registry_execution_grants",
+      "evidence_limit": "Transactional disposable local PostgreSQL with narrow mizizi_executor session-role simulator, NOT signed-in hosted Preview, real provider production source, or Production grant. Full original worker/32-Track corpus and independent rollback snapshots passed; no historical D1-D3 review reproduced."
     },
     {
       "id": "J27",
@@ -492,12 +520,12 @@
       }
     }
   ],
-  "verified_execution_sha": "51f9377e64575f04a8d7092450eb3fe282a374f2",
+  "verified_execution_sha": "733cde9061189aa7c2a301f8854eb5d9314da999",
   "verified_workflows": {
-    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38608980057",
-    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38608980274"
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38611765778",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38611765787"
   },
-  "last_audit_note": "O25 advanced after actual signed-in desktop and mobile local Playwright browsers read the same source-backed case revision 1, independent real GoTrue JWT C18 RPCs advanced its state with one winner and PT409 loser, stale mobile attempted the same transition through real UI and received HTTP 409 PT409; browser refreshed to true revision 2. Existing independent SQL proved two total events/one revision 2 actor-attributed event, original Registry review still open and zero active execution grants. Exact O25/C18 runtime source 51f9377e protected Critical Control Plane #38608980057 and disposable Postgres/Auth/JWT #38608980274 all SUCCESS; logs show all three O25 markers plus Auth/volume destruction. Product architecture, exit contract and code register now bind the owner-defined continuously learning MIZIZI brain, scale and evidence-calibrated earned licences without changing slice scope or claims of live performance. Original matrix now 32 LOCAL_EXECUTED, 8 PARTIAL_EVIDENCE, zero unspecified; 40 Production acceptances NOT_RUN. Remaining partial A05 C11 C13 C17 J26 H36 H37 H40. No SQL/Edge/frontend deploy/Preview mutation/Production grant/merge.",
+  "last_audit_note": "A05 C11 J26 advanced to LOCAL_EXECUTED after existing disposable worker SQL runner genuinely admitted packaging-shaped Release v1.2 source review without canonical mutation, two distinct approved claims against SAME Track with independent immutable case/review/receipt chains, and typed read-only research job admission with one resource/command/queued job/outbox, zero Registry grants. Original worker + 32 Track source corpus snapshots rolled back to empty. Source commit 733cde90 all protected CI success: Critical #38611765778; disposable worker/JWT #38611765787; all 7 new markers present in job logs. C13 remains PARTIAL: live canonical source drift rejection (40001) passed with case/review/event noninterference; historical observation fingerprint re-arrival after a different newer observation under unchanged canonical source has NOT been proven fail-closed and gateway source review indicates regression risk. Remaining partial C13 C17 H36 H37 H40. All 40 Production NOT_RUN; original MIZIZI brain/scale/licence docs preserved. No Preview/Production mutation, no SQL/Edge/frontend deployment, no PR merge.",
   "corpus_evidence": {
     "sources": 32,
     "lanes": 4,
