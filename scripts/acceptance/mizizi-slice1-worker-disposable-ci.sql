@@ -60,6 +60,66 @@ BEGIN
  THEN RAISE EXCEPTION 'CI_WORKER_SOURCE_BROKER_FAILED'; END IF;
  PERFORM set_config('wk.ci.case',result.headquarters_case_id::text,true);
 END $admit_source$;
+-- Original A06/A08/A09/A10, proven against the real source gateway and
+-- review broker in the SAME disposable rollback transaction. This never
+-- substitutes an invented Registry fixture for the accepted source record.
+DO $wk_source_replay_and_denial$
+DECLARE v_finding jsonb; v_replay record; v_denied boolean;
+ v_existing uuid; v_case uuid; v_receipt uuid;
+BEGIN
+ v_finding:=jsonb_build_object(
+  'entityType','release','entityId',current_setting('wk.ci.release'),
+  'ruleId','release_slug_provider_packaging','ruleVersion','1.2.0',
+  'fieldName','slug','currentValue',current_setting('wk.ci.slug'),
+  'proposedValue',current_setting('wk.ci.candidate'),
+  'fingerprint',current_setting('wk.ci.fp'),
+  'confidence',1,'severity','high','disposition','review',
+  'reason','Disposable local source-bound worker lease acceptance.',
+  'evidence',jsonb_build_object('fixture','ci-only'));
+ SELECT r.id INTO STRICT v_existing
+  FROM public.registry_review_items r
+  WHERE r.review_key='mizizi:'||current_setting('wk.ci.fp');
+ SELECT * INTO STRICT v_replay FROM mizizi_private.admit_review_case_gateway_v1(
+  current_setting('wk.ci.ws')::uuid,'wk-ci-local-worker',v_finding);
+ IF v_replay.outcome<>'unchanged'
+  OR v_replay.review_item_id<>v_existing
+  OR v_replay.headquarters_case_id<>current_setting('wk.ci.case')::uuid
+  OR v_replay.headquarters_case_revision<>1
+  OR (SELECT count(*) FROM mizizi_private.case_receipt_links
+      WHERE case_id=v_replay.headquarters_case_id AND relation_type='review_item')<>1
+  OR (SELECT count(*) FROM mizizi_private.case_events
+      WHERE case_id=v_replay.headquarters_case_id)<>1
+ THEN RAISE EXCEPTION 'STOP_A10_SOURCE_GATEWAY_REPLAY_NOT_EXACT'; END IF;
+ RAISE NOTICE 'CI_A10_DUPLICATE_FINDING_REPLAY_ONE_CASE_ONE_RECEIPT=PASS';
+ v_denied:=false;
+ BEGIN
+  PERFORM * FROM mizizi_private.admit_review_case_gateway_v1(
+   current_setting('wk.ci.ws')::uuid,'wk-ci-local-worker',
+   jsonb_set(v_finding,'{ruleVersion}','"1.4.0"'::jsonb));
+ EXCEPTION WHEN SQLSTATE '22023' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_A06_UNSUPPORTED_SOURCE_RULE_ADMITTED'; END IF;
+ RAISE NOTICE 'CI_A06_UNSUPPORTED_RELEASE_RULE_REJECTED=PASS';
+ v_denied:=false;
+ BEGIN
+  PERFORM * FROM mizizi_private.admit_review_case_gateway_v1(
+   current_setting('wk.ci.ws')::uuid,'wk-ci-local-worker',
+   jsonb_set(v_finding,'{entityId}',to_jsonb(gen_random_uuid()::text)));
+ EXCEPTION WHEN SQLSTATE '40001' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_A08_ABSENT_CANONICAL_SOURCE_ADMITTED'; END IF;
+ RAISE NOTICE 'CI_A08_MISSING_SOURCE_UUID_REJECTED_BY_LIVE_REGISTRY_BROKER=PASS';
+ v_denied:=false;
+ BEGIN
+  PERFORM * FROM mizizi_private.admit_review_case_gateway_v1(
+   current_setting('wk.ci.ws')::uuid,'wk-ci-local-worker',
+   jsonb_set(v_finding,'{fingerprint}',to_jsonb(repeat('f',64))));
+ EXCEPTION WHEN SQLSTATE '42501' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_A09_FORGED_SOURCE_FINGERPRINT_ADMITTED'; END IF;
+ RAISE NOTICE 'CI_A09_DETERMINISTIC_FINGERPRINT_DRIFT_REJECTED=PASS';
+ IF (SELECT count(*) FROM public.registry_review_items WHERE id=v_existing)<>1
+  OR (SELECT count(*) FROM mizizi_private.cases
+     WHERE id=current_setting('wk.ci.case')::uuid)<>1
+ THEN RAISE EXCEPTION 'STOP_A_SOURCE_NEGATIVE_ATTEMPT_PERSISTED'; END IF;
+END $wk_source_replay_and_denial$;
 SET SESSION AUTHORIZATION DEFAULT;
 -- Synthetic local state transition ONLY; NOT a signed-in human decision.
 UPDATE mizizi_private.cases
@@ -67,6 +127,49 @@ UPDATE mizizi_private.cases
  transition_actor_key='system:mizizi',
  transition_reason='Disposable local research-stage fixture, not a human decision.'
  WHERE id=current_setting('wk.ci.case')::uuid AND revision=1;
+-- C15/C16 immutability and C19 ordered case journal, direct PostgreSQL
+-- trigger proof under a local superuser; no false RLS-permission denial.
+DO $wk_case_immutability$
+DECLARE v_event uuid; v_link uuid; v_denied boolean; v_case uuid;
+BEGIN
+ v_case:=current_setting('wk.ci.case')::uuid;
+ SELECT id INTO STRICT v_event FROM mizizi_private.case_events
+ WHERE case_id=v_case AND revision=1;
+ SELECT id INTO STRICT v_link FROM mizizi_private.case_receipt_links
+ WHERE case_id=v_case AND relation_type='review_item';
+ v_denied:=false;
+ BEGIN
+  UPDATE mizizi_private.case_receipt_links SET link_reason='forged edit'
+  WHERE id=v_link;
+ EXCEPTION WHEN SQLSTATE '23514' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_C15_LINK_UPDATE_NOT_IMMUTABLE'; END IF;
+ v_denied:=false;
+ BEGIN
+  DELETE FROM mizizi_private.case_receipt_links WHERE id=v_link;
+ EXCEPTION WHEN SQLSTATE '23514' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_C15_LINK_DELETE_NOT_IMMUTABLE'; END IF;
+ RAISE NOTICE 'CI_C15_RECEIPT_LINK_EDIT_AND_DELETE_IMMUTABLE=PASS';
+ v_denied:=false;
+ BEGIN
+  UPDATE mizizi_private.case_events SET reason='forged event edit'
+  WHERE id=v_event;
+ EXCEPTION WHEN SQLSTATE '23514' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_C16_EVENT_UPDATE_NOT_IMMUTABLE'; END IF;
+ v_denied:=false;
+ BEGIN
+  DELETE FROM mizizi_private.case_events WHERE id=v_event;
+ EXCEPTION WHEN SQLSTATE '23514' THEN v_denied:=true; END;
+ IF NOT v_denied THEN RAISE EXCEPTION 'STOP_C16_EVENT_DELETE_NOT_IMMUTABLE'; END IF;
+ RAISE NOTICE 'CI_C16_CASE_EVENT_EDIT_AND_DELETE_IMMUTABLE=PASS';
+ IF (SELECT count(*) FROM mizizi_private.case_events
+     WHERE case_id=v_case)<>2
+  OR (SELECT count(*) FROM mizizi_private.case_events
+     WHERE case_id=v_case AND revision IN (1,2))<>2
+  OR (SELECT count(*) FROM mizizi_private.case_receipt_links
+     WHERE case_id=v_case AND id=v_link)<>1
+ THEN RAISE EXCEPTION 'STOP_C19_EVENT_CHAIN_OR_RECEIPT_PERSISTENCE_DRIFT'; END IF;
+ RAISE NOTICE 'CI_C19_TWO_REVISIONS_ORDERED_AND_LINK_PRESERVED=PASS';
+END $wk_case_immutability$;
 SELECT encode(extensions.digest(convert_to(
  current_setting('wk.ci.case')||E'\n'||current_setting('wk.ci.ws')
  ||E'\n2\nread_only_research\n'||
@@ -75,7 +178,7 @@ SELECT encode(extensions.digest(convert_to(
 SELECT set_config('wk.ci.research_fp',:'wk_research_fp',true);
 SET SESSION AUTHORIZATION mizizi_executor;
 DO $admit_job$
-DECLARE result record;
+DECLARE result record; replay record; denied boolean:=false;
 BEGIN
  SELECT * INTO STRICT result FROM mizizi_private.admit_case_research_job_v1(
  current_setting('wk.ci.case')::uuid,current_setting('wk.ci.ws')::uuid,2,
@@ -86,6 +189,29 @@ BEGIN
  THEN RAISE EXCEPTION 'CI_WORKER_SHARED_JOB_GATEWAY_FAILED'; END IF;
  PERFORM set_config('wk.ci.job',result.job_id::text,true);
  PERFORM set_config('wk.ci.receipt',result.command_receipt_id::text,true);
+ SELECT * INTO STRICT replay FROM mizizi_private.admit_case_research_job_v1(
+  current_setting('wk.ci.case')::uuid,current_setting('wk.ci.ws')::uuid,2,
+  'system:mizizi','wk-ci-research:'||current_setting('wk.ci.case')||':2',
+  current_setting('wk.ci.research_fp'),
+  'Check bounded local worker recovery without external provider access.');
+ IF replay.outcome<>'replayed' OR replay.job_id<>result.job_id
+  OR replay.command_receipt_id<>result.command_receipt_id
+  OR (SELECT count(*) FROM platform_private.jobs
+     WHERE command_receipt_id=result.command_receipt_id)<>1
+  OR (SELECT count(*) FROM platform_private.outbox_events
+     WHERE command_receipt_id=result.command_receipt_id
+       AND event_type='mizizi.case_research_v1.accepted')<>1
+ THEN RAISE EXCEPTION 'STOP_J27_SHARED_JOB_REPLAY_IDENTITY_DRIFT'; END IF;
+ RAISE NOTICE 'CI_J27_TYPED_RESEARCH_JOB_IDEMPOTENT_REPLAY=PASS';
+ BEGIN
+  PERFORM * FROM mizizi_private.admit_case_research_job_v1(
+   current_setting('wk.ci.case')::uuid,current_setting('wk.ci.ws')::uuid,2,
+   'system:mizizi','wk-ci-research:'||current_setting('wk.ci.case')||':2',
+   repeat('e',64),
+   'Check bounded local worker recovery without external provider access.');
+ EXCEPTION WHEN SQLSTATE '23514' THEN denied:=true; END;
+ IF NOT denied THEN RAISE EXCEPTION 'STOP_J28_RESEARCH_FINGERPRINT_DRIFT_ADMITTED'; END IF;
+ RAISE NOTICE 'CI_J28_SHARED_JOB_FINGERPRINT_DRIFT_REJECTED=PASS';
 END $admit_job$;
 SET SESSION AUTHORIZATION DEFAULT;
 -- First prove non-service role cannot use the worker RPC.
