@@ -3,6 +3,7 @@ set -euo pipefail
 # Disposable GitHub runner + local Supabase Docker ONLY. Never a hosted DB.
 ROOT="$(git rev-parse --show-toplevel)"
 SQL="$ROOT/scripts/acceptance/mizizi-slice1-worker-disposable-ci.sql"
+CORPUS="$ROOT/scripts/acceptance/mizizi-slice1-32-source-corpus-disposable-ci.sql"
 [ "$GITHUB_ACTIONS" = "true" ] || { echo 'STOP_NOT_DISPOSABLE_GITHUB_RUNNER'; exit 20; }
 [ "$GITHUB_EVENT_NAME" = "pull_request" ] || { echo 'STOP_NOT_PULL_REQUEST'; exit 20; }
 [ -z "$(printenv SUPABASE_ACCESS_TOKEN || true)" ] &&
@@ -12,6 +13,9 @@ SQL="$ROOT/scripts/acceptance/mizizi-slice1-worker-disposable-ci.sql"
 [ ! -e "$ROOT/supabase/.temp/project-ref" ] || { echo 'STOP_LINKED_SUPABASE_PROJECT'; exit 20; }
 [ "$(git hash-object "$SQL")" = "$(git rev-parse HEAD:scripts/acceptance/mizizi-slice1-worker-disposable-ci.sql)" ] || {
   echo 'STOP_SQL_NOT_EXACT_GIT_BLOB'; exit 20;
+}
+[ "$(git hash-object "$CORPUS")" = "$(git rev-parse HEAD:scripts/acceptance/mizizi-slice1-32-source-corpus-disposable-ci.sql)" ] || {
+  echo 'STOP_SOURCE_CORPUS_NOT_EXACT_GIT_BLOB'; exit 20;
 }
 DB_NAMES="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
 [ "$(printf '%s\n' "$DB_NAMES" | grep -c .)" -eq 1 ] || { echo 'STOP_DISPOSABLE_DB_CONTAINER_CARDINALITY'; exit 21; }
@@ -90,6 +94,52 @@ printf '%s\n' "$SQL_OUTPUT" | grep -Fq 'WK_CI_DISPOSABLE_WORKER_SQL_ROLLBACK=PAS
 printf '%s\n' "$SQL_OUTPUT" | grep -Fq 'CI_W31_TRUE_CONCURRENT_DB_SESSIONS=NOT_RUN' || {
   echo 'STOP_CONCURRENCY_SCOPE_UNDISCLOSED'; exit 24;
 }
+# Eight source-backed examples in each approved Track lane. Reuse the same
+# disposable database AFTER the separate worker transaction fully rolled back.
+# No new container, job, role grant, Supabase link or hosted fixture.
+EXTENDED_BEFORE="$(snapshot)|$(docker exec -i "$CONTAINER" psql -X -q -At -v ON_ERROR_STOP=1 \
+  -U supabase_admin -d postgres -c \
+  "SELECT (SELECT count(*) FROM public.registry_artists)::text||'|'||
+  (SELECT count(*) FROM public.registry_track_artists)::text;")"
+[ "$EXTENDED_BEFORE" = "$BEFORE|0|0" ] || {
+ echo 'STOP_CORPUS_NOT_EMPTY_AFTER_WORKER_ROLLBACK'; exit 25;
+}
+set +e
+CORPUS_OUTPUT="$(docker exec -i "$CONTAINER" psql -X -q -v ON_ERROR_STOP=1 \
+  -U supabase_admin -d postgres < "$CORPUS" 2>&1)"
+CORPUS_CODE=$?
+set -e
+printf '%s\n' "$CORPUS_OUTPUT"
+[ "$CORPUS_CODE" -eq 0 ] || { echo 'STOP_CORPUS_FIRST_SQL_ERROR_NO_RETRY'; exit "$CORPUS_CODE"; }
+for proof in \
+  CI_CORPUS_32_DISTINCT_TRACK_SOURCES_AND_STRUCTURED_CREDITS \
+  CI_A01_APPROVED_TRACK_SLUG_1_1_EIGHT_SOURCE_GATEWAY_CASES \
+  CI_A02_APPROVED_TRACK_SLUG_1_2_EIGHT_SOURCE_GATEWAY_CASES \
+  CI_A03_APPROVED_CREDIT_GAP_1_3_EIGHT_SOURCE_GATEWAY_CASES \
+  CI_A04_APPROVED_RECORDING_CONFLICT_1_3_EIGHT_SOURCE_GATEWAY_CASES \
+  CI_C17_UNAUTHORIZED_WORKSPACE_GATEWAY_REJECTED \
+  CI_A07_ARCHIVED_CANONICAL_TRACK_REPLAY_DENIED \
+  CI_CORPUS_32_APPROVED_DISTINCT_REVIEW_CASE_RECEIPT_CHAINS \
+  CI_CORPUS_CANONICAL_TRACK_SLUGS_UNMUTATED
+do
+ [ "$(printf '%s\n' "$CORPUS_OUTPUT" | grep -Fc "$proof=PASS" || true)" -eq 1 ] || {
+   echo "STOP_MISSING_OR_DUPLICATE_CORPUS_PROOF=$proof"; exit 26;
+ }
+done
+printf '%s\n' "$CORPUS_OUTPUT" | grep -Fq \
+ 'WK_CI_CORPUS_32_SOURCE_ROLLBACK=PASS' || {
+   echo 'STOP_CORPUS_TRANSACTION_ROLLBACK_MARKER_MISSING'; exit 26;
+}
+EXTENDED_AFTER="$(snapshot)|$(docker exec -i "$CONTAINER" psql -X -q -At -v ON_ERROR_STOP=1 \
+  -U supabase_admin -d postgres -c \
+  "SELECT (SELECT count(*) FROM public.registry_artists)::text||'|'||
+  (SELECT count(*) FROM public.registry_track_artists)::text;")"
+[ "$EXTENDED_BEFORE" = "$EXTENDED_AFTER" ] || {
+ echo 'STOP_CORPUS_TRANSACTION_LEFT_RESIDUAL_TRACKS_ARTISTS_CASES'; exit 26;
+}
+echo 'WK_CI_32_TRACK_CORPUS_INDEPENDENT_ROLLBACK_AND_CREDIT_SNAPSHOT=PASS'
+echo 'WK_CI_A01_A02_A03_A04_A07_C17_SOURCE_CORPUS_GATE=PASS'
+
 echo 'WK_CI_REAL_DATABASE_WORKER_6_SCENARIOS=PASS'
 echo 'WK_CI_W31_TRUE_PARALLEL_SESSION_TEST=NOT_RUN'
 echo 'WK_CI_OPERATOR_JWT_AND_BROWSER=NOT_RUN'
