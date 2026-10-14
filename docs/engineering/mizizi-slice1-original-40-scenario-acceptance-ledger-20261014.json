@@ -1,10 +1,10 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14",
+  "version": "2026-10-14-v2",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
-  "head": "ecf1b667d6cefac1b52f4ee33ebc468e65a1ff01",
+  "head": "d361726dc9584d58336bab485af8e4a770b7e83e",
   "rules": [
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
@@ -16,7 +16,8 @@
     "real_local_auth_pg": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
     "db05_pg_auth_subset": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
     "auth_jwt_subset": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
-    "prior_local_targeted_subset": "Prior locally accepted DB02/DB05 and gateway tests; requires per-scenario mapping before full pass"
+    "prior_local_targeted_subset": "Prior locally accepted DB02/DB05 and gateway tests; requires per-scenario mapping before full pass",
+    "source_case_research_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38550248044"
   },
   "deployment": {
     "preview": {
@@ -84,9 +85,13 @@
     {
       "id": "A06",
       "name": "unsupported_release_conflict_1_4",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A06_UNSUPPORTED_RELEASE_RULE_REJECTED"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
     },
     {
       "id": "A07",
@@ -98,23 +103,37 @@
     {
       "id": "A08",
       "name": "missing_source_id",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A08_MISSING_SOURCE_UUID_REJECTED_BY_LIVE_REGISTRY_BROKER",
+        "CI_A08_MISSING_ENTITY_ID_FIELD_REJECTED_AT_BOUNDARY"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
     },
     {
       "id": "A09",
       "name": "fabricated_fingerprint",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A09_DETERMINISTIC_FINGERPRINT_DRIFT_REJECTED"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
     },
     {
       "id": "A10",
       "name": "duplicate_finding_retry",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A10_DUPLICATE_FINDING_REPLAY_ONE_CASE_ONE_RECEIPT",
+        "CI_A10_BROKER_HISTORY_AND_REVIEW_CARDINALITY"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
     },
     {
       "id": "C11",
@@ -147,16 +166,24 @@
     {
       "id": "C15",
       "name": "immutable_receipt_edit",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_C15_RECEIPT_LINK_EDIT_AND_DELETE_IMMUTABLE"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
     },
     {
       "id": "C16",
       "name": "immutable_event_edit",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_C16_CASE_EVENT_EDIT_AND_DELETE_IMMUTABLE"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
     },
     {
       "id": "C17",
@@ -175,9 +202,13 @@
     {
       "id": "C19",
       "name": "audit_history_ordering",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_C19_TWO_REVISIONS_ORDERED_AND_LINK_PRESERVED"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
     },
     {
       "id": "O20",
@@ -231,16 +262,26 @@
     {
       "id": "J27",
       "name": "research_job_replay",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_J27_TYPED_RESEARCH_JOB_IDEMPOTENT_REPLAY",
+        "CI_J27_J28_ONE_COMMAND_RECEIPT_ONE_JOB_ONE_OUTBOX"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
     },
     {
       "id": "J28",
       "name": "research_fingerprint_drift",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_J28_SHARED_JOB_FINGERPRINT_DRIFT_REJECTED",
+        "CI_J27_J28_ONE_COMMAND_RECEIPT_ONE_JOB_ONE_OUTBOX"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
     },
     {
       "id": "W29",
@@ -326,5 +367,11 @@
       "production_acceptance": "NOT_RUN",
       "evidence_group": "db05_pg_auth_subset"
     }
-  ]
+  ],
+  "verified_execution_sha": "d361726dc9584d58336bab485af8e4a770b7e83e",
+  "verified_workflows": {
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38550248049",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38550248044"
+  },
+  "last_audit_note": "9 additional source/case/job scenarios reached direct disposable SQL execution on accepted PR code head d361726d. Exact individual PASS markers are recorded. Does not prove hosted Preview or Production operator acceptance. Previous local scenario labels remain unchanged."
 }
