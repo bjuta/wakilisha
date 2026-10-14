@@ -1,10 +1,10 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v5",
+  "version": "2026-10-14-v6",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
-  "head": "05e8dc5197609281ee8d6561a67a7c9b2d8e2c59",
+  "head": "04bbf7ae9502400ecac3f253d1d51bc8e50c84db",
   "rules": [
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
@@ -20,7 +20,10 @@
     "source_case_research_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38550248044",
     "track_32_source_corpus_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38552467759",
     "real_local_auth_pg_20261014_b0ef7434": "https://github.com/bjuta/wakilisha/actions/runs/38555894907",
-    "c14_disposable_pg_terminal_replay_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38572850391"
+    "c14_disposable_pg_terminal_replay_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38572850391",
+    "preview_229_verified_and_local_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38586802055",
+    "preview_229_verified_and_local_real_jwt_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38586802055",
+    "preview_229_exact_replay_seal": "https://github.com/bjuta/wakilisha/issues/1226#issuecomment-6171515032"
   },
   "deployment": {
     "preview": {
@@ -168,9 +171,16 @@
     {
       "id": "C12",
       "name": "case_observation_update",
-      "status": "NOT_VERIFIED_AS_SPECIFIED",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "prior_local_targeted_subset"
+      "evidence_group": "preview_229_verified_and_local_pg_20261014",
+      "exact_proof_markers": [
+        "CI_C12_CHANGED_VERIFIED_OBSERVATION_ONE_CASE_REVIEW_RECEIPT",
+        "CI_C12_CHANGED_OBSERVATION_EXACT_REPLAY_AND_FORGED_HASH",
+        "CI_C12_TWO_IMMUTABLE_OBSERVATIONS_ONE_UNCHANGED_REVIEW"
+      ],
+      "execution_scope": "same_live_local_approved_source_observation_revisions_1_and_2_under_trusted_executor;_original_Registry_review_and_receipt_unchanged;_invalid_fingerprint_and_exact_replay_rejected_or_idempotent",
+      "evidence_limit": "Local disposable execution plus deployed Preview 229 read-only schema verification; not a hosted Preview mutated observation or Production execution."
     },
     {
       "id": "C13",
@@ -182,16 +192,18 @@
     {
       "id": "C14",
       "name": "completed_case_replay",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "c14_disposable_pg_terminal_replay_20261014",
+      "evidence_group": "preview_229_verified_and_local_real_jwt_20261014",
       "exact_proof_markers": [
-        "CI_C14_SYNTHETIC_DONE_FOR_NOW_TRUSTED_GATEWAY_REPLAY_DENIED",
-        "CI_C14_TERMINAL_REPLAY_PRESERVED_JOURNAL_AND_REVIEW_RECEIPT",
-        "CI_C14_AUTHENTICATED_DURABLE_COMPLETION=NOT_RUN"
+        "WK_C14_AUTH_PERMISSION_NEGATIVES",
+        "WK_C14_GENUINE_STEWARD_COMPLETED",
+        "WK_C14_INDEPENDENT_DB_JOURNAL_AND_REVIEW",
+        "WK_AUTH_C14_SIGNED_IN_DURABLE_COMPLETION_TRUSTED_REPLAY_DENIED",
+        "WK_AUTH_C14_REAL_JWT_DURABLE_TIMEBOX_CAS_AND_REVIEW_INTACT"
       ],
-      "execution_scope": "disposable_postgres_existing_real_source_case_synthetic_superuser_terminal_state_then_mizizi_executor_session_authorization_gateway_denial",
-      "remaining_requirement": "Complete through an actual authorized durable-case terminal transition and prove exact replay and receipts. This proof only forces a local synthetic done_for_now state; no authenticated durable completion or resolved/closed case finalizer is asserted."
+      "execution_scope": "genuine_disposable_local_GoTrue_steward_JWT_authorized_source_backed_done_for_now_transition_with_expected_revision_followup_schedule_then_trusted_executor_terminal_case_replay_denied",
+      "evidence_limit": "Real signed-in local done_for_now terminal case only; resolved/closed finalizers not implemented or asserted; hosted deployed Preview operator/browser and Production not run."
     },
     {
       "id": "C15",
@@ -414,12 +426,12 @@
       "evidence_group": "db05_pg_auth_subset"
     }
   ],
-  "verified_execution_sha": "05e8dc5197609281ee8d6561a67a7c9b2d8e2c59",
+  "verified_execution_sha": "04bbf7ae9502400ecac3f253d1d51bc8e50c84db",
   "verified_workflows": {
-    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38572850368",
-    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38572850391"
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38586801773",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38586802055"
   },
-  "last_audit_note": "New C14 source-backed case synthetic done_for_now replay was refused by actual local trusted SQL gateway, with immutable event/review receipt unchanged and independent rollback. Only PARTIAL_EVIDENCE: signed-in durable completion not tested. C12 remains NOT_VERIFIED_AS_SPECIFIED due broker/gateway fingerprint contract gap; C17 cross-workspace case-ID remains partial because DB01 explicitly restricts to one internal workspace. Hosted Preview historical operator browser acceptance and broader varied corpus open.",
+  "last_audit_note": "C12 true changed observation, exact replay, forged hash and immutable original review accepted on local PostgreSQL. C14 actual local GoTrue steward authorized done_for_now, stale CAS, Registry review intact and trusted gateway replay denied. CLI-minted migration 229 installed on isolated Preview, read-only schema/ACL verifier passed, public/editorial types and replay proof sealed. All local Docker and Auth users cleaned. ONLY done_for_now terminal branch covered; resolved/closed finalizers, hosted Preview operators/historical D1-D3, broad provider/creator/tenant corpus and Production remain unaccepted. C17 genuine cross-workspace case ID remains PARTIAL under DB01 single-workspace policy. PR remains draft and Slice 1 stays OPEN.",
   "corpus_evidence": {
     "sources": 32,
     "lanes": 4,
