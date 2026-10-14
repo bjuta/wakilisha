@@ -62,7 +62,7 @@ BEGIN
   OR position('mizizi_private.assert_headquarters_operator_v1' in v_done_source)=0
   OR position('PT409' in v_done_source)=0
   OR position('next_action_at' in v_done_source)=0
-  OR position('r.status = ''open''' in v_done_source)=0
+  OR position('r.status=''open''' in v_done_source)=0
  THEN RAISE EXCEPTION 'STOP_229_ORIGINAL_HUMAN_REVIEW_OR_FOLLOWUP_AUTHORITY_DRIFT'; END IF;
  RAISE NOTICE 'WK_229_PRIVATE_OBSERVATION_IMMUTABLE_RLS_AND_EXECUTOR_BOUNDARY=PASS';
  RAISE NOTICE 'WK_229_SIGNED_IN_STEWARD_DONE_FOR_NOW_ACL_AND_CAS=PASS';
