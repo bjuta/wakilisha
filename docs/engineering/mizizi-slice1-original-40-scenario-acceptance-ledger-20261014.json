@@ -1,10 +1,10 @@
 {
   "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
-  "version": "2026-10-14-v3",
+  "version": "2026-10-14-v4",
   "status": "OPEN_NOT_FULLY_VERIFIED",
   "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
   "pr": 1227,
-  "head": "ee43fd1cb26acec0835956ec367447a6acd1ae8a",
+  "head": "b0ef7434b1bd3f6864dd391adc74e1a3e1c3f1c0",
   "rules": [
     "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
     "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
@@ -18,7 +18,8 @@
     "auth_jwt_subset": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
     "prior_local_targeted_subset": "Prior locally accepted DB02/DB05 and gateway tests; requires per-scenario mapping before full pass",
     "source_case_research_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38550248044",
-    "track_32_source_corpus_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38552467759"
+    "track_32_source_corpus_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38552467759",
+    "real_local_auth_pg_20261014_b0ef7434": "https://github.com/bjuta/wakilisha/actions/runs/38555894907"
   },
   "deployment": {
     "preview": {
@@ -238,23 +239,35 @@
     {
       "id": "O20",
       "name": "subscriber_case_read",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "auth_jwt_subset"
+      "evidence_group": "real_local_auth_pg_20261014_b0ef7434",
+      "exact_proof_markers": [
+        "WK_AUTH_O20_REAL_SUBSCRIBER_SOURCE_CASE_READ_JOURNAL_AND_WRITE_DENIED"
+      ],
+      "execution_scope": "fresh_unlinked_local_GoTrue_subscriber_real_JWT_against_actual_source_case_via_PostgREST"
     },
     {
       "id": "O21",
       "name": "unauthenticated_owner_bootstrap",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "auth_jwt_subset"
+      "evidence_group": "real_local_auth_pg_20261014_b0ef7434",
+      "exact_proof_markers": [
+        "WK_AUTH_O21_ANONYMOUS_OWNER_BOOTSTRAP_DENIED"
+      ],
+      "execution_scope": "fresh_unlinked_local_anon_PostgREST_owner_bootstrap_denial"
     },
     {
       "id": "O22",
       "name": "double_owner_bootstrap",
-      "status": "PARTIAL_EVIDENCE",
+      "status": "LOCAL_EXECUTED",
       "production_acceptance": "NOT_RUN",
-      "evidence_group": "auth_jwt_subset"
+      "evidence_group": "real_local_auth_pg_20261014_b0ef7434",
+      "exact_proof_markers": [
+        "WK_AUTH_O22_SECOND_GENUINE_ADMIN_OWNER_BOOTSTRAP_DENIED"
+      ],
+      "execution_scope": "second_genuine_local_administrator_JWT_already_bootstrapped_internal_workspace_denial"
     },
     {
       "id": "O23",
@@ -393,12 +406,12 @@
       "evidence_group": "db05_pg_auth_subset"
     }
   ],
-  "verified_execution_sha": "ee43fd1cb26acec0835956ec367447a6acd1ae8a",
+  "verified_execution_sha": "b0ef7434b1bd3f6864dd391adc74e1a3e1c3f1c0",
   "verified_workflows": {
-    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38552467823",
-    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38552467759"
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38555894221",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38555894907"
   },
-  "last_audit_note": "A01–A04 and A07 executed through actual local broker with 32 Track source examples; C17 is workspace-negative partial only; full broad corpus and actual Done for Now remain open.",
+  "last_audit_note": "O20/O21/O22 executed via actual local GoTrue/PostgREST with a source-bound case and second owner. Source corpus A01-A04/A07 remains accepted. C12/C14 not verified; C17 still partial and constrained by DB01 one-internal-workspace CHECK. Hosted Preview/operator D1/D2/D3 and broad provider/creator/tenant acceptance remain open.",
   "corpus_evidence": {
     "sources": 32,
     "lanes": 4,
