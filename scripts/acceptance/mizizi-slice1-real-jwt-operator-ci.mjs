@@ -207,6 +207,16 @@ async function main(){
   api,anonKey:values.ANON_KEY,first,second,caseId,
  });
  console.log("WK_AUTH_DESKTOP_MOBILE_BROWSER_AND_AUDIT=PASS");
+ const kept=localSql("SELECT (SELECT count(*) FROM mizizi_private.cases WHERE id='"+
+  caseId+"'::uuid AND revision=2 AND case_state='in_progress' AND current_stage='research')::text||'|'||"+
+  "(SELECT count(*) FROM public.registry_review_items WHERE id=(SELECT authority_id FROM "+
+  "mizizi_private.case_receipt_links WHERE case_id='"+caseId+"'::uuid "+
+  "AND relation_type='review_item' LIMIT 1) AND status='open')::text||'|'||"+
+  "(SELECT count(*) FROM mizizi_private.case_events WHERE case_id='"+
+  caseId+"'::uuid)::text;",db);
+ assert(kept==="1|1|2",
+  "STOP_FOCUSED_REVIEW_DONE_FOR_NOW_SILENTLY_CHANGED_CASE_OR_REVIEW");
+ console.log("WK_AUTH_REVIEW_DONE_FOR_NOW_NO_REGISTRY_DECISION_OR_CASE_MUTATION=PASS");
 
  // Capability re-evaluation with an unchanged genuine JWT.
  localSql("UPDATE public.user_role_assignments SET expires_at="+
