@@ -261,6 +261,11 @@ async function main(){
  requireDenied(staleAttempt,"PT409","STOP_STALE_AUTH_CASE_UPDATE");
  console.log("WK_AUTH_REAL_JWT_SOURCE_CASE_RESEARCH_AND_STALE_CAS=PASS");
 
+ // H36/H40 hold checks run before the unrelated C14 source-case setup.
+ // Resolve the genuine first-owner workspace at this point, not C14's later variable.
+ const holdWorkspaceId=localSql("SELECT id::text FROM mizizi_private.workspaces"+
+  " WHERE workspace_key='wakilisha-internal' AND status='active';",db);
+ assert(UUID.test(holdWorkspaceId),"STOP_H36_REAL_INTERNAL_WORKSPACE_AUTHORITY");
  const holdKey="wk-jwt-local-"+randomUUID();
  const hold=await call(first.user,"admin_mizizi_hold_workspace_writes_v1",{
   p_hold_key:holdKey,
@@ -270,7 +275,7 @@ async function main(){
   "STOP_AUTH_HOLD_RECEIPT");
  const h36=localSql("SELECT "+
   "h.revision::text||'|'||h.status||'|'||h.scope_kind||'|'||"+
-  "(h.workspace_id='"+workspaceId+"'::uuid)::text||'|'||"+
+  "(h.workspace_id='"+holdWorkspaceId+"'::uuid)::text||'|'||"+
   "(h.held_by_actor_key='user:"+first.id+"')::text||'|'||"+
   "(h.hold_key='"+holdKey+"')::text||'|'||"+
   "(h.hold_reason='Genuine signed-in operator sets disposable local Hold Writes.')::text||'|'||"+
@@ -308,7 +313,7 @@ async function main(){
  assert(evidence==="1|0","STOP_DOUBLE_RELEASE_OR_ACTIVE_GRANT");
  const h40=localSql("SELECT "+
   "h.revision::text||'|'||h.status||'|'||h.scope_kind||'|'||"+
-  "(h.workspace_id='"+workspaceId+"'::uuid)::text||'|'||"+
+  "(h.workspace_id='"+holdWorkspaceId+"'::uuid)::text||'|'||"+
   "(h.held_by_actor_key='user:"+first.id+"')::text||'|'||"+
   "(h.released_by_actor_key IN ('user:"+first.id+"','user:"+second.id+"'))::text||'|'||"+
   "(h.held_at IS NOT NULL AND h.released_at>=h.held_at)::text||'|'||"+
