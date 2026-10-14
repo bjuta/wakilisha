@@ -307,7 +307,7 @@ async function main(){
  assert(UUID.test(workspaceId),"C14_WORKSPACE");
  const sourceFP=localSql("SELECT mizizi_private.finding_fingerprint_v1("+
   "'release_slug_provider_packaging','1.2.0','release','"+
-  sourceId+"'::uuid,'slug','"+releaseSlug+"','"+proposed+"');",db);
+  sourceId+"','slug','"+releaseSlug+"','"+proposed+"');",db);
  assert(/^[0-9a-f]{64}$/.test(sourceFP),"C14_FINGERPRINT");
  const gatewayProof=localSql(
   "BEGIN; SET SESSION AUTHORIZATION mizizi_executor;"+
