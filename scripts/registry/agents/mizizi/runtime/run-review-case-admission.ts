@@ -14,6 +14,8 @@ import { createRegistryPool } from "../../../phase1-db";
 import { openMiziziJitSession } from "../../../../control-plane/mizizi-production-jit-runtime.mjs";
 import type { MiziziFinding } from "../core";
 import { createTrustedHeadquartersReviewDispatcherV1 } from "./trusted-headquarters-review-dispatch";
+import { existingMiziziReviewBrokerLaneV1 } from "./review-case-coordinator";
+import { findingToCaseCandidateV1 } from "./case-adapter";
 
 export const APPROVED_HEADQUARTERS_FINDING_INPUT_V1="mizizi.agent_review_finding.v1" as const;
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
@@ -39,7 +41,7 @@ export function parseReviewCaseAdmissionArgsV1(args:readonly string[]):Readonly<
  const rulesetVersion=values.get("ruleset-version")!;
  const findingFile=values.get("finding-file")!;
  const jitProjectRef=values.get("jit-project-ref")||null;
- if(jitProjectRef!==null && !/^[a-z]{20}$/.test(jitProjectRef))
+ if(jitProjectRef!==null && !/^[a-z0-9]{20}$/.test(jitProjectRef))
    throw new TypeError("MIZIZI_CASE_ADMISSION_INVALID_JIT_PROJECT");
  if(!UUID.test(workspaceId)||
     !/^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/.test(rulesetVersion)||
@@ -80,8 +82,14 @@ export async function admitReviewViaManagedJitV1(
  }>,
  openSession:typeof openMiziziJitSession=openMiziziJitSession,
 ):Promise<Readonly<{reviewItemId:string;caseId:string;receiptLinkId:string;caseRevision:number}>>{
- if(!/^[a-z]{20}$/.test(input.projectRef)||!input.token)
+ if(!/^[a-z0-9]{20}$/.test(input.projectRef)||!input.token)
    throw new TypeError("MIZIZI_JIT_AUTHORITY_REQUIRED");
+ // Cheap, pure evidence / jurisdiction checks before a global JIT toggle.
+ existingMiziziReviewBrokerLaneV1(input.finding);
+ findingToCaseCandidateV1({
+   workspaceId:input.workspaceId,policyRulesetVersion:input.rulesetVersion,
+   finding:input.finding,
+ });
  const session=await openSession({projectRef:input.projectRef,token:input.token});
  try{
    const dispatch=await createTrustedHeadquartersReviewDispatcherV1(
