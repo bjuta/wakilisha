@@ -1,5 +1,13 @@
 # MIZIZI Slice 1 — Operator Data API Preview 226 Acceptance
 
+## Status Reconciliation: 15 October 2026
+
+This is the genuine **historical 226-migration acceptance record**, not the current full deployment status. The later isolated Preview is at **230 migrations**, head `20261014182214`, while Production is still at **216**. The one-use owner bootstrap subsequently executed exactly once using a new authorized Preview operator. A genuine signed-in browser against localhost bound to isolated Preview issued and released one real workspace Hold Writes with independent immutable receipts. The old statement below that no owner bootstrap had occurred was accurate only **as of 13 October**.
+
+Current Preview still has one internal workspace/one unrevoked owner membership and **zero** durable cases and original #1094 Registry reviews. No hosted Production generic D1/D2/D3 reader acceptance or autonomous job throughput is proven. Original ledger v15 remains 38 local, two partial (C17/H37 assigned Slice 3), all 40 Production `NOT_RUN`. Preserve the original SHA, migration, and proof claims below exactly. See [enterprise product and current release authority](mizizi-enterprise-product-and-release-authority-20261015.md) and issue #1226 for current gates; no repeated bootstrap, historical write, or Production promotion.
+
+
+
 **Date:** 13 October 2026
 **Preview:** `nkgfoppunmnkcumalxqp` / branch `8c0affc1-b43b-44ac-b2eb-66715ed40252`
 **Migration:** `supabase/migrations/20261013123758_mizizi_headquarters_operator_data_api_v1.sql`
