@@ -1,5 +1,13 @@
 # MIZIZI Headquarters Slice 1 — accepted local clean migration replay
 
+## Status Reconciliation: 15 October 2026
+
+This document seals the exact **11 October clean local 216-to-223 replay** and must remain a historical acceptance record. Later CLI-minted migrations were independently applied to the isolated Preview, now **230** at head `20261014182214`, with accepted schema-baseline/replay proofs including later 230 replay. Current Production still has **216** migrations at head `20261009181647`. The draft PR #1227 is **unmerged**, and all original 40 Production scenario acceptance fields remain `NOT_RUN`; 38 were locally executed and the full C17/H37 originals remain partial and owned by Slice 3. Do not treat an older local 223 replay as current migration parity or permission to repeat it. See the [enterprise product and release authority](mizizi-enterprise-product-and-release-authority-20261015.md).
+
+The original exact CLI, machine, checksum and recovery observations below are retained unchanged. No additional reset, SQL or Production promotion follows from this status note.
+
+
+
 **Acceptance date:** 11 October 2026 (owner Mac, Africa/Nairobi)  
 **Owner evidence:** terminal output of checksum-pinned `wk_wakilisha_local_clean_216_then_223_recovery_v2.sh`  
 **Runner SHA-256:** `cf6b89dba93ec4c398d2d2d92c39ecbc3f85c989a0db763a8df3bb52cd2a0e0a`  
