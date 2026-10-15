@@ -565,9 +565,22 @@ describe("Headquarters #1094 live receipt convergence", () => {
     after_payload: { canonicalTrackId: desire.survivorId },
   };
   const facts = () => [review(desire, "open"), review(ficha, "resolved"), review(colors, "resolved")];
+  const fichaDecision: Issue1094DecisionFact = {
+    ...decision,
+    id: ficha.decisionId,
+    review_item_id: ficha.reviewId,
+    after_payload: { canonicalTrackId: ficha.survivorId },
+  };
+  const colorsDecision: Issue1094DecisionFact = {
+    ...decision,
+    id: colors.decisionId,
+    review_item_id: colors.reviewId,
+    after_payload: { canonicalTrackId: colors.survivorId },
+  };
+  const acceptedDecisions = () => [decision, fichaDecision, colorsDecision];
 
   it("shows recorded human decision and open DESIRE blocker beside exact verified Ficha and Colors receipts", () => {
-    const projected = projectIssue1094Brief(facts(), [decision]);
+    const projected = projectIssue1094Brief(facts(), acceptedDecisions());
     expect(projected.map(({ key, status }) => [key, status])).toEqual([
       ["desire", "blocked"], ["ficha", "completed"], ["colors", "completed"],
     ]);
@@ -591,10 +604,32 @@ describe("Headquarters #1094 live receipt convergence", () => {
       ...changed[1],
       resolution_payload: { ...changed[1].resolution_payload, verifiedOperationId: colors.operationId },
     };
-    expect(projectIssue1094Brief([changed[0], wrongReceipt, changed[2]], [decision])[1].status).toBe("unverified");
-    expect(projectIssue1094Brief([changed[0], { ...changed[1], source_id: desire.duplicateId }, changed[2]], [decision])[1].status).toBe("unverified");
-    expect(projectIssue1094Brief([changed[0], { ...changed[1], status: "open" }, changed[2]], [decision])[1].status).toBe("unverified");
-    expect(projectIssue1094Brief([changed[0], { ...changed[1], resolution_payload: { ...changed[1].resolution_payload, finalizerAuthority: "unknown" } }, changed[2]], [decision])[1].status).toBe("unverified");
+    expect(projectIssue1094Brief([changed[0], wrongReceipt, changed[2]], acceptedDecisions())[1].status).toBe("unverified");
+    expect(projectIssue1094Brief([changed[0], { ...changed[1], source_id: desire.duplicateId }, changed[2]], acceptedDecisions())[1].status).toBe("unverified");
+    expect(projectIssue1094Brief([changed[0], { ...changed[1], status: "open" }, changed[2]], acceptedDecisions())[1].status).toBe("unverified");
+    expect(projectIssue1094Brief([changed[0], { ...changed[1], resolution_payload: { ...changed[1].resolution_payload, finalizerAuthority: "unknown" } }, changed[2]], acceptedDecisions())[1].status).toBe("unverified");
+  });
+
+  it("requires a distinct, real recorded human decision for every completed historical repair", () => {
+    const [desireDecision, liveFicha, liveColors] = acceptedDecisions();
+    const missingFicha = [desireDecision, liveColors];
+    const missingColors = [desireDecision, liveFicha];
+    expect(projectIssue1094Brief(facts(), missingFicha).map(({ status }) => status))
+      .toEqual(["blocked", "unverified", "completed"]);
+    expect(projectIssue1094Brief(facts(), missingColors).map(({ status }) => status))
+      .toEqual(["blocked", "completed", "unverified"]);
+    expect(projectIssue1094Brief(facts(), [desireDecision, liveFicha, liveFicha, liveColors])[1].status)
+      .toBe("unverified");
+    expect(projectIssue1094Brief(facts(), [desireDecision, { ...liveFicha, id: liveColors.id }, liveColors])[1].status)
+      .toBe("unverified");
+    expect(projectIssue1094Brief(facts(), [desireDecision, { ...liveFicha, status: "pending" }, liveColors])[1].status)
+      .toBe("unverified");
+    expect(projectIssue1094Brief(facts(), [desireDecision, { ...liveFicha,
+      after_payload: { canonicalTrackId: desire.survivorId } }, liveColors])[1].status)
+      .toBe("unverified");
+    expect(projectIssue1094Brief(facts(), [desireDecision, liveFicha,
+      { ...liveColors, decision_type: "public_music_identity_distinct_recording" }])[2].status)
+      .toBe("unverified");
   });
 
   it("never silently treats a missing or duplicate review as a verified completion", () => {
@@ -612,6 +647,10 @@ describe("Headquarters #1094 live receipt convergence", () => {
     expect(source).not.toMatch(/<select\b|<input\b|<dialog\b/);
     expect(service).toContain('from("registry_review_items")');
     expect(service).toContain('from("registry_canonicalization_decisions")');
+    expect(service).toContain('.in("review_item_id", ids)');
+    expect(service).toContain('const exactDecision = matching.length === 1');
+    expect(service).toContain('if (!exactDecision || row.status !== "resolved"');
+    expect(service).not.toContain('.eq("review_item_id", ISSUE_1094_CASES[0].reviewId)');
     expect(service).not.toMatch(/\.(insert|update|upsert|delete|rpc)\(/);
   });
 });
