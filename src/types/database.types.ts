@@ -20486,6 +20486,55 @@ export type Database = {
         Args: { p_artist_id: string; p_staging_id: string }
         Returns: Json
       }
+      admin_mizizi_begin_case_research_v1: {
+        Args: {
+          p_case_id: string
+          p_expected_revision: number
+          p_reason: string
+        }
+        Returns: Json
+      }
+      admin_mizizi_bootstrap_internal_owner_v1: {
+        Args: { p_reason: string }
+        Returns: string
+      }
+      admin_mizizi_case_events_v1: {
+        Args: { p_case_id: string; p_limit?: number }
+        Returns: Json[]
+      }
+      admin_mizizi_cases_v1: {
+        Args: {
+          p_before_case_id?: string
+          p_before_updated_at?: string
+          p_limit?: number
+        }
+        Returns: Json[]
+      }
+      admin_mizizi_done_for_now_case_v1: {
+        Args: {
+          p_case_id: string
+          p_expected_revision: number
+          p_next_action_at: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      admin_mizizi_hold_workspace_writes_v1: {
+        Args: { p_hold_key: string; p_reason: string; p_review_after?: string }
+        Returns: Json
+      }
+      admin_mizizi_list_workspace_holds_v1: {
+        Args: { p_limit?: number }
+        Returns: Json[]
+      }
+      admin_mizizi_release_workspace_hold_v1: {
+        Args: {
+          p_expected_revision: number
+          p_hold_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       admin_open_mizizi_release_single_identity_authority_v1: {
         Args: { p_expires_at: string; p_reason: string }
         Returns: string
@@ -24793,6 +24842,42 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      mizizi_claim_case_research_jobs_v1: {
+        Args: {
+          p_lease_seconds?: number
+          p_limit?: number
+          p_worker_id: string
+        }
+        Returns: {
+          attempt_count: number
+          command_receipt_id: string
+          command_type: string
+          input_payload: Json
+          job_id: string
+          job_type: string
+          lease_expires_at: string
+          max_attempts: number
+          resource_id: string
+        }[]
+      }
+      mizizi_complete_case_research_job_v1: {
+        Args: { p_job_id: string; p_result?: Json; p_worker_id: string }
+        Returns: Json
+      }
+      mizizi_fail_case_research_job_v1: {
+        Args: {
+          p_error: string
+          p_job_id: string
+          p_retry_delay_seconds?: number
+          p_retryable?: boolean
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+      mizizi_recover_expired_case_research_jobs_v1: {
+        Args: { p_limit?: number; p_retry_delay_seconds?: number }
+        Returns: number
       }
       move_message_conversation: {
         Args: {

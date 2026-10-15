@@ -54,6 +54,15 @@ textarea.wk-input{
   -webkit-appearance:none;
   appearance:none;
 }
+/* Reserve persistent icon slots in canonical search and password inputs.
+   Generic .wk-input base spacing otherwise overrides utility padding,
+   causing the search glyph or clear/reveal control to overlap typed text. */
+input.wk-input[data-wk-search-input],
+input.wk-input[data-wk-password-input]{
+  padding-inline-start:42px;
+  padding-inline-end:42px;
+}
+input.wk-input[data-wk-password-input]{padding-inline-start:12px}
 .wk-input::placeholder{
   color:var(--wk-text-faint);
   opacity:1;

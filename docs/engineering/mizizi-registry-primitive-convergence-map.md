@@ -1,5 +1,13 @@
 # MIZIZI Registry Primitive Convergence Map
 
+## Current Scope Reading: 15 October 2026
+
+The September primitive-convergence mapping and original `main@` baseline below remain **historical design evidence**, not the current release state. MIZIZI's binding commercial goal is a licensable enterprise cultural intelligence product with WAKILISHA as first operator, described in [enterprise product and current release authority](mizizi-enterprise-product-and-release-authority-20261015.md). Preserve the existing shared Registry, typed domain semantics, evidence lineage, exact grants, immutable audit, jobs/outbox, and independent verifier. These are long-term portable governance primitives, not authorization to combine customer catalogues or grant cross-tenant access.
+
+Slice 1 now has a draft/unmerged 14-migration Headquarters implementation on isolated Preview at 230/head `20261014182214`; Production remains at 216. No new universal entity table, duplicate queue, customer tenancy, learned policy licence, or deployed autonomous worker is accepted. Original C17/H37 full tests remain partial and assigned to Slice 3, with signed-in single-workspace and direct reviewed Hold substitutes retaining their narrower proof. This addendum updates status only, not historical conclusions or migration ownership.
+
+
+
 Date: 14 September 2026
 
 Status: **Slice 1 primitive design authority. This document identifies shared infrastructure candidates. It does not authorize schema consolidation or deletion.**

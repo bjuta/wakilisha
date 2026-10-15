@@ -1,0 +1,23 @@
+{
+  "migration_file": "supabase/migrations/20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql",
+  "migration_sha256": "0d8e0b8a4b64c4ab96a5173dc0ac6f1bd372bec6d5e869caefd0063d01c3f2d4",
+  "base_main_sha": "cff8e57222ac735b5c2e8c3b7a17ee50c49da3dd",
+  "preview_project_ref": "nkgfoppunmnkcumalxqp",
+  "preview_branch_id": "8c0affc1-b43b-44ac-b2eb-66715ed40252",
+  "preview_migration_head": "20261014182214",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql",
+  "schema_types_sha256": "2806dd9e7fe3913c067e5945a627db397e2f1b07641447af1c31fb7c0453d6b9",
+  "schema_migration_count": 230,
+  "schema_migration_head": "20261014182214",
+  "verified_at": "2026-10-14T18:45:02.022Z",
+  "baseline_replay_evidence": "https://github.com/bjuta/wakilisha/actions/runs/38615139393",
+  "disposable_worker_and_signed_in_auth_verification": "230_migration_clean_replay_C13_old_observation_fence_and_32_track_corpus_real_GoTrue_browser_regression_independent_rollback_and_volume_cleanup_PASS",
+  "preview_candidate_apply": "Owner-confirmed exact native pinned Supabase CLI 2.107.0 one-file dry-run and isolated Preview push; independently observed migration ledger 230 exact version and migration name",
+  "preview_independent_verifier": "Connected Supabase read-only execution of scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql completed without error; independently inspected gateway definer owner, ACL, terminal guard and historical fingerprint fence",
+  "preview_apply_verification_record": "https://github.com/bjuta/wakilisha/issues/1226#issuecomment-6175778724",
+  "production_promotion": "not_run",
+  "note": "Retains exact Mac-generated migration/base/type/scope/timestamp fields; baseline_replay=pass is grounded in actual disposable 230 clean full history CI, candidate_apply=pass in CLI output plus independently read Preview ledger, verifier=pass in independently run live read-only verifier and narrow ACL inspection. No Production mutation or Production acceptance."
+}

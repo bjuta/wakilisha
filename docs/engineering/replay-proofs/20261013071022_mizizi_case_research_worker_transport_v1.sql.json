@@ -1,0 +1,22 @@
+{
+  "migration_file": "supabase/migrations/20261013071022_mizizi_case_research_worker_transport_v1.sql",
+  "migration_sha256": "6b2f3b916550ed53b94f838290ad044941b6294b69dff69bdd75ef8791df7a6a",
+  "base_main_sha": "cff8e57222ac735b5c2e8c3b7a17ee50c49da3dd",
+  "preview_project_ref": "nkgfoppunmnkcumalxqp",
+  "preview_branch_id": "8c0affc1-b43b-44ac-b2eb-66715ed40252",
+  "preview_migration_head": "20261013071022",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-headquarters-worker-transport.sql",
+  "schema_types_sha256": "36346fa73bfb3ba7d05112c0b53fbcb93e3a145fd20bb66f33535b213a1666ff",
+  "schema_migration_count": 225,
+  "schema_migration_head": "20261013071022",
+  "verified_at": "2026-10-13T09:21:18.136Z",
+  "baseline_replay_evidence": "docs/engineering/mizizi-headquarters-clean-local-replay-acceptance-20261011.md",
+  "prior_local_forward_evidence": "docs/engineering/mizizi-case-research-forward-repair-local-acceptance-20261011.md",
+  "preview_forward_apply_and_http_acceptance_evidence": "docs/engineering/mizizi-worker-transport-preview-acceptance-20261013.md",
+  "final_amended_local_replay": "pass_transactional_delta_replay_with_rollback",
+  "final_amended_local_replay_evidence": "docs/engineering/mizizi-worker-transport-preview-acceptance-20261013.md",
+  "final_full_clean_replay": "not_run"
+}

@@ -1,0 +1,23 @@
+{
+  "migration_file": "supabase/migrations/20261014094213_mizizi_db05_hold_supersedes_prior_registry_grants_v1.sql",
+  "migration_sha256": "b1ebba0c8ccc5ec10312afa845ea0dced383b1c740d838fbfe16e6fbb679c4d5",
+  "base_main_sha": "cff8e57222ac735b5c2e8c3b7a17ee50c49da3dd",
+  "preview_project_ref": "nkgfoppunmnkcumalxqp",
+  "preview_branch_id": "8c0affc1-b43b-44ac-b2eb-66715ed40252",
+  "preview_migration_head": "20261014094213",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql",
+  "schema_types_sha256": "8e8ea281a5e5eb50e06e9c5ac9f53291dc27d285307267aa893ef71c15da09b2",
+  "schema_migration_count": 228,
+  "schema_migration_head": "20261014094213",
+  "verified_at": "2026-10-14",
+  "baseline_replay_evidence": "https://github.com/bjuta/wakilisha/actions/runs/38454568398",
+  "local_jwt_and_migration_verification": "disposable_postgres_228_real_GoTrue_H38_and_H40_fresh_separate_grant_PASS",
+  "preview_candidate_apply": "isolated_preview_only_success_under_supabase_assigned_version_20261014094213",
+  "preview_independent_verifier": "success_no_rows_from_read_only_DO_assertion",
+  "preview_real_operator_browser": "not_run",
+  "production_promotion": "not_run",
+  "note": "Preview service assigned 20261014094213. Same SQL bytes renamed only on unmerged branch; local authenticated H38/H40 real grant proof and independent Preview readonly verification passed."
+}

@@ -1,0 +1,165 @@
+name: MIZIZI Slice 1 Disposable PostgreSQL Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/mizizi-slice1-disposable-postgres.yml"
+      - "scripts/acceptance/mizizi-slice1-worker-disposable-ci.sql"
+      - "scripts/acceptance/mizizi-slice1-32-source-corpus-disposable-ci.sql"
+      - "scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh"
+      - "scripts/acceptance/mizizi-slice1-worker-parallel-setup-ci.sql"
+      - "scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh"
+      - "scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs"
+      - "scripts/acceptance/mizizi-slice1-real-browser-ci.mjs"
+      - "scripts/acceptance/mizizi-slice1-h38-real-grant-ci.mjs"
+      - "scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql"
+      - "scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql"
+      - "scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql"
+      - "supabase/migrations/**"
+      - "scripts/registry/agents/mizizi/runtime/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mizizi-slice1-disposable-pg-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  disposable-worker-sql:
+    name: disposable-worker-sql
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Prove there is no linked or credentialed Supabase target
+        shell: bash
+        run: |
+          test ! -e supabase/.temp/project-ref
+          test -z "$(printenv SUPABASE_PROJECT_REF || true)"
+          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
+          test -f supabase/config.toml
+          echo "WK_CI_NO_REMOTE_TARGET=PASS"
+
+      - name: Check acceptance runner syntax
+        shell: bash
+        run: |
+          bash -n scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh
+          bash -n scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh
+
+      - name: Install pinned Supabase CLI for local-only Docker
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+
+      - name: Start disposable local database and replay migrations
+        shell: bash
+        run: |
+          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          echo "WK_CI_LOCAL_MIGRATION_REPLAY_FINISHED=PASS"
+
+      - name: Verify exact HTTP 409 operator RPC and sealed ACLs
+        shell: bash
+        run: |
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql
+
+      - name: Execute worker, source-negative and 32 Track corpus SQL acceptance
+        shell: bash
+        run: bash scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh
+
+      - name: Execute actual concurrent W31 claim on independent database sessions
+        shell: bash
+        run: bash scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh
+
+      - name: Destroy disposable PostgreSQL containers and all local data volumes
+        if: always()
+        shell: bash
+        run: |
+          supabase stop --no-backup
+          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
+          echo "WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS"
+
+  disposable-operator-jwt:
+    name: disposable-operator-jwt
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Prove no remote Supabase target can be used
+        shell: bash
+        run: |
+          test ! -e supabase/.temp/project-ref
+          test -z "$(printenv SUPABASE_PROJECT_REF || true)"
+          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
+          test -f supabase/config.toml
+          node --check scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs
+          node --check scripts/acceptance/mizizi-slice1-real-browser-ci.mjs
+          node --check scripts/acceptance/mizizi-slice1-h38-real-grant-ci.mjs
+          echo "WK_CI_AUTH_NO_REMOTE_TARGET=PASS"
+
+      - name: Install pinned local Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+
+      - name: Install Node dependencies for genuine HTTP Supabase Auth client
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install exact package-lock dependencies
+        shell: bash
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install local headless Chromium browser for genuine operator UI
+        shell: bash
+        run: npx playwright install --with-deps chromium
+
+      - name: Start disposable local database, Auth and REST gateway
+        shell: bash
+        run: |
+          supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          echo "WK_CI_LOCAL_GOTRUE_REST_MIGRATION_REPLAY=PASS"
+
+      - name: Verify exact HTTP 409 operator RPC and sealed ACLs
+        shell: bash
+        run: |
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql
+
+      - name: Exercise genuine JWT operator bootstrap, case and competing hold RPCs
+        shell: bash
+        run: node scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs
+
+      - name: Destroy all disposable local Auth and database volumes
+        if: always()
+        shell: bash
+        run: |
+          supabase stop --no-backup
+          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
+          echo "WK_CI_LOCAL_AUTH_USERS_MEMBERSHIPS_AND_VOLUMES_DESTROYED=PASS"

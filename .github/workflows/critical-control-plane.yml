@@ -77,6 +77,20 @@ jobs:
       - name: Test migration replay contract
         run: npx vitest run test/control-plane/migration-replay-contract.test.ts
 
+      - name: Enforce MIZIZI worker transport contracts
+        run: |
+          npx vitest run \
+            test/registry/mizizi-headquarters-shared-job-adapter.test.ts \
+            test/registry/mizizi-research-worker-cycle.test.ts
+
+      - name: Enforce MIZIZI review-to-case/research and operator Data API contracts
+        run: |
+          npx vitest run \
+            test/registry/mizizi-headquarters-review-case-research-flow.test.ts \
+            test/registry/mizizi-trusted-headquarters-review-dispatch.test.ts \
+            test/registry/mizizi-exact-case-research-job.test.ts \
+            test/registry/mizizi-durable-cases-operator.test.ts
+
       - name: Enforce primitive compounding contract
         run: |
           node scripts/control-plane/verify-primitive-compounding.mjs

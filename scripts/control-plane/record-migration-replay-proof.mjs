@@ -372,8 +372,10 @@ const proof = {
     previewBranchId,
   preview_migration_head:
     version,
+  // A linked migration ledger and schema seal are not a fresh clean replay.
+  // Keep this pending until independently proven by an accepted replay run.
   baseline_replay:
-    "pass",
+    "pending",
   candidate_apply:
     "pass",
   verifier:

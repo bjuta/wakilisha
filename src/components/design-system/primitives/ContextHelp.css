@@ -1,0 +1,55 @@
+.wk-context-help{position:relative;display:inline-flex;vertical-align:middle;min-width:0}
+.wk-context-help-trigger{
+  display:inline-flex;align-items:center;gap:7px;min-height:36px;
+  padding:5px 9px;border:1px solid var(--wk-border);border-radius:9px;
+  background:var(--wk-surface);color:var(--wk-text-muted);
+  font:650 11px/1.4 var(--wk-font-body,Inter,sans-serif);
+  text-align:left;cursor:pointer;
+}
+.wk-context-help-trigger:hover,.wk-context-help-trigger[aria-expanded="true"]{
+  color:var(--wk-text);background:var(--wk-bg-subtle);
+}
+.wk-context-help-trigger:focus-visible,.wk-context-help-close:focus-visible{
+  outline:2px solid var(--wk-brand);outline-offset:2px;
+}
+.wk-context-help-panel{
+  position:absolute;top:calc(100% + 8px);left:0;
+  display:block;box-sizing:border-box;z-index:40;
+  width:320px;max-width:calc(100vw - 32px);
+  padding:15px;border:1px solid var(--wk-border);
+  border-radius:12px;background:var(--wk-surface);
+  box-shadow:0 12px 35px rgba(0,0,0,.14);
+  color:var(--wk-text);text-align:left;
+}
+.wk-context-help-panel.is-end{left:auto;right:0}
+.wk-context-help-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.wk-context-help-head strong{font-size:13px;font-weight:750;line-height:1.4}
+.wk-context-help-close{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;flex:none;border:1px solid var(--wk-border);
+  border-radius:8px;background:var(--wk-surface);color:var(--wk-text-muted);
+  cursor:pointer;
+}
+.wk-context-help-body{display:block;margin-top:8px;color:var(--wk-text-muted);font-size:12px;line-height:1.65}
+@media(max-width:420px){
+  .wk-context-help-panel{width:270px;max-width:calc(100vw - 28px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .wk-context-help-trigger,.wk-context-help-close{transition:none}
+}
+
+/* The panel is portalled to document.body and positioned from the trigger's
+   viewport rectangle. Never pin contextual guidance to the document bottom. */
+.wk-context-help-panel {
+  z-index:var(--wk-z-modal,1000);
+  overscroll-behavior:contain;
+}
+.wk-context-help-panel.is-end{
+  /* Inline measured coordinates determine both alignments. */
+  right:auto;
+}
+@media(max-width:700px){
+  .wk-context-help-panel{
+    box-shadow:0 12px 35px rgba(0,0,0,.17);
+  }
+}

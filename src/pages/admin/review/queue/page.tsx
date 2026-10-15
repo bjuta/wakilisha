@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
-import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { Modal } from "@/components/design-system/primitives/Modal";
 import {
   formatReviewCount,
@@ -10,6 +9,7 @@ import {
   loadRegistryReviewItems,
   loadReviewCommandCenter,
   recordRegistryReviewDecision,
+  requiresGovernedSingleReleaseReview,
   type FieldDictionaryRow,
   type MediaReviewRow,
   type PromotionEventRow,
@@ -21,11 +21,24 @@ import {
   type ReviewArtifactSample,
   type ReviewCommandCenterData,
   type ReviewDecisionSample,
-  type ReviewWorkstream,
   type StagingSummaryRow,
 } from "@/services/adminReviewCommandCenter";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
+import {
+  chartIssueHeading,
+  genericChartIssue,
+  groupableReviewIssue,
+  singleReleaseIdentityIssue,
+  groupLoadedReviewRows,
+  sourceDisplay,
+} from "./reviewDeskPresentation";
+import { projectRecordedCaseSubject } from "@/services/miziziRecordedCaseSubject";
+import { WkContextHelp } from "@/components/design-system/primitives/ContextHelp";
+import { supabase } from "@/lib/supabase";
+import "./review-desk.css";
 
 
 
@@ -168,16 +181,13 @@ function reviewReadiness(item: RegistryReviewItemRow): { label: string; tone: Re
   return { label: "Review needed", tone: "neutral", description: "Needs manual review before canonicalization." };
 }
 
-function toneClass(tone: ReadinessTone): string {
-  if (tone === "success") return "bg-wk-success-soft text-wk-success";
-  if (tone === "warning") return "bg-wk-warning-soft text-wk-warning";
-  if (tone === "danger") return "bg-wk-danger-soft text-wk-danger";
-  if (tone === "brand") return "bg-wk-brand-soft text-wk-brand";
-  return "bg-wk-surface-raised text-wk-text-muted";
-}
-
 export default function AdminReviewQueuePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const linkedReviewId = new URLSearchParams(location.search).get("review");
+  const [linkedReviewError, setLinkedReviewError] = useState("");
+  const linkedRecordId = new URLSearchParams(location.search).get("record");
+  const [selectedRecord, setSelectedRecord] = useState<RegistryReviewItemRow | null>(null);
   const [state, setState] = useState<LoadState>("loading");
   const [data, setData] = useState<ReviewCommandCenterData | null>(null);
   const [error, setError] = useState("");
@@ -201,12 +211,12 @@ export default function AdminReviewQueuePage() {
     return () => { alive = false; };
   }, []);
 
-  const activeWork = useMemo(() => {
-    if (!data) return 0;
-    return data.totals.registryReviewItems + data.totals.openDecisions + data.totals.reviewArtifacts + data.totals.stagingNeedsReview + data.totals.blockedStaging + data.totals.unknownFields;
-  }, [data]);
-
-  const openItem = (item: RegistryReviewItemRow) => {
+  const openItem = useCallback((item: RegistryReviewItemRow) => {
+    if (requiresGovernedSingleReleaseReview(item)) {
+      setSelectedItem(null);
+      setSelectedRecord(item);
+      return;
+    }
     setSelectedItem(item);
 
     if (!isPublicMusicIdentityTrackReview(item)) {
@@ -242,7 +252,54 @@ export default function AdminReviewQueuePage() {
               : "Could not load current Track review context.",
         }));
       });
-  };
+  }, []);
+
+  useEffect(() => {
+    if (linkedReviewId === null) { setLinkedReviewError(""); return; }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(linkedReviewId)) {
+      setLinkedReviewError("That review reference is invalid.");
+      return;
+    }
+    let active = true;
+    void loadRegistryReviewItems({ reviewId: linkedReviewId, limit: 1 }).then(({ rows }) => {
+      if (!active) return;
+      const item = rows[0];
+      if (rows.length !== 1 || !item || item.id.toLowerCase() !== linkedReviewId.toLowerCase()) {
+        setLinkedReviewError("That review is no longer available.");
+        return;
+      }
+      if (item.status !== "open") {
+        setLinkedReviewError("This review is not open for a new decision.");
+        return;
+      }
+      setLinkedReviewError("");
+      setPanel("registry");
+      openItem(item);
+    }).catch(() => { if (active) setLinkedReviewError("That review could not be opened."); });
+    return () => { active = false; };
+  }, [linkedReviewId, openItem]);
+
+  // Historical records have a separate read-only deep-link. A resolved review
+  // must never enter the decision-only ?review= route, which correctly fails closed.
+  useEffect(() => {
+    if (linkedRecordId === null) return;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(linkedRecordId)) {
+      setLinkedReviewError("That review reference is invalid.");
+      return;
+    }
+    let active = true;
+    void loadRegistryReviewItems({ reviewId: linkedRecordId, limit: 1 }).then(({ rows }) => {
+      if (!active) return;
+      const row = rows[0];
+      if (!row || rows.length !== 1 || row.id.toLowerCase() !== linkedRecordId.toLowerCase()) {
+        setLinkedReviewError("That record is no longer available.");
+        return;
+      }
+      setLinkedReviewError("");
+      setSelectedRecord(row);
+    }).catch(() => { if (active) setLinkedReviewError("That record could not be opened."); });
+    return () => { active = false; };
+  }, [linkedRecordId]);
 
   const closeItem = () => {
     if (decision.submitting) return;
@@ -252,6 +309,13 @@ export default function AdminReviewQueuePage() {
 
   const submitDecision = async () => {
     if (!selectedItem) return;
+    if (requiresGovernedSingleReleaseReview(selectedItem)) {
+      setDecision(current => ({
+        ...current,
+        message: "This Release conflict must use governed MIZIZI resolution, not the generic review writer.",
+      }));
+      return;
+    }
     const notes = decision.notes.trim();
     const primaryName = decision.canonicalPrimaryArtistName.trim();
     const primarySlug = decision.canonicalPrimaryArtistSlug.trim();
@@ -404,51 +468,126 @@ export default function AdminReviewQueuePage() {
   if (state === "error" || !data) return <ErrorState error={error} />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">Review</div>
-          <h1 className="text-[24px] font-black tracking-tight text-wk-text">All Reviews</h1>
-          <p className="mt-1 max-w-3xl text-[13px] leading-6 text-wk-text-muted">Older review queues, import records, and audit history. Use MIZIZI for current music identity work.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => setPanel("registry")} className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"><WkIcon name="GitPullRequest" size={14} /> Registry Queue</button>
-          <button onClick={() => setPanel("artifacts")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><WkIcon name="Archive" size={14} /> Artifacts</button>
-          <button onClick={() => navigate("/admin/charts/review-queue")} className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"><WkIcon name="ArrowRight" size={14} /> Charts Review</button>
-        </div>
-      </div>
+    <main data-wk-review-desk className="wk-review-desk">
+      {linkedReviewError ? (
+        <p role="alert" className="rounded-xl border border-wk-warning bg-wk-warning-soft p-4 text-[13px] text-wk-text">
+          {linkedReviewError}
+        </p>
+      ) : null}
 
-      <div className="rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-wk-surface text-wk-brand"><WkIcon name="Command" size={20} /></div>
+      <header className="wk-review-desk-header">
+        <div>
+          <p className="wk-review-desk-eyebrow">WAKILISHA Registry</p>
+          <h1>All Reviews</h1>
+          <p className="wk-review-desk-intro">
+            Inspect the record, check the evidence, and make a governed decision.
+          </p>
+        </div>
+        <div className="wk-review-desk-actions">
+          <button type="button" className="wk-button wk-button-soft wk-button-sm"
+            onClick={() => navigate("/admin/review/mizizi")}>
+            <WkIcon name="GitBranch" size={16} /> Explore MIZIZI
+          </button>
+          <button type="button" className="wk-button wk-button-ghost wk-button-sm"
+            onClick={() => navigate("/admin/charts/review-queue")}>
+            <WkIcon name="BarChart3" size={16} /> Chart Reviews
+          </button>
+        </div>
+      </header>
+
+      <section className="wk-review-desk-overview" aria-label="Current Registry review load">
+        <div className="wk-review-desk-metric wk-review-desk-metric-primary">
+          <span>Open Registry Reviews</span>
+          <strong>{formatReviewCount(data.totals.registryReviewItems)}</strong>
+          <p>Records still awaiting resolution.</p>
+        </div>
+        <div className="wk-review-desk-metric">
+          <span>High Priority</span>
+          <strong>{formatReviewCount(data.totals.highPriorityRegistryReviewItems)}</strong>
+          <p>Open reviews marked high priority by the Registry.</p>
+        </div>
+        <div className="wk-review-desk-help-cell">
+          <WkContextHelp label="How Decisions Work" title="Reviews and Registry changes" align="end">
+            Recording a review decision does not change the canonical music record.
+            A separate governed step verifies and applies an accepted change.
+          </WkContextHelp>
+        </div>
+      </section>
+
+      <section id="review-desk-results" className="wk-review-desk-workspace"
+        aria-label="Review work">
+        <div className="wk-review-desk-workspace-head">
           <div>
-            <div className="text-[13px] font-bold text-wk-text">Operational, not decorative</div>
-            <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">Phase 3C.3 adds quick decisions, next-item flow, and readiness badges so the review queue can be processed quickly without bypassing audit safety.</p>
+            <p className="wk-review-desk-eyebrow">{panel === "registry" ? "Current work" : "Historical sources"}</p>
+            <h2>{panel === "registry" ? "Registry Review Queue" : PANEL_BUTTONS.find(item => item.key === panel)?.label}</h2>
+            <p>{panel === "registry"
+              ? "Find an open review, examine its recorded context, then decide through the authorised workflow."
+              : "Historical records are available for inspection. This view does not create new write authority."}</p>
+          </div>
+          {panel !== "registry" ? (
+            <button type="button" className="wk-button wk-button-soft wk-button-sm"
+              onClick={() => setPanel("registry")}>
+              <WkIcon name="ArrowLeft" size={14} /> Back to Reviews
+            </button>
+          ) : null}
+        </div>
+        <PanelContent panel={panel} data={data} onOpenRegistryItem={openItem}
+          onReadRegistryItem={setSelectedRecord} />
+      </section>
+
+      <WkDisclosure summary={(expanded) => (
+        <span className="wk-review-desk-archive-label">
+          <WkIcon name="Archive" size={18} />
+          <span><strong>Other Review Sources</strong>
+            <small>Historical imports, decision samples, fields, media, and staging records.</small>
+          </span>
+          <WkIcon name={expanded ? "ChevronUp" : "ChevronDown"} size={17} />
+        </span>
+      )} className="wk-review-desk-archive"
+        triggerClassName="wk-review-desk-archive-trigger"
+        contentClassName="wk-review-desk-archive-body">
+        <div className="wk-review-desk-source-nav" role="group" aria-label="Source views">
+          {PANEL_BUTTONS.filter(item => item.key !== "registry").map(item => (
+            <button key={item.key} type="button" aria-pressed={panel === item.key}
+              className="wk-review-desk-source-choice"
+              onClick={() => { setPanel(item.key); document.getElementById("review-desk-results")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+              <WkIcon name={item.icon} size={16} />
+              {item.label}
+              <WkIcon name="ArrowUpRight" size={13} />
+            </button>
+          ))}
+        </div>
+        <div className="wk-review-desk-legacy">
+          <h3>Import and Migration Workstreams</h3>
+          <p>Legacy process references. An unavailable staging count is not evidence that the work is complete.</p>
+          <div className="wk-review-desk-legacy-items">
+            {data.workstreams.filter(stream => stream.key !== "phase2b_registry_review").map(stream => (
+              <div key={stream.key} className="wk-review-desk-legacy-item">
+                <div>
+                  <strong>{stream.label}</strong>
+                  <p>{stream.description}</p>
+                </div>
+                {stream.path ? (
+                  <button type="button" className="wk-button wk-button-ghost wk-button-sm"
+                    onClick={() => navigate(stream.path!)}>
+                    Open <WkIcon name="ArrowRight" size={13} />
+                  </button>
+                ) : null}
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      </WkDisclosure>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Active review load" value={activeWork} icon="Activity" tone={activeWork > 0 ? "danger" : "success"} />
-        <KpiCard label="Registry review items" value={data.totals.registryReviewItems} icon="GitPullRequest" tone={data.totals.registryReviewItems > 0 ? "danger" : "success"} />
-        <KpiCard label="High priority registry" value={data.totals.highPriorityRegistryReviewItems} icon="AlertTriangle" tone={data.totals.highPriorityRegistryReviewItems > 0 ? "warning" : "success"} />
-        <KpiCard label="Open decisions" value={data.totals.openDecisions} icon="GitPullRequest" tone={data.totals.openDecisions > 0 ? "danger" : "success"} />
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MiniStat label="Staging needs review" value={data.totals.stagingNeedsReview} detail="Rows still awaiting resolver attention" />
-        <MiniStat label="Blocked staging" value={data.totals.blockedStaging} detail="Rows that cannot be promoted yet" />
-        <MiniStat label="Unknown/review fields" value={data.totals.unknownFields} detail="Postmeta keys needing policy" />
-        <MiniStat label="Media review items" value={data.totals.unresolvedMedia} detail="Unresolved media candidates" />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <WkSurface className="overflow-hidden p-0"><SectionHeader title="Workstreams" subtitle="Prioritized queues created by import, registry, resolver, and audit phases." icon="Layers" /><div className="divide-y divide-wk-border">{data.workstreams.map((stream) => <WorkstreamRow key={stream.key} stream={stream} onOpen={(path) => navigate(path)} />)}</div></WkSurface>
-        <WkSurface className="overflow-hidden p-0"><div className="border-b border-wk-border p-4"><div className="flex items-center gap-2"><WkIcon name="PanelTop" size={16} className="text-wk-brand" /><h2 className="text-[14px] font-bold text-wk-text">Review panels</h2></div><p className="mt-1 text-[12px] text-wk-text-muted">Recent examples from each operational review stream.</p><div className="mt-3 flex flex-wrap gap-2">{PANEL_BUTTONS.map((item) => <button key={item.key} onClick={() => setPanel(item.key)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${panel === item.key ? "border-wk-brand bg-wk-brand-soft text-wk-brand" : "border-wk-border bg-wk-surface text-wk-text-muted hover:bg-wk-surface-raised"}`}><WkIcon name={item.icon} size={12} /> {item.label}</button>)}</div></div><PanelContent panel={panel} data={data} onOpenRegistryItem={openItem} /></WkSurface>
-      </div>
-
-      {selectedItem && <RegistryDecisionModal item={selectedItem} decision={decision} setDecision={setDecision} onClose={closeItem} onSubmit={submitDecision} />}
-    </div>
+      {selectedItem ? <RegistryDecisionModal item={selectedItem}
+        decision={decision} setDecision={setDecision}
+        onClose={closeItem} onSubmit={submitDecision} /> : null}
+      {selectedRecord ? <RegistryReadOnlyModal item={selectedRecord}
+        onClose={() => {
+          setSelectedRecord(null);
+          if (linkedRecordId !== null) navigate("/admin/review/queue", { replace: true });
+        }} /> : null}
+    </main>
   );
 }
 
@@ -460,26 +599,8 @@ function ErrorState({ error }: { error: string }) {
   return <div className="py-20 text-center"><div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger"><WkIcon name="AlertCircle" size={28} /></div><h2 className="text-[18px] font-bold text-wk-text">Could not load review command center</h2><p className="mx-auto mt-2 max-w-xl text-[13px] text-wk-text-muted">{error || "Some review tables may not exist in this environment yet."}</p></div>;
 }
 
-function KpiCard({ label, value, icon, tone }: { label: string; value: number; icon: WkIconName; tone: "danger" | "warning" | "neutral" | "success" }) {
-  const cls = tone === "danger" ? "bg-wk-danger-soft text-wk-danger" : tone === "warning" ? "bg-wk-warning-soft text-wk-warning" : tone === "success" ? "bg-wk-success-soft text-wk-success" : "bg-wk-surface-raised text-wk-text-muted";
-  return <WkSurface className="p-4"><div className="flex items-start justify-between gap-3"><div><div className="text-[26px] font-black tracking-tight text-wk-text">{formatReviewCount(value)}</div><div className="mt-1 text-[11px] font-bold uppercase tracking-wider text-wk-text-faint">{label}</div></div><div className={`flex h-10 w-10 items-center justify-center rounded-xl ${cls}`}><WkIcon name={icon} size={19} /></div></div></WkSurface>;
-}
-
-function MiniStat({ label, value, detail }: { label: string; value: number; detail: string }) {
-  return <div className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3"><div className="text-[18px] font-black text-wk-text">{formatReviewCount(value)}</div><div className="mt-0.5 text-[12px] font-bold text-wk-text">{label}</div><div className="text-[11px] text-wk-text-muted">{detail}</div></div>;
-}
-
-function SectionHeader({ title, subtitle, icon }: { title: string; subtitle: string; icon: WkIconName }) {
-  return <div className="border-b border-wk-border p-4"><div className="flex items-center gap-2"><WkIcon name={icon} size={16} className="text-wk-brand" /><h2 className="text-[14px] font-bold text-wk-text">{title}</h2></div><p className="mt-1 text-[12px] text-wk-text-muted">{subtitle}</p></div>;
-}
-
-function WorkstreamRow({ stream, onOpen }: { stream: ReviewWorkstream; onOpen: (path: string) => void }) {
-  const tone = stream.severity === "danger" ? "bg-wk-danger-soft text-wk-danger" : stream.severity === "warning" ? "bg-wk-warning-soft text-wk-warning" : stream.severity === "success" ? "bg-wk-success-soft text-wk-success" : stream.severity === "brand" ? "bg-wk-brand-soft text-wk-brand" : "bg-wk-surface-raised text-wk-text-muted";
-  return <div className="p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="text-[14px] font-bold text-wk-text">{stream.label}</h3><span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${tone}`}>{formatReviewCount(stream.count)}</span></div><p className="mt-1 text-[12px] leading-5 text-wk-text-muted">{stream.description}</p><p className="mt-2 text-[12px] leading-5 text-wk-text"><span className="font-bold">Next:</span> {stream.nextAction}</p></div>{stream.path && <button onClick={() => onOpen(stream.path!)} className="wk-button wk-button-ghost wk-button-sm shrink-0 whitespace-nowrap">Open <WkIcon name="ArrowRight" size={13} /></button>}</div></div>;
-}
-
-function PanelContent({ panel, data, onOpenRegistryItem }: { panel: Panel; data: ReviewCommandCenterData; onOpenRegistryItem: (item: RegistryReviewItemRow) => void }) {
-  if (panel === "registry") return <RegistryReviewPanel initialRows={data.registryReviewItems} summary={data.registryReviewSummary} onOpen={onOpenRegistryItem} />;
+function PanelContent({ panel, data, onOpenRegistryItem, onReadRegistryItem }: { panel: Panel; data: ReviewCommandCenterData; onOpenRegistryItem: (item: RegistryReviewItemRow) => void; onReadRegistryItem: (item: RegistryReviewItemRow) => void }) {
+  if (panel === "registry") return <RegistryReviewPanel initialRows={data.registryReviewItems} summary={data.registryReviewSummary} openTotal={data.totals.registryReviewItems} onOpen={onOpenRegistryItem} onRead={onReadRegistryItem} />;
   if (panel === "decisions") return <DecisionRows rows={data.decisionSamples} />;
   if (panel === "artifacts") return <ArtifactRows rows={data.artifactSamples} />;
   if (panel === "fields") return <FieldRows rows={data.fieldDictionary} />;
@@ -488,67 +609,539 @@ function PanelContent({ panel, data, onOpenRegistryItem }: { panel: Panel; data:
   return <EventRows rows={data.promotionEvents} />;
 }
 
-function RegistryReviewPanel({ initialRows, summary, onOpen }: { initialRows: RegistryReviewItemRow[]; summary: RegistryReviewSummaryRow[]; onOpen: (item: RegistryReviewItemRow) => void }) {
+
+function reviewTypeLabel(value: string): string {
+  if (value === "mizizi_data_hygiene") return "Music Identity and Credits";
+  if (value === "chart_entry_missing_canonical_link") return "Chart Links";
+  if (value.includes("chart") && value.includes("label")) return "Chart Labels";
+  if (value === "public_music_identity") return "Public Music Identity";
+  return value ? humanize(value) : "Unclassified Review";
+}
+
+/** A single bounded, read-only title lookup for the loaded exact source IDs.
+ * The source title is display context, not proof that a proposed slug was accepted.
+ */
+function useLoadedCanonicalTitles(rows: readonly RegistryReviewItemRow[]): Readonly<Record<string, string>> {
+  const [snapshot, setSnapshot] = useState<Readonly<Record<string, string>>>({});
+  useEffect(() => {
+    let active = true;
+    setSnapshot({});
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const eligible = rows.filter(row => row.source_id && uuidPattern.test(row.source_id) &&
+      ((row.entity_type === "release" && row.source_table === "registry_releases") ||
+       (row.entity_type === "track" && row.source_table === "registry_tracks"))).slice(0, 300);
+    const readTitles = async () => {
+      const next: Record<string, string> = {};
+      for (const kind of ["release", "track"] as const) {
+        const group = eligible.filter(row => row.entity_type === kind);
+        if (!group.length) continue;
+        const table = kind === "release" ? "registry_releases" : "registry_tracks";
+        const sourceIds = [...new Set(group.map(row => row.source_id as string))];
+        // Keep each source read bounded even if the review pagination grows.
+        for (let offset = 0; offset < sourceIds.length; offset += 100) {
+          const requested = sourceIds.slice(offset, offset + 100);
+          const { data, error } = await supabase.from(table)
+            .select("id,title").in("id", requested);
+          if (!active) return;
+          if (error || !data) continue;
+          const allowed = new Set(requested);
+          const verified = new Map<string, string>();
+          for (const record of data) {
+            if (!record || !allowed.has(record.id) || verified.has(record.id) ||
+                typeof record.title !== "string" || !record.title.trim()) continue;
+            verified.set(record.id, record.title.trim());
+          }
+          for (const row of group) {
+            const title = verified.get(row.source_id as string);
+            if (title) next[row.id] = title;
+          }
+        }
+      }
+      if (active) setSnapshot(next);
+    };
+    void readTitles().catch(() => { if (active) setSnapshot({}); });
+    return () => { active = false; };
+  }, [rows]);
+  return snapshot;
+}
+
+function RegistryReviewPanel({ initialRows, summary, openTotal, onOpen, onRead }: {
+  initialRows: RegistryReviewItemRow[];
+  summary: RegistryReviewSummaryRow[];
+  openTotal: number;
+  onOpen: (item: RegistryReviewItemRow) => void;
+  onRead: (item: RegistryReviewItemRow) => void;
+}) {
   const [filters, setFilters] = useState<RegistryFilterState>(DEFAULT_REGISTRY_FILTERS);
-  const [rows, setRows] = useState<RegistryReviewItemRow[]>(initialRows);
-  const [total, setTotal] = useState(summary.find((item) => item.status === "open")?.count ?? initialRows.length);
+  const [rows, setRows] = useState<RegistryReviewItemRow[]>(initialRows.filter(row => row.status === "open"));
+  const canonicalTitles = useLoadedCanonicalTitles(rows);
+  const [total, setTotal] = useState(
+    openTotal
+  );
   const [offset, setOffset] = useState(0);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIssue, setExpandedIssue] = useState<string | null>(null);
+  const [visibleIssueItems, setVisibleIssueItems] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const requestVersion = useRef(0);
 
   const loadPage = async (nextFilters: RegistryFilterState, nextOffset: number, mode: "replace" | "append") => {
+    const version = ++requestVersion.current;
     setLoading(true);
     setMessage("");
     try {
       const page = await loadRegistryReviewItems(toRegistryFilters(nextFilters, nextOffset));
-      setRows((current) => mode === "append" ? [...current, ...page.rows] : page.rows);
+      if (version !== requestVersion.current) return;
+      setRows(current => mode === "append"
+        ? [...current, ...page.rows.filter(item => !current.some(other => other.id === item.id))]
+        : page.rows);
       setTotal(page.total);
       setOffset(page.offset);
+      if (mode === "replace") {
+        setExpandedId(null);
+        setExpandedIssue(null);
+        setVisibleIssueItems({});
+      }
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Could not load registry review items.");
+      if (version === requestVersion.current)
+        setMessage(err instanceof Error ? err.message : "Could not load reviews.");
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   };
 
-  useEffect(() => { setRows(initialRows); }, [initialRows]);
+  useEffect(() => {
+    if (filters.search || filters.status !== "open" || filters.priority ||
+        filters.reviewType || filters.entityType) {
+      void loadPage(filters, 0, "replace");
+    } else {
+      requestVersion.current += 1;
+      setLoading(false);
+      setRows(initialRows.filter(row => row.status === "open"));
+      setTotal(openTotal);
+      setOffset(0);
+      setExpandedId(null);
+      setExpandedIssue(null);
+      setVisibleIssueItems({});
+    }
+    // The authoritative snapshot changes after an actual governed decision.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRows, summary, openTotal]);
 
   const updateFilter = (key: keyof RegistryFilterState, value: string) => {
     const next = { ...filters, [key]: value };
     setFilters(next);
     void loadPage(next, 0, "replace");
   };
-
   const resetFilters = () => {
     setFilters(DEFAULT_REGISTRY_FILTERS);
     void loadPage(DEFAULT_REGISTRY_FILTERS, 0, "replace");
   };
-
   const loadMore = () => {
     if (rows.length >= total || loading) return;
     void loadPage(filters, offset + REGISTRY_PAGE_SIZE, "append");
   };
 
-  if (!rows.length && !summary.length) return <EmptyState title="No registry review items" body="Ambiguous release and track artist credits will appear here after Phase 2A review population runs." />;
+  const types = [...summary.filter(item => item.status === filters.status || !filters.status)
+    .reduce((map, item) => {
+      map.set(item.review_type, (map.get(item.review_type) ?? 0) + item.count);
+      return map;
+    }, new Map<string, number>())].sort((a, b) => b[1] - a[1]);
+  const activeTypeCount = types.find(([key]) => key === filters.reviewType)?.[1] ?? 0;
+  const displayGroups = groupLoadedReviewRows(rows);
 
-  return <div><div className="border-b border-wk-border bg-wk-surface-raised/50 p-4"><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{summary.slice(0, 6).map((item) => <div key={`${item.status}-${item.review_type}`} className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2"><div className="text-[15px] font-black text-wk-text">{formatReviewCount(item.count)}</div><div className="mt-0.5 truncate text-[10px] font-black uppercase tracking-wider text-wk-text-faint">{humanize(item.review_type)}</div><div className="mt-1 text-[11px] text-wk-text-muted">{item.status}</div></div>)}</div><div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5"><FilterInput label="Search" value={filters.search} placeholder="Title, summary, review key" onChange={(value) => updateFilter("search", value)} /><FilterSelect label="Status" value={filters.status} onChange={(value) => updateFilter("status", value)} options={["open", "resolved"]} /><FilterSelect label="Priority" value={filters.priority} onChange={(value) => updateFilter("priority", value)} options={["high", "normal"]} /><FilterSelect label="Review type" value={filters.reviewType} onChange={(value) => updateFilter("reviewType", value)} options={[...new Set(summary.map((item) => item.review_type))]} /><FilterSelect label="Entity" value={filters.entityType} onChange={(value) => updateFilter("entityType", value)} options={["release", "track"]} /></div><div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="text-[11px] font-semibold text-wk-text-muted">Showing {formatReviewCount(rows.length)} of {formatReviewCount(total)} matching review items.</div><button onClick={resetFilters} disabled={loading} className="wk-button wk-button-ghost wk-button-sm self-start sm:self-auto">Reset filters</button></div>{message && <div className="mt-2 text-[12px] font-semibold text-wk-warning">{message}</div>}</div><div className="divide-y divide-wk-border">{rows.map((row) => <RegistryReviewRow key={row.id} row={row} onOpen={() => onOpen(row)} />)}</div><div className="border-t border-wk-border p-4 text-center"><button onClick={loadMore} disabled={loading || rows.length >= total} className="wk-button wk-button-ghost wk-button-sm">{loading ? "Loading..." : rows.length >= total ? "All matching items loaded" : "Load more"}</button></div></div>;
+  return (
+    <div className="wk-review-queue" data-wk-registry-review-panel>
+      <div className="wk-review-queue-controls">
+        <div className="wk-review-status-switch" role="group" aria-label="Review state">
+          {[
+            { value: "open", label: "Open" },
+            { value: "resolved", label: "Resolved" },
+            { value: "", label: "All States" },
+          ].map(option => (
+            <button key={option.label} type="button"
+              aria-pressed={filters.status === option.value}
+              onClick={() => updateFilter("status", option.value)}>
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <div className="wk-review-search">
+          <WkSearchField ariaLabel="Search Registry reviews"
+            placeholder="Search reviews, artists, recordings, or references"
+            value={filters.search} onChange={value => updateFilter("search", value)} />
+        </div>
+        <div className="wk-review-queue-selectors">
+          <FilterSelect label="Priority" value={filters.priority}
+            onChange={value => updateFilter("priority", value)} options={["high", "normal"]} />
+          <FilterSelect label="Entity" value={filters.entityType}
+            onChange={value => updateFilter("entityType", value)}
+            options={["track", "release", "contribution_attestation"]} />
+        </div>
+        <div className="wk-review-types" role="group" aria-label="Review workstream">
+          <button type="button" aria-pressed={!filters.reviewType}
+            onClick={() => updateFilter("reviewType", "")}>All Workstreams</button>
+          {types.map(([type, count]) => (
+            <button key={type} type="button" aria-pressed={filters.reviewType === type}
+              onClick={() => updateFilter("reviewType", type)}>
+              {reviewTypeLabel(type)} <span>{formatReviewCount(count)}</span>
+            </button>
+          ))}
+        </div>
+        <div className="wk-review-queue-results">
+          <span role="status">
+            {loading ? "Loading reviews…" :
+              (filters.reviewType && activeTypeCount === 0 ? "No work in this category. " : "") +
+              formatReviewCount(rows.length) + " of " + formatReviewCount(total) + " matching records"}
+          </span>
+          <button type="button" className="wk-button wk-button-ghost wk-button-sm"
+            disabled={loading} onClick={resetFilters}>Reset Filters</button>
+        </div>
+        {message ? <p role="alert" className="text-[12px] text-wk-warning">{message}</p> : null}
+      </div>
+      <div className="wk-review-queue-list">
+        {rows.length ? displayGroups.map(group => group.grouped ? (
+          <section key={group.key} className="wk-review-issue-group"
+            aria-label={chartIssueHeading(group.items[0])}
+            data-wk-review-issue-group={group.key}>
+            <button type="button" className="wk-review-issue-trigger"
+              aria-expanded={expandedIssue === group.key}
+              onClick={() => {
+                setExpandedIssue(current => current === group.key ? null : group.key);
+                setExpandedId(null);
+              }}>
+              <span className="wk-review-issue-icon" aria-hidden="true">
+                <WkIcon name="Layers3" size={20} />
+              </span>
+              <span className="wk-review-issue-copy">
+                <strong>{chartIssueHeading(group.items[0])}</strong>
+                <span>{group.items[0].summary || "The source rows share one recorded issue type."}</span>
+                <small>{formatReviewCount(group.items.length)} distinct source records loaded · {humanize(group.items[0].status || "Unknown")} · Individual review required</small>
+              </span>
+              <span className="wk-review-issue-count" aria-hidden="true">{group.items.length}</span>
+              <WkIcon name={expandedIssue === group.key ? "ChevronUp" : "ChevronDown"}
+                size={19} aria-hidden="true" />
+            </button>
+            {expandedIssue === group.key ? (
+              <div className="wk-review-issue-contents">
+                <div className="wk-review-issue-help">
+                  <WkContextHelp label="About This Group" title="Separate reviews, one issue type">
+                    These reviews share a recorded issue type. Each source and decision remains separate.
+                    This list does not authorise a group decision.
+                  </WkContextHelp>
+                </div>
+                {group.items.slice(0, visibleIssueItems[group.key] ?? 6).map(row => (
+                  <RegistryReviewRow key={row.id} row={row} compact
+                    canonicalTitle={canonicalTitles[row.id]}
+                    expanded={expandedId === row.id}
+                    onToggle={() => setExpandedId(current => current === row.id ? null : row.id)}
+                    onOpen={() => onOpen(row)}
+                    onRead={() => onRead(row)} />
+                ))}
+                {group.items.length > (visibleIssueItems[group.key] ?? 6) ? (
+                  <button type="button" className="wk-button wk-button-soft wk-button-sm wk-review-issue-more"
+                    onClick={() => setVisibleIssueItems(current => ({
+                      ...current,
+                      [group.key]: Math.min(group.items.length, (current[group.key] ?? 6) + 6),
+                    }))}>
+                    Show more individual records ({Math.min(group.items.length, visibleIssueItems[group.key] ?? 6)} of {group.items.length})
+                    <WkIcon name="ChevronDown" size={14} />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : group.items.map(row => (
+          <RegistryReviewRow key={row.id} row={row}
+            canonicalTitle={canonicalTitles[row.id]}
+            expanded={expandedId === row.id}
+            onToggle={() => setExpandedId(current => current === row.id ? null : row.id)}
+            onOpen={() => onOpen(row)}
+            onRead={() => onRead(row)} />
+        ))) : !loading ? (
+          <div className="wk-review-queue-empty" role="status">
+            <WkIcon name="Inbox" size={26} aria-hidden="true" />
+            <h3>No matching reviews</h3>
+            <p>Try a different search or change the state and workstream filters.</p>
+            <button type="button" className="wk-button wk-button-ghost wk-button-sm"
+              onClick={resetFilters}>Clear Filters</button>
+          </div>
+        ) : null}
+      </div>
+      {rows.length < total ? (
+        <div className="wk-review-queue-pagination">
+          <span>{formatReviewCount(rows.length)} of {formatReviewCount(total)} loaded</span>
+          <button type="button" className="wk-button wk-button-soft wk-button-sm"
+            disabled={loading} onClick={loadMore}>
+            {loading ? "Loading…" : "Load More Reviews"} <WkIcon name="ChevronDown" size={15} />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
-function FilterInput({ label, value, placeholder, onChange }: { label: string; value: string; placeholder?: string; onChange: (value: string) => void }) {
-  return <label className="block"><span className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text" /></label>;
+function FilterSelect({ label, value, options, onChange }: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return <label className="wk-review-queue-filter">
+    <span>{label}</span>
+    <WkSelect value={value} onChange={onChange}
+      triggerClassName="w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[13px] text-wk-text">
+      <option value="">All</option>
+      {options.map(option => <option key={option} value={option}>{humanize(option)}</option>)}
+    </WkSelect>
+  </label>;
 }
 
-function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
-  return <label className="block"><span className="text-[10px] font-black uppercase tracking-wider text-wk-text-faint">{label}</span><WkSelect value={value} onChange={(value) => onChange(value)} triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] text-wk-text"><option value="">All</option>{options.filter(Boolean).map((option) => <option key={option} value={option}>{humanize(option)}</option>)}</WkSelect></label>;
-}
-
-function RegistryReviewRow({ row, onOpen }: { row: RegistryReviewItemRow; onOpen: () => void }) {
+function RegistryReviewRow({ row, canonicalTitle, expanded, onToggle, onOpen, onRead, compact = false }: {
+  canonicalTitle?: string;
+  row: RegistryReviewItemRow;
+  compact?: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+  onRead: () => void;
+}) {
   const artistText = candidateString(row, "artistText");
   const artistSlug = candidateString(row, "artistSlug");
-  const reviewType = row.review_type || "registry_review";
-  const readiness = reviewReadiness(row);
-  const priorityTone = row.priority === "high" ? "bg-wk-warning-soft text-wk-warning" : "bg-wk-surface-raised text-wk-text-muted";
-  return <div className="p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><RowTop left={row.title || row.review_key || row.id} right={humanize(reviewType)} /><div className="mt-2 flex flex-wrap gap-2"><span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${priorityTone}`}>{row.priority || "normal"}</span><span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-wk-text-muted">{row.status || "open"}</span><span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-wk-text-muted">{row.entity_type || "entity"}</span><span title={readiness.description} className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${toneClass(readiness.tone)}`}>{readiness.label}</span></div><p className="mt-2 text-[12px] leading-5 text-wk-text-muted">{row.summary || "Registry item requires human review before canonicalization."}</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><FieldPill label="Artist text" value={artistText || "Missing"} /><FieldPill label="Artist slug" value={artistSlug || "Missing"} /></div><div className="mt-2 text-[11px] text-wk-text-faint">Source: {row.source_table || "unknown"}/{row.source_id || row.entity_id || "unknown"}</div></div><div className="flex shrink-0 flex-col gap-2 sm:items-end"><button onClick={onOpen} className="wk-button wk-button-ghost wk-button-sm">Open detail <WkIcon name="ArrowRight" size={13} /></button><div className="max-w-[220px] text-right text-[10px] leading-4 text-wk-text-faint">{readiness.description}</div></div></div></div>;
+  const open = row.status === "open";
+  const needsReleaseGovernance = requiresGovernedSingleReleaseReview(row);
+  const recorded = row.review_type === "mizizi_data_hygiene"
+    ? projectRecordedCaseSubject(row.source_payload, row.title ?? "")
+    : null;
+  const reviewedTitle = canonicalTitle ||
+    (singleReleaseIdentityIssue(row) || genericChartIssue(row)
+      ? sourceDisplay(row)
+      : recorded?.specific ? recorded.title
+        : row.title?.trim() || row.review_key || row.id);
+  const recordedSource = [row.source_table, row.source_id || row.entity_id].filter(Boolean).join(" / ");
+  return <article className={"wk-review-record" + (compact ? " is-issue-child" : "")}
+    data-wk-review-record={row.id}>
+    <button type="button" className="wk-review-record-main"
+      aria-expanded={expanded} aria-controls={"review-preview-" + row.id}
+      onClick={onToggle}>
+      <span className="wk-review-record-marker" aria-hidden="true">
+        <WkIcon name={open ? "FileText" : "ClipboardCheck"} size={18} />
+      </span>
+      <span className="wk-review-record-description">
+        <strong className="wk-review-record-title">{reviewedTitle}</strong>
+        <span className="wk-review-record-context">
+          {row.entity_type ? humanize(row.entity_type) : reviewTypeLabel(row.review_type || "")}
+          {singleReleaseIdentityIssue(row) && canonicalTitle &&
+           typeof row.source_payload?.currentValue === "string" && row.source_payload.currentValue.trim()
+            ? " · Current slug: " + row.source_payload.currentValue.trim() : ""}
+        </span>
+        {recorded?.artistReference ? (
+          <span className="wk-review-record-context">Recorded artist reference: {recorded.artistReference}</span>
+        ) : null}
+        {!compact && row.summary
+          ? <span className="wk-review-record-summary">{row.summary}</span> : null}
+      </span>
+      <span className="wk-review-record-meta">
+        {row.priority === "high" ? <span className="wk-review-record-priority">High Priority</span> : null}
+        <span className={"wk-review-record-state " + (open ? "is-open" : "is-other")}>
+          {humanize(row.status || "Unknown")}
+        </span>
+        {row.updated_at ? <time dateTime={row.updated_at} className="wk-review-record-date">
+          {new Date(row.updated_at).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
+        </time> : null}
+      </span>
+      <span className="wk-review-record-expand" aria-hidden="true">
+        <WkIcon name={expanded ? "ChevronUp" : "ChevronDown"} size={18}/>
+      </span>
+    </button>
+    <div id={"review-preview-" + row.id} hidden={!expanded}
+      className="wk-review-record-detail">
+      <div className="wk-review-record-evidence">
+        <div>
+          <h4>Recorded Issue</h4>
+          <p>{row.summary || "This review needs an inspection of its source record."}</p>
+        </div>
+        {(artistText || artistSlug || singleReleaseIdentityIssue(row)) ? (
+          <dl className="wk-review-record-facts wk-review-record-decision-facts">
+            {artistText ? <div><dt>Source Artist</dt><dd>{artistText}</dd></div> : null}
+            {artistSlug ? <div><dt>Recorded Artist Slug</dt><dd>{artistSlug}</dd></div> : null}
+            {singleReleaseIdentityIssue(row) ? (
+              <>
+                {typeof row.source_payload?.currentValue === "string" && row.source_payload.currentValue.trim() ? (
+                  <div><dt>Current Release Slug</dt><dd className="break-all">{row.source_payload.currentValue}</dd></div>
+                ) : null}
+                {typeof row.candidate_payload?.proposedValue === "string" && row.candidate_payload.proposedValue.trim() ? (
+                  <div><dt>Proposed Release Slug (Not Approved)</dt><dd className="break-all">{row.candidate_payload.proposedValue}</dd></div>
+                ) : null}
+              </>
+            ) : null}
+          </dl>
+        ) : null}
+        <WkDisclosure summary="Technical references"
+          className="wk-review-record-technical"
+          triggerClassName="wk-button wk-button-ghost wk-button-sm wk-review-record-technical-trigger"
+          contentClassName="wk-review-record-technical-content">
+          <dl className="wk-review-record-facts">
+            <div><dt>Review Status</dt><dd>{humanize(row.status || "Unknown")}</dd></div>
+            <div><dt>Review Reference</dt><dd className="break-all font-mono">{row.id}</dd></div>
+            {recordedSource ? <div><dt>Source Reference</dt><dd className="break-all">{recordedSource}</dd></div> : null}
+            {groupableReviewIssue(row) ? (
+              <div><dt>Recorded Issue Title</dt><dd>{row.title}</dd></div>
+            ) : null}
+          </dl>
+        </WkDisclosure>
+      </div>
+      <div className="wk-review-record-footer">
+        <p>{needsReleaseGovernance
+          ? "Review the recorded Release identity conflict. A separate governed decision is required."
+          : "Inspect the latest source and evidence before recording a decision."}</p>
+        <button type="button" onClick={open && !needsReleaseGovernance ? onOpen : onRead}
+          className={"wk-button wk-button-sm " + (open ? "wk-button-primary" : "wk-button-soft")}>
+          {needsReleaseGovernance ? "Inspect Release Evidence" : open ? "Review Evidence and Decide" : "Read Governed Record"}
+          <WkIcon name="ArrowRight" size={14}/>
+        </button>
+      </div>
+    </div>
+  </article>;
+}
+
+/** Historical record inspection is read-only. It deliberately never mounts decision inputs. */
+
+/** Only exact, authorised Registry source IDs can provide the subject heading.
+ * This read does not infer that a proposed slug or a related peer is canonical.
+ */
+function useCanonicalReviewTitle(item: RegistryReviewItemRow): string | null {
+  const sourceId = item.source_id || item.entity_id || "";
+  const type = item.entity_type;
+  const key = type + ":" + sourceId;
+  const [found, setFound] = useState<{ key: string; title: string | null } | null>(null);
+  useEffect(() => {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sourceId) ||
+        (type !== "track" && type !== "release")) return;
+    let active = true;
+    const read = async (): Promise<string | null> => {
+      if (type === "track") {
+        const { data, error } = await supabase.from("registry_tracks")
+          .select("id,title").eq("id", sourceId).maybeSingle();
+        return !error && data?.id === sourceId && typeof data.title === "string" && data.title.trim()
+          ? data.title.trim() : null;
+      }
+      const { data, error } = await supabase.from("registry_releases")
+        .select("id,title").eq("id", sourceId).maybeSingle();
+      return !error && data?.id === sourceId && typeof data.title === "string" && data.title.trim()
+        ? data.title.trim() : null;
+    };
+    void read().then(title => {
+      if (active) setFound({ key, title });
+    }).catch(() => {
+      if (active) setFound({ key, title: null });
+    });
+    return () => { active = false; };
+  }, [sourceId, type, key]);
+  return found?.key === key ? found.title : null;
+}
+
+function RegistryReadOnlyModal({ item, onClose }: {
+  item: RegistryReviewItemRow;
+  onClose: () => void;
+}) {
+  const governedRelease = requiresGovernedSingleReleaseReview(item);
+  const canonicalTitle = useCanonicalReviewTitle(item);
+  const programmeCandidateValue = item.source_payload?.programmeCandidate;
+  const programmeCandidate = programmeCandidateValue && typeof programmeCandidateValue === "object" && !Array.isArray(programmeCandidateValue)
+    ? programmeCandidateValue as Record<string, unknown> : {};
+  // The accepted Release review stores reasonCodes at source_payload's root.
+  // Retain nested support for historical snapshots without inventing reasons.
+  const recordedReasons = item.source_payload?.reasonCodes ?? programmeCandidate.reasonCodes;
+  const reasonCodes = Array.isArray(recordedReasons)
+    ? recordedReasons.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : [];
+  const hasRecordedResolution = Boolean(
+    item.resolution_payload &&
+    typeof item.resolution_payload === "object" &&
+    Object.keys(item.resolution_payload).length > 0,
+  );
+  return <Modal open onClose={onClose}
+    title={governedRelease ? "Release identity review" : canonicalTitle || item.title?.trim() || "Recorded Registry Review"}
+    maxWidth="3xl"
+    footer={<button type="button" className="wk-button wk-button-soft wk-button-sm"
+      onClick={onClose}>Close Record</button>}>
+    <section data-wk-registry-record-readonly className="wk-review-record-modal">
+      {governedRelease ? (
+        <section aria-label="Release identity evidence" className="wk-release-evidence">
+          <h3 className="wk-release-evidence-title">
+            {canonicalTitle || "Release title unavailable"}
+          </h3>
+          <p className="wk-release-evidence-intro">Recorded Release identity conflict</p>
+          <p className="wk-release-evidence-intro">
+            The current Release identity conflicts with recorded Registry or Community evidence.
+            Inspect each source before a governed MIZIZI decision.
+          </p>
+          <dl className="wk-review-record-facts wk-release-identity-facts">
+            {typeof item.source_payload?.currentValue === "string" ? (
+              <div><dt>Current Release Slug</dt><dd className="break-all">{item.source_payload.currentValue || "Not recorded"}</dd></div>
+            ) : null}
+            {typeof item.candidate_payload?.proposedValue === "string" ? (
+              <div><dt>Proposed Release Slug (Not Approved)</dt><dd className="break-all">{item.candidate_payload.proposedValue || "Not recorded"}</dd></div>
+            ) : null}
+
+          </dl>
+          {reasonCodes.length ? (
+            <section className="wk-release-reason-block" aria-label="Recorded conflict reasons">
+              <h4>Recorded Conflict Reasons</h4>
+              <ul>
+                {reasonCodes.map(reason => <li key={reason}>
+                  <span>{humanize(reason)}</span>
+                  <code>{reason}</code>
+                </li>)}
+              </ul>
+            </section>
+          ) : null}
+          <p className="wk-release-readonly-note">
+            This review stays open. The generic decision form cannot resolve it.
+          </p>
+        </section>
+      ) : null}
+      <div className="wk-review-record-modal-head" aria-label="Recorded review status">
+        <span className="wk-review-record-state is-other">{humanize(item.status || "Unknown")}</span>
+        {!governedRelease ? <span className="text-[12px] text-wk-text-muted">{reviewTypeLabel(item.review_type || "")}</span> : null}
+      </div>
+      <div className="wk-review-record-issue-summary">
+        <h3 className="wk-review-record-meta-title">What needs review</h3>
+        <p className="wk-review-record-description-text">
+          {item.summary || "The Registry has not recorded a summary for this review."}
+        </p>
+      </div>
+      <WkDisclosure summary="Review references" triggerClassName="wk-button wk-button-ghost wk-button-sm"
+        contentClassName="pt-3">
+        <dl className="wk-review-record-facts wk-review-record-meta-facts">
+          <div><dt>Review Reference</dt><dd className="break-all font-mono">{item.id}</dd></div>
+          <div><dt>Recorded State</dt><dd>{humanize(item.status || "Unknown")}</dd></div>
+          {item.priority ? <div><dt>Priority</dt><dd>{humanize(item.priority)}</dd></div> : null}
+          {item.entity_type ? <div><dt>Subject</dt><dd>{humanize(item.entity_type)}</dd></div> : null}
+          {item.source_table ? <div><dt>Source Table</dt><dd>{item.source_table}</dd></div> : null}
+          {item.source_id ? <div><dt>Source ID</dt><dd className="break-all font-mono">{item.source_id}</dd></div> : null}
+          {governedRelease && item.source_payload?.ruleId ? <div><dt>Review Rule</dt><dd>{String(item.source_payload.ruleId)}</dd></div> : null}
+          {governedRelease && item.source_payload?.ruleVersion ? <div><dt>Rule Version</dt><dd>{String(item.source_payload.ruleVersion)}</dd></div> : null}
+        </dl>
+      </WkDisclosure>
+      <div className="wk-review-record-source-section">
+        <WkDisclosure summary="Read Recorded Source Data"
+          triggerClassName="wk-button wk-button-ghost wk-button-sm"
+          contentClassName="grid gap-3 pt-4 md:grid-cols-2">
+          <JsonBlock title="Source Evidence" value={item.source_payload} />
+          <JsonBlock title="Candidate Record" value={item.candidate_payload} />
+          {hasRecordedResolution ? <JsonBlock title="Recorded Resolution" value={item.resolution_payload} /> : null}
+        </WkDisclosure>
+      </div>
+      {!governedRelease ? (
+        <p className="wk-review-record-readonly-footer">
+          This is a record inspection. It does not change Registry data.
+        </p>
+      ) : null}
+    </section>
+  </Modal>;
 }
 
 function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit }: { item: RegistryReviewItemRow; decision: DecisionState; setDecision: Dispatch<SetStateAction<DecisionState>>; onClose: () => void; onSubmit: () => void }) {
@@ -572,9 +1165,17 @@ function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit 
     !publicMusicReview &&
     decision.decisionType === "approve_featured_artist_split";
   const readiness = reviewReadiness(item);
+  const hasRecordedTrackDecision = publicMusicReview && Boolean(decision.publicMusicContext?.existingDecision);
+  const recordedSubject = projectRecordedCaseSubject(item.source_payload, item.title ?? "");
+  const canonicalTitle = useCanonicalReviewTitle(item);
+  const jobTitle = publicMusicReview && decision.publicMusicContext?.title
+    ? decision.publicMusicContext.title
+    : canonicalTitle || (recordedSubject.specific ? recordedSubject.title
+      : item.title || item.review_key || item.id);
 
-  const setPreset = (decisionType: RegistryDecisionType, notes: string) => {
-    setDecision((current) => ({ ...current, decisionType, notes, message: "" }));
+  // Presets choose an option, never manufacture a verified evidence statement.
+  const setPreset = (decisionType: RegistryDecisionType) => {
+    setDecision((current) => ({ ...current, decisionType, notes: "", message: "" }));
   };
 
   const footer = (
@@ -586,8 +1187,10 @@ function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit 
       </p>
       <div className="flex shrink-0 gap-2">
         <button onClick={onClose} disabled={decision.submitting} className="wk-button wk-button-ghost wk-button-sm">Cancel</button>
-        <button onClick={onSubmit} disabled={decision.submitting} className="wk-button wk-button-primary wk-button-sm">
-          {decision.submitting ? "Recording..." : "Record decision"}
+        <button onClick={onSubmit} disabled={decision.submitting || !decision.notes.trim()} className="wk-button wk-button-primary wk-button-sm">
+          {decision.submitting
+            ? "Recording..."
+            : hasRecordedTrackDecision ? "Record Revised Decision" : "Record Decision"}
         </button>
       </div>
     </div>
@@ -597,18 +1200,49 @@ function RegistryDecisionModal({ item, decision, setDecision, onClose, onSubmit 
     <Modal
       open
       onClose={onClose}
-      title={item.title || item.review_key || item.id}
+      title={jobTitle}
       maxWidth="3xl"
       dismissable={!decision.submitting}
       footer={footer}
     >
-      <div className="mb-5">
-        <div className="text-[11px] font-black uppercase tracking-wider text-wk-brand">Registry review detail</div>
-        <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-          {item.summary || "Resolve this item by recording an auditable decision."}
-        </p>
+      <div className="wk-review-job-head">
+        <p className="wk-review-job-kicker">{item.entity_type === "track" ? "Recording" : item.entity_type === "release" ? "Release" : "Review"} to inspect</p>
+        <h3>{jobTitle}</h3>
+        {publicMusicReview && decision.publicMusicContext?.isrc ? (
+          <p>ISRC {decision.publicMusicContext.isrc}</p>
+        ) : null}
+        {recordedSubject.artistReference ? <p>Recorded artist reference: {recordedSubject.artistReference}</p> : null}
+        <div className="wk-review-job-issue">
+          <h4>What Needs Review</h4>
+          <p>{item.summary || item.title || "Inspect the source record before deciding."}</p>
+        </div>
       </div>
-<div className="grid gap-3 md:grid-cols-4"><FieldPill label="Review type" value={humanize(item.review_type || "registry_review")} /><FieldPill label="Priority" value={item.priority || "normal"} /><FieldPill label="Status" value={item.status || "open"} /><FieldPill label="Readiness" value={readiness.label} /></div><p className="mt-2 text-[11px] leading-5 text-wk-text-muted">{readiness.description}</p><div className="mt-4 grid gap-3 md:grid-cols-2"><FieldPill label="Source artist text" value={artistText || "Missing"} /><FieldPill label="Source artist slug" value={artistSlug || "Missing"} /></div><div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4"><div className="text-[11px] font-black uppercase tracking-wider text-wk-text-faint">Source reference</div><div className="mt-2 text-[12px] text-wk-text">{item.source_table || "unknown"}/{item.source_id || item.entity_id || "unknown"}</div><div className="mt-1 break-all text-[11px] text-wk-text-faint">{item.review_key || item.id}</div></div><div className="mt-4 grid gap-4 md:grid-cols-2"><JsonBlock title="Candidate payload" value={candidatePayload} /><JsonBlock title="Source payload" value={sourcePayload} /></div><div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4"><div className="text-[12px] font-bold text-wk-text">Quick decision presets</div><div className="mt-3 grid gap-2 sm:grid-cols-2">{publicMusicReview ? <><button type="button" onClick={() => setPreset("public_music_identity_needs_more_research", "Needs additional identity evidence before governed execution.")} className="wk-button wk-button-ghost wk-button-sm">Needs research</button><button type="button" onClick={() => setPreset("public_music_identity_safe_slug_repair", "Reviewed clean slug is culturally and structurally correct; execution remains governed.")} className="wk-button wk-button-ghost wk-button-sm">Safe slug repair</button><button type="button" onClick={() => setPreset("public_music_identity_distinct_recording", "Authoritative evidence proves this is a legitimately distinct recording.")} className="wk-button wk-button-ghost wk-button-sm">Distinct recording</button><button type="button" onClick={() => setPreset("public_music_identity_true_duplicate", "Authoritative evidence proves this Track is a duplicate of the selected canonical Track.")} className="wk-button wk-button-ghost wk-button-sm">True duplicate</button></> : <><button type="button" onClick={() => setPreset("needs_more_research", "Needs additional source verification before canonicalization.")} className="wk-button wk-button-ghost wk-button-sm">Needs research</button><button type="button" onClick={() => setPreset("approve_primary_artist", "Verified single canonical primary artist. No canonical mutation at review stage.")} className="wk-button wk-button-ghost wk-button-sm">Approve primary</button><button type="button" onClick={() => setPreset("approve_featured_artist_split", "Verified primary artist and featured/collaborator split. No canonical mutation at review stage.")} className="wk-button wk-button-ghost wk-button-sm">Approve split</button><button type="button" onClick={() => setPreset("reject_bad_metadata", "Source metadata is not reliable enough for canonical relationships.")} className="wk-button wk-button-ghost wk-button-sm">Reject metadata</button></>}</div></div><div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4"><label className="block text-[12px] font-bold text-wk-text">Decision</label><WkSelect value={decision.decisionType} onChange={(value) => setDecision((current) => ({ ...current, decisionType: value as RegistryDecisionType, message: "" }))} triggerClassName="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text">{decisionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</WkSelect><p className="mt-1 text-[11px] leading-5 text-wk-text-muted">{selectedOption?.help}</p>{publicMusicReview && <div className="mt-4 rounded-xl border border-wk-brand/25 bg-wk-brand-soft p-4"><div className="text-[12px] font-bold text-wk-text">Public Music Identity: governed human decision</div><p className="mt-1 text-[11px] leading-5 text-wk-text-muted">Recording this decision does not resolve the review or mutate the Track. A later governed executor must verify the accepted outcome before resolution.</p>{decision.publicMusicContextLoading ? <p className="mt-3 text-[12px] text-wk-text-muted">Loading current Track authority…</p> : decision.publicMusicContext ? <><div className="mt-3 grid gap-3 md:grid-cols-2"><FieldPill label="Current slug" value={decision.publicMusicContext.currentSlug} /><FieldPill label="Reviewed proposed slug" value={decision.publicMusicContext.proposedSlug || "None"} /><FieldPill label="Rule" value={decision.publicMusicContext.ruleId + "/" + decision.publicMusicContext.ruleVersion} /><FieldPill label="Recording identity review" value={decision.publicMusicContext.openRecordingIdentityReviewId || "None"} /><FieldPill label="Human decision" value={decision.publicMusicContext.existingDecision ? humanize(String(decision.publicMusicContext.existingDecision.decisionType || "recorded")) : "Not recorded"} /><FieldPill label="Execution state" value={decision.publicMusicContext.existingDecision ? "Decision recorded · execution pending" : "Awaiting human decision"} /></div><div className="mt-3 grid gap-4 md:grid-cols-2"><JsonBlock title="Current active credits" value={decision.publicMusicContext.activeCredits} /><JsonBlock title="Review evidence" value={decision.publicMusicContext.reviewEvidence} /></div></> : <p className="mt-3 text-[12px] text-wk-warning">Current Track authority could not be loaded.</p>}<div className="mt-4 grid gap-3 md:grid-cols-2"><TextInput label="Reviewed proposed slug" value={decision.proposedSlug} placeholder="e.g. summer" onChange={(value) => setDecision((current) => ({ ...current, proposedSlug: value, message: "" }))} />{decision.decisionType === "public_music_identity_distinct_recording" && <TextInput label="Evidence-backed canonical slug" value={decision.canonicalSlug} placeholder="e.g. song-live" onChange={(value) => setDecision((current) => ({ ...current, canonicalSlug: value, message: "" }))} />}{decision.decisionType === "public_music_identity_true_duplicate" && <TextInput label="Canonical Track UUID" value={decision.canonicalTrackId} placeholder="UUID of surviving Track" onChange={(value) => setDecision((current) => ({ ...current, canonicalTrackId: value, message: "" }))} />}</div>{decision.decisionType === "public_music_identity_distinct_recording" && <div className="mt-3"><TextAreaInput label="Semantic distinction evidence" value={decision.semanticDistinction} placeholder="What authoritative version distinction makes this recording legitimately distinct?" rows={3} onChange={(value) => setDecision((current) => ({ ...current, semanticDistinction: value, message: "" }))} /></div>}{decision.decisionType === "public_music_identity_credit_correction_required" && <div className="mt-3"><TextAreaInput label="Structured credit evidence" value={decision.creditEvidence} placeholder="State the exact primary/featured credit correction required and its evidence." rows={3} onChange={(value) => setDecision((current) => ({ ...current, creditEvidence: value, message: "" }))} /></div>}</div>}{showStructuredFields && <div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4"><div className="text-[12px] font-bold text-wk-text">Structured canonical resolution</div><p className="mt-1 text-[11px] leading-5 text-wk-text-muted">Phase 3A will only treat an approval as actionable when this points to one clean canonical artist.</p><div className="mt-3 grid gap-3 md:grid-cols-2"><TextInput label="Canonical primary artist name" value={decision.canonicalPrimaryArtistName} placeholder="e.g. Karun" onChange={(value) => setDecision((current) => ({ ...current, canonicalPrimaryArtistName: value, message: "" }))} /><TextInput label="Canonical primary artist slug" value={decision.canonicalPrimaryArtistSlug} placeholder="e.g. karun" onChange={(value) => setDecision((current) => ({ ...current, canonicalPrimaryArtistSlug: value, message: "" }))} /></div>{showFeaturedFields && <div className="mt-3 grid gap-3 md:grid-cols-2"><TextAreaInput label="Featured/collaborator names" value={decision.featuredArtistNames} placeholder="One per line or comma-separated" rows={3} onChange={(value) => setDecision((current) => ({ ...current, featuredArtistNames: value, message: "" }))} /><TextAreaInput label="Featured/collaborator slugs" value={decision.featuredArtistSlugs} placeholder="One per line or comma-separated" rows={3} onChange={(value) => setDecision((current) => ({ ...current, featuredArtistSlugs: value, message: "" }))} /></div>}</div>}<label className="mt-4 block text-[12px] font-bold text-wk-text">Decision notes</label><textarea value={decision.notes} onChange={(event) => setDecision((current) => ({ ...current, notes: event.target.value, message: "" }))} rows={4} className="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text" placeholder="Explain what you verified and why this decision is safe." /><WkCheckbox checked={decision.continueToNext} onChange={(checked) => setDecision((current) => ({ ...current, continueToNext: checked }))} className="mt-4 flex items-start gap-2 text-[12px] text-wk-text-muted"> Open next visible item after recording</WkCheckbox>{decision.message && <p className="mt-2 text-[12px] font-semibold text-wk-warning">{decision.message}</p>}</div>
+<p className="wk-review-job-standing">
+  <strong>{humanize(item.status || "Unknown")}</strong>
+  {item.priority === "high" ? " · High priority" : ""}
+  {readiness.label === "Review needed" ? " · Needs review" : ""}
+</p>{!publicMusicReview ? (
+  <div className="mt-4 grid gap-3 md:grid-cols-2">
+    <FieldPill label="Source Artist Text" value={artistText || "Not recorded"} />
+    <FieldPill label="Source Artist Slug" value={artistSlug || "Not recorded"} />
+  </div>
+) : null}<WkDisclosure summary="Source IDs and Recorded Data"
+ triggerClassName="wk-button wk-button-ghost wk-button-sm mt-4"
+ contentClassName="pt-3">
+ <p className="break-all text-[12px] text-wk-text-muted">{item.source_table || "Unknown source"} / {item.source_id || item.entity_id || "Unknown ID"}</p>
+ <p className="mt-1 break-all font-mono text-[11px] text-wk-text-muted">Review {item.id}</p>
+ <div className="mt-3 grid gap-4 md:grid-cols-2">
+   <JsonBlock title="Candidate Record" value={candidatePayload} />
+   <JsonBlock title="Recorded Source" value={sourcePayload} />
+ </div>
+</WkDisclosure><div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4"><div className="text-[12px] font-bold text-wk-text">Quick decision presets</div><div className="mt-3 grid gap-2 sm:grid-cols-2">{publicMusicReview ? <><button type="button" onClick={() => setPreset("public_music_identity_needs_more_research")} className="wk-button wk-button-ghost wk-button-sm">Needs research</button><button type="button" onClick={() => setPreset("public_music_identity_safe_slug_repair")} className="wk-button wk-button-ghost wk-button-sm">Safe slug repair</button><button type="button" onClick={() => setPreset("public_music_identity_distinct_recording")} className="wk-button wk-button-ghost wk-button-sm">Distinct recording</button><button type="button" onClick={() => setPreset("public_music_identity_true_duplicate")} className="wk-button wk-button-ghost wk-button-sm">True duplicate</button></> : <><button type="button" onClick={() => setPreset("needs_more_research")} className="wk-button wk-button-ghost wk-button-sm">Needs research</button><button type="button" onClick={() => setPreset("approve_primary_artist")} className="wk-button wk-button-ghost wk-button-sm">Approve primary</button><button type="button" onClick={() => setPreset("approve_featured_artist_split")} className="wk-button wk-button-ghost wk-button-sm">Approve split</button><button type="button" onClick={() => setPreset("reject_bad_metadata")} className="wk-button wk-button-ghost wk-button-sm">Reject metadata</button></>}</div></div><div className="mt-5 rounded-xl border border-wk-border bg-wk-surface p-4"><label className="block text-[12px] font-bold text-wk-text">Decision</label><WkSelect value={decision.decisionType} onChange={(value) => setDecision((current) => ({ ...current, decisionType: value as RegistryDecisionType, notes: "", message: "" }))} triggerClassName="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text">{decisionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</WkSelect><p className="mt-1 text-[11px] leading-5 text-wk-text-muted">{selectedOption?.help}</p>{publicMusicReview && <div className="mt-4 rounded-xl border border-wk-brand/25 bg-wk-brand-soft p-4"><div className="text-[12px] font-bold text-wk-text">Public Music Identity: governed human decision</div>
+{hasRecordedTrackDecision ? (
+  <p className="mt-3 rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-[12px] leading-5 text-wk-text">
+    A human decision is already recorded for this Track. Recording another decision will supersede it.
+    Review its evidence and existing judgment before making a change.
+  </p>
+) : null}
+<p className="mt-1 text-[11px] leading-5 text-wk-text-muted">Recording this decision does not resolve the review or mutate the Track. A later governed executor must verify the accepted outcome before resolution.</p>{decision.publicMusicContextLoading ? <p className="mt-3 text-[12px] text-wk-text-muted">Loading current Track authority…</p> : decision.publicMusicContext ? <><div className="mt-3 grid gap-3 md:grid-cols-2"><FieldPill label="Current slug" value={decision.publicMusicContext.currentSlug} /><FieldPill label="Reviewed proposed slug" value={decision.publicMusicContext.proposedSlug || "None"} /><FieldPill label="Rule" value={decision.publicMusicContext.ruleId + "/" + decision.publicMusicContext.ruleVersion} /><FieldPill label="Recording identity review" value={decision.publicMusicContext.openRecordingIdentityReviewId || "None"} /><FieldPill label="Human decision" value={decision.publicMusicContext.existingDecision ? humanize(String(decision.publicMusicContext.existingDecision.decisionType || "recorded")) : "Not recorded"} /><FieldPill label="Execution state" value={decision.publicMusicContext.existingDecision ? "Decision recorded · execution pending" : "Awaiting human decision"} /></div><div className="mt-3 grid gap-4 md:grid-cols-2"><JsonBlock title="Current active credits" value={decision.publicMusicContext.activeCredits} /><JsonBlock title="Review evidence" value={decision.publicMusicContext.reviewEvidence} /></div></> : <p className="mt-3 text-[12px] text-wk-warning">Current Track authority could not be loaded.</p>}<div className="mt-4 grid gap-3 md:grid-cols-2"><TextInput label="Reviewed proposed slug" value={decision.proposedSlug} placeholder="e.g. summer" onChange={(value) => setDecision((current) => ({ ...current, proposedSlug: value, message: "" }))} />{decision.decisionType === "public_music_identity_distinct_recording" && <TextInput label="Evidence-backed canonical slug" value={decision.canonicalSlug} placeholder="e.g. song-live" onChange={(value) => setDecision((current) => ({ ...current, canonicalSlug: value, message: "" }))} />}{decision.decisionType === "public_music_identity_true_duplicate" && <TextInput label="Canonical Track UUID" value={decision.canonicalTrackId} placeholder="UUID of surviving Track" onChange={(value) => setDecision((current) => ({ ...current, canonicalTrackId: value, message: "" }))} />}</div>{decision.decisionType === "public_music_identity_distinct_recording" && <div className="mt-3"><TextAreaInput label="Semantic distinction evidence" value={decision.semanticDistinction} placeholder="What authoritative version distinction makes this recording legitimately distinct?" rows={3} onChange={(value) => setDecision((current) => ({ ...current, semanticDistinction: value, message: "" }))} /></div>}{decision.decisionType === "public_music_identity_credit_correction_required" && <div className="mt-3"><TextAreaInput label="Structured credit evidence" value={decision.creditEvidence} placeholder="State the exact primary/featured credit correction required and its evidence." rows={3} onChange={(value) => setDecision((current) => ({ ...current, creditEvidence: value, message: "" }))} /></div>}</div>}{showStructuredFields && <div className="mt-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4"><div className="text-[12px] font-bold text-wk-text">Structured canonical resolution</div><p className="mt-1 text-[11px] leading-5 text-wk-text-muted">Phase 3A will only treat an approval as actionable when this points to one clean canonical artist.</p><div className="mt-3 grid gap-3 md:grid-cols-2"><TextInput label="Canonical primary artist name" value={decision.canonicalPrimaryArtistName} placeholder="e.g. Karun" onChange={(value) => setDecision((current) => ({ ...current, canonicalPrimaryArtistName: value, message: "" }))} /><TextInput label="Canonical primary artist slug" value={decision.canonicalPrimaryArtistSlug} placeholder="e.g. karun" onChange={(value) => setDecision((current) => ({ ...current, canonicalPrimaryArtistSlug: value, message: "" }))} /></div>{showFeaturedFields && <div className="mt-3 grid gap-3 md:grid-cols-2"><TextAreaInput label="Featured/collaborator names" value={decision.featuredArtistNames} placeholder="One per line or comma-separated" rows={3} onChange={(value) => setDecision((current) => ({ ...current, featuredArtistNames: value, message: "" }))} /><TextAreaInput label="Featured/collaborator slugs" value={decision.featuredArtistSlugs} placeholder="One per line or comma-separated" rows={3} onChange={(value) => setDecision((current) => ({ ...current, featuredArtistSlugs: value, message: "" }))} /></div>}</div>}<label className="mt-4 block text-[12px] font-bold text-wk-text">Decision notes</label><textarea value={decision.notes} onChange={(event) => setDecision((current) => ({ ...current, notes: event.target.value, message: "" }))} rows={4} className="mt-2 w-full rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text" placeholder="Explain what you verified and why this decision is safe." /><WkCheckbox checked={decision.continueToNext} onChange={(checked) => setDecision((current) => ({ ...current, continueToNext: checked }))} className="mt-4 flex items-start gap-2 text-[12px] text-wk-text-muted"> Open next visible item after recording</WkCheckbox>{decision.message && <p className="mt-2 text-[12px] font-semibold text-wk-warning">{decision.message}</p>}</div>
     </Modal>
   );
 }

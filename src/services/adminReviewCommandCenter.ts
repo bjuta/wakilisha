@@ -122,6 +122,7 @@ export type RegistryReviewFilters = {
   entityType?: string;
   offset?: number;
   limit?: number;
+  reviewId?: string;
 };
 
 export type RegistryReviewPage = {
@@ -336,6 +337,9 @@ async function exactCount(table: string, filters: Record<string, string | boolea
   let query = supabase.from(table).select("*", { count: "exact", head: true });
   for (const [key, value] of Object.entries(filters)) query = query.eq(key, value);
   const { count, error } = await query;
+  // Never show a fabricated zero for the authoritative Registry review count.
+  // Legacy migration sample sources may be unavailable in some environments.
+  if (error && table === "registry_review_items") throw error;
   if (error) return 0;
   return count ?? 0;
 }
@@ -374,11 +378,15 @@ async function loadRegistryReviewSummary(): Promise<RegistryReviewSummaryRow[]> 
 export async function loadRegistryReviewItems(filters: RegistryReviewFilters = {}): Promise<RegistryReviewPage> {
   const limit = Math.max(1, Math.min(Number(filters.limit ?? 18), 100));
   const offset = Math.max(0, Number(filters.offset ?? 0));
+  if (filters.reviewId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.reviewId)) {
+    throw new TypeError("Invalid Registry review reference");
+  }
   let query = supabase
     .from("registry_review_items")
     .select(registryReviewSelect, { count: "exact" })
     .order("updated_at", { ascending: false });
 
+  if (filters.reviewId) query = query.eq("id", filters.reviewId);
   if (filters.status) query = query.eq("status", filters.status);
   if (filters.reviewType) query = query.eq("review_type", filters.reviewType);
   if (filters.priority) query = query.eq("priority", filters.priority);
@@ -550,7 +558,7 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
     loadSamples<MediaReviewRow>("registry_media_assets", "id, source_entity, source_record_id, url, source_kind, status, metadata, updated_at", "updated_at", 10),
     loadSamples<PromotionEventRow>("wk_import_promotion_events", "id, target_table, target_record_id, event_type, message, created_at", "created_at", 10),
     loadStagingSummary(),
-    loadRegistryReviewItems({ limit: 18 }),
+    loadRegistryReviewItems({ status: "open", limit: 18 }),
     loadRegistryReviewSummary(),
   ]);
 
@@ -591,8 +599,25 @@ export async function loadReviewCommandCenter(): Promise<ReviewCommandCenterData
   };
 }
 
+/**
+ * MIZIZI Release Single conflicts are review-only until the exact governed
+ * Release resolution contract exists. Never send them through the legacy
+ * generic decision writer, which would mark an unresolved review resolved.
+ * Guard on source rule, not display title or the current rule version.
+ */
+export function requiresGovernedSingleReleaseReview(item: RegistryReviewItemRow): boolean {
+  return item.review_type === "mizizi_data_hygiene"
+    && item.entity_type === "release"
+    && item.source_payload?.ruleId === "release_single_identity_conflict";
+}
+
 export async function recordRegistryReviewDecision(input: RegistryReviewDecisionInput): Promise<void> {
   const item = input.item;
+  if (requiresGovernedSingleReleaseReview(item)) {
+    throw new Error(
+      "This Release identity conflict requires governed MIZIZI resolution. The generic review writer cannot record or resolve it.",
+    );
+  }
   const notes = input.notes.trim();
   let resolutionPayload = {
     decisionType: input.decisionType,

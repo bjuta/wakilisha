@@ -100,6 +100,22 @@ describe(
     );
 
     it(
+      "does not grant clean baseline replay from a linked migration ledger alone",
+      () => {
+        const recorder = readFileSync(
+          "scripts/control-plane/record-migration-replay-proof.mjs",
+          "utf8",
+        );
+        expect(recorder).toMatch(
+          /baseline_replay:\s*"pending"/,
+        );
+        expect(recorder).not.toMatch(
+          /baseline_replay:\s*"pass"/,
+        );
+      },
+    );
+
+    it(
       "rejects a preview replay proof whose candidate bytes or base changed",
       () => {
         const proof = {

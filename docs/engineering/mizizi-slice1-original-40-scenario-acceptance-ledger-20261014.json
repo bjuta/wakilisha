@@ -1,0 +1,614 @@
+{
+  "title": "MIZIZI Headquarters Slice 1 original 40-scenario evidence ledger",
+  "version": "2026-10-14-v15",
+  "status": "OPEN_NOT_FULLY_VERIFIED",
+  "authority": "Freeze original A01-A10, C11-C19, O20-O25, J26-J28, W29-W35, H36-H40. An executed subset is not full matrix acceptance.",
+  "pr": 1227,
+  "head": "887426ad9baf8f281112c63552906c0200ab5647",
+  "rules": [
+    "LOCAL_EXECUTED = actual disposable PostgreSQL and/or signed-in local GoTrue/PostgREST test covering named behavior, not hosted Preview or Production.",
+    "PARTIAL_EVIDENCE = a related behavior was tested, but the exact case/scenario has not been exhaustively exercised. Never count as full pass.",
+    "NOT_VERIFIED_AS_SPECIFIED = no directly traceable execution of the exact scenario was found in the current accepted record. This is not proof of failure.",
+    "No automatic provider connectivity demands for Slice 1. No artificial conversion of a fixture-independent unit assertion into an authenticated/runtime pass.",
+    "Owner-approved deferred delivery slice is a scheduling/exit-governance field only, never an evidence status. C17/H37 stay PARTIAL_EVIDENCE and all 40 Production acceptances NOT_RUN until their full original runtime scenarios are actually exercised."
+  ],
+  "evidence": {
+    "worker_pg": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
+    "real_local_auth_pg": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
+    "db05_pg_auth_subset": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
+    "auth_jwt_subset": "https://github.com/bjuta/wakilisha/actions/runs/38544675472",
+    "prior_local_targeted_subset": "Prior locally accepted DB02/DB05 and gateway tests; requires per-scenario mapping before full pass",
+    "source_case_research_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38550248044",
+    "track_32_source_corpus_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38552467759",
+    "real_local_auth_pg_20261014_b0ef7434": "https://github.com/bjuta/wakilisha/actions/runs/38555894907",
+    "c14_disposable_pg_terminal_replay_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38572850391",
+    "preview_229_verified_and_local_pg_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38586802055",
+    "preview_229_verified_and_local_real_jwt_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38586802055",
+    "preview_229_exact_replay_seal": "https://github.com/bjuta/wakilisha/issues/1226#issuecomment-6171515032",
+    "o24_real_jwt_reviewer_role_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38592306969",
+    "o23_real_jwt_steward_stage_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38595255493",
+    "c18_genuine_auth_race_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38603167807",
+    "o25_genuine_browser_stale_revision_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38608980274",
+    "source_worker_boundaries_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38611765787",
+    "c13_source_and_prior_observation_fences_migration230_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38619155134",
+    "h36_h40_true_signed_in_hold_release_preview_and_disposable_20261014": "https://github.com/bjuta/wakilisha/actions/runs/38622022580"
+  },
+  "deployment": {
+    "preview": {
+      "migrations": 230,
+      "head": "20261014182214",
+      "single_use_owner_bootstrap": "CONSUMED_ONCE_VERIFIED_20261014",
+      "signed_in_deployed_browser": "NOT_RUN",
+      "signed_in_localhost_preview_bound_browser": "PARTIAL_ACCEPTED_OWNER_BOOTSTRAP_AND_HOLD_WRITES_LIFECYCLE",
+      "hold_writes": {
+        "date": "2026-10-14",
+        "browser_origin": "127.0.0.1:5178",
+        "preview_project_ref": "nkgfoppunmnkcumalxqp",
+        "operator_role": "authenticated_internal_workspace_owner",
+        "hold_id": "efecd5c5-017e-4a23-a912-013b96919e3e",
+        "hold_key": "mizizi:workspace:hold:54dd4d17-373e-4b87-b162-2ba78b420c28",
+        "scope": "workspace",
+        "final_status": "released",
+        "final_revision": 2,
+        "issued_at": "2026-10-14T16:45:13.407838Z",
+        "released_at": "2026-10-14T16:46:09.305804Z",
+        "immutable_events": [
+          {
+            "sequence": 12,
+            "revision": 1,
+            "kind": "hold_started"
+          },
+          {
+            "sequence": 13,
+            "revision": 2,
+            "kind": "hold_released"
+          }
+        ],
+        "independent_sql": "one_distinct_released_hold_two_distinct_attributed_events_zero_active_holds_zero_active_registry_execution_grants_zero_preview_cases_and_registry_reviews",
+        "limitation": "No concurrent queued or previously granted Registry writer tested during this hosted hold; H37 remains PARTIAL_EVIDENCE. Production not exercised.",
+        "evidence": "Issue #1226: user screenshots 19:45:15, 19:45:58, 19:46:10 EAT and independent 2026-10-14 Supabase read-only SQL."
+      },
+      "c13_replay_fence": {
+        "migration": "20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql",
+        "native_preview_push": "PASS_OWNER_AUTHORIZED_SINGLE_FORWARD_CLI_2_107_0",
+        "independent_live_sql": "PASS_MIGRATION_230_EXACT_NAME_PRIVATE_GATEWAY_SOURCE_AND_ACL",
+        "schema_seal": "preview_230_exact_generated_types_sha256_2806dd9e7fe3913c067e5945a627db397e2f1b07641447af1c31fb7c0453d6b9",
+        "replay_proof": "docs/engineering/replay-proofs/20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql.json",
+        "browser_runtime": "NO_SOURCE_BACKED_PREVIEW_CASE_OR_REGISTRY_REVIEW_TESTED",
+        "production": "NOT_APPLIED"
+      }
+    },
+    "production": {
+      "migrations": 216,
+      "head": "20261009181647",
+      "write_actions": "NONE",
+      "cohort": {
+        "mizizi_data_hygiene": {
+          "open": 149,
+          "resolved": 75
+        },
+        "other_review_families": {
+          "chart_entry_missing_canonical_link_open": 49,
+          "chart_provisional_label_write_open": 27
+        },
+        "all_review_items": {
+          "open": 225,
+          "resolved": 76
+        }
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "A01",
+      "name": "approved_track_slug_1_1",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A01_APPROVED_TRACK_SLUG_1_1_EIGHT_SOURCE_GATEWAY_CASES"
+      ],
+      "execution_scope": "local_disposable_postgres_gateway_session_authorization_simulator"
+    },
+    {
+      "id": "A02",
+      "name": "approved_track_slug_1_2",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A02_APPROVED_TRACK_SLUG_1_2_EIGHT_SOURCE_GATEWAY_CASES"
+      ],
+      "execution_scope": "local_disposable_postgres_gateway_session_authorization_simulator"
+    },
+    {
+      "id": "A03",
+      "name": "approved_credit_gap_1_3",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A03_APPROVED_CREDIT_GAP_1_3_EIGHT_SOURCE_GATEWAY_CASES"
+      ],
+      "execution_scope": "local_disposable_postgres_gateway_session_authorization_simulator"
+    },
+    {
+      "id": "A04",
+      "name": "approved_recording_conflict_1_3",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A04_APPROVED_RECORDING_CONFLICT_1_3_EIGHT_SOURCE_GATEWAY_CASES"
+      ],
+      "execution_scope": "local_disposable_postgres_gateway_session_authorization_simulator"
+    },
+    {
+      "id": "A05",
+      "name": "approved_release_packaging_1_2",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_worker_boundaries_20261014",
+      "exact_proof_markers": [
+        "CI_A05_APPROVED_RELEASE_PACKAGING_V1_2_SOURCE_GATEWAY",
+        "CI_A05_CANONICAL_RELEASE_UNCHANGED_REVIEW_AND_RECEIPT"
+      ],
+      "execution_scope": "genuine_disposable_canonical_release_single_packaging_shape_approved_1_2_rule_source_gateway_human_review_one_case_and_immutable_link;_independent_SQL_confirms_original_canonical_release_slug_not_changed",
+      "evidence_limit": "Transactional disposable local PostgreSQL with narrow mizizi_executor session-role simulator, NOT signed-in hosted Preview, real provider production source, or Production grant. Full original worker/32-Track corpus and independent rollback snapshots passed; no historical D1-D3 review reproduced."
+    },
+    {
+      "id": "A06",
+      "name": "unsupported_release_conflict_1_4",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A06_UNSUPPORTED_RELEASE_RULE_REJECTED"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
+    },
+    {
+      "id": "A07",
+      "name": "archived_source_replay",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A07_ARCHIVED_CANONICAL_TRACK_REPLAY_DENIED"
+      ],
+      "execution_scope": "local_disposable_postgres_gateway_session_authorization_simulator"
+    },
+    {
+      "id": "A08",
+      "name": "missing_source_id",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A08_MISSING_SOURCE_UUID_REJECTED_BY_LIVE_REGISTRY_BROKER",
+        "CI_A08_MISSING_ENTITY_ID_FIELD_REJECTED_AT_BOUNDARY"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
+    },
+    {
+      "id": "A09",
+      "name": "fabricated_fingerprint",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A09_DETERMINISTIC_FINGERPRINT_DRIFT_REJECTED"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
+    },
+    {
+      "id": "A10",
+      "name": "duplicate_finding_retry",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_A10_DUPLICATE_FINDING_REPLAY_ONE_CASE_ONE_RECEIPT",
+        "CI_A10_BROKER_HISTORY_AND_REVIEW_CARDINALITY"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
+    },
+    {
+      "id": "C11",
+      "name": "distinct_case_claim",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_worker_boundaries_20261014",
+      "exact_proof_markers": [
+        "CI_C11_SAME_TRACK_TWO_INDEPENDENT_APPROVED_CLAIMS",
+        "CI_C11_TWO_DISTINCT_CASES_REVIEWS_EVENTS_NO_SOURCE_WRITE"
+      ],
+      "execution_scope": "same_live_disposable_canonical_track_two_distinct_approved_claim_keys_track_slug_identity_noise_1_2_and_track_slug_credit_evidence_gap_1_3_create_distinct_case_ids_review_item_ids_and_immutable_receipt_events;_independent_SQL_confirms_source_track_unchanged",
+      "evidence_limit": "Transactional disposable local PostgreSQL with narrow mizizi_executor session-role simulator, NOT signed-in hosted Preview, real provider production source, or Production grant. Full original worker/32-Track corpus and independent rollback snapshots passed; no historical D1-D3 review reproduced."
+    },
+    {
+      "id": "C12",
+      "name": "case_observation_update",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "preview_229_verified_and_local_pg_20261014",
+      "exact_proof_markers": [
+        "CI_C12_CHANGED_VERIFIED_OBSERVATION_ONE_CASE_REVIEW_RECEIPT",
+        "CI_C12_CHANGED_OBSERVATION_EXACT_REPLAY_AND_FORGED_HASH",
+        "CI_C12_TWO_IMMUTABLE_OBSERVATIONS_ONE_UNCHANGED_REVIEW"
+      ],
+      "execution_scope": "same_live_local_approved_source_observation_revisions_1_and_2_under_trusted_executor;_original_Registry_review_and_receipt_unchanged;_invalid_fingerprint_and_exact_replay_rejected_or_idempotent",
+      "evidence_limit": "Local disposable execution plus deployed Preview 229 read-only schema verification; not a hosted Preview mutated observation or Production execution."
+    },
+    {
+      "id": "C13",
+      "name": "stale_observation",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "c13_source_and_prior_observation_fences_migration230_20261014",
+      "exact_proof_markers": [
+        "CI_C13_CANONICAL_SOURCE_DRIFT_STALE_OBSERVATION_DENIED",
+        "CI_C13_STALE_CANONICAL_DENIAL_PRESERVED_EVENT_AND_REVIEW",
+        "CI_C13_PRIOR_OBSERVATION_REAPPEARANCE_DENIED",
+        "CI_C13_OLD_OBSERVATION_REPLAY_NO_ADDITIONAL_JOURNAL_OR_REVIEW",
+        "WK_DB02_230_OLD_OBSERVATION_REPLAY_FENCE_AND_NARROW_ACL"
+      ],
+      "execution_scope": "fresh_unlinked_disposable_PostgreSQL_full_230_replay_with_source_bound_Release_claim_case_revision_1_then_second_distinct_accepted_observation_revision_2;_older_fingerprint_reappearing_after_newer_observation_while_canonical_source_unchanged_is_rejected_23514_no_new_revision_event_review_or_grant;_source_drift_rejected_40001;_immutable_case_observation_and_source_review_chain_unchanged;_signed_in_real_GoTrue_operator_browser_regression_cleaned_up;_forward_230_migration_applied_native_CLI_to_isolated_Preview_with_read_only_function_source_ACL_and_migration_ledger_verification",
+      "evidence_limit": "LOCAL_EXECUTED original C13 negative cases; isolated Preview has only schema/ACL/owner state verification, no Preview source-backed case fixtures. Does not imply historical Production D1/D2/D3 tested, licenced learning accuracy or Production write authority.",
+      "migration_file": "supabase/migrations/20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql",
+      "forward_replay_proof": "docs/engineering/replay-proofs/20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql.json"
+    },
+    {
+      "id": "C14",
+      "name": "completed_case_replay",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "preview_229_verified_and_local_real_jwt_20261014",
+      "exact_proof_markers": [
+        "WK_C14_AUTH_PERMISSION_NEGATIVES",
+        "WK_C14_GENUINE_STEWARD_COMPLETED",
+        "WK_C14_INDEPENDENT_DB_JOURNAL_AND_REVIEW",
+        "WK_AUTH_C14_SIGNED_IN_DURABLE_COMPLETION_TRUSTED_REPLAY_DENIED",
+        "WK_AUTH_C14_REAL_JWT_DURABLE_TIMEBOX_CAS_AND_REVIEW_INTACT"
+      ],
+      "execution_scope": "genuine_disposable_local_GoTrue_steward_JWT_authorized_source_backed_done_for_now_transition_with_expected_revision_followup_schedule_then_trusted_executor_terminal_case_replay_denied",
+      "evidence_limit": "Real signed-in local done_for_now terminal case only; resolved/closed finalizers not implemented or asserted; hosted deployed Preview operator/browser and Production not run."
+    },
+    {
+      "id": "C15",
+      "name": "immutable_receipt_edit",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_C15_RECEIPT_LINK_EDIT_AND_DELETE_IMMUTABLE"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
+    },
+    {
+      "id": "C16",
+      "name": "immutable_event_edit",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_C16_CASE_EVENT_EDIT_AND_DELETE_IMMUTABLE"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
+    },
+    {
+      "id": "C17",
+      "name": "cross_workspace_case_id",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "track_32_source_corpus_pg_20261014",
+      "exact_proof_markers": [
+        "CI_C17_UNAUTHORIZED_WORKSPACE_GATEWAY_REJECTED"
+      ],
+      "remaining_requirement": "Original C17 genuine multi-workspace cross-tenant case-ID behavior moves to Slice 3 by explicit owner approval, but remains PARTIAL_EVIDENCE and Production NOT_RUN until a genuine second workspace and authentic cross-tenant test exist.",
+      "assigned_delivery_slice": "Slice 3",
+      "scope_decision": "OWNER_APPROVED_2026-10-14",
+      "slice1_replacement_gate": "Current single real internal workspace: signed-in O20 nonmember actual source-case/read/journal/stage denial, O24 reviewer versus steward role-based stage denial, C17 unauthorized workspace gateway denial, no case/review/journal mutation, and only one active internal workspace. Requires accepted exact-head local JWT and independent SQL proof. Does not count as two-workspace C17.",
+      "slice3_original_exit_gate": "Authenticated users authorized to different actual workspaces, a real case ID owned by the other workspace, and verified owner-allowed versus foreign-denied read, journal, evidence, transition, search/count and shared-canonical-source paths including revocation/stale-token tests and independent database noninterference."
+    },
+    {
+      "id": "C18",
+      "name": "two_reviewers_same_revision",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "c18_genuine_auth_race_20261014",
+      "exact_proof_markers": [
+        "WK_AUTH_C18_TWO_REAL_JWTS_SAME_SOURCE_CASE_REVISION_ONE",
+        "WK_AUTH_C18_GENUINE_CONCURRENT_REVIEWERS_SINGLE_CAS_JOURNAL"
+      ],
+      "execution_scope": "two_distinct_genuine_local_GoTrue_signed_in_administrator_workspace_owners_act_as_competing_reviewers_on_one_new_trusted_gateway_source_backed_approved_release_claim_both_read_revision_one_before_concurrent_PostgREST_begin_research_commands;_exactly_one_revision_two_success_and_one_PT409_rejection;_independent_PostgreSQL_proves_only_two_case_events_one_winning_actor_event_one_unchanged_original_open_Registry_review_receipt_and_zero_active_registry_grants",
+      "evidence_limit": "Trusted source gateway admission uses authorized disposable mizizi_executor local-session simulator; concurrent HUMAN stage commands are genuine GoTrue JWT PostgREST requests. This is not hosted Preview/browser concurrency or Production and it does not fabricate historical Registry decisions. CI cleanup destroys all local data."
+    },
+    {
+      "id": "C19",
+      "name": "audit_history_ordering",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_C19_TWO_REVISIONS_ORDERED_AND_LINK_PRESERVED"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
+    },
+    {
+      "id": "O20",
+      "name": "subscriber_case_read",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "real_local_auth_pg_20261014_b0ef7434",
+      "exact_proof_markers": [
+        "WK_AUTH_O20_REAL_SUBSCRIBER_SOURCE_CASE_READ_JOURNAL_AND_WRITE_DENIED"
+      ],
+      "execution_scope": "fresh_unlinked_local_GoTrue_subscriber_real_JWT_against_actual_source_case_via_PostgREST"
+    },
+    {
+      "id": "O21",
+      "name": "unauthenticated_owner_bootstrap",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "real_local_auth_pg_20261014_b0ef7434",
+      "exact_proof_markers": [
+        "WK_AUTH_O21_ANONYMOUS_OWNER_BOOTSTRAP_DENIED"
+      ],
+      "execution_scope": "fresh_unlinked_local_anon_PostgREST_owner_bootstrap_denial"
+    },
+    {
+      "id": "O22",
+      "name": "double_owner_bootstrap",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "real_local_auth_pg_20261014_b0ef7434",
+      "exact_proof_markers": [
+        "WK_AUTH_O22_SECOND_GENUINE_ADMIN_OWNER_BOOTSTRAP_DENIED"
+      ],
+      "execution_scope": "second_genuine_local_administrator_JWT_already_bootstrapped_internal_workspace_denial"
+    },
+    {
+      "id": "O23",
+      "name": "authorized_stage_transition",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "o23_real_jwt_steward_stage_20261014",
+      "exact_proof_markers": [
+        "WK_AUTH_O23_SIGNED_IN_STEWARD_STAGE2_REVIEW_AND_JOURNAL"
+      ],
+      "execution_scope": "genuine_signed_in_disposable_local_GoTrue_PostgREST_steward_with_active_admin_capability_and_workspace_owner_membership_performs_authorized_source_bound_case_transition_revision_1_to_2_triage_to_research;_independent_PostgreSQL_confirms_single_attributed_revision_2_event_and_original_open_Registry_review_receipt_intact",
+      "evidence_limit": "No deployed Preview-bound browser/operator or Production transition; only disposable local real Auth and PostgreSQL, destroyed on exact-head workflow success."
+    },
+    {
+      "id": "O24",
+      "name": "wrong_role_stage_transition",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "o24_real_jwt_reviewer_role_20261014",
+      "exact_proof_markers": [
+        "WK_AUTH_O24_AUTHENTICATED_REVIEWER_READ_ALLOWED_STAGE_DENIED"
+      ],
+      "execution_scope": "genuine_signed_in_disposable_local_GoTrue_PostgREST_JWT_administrator_with_active_reviewer_only_workspace_membership_reads_actual_source_bound_case_and_immutable_event_but_steward_only_stage_transition_returns_42501;_case_remains_revision_1_open_triage_with_one_event",
+      "evidence_limit": "No hosted Preview operator role membership or Production execution; temporary Auth user and database volumes destroyed by exact-source CI."
+    },
+    {
+      "id": "O25",
+      "name": "stale_browser_transition",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "o25_genuine_browser_stale_revision_20261014",
+      "exact_proof_markers": [
+        "WK_O25_TWO_SIGNED_IN_BROWSERS_STALE_REVISION_ONE",
+        "WK_O25_REAL_MOBILE_STALE_BROWSER_HTTP_409_AND_REFRESH",
+        "WK_AUTH_O25_STALE_BROWSER_INDEPENDENT_DB_EVENT_NONINTERFERENCE"
+      ],
+      "execution_scope": "real_two_separate_disposable_local_GoTrue_authenticated_desktop_mobile_Playwright_browsers_both_read_same_trusted_gateway_source_bound_case_revision_1;_two_distinct_authenticated_PostgREST_operator_stage_RPCs_race_one_success_one_PT409;_stale_mobile_browser_submits_old_revision_after_commit_and_receives_HTTP_409_PT409_then_safe_error_then_refresh_to_revision_2_in_progress_research;_independent_PostgreSQL_checks_exactly_one_attributed_case_stage_event_two_total_events_one_original_open_review_receipt_and_zero_active_registry_execution_grants",
+      "evidence_limit": "Genuine signed-in browsers use loopback local Vite/local disposable Supabase, not hosted Preview or Production. Trusted broker source admission uses disposable local mizizi_executor simulator; real operators use GoTrue Auth/JWT. Zero Production cases or mutations; Docker/Auth destroyed."
+    },
+    {
+      "id": "J26",
+      "name": "research_job_admission",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_worker_boundaries_20261014",
+      "exact_proof_markers": [
+        "CI_J26_SOURCE_BOUND_CASE_TYPED_RESOURCE_JOB_AND_COMMAND_RECEIPT"
+      ],
+      "execution_scope": "actual_disposable_trusted_source_bound_case_revision_2_in_research_admitted_through_existing_mizizi_executor_gateway_to_existing_editorial_mizizi_case_resource_binding_platform_private_command_receipt_queued_job_and_outbox;_independent_SQL_confirms_exact_authority_identity_and_zero_active_registry_execution_grants",
+      "evidence_limit": "Transactional disposable local PostgreSQL with narrow mizizi_executor session-role simulator, NOT signed-in hosted Preview, real provider production source, or Production grant. Full original worker/32-Track corpus and independent rollback snapshots passed; no historical D1-D3 review reproduced."
+    },
+    {
+      "id": "J27",
+      "name": "research_job_replay",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_J27_TYPED_RESEARCH_JOB_IDEMPOTENT_REPLAY",
+        "CI_J27_J28_ONE_COMMAND_RECEIPT_ONE_JOB_ONE_OUTBOX"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
+    },
+    {
+      "id": "J28",
+      "name": "research_fingerprint_drift",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "source_case_research_pg_20261014",
+      "exact_proof_markers": [
+        "CI_J28_SHARED_JOB_FINGERPRINT_DRIFT_REJECTED",
+        "CI_J27_J28_ONE_COMMAND_RECEIPT_ONE_JOB_ONE_OUTBOX"
+      ],
+      "execution_scope": "unlinked_disposable_local_postgres_sql_session_authorization_simulation"
+    },
+    {
+      "id": "W29",
+      "name": "service_worker_first_claim",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W30",
+      "name": "non_service_worker_claim",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W31",
+      "name": "concurrent_claimers",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W32",
+      "name": "lease_timeout_recovery",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W33",
+      "name": "worker_restart_resume",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W34",
+      "name": "stale_lease_completion",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "W35",
+      "name": "max_retry_dead_letter",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "worker_pg"
+    },
+    {
+      "id": "H36",
+      "name": "workspace_hold_issue",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "h36_h40_true_signed_in_hold_release_preview_and_disposable_20261014",
+      "preview_acceptance": {
+        "status": "ACCEPTED_PREVIEW_POSITIVE_RECEIPT",
+        "scope": "authorized_remote_Preview_DB_signed_in_localhost_Vite_browser_workspace_hold_revision_1_immutable_event_actor_reason_verified_live_SQL",
+        "limit": "No public hosted Preview frontend or canonical queued writer tested"
+      },
+      "exact_proof_markers": [
+        "WK_AUTH_H36_EXACT_SIGNED_IN_WORKSPACE_HOLD_ISSUANCE_JOURNAL",
+        "WK_AUTH_H36_H40_HOLD_READ_AND_SINGLE_RELEASE",
+        "CI_DB05_H36_TRANSACTIONAL_HOLD_AND_HISTORY"
+      ],
+      "execution_scope": "genuine_signed_in_disposable_GoTrue_first_internal_owner_hold_command_and_independent_PostgreSQL_source_workspaces_scope_reason_actor_hold_key_held_at_revision_1_exactly_one_immutable_hold_started_event_and_zero_active_registry_execution_grants;_second_real_signed_in_owner_independently_reads_hold;_genuine_preview_bound_localhost_browser_real_authorized_owner_issued_one_actual_workspace_hold_and_independent_live_Preview_SQL_checked_identical_event_source_fields",
+      "evidence_limit": "H36 positive hold issuance and audit accepted at LOCAL_EXECUTED with additional real signed-in isolated Preview browser/remote Supabase positive receipt; public hosted Preview frontend and Production not tested. H37 queued canonical writer denial is separate and remains unverified."
+    },
+    {
+      "id": "H37",
+      "name": "queued_registry_mutation_held",
+      "status": "PARTIAL_EVIDENCE",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "db05_pg_auth_subset",
+      "assigned_delivery_slice": "Slice 3",
+      "scope_decision": "OWNER_APPROVED_2026-10-14",
+      "slice1_replacement_gate": "DB05 per-scope hold and exact Registry grant/mutation admission trigger denial; H36 signed-in workspace hold and immutable issue record; H38 genuine pre-issued reviewed Artist merge grant denied during hold with no canonical mutation/success receipt; H40 release CAS and immutable journal, stale grant still denied and a new separately reviewed grant verified, zero standing grants. Read-only queued research cannot substitute for a Registry writer.",
+      "slice3_original_exit_gate": "Real existing-queue typed canonical Registry mutation, genuine frozen reviewed plan/exact grant and worker lease; active Hold Writes at dequeue/retry/resume/execution prevents any canonical write/grant consumption or success receipt, preserves immutable journal, and requires fresh authorization after release including race/expiry/lease recovery tests.",
+      "remaining_requirement": "Original H37 queued canonical Registry writer denied at execution under active Hold moves to Slice 3 by explicit owner approval. Existing H38 direct writer or read-only research job does not pass H37; PARTIAL_EVIDENCE and Production NOT_RUN remain."
+    },
+    {
+      "id": "H38",
+      "name": "stale_grant_write_during_hold",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "real_local_auth_pg"
+    },
+    {
+      "id": "H39",
+      "name": "hold_concurrent_release",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "real_local_auth_pg"
+    },
+    {
+      "id": "H40",
+      "name": "hold_release_postcheck",
+      "status": "LOCAL_EXECUTED",
+      "production_acceptance": "NOT_RUN",
+      "evidence_group": "h36_h40_true_signed_in_hold_release_preview_and_disposable_20261014",
+      "preview_acceptance": {
+        "status": "ACCEPTED_PREVIEW_POSITIVE_RECEIPT",
+        "scope": "same_authorized_Preview_owner_release_revision_2_exact_two_immutable_events_actor_reasons_and_no_active_hold_grants_verified_live_SQL",
+        "limit": "Stale exact grant denial and new authorized grant execution verified in disposable local GoTrue test, not with live Preview grant; H37 separate"
+      },
+      "exact_proof_markers": [
+        "WK_AUTH_H40_SIGNED_IN_RELEASE_ONE_EVENT_CAS_NO_GRANT",
+        "WK_AUTH_TWO_REAL_JWTS_H39_CONCURRENT_HOLD_RELEASE_CAS",
+        "WK_H40_POST_RELEASE_STALE_GRANT_CANNOT_REACQUIRE_AUTHORITY",
+        "WK_H40_FRESH_SEPARATE_GRANT_REQUIRED_AND_VERIFIED",
+        "CI_DB05_H40_RELEASE_JOURNAL_AND_NO_STANDING_GRANT"
+      ],
+      "execution_scope": "two_genuine_GoTrue_authenticated_workspace_owners_compete_on_same_revision_1_hold_release_one_winner_revision_2_one_PT409_stale_denial;_independent_PostgreSQL_exact_immutable_two_events_unique_seqs_correct_held_and_released_actor_reason_temporal_order_zero_active_holds_or_grants;_genuine_earlier_reviewed_exact_registry_artist_merge_grant_rejected_while_held_and_stays_stale_after_release;_only_distinct_freshly_reviewed_grant_may_execute_and_independent_verifier_passes;_isolated_Preview_actual_signed_in_browser_release_revision_2_and_live_SQL_exact_historical_receipts_preserved",
+      "evidence_limit": "H40 positive release, immutable record and postrelease stale-grant fencing accepted with full disposable real JWT source/operation proof and additional isolated Preview signed-in UI positive receipt. No Preview queued-writer test, no public deployed Preview frontend, and no Production acceptance. H37 remains separate."
+    }
+  ],
+  "verified_execution_sha": "887426ad9baf8f281112c63552906c0200ab5647",
+  "verified_workflows": {
+    "critical": "https://github.com/bjuta/wakilisha/actions/runs/38622022711",
+    "disposable": "https://github.com/bjuta/wakilisha/actions/runs/38622022580"
+  },
+  "last_audit_note": "Owner explicitly approved moving full original C17 genuine multi-workspace case-ID isolation and H37 genuine queued canonical Registry writer denied during Hold Writes to Slice 3 on 14 October 2026. The binding implementation exit contract and exact code register preserve narrow Slice 1 replacement gates based on actual O20/O24 authenticated nonmember/role tests, C17 denied foreign workspace gateway, DB05 policy and grant/mutation triggers, real signed-in H36/H38/H40 hold/previously issued exact Artist writer/postrelease fresh grant and independent audits. This is a scope decision, not test execution: original C17 and H37 remain PARTIAL_EVIDENCE, the v15 matrix stays 38 LOCAL_EXECUTED / 2 PARTIAL_EVIDENCE, all 40 Production NOT_RUN. Source evidence and protected CI from v14 remain the same; no new tenancy, Registry mutating queue, grant, Production deploy, admin bootstrap or PR merge. Full historical DESIRE/Ficha/Colors and real Production exit remain independently gated.",
+  "corpus_evidence": {
+    "sources": 32,
+    "lanes": 4,
+    "per_lane": 8,
+    "case_review_receipt_chains": 32,
+    "source_track_rows": 40,
+    "jit": "LOCAL_SESSION_AUTHORIZATION_SIMULATOR",
+    "provider_creator_tenant_variety": "NOT_VERIFIED",
+    "production_or_preview_mutation": "NONE",
+    "source_transaction": "ROLLED_BACK_AND_INDEPENDENTLY_VERIFIED"
+  },
+  "scope_decisions": [
+    {
+      "decision_id": "OWNER_APPROVED_C17_H37_SLICE3_20261014",
+      "approved_by": "project_owner",
+      "approved_at": "2026-10-14",
+      "decision": "Move execution of original C17 and H37 full scenarios to Slice 3; use exact narrower replacement security gates for Slice 1; do not waive, mark executed, remove or change original forty acceptance IDs.",
+      "source_issue": "https://github.com/bjuta/wakilisha/issues/1226",
+      "source_pr": "https://github.com/bjuta/wakilisha/pull/1227",
+      "contract": "docs/engineering/mizizi-headquarters-implementation-exit-contract-v1-20261010.md",
+      "implementation_register": "docs/engineering/mizizi-headquarters-code-change-register-v1-20261010.md",
+      "affected_original_ids": [
+        "C17",
+        "H37"
+      ],
+      "scope": "Slice 1 retains one existing internal workspace and no queued Registry writer; Slice 3 requires actual legitimate separate tenancy and actual queued canonical execution.",
+      "slice1_current_scope_proof": {
+        "c17": [
+          "CI_C17_UNAUTHORIZED_WORKSPACE_GATEWAY_REJECTED",
+          "WK_AUTH_O20_REAL_SUBSCRIBER_SOURCE_CASE_READ_JOURNAL_AND_WRITE_DENIED",
+          "WK_AUTH_O24_AUTHENTICATED_REVIEWER_READ_ALLOWED_STAGE_DENIED"
+        ],
+        "h37": [
+          "CI_DB05_H37_SCOPE_HOLD_POLICY_DENIAL",
+          "CI_DB05_H37_BOTH_CANONICAL_ADMISSION_TRIGGERS_DENIED",
+          "WK_H38_REAL_AUTH_STALE_EXACT_GRANT_WRITER_DENIED_DURING_HOLD",
+          "WK_H40_POST_RELEASE_STALE_GRANT_CANNOT_REACQUIRE_AUTHORITY",
+          "WK_H40_FRESH_SEPARATE_GRANT_REQUIRED_AND_VERIFIED"
+        ],
+        "last_accepted_runtime_source": "887426ad9baf8f281112c63552906c0200ab5647",
+        "accepted_critical": "https://github.com/bjuta/wakilisha/actions/runs/38622780914",
+        "accepted_disposable": "https://github.com/bjuta/wakilisha/actions/runs/38622780837",
+        "limitations": "These demonstrate the narrow single-workspace permission and SQL/direct-writer hold controls only, never a real foreign-tenant case or queued Registry writer."
+      },
+      "promotion_constraints": "Original C17/H37 remain PARTIAL_EVIDENCE; all 40 Production acceptances remain NOT_RUN. Full historical DESIRE/Ficha/Colors and separate Production release checks are still required. New tenancy, queued Registry writes and earned licences are not authorized for Slice 1."
+    }
+  ]
+}
