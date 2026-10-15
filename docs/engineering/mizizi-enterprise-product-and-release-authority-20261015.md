@@ -1,5 +1,14 @@
 # MIZIZI Enterprise Product and Release Authority
 
+## Slice 1 final scoped Production role gate, 15 October 2026
+
+**Current-scope acceptance:** The existing signed-in Production Analyst (not a Headquarters workspace member) issued actual PostgREST requests after the first authentic `Phases` case entered Research. `admin_mizizi_cases_v1`, `admin_mizizi_case_events_v1`, and `admin_mizizi_begin_case_research_v1` each returned **HTTP 403 / SQLSTATE 42501**. The latter used revision 0 for additional nonmutating safety; the independently inspected live function performs the `steward` authorization check before argument or revision validation. Existing owner-positive case-list/journal acceptance, case admission and owner-approved revision 1 to 2 transition, and prior genuine nonmember Hold Writes 403 remain separately evidenced on [issue #1226](https://github.com/bjuta/wakilisha/issues/1226). No additional Production mutation occurred in this security probe.
+
+**Independent postflight:** case `e875feea-c2fa-4543-8c55-532279e03539` remains `in_progress/research`, revision 2, epistemic `unknown`, mutation `not_planned`. Production contains 1 case, 2 immutable events, 1 observation, 1 original review receipt, 0 MIZIZI research jobs, 0 issued Registry execution grants, 0 active holds, 0 active system-actor capability grants, 1 internal workspace and 1 nonrevoked membership. Original review `219ddb11-eab8-4cdb-acdf-499dc39ecf69` remains open; 231 applied migrations end at `20261015091718`.
+
+**Binding scope and next work:** The *remaining named Production single-workspace role-denial gate* has now **PASSED**. Reconcile Slice 1 closure on its original locally accepted and Production-release evidence without rewriting the frozen original 40-scenario ledger. That ledger remains v15 at 38 `LOCAL_EXECUTED` and 2 `PARTIAL_EVIDENCE`. The original full C17 two-workspace isolation and H37 queued canonical Registry writer under Hold remain expressly assigned by the owner to **existing Slice 3**, **not accepted or waived**. Separate JIT Management API verification from another credential, independent learning, commercial tenancy and external delivery remain unproven and must never be inferred from Slice 1. The next engineering result belongs to **existing Slice 2**: one lawfully sourced, unfamiliar investigation with provenance, independent adjudication and repeatable outcome-learning evaluation. Do not repeat this case admission, D1/D2/D3 historical repairs, or security diagnostics.
+
+
 
 ## First Phases case lifecycle and two-sided access, 15 October 2026 (latest checkpoint)
 
