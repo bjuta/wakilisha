@@ -1,5 +1,19 @@
 # MIZIZI Headquarters — Exact Code Change Register and Interface Contracts V1
 
+## Current Implementation Ownership: 15 October 2026
+
+The 10 October `NEW/MODIFY/EXISTING` categories below are **historical proposed-change classifications**, not a current repository inventory. See [enterprise product and current release authority](mizizi-enterprise-product-and-release-authority-20261015.md) for deployment and buyer-readiness truth. Do not rename/delete old planned rows or retrofit historic migration stems as if they were today's live state.
+
+**Now implemented on open, unmerged PR #1227:** fourteen CLI-minted Slice 1 SQL migrations through `20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql`; `mizizi_private` workspace/membership, cases/events/dependencies, case observations, snapshots/plans, write holds/policy/licence scaffolding; source-verified finding-to-case admission; a typed `mizizi_case` resource bridge and `mizizi.case_research_v1` to existing `platform_private.jobs`, command receipts, and outbox; researcher lease/retry/recovery contracts; genuine signed-in operator RPCs; and Brief/Field/Cores/case/hold UI. All are **candidate branch or isolated-Preview features**, not Production rollout or proven continuous learning. Exact pre-doc source HEAD: `733b8452`, protected CI green.
+
+**Not implemented as deployed enterprise service:** actual DB04 independent research provenance loop, separate enterprise customer tenant/representation, consented inbound data contracts, independent shadow-calibration outcome store and evaluation runner, earned active stewardship licences, genuine queued canonical Registry writer, per-recipient customer delivery/ACK, Production worker scheduler, realistic sustained million-scale load/proven costs, and cross-customer learning authorization. Any new DB04/06/07/08/09/10/11/12 change requires the future appropriate slice and a generated migration, never a filename copied from these historical planning rows.
+
+**Enterprise portability must be designed into later seams:** customer-owned canonical truth; legal data-processing, retention and residency boundaries; zero inferred source-use licences; explicit tenant-specific permissions; per-customer audit/export; approved adapters rather than a copied Registry; provider-independent identities; no model- or customer-issued universal mutation grant. Separately classify commercial software licence, stewardship policy licence, and music/evidence rights.
+
+**Exact remaining Slice 1 work:** narrow pre-promotion audit of existing authenticated Registry decision/review read policy and consumers; genuine D1 blocked/D2-D3 complete historic reader browser proof; signed-in role and mobile/desktop acceptance; exact protected CI; separate controlled Production SQL/frontend/rollback and post-deploy read receipts. Keep C17/H37 original scenarios `PARTIAL_EVIDENCE` for Slice 3 and all Production acceptance `NOT_RUN` until exercised. No duplicate queue, fake second workspace, new direct Registry writer, or autonomous mutation in this docs update.
+
+
+
 **Date:** 10 October 2026 | **Status:** Planned change authority; zero implementation changes in this PR.  
 **Base:** `main@4381d6020b83e5b3b6781bb28003dee76618737d`; Production migration head `20261009181647`.  
 **Parent:** [product and system architecture](mizizi-headquarters-product-architecture-v1-20261010.md).  
