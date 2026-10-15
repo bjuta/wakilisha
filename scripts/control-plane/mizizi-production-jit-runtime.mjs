@@ -139,6 +139,33 @@ export function queryViaLinkedCli(sql) {
   return payload;
 }
 
+/**
+ * Read-only Management API transport for authoritative SQL pre/postflight.
+ * The linked CLI login (cli_login_postgres) is intentionally NOT allowed to
+ * SELECT private MIZIZI or migration-ledger tables. Never widen its grants.
+ * The server's /read-only endpoint executes as supabase_read_only_user.
+ * This transport must never be used for a case write or Registry mutation.
+ */
+export async function queryViaManagementReadOnly({projectRef, token, sql}) {
+  if (!projectRef || !token || typeof sql !== "string" ||
+      !/^\s*(?:select|with)\b/i.test(sql)) {
+    throw new Error("MIZIZI_READ_ONLY_QUERY_AUTHORITY_REQUIRED");
+  }
+  const result = await managementApi(
+    token, "POST",
+    "/v1/projects/" + projectRef + "/database/query/read-only",
+    { query: sql },
+  );
+  const rows = Array.isArray(result) ? result
+    : Array.isArray(result?.data) ? result.data
+    : Array.isArray(result?.result) ? result.result : null;
+  if (!rows || rows.length !== 1 || !rows[0] ||
+      typeof rows[0] !== "object" || Array.isArray(rows[0])) {
+    throw new Error("MIZIZI_READ_ONLY_QUERY_SINGLE_ROW_REQUIRED");
+  }
+  return rows[0];
+}
+
 function rowsFromJitList(raw) {
   return Array.isArray(raw)
     ? raw
@@ -324,7 +351,11 @@ export async function openMiziziJitSession({
 
   linkSupabaseProject(projectRef);
 
-  const authority = queryViaLinkedCli(stageCAuthoritySql);
+  // The Stage C ledger and actor bindings are private objects. Use the
+  // Management API's immutable read-only SQL transport, not cli_login_postgres.
+  const authority = await queryViaManagementReadOnly({
+    projectRef: managementProjectRef, token, sql: stageCAuthoritySql,
+  });
 
   if (
     authority.stage_c_applied !== true ||

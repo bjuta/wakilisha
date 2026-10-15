@@ -83,6 +83,16 @@ describe("MIZIZI current URL-identity production control plane", () => {
     expect(runtime).toContain('"--agent=yes"');
     expect(runtime).not.toContain('"--agent=no"');
     expect(runtime).toContain("MIZIZI_LINKED_CLI_EMPTY_JSON_RESPONSE");
+    // The CLI's cli_login_postgres role has no direct rights to private
+    // Headquarters/Registry/ledger tables. Preflight must instead use the
+    // supported read-only Management API role, never service-role writes.
+    expect(runtime).toContain("queryViaManagementReadOnly");
+    expect(runtime).toContain('"/database/query/read-only"');
+    expect(runtime).toContain('"/v1/projects/" + projectRef + "/database/query/read-only"');
+    expect(runtime).toContain("sql: stageCAuthoritySql");
+    expect(runtime).toContain("MIZIZI_READ_ONLY_QUERY_SINGLE_ROW_REQUIRED");
+    expect(runtime).not.toContain("const authority = queryViaLinkedCli(stageCAuthoritySql)");
+
     // Never rely on a CI-only masking directive in a Mac operator terminal.
     expect(runtime).not.toContain('console.log("::add-mask::" + url)');
     expect(runtime).not.toContain("return 'postgres'");
