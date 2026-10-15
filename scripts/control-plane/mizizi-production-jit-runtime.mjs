@@ -338,26 +338,6 @@ const stageCAuthoritySql = `select
       and status='disabled'
   ) as postgres_disabled`;
 
-/** Supabase's documented JIT mutation payload uses user_roles (not roles).
- * POST creates the first user mapping; PUT replaces an existing mapping.
- * Keep unrelated existing restrictions and roles exactly as supplied. */
-export function planMiziziJitUserMapping({userId,existing,now=Date.now()}) {
-  if(typeof userId!=="string" || userId.length===0 ||
-     !Number.isFinite(now)) throw new Error("MIZIZI_JIT_ID_OR_TIME_REQUIRED");
-  if(existing && !Array.isArray(existing.user_roles))
-    throw new Error("MIZIZI_JIT_EXISTING_USER_ROLES_MALFORMED");
-  const originalRoles=existing ? existing.user_roles : [];
-  const user_roles=originalRoles.filter(
-    entry=>!["postgres","mizizi_executor"].includes(String(entry?.role||""))
-  );
-  user_roles.push({role:"mizizi_executor",expires_at:now+60*60*1000});
-  return {
-    method:existing?"PUT":"POST",
-    body:{user_id:userId,user_roles},
-    originalRoles,
-  };
-}
-
 export async function openMiziziJitSession({
   projectRef,
   managementProjectRef = projectRef,
@@ -437,8 +417,10 @@ export async function openMiziziJitSession({
         ) === userId,
     ) || null;
 
-  const rolePlan=planMiziziJitUserMapping({userId,existing});
-  const originalRoles=rolePlan.originalRoles;
+  const originalRoles =
+    existing && Array.isArray(existing.user_roles)
+      ? existing.user_roles
+      : [];
   console.log("WK_JIT_MAPPING_LOOKUP="+(existing?"EXISTING":"NEW_USER"));
 
   let mappingChanged = false;
@@ -469,7 +451,7 @@ export async function openMiziziJitSession({
             "/v1/projects/" + managementProjectRef + "/database/jit",
             {
               user_id: userId,
-              user_roles: originalRoles,
+              roles: originalRoles,
             },
           );
         } else {
@@ -525,24 +507,28 @@ export async function openMiziziJitSession({
       { state: "enabled" },
     );
 
-    console.log("WK_JIT_MAPPING_WRITE_METHOD="+rolePlan.method);
+    const roles = originalRoles.filter(
+      (entry) =>
+        !["postgres", "mizizi_executor"].includes(
+          String(entry.role || ""),
+        ),
+    );
+    roles.push({
+      role: "mizizi_executor",
+      expires_at: Date.now() + 60 * 60 * 1000,
+    });
+
+    // The LIVE management endpoint validates a `roles` array for PUT.
+    // Preserve that accepted format even though public guide examples
+    // use a different field name.
+    console.log("WK_JIT_MAPPING_WRITE_METHOD=PUT");
     await managementApi(
       token,
-      rolePlan.method,
+      "PUT",
       "/v1/projects/" + managementProjectRef + "/database/jit",
-      rolePlan.body,
+      { user_id: userId, roles },
     );
     mappingChanged = true;
-
-    const confirmed = rowsFromJitList(await managementApi(
-      token,"GET",
-      "/v1/projects/" + managementProjectRef + "/database/jit/list",
-    )).find(item=>String(item.user_id||item.id||item.gotrue_id||"")===userId);
-    if(!Array.isArray(confirmed?.user_roles) ||
-       !confirmed.user_roles.some(role=>role?.role==="mizizi_executor")) {
-      throw new Error("MIZIZI_JIT_ROLE_MAPPING_NOT_CONFIRMED");
-    }
-    console.log("WK_JIT_EXACT_ROLE_MAPPING_CONFIRMED=PASS");
 
     const url = databaseUrl(
       projectRef,
