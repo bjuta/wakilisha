@@ -2,6 +2,64 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 describe("MIZIZI current URL-identity production control plane", () => {
+
+  it("binds scoped PAT identity to the self JIT endpoint and fails closed on malformed replies", async () => {
+    const { resolveMiziziJitCaller } = await import(
+      "../../scripts/control-plane/mizizi-production-jit-runtime.mjs"
+    );
+    const originalFetch = globalThis.fetch;
+    const calls: string[] = [];
+    const userId = "11111111-2222-4333-8444-555555555555";
+    let reply: unknown = {
+      user_id: userId,
+      user_roles: [{ role: "existing_readonly" }],
+    };
+    try {
+      globalThis.fetch = (async (url: string, options: {method: string}) => {
+        expect(options.method).toBe("GET");
+        calls.push(String(url));
+        return new Response(JSON.stringify(reply), { status: 200 });
+      }) as typeof fetch;
+
+      await expect(resolveMiziziJitCaller({
+        projectRef: "example-project", token: "sbp_fc_scoped",
+      })).resolves.toEqual({
+        userId, selfRoles: [{ role: "existing_readonly" }],
+      });
+      expect(calls).toEqual([
+        "https://api.supabase.com/v1/projects/example-project/database/jit",
+      ]);
+
+      reply = { user_id: userId }; // role mapping missing
+      await expect(resolveMiziziJitCaller({
+        projectRef: "example-project", token: "sbp_fc_scoped",
+      })).rejects.toThrow("MIZIZI_SCOPED_JIT_CALLER_UNVERIFIED");
+
+      reply = [{ user_id: userId, user_roles: [] }]; // a list is not self
+      await expect(resolveMiziziJitCaller({
+        projectRef: "example-project", token: "sbp_fc_scoped",
+      })).rejects.toThrow("MIZIZI_SCOPED_JIT_CALLER_UNVERIFIED");
+
+      reply = { user_id: "not-an-identity", user_roles: [] };
+      await expect(resolveMiziziJitCaller({
+        projectRef: "example-project", token: "sbp_fc_scoped",
+      })).rejects.toThrow("MIZIZI_SCOPED_JIT_CALLER_UNVERIFIED");
+
+      reply = { id: userId, user_roles: [] }; // cannot infer aliases
+      await expect(resolveMiziziJitCaller({
+        projectRef: "example-project", token: "sbp_fc_scoped",
+      })).rejects.toThrow("MIZIZI_SCOPED_JIT_CALLER_UNVERIFIED");
+
+      reply = { id: userId };
+      await expect(resolveMiziziJitCaller({
+        projectRef: "example-project", token: "sbp_classic",
+      })).resolves.toEqual({ userId, selfRoles: null });
+      expect(calls.at(-1)).toBe("https://api.supabase.com/v1/profile");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("keeps the current programme on the shared Stage C JIT boundary", () => {
     const workflow = readFileSync(
       ".github/workflows/mizizi-url-identity-production-control-plane.yml",
@@ -96,6 +154,10 @@ describe("MIZIZI current URL-identity production control plane", () => {
     expect(runtime).toContain("roles: originalRoles");
     expect(runtime).toContain("{ user_id: userId, roles }");
     expect(runtime).toContain("WK_JIT_PROFILE_LOOKUP=START");
+    expect(runtime).toContain("MIZIZI_SCOPED_JIT_CALLER_UNVERIFIED");
+    expect(runtime).toContain("MIZIZI_SCOPED_JIT_MAPPING_MISMATCH");
+    expect(runtime).toContain('"/database/jit"');
+    expect(runtime).toContain("resolveMiziziJitCaller");
     expect(runtime).toContain("WK_JIT_STATUS_READ=START");
     expect(runtime).toContain("WK_JIT_MAPPING_LIST=START");
     expect(runtime).toContain("WK_JIT_MAPPING_WRITE_METHOD=PUT");
