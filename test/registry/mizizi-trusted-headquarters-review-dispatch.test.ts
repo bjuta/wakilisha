@@ -68,6 +68,16 @@ describe("MIZIZI opt-in real JIT review-to-case dispatch",()=>{
      "--jit-project-ref=pgzizndxdyhqmtyywjmt",
    ])).toThrow("MIZIZI_CASE_ADMISSION_EXPLICIT_CONFIRMATION_REQUIRED");
  });
+ it("does not enable JIT for malformed or unapproved source findings",async()=>{
+   const opener=vi.fn();
+   await expect(admitReviewViaManagedJitV1({
+     projectRef:"pgzizndxdyhqmtyywjmt",token:"sbp_fc_test_only",
+     workspaceId:ws,rulesetVersion:"1.3.0",
+     finding:{...finding,ruleVersion:"unapproved"},
+   },opener as unknown as Parameters<typeof admitReviewViaManagedJitV1>[1]))
+     .rejects.toThrow();
+   expect(opener).not.toHaveBeenCalled();
+ });
  it("always restores the JIT mapping on case success and denial",async()=>{
    for(const role of ["mizizi_executor","postgres"]){
      const query=fixture(role),restore=vi.fn(async()=>undefined);
