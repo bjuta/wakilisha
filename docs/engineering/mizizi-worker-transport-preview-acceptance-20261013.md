@@ -1,5 +1,13 @@
 # MIZIZI Headquarters Slice 1 — Preview Worker Transport 225 Acceptance
 
+## Status Reconciliation: 15 October 2026
+
+This file is the sealed **historical Preview migration 225** receipt. Later Preview migrations installed through **230** (`20261014182214`). The original worker transport, typed case/resource bridge, read-only research command registration, lease/retry/recovery, and real-JWT/disposable PostgreSQL contracts remain preserved and pass on pre-documentation source HEAD `733b8452`. The installed Preview currently has **zero** durable cases and **zero** `mizizi.case_research_v1` jobs, and the shared queue contains **no `registry.%` canonical writer command type**.
+
+An available read-only worker contract is not a continuously scheduled Production research service, an independently learning model, a delivered customer integration, or evidence for original H37's queued mutating job. Do not backdate this 225 acceptance, rerun its applied migration, or claim million-scale throughput. See [enterprise product and current release authority](mizizi-enterprise-product-and-release-authority-20261015.md); Production is still at 216 migrations and PR #1227 remains draft.
+
+
+
 - **Date:** 13 October 2026 (Africa/Nairobi)
 - **Repository:** `bjuta/wakilisha` · draft PR #1227 · parent issue #1226
 - **PR head at acceptance:** `036688762e1a36a02da2dbf5d6a8a825b216c100`
