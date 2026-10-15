@@ -145,6 +145,15 @@ async function main(){
  // RLS authority: use the genuine source-bound review already admitted by the
  // existing fixture. No fabricated human decision or Registry mutation.
  const reviewId=cases[0].reviewId;
+ // This is NOT a human decision. It is an isolated access-control sentinel
+ // with no review link, operation, grant, cultural inference or production ID.
+ const decisionProbeId=randomUUID();
+ localSql("INSERT INTO public.registry_canonicalization_decisions("+
+  "id,decision_type,entity_type,before_payload,after_payload,decision_notes,status,metadata) "+
+  "VALUES ('"+decisionProbeId+"'::uuid,'wk_ci_reader_rls_sentinel','ci_only',"+
+  "jsonb_build_object('ciOnly',true),jsonb_build_object('ciOnly',true),"+
+  "'Non-human disposable read-authority sentinel.','ci_only',"+
+  "jsonb_build_object('ciOnly',true));",db);
  const policyCount=localSql(
   "SELECT count(*) FROM pg_policies WHERE schemaname='public' AND "+
   "tablename IN ('registry_review_items','registry_canonicalization_decisions') "+
@@ -157,6 +166,12 @@ async function main(){
  assert(!adminReview.error&&adminReview.count===1&&
   adminReview.data?.length===1&&adminReview.data[0].id===reviewId,
   "STOP_READER_RLS_REAL_ADMIN_JWT_LOST_SOURCE_REVIEW");
+ const adminDecision=await first.user.from("registry_canonicalization_decisions")
+  .select("id,decision_notes,before_payload,after_payload",{count:"exact"})
+  .eq("id",decisionProbeId);
+ assert(!adminDecision.error&&adminDecision.count===1&&
+  adminDecision.data?.length===1&&adminDecision.data[0].id===decisionProbeId,
+  "STOP_READER_RLS_REAL_ADMIN_JWT_LOST_DECISION_SENTINEL");
  const anonymousReview=await client(api,values.ANON_KEY)
   .from("registry_review_items")
   .select("id,source_payload,candidate_payload,resolution_payload",{count:"exact"})
@@ -164,7 +179,14 @@ async function main(){
  assert(!anonymousReview.error&&anonymousReview.count===0&&
   anonymousReview.data?.length===0,
   "STOP_READER_RLS_ANON_EVIDENCE_EXPOSED");
- console.log("WK_AUTH_REGISTRY_READER_RLS_POLICY_AND_REAL_ADMIN_ANON=PASS");
+ const anonymousDecision=await client(api,values.ANON_KEY)
+  .from("registry_canonicalization_decisions")
+  .select("id,decision_notes,before_payload,after_payload",{count:"exact"})
+  .eq("id",decisionProbeId);
+ assert(!anonymousDecision.error&&anonymousDecision.count===0&&
+  anonymousDecision.data?.length===0,
+  "STOP_READER_RLS_ANON_DECISION_SENTINEL_EXPOSED");
+ console.log("WK_AUTH_REGISTRY_READER_RLS_BOTH_TABLES_REAL_ADMIN_ANON=PASS");
  // O20: prove a fresh, actually signed-in subscriber cannot read a REAL
  // source-backed open case or its immutable event journal. No member grant.
  const subscriberEmail="wk-local-subscriber-"+randomUUID()+"@example.test";
@@ -184,7 +206,13 @@ async function main(){
  assert(!subscriberReview.error&&subscriberReview.count===0&&
   subscriberReview.data?.length===0,
   "STOP_READER_RLS_REAL_SUBSCRIBER_JWT_READS_PRIVATE_EVIDENCE");
- console.log("WK_AUTH_REGISTRY_READER_RLS_REAL_SUBSCRIBER_JWT_DENIED=PASS");
+ const subscriberDecision=await subscriber.from("registry_canonicalization_decisions")
+  .select("id,decision_notes,before_payload,after_payload",{count:"exact"})
+  .eq("id",decisionProbeId);
+ assert(!subscriberDecision.error&&subscriberDecision.count===0&&
+  subscriberDecision.data?.length===0,
+  "STOP_READER_RLS_REAL_SUBSCRIBER_JWT_READS_PRIVATE_DECISION");
+ console.log("WK_AUTH_REGISTRY_READER_RLS_BOTH_TABLES_REAL_SUBSCRIBER_JWT_DENIED=PASS");
  const nonMember=localSql("SELECT count(*) FROM mizizi_private.workspace_memberships"+
   " WHERE user_id='"+subscriberCreated.data.user.id+"'::uuid;",db);
  assert(nonMember==="0","STOP_O20_SUBSCRIBER_UNEXPECTED_WORKSPACE_MEMBERSHIP");
