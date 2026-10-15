@@ -65,6 +65,10 @@ describe("MIZIZI current URL-identity production control plane", () => {
       ".github/workflows/mizizi-url-identity-production-control-plane.yml",
       "utf8",
     );
+    const criticalWorkflow = readFileSync(
+      ".github/workflows/critical-control-plane.yml",
+      "utf8",
+    );
     const trackWorkflow = readFileSync(
       ".github/workflows/mizizi-track-production-control-plane.yml",
       "utf8",
@@ -105,6 +109,11 @@ describe("MIZIZI current URL-identity production control plane", () => {
       "group: mizizi-production-jit-control-plane",
     );
     expect(workflow).toContain("queue: max");
+    // Prevent the observed cli_login_postgres SQLSTATE 28P01 when
+    // critical-core and the Production JIT preflight overlap.
+    expect(criticalWorkflow).toMatch(
+      /critical-core:[\s\S]*?concurrency:\s*\n\s*group: mizizi-production-jit-control-plane\s*\n\s*queue: max/,
+    );
     expect(workflow).not.toContain("cancel-in-progress:");
 
     for (const acceptedControlPlane of [
