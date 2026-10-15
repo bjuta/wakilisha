@@ -1,5 +1,16 @@
 # MIZIZI Enterprise Product and Release Authority
 
+
+## First Production Headquarters case acceptance (15 October 2026, latest)
+
+The preceding zero-case checkpoint below is historical, **not the current Production state**. The operator executed the single explicitly confirmed `Phases` admission on protected `main@882bab9d5b2bb553253f82d0b023b30ea226dfa6` after [PR #1235](https://github.com/bjuta/wakilisha/pull/1235) and all exact-commit / merged-main Critical and disposable-JWT checks passed. The actual scoped-token `mizizi_executor` login succeeded on attempt 1; operator Management API cleanup reported temporary access disabled and role mapping restored. Independent second-credential Management API status verification is still **unverified**.
+
+Independent live read-only Production SQL proves exactly **one case, one observation, one immutable event and one typed review receipt**, all referencing the first admitted Track `23a36038-d6d9-406c-93dd-b2026db6fb24`. Case `e875feea-c2fa-4543-8c55-532279e03539` is revision 1, **open / triage / unknown**, with mutation `not_planned` and publication/delivery `not_requested`. Original review `219ddb11-eab8-4cdb-acdf-499dc39ecf69` remains **open**; observation `09fff45e-ef63-4f62-9b92-f407456d5122`, event `b9fd8254-b191-40ec-8eaf-9686ba29da6c`, and receipt `c7fcde04-c512-44d6-99ce-f4dadcff2a70` bind the case to that original unresolved cultural identity finding. Independently calculated receipt authority SHA-256 `07f56c861b776edc7367f3d18b05cb21faa99f9b3b3d07572bb83b193765dc96` exactly matches the stored receipt fingerprint.
+
+Production still has **231 migrations** through `20261015091718`, zero issued Registry execution grants, and zero MIZIZI research jobs. The admission introduced no new migration, grant, human decision, source repair, or research task. Broader Registry operations-count and full observation payload reads were blocked by the query interface; do not claim those independent checks passed. This is first **authentic durable review-to-case admission**, **not** a duplicate-recording decision, autonomous investigation, validated learning outcome, or customer delivery.
+
+Keep [Slice 1 #1226](https://github.com/bjuta/wakilisha/issues/1226) **open** until case-specific signed-in owner-positive/nonmember-negative HTTP access and controlled operator lifecycle acceptance. Earlier real nonmember 403 evidence is valid for its tested scope; it does not automatically prove this case's visibility. Retain the original 40-scenario ledger and the approved C17/H37 Slice 3 deferrals; do not repeat this case write or the historical Registry operations. Full original IDs, timestamps, invariants and proof limitations are sealed in issue #1226.
+
 ## Current audited authority update, 15 October 2026 (later checkpoint)
 
 **Source of truth:** protected `main@f3fc21f69b6752e38241848998f2da69421d9bd2`, Production `pgzizndxdyhqmtyywjmt` live read-only SQL, isolated Preview `nkgfoppunmnkcumalxqp` migration inventory, and [PR #1234](https://github.com/bjuta/wakilisha/pull/1234) exact head `59dd53173aebc786649f20ae55cb171df8f82c21`. This checkpoint corrects **current counts**, not historical original receipts or prior dated observations.
