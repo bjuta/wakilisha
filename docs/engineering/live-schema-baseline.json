@@ -1,15 +1,15 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-14T18:45:01Z",
+  "generatedAt": "2026-10-15T09:39:15Z",
   "typesSha256": "2806dd9e7fe3913c067e5945a627db397e2f1b07641447af1c31fb7c0453d6b9",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 230,
-  "latestMigration": "20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql",
+  "migrationCount": 231,
+  "latestMigration": "20261015091718_mizizi_registry_review_reader_rls_v1.sql",
   "schemaSeal": {
     "mode": "preview",
     "sourceProjectRef": "nkgfoppunmnkcumalxqp",
-    "migrationHead": "20261014182214",
+    "migrationHead": "20261015091718",
     "baseMainSha": "cff8e57222ac735b5c2e8c3b7a17ee50c49da3dd",
     "previewBranchId": "8c0affc1-b43b-44ac-b2eb-66715ed40252"
   }
