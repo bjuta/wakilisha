@@ -84,7 +84,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
     expect(runtime).not.toContain('"--agent=no"');
     expect(runtime).toContain("MIZIZI_LINKED_CLI_EMPTY_JSON_RESPONSE");
     // Never rely on a CI-only masking directive in a Mac operator terminal.
-    expect(runtime).not.toContain("::add-mask::" + url);
+    expect(runtime).not.toContain('console.log("::add-mask::" + url)');
     expect(runtime).not.toContain("return 'postgres'");
     expect(runtime).not.toContain('role: "postgres"');
 
