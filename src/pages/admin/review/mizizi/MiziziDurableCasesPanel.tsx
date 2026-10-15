@@ -7,20 +7,17 @@ import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import {
   beginMiziziCaseResearchV1,
   bootstrapHeadquartersOwnerV1,
-  loadDurableHeadquartersCasesV1,
+  loadHeadquartersDashboardV1,
   loadHeadquartersCaseEventsV1,
   type HeadquartersCaseEvent,
-  loadHeadquartersHoldsV1,
+  type HeadquartersDashboardLoadV1,
   releaseWorkspaceHoldV1,
   startWorkspaceHoldV1,
   type HeadquartersDurableCase,
   type HeadquartersHold,
 } from "@/services/miziziDurableCases";
 
-type State =
-  | {kind:"loading"}
-  | {kind:"denied"}
-  | {kind:"ready"; cases:readonly HeadquartersDurableCase[]; holds:readonly HeadquartersHold[]};
+type State = {kind:"loading"} | HeadquartersDashboardLoadV1;
 const actionReason = (value:string) => value.trim().length>=12 && value.trim().length<=1000;
 
 function ReasonField({value,onChange,label}:{value:string;onChange:(v:string)=>void;label:string}) {
@@ -50,9 +47,9 @@ export function MiziziDurableCasesPanel() {
   useEffect(()=>{
     let active=true;
     setState({kind:"loading"});
-    void Promise.all([loadDurableHeadquartersCasesV1(),loadHeadquartersHoldsV1()]).then(
-      ([cases,holds])=>{if(active)setState({kind:"ready",cases,holds});},
-      ()=>{if(active)setState({kind:"denied"});},
+    void loadHeadquartersDashboardV1().then(
+      result=>{if(active)setState(result);},
+      ()=>{if(active)setState({kind:"unavailable"});},
     );
     return ()=>{active=false;};
   },[refreshToken]);
@@ -104,6 +101,9 @@ export function MiziziDurableCasesPanel() {
       </div>
     </header>
     {state.kind==="loading" ? <p role="status" className="text-[13px] text-wk-text-muted">Checking recorded case access…</p> : null}
+    {state.kind==="unavailable" ? <p role="alert" className="text-[13px] text-wk-text-muted">
+      We could not verify Headquarters case access. Refresh Records to try again. No workspace changes were made.
+    </p> : null}
     {state.kind==="denied" ? <div className="space-y-3" role="status">
       <p className="text-[13px] text-wk-text-muted">No authorized internal Headquarters case view is available for this account. Existing Registry reviews remain accessible above.</p>
       <p className="text-[12px] text-wk-text-muted">An authorized administrator can set up the first internal workspace membership once.</p>
