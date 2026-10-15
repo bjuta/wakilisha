@@ -1,4 +1,4 @@
--- Read-only forward 229/230 verifier. No fixtures, DML or hosted mutation.
+-- Read-only forward 229/230/231 verifier. No fixtures, DML or hosted mutation.
 -- Run only AFTER CLI-minted migration 20261014134759 is installed.
 DO $wk_229_assert$
 DECLARE
@@ -8,14 +8,19 @@ BEGIN
  SELECT count(*),max(version) INTO n,v_head
  FROM supabase_migrations.schema_migrations;
  IF NOT ((n=229 AND v_head='20261014134759')
-       OR (n=230 AND v_head='20261014182214'))
+       OR (n=230 AND v_head='20261014182214')
+       OR (n=231 AND v_head='20261015091718'))
    OR NOT EXISTS(SELECT 1 FROM supabase_migrations.schema_migrations
      WHERE version='20261014134759'
        AND name='mizizi_db02_observation_completion_authority_v1')
-   OR (n=230 AND NOT EXISTS(
+   OR (n>=230 AND NOT EXISTS(
        SELECT 1 FROM supabase_migrations.schema_migrations
        WHERE version='20261014182214'
         AND name='mizizi_db02_prior_observation_replay_fence_v1'))
+   OR (n=231 AND NOT EXISTS(
+       SELECT 1 FROM supabase_migrations.schema_migrations
+       WHERE version='20261015091718'
+         AND name='mizizi_registry_review_reader_rls_v1'))
  THEN RAISE EXCEPTION 'STOP_229_EXACT_REPLAY_LEDGER_NOT_INSTALLED'; END IF;
  v_observations:=to_regclass('mizizi_private.case_observations');
  v_gateway:=to_regprocedure('mizizi_private.admit_review_case_gateway_v1(uuid,text,jsonb)');
@@ -69,7 +74,7 @@ BEGIN
   OR position('next_action_at' in v_done_source)=0
   OR position('r.status=''open''' in v_done_source)=0
  THEN RAISE EXCEPTION 'STOP_229_ORIGINAL_HUMAN_REVIEW_OR_FOLLOWUP_AUTHORITY_DRIFT'; END IF;
- IF n=230 THEN
+ IF n>=230 THEN
   IF position('Previously accepted MIZIZI observation cannot supersede newer evidence'
      in v_gateway_source)=0
    OR position('historical.observation_fingerprint=v_fp' in v_gateway_source)=0

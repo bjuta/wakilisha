@@ -45,8 +45,8 @@ snapshot() {
         WHERE status='active');"
 }
 BEFORE="$(snapshot)" || { echo 'STOP_LOCAL_PRE_SNAPSHOT_FAILED'; exit 22; }
-[ "$BEFORE" = '230|20261014182214|1|0|0|0|0|0|0|0|0|0|0|0|0|0' ] || {
-  echo 'STOP_LOCAL_NOT_EXACT_EMPTY_MIGRATION_230'; exit 22;
+[ "$BEFORE" = '231|20261015091718|1|0|0|0|0|0|0|0|0|0|0|0|0|0' ] || {
+  echo 'STOP_LOCAL_NOT_EXACT_EMPTY_MIGRATION_231'; exit 22;
 }
 printf 'WK_CI_BEFORE_SHA256=%s\n' "$(printf %s "$BEFORE" | sha256sum | awk '{print $1}')"
 set +e

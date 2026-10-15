@@ -1,5 +1,5 @@
 -- WAKILISHA Slice 1, CI-only, disposable PostgreSQL service-worker acceptance.
--- Fresh local 230 migration replay only. NEVER on linked, Preview or Production DB.
+-- Fresh local 231 migration replay only. NEVER on linked, Preview or Production DB.
 -- SET SESSION AUTHORIZATION is a local simulator, NOT a real service JWT/JIT login.
 -- One synthetic canonical Release is transaction-scoped; all changes ROLLBACK.
 \set ON_ERROR_STOP on
@@ -10,7 +10,7 @@ DO $guard$
 DECLARE n integer; head text;
 BEGIN
  SELECT count(*),max(version) INTO n,head FROM supabase_migrations.schema_migrations;
- IF n<>230 OR head<>'20261014182214'
+ IF n<>231 OR head<>'20261015091718'
    OR session_user<>'supabase_admin' OR current_user<>'supabase_admin'
    OR NOT (SELECT rolsuper FROM pg_roles WHERE rolname='supabase_admin')
    OR (SELECT count(*) FROM mizizi_private.cases)<>0
@@ -19,7 +19,7 @@ BEGIN
    OR to_regprocedure('public.mizizi_claim_case_research_jobs_v1(text,integer,integer)') IS NULL
    OR to_regprocedure('public.mizizi_recover_expired_case_research_jobs_v1(integer,integer)') IS NULL
    OR to_regprocedure('public.mizizi_complete_case_research_job_v1(uuid,text,jsonb)') IS NULL
- THEN RAISE EXCEPTION 'STOP_CI_WORKER_EXACT_EMPTY_LOCAL_230_REQUIRED'; END IF;
+ THEN RAISE EXCEPTION 'STOP_CI_WORKER_EXACT_EMPTY_LOCAL_231_REQUIRED'; END IF;
 END $guard$;
 SELECT id::text AS wk_workspace FROM mizizi_private.workspaces
  WHERE workspace_key='wakilisha-internal' AND status='active' \gset
