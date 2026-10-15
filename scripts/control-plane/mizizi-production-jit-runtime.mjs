@@ -184,6 +184,39 @@ function profileId(raw) {
   );
 }
 
+
+/**
+ * Scoped PATs can read project JIT mappings but may receive 403 on the
+ * account-wide /v1/profile endpoint. /database/jit is the authenticated
+ * caller's mapping, unlike /database/jit/list (the all-user inventory).
+ * Never derive a caller identity from that inventory or from input.
+ */
+export async function resolveMiziziJitCaller({ token, projectRef }) {
+  if (!token || !projectRef) {
+    throw new Error("MIZIZI_JIT_CALLER_AUTH_REQUIRED");
+  }
+
+  if (!token.startsWith("sbp_fc")) {
+    const userId = profileId(await managementApi(token, "GET", "/v1/profile"));
+    if (!userId) {
+      throw new Error("Supabase profile did not expose a JIT user id");
+    }
+    return { userId, selfRoles: null };
+  }
+
+  const self = await managementApi(
+    token, "GET", "/v1/projects/" + projectRef + "/database/jit",
+  );
+  const userId = self?.user_id;
+  if (!self || Array.isArray(self) ||
+      typeof userId !== "string" ||
+      !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(userId) ||
+      !Array.isArray(self.user_roles)) {
+    throw new Error("MIZIZI_SCOPED_JIT_CALLER_UNVERIFIED");
+  }
+  return { userId, selfRoles: self.user_roles };
+}
+
 function configState(raw) {
   return String(
     raw?.state || raw?.data?.state || raw?.config?.state || "",
@@ -372,16 +405,10 @@ export async function openMiziziJitSession({
   );
 
   console.log("WK_JIT_PROFILE_LOOKUP=START");
-  const userId = profileId(
-    await managementApi(token, "GET", "/v1/profile"),
-  );
+  const { userId, selfRoles } = await resolveMiziziJitCaller({
+    token, projectRef: managementProjectRef,
+  });
   console.log("WK_JIT_PROFILE_LOOKUP=RESPONSE_RECEIVED");
-
-  if (!userId) {
-    throw new Error(
-      "Supabase profile did not expose a JIT user id",
-    );
-  }
 
   console.log("WK_JIT_STATUS_READ=START");
   const originalState = configState(
@@ -421,6 +448,20 @@ export async function openMiziziJitSession({
     existing && Array.isArray(existing.user_roles)
       ? existing.user_roles
       : [];
+  // Prevent a scoped principal's mapping from overriding different grants
+  // returned by the all-user inventory. Both reads precede JIT activation.
+  if (selfRoles !== null) {
+    const roleFingerprint = (roles) => JSON.stringify(
+      roles.map((entry) => ({
+        role: entry?.role,
+        expires_at: entry?.expires_at ?? null,
+      })).sort((a, b) => String(a.role).localeCompare(String(b.role))),
+    );
+    if ((selfRoles.length > 0 && !existing) ||
+        roleFingerprint(selfRoles) !== roleFingerprint(originalRoles)) {
+      throw new Error("MIZIZI_SCOPED_JIT_MAPPING_MISMATCH");
+    }
+  }
   console.log("WK_JIT_MAPPING_LOOKUP="+(existing?"EXISTING":"NEW_USER"));
 
   let mappingChanged = false;
