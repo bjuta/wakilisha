@@ -60,9 +60,9 @@ async function main(){
   "(SELECT count(*) FROM mizizi_private.cases)||'|'||"+
   "(SELECT count(*) FROM mizizi_private.write_holds)||'|'||"+
   "(SELECT count(*) FROM public.registry_releases);",db);
- assert(baseline==="230|20261014182214|0|0|0|0|0",
-  "STOP_AUTH_NOT_FRESH_LOCAL_227");
- console.log("WK_AUTH_EMPTY_227_UNLINKED_LOCAL_BASELINE=PASS");
+ assert(baseline==="231|20261015091718|0|0|0|0|0",
+  "STOP_AUTH_NOT_FRESH_LOCAL_MIZIZI_READER_RLS");
+ console.log("WK_AUTH_EMPTY_231_UNLINKED_LOCAL_BASELINE=PASS");
 
  const admin=client(api,values.SERVICE_ROLE_KEY),people=[];
  for(const label of ["first","second"]){
@@ -142,6 +142,29 @@ async function main(){
   cases[0].caseRevision===1&&UUID.test(cases[0].reviewId||""),
   "STOP_SOURCE_BOUND_CASE_READ_MISMATCH");
  const caseId=cases[0].caseId;
+ // RLS authority: use the genuine source-bound review already admitted by the
+ // existing fixture. No fabricated human decision or Registry mutation.
+ const reviewId=cases[0].reviewId;
+ const policyCount=localSql(
+  "SELECT count(*) FROM pg_policies WHERE schemaname='public' AND "+
+  "tablename IN ('registry_review_items','registry_canonicalization_decisions') "+
+  "AND cmd='SELECT' AND roles=ARRAY['authenticated']::name[] "+
+  "AND qual LIKE '%view_review_queue%' AND qual LIKE '%uid()%';",db);
+ assert(policyCount==="2","STOP_READER_RLS_POLICY_COUNT_OR_IDENTITY");
+ const adminReview=await first.user.from("registry_review_items")
+  .select("id,source_payload,candidate_payload,resolution_payload",{count:"exact"})
+  .eq("id",reviewId);
+ assert(!adminReview.error&&adminReview.count===1&&
+  adminReview.data?.length===1&&adminReview.data[0].id===reviewId,
+  "STOP_READER_RLS_REAL_ADMIN_JWT_LOST_SOURCE_REVIEW");
+ const anonymousReview=await client(api,values.ANON_KEY)
+  .from("registry_review_items")
+  .select("id,source_payload,candidate_payload,resolution_payload",{count:"exact"})
+  .eq("id",reviewId);
+ assert(!anonymousReview.error&&anonymousReview.count===0&&
+  anonymousReview.data?.length===0,
+  "STOP_READER_RLS_ANON_EVIDENCE_EXPOSED");
+ console.log("WK_AUTH_REGISTRY_READER_RLS_POLICY_AND_REAL_ADMIN_ANON=PASS");
  // O20: prove a fresh, actually signed-in subscriber cannot read a REAL
  // source-backed open case or its immutable event journal. No member grant.
  const subscriberEmail="wk-local-subscriber-"+randomUUID()+"@example.test";
@@ -155,6 +178,13 @@ async function main(){
   email:subscriberEmail,password:subscriberPassword});
  assert(!subscriberLogin.error&&subscriberLogin.data.user?.id===subscriberCreated.data.user.id&&
   subscriberLogin.data.session?.access_token,"STOP_O20_REAL_SUBSCRIBER_JWT");
+ const subscriberReview=await subscriber.from("registry_review_items")
+  .select("id,source_payload,candidate_payload,resolution_payload",{count:"exact"})
+  .eq("id",reviewId);
+ assert(!subscriberReview.error&&subscriberReview.count===0&&
+  subscriberReview.data?.length===0,
+  "STOP_READER_RLS_REAL_SUBSCRIBER_JWT_READS_PRIVATE_EVIDENCE");
+ console.log("WK_AUTH_REGISTRY_READER_RLS_REAL_SUBSCRIBER_JWT_DENIED=PASS");
  const nonMember=localSql("SELECT count(*) FROM mizizi_private.workspace_memberships"+
   " WHERE user_id='"+subscriberCreated.data.user.id+"'::uuid;",db);
  assert(nonMember==="0","STOP_O20_SUBSCRIBER_UNEXPECTED_WORKSPACE_MEMBERSHIP");
