@@ -5,6 +5,7 @@ import {
   beginMiziziCaseResearchV1,
   bootstrapHeadquartersOwnerV1,
   loadDurableHeadquartersCasesV1,
+  loadHeadquartersDashboardV1,
   loadHeadquartersCaseEventsV1,
   projectHeadquartersCaseEventsV1,
   loadHeadquartersHoldsV1,
@@ -133,6 +134,37 @@ describe("Authenticated durable Headquarters read and governed commands",()=>{
   await expect(bootstrapHeadquartersOwnerV1("too short",rpc)).rejects.toThrow();
   expect(rpc).not.toHaveBeenCalled();
   await expect(bootstrapHeadquartersOwnerV1("Administrator opening the internal workspace",rpc)).rejects.toThrow();
+ });
+ it("distinguishes explicit 42501 authorization denial from transport, malformed data and partial failures",async()=>{
+   const permission:HeadquartersRpc=vi.fn(async()=>({
+     data:null,error:{code:"42501",message:"permission denied"},
+   }));
+   await expect(loadHeadquartersDashboardV1(permission)).resolves.toEqual({kind:"denied"});
+
+   const failedNetwork:HeadquartersRpc=vi.fn(async(name)=>{
+     if(name==="admin_mizizi_list_workspace_holds_v1")
+       throw new Error("offline");
+     return {data:null,error:{code:"42501",message:"permission denied"}};
+   });
+   await expect(loadHeadquartersDashboardV1(failedNetwork)).resolves.toEqual({kind:"unavailable"});
+
+   const missingCode:HeadquartersRpc=vi.fn(async()=>({
+     data:null,error:{message:"42501 denied, but structured code missing"},
+   }));
+   await expect(loadHeadquartersDashboardV1(missingCode)).resolves.toEqual({kind:"unavailable"});
+
+   const malformed:HeadquartersRpc=vi.fn(async(name)=>({
+     data:name==="admin_mizizi_cases_v1"?[{...recorded,receiptCount:-1}]:[],
+     error:null,
+   }));
+   await expect(loadHeadquartersDashboardV1(malformed)).resolves.toEqual({kind:"unavailable"});
+
+   const working:HeadquartersRpc=vi.fn(async(name)=>({
+     data:name==="admin_mizizi_cases_v1"?[recorded]:[],error:null,
+   }));
+   await expect(loadHeadquartersDashboardV1(working)).resolves.toMatchObject({
+     kind:"ready",cases:[{caseId}],holds:[],
+   });
  });
  it("does not hide denied Data API calls",async()=>{
   const rpc:HeadquartersRpc=vi.fn(async()=>({data:null,error:{message:"42501 denied"}}));

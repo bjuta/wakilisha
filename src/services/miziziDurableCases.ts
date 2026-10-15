@@ -43,7 +43,14 @@ export type HeadquartersCaseEvent = Readonly<{
   actorKey: string;
   recordedAt: string;
 }>;
-export type HeadquartersRpcResult = Readonly<{ data: unknown; error: { message: string } | null }>;
+export type HeadquartersRpcResult = Readonly<{ data: unknown; error: { message: string; code?: string | null } | null }>;
+/** Only an explicit database authorization denial may offer first-owner setup. */
+export class HeadquartersAuthorizationDeniedError extends Error {
+  constructor() {
+    super("Headquarters authorization denied (42501)");
+    this.name="HeadquartersAuthorizationDeniedError";
+  }
+}
 export type HeadquartersRpc = (functionName: string, args: Record<string, unknown>) => Promise<HeadquartersRpcResult>;
 const directRpc: HeadquartersRpc = async (functionName,args) => {
   const result = await supabase.rpc(functionName,args);
@@ -60,6 +67,7 @@ function date(v:unknown):string{const s=str(v);if(!Number.isFinite(Date.parse(s)
 function maybeDate(v:unknown):string|null{return v===null?null:date(v);}
 async function call(rpc:HeadquartersRpc,name:string,args:Record<string,unknown>):Promise<unknown>{
   const r=await rpc(name,args);
+  if(r.error?.code==="42501")throw new HeadquartersAuthorizationDeniedError();
   if(r.error)throw new Error(`Headquarters command unavailable: ${r.error.message}`);
   return r.data;
 }
@@ -155,6 +163,28 @@ export function projectWorkspaceHoldsV1(raw:unknown):readonly HeadquartersHold[]
 export async function loadHeadquartersHoldsV1(rpc:HeadquartersRpc=directRpc):Promise<readonly HeadquartersHold[]>{
   return projectWorkspaceHoldsV1(await call(rpc,"admin_mizizi_list_workspace_holds_v1",{p_limit:100}));
 }
+/** Do not mistake malformed data, network failure or a conflicting HTTP result
+ * for permission denial: ambiguous transport must NEVER offer bootstrap. */
+export type HeadquartersDashboardLoadV1 =
+  | Readonly<{kind:"ready"; cases:readonly HeadquartersDurableCase[]; holds:readonly HeadquartersHold[]}>
+  | Readonly<{kind:"denied"|"unavailable"}>;
+
+export async function loadHeadquartersDashboardV1(
+  rpc:HeadquartersRpc=directRpc,
+):Promise<HeadquartersDashboardLoadV1>{
+  const [cases,holds]=await Promise.allSettled([
+    loadDurableHeadquartersCasesV1(rpc),loadHeadquartersHoldsV1(rpc),
+  ]);
+  if(cases.status==="fulfilled"&&holds.status==="fulfilled")
+    return Object.freeze({kind:"ready" as const,cases:cases.value,holds:holds.value});
+  const failures=[cases,holds].filter(
+    (item):item is PromiseRejectedResult=>item.status==="rejected",
+  );
+  if(failures.every(item=>item.reason instanceof HeadquartersAuthorizationDeniedError))
+    return Object.freeze({kind:"denied" as const});
+  return Object.freeze({kind:"unavailable" as const});
+}
+
 export async function bootstrapHeadquartersOwnerV1(reason:string,rpc:HeadquartersRpc=directRpc):Promise<string>{
   if(typeof reason!=="string"||reason.trim().length<12||reason.trim().length>1000)throw new TypeError("Specify why you are setting up Headquarters");
   return uuid(await call(rpc,"admin_mizizi_bootstrap_internal_owner_v1",{p_reason:reason.trim()}));
