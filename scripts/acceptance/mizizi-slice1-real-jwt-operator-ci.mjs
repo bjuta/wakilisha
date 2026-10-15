@@ -176,16 +176,20 @@ async function main(){
   .from("registry_review_items")
   .select("id,source_payload,candidate_payload,resolution_payload",{count:"exact"})
   .eq("id",reviewId);
- assert(!anonymousReview.error&&anonymousReview.count===0&&
-  anonymousReview.data?.length===0,
-  "STOP_READER_RLS_ANON_EVIDENCE_EXPOSED");
+ assert(anonymousReview.error?.code==="42501"||
+  (!anonymousReview.error&&anonymousReview.count===0&&
+   anonymousReview.data?.length===0),
+  "STOP_READER_RLS_ANON_EVIDENCE_EXPOSED_OR_WRONG_DENIAL_"+
+  String(anonymousReview.error?.code||"NONE").replace(/[^A-Za-z0-9_]/g,""));
  const anonymousDecision=await client(api,values.ANON_KEY)
   .from("registry_canonicalization_decisions")
   .select("id,decision_notes,before_payload,after_payload",{count:"exact"})
   .eq("id",decisionProbeId);
- assert(!anonymousDecision.error&&anonymousDecision.count===0&&
-  anonymousDecision.data?.length===0,
-  "STOP_READER_RLS_ANON_DECISION_SENTINEL_EXPOSED");
+ assert(anonymousDecision.error?.code==="42501"||
+  (!anonymousDecision.error&&anonymousDecision.count===0&&
+   anonymousDecision.data?.length===0),
+  "STOP_READER_RLS_ANON_DECISION_SENTINEL_EXPOSED_OR_WRONG_DENIAL_"+
+  String(anonymousDecision.error?.code||"NONE").replace(/[^A-Za-z0-9_]/g,""));
  console.log("WK_AUTH_REGISTRY_READER_RLS_BOTH_TABLES_REAL_ADMIN_ANON=PASS");
  // O20: prove a fresh, actually signed-in subscriber cannot read a REAL
  // source-backed open case or its immutable event journal. No member grant.
