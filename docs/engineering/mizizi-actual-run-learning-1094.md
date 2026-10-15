@@ -1,5 +1,15 @@
 # MIZIZI actual-run learning: #1094
 
+## Current Historic-Reader Reconciliation: 15 October 2026
+
+The original 9 October and later Production read-only run records below are **historical evidence**, not approval to redo them. The current pre-doc Slice 1 source `733b8452` strengthens `src/services/miziziIssue1094Brief.ts` to reread the **three separate programme-scoped recorded human decisions** for D1 DESIRE, D2 Ficha, and D3 Colors. It requires exact decision ID, linked review ID, status, type, canonical survivor, and where completed the original verified-operation/finalizer fields; absent or inconsistent evidence is `unverified`.
+
+Independent 15 October Production read-only checks match the exact historical state: DESIRE remains open and **blocked**, with recorded human decision but no successful duplicate repair; Ficha and Colors remain **resolved** with original independently verified operations. This is source/database compatibility and protected local CI, **not** signed-in Production generic Headquarters browser acceptance. No D1 Artist/Track credit changes or D2/D3 replay occurred. Original acceptance ledger: 38 local, two partial assigned to Slice 3, all Production scenarios `NOT_RUN`. See [enterprise product and current release authority](mizizi-enterprise-product-and-release-authority-20261015.md) and issue #1226.
+
+**Additional existing policy classification gate:** Production `public.registry_review_items` and `public.registry_canonicalization_decisions` have RLS enabled but unconditional `authenticated` read policies and grants. Examine intended consumers and field sensitivity before any change. Existing policy is not proof of a browser authorization failure, and must not be altered by guesswork.
+
+
+
 Status: **Production-observed baseline, not a new mutation authority.** Captured 9 October 2026 from read-only Registry queries against Production `pgzizndxdyhqmtyywjmt`. This document records what happened, not what a future runner is permitted to skip.
 
 ## Run class A: completed safe Track slug canonicalization
