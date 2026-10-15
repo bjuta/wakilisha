@@ -1,5 +1,21 @@
 # MIZIZI Headquarters — Implementation Sequencing, Threat Proofs and Production Exit Contract V1
 
+## Current Exit and Commercial Gate: 15 October 2026
+
+The three delivery slices and the owner-approved C17/H37 deferral below remain binding. The original 10 October design-only header and closing handoff describe a **historical design milestone**. The operative commercial objective and current implementation state are in [enterprise product and current release authority](mizizi-enterprise-product-and-release-authority-20261015.md). No additional phases or scope waiver is authorized by that objective.
+
+**Slice 1, unfinished release:** the candidate has implemented durable source-bound cases, history, exact job/outbox bridging and worker recovery, signed-in owner controls, active/released Hold Writes, and a fail-closed D1/D2/D3 reader. Fourteen new migrations are installed only on isolated Preview: 230/head `20261014182214`; Production retains 216/head `20261009181647`. The original forty ledger v15 holds 38 `LOCAL_EXECUTED` and C17/H37 `PARTIAL_EVIDENCE` with approved Slice 3 ownership; all forty Production fields are `NOT_RUN`. Protected pre-doc candidate source `733b8452` is green; the generic historical Production view and complete Production release gates are not accepted. No PR merge, SQL promotion, Edge/frontend activation, Finish Update, or new grant follows from this document.
+
+**Before Slice 1 release:** inventory existing Registry review/decision `authenticated SELECT USING (true)` consumer and private-field scope; prove genuine authorized/unauthorized access without assuming UI route protection equals RLS; accept original historical D1 **blocked**, D2 and D3 **already completed** without rerunning repairs; verify signed-in browser/mobile roles, zero active grants, migration and reader parity; exact release-commit protected CI, reviewed diff, independent SQL and rollback receipts; then separate controlled Production promotions and postconditions. Hold/release in Preview is authentic but does not replace hosted or Production historic UI proof.
+
+**Slice 2 enterprise value gate:** operate one lawful source-linked unfamiliar investigation, preserve contradictory/derived sources and timeline, record independent human outcome and compare against frozen prediction/policy, then demonstrate measurable later shadow-evaluation improvement. No learning claim based on the same model grading itself; no novel writer permission.
+
+**Slice 3 enterprise deployment gate:** genuine distinct-workspace C17 and queued Registry-writer-under-hold H37 executions, full permission isolation, customer data licence and deletion controls, versioned external delivery/ACK, independent action and licence-calibration governance, and sustained workload/cost/security measurements. A properly consented catalogue pilot should inform buyer fit before any major-label readiness claim. The three majors are intended buyers, not integrated customers.
+
+**Licence types:** enterprise software contracts, MIZIZI expiring operational stewardship grants, and underlying music/source/creator rights stay strictly separate. No commercial agreement grants copyright ownership or unrestricted cross-customer training.
+
+
+
 **Date:** 10 October 2026 | **Status:** Binding proposed engineering acceptance; documents only.  
 **Architecture:** [system specification](mizizi-headquarters-product-architecture-v1-20261010.md)  
 **Exact code register:** [file, schema and RPC targets](mizizi-headquarters-code-change-register-v1-20261010.md)  
