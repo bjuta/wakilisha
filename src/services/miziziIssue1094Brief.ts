@@ -123,7 +123,7 @@ export function projectIssue1094Brief(
     }
     return {
       ...base, status: "completed",
-      summary: "Review resolved. Exact human decision and verified operation receipts match. No repair needs repeating.",
+      summary: "Review resolved. Stored human decision and operation reference match the accepted Registry record. This view does not independently recheck the operation verifier. No repair needs repeating.",
     };
   });
 }

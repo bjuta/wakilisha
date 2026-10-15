@@ -643,7 +643,7 @@ describe("Headquarters #1094 live receipt convergence", () => {
     expect(source).toContain("Issue1094WorthKnowing revision={revision} onInspect={inspect}");
     expect(source).toContain("Inspect open review");
     expect(source).toContain("Decision recorded");
-    expect(source).toContain("Verified complete");
+    expect(source).toContain("Recorded repair · receipt matched");
     expect(source).not.toMatch(/<select\b|<input\b|<dialog\b/);
     expect(service).toContain('from("registry_review_items")');
     expect(service).toContain('from("registry_canonicalization_decisions")');

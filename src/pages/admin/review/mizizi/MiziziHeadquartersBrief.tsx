@@ -240,7 +240,7 @@ function Issue1094WorthKnowing({ revision, onInspect }: { revision: number; onIn
                   compact
                   state={item.status === "completed" ? "verified" :
                     item.status === "blocked" ? "blocked" : "unverified"}
-                  label={item.status === "completed" ? "Verified complete" :
+                  label={item.status === "completed" ? "Recorded repair · receipt matched" :
                     item.status === "blocked" ? "Decision recorded · blocked" : "Needs verification"}
                 />
               </div>
