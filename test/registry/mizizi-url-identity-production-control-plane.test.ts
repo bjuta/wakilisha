@@ -91,6 +91,16 @@ describe("MIZIZI current URL-identity production control plane", () => {
     expect(runtime).toContain('"/v1/projects/" + projectRef + "/database/query/read-only"');
     expect(runtime).toContain("sql: stageCAuthoritySql");
     expect(runtime).toContain("MIZIZI_READ_ONLY_QUERY_SINGLE_ROW_REQUIRED");
+    // The live PUT endpoint expects a 'roles' array: actual CI rejected
+    // user_roles with HTTP 400 and stated 'roles: expected array'.
+    expect(runtime).toContain("roles: originalRoles");
+    expect(runtime).toContain("{ user_id: userId, roles }");
+    expect(runtime).toContain("WK_JIT_PROFILE_LOOKUP=START");
+    expect(runtime).toContain("WK_JIT_STATUS_READ=START");
+    expect(runtime).toContain("WK_JIT_MAPPING_LIST=START");
+    expect(runtime).toContain("WK_JIT_MAPPING_WRITE_METHOD=PUT");
+    expect(runtime).toContain("WK_JIT_DATABASE_LOGIN=START");
+    expect(runtime).toContain("MIZIZI_JIT_RESTORE_UNCONFIRMED");
     expect(runtime).not.toContain("const authority = queryViaLinkedCli(stageCAuthoritySql)");
 
     // Never rely on a CI-only masking directive in a Mac operator terminal.

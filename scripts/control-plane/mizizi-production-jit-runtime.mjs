@@ -371,9 +371,11 @@ export async function openMiziziJitSession({
     "PASS: Stage C ledger active; current programme transport = mizizi_executor",
   );
 
+  console.log("WK_JIT_PROFILE_LOOKUP=START");
   const userId = profileId(
     await managementApi(token, "GET", "/v1/profile"),
   );
+  console.log("WK_JIT_PROFILE_LOOKUP=RESPONSE_RECEIVED");
 
   if (!userId) {
     throw new Error(
@@ -381,6 +383,7 @@ export async function openMiziziJitSession({
     );
   }
 
+  console.log("WK_JIT_STATUS_READ=START");
   const originalState = configState(
     await managementApi(
       token,
@@ -396,6 +399,8 @@ export async function openMiziziJitSession({
     );
   }
 
+  console.log("WK_JIT_STATUS_DISABLED=PASS");
+  console.log("WK_JIT_MAPPING_LIST=START");
   const list = rowsFromJitList(
     await managementApi(
       token,
@@ -416,6 +421,7 @@ export async function openMiziziJitSession({
     existing && Array.isArray(existing.user_roles)
       ? existing.user_roles
       : [];
+  console.log("WK_JIT_MAPPING_LOOKUP="+(existing?"EXISTING":"NEW_USER"));
 
   let mappingChanged = false;
   let pool = null;
@@ -473,6 +479,10 @@ export async function openMiziziJitSession({
         "/v1/projects/" + managementProjectRef + "/jit-access",
         { state: "disabled" },
       );
+      const afterState=configState(await managementApi(
+        token,"GET","/v1/projects/"+managementProjectRef+"/jit-access",
+      ));
+      if(afterState!=="disabled")errors.push("temporary-access disabled state could not be verified");
     } catch (error) {
       errors.push(
         "temporary-access cleanup failed: " +
@@ -503,22 +513,21 @@ export async function openMiziziJitSession({
           String(entry.role || ""),
         ),
     );
-
     roles.push({
       role: "mizizi_executor",
       expires_at: Date.now() + 60 * 60 * 1000,
     });
 
+    // The LIVE management endpoint validates a `roles` array for PUT.
+    // Preserve that accepted format even though public guide examples
+    // use a different field name.
+    console.log("WK_JIT_MAPPING_WRITE_METHOD=PUT");
     await managementApi(
       token,
       "PUT",
       "/v1/projects/" + managementProjectRef + "/database/jit",
-      {
-        user_id: userId,
-        roles,
-      },
+      { user_id: userId, roles },
     );
-
     mappingChanged = true;
 
     const url = databaseUrl(
@@ -530,6 +539,7 @@ export async function openMiziziJitSession({
     // Never print the JIT connection URL. CI-only ::add-mask:: directives
     // are not safe in a normal operator terminal and would reveal credentials.
 
+    console.log("WK_JIT_DATABASE_LOGIN=START");
     pool = await createJitPoolWithRetry(
       url,
       "mizizi_executor",
@@ -541,7 +551,11 @@ export async function openMiziziJitSession({
       restore,
     };
   } catch (error) {
-    await restore().catch(() => {});
+    let restoreError=null;
+    try {await restore();} catch (failure) {restoreError=failure;}
+    if(restoreError) {
+      throw new Error("MIZIZI_JIT_RESTORE_UNCONFIRMED");
+    }
     throw error;
   }
 }
