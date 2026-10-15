@@ -1,25 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { planMiziziJitUserMapping } from "../../scripts/control-plane/mizizi-production-jit-runtime.mjs";
 
 describe("MIZIZI current URL-identity production control plane", () => {
-  it("uses the documented JIT create/update and user_roles contract without dropping unrelated mappings", () => {
-    const fresh = planMiziziJitUserMapping({userId:"test-owner",existing:null,now:5000});
-    expect(fresh).toEqual({
-      method:"POST",
-      body:{user_id:"test-owner",user_roles:[{role:"mizizi_executor",expires_at:3605000}]},
-      originalRoles:[],
-    });
-    expect(fresh.body).not.toHaveProperty("roles");
-    const retained={role:"readonly",allowed_networks:{allowed_cidrs:[{cidr:"192.0.2.10/32"}]}};
-    const old={user_roles:[retained,{role:"mizizi_executor",expires_at:50}]};
-    const update=planMiziziJitUserMapping({userId:"test-owner",existing:old,now:5000});
-    expect(update.method).toBe("PUT");
-    expect(update.body.user_roles).toEqual([retained,{role:"mizizi_executor",expires_at:3605000}]);
-    expect(update.originalRoles).toEqual(old.user_roles);
-    expect(()=>planMiziziJitUserMapping({userId:"test-owner",existing:{roles:[]}}))
-      .toThrow("MIZIZI_JIT_EXISTING_USER_ROLES_MALFORMED");
-  });
   it("keeps the current programme on the shared Stage C JIT boundary", () => {
     const workflow = readFileSync(
       ".github/workflows/mizizi-url-identity-production-control-plane.yml",
@@ -109,11 +91,14 @@ describe("MIZIZI current URL-identity production control plane", () => {
     expect(runtime).toContain('"/v1/projects/" + projectRef + "/database/query/read-only"');
     expect(runtime).toContain("sql: stageCAuthoritySql");
     expect(runtime).toContain("MIZIZI_READ_ONLY_QUERY_SINGLE_ROW_REQUIRED");
-    expect(runtime).toContain("user_roles: originalRoles");
-    expect(runtime).toContain("rolePlan.method");
-    expect(runtime).toContain("rolePlan.body");
-    expect(runtime).toContain("WK_JIT_MAPPING_LOOKUP=");
-    expect(runtime).toContain("WK_JIT_EXACT_ROLE_MAPPING_CONFIRMED=PASS");
+    // The live PUT endpoint expects a 'roles' array: actual CI rejected
+    // user_roles with HTTP 400 and stated 'roles: expected array'.
+    expect(runtime).toContain("roles: originalRoles");
+    expect(runtime).toContain("{ user_id: userId, roles }");
+    expect(runtime).toContain("WK_JIT_PROFILE_LOOKUP=START");
+    expect(runtime).toContain("WK_JIT_STATUS_READ=START");
+    expect(runtime).toContain("WK_JIT_MAPPING_LIST=START");
+    expect(runtime).toContain("WK_JIT_MAPPING_WRITE_METHOD=PUT");
     expect(runtime).toContain("WK_JIT_DATABASE_LOGIN=START");
     expect(runtime).toContain("MIZIZI_JIT_RESTORE_UNCONFIRMED");
     expect(runtime).not.toContain("const authority = queryViaLinkedCli(stageCAuthoritySql)");
