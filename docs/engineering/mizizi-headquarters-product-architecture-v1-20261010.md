@@ -1,5 +1,21 @@
 # MIZIZI Headquarters — Complete Product and System Architecture V1
 
+## Current Product Authority: 15 October 2026
+
+**Read this first:** [enterprise product and current release authority](mizizi-enterprise-product-and-release-authority-20261015.md). The 10 October heading, baseline, and closing statement below describe the original **documentation-only architecture approval**, not the current implementation. This document remains the domain architecture, not a claim that the full system is deployed.
+
+The binding commercial end state is a **licensable, customer-portable enterprise cultural intelligence system** for intended customers such as the three global music majors, independent labels, publishers, distributors, rights administrators, and catalogue owners. WAKILISHA is the first operating environment and validation partner, not the only tenant or the authority over customers' private catalogues. No major-label contract, permitted ingestion of a label catalogue, source-data entitlement, commercial licence, or customer integration has been established.
+
+Preserve separate legal/software licensing, time-limited MIZIZI stewardship execution permissions, and underlying music/evidence/creator rights. Source evidence must not cross customer boundaries, inform shared training, or become public merely because a customer licenses the software. Shared, independently verified learning methods require explicit lawful and contractual authorization.
+
+**Current engineering snapshot:** draft PR #1227 is unmerged. Slice 1 added 14 CLI-minted migrations and wired durable cases/observations, immutable receipts, a typed read-only research job into existing shared jobs/outbox, signed-in workspace control, Hold Writes, and a WAKILISHA-native Headquarters. Preview has 230 migrations at head `20261014182214`; Production remains at 216 at head `20261009181647`. Local disposable acceptance covers 38 of the original 40 scenarios; C17 and H37 remain partial and assigned to Slice 3, while **every Production scenario remains NOT_RUN**. A genuine owner and Hold issue/release were accepted in localhost connected to Preview. Preview has zero real cases and research jobs, and no continuous enterprise research or learning is operating. Protected source HEAD `733b8452` passed five workflow jobs; the docs pass needs its own CI.
+
+**Product completion is not infrastructure completion.** The existing case/job/hold system is the operating foundation. Slice 2 must deliver open-world source-aware investigations, contradiction memory, creator feedback, and independently measured shadow learning. Slice 3 must deliver actual customer isolation, reviewed bounded execution, licences, real partner delivery receipts, and sustained load/cost/privacy proof. Million-check or million-job daily processing is a commercial engineering target, **not observed throughput**. The simulated HTML enterprises, results, and licences are not customers or operational evidence.
+
+**Immediate safety gate:** the existing Production `authenticated` SELECT grants with `USING (true)` on Registry reviews and human canonicalization decisions need a precise intended-reader and private-field classification before any enterprise or Production promotion. Do not change policies blindly, infer a browser exploit, or weaken any existing reader.
+
+
+
 **Date:** 10 October 2026  
 **Status:** Architecture specification for engineering review; **docs-only, no new runtime authority**  
 **Baseline:** Protected `main@4381d6020b83e5b3b6781bb28003dee76618737d`; Production Supabase project `pgzizndxdyhqmtyywjmt`, migration head `20261009181647` (216 migrations).  
