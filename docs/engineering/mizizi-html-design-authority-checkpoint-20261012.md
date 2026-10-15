@@ -1,5 +1,13 @@
 # MIZIZI Headquarters HTML design authority checkpoint
 
+## Current Product Boundary: 15 October 2026
+
+The original `mizizi.html` and 12 October screenshots remain **visual/interaction design evidence**, never enterprise account contracts, customer throughput, active licences, or completed external deliveries. The intended buyers now expressly include the three global majors and downstream labels, publishers, distributors, and other authorized catalogue operators. This does not establish a customer relationship or authorize cross-tenant access. See [enterprise product and current release authority](mizizi-enterprise-product-and-release-authority-20261015.md).
+
+The live-design requirement remains **one evidence-backed Brief/Field/Cores/History/decision experience**, not five independent backends. Current implementation includes genuine sourced review UI plus private case/hold operator controls on draft PR #1227; its newer source HEAD `733b8452` passed pre-doc protected CI. The new generic experience still needs deployed authenticated D1 blocked/D2-D3 completed evidence and final mobile/desktop acceptance. Preserve all 12 October owner screenshot decisions below as dated observations, not a substitute for Production acceptance.
+
+
+
 Source: user-provided `mizizi.html`, SHA256 `ce05b3eb86b3e650292f8f1d3a1e2640e6f76a9f64da972fde9981bdb28035f3`, received 12 October 2026.
 
 ## Binding product-design direction
