@@ -185,6 +185,13 @@ export async function loadHeadquartersDashboardV1(
   return Object.freeze({kind:"unavailable" as const});
 }
 
+/** Display eligibility is advisory; the database remains the authorization authority. */
+export function canOfferInternalWorkspaceSetupV1(
+  loading:boolean,canManageRegistry:boolean,canManageUsers:boolean,
+):boolean {
+  return !loading && canManageRegistry && canManageUsers;
+}
+
 export async function bootstrapHeadquartersOwnerV1(reason:string,rpc:HeadquartersRpc=directRpc):Promise<string>{
   if(typeof reason!=="string"||reason.trim().length<12||reason.trim().length>1000)throw new TypeError("Specify why you are setting up Headquarters");
   return uuid(await call(rpc,"admin_mizizi_bootstrap_internal_owner_v1",{p_reason:reason.trim()}));

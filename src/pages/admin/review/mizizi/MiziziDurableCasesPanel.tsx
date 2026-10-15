@@ -1,4 +1,5 @@
 import { buildRedactedHeadquartersAuditV1 } from "@/services/miziziRedactedAudit";
+import { useAdminUser } from "@/hooks/useAdminUser";
 import { useCallback, useEffect, useState } from "react";
 import { TextArea, TextField, Label } from "react-aria-components";
 import { WkButton } from "@/components/design-system/primitives/Button";
@@ -7,6 +8,8 @@ import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import {
   beginMiziziCaseResearchV1,
   bootstrapHeadquartersOwnerV1,
+  canOfferInternalWorkspaceSetupV1,
+  HeadquartersAuthorizationDeniedError,
   loadHeadquartersDashboardV1,
   loadHeadquartersCaseEventsV1,
   type HeadquartersCaseEvent,
@@ -32,6 +35,10 @@ function ReasonField({value,onChange,label}:{value:string;onChange:(v:string)=>v
  * authenticated, capability-gated Data API. No heuristic review-to-case promotion.
  */
 export function MiziziDurableCasesPanel() {
+  const admin=useAdminUser();
+  const canOfferSetup=canOfferInternalWorkspaceSetupV1(
+    admin.loading,admin.can("manage_registry"),admin.can("manage_users"),
+  );
   const [state,setState] = useState<State>({kind:"loading"});
   const [refreshToken,setRefreshToken] = useState(0);
   const [selectedCase,setSelectedCase] = useState<string|null>(null);
@@ -67,7 +74,9 @@ export function MiziziDurableCasesPanel() {
     if(busy)return;
     setBusy(true);setNotice(null);
     try {await job();setNotice(success);setSelectedCase(null);setTransitionReason("");setHoldReason("");reload();}
-    catch{setNotice("We could not confirm that change. Please check the recorded state before trying again.");}
+    catch(error){setNotice(error instanceof HeadquartersAuthorizationDeniedError
+      ? "Your account is not authorized for that Headquarters action. No workspace changes were made."
+      : "We could not confirm that change. Please check the recorded state before trying again.");}
     finally{setBusy(false);}
   };
   const downloadRedactedAudit=async()=>{
@@ -106,11 +115,13 @@ export function MiziziDurableCasesPanel() {
     </p> : null}
     {state.kind==="denied" ? <div className="space-y-3" role="status">
       <p className="text-[13px] text-wk-text-muted">No authorized internal Headquarters case view is available for this account. Existing Registry reviews remain accessible above.</p>
-      <p className="text-[12px] text-wk-text-muted">An authorized administrator can set up the first internal workspace membership once.</p>
-      <ReasonField value={bootstrapReason} onChange={setBootstrapReason} label="Internal Workspace Setup Reason" />
-      <WkButton variant="soft" disabled={busy||!actionReason(bootstrapReason)}
-        onClick={()=>void takeAction(async()=>{await bootstrapHeadquartersOwnerV1(bootstrapReason);},"Internal workspace membership recorded.")}>
-        Set Up Internal Workspace</WkButton>
+      {canOfferSetup ? <>
+        <p className="text-[12px] text-wk-text-muted">First-owner setup is permitted only before the workspace has a member. If Headquarters is already initialized, request reviewed membership from its owner.</p>
+        <ReasonField value={bootstrapReason} onChange={setBootstrapReason} label="Internal Workspace Setup Reason" />
+        <WkButton variant="soft" disabled={busy||!actionReason(bootstrapReason)}
+          onClick={()=>void takeAction(async()=>{await bootstrapHeadquartersOwnerV1(bootstrapReason);},"Internal workspace membership recorded.")}>
+          Set Up Internal Workspace</WkButton>
+      </> : <p className="text-[12px] text-wk-text-muted">Headquarters case access requires an authorized workspace membership. Request reviewed access from its owner.</p>}
     </div> : null}
     {state.kind==="ready" ? <>
       <p className="text-[12px] text-wk-text-muted">{state.cases.length} recorded cases in this page. Each state comes from DB02.</p>

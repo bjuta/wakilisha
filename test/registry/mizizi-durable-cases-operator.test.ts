@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   beginMiziziCaseResearchV1,
   bootstrapHeadquartersOwnerV1,
+  canOfferInternalWorkspaceSetupV1,
   loadDurableHeadquartersCasesV1,
   loadHeadquartersDashboardV1,
   loadHeadquartersCaseEventsV1,
@@ -217,6 +218,23 @@ describe("Authenticated durable Headquarters read and governed commands",()=>{
   const rpc:HeadquartersRpc=vi.fn(async name=>({data:
     name==="admin_mizizi_cases_v1"?[]:holds,error:null}));
   await expect(buildRedactedHeadquartersAuditV1(rpc)).rejects.toThrow(/hold ledger/);
+ });
+ it("shows first-owner setup only with both fully loaded administrator capabilities",()=>{
+  const permutations=[
+    [true,true,true,false],
+    [false,false,false,false],
+    [false,true,false,false],
+    [false,false,true,false],
+    [false,true,true,true],
+  ] as const;
+  for(const [loading,registry,users,expected] of permutations)
+    expect(canOfferInternalWorkspaceSetupV1(loading,registry,users)).toBe(expected);
+  const panel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
+  expect(panel).toContain("const admin=useAdminUser()");
+  expect(panel).toContain('admin.can("manage_registry"),admin.can("manage_users")');
+  expect(panel).toContain("{canOfferSetup ? <>");
+  expect(panel).toContain("Headquarters case access requires an authorized workspace membership.");
+  expect(panel).toContain("error instanceof HeadquartersAuthorizationDeniedError");
  });
  it("keeps the redacted download behind an authorized case view",()=>{
   const panel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
