@@ -115,7 +115,9 @@ export function queryViaLinkedCli(sql) {
       "db",
       "query",
       "--linked",
-      "--agent=no",
+      // Pinned CLI 2.108.0 has a known --agent=no / JSON silent-stdout bug.
+      // Explicit agent mode retains structured machine output for read-only gates.
+      "--agent=yes",
       "-o",
       "json",
       wrapped,
@@ -123,6 +125,9 @@ export function queryViaLinkedCli(sql) {
     { capture: true },
   );
 
+  if (!raw) {
+    throw new Error("MIZIZI_LINKED_CLI_EMPTY_JSON_RESPONSE");
+  }
   const payload = findPayload(JSON.parse(raw));
 
   if (payload === null) {
@@ -491,7 +496,8 @@ export async function openMiziziJitSession({
       "mizizi_executor",
     );
 
-    console.log("::add-mask::" + url);
+    // Never print the JIT connection URL. CI-only ::add-mask:: directives
+    // are not safe in a normal operator terminal and would reveal credentials.
 
     pool = await createJitPoolWithRetry(
       url,
