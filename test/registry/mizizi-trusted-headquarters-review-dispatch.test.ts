@@ -2,6 +2,10 @@ import {describe,it,expect,vi} from "vitest";
 import type {MiziziFinding} from "../../scripts/registry/agents/mizizi/core";
 import {createTrustedHeadquartersReviewDispatcherV1} from "../../scripts/registry/agents/mizizi/runtime/trusted-headquarters-review-dispatch";
 import {readFileSync} from "node:fs";
+import {analyzeTrackIdentity} from "../../scripts/registry/agents/mizizi/core";
+import {
+ admitReviewViaManagedJitV1,parseReviewCaseAdmissionArgsV1,
+} from "../../scripts/registry/agents/mizizi/runtime/run-review-case-admission";
 
 const ws="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const entity="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -29,6 +33,68 @@ function fixture(role="mizizi_executor"){
 }
 
 describe("MIZIZI opt-in real JIT review-to-case dispatch",()=>{
+ it("reproduces the ORIGINAL Phases reviewed observation identity",()=>{
+   const track="23a36038-d6d9-406c-93dd-b2026db6fb24";
+   const output=analyzeTrackIdentity({
+     id:track,slug:"phases",title:"Phases",
+     primaryArtistSlug:"xenia-manasseh",primaryArtistName:"Xenia Manasseh",
+     recordingIdentityPeers:[{
+       id:"4300961f-94a6-4f50-8475-66fe5600fa04",
+       slug:"phases",title:"Phases",sharedPrimaryArtistSlug:"xenia-manasseh",
+     }],
+   });
+   const real=output.find(f=>f.ruleId==="track_recording_identity_conflict");
+   expect(real?.fingerprint).toBe(
+     "cbb15008aaaacb3de5c223521bf9e90debe067a6e0f4072edf37967a412dfaa0",
+   );
+   expect(real?.reason).toBe("same_primary_artist_and_normalized_title_multiple_track_identities");
+   expect(real?.proposedValue).toBe("human_review_required");
+   expect(real?.disposition).toBe("review");
+ });
+ it("validates the optional managed-JIT project boundary without widening confirmation",()=>{
+   const basics=[
+     "--workspace-id="+ws,"--ruleset-version=1.3.0",
+     "--finding-file=/tmp/approved.json","--confirm=MIZIZI_JIT_REVIEW_CASE_ONLY",
+   ];
+   expect(parseReviewCaseAdmissionArgsV1(basics).jitProjectRef).toBeNull();
+   expect(parseReviewCaseAdmissionArgsV1([
+     ...basics,"--jit-project-ref=pgzizndxdyhqmtyywjmt",
+   ]).jitProjectRef).toBe("pgzizndxdyhqmtyywjmt");
+   expect(()=>parseReviewCaseAdmissionArgsV1([
+     ...basics,"--jit-project-ref=invalid",
+   ])).toThrow("MIZIZI_CASE_ADMISSION_INVALID_JIT_PROJECT");
+   expect(()=>parseReviewCaseAdmissionArgsV1([
+     ...basics.filter(v=>!v.startsWith("--confirm=")),
+     "--jit-project-ref=pgzizndxdyhqmtyywjmt",
+   ])).toThrow("MIZIZI_CASE_ADMISSION_EXPLICIT_CONFIRMATION_REQUIRED");
+ });
+ it("does not enable JIT for malformed or unapproved source findings",async()=>{
+   const opener=vi.fn();
+   await expect(admitReviewViaManagedJitV1({
+     projectRef:"pgzizndxdyhqmtyywjmt",token:"sbp_fc_test_only",
+     workspaceId:ws,rulesetVersion:"1.3.0",
+     finding:{...finding,ruleVersion:"unapproved"},
+   },opener as unknown as Parameters<typeof admitReviewViaManagedJitV1>[1]))
+     .rejects.toThrow();
+   expect(opener).not.toHaveBeenCalled();
+ });
+ it("always restores the JIT mapping on case success and denial",async()=>{
+   for(const role of ["mizizi_executor","postgres"]){
+     const query=fixture(role),restore=vi.fn(async()=>undefined);
+     const open=vi.fn(async()=>({pool:{query},restore}));
+     const execute=admitReviewViaManagedJitV1({
+       projectRef:"pgzizndxdyhqmtyywjmt",token:"sbp_fc_test_only",
+       workspaceId:ws,rulesetVersion:"1.3.0",finding,
+     },open as unknown as Parameters<typeof admitReviewViaManagedJitV1>[1]);
+     if(role==="mizizi_executor"){
+       await expect(execute).resolves.toMatchObject({caseId,receiptLinkId:receiptId});
+     }else{
+       await expect(execute).rejects.toThrow("MIZIZI_HEADQUARTERS_REAL_JIT_EXECUTOR_REQUIRED");
+     }
+     expect(open).toHaveBeenCalledTimes(1);
+     expect(restore).toHaveBeenCalledTimes(1);
+   }
+ });
  it("requires the actual executor login, not a postgres role switch",async()=>{
    for(const role of ["postgres","service_role","authenticated","mizizi_worker"]){
      const q=fixture(role);
