@@ -96,13 +96,16 @@ export function projectIssue1094Brief(
     if (!row || !validSource) {
       return unverified("Evidence is missing or has changed. Review the original Registry record.");
     }
+    // Every visible historical state needs its own current human decision.
+    // A finalizer payload alone must never certify a completed repair.
+    const matching = decisions.filter((decision) => decision.review_item_id === target.reviewId);
+    const decision = matching[0];
+    const exactDecision = matching.length === 1 &&
+      decision?.id === target.decisionId && decision.status === "recorded" &&
+      decision.decision_type === "public_music_identity_true_duplicate" &&
+      asObject(decision.after_payload).canonicalTrackId === target.survivorId;
     if (target.key === "desire") {
-      const matching = decisions.filter((decision) => decision.review_item_id === target.reviewId);
-      const decision = matching[0];
-      if (row.status !== "open" || matching.length !== 1 ||
-          decision?.id !== target.decisionId || decision.status !== "recorded" ||
-          decision.decision_type !== "public_music_identity_true_duplicate" ||
-          asObject(decision.after_payload).canonicalTrackId !== target.survivorId) {
+      if (row.status !== "open" || !exactDecision) {
         return unverified("Decision or open-review authority differs from the accepted #1094 record.");
       }
       return {
@@ -110,7 +113,7 @@ export function projectIssue1094Brief(
         summary: "Human duplicate decision recorded. Review remains open. The documented archived Lilmaina Artist credit blocker needs separate governed reconciliation.",
       };
     }
-    if (row.status !== "resolved" ||
+    if (!exactDecision || row.status !== "resolved" ||
         resolution.decisionId !== target.decisionId ||
         resolution.verifiedOperationId !== target.operationId ||
         resolution.canonicalTrackId !== target.survivorId ||
@@ -133,7 +136,7 @@ export async function loadIssue1094Brief(): Promise<readonly Issue1094BriefRow[]
       .in("id", ids),
     supabase.from("registry_canonicalization_decisions")
       .select("id,review_item_id,status,decision_type,after_payload")
-      .eq("review_item_id", ISSUE_1094_CASES[0].reviewId)
+      .in("review_item_id", ids)
       .eq("status", "recorded")
       .eq("metadata->>programmeKey", "public_music_identity_track_actual_zero_v1"),
   ]);
