@@ -2,9 +2,9 @@
  * No private schema USAGE, arbitrary SQL, or second queue for the worker.
  */
 import {createHash} from "node:crypto";
-import type {WorkerRpc,ResearchJobV1} from "./research-worker-cycle-v1";
+import type {WorkerRpc,ResearchJobV1} from "./research-worker-cycle-v1.ts";
 import type {InvestigationStoreV1,InvestigationIdentityV1,
- InvestigationPassV1} from "./adaptive-investigation-v1";
+ InvestigationPassV1} from "./adaptive-investigation-v1.ts";
 const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const SHA=/^[0-9a-f]{64}$/;
 function expectResult(result:Awaited<ReturnType<WorkerRpc>>,label:string):unknown{
