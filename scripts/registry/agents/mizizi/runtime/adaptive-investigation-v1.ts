@@ -12,6 +12,7 @@ export type SourceAuthorityV1=Readonly<{
  fingerprint:string;authorityRef:string;
  useBasis:"first_party"|"documented_consent"|"documented_contract"|"open_license";
  observedAt:string;expiresAt:string|null;revokedAt:string|null;privateResearchAllowed:boolean;
+ externalModelProcessingAllowed:boolean;
 }>;
 export type SourceExcerptV1=Readonly<{source:SourceAuthorityV1;excerpt:string;citation:string}>;
 export type ResearchClaimV1=Readonly<{
@@ -101,6 +102,7 @@ function verifyHistory(id:InvestigationIdentityV1,history:readonly Investigation
 function verifySource(source:SourceAuthorityV1,id:InvestigationIdentityV1,nowMs:number){
  if(!UUID.test(source.sourceId)||source.workspaceId.toLowerCase()!==id.workspaceId||
     !USE.has(source.useBasis)||source.privateResearchAllowed!==true||
+    source.externalModelProcessingAllowed!==true||
     !SHA.test(source.fingerprint)||!requireText(source.originKey,"ORIGIN",500)||
     !requireText(source.lineageKey,"LINEAGE",500)||
     !requireText(source.authorityRef,"AUTHORITY",500)||
