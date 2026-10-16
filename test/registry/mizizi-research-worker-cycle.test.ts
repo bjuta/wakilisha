@@ -425,7 +425,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
      const parsed=packet.history.length===0?
       answer([lead(second)],"continue"):answer([],"pause");
      const {hypotheses,leads,passFinding,requestedDisposition}=parsed;
-     return new Response(JSON.stringify({stop_reason:"end_turn",
+     return new Response(JSON.stringify({stop_reason:"end_turn",usage:{input_tokens:1200,output_tokens:200},
       content:[{type:"text",text:JSON.stringify({
        hypotheses,leads,passFinding,requestedDisposition
       })}]}),{status:200,headers:{"Content-Type":"application/json"}});
@@ -437,6 +437,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(result).toMatchObject({claimed:1,failed:0,succeeded:1});
   expect(memory.size).toBe(2);
   expect(JSON.parse(memory.get(2)!.body_text).question).toBe(second);
+  expect([...memory.values()].map(p=>JSON.parse(p.body_text).costUnits)).toEqual([2,2]);
   expect(seen.filter(fn=>fn==="mizizi_append_research_pass_v1")).toHaveLength(2);
   expect(modelCalls.map(x=>x.question)).toEqual([identity.openingQuestion,second]);
   expect(modelCalls.every(x=>JSON.stringify(x.request).includes("test-anthropic-key-not-real")===false)).toBe(true);
@@ -799,7 +800,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
     const headers=init?.headers as Record<string,string>;
     calls.push({url:String(url),request,headers});
     return new Response(JSON.stringify({
-     stop_reason:"end_turn",
+     stop_reason:"end_turn",usage:{input_tokens:600,output_tokens:130},
      content:[{type:"text",text:JSON.stringify({
       ...answer([lead("Which independent source names the original performers?")],"continue"),
       hypotheses:[hypothesis]
@@ -825,11 +826,25 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   });
   expect(actual.promptFingerprint).toMatch(/^[a-f0-9]{64}$/);
  });
+ it("denies a valid-looking Anthropic analysis without provider usage evidence",async()=>{
+  const analyse=createAnthropicInvestigationAnalystV1({
+   apiKey:"test-anthropic-key-not-real",model:"claude-opus-4-8",
+   transport:async()=>new Response(JSON.stringify({
+    stop_reason:"end_turn",
+    content:[{type:"text",text:JSON.stringify({
+     hypotheses:[],leads:[],passFinding:"Unverified evidence remains insufficient.",
+     requestedDisposition:"pause"
+    })}]
+   }),{status:200,headers:{"Content-Type":"application/json"}})
+  });
+  await expect(analyse(identity.openingQuestion,[source],[]))
+   .rejects.toThrow("MIZIZI_ANALYST_USAGE_UNVERIFIED");
+ });
  it("rejects incomplete Anthropic provider output, not converting it into a cultural conclusion",async()=>{
   const analyse=createAnthropicInvestigationAnalystV1({
    apiKey:"test-anthropic-key-not-real",model:"claude-opus-4-8",
    transport:async()=>new Response(JSON.stringify({
-    stop_reason:"max_tokens",
+    stop_reason:"max_tokens",usage:{input_tokens:600,output_tokens:130},
     content:[{type:"text",text:JSON.stringify(answer([],"conclude"))}]
    }),{status:200,headers:{"Content-Type":"application/json"}})
   });
