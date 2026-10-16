@@ -88,8 +88,13 @@ export function createWikidataInvestigationReaderV1(
    throw new TypeError("MIZIZI_WIKIDATA_INVALID_QUESTION");
   if(await config.authorizePublicQuery(identity,question)!==true)
    throw new Error("MIZIZI_WIKIDATA_PUBLIC_QUERY_NOT_AUTHORIZED");
+  // A cultural question is not a useful entity-search term. Prefer an
+  // explicitly quoted work, recording or Artist title when present.
+  // Never substitute a guessed identity for the actual search result.
+  const quoted=question.match(/[“"]([^”"]{3,120})[”"]/);
+  const searchTerm=quoted?.[1]?.trim()||question;
   const search=new URL(API,HOST);
-  for(const [k,v] of Object.entries({action:"wbsearchentities",search:question,
+  for(const [k,v] of Object.entries({action:"wbsearchentities",search:searchTerm,
    language:"en",format:"json",limit:"3",maxlag:"5"}))
    search.searchParams.set(k,v);
   const first=await request(search,send);
