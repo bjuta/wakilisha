@@ -191,6 +191,12 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
    try{
      researchResult=await validatedResult(await research(job),job,input.verifySources,now());
    }catch(error){
+     // Server logs only: bounded internal error codes, never source excerpts,
+     // credentials, untrusted model text or full exception messages.
+     const raw=error instanceof Error?error.message:"";
+     const failureCode=/^MIZIZI_[A-Z0-9_]{3,100}$/.test(raw)?
+       raw:"MIZIZI_RESEARCH_UNCLASSIFIED";
+     console.error("MIZIZI_AUTHENTIC_WORKER_FAILURE_CODE="+failureCode);
      const failedReceipt=record(confirmed(await rpc("mizizi_fail_case_research_job_v1",{
        p_job_id:job.jobId,p_worker_id:workerId,
        p_error:error instanceof Error?error.name:"Research handler failed",
