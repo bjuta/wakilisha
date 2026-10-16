@@ -2,7 +2,7 @@
 -- Never invokes admission, creates a case, edits Registry, or asserts evidence truth.
 do $verify$
 declare v_fn regprocedure:='mizizi_private.admit_external_wikidata_research_v1(uuid,text,bigint,text,text)'::regprocedure;
-declare v_def text;
+v_def text;
 begin
  if (select count(*) from supabase_migrations.schema_migrations)<>233
   or (select max(version) from supabase_migrations.schema_migrations)<>'20261016092731'
