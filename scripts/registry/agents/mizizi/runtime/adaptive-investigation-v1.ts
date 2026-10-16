@@ -201,6 +201,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // A valid private source can forbid hosted-model processing. Such material
   // stays in the immutable internal receipt, never in the analyst packet.
   const modelSources=sources.filter(s=>s.source.externalModelProcessingAllowed);
+  const modelVisibleIds=new Set(modelSources.map(s=>s.source.sourceId.toLowerCase()));
   // Historic analysis and citations are not facts or disclosure consent.
   // Pass only method metadata, not excerpts, findings, or narrative that
   // could quote a privately retained witness or artifact.
@@ -252,9 +253,10 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    requireText(claim.reasoningSummary,"REASONING",2000);
    bounded(claim.uncertainty,"UNCERTAINTY",0,1);
    if(claim.sourceIds.length>20||
-      claim.sourceIds.some(ref=>!known.has(ref.toLowerCase())))
+      claim.sourceIds.some(ref=>!modelVisibleIds.has(ref.toLowerCase())))
     throw new TypeError("MIZIZI_RESEARCH_UNOBSERVED_EVIDENCE_CITATION");
-   const refs=authorities.filter(a=>claim.sourceIds.some(id=>id.toLowerCase()===a.sourceId.toLowerCase()));
+   const refs=authorities.filter(a=>modelVisibleIds.has(a.sourceId.toLowerCase())&&
+    claim.sourceIds.some(id=>id.toLowerCase()===a.sourceId.toLowerCase()));
    const independent=await verifyFinding(claim,Object.freeze(refs));
    if(typeof independent?.verified!=="boolean"||
       (independent.verified&&!independent.verificationRef))
