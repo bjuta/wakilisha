@@ -7,7 +7,7 @@
   "preview_migration_head": "20261016092731",
   "baseline_replay": "pass",
   "candidate_apply": "pass",
-  "verifier": "pending",
+  "verifier": "pass",
   "verifier_file": "scripts/control-plane/verify-mizizi-external-source-first-v1.sql",
   "schema_types_sha256": "639f0e9f3c80ac20d0927fa8bff601dcf39c91f9fc48c975abf9725bf48f226a",
   "schema_migration_count": 233,
@@ -15,5 +15,6 @@
   "verified_at": "2026-10-16T09:43:43.491Z",
   "disposable_baseline_evidence": "https://github.com/bjuta/wakilisha/actions/runs/38881585794",
   "production_promotion": "not_run",
-  "note": "Isolated Preview only. Independent SQL verifier must be executed separately before changing verifier to pass."
+  "note": "Actual isolated Preview DB05 migration applied and narrow read-only verified. Zero Preview cultural cases or research jobs at verifier time. Production not promoted; no external cultural conclusion claimed.",
+  "independent_preview_verifier_evidence": "Read-only Supabase PostgreSQL execution of scripts/control-plane/verify-mizizi-external-source-first-v1.sql on nkgfoppunmnkcumalxqp returned MIZIZI_DB05_READ_ONLY_VERIFIER=PASS. Exact 233 migration ledger, JIT-only function, no direct case or Registry grants."
 }
