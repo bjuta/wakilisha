@@ -49,6 +49,8 @@ export type InvestigationPassV1=Readonly<{
   citation:string;excerpt:string;
   /** Missing on older immutable passes; never infer their disclosure status. */
   modelDisclosed?:boolean;
+  /** Optional original custodian digest for human-only material. */
+  custodyFingerprint?:string;
  }>[];
  findings:readonly VerifiedClaimV1[];
  passFinding:string;proposedLeads:readonly ResearchLeadV1[];
@@ -288,18 +290,21 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   bounded(costUnits,"MEASURED_COST",0,1000000);
   remainingCost=Math.max(0,remainingCost-costUnits);
   const previous=history.at(-1)?.fingerprint??null;
+  const REDACTED="[Source content withheld: custodian-controlled human-only evidence]";
+  const redactedFingerprint=createHash("sha256").update(REDACTED,"utf8").digest("hex");
   const body={contract:ADAPTIVE_INVESTIGATION_CONTRACT,caseId:identity.caseId,
    workspaceId:identity.workspaceId,ordinal:history.length+1,question,
    predecessorFingerprint:previous,
    sourceReceipts:sources.map(({source:a,citation,excerpt})=>({
     sourceId:a.sourceId,originKey:a.originKey,
-    lineageKey:a.lineageKey,payloadFingerprint:a.fingerprint,useBasis:a.useBasis,
+    lineageKey:a.lineageKey,
+    // Snapshot hash covers what is *actually* embedded in this immutable
+    // pass. The original witness bytes remain with a revocable custodian.
+    payloadFingerprint:a.externalModelProcessingAllowed?a.fingerprint:redactedFingerprint,
+    ...(a.externalModelProcessingAllowed?{}:{custodyFingerprint:a.fingerprint}),
+    useBasis:a.useBasis,
     authorityRef:a.authorityRef,observedAt:a.observedAt,citation,
-    // Retain the source identity and hash, never embed human-only testimony
-    // in a permanent pass. Authorized custodians resolve content separately;
-    // consent withdrawal must not require rewriting an immutable chain.
-    excerpt:a.externalModelProcessingAllowed?excerpt:
-     "[Source content withheld: custodian-controlled human-only evidence]",
+    excerpt:a.externalModelProcessingAllowed?excerpt:REDACTED,
     modelDisclosed:a.externalModelProcessingAllowed&&!noModel})),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
