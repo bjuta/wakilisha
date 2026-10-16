@@ -5,6 +5,7 @@ import {createWikidataInvestigationReaderV1} from "../../scripts/registry/agents
 import {createAdaptiveResearchWorkerHandlerV1,runAdaptiveResearchWorkerCycleV1,runAnthropicAdaptiveResearchWorkerCycleV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
 import {
   runResearchWorkerCycleV1,
+  researchRetryDecisionV1,
   type WorkerRpc,
   type ResearchJobV1,
   type VerifiedResearchSourceV1,
@@ -46,7 +47,8 @@ function harness(overrides:{claimed?:unknown;recovered?:unknown;
   return {data:fn==="mizizi_recover_expired_case_research_jobs_v1"?
    (overrides.recovered??0):fn==="mizizi_claim_case_research_jobs_v1"?
    (overrides.claimed??[row]):fn==="mizizi_complete_case_research_job_v1"?
-   (overrides.completed??done):(overrides.failed??failed),error:null};
+   (overrides.completed??done):(overrides.failed??(args.p_retryable===false?
+    {...failed,job_status:"dead_letter",command_receipt_status:"failed"}:failed)),error:null};
  });
  return {rpc,calls};
 }
@@ -105,7 +107,29 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
    .resolves.toMatchObject({claimed:1,succeeded:0,failed:1});
   expect(calls.at(-1)?.fn).toBe("mizizi_fail_case_research_job_v1");
   expect(calls.at(-1)?.args.p_error).toBe("TypeError");
+  expect(calls.at(-1)?.args.p_retryable).toBe(false);
   expect(JSON.stringify(calls)).not.toContain("PRIVATE source details");
+ });
+ it("backs off transient research failures while stopping permanent errors",async()=>{
+  const transient=harness({claimed:[{...row,attempt_count:3,max_attempts:25}]});
+  const outcome=await cycle(transient.rpc,async()=>{
+   throw new Error("MIZIZI_WIKIDATA_MAXLAG_DEFERRED");
+  });
+  expect(outcome).toMatchObject({failed:1,succeeded:0});
+  expect(transient.calls.at(-1)?.args).toMatchObject({
+   p_retryable:true,p_retry_delay_seconds:240
+  });
+  const provider=researchRetryDecisionV1(
+   new Error("MIZIZI_ANALYST_UPSTREAM_UNAVAILABLE"),20);
+  expect(provider).toMatchObject({retryable:true,delaySeconds:3600});
+  for(const error of [
+   new Error("MIZIZI_PASS_INVALID_APPEND_HASH"),
+   new Error("MIZIZI_WIKIDATA_PUBLIC_QUERY_NOT_AUTHORIZED"),
+   new Error("MIZIZI_ANALYST_EXTERNAL_SOURCE_PROCESSING_DENIED"),
+   new TypeError("untrusted details")
+  ]){
+   expect(researchRetryDecisionV1(error,2).retryable).toBe(false);
+  }
  });
  it("never issues a contradictory failure after an indeterminate completion",async()=>{
   const {rpc,calls}=harness({reject:"mizizi_complete_case_research_job_v1"});
