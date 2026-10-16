@@ -13,6 +13,11 @@ const LICENCE="https://www.wikidata.org/wiki/Wikidata:Licensing";
 const CLIENT="WAKILISHA-MIZIZI/1.0 (https://wakilisha.africa)";
 const QID=/^Q[1-9][0-9]{0,11}$/;
 const MAX_BODY=180000;
+// Changing the persisted evidence projection changes the source snapshot ID.
+// A prior pass retains its original immutable identity and fingerprint.
+const EXCERPT_PROJECTION="wikidata:structured:entity:v2";
+const EXCERPT_PROPERTIES=["P31","P175","P86","P676","P264","P155","P156",
+ "P361","P577","P483","P434","P435","P1827"] as const;
 
 export type WikidataReadOptionsV1=Readonly<{
  authorizePublicQuery:(identity:InvestigationIdentityV1,question:string)=>Promise<boolean>;
@@ -20,7 +25,7 @@ export type WikidataReadOptionsV1=Readonly<{
 }>;
 
 function sourceUuid(qid:string,revision:number):string{
- const c=createHash("sha256").update("wikidata:structured:entity:"+qid+":revision:"+revision).digest("hex").slice(0,32).split("");
+ const c=createHash("sha256").update(EXCERPT_PROJECTION+":"+qid+":revision:"+revision).digest("hex").slice(0,32).split("");
  c[12]="5";c[16]="89ab"[parseInt(c[16],16)%4];
  return [c.slice(0,8).join(""),c.slice(8,12).join(""),c.slice(12,16).join(""),
  c.slice(16,20).join(""),c.slice(20).join("")].join("-");
@@ -76,7 +81,7 @@ function excerpt(entity:Record<string,unknown>,qid:string):string{
  const claims=entity.claims as Record<string,unknown>|undefined;
  const included:Record<string,unknown>={};
  // IDs and reference counts are kept as source data, not asserted truth.
- for(const prop of ["P31","P175","P86","P676","P264","P155","P156","P361","P577","P483","P434"]){
+ for(const prop of EXCERPT_PROPERTIES){
   const rows=claims?.[prop];
   if(!Array.isArray(rows))continue;
   included[prop]=rows.slice(0,4).map((r:Record<string,unknown>)=>{
@@ -88,6 +93,11 @@ function excerpt(entity:Record<string,unknown>,qid:string):string{
  }
  return JSON.stringify({entityId:qid,label:labels?.en?.value??null,
   description:descriptions?.en?.value??null,lastrevid:entity.lastrevid??null,
+  projection:EXCERPT_PROJECTION,
+  // Only these properties were evaluated. A missing property here does NOT
+  // prove that no Work, ISWC, author or right exists in another registry.
+  inspectedProperties:EXCERPT_PROPERTIES,
+  absentProperties:EXCERPT_PROPERTIES.filter(p=>!Array.isArray(claims?.[p])),
   claims:included});
 }
 /** A trusted caller must explicitly authorize sharing this case question
