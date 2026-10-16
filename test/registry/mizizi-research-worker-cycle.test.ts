@@ -405,8 +405,13 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(store.rows).toHaveLength(0);
   // Restricting model processing does not revoke lawful internal research.
   const humanOnly=memory(),neverDisclose=vi.fn(async()=>answer([],"pause"));
-  const restricted={...source,excerpt:"RESTRICTED_FIRSTHAND_WITNESS_STATEMENT",
-   source:{...authority,externalModelProcessingAllowed:false}};
+  const restricted={...source,
+   excerpt:"RESTRICTED_FIRSTHAND_WITNESS_STATEMENT",
+   citation:"CONFIDENTIAL_PERSONAL_WITNESS_URL",
+   source:{...authority,externalModelProcessingAllowed:false,
+    originKey:"WITNESS_ORIGIN_PRIVATE",
+    lineageKey:"WITNESS_LINEAGE_PRIVATE",
+    authorityRef:"WITNESS_CONSENT_PRIVATE"}};
   const internal=await runAdaptiveInvestigationV1({...base,store:humanOnly,
    readSources:async()=>[restricted],analyze:neverDisclose});
   expect(internal).toMatchObject({passesAdded:1,disposition:"paused"});
@@ -416,11 +421,18 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    decision:{action:"pause"}});
   expect(humanOnly.rows[0].sourceReceipts[0]).toMatchObject({
    excerpt:"[Source content withheld: custodian-controlled human-only evidence]",
-   modelDisclosed:false,custodyFingerprint:"a".repeat(64)
+   modelDisclosed:false,
+   originKey:"custodian:restricted",lineageKey:"custodian:restricted",
+   authorityRef:"custodian:access-controlled",citation:"custodian:source-held"
   });
+  expect(humanOnly.rows[0].sourceReceipts[0]).not.toHaveProperty("custodyFingerprint");
   expect(humanOnly.rows[0].sourceReceipts[0].payloadFingerprint)
    .not.toBe("a".repeat(64));
-  expect(JSON.stringify(humanOnly.rows)).not.toContain("RESTRICTED_FIRSTHAND_WITNESS_STATEMENT");
+  const serialized=JSON.stringify(humanOnly.rows);
+  for(const secret of ["RESTRICTED_FIRSTHAND_WITNESS_STATEMENT",
+   "CONFIDENTIAL_PERSONAL_WITNESS_URL","WITNESS_ORIGIN_PRIVATE",
+   "WITNESS_LINEAGE_PRIVATE","WITNESS_CONSENT_PRIVATE"])
+   expect(serialized).not.toContain(secret);
   await expect(runAdaptiveInvestigationV1({...base,store:memory(),
    readSources:async()=>[{...restricted,source:{
     ...restricted.source,privateEvidenceRetentionAllowed:false}}],
@@ -430,49 +442,45 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   await expect(runAdaptiveInvestigationV1({...base,store:tampered,
    analyze:async()=>answer([],"pause")})).rejects.toThrow("HISTORY_CORRUPT");
  });
- it("withholds restricted current evidence and all prior narratives from the analyst",async()=>{
-  const store=memory(),q2="Does another independent originator confirm this claim?";
-  const secret="ORAL_WITNESS_CONFIDENTIAL_EXCERPT";
-  const restricted={...source,excerpt:secret,
-   source:{...authority,sourceId:JOB,originKey:"original:private-testimony",
+ it("retains mixed public and restricted evidence without exporting private investigation context",async()=>{
+  const store=memory(),secret="ORAL_WITNESS_CONFIDENTIAL_EXCERPT";
+  const restricted={...source,excerpt:secret,citation:"WITNESS_PERSONAL_CITATION",
+   source:{...authority,sourceId:JOB,originKey:"WITNESS_ORIGIN_PRIVATE",
+    lineageKey:"WITNESS_LINEAGE_PRIVATE",authorityRef:"WITNESS_PERMISSION_PRIVATE",
     fingerprint:"c".repeat(64),externalModelProcessingAllowed:false}};
   const visible={...source,excerpt:"Public historical recording label has an unknown date."};
-  let calls=0;
+  const analyst=vi.fn(async()=>answer([],"conclude"));
+  const verifier=vi.fn(async()=>({verified:true,verificationRef:"forged:verdict"}));
   const result=await runAdaptiveInvestigationV1({
    identity,store,maxNewPasses:2,maxTotalPasses:20,costBudgetUnits:20,
    now:()=>NOW,readSources:async()=>[restricted,visible],
-   analyze:async(_,sources,history)=>{
-    calls++;
-    expect(sources).toHaveLength(1);
-    expect(sources[0].excerpt).not.toContain(secret);
-    if(history.length){
-     expect(history[0].sourceReceipts).toEqual([]);
-     expect(history[0].findings).toEqual([]);
-     expect(history[0].proposedLeads).toEqual([]);
-     expect(JSON.stringify(history)).not.toContain(secret);
-     expect(JSON.stringify(history)).not.toContain("The first evidence does not establish");
-    }
-    return calls===1?answer([lead(q2)],"continue"):answer([],"pause");
-   },
-   verifyFinding:async()=>({verified:false,verificationRef:null})
+   analyze:analyst,verifyFinding:verifier
   });
-  expect(result).toMatchObject({passesAdded:2,disposition:"paused"});
-  expect(calls).toBe(2);
+  expect(result).toMatchObject({passesAdded:1,disposition:"paused"});
+  expect(analyst).not.toHaveBeenCalled();
+  expect(verifier).not.toHaveBeenCalled();
+  expect(store.rows[0]).toMatchObject({costUnits:0,
+   modelVersion:"mizizi.human_review_required.v1",
+   findings:[],decision:{action:"pause"}});
   expect(store.rows[0].sourceReceipts).toEqual(expect.arrayContaining([
    expect.objectContaining({sourceId:JOB,modelDisclosed:false,
-    excerpt:"[Source content withheld: custodian-controlled human-only evidence]",
-    custodyFingerprint:"c".repeat(64)}),
-   expect.objectContaining({sourceId:EVENT,modelDisclosed:true})
+    originKey:"custodian:restricted",lineageKey:"custodian:restricted",
+    authorityRef:"custodian:access-controlled",citation:"custodian:source-held",
+    excerpt:"[Source content withheld: custodian-controlled human-only evidence]"}),
+   expect.objectContaining({sourceId:EVENT,modelDisclosed:false,excerpt:visible.excerpt})
   ]));
-  expect(store.rows[1].predecessorFingerprint).toBe(store.rows[0].fingerprint);
-  expect(JSON.stringify(store.rows)).not.toContain(secret);
-  await expect(runAdaptiveInvestigationV1({
-   identity,store:memory(),maxNewPasses:1,maxTotalPasses:20,
-   costBudgetUnits:20,now:()=>NOW,readSources:async()=>[restricted,visible],
-   analyze:async()=>({...answer([],"pause"),hypotheses:[{
-    ...hypothesis,sourceIds:[JOB]}]}),
-   verifyFinding:async()=>({verified:true,verificationRef:"untrusted:forged"})
-  })).rejects.toThrow("UNOBSERVED_EVIDENCE_CITATION");
+  expect(store.rows[0].sourceReceipts[0]).not.toHaveProperty("custodyFingerprint");
+  const serialized=JSON.stringify(store.rows);
+  for(const confidential of [secret,"WITNESS_PERSONAL_CITATION",
+   "WITNESS_ORIGIN_PRIVATE","WITNESS_LINEAGE_PRIVATE","WITNESS_PERMISSION_PRIVATE",
+   "c".repeat(64)])expect(serialized).not.toContain(confidential);
+  const resumed=await runAdaptiveInvestigationV1({
+   identity,store,maxNewPasses:2,maxTotalPasses:20,costBudgetUnits:20,
+   now:()=>NOW,readSources:async()=>[restricted,visible],
+   analyze:analyst,verifyFinding:verifier
+  });
+  expect(resumed).toMatchObject({passesAdded:0,totalPasses:1,disposition:"paused"});
+  expect(analyst).not.toHaveBeenCalled();
  });
  it("halts paraphrase loops against the same evidence without a third paid analysis",async()=>{
   const store=memory(),analyze=vi.fn(async()=>answer([
