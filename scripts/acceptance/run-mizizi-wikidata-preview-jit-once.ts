@@ -62,7 +62,7 @@ async function main(){
    evidenceLineage:target.source.lineageKey
  }));
  const session=await openMiziziJitSession({projectRef:PREVIEW,
-   managementProjectRef:PREVIEW,token});
+   managementProjectRef:PRODUCTION,token,branchOnly:true});
  try{
   const args=[identity.workspaceId,QID,revision,hash,QUESTION];
   const c=await session.pool.query(
