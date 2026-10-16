@@ -10,6 +10,8 @@ import type {ResearchJobHandlerV1,ResearchJobV1}
  from "./research-worker-cycle-v1";
 import {runResearchWorkerCycleV1, type WorkerRpc, type ResearchSourceVerifierV1} from "./research-worker-cycle-v1";
 import {createLeasedResearchPassStoreV1} from "./leased-research-pass-store-v1";
+import {createAnthropicInvestigationAnalystV1, type AnthropicInvestigationOptionsV1}
+ from "./anthropic-investigation-analyst-v1";
 export type AdaptiveWorkerDependenciesV1=Readonly<{
  store:InvestigationStoreV1;
  openingQuestion:(job:ResearchJobV1)=>Promise<string>;
@@ -74,5 +76,22 @@ export async function runAdaptiveResearchWorkerCycleV1(input:Readonly<{
     costBudgetUnits:input.costBudgetUnits,measureCostUnits:input.measureCostUnits});
    return handler(job);
   }
+ });
+}
+
+/** Reuse the Production Institute assistant's Anthropic Messages provider
+ * contract from an authorized server runtime. A model key remains in server
+ * configuration and is never sent in the shared worker job or SQL receipts.
+ * The actual source reader and independent verifier must be provided by
+ * independently trusted components, not the model.
+ */
+export function runAnthropicAdaptiveResearchWorkerCycleV1(input:Readonly<
+ Omit<Parameters<typeof runAdaptiveResearchWorkerCycleV1>[0],"analyze">&{
+  anthropic:AnthropicInvestigationOptionsV1
+ }
+>){
+ const {anthropic,...worker}=input;
+ return runAdaptiveResearchWorkerCycleV1({
+  ...worker,analyze:createAnthropicInvestigationAnalystV1(anthropic)
  });
 }
