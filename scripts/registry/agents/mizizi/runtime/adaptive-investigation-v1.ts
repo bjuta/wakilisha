@@ -235,8 +235,11 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // for a source-free model answer. Absence never establishes nonexistence.
   const noEvidence=sources.length===0;
   const noModel=humanOnly||evidenceExhausted||noEvidence;
-  const method=humanOnly?"human_only":
+  const method=humanOnly?"human_review_required":
    noEvidence?"no_authorized_evidence":"evidence_exhausted";
+  const methodFingerprintSeed=humanOnly?"mizizi.human_only_method.v1":
+   noEvidence?"mizizi.no_authorized_evidence_method.v1":
+   "mizizi.exhausted_evidence_method.v1";
   const analysis:ResearchAnalysisV1=noModel?{
    hypotheses:[],leads:[],
    passFinding:humanOnly?
@@ -246,7 +249,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     "No new independent source evidence; repeat model interpretation withheld.",
    requestedDisposition:"pause",
    modelVersion:"mizizi."+method+".v1",
-   promptFingerprint:digest("mizizi."+method+"_method.v1")
+   promptFingerprint:digest(methodFingerprintSeed)
   }:await analyze(question,Object.freeze(modelSources),
    Object.freeze(analystHistory));
   requireText(analysis.passFinding,"PASS_FINDING",3000);
