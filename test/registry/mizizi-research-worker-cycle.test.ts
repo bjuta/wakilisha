@@ -568,6 +568,53 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    readEnvironment:()=>null,readAdminSetting:async()=>null
   })).rejects.toThrow("EXISTING_PROVIDER_NOT_READY");
  });
+
+ it("selects the most recent compatible Opus when the configured 4.8 is missing",async()=>{
+  const models=[
+   {id:"claude-opus-older",line:"opus",created_at:"2026-01-01",
+    lifecycle:"active",capabilities:{structured_outputs:{supported:true},
+     thinking:{types:{adaptive:{supported:true}}}}},
+   {id:"claude-opus-newer",line:"opus",created_at:"2026-09-01",
+    lifecycle:"active",capabilities:{structured_outputs:{supported:true},
+     thinking:{types:{adaptive:{supported:true}}}}},
+   {id:"claude-opus-incompatible",line:"opus",created_at:"2026-10-01",
+    lifecycle:"active",capabilities:{structured_outputs:{supported:false},
+     thinking:{types:{adaptive:{supported:true}}}}}
+  ];
+  const transport:typeof fetch=async()=>new Response(JSON.stringify({
+   data:models,has_more:false}),{status:200});
+  const config=await resolveInstituteAnthropicConfigurationV1({
+   readEnvironment:name=>name==="ANTHROPIC_API_KEY"?"test-provider-key":null,
+   readAdminSetting:async()=>null
+  });
+  expect(config.model).toBe("");
+  expect(await discoverAnthropicResearchModelV1(config,transport)).toMatchObject({
+   ok:true,model:"claude-opus-newer",preferenceMatched:false
+  });
+  expect(await discoverAnthropicResearchModelV1({...config,
+   model:"claude-opus-older"},transport)).toMatchObject({
+   ok:true,model:"claude-opus-older",preferenceMatched:true
+  });
+ });
+ it("reports missing workspace authority instead of guessing models",async()=>{
+  const workspace="wrkspc_0123456789ABCDEFGHIJKLMNOP";
+  let calls=0;
+  const config={apiKey:"test-provider-key",model:"claude-opus-4-8",
+   workspaceId:workspace};
+  const failed=await discoverAnthropicResearchModelV1(config,async(_url,init)=>{
+   calls++;
+   expect((init?.headers as Record<string,string>)["anthropic-workspace-id"]).toBe(workspace);
+   return new Response(JSON.stringify({error:{
+    message:"Workspace ID header required for this API key"
+   }}),{status:400});
+  });
+  expect(failed).toEqual({ok:false,providerHttpStatus:400,
+   reason:"workspace_header_required"});
+  expect(calls).toBe(1);
+  expect(await discoverAnthropicResearchModelV1({...config,
+   workspaceId:undefined},async()=>new Response("",{status:401})))
+    .toMatchObject({ok:false,reason:"credential_rejected"});
+ });
  it("uses Institute's Anthropic Messages contract but never confuses model output with verification",async()=>{
   const key="test-anthropic-key-not-real";
   const calls:{url:string;request:Record<string,unknown>;headers:Record<string,string>}[]=[];
