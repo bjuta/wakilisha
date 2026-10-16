@@ -1,0 +1,33 @@
+name: MIZIZI Work Reader Contract One-Shot
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/mizizi-work-reader-contract-one-shot.yml"
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Isolated research-only contract acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "bjuta/wakilisha"
+          test "$GITHUB_HEAD_REF" = "feat/mizizi-slice2-adaptive-multipass-investigation"
+          test -z "${SUPABASE_ACCESS_TOKEN:-}"
+          test -z "${SUPABASE_PROJECT_REF:-}"
+          test ! -e supabase/.temp/project-ref
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx vitest run test/registry/mizizi-research-worker-cycle.test.ts
+          echo "MIZIZI_WORK_READER_SOURCE_AND_AUTHORITY_CONTRACT=PASS"
