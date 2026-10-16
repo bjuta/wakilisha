@@ -126,7 +126,8 @@ export function createWikidataInvestigationReaderV1(
     fingerprint:createHash("sha256").update(exact).digest("hex"),
     authorityRef:LICENCE,useBasis:"open_license",
     observedAt:new Date(now()).toISOString(),expiresAt:null,revokedAt:null,
-    privateResearchAllowed:true,externalModelProcessingAllowed:true
+    privateResearchAllowed:true,externalModelProcessingAllowed:true,
+    privateEvidenceRetentionAllowed:true
    };
    found.push({source,excerpt:exact,
     citation:HOST+"/wiki/"+qid+"?oldid="+revision});
