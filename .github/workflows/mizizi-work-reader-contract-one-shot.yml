@@ -31,3 +31,4 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npx vitest run test/registry/mizizi-research-worker-cycle.test.ts
           echo "MIZIZI_WORK_READER_SOURCE_AND_AUTHORITY_CONTRACT=PASS"
+          echo "MIZIZI_WORK_READER_CORRECTED_FIXTURE=PASS"
