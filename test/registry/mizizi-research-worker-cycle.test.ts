@@ -328,7 +328,9 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(result).toMatchObject({passesAdded:3,totalPasses:3,disposition:"paused"});
   expect(asked).toEqual([identity.openingQuestion,q2,q3]);
   expect(store.rows.map(p=>p.decision.action)).toEqual(["continue","continue","pause"]);
-  expect(store.rows[2].findings[0].independentlyVerified).toBe(false);
+  expect(store.rows[2].findings).toEqual([]);
+  expect(store.rows[2]).toMatchObject({modelVersion:"mizizi.evidence_exhausted.v1",
+   decision:{action:"pause"},costUnits:0});
   expect(store.rows[1].predecessorFingerprint).toBe(store.rows[0].fingerprint);
   expect(store.rows[0].proposedLeads[0].question).toBe(q2);
   expect(store.rows[0].sourceReceipts[0]).toMatchObject({
