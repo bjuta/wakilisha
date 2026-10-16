@@ -158,6 +158,14 @@ jobs:
         shell: bash
         run: npm ci --ignore-scripts --no-audit --no-fund
 
+      - name: Verify research evidence-disclosure and repeat-source safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${SUPABASE_ACCESS_TOKEN:-}"
+          npx vitest run test/registry/mizizi-research-worker-cycle.test.ts
+          echo MIZIZI_RESEARCH_HUMAN_ONLY_AND_LOOP_CONTRACT=PASS
+
       - name: Install local headless Chromium browser for genuine operator UI
         shell: bash
         run: npx playwright install --with-deps chromium
