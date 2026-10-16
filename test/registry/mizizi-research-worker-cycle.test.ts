@@ -389,8 +389,10 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    decision:{action:"pause"}});
   expect(humanOnly.rows[0].sourceReceipts[0]).toMatchObject({
    excerpt:"[Source content withheld: custodian-controlled human-only evidence]",
-   modelDisclosed:false
+   modelDisclosed:false,custodyFingerprint:"a".repeat(64)
   });
+  expect(humanOnly.rows[0].sourceReceipts[0].payloadFingerprint)
+   .not.toBe("a".repeat(64));
   expect(JSON.stringify(humanOnly.rows)).not.toContain("RESTRICTED_FIRSTHAND_WITNESS_STATEMENT");
   await expect(runAdaptiveInvestigationV1({...base,store:memory(),
    readSources:async()=>[{...restricted,source:{
@@ -431,7 +433,8 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(calls).toBe(2);
   expect(store.rows[0].sourceReceipts).toEqual(expect.arrayContaining([
    expect.objectContaining({sourceId:JOB,modelDisclosed:false,
-    excerpt:"[Source content withheld: custodian-controlled human-only evidence]"}),
+    excerpt:"[Source content withheld: custodian-controlled human-only evidence]",
+    custodyFingerprint:"c".repeat(64)}),
    expect.objectContaining({sourceId:EVENT,modelDisclosed:true})
   ]));
   expect(store.rows[1].predecessorFingerprint).toBe(store.rows[0].fingerprint);
