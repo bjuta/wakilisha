@@ -126,7 +126,7 @@ export function createWikidataInvestigationReaderV1(
   }else{
    const search=new URL(API,HOST);
    for(const [k,v] of Object.entries({action:"wbsearchentities",search:searchTerm,
-    language:"en",format:"json",limit:"3",maxlag:"5"}))
+    language:"en",format:"json",limit:"3"}))
     search.searchParams.set(k,v);
    const first=await request(search,send);
    if(!Array.isArray(first.search)||first.search.length>5)
@@ -139,7 +139,7 @@ export function createWikidataInvestigationReaderV1(
   const details=new URL(API,HOST);
   for(const [k,v] of Object.entries({action:"wbgetentities",ids:distinctIds.join("|"),
    props:"info|labels|descriptions|claims",languages:"en",
-   format:"json",maxlag:"5"}))
+   format:"json"}))
    details.searchParams.set(k,v);
   const second=await request(details,send);
   if(!second.entities||typeof second.entities!=="object"||
