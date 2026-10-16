@@ -176,7 +176,7 @@ begin
     v_receipt.id,v_job.id,v_job.status,
     case when v_created then 'created'::text else 'replayed'::text end;
 end;
-$function$
+$function$;
 
 do $verify$
 begin
