@@ -717,7 +717,12 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(sent).toBe(false);
  });
  it("reuses Institute's existing environment/setting names without creating another credential path",async()=>{
-  const forbiddenSetting=vi.fn(async()=>{throw new Error("must prefer existing environment");});
+  const forbiddenSetting=vi.fn(async(key:string)=>{
+   // New optional workspace selector can consult the existing trusted
+   // settings store; credentials and model are still environment-first.
+   if(key==="anthropic_workspace_id")return null;
+   throw new Error("must prefer existing environment");
+  });
   const env=await resolveInstituteAnthropicConfigurationV1({
    readEnvironment:name=>name==="ANTHROPIC_API_KEY"?"test-existing-provider-key":
     name==="INSTITUTE_ASSISTANT_MODEL"?"claude-opus-4-8":null,
@@ -725,7 +730,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   });
   expect(env.model).toBe("claude-opus-4-8");
   expect(env.apiKey).toBe("test-existing-provider-key");
-  expect(forbiddenSetting).not.toHaveBeenCalled();
+  expect(forbiddenSetting).toHaveBeenCalledExactlyOnceWith("anthropic_workspace_id");
   const fallback=await resolveInstituteAnthropicConfigurationV1({
    readEnvironment:()=>null,
    readAdminSetting:async key=>key==="anthropic_api_key"?
