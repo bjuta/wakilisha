@@ -86,12 +86,29 @@ export async function runAdaptiveResearchWorkerCycleV1(input:Readonly<{
  * independently trusted components, not the model.
  */
 export function runAnthropicAdaptiveResearchWorkerCycleV1(input:Readonly<
- Omit<Parameters<typeof runAdaptiveResearchWorkerCycleV1>[0],"analyze">&{
+ Omit<Parameters<typeof runAdaptiveResearchWorkerCycleV1>[0],"analyze"|"measureCostUnits">&{
   anthropic:AnthropicInvestigationOptionsV1
  }
 >){
  const {anthropic,...worker}=input;
+ let unconsumedTokenUnits=0;
+ const analyze=createAnthropicInvestigationAnalystV1({
+  ...anthropic,onUsage:(units)=>{
+   unconsumedTokenUnits+=units;
+   anthropic.onUsage?.(units);
+  }
+ });
  return runAdaptiveResearchWorkerCycleV1({
-  ...worker,analyze:createAnthropicInvestigationAnalystV1(anthropic)
+  ...worker,analyze,
+  // Consume only the preceding completed provider response. The generic
+  // investigation engine's costBudgetUnits are 1,000-token units here,
+  // NOT dollars and not complete billing for failed/retried requests.
+  measureCostUnits:()=>{
+   const used=unconsumedTokenUnits;
+   unconsumedTokenUnits=0;
+   if(!Number.isSafeInteger(used)||used<1)
+    throw new Error("MIZIZI_ANALYST_UNMETERED_PASS_DENIED");
+   return used;
+  }
  });
 }
