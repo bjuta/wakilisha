@@ -488,6 +488,33 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(anchored).toHaveLength(1);
   expect(searchTerms.at(-1)).toBe('Jerusalema');
  });
+ it("follows an explicit Wikidata Work QID without title ambiguity and preserves it on later passes",async()=>{
+  const actions:string[]=[];
+  const read=createWikidataInvestigationReaderV1({
+   authorizePublicQuery:async()=>true,now:()=>NOW,
+   transport:async url=>{
+    const query=new URL(String(url)).searchParams;
+    actions.push(query.get("action")||"");
+    expect(query.get("action")).toBe("wbgetentities");
+    expect(query.get("ids")).toBe("Q97652493");
+    return new Response(JSON.stringify({entities:{Q97652493:{
+     id:"Q97652493",lastrevid:3123456789,
+     labels:{en:{value:"Jerusalema"}},
+     descriptions:{en:{value:"2019 single by Master KG"}},
+     claims:{P31:[{id:"Q97652493$1",rank:"normal",
+      mainsnak:{datatype:"wikibase-item",datavalue:{value:{id:"Q134556"}}}}]}
+    }}}),{status:200,headers:{"Content-Type":"application/json"}});
+   }
+  });
+  const root='Does Wikidata Q97652493 identify the musical work "Jerusalema"?';
+  const first=await read(identity,root,[]);
+  const second=await read(identity,
+   "What competing creator and release identities remain unresolved?",
+   [{question:root} as InvestigationPassV1]);
+  expect(actions).toEqual(["wbgetentities","wbgetentities"]);
+  expect(first[0].source.sourceId).toBe(second[0].source.sourceId);
+  expect(first[0].source.lineageKey).toBe("wikidata:community-structured-data");
+ });
  it("refuses sending private excerpts to the existing provider without explicit permission",async()=>{
   let sent=false;
   const analyze=createAnthropicInvestigationAnalystV1({
