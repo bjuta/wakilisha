@@ -58,13 +58,13 @@ export async function runAdaptiveResearchWorkerCycleV1(input:Readonly<{
  readSources:InvestigationReaderV1;analyze:InvestigationAnalystV1;
  verifyFinding:IndependentFindingVerifierV1;
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
- measureCostUnits?:()=>number;leaseSeconds?:number;limit?:number;
+ measureCostUnits?:()=>number;leaseSeconds?:number;limit?:number;now?:()=>number;
 }>){
  if(!input||typeof input.verifySources!=="function")
   throw new TypeError("MIZIZI_ADAPTIVE_WORKER_SOURCE_VERIFIER_REQUIRED");
  return runResearchWorkerCycleV1({
   rpc:input.rpc,workerId:input.workerId,verifySources:input.verifySources,
-  leaseSeconds:input.leaseSeconds,limit:input.limit,
+  leaseSeconds:input.leaseSeconds,limit:input.limit,now:input.now,
   research:async(job)=>{
    const store=createLeasedResearchPassStoreV1(input.rpc,job,input.workerId);
    const handler=createAdaptiveResearchWorkerHandlerV1({store,
