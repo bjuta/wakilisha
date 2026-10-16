@@ -1,15 +1,15 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-16T07:20:14Z",
+  "generatedAt": "2026-10-16T09:43:43Z",
   "typesSha256": "639f0e9f3c80ac20d0927fa8bff601dcf39c91f9fc48c975abf9725bf48f226a",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 232,
-  "latestMigration": "20261016064245_mizizi_research_pass_memory_v1.sql",
+  "migrationCount": 233,
+  "latestMigration": "20261016092731_mizizi_external_wikidata_research_intake_v1.sql",
   "schemaSeal": {
     "mode": "preview",
     "sourceProjectRef": "nkgfoppunmnkcumalxqp",
-    "migrationHead": "20261016064245",
+    "migrationHead": "20261016092731",
     "baseMainSha": "aed0323cb3baa34313dede0d5d08b8af35c4f7a7",
     "previewBranchId": "8c0affc1-b43b-44ac-b2eb-66715ed40252"
   }
