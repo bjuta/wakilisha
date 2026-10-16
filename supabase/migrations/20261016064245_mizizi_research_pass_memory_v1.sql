@@ -231,4 +231,81 @@ revoke all on function public.mizizi_append_research_pass_v1(uuid,text,text,text
  from public,anon,authenticated,mizizi_executor;
 grant execute on function public.mizizi_append_research_pass_v1(uuid,text,text,text,text)
  to service_role;
+
+-- Narrow unknown-question intake. Only the JIT MIZIZI executor can admit a
+-- question about a live canonical Track. It confers no mutation/review rights.
+-- New questions are not forced through the historical predetermined rule list.
+create function mizizi_private.admit_unfamiliar_track_investigation_v1(
+ p_workspace_id uuid,p_track_id uuid,p_question text
+)
+returns table(case_id uuid,workspace_id uuid,case_revision integer,outcome text)
+language plpgsql security definer set search_path=pg_catalog
+as $unknown$
+declare
+ v_workspace uuid;
+ v_track public.registry_tracks%rowtype;
+ v_question text;
+ v_key text;
+ v_fp text;
+ v_case mizizi_private.cases%rowtype;
+ v_outcome text:='created';
+begin
+ perform mizizi_private.assert_executor_v1();
+ if session_user<>'mizizi_executor' then
+  raise exception 'Narrow MIZIZI JIT executor required' using errcode='42501';
+ end if;
+ v_question:=btrim(p_question);
+ if p_workspace_id is null or p_track_id is null or
+    p_question is null or v_question is null or
+    char_length(v_question) not between 20 and 500 or
+    p_question is distinct from v_question or
+    p_question ~ '[[:cntrl:]]'
+ then raise exception 'Invalid bounded unfamiliar research question' using errcode='22023';
+ end if;
+ select w.id into strict v_workspace
+ from mizizi_private.workspaces w
+ where w.id=p_workspace_id and w.workspace_key='wakilisha-internal'
+   and w.workspace_kind='internal' and w.status='active';
+ select t.* into strict v_track from public.registry_tracks t
+ where t.id=p_track_id and t.status='active' for share;
+ v_key:=encode(sha256(convert_to(
+  jsonb_build_array(p_track_id::text,lower(v_question))::text,'UTF8')),'hex');
+ v_fp:=encode(sha256(convert_to(
+  jsonb_build_array(v_track.id::text,v_track.title,v_track.isrc,
+                    v_track.updated_at::text)::text,'UTF8')),'hex');
+ insert into mizizi_private.cases(
+  workspace_id,case_key,subject_type,subject_id,claim_family_key,claim_key,
+  case_state,current_stage,epistemic_state,mutation_state,
+  policy_ruleset_version,last_observation_fingerprint,
+  transition_actor_key,transition_reason
+ )values(
+  v_workspace,'mizizi:unfamiliar:v1:'||v_key,'track',v_track.id,
+  'cultural_investigation_v1','unfamiliar.'||v_key,
+  'in_progress','research','unknown','not_planned',
+  'mizizi.research_only.v1',v_fp,'system:mizizi',
+  'New unfamiliar Track research-only question admitted from live canonical source.'
+ )on conflict (workspace_id,case_key) do nothing
+ returning * into v_case;
+ if v_case.id is null then
+  select c.* into strict v_case from mizizi_private.cases c
+  where c.workspace_id=v_workspace and c.case_key='mizizi:unfamiliar:v1:'||v_key
+  for update;
+  if v_case.subject_type<>'track' or v_case.subject_id<>v_track.id
+     or v_case.claim_family_key<>'cultural_investigation_v1'
+     or v_case.claim_key<>'unfamiliar.'||v_key
+     or v_case.last_observation_fingerprint is distinct from v_fp
+  then
+   raise exception 'Unfamiliar research replay conflicts with original source'
+    using errcode='55000';
+  end if;
+  v_outcome:='replayed';
+ end if;
+ return query select v_case.id,v_workspace,v_case.revision,v_outcome;
+end;
+$unknown$;
+revoke all on function mizizi_private.admit_unfamiliar_track_investigation_v1(uuid,uuid,text)
+ from public,anon,authenticated,service_role;
+grant execute on function mizizi_private.admit_unfamiliar_track_investigation_v1(uuid,uuid,text)
+ to mizizi_executor;
+
 commit;
