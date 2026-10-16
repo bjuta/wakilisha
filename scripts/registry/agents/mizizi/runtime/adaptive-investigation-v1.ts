@@ -294,7 +294,12 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    sourceReceipts:sources.map(({source:a,citation,excerpt})=>({
     sourceId:a.sourceId,originKey:a.originKey,
     lineageKey:a.lineageKey,payloadFingerprint:a.fingerprint,useBasis:a.useBasis,
-    authorityRef:a.authorityRef,observedAt:a.observedAt,citation,excerpt,
+    authorityRef:a.authorityRef,observedAt:a.observedAt,citation,
+    // Retain the source identity and hash, never embed human-only testimony
+    // in a permanent pass. Authorized custodians resolve content separately;
+    // consent withdrawal must not require rewriting an immutable chain.
+    excerpt:a.externalModelProcessingAllowed?excerpt:
+     "[Source content withheld: custodian-controlled human-only evidence]",
     modelDisclosed:a.externalModelProcessingAllowed&&!noModel})),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
