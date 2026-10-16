@@ -69,7 +69,7 @@ select encode(sha256(convert_to(
 select set_config('wk.db04.request_fp',:'wk_request_fp',true);
 set session authorization mizizi_executor;
 do $job$
-declare j record;v_budget integer;
+declare j record;
 begin
  select * into strict j from mizizi_private.admit_case_research_job_v1(
  current_setting('wk.db04.case')::uuid,current_setting('wk.db04.ws')::uuid,2,
@@ -78,14 +78,21 @@ begin
  'Investigate the unfamiliar research question in isolated local acceptance.');
  if j.outcome<>'created' or j.job_status<>'queued'
  then raise exception 'DB04 shared job admission failed';end if;
- select max_attempts into strict v_budget from platform_private.jobs where id=j.job_id;
+
+ perform set_config('wk.db04.job',j.job_id::text,true);
+end $job$;
+set session authorization default;
+do $db06_budget$
+declare v_budget integer;
+begin
+ select max_attempts into strict v_budget from platform_private.jobs
+  where id=current_setting('wk.db04.job')::uuid;
  if v_budget<>25 then raise exception 'DB06 research-only job retry budget drift';end if;
  if (select column_default from information_schema.columns where table_schema='platform_private'
   and table_name='jobs' and column_name='max_attempts')<>'5'
  then raise exception 'DB06 changed default for unrelated shared jobs';end if;
- perform set_config('wk.db04.job',j.job_id::text,true);
-end $job$;
-set session authorization default;
+ raise notice 'WK_DB06_RESEARCH_ONLY_RETRY_BUDGET=PASS';
+end $db06_budget$;
 set session authorization service_role;
 select set_config('request.jwt.claim.role','service_role',true);
 do $claim$
