@@ -97,16 +97,26 @@ export function createWikidataInvestigationReaderV1(
   // A quoted new entity in the follow-up takes precedence.
   const original=history[0]?.question?.match(/[“"]([^”"]{3,120})[”"]/);
   const searchTerm=quoted?.[1]?.trim()||original?.[1]?.trim()||question;
-  const search=new URL(API,HOST);
-  for(const [k,v] of Object.entries({action:"wbsearchentities",search:searchTerm,
-   language:"en",format:"json",limit:"3",maxlag:"5"}))
-   search.searchParams.set(k,v);
-  const first=await request(search,send);
-  if(!Array.isArray(first.search)||first.search.length>5)
-   throw new Error("MIZIZI_WIKIDATA_UNBOUNDED_SEARCH");
-  const ids=first.search.map(x=>(x as {id?:unknown})?.id)
-   .filter((id):id is string=>typeof id==="string"&&QID.test(id));
-  const distinctIds=[...new Set(ids)].slice(0,3);
+  // Explicit Wikidata entity IDs are verifiable source locators, not
+  // model-chosen network addresses. A follow-up may name another QID.
+  // Preserve the opening anchor when a continuation has no explicit ID.
+  const referenced=(question.match(/\bQ[1-9][0-9]{0,11}\b/g)||
+   history[0]?.question.match(/\bQ[1-9][0-9]{0,11}\b/g)||[]);
+  let distinctIds:string[];
+  if(referenced.length>0){
+   distinctIds=[...new Set(referenced.filter(id=>QID.test(id)))].slice(0,3);
+  }else{
+   const search=new URL(API,HOST);
+   for(const [k,v] of Object.entries({action:"wbsearchentities",search:searchTerm,
+    language:"en",format:"json",limit:"3",maxlag:"5"}))
+    search.searchParams.set(k,v);
+   const first=await request(search,send);
+   if(!Array.isArray(first.search)||first.search.length>5)
+    throw new Error("MIZIZI_WIKIDATA_UNBOUNDED_SEARCH");
+   const ids=first.search.map(x=>(x as {id?:unknown})?.id)
+    .filter((id):id is string=>typeof id==="string"&&QID.test(id));
+   distinctIds=[...new Set(ids)].slice(0,3);
+  }
   if(distinctIds.length===0)return [];
   const details=new URL(API,HOST);
   for(const [k,v] of Object.entries({action:"wbgetentities",ids:distinctIds.join("|"),
