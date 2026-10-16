@@ -1,0 +1,41 @@
+name: MIZIZI Authentic Preview Worker One-Shot
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/mizizi-authentic-preview-worker-once.yml"
+permissions:
+  contents: read
+concurrency:
+  group: mizizi-authentic-preview-worker-once
+  cancel-in-progress: false
+jobs:
+  resume-original-case:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      MIZIZI_PREVIEW_PROJECT_REF: nkgfoppunmnkcumalxqp
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+      - name: Invoke only existing original Preview research job
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "bjuta/wakilisha"
+          test "$GITHUB_HEAD_REF" = "feat/mizizi-slice2-adaptive-multipass-investigation"
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test "$MIZIZI_PREVIEW_PROJECT_REF" = "nkgfoppunmnkcumalxqp"
+          umask 077
+          F="$RUNNER_TEMP/wk-original-research-service-keys.json"
+          trap 'rm -f "$F"' EXIT
+          supabase projects api-keys --project-ref nkgfoppunmnkcumalxqp -o json > "$F"
+          node scripts/acceptance/invoke-mizizi-authentic-preview-worker-once.mjs "$F"
