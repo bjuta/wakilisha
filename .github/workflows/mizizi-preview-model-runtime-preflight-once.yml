@@ -21,6 +21,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund --silent
           deno check supabase/functions/mizizi-research-runner/index.ts
           echo "MIZIZI_PREVIEW_EDGE_DENO_CHECK=PASS"
       - uses: supabase/setup-cli@v1
