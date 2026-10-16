@@ -19,11 +19,20 @@ export type ReadOnlyResearchResultV1=Readonly<{
  sourceReferences:readonly string[];
 }>;
 export type ResearchJobHandlerV1=(job:ResearchJobV1)=>Promise<ReadOnlyResearchResultV1>;
-/** Independent source authority, supplied only by a trusted server-side reader.
- * A model or research callback cannot vouch for its own source identities. */
+/** Original source and permission facts returned by an independently trusted,
+ * read-only server-side verifier. These assertions must be checked against
+ * actual source/consent authority, never supplied by the research model.
+ * Shared lineage/payload hashes are NOT independent corroborations. */
+export type VerifiedResearchSourceV1=Readonly<{
+ sourceId:string;caseId:string;workspaceId:string;
+ sourceUseBasis:"first_party"|"documented_consent"|"documented_contract"|"open_license";
+ permissionAuthorityRef:string;privateResearchAllowed:boolean;
+ sourceOriginRef:string;lineageKey:string;sourcePayloadFingerprint:string;
+ observedAt:string;validUntil:string|null;revokedAt:string|null;
+}>;
 export type ResearchSourceVerifierV1=(
  job:ResearchJobV1,sourceReferences:readonly string[],
-)=>Promise<boolean>;
+)=>Promise<readonly VerifiedResearchSourceV1[]>;
 export type WorkerCycleResultV1=Readonly<{
  contract:typeof RESEARCH_WORKER_CYCLE_CONTRACT;
  recovered:number;claimed:number;succeeded:number;failed:number;
@@ -63,8 +72,49 @@ function validateClaim(raw:unknown,nowMs:number):ResearchJobV1{
  return Object.freeze({jobId,receiptId,caseId,workspaceId,expectedRevision,
    attempt,maxAttempts,leaseExpiresAt:new Date(expires).toISOString()});
 }
+const SOURCE_SHA256=/^[a-f0-9]{64}$/i;
+const SOURCE_USE=new Set(["first_party","documented_consent","documented_contract","open_license"]);
+function boundedSourceRef(value:unknown):boolean{
+ return typeof value==="string"&&value.trim()===value&&value.length>=8&&value.length<=512&&
+   !/[\u0000-\u001f]/.test(value);
+}
+/** Fail closed on missing source rights, unknown lineage, revocation or drift.
+ * This validates a trusted verifier's receipt shape, not source independence
+ * or the underlying legal permission: those remain external authorities. */
+async function assertVerifiedSourceAuthority(
+ job:ResearchJobV1,refs:readonly string[],verifySources:ResearchSourceVerifierV1|undefined,
+ nowMs:number,
+):Promise<void>{
+ if(typeof verifySources!=="function")
+   throw new TypeError("MIZIZI_WORKER_SOURCE_VERIFIER_REQUIRED");
+ const records=await verifySources(job,Object.freeze([...refs]));
+ if(!Array.isArray(records)||records.length!==refs.length)
+   throw new TypeError("MIZIZI_WORKER_SOURCE_AUTHORITY_UNCONFIRMED");
+ const received=new Set<string>();
+ for(const raw of records){
+   const source=record(raw);
+   const id=uuid(source.sourceId);
+   const observedMs=Date.parse(String(source.observedAt));
+   const validUntilMs=source.validUntil===null?null:Date.parse(String(source.validUntil));
+   if(!refs.includes(id)||received.has(id)||
+      uuid(source.caseId)!==job.caseId||uuid(source.workspaceId)!==job.workspaceId||
+      !SOURCE_USE.has(String(source.sourceUseBasis))||
+      source.privateResearchAllowed!==true||
+      !boundedSourceRef(source.permissionAuthorityRef)||
+      !boundedSourceRef(source.sourceOriginRef)||
+      !boundedSourceRef(source.lineageKey)||
+      typeof source.sourcePayloadFingerprint!=="string"||
+      !SOURCE_SHA256.test(source.sourcePayloadFingerprint)||
+      !Number.isFinite(observedMs)||observedMs>nowMs||
+      (validUntilMs!==null&&(!Number.isFinite(validUntilMs)||validUntilMs<=nowMs))||
+      source.revokedAt!==null)
+     throw new TypeError("MIZIZI_WORKER_SOURCE_PROVENANCE_UNVERIFIED");
+   received.add(id);
+ }
+}
 async function validatedResult(
- value:unknown,job:ResearchJobV1,verifySources?:ResearchSourceVerifierV1,
+ value:unknown,job:ResearchJobV1,verifySources:ResearchSourceVerifierV1|undefined,
+ nowMs:number,
 ):Promise<Readonly<Record<string,unknown>>>{
  const result=record(value);
  if(result.contract!=="mizizi.read_only_research_result.v1"||
@@ -85,11 +135,7 @@ async function validatedResult(
  if(new TextEncoder().encode(JSON.stringify(safe)).length>8192)
    throw new TypeError("MIZIZI_WORKER_RESULT_TOO_LARGE");
  if(result.status==="evidence_recorded"){
-   if(typeof verifySources!=="function")
-     throw new TypeError("MIZIZI_WORKER_SOURCE_VERIFIER_REQUIRED");
-   const verified=await verifySources(job,Object.freeze([...sourceReferences]));
-   if(verified!==true)
-     throw new TypeError("MIZIZI_WORKER_SOURCE_PROVENANCE_UNVERIFIED");
+   await assertVerifiedSourceAuthority(job,sourceReferences,verifySources,nowMs);
  }
  return Object.freeze(safe);
 }
@@ -130,7 +176,7 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
  for(const job of jobs){
    let researchResult:Readonly<Record<string,unknown>>;
    try{
-     researchResult=await validatedResult(await research(job),job,input.verifySources);
+     researchResult=await validatedResult(await research(job),job,input.verifySources,now());
    }catch(error){
      const failedReceipt=record(confirmed(await rpc("mizizi_fail_case_research_job_v1",{
        p_job_id:job.jobId,p_worker_id:workerId,
