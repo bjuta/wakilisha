@@ -6,7 +6,7 @@
  */
 import {createHash} from "node:crypto";
 import type {InvestigationAnalystV1,ResearchAnalysisV1,ResearchClaimV1,
- ResearchLeadV1,InvestigationPassV1,SourceExcerptV1} from "./adaptive-investigation-v1";
+ ResearchLeadV1,InvestigationPassV1,SourceExcerptV1} from "./adaptive-investigation-v1.ts";
 
 const VERSION="mizizi.anthropic_adaptive_analyst.20261016.v1";
 const PROMPT=[
