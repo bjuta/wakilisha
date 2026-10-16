@@ -102,9 +102,9 @@ Deno.serve(async(req:Request)=>{
   Object.keys(request as object).length!==1)
   return respond(req,400,{error:"expected_single_research_action"});
  const action=(request as {action?:unknown}).action;
- if(action!=="run_one"&&action!=="run_one_system")
+ if(action!=="run_one"&&action!=="run_one_system"&&action!=="provider_health_system")
   return respond(req,400,{error:"research_action_not_supported"});
- if(action==="run_one_system"){
+ if(action==="run_one_system"||action==="provider_health_system"){
   if(!serviceCaller)
    return respond(req,403,{error:"authorized_system_worker_required"});
  }else{
@@ -141,6 +141,25 @@ Deno.serve(async(req:Request)=>{
   });
  }catch{
   return respond(req,503,{error:"existing_anthropic_provider_not_configured_in_preview"});
+ }
+ if(action==="provider_health_system"){
+  // No case lease, prompt, or user material. This only tests whether the
+  // EXISTING server-only key is authorized to access the chosen model.
+  let status=0;
+  try{
+   const check=await fetch("https://api.anthropic.com/v1/models/"+
+    encodeURIComponent(config.model),{
+    method:"GET",redirect:"error",
+    headers:{"x-api-key":config.apiKey,"anthropic-version":"2023-06-01"},
+    signal:AbortSignal.timeout(10000)
+   });
+   status=check.status;
+  }catch{
+   return respond(req,503,{error:"provider_health_transport_unconfirmed"});
+  }
+  return respond(req,200,{ok:true,model:config.model,
+   providerHttpStatus:status,providerAccessConfirmed:status===200,
+   caseClaimed:false,registryMutations:0});
  }
  const rpc:WorkerRpc=async(fn,args)=>{
   if(!RPCS.has(fn))throw new Error("MIZIZI_PREVIEW_RPC_NOT_AUTHORIZED");
