@@ -14,7 +14,7 @@ import {resolveInstituteAnthropicConfigurationV1}
  from "../../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1.ts";
 import type {WorkerRpc,ResearchSourceVerifierV1,ResearchJobV1,VerifiedResearchSourceV1}
  from "../../../scripts/registry/agents/mizizi/runtime/research-worker-cycle-v1.ts";
-import type {InvestigationIdentityV1,SourceExcerptV1}
+import type {InvestigationIdentityV1}
  from "../../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1.ts";
 const PREVIEW="nkgfoppunmnkcumalxqp";
 const RPCS=new Set([
@@ -43,12 +43,12 @@ function respond(req:Request,code:number,body:Record<string,unknown>){
   headers:{...cors(req),"Content-Type":"application/json",
    "Cache-Control":"no-store"}});
 }
-function verifiedFromPass(
+async function verifiedFromPass(
  job:ResearchJobV1,receipt:{
   sourceId:string;originKey:string;lineageKey:string;
   payloadFingerprint:string;authorityRef:string;useBasis:string;
   observedAt:string;excerpt:string
- }):VerifiedResearchSourceV1{
+ }):Promise<VerifiedResearchSourceV1>{
  if(!UUID.test(receipt.sourceId)||!ENTITY_REV.test(receipt.originKey)||
   receipt.lineageKey!=="wikidata:community-structured-data"||
   receipt.authorityRef!==SOURCE_POLICY||
@@ -56,6 +56,10 @@ function verifiedFromPass(
   typeof receipt.excerpt!=="string"||receipt.excerpt.length>5500||
   receipt.payloadFingerprint.length!==64)
   throw new Error("MIZIZI_PREVIEW_SOURCE_PROVENANCE_INVALID");
+ const hashBytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(receipt.excerpt));
+ const digest=Array.from(new Uint8Array(hashBytes),b=>b.toString(16).padStart(2,'0')).join('');
+ if(digest!==receipt.payloadFingerprint)
+  throw new Error('MIZIZI_PREVIEW_SOURCE_SNAPSHOT_HASH_MISMATCH');
  return {sourceId:receipt.sourceId,caseId:job.caseId,
   workspaceId:job.workspaceId,sourceUseBasis:"open_license",
   permissionAuthorityRef:SOURCE_POLICY,privateResearchAllowed:true,
@@ -121,7 +125,6 @@ Deno.serve(async(req:Request)=>{
  };
  const workerId="mizizi-preview:"+crypto.randomUUID();
  const approved=new Map<string,string>();
- const evidence=new Map<string,SourceExcerptV1>();
  const reader=createWikidataInvestigationReaderV1({
   authorizePublicQuery:async(identity:InvestigationIdentityV1,question:string)=>{
    const opening=approved.get(identity.caseId);
@@ -141,7 +144,7 @@ Deno.serve(async(req:Request)=>{
   const byId=new Map(receipts.map(r=>[r.sourceId,r]));
   if(byId.size!==ids.length)
    throw new Error("MIZIZI_PREVIEW_SOURCE_RECEIPT_MISSING");
-  return ids.map(id=>verifiedFromPass(job,byId.get(id)!));
+  return Promise.all(ids.map(id=>verifiedFromPass(job,byId.get(id)!)));
  };
  try{
   const result=await runAnthropicAdaptiveResearchWorkerCycleV1({
@@ -155,7 +158,6 @@ Deno.serve(async(req:Request)=>{
    },
    readSources:async(identity,question,history)=>{
     const collected=await reader(identity,question,history);
-    for(const item of collected)evidence.set(item.source.sourceId,item);
     return collected;
    },
    verifyFinding:async()=>({verified:false,verificationRef:null}),
