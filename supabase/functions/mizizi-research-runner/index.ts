@@ -77,29 +77,40 @@ Deno.serve(async(req:Request)=>{
  if(url!=="https://"+PREVIEW+".supabase.co"||!anon||!service)
   return respond(req,503,{error:"preview_runtime_not_authorized"});
  const token=req.headers.get("Authorization")||"";
- if(!token.startsWith("Bearer "))
-  return respond(req,401,{error:"authenticated_operator_required"});
- const client=createClient(url,anon,{
-  global:{headers:{Authorization:token}},
-  auth:{persistSession:false,autoRefreshToken:false}
- });
- const jwt=token.slice(7);
- const {data:{user},error:authError}=await client.auth.getUser(jwt);
- if(authError||!user)return respond(req,401,{error:"invalid_session"});
- // This existing public RPC proves the signed-in caller is a scoped
- // Headquarters reader; separate Registry capability is also required.
- const [role,cases]=await Promise.all([
-  client.rpc("current_user_has_capability",{required_capability:"manage_registry"}),
-  client.rpc("admin_mizizi_cases_v1",{p_limit:1})
- ]);
- if(role.error||role.data!==true||cases.error)
-  return respond(req,403,{error:"headquarters_operator_authority_required"});
+ // Platform verify_jwt=true validates a genuine JWT before this handler.
+ // The pre-existing Preview service_role key is already authorized to use
+ // the shared worker lease RPCs. A system invocation does not impersonate
+ // a Headquarters user and cannot perform any new case admission.
+ const serviceCaller=token==="Bearer "+service&&
+  req.headers.get("apikey")===service;
  let request:unknown;
  try{request=await req.json();}catch{return respond(req,400,{error:"invalid_json"});}
  if(!request||typeof request!=="object"||Array.isArray(request)||
-  (request as Record<string,unknown>).action!=="run_one"||
   Object.keys(request as object).length!==1)
-  return respond(req,400,{error:"expected_run_one_only"});
+  return respond(req,400,{error:"expected_single_research_action"});
+ const action=(request as {action?:unknown}).action;
+ if(action!=="run_one"&&action!=="run_one_system")
+  return respond(req,400,{error:"research_action_not_supported"});
+ if(action==="run_one_system"){
+  if(!serviceCaller)
+   return respond(req,403,{error:"authorized_system_worker_required"});
+ }else{
+  if(serviceCaller||!token.startsWith("Bearer "))
+   return respond(req,401,{error:"authenticated_operator_required"});
+  const client=createClient(url,anon,{
+   global:{headers:{Authorization:token}},
+   auth:{persistSession:false,autoRefreshToken:false}
+  });
+  const {data:{user},error:authError}=await client.auth.getUser(token.slice(7));
+  if(authError||!user)return respond(req,401,{error:"invalid_session"});
+  // The existing signed-in Headquarters role and capability remain required.
+  const [role,cases]=await Promise.all([
+   client.rpc("current_user_has_capability",{required_capability:"manage_registry"}),
+   client.rpc("admin_mizizi_cases_v1",{p_limit:1})
+  ]);
+  if(role.error||role.data!==true||cases.error)
+   return respond(req,403,{error:"headquarters_operator_authority_required"});
+ }
  const db=createClient(url,service,{
   auth:{persistSession:false,autoRefreshToken:false}
  });
