@@ -81,8 +81,21 @@ Deno.serve(async(req:Request)=>{
  // The pre-existing Preview service_role key is already authorized to use
  // the shared worker lease RPCs. A system invocation does not impersonate
  // a Headquarters user and cannot perform any new case admission.
- const serviceCaller=token==="Bearer "+service&&
-  req.headers.get("apikey")===service;
+ // Do not compare the presented JWT with a separate Edge environment
+ // value: Preview Management's current service key may legitimately differ.
+ // Instead validate its actual service-role authority against PREVIEW Auth.
+ // Supabase Edge verify_jwt=true runs before this handler.
+ let serviceCaller=false;
+ if(token.startsWith("Bearer ")&&token.length<4096){
+  const callerJwt=token.slice(7);
+  try{
+   const authorityClient=createClient(url,callerJwt,{
+    auth:{persistSession:false,autoRefreshToken:false}
+   });
+   const check=await authorityClient.auth.admin.listUsers({page:1,perPage:1});
+   serviceCaller=check.error===null&&Array.isArray(check.data?.users);
+  }catch{serviceCaller=false;}
+ }
  let request:unknown;
  try{request=await req.json();}catch{return respond(req,400,{error:"invalid_json"});}
  if(!request||typeof request!=="object"||Array.isArray(request)||
