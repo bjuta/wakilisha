@@ -5,7 +5,7 @@
  */
 import {createHash} from "node:crypto";
 import type {InvestigationReaderV1,InvestigationIdentityV1,SourceExcerptV1,
- SourceAuthorityV1} from "./adaptive-investigation-v1";
+ SourceAuthorityV1} from "./adaptive-investigation-v1.ts";
 
 const HOST="https://www.wikidata.org";
 const API="/w/api.php";
