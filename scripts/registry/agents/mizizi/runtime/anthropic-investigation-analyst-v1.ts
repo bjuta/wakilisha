@@ -121,7 +121,6 @@ export async function discoverAnthropicResearchModelV1(
   try{
    const url=new URL("https://api.anthropic.com/v1/models");
    url.searchParams.set("limit","100");
-   url.searchParams.set("lifecycle","active");
    if(cursor)url.searchParams.set("after_id",cursor);
    response=await transport(url.toString(),{
     method:"GET",redirect:"error",headers,signal:AbortSignal.timeout(10000)
