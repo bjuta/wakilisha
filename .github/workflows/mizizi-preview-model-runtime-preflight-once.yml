@@ -1,0 +1,44 @@
+name: MIZIZI Preview Model Runtime Preflight (temporary)
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/mizizi-preview-model-runtime-preflight-once.yml"
+permissions:
+  contents: read
+jobs:
+  source-and-secret-preflight:
+    if: github.event.pull_request.number == 1243 && github.event.pull_request.head.repo.full_name == 'bjuta/wakilisha'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check Edge runtime and source imports without deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          deno check supabase/functions/mizizi-research-runner/index.ts
+          echo "MIZIZI_PREVIEW_EDGE_DENO_CHECK=PASS"
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+      - name: Verify only Preview Anthropic secret name, without value
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          supabase secrets list --project-ref nkgfoppunmnkcumalxqp --output json > "$RUNNER_TEMP/preview-secret-names.json"
+          node - "$RUNNER_TEMP/preview-secret-names.json" <<'NODE'
+          const fs=require("node:fs");
+          const raw=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const names=(Array.isArray(raw)?raw:(raw.secrets||raw.result||[]))
+            .map(s=>String(s.name||s.NAME||""));
+          const exists=names.includes("ANTHROPIC_API_KEY");
+          console.log("MIZIZI_PREVIEW_ANTHROPIC_API_KEY="+(exists?"PRESENT":"ABSENT"));
+          if(!exists)process.exit(1);
+          NODE
+          rm -f "$RUNNER_TEMP/preview-secret-names.json"
