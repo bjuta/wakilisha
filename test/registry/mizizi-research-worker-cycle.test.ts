@@ -441,6 +441,49 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(modelCalls.every(x=>JSON.stringify(x.request).includes("test-anthropic-key-not-real")===false)).toBe(true);
   expect(seen.at(-1)).toBe("mizizi_complete_case_research_job_v1");
  });
+
+ it("retains Work identifier properties in a newly versioned Wikidata evidence projection",async()=>{
+  const query="Does the Q97652493 single include an explicit MusicBrainz Work ID or ISWC?";
+  const observed:string[]=[];
+  const source= createWikidataInvestigationReaderV1({
+   authorizePublicQuery:async()=>true,now:()=>NOW,
+   transport:async(url)=>{
+    const parsed=new URL(String(url));
+    expect(parsed.origin).toBe("https://www.wikidata.org");
+    expect(parsed.pathname).toBe("/w/api.php");
+    observed.push(parsed.searchParams.get("action")||"");
+    expect(parsed.searchParams.get("ids")).toBe("Q97652493");
+    return new Response(JSON.stringify({entities:{Q97652493:{
+     id:"Q97652493",lastrevid:2438162423,
+     labels:{en:{value:"Jerusalema"}},claims:{
+      P31:[{mainsnak:{datatype:"wikibase-item",
+       datavalue:{type:"wikibase-entityid",value:{id:"Q134556"}}}}],
+      P435:[{mainsnak:{datatype:"external-id",datavalue:{
+       type:"string",value:"56950dba-94f8-46a9-aaaf-f2f59bbeed04"}}}],
+      P1827:[{mainsnak:{datatype:"external-id",datavalue:{
+       type:"string",value:"T-313.777.835-5"}}}],
+      P99999:[{mainsnak:{datatype:"string",datavalue:{value:"NOT_IN_PROJECTION"}}}]
+     }
+    }}}),{status:200,headers:{"Content-Type":"application/json"}});
+   }
+  });
+  const results=await source(identity,query,[]);
+  expect(observed).toEqual(["wbgetentities"]);
+  expect(results).toHaveLength(1);
+  const body=JSON.parse(results[0].excerpt);
+  expect(body.projection).toBe("wikidata:structured:entity:v2");
+  expect(body.inspectedProperties).toEqual(expect.arrayContaining(["P435","P1827"]));
+  expect(body.claims.P435[0].datavalue.value).toBe(
+   "56950dba-94f8-46a9-aaaf-f2f59bbeed04");
+  expect(body.claims.P1827[0].datavalue.value).toBe("T-313.777.835-5");
+  expect(body.absentProperties).not.toContain("P435");
+  expect(body.absentProperties).not.toContain("P1827");
+  expect(body.claims.P99999).toBeUndefined();
+  expect(results[0].source.lineageKey).toBe("wikidata:community-structured-data");
+  // Old production Preview passes are immutable and retain the v1 source ID.
+  expect(results[0].source.sourceId).not.toBe("ef082219-f90b-519a-9d47-297d527c0608");
+  expect(results[0].source.fingerprint).toMatch(/^[a-f0-9]{64}$/);
+ });
  it("acquires revision-pinned CC0 structured evidence without external query leakage",async()=>{
   const calls:string[]=[];
   const transport:typeof fetch=async(url,init)=>{
