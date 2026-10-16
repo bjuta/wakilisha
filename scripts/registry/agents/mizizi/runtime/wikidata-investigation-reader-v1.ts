@@ -19,8 +19,8 @@ export type WikidataReadOptionsV1=Readonly<{
  transport?:typeof fetch;now?:()=>number;
 }>;
 
-function sourceUuid(qid:string):string{
- const c=createHash("sha256").update("wikidata:structured:entity:"+qid).digest("hex").slice(0,32).split("");
+function sourceUuid(qid:string,revision:number):string{
+ const c=createHash("sha256").update("wikidata:structured:entity:"+qid+":revision:"+revision).digest("hex").slice(0,32).split("");
  c[12]="5";c[16]="89ab"[parseInt(c[16],16)%4];
  return [c.slice(0,8).join(""),c.slice(8,12).join(""),c.slice(12,16).join(""),
  c.slice(16,20).join(""),c.slice(20).join("")].join("-");
@@ -101,10 +101,11 @@ export function createWikidataInvestigationReaderV1(
   if(!Array.isArray(first.search)||first.search.length>5)
    throw new Error("MIZIZI_WIKIDATA_UNBOUNDED_SEARCH");
   const ids=first.search.map(x=>(x as {id?:unknown})?.id)
-   .filter((id):id is string=>typeof id==="string"&&QID.test(id)).slice(0,3);
-  if(ids.length===0)return [];
+   .filter((id):id is string=>typeof id==="string"&&QID.test(id));
+  const distinctIds=[...new Set(ids)].slice(0,3);
+  if(distinctIds.length===0)return [];
   const details=new URL(API,HOST);
-  for(const [k,v] of Object.entries({action:"wbgetentities",ids:ids.join("|"),
+  for(const [k,v] of Object.entries({action:"wbgetentities",ids:distinctIds.join("|"),
    props:"info|labels|descriptions|claims",languages:"en",
    format:"json",maxlag:"5"}))
    details.searchParams.set(k,v);
@@ -113,7 +114,7 @@ export function createWikidataInvestigationReaderV1(
    Array.isArray(second.entities))
    throw new Error("MIZIZI_WIKIDATA_ENTITIES_MISSING");
   const found:SourceExcerptV1[]=[];
-  for(const qid of ids){
+  for(const qid of distinctIds){
    const raw=(second.entities as Record<string,unknown>)[qid];
    if(!raw||typeof raw!=="object"||Array.isArray(raw))continue;
    const entity=raw as Record<string,unknown>;
@@ -124,7 +125,7 @@ export function createWikidataInvestigationReaderV1(
    const exact=excerpt(entity,qid);
    if(exact.length>5500)throw new Error("MIZIZI_WIKIDATA_ENTITY_BUDGET");
    const source:SourceAuthorityV1={
-    sourceId:sourceUuid(qid),caseId:identity.caseId,
+    sourceId:sourceUuid(qid,revision),caseId:identity.caseId,
     workspaceId:identity.workspaceId,
     originKey:"wikidata:"+qid+":revision:"+revision,
     lineageKey:"wikidata:community-structured-data",
