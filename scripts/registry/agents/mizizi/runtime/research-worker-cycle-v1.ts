@@ -12,6 +12,8 @@ export type WorkerRpc=(fn:string,args:Record<string,unknown>)=>Promise<WorkerRpc
 export type ResearchJobV1=Readonly<{
  jobId:string;receiptId:string;caseId:string;workspaceId:string;
  expectedRevision:number;attempt:number;maxAttempts:number;leaseExpiresAt:string;
+ /** Exact original job reason, only a publicly approved question may be searched. */
+ researchQuestion:string|null;publicSourceSearchApproved:boolean;
 }>;
 export type ReadOnlyResearchResultV1=Readonly<{
  contract:"mizizi.read_only_research_result.v1";caseId:string;
@@ -66,11 +68,22 @@ function validateClaim(raw:unknown,nowMs:number):ResearchJobV1{
  const expectedRevision=positive(payload.expected_case_revision);
  const attempt=positive(row.attempt_count),maxAttempts=positive(row.max_attempts);
  if(attempt>maxAttempts)throw new TypeError("MIZIZI_WORKER_ATTEMPT_OVERFLOW");
+ const rawReason=typeof payload.reason==='string'?payload.reason:null;
+ const publicPrefix='PUBLIC_CC0_RESEARCH: ';
+ const publicSourceSearchApproved=rawReason?.startsWith(publicPrefix)===true;
+ const researchQuestion=publicSourceSearchApproved?
+   rawReason!.slice(publicPrefix.length):null;
+ if(publicSourceSearchApproved&&(
+    !researchQuestion||researchQuestion.trim()!==researchQuestion||
+    researchQuestion.length<12||researchQuestion.length>500||
+    /[\\u0000-\\u001f]/.test(researchQuestion)))
+   throw new TypeError('MIZIZI_WORKER_UNSAFE_PUBLIC_RESEARCH_QUESTION');
  const expires=Date.parse(String(row.lease_expires_at));
  if(!Number.isFinite(expires)||expires<=nowMs)
    throw new TypeError("MIZIZI_WORKER_STALE_LEASE");
  return Object.freeze({jobId,receiptId,caseId,workspaceId,expectedRevision,
-   attempt,maxAttempts,leaseExpiresAt:new Date(expires).toISOString()});
+   attempt,maxAttempts,leaseExpiresAt:new Date(expires).toISOString(),
+   researchQuestion,publicSourceSearchApproved});
 }
 const SOURCE_SHA256=/^[a-f0-9]{64}$/i;
 const SOURCE_USE=new Set(["first_party","documented_consent","documented_contract","open_license"]);
