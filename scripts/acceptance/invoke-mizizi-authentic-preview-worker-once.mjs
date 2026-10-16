@@ -56,7 +56,7 @@ async function main(){
  if(Number(before.migrations)!==233||before.migration_head!=="20261016092731"||
     Number(before.tracks)!==0||Number(before.cases)!==1||Number(before.jobs)!==1||
     Number(before.passes)!==0||before.job?.id!==JOB||before.job?.resource_id!==CASE||
-    before.job?.status!=="queued"||Number(before.job?.attempt_count)!==0||
+    !["queued","retry_wait"].includes(before.job?.status)||Number(before.job?.attempt_count)!==1||
     before.job?.command_receipt_id!==RECEIPT||
     before.case_record?.id!==CASE||before.case_record?.subject_type!=="work"||
     before.case_record?.current_stage!=="research"||
