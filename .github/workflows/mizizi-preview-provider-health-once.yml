@@ -1,0 +1,36 @@
+name: MIZIZI Preview Provider Health (temporary)
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/mizizi-preview-provider-health-once.yml"
+permissions:
+  contents: read
+jobs:
+  read-only-existing-model-access:
+    if: github.event.pull_request.number == 1243 && github.event.pull_request.head.repo.full_name == 'bjuta/wakilisha'
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      MIZIZI_PREVIEW_PROJECT_REF: nkgfoppunmnkcumalxqp
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+      - name: Check existing Anthropic model permission without taking a job
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          F="$RUNNER_TEMP/mizizi-preview-health-keys.json"
+          umask 077
+          trap 'rm -f "$F"' EXIT
+          supabase projects api-keys --project-ref nkgfoppunmnkcumalxqp -o json > "$F"
+          node scripts/acceptance/check-mizizi-preview-anthropic-health-once.mjs "$F"
