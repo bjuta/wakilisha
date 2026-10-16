@@ -7,7 +7,7 @@ import {createHash} from "node:crypto";
 import type {InvestigationIdentityV1,InvestigationReaderV1,
  SourceAuthorityV1,SourceExcerptV1} from "./adaptive-investigation-v1.ts";
 
-const UUID=/^[0-9a-f]{8}-(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const ISWC=/^T-[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]$/;
 const HOST="https://musicbrainz.org";
 const MAX_BODY=20000;
