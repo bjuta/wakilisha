@@ -1,4 +1,4 @@
--- Disposable ONLY. Original 231 history first, then DB04 and source-first DB05.
+-- Disposable ONLY. Original 231 history first, then DB04, DB05 and DB06.
 -- No Production/Preview, authentic research or external source permissions.
 \set ON_ERROR_STOP on
 begin;
@@ -6,10 +6,10 @@ set local lock_timeout='5s';
 set local statement_timeout='120s';
 do $gate$
 begin
- if (select count(*) from supabase_migrations.schema_migrations)<>233
-   or (select max(version) from supabase_migrations.schema_migrations)<>'20261016092731'
+ if (select count(*) from supabase_migrations.schema_migrations)<>234
+   or (select max(version) from supabase_migrations.schema_migrations)<>'20261016114918'
    or to_regclass('mizizi_private.research_passes') is null
- then raise exception 'DB04/DB05 require exact 233-migration replay';end if;
+ then raise exception 'DB04/DB05/DB06 require exact 234-migration replay';end if;
  if has_table_privilege('service_role','mizizi_private.research_passes','SELECT')
     or has_table_privilege('authenticated','mizizi_private.research_passes','SELECT')
     or has_table_privilege('anon','mizizi_private.research_passes','INSERT')
@@ -69,7 +69,7 @@ select encode(sha256(convert_to(
 select set_config('wk.db04.request_fp',:'wk_request_fp',true);
 set session authorization mizizi_executor;
 do $job$
-declare j record;
+declare j record;v_budget integer;
 begin
  select * into strict j from mizizi_private.admit_case_research_job_v1(
  current_setting('wk.db04.case')::uuid,current_setting('wk.db04.ws')::uuid,2,
@@ -78,6 +78,11 @@ begin
  'Investigate the unfamiliar research question in isolated local acceptance.');
  if j.outcome<>'created' or j.job_status<>'queued'
  then raise exception 'DB04 shared job admission failed';end if;
+ select max_attempts into strict v_budget from platform_private.jobs where id=j.job_id;
+ if v_budget<>25 then raise exception 'DB06 research-only job retry budget drift';end if;
+ if (select column_default from information_schema.columns where table_schema='platform_private'
+  and table_name='jobs' and column_name='max_attempts')<>'5'
+ then raise exception 'DB06 changed default for unrelated shared jobs';end if;
  perform set_config('wk.db04.job',j.job_id::text,true);
 end $job$;
 set session authorization default;
