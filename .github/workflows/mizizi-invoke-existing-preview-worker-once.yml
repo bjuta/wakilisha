@@ -39,4 +39,4 @@ jobs:
           trap 'rm -f "$KEY_FILE"' EXIT
           supabase projects api-keys --project-ref "$MIZIZI_PREVIEW_PROJECT_REF" -o json > "$KEY_FILE"
           node scripts/acceptance/invoke-mizizi-authentic-preview-worker-once.mjs "$KEY_FILE"
-          echo "MIZIZI_PREVIEW_WORKER_AUTH_ADMIN_VERIFICATION_V3=COMPLETE"
+          echo "MIZIZI_PREVIEW_WORKER_SANITIZED_FAILURE_DIAG_V4=COMPLETE"
