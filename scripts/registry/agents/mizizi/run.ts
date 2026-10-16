@@ -38,6 +38,7 @@ type TrackRow = {
   id: string;
   slug: string;
   title: string;
+  isrc: string | null;
   status: "active" | "needs_review";
   updated_at: string;
   primary_artist_slug: string | null;
@@ -79,6 +80,7 @@ type ScopeCandidate = {
   id: string;
   slug: string;
   title: string;
+  isrc?: string | null;
   proposedSlug: string;
 };
 
@@ -597,7 +599,8 @@ async function loadArtistScopeCandidates(
       ta.artist_slug,
       t.id::text,
       t.slug,
-      t.title
+      t.title,
+      t.isrc
     from public.registry_track_artists ta
     join public.registry_tracks t
       on t.id = ta.track_id
@@ -628,6 +631,7 @@ async function loadArtistScopeCandidates(
       id: String(row.id),
       slug: String(row.slug || ""),
       title: String(row.title || ""),
+      isrc: row.isrc ? String(row.isrc) : null,
       proposedSlug:
         slugifyIdentity(core),
     });
@@ -1718,6 +1722,7 @@ async function scanTracks(
           t.id::text,
           t.slug,
           t.title,
+          t.isrc,
           t.status,
           t.updated_at::text,
           pa.artist_slug
@@ -1913,6 +1918,7 @@ async function scanTracks(
                             candidate.slug,
                           title:
                             candidate.title,
+                          isrc: candidate.isrc || null,
                           sharedPrimaryArtistSlug,
                         },
                       ] as const,
@@ -1954,6 +1960,7 @@ async function scanTracks(
           id: row.id,
           slug: row.slug,
           title: row.title,
+          isrc: row.isrc,
           primaryArtistSlug:
             row.primary_artist_slug,
           primaryArtistName:
