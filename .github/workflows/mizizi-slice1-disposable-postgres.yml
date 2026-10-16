@@ -67,6 +67,9 @@ jobs:
           test -f supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
           mv supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql "$RUNNER_TEMP/wk-mizizi-db05.sql"
           test ! -e supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
+          test -f supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+          mv supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql "$RUNNER_TEMP/wk-mizizi-db06.sql"
+          test ! -e supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
 
       - name: Start disposable local database and replay migrations
         shell: bash
@@ -94,13 +97,15 @@ jobs:
         shell: bash
         run: bash scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh
 
-      - name: Apply reviewed DB04 and source-first DB05 after sealed historical Slice 1 acceptance
+      - name: Apply DB04, DB05 and research retry DB06 after sealed Slice 1 acceptance
         shell: bash
         run: |
           test -f "$RUNNER_TEMP/wk-mizizi-db04.sql"
           mv "$RUNNER_TEMP/wk-mizizi-db04.sql" supabase/migrations/20261016064245_mizizi_research_pass_memory_v1.sql
           test -f "$RUNNER_TEMP/wk-mizizi-db05.sql"
           mv "$RUNNER_TEMP/wk-mizizi-db05.sql" supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
+          test -f "$RUNNER_TEMP/wk-mizizi-db06.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-db06.sql" supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
           supabase migration up --local
           DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
           test -n "$DB"
@@ -166,6 +171,9 @@ jobs:
           test -f supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
           mv supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql "$RUNNER_TEMP/wk-mizizi-db05.sql"
           test ! -e supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
+          test -f supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+          mv supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql "$RUNNER_TEMP/wk-mizizi-db06.sql"
+          test ! -e supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
 
       - name: Start disposable local database, Auth and REST gateway
         shell: bash
