@@ -54,6 +54,35 @@ export type AnthropicInvestigationOptionsV1=Readonly<{
  timeoutMs?:number;
  transport?:typeof fetch;
 }>;
+/** Resolve only the credential names already used by the deployed
+ * Institute assistant. The host must inject trusted server-side readers
+ * (Deno.env and, where authorized, admin_settings_secrets).
+ * No credential is read client-side, logged, returned in an RPC or copied
+ * into the case dossier. A missing key fails closed.
+ */
+export async function resolveInstituteAnthropicConfigurationV1(
+ trusted:Readonly<{
+  readEnvironment:(name:"ANTHROPIC_API_KEY"|"INSTITUTE_ASSISTANT_MODEL")=>
+   string|null|undefined;
+  readAdminSetting?:(key:"anthropic_api_key"|"institute_assistant_model")=>
+   Promise<string|null|undefined>;
+ }>
+):Promise<Pick<AnthropicInvestigationOptionsV1,"apiKey"|"model">>{
+ if(typeof trusted?.readEnvironment!=="function")
+  throw new TypeError("MIZIZI_ANALYST_TRUSTED_CONFIGURATION_REQUIRED");
+ const envKey=trusted.readEnvironment("ANTHROPIC_API_KEY")?.trim();
+ const dbKey=envKey?null:
+   (await trusted.readAdminSetting?.("anthropic_api_key"))?.trim();
+ const apiKey=envKey||dbKey||"";
+ const envModel=trusted.readEnvironment("INSTITUTE_ASSISTANT_MODEL")?.trim();
+ const dbModel=envModel?null:
+   (await trusted.readAdminSetting?.("institute_assistant_model"))?.trim();
+ const model=envModel||dbModel||"claude-opus-4-8";
+ if(apiKey.length<12||!/^[A-Za-z0-9._:-]{3,100}$/.test(model))
+  throw new TypeError("MIZIZI_ANALYST_EXISTING_PROVIDER_NOT_READY");
+ return {apiKey,model};
+}
+
 export function createAnthropicInvestigationAnalystV1(
  options:AnthropicInvestigationOptionsV1,
 ):InvestigationAnalystV1{
