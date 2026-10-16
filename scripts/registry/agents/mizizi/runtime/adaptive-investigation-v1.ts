@@ -8,7 +8,7 @@ const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const SHA=/^[a-f0-9]{64}$/i;
 const USE=new Set(["first_party","documented_consent","documented_contract","open_license"]);
 export type SourceAuthorityV1=Readonly<{
- sourceId:string;workspaceId:string;originKey:string;lineageKey:string;
+ sourceId:string;caseId:string;workspaceId:string;originKey:string;lineageKey:string;
  fingerprint:string;authorityRef:string;
  useBasis:"first_party"|"documented_consent"|"documented_contract"|"open_license";
  observedAt:string;expiresAt:string|null;revokedAt:string|null;privateResearchAllowed:boolean;
@@ -100,7 +100,8 @@ function verifyHistory(id:InvestigationIdentityV1,history:readonly Investigation
  }
 }
 function verifySource(source:SourceAuthorityV1,id:InvestigationIdentityV1,nowMs:number){
- if(!UUID.test(source.sourceId)||source.workspaceId.toLowerCase()!==id.workspaceId||
+ if(!UUID.test(source.sourceId)||source.caseId.toLowerCase()!==id.caseId||
+    source.workspaceId.toLowerCase()!==id.workspaceId||
     !USE.has(source.useBasis)||source.privateResearchAllowed!==true||
     source.externalModelProcessingAllowed!==true||
     !SHA.test(source.fingerprint)||!requireText(source.originKey,"ORIGIN",500)||
