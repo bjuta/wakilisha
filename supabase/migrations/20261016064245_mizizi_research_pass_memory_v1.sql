@@ -284,7 +284,7 @@ begin
   'in_progress','research','unknown','not_planned',
   'mizizi.research_only.v1',v_fp,'system:mizizi',
   'New unfamiliar Track research-only question admitted from live canonical source.'
- )on conflict (workspace_id,case_key) do nothing
+ )on conflict on constraint mizizi_cases_workspace_key_unique do nothing
  returning * into v_case;
  if v_case.id is null then
   select c.* into strict v_case from mizizi_private.cases c
