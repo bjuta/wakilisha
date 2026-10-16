@@ -516,7 +516,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    iswcs:["T-313.777.835-5"],iswcsFieldPresent:true});
   expect(JSON.stringify(result)).not.toContain("SUPPLEMENTARY_NON_CC0_CONTENT");
   expect(JSON.stringify(result)).not.toContain("no_unverified_rights");
-  expect(JSON.stringify(result)).not.toContain("private");
+  expect(JSON.stringify(projection)).not.toContain("private");
   expect(result.source).toMatchObject({
    caseId:CASE,workspaceId:WORKSPACE,
    lineageKey:"musicbrainz:community-core-work-data",
