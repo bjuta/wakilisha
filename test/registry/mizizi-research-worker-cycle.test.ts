@@ -463,10 +463,13 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(out[0].source.fingerprint).toMatch(/^[a-f0-9]{64}$/);
   // Revisions are distinct immutable source observations, not overwritten
   // evidence. All Wikidata items share one lineage, never independent votes.
+  const searchTerms:string[]=[];
   const nextReader=createWikidataInvestigationReaderV1({
    authorizePublicQuery:async()=>true,now:()=>NOW,
    transport:async(url,init)=>{
     const parsed=new URL(String(url));
+    if(parsed.searchParams.get('action')==='wbsearchentities')
+     searchTerms.push(parsed.searchParams.get('search')||'');
     const data=parsed.searchParams.get("action")==="wbsearchentities"?
      {search:[{id:"Q1422"},{id:"Q1422"}]}:
      {entities:{Q1422:{id:"Q1422",lastrevid:812346,
@@ -483,6 +486,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    "Which original songwriter credits establish the work identity?",
    [{question:'What is the original identity of "Jerusalema"?' } as InvestigationPassV1]);
   expect(anchored).toHaveLength(1);
+  expect(searchTerms.at(-1)).toBe('Jerusalema');
  });
  it("refuses sending private excerpts to the existing provider without explicit permission",async()=>{
   let sent=false;
