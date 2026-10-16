@@ -5,13 +5,13 @@
 import {runAdaptiveInvestigationV1, type InvestigationIdentityV1,
  type InvestigationStoreV1,type InvestigationReaderV1,
  type InvestigationAnalystV1,type IndependentFindingVerifierV1}
- from "./adaptive-investigation-v1";
+ from "./adaptive-investigation-v1.ts";
 import type {ResearchJobHandlerV1,ResearchJobV1}
- from "./research-worker-cycle-v1";
-import {runResearchWorkerCycleV1, type WorkerRpc, type ResearchSourceVerifierV1} from "./research-worker-cycle-v1";
-import {createLeasedResearchPassStoreV1} from "./leased-research-pass-store-v1";
+ from "./research-worker-cycle-v1.ts";
+import {runResearchWorkerCycleV1, type WorkerRpc, type ResearchSourceVerifierV1} from "./research-worker-cycle-v1.ts";
+import {createLeasedResearchPassStoreV1} from "./leased-research-pass-store-v1.ts";
 import {createAnthropicInvestigationAnalystV1, type AnthropicInvestigationOptionsV1}
- from "./anthropic-investigation-analyst-v1";
+ from "./anthropic-investigation-analyst-v1.ts";
 export type AdaptiveWorkerDependenciesV1=Readonly<{
  store:InvestigationStoreV1;
  openingQuestion:(job:ResearchJobV1)=>Promise<string>;
