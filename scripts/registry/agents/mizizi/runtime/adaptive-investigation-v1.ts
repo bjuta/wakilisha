@@ -12,7 +12,7 @@ export type SourceAuthorityV1=Readonly<{
  fingerprint:string;authorityRef:string;
  useBasis:"first_party"|"documented_consent"|"documented_contract"|"open_license";
  observedAt:string;expiresAt:string|null;revokedAt:string|null;privateResearchAllowed:boolean;
- externalModelProcessingAllowed:boolean;
+ externalModelProcessingAllowed:boolean;privateEvidenceRetentionAllowed:boolean;
 }>;
 export type SourceExcerptV1=Readonly<{source:SourceAuthorityV1;excerpt:string;citation:string}>;
 export type ResearchClaimV1=Readonly<{
@@ -46,6 +46,7 @@ export type InvestigationPassV1=Readonly<{
  sourceReceipts:readonly Readonly<{
   sourceId:string;originKey:string;lineageKey:string;payloadFingerprint:string;
   useBasis:string;authorityRef:string;observedAt:string;
+  citation:string;excerpt:string;
  }>[];
  findings:readonly VerifiedClaimV1[];
  passFinding:string;proposedLeads:readonly ResearchLeadV1[];
@@ -104,6 +105,7 @@ function verifySource(source:SourceAuthorityV1,id:InvestigationIdentityV1,nowMs:
     source.workspaceId.toLowerCase()!==id.workspaceId||
     !USE.has(source.useBasis)||source.privateResearchAllowed!==true||
     source.externalModelProcessingAllowed!==true||
+    source.privateEvidenceRetentionAllowed!==true||
     !SHA.test(source.fingerprint)||!requireText(source.originKey,"ORIGIN",500)||
     !requireText(source.lineageKey,"LINEAGE",500)||
     !requireText(source.authorityRef,"AUTHORITY",500)||
@@ -244,13 +246,17 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   const body={contract:ADAPTIVE_INVESTIGATION_CONTRACT,caseId:identity.caseId,
    workspaceId:identity.workspaceId,ordinal:history.length+1,question,
    predecessorFingerprint:previous,
-   sourceReceipts:authorities.map(a=>({sourceId:a.sourceId,originKey:a.originKey,
+   sourceReceipts:sources.map(({source:a,citation,excerpt})=>({
+    sourceId:a.sourceId,originKey:a.originKey,
     lineageKey:a.lineageKey,payloadFingerprint:a.fingerprint,useBasis:a.useBasis,
-    authorityRef:a.authorityRef,observedAt:a.observedAt})),
+    authorityRef:a.authorityRef,observedAt:a.observedAt,citation,excerpt})),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
    promptFingerprint:analysis.promptFingerprint,
    recordedAt:new Date(now()).toISOString(),costUnits};
+  // Only source-authorized, exact evidence snippets are persisted.
+  if(Buffer.byteLength(JSON.stringify(body),'utf8')>30000)
+   throw new Error('MIZIZI_RESEARCH_EVIDENCE_SNAPSHOT_BUDGET');
   const pass:InvestigationPassV1=Object.freeze({...body,
    fingerprint:digest({...body,fingerprint:undefined})});
   await store.append(identity,pass.ordinal,previous,pass);
