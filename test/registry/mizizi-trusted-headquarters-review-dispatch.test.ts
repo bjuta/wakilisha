@@ -33,14 +33,15 @@ function fixture(role="mizizi_executor"){
 }
 
 describe("MIZIZI opt-in real JIT review-to-case dispatch",()=>{
- it("reproduces the ORIGINAL Phases reviewed observation identity",()=>{
+ it("preserves the original Phases case fingerprint while passing actual recording ISRC evidence",()=>{
    const track="23a36038-d6d9-406c-93dd-b2026db6fb24";
    const output=analyzeTrackIdentity({
-     id:track,slug:"phases",title:"Phases",
+     id:track,slug:"phases",title:"Phases",isrc:"QMBZ92427982",
      primaryArtistSlug:"xenia-manasseh",primaryArtistName:"Xenia Manasseh",
      recordingIdentityPeers:[{
        id:"4300961f-94a6-4f50-8475-66fe5600fa04",
-       slug:"phases",title:"Phases",sharedPrimaryArtistSlug:"xenia-manasseh",
+       slug:"phases",title:"Phases",isrc:"QM6MZ2461585",
+       sharedPrimaryArtistSlug:"xenia-manasseh",
      }],
    });
    const real=output.find(f=>f.ruleId==="track_recording_identity_conflict");
@@ -48,6 +49,11 @@ describe("MIZIZI opt-in real JIT review-to-case dispatch",()=>{
      "cbb15008aaaacb3de5c223521bf9e90debe067a6e0f4072edf37967a412dfaa0",
    );
    expect(real?.reason).toBe("same_primary_artist_and_normalized_title_multiple_track_identities");
+   expect(real?.evidence).toMatchObject({
+     isrc:"QMBZ92427982",
+     peers:[{id:"4300961f-94a6-4f50-8475-66fe5600fa04",isrc:"QM6MZ2461585"}],
+     identityPolicy:"different_isrc_is_evidence_not_automatic_distinct_recording_proof",
+   });
    expect(real?.proposedValue).toBe("human_review_required");
    expect(real?.disposition).toBe("review");
  });
