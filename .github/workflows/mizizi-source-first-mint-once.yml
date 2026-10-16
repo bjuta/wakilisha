@@ -1,0 +1,23 @@
+name: MIZIZI Source-First Migration Mint (temporary)
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/mizizi-source-first-mint-once.yml"
+permissions:
+  contents: read
+jobs:
+  mint:
+    if: github.event.pull_request.number == 1243 && github.event.pull_request.head.repo.full_name == 'bjuta/wakilisha'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+      - name: Mint exact CLI migration filename without deployment
+        run: |
+          set -euo pipefail
+          supabase migration new mizizi_external_wikidata_research_intake_v1
+          find supabase/migrations -maxdepth 1 -name '*_mizizi_external_wikidata_research_intake_v1.sql' -print
+          test "$(find supabase/migrations -maxdepth 1 -name '*_mizizi_external_wikidata_research_intake_v1.sql' | wc -l | tr -d ' ')" = 1
