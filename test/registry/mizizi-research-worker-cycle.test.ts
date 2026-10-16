@@ -336,6 +336,21 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    lineageKey:'session-record-family'
   });
  });
+ it("stops paid research after measured provider token budget is exhausted",async()=>{
+  const store=memory(),reader=vi.fn(async()=>[source]);
+  const analyst=vi.fn(async()=>answer([lead("What independent original source exists?")],"continue"));
+  const result=await runAdaptiveInvestigationV1({
+   identity,store,maxNewPasses:5,maxTotalPasses:20,costBudgetUnits:1,
+   now:()=>NOW,measureCostUnits:()=>2,readSources:reader,
+   analyze:analyst,
+   verifyFinding:async()=>({verified:false,verificationRef:null})
+  });
+  expect(result).toMatchObject({passesAdded:1,totalPasses:1,disposition:"continue"});
+  expect(store.rows[0].costUnits).toBe(2);
+  expect(analyst).toHaveBeenCalledTimes(1);
+  expect(reader).toHaveBeenCalledTimes(1);
+  expect(store.rows[0].findings.every(x=>!x.independentlyVerified)).toBe(true);
+ });
  it("resumes an interrupted investigation at its next question, not pass one",async()=>{
   const store=memory();const reader=vi.fn(async()=>[source]);
   const q2="Can the original release liner notes resolve this discrepancy?";
