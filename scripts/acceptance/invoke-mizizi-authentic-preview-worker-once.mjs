@@ -83,7 +83,8 @@ async function main(){
  console.log("MIZIZI_PREVIEW_WORKER_HTTP_STATUS="+res.status);
  if(!res.ok||out?.ok!==true){
   const code=typeof out?.error==="string"&&/^[a-z0-9_]{1,80}$/.test(out.error)?out.error:"unknown";
-  stop("PROTECTED_WORKER_HTTP_"+res.status+"_"+code);
+  console.log("MIZIZI_PROTECTED_WORKER_REJECTION="+code);
+  stop("PROTECTED_WORKER_HTTP_"+res.status);
  }
  if(out.claimed!==1||out.succeeded!==1||out.failed!==0||
     out.registryMutations!==0||out.independentTruthClaimed!==false)
