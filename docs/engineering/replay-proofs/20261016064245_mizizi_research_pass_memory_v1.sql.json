@@ -7,7 +7,7 @@
   "preview_migration_head": "20261016064245",
   "baseline_replay": "pass",
   "candidate_apply": "pass",
-  "verifier": "pending",
+  "verifier": "pass",
   "verifier_file": "scripts/control-plane/verify-mizizi-db04-research-pass-v1.sql",
   "schema_types_sha256": "639f0e9f3c80ac20d0927fa8bff601dcf39c91f9fc48c975abf9725bf48f226a",
   "schema_migration_count": 232,
@@ -15,5 +15,6 @@
   "verified_at": "2026-10-16T07:20:14.222Z",
   "disposable_baseline_evidence": "https://github.com/bjuta/wakilisha/actions/runs/38865571437",
   "production_promotion": "not_run",
-  "note": "Isolated Preview only. Independent SQL verifier must be executed separately before changing verifier to pass."
+  "note": "Isolated Preview and disposable acceptance only. No Production SQL/Edge/frontend promotion. No authentic source-derived investigation or earned autonomous conclusion claimed.",
+  "independent_preview_verifier_evidence": "Independent read-only Supabase PostgreSQL execution of scripts/control-plane/verify-mizizi-db04-research-pass-v1.sql against nkgfoppunmnkcumalxqp returned MIZIZI_DB04_PREVIEW_NO_UNAUTHORIZED_MUTATIONS=PASS; function checked 232 migrations, exact head, empty case/job/pass fixture, sealed RLS and narrow role grants."
 }
