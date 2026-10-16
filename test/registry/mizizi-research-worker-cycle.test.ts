@@ -515,6 +515,27 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(first[0].source.sourceId).toBe(second[0].source.sourceId);
   expect(first[0].source.lineageKey).toBe("wikidata:community-structured-data");
  });
+ it("defers a MediaWiki maxlag response rather than mistaking it for cultural evidence",async()=>{
+  let attempts=0;
+  const read=createWikidataInvestigationReaderV1({
+   authorizePublicQuery:async()=>true,
+   transport:async()=>{
+    attempts++;
+    return new Response(JSON.stringify({error:{code:"maxlag",lag:21}}),{
+     status:200,headers:{"Content-Type":"application/json","Retry-After":"21"}});
+   }
+  });
+  await expect(read(identity,"What identifies Wikidata Q97652493 as a Work?",[]))
+   .rejects.toThrow("MIZIZI_WIKIDATA_MAXLAG_DEFERRED");
+  expect(attempts).toBe(1);
+  const other=createWikidataInvestigationReaderV1({
+   authorizePublicQuery:async()=>true,
+   transport:async()=>new Response(JSON.stringify({error:{code:"badvalue"}}),{
+    status:200,headers:{"Content-Type":"application/json"}})
+  });
+  await expect(other(identity,"What identifies Wikidata Q97652493 as a Work?",[]))
+   .rejects.toThrow("MIZIZI_WIKIDATA_PROVIDER_ERROR_badvalue");
+ });
  it("refuses sending private excerpts to the existing provider without explicit permission",async()=>{
   let sent=false;
   const analyze=createAnthropicInvestigationAnalystV1({
