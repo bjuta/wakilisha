@@ -82,7 +82,7 @@ export function createWikidataInvestigationReaderV1(
   throw new TypeError("MIZIZI_WIKIDATA_QUERY_AUTHORITY_REQUIRED");
  const send=config.transport??fetch;
  const now=config.now??Date.now;
- return async(identity,question,_history)=>{
+ return async(identity,question,history)=>{
   if(typeof question!=="string"||question.trim()!==question||
    question.length<12||question.length>500||/[\u0000-\u001f]/.test(question))
    throw new TypeError("MIZIZI_WIKIDATA_INVALID_QUESTION");
@@ -92,7 +92,11 @@ export function createWikidataInvestigationReaderV1(
   // explicitly quoted work, recording or Artist title when present.
   // Never substitute a guessed identity for the actual search result.
   const quoted=question.match(/[“"]([^”"]{3,120})[”"]/);
-  const searchTerm=quoted?.[1]?.trim()||question;
+  // If an autonomous follow-up no longer names the work, retain the
+  // original evidence anchor rather than searching a generic whole question.
+  // A quoted new entity in the follow-up takes precedence.
+  const original=history[0]?.question?.match(/[“"]([^”"]{3,120})[”"]/);
+  const searchTerm=quoted?.[1]?.trim()||original?.[1]?.trim()||question;
   const search=new URL(API,HOST);
   for(const [k,v] of Object.entries({action:"wbsearchentities",search:searchTerm,
    language:"en",format:"json",limit:"3",maxlag:"5"}))
