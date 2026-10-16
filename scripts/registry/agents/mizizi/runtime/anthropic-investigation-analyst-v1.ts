@@ -55,6 +55,8 @@ export type AnthropicInvestigationOptionsV1=Readonly<{
  workspaceId?:string;
  timeoutMs?:number;
  transport?:typeof fetch;
+ /** Trusted per-response usage callback; token totals are NOT USD prices. */
+ onUsage?:(billableTokenUnits:number)=>void;
 }>;
 /** Resolve only the credential names already used by the deployed
  * Institute assistant. The host must inject trusted server-side readers
@@ -231,8 +233,22 @@ export function createAnthropicInvestigationAnalystV1(
   if(!raw||typeof raw!=="object"||Array.isArray(raw))
    throw new Error("MIZIZI_ANALYST_INVALID_RESPONSE");
   const payload=raw as {
-   stop_reason?:string;content?:Array<{type?:string;text?:string}>
+   stop_reason?:string;content?:Array<{type?:string;text?:string}>;
+   usage?:{input_tokens?:number;output_tokens?:number;
+    cache_creation_input_tokens?:number;cache_read_input_tokens?:number}
   };
+  // Fail closed when the provider does not return usable metering.
+  // This is not a monetary cost or invoice; prices differ by model/cache.
+  const usage=payload.usage;
+  const numbers=[usage?.input_tokens,usage?.output_tokens,
+   usage?.cache_creation_input_tokens??0,usage?.cache_read_input_tokens??0];
+  if(!usage||numbers.some(n=>typeof n!=="number"||
+    !Number.isSafeInteger(n)||n<0||n>100000000)||
+    (numbers[0] as number)+(numbers[1] as number)===0)
+   throw new Error("MIZIZI_ANALYST_USAGE_UNVERIFIED");
+  const tokenUnits=Math.ceil(numbers.reduce<number>((a,b)=>a+(b as number),0)/1000);
+  if(tokenUnits<1||tokenUnits>1000000)
+   throw new Error("MIZIZI_ANALYST_USAGE_UNVERIFIED");
   if(payload.stop_reason!=="end_turn")
    throw new Error("MIZIZI_ANALYST_INCOMPLETE_OR_REFUSED");
   const text=payload.content?.find(b=>b.type==="text")?.text;
@@ -248,6 +264,9 @@ export function createAnthropicInvestigationAnalystV1(
      typeof p.passFinding!=="string"||
      !["continue","pause","conclude"].includes(String(p.requestedDisposition)))
    throw new Error("MIZIZI_ANALYST_SCHEMA_DRIFT");
+  // Meter after schema validation, before durable pass append. Retry failures
+  // can still incur provider charges; do not represent this as total billing.
+  options.onUsage?.(tokenUnits);
   // The independent verifier and engine validate all cited source IDs,
   // uncertainty bounds, follow-ups and authority before persistence.
   return {hypotheses:p.hypotheses,leads:p.leads,passFinding:p.passFinding,
