@@ -10,7 +10,7 @@ import {createLeasedResearchPassStoreV1}
  from "../../../scripts/registry/agents/mizizi/runtime/leased-research-pass-store-v1.ts";
 import {createWikidataInvestigationReaderV1}
  from "../../../scripts/registry/agents/mizizi/runtime/wikidata-investigation-reader-v1.ts";
-import {resolveInstituteAnthropicConfigurationV1}
+import {resolveInstituteAnthropicConfigurationV1,discoverAnthropicResearchModelV1}
  from "../../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1.ts";
 import type {WorkerRpc,ResearchSourceVerifierV1,ResearchJobV1,VerifiedResearchSourceV1}
  from "../../../scripts/registry/agents/mizizi/runtime/research-worker-cycle-v1.ts";
@@ -142,25 +142,25 @@ Deno.serve(async(req:Request)=>{
  }catch{
   return respond(req,503,{error:"existing_anthropic_provider_not_configured_in_preview"});
  }
+ // A source-free Models API preflight runs before ANY worker lease.
+ // This distinguishes missing workspace authority from a missing model.
+ const discovered=await discoverAnthropicResearchModelV1(config);
  if(action==="provider_health_system"){
-  // No case lease, prompt, or user material. This only tests whether the
-  // EXISTING server-only key is authorized to access the chosen model.
-  let status=0;
-  try{
-   const check=await fetch("https://api.anthropic.com/v1/models/"+
-    encodeURIComponent(config.model),{
-    method:"GET",redirect:"error",
-    headers:{"x-api-key":config.apiKey,"anthropic-version":"2023-06-01"},
-    signal:AbortSignal.timeout(10000)
-   });
-   status=check.status;
-  }catch{
-   return respond(req,503,{error:"provider_health_transport_unconfirmed"});
-  }
-  return respond(req,200,{ok:true,model:config.model,
-   providerHttpStatus:status,providerAccessConfirmed:status===200,
+  return respond(req,200,{ok:true,
+   model:discovered.ok?discovered.model:null,
+   providerHttpStatus:discovered.providerHttpStatus,
+   providerAccessConfirmed:discovered.ok,
+   providerFailure:discovered.ok?null:discovered.reason,
+   preferenceMatched:discovered.ok?discovered.preferenceMatched:false,
+   workspaceHeaderConfigured:!!config.workspaceId,
    caseClaimed:false,registryMutations:0});
  }
+ if(!discovered.ok){
+  return respond(req,503,{error:"anthropic_preflight_failed",
+   providerHttpStatus:discovered.providerHttpStatus,
+   providerFailure:discovered.reason,caseClaimed:false,registryMutations:0});
+ }
+ config={...config,model:discovered.model};
  const rpc:WorkerRpc=async(fn,args)=>{
   if(!RPCS.has(fn))throw new Error("MIZIZI_PREVIEW_RPC_NOT_AUTHORIZED");
   const value=await db.rpc(fn,args);
