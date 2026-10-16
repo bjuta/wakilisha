@@ -231,16 +231,22 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   const evidenceExhausted=sameEvidence&&priorRepeated;
   const humanOnly=sources.some(s=>!s.source.externalModelProcessingAllowed)&&
    modelSources.length===0;
-  const noModel=humanOnly||evidenceExhausted;
+  // A lawful reader returning no evidence is a method result, not a prompt
+  // for a source-free model answer. Absence never establishes nonexistence.
+  const noEvidence=sources.length===0;
+  const noModel=humanOnly||evidenceExhausted||noEvidence;
+  const method=humanOnly?"human_only":
+   noEvidence?"no_authorized_evidence":"evidence_exhausted";
   const analysis:ResearchAnalysisV1=noModel?{
    hypotheses:[],leads:[],
    passFinding:humanOnly?
     "Authorized evidence retained solely for private human review; no model received it.":
+    noEvidence?
+    "No authorized evidence was located; absence cannot establish that a cultural claim is false.":
     "No new independent source evidence; repeat model interpretation withheld.",
    requestedDisposition:"pause",
-   modelVersion:humanOnly?"mizizi.human_review_required.v1":"mizizi.evidence_exhausted.v1",
-   promptFingerprint:digest(humanOnly?"mizizi.human_only_method.v1":
-    "mizizi.exhausted_evidence_method.v1")
+   modelVersion:"mizizi."+method+".v1",
+   promptFingerprint:digest("mizizi."+method+"_method.v1")
   }:await analyze(question,Object.freeze(modelSources),
    Object.freeze(analystHistory));
   requireText(analysis.passFinding,"PASS_FINDING",3000);
