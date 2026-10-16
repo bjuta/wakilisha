@@ -1,0 +1,27 @@
+name: MIZIZI Model Authority Presence (temporary)
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/mizizi-model-authority-presence-once.yml"
+permissions:
+  contents: read
+jobs:
+  model-secret-presence:
+    if: github.event.pull_request.number == 1243 && github.event.pull_request.head.repo.full_name == 'bjuta/wakilisha'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report available model provider secret names, NEVER values
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MIZIZI_MODEL_API_KEY: ${{ secrets.MIZIZI_MODEL_API_KEY }}
+        run: |
+          set -euo pipefail
+          for name in OPENAI_API_KEY ANTHROPIC_API_KEY MIZIZI_MODEL_API_KEY; do
+            if [ -n "$(printenv "$name")" ]; then
+              printf 'MIZIZI_MODEL_%s=PRESENT\n' "$name"
+            else
+              printf 'MIZIZI_MODEL_%s=ABSENT\n' "$name"
+            fi
+          done
