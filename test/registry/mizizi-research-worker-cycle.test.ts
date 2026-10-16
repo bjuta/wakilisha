@@ -388,8 +388,10 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    modelVersion:"mizizi.human_review_required.v1",
    decision:{action:"pause"}});
   expect(humanOnly.rows[0].sourceReceipts[0]).toMatchObject({
-   excerpt:"RESTRICTED_FIRSTHAND_WITNESS_STATEMENT",modelDisclosed:false
+   excerpt:"[Source content withheld: custodian-controlled human-only evidence]",
+   modelDisclosed:false
   });
+  expect(JSON.stringify(humanOnly.rows)).not.toContain("RESTRICTED_FIRSTHAND_WITNESS_STATEMENT");
   await expect(runAdaptiveInvestigationV1({...base,store:memory(),
    readSources:async()=>[{...restricted,source:{
     ...restricted.source,privateEvidenceRetentionAllowed:false}}],
@@ -428,10 +430,12 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(result).toMatchObject({passesAdded:2,disposition:"paused"});
   expect(calls).toBe(2);
   expect(store.rows[0].sourceReceipts).toEqual(expect.arrayContaining([
-   expect.objectContaining({sourceId:JOB,modelDisclosed:false,excerpt:secret}),
+   expect.objectContaining({sourceId:JOB,modelDisclosed:false,
+    excerpt:"[Source content withheld: custodian-controlled human-only evidence]"}),
    expect.objectContaining({sourceId:EVENT,modelDisclosed:true})
   ]));
   expect(store.rows[1].predecessorFingerprint).toBe(store.rows[0].fingerprint);
+  expect(JSON.stringify(store.rows)).not.toContain(secret);
   await expect(runAdaptiveInvestigationV1({
    identity,store:memory(),maxNewPasses:1,maxTotalPasses:20,
    costBudgetUnits:20,now:()=>NOW,readSources:async()=>[restricted,visible],
