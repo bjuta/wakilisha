@@ -51,6 +51,8 @@ export type AnthropicInvestigationOptionsV1=Readonly<{
  apiKey:string;
  /** Explicit model from the same server-side configuration as Institute. */
  model:string;
+ /** Optional selector for Anthropic multi-workspace credentials. */
+ workspaceId?:string;
  timeoutMs?:number;
  transport?:typeof fetch;
 }>;
@@ -62,12 +64,12 @@ export type AnthropicInvestigationOptionsV1=Readonly<{
  */
 export async function resolveInstituteAnthropicConfigurationV1(
  trusted:Readonly<{
-  readEnvironment:(name:"ANTHROPIC_API_KEY"|"INSTITUTE_ASSISTANT_MODEL")=>
+  readEnvironment:(name:"ANTHROPIC_API_KEY"|"INSTITUTE_ASSISTANT_MODEL"|"ANTHROPIC_WORKSPACE_ID")=>
    string|null|undefined;
-  readAdminSetting?:(key:"anthropic_api_key"|"institute_assistant_model")=>
+  readAdminSetting?:(key:"anthropic_api_key"|"institute_assistant_model"|"anthropic_workspace_id")=>
    Promise<string|null|undefined>;
  }>
-):Promise<Pick<AnthropicInvestigationOptionsV1,"apiKey"|"model">>{
+):Promise<Pick<AnthropicInvestigationOptionsV1,"apiKey"|"model"|"workspaceId">>{
  if(typeof trusted?.readEnvironment!=="function")
   throw new TypeError("MIZIZI_ANALYST_TRUSTED_CONFIGURATION_REQUIRED");
  const envKey=trusted.readEnvironment("ANTHROPIC_API_KEY")?.trim();
@@ -77,10 +79,107 @@ export async function resolveInstituteAnthropicConfigurationV1(
  const envModel=trusted.readEnvironment("INSTITUTE_ASSISTANT_MODEL")?.trim();
  const dbModel=envModel?null:
    (await trusted.readAdminSetting?.("institute_assistant_model"))?.trim();
- const model=envModel||dbModel||"claude-opus-4-8";
- if(apiKey.length<12||!/^[A-Za-z0-9._:-]{3,100}$/.test(model))
+ // An unset preference is deliberate: only the live Models API may choose.
+ const model=envModel||dbModel||"";
+ const envWorkspace=trusted.readEnvironment("ANTHROPIC_WORKSPACE_ID")?.trim();
+ const dbWorkspace=envWorkspace?null:
+   (await trusted.readAdminSetting?.("anthropic_workspace_id"))?.trim();
+ const workspaceId=envWorkspace||dbWorkspace||undefined;
+ if(apiKey.length<12||(model&&!/^[A-Za-z0-9._:-]{3,100}$/.test(model))||
+    (workspaceId&&!/^wrkspc_[A-Za-z0-9]{8,100}$/.test(workspaceId)))
   throw new TypeError("MIZIZI_ANALYST_EXISTING_PROVIDER_NOT_READY");
- return {apiKey,model};
+ return {apiKey,model,workspaceId};
+}
+
+
+/** Unmetered, source-free model discovery. Run BEFORE leasing a research job.
+ * A bad credential/workspace is NEVER cured by trying different model names.
+ * A model must advertise both structured output and adaptive thinking.
+ */
+export type AnthropicModelDiscoveryV1=
+ | Readonly<{ok:true;providerHttpStatus:200;model:string;
+    preferenceMatched:boolean}>
+ | Readonly<{ok:false;providerHttpStatus:number;reason:string}>;
+
+export async function discoverAnthropicResearchModelV1(
+ config:Pick<AnthropicInvestigationOptionsV1,"apiKey"|"model"|"workspaceId">,
+ transport:typeof fetch=fetch
+):Promise<AnthropicModelDiscoveryV1>{
+ const headers:Record<string,string>={
+  "x-api-key":config.apiKey,"anthropic-version":"2023-06-01"
+ };
+ if(config.workspaceId)headers["anthropic-workspace-id"]=config.workspaceId;
+ type Available={id:string;line?:string|null;created_at?:string;
+   lifecycle?:string;max_tokens?:number;capabilities?:{
+    structured_outputs?:{supported?:boolean};
+    thinking?:{types?:{adaptive?:{supported?:boolean}}}
+   }};
+ const compatible:Available[]=[];
+ let cursor:string|undefined;
+ for(let page=0;page<4;page++){
+  let response:Response;
+  try{
+   const url=new URL("https://api.anthropic.com/v1/models");
+   url.searchParams.set("limit","100");
+   url.searchParams.set("lifecycle","active");
+   if(cursor)url.searchParams.set("after_id",cursor);
+   response=await transport(url.toString(),{
+    method:"GET",redirect:"error",headers,signal:AbortSignal.timeout(10000)
+   });
+  }catch{
+   return {ok:false,providerHttpStatus:0,reason:"transport_unconfirmed"};
+  }
+  if(!response.ok){
+   let message="";
+   if(response.status===400){
+    try{
+     const payload=await response.json() as {error?:{message?:string}};
+     message=String(payload?.error?.message||"").toLowerCase();
+    }catch{message="";}
+   }
+   const workspaceRequired=response.status===400&&
+    /workspace/.test(message)&&/header|required|specif|select/.test(message);
+   const reason=workspaceRequired?"workspace_header_required":
+    response.status===401?"credential_rejected":
+    response.status===403?"workspace_access_denied":
+    response.status===400?"provider_request_invalid":
+    response.status===429?"provider_rate_limited":"provider_unavailable";
+   return {ok:false,providerHttpStatus:response.status,reason};
+  }
+  let payload:{data?:Available[];has_more?:boolean;last_id?:string};
+  try{payload=await response.json();}catch{
+   return {ok:false,providerHttpStatus:200,reason:"invalid_model_inventory"};
+  }
+  if(!Array.isArray(payload?.data))
+   return {ok:false,providerHttpStatus:200,reason:"invalid_model_inventory"};
+  for(const m of payload.data){
+   if(!m||typeof m.id!=="string"||
+      !/^[A-Za-z0-9._:-]{3,100}$/.test(m.id)||
+      (m.lifecycle&&m.lifecycle!=="active")||
+      m.capabilities?.structured_outputs?.supported!==true||
+      m.capabilities?.thinking?.types?.adaptive?.supported!==true||
+      (typeof m.max_tokens==="number"&&m.max_tokens<2500))continue;
+   compatible.push(m);
+  }
+  if(payload.has_more!==true)break;
+  if(page===3)return {ok:false,providerHttpStatus:200,reason:"model_inventory_incomplete"};
+  if(!payload.last_id||payload.last_id===cursor)
+   return {ok:false,providerHttpStatus:200,reason:"model_inventory_invalid_cursor"};
+  cursor=payload.last_id;
+ }
+ const preferred=compatible.find(m=>m.id===config.model);
+ // Never silently downgrade to a fast, weaker model for cultural adjudication.
+ const ranked=compatible.filter(m=>m.line==="opus"||m.line==="sonnet")
+  .sort((a,b)=>{
+   const rank=(m:Available)=>m.line==="opus"?0:1;
+   if(rank(a)!==rank(b))return rank(a)-rank(b);
+   const dates=String(b.created_at||"").localeCompare(String(a.created_at||""));
+   return dates||a.id.localeCompare(b.id);
+  });
+ const selected=preferred||ranked[0];
+ if(!selected)return {ok:false,providerHttpStatus:200,reason:"no_compatible_research_model"};
+ return {ok:true,providerHttpStatus:200,model:selected.id,
+  preferenceMatched:!!preferred};
 }
 
 export function createAnthropicInvestigationAnalystV1(
@@ -89,7 +188,8 @@ export function createAnthropicInvestigationAnalystV1(
  if(typeof options?.apiKey!=="string"||options.apiKey.trim()!==options.apiKey||
     options.apiKey.length<12||
     typeof options.model!=="string"||
-    !/^[A-Za-z0-9._:-]{3,100}$/.test(options.model))
+    !/^[A-Za-z0-9._:-]{3,100}$/.test(options.model)||
+    (options.workspaceId&&!/^wrkspc_[A-Za-z0-9]{8,100}$/.test(options.workspaceId)))
   throw new TypeError("MIZIZI_ANALYST_SERVER_CREDENTIALS_REQUIRED");
  const timeout=options.timeoutMs??45000;
  if(!Number.isInteger(timeout)||timeout<3000||timeout>120000)
@@ -114,7 +214,8 @@ export function createAnthropicInvestigationAnalystV1(
    response=await send("https://api.anthropic.com/v1/messages",{
     method:"POST",headers:{
      "x-api-key":options.apiKey,"anthropic-version":"2023-06-01",
-     "Content-Type":"application/json"
+     "Content-Type":"application/json",
+     ...(options.workspaceId?{"anthropic-workspace-id":options.workspaceId}:{})
     },
     body:JSON.stringify({
      model:options.model,max_tokens:2500,thinking:{type:"adaptive"},
