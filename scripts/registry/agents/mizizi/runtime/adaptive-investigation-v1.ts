@@ -229,8 +229,10 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    prior.sourceReceipts.every(r=>
     earlier.has(r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint));
   const evidenceExhausted=sameEvidence&&priorRepeated;
-  const humanOnly=sources.some(s=>!s.source.externalModelProcessingAllowed)&&
-   modelSources.length===0;
+  // Mixed public and restricted packets are also human-only. The case
+  // question may itself disclose a protected witness or investigation lead;
+  // filtering excerpts alone cannot safely authorize sending that question.
+  const humanOnly=sources.some(s=>!s.source.externalModelProcessingAllowed);
   // A lawful reader returning no evidence is a method result, not a prompt
   // for a source-free model answer. Absence never establishes nonexistence.
   const noEvidence=sources.length===0;
@@ -301,19 +303,25 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   const previous=history.at(-1)?.fingerprint??null;
   const REDACTED="[Source content withheld: custodian-controlled human-only evidence]";
   const redactedFingerprint=createHash("sha256").update(REDACTED,"utf8").digest("hex");
+  // The source UUID is an opaque pointer, not a copy of the evidence or a
+  // grant to resolve it. Source/custody metadata and the original payload
+  // digest must stay with the independently authorized custodian.
+  const restrictedReceipt=(source:SourceAuthorityV1)=>!source.externalModelProcessingAllowed;
   const body={contract:ADAPTIVE_INVESTIGATION_CONTRACT,caseId:identity.caseId,
    workspaceId:identity.workspaceId,ordinal:history.length+1,question,
    predecessorFingerprint:previous,
    sourceReceipts:sources.map(({source:a,citation,excerpt})=>({
-    sourceId:a.sourceId,originKey:a.originKey,
-    lineageKey:a.lineageKey,
-    // Snapshot hash covers what is *actually* embedded in this immutable
-    // pass. The original witness bytes remain with a revocable custodian.
-    payloadFingerprint:a.externalModelProcessingAllowed?a.fingerprint:redactedFingerprint,
-    ...(a.externalModelProcessingAllowed?{}:{custodyFingerprint:a.fingerprint}),
+    sourceId:a.sourceId,
+    originKey:restrictedReceipt(a)?"custodian:restricted":a.originKey,
+    lineageKey:restrictedReceipt(a)?"custodian:restricted":a.lineageKey,
+    // This hashes the REDACTED pass excerpt only. It does not claim
+    // integrity or independent provenance of the custodian-held source.
+    payloadFingerprint:restrictedReceipt(a)?redactedFingerprint:a.fingerprint,
     useBasis:a.useBasis,
-    authorityRef:a.authorityRef,observedAt:a.observedAt,citation,
-    excerpt:a.externalModelProcessingAllowed?excerpt:REDACTED,
+    authorityRef:restrictedReceipt(a)?"custodian:access-controlled":a.authorityRef,
+    observedAt:a.observedAt,
+    citation:restrictedReceipt(a)?"custodian:source-held":citation,
+    excerpt:restrictedReceipt(a)?REDACTED:excerpt,
     modelDisclosed:a.externalModelProcessingAllowed&&!noModel})),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
