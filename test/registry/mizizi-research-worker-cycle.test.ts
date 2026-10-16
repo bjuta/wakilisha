@@ -430,6 +430,13 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    expect.objectContaining({sourceId:EVENT,modelDisclosed:true})
   ]));
   expect(store.rows[1].predecessorFingerprint).toBe(store.rows[0].fingerprint);
+  await expect(runAdaptiveInvestigationV1({
+   identity,store:memory(),maxNewPasses:1,maxTotalPasses:20,
+   costBudgetUnits:20,now:()=>NOW,readSources:async()=>[restricted,visible],
+   analyze:async()=>({...answer([],"pause"),hypotheses:[{
+    ...hypothesis,sourceIds:[JOB]}]}),
+   verifyFinding:async()=>({verified:true,verificationRef:"untrusted:forged"})
+  })).rejects.toThrow("UNOBSERVED_EVIDENCE_CITATION");
  });
  it("halts paraphrase loops against the same evidence without a third paid analysis",async()=>{
   const store=memory(),analyze=vi.fn(async()=>answer([
