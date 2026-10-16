@@ -438,11 +438,11 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   const result=await runAdaptiveInvestigationV1({
    identity,store,maxNewPasses:8,maxTotalPasses:20,costBudgetUnits:100,
    now:()=>NOW,readSources:async()=>[source],
-   analyze:async(...args)=>{
+   analyze:async()=>{
     const ordinal=analyze.mock.calls.length;
-    const result=await analyze(...args);
-    return {...result,leads:[lead("Alternative angle "+ordinal+
-     " regarding the same original evidence source?")]};
+    await analyze();
+    return answer([lead("Alternative angle "+ordinal+
+     " regarding the same original evidence source?")],"continue");
    },
    verifyFinding:async()=>({verified:false,verificationRef:null})
   });
