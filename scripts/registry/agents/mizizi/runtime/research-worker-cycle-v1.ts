@@ -152,6 +152,29 @@ async function validatedResult(
  }
  return Object.freeze(safe);
 }
+/** A job attempt is not an investigation budget. Distinguish conditions
+ * that may clear with time from broken evidence/authority, which must stop.
+ * Case-level immutable research passes remain available to a separately
+ * authorized follow-on job even after a terminal job.
+ */
+export function researchRetryDecisionV1(
+ error:unknown,attempt:number,baseDelaySeconds=60,
+):Readonly<{retryable:boolean;delaySeconds:number;category:string}>{
+ const raw=error instanceof Error?error.message:"";
+ const retryable=new Set([
+  "MIZIZI_WIKIDATA_UNREACHABLE",
+  "MIZIZI_WIKIDATA_RATE_LIMITED",
+  "MIZIZI_WIKIDATA_MAXLAG_DEFERRED",
+  "MIZIZI_ANALYST_TRANSPORT_UNCONFIRMED",
+  "MIZIZI_ANALYST_UPSTREAM_UNAVAILABLE"
+ ]).has(raw);
+ const category=/^MIZIZI_[A-Z0-9_]{3,100}$/.test(raw)?
+  raw:"MIZIZI_RESEARCH_UNCLASSIFIED";
+ const safeAttempt=Number.isSafeInteger(attempt)&&attempt>0?Math.min(attempt,16):1;
+ const delaySeconds=Math.min(3600,Math.max(1,baseDelaySeconds)*
+  Math.pow(2,safeAttempt-1));
+ return Object.freeze({retryable,delaySeconds,category});
+}
 /**
  * One bounded recover/claim/handle cycle. The SQL functions remain the sole
  * lease, retry and dead-letter authority. A completion RPC timeout is
@@ -193,14 +216,12 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
    }catch(error){
      // Server logs only: bounded internal error codes, never source excerpts,
      // credentials, untrusted model text or full exception messages.
-     const raw=error instanceof Error?error.message:"";
-     const failureCode=/^MIZIZI_[A-Z0-9_]{3,100}$/.test(raw)?
-       raw:"MIZIZI_RESEARCH_UNCLASSIFIED";
-     console.error("MIZIZI_AUTHENTIC_WORKER_FAILURE_CODE="+failureCode);
+     const decision=researchRetryDecisionV1(error,job.attempt,retryDelay);
+     console.error("MIZIZI_AUTHENTIC_WORKER_FAILURE_CODE="+decision.category);
      const failedReceipt=record(confirmed(await rpc("mizizi_fail_case_research_job_v1",{
        p_job_id:job.jobId,p_worker_id:workerId,
        p_error:error instanceof Error?error.name:"Research handler failed",
-       p_retryable:true,p_retry_delay_seconds:retryDelay,
+       p_retryable:decision.retryable,p_retry_delay_seconds:decision.delaySeconds,
      }),"FAIL"));
      if(uuid(failedReceipt.job_id)!==job.jobId||uuid(failedReceipt.case_id)!==job.caseId||
        !uuid(failedReceipt.outbox_event_id)||
