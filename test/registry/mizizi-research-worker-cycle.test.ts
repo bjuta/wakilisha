@@ -374,13 +374,85 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    hypotheses:[{...hypothesis,sourceIds:[JOB],interpretation:"supported" as const}]
   })})).rejects.toThrow("UNOBSERVED_EVIDENCE_CITATION");
   expect(store.rows).toHaveLength(0);
-  await expect(runAdaptiveInvestigationV1({...base,readSources:async()=>[
-   {...source,source:{...authority,externalModelProcessingAllowed:false}}
-  ],analyze:async()=>answer([],"pause")})).rejects.toThrow("SOURCE_AUTHORITY_UNVERIFIED");
+  // Restricting model processing does not revoke lawful internal research.
+  const humanOnly=memory(),neverDisclose=vi.fn(async()=>answer([],"pause"));
+  const restricted={...source,excerpt:"RESTRICTED_FIRSTHAND_WITNESS_STATEMENT",
+   source:{...authority,externalModelProcessingAllowed:false}};
+  const internal=await runAdaptiveInvestigationV1({...base,store:humanOnly,
+   readSources:async()=>[restricted],analyze:neverDisclose});
+  expect(internal).toMatchObject({passesAdded:1,disposition:"paused"});
+  expect(neverDisclose).not.toHaveBeenCalled();
+  expect(humanOnly.rows[0]).toMatchObject({costUnits:0,
+   modelVersion:"mizizi.human_review_required.v1",
+   decision:{action:"pause"}});
+  expect(humanOnly.rows[0].sourceReceipts[0]).toMatchObject({
+   excerpt:"RESTRICTED_FIRSTHAND_WITNESS_STATEMENT",modelDisclosed:false
+  });
+  await expect(runAdaptiveInvestigationV1({...base,store:memory(),
+   readSources:async()=>[{...restricted,source:{
+    ...restricted.source,privateEvidenceRetentionAllowed:false}}],
+   analyze:neverDisclose})).rejects.toThrow("SOURCE_AUTHORITY_UNVERIFIED");
   await runAdaptiveInvestigationV1({...base,analyze:async()=>answer([],"pause")});
   const tampered={...store,read:async()=>store.rows.map(p=>({...p,question:"Tampered claim direction"}))};
   await expect(runAdaptiveInvestigationV1({...base,store:tampered,
    analyze:async()=>answer([],"pause")})).rejects.toThrow("HISTORY_CORRUPT");
+ });
+ it("withholds restricted current evidence and all prior narratives from the analyst",async()=>{
+  const store=memory(),q2="Does another independent originator confirm this claim?";
+  const secret="ORAL_WITNESS_CONFIDENTIAL_EXCERPT";
+  const restricted={...source,excerpt:secret,
+   source:{...authority,sourceId:JOB,originKey:"original:private-testimony",
+    fingerprint:"c".repeat(64),externalModelProcessingAllowed:false}};
+  const visible={...source,excerpt:"Public historical recording label has an unknown date."};
+  let calls=0;
+  const result=await runAdaptiveInvestigationV1({
+   identity,store,maxNewPasses:2,maxTotalPasses:20,costBudgetUnits:20,
+   now:()=>NOW,readSources:async()=>[restricted,visible],
+   analyze:async(_,sources,history)=>{
+    calls++;
+    expect(sources).toHaveLength(1);
+    expect(sources[0].excerpt).not.toContain(secret);
+    if(history.length){
+     expect(history[0].sourceReceipts).toEqual([]);
+     expect(history[0].findings).toEqual([]);
+     expect(history[0].proposedLeads).toEqual([]);
+     expect(JSON.stringify(history)).not.toContain(secret);
+     expect(JSON.stringify(history)).not.toContain("The first evidence does not establish");
+    }
+    return calls===1?answer([lead(q2)],"continue"):answer([],"pause");
+   },
+   verifyFinding:async()=>({verified:false,verificationRef:null})
+  });
+  expect(result).toMatchObject({passesAdded:2,disposition:"paused"});
+  expect(calls).toBe(2);
+  expect(store.rows[0].sourceReceipts).toEqual(expect.arrayContaining([
+   expect.objectContaining({sourceId:JOB,modelDisclosed:false,excerpt:secret}),
+   expect.objectContaining({sourceId:EVENT,modelDisclosed:true})
+  ]));
+  expect(store.rows[1].predecessorFingerprint).toBe(store.rows[0].fingerprint);
+ });
+ it("halts paraphrase loops against the same evidence without a third paid analysis",async()=>{
+  const store=memory(),analyze=vi.fn(async()=>answer([
+   lead("What is another possible interpretation of the same unchanged witness?")
+  ],"continue"));
+  const result=await runAdaptiveInvestigationV1({
+   identity,store,maxNewPasses:8,maxTotalPasses:20,costBudgetUnits:100,
+   now:()=>NOW,readSources:async()=>[source],
+   analyze:async(...args)=>{
+    const ordinal=analyze.mock.calls.length;
+    const result=await analyze(...args);
+    return {...result,leads:[lead("Alternative angle "+ordinal+
+     " regarding the same original evidence source?")]};
+   },
+   verifyFinding:async()=>({verified:false,verificationRef:null})
+  });
+  expect(result).toMatchObject({passesAdded:3,disposition:"paused"});
+  expect(analyze).toHaveBeenCalledTimes(2);
+  expect(store.rows[2]).toMatchObject({
+   costUnits:0,modelVersion:"mizizi.evidence_exhausted.v1",
+   decision:{action:"pause"}});
+  expect(store.rows[2].findings).toEqual([]);
+  expect(store.rows[2].sourceReceipts[0]).toMatchObject({modelDisclosed:false});
  });
  it("executes two adaptive research passes through the existing actual worker RPC lifecycle",async()=>{
   const store=memory(),rpc=harness();
