@@ -233,7 +233,7 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
 describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundary)",()=>{
  const identity={caseId:CASE,workspaceId:WORKSPACE,
   openingQuestion:"Who actually performed on the disputed version of this recording?"};
- const authority={sourceId:EVENT,workspaceId:WORKSPACE,originKey:"original-session-record",
+ const authority={sourceId:EVENT,caseId:CASE,workspaceId:WORKSPACE,originKey:"original-session-record",
   lineageKey:"session-record-family",fingerprint:"a".repeat(64),
   authorityRef:"firstparty:research-allowed",
   useBasis:"first_party" as const,
