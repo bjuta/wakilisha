@@ -5,9 +5,11 @@ on:
       - ".github/workflows/mizizi-preview-source-first-admit-once.yml"
 permissions:
   contents: read
+# Share the established Production JIT workflow mutex. Supabase enables
+# temporary database access on the parent even for branch-only mappings.
 concurrency:
-  group: mizizi-preview-authentic-source-first-admission
-  cancel-in-progress: false
+  group: mizizi-production-jit-control-plane
+  queue: max
 jobs:
   verified-jit-admission:
     if: github.event.pull_request.number == 1243 && github.event.pull_request.head.repo.full_name == 'bjuta/wakilisha'
