@@ -355,7 +355,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   };
   const second="Was the producer independently credited in the original liner notes?";
   const result=await runAdaptiveResearchWorkerCycleV1({
-   rpc,workerId:"scoped-worker",maxNewPasses:4,maxTotalPasses:20,
+   rpc,workerId:"scoped-worker",now:()=>NOW,maxNewPasses:4,maxTotalPasses:20,
    costBudgetUnits:10,openingQuestion:async()=>identity.openingQuestion,
    readSources:async()=>[source],
    analyze:async(_,__,history)=>history.length===0?
