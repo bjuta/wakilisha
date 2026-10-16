@@ -76,7 +76,7 @@ function validateClaim(raw:unknown,nowMs:number):ResearchJobV1{
  if(publicSourceSearchApproved&&(
     !researchQuestion||researchQuestion.trim()!==researchQuestion||
     researchQuestion.length<12||researchQuestion.length>500||
-    /[\\u0000-\\u001f]/.test(researchQuestion)))
+    /[\u0000-\u001f]/.test(researchQuestion)))
    throw new TypeError('MIZIZI_WORKER_UNSAFE_PUBLIC_RESEARCH_QUESTION');
  const expires=Date.parse(String(row.lease_expires_at));
  if(!Number.isFinite(expires)||expires<=nowMs)
