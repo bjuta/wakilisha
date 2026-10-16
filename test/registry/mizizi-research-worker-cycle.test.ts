@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
 import {createAnthropicInvestigationAnalystV1,resolveInstituteAnthropicConfigurationV1} from "../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1";
+import {createWikidataInvestigationReaderV1} from "../../scripts/registry/agents/mizizi/runtime/wikidata-investigation-reader-v1";
 import {createAdaptiveResearchWorkerHandlerV1,runAdaptiveResearchWorkerCycleV1,runAnthropicAdaptiveResearchWorkerCycleV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
 import {
   runResearchWorkerCycleV1,
@@ -392,6 +393,51 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(modelCalls.map(x=>x.question)).toEqual([identity.openingQuestion,second]);
   expect(modelCalls.every(x=>JSON.stringify(x.request).includes("test-anthropic-key-not-real")===false)).toBe(true);
   expect(seen.at(-1)).toBe("mizizi_complete_case_research_job_v1");
+ });
+ it("acquires revision-pinned CC0 structured evidence without external query leakage",async()=>{
+  const calls:string[]=[];
+  const transport:typeof fetch=async(url,init)=>{
+   const parsed=new URL(String(url));calls.push(parsed.toString());
+   expect(parsed.origin).toBe("https://www.wikidata.org");
+   expect(parsed.pathname).toBe("/w/api.php");
+   expect(init?.method).toBe("GET");
+   expect((init?.headers as Record<string,string>)["User-Agent"])
+    .toContain("WAKILISHA-MIZIZI");
+   const data=parsed.searchParams.get("action")==="wbsearchentities"?
+    {search:[{id:"Q1422"}]}:
+    {entities:{Q1422:{id:"Q1422",lastrevid:812345,
+     labels:{en:{value:"Test cultural source"}},
+     descriptions:{en:{value:"Test recording identity"}},
+     claims:{P175:[{id:"Q1422$1",rank:"normal",
+      mainsnak:{datatype:"wikibase-item",
+       datavalue:{type:"wikibase-entityid",value:{id:"Q99"}}},
+      references:[{snaks:{}}]}]}}}};
+   return new Response(JSON.stringify(data),{
+    status:200,headers:{"Content-Type":"application/json"}});
+  };
+  let permission=false;
+  const reader=createWikidataInvestigationReaderV1({
+   authorizePublicQuery:async()=>permission,transport,now:()=>NOW
+  });
+  await expect(reader(identity,identity.openingQuestion,[]))
+   .rejects.toThrow("PUBLIC_QUERY_NOT_AUTHORIZED");
+  expect(calls).toHaveLength(0);
+  permission=true;
+  const out=await reader(identity,identity.openingQuestion,[]);
+  expect(calls).toHaveLength(2);
+  expect(out).toHaveLength(1);
+  expect(out[0].source).toMatchObject({
+   caseId:CASE,workspaceId:WORKSPACE,
+   useBasis:"open_license",
+   privateResearchAllowed:true,
+   externalModelProcessingAllowed:true,
+   privateEvidenceRetentionAllowed:true,
+   lineageKey:"wikidata:community-structured-data",
+   originKey:"wikidata:Q1422:revision:812345"
+  });
+  expect(out[0].citation).toBe("https://www.wikidata.org/wiki/Q1422?oldid=812345");
+  expect(out[0].excerpt).toContain("Q99");
+  expect(out[0].source.fingerprint).toMatch(/^[a-f0-9]{64}$/);
  });
  it("refuses sending private excerpts to the existing provider without explicit permission",async()=>{
   let sent=false;
