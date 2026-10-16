@@ -338,6 +338,33 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    lineageKey:'session-record-family'
   });
  });
+ it("records an evidence-absent method without a model call or invented verdict",async()=>{
+  const store=memory(),reader=vi.fn(async()=>[]),
+   analyst=vi.fn(async()=>answer([],"conclude")),
+   verifier=vi.fn(async()=>({verified:true,verificationRef:"forged:verdict"}));
+  const deps={identity,store,maxNewPasses:5,maxTotalPasses:20,
+   costBudgetUnits:20,now:()=>NOW,readSources:reader,
+   analyze:analyst,verifyFinding:verifier};
+  const result=await runAdaptiveInvestigationV1(deps);
+  expect(result).toMatchObject({passesAdded:1,totalPasses:1,
+   disposition:"paused",nextQuestion:null});
+  expect(reader).toHaveBeenCalledTimes(1);
+  expect(analyst).not.toHaveBeenCalled();
+  expect(verifier).not.toHaveBeenCalled();
+  expect(store.rows[0]).toMatchObject({
+   sourceReceipts:[],findings:[],proposedLeads:[],costUnits:0,
+   modelVersion:"mizizi.no_authorized_evidence.v1",
+   decision:{action:"pause",nextQuestion:null}
+  });
+  expect(store.rows[0].passFinding).toContain(
+   "absence cannot establish that a cultural claim is false");
+  expect(store.rows[0].fingerprint).toMatch(/^[a-f0-9]{64}$/);
+  const resumed=await runAdaptiveInvestigationV1(deps);
+  expect(resumed).toMatchObject({passesAdded:0,totalPasses:1,disposition:"paused"});
+  expect(reader).toHaveBeenCalledTimes(1);
+  expect(analyst).not.toHaveBeenCalled();
+  expect(verifier).not.toHaveBeenCalled();
+ });
  it("stops paid research after measured provider token budget is exhausted",async()=>{
   const store=memory(),reader=vi.fn(async()=>[source]);
   const analyst=vi.fn(async()=>answer([lead("What independent original source exists?")],"continue"));
