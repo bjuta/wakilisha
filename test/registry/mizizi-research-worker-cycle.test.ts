@@ -71,6 +71,29 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
   expect(calls[2].args.p_result).toEqual(finding);
   expect(JSON.stringify(calls)).not.toContain("DO_NOT_EXPORT");
  });
+ it("binds external public research authority to the exact immutable job reason",async()=>{
+  const question='Which original evidence supports the credits for "Suzanna" by Sauti Sol?';
+  const approved={...row,input_payload:{...row.input_payload,
+   reason:'PUBLIC_CC0_RESEARCH: '+question}};
+  const a=harness({claimed:[approved]});
+  await expect(cycle(a.rpc,async job=>{
+   expect(job).toMatchObject({publicSourceSearchApproved:true,
+    researchQuestion:question});
+   return finding;
+  })).resolves.toMatchObject({succeeded:1});
+  const unapproved=harness({claimed:[{...row,input_payload:{
+   ...row.input_payload,reason:question}}]});
+  await expect(cycle(unapproved.rpc,async job=>{
+   expect(job).toMatchObject({publicSourceSearchApproved:false,
+    researchQuestion:null});
+   return finding;
+  })).resolves.toMatchObject({succeeded:1});
+  const invalid=harness({claimed:[{...row,input_payload:{
+   ...row.input_payload,reason:'PUBLIC_CC0_RESEARCH: private\nunauthorized'}}]});
+  const handler=vi.fn(async()=>finding);
+  await expect(cycle(invalid.rpc,handler)).rejects.toThrow('UNSAFE_PUBLIC_RESEARCH_QUESTION');
+  expect(handler).not.toHaveBeenCalled();
+ });
  it("does not invent work when the queue is empty",async()=>{
   const {rpc,calls}=harness({claimed:[]});const handler=vi.fn(async()=>finding);
   await expect(cycle(rpc,handler)).resolves.toMatchObject({claimed:0,succeeded:0,failed:0});
