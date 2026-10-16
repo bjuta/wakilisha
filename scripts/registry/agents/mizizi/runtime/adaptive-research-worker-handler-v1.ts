@@ -8,6 +8,8 @@ import {runAdaptiveInvestigationV1, type InvestigationIdentityV1,
  from "./adaptive-investigation-v1";
 import type {ResearchJobHandlerV1,ResearchJobV1}
  from "./research-worker-cycle-v1";
+import {runResearchWorkerCycleV1, type WorkerRpc, type ResearchSourceVerifierV1} from "./research-worker-cycle-v1";
+import {createLeasedResearchPassStoreV1} from "./leased-research-pass-store-v1";
 export type AdaptiveWorkerDependenciesV1=Readonly<{
  store:InvestigationStoreV1;
  openingQuestion:(job:ResearchJobV1)=>Promise<string>;
@@ -44,4 +46,33 @@ export function createAdaptiveResearchWorkerHandlerV1(
    status:ids.length?"evidence_recorded":"insufficient_evidence",
    sourceReferences:ids};
  };
+}
+
+/** The actual service-only composition: existing queue and lease -> immutable
+ * case-scoped pass store -> adaptive analyst -> independent source verifier ->
+ * existing completion receipt. No second scheduler or Queue authority.
+ */
+export async function runAdaptiveResearchWorkerCycleV1(input:Readonly<{
+ rpc:WorkerRpc;workerId:string;verifySources:ResearchSourceVerifierV1;
+ openingQuestion:AdaptiveWorkerDependenciesV1["openingQuestion"];
+ readSources:InvestigationReaderV1;analyze:InvestigationAnalystV1;
+ verifyFinding:IndependentFindingVerifierV1;
+ maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
+ measureCostUnits?:()=>number;leaseSeconds?:number;limit?:number;
+}>){
+ if(!input||typeof input.verifySources!=="function")
+  throw new TypeError("MIZIZI_ADAPTIVE_WORKER_SOURCE_VERIFIER_REQUIRED");
+ return runResearchWorkerCycleV1({
+  rpc:input.rpc,workerId:input.workerId,verifySources:input.verifySources,
+  leaseSeconds:input.leaseSeconds,limit:input.limit,
+  research:async(job)=>{
+   const store=createLeasedResearchPassStoreV1(input.rpc,job,input.workerId);
+   const handler=createAdaptiveResearchWorkerHandlerV1({store,
+    openingQuestion:input.openingQuestion,readSources:input.readSources,
+    analyze:input.analyze,verifyFinding:input.verifyFinding,
+    maxNewPasses:input.maxNewPasses,maxTotalPasses:input.maxTotalPasses,
+    costBudgetUnits:input.costBudgetUnits,measureCostUnits:input.measureCostUnits});
+   return handler(job);
+  }
+ });
 }
