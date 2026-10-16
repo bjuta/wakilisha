@@ -255,7 +255,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    promptFingerprint:analysis.promptFingerprint,
    recordedAt:new Date(now()).toISOString(),costUnits};
   // Only source-authorized, exact evidence snippets are persisted.
-  if(Buffer.byteLength(JSON.stringify(body),'utf8')>30000)
+  if(new TextEncoder().encode(JSON.stringify(body)).length>30000)
    throw new Error('MIZIZI_RESEARCH_EVIDENCE_SNAPSHOT_BUDGET');
   const pass:InvestigationPassV1=Object.freeze({...body,
    fingerprint:digest({...body,fingerprint:undefined})});
