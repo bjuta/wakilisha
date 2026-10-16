@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
-import {createAnthropicInvestigationAnalystV1,resolveInstituteAnthropicConfigurationV1} from "../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1";
+import {createAnthropicInvestigationAnalystV1,resolveInstituteAnthropicConfigurationV1,discoverAnthropicResearchModelV1} from "../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1";
 import {createWikidataInvestigationReaderV1} from "../../scripts/registry/agents/mizizi/runtime/wikidata-investigation-reader-v1";
 import {createAdaptiveResearchWorkerHandlerV1,runAdaptiveResearchWorkerCycleV1,runAnthropicAdaptiveResearchWorkerCycleV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
 import {
@@ -550,7 +550,8 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
  it("reuses Institute's existing environment/setting names without creating another credential path",async()=>{
   const forbiddenSetting=vi.fn(async()=>{throw new Error("must prefer existing environment");});
   const env=await resolveInstituteAnthropicConfigurationV1({
-   readEnvironment:name=>name==="ANTHROPIC_API_KEY"?"test-existing-provider-key":"claude-opus-4-8",
+   readEnvironment:name=>name==="ANTHROPIC_API_KEY"?"test-existing-provider-key":
+    name==="INSTITUTE_ASSISTANT_MODEL"?"claude-opus-4-8":null,
    readAdminSetting:forbiddenSetting
   });
   expect(env.model).toBe("claude-opus-4-8");
@@ -559,7 +560,8 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   const fallback=await resolveInstituteAnthropicConfigurationV1({
    readEnvironment:()=>null,
    readAdminSetting:async key=>key==="anthropic_api_key"?
-    "test-database-provider-key":"claude-opus-4-8"
+    "test-database-provider-key":key==="institute_assistant_model"?
+    "claude-opus-4-8":null
   });
   expect(fallback.apiKey).toBe("test-database-provider-key");
   await expect(resolveInstituteAnthropicConfigurationV1({
