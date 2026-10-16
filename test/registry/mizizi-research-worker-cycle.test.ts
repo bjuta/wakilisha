@@ -461,6 +461,24 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(out[0].citation).toBe("https://www.wikidata.org/wiki/Q1422?oldid=812345");
   expect(out[0].excerpt).toContain("Q99");
   expect(out[0].source.fingerprint).toMatch(/^[a-f0-9]{64}$/);
+  // Revisions are distinct immutable source observations, not overwritten
+  // evidence. All Wikidata items share one lineage, never independent votes.
+  const nextReader=createWikidataInvestigationReaderV1({
+   authorizePublicQuery:async()=>true,now:()=>NOW,
+   transport:async(url,init)=>{
+    const parsed=new URL(String(url));
+    const data=parsed.searchParams.get("action")==="wbsearchentities"?
+     {search:[{id:"Q1422"},{id:"Q1422"}]}:
+     {entities:{Q1422:{id:"Q1422",lastrevid:812346,
+      labels:{en:{value:"Test cultural source"}},claims:{}}}};
+    return new Response(JSON.stringify(data),{status:200,
+     headers:{"Content-Type":"application/json"}});
+   }
+  });
+  const revised=await nextReader(identity,identity.openingQuestion,[]);
+  expect(revised).toHaveLength(1);
+  expect(revised[0].source.sourceId).not.toBe(out[0].source.sourceId);
+  expect(revised[0].source.lineageKey).toBe(out[0].source.lineageKey);
  });
  it("refuses sending private excerpts to the existing provider without explicit permission",async()=>{
   let sent=false;
