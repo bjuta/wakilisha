@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
 import {createAnthropicInvestigationAnalystV1,resolveInstituteAnthropicConfigurationV1,discoverAnthropicResearchModelV1} from "../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1";
 import {createWikidataInvestigationReaderV1} from "../../scripts/registry/agents/mizizi/runtime/wikidata-investigation-reader-v1";
+import {createMusicBrainzWorkReaderV1} from "../../scripts/registry/agents/mizizi/runtime/musicbrainz-work-reader-v1";
 import {createAdaptiveResearchWorkerHandlerV1,runAdaptiveResearchWorkerCycleV1,runAnthropicAdaptiveResearchWorkerCycleV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
 import {
   runResearchWorkerCycleV1,
@@ -442,6 +443,107 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(seen.at(-1)).toBe("mizizi_complete_case_research_job_v1");
  });
 
+
+ it("requires documented commercial MusicBrainz API permission before any source request",async()=>{
+  const work="56950dba-94f8-46a9-aaaf-f2f59bbeed04";
+  const requests=vi.fn(async()=>{throw Error("NO_NETWORK_EXPECTED");});
+  const rates=vi.fn(async()=>true);
+  const reader=createMusicBrainzWorkReaderV1({
+   workId:work,authorizeCommercialAccess:async()=>null,
+   acquireSharedRateSlot:rates,transport:requests as unknown as typeof fetch,
+   now:()=>NOW
+  });
+  await expect(reader(identity,identity.openingQuestion,[]))
+   .rejects.toThrow("MIZIZI_MUSICBRAINZ_COMMERCIAL_SOURCE_PERMISSION_REQUIRED");
+  expect(rates).not.toHaveBeenCalled();
+  expect(requests).not.toHaveBeenCalled();
+  const permit={contractReference:"contract:mb-commercial-api-reviewed-v1",
+   commercialApiAccessAllowed:true,coreDataOnly:true,
+   privateResearchAllowed:true,externalModelProcessingAllowed:true,
+   privateEvidenceRetentionAllowed:true,expiresAt:null,revokedAt:null};
+  for(const denied of [
+   {...permit,commercialApiAccessAllowed:false},
+   {...permit,coreDataOnly:false},
+   {...permit,externalModelProcessingAllowed:false},
+   {...permit,privateEvidenceRetentionAllowed:false},
+   {...permit,contractReference:""},
+   {...permit,expiresAt:new Date(NOW-1).toISOString()},
+   {...permit,revokedAt:new Date(NOW-1).toISOString()}
+  ]){
+   const blocked=createMusicBrainzWorkReaderV1({
+    workId:work,authorizeCommercialAccess:async()=>denied,
+    acquireSharedRateSlot:rates,transport:requests as unknown as typeof fetch,
+    now:()=>NOW
+   });
+   await expect(blocked(identity,identity.openingQuestion,[]))
+    .rejects.toThrow("MIZIZI_MUSICBRAINZ_COMMERCIAL_SOURCE_PERMISSION_REQUIRED");
+  }
+  expect(requests).not.toHaveBeenCalled();
+  expect(rates).not.toHaveBeenCalled();
+ });
+ it("requires a shared rate slot and strictly projects licensed Work core fields",async()=>{
+  const work="56950dba-94f8-46a9-aaaf-f2f59bbeed04";
+  const permission={contractReference:"contract:mb-commercial-api-reviewed-v1",
+   commercialApiAccessAllowed:true,coreDataOnly:true,
+   privateResearchAllowed:true,externalModelProcessingAllowed:true,
+   privateEvidenceRetentionAllowed:true,expiresAt:null,revokedAt:null};
+  const spy=vi.fn(async(url:unknown,init?:RequestInit)=>{
+   expect(String(url)).toBe("https://musicbrainz.org/ws/2/work/"+work+"?fmt=json");
+   expect(init?.method).toBe("GET");
+   expect(init?.redirect).toBe("error");
+   expect((init?.headers as Record<string,string>)["User-Agent"]).toContain("WAKILISHA");
+   return new Response(JSON.stringify({
+    id:work,title:"Jerusalema",type:"Song",iswcs:["T-313.777.835-5"],
+    annotation:"SUPPLEMENTARY_NON_CC0_CONTENT",tags:[{name:"private"}],
+    ratings:{value:5},relations:[{url:"no_unverified_rights"}]
+   }),{status:200,headers:{"Content-Type":"application/json"}});
+  });
+  const denied=createMusicBrainzWorkReaderV1({
+   workId:work,authorizeCommercialAccess:async()=>permission,
+   acquireSharedRateSlot:async()=>false,transport:spy as typeof fetch,now:()=>NOW
+  });
+  await expect(denied(identity,identity.openingQuestion,[]))
+   .rejects.toThrow("MIZIZI_MUSICBRAINZ_SHARED_RATE_SLOT_REQUIRED");
+  expect(spy).not.toHaveBeenCalled();
+  const allowed=createMusicBrainzWorkReaderV1({
+   workId:work,authorizeCommercialAccess:async()=>permission,
+   acquireSharedRateSlot:async()=>true,transport:spy as typeof fetch,now:()=>NOW
+  });
+  const [result]=await allowed(identity,identity.openingQuestion,[]);
+  expect(spy).toHaveBeenCalledTimes(1);
+  const projection=JSON.parse(result.excerpt);
+  expect(projection).toMatchObject({workId:work,title:"Jerusalema",type:"Song",
+   iswcs:["T-313.777.835-5"],iswcsFieldPresent:true});
+  expect(JSON.stringify(result)).not.toContain("SUPPLEMENTARY_NON_CC0_CONTENT");
+  expect(JSON.stringify(result)).not.toContain("no_unverified_rights");
+  expect(JSON.stringify(result)).not.toContain("private");
+  expect(result.source).toMatchObject({
+   caseId:CASE,workspaceId:WORKSPACE,
+   lineageKey:"musicbrainz:community-core-work-data",
+   useBasis:"documented_contract",
+   authorityRef:"contract:mb-commercial-api-reviewed-v1"
+  });
+  expect(result.source.fingerprint).toMatch(/^[a-f0-9]{64}$/);
+ });
+ it("rejects spoofed Work identity and never treats the API response as rights verification",async()=>{
+  const work="56950dba-94f8-46a9-aaaf-f2f59bbeed04";
+  const permit={contractReference:"contract:mb-commercial-api-reviewed-v1",
+   commercialApiAccessAllowed:true,coreDataOnly:true,
+   privateResearchAllowed:true,externalModelProcessingAllowed:true,
+   privateEvidenceRetentionAllowed:true,expiresAt:null,revokedAt:null};
+  for(const payload of [{id:JOB,title:"Jerusalema",type:"Song"},
+   {id:work,title:"Jerusalema",iswcs:["INVALID_ISWC"]},
+   {id:work,title:"",iswcs:[]}]){
+   const reader=createMusicBrainzWorkReaderV1({
+    workId:work,authorizeCommercialAccess:async()=>permit,
+    acquireSharedRateSlot:async()=>true,now:()=>NOW,
+    transport:async()=>new Response(JSON.stringify(payload),{
+     status:200,headers:{"Content-Type":"application/json"}})
+   });
+   await expect(reader(identity,identity.openingQuestion,[]))
+    .rejects.toThrow("MIZIZI_MUSICBRAINZ_CORE_WORK_IDENTITY_UNVERIFIED");
+  }
+ });
  it("retains Work identifier properties in a newly versioned Wikidata evidence projection",async()=>{
   const query="Does the Q97652493 single include an explicit MusicBrainz Work ID or ISWC?";
   const observed:string[]=[];
