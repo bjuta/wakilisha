@@ -27,30 +27,48 @@ function sourceUuid(qid:string,revision:number):string{
 }
 async function request(url:URL,send:typeof fetch):Promise<Record<string,unknown>>{
  if(url.origin!==HOST||url.pathname!==API)throw new Error("MIZIZI_WIKIDATA_HOST_DENIED");
- let response:Response;
- try{
-  response=await send(url.toString(),{
-   method:"GET",redirect:"error",
-   headers:{Accept:"application/json","User-Agent":CLIENT,"Api-User-Agent":CLIENT,
-    "Accept-Encoding":"gzip, deflate"},
-   signal:AbortSignal.timeout(16000)
-  });
- }catch{throw new Error("MIZIZI_WIKIDATA_UNREACHABLE");}
- if(response.status===429||response.status===503)
-  throw new Error("MIZIZI_WIKIDATA_RATE_LIMITED");
- if(!response.ok||!/^application\/json\b/i.test(response.headers.get("content-type")||""))
-  throw new Error("MIZIZI_WIKIDATA_PROVIDER_UNVERIFIED");
- const bytes=Number(response.headers.get("content-length"));
- if(Number.isFinite(bytes)&&bytes>MAX_BODY)
-  throw new Error("MIZIZI_WIKIDATA_RESPONSE_TOO_LARGE");
- const raw=await response.text();
- if(raw.length>MAX_BODY)throw new Error("MIZIZI_WIKIDATA_RESPONSE_TOO_LARGE");
- let value:unknown;
- try{value=JSON.parse(raw);}catch{throw new Error("MIZIZI_WIKIDATA_BAD_JSON");}
- if(!value||typeof value!=="object"||Array.isArray(value)||
-  (value as Record<string,unknown>).error)
-  throw new Error("MIZIZI_WIKIDATA_BAD_PAYLOAD");
- return value as Record<string,unknown>;
+ // MediaWiki can respond HTTP 200 with error.code='maxlag'. Respect its
+ // Retry-After rather than misclassifying database replica lag as bad evidence.
+ for(let attempt=0;attempt<3;attempt++){
+  let response:Response;
+  try{
+   response=await send(url.toString(),{
+    method:"GET",redirect:"error",
+    headers:{Accept:"application/json","User-Agent":CLIENT,"Api-User-Agent":CLIENT,
+     "Accept-Encoding":"gzip, deflate"},
+    signal:AbortSignal.timeout(16000)
+   });
+  }catch{throw new Error("MIZIZI_WIKIDATA_UNREACHABLE");}
+  if(response.status===429||response.status===503)
+   throw new Error("MIZIZI_WIKIDATA_RATE_LIMITED");
+  if(!response.ok||!/^application\/json\b/i.test(response.headers.get("content-type")||""))
+   throw new Error("MIZIZI_WIKIDATA_PROVIDER_UNVERIFIED");
+  const bytes=Number(response.headers.get("content-length"));
+  if(Number.isFinite(bytes)&&bytes>MAX_BODY)
+   throw new Error("MIZIZI_WIKIDATA_RESPONSE_TOO_LARGE");
+  const raw=await response.text();
+  if(raw.length>MAX_BODY)throw new Error("MIZIZI_WIKIDATA_RESPONSE_TOO_LARGE");
+  let value:unknown;
+  try{value=JSON.parse(raw);}catch{throw new Error("MIZIZI_WIKIDATA_BAD_JSON");}
+  if(!value||typeof value!=="object"||Array.isArray(value))
+   throw new Error("MIZIZI_WIKIDATA_BAD_PAYLOAD");
+  const payload=value as Record<string,unknown>;
+  if(payload.error!==undefined){
+   const err=payload.error as {code?:unknown}|null;
+   const code=typeof err?.code==="string"&&/^[a-z0-9_-]{1,48}$/.test(err.code)
+    ?err.code:"unknown";
+   if(code==="maxlag"){
+    const header=Number(response.headers.get("retry-after")||"5");
+    if(!Number.isFinite(header)||header>10||attempt===2)
+     throw new Error("MIZIZI_WIKIDATA_MAXLAG_DEFERRED");
+    await new Promise<void>(resolve=>setTimeout(resolve,Math.max(5000,header*1000)));
+    continue;
+   }
+   throw new Error("MIZIZI_WIKIDATA_PROVIDER_ERROR_"+code);
+  }
+  return payload;
+ }
+ throw new Error("MIZIZI_WIKIDATA_MAXLAG_DEFERRED");
 }
 function excerpt(entity:Record<string,unknown>,qid:string):string{
  const labels=entity.labels as Record<string,{value?:unknown}>|undefined;
