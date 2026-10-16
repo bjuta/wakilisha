@@ -239,7 +239,8 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   authorityRef:"firstparty:research-allowed",
   useBasis:"first_party" as const,
   observedAt:new Date(NOW-60000).toISOString(),expiresAt:null,revokedAt:null,
-  privateResearchAllowed:true,externalModelProcessingAllowed:true};
+  privateResearchAllowed:true,externalModelProcessingAllowed:true,
+  privateEvidenceRetentionAllowed:true};
  const source={source:authority,excerpt:"The original paperwork is incomplete.",
   citation:"source:first-party-session-record"};
  const hypothesis={statement:"The historical performer identity is not yet established.",
@@ -281,6 +282,10 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(store.rows[2].findings[0].independentlyVerified).toBe(false);
   expect(store.rows[1].predecessorFingerprint).toBe(store.rows[0].fingerprint);
   expect(store.rows[0].proposedLeads[0].question).toBe(q2);
+  expect(store.rows[0].sourceReceipts[0]).toMatchObject({
+   citation:source.citation,excerpt:source.excerpt,
+   lineageKey:'session-record-family'
+  });
  });
  it("resumes an interrupted investigation at its next question, not pass one",async()=>{
   const store=memory();const reader=vi.fn(async()=>[source]);
