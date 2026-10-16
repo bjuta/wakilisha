@@ -479,6 +479,10 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(revised).toHaveLength(1);
   expect(revised[0].source.sourceId).not.toBe(out[0].source.sourceId);
   expect(revised[0].source.lineageKey).toBe(out[0].source.lineageKey);
+  const anchored=await nextReader(identity,
+   "Which original songwriter credits establish the work identity?",
+   [{question:'What is the original identity of "Jerusalema"?' } as InvestigationPassV1]);
+  expect(anchored).toHaveLength(1);
  });
  it("refuses sending private excerpts to the existing provider without explicit permission",async()=>{
   let sent=false;
