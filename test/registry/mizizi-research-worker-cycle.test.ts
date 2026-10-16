@@ -3,6 +3,7 @@ import {
   runResearchWorkerCycleV1,
   type WorkerRpc,
   type ResearchJobV1,
+  type VerifiedResearchSourceV1,
 } from "../../scripts/registry/agents/mizizi/runtime/research-worker-cycle-v1";
 
 const JOB="11111111-1111-4111-8111-111111111111";
@@ -20,6 +21,13 @@ const row={
 };
 const finding={contract:"mizizi.read_only_research_result.v1" as const,
  caseId:CASE,status:"insufficient_evidence" as const,sourceReferences:[]};
+const verifiedSource:VerifiedResearchSourceV1={
+ sourceId:EVENT,caseId:CASE,workspaceId:WORKSPACE,
+ sourceUseBasis:"documented_contract",permissionAuthorityRef:"contract:research-use-1",
+ privateResearchAllowed:true,sourceOriginRef:"original:source-a",
+ lineageKey:"origin:source-a",sourcePayloadFingerprint:"a".repeat(64),
+ observedAt:new Date(NOW-60000).toISOString(),validUntil:null,revokedAt:null,
+};
 const done={job_id:JOB,case_id:CASE,command_receipt_id:RECEIPT,
  job_status:"succeeded",success_event_id:EVENT};
 const failed={job_id:JOB,case_id:CASE,job_status:"retry_wait",
@@ -152,7 +160,7 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
   const v=vi.fn(async(job:ResearchJobV1,refs:readonly string[])=>{
     expect(job.caseId).toBe(CASE);
     expect(refs).toEqual([EVENT]);
-    return true;
+    return [verifiedSource];
   });
   const approved=harness();
   await expect(cycle(approved.rpc,async()=>evidence,{verifySources:v}))
@@ -168,10 +176,37 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
   ];
   for(const evidence of bad){
     const {rpc,calls}=harness();
-    await expect(cycle(rpc,async()=>evidence,{verifySources:async()=>false}))
+    await expect(cycle(rpc,async()=>evidence,{verifySources:async()=>[]}))
       .resolves.toMatchObject({failed:1,succeeded:0});
     expect(calls.map(x=>x.fn)).not.toContain("mizizi_complete_case_research_job_v1");
   }
+  const evidence={...finding,status:"evidence_recorded" as const,sourceReferences:[EVENT]};
+  // The trusted verifier must return actual bound, permitted, non-revoked
+  // source authority. A bare true, copied model output, or missing licence
+  // metadata must never complete a claimed investigation.
+  for(const damaged of [
+    {...verifiedSource,sourceUseBasis:"unknown"},
+    {...verifiedSource,privateResearchAllowed:false},
+    {...verifiedSource,permissionAuthorityRef:""},
+    {...verifiedSource,lineageKey:""},
+    {...verifiedSource,sourcePayloadFingerprint:"invalid"},
+    {...verifiedSource,caseId:WORKSPACE},
+    {...verifiedSource,workspaceId:CASE},
+    {...verifiedSource,sourceId:JOB},
+    {...verifiedSource,observedAt:new Date(NOW+1000).toISOString()},
+    {...verifiedSource,validUntil:new Date(NOW-1000).toISOString()},
+    {...verifiedSource,revokedAt:new Date(NOW-1000).toISOString()},
+  ]){
+    const {rpc,calls}=harness();
+    await expect(cycle(rpc,async()=>evidence,{verifySources:async()=>[damaged]}))
+      .resolves.toMatchObject({failed:1,succeeded:0});
+    expect(calls.map(x=>x.fn)).not.toContain("mizizi_complete_case_research_job_v1");
+  }
+  const unconfirmed=harness();
+  await expect(cycle(unconfirmed.rpc,async()=>evidence,{
+    verifySources:async()=>true,
+  })).resolves.toMatchObject({failed:1,succeeded:0});
+  expect(unconfirmed.calls.map(x=>x.fn)).not.toContain("mizizi_complete_case_research_job_v1");
  });
  it("does not accept forged failure receipts for retry or terminal outcomes",async()=>{
   for(const patch of [
