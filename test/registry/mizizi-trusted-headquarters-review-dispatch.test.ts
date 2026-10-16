@@ -56,6 +56,13 @@ describe("MIZIZI opt-in real JIT review-to-case dispatch",()=>{
    });
    expect(real?.proposedValue).toBe("human_review_required");
    expect(real?.disposition).toBe("review");
+   // Also protect the actual scan's source-to-analyzer wiring, not merely
+   // the pure analyzer input fixture. Real data is verified separately in
+   // read-only Production SQL; this is a scoped source regression guard.
+   const scanner=readFileSync("scripts/registry/agents/mizizi/run.ts","utf8");
+   expect(scanner).toContain("t.isrc,");
+   expect(scanner).toContain("isrc: row.isrc,");
+   expect(scanner).toContain("isrc: candidate.isrc || null,");
  });
  it("validates the optional managed-JIT project boundary without widening confirmation",()=>{
    const basics=[
