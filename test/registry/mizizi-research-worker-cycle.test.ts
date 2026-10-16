@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
-import {createOpenAIInvestigationAnalystV1} from "../../scripts/registry/agents/mizizi/runtime/openai-investigation-analyst-v1";
+import {createAnthropicInvestigationAnalystV1} from "../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1";
 import {createAdaptiveResearchWorkerHandlerV1,runAdaptiveResearchWorkerCycleV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
 import {
   runResearchWorkerCycleV1,
@@ -369,15 +369,62 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(seen.filter(fn=>fn==="mizizi_append_research_pass_v1")).toHaveLength(2);
   expect(seen.at(-1)).toBe("mizizi_complete_case_research_job_v1");
  });
- it("refuses sending private excerpts to the model without explicit external processing authority",async()=>{
+ it("refuses sending private excerpts to the existing provider without explicit permission",async()=>{
   let sent=false;
-  const analyze=createOpenAIInvestigationAnalystV1({
-   apiKey:"test-api-key-not-real",model:"gpt-6",
+  const analyze=createAnthropicInvestigationAnalystV1({
+   apiKey:"test-anthropic-key-not-real",model:"claude-opus-4-8",
    transport:async()=>{sent=true;throw new Error("must not send");}
   });
   await expect(analyze(identity.openingQuestion,
    [{...source,source:{...authority,externalModelProcessingAllowed:false}}],[]))
    .rejects.toThrow("EXTERNAL_SOURCE_PROCESSING_DENIED");
   expect(sent).toBe(false);
+ });
+ it("uses Institute's Anthropic Messages contract but never confuses model output with verification",async()=>{
+  const key="test-anthropic-key-not-real";
+  const calls:{url:string;request:Record<string,unknown>;headers:Record<string,string>}[]=[];
+  const analyse=createAnthropicInvestigationAnalystV1({
+   apiKey:key,model:"claude-opus-4-8",
+   transport:async(url,init)=>{
+    const request=JSON.parse(String(init?.body)) as Record<string,unknown>;
+    const headers=init?.headers as Record<string,string>;
+    calls.push({url:String(url),request,headers});
+    return new Response(JSON.stringify({
+     stop_reason:"end_turn",
+     content:[{type:"text",text:JSON.stringify({
+      ...answer([lead("Which independent source names the original performers?")],"continue"),
+      hypotheses:[hypothesis]
+     })}]
+    }),{status:200,headers:{"Content-Type":"application/json"}});
+   }
+  });
+  const actual=await analyse(identity.openingQuestion,[source],[]);
+  expect(calls).toHaveLength(1);
+  expect(calls[0].url).toBe("https://api.anthropic.com/v1/messages");
+  expect(calls[0].headers["x-api-key"]).toBe(key);
+  expect(calls[0].headers["anthropic-version"]).toBe("2023-06-01");
+  expect(calls[0].request).toMatchObject({
+   model:"claude-opus-4-8",max_tokens:2500,
+   thinking:{type:"adaptive"},
+   output_config:{format:{type:"json_schema"}},
+  });
+  expect(JSON.stringify(calls[0].request)).not.toContain(key);
+  expect(actual).toMatchObject({
+   modelVersion:"claude-opus-4-8",
+   requestedDisposition:"continue",
+   hypotheses:[{interpretation:"hypothesis",sourceIds:[EVENT]}]
+  });
+  expect(actual.promptFingerprint).toMatch(/^[a-f0-9]{64}$/);
+ });
+ it("rejects incomplete Anthropic provider output, not converting it into a cultural conclusion",async()=>{
+  const analyse=createAnthropicInvestigationAnalystV1({
+   apiKey:"test-anthropic-key-not-real",model:"claude-opus-4-8",
+   transport:async()=>new Response(JSON.stringify({
+    stop_reason:"max_tokens",
+    content:[{type:"text",text:JSON.stringify(answer([],"conclude"))}]
+   }),{status:200,headers:{"Content-Type":"application/json"}})
+  });
+  await expect(analyse(identity.openingQuestion,[source],[]))
+   .rejects.toThrow("INCOMPLETE_OR_REFUSED");
  });
 });
