@@ -47,6 +47,8 @@ export type InvestigationPassV1=Readonly<{
   sourceId:string;originKey:string;lineageKey:string;payloadFingerprint:string;
   useBasis:string;authorityRef:string;observedAt:string;
   citation:string;excerpt:string;
+  /** Missing on older immutable passes; never infer their disclosure status. */
+  modelDisclosed?:boolean;
  }>[];
  findings:readonly VerifiedClaimV1[];
  passFinding:string;proposedLeads:readonly ResearchLeadV1[];
@@ -104,7 +106,7 @@ function verifySource(source:SourceAuthorityV1,id:InvestigationIdentityV1,nowMs:
  if(!UUID.test(source.sourceId)||source.caseId.toLowerCase()!==id.caseId||
     source.workspaceId.toLowerCase()!==id.workspaceId||
     !USE.has(source.useBasis)||source.privateResearchAllowed!==true||
-    source.externalModelProcessingAllowed!==true||
+    typeof source.externalModelProcessingAllowed!=="boolean"||
     source.privateEvidenceRetentionAllowed!==true||
     !SHA.test(source.fingerprint)||!requireText(source.originKey,"ORIGIN",500)||
     !requireText(source.lineageKey,"LINEAGE",500)||
@@ -196,7 +198,48 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     throw new TypeError("MIZIZI_RESEARCH_EXCERPT_TOO_LARGE");
    authorities.push(entry.source);
   }
-  const analysis=await analyze(question,Object.freeze(sources),Object.freeze([...history]));
+  // A valid private source can forbid hosted-model processing. Such material
+  // stays in the immutable internal receipt, never in the analyst packet.
+  const modelSources=sources.filter(s=>s.source.externalModelProcessingAllowed);
+  // Historic analysis and citations are not facts or disclosure consent.
+  // Pass only method metadata, not excerpts, findings, or narrative that
+  // could quote a privately retained witness or artifact.
+  const analystHistory=history.map(p=>Object.freeze({...p,
+   question:"Prior research question withheld from external processing.",
+   sourceReceipts:[],findings:[],proposedLeads:[],
+   passFinding:"Unverified prior analysis withheld from external processing.",
+   decision:{...p.decision,nextQuestion:null,
+    rationale:"Prior method decision; previous claims are not evidence.",
+    revisitTrigger:null}
+  }));
+  // Repeated identical source receipts, even under paraphrased questions,
+  // are not independent new evidence. Two previous same-family passes are
+  // sufficient to stop another paid interpretation of identical material.
+  const alreadySeen=new Set(history.flatMap(p=>
+   p.sourceReceipts.map(r=>r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint)));
+  const sameEvidence=sources.length>0&&sources.every(s=>
+   alreadySeen.has(s.source.lineageKey+"|"+s.source.originKey+"|"+s.source.fingerprint));
+  const prior=history.at(-1);
+  const earlier=new Set(history.slice(0,-1).flatMap(p=>
+   p.sourceReceipts.map(r=>r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint)));
+  const priorRepeated=history.length>1&&!!prior&&prior.sourceReceipts.length>0&&
+   prior.sourceReceipts.every(r=>
+    earlier.has(r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint));
+  const evidenceExhausted=sameEvidence&&priorRepeated;
+  const humanOnly=sources.some(s=>!s.source.externalModelProcessingAllowed)&&
+   modelSources.length===0;
+  const noModel=humanOnly||evidenceExhausted;
+  const analysis:ResearchAnalysisV1=noModel?{
+   hypotheses:[],leads:[],
+   passFinding:humanOnly?
+    "Authorized evidence retained solely for private human review; no model received it.":
+    "No new independent source evidence; repeat model interpretation withheld.",
+   requestedDisposition:"pause",
+   modelVersion:humanOnly?"mizizi.human_review_required.v1":"mizizi.evidence_exhausted.v1",
+   promptFingerprint:digest(humanOnly?"mizizi.human_only_method.v1":
+    "mizizi.exhausted_evidence_method.v1")
+  }:await analyze(question,Object.freeze(modelSources),
+   Object.freeze(analystHistory));
   requireText(analysis.passFinding,"PASS_FINDING",3000);
   requireText(analysis.modelVersion,"MODEL_VERSION",150);
   if(!SHA.test(analysis.promptFingerprint)||analysis.hypotheses.length>20||
@@ -239,7 +282,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     revisitTrigger:"Independent new source, permission, or contradictory evidence"};
    disposition="paused";
   }
-  const costUnits=input.measureCostUnits?.()??0;
+  const costUnits=noModel?0:(input.measureCostUnits?.()??0);
   bounded(costUnits,"MEASURED_COST",0,1000000);
   remainingCost=Math.max(0,remainingCost-costUnits);
   const previous=history.at(-1)?.fingerprint??null;
@@ -249,7 +292,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    sourceReceipts:sources.map(({source:a,citation,excerpt})=>({
     sourceId:a.sourceId,originKey:a.originKey,
     lineageKey:a.lineageKey,payloadFingerprint:a.fingerprint,useBasis:a.useBasis,
-    authorityRef:a.authorityRef,observedAt:a.observedAt,citation,excerpt})),
+    authorityRef:a.authorityRef,observedAt:a.observedAt,citation,excerpt,
+    modelDisclosed:a.externalModelProcessingAllowed&&!noModel})),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
    promptFingerprint:analysis.promptFingerprint,
