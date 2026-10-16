@@ -205,8 +205,10 @@ export function createAnthropicInvestigationAnalystV1(
   const packet={question,
    sources:sources.map(s=>({id:s.source.sourceId,citation:s.citation,
     origin:s.source.originKey,lineage:s.source.lineageKey,excerpt:s.excerpt})),
-   history:history.slice(-12).map(p=>({question:p.question,
-    findings:p.findings,passFinding:p.passFinding,decision:p.decision}))
+   // Historic case narratives, private excerpts and unverified model findings
+   // are not a transferable evidence grant. No prior free text leaves here.
+   history:history.slice(-12).map(p=>({ordinal:p.ordinal,
+    decision:p.decision.action}))
   };
   if(JSON.stringify(packet).length>32000)
    throw new TypeError("MIZIZI_ANALYST_CONTEXT_BUDGET_EXCEEDED");
