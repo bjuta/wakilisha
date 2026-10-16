@@ -1,15 +1,15 @@
--- Disposable ONLY. Existing 231-history checks run first; forward DB04 migration
--- is then applied locally to 232. No Production/Preview or source permissions.
+-- Disposable ONLY. Original 231 history first, then DB04 and source-first DB05.
+-- No Production/Preview, authentic research or external source permissions.
 \set ON_ERROR_STOP on
 begin;
 set local lock_timeout='5s';
 set local statement_timeout='120s';
 do $gate$
 begin
- if (select count(*) from supabase_migrations.schema_migrations)<>232
-   or (select max(version) from supabase_migrations.schema_migrations)<>'20261016064245'
+ if (select count(*) from supabase_migrations.schema_migrations)<>233
+   or (select max(version) from supabase_migrations.schema_migrations)<>'20261016092731'
    or to_regclass('mizizi_private.research_passes') is null
- then raise exception 'DB04 requires exact local 232 migration replay';end if;
+ then raise exception 'DB04/DB05 require exact 233-migration replay';end if;
  if has_table_privilege('service_role','mizizi_private.research_passes','SELECT')
     or has_table_privilege('authenticated','mizizi_private.research_passes','SELECT')
     or has_table_privilege('anon','mizizi_private.research_passes','INSERT')
@@ -225,5 +225,58 @@ begin
  then raise exception 'DB04 unknown case journal not exact';end if;
  raise notice 'WK_DB04_UNFAMILIAR_CASE_JOURNAL_NO_REGISTRY_MUTATION=PASS';
 end $unknown_check$;
+-- Source-first external cultural observation without a canonical Track.
+-- This remains a deterministic fixture; no Wikidata HTTP or model invoked.
+set session authorization mizizi_executor;
+do $external$
+declare a record; b record; denied boolean:=false;
+begin
+ select * into strict a from mizizi_private.admit_external_wikidata_research_v1(
+ current_setting('wk.db04.ws')::uuid,'Q97652493',12345,repeat('c',64),
+ 'What distinguishes the musical work "Jerusalema" from another same-name work?');
+ if a.outcome<>'created' or a.case_revision<>1
+ then raise exception 'Source-first case not admitted';end if;
+ select * into strict b from mizizi_private.admit_external_wikidata_research_v1(
+ current_setting('wk.db04.ws')::uuid,'Q97652493',12345,repeat('c',64),
+ 'What distinguishes the musical work "Jerusalema" from another same-name work?');
+ if b.case_id<>a.case_id or b.outcome<>'replayed'
+ then raise exception 'Source-first idempotent replay failed';end if;
+ begin
+  perform * from mizizi_private.admit_external_wikidata_research_v1(
+   current_setting('wk.db04.ws')::uuid,'Q97652493',12346,repeat('d',64),
+   'What distinguishes the musical work "Jerusalema" from another same-name work?');
+ exception when sqlstate '55000' then denied:=true;end;
+ if not denied then raise exception 'Conflicting original source revision was accepted';end if;
+ perform set_config('wk.db04.external_case',a.case_id::text,true);
+ raise notice 'WK_DB05_AUTHENTICALLY_UNFAMILIAR_SOURCE_FIRST_GATEWAY=PASS';
+end $external$;
+set session authorization default;
+do $external_invariants$
+begin
+ if (select count(*) from mizizi_private.cases
+  where id=current_setting('wk.db04.external_case')::uuid
+    and subject_type='work'
+    and claim_family_key='cultural_investigation_v1'
+    and current_stage='research'
+    and epistemic_state='unknown'
+    and mutation_state='not_planned'
+    and last_observation_fingerprint=repeat('c',64)
+    and policy_ruleset_version='mizizi.wikidata_research_only.v1')<>1
+ then raise exception 'External source-only case authority drift';end if;
+ if (select count(*) from mizizi_private.case_events
+    where case_id=current_setting('wk.db04.external_case')::uuid)<>1
+ then raise exception 'External source case journal missing or duplicated';end if;
+ if exists(select 1 from public.registry_tracks where title='Jerusalema')
+ then raise exception 'External source case synthesized canonical Track';end if;
+ if has_function_privilege('authenticated',
+  'mizizi_private.admit_external_wikidata_research_v1(uuid,text,bigint,text,text)',
+  'execute') or has_function_privilege('service_role',
+  'mizizi_private.admit_external_wikidata_research_v1(uuid,text,bigint,text,text)',
+  'execute') or not has_function_privilege('mizizi_executor',
+  'mizizi_private.admit_external_wikidata_research_v1(uuid,text,bigint,text,text)',
+  'execute')
+ then raise exception 'External source JIT-only privilege widened';end if;
+ raise notice 'WK_DB05_SOURCE_FIRST_NO_CANONICAL_MUTATION=PASS';
+end $external_invariants$;
 rollback;
-\echo WK_DB04_DISPOSABLE_RESEARCH_MEMORY_ROLLBACK=PASS
+\echo WK_DB04_DB05_DISPOSABLE_RESEARCH_MEMORY_ROLLBACK=PASS
