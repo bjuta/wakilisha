@@ -16,7 +16,7 @@ async function inspect(token){
  "(select count(*)::int from mizizi_private.cases) cases,"+
  "(select count(*)::int from platform_private.jobs where command_type='mizizi.case_research_v1') jobs,"+
  "(select count(*)::int from mizizi_private.research_passes) passes,"+
- "(select row_to_json(j) from (select id::text,resource_id::text,status,attempt_count,command_receipt_id::text "+
+ "(select row_to_json(j) from (select id::text,resource_id::text,status,attempt_count,max_attempts,command_receipt_id::text "+
  "from platform_private.jobs where id='"+JOB+"'::uuid) j) job,"+
  "(select row_to_json(c) from (select id::text,revision,subject_type,current_stage,policy_ruleset_version,"+
  "last_observation_fingerprint from mizizi_private.cases where id='"+CASE+"'::uuid) c) case_record";
@@ -56,7 +56,7 @@ async function main(){
  if(Number(before.migrations)!==233||before.migration_head!=="20261016092731"||
     Number(before.tracks)!==0||Number(before.cases)!==1||Number(before.jobs)!==1||
     Number(before.passes)!==0||before.job?.id!==JOB||before.job?.resource_id!==CASE||
-    !["queued","retry_wait"].includes(before.job?.status)||Number(before.job?.attempt_count)!==3||
+    !["queued","retry_wait"].includes(before.job?.status)||Number(before.job?.attempt_count)!==4||Number(before.job?.max_attempts)!==25||
     before.job?.command_receipt_id!==RECEIPT||
     before.case_record?.id!==CASE||before.case_record?.subject_type!=="work"||
     before.case_record?.current_stage!=="research"||
