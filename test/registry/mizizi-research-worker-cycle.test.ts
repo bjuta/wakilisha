@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
 import {createOpenAIInvestigationAnalystV1} from "../../scripts/registry/agents/mizizi/runtime/openai-investigation-analyst-v1";
+import {createAdaptiveResearchWorkerHandlerV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
 import {
   runResearchWorkerCycleV1,
   type WorkerRpc,
@@ -311,6 +312,30 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   const tampered={...store,read:async()=>store.rows.map(p=>({...p,question:"Tampered claim direction"}))};
   await expect(runAdaptiveInvestigationV1({...base,store:tampered,
    analyze:async()=>answer([],"pause")})).rejects.toThrow("HISTORY_CORRUPT");
+ });
+ it("executes two adaptive research passes through the existing actual worker RPC lifecycle",async()=>{
+  const store=memory(),rpc=harness();
+  const followup="Did the disputed credits originate from an alternate recording session?";
+  const handler=createAdaptiveResearchWorkerHandlerV1({
+   store,openingQuestion:async(job)=>{expect(job.caseId).toBe(CASE);
+    return identity.openingQuestion;},
+   readSources:async()=>[source],
+   analyze:async(_,__,history)=>history.length===0?
+    answer([lead(followup)],"continue"):answer([],"pause"),
+   verifyFinding:async()=>({verified:false,verificationRef:null}),
+   maxNewPasses:5,maxTotalPasses:20,costBudgetUnits:20,
+  });
+  const done=await cycle(rpc.rpc,handler,{
+   verifySources:async()=>[verifiedSource],
+  });
+  expect(done).toMatchObject({claimed:1,succeeded:1,failed:0});
+  expect(store.rows.map(p=>p.question)).toEqual([identity.openingQuestion,followup]);
+  expect(store.rows.map(p=>p.decision.action)).toEqual(["continue","pause"]);
+  expect(rpc.calls.at(-1)?.fn).toBe("mizizi_complete_case_research_job_v1");
+  expect(rpc.calls.at(-1)?.args.p_result).toMatchObject({
+   contract:"mizizi.read_only_research_result.v1",
+   status:"evidence_recorded",sourceReferences:[EVENT],
+  });
  });
  it("refuses sending private excerpts to the model without explicit external processing authority",async()=>{
   let sent=false;
