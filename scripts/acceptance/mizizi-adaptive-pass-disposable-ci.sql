@@ -181,5 +181,49 @@ begin
  raise notice 'WK_DB04_ANON_RESEARCH_READ_DENIED=PASS';
 end $denial$;
 set session authorization default;
+-- The unfamiliar family must be admitted independently of historical rule
+-- versions. This synthetic fixture does NOT count as an authentic investigation.
+with t as (
+ insert into public.registry_tracks(slug,title,normalized_title,status,metadata)
+ values ('wk-ci-db04-unfamiliar-'||substr(md5(gen_random_uuid()::text),1,10),
+  'Disposable Unknown Track','disposable unknown track','active','{"ci_only":true}'::jsonb)
+ returning id
+)
+select id::text as wk_unknown_track from t \gset
+select set_config('wk.db04.unknown_track',:'wk_unknown_track',true);
+set session authorization mizizi_executor;
+do $unknown_case$
+declare a record;b record;
+begin
+ select * into strict a from mizizi_private.admit_unfamiliar_track_investigation_v1(
+ current_setting('wk.db04.ws')::uuid,
+ current_setting('wk.db04.unknown_track')::uuid,
+ 'Which original source establishes the historically credited musician?');
+ if a.outcome<>'created' or a.case_revision<>1
+ then raise exception 'DB04 unknown research-only admission failed';end if;
+ select * into strict b from mizizi_private.admit_unfamiliar_track_investigation_v1(
+ current_setting('wk.db04.ws')::uuid,
+ current_setting('wk.db04.unknown_track')::uuid,
+ 'Which original source establishes the historically credited musician?');
+ if b.outcome<>'replayed' or b.case_id<>a.case_id
+ then raise exception 'DB04 unknown case replay mutated or duplicated';end if;
+ perform set_config('wk.db04.unknown_case',a.case_id::text,true);
+ raise notice 'WK_DB04_UNFAMILIAR_RESEARCH_ONLY_CASE_INTAKE=PASS';
+end $unknown_case$;
+set session authorization default;
+do $unknown_check$
+begin
+ if (select count(*) from mizizi_private.cases where
+ id=current_setting('wk.db04.unknown_case')::uuid and
+ subject_id=current_setting('wk.db04.unknown_track')::uuid and
+ claim_family_key='cultural_investigation_v1' and current_stage='research' and
+ epistemic_state='unknown' and mutation_state='not_planned' and
+ last_observation_fingerprint ~ '^[0-9a-f]{64}$')<>1
+ then raise exception 'DB04 research-only unknown case drift';end if;
+ if (select count(*) from mizizi_private.case_events
+  where case_id=current_setting('wk.db04.unknown_case')::uuid)<>1
+ then raise exception 'DB04 unknown case journal not exact';end if;
+ raise notice 'WK_DB04_UNFAMILIAR_CASE_JOURNAL_NO_REGISTRY_MUTATION=PASS';
+end $unknown_check$;
 rollback;
 \echo WK_DB04_DISPOSABLE_RESEARCH_MEMORY_ROLLBACK=PASS
