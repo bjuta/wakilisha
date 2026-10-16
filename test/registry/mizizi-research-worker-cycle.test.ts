@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
 import {createOpenAIInvestigationAnalystV1} from "../../scripts/registry/agents/mizizi/runtime/openai-investigation-analyst-v1";
-import {createAdaptiveResearchWorkerHandlerV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
+import {createAdaptiveResearchWorkerHandlerV1,runAdaptiveResearchWorkerCycleV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
 import {
   runResearchWorkerCycleV1,
   type WorkerRpc,
@@ -336,6 +336,38 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    contract:"mizizi.read_only_research_result.v1",
    status:"evidence_recorded",sourceReferences:[EVENT],
   });
+ });
+ it("runs the full leased worker -> private pass-store -> adaptive investigator -> completion loop",async()=>{
+  const backing=harness(),memory=new Map<number,{body_text:string;fingerprint:string;ordinal:number}>();
+  const seen:string[]=[];
+  const rpc:WorkerRpc=async(fn,args)=>{
+   seen.push(fn);
+   if(fn==="mizizi_read_research_passes_v1")return {
+    data:[...memory.values()].sort((a,b)=>a.ordinal-b.ordinal),error:null};
+   if(fn==="mizizi_append_research_pass_v1"){
+    const raw=String(args.p_body_text),ordinal=JSON.parse(raw).ordinal;
+    const fingerprint=String(args.p_fingerprint);
+    if(ordinal!==memory.size+1)throw new Error("STALE_PERSISTENCE_TEST");
+    memory.set(ordinal,{ordinal,body_text:raw,fingerprint});
+    return {data:[{case_id:CASE,ordinal,fingerprint,outcome:"created"}],error:null};
+   }
+   return backing.rpc(fn,args);
+  };
+  const second="Was the producer independently credited in the original liner notes?";
+  const result=await runAdaptiveResearchWorkerCycleV1({
+   rpc,workerId:"scoped-worker",maxNewPasses:4,maxTotalPasses:20,
+   costBudgetUnits:10,openingQuestion:async()=>identity.openingQuestion,
+   readSources:async()=>[source],
+   analyze:async(_,__,history)=>history.length===0?
+    answer([lead(second)],"continue"):answer([],"pause"),
+   verifyFinding:async()=>({verified:false,verificationRef:null}),
+   verifySources:async()=>[verifiedSource]
+  });
+  expect(result).toMatchObject({claimed:1,failed:0,succeeded:1});
+  expect(memory.size).toBe(2);
+  expect(JSON.parse(memory.get(2)!.body_text).question).toBe(second);
+  expect(seen.filter(fn=>fn==="mizizi_append_research_pass_v1")).toHaveLength(2);
+  expect(seen.at(-1)).toBe("mizizi_complete_case_research_job_v1");
  });
  it("refuses sending private excerpts to the model without explicit external processing authority",async()=>{
   let sent=false;
