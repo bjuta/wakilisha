@@ -60,9 +60,9 @@ async function main(){
   "(SELECT count(*) FROM mizizi_private.cases)||'|'||"+
   "(SELECT count(*) FROM mizizi_private.write_holds)||'|'||"+
   "(SELECT count(*) FROM public.registry_releases);",db);
- assert(baseline==="236|20261017202800|0|0|0|0|0",
+ assert(baseline==="237|20261017212255|0|0|0|0|0",
   "STOP_AUTH_NOT_FRESH_LOCAL_MIZIZI_READER_RLS");
- console.log("WK_AUTH_EMPTY_236_UNLINKED_LOCAL_BASELINE=PASS");
+ console.log("WK_AUTH_EMPTY_237_UNLINKED_LOCAL_BASELINE=PASS");
 
  const admin=client(api,values.SERVICE_ROLE_KEY),people=[];
  for(const label of ["first","second"]){
@@ -186,6 +186,131 @@ async function main(){
    frozen.questions[0].assessments?.length===0,
    "STOP_QV1_AUTH_DOSSIER_MASQUERADES_AS_GRADED");
  console.log("WK_QV1_REAL_JWT_READ_WITH_ZERO_SOURCE_GRADES=PASS");
+
+ // QV3: only a different signed-in human may correlate an immutable Registry
+ // assertion with an independently approved Editorial Source version. This is
+ // a synthetic, fully disposable authority test, not production evidence.
+ const qv3Empty=await call(first.user,
+  "admin_mizizi_question_source_attestations_v1",{
+   p_case_id:caseId,p_expected_case_revision:1,
+   p_question_id:qid,p_question_revision:1,
+  },"STOP_QV3_EMPTY_AUTH_READ");
+ assert(qv3Empty?.kind==="not_recorded"&&
+  qv3Empty.rows?.length===0&&
+  qv3Empty.independentlyVerifiedFamilies===0&&
+  qv3Empty.achAssessmentsAllowed===0,"STOP_QV3_EMPTY_CANNOT_GRADE");
+ const subject=localSql("SELECT subject_type||'|'||subject_id::text"+
+  " FROM mizizi_private.cases WHERE id='"+caseId+"'::uuid;",db).split("|");
+ assert(subject.length===2&&subject[0]==="release"&&UUID.test(subject[1]),
+  "STOP_QV3_DISPOSABLE_CASE_SUBJECT");
+ const approvedSource=randomUUID(),approvedVersion=randomUUID();
+ const assertionId=randomUUID(),sourceFingerprint=randomBytes(32).toString("hex");
+ const registryFingerprint=randomBytes(32).toString("hex");
+ const registryPayloadFingerprint=randomBytes(32).toString("hex");
+ localSql("BEGIN;"+
+  "INSERT INTO editorial.sources(id,source_type,title,rights_status,"+
+  "consent_status,sensitivity,review_status,exposure_class,source_state,created_by)"+
+  " VALUES ('"+approvedSource+"'::uuid,'archive_document',"+
+  "'Disposable reviewed source record','licensed','granted','low',"+
+  "'draft','internal','active','"+first.id+"'::uuid);"+
+  "INSERT INTO editorial.source_versions(id,source_id,version_number,source_type,"+
+  "title,rights_status,consent_status,sensitivity,content_fingerprint)"+
+  " VALUES ('"+approvedVersion+"'::uuid,'"+approvedSource+"'::uuid,1,"+
+  "'archive_document','Disposable approved source version',"+
+  "'licensed','granted','low','"+sourceFingerprint+"');"+
+  "UPDATE editorial.sources SET review_status='approved',"+
+  "current_approved_version_id='"+approvedVersion+"'::uuid,"+
+  "reviewed_by='"+first.id+"'::uuid,reviewed_at=clock_timestamp()"+
+  " WHERE id='"+approvedSource+"'::uuid;"+
+  "INSERT INTO editorial.source_registry_links(source_id,source_version_id,"+
+  "registry_entity_type,registry_entity_id,relationship_role) VALUES ("+
+  "'"+approvedSource+"'::uuid,'"+approvedVersion+"'::uuid,'release',"+
+  "'"+subject[1]+"'::uuid,'subject');"+
+  "INSERT INTO platform_private.registry_evidence_assertions("+
+  "id,subject_type,subject_id,claim_key,claim_payload,trust_class,"+
+  "source_kind,source_ref,source_payload_fingerprint,observed_at,"+
+  "recorded_by_principal_key,assertion_fingerprint,lineage_key,"+
+  "source_use_basis,source_use_detail) VALUES ("+
+  "'"+assertionId+"'::uuid,'release','"+subject[1]+"'::uuid,"+
+  "'registry.ci_source_identity',jsonb_build_object('ciOnly',true),"+
+  "'EXTERNAL_EVIDENCE','archive_document','ci-local-source:"+approvedSource+"',"+
+  "'"+registryPayloadFingerprint+"',clock_timestamp(),'system:mizizi',"+
+  "'"+registryFingerprint+"','ci-local-source-version-"+approvedVersion+"',"+
+  "'documented_consent','Documented synthetic permission for disposable test only.');"+
+  "COMMIT;",db);
+ const attestationArgs={
+  p_case_id:caseId,p_expected_case_revision:1,
+  p_question_id:qid,p_question_revision:1,
+  p_attestation_id:randomUUID(),p_registry_assertion_id:assertionId,
+  p_editorial_source_version_id:approvedVersion,
+  p_expected_registry_fingerprint:registryFingerprint,
+  p_expected_source_fingerprint:sourceFingerprint,
+  p_source_family_key:"ci:original-document-family",
+  p_source_correlation_reason:
+   "Independently checked the exact subject, reviewed version and original Registry assertion.",
+  p_independence_reason:
+   "This test record has one declared original custody chain and cannot imply a second independent family.",
+  p_decision:"attested",
+  p_review_reason:"Human reviewer inspected the disposable source identifiers.",
+ };
+ requireDenied(await client(api,values.ANON_KEY).rpc(
+  "admin_mizizi_attest_question_source_v1",attestationArgs),
+  "42501","STOP_QV3_ANON_ATTEST_DENIED");
+ requireDenied(await first.user.rpc("admin_mizizi_attest_question_source_v1",
+  attestationArgs),"42501","STOP_QV3_QUESTION_AUTHOR_SELF_REVIEW_DENIED");
+ requireDenied(await second.user.rpc("admin_mizizi_attest_question_source_v1",{
+  ...attestationArgs,p_editorial_source_version_id:randomUUID(),
+ }),"42501","STOP_QV3_UNREVIEWED_SOURCE_VERSION_DENIED");
+ const sourceReceipt=await call(second.user,
+  "admin_mizizi_attest_question_source_v1",attestationArgs,
+  "STOP_QV3_SECOND_HUMAN_REVIEWED_SOURCE");
+ assert(sourceReceipt?.outcome==="attested"&&
+  /^[a-f0-9]{64}$/.test(sourceReceipt?.receiptFingerprint||"")&&
+  sourceReceipt?.reviewRevision===1,
+  "STOP_QV3_AUTH_SOURCE_RECEIPT");
+ const sourceReplay=await call(second.user,
+  "admin_mizizi_attest_question_source_v1",attestationArgs,
+  "STOP_QV3_NETWORK_REPLAY");
+ assert(sourceReplay.outcome==="replayed"&&
+  sourceReplay.receiptFingerprint===sourceReceipt.receiptFingerprint,
+  "STOP_QV3_IDENTICAL_REPLAY_RECEIPT");
+ requireDenied(await second.user.rpc("admin_mizizi_attest_question_source_v1",{
+  ...attestationArgs,p_review_reason:"Attempted altered signed receipt replay.",
+ }),"PT409","STOP_QV3_CHANGED_RECEIPT_DENIED");
+ const reviewed=await call(first.user,
+  "admin_mizizi_question_source_attestations_v1",{
+   p_case_id:caseId,p_expected_case_revision:1,
+   p_question_id:qid,p_question_revision:1,
+  },"STOP_QV3_REVIEWED_READER");
+ assert(reviewed.rows?.length===1&&
+  reviewed.rows[0].decision==="human_reviewed"&&
+  reviewed.independentlyVerifiedFamilies===0&&
+  reviewed.achAssessmentsAllowed===0&&
+  !JSON.stringify(reviewed).includes("Documented synthetic permission"),
+  "STOP_QV3_REVIEW_NO_GRADE_OR_CONSENT_LEAK");
+ const revokeArgs={
+  ...attestationArgs,p_attestation_id:randomUUID(),p_decision:"revoked",
+  p_review_reason:"Human reviewer withdrew the prior local-only attestation.",
+ };
+ const revoked=await call(second.user,
+  "admin_mizizi_attest_question_source_v1",revokeArgs,
+  "STOP_QV3_REVOKED_BY_SECOND_HUMAN");
+ assert(revoked.outcome==="revoked"&&revoked.reviewRevision===2,
+  "STOP_QV3_APPEND_REVOCATION");
+ const afterRevocation=await call(first.user,
+  "admin_mizizi_question_source_attestations_v1",{
+   p_case_id:caseId,p_expected_case_revision:1,
+   p_question_id:qid,p_question_revision:1,
+  },"STOP_QV3_REVOKED_READ");
+ assert(afterRevocation.rows?.length===1&&
+  afterRevocation.rows[0].decision==="unavailable_or_revoked"&&
+  afterRevocation.achAssessmentsAllowed===0,
+  "STOP_QV3_REVOKED_NEVER_PUBLIC_OR_ACH");
+ const journalCount=localSql("SELECT count(*)::text FROM "+
+  "mizizi_private.question_source_attestation_events"+
+  " WHERE question_id='"+qid+"'::uuid;",db);
+ assert(journalCount==="2","STOP_QV3_REVOCATION_MUST_BE_APPEND_ONLY");
+ console.log("WK_QV3_TWO_HUMAN_SOURCE_REVIEW_REPLAY_REVOCATION_DENIAL=PASS");
  // RLS authority: use the genuine source-bound review already admitted by the
  // existing fixture. No fabricated human decision or Registry mutation.
  const reviewId=cases[0].reviewId;
