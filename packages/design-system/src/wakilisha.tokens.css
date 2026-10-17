@@ -1,29 +1,30 @@
-/* WAKILISHA Design System v5 — product tokens
-   Source: wakilisha-design-system-v5.html
+/* WAKILISHA × MIZIZI Workbook v4 — source-led tokens
+   Source: MIZIZI WAKILISHA Brand Workbook.dc.html
    This file is the canonical CSS variable bridge for React/Admin/Public UI.
 */
 
 *,*::before,*::after{box-sizing:border-box}
 
 :root{
-  --wk-font-display:'Inter',system-ui,-apple-system,sans-serif;
-  --wk-font-ui:'Inter',system-ui,-apple-system,sans-serif;
-  --wk-font-body:'DM Sans','Inter',system-ui,sans-serif;
-  --wk-font-mono:'DM Mono',ui-monospace,Menlo,Consolas,monospace;
+  --wk-font-display:'Figtree',system-ui,-apple-system,sans-serif;
+  --wk-font-ui:'Figtree',system-ui,-apple-system,sans-serif;
+  --wk-font-body:'Figtree',system-ui,sans-serif;
+  --wk-font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  --wk-mobile-editable-font-size:16px;--wk-brand-dot:#85C441;--wk-brand-dark:#0B0B0B;--wk-paper:#FCFCFB;--wk-canvas:#ECEBE8;--wk-r-artefact:8px;--wk-r-control:12px;--wk-r-card:16px;--wk-r-sheet:24px;--wk-hit-min:44px;
 
   --wk-s-1:4px;--wk-s-2:8px;--wk-s-3:12px;--wk-s-4:16px;--wk-s-5:20px;
   --wk-s-6:24px;--wk-s-8:32px;--wk-s-10:40px;--wk-s-12:48px;--wk-s-16:64px;
   --wk-s-20:80px;--wk-s-24:96px;--wk-s-32:128px;
 
-  --wk-r-1:4px;--wk-r-2:6px;--wk-r-3:8px;--wk-r-4:10px;--wk-r-5:14px;
-  --wk-r-6:20px;--wk-r-7:28px;--wk-r-pill:999px;
+  --wk-r-1:4px;--wk-r-2:8px;--wk-r-3:12px;--wk-r-4:16px;--wk-r-5:24px;
+  --wk-r-6:24px;--wk-r-7:24px;--wk-r-pill:999px;
 
   --wk-d-instant:60ms;
   --wk-d-fast:120ms;
-  --wk-d-standard:220ms;
-  --wk-d-slow:420ms;
-  --wk-d-deliberate:640ms;
-  --wk-ease-standard:cubic-bezier(.2,.8,.2,1);
+  --wk-d-standard:200ms;
+  --wk-d-slow:320ms;
+  --wk-d-deliberate:420ms;
+  --wk-ease-standard:cubic-bezier(.2,.7,.2,1);
   --wk-ease-snap:cubic-bezier(.16,1,.3,1);
   --wk-ease-in:cubic-bezier(.4,0,1,1);
   --wk-ease-out:cubic-bezier(0,0,.2,1);
@@ -47,36 +48,36 @@
 }
 
 [data-wk-theme='dark'],:root:not([data-wk-theme='light']){
-  --wk-bg:#080908;
-  --wk-bg-subtle:#0E100D;
-  --wk-surface:#141712;
-  --wk-surface-raised:#1C2018;
-  --wk-surface-strong:#23271E;
+  --wk-bg:#0B0B0B;
+  --wk-bg-subtle:#131313;
+  --wk-surface:#131313;
+  --wk-surface-raised:#1C1C1C;
+  --wk-surface-strong:#262626;
   --wk-overlay:rgba(8,9,8,.82);
-  --wk-text:#F0EFE8;
-  --wk-text-soft:#B6B4AC;
-  --wk-text-muted:#7E7C74;
-  --wk-text-faint:#52514B;
+  --wk-text:#F5F5F4;
+  --wk-text-soft:rgba(255,255,255,.8);
+  --wk-text-muted:rgba(255,255,255,.6);
+  --wk-text-faint:rgba(255,255,255,.4);
   --wk-text-on-brand:#081006;
   --wk-text-inverse:#0C0D0A;
   --wk-border:rgba(255,255,255,.07);
   --wk-border-2:rgba(255,255,255,.12);
   --wk-border-strong:rgba(255,255,255,.22);
   --wk-divider:rgba(255,255,255,.05);
-  --wk-brand:#84C241;
-  --wk-brand-rgb:132,194,65;
-  --wk-brand-2:#A4DC60;
-  --wk-brand-soft:rgba(132,194,65,.15);
-  --wk-brand-on:#081006;
-  --wk-success:#4FD98E;
-  --wk-success-soft:rgba(79,217,142,.14);
+  --wk-brand:#85C441;
+  --wk-brand-rgb:133,196,65;
+  --wk-brand-2:#85C441;
+  --wk-brand-soft:rgba(133,196,65,.14);
+  --wk-brand-on:#0B0B0B;
+  --wk-success:#85C441;
+  --wk-success-soft:rgba(133,196,65,.14);
   --wk-warning:#F5B84B;
   --wk-warning-soft:rgba(245,184,75,.14);
   --wk-danger:#FF6B6B;
   --wk-danger-soft:rgba(255,107,107,.14);
   --wk-info:#6BA8F5;
   --wk-info-soft:rgba(107,168,245,.14);
-  --wk-v-music:#84C241;
+  --wk-v-music:#85C441;
   --wk-v-film:#D6766A;
   --wk-v-fashion:#C7A06D;
   --wk-v-food:#E8A23A;
@@ -88,40 +89,40 @@
   --wk-shadow:0 6px 20px -6px rgba(0,0,0,.50);
   --wk-shadow-lg:0 24px 60px -20px rgba(0,0,0,.65);
   --wk-code-bg:rgba(132,194,65,.10);
-  --wk-code-fg:#A4DC60;
+  --wk-code-fg:#85C441;
 }
 
 [data-wk-theme='light']{
-  --wk-bg:#F7F8F3;
-  --wk-bg-subtle:#EEF1E8;
+  --wk-bg:#FCFCFB;
+  --wk-bg-subtle:oklch(0.98 0.002 250);
   --wk-surface:#FFFFFF;
-  --wk-surface-raised:#F1F4EA;
-  --wk-surface-strong:#E7ECD9;
+  --wk-surface-raised:oklch(0.965 0.003 90);
+  --wk-surface-strong:oklch(0.935 0.004 90);
   --wk-overlay:rgba(247,248,243,.85);
-  --wk-text:#0C0D0A;
-  --wk-text-soft:#3F4138;
-  --wk-text-muted:#6B6E62;
-  --wk-text-faint:#9A9C8E;
+  --wk-text:oklch(0.22 0.005 250);
+  --wk-text-soft:oklch(0.35 0.005 250);
+  --wk-text-muted:oklch(0.48 0.005 250);
+  --wk-text-faint:oklch(0.62 0.005 250);
   --wk-text-on-brand:#081006;
   --wk-text-inverse:#F0EFE8;
-  --wk-border:rgba(12,13,10,.10);
+  --wk-border:oklch(0.915 0.004 90);
   --wk-border-2:rgba(12,13,10,.16);
   --wk-border-strong:rgba(12,13,10,.28);
   --wk-divider:rgba(12,13,10,.08);
-  --wk-brand:#5C8E25;
-  --wk-brand-rgb:92,142,37;
-  --wk-brand-2:#4E7A1E;
-  --wk-brand-soft:rgba(92,142,37,.12);
+  --wk-brand:#4E7425;
+  --wk-brand-rgb:78,116,37;
+  --wk-brand-2:#4E7425;
+  --wk-brand-soft:#EDF5E3;
   --wk-brand-on:#FFFFFF;
-  --wk-success:#2D9E5B;
-  --wk-success-soft:rgba(45,158,91,.12);
+  --wk-success:#4E7425;
+  --wk-success-soft:#EDF5E3;
   --wk-warning:#A06800;
   --wk-warning-soft:rgba(160,104,0,.10);
   --wk-danger:#C24545;
   --wk-danger-soft:rgba(194,69,69,.10);
   --wk-info:#2D6BB5;
   --wk-info-soft:rgba(45,107,181,.10);
-  --wk-v-music:#5C8E25;
+  --wk-v-music:#4E7425;
   --wk-v-film:#A8483C;
   --wk-v-fashion:#946B33;
   --wk-v-food:#A06800;
@@ -133,31 +134,36 @@
   --wk-shadow:0 6px 20px -6px rgba(0,0,0,.10);
   --wk-shadow-lg:0 24px 60px -20px rgba(0,0,0,.16);
   --wk-code-bg:rgba(92,142,37,.10);
-  --wk-code-fg:#4E7A1E;
+  --wk-code-fg:#4E7425;
 }
 
 html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 body{font-family:var(--wk-font-body);background:var(--wk-bg);color:var(--wk-text);line-height:1.55;font-size:15px;letter-spacing:-.005em}
 ::selection{background:rgba(var(--wk-brand-rgb),.30);color:var(--wk-text)}
 
-.wk-app-shell{min-height:100vh;background:var(--wk-bg);color:var(--wk-text);font-family:var(--wk-font-body)}
+.wk-app-shell{min-height:100dvh;background:var(--wk-bg);color:var(--wk-text);font-family:var(--wk-font-body)}
 .wk-container{width:min(100% - 32px,var(--wk-w-content));margin-inline:auto}
 .wk-container-wide{width:min(100% - 32px,var(--wk-w-wide));margin-inline:auto}
 .wk-container-max{width:min(100% - 32px,var(--wk-w-max));margin-inline:auto}
 .wk-eyebrow{font:800 10px/1 var(--wk-font-ui);letter-spacing:.22em;text-transform:uppercase;color:var(--wk-brand);display:flex;align-items:center;gap:8px}
 .wk-eyebrow::before{content:'';width:28px;height:1px;background:var(--wk-brand)}
-.wk-h-hero{font:900 clamp(48px,7vw,96px)/.92 var(--wk-font-display);letter-spacing:-.055em;color:var(--wk-text)}
-.wk-h-page{font:900 clamp(34px,4.5vw,52px)/.94 var(--wk-font-display);letter-spacing:-.045em;color:var(--wk-text)}
-.wk-h-section{font:900 clamp(24px,3vw,36px)/1.02 var(--wk-font-display);letter-spacing:-.038em;color:var(--wk-text)}
+.wk-h-hero{font:800 clamp(48px,7vw,96px)/.92 var(--wk-font-display);letter-spacing:-.055em;color:var(--wk-text)}
+.wk-h-page{font:700 clamp(34px,4.5vw,52px)/.94 var(--wk-font-display);letter-spacing:-.045em;color:var(--wk-text)}
+.wk-h-section{font:700 clamp(24px,3vw,36px)/1.02 var(--wk-font-display);letter-spacing:-.038em;color:var(--wk-text)}
 .wk-copy{font:400 15px/1.65 var(--wk-font-body);color:var(--wk-text-soft)}
 .wk-panel{background:var(--wk-surface);border:1px solid var(--wk-border);border-radius:var(--wk-r-4);box-shadow:var(--wk-shadow-sm)}
-.wk-button{display:inline-flex;align-items:center;gap:8px;border-radius:var(--wk-r-pill);font:700 13px/1 var(--wk-font-ui);letter-spacing:-.005em;border:1px solid transparent;transition:all var(--wk-d-fast) var(--wk-ease-standard);cursor:pointer;padding:11px 18px}
+.wk-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:var(--wk-r-pill);font:600 14px/1.2 var(--wk-font-ui);letter-spacing:-.005em;border:1px solid transparent;transition:all var(--wk-d-fast) var(--wk-ease-standard);cursor:pointer;padding:11px 18px}
 .wk-button-primary{background:var(--wk-brand);color:var(--wk-brand-on)}
 .wk-button-ghost{background:transparent;color:var(--wk-text);border-color:var(--wk-border-2)}
 .wk-button-soft{background:var(--wk-surface);color:var(--wk-text);border-color:var(--wk-border)}
+.wk-button-sm{padding:8px 14px;font-size:13px;min-height:44px}
+.wk-button-lg{padding:14px 24px;font-size:14px}
+.wk-button-danger{background:transparent;color:var(--wk-danger);border-color:var(--wk-danger)}
 .wk-tag{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--wk-r-pill);font:600 11px/1.4 var(--wk-font-ui);background:var(--wk-surface);border:1px solid var(--wk-border-2);color:var(--wk-text-soft)}
 .wk-tag-brand{background:var(--wk-brand-soft);color:var(--wk-brand);border-color:rgba(var(--wk-brand-rgb),.30)}
 
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important;scroll-behavior:auto!important}
 }
+/* Workbook v4 semantic evidence colours are independent of workflow states. */
+:root{--wk-evidence-established:#85C441;--wk-evidence-established-fg:#4E7425;--wk-evidence-established-bg:#EDF5E3;--wk-evidence-supported:oklch(0.58 0.13 240);--wk-evidence-unresolved:oklch(0.58 0.13 75);--wk-evidence-contested:oklch(0.58 0.13 25);--wk-evidence-unknown:oklch(0.70 0.005 250);--wk-evidence-unknown-bg:#FFFFFF;--wk-evidence-unknown-border:oklch(0.72 0.005 250)}

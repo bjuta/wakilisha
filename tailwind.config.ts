@@ -8,10 +8,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ["var(--wk-font-display)", "Inter", "system-ui", "sans-serif"],
-        body: ["var(--wk-font-body)", "DM Sans", "Inter", "system-ui", "sans-serif"],
-        ui: ["var(--wk-font-ui)", "Inter", "system-ui", "sans-serif"],
-        mono: ["var(--wk-font-mono)", "DM Mono", "ui-monospace", "monospace"],
+        display: ["var(--wk-font-display)", "Figtree", "system-ui", "sans-serif"],
+        body: ["var(--wk-font-body)", "Figtree", "system-ui", "sans-serif"],
+        ui: ["var(--wk-font-ui)", "Figtree", "system-ui", "sans-serif"],
+        mono: ["var(--wk-font-mono)", "IBM Plex Mono", "ui-monospace", "monospace"],
       },
       colors: {
         wk: {

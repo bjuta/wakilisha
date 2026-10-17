@@ -104,10 +104,10 @@ function LogoBoard() {
 
 function TokenBoard() {
   const tokens: [string, string][] = [
-    ['--wk-bg', '#080908'],
-    ['--wk-surface', '#141712'],
-    ['--wk-brand', '#84C241'],
-    ['--wk-success', '#4FD98E'],
+    ['--wk-bg', '#0B0B0B'],
+    ['--wk-surface', '#131313'],
+    ['--wk-brand', '#85C441'],
+    ['--wk-success', '#85C441'],
     ['--wk-warning', '#F5B84B'],
     ['--wk-danger', '#FF6B6B'],
   ];
@@ -142,7 +142,7 @@ function TypeBoard() {
         { className: 'text-[clamp(38px,7vw,72px)] font-black leading-[.88] tracking-[-0.06em] text-[var(--wk-text)]' },
         'Every voice on WAKILISHA.'
       ),
-      h('p', { className: 'mt-3 font-mono text-[10px] text-[var(--wk-text-muted)]' }, 'Hero display · Inter 900 · clamp scale')
+      h('p', { className: 'mt-3 font-mono text-[10px] text-[var(--wk-text-muted)]' }, 'Hero display · Figtree 800 · clamp scale')
     ),
     h(
       'div',
@@ -150,7 +150,7 @@ function TypeBoard() {
       h(
         'p',
         { className: 'text-[16px] leading-relaxed text-[var(--wk-text-soft)]' },
-        'DM Sans body copy carries editorial warmth while Inter carries structure, metadata, numbers and headings.'
+        'Figtree carries editorial reading, controls and headlines. IBM Plex Mono records identifiers and exact machine values.'
       )
     )
   );

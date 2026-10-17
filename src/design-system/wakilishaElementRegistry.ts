@@ -48,10 +48,10 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     chapter: '05',
     title: 'Typography',
     group: 'Foundations',
-    purpose: 'Inter display/UI, DM Sans body and DM Mono metadata/code.',
+    purpose: 'Figtree display/body/UI and IBM Plex Mono machine-exact metadata.',
     primaryClasses: ['type-row', 'type-meta', 'type-sample', 'wk-h-hero', 'wk-h-page', 'wk-h-section', 'wk-copy'],
     productRoutes: ['all routes'],
-    implementationNotes: ['Use Inter for structure and impact; use DM Sans for readable editorial body copy.']
+    implementationNotes: ['Use Figtree 400–800 for headings, body and controls. Use IBM Plex Mono 400/500 for exact identifiers.']
   },
   {
     chapter: '06',

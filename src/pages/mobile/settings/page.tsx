@@ -22,15 +22,6 @@ const TABS: { key: SettingsTab; icon: string }[] = [
   { key: "Danger", icon: "ri-error-warning-line" },
 ];
 
-const ACCENTS = [
-  { label: "Verdant", value: "#84C241" },
-  { label: "Terracotta", value: "#D6766A" },
-  { label: "Sand", value: "#C7A06D" },
-  { label: "Amber", value: "#E8A23A" },
-  { label: "Rose", value: "#E86A8A" },
-  { label: "Teal", value: "#4AB8A0" },
-];
-
 function isSettingsTab(
   value: string | null,
 ): value is SettingsTab {
@@ -505,23 +496,16 @@ export default function MobileSettingsPage() {
               </div>
             </div>
 
-            <div>
-              <div className="text-[11px] font-bold text-[var(--wk-text-faint)] uppercase tracking-wider mb-3">Accent</div>
-              <div className="flex gap-3 flex-wrap">
-                {ACCENTS.map((acc) => (
-                  <button
-                    key={acc.value}
-                    onClick={() => {
-                      updateAppearance({ accent: acc.value });
-                      window.dispatchEvent(new CustomEvent("wk-accent-changed"));
-                    }}
-                    className={`w-10 h-10 rounded-full cursor-pointer transition-transform hover:scale-110 border-[3px] ${
-                      appearance.accent === acc.value ? "border-[var(--wk-text)]" : "border-transparent"
-                    }`}
-                    style={{ background: acc.value }}
-                    aria-label={acc.label}
-                  />
-                ))}
+            <div role="note" className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4">
+              <div className="flex items-center gap-3">
+                <span aria-hidden="true" className="h-8 w-8 shrink-0 rounded-full" style={{ background: "#85C441" }} />
+                <div>
+                  <div className="text-[13px] font-semibold text-[var(--wk-text)]">WAKILISHA brand green</div>
+                  <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">
+                    The brand colour is fixed across WAKILISHA and MIZIZI. Earlier personal accent
+                    selections are preserved but no longer recolour the platform.
+                  </p>
+                </div>
               </div>
             </div>
 
