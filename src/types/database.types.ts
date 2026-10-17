@@ -20523,6 +20523,18 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_mizizi_freeze_case_question_v1: {
+        Args: {
+          p_case_id: string
+          p_expected_case_revision: number
+          p_expected_question_revision: number
+          p_hypotheses: Json
+          p_question_id: string
+          p_question_text: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       admin_mizizi_hold_workspace_writes_v1: {
         Args: { p_hold_key: string; p_reason: string; p_review_after?: string }
         Returns: Json
