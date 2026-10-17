@@ -2,6 +2,7 @@ import { MiziziDurableCasesPanel } from "./MiziziDurableCasesPanel";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { WkStateMark } from "@/components/data-viz/WkStateMark";
 import { WkStatusDistribution } from "@/components/data-viz/WkStatusDistribution";
 import { WkRankedBars } from "@/components/data-viz/WkRankedBars";
@@ -362,8 +363,16 @@ export function MiziziHeadquartersBrief({
         </WkSurface>
       ) : null}
 
+      {view === "brief" ? <MiziziDurableCasesPanel queue={queue} onInspectReview={inspect} /> : null}
+
       {queue && view === "brief" ? (
-        <div className="mz-brief-shell">
+        <WkDisclosure
+          summary={`Registry review inventory · ${queue.total} reviews · ${queue.open} open · ${queue.resolved} resolved`}
+          className="mz-review-inventory"
+          triggerClassName="mz-review-inventory-trigger"
+          contentClassName="mz-review-inventory-detail"
+        >
+          <div className="mz-brief-shell">
           <header className="night">
             <div className="night-copy">
               <p className="when">Current authenticated Registry review inventory · Read at <WkZonedTimestamp value={queue.readAt} /></p>
@@ -415,10 +424,11 @@ export function MiziziHeadquartersBrief({
               <ReviewPreview items={queue.recentOpen.slice(0, 4)} onInspect={inspect} subjects={caseSubjects} />
             </div>
           </section>
-        </div>
+          </div>
+        </WkDisclosure>
       ) : null}
 
-      {queue && view === "brief" ? <MiziziDurableCasesPanel /> : null}
+
 
       {queue && view === "field" ? (
         <MiziziReviewField queue={queue} onInspect={inspect} />

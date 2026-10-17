@@ -36,7 +36,11 @@ describe("Authenticated durable Headquarters read and governed commands",()=>{
  it("renders the operator panel inside the accepted authenticated Headquarters route",()=>{
   const brief=readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx","utf8");
   const panel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
-  expect(brief).toContain('<MiziziDurableCasesPanel />');
+  expect(brief).toContain('<MiziziDurableCasesPanel queue={queue} onInspectReview={inspect} />');
+  expect(brief.indexOf('<MiziziDurableCasesPanel queue={queue}')).toBeLessThan(brief.indexOf('<div className="mz-brief-shell">'));
+  expect(panel).toContain('data-wk-mizizi-investigation-first');
+  expect(panel).toContain('loadHeadquartersCaseEventsV1(focusedCase.caseId)');
+  expect(panel).toContain('No automatic Registry correction');
   expect(panel).toContain('data-wk-mizizi-durable-cases');
   expect(panel).toContain('Immutable case event timeline');
  });

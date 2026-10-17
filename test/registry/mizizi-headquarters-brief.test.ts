@@ -151,6 +151,8 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(source).toContain("<WkButton");
     expect(source).not.toMatch(/<select\b|<dialog\b|<input\b|<textarea\b/);
     expect(source).toContain("<MiziziReviewRoots queue={queue} onInspect={inspect} subjects={caseSubjects} />");
+    expect(source).toContain('summary={`Registry review inventory');
+    expect(source).toContain('className="mz-review-inventory"');
     expect(source).toContain("queue.items");
     expect(source).toContain("queue.resolved.toLocaleString()");
     expect(source).toContain("queue.open.toLocaleString()");
