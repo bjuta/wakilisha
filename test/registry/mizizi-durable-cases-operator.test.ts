@@ -89,7 +89,7 @@ describe("Authenticated durable Headquarters read and governed commands",()=>{
     schemaVersion:"wakilisha.mizizi.headquarters.case-read.v1",
     caseId,revision:1,subject:{type:"track",id:subjectId},
     claim:{family:recorded.claimFamily,key:recorded.claimKey},
-    lifecycle:{state:"open",stage:"triage"},
+    lifecycle:{state:"open",stage:"triage"},updatedAt:recorded.updatedAt,
     evidenceReferences:{linkedRegistryReviewId:reviewId,linkedReceiptCount:1},
     actionAuthority:"not_included_in_read_only_projection",
     publicationAuthority:"not_included_in_read_only_projection",

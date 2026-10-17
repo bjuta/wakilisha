@@ -37,7 +37,7 @@ export function projectHeadquartersCaseMachineReadV1(row: HeadquartersDurableCas
       linkedRegistryReviewId: row.reviewId,
       linkedReceiptCount: row.receiptCount,
     }),
-    recordedAt: row.updatedAt,
+    updatedAt: row.updatedAt,
     actionAuthority: "not_included_in_read_only_projection",
     publicationAuthority: "not_included_in_read_only_projection",
   });
