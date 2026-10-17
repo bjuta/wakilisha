@@ -52,7 +52,7 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
   const [selectedCase,setSelectedCase] = useState<string|null>(null);
   const [activeCaseId,setActiveCaseId] = useState<string|null>(null);
   const [recordView,setRecordView] = useState<"human"|"machine">("human");
-  const [detailTab,setDetailTab] = useState<"overview"|"evidence"|"next"|"history">("overview");
+  const [detailTab,setDetailTab] = useState<"questions"|"evidence"|"next"|"history">("questions");
   const [recentEvents,setRecentEvents] = useState<readonly HeadquartersCaseEvent[]>([]);
   const [recentEventsState,setRecentEventsState] = useState<"loading"|"ready"|"error">("loading");
   const [timelineCase,setTimelineCase] = useState<string|null>(null);
@@ -165,7 +165,7 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
             onChange={(caseId) => {
               if (!cases.some(item => item.caseId === caseId)) return;
               setActiveCaseId(caseId);
-              setDetailTab("overview");
+              setDetailTab("questions");
               setRecordView("human");
             }}
             options={cases.map(item => ({
@@ -213,18 +213,19 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
             <>
           <div className="mz-case-detail-tabs" role="group" aria-label="Case reading views">
             {([
-              ["overview","Overview"],["evidence","Evidence"],
+              ["questions","Questions"],["evidence","Evidence"],
               ["next","Next evidence"],["history","History"],
             ] as const).map(([id,label]) => (
               <button key={id} type="button" aria-pressed={detailTab===id}
                 onClick={()=>setDetailTab(id)}>{label}</button>
             ))}
           </div>
-          {detailTab === "overview" ? (
+          {detailTab === "questions" ? (
             <>
               <section className="mz-case-focus">
             <div className="mz-case-section-head"><span className="mz-case-eyebrow">Linked review lead</span><span className="mz-case-unresolved">Not adjudicated here</span></div>
             <h3>{sourceReview?.title || displayClaim(focusedCase.claimFamily)}</h3>
+            <p role="status">No independently reviewed question set is connected to this case yet.</p>
             <p>The attached Registry review is a research lead. Inspect its original record before choosing an explanation. A review's status does not establish independent evidence or ownership.</p>
           </section>
               <footer className="mz-case-next">

@@ -44,9 +44,11 @@ describe("Authenticated durable Headquarters read and governed commands",()=>{
   expect(panel).toContain('Questions decided</dt><dd>Not recorded');
   expect(panel).toContain('Runtime status unavailable');
   expect(panel).toContain('aria-label="Case reading views"');
-  for (const name of ["Overview","Evidence","Next evidence","History"])
+  for (const name of ["Questions","Evidence","Next evidence","History"])
     expect(panel).toContain(`"${name}"`);
   expect(panel).toContain('No recorded evidence requests available.');
+  expect(panel).toContain('No independently reviewed question set is connected to this case yet.');
+  expect(panel).toContain('Linked review lead');
   expect(panel).not.toContain('8 sources · 3 private');
   expect(panel).toContain('loadHeadquartersCaseEventsV1(focusedCase.caseId)');
   expect(panel).toContain('No automatic Registry correction');
