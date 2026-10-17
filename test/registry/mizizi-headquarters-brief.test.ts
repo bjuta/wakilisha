@@ -99,6 +99,22 @@ describe("Flat master/detail history and evidence workspaces", () => {
 });
 
 describe("MIZIZI reference-inspired, live-data operational workspace", () => {
+  it("ships original Product v4 Figtree and IBM Plex Mono subsets locally with integrity and license authority", async () => {
+    const css=readFileSync("src/pages/admin/review/mizizi/mizizi-html.css","utf8");
+    const {createHash}=await import("node:crypto");
+    for(const [file,expectedHash] of [["mz-figtree-latin.woff2","8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928"],["mz-figtree-latin-ext.woff2","f153aa07c1b16fbb12391c2512860c97819a0a9fd014f338b2b3f12496479d13"],["mz-plexmono-400-latin.woff2","c36f509c0a8f9f85f29cb44bc8701d8a9e0b14c499e77a884f789ead7093a7ac"],["mz-plexmono-400-latin-ext.woff2","f1050dc5317b43434c0aeda599d4624c774ffc162e87a8cf204b949b6a85816d"],["mz-plexmono-500-latin.woff2","a76f53ca6612e7b3828eec2311098675b7f9849ae4169a8bcef6302aec02a6c0"],["mz-plexmono-500-latin-ext.woff2","77f03e26f981c582bdba3a7abed4baa2d3149211c01366bb3ab3ba7622ec4ae5"]]) {
+      const contents=readFileSync(`public/assets/fonts/mizizi/${file}`);
+      expect(contents.subarray(0,4).toString("ascii")).toBe("wOF2");
+      expect(createHash("sha256").update(contents).digest("hex")).toBe(expectedHash);
+      expect(css).toContain(`/assets/fonts/mizizi/${file}`);
+    }
+    for(const name of ["FIGTREE-OFL.txt","IBM-PLEX-OFL.txt"]) {
+      expect(readFileSync(`public/assets/fonts/mizizi/licenses/${name}`,"utf8")).toContain("SIL OPEN FONT LICENSE");
+    }
+    expect(css).not.toContain("fonts.googleapis.com");
+    expect(css).not.toContain("fonts.gstatic.com");
+  });
+
   it("copies Product v4 surface and Headquarters navigation without altering review authority", () => {
     const page = readFileSync("src/pages/admin/review/mizizi/page.tsx", "utf8");
     expect(page).toContain('useState<"brief" | "field" | "cores" | "history" | "decisions">("brief")');
