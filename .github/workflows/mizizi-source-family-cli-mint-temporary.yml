@@ -1,0 +1,27 @@
+name: MIZIZI source attestation migration filename mint (temporary)
+on:
+  push:
+    branches:
+      - feat/mizizi-source-family-attestation-v1
+    paths:
+      - .github/workflows/mizizi-source-family-cli-mint-temporary.yml
+permissions:
+  contents: read
+jobs:
+  mint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Mint exact QV3 migration path with accepted Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes supabase@2.107.0 --version
+          npx --yes supabase@2.107.0 migration new mizizi_source_family_attestation_v1
+          CANDIDATE="$(find supabase/migrations -maxdepth 1 -name '*_mizizi_source_family_attestation_v1.sql' -type f -print)"
+          test "$(printf '%s\n' "$CANDIDATE" | sed '/^$/d' | wc -l | tr -d ' ')" = "1"
+          echo "WK_CLI_MINTED_MIGRATION_PATH=$CANDIDATE"
