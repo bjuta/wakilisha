@@ -1,5 +1,20 @@
 # MIZIZI Enterprise Product and Release Authority
 
+## 17 October 2026: independently authorized model-use gate
+
+**Live evidence:** Production creator-attestation permissions are not hosted-model consent. The established `create_my_music_credit_attestation_v1` and `transition_my_music_credit_attestation_v1` authenticated RPCs support original creator assertions and withdrawal/dispute; private attestation and permission-version tables are not service-readable. The internal permission-history table exposes public display, CMO contexts, approved partners, and third-party commercial reuse, but no specific model-use grant. Production has zero attestation and permission-version rows. No cultural witness, permissions, or original source was created during this checkpoint.
+
+**Actual vulnerability:** The adaptive engine accepted `externalModelProcessingAllowed=true` directly from an incoming reader. A future reader could mistakenly treat an attestation-sharing flag as consent to disclose a private claim and its case question to Anthropic. Privacy redaction performed after that decision would not prevent the disclosure.
+
+**Minimal correction on draft PR #1243 (not deployed):** Keep the established Wikidata open-license path. For `first_party`, `documented_consent`, or `documented_contract` sources, the source flag alone is no longer model authority. A *separate trusted* `authorizeModelProcessing(identity,question,source)` callback must approve that exact case/question/source use; absent or denied approval yields the existing zero-model human-review receipt with source and question redacted. The callback is passed through the existing worker; **none is wired into the current Preview Edge function**, and no model-use consent is granted. A callback that simply repeats reader metadata or generic creator-sharing permissions would be an invalid implementation.
+
+**Proof and limits:** The existing research-worker test covers a first-party reader claiming external-model permission, default denial, explicitly denied/revoked-use decision, and a positive **synthetic** trusted decision to protect the intended contract. Prior research pass fingerprints remain unchanged. Exact-commit CI must pass before isolated Preview promotion. A read-only research pass is not a verified rights assertion. The current Preview source verifier remains Wikidata-specific, so this change is **not** a functioning attestation-to-research integration or proof of revocable custodian access.
+
+**Highest-leverage next real gate:** Independently reviewed case-scoped custodian read authority, explicit model-use disclosure consent where desired, revalidation at the actual operation boundary, and a qualified human verdict from one first-party evidence-poor case. This requires real permission and original evidence, not another provider connector or synthetic cultural conclusion. Production temporary-access disabled-at-rest remains an independent release-control requirement. No Production change, grant issuance, review decision, or merge is authorized by this checkpoint.
+
+---
+
+
 ## 17 October 2026: confidential-question pass containment
 
 **Why:** A model-restricted source could already be redacted in the immutable research pass while the accompanying original research question remained verbatim. A human-only question may identify the same witness, a confidential artefact, or a private investigative lead. The 16 October Preview v21 source-metadata fix does not, on its own, close this leak.
