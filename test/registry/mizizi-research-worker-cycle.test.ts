@@ -321,6 +321,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   const result=await runAdaptiveInvestigationV1({identity,store,maxNewPasses:5,
    maxTotalPasses:20,costBudgetUnits:20,now:()=>NOW,
    readSources:async(_,question)=>{asked.push(question);return [source];},
+   authorizeModelProcessing:async()=>true,
    analyze:async(_,__,history)=>history.length===0?answer([lead(q2)],"continue"):
      history.length===1?answer([lead(q3)],"continue"):answer([],"pause"),
    verifyFinding:async()=>({verified:false,verificationRef:null}),
@@ -365,13 +366,45 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(analyst).not.toHaveBeenCalled();
   expect(verifier).not.toHaveBeenCalled();
  });
+ it("requires independent model-use consent for a claimed first-party source",async()=>{
+  const store=memory(),model=vi.fn(async()=>answer([],"conclude"));
+  const declared={...source,source:{...authority,
+   authorityRef:"attestation:claimed-model-permission",
+   externalModelProcessingAllowed:true}};
+  const common={identity,maxNewPasses:2,maxTotalPasses:20,
+   costBudgetUnits:20,now:()=>NOW,readSources:async()=>[declared],
+   analyze:model,verifyFinding:async()=>({verified:false,verificationRef:null})};
+  const denied=await runAdaptiveInvestigationV1({...common,store});
+  expect(denied).toMatchObject({passesAdded:1,disposition:"paused"});
+  expect(model).not.toHaveBeenCalled();
+  expect(store.rows[0]).toMatchObject({costUnits:0,
+   modelVersion:"mizizi.human_review_required.v1",decision:{action:"pause"}});
+  expect(store.rows[0].sourceReceipts[0]).toMatchObject({
+   modelDisclosed:false,originKey:"custodian:restricted",
+   authorityRef:"custodian:access-controlled"
+  });
+  expect(JSON.stringify(store.rows)).not.toContain("attestation:claimed-model-permission");
+  const revoked=vi.fn(async()=>false);
+  const rejected=await runAdaptiveInvestigationV1({...common,store:memory(),
+   authorizeModelProcessing:revoked});
+  expect(rejected.disposition).toBe("paused");
+  expect(revoked).toHaveBeenCalledExactlyOnceWith(identity,
+   identity.openingQuestion,declared.source);
+  expect(model).not.toHaveBeenCalled();
+  const allowed=vi.fn(async()=>true),approved=memory();
+  await runAdaptiveInvestigationV1({...common,store:approved,
+   authorizeModelProcessing:allowed});
+  expect(allowed).toHaveBeenCalledOnce();
+  expect(model).toHaveBeenCalledOnce();
+  expect(approved.rows[0].sourceReceipts[0].modelDisclosed).toBe(true);
+ });
  it("stops paid research after measured provider token budget is exhausted",async()=>{
   const store=memory(),reader=vi.fn(async()=>[source]);
   const analyst=vi.fn(async()=>answer([lead("What independent original source exists?")],"continue"));
   const result=await runAdaptiveInvestigationV1({
    identity,store,maxNewPasses:5,maxTotalPasses:20,costBudgetUnits:1,
    now:()=>NOW,measureCostUnits:()=>2,readSources:reader,
-   analyze:analyst,
+   authorizeModelProcessing:async()=>true,analyze:analyst,
    verifyFinding:async()=>({verified:false,verificationRef:null})
   });
   expect(result).toMatchObject({passesAdded:1,totalPasses:1,disposition:"continue"});
@@ -385,6 +418,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   const q2="Can the original release liner notes resolve this discrepancy?";
   const base={identity,store,maxTotalPasses:20,costBudgetUnits:20,
    now:()=>NOW,readSources:reader,
+   authorizeModelProcessing:async()=>true,
    verifyFinding:async()=>({verified:false,verificationRef:null})};
   await runAdaptiveInvestigationV1({...base,maxNewPasses:1,
    analyze:async()=>answer([lead(q2)],"continue")});
@@ -397,6 +431,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
  it("rejects false citations, unauthorized model processing and tampered memory",async()=>{
   const store=memory(),base={identity,store,maxNewPasses:3,maxTotalPasses:20,
    costBudgetUnits:20,now:()=>NOW,readSources:async()=>[source],
+   authorizeModelProcessing:async()=>true,
    verifyFinding:async()=>({verified:false,verificationRef:null})};
   await expect(runAdaptiveInvestigationV1({...base,analyze:async()=>({
    ...answer([],"conclude"),
@@ -493,6 +528,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   const result=await runAdaptiveInvestigationV1({
    identity,store,maxNewPasses:8,maxTotalPasses:20,costBudgetUnits:100,
    now:()=>NOW,readSources:async()=>[source],
+   authorizeModelProcessing:async()=>true,
    analyze:async()=>{
     const ordinal=analyze.mock.calls.length;
     await analyze();
@@ -516,6 +552,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    store,openingQuestion:async(job)=>{expect(job.caseId).toBe(CASE);
     return identity.openingQuestion;},
    readSources:async()=>[source],
+   authorizeModelProcessing:async()=>true,
    analyze:async(_,__,history)=>history.length===0?
     answer([lead(followup)],"continue"):answer([],"pause"),
    verifyFinding:async()=>({verified:false,verificationRef:null}),
@@ -555,6 +592,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    rpc,workerId:"scoped-worker",now:()=>NOW,maxNewPasses:4,maxTotalPasses:20,
    costBudgetUnits:10,openingQuestion:async()=>identity.openingQuestion,
    readSources:async()=>[source],
+   authorizeModelProcessing:async()=>true,
    anthropic:{apiKey:"test-anthropic-key-not-real",model:"claude-opus-4-8",
     transport:async(url,init)=>{
      expect(String(url)).toBe("https://api.anthropic.com/v1/messages");
