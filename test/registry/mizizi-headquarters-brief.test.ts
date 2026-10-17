@@ -99,11 +99,65 @@ describe("Flat master/detail history and evidence workspaces", () => {
 });
 
 describe("MIZIZI reference-inspired, live-data operational workspace", () => {
-  it("keeps Brief, Field, Cores, History and governed Decision Work distinct", () => {
+  it("ships original Product v4 Figtree and IBM Plex Mono subsets locally with integrity and license authority", async () => {
+    const css=readFileSync("src/pages/admin/review/mizizi/mizizi-html.css","utf8");
+    const {createHash}=await import("node:crypto");
+    for(const [file,expectedHash] of [["mz-figtree-latin.woff2","8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928"],["mz-figtree-latin-ext.woff2","f153aa07c1b16fbb12391c2512860c97819a0a9fd014f338b2b3f12496479d13"],["mz-plexmono-400-latin.woff2","c36f509c0a8f9f85f29cb44bc8701d8a9e0b14c499e77a884f789ead7093a7ac"],["mz-plexmono-400-latin-ext.woff2","f1050dc5317b43434c0aeda599d4624c774ffc162e87a8cf204b949b6a85816d"],["mz-plexmono-500-latin.woff2","a76f53ca6612e7b3828eec2311098675b7f9849ae4169a8bcef6302aec02a6c0"],["mz-plexmono-500-latin-ext.woff2","77f03e26f981c582bdba3a7abed4baa2d3149211c01366bb3ab3ba7622ec4ae5"]]) {
+      const contents=readFileSync(`public/assets/fonts/mizizi/${file}`);
+      expect(contents.subarray(0,4).toString("ascii")).toBe("wOF2");
+      expect(createHash("sha256").update(contents).digest("hex")).toBe(expectedHash);
+      expect(css).toContain(`/assets/fonts/mizizi/${file}`);
+    }
+    for(const name of ["FIGTREE-OFL.txt","IBM-PLEX-OFL.txt"]) {
+      expect(readFileSync(`public/assets/fonts/mizizi/licenses/${name}`,"utf8")).toContain("SIL OPEN FONT LICENSE");
+    }
+    expect(css).not.toContain("fonts.googleapis.com");
+    expect(css).not.toContain("fonts.gstatic.com");
+  });
+
+  it("copies Product v4 surface and Headquarters navigation without altering review authority", () => {
     const page = readFileSync("src/pages/admin/review/mizizi/page.tsx", "utf8");
     expect(page).toContain('useState<"brief" | "field" | "cores" | "history" | "decisions">("brief")');
-    for (const label of ["Brief", "Field", "Cores", "History", "Decision Work"]) {
-      expect(page).toContain(`label: "${label}"`);
+    for (const [id, label] of [
+      ["brief", "Workbench"], ["field", "Orion"], ["decisions", "Review"],
+      ["cores", "Evidence"], ["history", "Outcomes"],
+    ]) expect(page).toContain(`id: "${id}", label: "${label}"`);
+    expect(page).toContain('aria-label="MIZIZI product surfaces"');
+    expect(page).toContain('className="mz-v3-tabs"');
+    const casePanel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
+    const tabs=readFileSync("src/components/design-system/primitives/Tabs.tsx","utf8");
+    const css=readFileSync("src/pages/admin/review/mizizi/mizizi-html.css","utf8");
+    expect(casePanel).toContain('<WkSelect');
+    expect(casePanel).toContain('state.kind === "ready" && focusedCase ? null');
+    expect(css).toContain('aspect-ratio:5/8');
+    expect(css).toContain('border-radius:0 0 var(--mz-r-card) var(--mz-r-card)');
+    expect(casePanel).toContain('ariaLabel="Switch recorded investigation"');
+    expect(casePanel).toContain('cases.map(item => ({');
+    expect(casePanel).not.toContain('className="mz-case-option"');
+    expect(tabs).toContain('icon?: ReactNode;');
+    expect(tabs).toContain('data-wk-tab-icon');
+    for(const name of ["Folder","Network","ClipboardCheck","Archive","CheckCircle"])
+      expect(page).toContain(`name="${name}" size={20}`);
+    expect(page).toContain('tabListClassName="mz-v3-rail"');
+    expect(page).toContain('aria-label="MIZIZI Headquarters"');
+    for (const surface of ["Field","Contributions","Record"])
+      expect(page).toContain(`label: "${surface}", disabled: true`);
+
+    expect(css).toContain("--mz-v3-rail-width:248px");
+    expect(css).toContain("grid-template-rows:64px minmax(0,1fr)");
+    expect(css).toContain("min-height:44px");
+    expect(css).toContain("@media(max-width:768px)");
+    expect(page).toContain('aria-current="page" className="mz-v4-surface-current">Headquarters');
+    for (const surface of ["Field", "Contributions", "Record"]) {
+      expect(page).toContain(`>${surface}</button>`);
+    }
+    expect(page).not.toContain('label: "Cores"');
+    expect(page).toContain('navigate("/credits")');
+    expect(page).toContain('<WkDisclosure');
+    expect(page).toContain('triggerClassName="mz-future-trigger"');
+    expect(page).toContain("What is connected and what still requires evidence?");
+    for (const reason of ["Field unavailable:", "Contributions unavailable:", "Record unavailable:", "Organization workspace unavailable:", "Research execution unavailable:"]) {
+      expect(page).toContain(reason);
     }
     expect(page).toContain('workspaceView === "decisions"');
     expect(page).toContain('view={workspaceView}');
@@ -133,13 +187,15 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(source).toContain("queue.recentOpen.slice(0, 4)");
     expect(source).toContain('<MiziziEvidenceWorkbench mode="history"');
     expect(source).toContain("Show Receipt");
-    expect(source).toContain("View Evidence in Cores");
+    expect(source).toContain("View Evidence in Workbench");
     expect(source).toContain("expandedReceipt === item.reviewId");
     expect(source).toContain("<WkSurface");
     expect(source).toContain("<MiziziReviewField");
     expect(source).toContain("<WkButton");
     expect(source).not.toMatch(/<select\b|<dialog\b|<input\b|<textarea\b/);
     expect(source).toContain("<MiziziReviewRoots queue={queue} onInspect={inspect} subjects={caseSubjects} />");
+    expect(source).toContain('summary={`Registry review inventory');
+    expect(source).toContain('className="mz-review-inventory"');
     expect(source).toContain("queue.items");
     expect(source).toContain("queue.resolved.toLocaleString()");
     expect(source).toContain("queue.open.toLocaleString()");
@@ -428,7 +484,16 @@ describe("Headquarters complete Registry review inventory", () => {
     expect(css).toContain(".wk-mizizi-search .wk-input");
     expect(css).not.toContain("--soil-0");
     expect(css).not.toContain("!important");
-    expect(css).not.toMatch(/#[0-9a-f]{6}/i);
+    // Product v4 explicitly owns a route-scoped neutral palette; the old
+    // platform-wide no-hex restriction no longer applies inside MIZIZI.
+    expect(css).toContain("--mz-paper:#FCFCFB;");
+    expect(css).toContain("--mz-established:#85C441;");
+    expect(css).toContain("--mz-established-bg:#EDF5E3;");
+    expect(css).toContain("--mz-established-fg:#4E7425;");
+    expect(css).toContain("--mz-h1:700 34px/1.15");
+    expect(css).toContain("--mz-canvas:#ECEBE8;");
+    expect(css).toContain("[data-wk-mizizi-workspace] {");
+    expect(css).toContain("--wk-font-body:var(--mz-font-sans);");
     expect(css).not.toContain("[data-wk-mizizi-workspace] button{");
     expect(css).toContain("[data-wk-mizizi-workspace] .field");
     expect(css).not.toContain("Northline Audio");

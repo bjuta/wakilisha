@@ -9,6 +9,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSplitWorkspace } from "@/components/data-viz/WkSplitWorkspace";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkTabs } from "@/components/design-system/primitives/Tabs";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
 import { Input, Label, TextArea as AriaTextArea, TextField as AriaTextField } from "react-aria-components";
@@ -691,11 +692,20 @@ function AdminMiziziWorkspaceContent() {
     <div className="mz-port" data-wk-mizizi-workspace>
       <header className="mz-head">
         <span className="mz-wordmark" aria-label="MIZIZI by WAKILISHA">
-          <WkIcon name="GitBranch" size={23} aria-hidden="true" />
           MIZIZI <span className="mz-small">by WAKILISHA™</span>
         </span>
+        <nav className="mz-v4-surfaces" aria-label="MIZIZI product surfaces">
+          <span aria-current="page" className="mz-v4-surface-current">Headquarters</span>
+          <button type="button" disabled title="Research-push capture is not yet connected">Field</button>
+          <button type="button" disabled title="The v4 contribution mandate flow is not yet connected">Contributions</button>
+          <button type="button" disabled title="The governed public Record is not yet published">Record</button>
+        </nav>
         <span className="mz-context" title="Current internal Registry authority">Internal Registry</span>
         <div className="mz-right">
+          <WkButton variant="ghost" className="wk-button-sm"
+            onClick={() => navigate("/credits")}>
+            <WkIcon name="Contact" size={14} aria-hidden="true" /> Your Credits
+          </WkButton>
           <WkButton variant="ghost" className="wk-button-sm"
             onClick={() => navigate("/admin/review/queue")}>
             <WkIcon name="ClipboardList" size={14} aria-hidden="true" /> All Reviews
@@ -710,22 +720,47 @@ function AdminMiziziWorkspaceContent() {
           </span>
         </div>
       </header>
+      <div className="mz-v3-rail-brand" aria-label="MIZIZI Headquarters">
+        <span className="mz-v3-rail-wordmark">MIZIZI</span>
+        <span className="mz-v3-rail-subtitle">HEADQUARTERS</span>
+      </div>
 
       <WkTabs
+        className="mz-v3-tabs"
         items={[
-          { id: "brief", label: "Brief" },
-          { id: "field", label: "Field" },
-          { id: "cores", label: "Cores" },
-          { id: "history", label: "History" },
-          { id: "decisions", label: "Decision Work" },
+          { id: "brief", label: "Workbench", icon: <WkIcon name="Folder" size={20} aria-hidden="true" /> },
+          { id: "field", label: "Orion", icon: <WkIcon name="Network" size={20} aria-hidden="true" /> },
+          { id: "decisions", label: "Review", icon: <WkIcon name="ClipboardCheck" size={20} aria-hidden="true" /> },
+          { id: "cores", label: "Evidence", icon: <WkIcon name="Archive" size={20} aria-hidden="true" /> },
+          { id: "history", label: "Outcomes", icon: <WkIcon name="CheckCircle" size={20} aria-hidden="true" /> },
+          { id: "field_capture", label: "Field", disabled: true },
+          { id: "contributions", label: "Contributions", disabled: true },
+          { id: "record", label: "Record", disabled: true },
         ] as const}
         value={workspaceView}
-        onChange={setWorkspaceView}
-        ariaLabel="MIZIZI workspace sections"
-        tabListClassName="overflow-x-auto"
-        panelClassName=""
+        onChange={(view) => {
+          if (view === "field_capture" || view === "contributions" || view === "record") return;
+          setWorkspaceView(view);
+        }}
+        ariaLabel="MIZIZI Headquarters navigation"
+        tabListClassName="mz-v3-rail"
+        panelClassName="mz-v3-panel"
       >
         <div className="mz-rootband" aria-hidden="true" />
+        <WkDisclosure
+          summary="What is connected and what still requires evidence?"
+          className="mz-future-note"
+          triggerClassName="mz-future-trigger"
+          contentClassName="mz-future-detail"
+        >
+          <p><strong>Field unavailable:</strong> Research-push capture, consent and custody are not accepted for this interface.</p>
+          <p><strong>Contributions unavailable:</strong> A capacity-verified spokesperson or estate response is not yet connected; the separate Your Credits route remains available.</p>
+          <p><strong>Record unavailable:</strong> No authorized public finding or versioned publication is connected.</p>
+          <p><strong>Organization workspace unavailable:</strong> No accepted customer isolation, delivery or acknowledgement exists.</p>
+          <p><strong>Research execution unavailable:</strong> The Preview runner is not an authorized Production UI action.</p>
+          <p><strong>Evidence:</strong> The connected view inspects governed Registry review evidence, not the full v4 evidence library.</p>
+          <p><strong>Outcomes:</strong> The connected view shows existing Registry history and receipts, not v4 calibration or independently adjudicated outcomes.</p>
+        </WkDisclosure>
         {workspaceView === "decisions" ? (
           <div className="space-y-6">
             <WkWorkflowRail steps={WORKFLOW_STEPS} ariaLabel="MIZIZI workflow" />
@@ -740,7 +775,7 @@ function AdminMiziziWorkspaceContent() {
       <WkSplitWorkspace data-wk-mizizi-decision-workspace>
         <div className="min-w-0 border-b border-wk-border lg:border-b-0 lg:border-r">
           <header className="border-b border-wk-border px-4 py-4">
-            <h2 className="text-[17px] font-black text-wk-text">Decision Work</h2>
+            <h2 className="text-[17px] font-black text-wk-text">Review</h2>
             <p className="mt-1 text-[12px] text-wk-text-muted">
               Select a review to inspect its proposed change.
             </p>

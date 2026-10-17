@@ -2,6 +2,7 @@ import { MiziziDurableCasesPanel } from "./MiziziDurableCasesPanel";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { WkStateMark } from "@/components/data-viz/WkStateMark";
 import { WkStatusDistribution } from "@/components/data-viz/WkStatusDistribution";
 import { WkRankedBars } from "@/components/data-viz/WkRankedBars";
@@ -98,7 +99,7 @@ function OperatorReviewSession({
           <h2>How long do you have?</h2>
           <WkContextHelp label="How Focused Reviews Work" title="Review at your own pace">
             Choose a set of open reviews and inspect each recording. This does not record a decision.
-            You can leave at any time. Open Cores to examine evidence.
+            You can leave at any time. Open Workbench to examine evidence.
           </WkContextHelp>
         </div>
         <span className="text-[12px] tabular-nums text-wk-text-muted">
@@ -173,11 +174,11 @@ function OperatorReviewSession({
               </div>
               {!job?.sourced && (current.subjectType === "track" || current.subjectType === "release") ? (
                 <p role="status" className="mt-3 text-[12px] text-wk-text-muted">
-                  The Registry source name is unavailable. Inspect Cores before deciding.
+                  The Registry source name is unavailable. Inspect Workbench before deciding.
                 </p>
               ) : null}
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <WkButton onClick={inspect}>Inspect evidence in Cores <WkIcon name="ArrowRight" size={14}/></WkButton>
+                <WkButton onClick={inspect}>Inspect evidence in Workbench <WkIcon name="ArrowRight" size={14}/></WkButton>
                 <WkButton variant="ghost" disabled={step + 1 >= sessionItems.length}
                   onClick={() => {
                     setSkipped(ids => ids.includes(current.id) ? ids : [...ids, current.id]);
@@ -248,7 +249,7 @@ function Issue1094WorthKnowing({ revision, onInspect }: { revision: number; onIn
               {item.status !== "unverified" ? (
                 <WkButton variant="soft" className="wk-button-sm mt-3"
                   onClick={() => onInspect(item.reviewId)}>
-                  View Evidence in Cores <WkIcon name="ArrowRight" size={13} />
+                  View Evidence in Workbench <WkIcon name="ArrowRight" size={13} />
                 </WkButton>
               ) : null}
               {item.status !== "unverified" ? (
@@ -362,8 +363,16 @@ export function MiziziHeadquartersBrief({
         </WkSurface>
       ) : null}
 
+      {view === "brief" ? <MiziziDurableCasesPanel queue={queue} onInspectReview={inspect} /> : null}
+
       {queue && view === "brief" ? (
-        <div className="mz-brief-shell">
+        <WkDisclosure
+          summary={`Registry review inventory · ${queue.total} reviews · ${queue.open} open · ${queue.resolved} resolved`}
+          className="mz-review-inventory"
+          triggerClassName="mz-review-inventory-trigger"
+          contentClassName="mz-review-inventory-detail"
+        >
+          <div className="mz-brief-shell">
           <header className="night">
             <div className="night-copy">
               <p className="when">Current authenticated Registry review inventory · Read at <WkZonedTimestamp value={queue.readAt} /></p>
@@ -385,14 +394,14 @@ export function MiziziHeadquartersBrief({
           </header>
           {subjectReadError ? (
              <p role="status" className="text-[12px] text-wk-text-muted">
-               Some source names are unavailable. Reviews remain accessible in Cores.
+               Some source names are unavailable. Reviews remain accessible in Workbench.
              </p>
            ) : null}
            <OperatorReviewSession queue={queue} onInspect={inspect} subjects={caseSubjects} />
           <div className="mz-brief-columns">
             <section className="min-w-0">
               <div className="sect-head"><h2>Worth Knowing</h2>
-                <WkButton variant="ghost" className="wk-button-sm" onClick={onShowCases}>Explore Cores</WkButton>
+                <WkButton variant="ghost" className="wk-button-sm" onClick={onShowCases}>Explore Workbench</WkButton>
               </div>
               <Issue1094WorthKnowing revision={revision} onInspect={inspect} />
             </section>
@@ -409,16 +418,17 @@ export function MiziziHeadquartersBrief({
           </div>
           <section>
             <div className="sect-head"><h2>Recent Work</h2>
-              <button className="link" onClick={onShowCases}>Explore Cores</button>
+              <button className="link" onClick={onShowCases}>Explore Workbench</button>
             </div>
             <div style={{ borderTop: "1px solid var(--seam)" }}>
               <ReviewPreview items={queue.recentOpen.slice(0, 4)} onInspect={inspect} subjects={caseSubjects} />
             </div>
           </section>
-        </div>
+          </div>
+        </WkDisclosure>
       ) : null}
 
-      {queue && view === "brief" ? <MiziziDurableCasesPanel /> : null}
+
 
       {queue && view === "field" ? (
         <MiziziReviewField queue={queue} onInspect={inspect} />

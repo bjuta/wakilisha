@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { buildRedactedHeadquartersAuditV1 } from "../../src/services/miziziRedactedAudit";
 import { describe, it, expect, vi } from "vitest";
+import {projectMiziziQuestionReadV1,MIZIZI_QUESTION_READ_V1} from "../../src/services/miziziQuestionRead";
 import {
   beginMiziziCaseResearchV1,
   bootstrapHeadquartersOwnerV1,
@@ -11,6 +12,7 @@ import {
   projectHeadquartersCaseEventsV1,
   loadHeadquartersHoldsV1,
   projectDurableCasesV1,
+  projectHeadquartersCaseMachineReadV1,
   projectWorkspaceHoldsV1,
   releaseWorkspaceHoldV1,
   startWorkspaceHoldV1,
@@ -36,7 +38,21 @@ describe("Authenticated durable Headquarters read and governed commands",()=>{
  it("renders the operator panel inside the accepted authenticated Headquarters route",()=>{
   const brief=readFileSync("src/pages/admin/review/mizizi/MiziziHeadquartersBrief.tsx","utf8");
   const panel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
-  expect(brief).toContain('<MiziziDurableCasesPanel />');
+  expect(brief).toContain('<MiziziDurableCasesPanel queue={queue} onInspectReview={inspect} />');
+  expect(brief.indexOf('<MiziziDurableCasesPanel queue={queue}')).toBeLessThan(brief.indexOf('<div className="mz-brief-shell">'));
+  expect(panel).toContain('data-wk-mizizi-investigation-first');
+  expect(panel).toContain('aria-label="Recorded case status and research limits"');
+  expect(panel).toContain('Questions decided</dt><dd>Not recorded');
+  expect(panel).toContain('Runtime status unavailable');
+  expect(panel).toContain('aria-label="Case reading views"');
+  for (const name of ["Questions","Evidence","Next evidence","History"])
+    expect(panel).toContain(`"${name}"`);
+  expect(panel).toContain('No recorded evidence requests available.');
+  expect(panel).toContain('No independently reviewed question set is connected to this case yet.');
+  expect(panel).toContain('Linked review lead');
+  expect(panel).not.toContain('8 sources · 3 private');
+  expect(panel).toContain('loadHeadquartersCaseEventsV1(focusedCase.caseId)');
+  expect(panel).toContain('No automatic Registry correction');
   expect(panel).toContain('data-wk-mizizi-durable-cases');
   expect(panel).toContain('Immutable case event timeline');
  });
@@ -76,6 +92,24 @@ describe("Authenticated durable Headquarters read and governed commands",()=>{
   expect(rpc).toHaveBeenCalledWith("admin_mizizi_case_events_v1",{p_case_id:caseId,p_limit:100});
   expect(()=>projectHeadquartersCaseEventsV1([events[1],events[0]])).toThrow();
   expect(()=>projectHeadquartersCaseEventsV1([events[0],events[0]])).toThrow();
+ });
+ it("derives Human and Machine case inspection from the same authorized case projection",()=>{
+  const caseRecord=projectDurableCasesV1([recorded])[0];
+  const machine=projectHeadquartersCaseMachineReadV1(caseRecord);
+  expect(machine).toMatchObject({
+    schemaVersion:"wakilisha.mizizi.headquarters.case-read.v1",
+    caseId,revision:1,subject:{type:"track",id:subjectId},
+    claim:{family:recorded.claimFamily,key:recorded.claimKey},
+    lifecycle:{state:"open",stage:"triage"},updatedAt:recorded.updatedAt,
+    evidenceReferences:{linkedRegistryReviewId:reviewId,linkedReceiptCount:1},
+    actionAuthority:"not_included_in_read_only_projection",
+    publicationAuthority:"not_included_in_read_only_projection",
+  });
+  const panel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
+  expect(panel).toContain('state.kind === "ready" && focusedCase');
+  expect(panel).toContain('JSON.stringify(projectHeadquartersCaseMachineReadV1(focusedCase), null, 2)');
+  expect(panel).toContain('aria-pressed={recordView === "machine"}');
+  expect(JSON.stringify(machine)).not.toContain("actorKey");
  });
  it("reports true zero case ledger rather than assuming one case per open review",()=>{
   expect(projectDurableCasesV1([])).toEqual([]);
@@ -243,4 +277,76 @@ describe("Authenticated durable Headquarters read and governed commands",()=>{
   expect(panel).toContain("No file was exported.");
  });
 
+});
+
+// #1247: question projection proofs belong next to the existing DB02 case contract.
+const wid="aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa",cid="bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb";
+const qid="cccccccc-cccc-4ccc-8ccc-cccccccccccc",sid="dddddddd-dddd-4ddd-bddd-dddddddddddd";
+const assertion="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const ha="11111111-1111-4111-8111-111111111111",hb="22222222-2222-4222-8222-222222222222";
+const receipt="33333333-3333-4333-8333-333333333333";
+const hash="a".repeat(64),scope={workspaceId:wid,caseId:cid,caseRevision:7};
+const question={
+  questionId:qid,questionRevision:2,caseId:cid,caseRevision:7,
+  question:"Which interpretation is supported by independently verified recorded evidence?",
+  hypotheses:[{id:ha,label:"One recorded performance"},{id:hb,label:"Two distinct performances"}],
+  sources:[{sourceId:sid,assertionId:assertion,assertionFingerprint:hash,
+    familyKey:"catalogue:v1",familyVerified:true,useBasis:"documented_contract",
+    disclosure:"internal_authorized"}],
+  assessments:[{sourceId:sid,hypothesisId:ha,consistency:"C",
+    assessedFingerprint:hash,humanReviewReceiptId:receipt,reviewedAt:"2026-10-17T13:00:00Z"}],
+};
+const ready=(questions:unknown[]=[question])=>({
+  kind:"ready",contract:MIZIZI_QUESTION_READ_V1,workspaceId:wid,caseId:cid,caseRevision:7,questions
+});
+const mutated=(patch:Record<string,unknown>)=>ready([{...question,...patch}]);
+describe("MIZIZI read-only question contract (no authorization grant)",()=>{
+  it("accepts only a versioned same-case dossier and literal reviewed assessment",()=>{
+    const result=projectMiziziQuestionReadV1(scope,ready());
+    expect(result.kind).toBe("ready");
+    if(result.kind!=="ready")throw new Error("Unexpected fixture state");
+    expect(result.questions[0].assessments[0]).toMatchObject({consistency:"C",humanReviewReceiptId:receipt});
+    expect(Object.isFrozen(result.questions[0].sources)).toBe(true);
+    expect(JSON.stringify(result)).not.toContain("publicationAuthority");
+  });
+  it("distinguishes not recorded, denied, stale and server unavailable",()=>{
+    for(const kind of ["not_recorded","denied","stale","unavailable"])
+      expect(projectMiziziQuestionReadV1(scope,{kind})).toEqual({kind});
+    expect(()=>projectMiziziQuestionReadV1(scope,ready([]))).toThrow();
+  });
+  it("denies cross-workspace data, stale case revision and unknown fields",()=>{
+    expect(()=>projectMiziziQuestionReadV1(scope,{...ready(),workspaceId:assertion})).toThrow();
+    expect(()=>projectMiziziQuestionReadV1(scope,{...ready(),caseRevision:8})).toThrow();
+    expect(()=>projectMiziziQuestionReadV1(scope,mutated({caseId:assertion}))).toThrow();
+    expect(()=>projectMiziziQuestionReadV1(scope,mutated({caseRevision:8}))).toThrow();
+    expect(()=>projectMiziziQuestionReadV1(scope,mutated({winner:"hypothesisA"}))).toThrow();
+  });
+  it("requires competing, distinct hypotheses and distinct question IDs",()=>{
+    expect(()=>projectMiziziQuestionReadV1(scope,mutated({hypotheses:[question.hypotheses[0]]}))).toThrow();
+    expect(()=>projectMiziziQuestionReadV1(scope,mutated({hypotheses:[question.hypotheses[0],question.hypotheses[0]]}))).toThrow();
+    expect(()=>projectMiziziQuestionReadV1(scope,ready([question,question]))).toThrow();
+  });
+  it("never creates a grade from an independence hint or withheld source",()=>{
+    for(const changed of [{familyVerified:false},{disclosure:"withheld"},{useBasis:null}])
+      expect(()=>projectMiziziQuestionReadV1(scope,mutated({
+        sources:[{...question.sources[0],...changed}],
+      }))).toThrow();
+    const ungraded=projectMiziziQuestionReadV1(scope,mutated({
+      sources:[{...question.sources[0],familyVerified:false,useBasis:null,disclosure:"withheld"}],
+      assessments:[],
+    }));
+    expect(ungraded.kind).toBe("ready");
+    if(ungraded.kind==="ready")expect(ungraded.questions[0].assessments).toEqual([]);
+  });
+  it("rejects unsupported assessment, missing human receipt, wrong source hash and duplicate cells",()=>{
+    for(const changed of [
+      {consistency:"approved"},{humanReviewReceiptId:"invalid"},
+      {assessedFingerprint:"b".repeat(64)},{sourceId:assertion},{hypothesisId:assertion},
+    ])expect(()=>projectMiziziQuestionReadV1(scope,mutated({
+      assessments:[{...question.assessments[0],...changed}],
+    }))).toThrow();
+    expect(()=>projectMiziziQuestionReadV1(scope,mutated({
+      assessments:[question.assessments[0],question.assessments[0]],
+    }))).toThrow();
+  });
 });
