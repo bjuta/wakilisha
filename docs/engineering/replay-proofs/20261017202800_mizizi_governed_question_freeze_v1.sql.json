@@ -1,0 +1,21 @@
+{
+  "migration_file": "supabase/migrations/20261017202800_mizizi_governed_question_freeze_v1.sql",
+  "migration_sha256": "2c6243aefd87ef7ba9c72b32de8077e19ee3681898dd09d0c11a1869254f88df",
+  "base_main_sha": "aed0323cb3baa34313dede0d5d08b8af35c4f7a7",
+  "preview_project_ref": "nkgfoppunmnkcumalxqp",
+  "preview_branch_id": "8c0affc1-b43b-44ac-b2eb-66715ed40252",
+  "preview_migration_head": "20261017202800",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-question-freeze-v1.sql",
+  "schema_types_sha256": "e645cb77a8e130f4505c51f936fadbccf8153276eb60dab313618fcacde98d1b",
+  "schema_migration_count": 236,
+  "schema_migration_head": "20261017202800",
+  "verified_at": "2026-10-17T20:44:27.702Z",
+  "disposable_baseline_evidence": "https://github.com/bjuta/wakilisha/actions/runs/39067363103",
+  "native_preview_cli_evidence": "https://github.com/bjuta/wakilisha/actions/runs/39067798512",
+  "production_promotion": "not_run",
+  "independent_preview_verifier_evidence": "Independent connected Supabase read-only verifier executed after native push, with an additional live read-only ACL and 236-head assertion in https://github.com/bjuta/wakilisha/actions/runs/39067971355. The native run separately checked preserved case/research/membership/hold/job row fingerprints.",
+  "note": "The existing Preview retained its legitimate DB04–DB06 and QV1 predecessors, original case, two research passes, membership and Hold. No reset or question fixture. QV2 adds a human writer but no authentic graded source. Production unchanged."
+}

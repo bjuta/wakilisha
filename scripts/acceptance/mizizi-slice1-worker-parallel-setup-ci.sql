@@ -1,5 +1,5 @@
 -- WAKILISHA Slice 1 true-concurrency fixture. CI-only disposable database.
--- Fresh disposable local 231 baseline OR exact stacked 235 acceptance ONLY. Never linked, Preview or Production.
+-- Fresh disposable local 231 baseline, 235 research/QV1 or 236 QV2 acceptance ONLY. Never linked, Preview or Production.
 -- SET SESSION AUTHORIZATION is a local simulator, NOT a real service JWT/JIT login.
 -- This separate fixture must COMMIT to become visible to two independent DB sessions.
 -- Never run on a linked or hosted database. The CI job destroys its local volume.
@@ -14,6 +14,7 @@ BEGIN
  IF NOT (
      (n=231 AND head='20261015091718')
      OR (n=235 AND head='20261017185928')
+     OR (n=236 AND head='20261017202800')
    )
    OR session_user<>'supabase_admin' OR current_user<>'supabase_admin'
    OR NOT (SELECT rolsuper FROM pg_roles WHERE rolname='supabase_admin')
@@ -23,7 +24,7 @@ BEGIN
    OR to_regprocedure('public.mizizi_claim_case_research_jobs_v1(text,integer,integer)') IS NULL
    OR to_regprocedure('public.mizizi_recover_expired_case_research_jobs_v1(integer,integer)') IS NULL
    OR to_regprocedure('public.mizizi_complete_case_research_job_v1(uuid,text,jsonb)') IS NULL
- THEN RAISE EXCEPTION 'STOP_CI_WORKER_EXACT_EMPTY_LOCAL_231_OR_235_REQUIRED'; END IF;
+ THEN RAISE EXCEPTION 'STOP_CI_WORKER_EXACT_EMPTY_LOCAL_231_235_OR_236_REQUIRED'; END IF;
 END $guard$;
 SELECT id::text AS wk_workspace FROM mizizi_private.workspaces
  WHERE workspace_key='wakilisha-internal' AND status='active' \gset

@@ -60,9 +60,9 @@ async function main(){
   "(SELECT count(*) FROM mizizi_private.cases)||'|'||"+
   "(SELECT count(*) FROM mizizi_private.write_holds)||'|'||"+
   "(SELECT count(*) FROM public.registry_releases);",db);
- assert(baseline==="235|20261017185928|0|0|0|0|0",
+ assert(baseline==="236|20261017202800|0|0|0|0|0",
   "STOP_AUTH_NOT_FRESH_LOCAL_MIZIZI_READER_RLS");
- console.log("WK_AUTH_EMPTY_235_UNLINKED_LOCAL_BASELINE=PASS");
+ console.log("WK_AUTH_EMPTY_236_UNLINKED_LOCAL_BASELINE=PASS");
 
  const admin=client(api,values.SERVICE_ROLE_KEY),people=[];
  for(const label of ["first","second"]){
@@ -142,25 +142,39 @@ async function main(){
   cases[0].caseRevision===1&&UUID.test(cases[0].reviewId||""),
   "STOP_SOURCE_BOUND_CASE_READ_MISMATCH");
  const caseId=cases[0].caseId;
- // MIZIZI #1247: a REAL local JWT read and a LOCAL privileged SQL seed only.
- // Browser clients never have a write or private-table permission.
+ // QV2: genuine signed-in steward freezes a question, not ACH evidence.
  const emptyQuestion=await call(first.user,"admin_mizizi_case_questions_v1",{
   p_case_id:caseId,p_expected_case_revision:1,
- },"STOP_QV1_AUTH_EMPTY_READ");
- assert(emptyQuestion?.kind==="not_recorded","STOP_QV1_EMPTY_MASQUERADES_AS_ASSESSED");
- requireDenied(await client(api,values.ANON_KEY).rpc("admin_mizizi_case_questions_v1",{
-   p_case_id:caseId,p_expected_case_revision:1,
- }),"42501","STOP_QV1_ANON_READ");
+ },"STOP_QV2_AUTH_EMPTY_READ");
+ assert(emptyQuestion?.kind==="not_recorded","STOP_QV2_EMPTY_NOT_RECORD");
  const qid=randomUUID(),hypA=randomUUID(),hypB=randomUUID();
- localSql("INSERT INTO mizizi_private.case_question_versions("+
-   "workspace_id,case_id,question_id,question_revision,expected_case_revision,"+
-   "question_text,hypotheses,frozen_by_user_id,freeze_reason) VALUES ('"+
-   cases[0].workspaceId+"'::uuid,'"+caseId+"'::uuid,'"+qid+"'::uuid,1,1,"+
-   "'Is this recording the same independently documented original performance?',"+
-   "jsonb_build_array(jsonb_build_object('id','"+hypA+
-   "','label','Same source performance'),jsonb_build_object('id','"+hypB+
-   "','label','Distinct source performance')),'"+first.id+
-   "'::uuid,'Disposable-only reviewed question snapshot for operator reader acceptance.');",db);
+ const questionText="Is this recording the same independently documented original performance?";
+ const hypothesisList=[{id:hypA,label:"Same source performance"},
+  {id:hypB,label:"Distinct source performance"}];
+ const questionArgs={
+  p_case_id:caseId,p_expected_case_revision:1,p_question_id:qid,
+  p_expected_question_revision:0,p_question_text:questionText,
+  p_hypotheses:hypothesisList,
+  p_reason:"Disposable signed-in steward question freeze pending independent review.",
+ };
+ requireDenied(await client(api,values.ANON_KEY).rpc("admin_mizizi_freeze_case_question_v1",questionArgs),
+  "42501","STOP_QV2_ANON_FREEZE");
+ const firstFreeze=await call(first.user,"admin_mizizi_freeze_case_question_v1",
+  questionArgs,"STOP_QV2_REAL_JWT_STEWARD_FREEZE");
+ assert(firstFreeze.outcome==="created"&&firstFreeze.questionId===qid&&
+  firstFreeze.questionRevision===1&&firstFreeze.caseRevision===1&&
+  /^[a-f0-9]{64}$/.test(firstFreeze.questionFingerprint||""),
+  "STOP_QV2_AUTH_CREATED_RECEIPT");
+ const replay=await call(first.user,"admin_mizizi_freeze_case_question_v1",
+  questionArgs,"STOP_QV2_IDENTICAL_RETRY");
+ assert(replay.outcome==="replayed"&&replay.questionFingerprint===firstFreeze.questionFingerprint,
+  "STOP_QV2_IDEMPOTENCY");
+ requireDenied(await first.user.rpc("admin_mizizi_freeze_case_question_v1",{
+  ...questionArgs,p_question_text:questionText+" Different claim without new revision.",
+ }),"PT409","STOP_QV2_CHANGED_PAYLOAD_NOT_REPLAY");
+ const frozenCount=localSql("SELECT count(*)::text FROM mizizi_private.case_question_versions"+
+  " WHERE question_id='"+qid+"'::uuid;",db);
+ assert(frozenCount==="1","STOP_QV2_NO_DUPLICATE_VERSION");
  const frozen=await call(first.user,"admin_mizizi_case_questions_v1",{
    p_case_id:caseId,p_expected_case_revision:1,
  },"STOP_QV1_AUTH_POSITIVE_READ");
@@ -257,6 +271,9 @@ async function main(){
  requireDenied(await subscriber.rpc("admin_mizizi_case_questions_v1",{
    p_case_id:caseId,p_expected_case_revision:1,
  }),"42501","STOP_QV1_SIGNED_IN_NONMEMBER_DENIED");
+ requireDenied(await subscriber.rpc("admin_mizizi_freeze_case_question_v1",{
+  ...questionArgs,p_question_id:randomUUID(),
+ }),"42501","STOP_QV2_NONMEMBER_FREEZE_DENIED");
  requireDenied(await subscriber.rpc("admin_mizizi_begin_case_research_v1",
   {p_case_id:caseId,p_expected_revision:1,
    p_reason:"Unprivileged subscriber cannot change a source-bound case."}),
@@ -301,6 +318,9 @@ async function main(){
   p_case_id:caseId,p_expected_revision:1,
   p_reason:"Reviewer can inspect evidence but may not start research."}),
   "42501","STOP_O24_REVIEWER_STAGE_ROLE_BOUNDARY");
+ requireDenied(await reviewer.rpc("admin_mizizi_freeze_case_question_v1",{
+  ...questionArgs,p_question_id:randomUUID(),
+ }),"42501","STOP_QV2_REVIEWER_FREEZE_DENIED");
  const reviewerImmutable=localSql("SELECT revision::text||'|'||case_state||'|'||"+
   "current_stage||'|'||(SELECT count(*)::text FROM mizizi_private.case_events"+
   " WHERE case_id='"+caseId+"'::uuid) FROM mizizi_private.cases"+
@@ -319,6 +339,9 @@ async function main(){
  assert(progressed.caseId===caseId&&progressed.revision===2&&
   progressed.stage==="research","STOP_CASE_REVISION_RECEIPT");
  console.log("WK_AUTH_REAL_JWT_SOURCE_CASE_STAGE2_RECEIPT=PASS");
+ requireDenied(await first.user.rpc("admin_mizizi_freeze_case_question_v1",{
+  ...questionArgs,p_expected_question_revision:1,
+ }),"PT409","STOP_QV2_STALE_CASE_REVISION_DENIED");
  requireDenied(await first.user.rpc("admin_mizizi_case_questions_v1",{
    p_case_id:caseId,p_expected_case_revision:1,
  }),"PT409","STOP_QV1_CLIENT_STALE_CASE_REVISION");
@@ -391,6 +414,10 @@ async function main(){
  assert(h36==="1|active|workspace|true|true|true|true|true|1|1|0",
   "STOP_H36_SIGNED_IN_SOURCE_SCOPED_HOLD_IMMUTABLE_AUDIT_OR_GRANT_DRIFT");
  console.log("WK_AUTH_H36_EXACT_SIGNED_IN_WORKSPACE_HOLD_ISSUANCE_JOURNAL=PASS");
+ requireDenied(await first.user.rpc("admin_mizizi_freeze_case_question_v1",{
+  ...questionArgs,p_expected_case_revision:2,p_expected_question_revision:1,
+ }),"42501","STOP_QV2_ACTIVE_HOLD_FREEZE_DENIED");
+ console.log("WK_QV2_ACTIVE_DB05_HOLD_FREEZE_DENIED=PASS");
  const visible=await call(second.user,"admin_mizizi_list_workspace_holds_v1",
   {p_limit:100},"STOP_SECOND_JWT_HOLD_VIEW");
  assert(visible.some(h=>h.holdId===hold.holdId&&h.status==="active"),
@@ -408,6 +435,13 @@ async function main(){
   {p_limit:100},"STOP_RECORDED_RELEASE_QUERY");
  assert(settled.filter(x=>x.holdId===hold.holdId&&
   x.status==="released"&&x.revision===2).length===1,"STOP_RELEASED_HOLD_READ");
+ const reFreeze=await call(first.user,"admin_mizizi_freeze_case_question_v1",{
+  ...questionArgs,p_expected_case_revision:2,p_expected_question_revision:1,
+ },"STOP_QV2_REFRESH_AFTER_HOLD_RELEASE");
+ assert(reFreeze.outcome==="revised"&&reFreeze.questionRevision===2&&
+  reFreeze.caseRevision===2&&reFreeze.questionFingerprint!==firstFreeze.questionFingerprint,
+  "STOP_QV2_REVISION_ADVANCE_AFTER_HOLD");
+ console.log("WK_QV2_AUTH_REFRESH_AFTER_HOLD_RELEASE=PASS");
  const evidence=localSql("SELECT (SELECT count(*) FROM mizizi_private.write_hold_events"+
   " WHERE hold_id='"+hold.holdId+"'::uuid AND event_kind='hold_released')::text||'|'||"+
   "(SELECT count(*) FROM platform_private.registry_execution_grants"+
