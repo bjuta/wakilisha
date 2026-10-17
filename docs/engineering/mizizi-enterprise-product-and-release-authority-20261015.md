@@ -1,5 +1,16 @@
 # MIZIZI Enterprise Product and Release Authority
 
+## 17 October 2026: confidential-question pass containment
+
+**Why:** A model-restricted source could already be redacted in the immutable research pass while the accompanying original research question remained verbatim. A human-only question may identify the same witness, a confidential artefact, or a private investigative lead. The 16 October Preview v21 source-metadata fix does not, on its own, close this leak.
+
+**Narrow PR #1243 correction (not yet deployed):** For a pass containing any model-restricted source, persist the static question `Private research question held by authorized evidence custodian.` instead of the original question. Keep the original question only in the authorized runtime/custody context; do not preserve a reversible encoding or unsalted guessable digest in the pass. The source UUID and journal ordinal still link the redacted pass to the case. Existing historic pass fingerprints, the accepted `mizizi.human_review_required.v1` method identifier, the original retry/job receipts, and public-source investigation semantics are unchanged. The existing research test now uses a deliberately private question and rejects its appearance anywhere in the immutable serialized pass; no extra test framework or schema migration was added.
+
+**Exact proof boundary:** Protected CI and isolated Preview v22 deployment are *not* assumed complete by this document; verify them against the exact subsequent commit. The original question can still exist in authorized case/job/custodian records, and this change is not proof of real consent, withdrawal, independent cultural adjudication, or customer-tenant privacy. Production temporary-access-at-rest remains a separate release blocker, with no Production mutation authorized in this research work.
+
+---
+
+
 ## 16 October 2026: field-first research correction (post-assessment)
 
 **A new assessment challenged the underlying research function, not merely the next provider.** Independent reinspection of draft PR #1243 confirmed that `verifySource` had prohibited internally consented evidence whenever `externalModelProcessingAllowed=false`, `selectLead` ranked its own suggestions using model-provided scores, and the analyst had received prior unverified findings. This makes "read provider → ask model → append pass" structurally unable to investigate restricted oral history, physical artefacts or locally custodied records. The proposed permanent substrate is the already existing case, attestation, provenance, restricted execution, immutable pass and human adjudication infrastructure—not a connector platform.
