@@ -6,10 +6,10 @@ set local lock_timeout='5s';
 set local statement_timeout='120s';
 do $gate$
 begin
- if (select count(*) from supabase_migrations.schema_migrations)<>234
-   or (select max(version) from supabase_migrations.schema_migrations)<>'20261016114918'
+ if (select count(*) from supabase_migrations.schema_migrations)<>235
+   or (select max(version) from supabase_migrations.schema_migrations)<>'20261017185928'
    or to_regclass('mizizi_private.research_passes') is null
- then raise exception 'DB04/DB05/DB06 require exact 234-migration replay';end if;
+ then raise exception 'DB04/DB05/DB06 require exact 235-migration replay';end if;
  if has_table_privilege('service_role','mizizi_private.research_passes','SELECT')
     or has_table_privilege('authenticated','mizizi_private.research_passes','SELECT')
     or has_table_privilege('anon','mizizi_private.research_passes','INSERT')
