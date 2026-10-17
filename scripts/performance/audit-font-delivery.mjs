@@ -224,3 +224,12 @@ const totalBytes = manifest.assets.reduce(
 console.log(
   `WAKILISHA_FONT_DELIVERY_AUDIT_PASS assets=${manifest.assets.length} bytes=${totalBytes} preloads=${manifest.preloads.length}`,
 );
+
+const wkBrandFontCss=fs.readFileSync("src/styles/wakilisha-workbook-fonts.css","utf8");
+const wkBrandTokens=fs.readFileSync("src/design-system/wakilisha.tokens.css","utf8");
+if(wkBrandTokens!==fs.readFileSync("packages/design-system/src/wakilisha.tokens.css","utf8"))throw new Error("Brand token mirrors diverged");
+if(!rootCss.includes('@import "./styles/wakilisha-workbook-fonts.css";'))throw new Error("Workbook font import missing");
+for(const val of ["--wk-font-body:'Figtree'","--wk-font-mono:'IBM Plex Mono'","--wk-bg:#FCFCFB","--wk-bg:#0B0B0B","--wk-brand:#85C441"])if(!wkBrandTokens.includes(val))throw new Error("Workbook token missing: "+val);
+for(const [name,digest] of [["figtree-latin.woff2","8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928"],["figtree-latin-ext.woff2","f153aa07c1b16fbb12391c2512860c97819a0a9fd014f338b2b3f12496479d13"],["plexmono-400-latin.woff2","c36f509c0a8f9f85f29cb44bc8701d8a9e0b14c499e77a884f789ead7093a7ac"],["plexmono-400-latin-ext.woff2","f1050dc5317b43434c0aeda599d4624c774ffc162e87a8cf204b949b6a85816d"],["plexmono-500-latin.woff2","a76f53ca6612e7b3828eec2311098675b7f9849ae4169a8bcef6302aec02a6c0"],["plexmono-500-latin-ext.woff2","77f03e26f981c582bdba3a7abed4baa2d3149211c01366bb3ab3ba7622ec4ae5"]]){const bytes=fs.readFileSync("public/assets/fonts/workbook/"+name);if(bytes.toString("ascii",0,4)!=="wOF2"||crypto.createHash("sha256").update(bytes).digest("hex")!==digest)throw new Error("Workbook font SHA: "+name);if(!wkBrandFontCss.includes("/assets/fonts/workbook/"+name))throw new Error("Missing face "+name)}
+for(const n of ["FIGTREE-OFL.txt","IBM-PLEX-OFL.txt"])if(!/SIL OPEN FONT LICENSE/i.test(fs.readFileSync("public/assets/fonts/workbook/licenses/"+n,"utf8")))throw new Error("Missing Workbook OFL");
+console.log("WK_WORKBOOK_GLOBAL_FOUNDATION_AUDIT_PASS");
