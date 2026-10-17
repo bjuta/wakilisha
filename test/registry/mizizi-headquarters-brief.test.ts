@@ -110,6 +110,9 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(page).toContain('{ id: "enterprise", label: "Enterprise", disabled: true }');
     expect(page).toContain('view === "field_capture" || view === "published_cores" || view === "enterprise"');
     expect(page).toContain('navigate("/credits")');
+    expect(page).toContain('<WkDisclosure');
+    expect(page).toContain('triggerClassName="mz-future-trigger"');
+    expect(page).toContain("Field, Cores, Enterprise and Ask MIZIZI are not yet available. Why?");
     for (const reason of ["Field unavailable:", "Cores unavailable:", "Enterprise unavailable:", "Ask MIZIZI unavailable:"]) {
       expect(page).toContain(reason);
     }

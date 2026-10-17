@@ -9,6 +9,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { WkSplitWorkspace } from "@/components/data-viz/WkSplitWorkspace";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkTabs } from "@/components/design-system/primitives/Tabs";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
 import { Input, Label, TextArea as AriaTextArea, TextField as AriaTextField } from "react-aria-components";
@@ -736,12 +737,17 @@ function AdminMiziziWorkspaceContent() {
         panelClassName=""
       >
         <div className="mz-rootband" aria-hidden="true" />
-        <div className="mz-future-note" role="note" aria-label="MIZIZI connection boundaries">
-          <span><strong>Field unavailable:</strong> Case-scoped evidence capture and custody are not yet accepted.</span>
-          <span><strong>Cores unavailable:</strong> No authorized public case publication is connected.</span>
-          <span><strong>Enterprise unavailable:</strong> No accepted customer delivery or acknowledgement exists.</span>
-          <span><strong>Ask MIZIZI unavailable:</strong> The research runner is not an authorized Production UI action.</span>
-        </div>
+        <WkDisclosure
+          summary="Field, Cores, Enterprise and Ask MIZIZI are not yet available. Why?"
+          className="mz-future-note"
+          triggerClassName="mz-future-trigger"
+          contentClassName="mz-future-detail"
+        >
+          <p><strong>Field unavailable:</strong> Case-scoped evidence capture and custody are not yet accepted.</p>
+          <p><strong>Cores unavailable:</strong> No authorized public case publication is connected.</p>
+          <p><strong>Enterprise unavailable:</strong> No accepted customer delivery or acknowledgement exists.</p>
+          <p><strong>Ask MIZIZI unavailable:</strong> The research runner is not an authorized Production UI action.</p>
+        </WkDisclosure>
         {workspaceView === "decisions" ? (
           <div className="space-y-6">
             <WkWorkflowRail steps={WORKFLOW_STEPS} ariaLabel="MIZIZI workflow" />
