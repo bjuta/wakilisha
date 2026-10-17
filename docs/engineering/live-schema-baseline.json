@@ -1,15 +1,15 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-17T20:44:27.702Z",
-  "typesSha256": "e645cb77a8e130f4505c51f936fadbccf8153276eb60dab313618fcacde98d1b",
+  "generatedAt": "2026-10-17T21:46:32Z",
+  "typesSha256": "96bda850a2e1f7622c48159419647b4932ff1283ab96ad0b2a6324e9f3c58821",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 236,
-  "latestMigration": "20261017202800_mizizi_governed_question_freeze_v1.sql",
+  "migrationCount": 237,
+  "latestMigration": "20261017212255_mizizi_source_family_attestation_v1.sql",
   "schemaSeal": {
     "mode": "preview",
     "sourceProjectRef": "nkgfoppunmnkcumalxqp",
-    "migrationHead": "20261017202800",
+    "migrationHead": "20261017212255",
     "baseMainSha": "aed0323cb3baa34313dede0d5d08b8af35c4f7a7",
     "previewBranchId": "8c0affc1-b43b-44ac-b2eb-66715ed40252"
   }
