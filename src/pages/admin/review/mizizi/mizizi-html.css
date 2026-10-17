@@ -47,6 +47,20 @@
 [data-wk-mizizi-workspace] [role="tablist"] [role="tab"]{
   min-height:43px;white-space:nowrap;
 }
+/* Planned Field capture and published Cores must stay visibly disabled. */
+[data-wk-mizizi-workspace] [role="tablist"] [role="tab"][data-disabled] {
+  opacity:.45;
+  cursor:not-allowed;
+  color:var(--wk-text-muted);
+}
+[data-wk-mizizi-workspace] .mz-future-note {
+  max-width:1350px;
+  margin-inline:auto;
+  padding:8px clamp(14px,2vw,28px);
+  font-size:11px;
+  line-height:1.5;
+  color:var(--wk-text-muted);
+}
 [data-wk-mizizi-workspace] [role="tabpanel"]{
   min-width:0;
 }

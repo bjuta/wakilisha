@@ -99,12 +99,16 @@ describe("Flat master/detail history and evidence workspaces", () => {
 });
 
 describe("MIZIZI reference-inspired, live-data operational workspace", () => {
-  it("keeps Brief, Field, Cores, History and governed Decision Work distinct", () => {
+  it("keeps Brief, Orion, Workbench, History and governed Decision Work distinct", () => {
     const page = readFileSync("src/pages/admin/review/mizizi/page.tsx", "utf8");
     expect(page).toContain('useState<"brief" | "field" | "cores" | "history" | "decisions">("brief")');
-    for (const label of ["Brief", "Field", "Cores", "History", "Decision Work"]) {
+    for (const label of ["Brief", "Orion", "Workbench", "History", "Decision Work"]) {
       expect(page).toContain(`label: "${label}"`);
     }
+    expect(page).toContain('{ id: "field_capture", label: "Field", disabled: true }');
+    expect(page).toContain('{ id: "published_cores", label: "Cores", disabled: true }');
+    expect(page).toContain('view === "field_capture" || view === "published_cores"');
+    expect(page).toContain("Field evidence capture and published Cores are unavailable");
     expect(page).toContain('workspaceView === "decisions"');
     expect(page).toContain('view={workspaceView}');
     expect(page).toContain('onShowCases={() => setWorkspaceView("cores")}');
@@ -133,7 +137,7 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(source).toContain("queue.recentOpen.slice(0, 4)");
     expect(source).toContain('<MiziziEvidenceWorkbench mode="history"');
     expect(source).toContain("Show Receipt");
-    expect(source).toContain("View Evidence in Cores");
+    expect(source).toContain("View Evidence in Workbench");
     expect(source).toContain("expandedReceipt === item.reviewId");
     expect(source).toContain("<WkSurface");
     expect(source).toContain("<MiziziReviewField");
