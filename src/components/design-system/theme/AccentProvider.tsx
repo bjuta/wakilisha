@@ -19,9 +19,9 @@ function readAppearance(): AppearancePrefs | null {
 }
 
 /**
- * Parses a hex color like "#84C241" into its RGB channels (0-255).
+ * Parses a saved personal accent into its RGB channels (0-255).
  * Used to set CSS variable overrides so the accent color from settings
- * replaces the default --wk-brand token globally.
+ * never alters canonical --wk-brand or evidence tokens.
  */
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const clean = hex.replace("#", "");
@@ -37,8 +37,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
  * Listens for localStorage changes to `wk-appearance-v2` and
  * applies the accent color as CSS custom properties on :root.
  *
- * The accent is mapped to --wk-brand, --wk-brand-rgb, --wk-brand-2,
- * and --wk-brand-soft so the whole UI responds to the user's choice.
+ * Personal accent metadata is retained, but no longer overrides the Workbook brand.
  */
 export function AccentProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {

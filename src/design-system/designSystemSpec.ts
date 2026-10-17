@@ -45,8 +45,8 @@ const canonicalTotals = canonicalChapterEnhancements.reduce(
 export const wakilishaDesignSystemSpec: WkDesignSystemSpec = {
   meta: {
     name: 'WAKILISHA Design System',
-    version: 'v5.0',
-    sourceDocument: 'wakilisha-design-system-v5 (4).html',
+    version: 'Workbook v4 (foundation migration)',
+    sourceDocument: 'MIZIZI WAKILISHA Brand Workbook.dc.html',
     northStar: 'One system. Every WAKILISHA surface.',
     principles: [
       'Cinematic restraint',
