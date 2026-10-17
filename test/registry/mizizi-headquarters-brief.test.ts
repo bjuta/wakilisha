@@ -107,8 +107,12 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     }
     expect(page).toContain('{ id: "field_capture", label: "Field", disabled: true }');
     expect(page).toContain('{ id: "published_cores", label: "Cores", disabled: true }');
-    expect(page).toContain('view === "field_capture" || view === "published_cores"');
-    expect(page).toContain("Field evidence capture and published Cores are unavailable");
+    expect(page).toContain('{ id: "enterprise", label: "Enterprise", disabled: true }');
+    expect(page).toContain('view === "field_capture" || view === "published_cores" || view === "enterprise"');
+    expect(page).toContain('navigate("/credits")');
+    for (const reason of ["Field unavailable:", "Cores unavailable:", "Enterprise unavailable:", "Ask MIZIZI unavailable:"]) {
+      expect(page).toContain(reason);
+    }
     expect(page).toContain('workspaceView === "decisions"');
     expect(page).toContain('view={workspaceView}');
     expect(page).toContain('onShowCases={() => setWorkspaceView("cores")}');

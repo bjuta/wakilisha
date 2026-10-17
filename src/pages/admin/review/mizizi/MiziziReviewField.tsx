@@ -353,7 +353,7 @@ export function MiziziReviewField({ queue, onInspect }: {
         onPointerLeave={() => setHover(null)} />
       <div className="mz-field-panel">
         <h2>Orion</h2>
-        <p>Explore recorded credits and reviews. Lines connect exact Registry IDs. Scroll to zoom, drag to move.</p>
+        <p>Explore recorded credits and reviews. Links reflect Registry records, not proven authorship or ownership. Scroll to zoom, drag to move.</p>
         <WkSearchField ariaLabel="Find a recorded artist credit, recording, release, or ISRC"
           className="wk-mizizi-search" inputClassName="h-11"
           placeholder="Search artist, recording, or ISRC" value={search}

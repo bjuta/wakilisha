@@ -54,11 +54,20 @@
   color:var(--wk-text-muted);
 }
 [data-wk-mizizi-workspace] .mz-future-note {
-  max-width:1350px;
-  margin-inline:auto;
-  padding:8px clamp(14px,2vw,28px);
+  display:flex;
+  flex-wrap:wrap;
+  align-items:baseline;
+  column-gap:16px;
+  row-gap:5px;
+  padding:11px clamp(14px,2vw,28px);
+  background:var(--wk-surface-raised);
+  border-bottom:1px solid var(--wk-border);
+  color:var(--wk-text-muted);
   font-size:11px;
-  line-height:1.5;
+  line-height:1.6;
+}
+[data-wk-mizizi-workspace] .mz-future-note strong {
+  font-weight:700;
   color:var(--wk-text-muted);
 }
 [data-wk-mizizi-workspace] [role="tabpanel"]{

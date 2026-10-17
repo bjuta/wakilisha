@@ -697,6 +697,10 @@ function AdminMiziziWorkspaceContent() {
         <span className="mz-context" title="Current internal Registry authority">Internal Registry</span>
         <div className="mz-right">
           <WkButton variant="ghost" className="wk-button-sm"
+            onClick={() => navigate("/credits")}>
+            <WkIcon name="Contact" size={14} aria-hidden="true" /> Your Credits
+          </WkButton>
+          <WkButton variant="ghost" className="wk-button-sm"
             onClick={() => navigate("/admin/review/queue")}>
             <WkIcon name="ClipboardList" size={14} aria-hidden="true" /> All Reviews
           </WkButton>
@@ -720,10 +724,11 @@ function AdminMiziziWorkspaceContent() {
           { id: "decisions", label: "Decision Work" },
           { id: "field_capture", label: "Field", disabled: true },
           { id: "published_cores", label: "Cores", disabled: true },
+          { id: "enterprise", label: "Enterprise", disabled: true },
         ] as const}
         value={workspaceView}
         onChange={(view) => {
-          if (view === "field_capture" || view === "published_cores") return;
+          if (view === "field_capture" || view === "published_cores" || view === "enterprise") return;
           setWorkspaceView(view);
         }}
         ariaLabel="MIZIZI workspace sections"
@@ -731,10 +736,12 @@ function AdminMiziziWorkspaceContent() {
         panelClassName=""
       >
         <div className="mz-rootband" aria-hidden="true" />
-        <p className="mz-future-note">
-          Field evidence capture and published Cores are unavailable until their
-          permissions and publication contracts are accepted.
-        </p>
+        <div className="mz-future-note" role="note" aria-label="MIZIZI connection boundaries">
+          <span><strong>Field unavailable:</strong> Case-scoped evidence capture and custody are not yet accepted.</span>
+          <span><strong>Cores unavailable:</strong> No authorized public case publication is connected.</span>
+          <span><strong>Enterprise unavailable:</strong> No accepted customer delivery or acknowledgement exists.</span>
+          <span><strong>Ask MIZIZI unavailable:</strong> The research runner is not an authorized Production UI action.</span>
+        </div>
         {workspaceView === "decisions" ? (
           <div className="space-y-6">
             <WkWorkflowRail steps={WORKFLOW_STEPS} ariaLabel="MIZIZI workflow" />
