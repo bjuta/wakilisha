@@ -720,20 +720,31 @@ function AdminMiziziWorkspaceContent() {
           </span>
         </div>
       </header>
+      <div className="mz-v3-rail-brand" aria-label="MIZIZI Headquarters">
+        <span className="mz-v3-rail-wordmark">MIZIZI</span>
+        <span className="mz-v3-rail-subtitle">HEADQUARTERS</span>
+      </div>
 
       <WkTabs
+        className="mz-v3-tabs"
         items={[
           { id: "brief", label: "Workbench" },
           { id: "field", label: "Orion" },
           { id: "decisions", label: "Review" },
           { id: "cores", label: "Evidence" },
           { id: "history", label: "Outcomes" },
+          { id: "field_capture", label: "Field", disabled: true },
+          { id: "contributions", label: "Contributions", disabled: true },
+          { id: "record", label: "Record", disabled: true },
         ] as const}
         value={workspaceView}
-        onChange={(view) => setWorkspaceView(view)}
-        ariaLabel="MIZIZI workspace sections"
-        tabListClassName="overflow-x-auto"
-        panelClassName=""
+        onChange={(view) => {
+          if (view === "field_capture" || view === "contributions" || view === "record") return;
+          setWorkspaceView(view);
+        }}
+        ariaLabel="MIZIZI Headquarters navigation"
+        tabListClassName="mz-v3-rail"
+        panelClassName="mz-v3-panel"
       >
         <div className="mz-rootband" aria-hidden="true" />
         <WkDisclosure

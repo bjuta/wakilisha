@@ -123,6 +123,16 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
       ["cores", "Evidence"], ["history", "Outcomes"],
     ]) expect(page).toContain(`id: "${id}", label: "${label}"`);
     expect(page).toContain('aria-label="MIZIZI product surfaces"');
+    expect(page).toContain('className="mz-v3-tabs"');
+    expect(page).toContain('tabListClassName="mz-v3-rail"');
+    expect(page).toContain('aria-label="MIZIZI Headquarters"');
+    for (const surface of ["Field","Contributions","Record"])
+      expect(page).toContain(`label: "${surface}", disabled: true`);
+    const css=readFileSync("src/pages/admin/review/mizizi/mizizi-html.css","utf8");
+    expect(css).toContain("--mz-v3-rail-width:248px");
+    expect(css).toContain("grid-template-rows:64px minmax(0,1fr)");
+    expect(css).toContain("min-height:44px");
+    expect(css).toContain("@media(max-width:768px)");
     expect(page).toContain('aria-current="page" className="mz-v4-surface-current">Headquarters');
     for (const surface of ["Field", "Contributions", "Record"]) {
       expect(page).toContain(`>${surface}</button>`);
