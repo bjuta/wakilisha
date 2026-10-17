@@ -23,8 +23,8 @@ function localSql(query,container){
   "-A","-t","-v","ON_ERROR_STOP=1","-U","supabase_admin","-d","postgres"],
   {input:query,encoding:"utf8",timeout:180000,maxBuffer:512*1024});
  if(result.error||result.status!==0)throw new Error(
-  "LOCAL_SQL_"+String((result.stderr||"").match(/ERROR:\s*([^\n]+)/)?.[1]||
-  "UNKNOWN").replace(/[^A-Za-z0-9_]/g,"_").slice(0,110));
+  "LOCAL_SQL: "+String((result.stderr||"").match(/ERROR:\s*([^\n]+)/)?.[1]||
+  "UNKNOWN").replace(/[^A-Za-z0-9_ ]/g," ").replace(/\s+/g," ").slice(0,110));
  return result.stdout.trim();
 }
 function requireDenied(result,sqlstate,label){
