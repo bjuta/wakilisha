@@ -307,8 +307,13 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // grant to resolve it. Source/custody metadata and the original payload
   // digest must stay with the independently authorized custodian.
   const restrictedReceipt=(source:SourceAuthorityV1)=>!source.externalModelProcessingAllowed;
+  // A private witness can be named in the question itself. The custodian,
+  // not the permanent research-pass journal, must retain that context.
+  const receiptQuestion=humanOnly?
+   "Private research question held by authorized evidence custodian.":question;
   const body={contract:ADAPTIVE_INVESTIGATION_CONTRACT,caseId:identity.caseId,
-   workspaceId:identity.workspaceId,ordinal:history.length+1,question,
+   workspaceId:identity.workspaceId,ordinal:history.length+1,
+   question:receiptQuestion,
    predecessorFingerprint:previous,
    sourceReceipts:sources.map(({source:a,citation,excerpt})=>({
     sourceId:a.sourceId,
