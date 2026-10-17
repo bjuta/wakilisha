@@ -1024,3 +1024,50 @@
   [data-wk-mizizi-workspace] .mz-case-event > :last-child { grid-column:2; }
   [data-wk-mizizi-workspace] .mz-case-next { flex-direction:column; }
 }
+
+
+
+/* Product v2 identity: a typographic MIZIZI mark and neutral controls. */
+[data-wk-mizizi-workspace] .mz-head {
+  background: var(--mz-product-ink);
+  color: var(--mz-product-paper);
+  border-bottom: 1px solid var(--mz-product-ink);
+}
+[data-wk-mizizi-workspace] .mz-wordmark {
+  font: 700 16px/1.2 "Instrument Sans", var(--wk-font-display,sans-serif);
+  letter-spacing: .16em;
+  color: var(--mz-product-paper);
+}
+[data-wk-mizizi-workspace] .mz-small {
+  font: 400 11px/1.4 "Instrument Sans", var(--wk-font-body,sans-serif);
+  letter-spacing: 0;
+  color: oklch(0.80 0.003 250);
+}
+[data-wk-mizizi-workspace] .mz-context,
+[data-wk-mizizi-workspace] .mz-readonly {
+  background: transparent;
+  border-color: oklch(0.50 0.003 250);
+  color: oklch(0.89 0.003 250);
+  border-radius: 4px;
+}
+[data-wk-mizizi-workspace] .mz-right .wk-button {
+  border-color: oklch(0.56 0.003 250);
+  color: var(--mz-product-paper);
+  background: transparent;
+  border-radius: 4px;
+}
+[data-wk-mizizi-workspace] .mz-right .wk-button:hover {
+  background: oklch(0.32 0.005 250);
+}
+[data-wk-mizizi-workspace] .mz-right .wk-button:focus-visible {
+  outline: 2px solid var(--mz-product-paper);
+  outline-offset: 2px;
+}
+[data-wk-mizizi-workspace] .mz-rootband {
+  height: 1px;
+  background: var(--mz-product-line);
+}
+[data-wk-mizizi-workspace] [role="tablist"] [role="tab"][data-selected] {
+  color: var(--mz-product-ink);
+  border-bottom: 2px solid var(--mz-product-ink);
+}
