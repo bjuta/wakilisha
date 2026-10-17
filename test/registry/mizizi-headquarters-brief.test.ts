@@ -473,6 +473,10 @@ describe("Headquarters complete Registry review inventory", () => {
     // Product v4 explicitly owns a route-scoped neutral palette; the old
     // platform-wide no-hex restriction no longer applies inside MIZIZI.
     expect(css).toContain("--mz-paper:#FCFCFB;");
+    expect(css).toContain("--mz-established:#85C441;");
+    expect(css).toContain("--mz-established-bg:#EDF5E3;");
+    expect(css).toContain("--mz-established-fg:#4E7425;");
+    expect(css).toContain("--mz-h1:700 34px/1.15");
     expect(css).toContain("--mz-canvas:#ECEBE8;");
     expect(css).toContain("[data-wk-mizizi-workspace] {");
     expect(css).toContain("--wk-font-body:var(--mz-font-sans);");

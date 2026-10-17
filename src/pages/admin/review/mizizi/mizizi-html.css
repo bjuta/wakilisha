@@ -1173,9 +1173,9 @@
   --mz-wash:oklch(0.98 0.002 250);
   --mz-hover:oklch(0.965 0.002 250);
   --mz-shelf:oklch(0.965 0.003 70);
-  --mz-established:oklch(0.58 0.13 150);
-  --mz-established-bg:oklch(0.95 0.035 150);
-  --mz-established-fg:oklch(0.40 0.11 150);
+  --mz-established:#85C441;
+  --mz-established-bg:#EDF5E3;
+  --mz-established-fg:#4E7425;
   --mz-supported:oklch(0.58 0.13 240);
   --mz-supported-bg:oklch(0.95 0.035 240);
   --mz-supported-fg:oklch(0.40 0.11 240);
@@ -1190,7 +1190,7 @@
   --mz-unknown-fg:oklch(0.42 0.005 250);
   --mz-unknown-border:oklch(0.72 0.005 250);
   --mz-display:600 40px/1.05 var(--mz-font-sans);
-  --mz-h1:600 34px/1.15 var(--mz-font-sans);
+  --mz-h1:700 34px/1.15 var(--mz-font-sans);
   --mz-h2:600 24px/1.3 var(--mz-font-sans);
   --mz-h3:600 21px/1.3 var(--mz-font-sans);
   --mz-h4:600 17px/1.35 var(--mz-font-sans);
