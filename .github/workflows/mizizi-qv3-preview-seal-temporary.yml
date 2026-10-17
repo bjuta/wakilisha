@@ -39,7 +39,7 @@ jobs:
           test "$GITHUB_BASE_REF" = "feat/mizizi-governed-question-freeze-v1"
           test "$PREVIEW_REF" != "$PROD_REF"
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          test "$(git ls-remote origin refs/heads/$HEAD_BRANCH | awk '{print $1}')" = "$EXPECTED_SHA"
+          test "$(git ls-remote origin refs/heads/$HEAD_BRANCH | awk '{print $1}')" = "$EXPECTED_SHA" || { echo STOP_QV3_HEAD_ADVANCED; exit 1; }
           test -n "$SUPABASE_ACCESS_TOKEN"
           test ! -e supabase/.temp/project-ref
           test -z "$(git status --porcelain)"
