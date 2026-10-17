@@ -1521,3 +1521,34 @@
 @media(prefers-reduced-motion:reduce) {
   [data-wk-mizizi-workspace] .mz-v3-rail [role="tab"] {transition:none}
 }
+
+/* v3 case selector: existing DB02 list in one accessible pill instead of
+   a second 235px side rail competing with the canonical 248px shell. */
+[data-wk-mizizi-workspace] .mz-case-layout {
+  display:grid;grid-template-columns:minmax(0,1fr);
+  gap:20px;margin-top:0;min-width:0;
+}
+[data-wk-mizizi-workspace] .mz-case-switcher {
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;min-width:0;padding:0;border:0;
+}
+[data-wk-mizizi-workspace] .mz-case-select {width:min(100%,460px)}
+[data-wk-mizizi-workspace] .mz-case-select [data-wk-select-trigger],
+[data-wk-mizizi-workspace] .mz-case-select-trigger {
+  height:44px;min-height:44px;width:100%;
+  border-radius:999px;border:1px solid var(--mz-line-strong);
+  background:#fff;color:var(--mz-ink);font:600 14px/1.3 var(--mz-font-sans);
+  padding:0 16px;
+}
+[data-wk-mizizi-workspace] .mz-case-switcher-count {
+  font:400 13px/1.5 var(--mz-font-sans);color:var(--mz-ink-3);
+}
+[data-wk-mizizi-workspace] .mz-v3-rail [data-wk-tab-icon] {
+  width:20px;height:20px;display:inline-flex;flex:none;
+}
+[data-wk-mizizi-workspace] .mz-case-story {min-width:0;}
+@media(max-width:768px) {
+  [data-wk-mizizi-workspace] .mz-case-switcher {align-items:flex-start}
+  [data-wk-mizizi-workspace] .mz-case-select {width:100%}
+  [data-wk-mizizi-workspace] .mz-case-switcher-count {font-size:12px}
+}

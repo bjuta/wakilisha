@@ -124,6 +124,16 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     ]) expect(page).toContain(`id: "${id}", label: "${label}"`);
     expect(page).toContain('aria-label="MIZIZI product surfaces"');
     expect(page).toContain('className="mz-v3-tabs"');
+    const casePanel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
+    const tabs=readFileSync("src/components/design-system/primitives/Tabs.tsx","utf8");
+    expect(casePanel).toContain('<WkSelect');
+    expect(casePanel).toContain('ariaLabel="Switch recorded investigation"');
+    expect(casePanel).toContain('cases.map(item => ({');
+    expect(casePanel).not.toContain('className="mz-case-option"');
+    expect(tabs).toContain('icon?: ReactNode;');
+    expect(tabs).toContain('data-wk-tab-icon');
+    for(const name of ["Folder","Network","ClipboardCheck","Archive","CheckCircle"])
+      expect(page).toContain(`name="${name}" size={20}`);
     expect(page).toContain('tabListClassName="mz-v3-rail"');
     expect(page).toContain('aria-label="MIZIZI Headquarters"');
     for (const surface of ["Field","Contributions","Record"])

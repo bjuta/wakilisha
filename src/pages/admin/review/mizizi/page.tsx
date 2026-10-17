@@ -728,11 +728,11 @@ function AdminMiziziWorkspaceContent() {
       <WkTabs
         className="mz-v3-tabs"
         items={[
-          { id: "brief", label: "Workbench" },
-          { id: "field", label: "Orion" },
-          { id: "decisions", label: "Review" },
-          { id: "cores", label: "Evidence" },
-          { id: "history", label: "Outcomes" },
+          { id: "brief", label: "Workbench", icon: <WkIcon name="Folder" size={20} aria-hidden="true" /> },
+          { id: "field", label: "Orion", icon: <WkIcon name="Network" size={20} aria-hidden="true" /> },
+          { id: "decisions", label: "Review", icon: <WkIcon name="ClipboardCheck" size={20} aria-hidden="true" /> },
+          { id: "cores", label: "Evidence", icon: <WkIcon name="Archive" size={20} aria-hidden="true" /> },
+          { id: "history", label: "Outcomes", icon: <WkIcon name="CheckCircle" size={20} aria-hidden="true" /> },
           { id: "field_capture", label: "Field", disabled: true },
           { id: "contributions", label: "Contributions", disabled: true },
           { id: "record", label: "Record", disabled: true },

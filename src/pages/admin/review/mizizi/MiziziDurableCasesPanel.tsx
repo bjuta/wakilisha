@@ -5,6 +5,7 @@ import { TextArea, TextField, Label } from "react-aria-components";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
+import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkIcon } from "@/components/design-system/Icon";
 import type { HeadquartersQueueV2 } from "@/services/miziziHeadquartersBrief";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
@@ -153,29 +154,29 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
     ) : null}
     {state.kind === "ready" && focusedCase ? (
       <div className="mz-case-layout">
-        <aside className="mz-case-switcher" aria-label="Recorded investigations">
-          <p className="mz-case-eyebrow">Investigations · {cases.length}</p>
-          <div className="mz-case-options">
-            {cases.map(item => (
-              <button key={item.caseId} type="button"
-                aria-pressed={item.caseId === focusedCase.caseId}
-                className="mz-case-option"
-                onClick={() => {setActiveCaseId(item.caseId);setDetailTab("overview");setRecordView("human");}}>
-                <span className="mz-case-option-title">
-                  {queue?.items.find(review => review.id === item.reviewId)?.title
-                    || displayClaim(item.claimFamily)}
-                </span>
-                <span className="mz-case-option-sub">
-                  {item.subjectType} · {item.caseId.slice(0, 8)} · {item.stage.replaceAll("_", " ")}
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="mz-case-scope">
-            <WkIcon name="Lock" size={15} aria-hidden="true" />
-            Internal workspace only. Case access is checked by the existing Headquarters authority.
-          </div>
-        </aside>
+        <div className="mz-case-switcher" aria-label="Recorded investigations">
+          <WkSelect
+            ariaLabel="Switch recorded investigation"
+            className="mz-case-select"
+            triggerClassName="mz-case-select-trigger"
+            value={focusedCase.caseId}
+            onChange={(caseId) => {
+              if (!cases.some(item => item.caseId === caseId)) return;
+              setActiveCaseId(caseId);
+              setDetailTab("overview");
+              setRecordView("human");
+            }}
+            options={cases.map(item => ({
+              value: item.caseId,
+              label: queue?.items.find(review => review.id === item.reviewId)?.title
+                || displayClaim(item.claimFamily),
+              description: `${item.subjectType} · ${item.caseId.slice(0,8)} · ${item.stage.replaceAll("_"," ")}`,
+            }))}
+          />
+          <span className="mz-case-switcher-count">
+            {cases.length} recorded {cases.length === 1 ? "case" : "cases"}
+          </span>
+        </div>
         <article className="mz-case-story" aria-label="Selected investigation">
           <header className="mz-case-hero">
             <div className="mz-case-hero-art" aria-label="No authorized artefact image is connected">
