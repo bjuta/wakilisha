@@ -2,7 +2,7 @@ name: MIZIZI Slice 1 Disposable PostgreSQL Proof
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/mizizi-governed-question-freeze-v1]
     paths:
       - ".github/workflows/mizizi-slice1-disposable-postgres.yml"
       - "scripts/acceptance/mizizi-slice1-worker-disposable-ci.sql"
@@ -19,6 +19,7 @@ on:
       - "scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql"
       - "scripts/control-plane/verify-mizizi-question-version-reader-v1.sql"
       - "scripts/control-plane/verify-mizizi-question-freeze-v1.sql"
+      - "scripts/control-plane/verify-mizizi-question-source-attestations-v1.sql"
       - "supabase/migrations/**"
       - "scripts/registry/agents/mizizi/runtime/**"
 
@@ -77,6 +78,8 @@ jobs:
           test ! -e supabase/migrations/20261017185928_mizizi_question_assessment_authority_v1.sql
           test -f supabase/migrations/20261017202800_mizizi_governed_question_freeze_v1.sql
           mv supabase/migrations/20261017202800_mizizi_governed_question_freeze_v1.sql "$RUNNER_TEMP/wk-mizizi-qv2.sql"
+          test -f supabase/migrations/20261017212255_mizizi_source_family_attestation_v1.sql
+          mv supabase/migrations/20261017212255_mizizi_source_family_attestation_v1.sql "$RUNNER_TEMP/wk-mizizi-qv3.sql"
           test ! -e supabase/migrations/20261017202800_mizizi_governed_question_freeze_v1.sql
 
       - name: Start disposable local database and replay migrations
@@ -128,7 +131,12 @@ jobs:
           supabase migration up --local
           docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
             < scripts/control-plane/verify-mizizi-question-freeze-v1.sql
-          echo "WK_MIZIZI_LOCAL_236_GOVERNED_QUESTION_SQL_PASS=PASS"
+          test -f "$RUNNER_TEMP/wk-mizizi-qv3.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-qv3.sql" supabase/migrations/20261017212255_mizizi_source_family_attestation_v1.sql
+          supabase migration up --local
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-question-source-attestations-v1.sql
+          echo "WK_MIZIZI_LOCAL_237_HUMAN_SOURCE_ATTESTATION_SQL_PASS=PASS"
 
       - name: Destroy disposable PostgreSQL containers and all local data volumes
         if: always()
@@ -205,6 +213,8 @@ jobs:
           test ! -e supabase/migrations/20261017185928_mizizi_question_assessment_authority_v1.sql
           test -f supabase/migrations/20261017202800_mizizi_governed_question_freeze_v1.sql
           mv supabase/migrations/20261017202800_mizizi_governed_question_freeze_v1.sql "$RUNNER_TEMP/wk-mizizi-qv2.sql"
+          test -f supabase/migrations/20261017212255_mizizi_source_family_attestation_v1.sql
+          mv supabase/migrations/20261017212255_mizizi_source_family_attestation_v1.sql "$RUNNER_TEMP/wk-mizizi-qv3.sql"
           test ! -e supabase/migrations/20261017202800_mizizi_governed_question_freeze_v1.sql
 
       - name: Start disposable local database, Auth and REST gateway
@@ -247,7 +257,12 @@ jobs:
           supabase migration up --local
           docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
             < scripts/control-plane/verify-mizizi-question-freeze-v1.sql
-          echo "WK_MIZIZI_LOCAL_236_FOR_GENUINE_JWT=PASS"
+          test -f "$RUNNER_TEMP/wk-mizizi-qv3.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-qv3.sql" supabase/migrations/20261017212255_mizizi_source_family_attestation_v1.sql
+          supabase migration up --local
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-question-source-attestations-v1.sql
+          echo "WK_MIZIZI_LOCAL_237_FOR_GENUINE_JWT=PASS"
 
       - name: Exercise genuine JWT operator bootstrap, case and competing hold RPCs
         shell: bash
