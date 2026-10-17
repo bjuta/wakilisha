@@ -223,7 +223,7 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
           {detailTab === "overview" ? (
             <>
               <section className="mz-case-focus">
-            <div className="mz-case-section-head"><span className="mz-case-eyebrow">Question in this case</span><span className="mz-case-unresolved">Not adjudicated here</span></div>
+            <div className="mz-case-section-head"><span className="mz-case-eyebrow">Linked review lead</span><span className="mz-case-unresolved">Not adjudicated here</span></div>
             <h3>{sourceReview?.title || displayClaim(focusedCase.claimFamily)}</h3>
             <p>The attached Registry review is a research lead. Inspect its original record before choosing an explanation. A review's status does not establish independent evidence or ownership.</p>
           </section>
