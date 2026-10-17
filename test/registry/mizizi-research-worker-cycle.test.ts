@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {screenMiziziQuestionSourcesV1} from "../../scripts/registry/agents/mizizi/runtime/question-source-review-v1";
-import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
+import {screenMiziziQuestionSourcesV1, type SourceReviewInputV1, type SourceAssertionRefV1} from "../../scripts/registry/agents/mizizi/runtime/question-source-review-v1";
+import {runAdaptiveInvestigationV1, type InvestigationPassV1, type SourceAuthorityV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
 import {createAnthropicInvestigationAnalystV1,resolveInstituteAnthropicConfigurationV1,discoverAnthropicResearchModelV1} from "../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1";
 import {createWikidataInvestigationReaderV1} from "../../scripts/registry/agents/mizizi/runtime/wikidata-investigation-reader-v1";
 import {createMusicBrainzWorkReaderV1} from "../../scripts/registry/agents/mizizi/runtime/musicbrainz-work-reader-v1";
@@ -1045,17 +1045,17 @@ describe("MIZIZI question source review queue never grants ACH authority",()=>{
  const sourceId="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
  const assertionId="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
  const hash="f".repeat(64),now="2026-10-17T20:00:00Z";
- const source={sourceId,caseId:scope.caseId,workspaceId:scope.workspaceId,
+ const source:SourceAuthorityV1={sourceId,caseId:scope.caseId,workspaceId:scope.workspaceId,
   originKey:"catalogue:one",lineageKey:"source:one",fingerprint:hash,
   authorityRef:"signed-custodian-1",useBasis:"documented_contract" as const,
   observedAt:"2026-10-16T20:00:00Z",expiresAt:"2026-11-17T20:00:00Z",
   revokedAt:null,privateResearchAllowed:true,privateEvidenceRetentionAllowed:true,
   externalModelProcessingAllowed:false};
- const assertion={assertionId,sourceId,subjectType:"track" as const,subjectId:scope.subjectId,
+ const assertion:SourceAssertionRefV1={assertionId,sourceId,subjectType:"track",subjectId:scope.subjectId,
   assertionFingerprint:hash,sourceUseBasis:"documented_contract",lineageKey:"source:one",
   independenceGroupHint:"looks-independent-but-unverified"};
  const item={source,assertion};
- const run=(input:readonly typeof item[]=[item])=>screenMiziziQuestionSourcesV1(scope,input,now);
+ const run=(input:readonly SourceReviewInputV1[]=[item])=>screenMiziziQuestionSourcesV1(scope,input,now);
  it("does not mistake zero source assertions for a prepared matrix",()=>{
   expect(run([])).toEqual({kind:"not_recorded",rows:[],independentlyVerifiedFamilies:0,achAssessmentsAllowed:0});
  });

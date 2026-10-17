@@ -90,7 +90,7 @@ export function screenMiziziQuestionSourcesV1(
   if(s.caseId.toLowerCase()!==scope.caseId.toLowerCase()||s.workspaceId.toLowerCase()!==scope.workspaceId.toLowerCase())blockers.push("scope_mismatch");
   if(!uuid(s.sourceId)||!digest(s.fingerprint)||!nonempty(s.originKey)||!nonempty(s.lineageKey)||
      !nonempty(s.authorityRef)||!USE.has(s.useBasis))blockers.push("source_identity_invalid");
-  const observed=moment(s.observedAt),expiry=moment(s.expiresAt),revoked=moment(s.revokedAt);
+  const observed=moment(s.observedAt)??NaN,expiry=moment(s.expiresAt),revoked=moment(s.revokedAt);
   if(!Number.isFinite(observed)||observed>now||(expiry!==null&&(!Number.isFinite(expiry)||expiry<=now))||
      revoked!==null)blockers.push("source_expired_or_revoked");
   if(!s.privateResearchAllowed||!s.privateEvidenceRetentionAllowed)blockers.push("private_retention_not_allowed");
@@ -100,7 +100,7 @@ export function screenMiziziQuestionSourcesV1(
        a.subjectType!==scope.subjectType||a.subjectId.toLowerCase()!==scope.subjectId.toLowerCase()||
        !digest(a.assertionFingerprint)||a.assertionFingerprint.toLowerCase()!==s.fingerprint.toLowerCase())
       blockers.push("registry_assertion_mismatch");
-    if(!USE.has(a.sourceUseBasis)||a.sourceUseBasis!==s.useBasis)blockers.push("source_use_not_documented");
+    if(!USE.has(a.sourceUseBasis??"")||a.sourceUseBasis!==s.useBasis)blockers.push("source_use_not_documented");
     if(a.lineageKey===null||a.lineageKey!==s.lineageKey)blockers.push("lineage_conflict");
   }
   if((origins.get(s.originKey+"|"+s.lineageKey)||0)>1)blockers.push("possible_shared_origin");
