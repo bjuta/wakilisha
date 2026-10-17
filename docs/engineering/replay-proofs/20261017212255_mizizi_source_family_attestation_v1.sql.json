@@ -12,7 +12,7 @@
   "schema_types_sha256": "96bda850a2e1f7622c48159419647b4932ff1283ab96ad0b2a6324e9f3c58821",
   "schema_migration_count": 237,
   "schema_migration_head": "20261017212255",
-  "verified_at": "2026-10-17T21:46:32.341Z",
+  "verified_at": "2026-10-17T21:47:34.076Z",
   "disposable_baseline_evidence": "https://github.com/bjuta/wakilisha/actions/runs/39071539232",
   "native_preview_cli_evidence": "https://github.com/bjuta/wakilisha/actions/runs/39071985658",
   "independent_preview_verifier_evidence": "Connected read-only QV3 SQL verifier after accepted 237-head native Preview push.",

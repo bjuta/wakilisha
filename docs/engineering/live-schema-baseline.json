@@ -1,7 +1,7 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-17T21:46:32Z",
+  "generatedAt": "2026-10-17T21:47:34Z",
   "typesSha256": "96bda850a2e1f7622c48159419647b4932ff1283ab96ad0b2a6324e9f3c58821",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 237,
