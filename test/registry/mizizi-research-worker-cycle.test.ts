@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import {screenMiziziQuestionSourcesV1} from "../../scripts/registry/agents/mizizi/runtime/question-source-review-v1";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
 import {createAnthropicInvestigationAnalystV1,resolveInstituteAnthropicConfigurationV1,discoverAnthropicResearchModelV1} from "../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1";
 import {createWikidataInvestigationReaderV1} from "../../scripts/registry/agents/mizizi/runtime/wikidata-investigation-reader-v1";
@@ -1033,5 +1034,80 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   });
   await expect(analyse(identity.openingQuestion,[source],[]))
    .rejects.toThrow("INCOMPLETE_OR_REFUSED");
+ });
+});
+
+
+describe("MIZIZI question source review queue never grants ACH authority",()=>{
+ const scope={workspaceId:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  caseId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",caseRevision:7,
+  subjectType:"track" as const,subjectId:"cccccccc-cccc-4ccc-8ccc-cccccccccccc"};
+ const sourceId="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+ const assertionId="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+ const hash="f".repeat(64),now="2026-10-17T20:00:00Z";
+ const source={sourceId,caseId:scope.caseId,workspaceId:scope.workspaceId,
+  originKey:"catalogue:one",lineageKey:"source:one",fingerprint:hash,
+  authorityRef:"signed-custodian-1",useBasis:"documented_contract" as const,
+  observedAt:"2026-10-16T20:00:00Z",expiresAt:"2026-11-17T20:00:00Z",
+  revokedAt:null,privateResearchAllowed:true,privateEvidenceRetentionAllowed:true,
+  externalModelProcessingAllowed:false};
+ const assertion={assertionId,sourceId,subjectType:"track" as const,subjectId:scope.subjectId,
+  assertionFingerprint:hash,sourceUseBasis:"documented_contract",lineageKey:"source:one",
+  independenceGroupHint:"looks-independent-but-unverified"};
+ const item={source,assertion};
+ const run=(input:readonly typeof item[]=[item])=>screenMiziziQuestionSourcesV1(scope,input,now);
+ it("does not mistake zero source assertions for a prepared matrix",()=>{
+  expect(run([])).toEqual({kind:"not_recorded",rows:[],independentlyVerifiedFamilies:0,achAssessmentsAllowed:0});
+ });
+ it("keeps even consistent, distinct Registry source references pending independent human review",()=>{
+  const result=run();
+  expect(result.rows[0]).toMatchObject({sourceId,assertionId,
+   disposition:"needs_independent_human_review",blockers:[]});
+  expect(result.independentlyVerifiedFamilies).toBe(0);
+  expect(result.achAssessmentsAllowed).toBe(0);
+  expect(JSON.stringify(result)).not.toContain("signed-custodian-1");
+  expect(Object.isFrozen(result.rows[0].blockers)).toBe(true);
+ });
+ it("blocks missing evidence assertions, mismatched registry subject/fingerprint/use and lineage",()=>{
+  expect(screenMiziziQuestionSourcesV1(scope,[{source,assertion:null}],now).rows[0].blockers)
+   .toContain("registry_assertion_absent");
+  for(const patch of [{subjectId:sourceId},{assertionFingerprint:"0".repeat(64)},
+     {sourceId:assertionId}]){
+    expect(run([{source,assertion:{...assertion,...patch}}]).rows[0].blockers)
+     .toContain("registry_assertion_mismatch");
+  }
+  expect(run([{source,assertion:{...assertion,sourceUseBasis:null}}]).rows[0].blockers)
+   .toContain("source_use_not_documented");
+  expect(run([{source,assertion:{...assertion,lineageKey:"different"}}]).rows[0].blockers)
+   .toContain("lineage_conflict");
+ });
+ it("blocks other workspaces, expired/revoked sources and forbidden retention",()=>{
+  for(const patch of [{caseId:scope.subjectId},{workspaceId:scope.subjectId}]){
+   expect(run([{source:{...source,...patch},assertion}]).rows[0].blockers)
+    .toContain("scope_mismatch");
+  }
+  for(const patch of [{revokedAt:"2026-10-01T20:00:00Z"},
+    {expiresAt:"2026-10-16T20:00:00Z"},{observedAt:"2026-11-01T20:00:00Z"}]){
+   expect(run([{source:{...source,...patch},assertion}]).rows[0].blockers)
+    .toContain("source_expired_or_revoked");
+  }
+  for(const patch of [{privateResearchAllowed:false},{privateEvidenceRetentionAllowed:false}]){
+   expect(run([{source:{...source,...patch},assertion}]).rows[0].blockers)
+    .toContain("private_retention_not_allowed");
+  }
+ });
+ it("detects repeated upstream source, never upgrades a Registry independence hint",()=>{
+  const next="11111111-1111-4111-8111-111111111111";
+  const other={source:{...source,sourceId:next},assertion:{...assertion,
+    sourceId:next,assertionId:"22222222-2222-4222-8222-222222222222"}};
+  const result=run([item,other]);
+  expect(result.rows.map(r=>r.blockers)).toEqual([["possible_shared_origin"],["possible_shared_origin"]]);
+  expect(result.achAssessmentsAllowed).toBe(0);
+  expect(()=>run([item,item])).toThrow("DUPLICATE_SOURCE");
+ });
+ it("denies malformed scope and unbounded queue before source access",()=>{
+  expect(()=>screenMiziziQuestionSourcesV1({...scope,caseRevision:0},[],now)).toThrow("INVALID_SCOPE");
+  expect(()=>screenMiziziQuestionSourcesV1(scope,[item],"invalid")).toThrow("INVALID_SCOPE");
+  expect(()=>run(Array.from({length:101},()=>item))).toThrow("MIZIZI_SOURCE_REVIEW_CAP");
  });
 });
