@@ -14,6 +14,7 @@ import {
   canOfferInternalWorkspaceSetupV1,
   HeadquartersAuthorizationDeniedError,
   loadHeadquartersDashboardV1,
+  projectHeadquartersCaseMachineReadV1,
   loadHeadquartersCaseEventsV1,
   type HeadquartersCaseEvent,
   type HeadquartersDashboardLoadV1,
@@ -49,6 +50,7 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
   const [refreshToken,setRefreshToken] = useState(0);
   const [selectedCase,setSelectedCase] = useState<string|null>(null);
   const [activeCaseId,setActiveCaseId] = useState<string|null>(null);
+  const [recordView,setRecordView] = useState<"human"|"machine">("human");
   const [recentEvents,setRecentEvents] = useState<readonly HeadquartersCaseEvent[]>([]);
   const [recentEventsState,setRecentEventsState] = useState<"loading"|"ready"|"error">("loading");
   const [timelineCase,setTimelineCase] = useState<string|null>(null);
@@ -189,6 +191,14 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
               <p className="mz-case-hero-context">Canonical subject {focusedCase.subjectId}. The case stage is operational state, not a verified finding about music identity or rights.</p>
             </div>
           </header>
+          <div className="mz-case-view-switch" role="group" aria-label="Selected case representation">
+            <button type="button" className="mz-case-view-option"
+              aria-pressed={recordView === "human"} onClick={() => setRecordView("human")}>Human View</button>
+            <button type="button" className="mz-case-view-option"
+              aria-pressed={recordView === "machine"} onClick={() => setRecordView("machine")}>Machine View</button>
+          </div>
+          {recordView === "human" ? (
+            <>
           <section className="mz-case-focus">
             <div className="mz-case-section-head"><span className="mz-case-eyebrow">Question in this case</span><span className="mz-case-unresolved">Not adjudicated here</span></div>
             <h3>{sourceReview?.title || displayClaim(focusedCase.claimFamily)}</h3>
@@ -232,6 +242,15 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
             <div><strong>Next step</strong><p>Examine the source review and the case journal. Only an authorized operator can change case stage or activate Holds.</p></div>
             <span className="mz-case-next-state">{activeHolds.length} active workspace {activeHolds.length === 1 ? "hold" : "holds"}</span>
           </footer>
+            </>
+          ) : (
+            <section className="mz-case-machine" aria-label="Authorized case machine record">
+              <h3>Machine View</h3>
+              <p>This read-only record comes from the same authorized case as the Human View.
+                It does not grant actions, verify evidence, or authorize publication.</p>
+              <pre><code>{JSON.stringify(projectHeadquartersCaseMachineReadV1(focusedCase), null, 2)}</code></pre>
+            </section>
+          )}
         </article>
       </div>
     ) : null}

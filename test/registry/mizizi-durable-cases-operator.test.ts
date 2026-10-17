@@ -11,6 +11,7 @@ import {
   projectHeadquartersCaseEventsV1,
   loadHeadquartersHoldsV1,
   projectDurableCasesV1,
+  projectHeadquartersCaseMachineReadV1,
   projectWorkspaceHoldsV1,
   releaseWorkspaceHoldV1,
   startWorkspaceHoldV1,
@@ -80,6 +81,24 @@ describe("Authenticated durable Headquarters read and governed commands",()=>{
   expect(rpc).toHaveBeenCalledWith("admin_mizizi_case_events_v1",{p_case_id:caseId,p_limit:100});
   expect(()=>projectHeadquartersCaseEventsV1([events[1],events[0]])).toThrow();
   expect(()=>projectHeadquartersCaseEventsV1([events[0],events[0]])).toThrow();
+ });
+ it("derives Human and Machine case inspection from the same authorized case projection",()=>{
+  const caseRecord=projectDurableCasesV1([recorded])[0];
+  const machine=projectHeadquartersCaseMachineReadV1(caseRecord);
+  expect(machine).toMatchObject({
+    schemaVersion:"wakilisha.mizizi.headquarters.case-read.v1",
+    caseId,revision:1,subject:{type:"track",id:subjectId},
+    claim:{family:recorded.claimFamily,key:recorded.claimKey},
+    lifecycle:{state:"open",stage:"triage"},
+    evidenceReferences:{linkedRegistryReviewId:reviewId,linkedReceiptCount:1},
+    actionAuthority:"not_included_in_read_only_projection",
+    publicationAuthority:"not_included_in_read_only_projection",
+  });
+  const panel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
+  expect(panel).toContain('state.kind === "ready" && focusedCase');
+  expect(panel).toContain('JSON.stringify(projectHeadquartersCaseMachineReadV1(focusedCase), null, 2)');
+  expect(panel).toContain('aria-pressed={recordView === "machine"}');
+  expect(JSON.stringify(machine)).not.toContain("actorKey");
  });
  it("reports true zero case ledger rather than assuming one case per open review",()=>{
   expect(projectDurableCasesV1([])).toEqual([]);
