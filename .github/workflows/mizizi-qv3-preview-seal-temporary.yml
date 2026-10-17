@@ -94,4 +94,6 @@ jobs:
           git add src/types/database.types.ts docs/engineering/live-schema-baseline.json docs/engineering/replay-proofs/20261017212255_mizizi_source_family_attestation_v1.sql.json
           git diff --cached --quiet && { echo STOP_QV3_SCHEMA_SEAL_UNCHANGED; exit 1; }
           git commit -m "docs(mizizi): seal QV3 Preview 237 types and verified replay"
+          git fetch origin "$HEAD_BRANCH"
+          git rebase "origin/$HEAD_BRANCH"
           git push origin "HEAD:refs/heads/$HEAD_BRANCH"
