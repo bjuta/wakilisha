@@ -1,0 +1,159 @@
+name: MIZIZI QV2 Preview Schema Seal One-Shot
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/tmp-mizizi-freeze-types-seal-once.yml"
+permissions:
+  contents: write
+concurrency:
+  group: mizizi-freeze-types-seal-once
+  cancel-in-progress: false
+jobs:
+  preview-seal:
+    name: checked-real-preview-typegen-and-proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PREVIEW_REF: nkgfoppunmnkcumalxqp
+      PROD_REF: pgzizndxdyhqmtyywjmt
+      EXPECTED_MIGRATION: 20261017202800_mizizi_governed_question_freeze_v1.sql
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Enforce exact trusted PR head, project, clean worktree and migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "bjuta/wakilisha"
+          test "$GITHUB_EVENT_NAME" = "pull_request"
+          test "$GITHUB_HEAD_REF" = "feat/mizizi-governed-question-freeze-v1"
+          test "$PREVIEW_REF" = "nkgfoppunmnkcumalxqp"
+          test "$PREVIEW_REF" != "$PROD_REF"
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test ! -e supabase/.temp/project-ref
+          git fetch origin "refs/heads/$GITHUB_HEAD_REF" main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$GITHUB_HEAD_REF")"
+          test -z "$(git status --porcelain)"
+          test -f "supabase/migrations/$EXPECTED_MIGRATION"
+          test -f supabase/migrations/20261016064245_mizizi_research_pass_memory_v1.sql
+          test -f supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
+          test -f supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+          test "$(find supabase/migrations -maxdepth 1 -name '*.sql' | wc -l | tr -d ' ')" = 236
+          echo WK_QV2_PREVIEW_TYPEGEN_EXACT_HEAD_236=PASS
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+      - name: Generate authoritative public and editorial TypeScript from Preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase gen types typescript --project-id "$PREVIEW_REF" --schema public,editorial > "$RUNNER_TEMP/wk-qv2-types.ts"
+          grep -q '^export type Json' "$RUNNER_TEMP/wk-qv2-types.ts"
+          grep -q '^  editorial: {' "$RUNNER_TEMP/wk-qv2-types.ts"
+          grep -q 'admin_mizizi_freeze_case_question_v1' "$RUNNER_TEMP/wk-qv2-types.ts"
+          test "$(wc -c < "$RUNNER_TEMP/wk-qv2-types.ts")" -gt 500000
+          cp "$RUNNER_TEMP/wk-qv2-types.ts" src/types/database.types.ts
+          echo WK_QV2_REAL_PREVIEW_PUBLIC_AND_EDITORIAL_TYPES=PASS
+      - name: Independently check exact Preview state with read-only Management API
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const ref="nkgfoppunmnkcumalxqp";
+          const query=[
+            "SELECT",
+            "(SELECT count(*)::int FROM supabase_migrations.schema_migrations) AS n,",
+            "(SELECT max(version) FROM supabase_migrations.schema_migrations) AS head,",
+            "(SELECT count(*)::int FROM mizizi_private.cases) AS cases,",
+            "(SELECT count(*)::int FROM mizizi_private.research_passes) AS passes,",
+            "(SELECT count(*)::int FROM mizizi_private.workspace_memberships) AS members,",
+            "(SELECT count(*)::int FROM mizizi_private.write_holds) AS holds,",
+            "(SELECT count(*)::int FROM mizizi_private.case_question_versions) AS questions,",
+            "(SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='mizizi_private.case_question_versions'::regclass) AS rls,",
+            "(SELECT count(*)::int FROM pg_trigger WHERE tgrelid='mizizi_private.case_question_versions'::regclass AND NOT tgisinternal AND tgenabled='O') AS triggers,",
+            "has_function_privilege('anon','public.admin_mizizi_freeze_case_question_v1(uuid,integer,uuid,integer,text,jsonb,text)','EXECUTE') AS anon_execute,",
+            "has_function_privilege('authenticated','public.admin_mizizi_freeze_case_question_v1(uuid,integer,uuid,integer,text,jsonb,text)','EXECUTE') AS auth_execute,",
+            "has_table_privilege('authenticated','mizizi_private.case_question_versions','SELECT') AS table_select"
+          ].join(" ");
+          const response=await fetch("https://api.supabase.com/v1/projects/"+ref+"/database/query/read-only",{
+            method:"POST",headers:{Authorization:"Bearer "+process.env.SUPABASE_ACCESS_TOKEN,
+              "Content-Type":"application/json"},body:JSON.stringify({query}),signal:AbortSignal.timeout(25000)});
+          if(!response.ok)throw Error("STOP_QV2_SCHEMA_PROOF_HTTP_"+response.status);
+          const payload=await response.json(),rows=Array.isArray(payload)?payload:(payload.result||payload.data);
+          if(!Array.isArray(rows)||rows.length!==1)throw Error("STOP_QV2_SCHEMA_PROOF_SHAPE");
+          const x=rows[0];
+          if(x.n!==236||x.head!=="20261017202800"||x.cases!==1||x.passes!==2||
+             x.members!==1||x.holds!==1||x.questions!==0||x.rls!==true||
+             x.triggers!==2||x.anon_execute!==false||x.auth_execute!==true||
+             x.table_select!==false)throw Error("STOP_QV2_SCHEMA_PROOF_DRIFT");
+          console.log("WK_QV2_INDEPENDENT_REAL_PREVIEW_READONLY_SEAL=PASS");
+          NODE
+      - name: Bind true source hashes and runtime proof to schema manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {createHash} from "node:crypto";
+          import {readFileSync,writeFileSync} from "node:fs";
+          import {execFileSync} from "node:child_process";
+          const hash=path=>createHash("sha256").update(readFileSync(path)).digest("hex");
+          const migrationFile="supabase/migrations/20261017202800_mizizi_governed_question_freeze_v1.sql";
+          const branchId="8c0affc1-b43b-44ac-b2eb-66715ed40252";
+          const typesHash=hash("src/types/database.types.ts"),migrationHash=hash(migrationFile);
+          const base=execFileSync("git",["merge-base","HEAD","origin/main"],{encoding:"utf8"}).trim();
+          if(!/^[a-f0-9]{40}$/.test(base)||!(/^[a-f0-9]{64}$/.test(typesHash)))
+            throw Error("STOP_QV2_TYPES_OR_BASE_INTEGRITY");
+          const now=new Date().toISOString();
+          const baseline={
+            projectRef:"pgzizndxdyhqmtyywjmt",schema:"public,editorial",
+            generatedAt:now,typesSha256:typesHash,
+            authoritativeMigrationDirectory:"supabase/migrations",
+            migrationCount:236,latestMigration:"20261017202800_mizizi_governed_question_freeze_v1.sql",
+            schemaSeal:{mode:"preview",sourceProjectRef:"nkgfoppunmnkcumalxqp",
+              migrationHead:"20261017202800",baseMainSha:base,previewBranchId:branchId}
+          };
+          const run="https://github.com/bjuta/wakilisha/actions/runs/"+process.env.GITHUB_RUN_ID;
+          const proof={
+            migration_file:migrationFile,migration_sha256:migrationHash,base_main_sha:base,
+            preview_project_ref:"nkgfoppunmnkcumalxqp",preview_branch_id:branchId,
+            preview_migration_head:"20261017202800",
+            baseline_replay:"pass",candidate_apply:"pass",verifier:"pass",
+            verifier_file:"scripts/control-plane/verify-mizizi-question-freeze-v1.sql",
+            schema_types_sha256:typesHash,schema_migration_count:236,
+            schema_migration_head:"20261017202800",verified_at:now,
+            disposable_baseline_evidence:"https://github.com/bjuta/wakilisha/actions/runs/39067363103",
+            native_preview_cli_evidence:"https://github.com/bjuta/wakilisha/actions/runs/39067798512",
+            production_promotion:"not_run",
+            independent_preview_verifier_evidence:"Independent connected Supabase read-only verifier executed after native push, with an additional live read-only ACL and 236-head assertion in "+run+". The native run separately checked preserved case/research/membership/hold/job row fingerprints.",
+            note:"The existing Preview retained its legitimate DB04–DB06 and QV1 predecessors, original case, two research passes, membership and Hold. No reset or question fixture. QV2 adds a human writer but no authentic graded source. Production unchanged."
+          };
+          writeFileSync("docs/engineering/live-schema-baseline.json",JSON.stringify(baseline,null,2)+"\n");
+          writeFileSync("docs/engineering/replay-proofs/20261017202800_mizizi_governed_question_freeze_v1.sql.json",JSON.stringify(proof,null,2)+"\n");
+          console.log("WK_QV2_MIGRATION_SHA256="+migrationHash);
+          console.log("WK_QV2_PREVIEW_SCHEMA_TYPES_SHA256="+typesHash);
+          console.log("WK_QV2_REPLAY_BASE_MAIN_SHA="+base);
+          console.log("WK_QV2_REAL_SCHEMA_RECEIPT_GENERATED=PASS");
+          NODE
+      - name: Commit only verified schema artifacts and remove this temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/tmp-mizizi-freeze-types-seal-once.yml
+          git rm .github/workflows/tmp-mizizi-freeze-existing-preview-one-shot.yml
+          git add src/types/database.types.ts docs/engineering/live-schema-baseline.json \
+            docs/engineering/replay-proofs/20261017202800_mizizi_governed_question_freeze_v1.sql.json
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" -eq 5
+          test -z "$(git diff --name-only)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs(mizizi): seal QV2 preview replay and exact generated database types"
+          git fetch origin "refs/heads/$GITHUB_HEAD_REF"
+          PR_HEAD_SHA="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.GITHUB_EVENT_PATH,"utf8")).pull_request.head.sha)')"
+          test "$(git rev-parse FETCH_HEAD)" = "$PR_HEAD_SHA"
+          git push origin "HEAD:refs/heads/$GITHUB_HEAD_REF"
+          echo WK_QV2_REPLAY_PROOF_AND_SCHEMA_TYPES_COMMITTED=PASS
