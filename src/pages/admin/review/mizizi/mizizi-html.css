@@ -720,3 +720,307 @@
 @media(max-width:680px){
   .mz-session-job-issue{padding:13px 14px;margin-top:17px}
 }
+
+
+
+/* Product v2 / Design System: case-first, neutral MIZIZI Headquarters.
+   Only local, evidence-backed presentation. No global WAKILISHA resets. */
+[data-wk-mizizi-workspace] {
+  --mz-product-ink: oklch(0.22 0.005 250);
+  --mz-product-muted: oklch(0.48 0.005 250);
+  --mz-product-line: oklch(0.91 0.003 250);
+  --mz-product-paper: #fcfcfb;
+  --mz-product-wash: oklch(0.98 0.002 250);
+  --mz-product-shelf: oklch(0.965 0.003 70);
+}
+[data-wk-mizizi-workspace] .mz-case-home {
+  max-width: 1420px;
+  margin: 0 auto;
+  padding: clamp(20px, 3vw, 44px);
+  color: var(--mz-product-ink);
+}
+[data-wk-mizizi-workspace] .mz-case-introduction {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--mz-product-line);
+}
+[data-wk-mizizi-workspace] .mz-case-eyebrow {
+  font: 500 11px/1.45 "IBM Plex Mono", ui-monospace, monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--mz-product-muted);
+}
+[data-wk-mizizi-workspace] .mz-case-introduction h1 {
+  font: 600 clamp(29px,3.4vw,42px)/1.1 "Instrument Sans", var(--wk-font-display, sans-serif);
+  letter-spacing: -.02em;
+}
+[data-wk-mizizi-workspace] .mz-case-introduction p {
+  font: 400 15px/1.55 "Instrument Sans", var(--wk-font-body, sans-serif);
+  color: var(--mz-product-muted);
+  max-width: 750px;
+}
+[data-wk-mizizi-workspace] .mz-case-layout {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: 235px minmax(0,1fr);
+  align-items: start;
+  gap: 24px;
+}
+[data-wk-mizizi-workspace] .mz-case-switcher {
+  border-right: 1px solid var(--mz-product-line);
+  padding: 8px 18px 16px 0;
+  min-width: 0;
+}
+[data-wk-mizizi-workspace] .mz-case-options {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+[data-wk-mizizi-workspace] .mz-case-option {
+  display: grid;
+  gap: 5px;
+  text-align: left;
+  padding: 13px 12px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  width: 100%;
+  min-width: 0;
+  color: var(--mz-product-ink);
+}
+[data-wk-mizizi-workspace] .mz-case-option[aria-pressed="true"] {
+  border-color: var(--mz-product-ink);
+  box-shadow: inset 0 0 0 1px var(--mz-product-ink);
+  background: var(--mz-product-paper);
+}
+[data-wk-mizizi-workspace] .mz-case-option:hover { background: var(--mz-product-wash); }
+[data-wk-mizizi-workspace] .mz-case-option:focus-visible,
+[data-wk-mizizi-workspace] .mz-review-inventory-trigger:focus-visible,
+[data-wk-mizizi-workspace] .mz-case-operations-trigger:focus-visible {
+  outline: 2px solid var(--mz-product-ink);
+  outline-offset: 3px;
+}
+[data-wk-mizizi-workspace] .mz-case-option-title {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+[data-wk-mizizi-workspace] .mz-case-option-sub {
+  font-size: 12px;
+  color: var(--mz-product-muted);
+}
+[data-wk-mizizi-workspace] .mz-case-scope {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  padding: 18px 9px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mz-product-muted);
+}
+[data-wk-mizizi-workspace] .mz-case-story {
+  display: grid;
+  gap: 25px;
+  min-width: 0;
+}
+[data-wk-mizizi-workspace] .mz-case-hero {
+  display: grid;
+  grid-template-columns: 112px minmax(0,1fr);
+  gap: 25px;
+  align-items: center;
+  padding: 26px;
+  background: var(--mz-product-shelf);
+  border-radius: 6px;
+}
+[data-wk-mizizi-workspace] .mz-case-hero-art {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px;
+  text-align: center;
+  border: 1px dashed var(--mz-product-muted);
+  border-radius: 3px;
+  font: 11px/1.35 "IBM Plex Mono", monospace;
+  color: var(--mz-product-muted);
+}
+[data-wk-mizizi-workspace] .mz-case-hero-copy { min-width: 0; }
+[data-wk-mizizi-workspace] .mz-case-hero-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+[data-wk-mizizi-workspace] .mz-case-lifecycle {
+  font: 600 12px/1.45 "Instrument Sans", sans-serif;
+  color: var(--mz-product-ink);
+  padding: 5px 9px;
+  border: 1px solid var(--mz-product-line);
+  border-radius: 999px;
+}
+[data-wk-mizizi-workspace] .mz-case-hero h2 {
+  font: 600 clamp(24px,3vw,38px)/1.1 "Instrument Sans",var(--wk-font-display,sans-serif);
+  overflow-wrap: anywhere;
+  letter-spacing: -.02em;
+  margin: 12px 0;
+}
+[data-wk-mizizi-workspace] .mz-case-hero p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--mz-product-muted);
+  overflow-wrap: anywhere;
+}
+[data-wk-mizizi-workspace] .mz-case-hero .mz-case-hero-context {
+  margin-top: 9px;
+  font-size: 13px;
+}
+[data-wk-mizizi-workspace] .mz-case-focus {
+  display: grid;
+  gap: 12px;
+  padding: 22px 0 25px;
+  border-bottom: 1px solid var(--mz-product-line);
+}
+[data-wk-mizizi-workspace] .mz-case-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+[data-wk-mizizi-workspace] .mz-case-unresolved {
+  border: 1px dashed var(--mz-product-muted);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mz-product-muted);
+}
+[data-wk-mizizi-workspace] .mz-case-focus h3 {
+  font: 600 22px/1.3 "Instrument Sans",var(--wk-font-display,sans-serif);
+}
+[data-wk-mizizi-workspace] .mz-case-focus p,
+[data-wk-mizizi-workspace] .mz-case-facts p,
+[data-wk-mizizi-workspace] .mz-case-history p,
+[data-wk-mizizi-workspace] .mz-case-next p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--mz-product-muted);
+}
+[data-wk-mizizi-workspace] .mz-case-facts {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 20px;
+}
+[data-wk-mizizi-workspace] .mz-case-facts section {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 12px;
+  border: 1px solid var(--mz-product-line);
+  border-radius: 6px;
+  padding: 22px;
+}
+[data-wk-mizizi-workspace] .mz-case-facts strong { font-size: 17px; font-weight: 600; }
+[data-wk-mizizi-workspace] .mz-case-facts .wk-button { margin-top: 4px; }
+[data-wk-mizizi-workspace] .mz-case-link { font-size: 13px; text-decoration: underline; }
+[data-wk-mizizi-workspace] .mz-case-muted-state {
+  padding: 6px 10px;
+  border: 1px dashed var(--mz-product-muted);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--mz-product-muted);
+}
+[data-wk-mizizi-workspace] .mz-case-history { display: grid; gap: 12px; }
+[data-wk-mizizi-workspace] .mz-case-event {
+  display: grid;
+  grid-template-columns: 74px minmax(0,1fr) auto;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--mz-product-line);
+  align-items: start;
+}
+[data-wk-mizizi-workspace] .mz-case-event-rev {
+  font: 12px/1.5 "IBM Plex Mono",monospace;
+  color: var(--mz-product-muted);
+}
+[data-wk-mizizi-workspace] .mz-case-event strong { font-size: 14px; font-weight: 600; }
+[data-wk-mizizi-workspace] .mz-case-event p { overflow-wrap: anywhere; }
+[data-wk-mizizi-workspace] .mz-case-next {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: start;
+  padding: 20px;
+  border-top: 1px solid var(--mz-product-line);
+  background: var(--mz-product-wash);
+}
+[data-wk-mizizi-workspace] .mz-case-next strong { font-size: 15px; font-weight: 600; }
+[data-wk-mizizi-workspace] .mz-case-next-state {
+  border: 1px solid var(--mz-product-line);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font: 12px/1.5 "IBM Plex Mono",monospace;
+  white-space: nowrap;
+}
+[data-wk-mizizi-workspace] .mz-case-readstate,
+[data-wk-mizizi-workspace] .mz-case-empty {
+  margin-top: 25px;
+  padding: 24px;
+  border: 1px dashed var(--mz-product-line);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--mz-product-muted);
+}
+[data-wk-mizizi-workspace] .mz-case-empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+[data-wk-mizizi-workspace] .mz-case-empty h2 { font-size: 19px; color: var(--mz-product-ink); }
+[data-wk-mizizi-workspace] .mz-case-operations,
+[data-wk-mizizi-workspace] .mz-review-inventory {
+  border-top: 1px solid var(--mz-product-line);
+  margin-top: 26px;
+}
+[data-wk-mizizi-workspace] .mz-case-operations-trigger,
+[data-wk-mizizi-workspace] .mz-review-inventory-trigger {
+  padding: 17px 0;
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--mz-product-ink);
+}
+[data-wk-mizizi-workspace] .mz-case-operations-detail:not([hidden]),
+[data-wk-mizizi-workspace] .mz-review-inventory-detail:not([hidden]) {
+  display: block;
+  border-top: 1px solid var(--mz-product-line);
+}
+[data-wk-mizizi-workspace] .mz-review-inventory {
+  max-width: 1420px;
+  margin: 12px auto 40px;
+  padding: 0 clamp(20px,3vw,44px);
+}
+[data-wk-mizizi-workspace] .mz-review-inventory .mz-brief-shell { padding: 25px 0 35px; }
+@media(max-width:830px) {
+  [data-wk-mizizi-workspace] .mz-case-layout { grid-template-columns:minmax(0,1fr); gap:18px; }
+  [data-wk-mizizi-workspace] .mz-case-switcher {
+    border-right:0; border-bottom:1px solid var(--mz-product-line); padding:0 0 18px;
+  }
+  [data-wk-mizizi-workspace] .mz-case-options { display:flex; overflow-x:auto; gap:8px; }
+  [data-wk-mizizi-workspace] .mz-case-option { flex:0 0 min(72vw,240px); }
+  [data-wk-mizizi-workspace] .mz-case-scope { padding:10px 0 0; }
+}
+@media(max-width:550px) {
+  [data-wk-mizizi-workspace] .mz-case-hero {
+    grid-template-columns:minmax(0,1fr); padding:19px; gap:14px;
+  }
+  [data-wk-mizizi-workspace] .mz-case-hero-art { width:95px; }
+  [data-wk-mizizi-workspace] .mz-case-facts { grid-template-columns:minmax(0,1fr); }
+  [data-wk-mizizi-workspace] .mz-case-event { grid-template-columns:62px minmax(0,1fr); }
+  [data-wk-mizizi-workspace] .mz-case-event > :last-child { grid-column:2; }
+  [data-wk-mizizi-workspace] .mz-case-next { flex-direction:column; }
+}
