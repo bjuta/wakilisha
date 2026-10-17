@@ -692,7 +692,6 @@ function AdminMiziziWorkspaceContent() {
     <div className="mz-port" data-wk-mizizi-workspace>
       <header className="mz-head">
         <span className="mz-wordmark" aria-label="MIZIZI by WAKILISHA">
-          <WkIcon name="GitBranch" size={23} aria-hidden="true" />
           MIZIZI <span className="mz-small">by WAKILISHA™</span>
         </span>
         <span className="mz-context" title="Current internal Registry authority">Internal Registry</span>
