@@ -149,6 +149,12 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    previous:InvestigationPassV1)=>Promise<boolean>;
  /** Trusted runtime metering, never model-generated estimated usage. */
  measureCostUnits?:()=>number;now?:()=>number;
+ /** Independently trusted, current external-model permission for non-open sources.
+  * The reader's model-processing flag is necessary but never sufficient.
+  * Do not implement this by echoing the source reader's own claim.
+  */
+ authorizeModelProcessing?:(identity:InvestigationIdentityV1,question:string,
+  source:SourceAuthorityV1)=>Promise<boolean>;
 }>):Promise<InvestigationResultV1>{
  const {identity,store,readSources,analyze,verifyFinding}=input;
  if(!identity||!UUID.test(identity.caseId)||!UUID.test(identity.workspaceId)||
@@ -202,8 +208,19 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   }
   // A valid private source can forbid hosted-model processing. Such material
   // stays in the immutable internal receipt, never in the analyst packet.
-  const modelSources=sources.filter(s=>s.source.externalModelProcessingAllowed);
-  const modelVisibleIds=new Set(modelSources.map(s=>s.source.sourceId.toLowerCase()));
+  const modelVisibleIds=new Set<string>();
+  for(const {source} of sources){
+   if(!source.externalModelProcessingAllowed)continue;
+   // An attestation's sharing flags do not grant hosted-LLM disclosure.
+   // Only a reviewed open-license reader uses the established default path.
+   // All other sources require a distinct trusted current-use decision.
+   const permitted=source.useBasis==="open_license"||
+    (typeof input.authorizeModelProcessing==="function"&&
+     await input.authorizeModelProcessing(identity,question,source)===true);
+   if(permitted)modelVisibleIds.add(source.sourceId.toLowerCase());
+  }
+  const modelSources=sources.filter(s=>
+   modelVisibleIds.has(s.source.sourceId.toLowerCase()));
   // Historic analysis and citations are not facts or disclosure consent.
   // Pass only method metadata, not excerpts, findings, or narrative that
   // could quote a privately retained witness or artifact.
@@ -232,7 +249,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // Mixed public and restricted packets are also human-only. The case
   // question may itself disclose a protected witness or investigation lead;
   // filtering excerpts alone cannot safely authorize sending that question.
-  const humanOnly=sources.some(s=>!s.source.externalModelProcessingAllowed);
+  const humanOnly=sources.some(s=>
+   !modelVisibleIds.has(s.source.sourceId.toLowerCase()));
   // A lawful reader returning no evidence is a method result, not a prompt
   // for a source-free model answer. Absence never establishes nonexistence.
   const noEvidence=sources.length===0;
@@ -306,7 +324,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // The source UUID is an opaque pointer, not a copy of the evidence or a
   // grant to resolve it. Source/custody metadata and the original payload
   // digest must stay with the independently authorized custodian.
-  const restrictedReceipt=(source:SourceAuthorityV1)=>!source.externalModelProcessingAllowed;
+  const restrictedReceipt=(source:SourceAuthorityV1)=>
+   !modelVisibleIds.has(source.sourceId.toLowerCase());
   // A private witness can be named in the question itself. The custodian,
   // not the permanent research-pass journal, must retain that context.
   const receiptQuestion=humanOnly?
@@ -327,7 +346,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     observedAt:a.observedAt,
     citation:restrictedReceipt(a)?"custodian:source-held":citation,
     excerpt:restrictedReceipt(a)?REDACTED:excerpt,
-    modelDisclosed:a.externalModelProcessingAllowed&&!noModel})),
+    modelDisclosed:modelVisibleIds.has(a.sourceId.toLowerCase())&&!noModel})),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
    promptFingerprint:analysis.promptFingerprint,
