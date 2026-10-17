@@ -51,6 +51,7 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
   const [selectedCase,setSelectedCase] = useState<string|null>(null);
   const [activeCaseId,setActiveCaseId] = useState<string|null>(null);
   const [recordView,setRecordView] = useState<"human"|"machine">("human");
+  const [detailTab,setDetailTab] = useState<"overview"|"evidence"|"next"|"history">("overview");
   const [recentEvents,setRecentEvents] = useState<readonly HeadquartersCaseEvent[]>([]);
   const [recentEventsState,setRecentEventsState] = useState<"loading"|"ready"|"error">("loading");
   const [timelineCase,setTimelineCase] = useState<string|null>(null);
@@ -159,7 +160,7 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
               <button key={item.caseId} type="button"
                 aria-pressed={item.caseId === focusedCase.caseId}
                 className="mz-case-option"
-                onClick={() => setActiveCaseId(item.caseId)}>
+                onClick={() => {setActiveCaseId(item.caseId);setDetailTab("overview");setRecordView("human");}}>
                 <span className="mz-case-option-title">
                   {queue?.items.find(review => review.id === item.reviewId)?.title
                     || displayClaim(item.claimFamily)}
@@ -191,6 +192,14 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
               <p className="mz-case-hero-context">Canonical subject {focusedCase.subjectId}. The case stage is operational state, not a verified finding about music identity or rights.</p>
             </div>
           </header>
+          <dl className="mz-case-stats" aria-label="Recorded case status and research limits">
+            <div><dt>Questions decided</dt><dd>Not recorded</dd></div>
+            <div><dt>Linked receipts</dt><dd>{focusedCase.receiptCount.toLocaleString()}</dd></div>
+            <div><dt>Next due</dt><dd>{focusedCase.nextActionAt
+              ? <WkZonedTimestamp value={focusedCase.nextActionAt}/>
+              : "Not scheduled"}</dd></div>
+            <div><dt>MIZIZI research</dt><dd>Runtime status unavailable</dd></div>
+          </dl>
           <div className="mz-case-view-switch" role="group" aria-label="Selected case representation">
             <button type="button" className="mz-case-view-option"
               aria-pressed={recordView === "human"} onClick={() => setRecordView("human")}>Human View</button>
@@ -199,12 +208,32 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
           </div>
           {recordView === "human" ? (
             <>
-          <section className="mz-case-focus">
+          <div className="mz-case-detail-tabs" role="group" aria-label="Case reading views">
+            {([
+              ["overview","Overview"],["evidence","Evidence"],
+              ["next","Next evidence"],["history","History"],
+            ] as const).map(([id,label]) => (
+              <button key={id} type="button" aria-pressed={detailTab===id}
+                onClick={()=>setDetailTab(id)}>{label}</button>
+            ))}
+          </div>
+          {detailTab === "overview" ? (
+            <>
+              <section className="mz-case-focus">
             <div className="mz-case-section-head"><span className="mz-case-eyebrow">Question in this case</span><span className="mz-case-unresolved">Not adjudicated here</span></div>
             <h3>{sourceReview?.title || displayClaim(focusedCase.claimFamily)}</h3>
             <p>The attached Registry review is a research lead. Inspect its original record before choosing an explanation. A review's status does not establish independent evidence or ownership.</p>
           </section>
-          <div className="mz-case-facts">
+              <footer className="mz-case-next">
+            <div><strong>Next step</strong><p>Examine the source review and the case journal. Only an authorized operator can change case stage or activate Holds.</p></div>
+            <span className="mz-case-next-state">{activeHolds.length} active workspace {activeHolds.length === 1 ? "hold" : "holds"}</span>
+          </footer>
+            </>
+          ) : detailTab === "evidence" ? (
+            <>
+              <p className="mz-case-pane-explanation">Only authorized linked receipts and the governed Registry review are available here.
+                The source-grade, ACH and custody library require their own accepted evidence records.</p>
+              <div className="mz-case-facts">
             <section aria-label="Source and provenance">
               <span className="mz-case-eyebrow">Source and provenance</span>
               <strong>{focusedCase.receiptCount} linked {focusedCase.receiptCount === 1 ? "receipt" : "receipts"}</strong>
@@ -225,7 +254,20 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
               <span className="mz-case-muted-state">Decision authority remains separate</span>
             </section>
           </div>
-          <section className="mz-case-history" aria-label="Recent case journal">
+            </>
+          ) : detailTab === "next" ? (
+            <section className="mz-case-future" aria-label="Next evidence for this case">
+              <span className="mz-case-eyebrow">Next evidence</span>
+              <h3>No recorded evidence requests available.</h3>
+              <p>The current authorized case read does not contain source-backed proposed collection tasks,
+                custodian consent or a research request queue.</p>
+              <p>{focusedCase.nextActionAt
+                ? <>Recorded case next-action time: <WkZonedTimestamp value={focusedCase.nextActionAt}/></>
+                : "No case next-action date has been recorded."}</p>
+            </section>
+          ) : (
+            <>
+              <section className="mz-case-history" aria-label="Recent case journal">
             <div className="mz-case-section-head"><span className="mz-case-eyebrow">Recorded activity</span><span className="mz-case-eyebrow">Immutable case events</span></div>
             {recentEventsState === "loading" ? <p role="status">Loading case history…</p> : null}
             {recentEventsState === "error" ? <p role="alert">The case journal could not be verified.</p> : null}
@@ -238,10 +280,10 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
               </div>
             )) : null}
           </section>
-          <footer className="mz-case-next">
-            <div><strong>Next step</strong><p>Examine the source review and the case journal. Only an authorized operator can change case stage or activate Holds.</p></div>
-            <span className="mz-case-next-state">{activeHolds.length} active workspace {activeHolds.length === 1 ? "hold" : "holds"}</span>
-          </footer>
+              <p className="mz-case-pane-explanation">This is a recent journal view, not the complete authenticated case export.
+                Open case controls for the full verified event timeline.</p>
+            </>
+          )}
             </>
           ) : (
             <section className="mz-case-machine" aria-label="Authorized case machine record">
