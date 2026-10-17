@@ -729,7 +729,7 @@
   --mz-product-ink: oklch(0.22 0.005 250);
   --mz-product-muted: oklch(0.48 0.005 250);
   --mz-product-line: oklch(0.91 0.003 250);
-  --mz-product-paper: #fcfcfb;
+  --mz-product-paper: var(--wk-surface);
   --mz-product-wash: oklch(0.98 0.002 250);
   --mz-product-shelf: oklch(0.965 0.003 70);
 }
