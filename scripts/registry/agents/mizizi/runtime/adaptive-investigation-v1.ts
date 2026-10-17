@@ -1,0 +1,369 @@
+/** MIZIZI Slice 2: evidence-grounded, resumable, adaptive research.
+ * A pass is not an investigation; inconclusive is not terminal.
+ * No canonical writes, grants, source licences or model trust are created here.
+ */
+import {createHash} from "node:crypto";
+export const ADAPTIVE_INVESTIGATION_CONTRACT="mizizi.adaptive_investigation.v1" as const;
+const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+const SHA=/^[a-f0-9]{64}$/i;
+const USE=new Set(["first_party","documented_consent","documented_contract","open_license"]);
+export type SourceAuthorityV1=Readonly<{
+ sourceId:string;caseId:string;workspaceId:string;originKey:string;lineageKey:string;
+ fingerprint:string;authorityRef:string;
+ useBasis:"first_party"|"documented_consent"|"documented_contract"|"open_license";
+ observedAt:string;expiresAt:string|null;revokedAt:string|null;privateResearchAllowed:boolean;
+ externalModelProcessingAllowed:boolean;privateEvidenceRetentionAllowed:boolean;
+}>;
+export type SourceExcerptV1=Readonly<{source:SourceAuthorityV1;excerpt:string;citation:string}>;
+export type ResearchClaimV1=Readonly<{
+ statement:string;sourceIds:readonly string[];
+ interpretation:"hypothesis"|"supported"|"contradicted"|"unknown";
+ uncertainty:number;reasoningSummary:string;
+}>;
+export type ResearchLeadV1=Readonly<{
+ question:string;rationale:string;expectedInformationGain:number;
+ importance:number;estimatedCostUnits:number;
+}>;
+export type ResearchAnalysisV1=Readonly<{
+ hypotheses:readonly ResearchClaimV1[];leads:readonly ResearchLeadV1[];
+ passFinding:string;requestedDisposition:"continue"|"pause"|"conclude";
+ modelVersion:string;promptFingerprint:string;
+}>;
+export type VerifiedClaimV1=Readonly<ResearchClaimV1&{
+ independentlyVerified:boolean;verificationRef:string|null;
+}>;
+export type PassDecisionV1=Readonly<{
+ action:"continue"|"pause"|"conclude";nextQuestion:string|null;
+ rationale:string;revisitTrigger:string|null;
+}>;
+export type InvestigationIdentityV1=Readonly<{
+ caseId:string;workspaceId:string;openingQuestion:string;
+}>;
+export type InvestigationPassV1=Readonly<{
+ contract:typeof ADAPTIVE_INVESTIGATION_CONTRACT;
+ caseId:string;workspaceId:string;ordinal:number;question:string;
+ predecessorFingerprint:string|null;fingerprint:string;
+ sourceReceipts:readonly Readonly<{
+  sourceId:string;originKey:string;lineageKey:string;payloadFingerprint:string;
+  useBasis:string;authorityRef:string;observedAt:string;
+  citation:string;excerpt:string;
+  /** Missing on older immutable passes; never infer their disclosure status. */
+  modelDisclosed?:boolean;
+  /** Optional original custodian digest for human-only material. */
+  custodyFingerprint?:string;
+ }>[];
+ findings:readonly VerifiedClaimV1[];
+ passFinding:string;proposedLeads:readonly ResearchLeadV1[];
+ decision:PassDecisionV1;
+ modelVersion:string;promptFingerprint:string;
+ recordedAt:string;costUnits:number;
+}>;
+export type InvestigationStoreV1=Readonly<{
+ read:(identity:InvestigationIdentityV1)=>Promise<readonly InvestigationPassV1[]>;
+ /** Must be transactional, compare-and-swap on ordinal and predecessor hash. */
+ append:(identity:InvestigationIdentityV1,expectedOrdinal:number,
+         predecessorFingerprint:string|null,pass:InvestigationPassV1)=>Promise<void>;
+}>;
+export type InvestigationReaderV1=(
+ identity:InvestigationIdentityV1,question:string,history:readonly InvestigationPassV1[],
+)=>Promise<readonly SourceExcerptV1[]>;
+export type InvestigationAnalystV1=(
+ question:string,sources:readonly SourceExcerptV1[],history:readonly InvestigationPassV1[],
+)=>Promise<ResearchAnalysisV1>;
+export type IndependentFindingVerifierV1=(
+ claim:ResearchClaimV1,sources:readonly SourceAuthorityV1[],
+)=>Promise<{verified:boolean;verificationRef:string|null}>;
+export type InvestigationResultV1=Readonly<{
+ caseId:string;workspaceId:string;passesAdded:number;totalPasses:number;
+ disposition:"continue"|"paused"|"concluded";
+ nextQuestion:string|null;lastFingerprint:string|null;
+}>;
+function requireText(v:unknown,label:string,max=2000):string{
+ if(typeof v!=="string"||v!==v.trim()||v.length<8||v.length>max||
+    /[\u0000-\u001f]/.test(v))throw new TypeError("MIZIZI_RESEARCH_INVALID_"+label);
+ return v;
+}
+function bounded(v:unknown,label:string,min:number,max:number):number{
+ if(typeof v!=="number"||!Number.isFinite(v)||v<min||v>max)
+  throw new TypeError("MIZIZI_RESEARCH_INVALID_"+label);
+ return v;
+}
+function digest(v:unknown):string{
+ return createHash("sha256").update(JSON.stringify(v)).digest("hex");
+}
+function questionKey(s:string):string{return s.normalize("NFKC").toLowerCase().replace(/\s+/g," ").trim();}
+function verifyHistory(id:InvestigationIdentityV1,history:readonly InvestigationPassV1[]){
+ let prior:string|null=null;
+ for(let i=0;i<history.length;i++){
+  const pass=history[i];
+  if(pass.contract!==ADAPTIVE_INVESTIGATION_CONTRACT||pass.caseId!==id.caseId||
+     pass.workspaceId!==id.workspaceId||pass.ordinal!==i+1||
+     pass.predecessorFingerprint!==prior||!SHA.test(pass.fingerprint)||
+     digest({...pass,fingerprint:undefined})!==pass.fingerprint)
+   throw new Error("MIZIZI_RESEARCH_HISTORY_CORRUPT_OR_CONFLICTED");
+  prior=pass.fingerprint;
+ }
+}
+function verifySource(source:SourceAuthorityV1,id:InvestigationIdentityV1,nowMs:number){
+ if(!UUID.test(source.sourceId)||source.caseId.toLowerCase()!==id.caseId||
+    source.workspaceId.toLowerCase()!==id.workspaceId||
+    !USE.has(source.useBasis)||source.privateResearchAllowed!==true||
+    typeof source.externalModelProcessingAllowed!=="boolean"||
+    source.privateEvidenceRetentionAllowed!==true||
+    !SHA.test(source.fingerprint)||!requireText(source.originKey,"ORIGIN",500)||
+    !requireText(source.lineageKey,"LINEAGE",500)||
+    !requireText(source.authorityRef,"AUTHORITY",500)||
+    !Number.isFinite(Date.parse(source.observedAt))||
+    Date.parse(source.observedAt)>nowMs||
+    (source.expiresAt!==null&&(!Number.isFinite(Date.parse(source.expiresAt))||
+      Date.parse(source.expiresAt)<=nowMs))||source.revokedAt!==null)
+  throw new TypeError("MIZIZI_RESEARCH_SOURCE_AUTHORITY_UNVERIFIED");
+}
+function selectLead(leads:readonly ResearchLeadV1[],history:readonly InvestigationPassV1[],
+ currentQuestion:string,remainingCost:number):ResearchLeadV1|null{
+ const visited=new Set([questionKey(currentQuestion),...history.map(p=>questionKey(p.question))]);
+ const eligible=leads.filter(lead=>{
+  requireText(lead.question,"LEAD_QUESTION",500);
+  requireText(lead.rationale,"LEAD_RATIONALE",1000);
+  bounded(lead.expectedInformationGain,"INFORMATION_GAIN",0,1);
+  bounded(lead.importance,"IMPORTANCE",0,1);
+  bounded(lead.estimatedCostUnits,"ESTIMATED_COST",0,100000);
+  return !visited.has(questionKey(lead.question))&&lead.expectedInformationGain>=.15&&
+    lead.estimatedCostUnits<=remainingCost;
+ });
+ return [...eligible].sort((a,b)=>
+  b.expectedInformationGain*b.importance/(1+b.estimatedCostUnits)-
+  a.expectedInformationGain*a.importance/(1+a.estimatedCostUnits)||
+  a.question.localeCompare(b.question))[0]||null;
+}
+/** Each appended pass is permanent. A continuation is determined from evidence,
+ * not from a preselected number of turns or a mandatory human decision.
+ */
+export async function runAdaptiveInvestigationV1(input:Readonly<{
+ identity:InvestigationIdentityV1;store:InvestigationStoreV1;
+ readSources:InvestigationReaderV1;analyze:InvestigationAnalystV1;
+ verifyFinding:IndependentFindingVerifierV1;
+ maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
+ reopen?:Readonly<{sourceEventRef:string;question:string}>;
+ verifyReopen?:(sourceEventRef:string,identity:InvestigationIdentityV1,
+   previous:InvestigationPassV1)=>Promise<boolean>;
+ /** Trusted runtime metering, never model-generated estimated usage. */
+ measureCostUnits?:()=>number;now?:()=>number;
+ /** Independently trusted, current external-model permission for non-open sources.
+  * The reader's model-processing flag is necessary but never sufficient.
+  * Do not implement this by echoing the source reader's own claim.
+  */
+ authorizeModelProcessing?:(identity:InvestigationIdentityV1,question:string,
+  source:SourceAuthorityV1)=>Promise<boolean>;
+}>):Promise<InvestigationResultV1>{
+ const {identity,store,readSources,analyze,verifyFinding}=input;
+ if(!identity||!UUID.test(identity.caseId)||!UUID.test(identity.workspaceId)||
+    typeof store?.read!=="function"||typeof store?.append!=="function"||
+    typeof readSources!=="function"||typeof analyze!=="function"||
+    typeof verifyFinding!=="function")
+  throw new TypeError("MIZIZI_RESEARCH_INVALID_RUNTIME");
+ requireText(identity.openingQuestion,"OPENING_QUESTION",1000);
+ bounded(input.maxNewPasses,"MAX_NEW_PASSES",1,20);
+ bounded(input.maxTotalPasses,"MAX_TOTAL_PASSES",1,10000);
+ bounded(input.costBudgetUnits,"COST_BUDGET",0,1000000);
+ if(!Number.isInteger(input.maxNewPasses)||!Number.isInteger(input.maxTotalPasses))
+  throw new TypeError("MIZIZI_RESEARCH_INVALID_PASS_LIMIT");
+ const now=input.now??Date.now;
+ const history=[...await store.read(identity)];
+ verifyHistory(identity,history);
+ let latest=history.at(-1);
+ if(latest?.decision.action==="conclude")return {
+  caseId:identity.caseId,workspaceId:identity.workspaceId,passesAdded:0,
+  totalPasses:history.length,disposition:"concluded",nextQuestion:null,
+  lastFingerprint:latest.fingerprint};
+ if(latest?.decision.action==="pause"){
+  if(!input.reopen)return {
+   caseId:identity.caseId,workspaceId:identity.workspaceId,passesAdded:0,
+   totalPasses:history.length,disposition:"paused",nextQuestion:null,
+   lastFingerprint:latest.fingerprint};
+  requireText(input.reopen.sourceEventRef,"REOPEN_REF",500);
+  requireText(input.reopen.question,"REOPEN_QUESTION",500);
+  if(typeof input.verifyReopen!=="function"||
+     await input.verifyReopen(input.reopen.sourceEventRef,identity,latest)!==true)
+   throw new Error("MIZIZI_RESEARCH_REOPEN_AUTHORITY_UNVERIFIED");
+ }
+ let question=(latest?.decision.action==="pause"?input.reopen?.question:null)||
+     latest?.decision.nextQuestion||identity.openingQuestion;
+ let remainingCost=input.costBudgetUnits,added=0;
+ let disposition:InvestigationResultV1["disposition"]="continue";
+ while(added<input.maxNewPasses&&history.length<input.maxTotalPasses){
+  const sources=[...await readSources(identity,question,Object.freeze([...history]))];
+  if(sources.length>30)throw new Error("MIZIZI_RESEARCH_SOURCE_BUDGET_EXCEEDED");
+  const known=new Set<string>();
+  const authorities:SourceAuthorityV1[]=[];
+  for(const entry of sources){
+   verifySource(entry.source,identity,now());
+   if(known.has(entry.source.sourceId.toLowerCase()))
+    throw new Error("MIZIZI_RESEARCH_DUPLICATE_SOURCE");
+   known.add(entry.source.sourceId.toLowerCase());
+   requireText(entry.citation,"CITATION",1000);
+   if(typeof entry.excerpt!=="string"||entry.excerpt.length>10000)
+    throw new TypeError("MIZIZI_RESEARCH_EXCERPT_TOO_LARGE");
+   authorities.push(entry.source);
+  }
+  // A valid private source can forbid hosted-model processing. Such material
+  // stays in the immutable internal receipt, never in the analyst packet.
+  const modelVisibleIds=new Set<string>();
+  for(const {source} of sources){
+   if(!source.externalModelProcessingAllowed)continue;
+   // An attestation's sharing flags do not grant hosted-LLM disclosure.
+   // Only a reviewed open-license reader uses the established default path.
+   // All other sources require a distinct trusted current-use decision.
+   const permitted=source.useBasis==="open_license"||
+    (typeof input.authorizeModelProcessing==="function"&&
+     await input.authorizeModelProcessing(identity,question,source)===true);
+   if(permitted)modelVisibleIds.add(source.sourceId.toLowerCase());
+  }
+  const modelSources=sources.filter(s=>
+   modelVisibleIds.has(s.source.sourceId.toLowerCase()));
+  // Historic analysis and citations are not facts or disclosure consent.
+  // Pass only method metadata, not excerpts, findings, or narrative that
+  // could quote a privately retained witness or artifact.
+  const analystHistory=history.map(p=>Object.freeze({...p,
+   question:"Prior research question withheld from external processing.",
+   sourceReceipts:[],findings:[],proposedLeads:[],
+   passFinding:"Unverified prior analysis withheld from external processing.",
+   decision:{...p.decision,nextQuestion:null,
+    rationale:"Prior method decision; previous claims are not evidence.",
+    revisitTrigger:null}
+  }));
+  // Repeated identical source receipts, even under paraphrased questions,
+  // are not independent new evidence. Two previous same-family passes are
+  // sufficient to stop another paid interpretation of identical material.
+  const alreadySeen=new Set(history.flatMap(p=>
+   p.sourceReceipts.map(r=>r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint)));
+  const sameEvidence=sources.length>0&&sources.every(s=>
+   alreadySeen.has(s.source.lineageKey+"|"+s.source.originKey+"|"+s.source.fingerprint));
+  const prior=history.at(-1);
+  const earlier=new Set(history.slice(0,-1).flatMap(p=>
+   p.sourceReceipts.map(r=>r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint)));
+  const priorRepeated=history.length>1&&!!prior&&prior.sourceReceipts.length>0&&
+   prior.sourceReceipts.every(r=>
+    earlier.has(r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint));
+  const evidenceExhausted=sameEvidence&&priorRepeated;
+  // Mixed public and restricted packets are also human-only. The case
+  // question may itself disclose a protected witness or investigation lead;
+  // filtering excerpts alone cannot safely authorize sending that question.
+  const humanOnly=sources.some(s=>
+   !modelVisibleIds.has(s.source.sourceId.toLowerCase()));
+  // A lawful reader returning no evidence is a method result, not a prompt
+  // for a source-free model answer. Absence never establishes nonexistence.
+  const noEvidence=sources.length===0;
+  const noModel=humanOnly||evidenceExhausted||noEvidence;
+  const method=humanOnly?"human_review_required":
+   noEvidence?"no_authorized_evidence":"evidence_exhausted";
+  const methodFingerprintSeed=humanOnly?"mizizi.human_only_method.v1":
+   noEvidence?"mizizi.no_authorized_evidence_method.v1":
+   "mizizi.exhausted_evidence_method.v1";
+  const analysis:ResearchAnalysisV1=noModel?{
+   hypotheses:[],leads:[],
+   passFinding:humanOnly?
+    "Authorized evidence retained solely for private human review; no model received it.":
+    noEvidence?
+    "No authorized evidence was located; absence cannot establish that a cultural claim is false.":
+    "No new independent source evidence; repeat model interpretation withheld.",
+   requestedDisposition:"pause",
+   modelVersion:"mizizi."+method+".v1",
+   promptFingerprint:digest(methodFingerprintSeed)
+  }:await analyze(question,Object.freeze(modelSources),
+   Object.freeze(analystHistory));
+  requireText(analysis.passFinding,"PASS_FINDING",3000);
+  requireText(analysis.modelVersion,"MODEL_VERSION",150);
+  if(!SHA.test(analysis.promptFingerprint)||analysis.hypotheses.length>20||
+     analysis.leads.length>20||
+     !["continue","pause","conclude"].includes(analysis.requestedDisposition))
+   throw new TypeError("MIZIZI_RESEARCH_UNTRUSTED_ANALYSIS");
+  const findings:VerifiedClaimV1[]=[];
+  for(const claim of analysis.hypotheses){
+   requireText(claim.statement,"CLAIM",1800);
+   requireText(claim.reasoningSummary,"REASONING",2000);
+   bounded(claim.uncertainty,"UNCERTAINTY",0,1);
+   if(claim.sourceIds.length>20||
+      claim.sourceIds.some(ref=>!modelVisibleIds.has(ref.toLowerCase())))
+    throw new TypeError("MIZIZI_RESEARCH_UNOBSERVED_EVIDENCE_CITATION");
+   const refs=authorities.filter(a=>modelVisibleIds.has(a.sourceId.toLowerCase())&&
+    claim.sourceIds.some(id=>id.toLowerCase()===a.sourceId.toLowerCase()));
+   const independent=await verifyFinding(claim,Object.freeze(refs));
+   if(typeof independent?.verified!=="boolean"||
+      (independent.verified&&!independent.verificationRef))
+    throw new Error("MIZIZI_RESEARCH_INDEPENDENT_VERIFIER_INVALID");
+   const verified=independent.verified&&refs.length>0;
+   findings.push({...claim,sourceIds:[...claim.sourceIds],
+    interpretation:claim.interpretation==="supported"&&!verified?"hypothesis":claim.interpretation,
+    independentlyVerified:verified,
+    verificationRef:verified?independent.verificationRef:null});
+  }
+  const supported=findings.some(f=>f.interpretation==="supported"&&
+    f.independentlyVerified&&f.uncertainty<=.2);
+  const next=selectLead(analysis.leads,history,question,remainingCost);
+  let decision:PassDecisionV1;
+  if(analysis.requestedDisposition==="conclude"&&supported){
+   decision={action:"conclude",nextQuestion:null,
+    rationale:"Independent claim verifier confirmed the bounded outcome.",
+    revisitTrigger:null}; disposition="concluded";
+  }else if(next){
+   decision={action:"continue",nextQuestion:next.question,rationale:next.rationale,
+    revisitTrigger:null};disposition="continue";
+  }else{
+   decision={action:"pause",nextQuestion:null,
+    rationale:"No eligible new research lead within present source and cost constraints.",
+    revisitTrigger:"Independent new source, permission, or contradictory evidence"};
+   disposition="paused";
+  }
+  const costUnits=noModel?0:(input.measureCostUnits?.()??0);
+  bounded(costUnits,"MEASURED_COST",0,1000000);
+  remainingCost=Math.max(0,remainingCost-costUnits);
+  const previous=history.at(-1)?.fingerprint??null;
+  const REDACTED="[Source content withheld: custodian-controlled human-only evidence]";
+  const redactedFingerprint=createHash("sha256").update(REDACTED,"utf8").digest("hex");
+  // The source UUID is an opaque pointer, not a copy of the evidence or a
+  // grant to resolve it. Source/custody metadata and the original payload
+  // digest must stay with the independently authorized custodian.
+  const restrictedReceipt=(source:SourceAuthorityV1)=>
+   !modelVisibleIds.has(source.sourceId.toLowerCase());
+  // A private witness can be named in the question itself. The custodian,
+  // not the permanent research-pass journal, must retain that context.
+  const receiptQuestion=humanOnly?
+   "Private research question held by authorized evidence custodian.":question;
+  const body={contract:ADAPTIVE_INVESTIGATION_CONTRACT,caseId:identity.caseId,
+   workspaceId:identity.workspaceId,ordinal:history.length+1,
+   question:receiptQuestion,
+   predecessorFingerprint:previous,
+   sourceReceipts:sources.map(({source:a,citation,excerpt})=>({
+    sourceId:a.sourceId,
+    originKey:restrictedReceipt(a)?"custodian:restricted":a.originKey,
+    lineageKey:restrictedReceipt(a)?"custodian:restricted":a.lineageKey,
+    // This hashes the REDACTED pass excerpt only. It does not claim
+    // integrity or independent provenance of the custodian-held source.
+    payloadFingerprint:restrictedReceipt(a)?redactedFingerprint:a.fingerprint,
+    useBasis:a.useBasis,
+    authorityRef:restrictedReceipt(a)?"custodian:access-controlled":a.authorityRef,
+    observedAt:a.observedAt,
+    citation:restrictedReceipt(a)?"custodian:source-held":citation,
+    excerpt:restrictedReceipt(a)?REDACTED:excerpt,
+    modelDisclosed:modelVisibleIds.has(a.sourceId.toLowerCase())&&!noModel})),
+   findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
+   decision,modelVersion:analysis.modelVersion,
+   promptFingerprint:analysis.promptFingerprint,
+   recordedAt:new Date(now()).toISOString(),costUnits};
+  // Only source-authorized, exact evidence snippets are persisted.
+  if(new TextEncoder().encode(JSON.stringify(body)).length>30000)
+   throw new Error('MIZIZI_RESEARCH_EVIDENCE_SNAPSHOT_BUDGET');
+  const pass:InvestigationPassV1=Object.freeze({...body,
+   fingerprint:digest({...body,fingerprint:undefined})});
+  await store.append(identity,pass.ordinal,previous,pass);
+  history.push(pass);added++;
+  if(decision.action!=="continue"||remainingCost<=0)break;
+  question=decision.nextQuestion!;
+ }
+ latest=history.at(-1);
+ return {caseId:identity.caseId,workspaceId:identity.workspaceId,
+  passesAdded:added,totalPasses:history.length,disposition,
+  nextQuestion:latest?.decision.nextQuestion??null,
+  lastFingerprint:latest?.fingerprint??null};
+}

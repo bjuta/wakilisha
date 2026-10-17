@@ -12,6 +12,8 @@ export type WorkerRpc=(fn:string,args:Record<string,unknown>)=>Promise<WorkerRpc
 export type ResearchJobV1=Readonly<{
  jobId:string;receiptId:string;caseId:string;workspaceId:string;
  expectedRevision:number;attempt:number;maxAttempts:number;leaseExpiresAt:string;
+ /** Exact original job reason, only a publicly approved question may be searched. */
+ researchQuestion:string|null;publicSourceSearchApproved:boolean;
 }>;
 export type ReadOnlyResearchResultV1=Readonly<{
  contract:"mizizi.read_only_research_result.v1";caseId:string;
@@ -66,11 +68,22 @@ function validateClaim(raw:unknown,nowMs:number):ResearchJobV1{
  const expectedRevision=positive(payload.expected_case_revision);
  const attempt=positive(row.attempt_count),maxAttempts=positive(row.max_attempts);
  if(attempt>maxAttempts)throw new TypeError("MIZIZI_WORKER_ATTEMPT_OVERFLOW");
+ const rawReason=typeof payload.reason==='string'?payload.reason:null;
+ const publicPrefix='PUBLIC_CC0_RESEARCH: ';
+ const publicSourceSearchApproved=rawReason?.startsWith(publicPrefix)===true;
+ const researchQuestion=publicSourceSearchApproved?
+   rawReason!.slice(publicPrefix.length):null;
+ if(publicSourceSearchApproved&&(
+    !researchQuestion||researchQuestion.trim()!==researchQuestion||
+    researchQuestion.length<12||researchQuestion.length>500||
+    /[\u0000-\u001f]/.test(researchQuestion)))
+   throw new TypeError('MIZIZI_WORKER_UNSAFE_PUBLIC_RESEARCH_QUESTION');
  const expires=Date.parse(String(row.lease_expires_at));
  if(!Number.isFinite(expires)||expires<=nowMs)
    throw new TypeError("MIZIZI_WORKER_STALE_LEASE");
  return Object.freeze({jobId,receiptId,caseId,workspaceId,expectedRevision,
-   attempt,maxAttempts,leaseExpiresAt:new Date(expires).toISOString()});
+   attempt,maxAttempts,leaseExpiresAt:new Date(expires).toISOString(),
+   researchQuestion,publicSourceSearchApproved});
 }
 const SOURCE_SHA256=/^[a-f0-9]{64}$/i;
 const SOURCE_USE=new Set(["first_party","documented_consent","documented_contract","open_license"]);
@@ -139,6 +152,29 @@ async function validatedResult(
  }
  return Object.freeze(safe);
 }
+/** A job attempt is not an investigation budget. Distinguish conditions
+ * that may clear with time from broken evidence/authority, which must stop.
+ * Case-level immutable research passes remain available to a separately
+ * authorized follow-on job even after a terminal job.
+ */
+export function researchRetryDecisionV1(
+ error:unknown,attempt:number,baseDelaySeconds=60,
+):Readonly<{retryable:boolean;delaySeconds:number;category:string}>{
+ const raw=error instanceof Error?error.message:"";
+ const retryable=new Set([
+  "MIZIZI_WIKIDATA_UNREACHABLE",
+  "MIZIZI_WIKIDATA_RATE_LIMITED",
+  "MIZIZI_WIKIDATA_MAXLAG_DEFERRED",
+  "MIZIZI_ANALYST_TRANSPORT_UNCONFIRMED",
+  "MIZIZI_ANALYST_UPSTREAM_UNAVAILABLE"
+ ]).has(raw);
+ const category=/^MIZIZI_[A-Z0-9_]{3,100}$/.test(raw)?
+  raw:"MIZIZI_RESEARCH_UNCLASSIFIED";
+ const safeAttempt=Number.isSafeInteger(attempt)&&attempt>0?Math.min(attempt,16):1;
+ const delaySeconds=Math.min(3600,Math.max(1,baseDelaySeconds)*
+  Math.pow(2,safeAttempt-1));
+ return Object.freeze({retryable,delaySeconds,category});
+}
 /**
  * One bounded recover/claim/handle cycle. The SQL functions remain the sole
  * lease, retry and dead-letter authority. A completion RPC timeout is
@@ -178,10 +214,14 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
    try{
      researchResult=await validatedResult(await research(job),job,input.verifySources,now());
    }catch(error){
+     // Server logs only: bounded internal error codes, never source excerpts,
+     // credentials, untrusted model text or full exception messages.
+     const decision=researchRetryDecisionV1(error,job.attempt,retryDelay);
+     console.error("MIZIZI_AUTHENTIC_WORKER_FAILURE_CODE="+decision.category);
      const failedReceipt=record(confirmed(await rpc("mizizi_fail_case_research_job_v1",{
        p_job_id:job.jobId,p_worker_id:workerId,
        p_error:error instanceof Error?error.name:"Research handler failed",
-       p_retryable:true,p_retry_delay_seconds:retryDelay,
+       p_retryable:decision.retryable,p_retry_delay_seconds:decision.delaySeconds,
      }),"FAIL"));
      if(uuid(failedReceipt.job_id)!==job.jobId||uuid(failedReceipt.case_id)!==job.caseId||
        !uuid(failedReceipt.outbox_event_id)||

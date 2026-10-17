@@ -24843,6 +24843,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      mizizi_append_research_pass_v1: {
+        Args: {
+          p_body_text: string
+          p_fingerprint: string
+          p_job_id: string
+          p_predecessor: string
+          p_worker_id: string
+        }
+        Returns: {
+          case_id: string
+          fingerprint: string
+          ordinal: number
+          outcome: string
+        }[]
+      }
       mizizi_claim_case_research_jobs_v1: {
         Args: {
           p_lease_seconds?: number
@@ -24874,6 +24889,14 @@ export type Database = {
           p_worker_id: string
         }
         Returns: Json
+      }
+      mizizi_read_research_passes_v1: {
+        Args: { p_job_id: string; p_worker_id: string }
+        Returns: {
+          body_text: string
+          fingerprint: string
+          ordinal: number
+        }[]
       }
       mizizi_recover_expired_case_research_jobs_v1: {
         Args: { p_limit?: number; p_retry_delay_seconds?: number }
