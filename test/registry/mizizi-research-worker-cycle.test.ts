@@ -444,6 +444,8 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
  });
  it("retains mixed public and restricted evidence without exporting private investigation context",async()=>{
   const store=memory(),secret="ORAL_WITNESS_CONFIDENTIAL_EXCERPT";
+  const protectedQuestion="Did the confidential witness named PRIVATE_SOURCE_PERSON report a different recording session?";
+  const privateIdentity={...identity,openingQuestion:protectedQuestion};
   const restricted={...source,excerpt:secret,citation:"WITNESS_PERSONAL_CITATION",
    source:{...authority,sourceId:JOB,originKey:"WITNESS_ORIGIN_PRIVATE",
     lineageKey:"WITNESS_LINEAGE_PRIVATE",authorityRef:"WITNESS_PERMISSION_PRIVATE",
@@ -452,7 +454,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   const analyst=vi.fn(async()=>answer([],"conclude"));
   const verifier=vi.fn(async()=>({verified:true,verificationRef:"forged:verdict"}));
   const result=await runAdaptiveInvestigationV1({
-   identity,store,maxNewPasses:2,maxTotalPasses:20,costBudgetUnits:20,
+   identity:privateIdentity,store,maxNewPasses:2,maxTotalPasses:20,costBudgetUnits:20,
    now:()=>NOW,readSources:async()=>[restricted,visible],
    analyze:analyst,verifyFinding:verifier
   });
@@ -460,6 +462,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(analyst).not.toHaveBeenCalled();
   expect(verifier).not.toHaveBeenCalled();
   expect(store.rows[0]).toMatchObject({costUnits:0,
+   question:"Private research question held by authorized evidence custodian.",
    modelVersion:"mizizi.human_review_required.v1",
    findings:[],decision:{action:"pause"}});
   expect(store.rows[0].sourceReceipts).toEqual(expect.arrayContaining([
@@ -471,11 +474,12 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   ]));
   expect(store.rows[0].sourceReceipts[0]).not.toHaveProperty("custodyFingerprint");
   const serialized=JSON.stringify(store.rows);
-  for(const confidential of [secret,"WITNESS_PERSONAL_CITATION",
-   "WITNESS_ORIGIN_PRIVATE","WITNESS_LINEAGE_PRIVATE","WITNESS_PERMISSION_PRIVATE",
+  for(const confidential of [secret,protectedQuestion,"PRIVATE_SOURCE_PERSON",
+   "WITNESS_PERSONAL_CITATION","WITNESS_ORIGIN_PRIVATE",
+   "WITNESS_LINEAGE_PRIVATE","WITNESS_PERMISSION_PRIVATE",
    "c".repeat(64)])expect(serialized).not.toContain(confidential);
   const resumed=await runAdaptiveInvestigationV1({
-   identity,store,maxNewPasses:2,maxTotalPasses:20,costBudgetUnits:20,
+   identity:privateIdentity,store,maxNewPasses:2,maxTotalPasses:20,costBudgetUnits:20,
    now:()=>NOW,readSources:async()=>[restricted,visible],
    analyze:analyst,verifyFinding:verifier
   });
