@@ -99,21 +99,24 @@ describe("Flat master/detail history and evidence workspaces", () => {
 });
 
 describe("MIZIZI reference-inspired, live-data operational workspace", () => {
-  it("keeps Brief, Orion, Workbench, History and governed Decision Work distinct", () => {
+  it("copies Product v4 surface and Headquarters navigation without altering review authority", () => {
     const page = readFileSync("src/pages/admin/review/mizizi/page.tsx", "utf8");
     expect(page).toContain('useState<"brief" | "field" | "cores" | "history" | "decisions">("brief")');
-    for (const label of ["Brief", "Orion", "Workbench", "History", "Decision Work"]) {
-      expect(page).toContain(`label: "${label}"`);
+    for (const [id, label] of [
+      ["brief", "Workbench"], ["field", "Orion"], ["decisions", "Review"],
+      ["cores", "Evidence"], ["history", "Outcomes"],
+    ]) expect(page).toContain(`id: "${id}", label: "${label}"`);
+    expect(page).toContain('aria-label="MIZIZI product surfaces"');
+    expect(page).toContain('aria-current="page" className="mz-v4-surface-current">Headquarters');
+    for (const surface of ["Field", "Contributions", "Record"]) {
+      expect(page).toContain(`>${surface}</button>`);
     }
-    expect(page).toContain('{ id: "field_capture", label: "Field", disabled: true }');
-    expect(page).toContain('{ id: "published_cores", label: "Cores", disabled: true }');
-    expect(page).toContain('{ id: "enterprise", label: "Enterprise", disabled: true }');
-    expect(page).toContain('view === "field_capture" || view === "published_cores" || view === "enterprise"');
+    expect(page).not.toContain('label: "Cores"');
     expect(page).toContain('navigate("/credits")');
     expect(page).toContain('<WkDisclosure');
     expect(page).toContain('triggerClassName="mz-future-trigger"');
-    expect(page).toContain("Field, Cores, Enterprise and Ask MIZIZI are not yet available. Why?");
-    for (const reason of ["Field unavailable:", "Cores unavailable:", "Enterprise unavailable:", "Ask MIZIZI unavailable:"]) {
+    expect(page).toContain("What is connected and what still requires evidence?");
+    for (const reason of ["Field unavailable:", "Contributions unavailable:", "Record unavailable:", "Organization workspace unavailable:", "Research execution unavailable:"]) {
       expect(page).toContain(reason);
     }
     expect(page).toContain('workspaceView === "decisions"');
