@@ -491,6 +491,9 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   const result=await runAdaptiveInvestigationV1({
    identity:privateIdentity,store,maxNewPasses:2,maxTotalPasses:20,costBudgetUnits:20,
    now:()=>NOW,readSources:async()=>[restricted,visible],
+   // This public-looking first-party fixture needs a separate trusted decision.
+   // The restricted witness is never authorized for model disclosure.
+   authorizeModelProcessing:async(_identity,_question,src)=>src.sourceId===EVENT,
    analyze:analyst,verifyFinding:verifier
   });
   expect(result).toMatchObject({passesAdded:1,disposition:"paused"});
