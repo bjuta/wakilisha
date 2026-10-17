@@ -152,6 +152,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "docs(mizizi): seal QV1 preview replay and exact generated database types"
           git fetch origin "refs/heads/$GITHUB_HEAD_REF"
-          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+          PR_HEAD_SHA="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.GITHUB_EVENT_PATH,"utf8")).pull_request.head.sha)')"
+          test "$(git rev-parse FETCH_HEAD)" = "$PR_HEAD_SHA"
           git push origin "HEAD:refs/heads/$GITHUB_HEAD_REF"
           echo WK_QV1_REPLAY_PROOF_AND_SCHEMA_TYPES_COMMITTED=PASS
