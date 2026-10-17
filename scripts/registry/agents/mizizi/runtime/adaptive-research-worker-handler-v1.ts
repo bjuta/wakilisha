@@ -20,6 +20,8 @@ export type AdaptiveWorkerDependenciesV1=Readonly<{
  verifyFinding:IndependentFindingVerifierV1;
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
  measureCostUnits?:()=>number;
+ /** Trusted case-scoped grant checker; never inferred from the source reader. */
+ authorizeModelProcessing?:Parameters<typeof runAdaptiveInvestigationV1>[0]["authorizeModelProcessing"];
 }>;
 export function createAdaptiveResearchWorkerHandlerV1(
  deps:AdaptiveWorkerDependenciesV1,
@@ -35,7 +37,8 @@ export function createAdaptiveResearchWorkerHandlerV1(
    identity,store:deps.store,readSources:deps.readSources,
    analyze:deps.analyze,verifyFinding:deps.verifyFinding,
    maxNewPasses:deps.maxNewPasses,maxTotalPasses:deps.maxTotalPasses,
-   costBudgetUnits:deps.costBudgetUnits,measureCostUnits:deps.measureCostUnits
+   costBudgetUnits:deps.costBudgetUnits,measureCostUnits:deps.measureCostUnits,
+   authorizeModelProcessing:deps.authorizeModelProcessing
   });
   // Re-read durable case history: never trust an ephemeral in-memory claim
   // of success after the append transport potentially timed out.
@@ -60,7 +63,9 @@ export async function runAdaptiveResearchWorkerCycleV1(input:Readonly<{
  readSources:InvestigationReaderV1;analyze:InvestigationAnalystV1;
  verifyFinding:IndependentFindingVerifierV1;
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
- measureCostUnits?:()=>number;leaseSeconds?:number;limit?:number;now?:()=>number;
+ measureCostUnits?:()=>number;
+ authorizeModelProcessing?:AdaptiveWorkerDependenciesV1["authorizeModelProcessing"];
+ leaseSeconds?:number;limit?:number;now?:()=>number;
 }>){
  if(!input||typeof input.verifySources!=="function")
   throw new TypeError("MIZIZI_ADAPTIVE_WORKER_SOURCE_VERIFIER_REQUIRED");
@@ -73,7 +78,8 @@ export async function runAdaptiveResearchWorkerCycleV1(input:Readonly<{
     openingQuestion:input.openingQuestion,readSources:input.readSources,
     analyze:input.analyze,verifyFinding:input.verifyFinding,
     maxNewPasses:input.maxNewPasses,maxTotalPasses:input.maxTotalPasses,
-    costBudgetUnits:input.costBudgetUnits,measureCostUnits:input.measureCostUnits});
+    costBudgetUnits:input.costBudgetUnits,measureCostUnits:input.measureCostUnits,
+    authorizeModelProcessing:input.authorizeModelProcessing});
    return handler(job);
   }
  });
