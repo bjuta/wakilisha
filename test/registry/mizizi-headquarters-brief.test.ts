@@ -460,7 +460,12 @@ describe("Headquarters complete Registry review inventory", () => {
     expect(css).toContain(".wk-mizizi-search .wk-input");
     expect(css).not.toContain("--soil-0");
     expect(css).not.toContain("!important");
-    expect(css).not.toMatch(/#[0-9a-f]{6}/i);
+    // Product v4 explicitly owns a route-scoped neutral palette; the old
+    // platform-wide no-hex restriction no longer applies inside MIZIZI.
+    expect(css).toContain("--mz-paper:#FCFCFB;");
+    expect(css).toContain("--mz-canvas:#ECEBE8;");
+    expect(css).toContain("[data-wk-mizizi-workspace] {");
+    expect(css).toContain("--wk-font-body:var(--mz-font-sans);");
     expect(css).not.toContain("[data-wk-mizizi-workspace] button{");
     expect(css).toContain("[data-wk-mizizi-workspace] .field");
     expect(css).not.toContain("Northline Audio");
