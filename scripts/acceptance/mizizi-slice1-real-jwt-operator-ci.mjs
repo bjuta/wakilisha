@@ -23,8 +23,8 @@ function localSql(query,container){
   "-A","-t","-v","ON_ERROR_STOP=1","-U","supabase_admin","-d","postgres"],
   {input:query,encoding:"utf8",timeout:180000,maxBuffer:512*1024});
  if(result.error||result.status!==0)throw new Error(
-  "LOCAL_SQL_"+String((result.stderr||"").match(/ERROR:\s*([^\n]+)/)?.[1]||
-  "UNKNOWN").replace(/[^A-Za-z0-9_]/g,"_").slice(0,110));
+  "LOCAL_SQL: "+String((result.stderr||"").match(/ERROR:\s*([^\n]+)/)?.[1]||
+  "UNKNOWN").replace(/[^A-Za-z0-9_ ]/g," ").replace(/\s+/g," ").slice(0,110));
  return result.stdout.trim();
 }
 function requireDenied(result,sqlstate,label){
@@ -60,9 +60,9 @@ async function main(){
   "(SELECT count(*) FROM mizizi_private.cases)||'|'||"+
   "(SELECT count(*) FROM mizizi_private.write_holds)||'|'||"+
   "(SELECT count(*) FROM public.registry_releases);",db);
- assert(baseline==="231|20261015091718|0|0|0|0|0",
+ assert(baseline==="235|20261017185928|0|0|0|0|0",
   "STOP_AUTH_NOT_FRESH_LOCAL_MIZIZI_READER_RLS");
- console.log("WK_AUTH_EMPTY_231_UNLINKED_LOCAL_BASELINE=PASS");
+ console.log("WK_AUTH_EMPTY_235_UNLINKED_LOCAL_BASELINE=PASS");
 
  const admin=client(api,values.SERVICE_ROLE_KEY),people=[];
  for(const label of ["first","second"]){
@@ -142,6 +142,36 @@ async function main(){
   cases[0].caseRevision===1&&UUID.test(cases[0].reviewId||""),
   "STOP_SOURCE_BOUND_CASE_READ_MISMATCH");
  const caseId=cases[0].caseId;
+ // MIZIZI #1247: a REAL local JWT read and a LOCAL privileged SQL seed only.
+ // Browser clients never have a write or private-table permission.
+ const emptyQuestion=await call(first.user,"admin_mizizi_case_questions_v1",{
+  p_case_id:caseId,p_expected_case_revision:1,
+ },"STOP_QV1_AUTH_EMPTY_READ");
+ assert(emptyQuestion?.kind==="not_recorded","STOP_QV1_EMPTY_MASQUERADES_AS_ASSESSED");
+ requireDenied(await client(api,values.ANON_KEY).rpc("admin_mizizi_case_questions_v1",{
+   p_case_id:caseId,p_expected_case_revision:1,
+ }),"42501","STOP_QV1_ANON_READ");
+ const qid=randomUUID(),hypA=randomUUID(),hypB=randomUUID();
+ localSql("INSERT INTO mizizi_private.case_question_versions("+
+   "workspace_id,case_id,question_id,question_revision,expected_case_revision,"+
+   "question_text,hypotheses,frozen_by_user_id,freeze_reason) VALUES ('"+
+   cases[0].workspaceId+"'::uuid,'"+caseId+"'::uuid,'"+qid+"'::uuid,1,1,"+
+   "'Is this recording the same independently documented original performance?',"+
+   "jsonb_build_array(jsonb_build_object('id','"+hypA+
+   "','label','Same source performance'),jsonb_build_object('id','"+hypB+
+   "','label','Distinct source performance')),'"+first.id+
+   "'::uuid,'Disposable-only reviewed question snapshot for operator reader acceptance.');",db);
+ const frozen=await call(first.user,"admin_mizizi_case_questions_v1",{
+   p_case_id:caseId,p_expected_case_revision:1,
+ },"STOP_QV1_AUTH_POSITIVE_READ");
+ assert(frozen?.kind==="ready"&&frozen.contract==="mizizi.question_read.v1"&&
+   frozen.caseId===caseId&&frozen.caseRevision===1&&
+   frozen.questions?.length===1&&frozen.questions[0].questionId===qid&&
+   frozen.questions[0].hypotheses?.length===2&&
+   frozen.questions[0].sources?.length===0&&
+   frozen.questions[0].assessments?.length===0,
+   "STOP_QV1_AUTH_DOSSIER_MASQUERADES_AS_GRADED");
+ console.log("WK_QV1_REAL_JWT_READ_WITH_ZERO_SOURCE_GRADES=PASS");
  // RLS authority: use the genuine source-bound review already admitted by the
  // existing fixture. No fabricated human decision or Registry mutation.
  const reviewId=cases[0].reviewId;
@@ -224,6 +254,9 @@ async function main(){
   "42501","STOP_O20_SUBSCRIBER_CASE_READ");
  requireDenied(await subscriber.rpc("admin_mizizi_case_events_v1",
   {p_case_id:caseId,p_limit:100}),"42501","STOP_O20_SUBSCRIBER_CASE_JOURNAL");
+ requireDenied(await subscriber.rpc("admin_mizizi_case_questions_v1",{
+   p_case_id:caseId,p_expected_case_revision:1,
+ }),"42501","STOP_QV1_SIGNED_IN_NONMEMBER_DENIED");
  requireDenied(await subscriber.rpc("admin_mizizi_begin_case_research_v1",
   {p_case_id:caseId,p_expected_revision:1,
    p_reason:"Unprivileged subscriber cannot change a source-bound case."}),
@@ -286,6 +319,13 @@ async function main(){
  assert(progressed.caseId===caseId&&progressed.revision===2&&
   progressed.stage==="research","STOP_CASE_REVISION_RECEIPT");
  console.log("WK_AUTH_REAL_JWT_SOURCE_CASE_STAGE2_RECEIPT=PASS");
+ requireDenied(await first.user.rpc("admin_mizizi_case_questions_v1",{
+   p_case_id:caseId,p_expected_case_revision:1,
+ }),"PT409","STOP_QV1_CLIENT_STALE_CASE_REVISION");
+ requireDenied(await first.user.rpc("admin_mizizi_case_questions_v1",{
+   p_case_id:caseId,p_expected_case_revision:2,
+ }),"PT409","STOP_QV1_OLD_FROZEN_QUESTION_STALE");
+ console.log("WK_QV1_REAL_JWT_STALE_READ_DENIED=PASS");
  // O23: independently confirm the authenticated steward changed exactly
  // one source-backed case, retained the original open Registry review, and
  // appended one correctly attributed DB02 transition event.
