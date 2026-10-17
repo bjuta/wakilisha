@@ -1552,3 +1552,41 @@
   [data-wk-mizizi-workspace] .mz-case-select {width:100%}
   [data-wk-mizizi-workspace] .mz-case-switcher-count {font-size:12px}
 }
+
+/* v3 workbench shelf/record proportions. Artwork remains honestly unavailable
+   until an authorized source image exists; never synthesize historical covers. */
+[data-wk-mizizi-workspace] .mz-case-hero {
+  grid-template-columns:75px minmax(0,1fr);
+  gap:20px;padding:32px;align-items:center;
+  border-radius:var(--mz-r-card) var(--mz-r-card) 0 0;
+  background:var(--mz-shelf);
+}
+[data-wk-mizizi-workspace] .mz-case-hero-art {
+  width:75px;height:120px;aspect-ratio:5/8;
+  padding:6px;gap:8px;
+  border-radius:var(--mz-r-artefact);box-shadow:none;
+  font:400 10px/1.4 var(--mz-font-mono);
+}
+[data-wk-mizizi-workspace] .mz-case-hero h2 {
+  font:var(--mz-h1);letter-spacing:-.02em;line-height:1.05;
+}
+[data-wk-mizizi-workspace] .mz-case-stats {
+  margin-top:0;padding:0;
+  border-top:1px solid oklch(0.9 0.006 70);
+  border-radius:0 0 var(--mz-r-card) var(--mz-r-card);
+}
+[data-wk-mizizi-workspace] .mz-case-stats > div {padding:16px 24px}
+[data-wk-mizizi-workspace] .mz-case-stats dt {
+  font:400 12px/1.4 var(--mz-font-sans);
+  text-transform:none;letter-spacing:0;color:var(--mz-ink-3);
+}
+[data-wk-mizizi-workspace] .mz-case-stats dd {
+  margin-top:4px;font:600 15px/1.4 var(--mz-font-sans);
+}
+@media(max-width:480px) {
+  [data-wk-mizizi-workspace] .mz-case-hero {
+    gap:14px;padding:20px;
+  }
+  [data-wk-mizizi-workspace] .mz-case-hero h2 {font-size:clamp(24px,6vw,34px)}
+  [data-wk-mizizi-workspace] .mz-case-stats > div {padding:12px}
+}

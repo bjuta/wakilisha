@@ -133,11 +133,13 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
     } finally {setBusy(false);}
   };
   return <div className="mz-case-home" data-wk-mizizi-investigation-first>
-    <header className="mz-case-introduction">
-      <span className="mz-case-eyebrow">MIZIZI / Headquarters / Investigate</span>
-      <h1>Start with the investigation.</h1>
-      <p>What does the record support, what remains uncertain, and which action is actually permitted?</p>
-    </header>
+    {state.kind === "ready" && focusedCase ? null : (
+      <header className="mz-case-introduction">
+        <span className="mz-case-eyebrow">MIZIZI / Headquarters / Investigate</span>
+        <h1>Start with the investigation.</h1>
+        <p>What does the record support, what remains uncertain, and which action is actually permitted?</p>
+      </header>
+    )}
     {state.kind === "loading" ? (
       <p role="status" className="mz-case-readstate">Checking recorded cases and access…</p>
     ) : state.kind === "denied" ? (

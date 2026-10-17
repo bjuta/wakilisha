@@ -127,6 +127,9 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     const casePanel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
     const tabs=readFileSync("src/components/design-system/primitives/Tabs.tsx","utf8");
     expect(casePanel).toContain('<WkSelect');
+    expect(casePanel).toContain('state.kind === "ready" && focusedCase ? null');
+    expect(css).toContain('aspect-ratio:5/8');
+    expect(css).toContain('border-radius:0 0 var(--mz-r-card) var(--mz-r-card)');
     expect(casePanel).toContain('ariaLabel="Switch recorded investigation"');
     expect(casePanel).toContain('cases.map(item => ({');
     expect(casePanel).not.toContain('className="mz-case-option"');
