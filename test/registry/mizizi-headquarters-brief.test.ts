@@ -126,6 +126,7 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(page).toContain('className="mz-v3-tabs"');
     const casePanel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
     const tabs=readFileSync("src/components/design-system/primitives/Tabs.tsx","utf8");
+    const css=readFileSync("src/pages/admin/review/mizizi/mizizi-html.css","utf8");
     expect(casePanel).toContain('<WkSelect');
     expect(casePanel).toContain('state.kind === "ready" && focusedCase ? null');
     expect(css).toContain('aspect-ratio:5/8');
@@ -141,7 +142,7 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     expect(page).toContain('aria-label="MIZIZI Headquarters"');
     for (const surface of ["Field","Contributions","Record"])
       expect(page).toContain(`label: "${surface}", disabled: true`);
-    const css=readFileSync("src/pages/admin/review/mizizi/mizizi-html.css","utf8");
+
     expect(css).toContain("--mz-v3-rail-width:248px");
     expect(css).toContain("grid-template-rows:64px minmax(0,1fr)");
     expect(css).toContain("min-height:44px");
