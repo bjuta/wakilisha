@@ -399,3 +399,99 @@
   .wk-reference-article-columns { grid-template-columns:minmax(0,1fr); }
   .wk-reference-article-byline { position:static; }
 }
+
+
+/* WORKBOOK PALETTE CONTRACT: two authored palettes, not a colour inversion.
+   The same theme switch that drives the app selects the exact workbook
+   editorial neutrals. Brand ink is #4E7425 on light, #85C441 on dark.
+   P4 Artists and P5 Artist detail are deliberately outside this scope. */
+:where([data-wk-theme="light"]) :is(
+  [data-wk-workbook-screen="video"],
+  [data-wk-workbook-screen="audio"],
+  [data-wk-workbook-screen="podcasts"],
+  [data-wk-workbook-screen="following"],
+  [data-wk-workbook-screen="messages"],
+  [data-wk-workbook-screen="notifications"],
+  [data-wk-workbook-screen="music"],
+  [data-wk-workbook-screen="magazine"],
+  [data-wk-workbook-screen="magazine-mobile"]
+) {
+  --wk-bg:#FCFCFB;
+  --wk-bg-subtle:#FAFAF9;
+  --wk-surface:#FFFFFF;
+  --wk-surface-raised:oklch(0.965 0.003 90);
+  --wk-surface-strong:oklch(0.935 0.004 90);
+  --wk-text:oklch(0.22 0.005 250);
+  --wk-text-soft:oklch(0.35 0.005 250);
+  --wk-text-muted:oklch(0.48 0.005 250);
+  --wk-text-faint:oklch(0.62 0.005 250);
+  --wk-border:oklch(0.915 0.004 90);
+  --wk-border-2:rgba(12,13,10,.16);
+  --wk-border-strong:rgba(12,13,10,.28);
+  --wk-divider:rgba(12,13,10,.08);
+  --wk-brand:#4E7425;
+  --wk-brand-soft:#EDF5E3;
+  --wk-brand-on:#FFFFFF;
+  --wk-workbook-cover-scrim:linear-gradient(0deg,rgba(0,0,0,.83),rgba(0,0,0,.20) 60%,rgba(0,0,0,.06));
+}
+:where([data-wk-theme="dark"],:root:not([data-wk-theme="light"])) :is(
+  [data-wk-workbook-screen="video"],
+  [data-wk-workbook-screen="audio"],
+  [data-wk-workbook-screen="podcasts"],
+  [data-wk-workbook-screen="following"],
+  [data-wk-workbook-screen="messages"],
+  [data-wk-workbook-screen="notifications"],
+  [data-wk-workbook-screen="music"],
+  [data-wk-workbook-screen="magazine"],
+  [data-wk-workbook-screen="magazine-mobile"]
+) {
+  --wk-bg:#0B0B0B;
+  --wk-bg-subtle:#131313;
+  --wk-surface:#131313;
+  --wk-surface-raised:#1C1C1C;
+  --wk-surface-strong:#262626;
+  --wk-text:#F5F5F4;
+  --wk-text-soft:rgba(255,255,255,.8);
+  --wk-text-muted:rgba(255,255,255,.6);
+  --wk-text-faint:rgba(255,255,255,.4);
+  --wk-border:rgba(255,255,255,.09);
+  --wk-border-2:rgba(255,255,255,.14);
+  --wk-border-strong:rgba(255,255,255,.24);
+  --wk-divider:rgba(255,255,255,.09);
+  --wk-brand:#85C441;
+  --wk-brand-soft:rgba(133,196,65,.14);
+  --wk-brand-on:#0B0B0B;
+  --wk-workbook-cover-scrim:linear-gradient(0deg,rgba(0,0,0,.89),rgba(0,0,0,.32) 60%,rgba(0,0,0,.10));
+}
+/* P11 article: workbook warm paper in light, a fully readable ink
+   counterpart in dark. Photographic hero scrims remain dark in either mode. */
+:where([data-wk-theme="light"]) .wk-workbook-article-paper {
+  --wk-bg:#F5F2EC;
+  --wk-surface:#F5F2EC;
+  --wk-surface-raised:#EEEAE2;
+  --wk-text:#202020;
+  --wk-text-soft:#414141;
+  --wk-text-muted:#5C5C5C;
+  --wk-border:#DCD7CD;
+  --wk-brand:#4E7425;
+  --wk-brand-on:#FFFFFF;
+}
+:where([data-wk-theme="dark"],:root:not([data-wk-theme="light"])) .wk-workbook-article-paper {
+  --wk-bg:#0B0B0B;
+  --wk-surface:#131313;
+  --wk-surface-raised:#1C1C1C;
+  --wk-text:#F5F5F4;
+  --wk-text-soft:rgba(255,255,255,.8);
+  --wk-text-muted:rgba(255,255,255,.6);
+  --wk-border:rgba(255,255,255,.09);
+  --wk-brand:#85C441;
+  --wk-brand-on:#0B0B0B;
+}
+.wk-workbook-article-paper { background:var(--wk-bg);color:var(--wk-text); }
+.wk-reference-media-hero::before { background:var(--wk-workbook-cover-scrim); }
+.wk-reference-media-hero-copy, .wk-reference-media-hero-copy :is(h1,h2,p) { color:#FFFFFF; }
+.wk-reference-media-hero-copy [class*="text-"] { color:inherit; }
+.wk-reference-media-hero-copy .wk-reference-hero-caption { color:rgba(255,255,255,.84); }
+.wk-reference-media-hero-copy .wk-reference-media-hero-title { color:#FFFFFF; }
+.wk-reference-media-hero-copy .wk-reference-hero-caption { color:rgba(255,255,255,.84); }
+.wk-reference-media-hero-copy .wk-reference-play-button { background:#FFFFFF;color:#0B0B0B; }
