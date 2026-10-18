@@ -165,7 +165,7 @@ describe("Workbook v4 is the only active product design authority", () => {
     const css = read("src/styles/wakilisha-magazine-38-44.css");
 
     expect(desktop).toContain('<ArticleFloatHeader article={article} />');
-    expect(articleHeader).toContain('<ShareMenu');
+    expect(articleHeader).toContain('<SharePopover');
     expect(desktop).not.toContain('ArticleBottomShare');
     expect(desktop).not.toContain('handleNavCopy');
     expect(mobile.match(/<MobileShareButton/g)).toHaveLength(1);
