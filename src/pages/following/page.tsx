@@ -540,7 +540,7 @@ function ActivityMedia({
 
   if (item.itemType === "playlist") {
     return (
-      <div className="mx-auto aspect-square w-full max-w-[680px] overflow-hidden bg-[var(--wk-surface-raised)] md:rounded-[28px]">
+      <div className="mx-auto aspect-square w-full max-w-[520px] overflow-hidden rounded-[16px] bg-[var(--wk-surface-raised)]">
         <PlaylistCoverPresentation
           src={item.imageUrl}
           altText={item.title}
@@ -564,12 +564,12 @@ function ActivityMedia({
 
   const shape =
     item.itemType === "release"
-      ? "mx-auto aspect-square w-full max-w-[680px]"
-      : "aspect-[4/3] w-full md:aspect-[16/10]";
+      ? "mx-auto aspect-square w-full max-w-[520px]"
+      : "mx-auto aspect-[3/2] w-full max-w-[680px]";
 
   return (
     <div
-      className={`${shape} overflow-hidden bg-[var(--wk-surface-raised)] md:rounded-[28px]`}
+      className={`${shape} overflow-hidden rounded-[16px] bg-[var(--wk-surface-raised)]`}
     >
       {item.imageUrl ? (
         <img
@@ -1079,7 +1079,7 @@ function FollowingActivity({
             </h2>
 
             {item.summary && (
-              <p className="mt-2 line-clamp-2 max-w-[680px] text-[13px] leading-relaxed text-[var(--wk-text-muted)] md:mt-3 md:text-[14px] md:line-clamp-3">
+              <p className="mt-2 line-clamp-3 max-w-[680px] text-[15px] leading-[1.55] text-[var(--wk-text-muted)] md:mt-3 md:text-[16px]">
                 {item.summary}
               </p>
             )}
@@ -2292,7 +2292,7 @@ export default function FollowingPage() {
                   aria-hidden="true"
                 />
                 <h2 className="mt-4 text-[20px] font-black tracking-[-0.03em]">
-                  Your People Are Still Here
+                  We couldn’t finish following
                 </h2>
                 <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
                   {guestIntentError}
@@ -2313,10 +2313,10 @@ export default function FollowingPage() {
               <>
                 <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[var(--wk-border)] border-t-[var(--wk-brand)]" />
                 <h2 className="mt-5 text-[20px] font-black tracking-[-0.03em]">
-                  Keeping Your People
+                  Saving your follows
                 </h2>
                 <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
-                  Turning the Artists you chose into real Follows.
+                  Saving the artists you chose.
                 </p>
               </>
             )}
@@ -2352,8 +2352,8 @@ export default function FollowingPage() {
             </div>
             <h2 className="mt-5 text-[20px] font-black tracking-[-0.03em]">
               {matureFollows.length === 0
-                ? "Build Your Circle"
-                : "Nothing Here Yet"}
+                ? "Find your people"
+                : "Nothing new yet"}
             </h2>
             <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
               {matureFollows.length === 0
