@@ -42,6 +42,10 @@ const mobileMagazine = read(
   "src/pages/mobile/magazine/page.tsx",
 );
 
+const magazineCard = read(
+  "src/pages/magazine/components/MagazineCard.tsx",
+);
+
 const magazineFallbackBuilder = read(
   "scripts/seo/build-public-magazine-fallback.mjs",
 );
@@ -280,11 +284,19 @@ if (
   );
 }
 
+// The cover image lives in MobileMagazine; all secondary story images
+// live in the shared MagazineCard used by that route. Verify both halves.
 if (
   !mobileMagazine.includes(
     'fetchPriority="high"',
   ) ||
   !mobileMagazine.includes(
+    'import { MagazineCard } from "@/pages/magazine/components/MagazineCard";',
+  ) ||
+  !mobileMagazine.includes(
+    "<MagazineCard",
+  ) ||
+  !magazineCard.includes(
     'fetchPriority="low"',
   )
 ) {
