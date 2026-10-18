@@ -248,6 +248,15 @@
   }
 }
 @media (max-width: 639px) {
+  /* In a message thread the composer replaces the dock at the thumb edge.
+     Playback state continues; only its global chrome steps aside. */
+  body:has([data-wk-workbook-screen="messages"] [data-wk-message-thread][data-wk-thread-selected="true"]) [data-wk-player-dock] {
+    display: none;
+  }
+  [data-wk-workbook-screen="following"] [data-following-masthead],
+  [data-wk-workbook-screen="notifications"] > div > section > header {
+    top: 64px;
+  }
   [data-wk-workbook-screen="following"] article[data-following-activity] {
     grid-template-columns: 42px minmax(0, 1fr);
     gap: 10px;
