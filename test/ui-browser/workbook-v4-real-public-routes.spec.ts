@@ -23,14 +23,21 @@ async function waitForSettledMedia(page: Page, name: string) {
     }
   }
   if (name === "music") {
-    const recordedCover = surface.locator('.wk-music-hero img[alt$="cover artwork"]').first();
-    if (await recordedCover.count()) {
-      // The signed-in theme provider can rerender before a lazy image decodes.
-      // Await the real release artwork, never a mocked or invented cover.
-      await expect.poll(
-        () => recordedCover.evaluate((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
-        { timeout: 25_000 },
-      ).toBe(true);
+    const coverSlot = surface.locator(".wk-music-hero [data-wk-music-artwork-state]").last();
+    if (await coverSlot.count()) {
+      // The Registry image host can stall or reject a CI client. The UI must
+      // paint either decoded cover art or its labelled fallback immediately;
+      // this browser test does not claim external-image availability.
+      await expect(coverSlot).toBeVisible();
+      const state = await coverSlot.getAttribute("data-wk-music-artwork-state");
+      expect(["recorded", "fallback"]).toContain(state);
+      if (state === "fallback") {
+        await expect(coverSlot.locator("[data-wk-music-artwork-fallback]")).toBeVisible();
+      } else {
+        const image = coverSlot.locator("img");
+        await expect(image).toHaveCount(1);
+        expect(await image.evaluate((node) => node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0)).toBe(true);
+      }
     }
   }
 }
