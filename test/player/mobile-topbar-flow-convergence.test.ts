@@ -17,7 +17,7 @@ describe("Workbook v4 mobile header and sidebar flow", () => {
   it("keeps a single start-edge sidebar without a bottom tab or second menu", () => {
     expect(header).toContain("Open WAKILISHA menu");
     expect(header).toContain('aria-controls="wk-workbook-sidebar"');
-    expect(drawer).toContain("WAKILISHA_NAVIGATION.map");
+    expect(drawer).toContain("navigation.map");
     expect(drawer).toContain('aria-modal="true"');
     expect(layout).not.toContain("MobileBottomNav");
     expect(layout).not.toContain("phn-nav");
