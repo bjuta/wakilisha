@@ -101,6 +101,13 @@ for (const width of [390, 1440]) {
       });
       expect(overflow).toBeLessThanOrEqual(2);
 
+      if (surface.name === "music") {
+        const background = await page.locator('[data-wk-workbook-screen="music"]').evaluate(
+          (node) => getComputedStyle(node).backgroundColor,
+        );
+        expect(background).toBe("rgb(11, 11, 11)");
+      }
+
       await page.screenshot({
         path: testInfo.outputPath(`workbook-v4-${surface.name}-${width}.png`),
         animations: "disabled",
