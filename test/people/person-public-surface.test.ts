@@ -985,9 +985,9 @@ describe(
             'to="/following"',
           );
 
-        expect(mobileAppLayout)
+        expect(readFileSync("src/components/navigation/wakilishaNavigation.ts", "utf8"))
           .toContain(
-            '{ label: "Following", to: "/following", icon: "UserPlus" }',
+            '{ label: "Following", to: "/following", icon: "Heart" }',
           );
       },
     );
@@ -1410,10 +1410,10 @@ describe(
     it(
       "keeps all public destinations in one identical desktop and mobile sidebar",
       () => {
-        const navigation = read("src/components/navigation/wakilishaNavigation.ts");
-        const desktop = read("src/components/music/MusicDesktopShell.tsx");
-        const drawer = read("src/components/mobile/MobileAccountDrawer.tsx");
-        const mobileTop = read("src/components/mobile/MobileTopBar.tsx");
+        const navigation = readFileSync("src/components/navigation/wakilishaNavigation.ts", "utf8");
+        const desktop = readFileSync("src/components/music/MusicDesktopShell.tsx", "utf8");
+        const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
+        const mobileTop = readFileSync("src/components/mobile/MobileTopBar.tsx", "utf8");
 
         for (const route of [
           "/music", "/video", "/audio", "/shows", "/magazine",
@@ -1753,50 +1753,17 @@ describe("public discovery final refinement regressions", () => {
   );
 
   it(
-    "keeps Home central while reusing the existing WAKILISHA thunderbolt",
+    "uses the shared Workbook navigation without a simulated mobile tab bar",
     () => {
-      const followingIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Following", to: "/following", icon: "UserPlus" }',
-        );
-
-      const chartsIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Charts", to: "/charts", icon: "BarChart3" }',
-        );
-
-      const homeIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Home", to: "/", icon: "Home", prominent: true }',
-        );
-
-      const artistsIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Artists", to: "/artists", icon: "Mic2" }',
-        );
-
-      expect(followingIndex)
-        .toBeGreaterThanOrEqual(0);
-
-      expect(followingIndex)
-        .toBeLessThan(
-          chartsIndex,
-        );
-
-      expect(chartsIndex)
-        .toBeLessThan(
-          homeIndex,
-        );
-
-      expect(homeIndex)
-        .toBeLessThan(
-          artistsIndex,
-        );
-
-      expect(mobileAppLayoutFinal)
-        .toContain(
-          "wakilisha-thunderbolt.png",
-        );
+      const canonical = readFileSync(
+        "src/components/navigation/wakilishaNavigation.ts", "utf8",
+      );
+      expect(canonical).toContain('{ label: "Home", to: "/", icon: "Home" }');
+      expect(canonical).toContain('{ label: "Following", to: "/following", icon: "Heart" }');
+      expect(canonical).toContain('{ label: "Charts", to: "/charts", icon: "ChartNoAxesColumnIncreasing" }');
+      expect(mobileAppLayoutFinal).toContain('data-wk-workbook-mobile-shell="v4"');
+      expect(mobileAppLayoutFinal).not.toContain("MobileBottomNav");
+      expect(mobileAppLayoutFinal).not.toContain("wakilisha-thunderbolt.png");
     },
   );
 });
