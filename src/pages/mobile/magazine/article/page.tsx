@@ -227,11 +227,7 @@ export default function MobileArticle() {
         <section
           key="mobile-article-hero-shell"
           data-wakilisha-mobile-article-loading-hero="true"
-          className="relative overflow-hidden"
-          style={{
-            height: "62dvh",
-            minHeight: "380px",
-          }}
+          className="relative aspect-[4/5] overflow-hidden"
         >
           {prerenderedArticleHeroSource ? (
             <ResponsiveMediaImage
@@ -289,7 +285,7 @@ export default function MobileArticle() {
     <div data-wk-workbook-screen="article-mobile" className="min-h-screen bg-[var(--wk-bg)]">
       {previewNonce ? <ArticlePreviewModeBanner /> : null}
 
-      <section key="mobile-article-hero-shell" className="relative overflow-hidden" style={{ height: "62dvh", minHeight: "380px" }}>
+      <section key="mobile-article-hero-shell" className="relative aspect-[4/5] overflow-hidden">
         {article.heroUrl ? (
           <ResponsiveMediaImage
             key="mobile-article-hero-media"
