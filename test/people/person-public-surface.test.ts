@@ -1,6 +1,7 @@
 import {
   readFileSync,
 } from "node:fs";
+import { visibleWakilishaNavigation } from "@/components/navigation/wakilishaNavigation";
 import {
   describe,
   expect,
@@ -1960,4 +1961,26 @@ describe("chart edition collapsed-versus-expanded hierarchy regression", () => {
         );
     },
   );
+});
+
+describe("Viewer-aware universal navigation", () => {
+  const destinations = (signedIn: boolean, messagesVisible: boolean) =>
+    visibleWakilishaNavigation({ signedIn, messagesVisible })
+      .flatMap((group) => group.items.map((item) => item.to));
+
+  it("does not advertise private messaging or notifications to incognito visitors", () => {
+    const guest = destinations(false, false);
+    expect(guest).toContain("/magazine");
+    expect(guest).toContain("/artists");
+    expect(guest).toContain("/following");
+    expect(guest).not.toContain("/messages");
+    expect(guest).not.toContain("/notifications");
+    expect(destinations(false, true)).toEqual(guest);
+  });
+
+  it("keeps the right destinations for eligible authenticated listeners", () => {
+    expect(destinations(true, false)).toContain("/notifications");
+    expect(destinations(true, false)).not.toContain("/messages");
+    expect(destinations(true, true)).toContain("/messages");
+  });
 });
