@@ -186,3 +186,58 @@ test("sheet remains bounded in a narrow viewport", async ({ page }) => {
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
   expect(box!.y + box!.height).toBeLessThanOrEqual(844);
 });
+
+
+test("Workbook v4 loads authentic font faces and keeps controls and theme legible across phone, tablet and desktop", async ({ page }) => {
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/test/ui-browser/fixtures/interaction.html");
+
+    const state = await page.evaluate(async () => {
+      const loadedFigtree = await document.fonts.load('400 16px "Figtree"');
+      const loadedPlex = await document.fonts.load('400 12px "IBM Plex Mono"');
+      const root = document.documentElement;
+      const opener = Array.from(document.querySelectorAll("button")).find(
+        (button) => button.textContent?.trim() === "Open interaction sheet",
+      )!;
+      const initial = getComputedStyle(opener);
+      const rectangle = opener.getBoundingClientRect();
+      const darkBrand = getComputedStyle(root).getPropertyValue("--wk-brand").trim();
+      root.setAttribute("data-wk-theme", "light");
+      const lightBrand = getComputedStyle(root).getPropertyValue("--wk-brand").trim();
+      root.setAttribute("data-wk-theme", "dark");
+
+      return {
+        loadedFigtree: loadedFigtree.length,
+        loadedPlex: loadedPlex.length,
+        bodyFont: getComputedStyle(document.body).fontFamily,
+        darkBrand, lightBrand,
+        buttonHeight: rectangle.height,
+        buttonRadius: initial.borderRadius,
+        textColor: initial.color,
+        backgroundColor: initial.backgroundColor,
+        overflow: Math.max(root.scrollWidth, document.body.scrollWidth) - root.clientWidth,
+      };
+    });
+
+    expect(state.loadedFigtree).toBeGreaterThan(0);
+    expect(state.loadedPlex).toBeGreaterThan(0);
+    expect(state.bodyFont).toContain("Figtree");
+    expect(state.darkBrand.toLowerCase()).toBe("#85c441");
+    expect(state.lightBrand.toLowerCase()).toBe("#4e7425");
+    expect(state.buttonHeight).toBeGreaterThanOrEqual(44);
+    expect(state.buttonRadius).not.toBe("0px");
+    expect(state.textColor).not.toBe(state.backgroundColor);
+    expect(state.overflow).toBeLessThanOrEqual(2);
+
+    await page.getByRole("button", { name: "Open interaction sheet" }).click();
+    const field = page.getByRole("textbox", { name: "Following field" });
+    const control = await field.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return { height: rect.height, size: Number.parseFloat(style.fontSize) };
+    });
+    expect(control.height).toBeGreaterThanOrEqual(44);
+    expect(control.size).toBeGreaterThanOrEqual(16);
+  }
+});

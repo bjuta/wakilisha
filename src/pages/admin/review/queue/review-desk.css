@@ -13,7 +13,7 @@
   font-size:11px;font-weight:750;letter-spacing:.055em;color:var(--wk-text-muted);
 }
 [data-wk-review-desk] .wk-review-desk-header h1{
-  margin-top:5px;font:780 clamp(30px,3.6vw,49px)/1.1 var(--wk-font-display,Inter,sans-serif);
+  margin-top:5px;font:780 clamp(30px,3.6vw,49px)/1.1 var(--wk-font-display,Figtree,sans-serif);
   letter-spacing:-.035em;color:var(--wk-text);
 }
 [data-wk-review-desk] .wk-review-desk-intro{
@@ -34,7 +34,7 @@
   display:block;color:var(--wk-text-muted);font-size:12px;font-weight:650;
 }
 [data-wk-review-desk] .wk-review-desk-metric>strong{
-  display:block;margin-top:9px;font:780 clamp(26px,3vw,39px)/1.05 var(--wk-font-display,Inter,sans-serif);
+  display:block;margin-top:9px;font:780 clamp(26px,3vw,39px)/1.05 var(--wk-font-display,Figtree,sans-serif);
   font-variant-numeric:tabular-nums;letter-spacing:-.035em;color:var(--wk-text);
 }
 [data-wk-review-desk] .wk-review-desk-metric>p{
@@ -64,7 +64,7 @@
   border-bottom:1px solid var(--wk-border);
 }
 [data-wk-review-desk] .wk-review-desk-workspace-head h2{
-  margin-top:4px;font:760 clamp(21px,2.5vw,29px)/1.18 var(--wk-font-display,Inter,sans-serif);
+  margin-top:4px;font:760 clamp(21px,2.5vw,29px)/1.18 var(--wk-font-display,Figtree,sans-serif);
   letter-spacing:-.025em;
 }
 [data-wk-review-desk] .wk-review-desk-workspace-head p:not(.wk-review-desk-eyebrow){
@@ -336,7 +336,7 @@
   font-size:11px;font-weight:700;color:var(--wk-text-muted);
 }
 [data-wk-review-desk] .wk-review-issue-count{
-  flex:none;min-width:44px;font:770 24px/1 var(--wk-font-display,Inter,sans-serif);
+  flex:none;min-width:44px;font:770 24px/1 var(--wk-font-display,Figtree,sans-serif);
   color:var(--wk-text);font-variant-numeric:tabular-nums;text-align:center;
 }
 [data-wk-review-desk] .wk-review-issue-contents{
@@ -462,7 +462,7 @@
   min-width:0;
 }
 [data-wk-registry-record-readonly] .wk-release-evidence-title {
-  font:750 clamp(19px,2.2vw,24px)/1.25 var(--wk-font-display,Inter,sans-serif);
+  font:750 clamp(19px,2.2vw,24px)/1.25 var(--wk-font-display,Figtree,sans-serif);
   letter-spacing:-.022em;
 }
 [data-wk-registry-record-readonly] .wk-release-evidence-intro,
@@ -618,7 +618,7 @@
 .wk-review-job-head{display:grid;gap:8px;margin-bottom:17px;min-width:0}
 .wk-review-job-kicker{font-size:11px;font-weight:750;color:var(--wk-text-muted)}
 .wk-review-job-head h3{
-  font:760 clamp(23px,2.6vw,30px)/1.2 var(--wk-font-display,Inter,sans-serif);
+  font:760 clamp(23px,2.6vw,30px)/1.2 var(--wk-font-display,Figtree,sans-serif);
   letter-spacing:-.026em;color:var(--wk-text);overflow-wrap:anywhere;
 }
 .wk-review-job-head>p:not(.wk-review-job-kicker){

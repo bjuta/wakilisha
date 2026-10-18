@@ -24,9 +24,9 @@ export interface Top3Entry {
 }
 
 const MOVEMENT_CONFIG = {
-  up: { icon: "ri-arrow-up-line", color: "#4FD98E", label: "Up" },
+  up: { icon: "ri-arrow-up-line", color: "var(--wk-brand)", label: "Up" },
   down: { icon: "ri-arrow-down-line", color: "#FF6B6B", label: "Down" },
-  new: { icon: "ri-star-smile-line", color: "#84C241", label: "New" },
+  new: { icon: "ri-star-smile-line", color: "var(--wk-text)", label: "New" },
   same: { icon: "ri-subtract-line", color: "#7E7C74", label: "Same" },
 };
 

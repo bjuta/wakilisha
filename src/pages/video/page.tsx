@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+import { WkEditorialIntro, WkEditorialArtworkFrame } from "@/components/design-system/layout/WorkbookEditorial";
 import { useEffect, useMemo, useState } from "react";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
 import { MetaTags } from "@/components/seo/MetaTags";
@@ -58,43 +60,25 @@ export default function VideoIndexPage() {
       />
 
       <main className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
-        <header className="border-b border-[var(--wk-border)]">
-          <div className="mx-auto flex min-h-14 max-w-[1180px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--wk-text-faint)]">
-                WAKILISHA
-              </p>
-              <h1 className="text-[18px] font-black tracking-[-0.025em]">
-                Video
-              </h1>
+        <div className="mx-auto max-w-[1180px] px-4 sm:px-6">
+          <WkEditorialIntro eyebrow="Watch" title="Video" description="Films, sessions, documentaries, shorts, and live performances. Music and the people behind it stay connected.">
+            <div className="mt-6 max-w-[420px]">
+              <WkSearchField value={query} onChange={setQuery} ariaLabel="Search Video" placeholder="Search Video"
+                inputClassName="min-h-11 rounded-full border-[var(--wk-border)] bg-[var(--wk-surface)] text-[16px] text-[var(--wk-text)]" />
             </div>
-
-            <div className="w-full max-w-[260px]">
-              <WkSearchField
-                value={query}
-                onChange={setQuery}
-                ariaLabel="Search Video"
-                placeholder="Search Video"
-                inputClassName="h-9 rounded-full border-[var(--wk-border)] bg-[var(--wk-surface)] text-[12px] font-semibold text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] focus:border-[var(--wk-brand)]"
-              />
-            </div>
-          </div>
-        </header>
-
-        <section className="mx-auto max-w-[1180px] px-4 pb-14 pt-8 sm:px-6 sm:pt-10 lg:pb-20">
-          <div className="max-w-2xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)]">
-              Watch
-            </p>
-            <h2 className="mt-2 text-[38px] font-black leading-[0.98] tracking-[-0.05em] sm:text-[52px]">
-              The culture in motion.
-            </h2>
-            <p className="mt-4 max-w-xl text-[14px] leading-6 text-[var(--wk-text-muted)] sm:text-[15px]">
-              Films, performances, conversations and field recordings from
-              African creative life.
-            </p>
-          </div>
-
+          </WkEditorialIntro>
+        </div>
+        <section className="mx-auto max-w-[1180px] px-4 pb-14 sm:px-6 lg:pb-20">
+          {!query.trim() && items.length > 0 ? (
+            <Link to={items[0].canonicalPath} className="wk-editorial-media-feature" aria-label={`Watch ${items[0].title}`}>
+              <WkEditorialArtworkFrame src={items[0].poster?.url} alt={items[0].title} ratio="cinema" />
+              <div className="wk-editorial-feature-copy">
+                <span className="wk-editorial-eyebrow">Featured Video</span>
+                <h2 className="mt-3">{items[0].title}</h2>
+                {items[0].summary ? <p className="line-clamp-2">{items[0].summary}</p> : null}
+              </div>
+            </Link>
+          ) : null}
           {error ? (
             <div className="mt-8 rounded-2xl border border-[var(--wk-danger)]/20 bg-[var(--wk-surface)] p-5 text-[13px] text-[var(--wk-danger)]">
               {error}

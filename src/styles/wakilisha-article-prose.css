@@ -110,7 +110,7 @@
 .article-content-v2 > div:first-child > p:first-child::first-letter,
 .article-content-v2-mobile > div:first-child > p:first-child::first-letter {
   float: left;
-  font: 900 76px / 0.78 var(--wk-font-display);
+  font: 800 76px / 0.78 var(--wk-font-display);
   color: var(--wk-brand);
   padding-right: 10px;
   margin-top: 4px;
@@ -450,7 +450,7 @@
 
 .article-content-v2 > p:first-child::first-letter {
   float: left;
-  font: 900 84px / 0.78 var(--wk-font-display);
+  font: 800 84px / 0.78 var(--wk-font-display);
   color: var(--wk-brand);
   padding-right: 12px;
   margin-top: 6px;
@@ -487,7 +487,7 @@
   border-left: 4px solid var(--wk-brand);
   padding: 8px 0 8px 28px;
   margin: 36px 0;
-  font: 900 26px / 1.2 var(--wk-font-display);
+  font: 800 26px / 1.2 var(--wk-font-display);
   letter-spacing: -0.03em;
   color: var(--wk-text);
 }
@@ -578,7 +578,7 @@
 
 .article-content-v2-mobile > p:first-child::first-letter {
   float: left;
-  font: 900 72px / 0.78 var(--wk-font-display);
+  font: 800 72px / 0.78 var(--wk-font-display);
   color: var(--wk-brand);
   padding-right: 10px;
   margin-top: 4px;
@@ -615,7 +615,7 @@
   border-left: 3px solid var(--wk-brand);
   padding: 6px 0 6px 20px;
   margin: 28px 0;
-  font: 900 22px / 1.2 var(--wk-font-display);
+  font: 800 22px / 1.2 var(--wk-font-display);
   letter-spacing: -0.02em;
   color: var(--wk-text);
 }

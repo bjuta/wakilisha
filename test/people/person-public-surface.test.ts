@@ -111,7 +111,7 @@ const mobileAppLayout =
 
 const mobileChromeCss =
   readFileSync(
-    "src/styles/wakilisha-mobile-ch53-75.css",
+    "src/styles/wakilisha-mobile-workbook-v4.css",
     "utf8",
   );
 
@@ -985,9 +985,9 @@ describe(
             'to="/following"',
           );
 
-        expect(mobileAppLayout)
+        expect(readFileSync("src/components/navigation/wakilishaNavigation.ts", "utf8"))
           .toContain(
-            '{ label: "Following", to: "/following", icon: "UserPlus" }',
+            '{ label: "Following", to: "/following", icon: "Heart" }',
           );
       },
     );
@@ -1408,90 +1408,30 @@ describe(
     );
 
     it(
-      "keeps secondary public destinations globally reachable on mobile",
+      "keeps all public destinations in one identical desktop and mobile sidebar",
       () => {
-        expect(mobileAppLayout)
-          .toContain(
-            "const MORE_LINKS",
-          );
+        const navigation = readFileSync("src/components/navigation/wakilishaNavigation.ts", "utf8");
+        const desktop = readFileSync("src/components/music/MusicDesktopShell.tsx", "utf8");
+        const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
+        const mobileTop = readFileSync("src/components/mobile/MobileTopBar.tsx", "utf8");
 
-        for (
-          const route of [
-            "/genres",
-            "/labels",
-            "/guides",
-            "/about",
-            "/contact",
-            "/faqs",
-            "/privacy",
-            "/terms",
-          ]
-        ) {
-          expect(mobileAppLayout)
-            .toContain(
-              `to: "${route}"`,
-            );
+        for (const route of [
+          "/music", "/video", "/audio", "/shows", "/magazine",
+          "/following", "/messages", "/notifications", "/artists",
+          "/charts", "/playlists", "/releases", "/genres", "/labels",
+          "/guides", "/credits", "/field", "/artist-studio",
+          "/about", "/contact", "/faqs", "/privacy", "/terms",
+        ]) {
+          expect(navigation).toContain(`to: "${route}"`);
         }
 
-        expect(mobileAppLayout)
-          .toContain(
-            'aria-label="More"',
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "useScrollLock(moreOpen)",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "Appearance",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "SIGNED_IN_NAV",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "SIGNED_OUT_NAV",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "prominent: true",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            'className="phn-nav phn-nav--compact"',
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            'to="/artists"',
-          );
-
-        expect(mobileAppLayout)
-          .not.toContain(
-            "<NotificationBell",
-          );
-
-        expect(mobileChromeCss)
-          .toContain(
-            "compact five-slot mobile nav",
-          );
-
-        expect(mobileChromeCss)
-          .toContain(
-            ".phn-nav-primary-core",
-          );
+        expect(drawer).toContain("WAKILISHA_NAVIGATION.map");
+        expect(desktop).toContain("WAKILISHA_NAVIGATION.map");
+        expect(mobileTop).toContain('aria-label="Open WAKILISHA menu"');
+        expect(mobileAppLayout).not.toContain("MobileBottomNav");
+        expect(mobileAppLayout).not.toContain("phn-nav");
+        expect(mobileChromeCss).not.toContain(".phn-nav-primary-core");
+        expect(mobileChromeCss).not.toContain(".phn-nav--compact");
       },
     );
 
@@ -1813,50 +1753,17 @@ describe("public discovery final refinement regressions", () => {
   );
 
   it(
-    "keeps Home central while reusing the existing WAKILISHA thunderbolt",
+    "uses the shared Workbook navigation without a simulated mobile tab bar",
     () => {
-      const followingIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Following", to: "/following", icon: "UserPlus" }',
-        );
-
-      const chartsIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Charts", to: "/charts", icon: "BarChart3" }',
-        );
-
-      const homeIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Home", to: "/", icon: "Home", prominent: true }',
-        );
-
-      const artistsIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Artists", to: "/artists", icon: "Mic2" }',
-        );
-
-      expect(followingIndex)
-        .toBeGreaterThanOrEqual(0);
-
-      expect(followingIndex)
-        .toBeLessThan(
-          chartsIndex,
-        );
-
-      expect(chartsIndex)
-        .toBeLessThan(
-          homeIndex,
-        );
-
-      expect(homeIndex)
-        .toBeLessThan(
-          artistsIndex,
-        );
-
-      expect(mobileAppLayoutFinal)
-        .toContain(
-          "wakilisha-thunderbolt.png",
-        );
+      const canonical = readFileSync(
+        "src/components/navigation/wakilishaNavigation.ts", "utf8",
+      );
+      expect(canonical).toContain('{ label: "Home", to: "/", icon: "Home" }');
+      expect(canonical).toContain('{ label: "Following", to: "/following", icon: "Heart" }');
+      expect(canonical).toContain('{ label: "Charts", to: "/charts", icon: "ChartNoAxesColumnIncreasing" }');
+      expect(mobileAppLayoutFinal).toContain('data-wk-workbook-mobile-shell="v4"');
+      expect(mobileAppLayoutFinal).not.toContain("MobileBottomNav");
+      expect(mobileAppLayoutFinal).not.toContain("wakilisha-thunderbolt.png");
     },
   );
 });

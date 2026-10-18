@@ -170,17 +170,17 @@ export default function MobileMagazine() {
 
   if (status === "error" || !heroStory) {
     return (
-      <div className="wk-mobile-v5 flex min-h-screen items-center justify-center px-5 text-center bg-[var(--wk-bg)]">
+      <div className="wk-mobile flex min-h-screen items-center justify-center px-5 text-center bg-[var(--wk-bg)]">
         <div>
           <i className="ri-error-warning-line text-[var(--wk-text-faint)] text-[36px] mb-3 block" />
-          <p className="text-[14px] font-bold text-[var(--wk-text-muted)]">{error || "No stories yet."}</p>
+          <h1 className="text-[20px] font-bold text-[var(--wk-text-muted)]">{error || "No stories yet."}</h1>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="wk-mobile-v5 min-h-screen bg-[var(--wk-bg)]">
+    <div className="wk-mobile min-h-screen bg-[var(--wk-bg)]">
 
       {/* ═══════════════════════ HERO ═══════════════════════ */}
       <div

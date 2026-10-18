@@ -8,15 +8,6 @@ interface Props {
   updateAppearance: (patch: Partial<UserAppearancePrefs>) => void;
 }
 
-const ACCENTS = [
-  { label: "Verdant", value: "#84C241" },
-  { label: "Terracotta", value: "#D6766A" },
-  { label: "Sand", value: "#C7A06D" },
-  { label: "Amber", value: "#E8A23A" },
-  { label: "Rose", value: "#E86A8A" },
-  { label: "Teal", value: "#4AB8A0" },
-];
-
 export function AppearanceSettingsPane({ appearance, updateAppearance }: Props) {
   const { setTheme } = useTheme();
 
@@ -65,33 +56,18 @@ export function AppearanceSettingsPane({ appearance, updateAppearance }: Props) 
         </div>
       </div>
 
-      {/* Accent */}
-      <div className="mb-7">
-        <h3 className="text-sm font-black tracking-[-0.015em] text-[var(--wk-text)] mb-1">Accent color</h3>
-        <p className="text-[12px] leading-relaxed text-[var(--wk-text-muted)] mb-4">
-          Your personal highlight color for buttons, links, badges, and interactive surfaces.
-        </p>
-        <div className="flex items-center gap-3 flex-wrap">
-          {ACCENTS.map((acc) => (
-            <button
-              key={acc.value}
-              onClick={() => updateAppearance({ accent: acc.value })}
-              className="relative w-11 h-11 rounded-full cursor-pointer transition-transform hover:scale-110"
-              style={{ background: acc.value }}
-              aria-label={`Accent: ${acc.label}`}
-            >
-              {appearance.accent === acc.value && (
-                <span className="absolute inset-0 rounded-full border-[3px] border-[var(--wk-text)]" />
-              )}
-            </button>
-          ))}
-        </div>
-        {appearance.accent && (
-          <div className="mt-3 flex items-center gap-2 text-[11px] text-[var(--wk-text-muted)]">
-            <span className="w-4 h-4 rounded-full shrink-0" style={{ background: appearance.accent }} />
-            <span>Active</span>
+      {/* Brand identity is governed by Workbook v4; saved accents remain private metadata. */}
+      <div className="mb-7 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4" role="note">
+        <div className="flex items-center gap-3">
+          <span aria-hidden="true" className="h-9 w-9 shrink-0 rounded-full" style={{ background: "#85C441" }} />
+          <div>
+            <h3 className="text-[13px] font-semibold text-[var(--wk-text)]">WAKILISHA brand green</h3>
+            <p className="mt-1 text-[12px] leading-relaxed text-[var(--wk-text-muted)]">
+              Brand colour is consistent across WAKILISHA and MIZIZI. Previous
+              personal accent selections remain saved but do not recolour the platform.
+            </p>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Density */}

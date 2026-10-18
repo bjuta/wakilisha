@@ -243,6 +243,14 @@ jobs:
 
       - name: Run WAKILISHA real-browser interaction acceptance
         run: npm run test:ui-browser
+      - name: Preserve actual-route visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workbook-v4-public-route-browser-captures
+          path: test-results/**/workbook-v4-*.png
+          if-no-files-found: ignore
+          retention-days: 7
 
   critical:
     name: critical

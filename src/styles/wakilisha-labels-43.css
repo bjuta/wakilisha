@@ -61,7 +61,7 @@
   margin-bottom: 20px;
 }
 .label43-hero-title {
-  font: 900 clamp(52px,9vw,128px)/.84 var(--wk-font-display);
+  font: 800 clamp(52px,9vw,128px)/.84 var(--wk-font-display);
   letter-spacing: -.065em;
   color: #F0EFE8;
   margin-bottom: 16px;
@@ -130,7 +130,7 @@
 }
 .label43-hero-stat-val {
   display: block;
-  font: 900 26px/1 var(--wk-font-display);
+  font: 800 26px/1 var(--wk-font-display);
   letter-spacing: -.035em;
   color: #F0EFE8;
 }
@@ -350,7 +350,7 @@
   margin-bottom: 10px;
 }
 .label43-spot-title {
-  font: 900 clamp(26px,4vw,48px)/.92 var(--wk-font-display);
+  font: 800 clamp(26px,4vw,48px)/.92 var(--wk-font-display);
   letter-spacing: -.045em;
   color: #F0EFE8;
   margin-bottom: 10px;
@@ -425,7 +425,7 @@
   letter-spacing: .06em;
 }
 .label43-compact-name {
-  font: 900 14px/1.15 var(--wk-font-display);
+  font: 800 14px/1.15 var(--wk-font-display);
   letter-spacing: -.02em;
   color: var(--wk-text);
   transition: color var(--wk-d-fast);
@@ -522,7 +522,7 @@
   right: 0;
   z-index: 1;
   padding: 12px 14px;
-  font: 900 16px/1.1 var(--wk-font-display);
+  font: 800 16px/1.1 var(--wk-font-display);
   letter-spacing: -.025em;
   color: #F0EFE8;
   background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,.55) 100%);
@@ -565,7 +565,7 @@
 }
 .label43-card-stat-pill strong {
   display: block;
-  font: 900 16px/1 var(--wk-font-display);
+  font: 800 16px/1 var(--wk-font-display);
   letter-spacing: -.02em;
   color: var(--wk-text);
 }
@@ -649,7 +649,7 @@
   margin-bottom: 10px;
 }
 .label43-card-hero-name {
-  font: 900 clamp(24px,3.5vw,38px)/.95 var(--wk-font-display);
+  font: 800 clamp(24px,3.5vw,38px)/.95 var(--wk-font-display);
   letter-spacing: -.04em;
   color: #F0EFE8;
   margin-bottom: 8px;
@@ -705,7 +705,7 @@
   margin: 0 auto;
 }
 .label43-pullquote-text {
-  font: 900 clamp(26px,3.5vw,44px)/1.02 var(--wk-font-display);
+  font: 800 clamp(26px,3.5vw,44px)/1.02 var(--wk-font-display);
   letter-spacing: -.04em;
   color: var(--wk-text);
   margin: 22px 0;
@@ -768,7 +768,7 @@
 }
 .label43-carousel-name {
   display: block;
-  font: 900 15px/1.1 var(--wk-font-display);
+  font: 800 15px/1.1 var(--wk-font-display);
   letter-spacing: -.02em;
   color: #F0EFE8;
 }
@@ -840,7 +840,7 @@
   margin-bottom: 12px;
 }
 .label43-footer-tagline {
-  font: 900 22px/1.25 var(--wk-font-display);
+  font: 800 22px/1.25 var(--wk-font-display);
   letter-spacing: -.03em;
   color: var(--wk-text);
   max-width: 380px;

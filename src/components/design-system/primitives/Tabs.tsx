@@ -43,7 +43,7 @@ export function WkTabs<T extends string>({
     >
       <TabList
         aria-label={ariaLabel}
-        className={`flex gap-1 ${tabListClassName}`}
+        className={`flex gap-1 overflow-x-auto border-b border-wk-border ${tabListClassName}`}
       >
         {items.map((item) => (
           <Tab
@@ -51,9 +51,9 @@ export function WkTabs<T extends string>({
             id={item.id}
             isDisabled={item.disabled}
             className={({ isSelected }) =>
-              `shrink-0 rounded-t-xl px-3.5 py-3 text-[11px] font-black transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-wk-brand/20 ${
+              `flex min-h-11 shrink-0 items-center border-b-4 border-transparent px-4 text-[14px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-wk-brand/20 ${
                 isSelected
-                  ? "bg-wk-surface text-wk-brand shadow-[0_-1px_0_var(--wk-border),1px_0_0_var(--wk-border),-1px_0_0_var(--wk-border)]"
+                  ? "border-wk-brand text-wk-text"
                   : "text-wk-text-muted hover:bg-wk-surface-raised hover:text-wk-text"
               }`
             }

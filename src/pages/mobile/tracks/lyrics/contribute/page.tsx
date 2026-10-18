@@ -183,7 +183,7 @@ export default function MobileLyricContribution() {
 
   if (loading) {
     return (
-      <div className="wk-mobile-v5 min-h-screen flex items-center justify-center">
+      <div className="wk-mobile min-h-screen flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="mx-auto h-16 w-16 rounded-2xl bg-[var(--wk-surface-raised)] animate-pulse" />
           <p className="text-[13px] font-semibold text-[var(--wk-text-muted)]">Loading track&hellip;</p>
@@ -194,7 +194,7 @@ export default function MobileLyricContribution() {
 
   if (error || !track) {
     return (
-      <div className="wk-mobile-v5 px-5 py-20 text-center">
+      <div className="wk-mobile px-5 py-20 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
           <i className="ri-file-music-line text-[var(--wk-text-faint)] text-[24px]" />
         </div>
@@ -206,7 +206,7 @@ export default function MobileLyricContribution() {
 
   if (submitted) {
     return (
-      <div className="wk-mobile-v5 min-h-screen">
+      <div className="wk-mobile min-h-screen">
         <div className="px-5 py-20 text-center">
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10">
             <WkIcon name="Check" size={30} className="text-emerald-500" />
@@ -225,7 +225,7 @@ export default function MobileLyricContribution() {
   }
 
   return (
-    <div className="wk-mobile-v5 min-h-screen bg-[var(--wk-bg)]">
+    <div className="wk-mobile min-h-screen bg-[var(--wk-bg)]">
       {/* Compact header */}
       <div className="sticky top-0 z-10 border-b border-[var(--wk-border)] bg-[var(--wk-surface)] px-4 py-3">
         <div className="flex items-center gap-3">

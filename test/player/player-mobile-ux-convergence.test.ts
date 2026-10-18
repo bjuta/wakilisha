@@ -86,26 +86,17 @@ describe("Player and mobile media UX convergence", () => {
     expect(timedText).toContain('variant: "lyrics" | "transcript"');
   });
 
-  it("makes mobile top chrome floating and scroll-reactive", () => {
-    expect(mobileLayout).toContain("MobileTopBar");
-    expect(mobileLayout).toContain(
-      "<MobileTopBar",
-    );
-    expect(mobileLayout).toContain(
-      "scrollVisible={scrollChrome.topVisible}",
-    );
-    expect(mobileLayout).toContain(
-      "const scrollChrome = useScrollDirection();",
-    );
-    expect(mobileTopBar).not.toContain("useScrollDirection()");
-    expect(mobileTopBar).toContain("translateY(-16px)");
-    expect(mobileTopBar).toContain(
-      "pointer-events-none fixed inset-x-0 top-0",
-    );
-    expect(mobileTopBar).not.toContain("border-b");
-    expect(mobileTopBar).not.toContain('to="/profile"');
-    expect(mobileTopBar).not.toContain("sectionLabel");
-    expect(mobileTopBar).not.toContain("{label}");
+  it("keeps one persistent 56px Workbook header and no fake browser chrome or bottom menu", () => {
+    expect(mobileLayout).toContain('data-wk-workbook-mobile-shell="v4"');
+    expect(mobileLayout).toContain("<MobileTopBar");
+    expect(mobileLayout).not.toContain("MobileBottomNav");
+    expect(mobileLayout).not.toContain("useScrollDirection()");
+    expect(mobileTopBar).toContain('data-wk-mobile-app-header="v4"');
+    expect(mobileTopBar).toContain("sticky top-0");
+    expect(mobileTopBar).toContain("h-14");
+    expect(mobileTopBar).toContain('aria-label="Open WAKILISHA menu"');
+    expect(mobileTopBar).toContain('aria-label="Search"');
+    expect(mobileTopBar).toContain("NotificationBell");
   });
 
   it("opens a left account drawer from the listener control instead of navigating", () => {
@@ -115,9 +106,11 @@ describe("Player and mobile media UX convergence", () => {
     expect(mobileTopBar).toContain("NotificationBell");
     expect(accountDrawer).toContain("WAKILISHA Menu");
     expect(accountDrawer).toContain("translateX(-18px)");
-    expect(accountDrawer).toContain("New This Week");
-    expect(accountDrawer).toContain("On The Radar");
-    expect(accountDrawer).toContain("From The Registry");
+
+
+
+    expect(accountDrawer).toContain("WAKILISHA_NAVIGATION.map");
+    expect(accountDrawer).toContain("useScrollLock(open)");
     expect(accountDrawer).toContain("Appearance");
     expect(accountDrawer).toContain("Settings");
     expect(accountDrawer).toContain("Profile");

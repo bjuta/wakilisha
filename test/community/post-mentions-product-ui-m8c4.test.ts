@@ -72,6 +72,11 @@ const mobileLayout = readFileSync(
   "src/components/mobile/MobileAppLayout.tsx",
   "utf8",
 );
+const sharedNavigation = readFileSync(
+  "src/components/navigation/wakilishaNavigation.ts",
+  "utf8",
+);
+
 import {
   applyPostMentionSuggestion,
   findPostMentionComposerQuery,
@@ -333,9 +338,10 @@ describe("WAKILISHA M8C.4 Mention product UI", () => {
     expect(notificationBell).not.toContain(
       "Alerts",
     );
-    expect(mobileLayout).toContain(
+    expect(sharedNavigation).toContain(
       '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
     );
+    expect(mobileLayout).not.toContain("MobileBottomNav");
     expect(mobileLayout).not.toContain(
       "Alerts",
     );

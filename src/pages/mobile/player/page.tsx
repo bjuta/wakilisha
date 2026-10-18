@@ -30,7 +30,7 @@ export default function MobilePlayer() {
 
   if (!currentTrack) {
     return (
-      <div className="wk-mobile-v5 full-player mobile-full-player flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <div className="wk-mobile full-player mobile-full-player flex min-h-screen flex-col items-center justify-center px-6 text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]"><WkIcon name="Music2" size={26} className="text-[var(--wk-text-faint)]" /></div>
         <h2 className="fp-track-name">No track playing</h2>
         <p className="mt-2 text-[13px] text-[var(--wk-text-muted)]">Tap play on any track to start listening.</p>
@@ -46,7 +46,7 @@ export default function MobilePlayer() {
   const upcoming = queue.slice(queueIndex + 1, queueIndex + 4);
 
   return (
-    <div className="wk-mobile-v5 full-player mobile-full-player">
+    <div className="wk-mobile full-player mobile-full-player">
       <div className="fp-ambient" style={{ backgroundImage: currentTrack.artworkUrl ? `url(${currentTrack.artworkUrl})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }} />
       <div className="fp-topbar">
         <button className="fp-topbar-btn mobile-pressable" onClick={() => nav(-1)} aria-label="Collapse player"><WkIcon name="ChevronDown" size={22} /></button>

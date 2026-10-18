@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { briefingService } from "@/services/briefingService";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 
 export default function BriefingIssuePage() {
+  const { theme } = useTheme();
   const { issueId } = useParams<{ issueId: string }>();
   const [issueHtml, setIssueHtml] = useState<string | null>(null);
   const [issueTitle, setIssueTitle] = useState<string>("");
@@ -42,8 +44,8 @@ export default function BriefingIssuePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#f6f4ef" }}>
-        <div style={{ fontFamily: "Inter, Arial, sans-serif", color: "#5a5a5a", fontSize: "14px", display: "flex", alignItems: "center", gap: "10px" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--wk-bg)" }}>
+        <div style={{ fontFamily: "var(--wk-font-body)", color: "var(--wk-text-muted)", fontSize: "14px", display: "flex", alignItems: "center", gap: "10px" }}>
           <span style={{ display: "inline-block", width: 18, height: 18, border: "2px solid #85C441", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
           Loading briefing...
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -54,12 +56,12 @@ export default function BriefingIssuePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center flex-col gap-4 px-4" style={{ background: "#f6f4ef" }}>
-        <div style={{ fontFamily: "Inter, Arial, sans-serif", textAlign: "center", maxWidth: 400 }}>
+      <div className="min-h-screen flex items-center justify-center flex-col gap-4 px-4" style={{ background: "var(--wk-bg)" }}>
+        <div style={{ fontFamily: "var(--wk-font-body)", textAlign: "center", maxWidth: 400 }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
-          <h1 style={{ fontSize: 20, fontWeight: 900, color: "#1a1a1a", margin: "0 0 8px" }}>Briefing not found</h1>
-          <p style={{ fontSize: 14, color: "#5a5a5a", margin: "0 0 20px" }}>{error}</p>
-          <Link to="/" style={{ display: "inline-block", background: "#85C441", color: "#111", textDecoration: "none", fontWeight: 800, fontSize: 13, borderRadius: 10, padding: "10px 20px" }}>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--wk-text)", margin: "0 0 8px" }}>Briefing not found</h1>
+          <p style={{ fontSize: 14, color: "var(--wk-text-muted)", margin: "0 0 20px" }}>{error}</p>
+          <Link to="/" style={{ display: "inline-block", background: "var(--wk-text)", color: "var(--wk-bg)", textDecoration: "none", fontWeight: 700, fontSize: 15, borderRadius: 999, padding: "10px 20px" }}>
             Back to WAKILISHA
           </Link>
         </div>
@@ -73,7 +75,7 @@ export default function BriefingIssuePage() {
         title={`${issueTitle} — WAKILISHA`}
         description={`Read ${issueTitle} on the web`}
       />
-      <div style={{ background: "#f6f4ef", minHeight: "100vh", padding: "32px 0" }}>
+      <div style={{ background: "var(--wk-bg)", minHeight: "100vh", padding: "32px 0" }}>
         {/* Top nav bar */}
         <div style={{
           maxWidth: 600,
@@ -85,12 +87,12 @@ export default function BriefingIssuePage() {
           gap: 12,
         }}>
           <Link to="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
-            <span style={{ fontFamily: "Inter, Arial, sans-serif", fontWeight: 900, fontSize: 16, color: "#1a1a1a", letterSpacing: "-0.04em" }}>WAKILISHA</span>
+            <img src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"} alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain" />
           </Link>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Link
               to="/briefing/preferences"
-              style={{ fontSize: 12, color: "#5a5a5a", textDecoration: "underline", fontFamily: "Inter, Arial, sans-serif" }}
+              style={{ fontSize: 12, color: "var(--wk-text-muted)", textDecoration: "underline", fontFamily: "var(--wk-font-body)" }}
             >
               Manage subscription
             </Link>
@@ -127,11 +129,11 @@ export default function BriefingIssuePage() {
         )}
 
         {/* Footer */}
-        <div style={{ maxWidth: 600, margin: "24px auto 0", padding: "0 16px", textAlign: "center", fontFamily: "Inter, Arial, sans-serif", fontSize: 12, color: "#8a8a8a" }}>
+        <div style={{ maxWidth: 600, margin: "24px auto 0", padding: "0 16px", textAlign: "center", fontFamily: "var(--wk-font-body)", fontSize: 12, color: "var(--wk-text-faint)" }}>
           <p style={{ margin: 0 }}>
-            <Link to="/" style={{ color: "#5a5a5a", textDecoration: "underline" }}>Back to wakilisha.africa</Link>
+            <Link to="/" style={{ color: "var(--wk-text-muted)", textDecoration: "underline" }}>Back to wakilisha.africa</Link>
             {" · "}
-            <Link to="/briefing/unsubscribe" style={{ color: "#5a5a5a", textDecoration: "underline" }}>Unsubscribe</Link>
+            <Link to="/briefing/unsubscribe" style={{ color: "var(--wk-text-muted)", textDecoration: "underline" }}>Unsubscribe</Link>
           </p>
         </div>
       </div>

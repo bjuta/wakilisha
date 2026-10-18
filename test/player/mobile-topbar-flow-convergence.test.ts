@@ -1,89 +1,35 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const layoutSource = readFileSync(
-  "src/components/mobile/MobileAppLayout.tsx",
-  "utf8",
-);
+const layout = readFileSync("src/components/mobile/MobileAppLayout.tsx", "utf8");
+const header = readFileSync("src/components/mobile/MobileTopBar.tsx", "utf8");
+const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
 
-const topBar = readFileSync(
-  "src/components/mobile/MobileTopBar.tsx",
-  "utf8",
-);
-
-const app = layoutSource.slice(
-  layoutSource.indexOf(
-    "export function MobileAppLayout()",
-  ),
-);
-
-const nonAuthShell = app.slice(
-  app.indexOf(
-    'className="wk-app-shell min-h-[100dvh] flex flex-col relative"',
-  ),
-);
-
-describe("Mobile top bar flow convergence", () => {
-  it("keeps transient top chrome out of document flow so content owns the resting top edge", () => {
-    expect(topBar).toContain(
-      "pointer-events-none fixed inset-x-0 top-0",
-    );
-    expect(topBar).not.toContain(
-      "pointer-events-none sticky top-0",
-    );
-    expect(nonAuthShell).not.toContain(
-      "data-mobile-top-chrome-clearance",
-    );
+describe("Workbook v4 mobile header and sidebar flow", () => {
+  it("places the 56px application header in normal content flow", () => {
+    expect(header).toContain("sticky top-0");
+    expect(header).toContain("h-14");
+    expect(layout).toContain("<MobileTopBar");
+    expect(header).not.toContain("pointer-events-none fixed inset-x-0 top-0");
+    expect(layout).not.toContain("scrollVisible");
   });
 
-  it("uses one scroll signal with separate top and bottom chrome visibility", () => {
-    expect(
-      layoutSource.match(
-        /useScrollDirection\(\)/g,
-      )?.length,
-    ).toBe(1);
-
-    expect(nonAuthShell).toContain(
-      "scrollVisible={scrollChrome.topVisible}",
-    );
-    expect(layoutSource).toContain(
-      "scrollVisible={scrollChrome.visible}",
-    );
-    expect(topBar).not.toContain(
-      "useScrollDirection()",
-    );
-    expect(topBar).toContain(
-      "scrollVisible || searchOpen || accountOpen",
-    );
+  it("keeps a single start-edge sidebar without a bottom tab or second menu", () => {
+    expect(header).toContain("Open WAKILISHA menu");
+    expect(header).toContain('aria-controls="wk-workbook-sidebar"');
+    expect(drawer).toContain("WAKILISHA_NAVIGATION.map");
+    expect(drawer).toContain('aria-modal="true"');
+    expect(layout).not.toContain("MobileBottomNav");
+    expect(layout).not.toContain("phn-nav");
   });
 
-  it("keeps transient mobile top chrome to account left and Notifications right", () => {
-    expect(topBar).toContain(
-      "Open account menu",
-    );
-    expect(topBar).toContain(
-      "NotificationBell",
-    );
-    expect(topBar).not.toContain(
-      "sectionLabel",
-    );
-    expect(topBar).not.toContain(
-      "{label}",
-    );
-    expect(topBar).not.toContain(
-      'aria-label="Search"',
-    );
-  });
-
-  it("keeps Search available through the account drawer", () => {
-    expect(topBar).toContain(
-      "MobileAccountDrawer",
-    );
-    expect(topBar).toContain(
-      "onSearch={() => setSearchOpen(true)}",
-    );
-    expect(topBar).toContain(
-      "GlobalSearchSurface",
-    );
+  it("keeps search, notification, profile entry and appearance accessible", () => {
+    expect(header).toContain('aria-label="Search"');
+    expect(header).toContain("GlobalSearchSurface");
+    expect(header).toContain("NotificationBell");
+    expect(header).toContain('aria-label="Account"');
+    expect(drawer).toContain("Appearance");
+    expect(drawer).toContain('to="/settings"');
+    expect(drawer).toContain("Profile");
   });
 });

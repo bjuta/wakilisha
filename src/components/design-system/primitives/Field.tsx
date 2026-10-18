@@ -63,13 +63,13 @@ export function WkPasswordField({
         minLength={minLength}
         placeholder={placeholder}
         style={inputStyle}
-        className={`wk-input w-full min-w-0 rounded-xl border-wk-border bg-wk-surface pr-11 text-[13px] text-wk-text ${inputClassName}`.trim()}
+        className={`wk-input w-full min-w-0 rounded-xl border-wk-border bg-wk-surface pr-12 text-[16px] text-wk-text ${inputClassName}`.trim()}
       />
       <Button
         type="button"
         aria-label={revealed ? concealLabel : revealLabel}
         onPress={() => setRevealed((current) => !current)}
-        className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-wk-text-muted transition-colors hover:bg-wk-surface-raised hover:text-wk-text focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20 disabled:cursor-not-allowed disabled:opacity-40"
+        className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-wk-text-muted transition-colors hover:bg-wk-surface-raised hover:text-wk-text focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20 disabled:cursor-not-allowed disabled:opacity-40"
       >
         <i
           aria-hidden="true"
@@ -122,14 +122,14 @@ export function WkSearchField({
         autoComplete={autoComplete}
         placeholder={placeholder}
         style={inputStyle}
-        className={`wk-input w-full rounded-xl border-wk-border bg-wk-surface pl-9 pr-10 text-[13px] text-wk-text ${inputClassName}`.trim()}
+        className={`wk-input w-full rounded-xl border-wk-border bg-wk-surface pl-9 pr-12 text-[16px] text-wk-text ${inputClassName}`.trim()}
       />
       {value ? (
         <Button
           type="button"
           aria-label={clearLabel}
           onPress={() => onChange("")}
-          className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-wk-text-muted transition-colors hover:bg-wk-surface-raised hover:text-wk-text focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20 disabled:cursor-not-allowed disabled:opacity-40"
+          className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-wk-text-muted transition-colors hover:bg-wk-surface-raised hover:text-wk-text focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <i aria-hidden="true" className="ri-close-line text-[16px]" />
         </Button>

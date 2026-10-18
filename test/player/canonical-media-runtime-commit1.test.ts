@@ -107,14 +107,16 @@ describe(
     );
 
     it(
-      "retains the mobile navigation scroll-lock hook while removing duplicate player ownership",
+      "locks the single Workbook navigation drawer without duplicate player ownership",
       () => {
-        expect(mobileLayout).toContain(
-          'import { useScrollLock } from "@/hooks/useScrollLock";',
+        const drawer = readFileSync(
+          "src/components/mobile/MobileAccountDrawer.tsx",
+          "utf8",
         );
-        expect(mobileLayout).toContain(
-          "useScrollLock(moreOpen);",
-        );
+        expect(drawer).toContain("useScrollLock(open)");
+        expect(drawer).toContain("WAKILISHA_NAVIGATION.map");
+        expect(mobileLayout).not.toContain("MobileBottomNav");
+        expect(mobileLayout).not.toContain("useScrollLock(moreOpen)");
       },
     );
 

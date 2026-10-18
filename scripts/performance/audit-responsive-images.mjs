@@ -332,35 +332,17 @@ if (
   );
 }
 
-const mobileAppLayout = read(
+const mobileTopBar = read(
+  "src/components/mobile/MobileTopBar.tsx",
+);
+if (!mobileTopBar.includes('/assets/logos/wakilisha-logo-dark.svg')) {
+  fail("The Workbook v4 mobile header must use the approved vector mark.");
+}
+const mobileNavigation = read(
   "src/components/mobile/MobileAppLayout.tsx",
 );
-
-for (const marker of [
-  "WAKILISHA_THUNDERBOLT_URL",
-  "<ResponsiveMediaImage",
-  "src={WAKILISHA_THUNDERBOLT_URL}",
-  'preset="thumbnail"',
-  'loading="eager"',
-  'fetchPriority="low"',
-  'decoding="async"',
-  'data-wakilisha-mobile-home-mark="true"',
-]) {
-  if (!mobileAppLayout.includes(marker)) {
-    fail(
-      `Mobile Home mark media is missing ${marker}`,
-    );
-  }
-}
-
-if (
-  /<img[\s\S]{0,240}src=\{WAKILISHA_THUNDERBOLT_URL\}/.test(
-    mobileAppLayout,
-  )
-) {
-  fail(
-    "Mobile Home mark regressed to a raw original img",
-  );
+if (mobileNavigation.includes("MobileBottomNav") || mobileNavigation.includes("WAKILISHA_THUNDERBOLT_URL")) {
+  fail("Retired mobile tab bar and generated home mark must remain absent.");
 }
 
 const artistHero = read(

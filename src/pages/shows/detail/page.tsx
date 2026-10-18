@@ -1,3 +1,4 @@
+import { WkEditorialArtworkFrame } from "@/components/design-system/layout/WorkbookEditorial";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -147,21 +148,14 @@ export default function PublicShowPage() {
       />
 
       <main className="mx-auto w-full max-w-5xl px-4 pb-20 pt-8 sm:px-6 lg:px-8 lg:pt-12">
-        <section className="grid gap-7 border-b border-wk-border pb-9 md:grid-cols-[220px_minmax(0,1fr)] md:items-end">
-          <div
-            aria-hidden="true"
-            className="aspect-square w-full max-w-[220px] rounded-[28px] border border-wk-border shadow-sm"
-            style={{
-              background:
-                "radial-gradient(circle at 30% 25%, rgba(255,255,255,.75), transparent 30%), linear-gradient(145deg, #f8d57e 0%, #ee8d68 42%, #714f7d 100%)",
-            }}
-          />
+        <section className="grid gap-7 border-b border-wk-border pb-9 md:grid-cols-[220px_minmax(0,1fr)] md:items-center">
+          <WkEditorialArtworkFrame ratio="square" alt={`${show.title} cover unavailable`} />
 
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-wk-text-faint">
               Show
             </p>
-            <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.035em] text-wk-text sm:text-5xl">
+            <h1 className="mt-3 max-w-3xl text-4xl font-extrabold tracking-[-0.045em] text-wk-text sm:text-5xl">
               {show.title}
             </h1>
 
@@ -223,7 +217,7 @@ export default function PublicShowPage() {
           </p>
           <h2
             id="episodes-heading"
-            className="mt-2 text-2xl font-semibold tracking-tight text-wk-text"
+            className="mt-2 text-3xl font-extrabold tracking-tight text-wk-text"
           >
             Episodes
           </h2>
@@ -261,7 +255,7 @@ export default function PublicShowPage() {
                     {item.video ? (
                       <Link
                         to={item.episode.canonicalPath}
-                        className="inline-flex items-center gap-2 rounded-full bg-wk-text px-4 py-2 text-xs font-semibold text-wk-bg"
+                        className="inline-flex min-h-11 items-center gap-2 rounded-full bg-wk-text px-4 py-2 text-xs font-semibold text-wk-bg"
                       >
                         <WkIcon name="Play" className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
                         Watch
@@ -271,7 +265,7 @@ export default function PublicShowPage() {
                       <button
                         type="button"
                         onClick={() => listenToEpisode(item)}
-                        className="inline-flex items-center gap-2 rounded-full border border-wk-border px-4 py-2 text-xs font-semibold text-wk-text"
+                        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-wk-border px-4 py-2 text-xs font-semibold text-wk-text"
                       >
                         {audioActive ? (
                           <WkIcon name="Pause" className="h-3.5 w-3.5" aria-hidden="true" />

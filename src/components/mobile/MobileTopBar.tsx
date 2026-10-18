@@ -1,8 +1,10 @@
-import { WakilishaAccountMark } from "@/components/brand/WakilishaAccountMark";
+import { useTheme } from "@/components/design-system/theme/ThemeProvider";
+import { WkIcon } from "@/components/design-system/Icon";
 import {
   useState,
 } from "react";
 import {
+  Link,
   useLocation,
 } from "react-router-dom";
 import {
@@ -19,68 +21,62 @@ import {
 } from "./MobileAccountDrawer";
 
 
-export function MobileTopBar({ scrollVisible }: { scrollVisible: boolean }) {
+export function MobileTopBar() {
   const location = useLocation();
+  const { theme } = useTheme();
   const authUser = useAuthUser();
   const [searchOpen, setSearchOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
 
   const signedIn = Boolean(authUser.id);
-  const displayName = authUser.name?.trim()
-    || authUser.email?.split("@")[0]
-    || "Listener";
-  const initial = displayName.slice(0, 1).toUpperCase() || "W";
-  const visible = scrollVisible || searchOpen || accountOpen;
 
   if (location.pathname === "/auth") return null;
 
   return (
     <>
-      <div
-        className="pointer-events-none fixed inset-x-0 top-0 z-[78] w-full px-4"
-        aria-hidden={!visible}
-        inert={!visible}
-        style={{
-          paddingTop: "max(env(safe-area-inset-top), 12px)",
-          opacity: visible ? 1 : 0,
-          transform: visible ? "translateY(0)" : "translateY(-16px)",
-          transition: "opacity 0.28s cubic-bezier(.16,1,.3,1), transform 0.28s cubic-bezier(.16,1,.3,1)",
-        }}
+      <header
+        className="sticky top-0 z-[78] flex h-14 w-full items-center justify-between gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 px-4 backdrop-blur-xl"
+        data-wk-mobile-app-header="v4"
       >
-        <div className="relative mx-auto h-12 w-full max-w-[980px]">
+        <button
+          type="button"
+          onClick={() => setAccountOpen(true)}
+          className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
+          aria-label="Open WAKILISHA menu"
+          aria-controls="wk-workbook-sidebar"
+          aria-expanded={accountOpen}
+        >
+          <WkIcon name="Menu" size={21} />
+        </button>
+        <Link to="/" aria-label="WAKILISHA home" className="flex min-w-0 flex-1 justify-center">
+          <img src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"} alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain" />
+        </Link>
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setAccountOpen(true)}
-            className="pointer-events-auto absolute left-0 top-0 flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-white/25 bg-[var(--wk-surface)]/88 text-[var(--wk-text)] shadow-[0_8px_28px_rgba(0,0,0,0.16)] backdrop-blur-xl"
-            aria-label="Open account menu"
-            aria-expanded={accountOpen}
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text)]"
           >
-            {authUser.avatarUrl ? (
-              <img
-                src={authUser.avatarUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span className="text-[14px] font-black">{authUser.id ? (
-              initial
-            ) : (
-              <WakilishaAccountMark size={24} />
-            )}</span>
-            )}
+            <WkIcon name="Search" size={20} />
           </button>
-
-          <div className="pointer-events-auto absolute right-0 top-0">
-
-            {signedIn ? (
-              <NotificationBell
-                userId={authUser.id}
-                className="h-11 w-11 border border-white/25 bg-[var(--wk-surface)]/88 shadow-[0_8px_28px_rgba(0,0,0,0.16)] backdrop-blur-xl"
-              />
-            ) : null}
-          </div>
+          {signedIn ? (
+            <NotificationBell
+              userId={authUser.id}
+              className="h-11 w-11 border border-[var(--wk-border)]"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAccountOpen(true)}
+              aria-label="Account"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text)]"
+            >
+              <WkIcon name="UserRound" size={20} />
+            </button>
+          )}
         </div>
-      </div>
+      </header>
 
       <MobileAccountDrawer
         open={accountOpen}

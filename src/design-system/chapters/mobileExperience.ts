@@ -3,7 +3,7 @@ import type { WkDesignChapterSpec } from '../designSystemSpecTypes';
 const mobileFirst: WkDesignChapterSpec[] = [
   ['55','mobile-philosophy','Mobile Philosophy & Manifesto','Mobile is a first-class product expression for WAKILISHA, not a collapsed desktop viewport. The interface should feel touch-native, cinematic, music-aware and editorially serious.','mob-device, mob-screen, feature-chip, desktop-vs-mobile'],
   ['56','thumb-zone-touch-architecture','Thumb Zone & Touch Architecture','Mobile layouts must respect reachability, touch size and thumb-zone priority. Primary actions live low, secondary context lives high.','thumb-canvas, thumb-zone, touch-grid, touch-cell'],
-  ['57','mobile-navigation-systems','Mobile Navigation Systems','Bottom navigation, tab states, mini-player coexistence and active states define the mobile shell.','mob-nav-specimen, mob-nav-bar, mob-nav-tab, mobile-bottom-nav, mobile-nav-item'],
+  ['57','mobile-navigation-systems','Mobile Navigation Systems','Bottom navigation, tab states, persistent shared player coexistence and active states define the mobile shell.','mob-nav-specimen, mob-nav-bar, mob-nav-tab, mobile-bottom-nav, mobile-nav-item'],
   ['58','mobile-player-full-experience','Mobile Player — Full Experience','The full mobile player is a flagship listening surface with artwork, ambient color, scrubber, controls and lyrics.','player-full, player-full-art, player-scrubber, player-controls-row, player-play-btn, player-lyrics-strip'],
   ['59','mobile-typography-reading','Mobile Typography & Reading','Mobile typography must keep editorial reading comfortable while preserving WAKILISHA display impact.','mob-type-specimen, mob-type-row, mob-type-meta'],
   ['60','mobile-cards-surfaces','Mobile Cards & Surfaces','Mobile cards use strong imagery, short metadata and horizontally scrollable shelves where useful.','mob-card-vert, mob-card-horiz, mobile-card-sm'],
@@ -36,7 +36,7 @@ const mobileFirst: WkDesignChapterSpec[] = [
 
 const mobileScreens: WkDesignChapterSpec[] = [
   ['65','auth-onboarding','Auth & Onboarding','High-fidelity auth and onboarding screens with a cinematic brand zone and focused CTA stack.','phone, auth-screen, auth-logo-zone, auth-tagline, auth-buttons, auth-btn'],
-  ['66','home-feed','Home & Feed','Mobile home/feed patterns built around greeting, curation shelves, compact cards and mini-player coexistence.','home-greeting, home-section, home-shelf, hcard, phn-miniplayer'],
+  ['66','home-feed','Home & Feed','Mobile home/feed patterns built around greeting, curation shelves, compact cards and persistent shared player coexistence.','home-greeting, home-section, home-shelf, hcard, wk-player-compact'],
   ['67','mobile-charts-page','Charts Page','Mobile chart view with edition header, filter chips, emotional top-entry cards and compact ranked rows.','charts-hdr, charts-ed-badge, charts-filter-row, chart-hero-card, chart-row-list'],
   ['68','mobile-magazine-page','Magazine Page','Mobile magazine page with full-image editorial hero and stacked story cards.','mag-hero-full, mag-hero-overlay, mag-card, mag-card-art, mag-card-title'],
   ['69','mobile-artist-directory','Artist Directory','Two-column mobile artist discovery with image-first cards and cultural figure hierarchy.','artist-grid-2col, acard, acard-overlay, acard-name, acard-meta'],

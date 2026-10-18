@@ -89,7 +89,7 @@ export const DEFAULT_PROFILE: UserProfileFields = {
 const DEFAULT_APPEARANCE: UserAppearancePrefs = {
   theme: "dark",
   density: "Comfortable",
-  accent: "#84C241",
+  accent: "#85C441",
   coverColor: "#1a3a0a",
 };
 

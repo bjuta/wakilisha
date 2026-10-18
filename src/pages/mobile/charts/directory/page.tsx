@@ -93,7 +93,7 @@ export default function MobileChartsDirectory() {
 
   if (state.status === "loading") {
     return (
-      <div className="wk-mobile-v5 px-5 py-10 space-y-4">
+      <div className="wk-mobile px-5 py-10 space-y-4">
         <div className="h-48 rounded-xl bg-[var(--wk-surface-raised)] animate-pulse" />
         <div className="flex gap-3">
           <div className="h-10 flex-1 rounded-full bg-[var(--wk-surface-raised)] animate-pulse" />
@@ -116,7 +116,7 @@ export default function MobileChartsDirectory() {
 
   if (state.status === "error") {
     return (
-      <div className="wk-mobile-v5 px-5 py-16 text-center">
+      <div className="wk-mobile px-5 py-16 text-center">
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-danger-soft)] text-[var(--wk-danger)] mx-auto">
           <i className="ri-error-warning-line text-2xl" />
         </div>
@@ -131,7 +131,7 @@ export default function MobileChartsDirectory() {
 
   if (state.status === "empty") {
     return (
-      <div className="wk-mobile-v5 px-5 py-16 text-center">
+      <div className="wk-mobile px-5 py-16 text-center">
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)] mx-auto">
           <i className="ri-bar-chart-box-line text-2xl" />
         </div>
@@ -182,7 +182,7 @@ export default function MobileChartsDirectory() {
     : `Loaded from API`;
 
   return (
-    <div className="wk-mobile-v5">
+    <div className="wk-mobile">
       {/* Fullwidth visual hero */}
       <section className="charts-visual-hero">
         {topTrack?.artworkUrl && (

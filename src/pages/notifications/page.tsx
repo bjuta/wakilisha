@@ -20,9 +20,7 @@ import type {
 } from "@/services/community";
 import { WkIcon } from "@/components/design-system/Icon";
 
-type NotificationFilter =
-  | "all"
-  | "mentions";
+type NotificationFilter = "all" | "mentions" | "releases" | "credits" | "live";
 
 interface NotificationWithActor
   extends CommunityNotification {
@@ -237,20 +235,16 @@ export default function NotificationsPage() {
     loadNotifications,
   ]);
 
-  const visibleNotifications =
-    useMemo(
-      () =>
-        filter === "mentions"
-          ? notifications.filter(
-              (notification) =>
-                notification.notificationType
-                  === "mention"
-                || notification.notificationType
-                  === "post_mention",
-            )
-          : notifications,
-      [filter, notifications],
-    );
+  const visibleNotifications = useMemo(() => {
+    if (filter === "all") return notifications;
+    return notifications.filter((notification) => {
+      const type = notification.notificationType;
+      if (filter === "mentions") return type === "mention" || type === "post_mention";
+      if (filter === "credits") return type.startsWith("credit_") || type.startsWith("contribution_");
+      if (filter === "releases") return type.startsWith("release_") || type === "new_release";
+      return type.startsWith("live_") || type === "live";
+    });
+  }, [filter, notifications]);
 
   const unreadCount =
     notifications.filter(
@@ -334,7 +328,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-6rem)] bg-[var(--wk-bg)] pb-28 md:pb-12">
+    <main data-wk-workbook-screen="notifications" className="min-h-[calc(100dvh-6rem)] bg-[var(--wk-bg)] pb-12">
       <section className="mx-auto min-h-[calc(100dvh-6rem)] w-full max-w-[760px] border-x border-[var(--wk-border)] bg-[var(--wk-surface)]">
         <header className="sticky top-0 z-20 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 backdrop-blur-xl">
           <div className="flex min-h-[72px] items-center justify-between gap-4 px-5 sm:px-6">
@@ -379,13 +373,16 @@ export default function NotificationsPage() {
           </div>
 
           <nav
-            className="grid grid-cols-2"
+            className="flex gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none]"
             aria-label="Notification filters"
           >
             {(
               [
                 ["all", "All"],
                 ["mentions", "Mentions"],
+                ["releases", "Releases"],
+                ["credits", "Credits"],
+                ["live", "Live"],
               ] as const
             ).map(([value, label]) => {
               const active =
@@ -403,7 +400,7 @@ export default function NotificationsPage() {
                   onClick={() =>
                     setFilter(value)
                   }
-                  className={`relative min-h-12 text-[13px] font-black transition-colors ${
+                  className={`relative min-h-11 shrink-0 rounded-full px-4 text-[13px] font-semibold transition-colors ${
                     active
                       ? "text-[var(--wk-text)]"
                       : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
@@ -447,7 +444,7 @@ export default function NotificationsPage() {
         ) : (
           <div className="divide-y divide-[var(--wk-border)]">
             {visibleNotifications.map(
-              (notification) => {
+              (notification, index) => {
                 const target =
                   notificationTarget(
                     notification,
@@ -479,6 +476,14 @@ export default function NotificationsPage() {
                   || metadataSenderName
                   || "Someone";
 
+                const recent = Date.now() - new Date(notification.createdAt).getTime() < 24 * 60 * 60 * 1000;
+                const previous = index > 0 ? visibleNotifications[index - 1] : null;
+                const previousRecent = previous
+                  ? Date.now() - new Date(previous.createdAt).getTime() < 24 * 60 * 60 * 1000
+                  : null;
+                const groupHeading = !previous || recent !== previousRecent
+                  ? <h2 className="px-5 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">{recent ? "New" : "Earlier"}</h2>
+                  : null;
                 const row = (
                   <div
                     className={`relative flex gap-4 px-5 py-5 transition-colors sm:px-6 ${
@@ -546,8 +551,9 @@ export default function NotificationsPage() {
 
                 if (!target) {
                   return (
+                    <div key={notification.id}>
+                      {groupHeading}
                     <button
-                      key={notification.id}
                       type="button"
                       onClick={() =>
                         void handleOpen(
@@ -558,12 +564,14 @@ export default function NotificationsPage() {
                     >
                       {row}
                     </button>
+                    </div>
                   );
                 }
 
                 return (
+                  <div key={notification.id}>
+                    {groupHeading}
                   <Link
-                    key={notification.id}
                     to={target}
                     onClick={() =>
                       void handleOpen(
@@ -574,6 +582,7 @@ export default function NotificationsPage() {
                   >
                     {row}
                   </Link>
+                  </div>
                 );
               },
             )}

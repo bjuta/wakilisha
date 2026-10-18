@@ -511,7 +511,7 @@ export default function Magazine() {
       <main className="min-h-screen flex items-center justify-center bg-[var(--wk-bg)]">
         <div className="text-center px-6">
           <i className="ri-error-warning-line text-[var(--wk-text-faint)] text-[40px] mb-4 block" />
-          <p className="text-[15px] font-bold text-[var(--wk-text-muted)]">{error ? "We couldn't load the magazine. Try again in a moment." : "No stories yet."}</p>
+          <h1 className="text-[20px] font-bold text-[var(--wk-text-muted)]">{error ? "We couldn't load the magazine. Try again in a moment." : "No stories yet."}</h1>
         </div>
       </main>
     );
