@@ -678,3 +678,10 @@
   background: #FFFFFF;
   color: #0B0B0B;
 }
+
+
+/* Square release artwork keeps its complete approved cover. The general
+   Music editorial-photo cover rule must not override explicit containment. */
+[data-wk-workbook-screen="music"] main article img.object-contain {
+  object-fit: contain;
+}
