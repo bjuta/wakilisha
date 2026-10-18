@@ -86,29 +86,42 @@ function MusicArtwork({
   fit?: "cover" | "contain";
   loading?: "lazy" | "eager";
 }) {
-  // A Registry URL may expire or fail upstream. Do not leave a blank image
-  // rectangle or pretend that a generated texture is approved cover art.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  if (!src || failedSrc === src) {
-    return (
-      <div
-        className={`flex h-full w-full flex-col items-center justify-center gap-2 bg-[var(--wk-surface-raised)] p-3 text-center ${className}`}
-      >
-        <WkIcon name="Music" size={23} className="text-[var(--wk-text-faint)]" />
-        {alt ? <span className="line-clamp-2 text-[11px] font-semibold leading-tight text-[var(--wk-text-muted)]">{alt}</span> : null}
-      </div>
-    );
-  }
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const recorded = Boolean(src && loadedSrc === src && failedSrc !== src);
 
+  // Draw an honest source-labelled fallback from the first paint. Network
+  // stalls and broken Registry artwork must never leave an empty rectangle.
   return (
-    <img
-      src={src}
-      alt={alt}
-      loading={loading}
-      fetchPriority={loading === "eager" ? "high" : undefined}
-      onError={() => setFailedSrc(src)}
-      className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${className}`}
-    />
+    <div
+      data-wk-music-artwork-state={recorded ? "recorded" : "fallback"}
+      className={`relative h-full w-full overflow-hidden ${className}`}
+    >
+      {!recorded && (
+        <div
+          data-wk-music-artwork-fallback
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[var(--wk-surface-raised)] p-3 text-center"
+        >
+          <WkIcon name="Music" size={23} className="text-[var(--wk-text-faint)]" />
+          {alt ? (
+            <span className="line-clamp-2 max-w-full break-words text-[11px] font-semibold leading-tight text-[var(--wk-text-muted)]">
+              {alt}
+            </span>
+          ) : null}
+        </div>
+      )}
+      {src && failedSrc !== src ? (
+        <img
+          src={src}
+          alt={alt}
+          loading={loading}
+          fetchPriority={loading === "eager" ? "high" : undefined}
+          onLoad={() => setLoadedSrc(src)}
+          onError={() => setFailedSrc(src)}
+          className={`absolute inset-0 h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${recorded ? "opacity-100" : "opacity-0"}`}
+        />
+      ) : null}
+    </div>
   );
 }
 
