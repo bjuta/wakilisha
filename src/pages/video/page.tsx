@@ -122,13 +122,13 @@ export default function VideoIndexPage() {
           )}
 
           {error && (
-            <p className="mx-5 my-8 border-l-2 border-[#85c441] pl-4 text-[14px] text-[var(--wk-text-muted)]" role="alert">
+            <p className="mx-5 my-8 border-l-2 border-[var(--wk-brand)] pl-4 text-[14px] text-[var(--wk-text-muted)]" role="alert">
               Video is temporarily unavailable.
             </p>
           )}
           {!index && !error && (
             <div className="grid grid-cols-2 gap-4 px-5 py-10 sm:grid-cols-3 sm:px-9" aria-busy="true">
-              {[0,1,2].map((i) => <div key={i} className="aspect-video animate-pulse rounded-[12px] bg-[#1c1c1c]" />)}
+              {[0,1,2].map((i) => <div key={i} className="aspect-video animate-pulse rounded-[12px] bg-[var(--wk-surface-raised)]" />)}
             </div>
           )}
           {index && items.length === 0 && (
