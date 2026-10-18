@@ -20,8 +20,8 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(desktop).toContain('text-[clamp(22px,2.5vw,30px)]');
     expect(mobile).toContain('text-[22px] font-bold');
     expect(mobile).toContain('grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2');
-    expect(mobile).toContain('useMagazineArticles()');
-    expect(mobile).not.toContain('useMagazineArticles(24)');
+    expect(mobile).toContain('useMagazineArticles(24)');
+    expect(mobile).not.toContain('useMagazineArticles(500)');
   });
 
   it("renders one restrained newsletter at the end of Magazine and each article route", () => {
