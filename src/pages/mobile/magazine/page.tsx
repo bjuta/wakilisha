@@ -163,7 +163,7 @@ export default function MobileMagazine() {
         onClick={handleHeroOpen}
         onKeyDown={handleHeroKeyDown}
         aria-labelledby="wk-mobile-magazine-hero-title"
-        className="relative min-h-[580px] h-[78dvh] flex items-end overflow-hidden bg-[#0a0a0a] block cursor-pointer"
+        className="relative flex h-[min(61dvh,510px)] min-h-[420px] cursor-pointer items-end overflow-hidden bg-[#0a0a0a]"
       >
         {heroStory.heroUrl ? (
           <ResponsiveMediaImage
@@ -222,17 +222,16 @@ export default function MobileMagazine() {
       </div>
 
       {/* Published Magazine sections, not scroll markers or future categories. */}
-      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-surface)] backdrop-blur-lg">
+      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[#0b0b0b] backdrop-blur-lg">
         <div className="flex items-center gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none]">
           {sectionNames.map((sec) => (
             <button
               type="button"
               key={sec}
+              data-wk-magazine-filter={sec.toLowerCase()}
               aria-pressed={activeSection === sec}
               onClick={() => setActiveSection(sec)}
-              className={`min-h-11 shrink-0 border-b-2 px-3 text-[13px] font-semibold transition-colors ${activeSection === sec
-                ? "border-[var(--wk-brand)] text-[var(--wk-text)]"
-                : "border-transparent text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"}`}
+              className={`wk-reference-pill ${activeSection === sec ? "bg-[#f5f5f4] text-[#0b0b0b]" : ""}`}
             >
               {sec}
             </button>
@@ -241,7 +240,7 @@ export default function MobileMagazine() {
       </nav>
 
       {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
-      <div className="px-4 py-8 flex flex-col gap-12">
+      <div className="flex flex-col gap-10 px-4 py-8">
 
         {activeSection === "All" ? (
           <>
@@ -294,18 +293,6 @@ export default function MobileMagazine() {
 
         <MobileNewsletterCTA />
 
-        {/* ── Footer ── */}
-        <footer className="border-t border-[var(--wk-border)] pt-10 pb-4 text-center">
-          <span className="text-[9px] font-black uppercase tracking-[0.24em] text-[var(--wk-brand)] mb-2 block">
-            WAKILISHA Magazine
-          </span>
-          <p className="text-[20px] font-black tracking-[-0.035em] text-[var(--wk-text)] leading-snug max-w-[320px] mx-auto">
-            Music, art, and stories from East Africa.
-          </p>
-          <p className="mt-2 text-[11px] text-[var(--wk-text-muted)]">
-            Issue {issueNum} &middot; {issueDate}
-          </p>
-        </footer>
       </div>
     </div>
   );
@@ -366,10 +353,8 @@ function MobileNewsletterCTA() {
             <i className="ri-mail-line text-[14px]" />
             Magazine
           </span>
-          <h2 className="text-[26px] font-black tracking-[-0.04em] text-[var(--wk-text)] leading-tight mb-2">Read with us</h2>
-          <p className="text-[13px] text-[var(--wk-text-muted)] leading-relaxed mb-6">
-            Get new stories and charts in your inbox.
-          </p>
+          <h2 className="text-[26px] font-black tracking-[-0.04em] text-[var(--wk-text)] leading-tight mb-2">One email a week. The stories, the films and what changed in the record.</h2>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <input type="hidden" name="wk_page_type" value="magazine" />
             <input type="hidden" name="wk_source_section" value="mobile_footer" />
@@ -389,7 +374,7 @@ function MobileNewsletterCTA() {
               {subscribing ? "Subscribing..." : "Subscribe"}
             </button>
           </form>
-          <p className="mt-3 text-[10px] font-semibold text-[var(--wk-text-faint)]">No spam. Unsubscribe anytime.</p>
+
         </div>
       )}
     </section>
