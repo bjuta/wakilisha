@@ -661,3 +661,19 @@
     width: 100%;
   }
 }
+
+
+/* The Podcasts index has a typographic cover when no approved show art exists.
+   Keep that actual title visible in both theme palettes. */
+[data-wk-workbook-screen="podcasts"] .wk-reference-podcast-cover {
+  background: #1B1B1B;
+  color: #FFFFFF;
+}
+[data-wk-workbook-screen="podcasts"] .wk-reference-podcast-cover > span {
+  color: #FFFFFF;
+  padding: 24px;
+}
+[data-wk-workbook-screen="video"] .wk-reference-media-hero-copy .wk-reference-play-button {
+  background: #FFFFFF;
+  color: #0B0B0B;
+}
