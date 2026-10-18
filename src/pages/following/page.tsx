@@ -1,6 +1,6 @@
 import "@/styles/wakilisha-workbook-p1-p11-authority.css";
-import "@/styles/wakilisha-social-workbook-p6-p8.css";
 import "@/styles/wakilisha-workbook-surface-fidelity.css";
+import "@/styles/wakilisha-social-workbook-p6-p8.css";
 import {
   useCallback,
   useEffect,
