@@ -62,11 +62,13 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(css).toContain('--wk-brand: #85c441');
   });
 
-  it("preserves readable inboxes, active actions and a real desktop notification sidebar", () => {
+  it("preserves readable inboxes, active actions and a real desktop notification settings panel", () => {
     const notifications = read("src/pages/notifications/page.tsx");
     const messages = read("src/pages/messages/page.tsx");
-    expect(notifications).toContain('aria-label="Notification category navigation"');
-    expect(notifications).toContain('className="hidden self-start lg:block"');
+    expect(notifications).toContain('aria-label="Notification preferences"');
+    expect(notifications).toContain('Tell me about');
+    expect(notifications).toContain('to="/settings?section=Notifications"');
+    expect(notifications).toContain('hidden self-start border-l border-[var(--wk-border)]');
     expect(notifications).toContain('aria-label="Notification filters"');
     expect(notifications).toContain('handleMarkAll()');
     expect(notifications).toContain('notificationTarget(');
