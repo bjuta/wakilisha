@@ -60,9 +60,9 @@ export default function PublicShowsPage() {
         <div className="mx-auto w-full max-w-[1320px] px-5 py-9 sm:px-9">
           {loading && (
             <div className="grid gap-9 lg:grid-cols-[.74fr_1.26fr]" aria-busy="true">
-              <div className="aspect-square animate-pulse rounded-[18px] bg-[#1c1c1c]" />
+              <div className="aspect-square animate-pulse rounded-[18px] bg-[var(--wk-surface-raised)]" />
               <div className="space-y-4">
-                {[0,1,2].map(i => <div key={i} className="h-28 animate-pulse rounded-[16px] bg-[#1c1c1c]" />)}
+                {[0,1,2].map(i => <div key={i} className="h-28 animate-pulse rounded-[16px] bg-[var(--wk-surface-raised)]" />)}
               </div>
             </div>
           )}
@@ -76,12 +76,12 @@ export default function PublicShowsPage() {
                     {shows[0].title}
                   </span>
                 </Link>
-                <div className="mt-5 text-[11px] font-bold uppercase tracking-[.15em] text-[#85c441]">Podcast</div>
+                <div className="mt-5 text-[11px] font-bold uppercase tracking-[.15em] text-[var(--wk-brand)]">Podcast</div>
                 <h1 className="mt-2 text-[clamp(34px,4vw,52px)] font-extrabold uppercase leading-[.95] tracking-[-.045em] text-[#f5f5f4]">
                   {shows[0].title}
                 </h1>
                 {shows[0].description && (
-                  <p id="podcast-about" className="mt-4 max-w-[48ch] text-[15px] leading-[1.6] text-[#c9c9c9]">
+                  <p id="podcast-about" className="mt-4 max-w-[48ch] text-[15px] leading-[1.6] text-[var(--wk-text-soft)]">
                     {shows[0].description}
                   </p>
                 )}
@@ -89,11 +89,11 @@ export default function PublicShowsPage() {
                   <Link to={shows[0].canonicalPath} className="inline-flex min-h-11 items-center rounded-full bg-[#f5f5f4] px-5 text-[14px] font-bold text-[#0b0b0b]">
                     Explore show ↗
                   </Link>
-                  <a href="#podcast-episodes" className="inline-flex min-h-11 items-center rounded-full border border-[#333] px-5 text-[14px] font-semibold text-[#f5f5f4]">
+                  <a href="#podcast-episodes" className="inline-flex min-h-11 items-center rounded-full border border-[var(--wk-border-2)] px-5 text-[14px] font-semibold text-[#f5f5f4]">
                     Episodes
                   </a>
                 </div>
-                <p className="mt-5 text-[13px] text-[#a4a4a4]">
+                <p className="mt-5 text-[13px] text-[var(--wk-text-muted)]">
                   <strong className="text-[#f5f5f4]">{shows[0].episodeCount}</strong> episodes
                 </p>
               </section>
@@ -105,13 +105,13 @@ export default function PublicShowsPage() {
                 {featuredShow?.episodes.length ? (
                   <div className="grid gap-1">
                     {[...featuredShow.episodes].reverse().map(({episode,audio,video}) => (
-                      <Link key={episode.resourceId} to={episode.canonicalPath} className="group flex min-w-0 gap-4 border-b border-[var(--wk-border)] px-2 py-4 hover:bg-[#151515]">
+                      <Link key={episode.resourceId} to={episode.canonicalPath} className="group flex min-w-0 gap-4 border-b border-[var(--wk-border)] px-2 py-4 hover:bg-[var(--wk-surface)]">
                         <div className="aspect-square w-[76px] shrink-0 rounded-[12px] bg-[linear-gradient(155deg,#9c91c4,#4d355c)] sm:w-[96px]" aria-hidden="true" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-[12px] text-[#85c441]">{episode.episodeNumber ? `Ep ${episode.episodeNumber}` : "Episode"}{audio?.delivery.durationSeconds ? ` · ${Math.round(audio.delivery.durationSeconds / 60)} min` : ""}</p>
-                          <h2 className="mt-2 line-clamp-2 text-[17px] font-bold leading-[1.2] text-[#f5f5f4] group-hover:text-[#85c441]">{episode.title}</h2>
-                          {episode.summary && <p className="mt-1 line-clamp-2 text-[13px] leading-[1.5] text-[#a4a4a4]">{episode.summary}</p>}
-                          {video && <span className="mt-2 inline-block text-[11px] text-[#a4a4a4]">Watch or listen</span>}
+                          <p className="text-[12px] text-[var(--wk-brand)]">{episode.episodeNumber ? `Ep ${episode.episodeNumber}` : "Episode"}{audio?.delivery.durationSeconds ? ` · ${Math.round(audio.delivery.durationSeconds / 60)} min` : ""}</p>
+                          <h2 className="mt-2 line-clamp-2 text-[17px] font-bold leading-[1.2] text-[#f5f5f4] group-hover:text-[var(--wk-brand)]">{episode.title}</h2>
+                          {episode.summary && <p className="mt-1 line-clamp-2 text-[13px] leading-[1.5] text-[var(--wk-text-muted)]">{episode.summary}</p>}
+                          {video && <span className="mt-2 inline-block text-[11px] text-[var(--wk-text-muted)]">Watch or listen</span>}
                         </div>
                         <span aria-hidden="true" className="self-center text-[23px] text-[#f5f5f4]">↗</span>
                       </Link>
@@ -132,9 +132,9 @@ export default function PublicShowsPage() {
                 {shows.slice(1).map(show => (
                   <Link key={show.resourceId} to={show.canonicalPath} className="group min-w-0">
                     <div className="aspect-square rounded-[12px] bg-[linear-gradient(155deg,#9879a8,#33253d)]" />
-                    <h3 className="mt-3 text-[17px] font-bold leading-[1.2] text-[#f5f5f4] group-hover:text-[#85c441]">{show.title}</h3>
-                    <p className="mt-1 text-[13px] text-[#a4a4a4]">{show.episodeCount} episodes</p>
-                    {show.description && <p className="mt-2 line-clamp-2 text-[13px] leading-[1.5] text-[#a4a4a4]">{show.description}</p>}
+                    <h3 className="mt-3 text-[17px] font-bold leading-[1.2] text-[#f5f5f4] group-hover:text-[var(--wk-brand)]">{show.title}</h3>
+                    <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">{show.episodeCount} episodes</p>
+                    {show.description && <p className="mt-2 line-clamp-2 text-[13px] leading-[1.5] text-[var(--wk-text-muted)]">{show.description}</p>}
                   </Link>
                 ))}
               </div>
