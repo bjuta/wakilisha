@@ -116,3 +116,49 @@ for (const width of [390, 1440]) {
     });
   }
 }
+
+
+/**
+ * Verify the workbook-authorised palettes in the actual React surface, not
+ * merely a CSS source string. The dark/light theme switch must change both
+ * text ink and background on real public routes without changing structure.
+ */
+for (const route of [
+  { path: "/video", name: "video" },
+  { path: "/audio", name: "audio" },
+  { path: "/shows", name: "podcasts" },
+  { path: "/music", name: "music" },
+]) {
+  test(`Workbook ${route.name} theme palettes retain workbook colour authority`, async ({ page }, testInfo) => {
+    test.setTimeout(45_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(route.path, { waitUntil: "domcontentloaded" });
+    const surface = page.locator(`[data-wk-workbook-screen="${route.name}"]`);
+    await expect(surface).toBeVisible({ timeout: 25_000 });
+
+    for (const [mode, background, brand] of [
+      ["light", "rgb(252, 252, 251)", "#4e7425"],
+      ["dark", "rgb(11, 11, 11)", "#85c441"],
+    ] as const) {
+      await page.evaluate((theme) => {
+        document.documentElement.setAttribute("data-wk-theme", theme);
+      }, mode);
+      const actual = await surface.evaluate((node) => {
+        const css = getComputedStyle(node);
+        return {
+          background: css.backgroundColor,
+          brand: css.getPropertyValue("--wk-brand").trim().toLowerCase(),
+          text: css.color,
+        };
+      });
+      expect(actual.background).toBe(background);
+      expect(actual.brand).toBe(brand);
+      expect(actual.text).not.toBe(actual.background);
+      await page.screenshot({
+        path: testInfo.outputPath(`workbook-${route.name}-${mode}-390.png`),
+        animations: "disabled",
+        fullPage: false,
+      });
+    }
+  });
+}
