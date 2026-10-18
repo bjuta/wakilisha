@@ -1,8 +1,13 @@
 import { buildRedactedHeadquartersAuditV1 } from "@/services/miziziRedactedAudit";
-import { loadMiziziCaseQuestionsV1, type QuestionReadV1 } from "@/services/miziziQuestionRead";
+import {
+ loadMiziziCaseQuestionsV1,freezeMiziziQuestionV1,
+ loadMiziziSourceAttestationsV1,
+ type QuestionReadV1,type QuestionAttestationReadV1,
+ type QuestionFreezeInputV1,
+} from "@/services/miziziQuestionRead";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { useCallback, useEffect, useState } from "react";
-import { TextArea, TextField, Label } from "react-aria-components";
+import { Input, TextArea, TextField, Label } from "react-aria-components";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
@@ -36,51 +41,204 @@ function ReasonField({value,onChange,label}:{value:string;onChange:(v:string)=>v
   </TextField>;
 }
 
-/** Shows only authenticated, frozen QV1 questions. No source/ACH verdict is inferred. */
+/** QV3 metadata is signed and redacted by the server. It does not confer
+ * independent evidence status, source-use permission or an ACH grade.
+ */
+function MiziziQuestionEvidenceState({record,questionId,questionRevision}:{
+ record:HeadquartersDurableCase;questionId:string;questionRevision:number;
+}) {
+ const [state,setState]=useState<QuestionAttestationReadV1 | {kind:"loading"}>({kind:"loading"});
+ useEffect(()=>{
+  let active=true;
+  setState({kind:"loading"});
+  void loadMiziziSourceAttestationsV1({
+   workspaceId:record.workspaceId,caseId:record.caseId,caseRevision:record.caseRevision,
+  },questionId,questionRevision).then(value=>{if(active)setState(value);});
+  return ()=>{active=false;};
+ },[record.workspaceId,record.caseId,record.caseRevision,questionId,questionRevision]);
+ if(state.kind==="loading")return <p role="status" className="mt-3 text-[12px] text-wk-text-muted">Checking recorded source reviews…</p>;
+ if(state.kind==="not_recorded")
+  return <p className="mt-3 text-[12px] text-wk-text-muted">No reviewed source correspondences recorded yet.</p>;
+ if(state.kind==="stale")
+  return <p role="status" className="mt-3 text-[12px] text-wk-text-muted">Source review is out of date. Refresh the case.</p>;
+ if(state.kind==="denied")
+  return <p role="status" className="mt-3 text-[12px] text-wk-text-muted">Source-review details are restricted for this account.</p>;
+ if(state.kind==="unavailable")
+  return <p role="alert" className="mt-3 text-[12px] text-wk-text-muted">Current source-review status could not be verified.</p>;
+ return <section className="mt-4 border-t border-wk-border pt-3" aria-label="Source review status">
+   <p className="text-[12px] font-semibold text-wk-text">Recorded source reviews</p>
+   <ul className="mt-2 space-y-1">
+    {state.rows.map(row=><li key={row.assertionId} className="text-[12px] text-wk-text-muted">
+      {row.decision==="human_reviewed"
+       ?"Human correspondence recorded. Independent review is still required."
+       :"Source correspondence is withdrawn or unavailable."}
+      {" "}Review revision {row.reviewRevision}.
+    </li>)}
+   </ul>
+   <p className="mt-2 text-[12px] text-wk-text-muted">
+     No independent source families or ACH assessments have been verified.
+   </p>
+ </section>;
+}
+
+type QuestionDraft={
+ questionId:string;expectedQuestionRevision:number;
+ question:string;hypotheses:{id:string;label:string}[];reason:string;
+};
+function newQuestionDraft():QuestionDraft{
+ return {
+  questionId:crypto.randomUUID(),expectedQuestionRevision:0,question:"",
+  hypotheses:[{id:crypto.randomUUID(),label:""},{id:crypto.randomUUID(),label:""}],
+  reason:"",
+ };
+}
+
+/** Existing QV2 steward writer and QV1 reader, shown in the same case view.
+ * All mutation permission, scope, revision and Hold checks remain server-side.
+ */
 function MiziziRecordedQuestions({record}: {record:HeadquartersDurableCase}) {
-  const [result,setResult]=useState<QuestionReadV1 | {kind:"loading"}>({kind:"loading"});
-  useEffect(()=>{
-    let active=true;
-    setResult({kind:"loading"});
-    void loadMiziziCaseQuestionsV1({
-      workspaceId:record.workspaceId,
-      caseId:record.caseId,
-      caseRevision:record.caseRevision,
-    }).then(questions=>{if(active)setResult(questions);});
-    return ()=>{active=false;};
-  },[record.workspaceId,record.caseId,record.caseRevision]);
-  if(result.kind==="loading")
-    return <p role="status">Checking frozen questions for this case…</p>;
-  if(result.kind==="not_recorded")
-    return <p role="status">No independently reviewed question set is connected to this case yet.</p>;
-  if(result.kind==="stale")
-    return <p role="status">The case revision has changed. Refresh Records to read its current questions.</p>;
-  if(result.kind==="denied")
-    return <p role="status">Your account cannot read this case's frozen questions.</p>;
-  if(result.kind==="unavailable")
-    return <p role="alert">The question record could not be verified. No finding is shown.</p>;
-  return <section aria-label="Frozen investigation questions" className="mt-4">
-    <p className="text-[12px] text-wk-text-muted">
-      {result.questions.length} frozen {result.questions.length===1?"question":"questions"}.
-      These are competing explanations, not reviewed evidence findings.
-    </p>
-    <ol className="mt-3 space-y-4">
-      {result.questions.map(question=><li key={question.questionId}
-        className="rounded-xl border border-wk-border bg-wk-surface p-4">
-        <p className="mz-case-eyebrow">Question revision {question.questionRevision}</p>
-        <h4 className="mt-2 text-[16px] font-semibold text-wk-text">{question.question}</h4>
-        <ul aria-label="Competing explanations" className="mt-3 space-y-2">
-          {question.hypotheses.map(hypothesis=><li key={hypothesis.id}
-            className="rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text">
-            {hypothesis.label}
-          </li>)}
-        </ul>
-        <p className="mt-3 text-[12px] text-wk-text-muted">
-          No independently assessed source grades or findings are recorded by this reader.
-        </p>
+ const [result,setResult]=useState<QuestionReadV1 | {kind:"loading"}>({kind:"loading"});
+ const [refresh,setRefresh]=useState(0);
+ const [draft,setDraft]=useState<QuestionDraft|null>(null);
+ const [busy,setBusy]=useState(false);
+ const [notice,setNotice]=useState("");
+ useEffect(()=>{
+  let active=true;
+  setDraft(null);
+  setNotice("");
+  return ()=>{active=false;};
+ },[record.caseId,record.caseRevision]);
+ useEffect(()=>{
+  let active=true;
+  setResult({kind:"loading"});
+  void loadMiziziCaseQuestionsV1({
+   workspaceId:record.workspaceId,caseId:record.caseId,caseRevision:record.caseRevision,
+  }).then(questions=>{if(active)setResult(questions);});
+  return ()=>{active=false;};
+ },[record.workspaceId,record.caseId,record.caseRevision,refresh]);
+ const canCompose=result.kind==="not_recorded"||result.kind==="ready";
+ const validDraft=Boolean(draft&&
+  draft.question===draft.question.trim()&&
+  draft.question.length>=20&&draft.question.length<=500&&
+  draft.reason===draft.reason.trim()&&
+  draft.reason.length>=12&&draft.reason.length<=1000&&
+  draft.hypotheses.length>=2&&draft.hypotheses.length<=12&&
+  draft.hypotheses.every(h=>h.label===h.label.trim()&&h.label.length>=3&&h.label.length<=200)&&
+  new Set(draft.hypotheses.map(h=>h.label.toLocaleLowerCase())).size===draft.hypotheses.length);
+ const submit=async(event:React.FormEvent)=>{
+  event.preventDefault();
+  if(busy||!draft||!validDraft||!canCompose)return;
+  setBusy(true);setNotice("");
+  const payload:QuestionFreezeInputV1={...draft};
+  const response=await freezeMiziziQuestionV1({
+   workspaceId:record.workspaceId,caseId:record.caseId,caseRevision:record.caseRevision,
+  },payload);
+  setBusy(false);
+  if(response.kind==="recorded"){
+   setDraft(null);
+   setNotice(response.outcome==="replayed"?
+    "The question was already recorded. Its receipt matches this request.":
+    "Question revision recorded. Another reviewer must assess its sources.");
+   setRefresh(n=>n+1);
+  }else{
+   const messages={
+    denied:"Only an authorized Headquarters steward can freeze questions. No permission was granted.",
+    stale:"This question or case has changed. Refresh the case before trying again.",
+    invalid:"Check the question, competing explanations, and review reason.",
+    unavailable:"The result could not be confirmed. Keep this draft and retry the same request before creating another.",
+   };
+   setNotice(messages[response.kind]);
+  }
+ };
+ return <section aria-label="Frozen investigation questions" className="mt-4">
+  {result.kind==="loading" ? <p role="status">Checking frozen questions for this case…</p> : null}
+  {result.kind==="not_recorded" ? <p role="status">No independently reviewed question set is connected to this case yet.</p> : null}
+  {result.kind==="stale" ? <p role="status">The case revision has changed. Refresh Records to read its current questions.</p> : null}
+  {result.kind==="denied" ? <p role="status">Your account cannot read this case's frozen questions.</p> : null}
+  {result.kind==="unavailable" ? <p role="alert">The question record could not be verified. No finding is shown.</p> : null}
+  {result.kind==="ready" ? <>
+   <p className="text-[12px] text-wk-text-muted">
+    {result.questions.length} frozen {result.questions.length===1?"question":"questions"}.
+    These are competing explanations, not reviewed evidence findings.
+   </p>
+   <ol className="mt-3 space-y-4">
+    {result.questions.map(question=><li key={question.questionId}
+     className="rounded-xl border border-wk-border bg-wk-surface p-4">
+     <p className="mz-case-eyebrow">Question revision {question.questionRevision}</p>
+     <h4 className="mt-2 text-[16px] font-semibold text-wk-text">{question.question}</h4>
+     <ul aria-label="Competing explanations" className="mt-3 space-y-2">
+      {question.hypotheses.map(hypothesis=><li key={hypothesis.id}
+       className="rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text">
+       {hypothesis.label}
       </li>)}
-    </ol>
-  </section>;
+     </ul>
+     <MiziziQuestionEvidenceState record={record} questionId={question.questionId}
+      questionRevision={question.questionRevision}/>
+     <p className="mt-3 text-[12px] text-wk-text-muted">
+      No independently assessed source grades or findings are recorded by this reader.
+     </p>
+     <WkButton variant="soft" className="wk-button-sm mt-3"
+      disabled={busy||draft!==null}
+      onClick={()=>{
+       setNotice("");
+       setDraft({
+        questionId:question.questionId,expectedQuestionRevision:question.questionRevision,
+        question:question.question,
+        hypotheses:question.hypotheses.map(h=>({id:h.id,label:h.label})),reason:"",
+       });
+      }}>Propose a revised question</WkButton>
+    </li>)}
+   </ol>
+  </> : null}
+  {canCompose&&!draft ? <div className="mt-4">
+   <WkButton variant="soft" className="wk-button-sm"
+    onClick={()=>{setNotice("");setDraft(newQuestionDraft());}}>
+    Add an investigation question
+   </WkButton>
+  </div> : null}
+  {draft&&canCompose ? <form onSubmit={submit}
+   className="mt-4 space-y-3 rounded-xl border border-wk-border bg-wk-surface p-4"
+   aria-label="Review and freeze an investigation question">
+   <div>
+    <h4 className="text-[15px] font-semibold text-wk-text">
+     {draft.expectedQuestionRevision>0?"Propose a new revision":"New investigation question"}
+    </h4>
+    <p className="mt-1 text-[12px] text-wk-text-muted">
+     A steward records competing explanations. This does not approve evidence or change the Registry.
+    </p>
+   </div>
+   <TextField value={draft.question}
+    onChange={value=>setDraft(current=>current?{...current,question:value}:current)}
+    className="block">
+    <Label className="mb-1 block text-[12px] font-semibold text-wk-text">Question</Label>
+    <TextArea rows={3} maxLength={500} className="wk-input w-full min-w-0 rounded-xl p-3 text-[13px]"/>
+   </TextField>
+   {draft.hypotheses.map((h,index)=><TextField key={h.id}
+    value={h.label}
+    onChange={value=>setDraft(current=>current?{...current,hypotheses:current.hypotheses.map(x=>x.id===h.id?{...x,label:value}:x)}:current)}
+    className="block">
+    <Label className="mb-1 block text-[12px] font-semibold text-wk-text">
+     Competing explanation {index+1}
+    </Label>
+    <Input maxLength={200} className="wk-input w-full min-w-0 rounded-xl p-3 text-[13px]"/>
+   </TextField>)}
+   <TextField value={draft.reason}
+    onChange={value=>setDraft(current=>current?{...current,reason:value}:current)}
+    className="block">
+    <Label className="mb-1 block text-[12px] font-semibold text-wk-text">Reason for review</Label>
+    <TextArea rows={2} maxLength={1000} className="wk-input w-full min-w-0 rounded-xl p-3 text-[13px]"/>
+   </TextField>
+   <div className="flex flex-wrap items-center gap-2">
+    <WkButton type="submit" variant="primary" className="wk-button-sm"
+     disabled={!validDraft||busy}>
+     {busy?"Checking authority…":"Freeze question for review"}
+    </WkButton>
+    <WkButton type="button" variant="ghost" className="wk-button-sm"
+     disabled={busy} onClick={()=>{setDraft(null);setNotice("");}}>Cancel</WkButton>
+   </div>
+  </form> : null}
+  {notice ? <p role="status" className="mt-3 text-[12px] text-wk-text-muted">{notice}</p> : null}
+ </section>;
 }
 
 /** The Registry queue above remains the source of review facts.
