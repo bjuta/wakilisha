@@ -108,7 +108,7 @@ export function PlayerCompactSurface({
         isMobile
           ? {
               bottom:
-                "calc(52px + max(env(safe-area-inset-bottom), 8px) + 8px)",
+                "calc(env(safe-area-inset-bottom) + 8px)",
             }
           : undefined
       }
