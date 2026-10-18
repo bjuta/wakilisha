@@ -26,6 +26,11 @@ describe("Workbook v4 is the only active product design authority", () => {
     }
     expect(read("src/design-system/wakilisha.elements.foundation.css")).toContain("width: 44px;");
     expect(read("test/ui-browser/fixtures/interaction.tsx")).not.toContain("wakilisha.elements.content.css");
+    expect(existsSync("src/design-system/wakilisha.elements.charts-directory.css")).toBe(false);
+    expect(read("src/design-system/wakilisha.elements.motion.css"))
+      .not.toContain("wakilisha.elements.charts-directory.css");
+    expect(read("src/design-system/chapters/pageBlueprints.ts")).not.toContain("mob-cdir");
+
 
     expect(read("src/components/mobile/ResponsiveAppLayout.tsx")).not.toContain("playerChrome.css");
   });
