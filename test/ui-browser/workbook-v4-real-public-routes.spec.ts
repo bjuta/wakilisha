@@ -22,6 +22,17 @@ async function waitForSettledMedia(page: Page, name: string) {
       ).toBe(true);
     }
   }
+  if (name === "music") {
+    const recordedCover = surface.locator('.wk-music-hero img[alt$="cover artwork"]').first();
+    if (await recordedCover.count()) {
+      // The signed-in theme provider can rerender before a lazy image decodes.
+      // Await the real release artwork, never a mocked or invented cover.
+      await expect.poll(
+        () => recordedCover.evaluate((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
+        { timeout: 25_000 },
+      ).toBe(true);
+    }
+  }
 }
 
 /**
