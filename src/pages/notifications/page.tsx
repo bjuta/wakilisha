@@ -432,7 +432,7 @@ export default function NotificationsPage() {
 
   return (
     <main data-wk-workbook-screen="notifications" className="min-h-[calc(100dvh-6rem)] bg-[var(--wk-bg)] pb-12">
-      <div className="mx-auto grid w-full max-w-[1180px] gap-0 lg:grid-cols-[minmax(0,1fr)_310px] lg:gap-0 lg:px-0 lg:pt-0">
+      <div className="mx-auto grid w-full max-w-[1180px] gap-0 lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)] lg:gap-0 lg:px-0 lg:pt-0">
         <section className="min-h-[calc(100dvh-6rem)] min-w-0 border-r border-[var(--wk-border)] bg-[var(--wk-surface)]">
         <header className="sticky top-0 z-20 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 backdrop-blur-xl">
           <div className="flex min-h-14 items-center justify-between gap-4 px-5">
