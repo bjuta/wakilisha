@@ -27,7 +27,7 @@ function MobileSectionLabel({ children, count, href }: { children: string; count
   return (
     <div className="flex items-end justify-between mb-5 gap-3">
       <div className="flex items-center gap-2.5">
-        <h2 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
+        <h2 className="text-[22px] font-bold leading-tight tracking-[-0.035em] text-[var(--wk-text)]">
           {children}
         </h2>
         {count !== undefined && (
@@ -379,9 +379,9 @@ function MobileNewsletterCTA() {
                 name="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+                placeholder="Your email address"
                 required
-                className="w-full h-12 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] pl-10 pr-4 text-[14px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] transition-colors"
+                className="w-full h-12 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] pl-10 pr-4 text-[16px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] transition-colors"
               />
             </div>
             <button type="submit" disabled={subscribing} className="min-h-12 rounded-full bg-[var(--wk-text)] px-6 text-[14px] font-bold text-[var(--wk-bg)] disabled:opacity-60">
