@@ -171,8 +171,8 @@
   .wk-app-shell{background:var(--wk-bg);color:var(--wk-text);overscroll-behavior-y:none;}
   .wk-app-shell main{scroll-behavior:smooth;-webkit-overflow-scrolling:touch;}
   .wk-mobile{min-height:100dvh;background:var(--wk-bg);color:var(--wk-text);font-size:14px;line-height:1.55;}
-  .wk-mobile a,.wk-mobile button,.phn-nav-tab,.phn-mp-btn,.chart-row,.mag-card,.acard,.gcard-mob,.lbl-row,.hcard{min-height:var(--wk-tap-min);-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
-  .wk-mobile button:active,.wk-mobile a:active,.phn-nav-tab:active,.phn-mp-btn:active{opacity:.92;}
+  .wk-mobile a,.wk-mobile button,.phn-mp-btn,.chart-row,.mag-card,.acard,.gcard-mob,.lbl-row,.hcard{min-height:var(--wk-tap-min);-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+  .wk-mobile button:active,.wk-mobile a:active:active,.phn-mp-btn:active{opacity:.92;}
   .wk-mobile h1{font:800 32px/.98 var(--wk-font-display);letter-spacing:-.03em;}
   .wk-mobile h2{font:800 24px/1.05 var(--wk-font-display);letter-spacing:-.025em;}
   .wk-mobile h3{font:700 18px/1.12 var(--wk-font-display);letter-spacing:-.015em;}
@@ -185,56 +185,8 @@
   .wk-mobile input,.wk-mobile textarea,.wk-mobile select{min-height:44px;font-size:16px;}
   .wk-mobile .chart-row,.wk-mobile .lbl-row,.wk-mobile .atrow,.wk-mobile .mag-card,.wk-mobile .mob-card-horiz{min-height:56px;}
 
-  /* CH57: single-row persistent navigation — fixed, floating, horizontally scrollable */
-  .phn-nav{
-    position:fixed;
-    bottom:0;
-    left:12px;
-    right:12px;
-    z-index:80;
-    margin:0;
-    height:calc(52px + max(env(safe-area-inset-bottom), 8px));
-    min-height:calc(52px + max(env(safe-area-inset-bottom), 8px));
-    padding:0 8px max(env(safe-area-inset-bottom), 8px);
-    display:flex;
-    flex-wrap:nowrap;
-    align-items:end;
-    justify-content:center;
-    gap:2px;
-    overflow-x:auto;
-    overflow-y:hidden;
-    overscroll-behavior-x:contain;
-    scroll-snap-type:x proximity;
-    scroll-padding-inline:8px;
-    scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;
-    background:color-mix(in srgb,var(--wk-surface) 96%,transparent);
-    backdrop-filter:blur(22px);
-    -webkit-backdrop-filter:blur(22px);
-    border:1px solid var(--wk-divider);
-    border-radius:24px;
-    transform:translateZ(0);
-    -webkit-transform:translateZ(0);
-  }
-  .phn-nav::-webkit-scrollbar{display:none;}
+  /* Workbook v4 has no mobile tab navigation; the only bottom surface is the player. */
   .wk-app-shell main{min-height:0;}
-  .phn-nav-tab{height:52px;min-width:50px;flex:1 0 50px;scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--wk-text-muted);position:relative;border-radius:10px;font:700 8px/1 var(--wk-font-ui);letter-spacing:.02em;}
-  .phn-nav-tab svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;}
-  .phn-nav-tab.on{color:var(--wk-brand);}
-  .phn-nav-tab.on:before{content:"";position:absolute;top:4px;right:calc(50% - 10px);width:4px;height:4px;border-radius:50%;background:var(--wk-brand);}
-  .pnl{font:700 8px/1 var(--wk-font-ui);color:currentColor;}
-  .phn-nav-theme{color:var(--wk-text-muted);}
-  .phn-nav-theme:active{color:var(--wk-brand);}
-  .phn-nav-theme svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;}
-
-  /* Spacer for fixed nav + mini player so last content isn't hidden */
-  .mobile-bottom-spacer{
-    flex-shrink:0;
-    height:calc(52px + max(env(safe-area-inset-bottom), 8px));
-  }
-  .mobile-bottom-spacer.has-mini{
-    height:calc(52px + max(env(safe-area-inset-bottom), 8px) + 12px + 60px);
-  }
 
   /* CH57/58: mini player, permanent above nav — respects safe-area */
   
@@ -769,68 +721,3 @@
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}
 }
 
-/* Public discovery remediation: compact five-slot mobile nav */
-@media (max-width: 767px) {
-  .phn-nav.phn-nav--compact {
-    gap: 0;
-    overflow: visible;
-    overscroll-behavior-x: auto;
-    scroll-snap-type: none;
-    padding-left: 6px;
-    padding-right: 6px;
-  }
-
-  .phn-nav--compact .phn-nav-tab {
-    min-width: 0;
-    flex: 1 1 0;
-    scroll-snap-align: none;
-    font-size: 9px;
-  }
-
-  .phn-nav--compact .pnl {
-    font-size: 9px;
-  }
-
-  .phn-nav--compact .phn-nav-primary {
-    min-width: 62px;
-    flex: 0 0 62px;
-    overflow: visible;
-  }
-
-  .phn-nav--compact .phn-nav-primary::before {
-    display: none;
-  }
-
-  .phn-nav-primary-core {
-    display: flex;
-    width: 50px;
-    height: 50px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    background: #111;
-    color: var(--wk-brand-on);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
-    transform: translateY(-10px);
-    transition:
-      transform 160ms var(--wk-ease-standard),
-      box-shadow 160ms var(--wk-ease-standard);
-  }
-
-  .phn-nav-primary-core img {
-    display: block;
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
-  }
-
-  .phn-nav-primary:active .phn-nav-primary-core {
-    transform: translateY(-8px) scale(.96);
-  }
-
-  .phn-nav-primary.on .phn-nav-primary-core {
-    box-shadow:
-      0 10px 24px rgba(0, 0, 0, .18),
-      0 0 0 4px color-mix(in srgb, var(--wk-brand) 18%, transparent);
-  }
-}

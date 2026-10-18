@@ -1408,90 +1408,30 @@ describe(
     );
 
     it(
-      "keeps secondary public destinations globally reachable on mobile",
+      "keeps all public destinations in one identical desktop and mobile sidebar",
       () => {
-        expect(mobileAppLayout)
-          .toContain(
-            "const MORE_LINKS",
-          );
+        const navigation = read("src/components/navigation/wakilishaNavigation.ts");
+        const desktop = read("src/components/music/MusicDesktopShell.tsx");
+        const drawer = read("src/components/mobile/MobileAccountDrawer.tsx");
+        const mobileTop = read("src/components/mobile/MobileTopBar.tsx");
 
-        for (
-          const route of [
-            "/genres",
-            "/labels",
-            "/guides",
-            "/about",
-            "/contact",
-            "/faqs",
-            "/privacy",
-            "/terms",
-          ]
-        ) {
-          expect(mobileAppLayout)
-            .toContain(
-              `to: "${route}"`,
-            );
+        for (const route of [
+          "/music", "/video", "/audio", "/shows", "/magazine",
+          "/following", "/messages", "/notifications", "/artists",
+          "/charts", "/playlists", "/releases", "/genres", "/labels",
+          "/guides", "/credits", "/field", "/artist-studio",
+          "/about", "/contact", "/faqs", "/privacy", "/terms",
+        ]) {
+          expect(navigation).toContain(`to: "${route}"`);
         }
 
-        expect(mobileAppLayout)
-          .toContain(
-            'aria-label="More"',
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "useScrollLock(moreOpen)",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "Appearance",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "SIGNED_IN_NAV",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "SIGNED_OUT_NAV",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "prominent: true",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            'className="phn-nav phn-nav--compact"',
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            'to="/artists"',
-          );
-
-        expect(mobileAppLayout)
-          .not.toContain(
-            "<NotificationBell",
-          );
-
-        expect(mobileChromeCss)
-          .toContain(
-            "compact five-slot mobile nav",
-          );
-
-        expect(mobileChromeCss)
-          .toContain(
-            ".phn-nav-primary-core",
-          );
+        expect(drawer).toContain("WAKILISHA_NAVIGATION.map");
+        expect(desktop).toContain("WAKILISHA_NAVIGATION.map");
+        expect(mobileTop).toContain('aria-label="Open WAKILISHA menu"');
+        expect(mobileAppLayout).not.toContain("MobileBottomNav");
+        expect(mobileAppLayout).not.toContain("phn-nav");
+        expect(mobileChromeCss).not.toContain(".phn-nav-primary-core");
+        expect(mobileChromeCss).not.toContain(".phn-nav--compact");
       },
     );
 

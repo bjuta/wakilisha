@@ -50,6 +50,8 @@ export const WAKILISHA_NAVIGATION: readonly WkNavGroup[] = [
       { label: "About", to: "/about", icon: "Info" },
       { label: "Contact", to: "/contact", icon: "Mail" },
       { label: "FAQs", to: "/faqs", icon: "CircleHelp" },
+      { label: "Privacy", to: "/privacy", icon: "ShieldCheck" },
+      { label: "Terms", to: "/terms", icon: "FileText" },
       { label: "Settings", to: "/settings", icon: "Settings" },
     ],
   },
