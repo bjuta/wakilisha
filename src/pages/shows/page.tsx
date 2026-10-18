@@ -75,7 +75,7 @@ export default function PublicShowsPage() {
             <div className="grid gap-9 lg:grid-cols-[.74fr_1.26fr] lg:gap-11">
               <section className="min-w-0">
                 <Link to={shows[0].canonicalPath} className="wk-reference-podcast-cover group" aria-label={`Open ${shows[0].title}`}>
-                  <span className="max-w-[80%] text-center text-[clamp(32px,5vw,56px)] font-extrabold leading-[.98] tracking-[-.05em] text-white">
+                  <span className="max-w-[80%] break-words text-center text-[clamp(32px,5vw,56px)] font-extrabold leading-[1.06] tracking-[-.05em] text-white">
                     {shows[0].title}
                   </span>
                 </Link>
