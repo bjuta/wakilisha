@@ -1,4 +1,5 @@
 import { MobileAccountDrawer } from "@/components/mobile/MobileAccountDrawer";
+import { WakilishaAccountMark } from "@/components/brand/WakilishaAccountMark";
 import { WAKILISHA_NAVIGATION, isWakilishaNavCurrent } from "@/components/navigation/wakilishaNavigation";
 import {
   useEffect,
@@ -207,6 +208,21 @@ export function MusicDesktopShell({
     setGlobalSearchOpen,
   ] = useState(false);
   const [smallScreenMenuOpen, setSmallScreenMenuOpen] = useState(false);
+  // Workbook: 768–1023px is a permanent 80px icon rail, not a phone drawer.
+  // Keep the user's desktop-expanded preference untouched for >=1024px.
+  const [tabletRail, setTabletRail] = useState(() =>
+    typeof window !== "undefined" &&
+    window.matchMedia("(min-width: 768px) and (max-width: 1023px)").matches
+  );
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 768px) and (max-width: 1023px)");
+    const update = () => setTabletRail(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  const compactSidebar = sidebarCollapsed || tabletRail;
+
   const selectedLogoUrl =
     theme === "dark"
       ? (
@@ -370,24 +386,24 @@ export function MusicDesktopShell({
     }, [location.pathname]);
 
   return (
-    <div className="wk-music-app-shell min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)] lg:flex">
+    <div className="wk-music-app-shell min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)] md:flex">
       <aside
         className={[
-          "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-[var(--wk-border)] bg-[var(--wk-surface)] transition-[width] duration-200 ease-out [scrollbar-width:thin] lg:flex",
-          sidebarCollapsed
-            ? "w-[72px]"
-            : "w-[270px]",
+          "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-[var(--wk-border)] bg-[var(--wk-surface)] transition-[width] duration-200 ease-out [scrollbar-width:thin] md:flex",
+          compactSidebar
+            ? "w-[80px]"
+            : "w-[272px]",
         ].join(" ")}
       >
         <div
           className={[
             "sticky top-0 z-10 flex min-h-[82px] shrink-0 items-center border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 backdrop-blur",
-            sidebarCollapsed
+            compactSidebar
               ? "justify-center px-2"
               : "justify-between gap-3 px-5",
           ].join(" ")}
         >
-          {!sidebarCollapsed ? (
+          {!compactSidebar ? (
             <Link
               to="/music"
               aria-label={displayName}
@@ -404,6 +420,9 @@ export function MusicDesktopShell({
             </Link>
           ) : null}
 
+          <Link to="/" aria-label="WAKILISHA home" className="flex h-11 w-11 items-center justify-center lg:hidden">
+            <WakilishaAccountMark size={30} />
+          </Link>
           <button
             type="button"
             onClick={() =>
@@ -412,20 +431,20 @@ export function MusicDesktopShell({
               )
             }
             aria-label={
-              sidebarCollapsed
+              compactSidebar
                 ? "Expand sidebar"
                 : "Collapse sidebar"
             }
             title={
-              sidebarCollapsed
+              compactSidebar
                 ? "Expand sidebar"
                 : "Collapse sidebar"
             }
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+            className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)] lg:flex"
           >
             <WkIcon
               name={
-                sidebarCollapsed
+                compactSidebar
                   ? "ChevronRight"
                   : "ChevronLeft"
               }
@@ -439,10 +458,10 @@ export function MusicDesktopShell({
             type="button"
             onClick={() => setGlobalSearchOpen(true)}
             aria-label="Search"
-            title={sidebarCollapsed ? "Search" : undefined}
+            title={compactSidebar ? "Search" : undefined}
             className={[
               "relative flex min-h-11 w-full items-center rounded-xl text-[13px] font-semibold transition-colors",
-              sidebarCollapsed
+              compactSidebar
                 ? "justify-center px-0"
                 : "gap-3 px-3",
               activeSection === "search"
@@ -462,12 +481,12 @@ export function MusicDesktopShell({
                   : "text-[var(--wk-text-faint)]"
               }
             />
-            {!sidebarCollapsed ? <span>Search</span> : null}
+            {!compactSidebar ? <span>Search</span> : null}
           </button>
 
           {WAKILISHA_NAVIGATION.map((group) => (
             <div key={group.label}>
-              {!sidebarCollapsed && (
+              {!compactSidebar && (
                 <p className="mb-1 mt-5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
                   {group.label}
                 </p>
@@ -476,7 +495,7 @@ export function MusicDesktopShell({
                 <AppNavLink
                   key={item.to}
                   {...item}
-                  collapsed={sidebarCollapsed}
+                  collapsed={compactSidebar}
                   active={isWakilishaNavCurrent(location.pathname, item.to)}
                 />
               ))}
@@ -486,12 +505,12 @@ export function MusicDesktopShell({
         <div
           className={[
             "mt-auto",
-            sidebarCollapsed
+            compactSidebar
               ? "px-3 pb-4"
               : "p-4",
           ].join(" ")}
         >
-          {!sidebarCollapsed ? (
+          {!compactSidebar ? (
             <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-4">
               <div className="text-[11px] font-black text-[var(--wk-brand)]">
                 Are you an Artist?
@@ -515,7 +534,7 @@ export function MusicDesktopShell({
           <div
             className={[
               "border-t border-[var(--wk-divider)] pt-4",
-              sidebarCollapsed
+              compactSidebar
                 ? "flex flex-col items-center gap-2"
                 : "mt-5 flex items-center gap-2",
             ].join(" ")}
@@ -576,26 +595,26 @@ export function MusicDesktopShell({
           </div>
 
           {isSignedIn ? (
-            <div className={sidebarCollapsed ? "mt-2" : "mt-3"}>
+            <div className={compactSidebar ? "mt-2" : "mt-3"}>
               <button
                 type="button"
                 onClick={() => void signOut()}
                 disabled={signingOut}
-                title={sidebarCollapsed ? "Sign out" : undefined}
-                aria-label={sidebarCollapsed ? "Sign out" : undefined}
+                title={compactSidebar ? "Sign out" : undefined}
+                aria-label={compactSidebar ? "Sign out" : undefined}
                 className={[
                   "flex h-11 items-center rounded-full border border-[var(--wk-border)] text-[12px] font-bold text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)] disabled:cursor-wait disabled:opacity-60",
-                  sidebarCollapsed
+                  compactSidebar
                     ? "w-full justify-center px-0"
                     : "w-full justify-start gap-2.5 px-3",
                 ].join(" ")}
               >
                 <WkIcon name="LogOut" size={15} />
-                {!sidebarCollapsed ? (
+                {!compactSidebar ? (
                   <span>{signingOut ? "Signing out" : "Sign out"}</span>
                 ) : null}
               </button>
-              {!sidebarCollapsed && signOutError ? (
+              {!compactSidebar && signOutError ? (
                 <p role="alert" className="mt-2 text-[11px] font-semibold text-[var(--wk-danger)]">
                   {signOutError}
                 </p>
@@ -606,7 +625,7 @@ export function MusicDesktopShell({
       </aside>
 
       <div className="min-w-0 flex-1 pb-24">
-        <div className="sticky top-0 z-40 flex h-[64px] items-center gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-overlay)] px-4 backdrop-blur-xl lg:hidden">
+        <div className="sticky top-0 z-40 flex h-[64px] items-center gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-overlay)] px-4 backdrop-blur-xl md:hidden">
           <button
             type="button"
             aria-label="Open WAKILISHA menu"
