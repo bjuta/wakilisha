@@ -1,3 +1,4 @@
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import "@/styles/wakilisha-magazine-38-44.css";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -412,7 +413,8 @@ export default function ArticlePage() {
 
 
 
-      <div className="wk-workbook-article-paper relative z-10">
+      <div data-wk-article-category={article.section.trim().toLowerCase()}
+        className="wk-workbook-article-paper relative z-10">
         <ArticleFloatHeader article={article} />
         <article className="max-w-[740px] mx-auto px-6 lg:px-8 pb-12">
           <ArticleContentRenderer segments={displaySegments} videos={videoEmbeds} releases={finalReleases} artists={artistEmbeds} tracks={trackEmbeds} articleSlug={article.slug} />
@@ -442,6 +444,14 @@ export default function ArticlePage() {
       </div>
 
       <ArticleRelated stories={related.filter((item) => item.slug !== article.slug)} loading={relatedLoading} />
+      <div data-wk-article-newsletter className="mx-auto w-full max-w-[780px] border-t border-[var(--wk-border)] px-5 py-12 sm:px-8">
+        <NewsletterSubscribe
+          formId="article-newsletter"
+          headline="Read with us"
+          description="Get new stories and charts in your inbox."
+          contextFields={{ wk_page_type: "article", wk_source_section: "article_footer" }}
+        />
+      </div>
 
     </main>
   );
