@@ -141,8 +141,18 @@ for (const route of [
       ["dark", "rgb(11, 11, 11)", "#85c441"],
     ] as const) {
       await page.evaluate((theme) => {
-        document.documentElement.setAttribute("data-wk-theme", theme);
+        localStorage.setItem("wk-theme", theme);
       }, mode);
+      // Mount ThemeProvider with the chosen user preference, not just a
+      // changed DOM attribute. Header logos are rendered from React context.
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await expect(page.locator("html")).toHaveAttribute("data-wk-theme", mode);
+      await expect(surface).toBeVisible({ timeout: 25_000 });
+      const logo = page.locator('[data-wk-mobile-app-header="v4"] img[alt="WAKILISHA"]');
+      await expect(logo).toHaveAttribute(
+        "src",
+        mode === "light" ? "/assets/logos/wakilisha-logo-light.svg" : "/assets/logos/wakilisha-logo-dark.svg",
+      );
       const actual = await surface.evaluate((node) => {
         const css = getComputedStyle(node);
         return {
