@@ -1042,7 +1042,7 @@ describe(
 
         expect(followingFeedPage)
           .toContain(
-            "What’s moving through your circle.",
+            "New work from the people you follow.",
           );
 
         expect(followingFeedPage)
@@ -1503,7 +1503,7 @@ describe(
 
         expect(magazineCard)
           .toContain(
-            'className="line-clamp-3 text-[15px] font-black',
+            'className="line-clamp-3 text-[19px] font-bold',
           );
       },
     );
