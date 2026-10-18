@@ -78,13 +78,18 @@ function MusicArtwork({
   alt,
   className = "",
   fit = "cover",
+  loading = "lazy",
 }: {
   src?: string | null;
   alt: string;
   className?: string;
   fit?: "cover" | "contain";
+  loading?: "lazy" | "eager";
 }) {
-  if (!src) {
+  // A Registry URL may expire or fail upstream. Do not leave a blank image
+  // rectangle or pretend that a generated texture is approved cover art.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (!src || failedSrc === src) {
     return (
       <div
         className={`flex h-full w-full flex-col items-center justify-center gap-2 bg-[var(--wk-surface-raised)] p-3 text-center ${className}`}
@@ -99,7 +104,9 @@ function MusicArtwork({
     <img
       src={src}
       alt={alt}
-      loading="lazy"
+      loading={loading}
+      fetchPriority={loading === "eager" ? "high" : undefined}
+      onError={() => setFailedSrc(src)}
       className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${className}`}
     />
   );
@@ -765,6 +772,7 @@ export default function MusicDiscoveryPage() {
                     <MusicArtwork
                       src={hero.artworkUrl}
                       alt={`${hero.title} artwork`}
+                      loading="eager"
                       className="object-cover object-center opacity-75"
                     />
                     <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,4,0.98)_0%,rgba(4,4,4,0.86)_29%,rgba(4,4,4,0.18)_67%,rgba(4,4,4,0.62)_100%)]" />
@@ -877,6 +885,7 @@ export default function MusicDiscoveryPage() {
                         src={hero.artworkUrl}
                         alt={`${hero.title} cover artwork`}
                         fit="contain"
+                        loading="eager"
                         className="h-full w-full"
                       />
                     </Link>
