@@ -72,12 +72,12 @@ export default function PublicShowsPage() {
             <div className="grid gap-9 lg:grid-cols-[.74fr_1.26fr] lg:gap-11">
               <section className="min-w-0">
                 <Link to={shows[0].canonicalPath} className="wk-reference-podcast-cover group" aria-label={`Open ${shows[0].title}`}>
-                  <span className="max-w-[80%] text-center text-[clamp(32px,5vw,56px)] font-extrabold leading-[.98] tracking-[-.05em] text-[#f5f5f4]">
+                  <span className="max-w-[80%] text-center text-[clamp(32px,5vw,56px)] font-extrabold leading-[.98] tracking-[-.05em] text-white">
                     {shows[0].title}
                   </span>
                 </Link>
                 <div className="mt-5 text-[11px] font-bold uppercase tracking-[.15em] text-[var(--wk-brand)]">Podcast</div>
-                <h1 className="mt-2 text-[clamp(34px,4vw,52px)] font-extrabold uppercase leading-[.95] tracking-[-.045em] text-[#f5f5f4]">
+                <h1 className="mt-2 text-[clamp(34px,4vw,52px)] font-extrabold uppercase leading-[.95] tracking-[-.045em] text-[var(--wk-text)]">
                   {shows[0].title}
                 </h1>
                 {shows[0].description && (
@@ -86,15 +86,15 @@ export default function PublicShowsPage() {
                   </p>
                 )}
                 <div className="mt-6 flex flex-wrap gap-3">
-                  <Link to={shows[0].canonicalPath} className="inline-flex min-h-11 items-center rounded-full bg-[#f5f5f4] px-5 text-[14px] font-bold text-[#0b0b0b]">
+                  <Link to={shows[0].canonicalPath} className="inline-flex min-h-11 items-center rounded-full bg-[var(--wk-text)] px-5 text-[14px] font-bold text-[var(--wk-bg)]">
                     Explore show ↗
                   </Link>
-                  <a href="#podcast-episodes" className="inline-flex min-h-11 items-center rounded-full border border-[var(--wk-border-2)] px-5 text-[14px] font-semibold text-[#f5f5f4]">
+                  <a href="#podcast-episodes" className="inline-flex min-h-11 items-center rounded-full border border-[var(--wk-border-2)] px-5 text-[14px] font-semibold text-[var(--wk-text)]">
                     Episodes
                   </a>
                 </div>
                 <p className="mt-5 text-[13px] text-[var(--wk-text-muted)]">
-                  <strong className="text-[#f5f5f4]">{shows[0].episodeCount}</strong> episodes
+                  <strong className="text-[var(--wk-text)]">{shows[0].episodeCount}</strong> episodes
                 </p>
               </section>
               <section id="podcast-episodes" className="min-w-0">
@@ -109,16 +109,16 @@ export default function PublicShowsPage() {
                         <div className="aspect-square w-[76px] shrink-0 rounded-[12px] bg-[linear-gradient(155deg,#9c91c4,#4d355c)] sm:w-[96px]" aria-hidden="true" />
                         <div className="min-w-0 flex-1">
                           <p className="text-[12px] text-[var(--wk-brand)]">{episode.episodeNumber ? `Ep ${episode.episodeNumber}` : "Episode"}{audio?.delivery.durationSeconds ? ` · ${Math.round(audio.delivery.durationSeconds / 60)} min` : ""}</p>
-                          <h2 className="mt-2 line-clamp-2 text-[17px] font-bold leading-[1.2] text-[#f5f5f4] group-hover:text-[var(--wk-brand)]">{episode.title}</h2>
+                          <h2 className="mt-2 line-clamp-2 text-[17px] font-bold leading-[1.2] text-[var(--wk-text)] group-hover:text-[var(--wk-brand)]">{episode.title}</h2>
                           {episode.summary && <p className="mt-1 line-clamp-2 text-[13px] leading-[1.5] text-[var(--wk-text-muted)]">{episode.summary}</p>}
                           {video && <span className="mt-2 inline-block text-[11px] text-[var(--wk-text-muted)]">Watch or listen</span>}
                         </div>
-                        <span aria-hidden="true" className="self-center text-[23px] text-[#f5f5f4]">↗</span>
+                        <span aria-hidden="true" className="self-center text-[23px] text-[var(--wk-text)]">↗</span>
                       </Link>
                     ))}
                   </div>
                 ) : (
-                  <Link to={shows[0].canonicalPath} className="block border-t border-[var(--wk-border)] py-5 text-[14px] font-semibold text-[#f5f5f4]">
+                  <Link to={shows[0].canonicalPath} className="block border-t border-[var(--wk-border)] py-5 text-[14px] font-semibold text-[var(--wk-text)]">
                     See published episodes ↗
                   </Link>
                 )}
@@ -132,7 +132,7 @@ export default function PublicShowsPage() {
                 {shows.slice(1).map(show => (
                   <Link key={show.resourceId} to={show.canonicalPath} className="group min-w-0">
                     <div className="aspect-square rounded-[12px] bg-[linear-gradient(155deg,#9879a8,#33253d)]" />
-                    <h3 className="mt-3 text-[17px] font-bold leading-[1.2] text-[#f5f5f4] group-hover:text-[var(--wk-brand)]">{show.title}</h3>
+                    <h3 className="mt-3 text-[17px] font-bold leading-[1.2] text-[var(--wk-text)] group-hover:text-[var(--wk-brand)]">{show.title}</h3>
                     <p className="mt-1 text-[13px] text-[var(--wk-text-muted)]">{show.episodeCount} episodes</p>
                     {show.description && <p className="mt-2 line-clamp-2 text-[13px] leading-[1.5] text-[var(--wk-text-muted)]">{show.description}</p>}
                   </Link>
