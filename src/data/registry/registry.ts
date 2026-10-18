@@ -39,7 +39,6 @@ const chartEditionsBySeries = importedRegistry.chartEditions.reduce((acc, editio
 }, new Map<string, typeof importedRegistry.chartEditions>());
 
 const titleCase = (value: string) => value.replace(/\b\w/g, (char) => char.toUpperCase());
-const fallbackImage = (seed: string) => `https://picsum.photos/seed/${encodeURIComponent(seed)}/600/600`;
 
 function extractEntryCount(label: string, explicit?: number | null): number {
   if (explicit != null && explicit > 0) return explicit;
@@ -187,7 +186,7 @@ export function toChartRow(entry: ImportedChartEntry) {
     peakPosition: entry.peakPosition ?? entry.rank,
     isPlayable: Boolean(track?.sourceUrl),
     source: track?.source ?? undefined,
-    artworkUrl: track?.artworkUrl ?? fallbackImage(track?.slug ?? entry.id),
+    artworkUrl: track?.artworkUrl || "",
     artistImage: undefined,
     genre: track?.genres[0] ?? undefined,
     label: track?.labelIds.map((id) => labelsById.get(id)?.name).filter(Boolean).join(', ') || undefined,

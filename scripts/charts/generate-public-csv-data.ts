@@ -204,7 +204,7 @@ for (const edition of editions) {
       trackTitle: title,
       artistSlugs: row.artist_slug ? [row.artist_slug] : splitArtistNames(artistName).map(slugify),
       artistNames: [artistName],
-      artworkUrl: artworkUrl || `https://picsum.photos/seed/${encodeURIComponent(trackSlug)}/600/600`,
+      artworkUrl: artworkUrl || "",
       score: Math.max(100, 10000 - rank * 10),
       entryPayload: {
         source: "normalized_csv_export",

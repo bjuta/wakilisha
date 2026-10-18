@@ -2,16 +2,18 @@ import { createElement } from 'react';
 import type { WkRichMediaSpecimen } from '@/design-system/designSystemSpec';
 
 const h = createElement;
-const photo = (seed: string) => `https://picsum.photos/seed/${seed}/900/650`;
 const c = (...parts: Array<string | false | undefined>) => parts.filter(Boolean).join(' ');
 
+/** Explicitly absent artwork, never a random stock face or false entity photograph. */
 function Img({ seed, className = '' }: { seed: string; className?: string }) {
-  return h('img', {
-    src: photo(seed),
-    alt: '',
-    loading: 'lazy',
-    className: c('h-full w-full object-cover', className),
-  });
+  return h('span', {
+    role: 'img',
+    'aria-label': `Artwork unavailable for design specimen ${seed}`,
+    className: c(
+      'flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,var(--wk-surface-raised),var(--wk-surface-strong))] px-3 text-center text-[10px] font-medium text-[var(--wk-text-muted)]',
+      className,
+    ),
+  }, 'Artwork unavailable');
 }
 
 function Pill({ text, brand = false }: { text: string; brand?: boolean }) {
@@ -30,24 +32,11 @@ function Pill({ text, brand = false }: { text: string; brand?: boolean }) {
 }
 
 function Logo({ light = false }: { light?: boolean }) {
-  const fill = light ? '#0C0D0A' : '#fff';
-  const paths = [
-    'M25.79,25.46h.08L32.27,0h2.86l-7.71,29.38h-3.06L17.54,3.43h-.08l-6.81,25.95h-3.06L0,0h2.77l6.32,25.46h.08L15.99,0h3.1l6.69,25.46Z',
-    'M32.21,29.38L43.75,0h3.14l11.26,29.38h-2.86l-3.39-9.22h-13.38l-3.47,9.22h-2.86ZM39.47,17.79h11.51l-5.75-15.42-5.75,15.42Z',
-    'M60.23,29.38V0h2.77v15.22L78.06,0h3.14l-11.59,11.71,13.63,17.67h-3.39l-12.24-15.95-4.61,4.61v11.34h-2.77Z',
-    'M86.2,29.38V0h2.77v29.38h-2.77Z',
-    'M93.49,29.38V0h2.77v27.01h15.75v2.37h-18.52Z',
-    'M115.1,29.38V0h2.77v29.38h-2.77Z',
-    'M146.3,29.38V0h2.77v12.61h17.38V0h2.77v29.38h-2.77v-14.4h-17.38v14.4h-2.77Z',
-    'M173.11,29.38L184.65,0h3.14l11.26,29.38h-2.86l-3.39-9.22h-13.38l-3.47,9.22h-2.86ZM180.37,17.79h11.51l-5.75-15.42-5.75,15.42Z',
-  ];
-  return h(
-    'svg',
-    { viewBox: '0 0 199.05 29.87', 'aria-label': 'WAKILISHA', className: 'h-auto w-full max-w-[220px]' },
-    ...paths.map((d) => h('path', { key: d, fill, d })),
-    h('path', { fill: '#84C241', d: 'M132.91,11.14l-7.87,18.73,15.96-17.97c.26-.29.05-.76-.34-.76h-7.75Z' }),
-    h('path', { fill: '#84C241', d: 'M130.72.18h6.59c.15.01.26.17.2.31-2.24,5.23-4.48,10.46-6.73,15.69l-6.74-.02c-.19,0-.32-.19-.24-.37l6.54-15.37c.06-.15.21-.25.37-.25Z' })
-  );
+  return h('img', {
+    src: light ? '/assets/logos/wakilisha-logo-light.svg' : '/assets/logos/wakilisha-logo-dark.svg',
+    alt: 'WAKILISHA',
+    className: 'h-auto w-full max-w-[220px]',
+  });
 }
 
 export function SpecimenCanvas({ item }: { item: WkRichMediaSpecimen }) {
