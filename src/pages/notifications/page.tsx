@@ -477,7 +477,7 @@ export default function NotificationsPage() {
           </div>
 
           <nav
-            className="flex gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none] lg:hidden"
+            className="flex gap-2 overflow-x-auto px-5 py-3 [scrollbar-width:none] sm:px-6"
             aria-label="Notification filters"
           >
             {(
@@ -587,7 +587,8 @@ export default function NotificationsPage() {
                   : null;
                 const row = (
                   <div
-                    className={`relative flex gap-4 px-5 py-5 transition-colors sm:px-6 ${
+                    data-wk-notification-row
+                    className={`relative flex items-start gap-3 px-5 py-4 transition-colors sm:gap-4 sm:px-6 ${
                       unread
                         ? "bg-[var(--wk-brand-soft)]/30"
                         : "hover:bg-[var(--wk-surface-raised)]"
@@ -601,11 +602,20 @@ export default function NotificationsPage() {
                     )}
 
                     <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" aria-hidden="true">
-                      <i className={`${icon} text-[19px]`} />
+                      {notification.actor?.avatarUrl ? (
+                        <>
+                          <img src={notification.actor.avatarUrl} alt="" loading="lazy" className="h-11 w-11 rounded-full object-cover" />
+                          <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[var(--wk-surface)] bg-[var(--wk-brand-soft)]">
+                            <i className={`${icon} text-[13px]`} />
+                          </span>
+                        </>
+                      ) : (
+                        <i className={`${icon} text-[19px]`} />
+                      )}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-[15px] leading-[1.5] text-[var(--wk-text)]">
+                      <p className="text-[14px] leading-[1.55] text-[var(--wk-text)] sm:text-[15px]">
                         <span className="font-bold">
                           {actorName}
                         </span>{" "}
@@ -614,7 +624,7 @@ export default function NotificationsPage() {
                         </span>
                       </p>
 
-                      <div className="mt-1.5 flex items-center gap-2 text-[12px] font-medium text-[var(--wk-text-muted)]">
+                      <div className="mt-1 flex items-center gap-2 text-[11px] font-medium text-[var(--wk-text-muted)]">
                         <span>
                           {timeAgo(
                             notification.createdAt,
