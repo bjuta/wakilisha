@@ -589,6 +589,7 @@
   grid-column: 1 / -1;
 }
 [data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-media],
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-caption],
 [data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-body] {
   grid-column: 2;
   min-width: 0;
