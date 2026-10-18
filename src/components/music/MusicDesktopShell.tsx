@@ -1,3 +1,4 @@
+import { MobileAccountDrawer } from "@/components/mobile/MobileAccountDrawer";
 import { WAKILISHA_NAVIGATION, isWakilishaNavCurrent } from "@/components/navigation/wakilishaNavigation";
 import {
   useEffect,
@@ -205,6 +206,7 @@ export function MusicDesktopShell({
     globalSearchOpen,
     setGlobalSearchOpen,
   ] = useState(false);
+  const [smallScreenMenuOpen, setSmallScreenMenuOpen] = useState(false);
   const selectedLogoUrl =
     theme === "dark"
       ? (
@@ -605,6 +607,16 @@ export function MusicDesktopShell({
 
       <div className="min-w-0 flex-1 pb-24">
         <div className="sticky top-0 z-40 flex h-[64px] items-center gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-overlay)] px-4 backdrop-blur-xl lg:hidden">
+          <button
+            type="button"
+            aria-label="Open WAKILISHA menu"
+            aria-expanded={smallScreenMenuOpen}
+            aria-controls="wk-workbook-sidebar"
+            onClick={() => setSmallScreenMenuOpen(true)}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text)]"
+          >
+            <WkIcon name="Menu" size={20} />
+          </button>
           <Link to="/music" aria-label={displayName} className="min-w-0 flex-1">
             {<img
                 src={resolvedLogoUrl}
@@ -636,6 +648,11 @@ export function MusicDesktopShell({
           {children}
         </div>
       </div>
+      <MobileAccountDrawer
+        open={smallScreenMenuOpen}
+        onClose={() => setSmallScreenMenuOpen(false)}
+        onSearch={() => setGlobalSearchOpen(true)}
+      />
       <GlobalSearchSurface
         open={globalSearchOpen}
         onClose={() => setGlobalSearchOpen(false)}
