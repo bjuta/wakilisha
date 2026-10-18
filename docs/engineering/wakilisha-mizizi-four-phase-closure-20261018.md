@@ -21,53 +21,37 @@ This programme closes **both jobs**, not merely the reference implementation, an
 
 These are state observations, not immutable estimates. Recheck at each phase exit and annotate the actual commit, CI, tested deployment and reviewer acceptance.
 
-## Phase 1 — Shared foundations and primitives (starts in #1246)
+## Phase 1 — One complete WAKILISHA Workbook v4 replacement (existing #1246)
 
-**Ship:** the Workbook v4 **replacement** design system, shared by WAKILISHA and MIZIZI.
+**One delivery. One exit. No mini-phases.** Phase 1 now **includes the complete WAKILISHA-wide design overhaul inside real product routes**, by the owner's 18 October instruction. Phase 2 is NOT where unfinished public or admin v5 styling gets postponed. Do not declare completion because token compilation, legacy-file deletion, a CI pass, a rebranded stylesheet name or inspector specimens succeed.
 
-1. Inventory actual use of canonical src/design-system/wakilisha.tokens.css and packages/design-system/src/wakilisha.tokens.css, package exports, src/styles/wakilisha-fonts.css and workbook font faces, index.html preload policy, route-specific CSS, existing primitives, and major consumer classes. Require token parity and no conflicting competing runtime authority.
-2. Finish self-hosted Figtree (400–800) and IBM Plex Mono (400/500) delivery, source/licence/SHA audits, CSP and correct critical preloads. Keep legacy font faces only for *named unmigrated consumers*; retire them as those consumers move rather than duplicate preloading forever. Preserve culturally and linguistically correct glyph fallback.
-3. Converge mode/accent, fixed brand green, evidence standings, spacing (4px base), radii (artwork 8, controls 12, cards 16, sheets/heroes 24, actions full pill), 44px touch size and reduced motion across the canonical CSS and TS/package surface.
-4. Consolidate reusable React Aria-backed navigation, buttons, fields, segmented controls, menus, sheets, modal/focus, tabs, status/unknown, player dock and graph legend. Prevent route-specific unscoped CSS from overriding shared semantics; preserve existing public/admin behavior.
-5. Complete working two-brand/two-mode specimens in existing admin design-system inspector. Inspect real font loading, theme switching, input alignment and mobile overflow, including 390/480/768/1024/1280/1440 viewports.
+Replace—not layer over—the old design runtime across the actual route inventory: navigation and responsive shells, charts/search, artists/tracks/releases, player and media, stories/editorial, profiles/social/messages, authentication and settings, forms and administrative interfaces. Use the approved Brand Workbook v4 geometry, Figtree/Plex type, unmodified vector logo, dark-first WAKILISHA, light-first endorsed MIZIZI exceptions, semantic standing, real media sources, single token/theme/brand policy, mobile safe areas and accessible React Aria components. Preserve behavior, playback, privacy, Registry, permissions and stored content, while retiring all shadow versions, CSS selectors and adapter-only workarounds. Do not keep Inter, DM Sans, DM Mono, Cormorant, v5 styles, fake photograph URLs or old prototype components as invisible fallbacks.
 
-**Exit:** source/package token parity, current CI + browser security/playback, no third-party font loads, responsive/keyboard/focus/contrast checks and actual comparable owner-reviewed design renders. All affected consumers are enumerated and their migration outcome documented; no unsafe site-wide activation. Close/merge existing #1246 once this is achieved, not at token compilation alone.
+Work in the existing #1246 branch, refactoring source and actual consumers directly. The fonts/tokens, live mobile styles, shared form controls and immutable-brand code are already part of this PR; the remaining route and design audit must be evidence-based and exhaustive. Inspect the full live route manifest, rendered states and interactive workflows, not only a handpicked sample. Do not substitute source-scan grep or React-only build confidence for real visual parity. Consolidate tests into existing application/browser gates, add negative anti-legacy assertions, and avoid new phase PRs or standing workflow debt.
 
-## Phase 2 — WAKILISHA-wide design convergence and shipped refactor
+**Single exit:** All active WAKILISHA route families are inventoried and migrated; no legacy design implementation, fallback image/font, conflicting token or CSS override remains. Desktop/tablet/mobile and both approved brand modes pass visual comparison against supplied sources at representative 390, 480, 768, 1024, 1280 and 1440px widths. Public and authenticated behavior, keyboard, focus, contrast, reduced motion, real font loading and playback pass. Exact HEAD CI is green; approved frontend is merged and deployed with a verified rollback. **Anything less is Phase 1 still open**, even if its latest commit is green.
 
-**Ship:** current WAKILISHA functionality with Workbook v4 visual/interactions across public, account and admin surfaces, not a subset of photogenic routes.
+## Phase 2 — MIZIZI Headquarters M1–M5 and lawful decision engine
 
-- Audit the actual route manifest; assign all live routes to a shared shell or a documented domain-specific exception. Prioritize home/music/search, charts, artist/recording/releases, player, editorial/articles, profile/social/messages, onboarding/settings/forms and admin operations.
-- Move surfaces to Phase 1 navigation, type, tokens, imagery rules, controls, status meanings and responsive layouts. Preserve original logo and music credit statuses. Retire redundant v5/one-off styling after each caller migrates.
-- Preserve playback quality/captions, search and current Registry API behavior, permissions, uploads and existing user data. No opportunistic backend rewrite under a style PR.
-- Verify accessibility, language, major flows and visual parity across accepted viewports. Audit performance and critical player/browser behavior; keep existing regression suites consolidated.
+**Ship:** the complete case-first Headquarters Product v4 built using the final Phase 1 design primitives and existing UI PR #1244, not a second forked design system. Converge M1 Workbench, M2 Review, M3 Orion, M4 Evidence, and M5 Outcomes with MIZIZI v3's precise layout, source-backed case data, versioned questions, hypotheses, typed edges, evidence custody/translation/use basis, status distinctions, immutable review receipts and accountable decisions.
 
-**Exit:** the complete audited WAKILISHA route inventory matches Workbook v4, or has a narrowly documented product exception. Actual authenticated and public routes render and interact correctly; deploy frontend via existing process with rollback and Production check. WAKILISHA redesign can be closed independently of unfinished MIZIZI domain work.
+Resolve backend draft dependencies #1243 → #1248 → #1249 → #1250 → #1251 and complete independently authorized evidence adjudication. Human QV3 source-family correspondence does not independently verify evidence or grant ACH scoring rights. Do not calculate grades, findings, rights or public records from mere Registry proximity or attestation metadata. Respect DB05 Hold, scoped actor authority, same-case/revision, revocation and denied state.
 
-## Phase 3 — MIZIZI Headquarters M1–M5 and lawful decision engine
+**Exit:** An authorized operator completes a real signed-in case → question → assessed evidence → review → outcome journey, with stale, denied, revoked, held and unknown paths failing closed; M1–M5 v3 visuals are accepted on desktop/mobile; protected CI and required Production security controls are current; necessary SQL, Edge and frontend deployment is real and verified.
 
-**Ship:** a real, case-first Headquarters experience matched to MIZIZI v3 screens and Product v4, using #1244 and its already-open backend chain.
+## Phase 3 — MIZIZI Field, Contributions, public Record, and Organization
 
-- M1 Workbench: the precise 248px v3 rail, 64px toolbar, responsive collapse, case switcher, source-true 5:8 artefacts, real immutable questions, hypotheses and sources, case/history, explicit evidence standings, credible per-question read model and DB05 Hold.
-- M2 Review: authenticated one-question-at-a-time assessment, frozen exact revisions, competing choices, human independence and adverse-impact/undo analysis, recorded decision/operation distinction. Never assert real ACH grades, verified families, verdicts or rights without new independently accepted authority.
-- M3 Orion: pan/zoom graph and text/list alternative from *typed recorded edges*, inspect exact IDs and source-specific links, with accessibility/keyboard/touch parity. Neither proximity nor a name match proves credit ownership or rights.
-- M4 Evidence: real attention queue, consent/use basis, source families, custody and translation controls, reviewed items and revocation without displaying private material on public routes.
-- M5 Outcomes: source-backed state transitions, remaining uncertainties, immutable outcome receipts, calibration from real historical data only and approved publication requests. No fabricated percent, consumer, audit or delivery.
-- Consolidate/land existing #1243 → #1248 → #1249 → #1250 → #1251 only in approved dependency order. Complete missing independent ACH adjudication with the existing human authority, not automatic source hints. Rebase/reconcile #1244 with Phase 1 shared primitives before integration.
+**Ship:** M6 field capture and offline custody/recovery; M7 controlled personal/group/estate contributions, original-language statements, mandates, translations, withdrawal and consent; M8 bilingual evidence-backed public Record with lawful redactions and revision history; Product v4 organization workspace with tenant-scoped requests, Changesets, delivery and actual ACK/correction receipts.
 
-**Exit:** signed-in authorized member can go case → question → recorded evidence assessment → governed review → outcome, and nonmember/stale/revoked/held actions fail closed. Real v3 M1–M5 desktop/mobile parity and keyboard/touch acceptance; exact-head protected CI and resolved Production security status before deployment. Authenticated preview must be verified first, without borrowing Production passwords. Merge and deploy correct SQL/Edge/frontend surfaces in normal order; actual Production confirmation before marking delivered.
+Reuse the existing WAKILISHA and Registry infrastructure, not a new service architecture. No fabricated customers, artwork, provenance, consent, identities, partner integrations, licences or publication rights. Offline and unconfirmed actions must remain unconfirmed.
 
-## Phase 4 — MIZIZI Field, Contributions, Public Record, Organization and final closure
+**Exit:** M6–M8 and Organization render as real responsive application surfaces with authorized data and all active/revoked/denied/offline states; their respective journeys pass security, accessibility and custody tests, and their supported production integrations function.
 
-**Ship:** the full MIZIZI v4 product beyond Headquarters, reusing proven WAKILISHA and Registry primitives.
+## Phase 4 — End-to-end integration, rollout and full programme closure
 
-- M6 Field: source capture, real custodian permissions, offline/on-device resumability, immutable originals, provenance hashes, retry/recovery, private metadata and supervisor review. Never claim successful upload from a simulated local preview.
-- M7 Contributions: individual, group representative and estate capacities; identity/mandate validation; original-language statement, checked translation/custody, controlled disclosure, correction and withdrawal/revocation.
-- M8 Public Record: WAKILISHA-endorsed, bilingual, accessible source-redacted canonical revision; only human approved/publishable findings and change history, with removal/revocation reflected exactly.
-- Organization: customer-authorized catalogue requests, members, scoped Changesets, independent rights/tenant permissions and real downstream outbox/ACK/correction receipts. No invented customer, licences, partner access or outbound delivery. External dependencies must be identified as conditional, not certified by mock data.
-- Verify Field → Contributions → Headquarters → approved public Record and Organization as applicable with exact IDs and receipts. Consolidate documentation/tests, clean disposable artefacts, close superseded issues/branches, execute individually approved deployment steps and the normal Production Finish Update when appropriate.
+**Ship:** integrated Field → Contributions → governed Headquarters → approved public Record journeys, plus organization delivery where enabled. Verify exact source/ID/consent/custody, bilingual copy, media and rights boundaries and both brands in one design system. Reconcile migrations, hardened access, Edge/SQL/frontend sequence, end-to-end browser and rollback tests, and clean completed PR/issue/branch/deployment documentation.
 
-**Exit:** every MIZIZI v3 M1–M8 surface plus Product v4 Organization has real responsive UI and permitted interaction paths, with no unsupported evidence or rights claims. Real authenticated/denied/offline/stale/accessibility/translation/security tests pass. All intended public and private surfaces are deployed and independently verified; no critical unresolved release blocker, orphaned draft or unsupported feature is described as finished.
+**Exit:** All accepted WAKILISHA and MIZIZI surfaces are actually deployed and independently verified; no critical security, auth, visual or data-integrity blocker; owner receives truthful live URLs and evidence; normal Production Finish Update runs only on legitimately completed deployment. No old design work may be deferred here: it was the mandatory Phase 1 exit.
 
 ## Operating rules and proof, across all four phases
 
@@ -82,13 +66,15 @@ These are state observations, not immutable estimates. Recheck at each phase exi
 
 ## Living delivery ledger
 
-| Phase | Start state | Current branch/PR | Next required real work | Exit |
-| --- | --- | --- | --- | --- |
-| 1 | IN PROGRESS, shared token/font base coded, consumer/preload debt | existing #1246 | eliminate legacy critical font preload conflict; inventory shared primitives, CSS and consumers; real parity | NOT MET |
-| 2 | NOT STARTED as comprehensive site-wide replacement | reuse WAKILISHA route ownership | full route inventory/migration and Production acceptance | NOT MET |
-| 3 | IN PROGRESS, case/holds/questions available in draft, end-to-end absent | #1244 + #1243/#1248–#1251 | complete source-true ACH, M1–M5 exact UI, authenticated full journey | NOT MET |
-| 4 | DOMAIN FOUNDATIONS ONLY | reuse MIZIZI/WAKILISHA authorities | M6–M8, Organization and full release closure | NOT MET |
+| Phase | Current authority | Real next requirement | Exit |
+| --- | --- | --- | --- |
+| 1: full WAKILISHA design replacement | existing draft #1246; real code migration in progress | no legacy runtime, complete route parity, verified release | OPEN |
+| 2: MIZIZI Headquarters M1–M5 | existing #1244 and #1243/#1248–#1251 | independently governed ACH/review and complete authentic UI | OPEN |
+| 3: Field/Contributions/Public/Organization | existing Registry/MIZIZI domains | real end-user surfaces, consent, offline and tenant authorities | OPEN |
+| 4: full integration and closure | existing production control plane | production E2E verification and accountable closure | OPEN |
 
-**Scheduling:** original broad planning envelope 13–21+ dedicated senior engineering weeks overall (not a deadline), subject to actual consumer inventories and external Organization dependencies. Reduce calendar time through parallel independent domain work, not by omitting acceptance.
+**18 October implementation evidence:** #1246 migrated away from legacy DM/Inter/Cormorant design fonts, retired the split mobile-v5 CSS runtime and CSS-only old player suppressor, updated shared controls and source-truthful artwork states. The generated icon sprite also now tracks active referenced icons (274), removing a stale hard-coded 275-icon gate. These are code changes; they are not a visual release certificate. [Current Critical CI](https://github.com/bjuta/wakilisha/actions/runs/39103845095) was green at head `44ea75dca867529618e022b701615ebf14d4c6ff` when recorded. Neither #1246 nor Phase 1 is yet merged or deployed. Additional full-route visual parity remains unverified, so Phase 1 is **not accepted**.
 
-**Immediate action:** finish Phase 1's critical font-preload mismatch within #1246, update the same font audit and preserve old faces for named unmigrated consumers. Then continue the shared-primitives/consumer inventory. Do not open another workstream merely to record progress.
+**Scheduling:** original broad planning envelope 13–21+ focused senior engineering weeks is a rough capacity estimate, not a deadline. This owner-directed transfer of all WAKILISHA-wide design work into Phase 1 does not reduce the work or permit false acceptance. No extra phases are authorized.
+
+**Immediate engineering focus:** complete actual route/component design convergence under #1246 and inspect the current-head CI + visual proof; do not open another phase merely to describe what remains.
