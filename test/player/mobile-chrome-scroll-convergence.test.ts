@@ -13,7 +13,7 @@ describe("Workbook v4 mobile shell and safe-area convergence", () => {
     expect(header).toContain('aria-controls="wk-workbook-sidebar"');
     expect(header).toContain('aria-label="Open WAKILISHA menu"');
     expect(drawer).toContain('id="wk-workbook-sidebar"');
-    expect(drawer).toContain("WAKILISHA_NAVIGATION.map");
+    expect(drawer).toContain("navigation.map");
     expect(drawer).toContain("useScrollLock(open)");
   });
 

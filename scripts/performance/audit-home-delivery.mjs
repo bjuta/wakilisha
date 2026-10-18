@@ -341,9 +341,9 @@ if (
     notificationsPage,
   ) ||
   !canonicalNavigation.includes(
-    '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
+    '{ label: "Notifications", to: "/notifications", icon: "Bell", audience: "signed-in" }',
   ) ||
-  !mobileSidebar.includes("WAKILISHA_NAVIGATION.map") ||
+  (!mobileSidebar.includes("navigation.map") || !mobileSidebar.includes("visibleWakilishaNavigation")) ||
   !mobileTopBar.includes("<NotificationBell") ||
   !mobileTopBar.includes('aria-label="Open WAKILISHA menu"')
 ) {

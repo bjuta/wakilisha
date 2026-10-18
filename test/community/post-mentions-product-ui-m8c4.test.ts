@@ -339,7 +339,7 @@ describe("WAKILISHA M8C.4 Mention product UI", () => {
       "Alerts",
     );
     expect(sharedNavigation).toContain(
-      '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
+      '{ label: "Notifications", to: "/notifications", icon: "Bell", audience: "signed-in" }',
     );
     expect(mobileLayout).not.toContain("MobileBottomNav");
     expect(mobileLayout).not.toContain(

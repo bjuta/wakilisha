@@ -28,7 +28,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
-import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
+import { MagazineHeroMeta } from "./components/MagazineHeroMeta";
 
 
 function computeIssueInfo(articles: MagazineArticle[]) {
@@ -501,29 +501,20 @@ export default function Magazine() {
             {heroStory.title}
           </h1>
 
-          <p className="mt-5 text-[16px] lg:text-[18px] leading-relaxed text-white/60 max-w-[52ch]">
+          <p className="mt-5 text-[16px] lg:text-[18px] leading-relaxed text-white/85 max-w-[52ch]">
             {heroStory.dek}
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link to={heroArticleUrl} className="inline-flex min-h-11 items-center gap-2 bg-white px-5 text-[13px] font-bold text-black transition-opacity hover:opacity-85">Read the story <span aria-hidden="true">→</span></Link>
+            <Link to={heroArticleUrl} className="inline-flex min-h-11 items-center gap-3 rounded-full border border-white/45 bg-black/25 px-5 text-[13px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white hover:text-[#111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Read the story <span aria-hidden="true" className="text-[17px]">→</span></Link>
           </div>
 
-          <div className="flex items-center gap-2 mt-6 text-[12px] flex-wrap">
-            <ArticleAuthorIdentity name={heroStory.author} personPath={heroStory.authorPersonPath}
-
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/85 font-semibold px-3 py-1.5 hover:bg-white/18 hover:text-white transition-all"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {heroStory.author}
-            </ArticleAuthorIdentity>
-            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/65 px-3 py-1.5">
-              {heroStory.date || issueDate}
-            </span>
-            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/65 px-3 py-1.5">
-              {heroStory.readingTime} min read
-            </span>
-          </div>
+          <MagazineHeroMeta
+            author={heroStory.author}
+            authorPersonPath={heroStory.authorPersonPath}
+            date={heroStory.date || issueDate}
+            readingTime={heroStory.readingTime}
+          />
         </div>
 
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 hidden lg:flex flex-col items-center gap-2">

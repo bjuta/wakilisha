@@ -118,13 +118,29 @@ test("Workbook sidebar uses accessible modal focus and replaces the old mobile b
   await expect(sidebar.getByRole("link", { name: "Audio" })).toHaveAttribute("href", "/audio");
   await expect(sidebar.getByRole("link", { name: "Podcasts" })).toHaveAttribute("href", "/shows");
   await expect(sidebar.getByRole("link", { name: "Following" })).toHaveAttribute("href", "/following");
-  await expect(sidebar.getByRole("link", { name: "Messages" })).toHaveAttribute("href", "/messages");
-  await expect(sidebar.getByRole("link", { name: "Notifications" })).toHaveAttribute("href", "/notifications");
+  // Guest discovery may include Following signup, never private inboxes.
+  await expect(sidebar.getByRole("link", { name: "Messages" })).toHaveCount(0);
+  await expect(sidebar.getByRole("link", { name: "Notifications" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await expect(menu).toBeFocused();
 });
 
+
+test("Signed-out visitors cannot open private messaging or notifications", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/magazine", { waitUntil: "domcontentloaded" });
+  const navigation = page.locator(".wk-music-app-shell > aside nav").first();
+  await expect(navigation).toBeVisible({ timeout: 25_000 });
+  await expect(navigation.getByRole("link", { name: "Messages" })).toHaveCount(0);
+  await expect(navigation.getByRole("link", { name: "Notifications" })).toHaveCount(0);
+
+  for (const privatePath of ["/messages", "/notifications"]) {
+    await page.goto(privatePath, { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/auth(?:\?|$)/, { timeout: 25_000 });
+    await expect(page.locator('[data-wk-workbook-screen="messages"], [data-wk-workbook-screen="notifications"]')).toHaveCount(0);
+  }
+});
 
 /**
  * Media landing pages reuse their existing live index services. These

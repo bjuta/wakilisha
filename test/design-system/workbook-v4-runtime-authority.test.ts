@@ -108,7 +108,8 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(desktop).toContain("w-[80px]");
     expect(desktop).toContain("w-[272px]");
     expect(desktop).toContain("md:hidden");
-    expect(desktop).toContain("WAKILISHA_NAVIGATION.map");
+    expect(desktop).toContain("navigation.map");
+    expect(desktop).toContain("visibleWakilishaNavigation");
     const menu = read("src/components/navigation/wakilishaNavigation.ts");
     expect(menu).not.toContain('{ label: "Settings", to: "/settings"');
     expect(read("src/components/mobile/MobileAccountDrawer.tsx")).toContain('to="/settings"');

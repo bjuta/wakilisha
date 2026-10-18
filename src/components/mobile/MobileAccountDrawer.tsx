@@ -5,7 +5,7 @@ import {
 } from "react-router-dom";
 import { Dialog, Modal as AriaModal, ModalOverlay } from "react-aria-components";
 import { WkIcon } from "@/components/design-system/Icon";
-import { WAKILISHA_NAVIGATION, isWakilishaNavCurrent, type WkNavDestination } from "@/components/navigation/wakilishaNavigation";
+import { visibleWakilishaNavigation, isWakilishaNavCurrent, type WkNavDestination } from "@/components/navigation/wakilishaNavigation";
 import {
   useTheme,
 } from "@/components/design-system/theme/ThemeProvider";
@@ -13,6 +13,7 @@ import {
   useAuthUser,
 } from "@/hooks/useAuthUser";
 import { useSessionSignOut } from "@/hooks/useSessionSignOut";
+import { useMessagesAccess } from "@/hooks/useMessagesAccess";
 
 function DrawerNavLink({
   item,
@@ -53,7 +54,12 @@ export function MobileAccountDrawer({
   const authUser = useAuthUser();
   const { theme, toggle } = useTheme();
   const { signOut, signingOut, signOutError } = useSessionSignOut("/auth");
-  const signedIn = Boolean(authUser.id);
+  const signedIn = !authUser.loading && Boolean(authUser.id);
+  const messagesAccess = useMessagesAccess();
+  const navigation = visibleWakilishaNavigation({
+    signedIn,
+    messagesVisible: !messagesAccess.loading && messagesAccess.visible,
+  });
   const displayName = signedIn
     ? authUser.name?.trim()
       || authUser.email?.split("@")[0]
@@ -135,7 +141,7 @@ export function MobileAccountDrawer({
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
             <nav aria-label="WAKILISHA">
-              {WAKILISHA_NAVIGATION.map((group) => (
+              {navigation.map((group) => (
                 <div key={group.label}>
                   <div className="mb-2 mt-5 px-3.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--wk-text-faint)]">
                     {group.label}
