@@ -263,18 +263,17 @@ function NotificationPreferencesSidebar({ userId }: { userId: string | null | un
   }, [userId, prefs, pending]);
 
   return (
-    <aside data-wk-notifications-preferences className="hidden self-start px-6 py-5 lg:block" aria-label="Notification preferences">
+    <aside data-wk-notifications-preferences className="mx-4 mt-4 hidden self-start rounded-[18px] border border-[var(--wk-border)] px-5 py-5 lg:block" aria-label="Notification preferences">
       <h2 className="text-[19px] font-bold leading-[1.2] tracking-[-0.03em] text-[var(--wk-text)]">Tell me about</h2>
-      <p className="mt-2 text-[13px] leading-[1.6] text-[var(--wk-text-muted)]">
-        Choose the updates that matter to you.
-      </p>
+
       {prefs ? (
         <div className="mt-4 divide-y divide-[var(--wk-border)]">
           {([
             ["New releases from artists I follow", "artistDrops"],
+            ["Chart updates", "chartAlerts"],
             ["Replies to my comments", "replyNotifications"],
             ["Mentions", "mentionNotifications"],
-            ["Contribution updates", "contributionNotifications"],
+            ["Credit and MIZIZI updates", "contributionNotifications"],
           ] as const).map(([label, key]) => (
             <div key={key} className="flex min-h-[58px] items-center justify-between gap-2 py-2">
               <span className="text-[13px] leading-[1.4] text-[var(--wk-text)]">{label}</span>
