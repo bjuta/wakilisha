@@ -132,6 +132,7 @@ function CompactRelease({
         <MusicArtwork
           src={release.artworkUrl}
           alt=""
+          fit="contain"
           className="transition-transform duration-500 group-hover:scale-[1.04]"
         />
       </PlayableArtwork>
@@ -185,7 +186,7 @@ function EditorialArtistCard({
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/5" />
       <div className="absolute inset-x-0 bottom-0 p-4">
         {eyebrow ? (
-          <div className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
+          <div className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#B6EB79]">
             {eyebrow}
           </div>
         ) : null}
@@ -224,11 +225,12 @@ function PlaylistFeature({
           playlist.coverAltText ||
           playlist.title
         }
+        fit="contain"
         className="transition-transform duration-700 group-hover:scale-[1.035]"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/5" />
       <div className="absolute inset-x-0 bottom-0 p-4">
-        <div className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
+        <div className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#B6EB79]">
           {playlist.curatorLabel ||
             "WAKILISHA"}
         </div>
@@ -273,6 +275,7 @@ function ChartMiniList({
             <MusicArtwork
               src={entry.artworkUrl}
               alt={entry.trackTitle}
+              fit="contain"
             />
           </div>
           <div className="min-w-0 flex-1">
@@ -770,7 +773,7 @@ export default function MusicDiscoveryPage() {
 
                   <div className="relative grid min-h-[430px] gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(260px,410px)] lg:items-center lg:gap-12 lg:px-10">
                     <div className="max-w-[720px] self-center">
-                      <div className="mb-4 inline-flex items-center rounded bg-[var(--wk-brand)]/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--wk-brand)]">
+                      <div className="mb-4 inline-flex items-center rounded bg-black/50 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-[#B6EB79]">
                         Featured release
                       </div>
 
@@ -787,7 +790,7 @@ export default function MusicDiscoveryPage() {
                         {hero.artist}
                       </Link>
 
-                      <p className="mt-3 max-w-[42ch] text-[13px] font-medium leading-relaxed text-[var(--wk-text-muted)]">
+                      <p className="mt-3 max-w-[42ch] text-[13px] font-medium leading-relaxed text-[var(--wk-text-soft)]">
                         {hero.description ||
                           `${hero.releaseType || "Release"} · ${hero.year || "From the Registry"}`}
                       </p>
@@ -840,13 +843,11 @@ export default function MusicDiscoveryPage() {
                           to={releaseUrl(
                             hero,
                           )}
-                          className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border-strong)] bg-black/20 text-[var(--wk-text-soft)] backdrop-blur transition hover:bg-white/10 hover:text-[var(--wk-text)]"
+                          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/30 bg-black/30 px-4 text-[12px] font-semibold text-white backdrop-blur transition hover:bg-white/15"
                           aria-label="Open release"
                         >
-                          <WkIcon
-                            name="Plus"
-                            size={16}
-                          />
+                          <WkIcon name="ArrowUpRight" size={16} />
+                          Release
                         </Link>
 
                         <button
