@@ -222,7 +222,7 @@ export default function MobileMagazine() {
       </div>
 
       {/* Published Magazine sections, not scroll markers or future categories. */}
-      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[#0b0b0b] backdrop-blur-lg">
+      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-bg)] backdrop-blur-lg">
         <div className="flex items-center gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none]">
           {sectionNames.map((sec) => (
             <button
@@ -231,7 +231,7 @@ export default function MobileMagazine() {
               data-wk-magazine-filter={sec.toLowerCase()}
               aria-pressed={activeSection === sec}
               onClick={() => setActiveSection(sec)}
-              className={`wk-reference-pill ${activeSection === sec ? "bg-[#f5f5f4] text-[#0b0b0b]" : ""}`}
+              className={`wk-reference-pill ${activeSection === sec ? "bg-[var(--wk-text)] text-[var(--wk-bg)]" : ""}`}
             >
               {sec}
             </button>
