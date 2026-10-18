@@ -2559,3 +2559,22 @@
     line-height: 1.25;
   }
 }
+
+[data-wk-magazine-newsletter] :is(section > div, section > div > div) {
+  box-shadow: none;
+}
+[data-wk-magazine-newsletter] > section > div {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 28px 0;
+}
+[data-wk-magazine-newsletter] input[type="email"] {
+  min-height: 48px;
+  font-size: 16px;
+}
+[data-wk-magazine-newsletter] button[type="submit"] {
+  min-height: 48px;
+  background: #202020;
+  color: #fff;
+}
