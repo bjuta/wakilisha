@@ -12,7 +12,7 @@
 - Music: release-first hero with uncropped cover and real Play/Share/Release actions, published releases, ranked chart entries, published genre tiles, usable discovery links. No inert carousel arrows, generic repeated 'go deeper' tiles, or invented genre names.
 - Following: readable one-column feed, user composer and interactions, media framing by type, genuine All / Artists Only filter based on followed artist matching, not fabricated posts.
 - Messages: conversation list left, messages right on desktop; own messages green, incoming grey, live request/spam/archive, sender approval controls, reporting, message/reference rendering and composer. Do not shortcut messaging authority or drop existing functional actions.
-- Notifications: list filters and New/Earlier groupings remain; right-hand desktop preference context ("Tell me about") navigates to the real saved settings page. **Not equivalent to inline saved preference toggles.** Implement those only through a reviewed, field-scoped persistence path, not a simulated or profile-wide save.
+- Notifications: list filters and New/Earlier groupings remain; the right-hand desktop "Tell me about" panel exposes real artist-drop, reply, mention and contribution toggles through the existing scoped preference RPCs. It also links to full settings. Live-party and separate credit-specific alert toggles are **not** claimed without backend support. No profile-wide save.
 - Every data-empty or auth-absent CI screenshot represents only route chrome, not article/image fidelity or authenticated workflow acceptance.
 
 ## Source changes
@@ -21,7 +21,7 @@
 | Magazine desktop/mobile | 3:2 image frames, rounded editorial photography, readable headline/excerpt, category ink, complete mobile article catalogue, one plain final newsletter form |
 | Article desktop/mobile | Real 3:2 and 4:5 hero frames, 19px desktop editorial body, flat inline images, related 3:2 imagery and one final CTA |
 | Music | Night surface, contained 1:1 featured cover, real releases, charts and genres, source-backed navigation, no inert arrival arrows |
-| Notifications | Content list with filters and grouped timeline, right preference information pane linking to actual settings |
+| Notifications | Content list, grouped timeline and real desktop preference toggles for supported settings; full settings link |
 | Messages | Larger correspondence type and clear message colour hierarchy, all existing folder/action and security behavior kept |
 | Following | Native image geometry, quieter labels, functional followed-artist view and existing social interactions |
 
