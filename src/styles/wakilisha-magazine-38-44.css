@@ -2531,12 +2531,8 @@
 }
 [data-wk-workbook-screen="magazine"],
 [data-wk-workbook-screen="magazine-mobile"] {
-  --wk-bg: #fcfcfb;
-  --wk-surface: #fcfcfb;
-  --wk-surface-raised: #f1eee8;
-  --wk-text: #202020;
-  --wk-text-soft: #464646;
-  --wk-text-muted: #5a5a5a;
+  background: var(--wk-bg);
+  color: var(--wk-text);
 }
 [data-wk-magazine-newsletter] {
   max-width: 780px;
@@ -2575,6 +2571,6 @@
 }
 [data-wk-magazine-newsletter] button[type="submit"] {
   min-height: 48px;
-  background: #202020;
-  color: #fff;
+  background: var(--wk-text);
+  color: var(--wk-bg);
 }
