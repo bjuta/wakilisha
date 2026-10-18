@@ -100,11 +100,11 @@ function MusicArtwork({
       {!recorded && (
         <div
           data-wk-music-artwork-fallback
-          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[var(--wk-surface-raised)] p-3 text-center"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#1B1B1B] p-3 text-center"
         >
-          <WkIcon name="Music" size={23} className="text-[var(--wk-text-faint)]" />
+          <WkIcon name="Music" size={23} className="text-white/65" />
           {alt ? (
-            <span className="line-clamp-2 max-w-full break-words text-[11px] font-semibold leading-tight text-[var(--wk-text-muted)]">
+            <span className="line-clamp-2 max-w-full break-words text-[11px] font-semibold leading-tight text-white/80">
               {alt}
             </span>
           ) : null}
