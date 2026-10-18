@@ -414,7 +414,6 @@ export default function ArticlePage() {
 
       <div className="wk-workbook-article-paper relative z-10">
         <ArticleFloatHeader article={article} />
-        <div className="max-w-[740px] mx-auto px-6 lg:px-8"><div className="h-px bg-[var(--wk-border)] mb-10" /></div>
         <article className="max-w-[740px] mx-auto px-6 lg:px-8 pb-12">
           <ArticleContentRenderer segments={displaySegments} videos={videoEmbeds} releases={finalReleases} artists={artistEmbeds} tracks={trackEmbeds} articleSlug={article.slug} />
         </article>
@@ -443,7 +442,7 @@ export default function ArticlePage() {
       </div>
 
       <ArticleRelated stories={related.filter((item) => item.slug !== article.slug)} loading={relatedLoading} />
-      <section className="bg-[var(--wk-surface)] border-t border-[var(--wk-border)] py-16 px-6 text-center"><div className="max-w-[480px] mx-auto"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)] mb-3">WAKILISHA Magazine</p><h3 className="text-[24px] lg:text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)] mb-6 leading-snug">Stories that move African creative life forward.</h3><Link to="/magazine" className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] px-7 py-3.5 text-[14px] font-black transition-all hover:-translate-y-0.5 whitespace-nowrap">Back to Magazine<WkIcon name="ArrowRight" size={16} /></Link></div></section>
+
     </main>
   );
 }
