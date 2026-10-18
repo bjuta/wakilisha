@@ -1,3 +1,4 @@
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { WkEditorialIntro } from "@/components/design-system/layout/WorkbookEditorial";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
