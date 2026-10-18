@@ -942,9 +942,9 @@ function FollowingActivity({
       data-following-subjects={subjects
         .map((subject) => subject.key)
         .join(" ")}
-      className="scroll-mt-24 border-b border-[var(--wk-divider)] py-7 first:pt-0 md:py-11"
+      className="scroll-mt-24 border-b border-[var(--wk-divider)] py-6 first:pt-0 md:py-7"
     >
-      <div className="px-4 md:px-0">
+      <div data-following-header className="px-4 md:px-0">
         <div className="flex items-center gap-3">
           {primarySubject.canonicalPath === "#" ? (
             <ActivitySubjectAvatar
@@ -1005,13 +1005,14 @@ function FollowingActivity({
         <Link
           to={item.canonicalPath}
           aria-label={item.title}
-          className="group mt-4 block overflow-hidden md:mt-5"
+          data-following-media
+          className="group mt-3 block min-w-0 overflow-hidden md:mt-4"
         >
           <ActivityMedia item={item} />
         </Link>
       )}
 
-      <div className="px-4 pt-4 md:px-0 md:pt-5">
+      <div data-following-body className="min-w-0 px-4 pt-3 md:px-0 md:pt-4">
         {(
           item.itemType === "artist_update" ||
           item.itemType === "post"
@@ -1023,10 +1024,10 @@ function FollowingActivity({
                 mentions={post.mentions}
                 canonicalPath={post.canonicalPath}
                 openLabel={`Open Post from ${post.actor.name}`}
-                className="max-w-[680px] whitespace-pre-wrap text-[18px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[21px]"
+                className="max-w-[680px] whitespace-pre-wrap text-[16px] font-medium leading-[1.6] tracking-[-0.01em] text-[var(--wk-text)] md:text-[17px]"
               />
             ) : item.summary ? (
-              <p className="max-w-[680px] whitespace-pre-wrap text-[18px] font-semibold leading-[1.55] tracking-[-0.015em] text-[var(--wk-text)] md:text-[21px]">
+              <p className="max-w-[680px] whitespace-pre-wrap text-[16px] font-medium leading-[1.6] tracking-[-0.01em] text-[var(--wk-text)] md:text-[17px]">
                 {item.summary}
               </p>
             ) : null}
@@ -1071,7 +1072,7 @@ function FollowingActivity({
           </>
         ) : (
           <>
-            <h2 className="text-[22px] font-black leading-[1.02] tracking-[-0.035em] text-[var(--wk-text)] md:text-[30px]">
+            <h2 className="text-[20px] font-bold leading-[1.24] tracking-[-0.025em] text-[var(--wk-text)] md:text-[23px]">
               <Link
                 to={item.canonicalPath}
                 className="transition-colors hover:text-[var(--wk-brand)]"
@@ -1197,7 +1198,7 @@ function FollowingActivity({
         ) : (
           <div
             data-following-actions
-            className="mt-3 flex items-center gap-1 border-t border-[var(--wk-divider)] pt-2 md:mt-4"
+            className="mt-4 flex items-center justify-between gap-1 border-t border-[var(--wk-divider)] pt-2 md:mt-5"
           >
             <ActivityAction
               icon={
