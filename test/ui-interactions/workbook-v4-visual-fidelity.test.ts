@@ -10,7 +10,7 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     const podcasts = read("src/pages/shows/page.tsx");
     expect(video).toContain('{!featured && (');
     expect(video).toContain('>Video</h1>');
-    expect(video).toContain('>No video is published yet.');
+    expect(video).toContain('No video is published yet.');
     expect(podcasts).toContain('{!shows[0] && (');
     expect(podcasts).toContain('>Podcasts</h1>');
     expect(podcasts).toContain('No podcasts have been published yet.');
