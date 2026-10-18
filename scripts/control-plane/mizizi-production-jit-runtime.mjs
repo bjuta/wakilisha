@@ -375,11 +375,19 @@ export async function openMiziziJitSession({
   projectRef,
   managementProjectRef = projectRef,
   token,
+  branchOnly = false,
 }) {
   if (!projectRef || !managementProjectRef || !token) {
     throw new Error(
       "projectRef, managementProjectRef and Supabase access token are required",
     );
+  }
+
+  if (branchOnly && (
+    projectRef !== "nkgfoppunmnkcumalxqp" ||
+    managementProjectRef !== "pgzizndxdyhqmtyywjmt"
+  )) {
+    throw new Error("MIZIZI_JIT_BRANCH_ONLY_EXACT_PREVIEW_PARENT_REQUIRED");
   }
 
   linkSupabaseProject(projectRef);
@@ -398,6 +406,19 @@ export async function openMiziziJitSession({
     throw new Error(
       "current MIZIZI programme requires exact Stage C mizizi_executor authority",
     );
+  }
+
+  if (branchOnly) {
+    // Never authorize a Preview runner on the basis of Production's
+    // otherwise-matching Stage C binding alone.
+    const branchAuthority = await queryViaManagementReadOnly({
+      projectRef, token, sql: stageCAuthoritySql,
+    });
+    if (!branchAuthority.stage_c_applied ||
+        !branchAuthority.executor_active ||
+        !branchAuthority.postgres_disabled) {
+      throw new Error("MIZIZI_JIT_PREVIEW_EXECUTOR_AUTHORITY_DRIFT");
+    }
   }
 
   console.log(
@@ -436,6 +457,17 @@ export async function openMiziziJitSession({
     ),
   );
 
+  if (branchOnly) {
+    if (!Array.isArray(list)) throw new Error("MIZIZI_BRANCH_JIT_INVENTORY_UNVERIFIED");
+    const active = list.flatMap(item =>
+      Array.isArray(item.user_roles) ? item.user_roles : []
+    ).filter(role => !role.expires_at || Number(role.expires_at) > Date.now());
+    if (active.length !== 0) {
+      throw new Error("MIZIZI_BRANCH_JIT_PARENT_HAS_ACTIVE_MAPPINGS");
+    }
+    console.log("MIZIZI_BRANCH_ONLY_JIT_NO_ACTIVE_BASE_ROLES=PASS");
+  }
+
   const existing =
     list.find(
       (item) =>
@@ -455,6 +487,7 @@ export async function openMiziziJitSession({
       roles.map((entry) => ({
         role: entry?.role,
         expires_at: entry?.expires_at ?? null,
+        branches_only: entry?.branches_only ?? false,
       })).sort((a, b) => String(a.role).localeCompare(String(b.role))),
     );
     if ((selfRoles.length > 0 && !existing) ||
@@ -556,7 +589,8 @@ export async function openMiziziJitSession({
     );
     roles.push({
       role: "mizizi_executor",
-      expires_at: Date.now() + 60 * 60 * 1000,
+      expires_at: Date.now() + (branchOnly ? 15 : 60) * 60 * 1000,
+      ...(branchOnly ? { branches_only: true } : {}),
     });
 
     // The LIVE management endpoint validates a `roles` array for PUT.
@@ -570,6 +604,19 @@ export async function openMiziziJitSession({
       { user_id: userId, roles },
     );
     mappingChanged = true;
+
+    if (branchOnly) {
+      const confirmed = await managementApi(token,"GET",
+        "/v1/projects/" + managementProjectRef + "/database/jit");
+      const granted = Array.isArray(confirmed?.user_roles) &&
+        confirmed.user_roles.some(role =>
+          role.role === "mizizi_executor" &&
+          role.branches_only === true &&
+          Number(role.expires_at) > Date.now()
+        );
+      if (!granted) throw new Error("MIZIZI_BRANCH_JIT_SCOPE_NOT_CONFIRMED");
+      console.log("MIZIZI_BRANCH_ONLY_JIT_EXACT_MAPPING=PASS");
+    }
 
     const url = databaseUrl(
       projectRef,

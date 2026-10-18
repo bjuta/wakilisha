@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/mizizi-slice1-disposable-postgres.yml"
       - "scripts/acceptance/mizizi-slice1-worker-disposable-ci.sql"
+      - "scripts/acceptance/mizizi-adaptive-pass-disposable-ci.sql"
       - "scripts/acceptance/mizizi-slice1-32-source-corpus-disposable-ci.sql"
       - "scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh"
       - "scripts/acceptance/mizizi-slice1-worker-parallel-setup-ci.sql"
@@ -57,6 +58,19 @@ jobs:
         with:
           version: 2.107.0
 
+      - name: Preserve original 231-migration Slice 1 test baseline
+        shell: bash
+        run: |
+          test -f supabase/migrations/20261016064245_mizizi_research_pass_memory_v1.sql
+          mv supabase/migrations/20261016064245_mizizi_research_pass_memory_v1.sql "$RUNNER_TEMP/wk-mizizi-db04.sql"
+          test ! -e supabase/migrations/20261016064245_mizizi_research_pass_memory_v1.sql
+          test -f supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
+          mv supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql "$RUNNER_TEMP/wk-mizizi-db05.sql"
+          test ! -e supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
+          test -f supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+          mv supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql "$RUNNER_TEMP/wk-mizizi-db06.sql"
+          test ! -e supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+
       - name: Start disposable local database and replay migrations
         shell: bash
         run: |
@@ -82,6 +96,21 @@ jobs:
       - name: Execute actual concurrent W31 claim on independent database sessions
         shell: bash
         run: bash scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh
+
+      - name: Apply DB04, DB05 and research retry DB06 after sealed Slice 1 acceptance
+        shell: bash
+        run: |
+          test -f "$RUNNER_TEMP/wk-mizizi-db04.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-db04.sql" supabase/migrations/20261016064245_mizizi_research_pass_memory_v1.sql
+          test -f "$RUNNER_TEMP/wk-mizizi-db05.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-db05.sql" supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
+          test -f "$RUNNER_TEMP/wk-mizizi-db06.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-db06.sql" supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+          supabase migration up --local
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/acceptance/mizizi-adaptive-pass-disposable-ci.sql
 
       - name: Destroy disposable PostgreSQL containers and all local data volumes
         if: always()
@@ -129,9 +158,30 @@ jobs:
         shell: bash
         run: npm ci --ignore-scripts --no-audit --no-fund
 
+      - name: Verify research evidence-disclosure and repeat-source safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${SUPABASE_ACCESS_TOKEN:-}"
+          npx vitest run test/registry/mizizi-research-worker-cycle.test.ts
+          echo MIZIZI_RESEARCH_HUMAN_ONLY_AND_LOOP_CONTRACT=PASS
+
       - name: Install local headless Chromium browser for genuine operator UI
         shell: bash
         run: npx playwright install --with-deps chromium
+
+      - name: Preserve original 231-migration Slice 1 test baseline
+        shell: bash
+        run: |
+          test -f supabase/migrations/20261016064245_mizizi_research_pass_memory_v1.sql
+          mv supabase/migrations/20261016064245_mizizi_research_pass_memory_v1.sql "$RUNNER_TEMP/wk-mizizi-db04.sql"
+          test ! -e supabase/migrations/20261016064245_mizizi_research_pass_memory_v1.sql
+          test -f supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
+          mv supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql "$RUNNER_TEMP/wk-mizizi-db05.sql"
+          test ! -e supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
+          test -f supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+          mv supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql "$RUNNER_TEMP/wk-mizizi-db06.sql"
+          test ! -e supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
 
       - name: Start disposable local database, Auth and REST gateway
         shell: bash

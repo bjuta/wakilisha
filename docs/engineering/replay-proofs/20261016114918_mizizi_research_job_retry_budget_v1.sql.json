@@ -1,0 +1,21 @@
+{
+  "migration_file": "supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql",
+  "migration_sha256": "64020709e3099dedc6dcae3f917b095bc4516243c3770fb0202d3758cd647c1a",
+  "base_main_sha": "aed0323cb3baa34313dede0d5d08b8af35c4f7a7",
+  "preview_project_ref": "nkgfoppunmnkcumalxqp",
+  "preview_branch_id": "8c0affc1-b43b-44ac-b2eb-66715ed40252",
+  "preview_migration_head": "20261016114918",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-mizizi-db06-research-budget-v1.sql",
+  "schema_types_sha256": "639f0e9f3c80ac20d0927fa8bff601dcf39c91f9fc48c975abf9725bf48f226a",
+  "schema_migration_count": 234,
+  "schema_migration_head": "20261016114918",
+  "verified_at": "2026-10-16T15:02:08.188Z",
+  "disposable_baseline_evidence": "https://github.com/bjuta/wakilisha/actions/runs/38917002877",
+  "native_preview_cli_evidence": "https://github.com/bjuta/wakilisha/actions/runs/38900316580",
+  "production_promotion": "not_run",
+  "independent_preview_verifier_evidence": "Exact read-only scripts/control-plane/verify-mizizi-db06-research-budget-v1.sql executed independently through the isolated Preview database on 2026-10-16T15:02:08.188Z and returned MIZIZI_DB06_PREVIEW_BUDGET_AND_AUTHORITY=PASS. Preview had 234 migration rows, exact head, sealed private pass RLS, research admission 25 and unrelated default 5.",
+  "note": "The original case/job was preserved after native Preview DB06 (original job succeeded 5/25, two immutable passes, no Registry Tracks). Its earlier guarded 5-to-25 attempt repair is NOT clean-room fixture parity. The separate disposable PostgreSQL workflow starts from the original 231-migration baseline, then applies DB04 through DB06. Production unchanged. This evidence does not grant human-source consent or validate model learning."
+}
