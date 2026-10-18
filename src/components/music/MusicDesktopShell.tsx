@@ -1,6 +1,6 @@
 import { MobileAccountDrawer } from "@/components/mobile/MobileAccountDrawer";
 import { WakilishaAccountMark } from "@/components/brand/WakilishaAccountMark";
-import { WAKILISHA_NAVIGATION, isWakilishaNavCurrent } from "@/components/navigation/wakilishaNavigation";
+import { visibleWakilishaNavigation, isWakilishaNavCurrent } from "@/components/navigation/wakilishaNavigation";
 import {
   useEffect,
   useMemo,
@@ -28,6 +28,7 @@ import type {
 } from "@/services/adminSettings/settingsTypes";
 import { GlobalSearchSurface } from "@/components/search/GlobalSearchSurface";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { useMessagesAccess } from "@/hooks/useMessagesAccess";
 import { useSessionSignOut } from "@/hooks/useSessionSignOut";
 
 const MUSIC_APP_PREFIXES = [
@@ -186,6 +187,11 @@ export function MusicDesktopShell({
   } = useTheme();
   const authUser = useAuthUser();
   const isSignedIn = !authUser.loading && authUser.id.length > 0;
+  const messagesAccess = useMessagesAccess();
+  const navigation = visibleWakilishaNavigation({
+    signedIn: isSignedIn,
+    messagesVisible: !messagesAccess.loading && messagesAccess.visible,
+  });
   const { signOut, signingOut, signOutError } = useSessionSignOut("/auth");
   const [logoError, setLogoError] =
     useState(false);
@@ -484,7 +490,7 @@ export function MusicDesktopShell({
             {!compactSidebar ? <span>Search</span> : null}
           </button>
 
-          {WAKILISHA_NAVIGATION.map((group) => (
+          {navigation.map((group) => (
             <div key={group.label}>
               {!compactSidebar && (
                 <p className="mb-1 mt-5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
