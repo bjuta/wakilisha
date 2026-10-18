@@ -35,6 +35,12 @@ describe("Workbook v4 is the only active product design authority", () => {
     ]) expect(read(path)).not.toContain("picsum.photos");
     expect(read("src/pages/admin/design-system/components/RichSpecimenBoards.ts"))
       .toContain("/assets/logos/wakilisha-logo-dark.svg");
+    const charts = read("src/styles/wakilisha-charts-39.css");
+    expect(charts).toContain("background:var(--wk-success-soft)");
+    expect(charts).toContain("background:var(--wk-warning-soft)");
+    expect(charts).not.toMatch(/#(?:ecfdf5|fffbeb|065f46|92400e|059669|d97706)/i);
+    expect(read("src/styles/wakilisha-embeds.css")).not.toMatch(/var\(--wk-(?:accent|secondary)-500,/);
+
   });
   it("maintains at least 44px interactive targets in the shared Workbook controls", () => {
     const field=read("src/components/design-system/primitives/Field.tsx");

@@ -77,7 +77,7 @@
   margin: 40px 0;
   border-radius: var(--wk-r-4);
   overflow: hidden;
-  background: var(--wk-surface-raised, #0d0d0d);
+  background: var(--wk-surface-raised);
 }
 
 /* 16:9 aspect-ratio container for video embeds */
@@ -164,13 +164,13 @@
 }
 
 .wk-entity-link--artist .wk-entity-link__badge {
-  background: color-mix(in srgb, var(--wk-accent-500, #d97706) 14%, transparent);
-  color: var(--wk-accent-500, #d97706);
+  background: color-mix(in srgb, var(--wk-warning) 14%, transparent);
+  color: var(--wk-warning);
 }
 
 .wk-entity-link--release .wk-entity-link__badge {
-  background: color-mix(in srgb, var(--wk-secondary-500, #059669) 14%, transparent);
-  color: var(--wk-secondary-500, #059669);
+  background: color-mix(in srgb, var(--wk-success) 14%, transparent);
+  color: var(--wk-success);
 }
 
 .wk-entity-link--genre .wk-entity-link__badge {

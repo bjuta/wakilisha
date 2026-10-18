@@ -102,8 +102,8 @@
 
 /* Badge */
 .chart-mover-card-badge{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;padding:7px 16px;margin:20px 20px 0;border-radius:999px;font:800 10px/1 var(--wk-font-ui);letter-spacing:.14em;text-transform:uppercase}
-.chart-mover-card-badge--up{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
-.chart-mover-card-badge--down{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+.chart-mover-card-badge--up{background:var(--wk-success-soft);color:var(--wk-success);border:1px solid var(--wk-border-2)}
+.chart-mover-card-badge--down{background:var(--wk-warning-soft);color:var(--wk-warning);border:1px solid var(--wk-border-2)}
 .chart-mover-card-badge--neutral{background:var(--wk-bg);color:var(--wk-text-muted);border:1px solid var(--wk-border)}
 
 /* Body */
@@ -114,7 +114,7 @@
 .chart-mover-card-art img{width:100%;height:100%;object-fit:cover}
 .chart-mover-card-rank-pip{position:absolute;bottom:8px;right:8px;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:900 13px/1 var(--wk-font-display);backdrop-filter:blur(6px)}
 .chart-mover-card-rank-pip--up{background:rgba(6,95,70,.85);color:#d1fae5}
-.chart-mover-card-rank-pip--down{background:rgba(146,64,14,.85);color:#fef3c7}
+.chart-mover-card-rank-pip--down{background:var(--wk-warning-soft);color:var(--wk-warning)}
 
 /* Info */
 .chart-mover-card-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
@@ -124,8 +124,8 @@
 /* Delta */
 .chart-mover-card-delta{display:flex;align-items:baseline;gap:10px;margin-top:4px}
 .chart-mover-card-delta-val{font:900 36px/.8 var(--wk-font-display);letter-spacing:-.05em}
-.chart-mover-card-delta-val--up{color:#059669}
-.chart-mover-card-delta-val--down{color:#d97706}
+.chart-mover-card-delta-val--up{color:var(--wk-success)}
+.chart-mover-card-delta-val--down{color:var(--wk-warning)}
 .chart-mover-card-delta-range{font:500 12px/1.3 var(--wk-font-ui);color:var(--wk-text-faint)}
 
 /* Story */

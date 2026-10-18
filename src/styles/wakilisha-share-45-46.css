@@ -2,8 +2,7 @@
 
 /* ═══════════════════════════════════════════════════════════════
    BACKDROP + SHEET SHELL
-   z-index must exceed all app chrome (nav: 80, miniplayer: 82,
-   full-player: 90, more-menu: 61). Use 300 to stay well above.
+   z-index is assigned above the shared player and navigation chrome ( more-menu: 61). Use 300 to stay well above.
    ═══════════════════════════════════════════════════════════════ */
 
 .share-sheet-backdrop {
