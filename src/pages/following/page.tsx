@@ -995,6 +995,24 @@ function FollowingActivity({
         </div>
       </div>
 
+      {(item.itemType === "artist_update" || item.itemType === "post") && (post?.body || item.summary) ? (
+        <div data-following-caption className="min-w-0 px-4 pt-3 md:px-0 md:pt-4">
+          {item.itemType === "post" && post?.body ? (
+            <PostBody
+              body={post.body}
+              mentions={post.mentions}
+              canonicalPath={post.canonicalPath}
+              openLabel={`Open Post from ${post.actor.name}`}
+              className="max-w-[680px] whitespace-pre-wrap text-[16px] font-medium leading-[1.6] tracking-[-0.01em] text-[var(--wk-text)] md:text-[17px]"
+            />
+          ) : item.summary ? (
+            <p className="max-w-[680px] whitespace-pre-wrap text-[16px] font-medium leading-[1.6] tracking-[-0.01em] text-[var(--wk-text)] md:text-[17px]">
+              {item.summary}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {(
         (
           item.itemType !== "artist_update" &&
@@ -1018,20 +1036,6 @@ function FollowingActivity({
           item.itemType === "post"
         ) ? (
           <>
-            {item.itemType === "post" && post?.body ? (
-              <PostBody
-                body={post.body}
-                mentions={post.mentions}
-                canonicalPath={post.canonicalPath}
-                openLabel={`Open Post from ${post.actor.name}`}
-                className="max-w-[680px] whitespace-pre-wrap text-[16px] font-medium leading-[1.6] tracking-[-0.01em] text-[var(--wk-text)] md:text-[17px]"
-              />
-            ) : item.summary ? (
-              <p className="max-w-[680px] whitespace-pre-wrap text-[16px] font-medium leading-[1.6] tracking-[-0.01em] text-[var(--wk-text)] md:text-[17px]">
-                {item.summary}
-              </p>
-            ) : null}
-
             {post?.track ? (
               <PostTrackAttachment
                 track={post.track}
