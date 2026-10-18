@@ -116,7 +116,7 @@
   outline-offset: 2px;
 }
 
-[data-wk-workbook-screen="notifications"] [aria-label="Notification categories"] {
+[data-wk-workbook-screen="notifications"] [aria-label="Notification preferences"] {
   padding-top: 20px;
 }
 
