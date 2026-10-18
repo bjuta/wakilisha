@@ -112,7 +112,7 @@ function CompactRelease({
   busy: boolean;
 }) {
   return (
-    <article className="group flex min-w-[260px] flex-1 overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] transition hover:bg-[var(--wk-surface-strong)]">
+    <article className="group flex min-w-[272px] flex-1 overflow-hidden rounded-[16px] border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-colors hover:bg-[var(--wk-surface-raised)]">
       <PlayableArtwork
         label={release.title}
         onPlay={(event) => {
@@ -121,7 +121,7 @@ function CompactRelease({
         }}
         isPlaying={active}
         pending={busy}
-        className="h-[88px] w-[88px]"
+        className="aspect-square w-[100px] shrink-0"
         iconClassName="h-9 w-9 text-[15px]"
       >
         <MusicArtwork
@@ -135,17 +135,17 @@ function CompactRelease({
         <div className="min-w-0 flex-1">
           <Link
             to={releaseUrl(release)}
-            className="block truncate text-[12px] font-black text-[var(--wk-text)] transition hover:text-[var(--wk-brand)]"
+            className="block line-clamp-2 text-[15px] font-bold leading-tight text-[var(--wk-text)] transition hover:text-[var(--wk-brand)]"
           >
             {release.title}
           </Link>
           <Link
             to={`/artists/${slugify(release.artist)}`}
-            className="mt-1 block truncate text-[10px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-text)]"
+            className="mt-1 block truncate text-[13px] font-medium text-[var(--wk-text-soft)] hover:text-[var(--wk-text)]"
           >
             {release.artist}
           </Link>
-          <p className="mt-1.5 truncate text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--wk-text-muted)]">
+          <p className="mt-1.5 truncate text-[12px] font-medium text-[var(--wk-text-muted)]">
             {release.releaseType || "Release"}
             {release.trackCount > 1
               ? ` · ${release.trackCount} tracks`
@@ -814,7 +814,7 @@ export default function MusicDiscoveryPage() {
         }
       `}</style>
       <main>
-            <section className="wk-music-hero relative min-h-[430px] overflow-hidden border-b border-[var(--wk-border)] bg-[#0a0a0a]">
+            <section className="wk-music-hero relative min-h-[430px] overflow-hidden rounded-[24px] bg-[#0a0a0a]">
               {hero ? (
                 <>
                   <div className="absolute inset-0">
@@ -929,7 +929,7 @@ export default function MusicDiscoveryPage() {
                     <Link
                       to={releaseUrl(hero)}
                       aria-label={`Open ${hero.title}`}
-                      className="order-first mx-auto block aspect-square w-full max-w-[410px] overflow-hidden bg-black/50 shadow-2xl lg:order-last"
+                      className="order-first mx-auto block aspect-square w-full max-w-[410px] overflow-hidden rounded-[16px] bg-black/50 lg:order-last"
                     >
                       <MusicArtwork
                         src={hero.artworkUrl}
@@ -967,28 +967,7 @@ export default function MusicDiscoveryPage() {
                   </Link>
                 </div>
 
-                <div className="hidden gap-2 sm:flex">
-                  <button
-                    type="button"
-                    aria-label="Previous arrivals"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
-                  >
-                    <WkIcon
-                      name="ChevronLeft"
-                      size={14}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Next arrivals"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
-                  >
-                    <WkIcon
-                      name="ChevronRight"
-                      size={14}
-                    />
-                  </button>
-                </div>
+
               </div>
 
               <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1035,7 +1014,7 @@ export default function MusicDiscoveryPage() {
                     </div>
                     <EditorialArtistCard
                       artist={risingArtist}
-                      footer="Next up. Watch this space."
+                      
                     />
                   </div>
                 ) : null}
