@@ -37,7 +37,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     title: 'Color',
     group: 'Foundations',
     purpose: 'Dark/light surface system, text hierarchy, status colors and vertical accents.',
-    primaryClasses: ['swatch-row', 'swatch-block', 'swatch-token', 'swatch-hex', 'swatch-use'],
+    primaryClasses: ['wk-swatch-row', 'wk-swatch-block', 'wk-swatch-token', 'wk-swatch-hex', 'wk-swatch-use'],
     productRoutes: ['all routes'],
     implementationNotes: [
       'Use CSS variables only; do not introduce random hex values in product components.',
@@ -76,7 +76,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     title: 'Buttons & Actions',
     group: 'Product',
     purpose: 'Primary, ghost, soft, danger and size variants for actions.',
-    primaryClasses: ['btn', 'btn-sm', 'btn-md', 'btn-lg', 'btn-primary', 'btn-ghost', 'btn-soft', 'btn-danger'],
+    primaryClasses: ['wk-button', 'wk-button-sm', 'wk-button-lg', 'wk-button-primary', 'wk-button-ghost', 'wk-button-soft', 'wk-button-danger'],
     productRoutes: ['all routes'],
     implementationNotes: ['CTA copy must be specific; no generic engagement-bait language.']
   },
@@ -85,7 +85,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     title: 'Tags & Badges',
     group: 'Product',
     purpose: 'Metadata tags, status tags and movement indicators.',
-    primaryClasses: ['tag', 'tag-brand', 'tag-success', 'tag-warn', 'tag-up', 'tag-dn'],
+    primaryClasses: ['wk-tag', 'wk-tag-brand', 'wk-tag-success', 'wk-tag-warn'],
     productRoutes: ['/charts', '/artists', '/genres', '/labels', '/magazine', '/admin'],
     implementationNotes: ['Use tags for scannable metadata, not decorative stickers.']
   },
@@ -115,7 +115,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     title: 'States',
     group: 'Product',
     purpose: 'Empty, loading, error and skeleton states.',
-    primaryClasses: ['loading-skeleton', 'shimmer', 'wk-callout', 'cal', 'cal.warn', 'cal.bad', 'cal.info'],
+    primaryClasses: ['loading-skeleton', 'shimmer', 'wk-callout', 'wk-callout.warn', 'wk-callout.bad', 'wk-callout.info'],
     productRoutes: ['all data routes'],
     implementationNotes: ['Do not show fake data to avoid empty states; explain what is missing and what can happen next.']
   },

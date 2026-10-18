@@ -25,6 +25,7 @@ export function WkButton({
 
   return (
     <button
+      data-wk-button
       type={type}
       onClick={onClick}
       disabled={disabled}
