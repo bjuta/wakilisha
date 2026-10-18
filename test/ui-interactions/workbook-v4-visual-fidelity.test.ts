@@ -184,16 +184,25 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(css).toContain('color: var(--wk-text)');
     expect(css).toContain('@media (max-width: 639px)');
 
+    expect(following).toContain('lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)]');
+    expect(notifications).toContain('lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)]');
     expect(following).toContain('["all", "Following"]');
     expect(following).toContain('["artists", "Artists only"]');
     expect(following).toContain('ActivityAnchorAvatar subject={person}');
     expect(composer).toContain('What are you listening to?');
     expect(composer).toContain('compactFollowing?: boolean;');
+    expect(composer).toContain('data-wk-following-mobile-compose');
     expect(messages).toContain('minmax(280px,34%)_minmax(0,1fr)');
     expect(messages).toContain('selectedId ? "flex" : "hidden lg:flex"');
+    expect(messages).toContain('data-wk-thread-selected={selectedId ? "true" : "false"}');
+    expect(read("src/components/design-system/music/PlayerDock.tsx")).toContain("data-wk-player-dock");
+    expect(css).toContain('body:has([data-wk-workbook-screen="messages"]');
     expect(messages).toContain('aria-label="Conversation actions"');
     expect(notifications).toContain('data-wk-notification-type={notification.notificationType}');
     expect(notifications).toContain('wk-notification-event-icon');
+    expect(notifications).toContain('new_release: "ri-disc-3-line"');
+    expect(notifications).toContain('post_like: "ri-heart-line"');
+    expect(notifications).toContain('reply: "ri-chat-3-line"');
     expect(notifications).toContain('notification.actor?.avatarUrl');
   });
 
