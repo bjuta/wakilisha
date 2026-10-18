@@ -53,7 +53,7 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     }
   });
 
-  it("sets Music to genuine night mode without decorative playback buttons", () => {
+  it("keeps Music workbook hierarchy theme-aware without decorative playback buttons", () => {
     const music = read("src/pages/music/page.tsx");
     const css = read("src/styles/wakilisha-workbook-surface-fidelity.css");
     expect(music).toContain('data-wk-workbook-screen="music"');
@@ -68,9 +68,13 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(music).toContain('handlePlayRelease(');
     expect(music).not.toContain('aria-label="Previous arrivals"');
     expect(music).not.toContain('aria-label="Next arrivals"');
-    expect(css).toContain('--wk-bg: #0b0b0b');
+    expect(css).toContain('background-color: var(--wk-bg)');
     expect(css).toContain('border-radius: 24px');
-    expect(css).toContain('--wk-brand: #85c441');
+    expect(css).toContain('color: var(--wk-text)');
+    expect(css).not.toMatch(/--wk-bg\\s*:/);
+    const theme = read("src/design-system/wakilisha.tokens.css");
+    expect(theme).toContain("[data-wk-theme='dark']");
+    expect(theme).toContain("[data-wk-theme='light']");
   });
 
   it("preserves readable inboxes, active actions and a real desktop notification settings panel", () => {
