@@ -38,6 +38,15 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(mobile).toContain('useMagazineArticles(24)');
     expect(card).toContain('data-wk-magazine-feature="true"');
     expect(card).not.toContain('line-clamp-3 text-[clamp(20px,2.6vw,30px)]');
+    const byline = read("src/pages/magazine/components/MagazineHeroMeta.tsx");
+    for (const page of [desktop, mobile]) {
+      expect(page).toContain("<MagazineHeroMeta");
+      expect(page).toContain("rounded-full border border-white/45 bg-black/25");
+      expect(page).not.toContain("bg-white px-5 text-[13px] font-bold text-black");
+    }
+    expect(byline).toContain('data-wk-magazine-hero-byline');
+    expect(byline).toContain('new Intl.DateTimeFormat("en-KE"');
+    expect(byline).not.toContain("bg-white/10 backdrop-blur-md");
     expect(mobile).toContain('useMagazineArticles(24)');
     expect(mobile).not.toContain('useMagazineArticles(500)');
   });
@@ -148,6 +157,12 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(notifications).toContain('data-wk-notification-row');
     expect(messages).toContain('data-wk-message-conversation');
     expect(messages).toContain('data-wk-message-bubble');
+    const safety = read("src/pages/messages/MessageSafetyState.tsx");
+    expect(safety).toContain('effective.length === 0');
+    expect(safety).toContain('state.can_send');
+    expect(safety).toContain('state.can_start');
+    expect(safety).toContain("Previous Messages safety activity");
+    expect(safety).toContain("Close Safety History");
     expect(messages).toContain('listMessageConversations(nextFolder)');
     expect(messages).toContain('sendMessage(selectedId, composer.trim())');
     expect(messages).toContain('bg-[var(--wk-brand)] text-[var(--wk-brand-on)]');
