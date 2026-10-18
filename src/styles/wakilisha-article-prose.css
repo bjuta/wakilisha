@@ -792,7 +792,7 @@
   letter-spacing: .1em;
 }
 .wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) {
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.7;
   color: var(--wk-text);
 }
@@ -831,8 +831,8 @@
 }
 @media (min-width: 768px) {
   .wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) {
-    font-size: 17px;
-    line-height: 1.8;
+    font-size: 19px;
+    line-height: 1.7;
   }
 }
 
