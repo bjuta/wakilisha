@@ -684,11 +684,11 @@ function CompactCardFill({ story, rank }: { story: MagazineArticle; rank: number
           <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">{story.section}</span>
           <span className="text-[10px] font-bold text-[var(--wk-text-faint)] opacity-40">#{rank}</span>
         </div>
-        <h4 className="line-clamp-2 text-[17px] font-bold leading-[1.25] tracking-[-0.02em] text-[var(--wk-text)] group-hover:text-[var(--wk-brand)]">
+        <h4 className="line-clamp-3 break-words text-[16px] font-bold leading-[1.34] tracking-[-0.02em] text-[var(--wk-text)] group-hover:text-[var(--wk-brand)]">
           {story.title}
         </h4>
         {story.dek && (
-          <p className="text-[12px] leading-relaxed text-[var(--wk-text-soft)] line-clamp-3">
+          <p className="text-[12px] leading-[1.55] text-[var(--wk-text-soft)] line-clamp-3">
             {story.dek.length > 160 ? story.dek.slice(0, 160).trimEnd() + "…" : story.dek}
           </p>
         )}
