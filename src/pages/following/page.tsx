@@ -2428,7 +2428,7 @@ export default function FollowingPage() {
               {activityAnchors.length > 0 ? (
                 <div className="mt-3 grid gap-1">
                   {activityAnchors.slice(0, 6).map((person) => (
-                    <button key={person.key} type="button" onClick={() => scrollToAnchor(person.key)} className="flex min-h-[58px] w-full items-center gap-3 rounded-xl px-1 text-left transition-colors hover:bg-[var(--wk-surface-raised)]">
+                    <button key={person.key} type="button" onClick={() => scrollToAnchor(person.key)} aria-current={person.key === activeAnchorKey ? "true" : undefined} className="flex min-h-[58px] w-full items-center gap-3 rounded-xl px-1 text-left transition-colors hover:bg-[var(--wk-surface-raised)]">
                       <ActivityAnchorAvatar subject={person} active={person.key === activeAnchorKey} />
                       <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--wk-text)]">{person.title}</span>
                       <i className="ri-arrow-right-up-line text-[15px] text-[var(--wk-text-faint)]" aria-hidden="true" />
