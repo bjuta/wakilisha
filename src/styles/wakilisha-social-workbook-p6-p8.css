@@ -208,6 +208,18 @@
 [data-wk-workbook-screen="notifications"] [data-wk-notification-type="credit_confirmation_response"] .wk-notification-event-icon {
   color: var(--wk-brand);
 }
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="new_release"] .wk-notification-event-icon,
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="release_published"] .wk-notification-event-icon {
+  color: var(--wk-brand);
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="live"] .wk-notification-event-icon,
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="live_started"] .wk-notification-event-icon {
+  color: #E85D62;
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="post_like"] .wk-notification-event-icon,
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="post_reaction"] .wk-notification-event-icon {
+  color: #D74763;
+}
 [data-wk-workbook-screen="notifications"] [data-wk-notification-type="direct_message"] .wk-notification-event-icon {
   color: #D3A346;
 }
