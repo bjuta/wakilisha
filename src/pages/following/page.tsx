@@ -2189,7 +2189,7 @@ export default function FollowingPage() {
         robots="noindex,nofollow"
       />
 
-      <div data-wk-following-layout className="mx-auto grid w-full max-w-[1180px] grid-cols-1 lg:grid-cols-[minmax(0,1fr)_310px]">
+      <div data-wk-following-layout className={isSignedIn ? "mx-auto grid w-full max-w-[1180px] grid-cols-1 lg:grid-cols-[minmax(0,1fr)_310px]" : "mx-auto w-full max-w-[850px]"}>
         <div data-wk-following-timeline className="min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r">
         <header data-following-masthead className="sticky top-0 z-20 border-b border-[var(--wk-divider)] bg-[var(--wk-surface)]/95 backdrop-blur-xl">
           {isSignedIn ? (
