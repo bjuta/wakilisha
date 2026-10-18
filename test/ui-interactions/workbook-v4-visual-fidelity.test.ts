@@ -33,7 +33,11 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(css).toContain('data-wk-magazine-category*="opinion"');
     expect(desktop).toContain('text-[clamp(22px,2.5vw,30px)]');
     expect(mobile).toContain('text-[22px] font-bold');
-    expect(mobile).toContain('grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2');
+    expect(mobile).toContain('data-wk-magazine-story-rail');
+    expect(mobile).toContain('snap-x snap-mandatory');
+    expect(mobile).toContain('useMagazineArticles(24)');
+    expect(card).toContain('data-wk-magazine-feature="true"');
+    expect(card).not.toContain('line-clamp-3 text-[clamp(20px,2.6vw,30px)]');
     expect(mobile).toContain('useMagazineArticles(24)');
     expect(mobile).not.toContain('useMagazineArticles(500)');
   });
@@ -59,7 +63,7 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(articleCss).toContain("line-height: 1.7;");
     for (const source of [article, articleMobile]) {
       expect(source.match(/<NewsletterSubscribe/g)).toHaveLength(1);
-      expect(source).toContain('variant="compact"');
+      expect(source).toContain('variant="default"');
       expect(source).toContain('data-wk-article-newsletter');
       expect(source).toContain('<ArticleRelated');
       expect(source.indexOf("data-wk-article-newsletter")).toBeGreaterThan(
@@ -111,7 +115,10 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(css).toContain('--wk-bg:#0B0B0B;');
     expect(css).toContain('--wk-brand:#4E7425;');
     expect(css).toContain('--wk-brand:#85C441;');
-    expect(css).toContain('--wk-bg:#F5F2EC;');
+    expect(css).not.toContain('--wk-bg:#F5F2EC;');
+    expect(css).toContain('--wk-surface:#FFFFFF;');
+    expect(css).toContain('[data-following-header]');
+    expect(css).toContain('[data-wk-message-bubble]');
     expect(css).toContain('.wk-workbook-article-paper');
     expect(css).not.toContain('[data-wk-workbook-screen="artist"]');
     expect(css).not.toContain('[data-wk-workbook-screen="artist-detail"]');
