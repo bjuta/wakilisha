@@ -58,6 +58,9 @@ export default function PublicShowsPage() {
       />
       <main data-wk-workbook-screen="podcasts" className="min-h-screen pb-24">
         <div className="mx-auto w-full max-w-[1320px] px-5 py-9 sm:px-9">
+          {!shows[0] && (
+            <h1 className="mb-6 text-[clamp(38px,5vw,62px)] font-extrabold uppercase leading-[.95] tracking-[-.05em] text-[var(--wk-text)]">Podcasts</h1>
+          )}
           {loading && (
             <div className="grid gap-9 lg:grid-cols-[.74fr_1.26fr]" aria-busy="true">
               <div className="aspect-square animate-pulse rounded-[18px] bg-[var(--wk-surface-raised)]" />
