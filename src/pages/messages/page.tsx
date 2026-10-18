@@ -706,7 +706,7 @@ export default function MessagesPage() {
             )}
           </section>
 
-          <section data-wk-message-thread className={`${selectedId ? "flex" : "hidden lg:flex"} min-w-0 flex-col`} aria-label="Conversation">
+          <section data-wk-message-thread data-wk-thread-selected={selectedId ? "true" : "false"} className={`${selectedId ? "flex" : "hidden lg:flex"} min-w-0 flex-col`} aria-label="Conversation">
             {!selectedId ? (
               <div className="flex min-h-[650px] flex-1 flex-col items-center justify-center px-8 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"><i className="ri-chat-3-line text-2xl" /></div>
