@@ -835,3 +835,14 @@
     line-height: 1.8;
   }
 }
+
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) blockquote {
+  border-left: 4px solid #202020;
+  padding: 10px 0 10px 20px;
+  margin-block: 36px;
+  background: transparent;
+  color: #202020;
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 600;
+  line-height: 1.38;
+}
