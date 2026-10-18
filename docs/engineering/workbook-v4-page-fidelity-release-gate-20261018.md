@@ -7,7 +7,7 @@
 ## Nonnegotiable design
 - WAKILISHA uses editorial Figtree/Plex typography; green #85C441 is the one brand signal, with #4E7425 for accessible text on paper. Music and full-bleed hero areas use night #0B0B0B; the magazine's article body uses warm paper #F5F2EC. Don't invent content, awards, or endorsement states.
 - Full release/playlist covers are square and **uncropped**. Standard editorial photographs are 3:2; Magazine inline video retains its own ratio; artist portraits are 4:5. Single-article hero is 3:2 desktop and 4:5 phone, with a genuine aspect-ratio container in loaded and loading states. Never let a global object-fit rule override artwork's contained fit.
-- Magazine order: cover, Editor's Picks, Latest, artists, published-content sections, guide, one newsletter CTA. Sections are content-backed filters, never dummy tabs. Editorial card: image, category ink, readable title, visible excerpt where supplied, byline. Newsletter never appears in the admin-reorderable region.
+- Magazine order: cover, Editor's Picks, Latest, artists, published-content sections, guide, one newsletter CTA. Sections are content-backed filters of the initial 24-story set, never dummy tabs or an expensive full-archive fetch. Editorial card: image, category ink, readable title, visible excerpt where supplied, byline. Newsletter never appears in the admin-reorderable region.
 - Article body: warm paper, 680px inner measure, desktop 19px/1.7 body, readable lede and heading levels, black pull-quote rule, unboxed inline media, source-backed release/artist/track embeds, author/credit and community, one existing share action per routed viewport, related story imagery 3:2, one compact newsletter after related stories.
 - Music: release-first hero with uncropped cover and real Play/Share/Release actions, published releases, ranked chart entries, published genre tiles, usable discovery links. No inert carousel arrows, generic repeated 'go deeper' tiles, or invented genre names.
 - Following: readable one-column feed, user composer and interactions, media framing by type, genuine All / Artists Only filter based on followed artist matching, not fabricated posts.
@@ -18,7 +18,7 @@
 ## Source changes
 | Page | Contract |
 | --- | --- |
-| Magazine desktop/mobile | 3:2 image frames, rounded editorial photography, readable headline/excerpt, category ink, complete mobile article catalogue, one plain final newsletter form |
+| Magazine desktop/mobile | 3:2 image frames, rounded editorial photography, readable headline/excerpt, category ink, bounded mobile initial article set, one plain final newsletter form |
 | Article desktop/mobile | Real 3:2 and 4:5 hero frames, 19px desktop editorial body, flat inline images, related 3:2 imagery and one final CTA |
 | Music | Night surface, contained 1:1 featured cover, real releases, charts and genres, source-backed navigation, no inert arrival arrows |
 | Notifications | Content list, grouped timeline and real desktop preference toggles for supported settings; full settings link |
