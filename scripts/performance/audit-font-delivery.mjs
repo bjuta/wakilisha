@@ -139,12 +139,36 @@ for (const family of expectedFamilies) {
   }
 }
 
+// Workbook Figtree now owns the root rendering path. Old Inter and DM Sans
+// face files remain self-hosted for specifically unmigrated consumers, but
+// must not receive unconditional critical startup priority.
+const criticalPreloads = [
+  {family: "Figtree", file: "/assets/fonts/workbook/figtree-latin.woff2"},
+];
 if (
   !Array.isArray(manifest.preloads)
-  || manifest.preloads.length !== 2
+  || manifest.preloads.length !== criticalPreloads.length
+  || manifest.preloads.some((preload, index) =>
+    preload.family !== criticalPreloads[index].family
+    || preload.file !== criticalPreloads[index].file
+    || preload.scope !== "root"
+    || preload.subset !== "latin"
+  )
 ) {
   console.error(
-    "Font delivery audit failed: expected exactly two critical root font preloads.",
+    "Font delivery audit failed: Workbook root preload manifest must match actual critical font.",
+  );
+  process.exit(1);
+}
+
+const indexFontPreloads = [...index.matchAll(/rel="preload" href="([^"]+)" as="font"/g)]
+  .map((match) => match[1]);
+if (
+  indexFontPreloads.length !== criticalPreloads.length
+  || indexFontPreloads.some((file, index) => file !== criticalPreloads[index].file)
+) {
+  console.error(
+    "Font delivery audit failed: old or extraneous critical font preloads remain in index.html.",
   );
   process.exit(1);
 }
