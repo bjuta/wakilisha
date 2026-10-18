@@ -201,6 +201,22 @@ for (const route of [
       expect(actual.background).toBe(background);
       expect(actual.brand).toBe(brand);
       expect(actual.text).not.toBe(actual.background);
+      if (route.name === "podcasts") {
+        const cover = surface.locator(".wk-reference-podcast-cover");
+        if (await cover.count()) {
+          // The light theme previously rendered a white title on a white cover.
+          // Check the actual browser-computed pixels, not just theme tokens.
+          const colours = await cover.evaluate((node) => {
+            const heading = node.querySelector("span");
+            return {
+              background: getComputedStyle(node).backgroundColor,
+              title: heading ? getComputedStyle(heading).color : "",
+            };
+          });
+          expect(colours.background).toBe("rgb(27, 27, 27)");
+          expect(colours.title).toBe("rgb(255, 255, 255)");
+        }
+      }
       await page.screenshot({
         path: testInfo.outputPath(`workbook-v4-${route.name}-${mode}-390.png`),
         animations: "disabled",
