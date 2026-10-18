@@ -1288,6 +1288,7 @@ export default function FollowingPage() {
 
   const [items, setItems] =
     useState<FollowingFeedItem[]>([]);
+  const [feedFilter, setFeedFilter] = useState<"all" | "artists">("all");
 
   const [follows, setFollows] =
     useState<FollowingPresentationItem[]>([]);
@@ -2169,6 +2170,10 @@ export default function FollowingPage() {
     }
   };
 
+  const visibleItems = feedFilter === "artists"
+    ? items.filter((item) => item.matchedFollows.some((reason) => reason.targetType === "artist"))
+    : items;
+
   return (
     <main data-wk-workbook-screen="following" className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
       <MetaTags
@@ -2212,8 +2217,29 @@ export default function FollowingPage() {
             )}
           </div>
 
+          {isSignedIn && (
+            <nav aria-label="Following feed filters" className="mt-5 flex items-center gap-2">
+              {([
+                ["all", "All"],
+                ["artists", "Artists Only"],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFeedFilter(value)}
+                  aria-pressed={feedFilter === value}
+                  className={`min-h-11 rounded-full px-4 text-[13px] font-semibold transition-colors ${feedFilter === value
+                    ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+                    : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+          )}
           {isSignedIn &&
             !loading &&
+            feedFilter === "all" &&
             activityAnchors.length > 0 && (
               <nav
                 data-following-activity-anchors
@@ -2343,7 +2369,7 @@ export default function FollowingPage() {
               Try Again
             </button>
           </section>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <section className="mx-4 rounded-3xl border border-dashed border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-14 text-center md:mx-0">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
               <i
@@ -2354,7 +2380,7 @@ export default function FollowingPage() {
             <h2 className="mt-5 text-[20px] font-black tracking-[-0.03em]">
               {matureFollows.length === 0
                 ? "Find your people"
-                : "Nothing new yet"}
+                : feedFilter === "artists" ? "No artist updates yet" : "Nothing new yet"}
             </h2>
             <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-[var(--wk-text-muted)]">
               {matureFollows.length === 0
@@ -2382,7 +2408,7 @@ export default function FollowingPage() {
               aria-label="Following activity"
               className="w-full"
             >
-              {items.map((item) => {
+              {visibleItems.map((item) => {
                 const key =
                   itemKey(item);
 
