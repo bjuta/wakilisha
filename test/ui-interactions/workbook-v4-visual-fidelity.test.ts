@@ -78,6 +78,11 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     const messages = read("src/pages/messages/page.tsx");
     expect(notifications).toContain('aria-label="Notification preferences"');
     expect(notifications).toContain('Tell me about');
+    expect(notifications).toContain('community_get_notification_prefs');
+    expect(notifications).toContain('community_update_notification_prefs');
+    expect(notifications).toContain('WakilishaToggle');
+    expect(notifications).toContain('contributionNotifications');
+    expect(notifications).not.toContain('saveAll(');
     expect(notifications).toContain('to="/settings?section=Notifications"');
     expect(notifications).toContain('hidden self-start border-l border-[var(--wk-border)]');
     expect(notifications).toContain('aria-label="Notification filters"');
