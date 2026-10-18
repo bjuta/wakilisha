@@ -62,6 +62,14 @@ const mobileAppLayout = read(
   "src/components/mobile/MobileAppLayout.tsx",
 );
 
+const canonicalNavigation = read(
+  "src/components/navigation/wakilishaNavigation.ts",
+);
+
+const mobileSidebar = read(
+  "src/components/mobile/MobileAccountDrawer.tsx",
+);
+
 const mobileCss = read(
   "src/styles/wakilisha-mobile-workbook-v4.css",
 );
@@ -311,9 +319,12 @@ if (
   !/<h1[^>]*>\s*Notifications\s*<\/h1>/m.test(
     notificationsPage,
   ) ||
-  !mobileAppLayout.includes(
+  !canonicalNavigation.includes(
     '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
-  )
+  ) ||
+  !mobileSidebar.includes("WAKILISHA_NAVIGATION.map") ||
+  !mobileTopBar.includes("<NotificationBell") ||
+  !mobileTopBar.includes('aria-label="Open WAKILISHA menu"')
 ) {
   fail(
     "Notifications destination, visible label, or accessible name is incomplete",
@@ -321,12 +332,15 @@ if (
 }
 
 if (
-  !mobileCss.includes(
-    "color:var(--wk-text-muted);position:relative;",
-  )
+  mobileAppLayout.includes("MobileBottomNav") ||
+  mobileCss.includes(".phn-nav--compact") ||
+  mobileCss.includes(".phn-nav-primary-core") ||
+  !mobileAppLayout.includes("<MobileTopBar") ||
+  !mobileSidebar.includes('aria-label="WAKILISHA Menu"') ||
+  !mobileSidebar.includes('aria-label="WAKILISHA"')
 ) {
   fail(
-    "inactive mobile navigation still uses faint text",
+    "Workbook v4 must render one accessible mobile sidebar and no legacy bottom navigation",
   );
 }
 
@@ -367,7 +381,7 @@ if (
 
 for (const [name, sourceText] of [
   ["mobile top bar", mobileTopBar],
-  ["mobile bottom navigation", mobileAppLayout],
+  ["mobile app shell", mobileAppLayout],
 ]) {
   if (
     sourceText.includes("translateZ(0)")
