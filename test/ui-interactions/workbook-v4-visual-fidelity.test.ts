@@ -53,6 +53,12 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     const css = read("src/styles/wakilisha-workbook-surface-fidelity.css");
     expect(music).toContain('data-wk-workbook-screen="music"');
     expect(music).toContain("PlayableArtwork");
+    expect(music).toContain('fit="contain"');
+    expect(music).toContain('aria-label="Music discovery"');
+    expect(music).toContain('listGenres()');
+    expect(music).toContain('genre.artistImageUrl');
+    expect(music).toContain('to={`/genres/${genre.slug}`}');
+    expect(music).toContain('<ChartMiniList entries={chartEntries} />');
     expect(music).toContain('onPlay(release, "fresh-arrivals")');
     expect(music).toContain('handlePlayRelease(');
     expect(music).not.toContain('aria-label="Previous arrivals"');
