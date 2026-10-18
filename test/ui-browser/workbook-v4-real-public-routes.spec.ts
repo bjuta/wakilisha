@@ -11,6 +11,17 @@ async function waitForSettledMedia(page: Page, name: string) {
   } else {
     await expect(surface.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 25_000 });
   }
+  // The data request can settle before a published poster has decoded.
+  // A blank image frame is not valid workbook visual evidence.
+  if (name === "video") {
+    const recordedHero = surface.locator('.wk-reference-media-hero [data-wk-artwork-state="recorded"] img').first();
+    if (await recordedHero.count()) {
+      await expect.poll(
+        () => recordedHero.evaluate((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
+        { timeout: 25_000 },
+      ).toBe(true);
+    }
+  }
 }
 
 /**
