@@ -463,12 +463,12 @@
   --wk-brand-on:#0B0B0B;
   --wk-workbook-cover-scrim:linear-gradient(0deg,rgba(0,0,0,.89),rgba(0,0,0,.32) 60%,rgba(0,0,0,.10));
 }
-/* P11 article: workbook warm paper in light, a fully readable ink
-   counterpart in dark. Photographic hero scrims remain dark in either mode. */
+/* P11 Article: normal WAKILISHA canvas in both themes.
+   Photographic hero scrims stay dark in either mode. */
 :where([data-wk-theme="light"]) .wk-workbook-article-paper {
-  --wk-bg:#F5F2EC;
-  --wk-surface:#F5F2EC;
-  --wk-surface-raised:#EEEAE2;
+  --wk-bg:#FCFCFB;
+  --wk-surface:#FFFFFF;
+  --wk-surface-raised:#F4F4F2;
   --wk-text:#202020;
   --wk-text-soft:#414141;
   --wk-text-muted:#5C5C5C;
@@ -522,12 +522,14 @@
   color: var(--wk-text);
   background: var(--wk-bg);
 }
-:is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) > :is(div,section),
-[data-wk-magazine-newsletter] > section > div {
-  padding: 0;
+:is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) > :is(div,section) {
   border: 0;
   background: transparent;
   box-shadow: none;
+}
+[data-wk-magazine-newsletter] > section > div,
+[data-wk-article-newsletter] > div {
+  padding: 0;
 }
 :is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) h2 {
   max-width: 34ch;
