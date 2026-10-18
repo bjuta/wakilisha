@@ -50,9 +50,9 @@ function SectionLabel({ children, count, href }: { children: string; count?: num
   return (
     <div className="flex items-end justify-between mb-8 gap-4 flex-wrap">
       <div className="flex items-center gap-3">
-        <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
+        <h2 className="text-[clamp(22px,2.5vw,30px)] font-bold leading-[1.15] tracking-[-0.035em] text-[var(--wk-text)]">
           {children}
-        </span>
+        </h2>
         {count !== undefined && (
           <span className="text-[11px] font-semibold text-[var(--wk-text-faint)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2.5 py-0.5 rounded-full">
             {count} {count === 1 ? "story" : "stories"}
