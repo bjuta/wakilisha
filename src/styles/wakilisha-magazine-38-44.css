@@ -2409,3 +2409,75 @@
     margin-bottom: 16px;
   }
 }
+
+/* Workbook P10/P11 fidelity. Scope to published Magazine and Article only.
+   Editorial photography is flat; controls may retain their own focus geometry. */
+[data-wk-workbook-screen="magazine"] a[data-wk-magazine-story] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+[data-wk-workbook-screen="magazine"] a[data-wk-magazine-story]:hover,
+[data-wk-workbook-screen="magazine"] a[data-wk-magazine-story]:focus-visible {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+[data-wk-workbook-screen="magazine"] a[data-wk-magazine-story] > div[class*="aspect-"] {
+  aspect-ratio: 3 / 2;
+  border-radius: 0;
+}
+[data-wk-workbook-screen="magazine"] a[data-wk-magazine-story] > div[class*="p-4"]:last-child {
+  padding: 14px 0 0;
+}
+[data-wk-workbook-screen="magazine"] a[data-wk-magazine-story] > div[class*="p-6"]:last-child {
+  padding: 18px 0 0;
+}
+[data-wk-workbook-screen="magazine"] a[data-wk-magazine-story] img {
+  border-radius: 0;
+}
+[data-wk-workbook-screen="magazine"] .wk-reveal,
+[data-wk-workbook-screen="magazine"] [data-mag-section] {
+  min-width: 0;
+  scroll-margin-top: 84px;
+}
+[data-wk-workbook-screen="magazine"] [data-mag-content] {
+  min-width: 0;
+}
+[data-wk-workbook-screen="magazine"] [data-mag-content] .group.flex.gap-4.rounded-xl {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+[data-wk-workbook-screen="magazine"] [data-mag-content] .group.flex.gap-4.rounded-xl > div:first-child {
+  border-radius: 0;
+}
+.wk-workbook-article-paper {
+  margin-top: 0;
+  border-radius: 0;
+  background: var(--wk-bg);
+}
+.wk-workbook-article-paper .article-content-v2 img,
+.wk-workbook-article-paper .article-content-v2 figure,
+.wk-workbook-article-paper .article-content-v2 .wp-block-image,
+.wk-workbook-article-paper .article-content-v2 .wp-caption {
+  border-radius: 0;
+}
+.wk-workbook-article-paper .article-content-v2 figure {
+  overflow: visible;
+}
+[data-wk-workbook-related="articles"] img {
+  border-radius: 0;
+}
+@media (max-width: 640px) {
+  [data-wk-workbook-screen="magazine"] [data-mag-content] {
+    padding-top: 28px;
+    padding-bottom: 44px;
+  }
+  [data-wk-workbook-related="articles"] {
+    padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  }
+}
