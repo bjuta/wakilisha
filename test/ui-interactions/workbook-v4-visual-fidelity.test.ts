@@ -4,6 +4,20 @@ import { describe, expect, it } from "vitest";
 const read = (file: string) => readFileSync(file, "utf8");
 
 describe("Workbook v4 source-backed public visual fidelity", () => {
+
+  it("keeps authored Video and Podcasts page identity in loading and empty states", () => {
+    const video = read("src/pages/video/page.tsx");
+    const podcasts = read("src/pages/shows/page.tsx");
+    expect(video).toContain('{!featured && (');
+    expect(video).toContain('>Video</h1>');
+    expect(video).toContain('>No video is published yet.');
+    expect(podcasts).toContain('{!shows[0] && (');
+    expect(podcasts).toContain('>Podcasts</h1>');
+    expect(podcasts).toContain('No podcasts have been published yet.');
+    expect(podcasts).toContain("getPublicShow(first.slug)");
+  });
+
+
   it("keeps Magazine editorial imagery, categories and readable excerpts", () => {
     const card = read("src/pages/magazine/components/MagazineCard.tsx");
     const css = read("src/styles/wakilisha-magazine-38-44.css");
