@@ -70,7 +70,7 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
                 to={`/magazine/${story.slug}`}
                 className="group block min-w-0"
               >
-                <div className="relative aspect-[3/2] overflow-hidden bg-[var(--wk-surface-raised)]">
+                <div className="relative aspect-[3/2] overflow-hidden rounded-[12px] bg-[var(--wk-surface-raised)]">
                   {story.heroUrl ? (
                     <ResponsiveMediaImage
                       src={story.heroUrl}
