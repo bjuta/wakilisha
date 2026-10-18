@@ -719,6 +719,7 @@ function NewsletterCTA() {
   return (
     <section className="wk-reveal">
       <NewsletterSubscribe
+          variant="compact"
         formId="magazine-newsletter-form"
         headline="Read with us"
         description="Get new stories and charts in your inbox."
