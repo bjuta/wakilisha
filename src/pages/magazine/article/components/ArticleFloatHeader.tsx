@@ -108,7 +108,7 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
               <i className="ri-share-forward-line text-[15px]" />
               Share
               {totalShares > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-[6px] rounded-full bg-white/20 text-white text-[11px] font-bold">
+                <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-[6px] rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)] text-[11px] font-bold">
                   {totalShares.toLocaleString()}
                 </span>
               )}
