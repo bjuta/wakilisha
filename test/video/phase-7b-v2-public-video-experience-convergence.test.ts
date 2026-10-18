@@ -116,7 +116,7 @@ describe("Phase 7B V2 public Video experience convergence", () => {
   });
 
   it("keeps Video visible in the single Workbook sidebar without a mobile bottom bar", () => {
-    const nav = readFileSync("src/components/navigation/wakilishaNavigation.ts", "utf8");
+    const nav = read("src/components/navigation/wakilishaNavigation.ts");
     expect(nav).toContain('label: "Video", to: "/video"');
     expect(nav).toContain('label: "Audio", to: "/audio"');
     expect(nav).toContain('label: "Podcasts", to: "/shows"');
