@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { buildRedactedHeadquartersAuditV1 } from "../../src/services/miziziRedactedAudit";
 import { describe, it, expect, vi } from "vitest";
-import {projectMiziziQuestionReadV1,loadMiziziCaseQuestionsV1,MIZIZI_QUESTION_READ_V1} from "../../src/services/miziziQuestionRead";
+import {
+ projectMiziziQuestionReadV1,loadMiziziCaseQuestionsV1,
+ freezeMiziziQuestionV1,loadMiziziSourceAttestationsV1,
+ MIZIZI_QUESTION_READ_V1,
+} from "../../src/services/miziziQuestionRead";
 import {
   beginMiziziCaseResearchV1,
   bootstrapHeadquartersOwnerV1,
@@ -396,4 +400,107 @@ describe("MIZIZI connected frozen-question read in the existing Headquarters UI"
     expect(panel).toContain("No independently reviewed question set is connected to this case yet.");
     expect(panel).not.toContain("Pwani ya Upendo");
   });
+});
+
+describe("QV2 steward question freeze and QV3 current reviewed-source UI seam",()=>{
+ const correct={
+  questionId:qid,expectedQuestionRevision:0,
+  question:"Which documented recording identity interpretation is best supported?",
+  hypotheses:[{id:ha,label:"One distinct original performance"},
+   {id:hb,label:"Two independently distinct performances"}],
+  reason:"Review the competing explanations without inferring identity truth.",
+ };
+ const receipt={
+  questionId:qid,questionRevision:1,caseId:cid,caseRevision:7,
+  questionFingerprint:hash,outcome:"created",
+ };
+ it("submits exact QV2 revision and stable human-owned hypothesis IDs",async()=>{
+  const rpc=vi.fn(async()=>({data:receipt,error:null}));
+  const result=await freezeMiziziQuestionV1(scope,correct,rpc);
+  expect(result).toMatchObject({kind:"recorded",outcome:"created",questionId:qid,questionRevision:1});
+  expect(rpc).toHaveBeenCalledExactlyOnceWith("admin_mizizi_freeze_case_question_v1",{
+   p_case_id:cid,p_expected_case_revision:7,
+   p_question_id:qid,p_expected_question_revision:0,
+   p_question_text:correct.question,p_hypotheses:correct.hypotheses,p_reason:correct.reason,
+  });
+ });
+ it("preserves exact replay receipt, but rejects altered or wrong identity responses",async()=>{
+  const replay=vi.fn(async()=>({data:{...receipt,outcome:"replayed"},error:null}));
+  await expect(freezeMiziziQuestionV1(scope,correct,replay)).resolves.toMatchObject({
+   kind:"recorded",outcome:"replayed",questionRevision:1,
+  });
+  const bad=vi.fn(async()=>({data:{...receipt,questionId:assertion},error:null}));
+  await expect(freezeMiziziQuestionV1(scope,correct,bad)).resolves.toEqual({kind:"unavailable"});
+ });
+ it("refuses malformed drafts before any server write",async()=>{
+  const rpc=vi.fn(async()=>({data:receipt,error:null}));
+  for(const changed of [
+   {question:"Too short"},
+   {hypotheses:[correct.hypotheses[0],correct.hypotheses[0]]},
+   {reason:"short"},
+   {expectedQuestionRevision:-1},
+   {questionId:"forged"},
+  ]){
+   await expect(freezeMiziziQuestionV1(scope,{...correct,...changed},rpc)).resolves.toEqual({kind:"invalid"});
+  }
+  expect(rpc).not.toHaveBeenCalled();
+ });
+ it("keeps denied, stale, missing RPC and broken transport distinct",async()=>{
+  for(const [code,kind] of [
+   ["42501","denied"],["PT409","stale"],["PGRST202","unavailable"],
+  ] as const){
+   const rpc=vi.fn(async()=>({data:null,error:{code,message:"Rejected"}}));
+   await expect(freezeMiziziQuestionV1(scope,correct,rpc)).resolves.toEqual({kind});
+  }
+  const offline=vi.fn(async()=>{throw new Error("timeout");});
+  await expect(freezeMiziziQuestionV1(scope,correct,offline)).resolves.toEqual({kind:"unavailable"});
+ });
+ const attestation={
+  contract:"mizizi.source_attestation_read.v1",
+  kind:"requires_review",caseId:cid,caseRevision:7,
+  questionId:qid,questionRevision:2,
+  rows:[{attestationId:receiptId(),assertionId:assertion,sourceVersionId:sid,
+   sourceFamilyKey:"catalogue:first-party",reviewRevision:1,decision:"human_reviewed",
+   receiptFingerprint:hash}],
+  independentlyVerifiedFamilies:0,achAssessmentsAllowed:0,
+ };
+ function receiptId(){return "55555555-5555-4555-8555-555555555555";}
+ it("reads only QV3 protected metadata, never invents independent verification",async()=>{
+  const rpc=vi.fn(async()=>({data:attestation,error:null}));
+  const result=await loadMiziziSourceAttestationsV1(scope,qid,2,rpc);
+  expect(rpc).toHaveBeenCalledExactlyOnceWith("admin_mizizi_question_source_attestations_v1",{
+   p_case_id:cid,p_expected_case_revision:7,p_question_id:qid,p_question_revision:2,
+  });
+  expect(result).toMatchObject({kind:"requires_review",
+   independentlyVerifiedFamilies:0,achAssessmentsAllowed:0});
+  expect(JSON.stringify(result)).not.toContain("source_payload");
+  const none=vi.fn(async()=>({data:{...attestation,kind:"not_recorded",rows:[]},error:null}));
+  await expect(loadMiziziSourceAttestationsV1(scope,qid,2,none)).resolves.toEqual({kind:"not_recorded"});
+ });
+ it("fails closed on fabricated QV3 ACH permission, family count, scope, status or malformed receipt",async()=>{
+  const candidates=[
+   {...attestation,achAssessmentsAllowed:1},
+   {...attestation,independentlyVerifiedFamilies:1},
+   {...attestation,caseId:assertion},
+   {...attestation,rows:[{...attestation.rows[0],decision:"independent_verified"}]},
+   {...attestation,rows:[{...attestation.rows[0],receiptFingerprint:"not-a-hash"}]},
+   {...attestation,rows:[attestation.rows[0],attestation.rows[0]]},
+  ];
+  for(const data of candidates){
+   const rpc=vi.fn(async()=>({data,error:null}));
+   await expect(loadMiziziSourceAttestationsV1(scope,qid,2,rpc)).resolves.toEqual({kind:"unavailable"});
+  }
+ });
+ it("presents a usable question form, source receipt labels, and no implied permission override",()=>{
+  const panel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
+  for(const label of [
+   "Add an investigation question","Competing explanation",
+   "Freeze question for review","Propose a revised question",
+   "Recorded source reviews","No independent source families or ACH assessments have been verified.",
+  ])expect(panel).toContain(label);
+  expect(panel).toContain("freezeMiziziQuestionV1({");
+  expect(panel).toContain("loadMiziziSourceAttestationsV1({");
+  expect(panel).toContain('aria-label="Review and freeze an investigation question"');
+  expect(panel).not.toContain("Pwani ya Upendo");
+ });
 });
