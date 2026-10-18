@@ -329,11 +329,36 @@ export default function NotificationsPage() {
 
   return (
     <main data-wk-workbook-screen="notifications" className="min-h-[calc(100dvh-6rem)] bg-[var(--wk-bg)] pb-12">
-      <section className="mx-auto min-h-[calc(100dvh-6rem)] w-full max-w-[760px] border-x border-[var(--wk-border)] bg-[var(--wk-surface)]">
+      <div className="mx-auto grid w-full max-w-[1180px] gap-0 lg:grid-cols-[224px_minmax(0,1fr)] lg:gap-8 lg:px-8 lg:pt-9">
+        <aside className="hidden self-start lg:block" aria-label="Notification categories">
+          <p className="mb-5 text-[12px] font-semibold uppercase tracking-[0.15em] text-[var(--wk-text-muted)]">Your Notifications</p>
+          <nav className="flex flex-col gap-1" aria-label="Notification category navigation">
+            {([
+              ["all", "All"],
+              ["mentions", "Mentions"],
+              ["releases", "Releases"],
+              ["credits", "Credits"],
+              ["live", "Live"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setFilter(value)}
+                aria-current={filter === value ? "page" : undefined}
+                className={`min-h-11 rounded-[12px] px-4 text-left text-[14px] font-semibold transition-colors ${filter === value
+                  ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+                  : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        </aside>
+        <section className="min-h-[calc(100dvh-6rem)] min-w-0 border-x border-[var(--wk-border)] bg-[var(--wk-surface)]">
         <header className="sticky top-0 z-20 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 backdrop-blur-xl">
           <div className="flex min-h-[72px] items-center justify-between gap-4 px-5 sm:px-6">
             <div>
-              <h1 className="text-[24px] font-black tracking-[-0.035em] text-[var(--wk-text)] sm:text-[28px]">
+              <h1 className="text-[28px] font-bold leading-[1.08] tracking-[-0.035em] text-[var(--wk-text)] sm:text-[34px]">
                 Notifications
               </h1>
               {unreadCount > 0 && (
@@ -373,7 +398,7 @@ export default function NotificationsPage() {
           </div>
 
           <nav
-            className="flex gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none]"
+            className="flex gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none] lg:hidden"
             aria-label="Notification filters"
           >
             {(
@@ -501,8 +526,8 @@ export default function NotificationsPage() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-[14px] leading-5 text-[var(--wk-text)]">
-                        <span className="font-black">
+                      <p className="text-[15px] leading-[1.5] text-[var(--wk-text)]">
+                        <span className="font-bold">
                           {actorName}
                         </span>{" "}
                         <span className="font-medium">
@@ -510,7 +535,7 @@ export default function NotificationsPage() {
                         </span>
                       </p>
 
-                      <div className="mt-1.5 flex items-center gap-2 text-[11px] font-semibold text-[var(--wk-text-faint)]">
+                      <div className="mt-1.5 flex items-center gap-2 text-[12px] font-medium text-[var(--wk-text-muted)]">
                         <span>
                           {timeAgo(
                             notification.createdAt,
@@ -572,7 +597,8 @@ export default function NotificationsPage() {
           </div>
         )}
 
-      </section>
+        </section>
+      </div>
     </main>
   );
 }
