@@ -32,7 +32,14 @@ async function waitForSettledMedia(page: Page, name: string) {
       const state = await coverSlot.getAttribute("data-wk-music-artwork-state");
       expect(["recorded", "fallback"]).toContain(state);
       if (state === "fallback") {
-        await expect(coverSlot.locator("[data-wk-music-artwork-fallback]")).toBeVisible();
+        const fallback = coverSlot.locator("[data-wk-music-artwork-fallback]");
+        await expect(fallback).toBeVisible();
+        const colours = await fallback.evaluate((node) => ({
+          background: getComputedStyle(node).backgroundColor,
+          ink: getComputedStyle(node.querySelector("span") ?? node.querySelector("svg") ?? node).color,
+        }));
+        expect(colours.background).toBe("rgb(27, 27, 27)");
+        expect(colours.ink).not.toBe(colours.background);
       } else {
         const image = coverSlot.locator("img");
         await expect(image).toHaveCount(1);
