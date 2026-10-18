@@ -330,31 +330,7 @@ export default function NotificationsPage() {
 
   return (
     <main data-wk-workbook-screen="notifications" className="min-h-[calc(100dvh-6rem)] bg-[var(--wk-bg)] pb-12">
-      <div className="mx-auto grid w-full max-w-[1180px] gap-0 lg:grid-cols-[224px_minmax(0,1fr)] lg:gap-8 lg:px-8 lg:pt-9">
-        <aside className="hidden self-start lg:block" aria-label="Notification categories">
-          <p className="mb-5 text-[12px] font-semibold uppercase tracking-[0.15em] text-[var(--wk-text-muted)]">Your Notifications</p>
-          <nav className="flex flex-col gap-1" aria-label="Notification category navigation">
-            {([
-              ["all", "All"],
-              ["mentions", "Mentions"],
-              ["releases", "Releases"],
-              ["credits", "Credits"],
-              ["live", "Live"],
-            ] as const).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setFilter(value)}
-                aria-current={filter === value ? "page" : undefined}
-                className={`min-h-11 rounded-[12px] px-4 text-left text-[14px] font-semibold transition-colors ${filter === value
-                  ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
-                  : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-        </aside>
+      <div className="mx-auto grid w-full max-w-[1180px] gap-0 lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-9 lg:px-8 lg:pt-9">
         <section className="min-h-[calc(100dvh-6rem)] min-w-0 border-x border-[var(--wk-border)] bg-[var(--wk-surface)]">
         <header className="sticky top-0 z-20 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 backdrop-blur-xl">
           <div className="flex min-h-[72px] items-center justify-between gap-4 px-5 sm:px-6">
@@ -599,6 +575,25 @@ export default function NotificationsPage() {
         )}
 
         </section>
+
+        <aside className="hidden self-start border-l border-[var(--wk-border)] pl-8 pt-5 lg:block" aria-label="Notification preferences">
+          <h2 className="text-[19px] font-bold leading-[1.15] tracking-[-0.03em] text-[var(--wk-text)]">Tell me about</h2>
+          <p className="mt-2 text-[13px] leading-[1.6] text-[var(--wk-text-muted)]">
+            Choose the updates that matter to you.
+          </p>
+          <div className="mt-6 space-y-5 text-[13px] leading-[1.45] text-[var(--wk-text)]">
+            <p>New releases from artists I follow</p>
+            <p>Replies and mentions</p>
+            <p>Credit and MIZIZI updates</p>
+            <p>Live events and listening parties</p>
+          </div>
+          <Link
+            to="/settings?section=Notifications"
+            className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 text-[13px] font-semibold text-[var(--wk-text)] transition-colors hover:border-[var(--wk-brand)]"
+          >
+            Manage notifications <WkIcon name="ArrowUpRight" size={14} />
+          </Link>
+        </aside>
       </div>
     </main>
   );
