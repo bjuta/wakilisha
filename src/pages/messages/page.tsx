@@ -749,7 +749,7 @@ export default function MessagesPage() {
                       const mine = Boolean(otherId && message.sender_person_resource_id !== otherId);
                       return (
                         <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[86%] rounded-[16px] px-4 py-3 sm:max-w-[74%] ${mine ? "rounded-br-[4px] bg-[#4E7425] text-white" : "rounded-bl-[4px] bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
+                          <div className={`max-w-[86%] rounded-[16px] px-4 py-3 sm:max-w-[74%] ${mine ? "rounded-br-[4px] bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "rounded-bl-[4px] bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
                             <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.55]">{message.body}</p>
                             {message.resource_references?.length > 0 && (
                               <div className={`mt-2 space-y-2 border-t pt-2 ${mine ? "border-white/20" : "border-[var(--wk-divider)]"}`}>
