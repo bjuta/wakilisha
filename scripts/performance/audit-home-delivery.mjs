@@ -311,13 +311,22 @@ if (mobileMagazine.includes("<h4")) {
   );
 }
 
+// The workbook replaces the old text footer with exactly one genuine,
+// theme-aware newsletter after all editorial sections. Verify that final
+// component uses readable muted text rather than recreating retired UI.
 if (
   !mobileMagazine.includes(
-    'className="mt-2 text-[11px] text-[var(--wk-text-muted)]"',
+    '<MobileNewsletterCTA />',
+  )
+  || !mobileMagazine.includes(
+    'data-wk-magazine-newsletter',
+  )
+  || !mobileMagazine.includes(
+    'text-[13px] text-[var(--wk-text-muted)]',
   )
 ) {
   fail(
-    "mobile magazine footer contrast was not raised",
+    "mobile magazine final newsletter lacks workbook contrast authority",
   );
 }
 
