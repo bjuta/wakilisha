@@ -37,6 +37,12 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(read("src/pages/charts/directory/page.tsx")).not.toContain("HERO_FALLBACK");
     expect(read("src/pages/home/components/HomeExplore.tsx")).not.toContain('acc: "');
     expect(read("src/pages/home/components/HomeExplore.tsx")).toContain("color-mix(in srgb");
+    for (const name of ["dark", "light"]) {
+      const svg = read(`public/assets/logos/wakilisha-logo-${name}.svg`);
+      expect(svg.toLowerCase()).toContain("#85c441");
+      expect(svg.toLowerCase()).not.toContain("#84c241");
+    }
+
     expect(existsSync("src/pages/home/components/HomeFeatured.tsx")).toBe(false);
     expect(existsSync("src/pages/home/components/HomeCollage.tsx")).toBe(false);
 
