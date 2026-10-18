@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { buildRedactedHeadquartersAuditV1 } from "../../src/services/miziziRedactedAudit";
 import { describe, it, expect, vi } from "vitest";
-import {projectMiziziQuestionReadV1,MIZIZI_QUESTION_READ_V1} from "../../src/services/miziziQuestionRead";
+import {projectMiziziQuestionReadV1,loadMiziziCaseQuestionsV1,MIZIZI_QUESTION_READ_V1} from "../../src/services/miziziQuestionRead";
 import {
   beginMiziziCaseResearchV1,
   bootstrapHeadquartersOwnerV1,
@@ -348,5 +348,52 @@ describe("MIZIZI read-only question contract (no authorization grant)",()=>{
     expect(()=>projectMiziziQuestionReadV1(scope,mutated({
       assessments:[question.assessments[0],question.assessments[0]],
     }))).toThrow();
+  });
+});
+
+describe("MIZIZI connected frozen-question read in the existing Headquarters UI",()=>{
+  it("uses the exact authenticated case-revision reader, never a Registry queue guess",async()=>{
+    const rpc=vi.fn(async()=>({data:ready([{...question,sources:[],assessments:[]}]),error:null}));
+    const result=await loadMiziziCaseQuestionsV1(scope,rpc);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("admin_mizizi_case_questions_v1",{
+      p_case_id:caseId,p_expected_case_revision:7,
+    });
+    expect(result.kind).toBe("ready");
+    if(result.kind!=="ready")throw new Error("Unexpected question result");
+    expect(result.questions[0].hypotheses).toHaveLength(2);
+    expect(result.questions[0].sources).toEqual([]);
+    expect(result.questions[0].assessments).toEqual([]);
+  });
+  it("keeps zero questions genuinely unrecorded",async()=>{
+    const rpc=vi.fn(async()=>({data:{kind:"not_recorded"},error:null}));
+    await expect(loadMiziziCaseQuestionsV1(scope,rpc)).resolves.toEqual({kind:"not_recorded"});
+  });
+  it("does not turn stale, denied or missing RPC into no questions",async()=>{
+    for(const [code,kind] of [
+      ["PT409","stale"],["42501","denied"],["PGRST202","unavailable"],
+    ] as const){
+      const rpc=vi.fn(async()=>({data:null,error:{code,message:"Server rejected request"}}));
+      await expect(loadMiziziCaseQuestionsV1(scope,rpc)).resolves.toEqual({kind});
+    }
+  });
+  it("fails closed on wrong-workspace dossiers, forged grades and transport exceptions",async()=>{
+    const wrong=vi.fn(async()=>({data:{...ready(),workspaceId:assertion},error:null}));
+    await expect(loadMiziziCaseQuestionsV1(scope,wrong)).resolves.toEqual({kind:"unavailable"});
+    const unproved=vi.fn(async()=>({data:mutated({
+      sources:[{...question.sources[0],familyVerified:false}],
+    }),error:null}));
+    await expect(loadMiziziCaseQuestionsV1(scope,unproved)).resolves.toEqual({kind:"unavailable"});
+    const offline=vi.fn(async()=>{throw new Error("Network unavailable");});
+    await expect(loadMiziziCaseQuestionsV1(scope,offline)).resolves.toEqual({kind:"unavailable"});
+  });
+  it("renders only signed-in QV1 questions and still withholds fabricated verdicts",()=>{
+    const panel=readFileSync("src/pages/admin/review/mizizi/MiziziDurableCasesPanel.tsx","utf8");
+    expect(panel).toContain("loadMiziziCaseQuestionsV1({");
+    expect(panel).toContain("workspaceId:record.workspaceId");
+    expect(panel).toContain("caseRevision:record.caseRevision");
+    expect(panel).toContain('aria-label="Frozen investigation questions"');
+    expect(panel).toContain("No independently assessed source grades or findings are recorded by this reader.");
+    expect(panel).toContain("No independently reviewed question set is connected to this case yet.");
+    expect(panel).not.toContain("Pwani ya Upendo");
   });
 });
