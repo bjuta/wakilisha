@@ -26,7 +26,7 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
       className="border-t border-[var(--wk-border)] bg-[var(--wk-bg)]"
       aria-label="Related articles"
     >
-      <div className="mx-auto w-full max-w-[1060px] px-5 py-10 sm:px-8 sm:py-14">
+      <div className="mx-auto w-full max-w-[1060px] px-5 py-12 sm:px-8 sm:py-16">
         <div className="mb-6 flex items-end justify-between gap-4 border-b border-[var(--wk-border)] pb-4 sm:mb-8">
           <div>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--wk-brand)]">
@@ -63,7 +63,7 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
             Loading related stories…
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
             {stories.map((story) => (
               <Link
                 key={story.slug}
@@ -88,10 +88,10 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
                 <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--wk-brand)]">
                   {story.section}
                 </p>
-                <h3 className="mt-1 text-[17px] font-black leading-[1.2] tracking-[-0.025em] text-[var(--wk-text)] group-hover:text-[var(--wk-brand)]">
+                <h3 className="mt-1 text-[19px] font-bold leading-[1.26] tracking-[-0.025em] text-[var(--wk-text)] group-hover:text-[var(--wk-brand)]">
                   {story.title}
                 </h3>
-                <p className="mt-2 text-[11px] text-[var(--wk-text-muted)]">
+                <p className="mt-2 text-[12px] text-[var(--wk-text-muted)]">
                   {story.author} · {story.readingTime} min read
                 </p>
               </Link>
