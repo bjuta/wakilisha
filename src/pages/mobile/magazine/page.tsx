@@ -299,7 +299,7 @@ export default function MobileMagazine() {
             WAKILISHA Magazine
           </span>
           <p className="text-[20px] font-black tracking-[-0.035em] text-[var(--wk-text)] leading-snug max-w-[320px] mx-auto">
-            Stories that move East African culture forward.
+            Music, art, and stories from East Africa.
           </p>
           <p className="mt-2 text-[11px] text-[var(--wk-text-muted)]">
             Issue {issueNum} &middot; {issueDate}
