@@ -9,6 +9,7 @@ export type WkNavDestination = Readonly<{
   label: string;
   to: string;
   icon: WkIconName;
+  audience?: "public" | "signed-in" | "messages-access";
 }>;
 export type WkNavGroup = Readonly<{
   label: string;
@@ -26,8 +27,8 @@ export const WAKILISHA_NAVIGATION: readonly WkNavGroup[] = [
       { label: "Magazine", to: "/magazine", icon: "NotebookText" },
       { label: "Artists", to: "/artists", icon: "Users" },
       { label: "Following", to: "/following", icon: "Heart" },
-      { label: "Messages", to: "/messages", icon: "MessageSquare" },
-      { label: "Notifications", to: "/notifications", icon: "Bell" },
+      { label: "Messages", to: "/messages", icon: "MessageSquare", audience: "messages-access" },
+      { label: "Notifications", to: "/notifications", icon: "Bell", audience: "signed-in" },
     ],
   },
   {
@@ -60,4 +61,25 @@ export function isWakilishaNavCurrent(pathname: string, to: string): boolean {
   return to === "/"
     ? pathname === "/"
     : pathname === to || pathname.startsWith(to + "/");
+}
+
+
+// A route's presence in the universal product map does not make its
+// destination appropriate for a signed-out visitor. This is presentation
+// authority only. The Router and server-side access guards remain required.
+export function visibleWakilishaNavigation({
+  signedIn,
+  messagesVisible,
+}: {
+  signedIn: boolean;
+  messagesVisible: boolean;
+}): readonly WkNavGroup[] {
+  return WAKILISHA_NAVIGATION.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (item.audience === "signed-in") return signedIn;
+      if (item.audience === "messages-access") return signedIn && messagesVisible;
+      return true;
+    }),
+  })).filter((group) => group.items.length > 0);
 }
