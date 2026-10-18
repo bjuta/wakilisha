@@ -94,6 +94,9 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(following).toContain('data-following-activity');
     expect(following).toContain('mx-auto aspect-square w-full max-w-[520px]');
     expect(following).toContain('mx-auto aspect-[3/2] w-full max-w-[680px]');
+    expect(following).toContain('aria-label="Following feed filters"');
+    expect(following).toContain('reason.targetType === "artist"');
+    expect(following).toContain('visibleItems.map((item)');
     expect(following).toContain('PostActions');
     expect(following).toContain('<FollowingShareAction');
     expect(following).toContain('New work from the people you follow.');
