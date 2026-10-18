@@ -109,7 +109,7 @@ describe("Player and mobile media UX convergence", () => {
 
 
 
-    expect(accountDrawer).toContain("WAKILISHA_NAVIGATION.map");
+    expect(accountDrawer).toContain("navigation.map");
     expect(accountDrawer).toContain("useScrollLock(open)");
     expect(accountDrawer).toContain("Appearance");
     expect(accountDrawer).toContain("Settings");
