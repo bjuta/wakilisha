@@ -1,3 +1,4 @@
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import "@/styles/wakilisha-magazine-38-44.css";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
@@ -359,13 +360,15 @@ export default function MobileArticle() {
       {/* ── Floating content card ── */}
       <div
         key="mobile-article-content-shell"
+        data-wk-article-category={article.section.trim().toLowerCase()}
         className="wk-workbook-article-paper relative z-10 min-h-[360px]"
       >
         <div className="px-5 pt-8 pb-6">
           {/* Section pill + stats */}
           <div className="flex items-center gap-2 mb-5 flex-wrap">
             <span
-              className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand)]"
+              data-wk-article-section
+              className="text-[12px] font-bold uppercase tracking-[0.12em] text-[var(--wk-brand)]"
             >
               {article.section}
             </span>
@@ -381,8 +384,8 @@ export default function MobileArticle() {
 
           {/* Title */}
           <h1
-            className="font-black leading-[0.93] tracking-[-0.045em] text-[var(--wk-text)] mb-4"
-            style={{ fontSize: "clamp(26px, 7.5vw, 40px)" }}
+            className="mb-5 font-bold leading-[1.02] tracking-[-0.04em] text-[var(--wk-text)]"
+            style={{ fontSize: "clamp(32px, 8vw, 46px)" }}
           >
             {article.title}
           </h1>
@@ -466,6 +469,14 @@ export default function MobileArticle() {
       )}
 
       <ArticleRelated stories={relatedStories} loading={relatedLoading} />
+      <div data-wk-article-newsletter className="border-t border-[var(--wk-border)] px-5 py-10">
+        <NewsletterSubscribe
+          formId="article-newsletter-mobile"
+          headline="Read with us"
+          description="Get new stories and charts in your inbox."
+          contextFields={{ wk_page_type: "article", wk_source_section: "article_footer" }}
+        />
+      </div>
 
       {/* Community Action Sheet */}
       {actionEntity && (
