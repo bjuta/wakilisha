@@ -102,6 +102,14 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(shell).not.toContain("h-9 w-9");
     const mobile = read("src/components/mobile/MobileAppLayout.tsx");
     expect(mobile).not.toContain("MobileBottomNav");
+    const desktop = read("src/components/music/MusicDesktopShell.tsx");
+    expect(desktop).toContain("const compactSidebar = sidebarCollapsed || tabletRail;");
+    expect(desktop).toContain("md:flex");
+    expect(desktop).toContain("w-[80px]");
+    expect(desktop).toContain("w-[272px]");
+    expect(desktop).toContain("md:hidden");
+    expect(desktop).toContain("WAKILISHA_NAVIGATION.map");
+
     const compact = read("src/components/design-system/player/PlayerCompactSurface.tsx");
     expect(compact).toContain("calc(env(safe-area-inset-bottom) + 8px)");
     expect(compact).not.toContain("calc(52px + max(env(safe-area-inset-bottom)");
