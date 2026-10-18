@@ -79,8 +79,8 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
             name={article.author}
             personPath={article.authorPersonPath}
             organizationPath={article.authorOrganizationPath}
-            className="w-11 h-11 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[13px] font-black text-[var(--wk-brand-on)] hover:opacity-80 transition-opacity shrink-0"
-            plainClassName="w-11 h-11 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[13px] font-black text-[var(--wk-brand-on)] shrink-0"
+            className="w-11 h-11 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] flex items-center justify-center text-[13px] font-bold text-[var(--wk-text)] hover:opacity-80 transition-opacity shrink-0"
+            plainClassName="w-11 h-11 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] flex items-center justify-center text-[13px] font-bold text-[var(--wk-text)] shrink-0"
           >
             {initials}
           </ArticleAuthorIdentity>
