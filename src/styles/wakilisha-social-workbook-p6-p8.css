@@ -216,8 +216,6 @@
   align-self: start;
   position: sticky;
   top: 12px;
-  border-left: 1px solid var(--wk-divider);
-  min-height: 460px;
   background: var(--wk-surface);
 }
 [data-wk-workbook-screen="notifications"] [data-wk-notifications-preferences] h2 {
