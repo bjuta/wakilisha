@@ -1,8 +1,10 @@
+import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { WkIcon } from "@/components/design-system/Icon";
 import {
   useState,
 } from "react";
 import {
+  Link,
   useLocation,
 } from "react-router-dom";
 import {
@@ -21,6 +23,7 @@ import {
 
 export function MobileTopBar() {
   const location = useLocation();
+  const { theme } = useTheme();
   const authUser = useAuthUser();
   const [searchOpen, setSearchOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -45,9 +48,9 @@ export function MobileTopBar() {
         >
           <WkIcon name="Menu" size={21} />
         </button>
-        <a href="/" aria-label="WAKILISHA home" className="flex min-w-0 flex-1 justify-center">
-          <img src="/assets/logos/wakilisha-logo-dark.svg" alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain" />
-        </a>
+        <Link to="/" aria-label="WAKILISHA home" className="flex min-w-0 flex-1 justify-center">
+          <img src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"} alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain" />
+        </Link>
         <div className="flex items-center gap-1">
           <button
             type="button"
