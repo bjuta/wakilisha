@@ -1,5 +1,6 @@
 import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import "@/styles/wakilisha-magazine-38-44.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
