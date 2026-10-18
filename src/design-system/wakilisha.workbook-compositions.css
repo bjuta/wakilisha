@@ -35,3 +35,10 @@
 .wk-workbook-article-paper :is(h1,h2,h3,blockquote){text-wrap:balance}
 @media(max-width:639px){.wk-editorial-frame[data-wk-artwork-ratio=cinema]{aspect-ratio:16/10}.wk-editorial-section{padding-block:28px}.wk-editorial-intro{padding-block:28px 18px}.wk-editorial-feature-copy{padding:18px}.wk-workbook-article-paper{border-radius:20px 20px 0 0}}
 @media(prefers-reduced-motion:reduce){.wk-editorial-frame-image{transition:none!important}}
+
+/* The social feed is a readable content column; controls share Workbook geometry. */
+[data-wk-workbook-screen=following] [data-following-masthead]{border-bottom:1px solid var(--wk-border);margin-bottom:18px}
+[data-wk-workbook-screen=following] [data-following-masthead] h1{font:800 clamp(34px,4vw,54px)/1 var(--wk-font-ui);letter-spacing:-.045em}
+[data-wk-workbook-screen=messages] textarea{font-family:var(--wk-font-ui)}
+[data-wk-workbook-screen=notifications] nav button[aria-current=page]{background:var(--wk-brand-soft);color:var(--wk-brand)}
+[data-wk-workbook-screen=notifications] nav button[aria-current=page] span{display:none}

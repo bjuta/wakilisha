@@ -2176,7 +2176,7 @@ export default function FollowingPage() {
         robots="noindex,nofollow"
       />
 
-      <div className="mx-auto w-full max-w-[760px] pb-10 pt-5 md:pb-16 md:pt-9">
+      <div className="mx-auto w-full max-w-[760px] pb-10 pt-6 md:pb-16 md:pt-12">
         <header
           data-following-masthead
           className="px-4 pb-4 md:px-0 md:pb-6"
@@ -2195,7 +2195,7 @@ export default function FollowingPage() {
               <Link
                 to="/profile"
                 aria-label="Manage Following"
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[var(--wk-border)] px-3 py-2 text-[11px] font-black text-[var(--wk-text)] transition-colors hover:border-[var(--wk-border-2)] sm:px-4"
+                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-[var(--wk-border)] px-3 py-2 text-[11px] font-black text-[var(--wk-text)] transition-colors hover:border-[var(--wk-border-2)] sm:px-4"
               >
                 <i
                   className="ri-user-settings-line text-[15px]"

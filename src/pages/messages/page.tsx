@@ -603,14 +603,14 @@ export default function MessagesPage() {
 
   return (
     <main data-wk-workbook-screen="messages" className="min-h-[calc(100dvh-80px)] bg-[var(--wk-bg)]">
-      <div className="mx-auto w-full max-w-[1280px] px-3 pb-24 pt-5 sm:px-6 lg:pb-10 lg:pt-8">
+      <div className="mx-auto w-full max-w-[1280px] px-0 pb-8 pt-5 sm:px-5 lg:pb-10 lg:pt-8">
         <div className="mb-4 flex items-end justify-between gap-4 px-1">
           <div>
             <div className="text-[10px] font-black tracking-[0.18em] text-[var(--wk-brand)]">Private communication</div>
             <h1 className="mt-1 text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)]">Messages</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/settings?section=Messages" className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]" aria-label="Messages settings">
+            <Link to="/settings?section=Messages" className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]" aria-label="Messages settings">
               <i className="ri-settings-3-line text-base" />
             </Link>
             <button type="button" onClick={() => setNewOpen(true)} disabled={!messagesAccess.can_start} className="wk-button wk-button-sm wk-button-primary disabled:opacity-45">
@@ -642,7 +642,7 @@ export default function MessagesPage() {
           ))}
         </div>
 
-        <div className="overflow-hidden rounded-[24px] border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-sm lg:grid lg:min-h-[650px] lg:grid-cols-[340px_minmax(0,1fr)]">
+        <div className="overflow-hidden rounded-none border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:min-h-[650px] lg:grid-cols-[340px_minmax(0,1fr)] lg:rounded-[24px] lg:border">
           <section className={`${selectedId ? "hidden lg:block" : "block"} border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
             {loadingList ? (
               <div className="space-y-2 p-3" aria-busy="true">
@@ -697,7 +697,7 @@ export default function MessagesPage() {
             ) : (
               <>
                 <header className="flex items-center gap-3 border-b border-[var(--wk-divider)] px-3 py-3 sm:px-5">
-                  <button type="button" onClick={() => { setSelectedId(null); setDetail(null); }} className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] lg:hidden" aria-label="Back to conversations"><i className="ri-arrow-left-line" /></button>
+                  <button type="button" onClick={() => { setSelectedId(null); setDetail(null); }} className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] lg:hidden" aria-label="Back to conversations"><i className="ri-arrow-left-line" /></button>
                   <Avatar summary={selectedSummary} size="h-9 w-9" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[13px] font-black text-[var(--wk-text)]">{messageDisplayName(selectedSummary.other_participant?.presentation)}</div>
@@ -776,9 +776,9 @@ export default function MessagesPage() {
                         rows={1}
                         maxLength={10000}
                         placeholder="Write a message"
-                        className="max-h-32 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-[13px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
+                        className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-2 py-2 text-[16px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
                       />
-                      <button type="button" onClick={() => void handleSend()} disabled={!composer.trim() || sending} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] disabled:opacity-40" aria-label="Send message"><i className="ri-send-plane-fill" /></button>
+                      <button type="button" onClick={() => void handleSend()} disabled={!composer.trim() || sending} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] disabled:opacity-40" aria-label="Send message"><i className="ri-send-plane-fill" /></button>
                     </div>
                     <div className="mx-auto mt-2 flex max-w-[760px] justify-end gap-2">
                       {folder === "archived" ? (
