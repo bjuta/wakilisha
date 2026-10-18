@@ -1,4 +1,17 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * Do not mistake an in-flight public content request for an empty page.
+ * A settled empty/error state is still NOT published-content visual acceptance.
+ */
+async function waitForSettledMedia(page: Page, name: string) {
+  const surface = page.locator(`[data-wk-workbook-screen="${name}"]`);
+  if (name === "music") {
+    await expect(surface.getByText("Loading music...", { exact: true })).toHaveCount(0, { timeout: 25_000 });
+  } else {
+    await expect(surface.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 25_000 });
+  }
+}
 
 /**
  * Actual same-checkout Vite/React public route captures.
@@ -94,6 +107,7 @@ for (const width of [390, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(surface.path, { waitUntil: "domcontentloaded" });
       await expect(page.locator(`[data-wk-workbook-screen="${surface.name}"]`)).toBeVisible({ timeout: 25_000 });
+      await waitForSettledMedia(page, surface.name);
 
       const overflow = await page.evaluate(() => {
         const root = document.documentElement;
@@ -148,6 +162,7 @@ for (const route of [
       await page.reload({ waitUntil: "domcontentloaded" });
       await expect(page.locator("html")).toHaveAttribute("data-wk-theme", mode);
       await expect(surface).toBeVisible({ timeout: 25_000 });
+      await waitForSettledMedia(page, route.name);
       const logo = page.locator('[data-wk-mobile-app-header="v4"] img[alt="WAKILISHA"]');
       await expect(logo).toHaveAttribute(
         "src",
