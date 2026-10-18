@@ -119,6 +119,9 @@ describe("Workbook v4 is the only active product design authority", () => {
     const mobileStyles = read("src/styles/wakilisha-mobile-workbook-v4.css");
     expect(mobileStyles).not.toContain(".phn-nav--compact");
     expect(mobileStyles).not.toContain(".phn-nav-primary-core");
+    expect(mobileStyles).not.toContain(".wk-thumb-primary");
+    expect(mobileStyles).not.toContain("above nav");
+
 
 
   });
