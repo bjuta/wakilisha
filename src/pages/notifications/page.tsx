@@ -351,7 +351,7 @@ export default function NotificationsPage() {
                   onClick={() =>
                     void handleMarkAll()
                   }
-                  className="hidden min-h-10 rounded-full px-4 text-[12px] font-black text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)] disabled:opacity-50 sm:inline-flex sm:items-center"
+                  className="inline-flex min-h-11 items-center rounded-full px-3 text-[11px] font-bold text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)] disabled:opacity-50 sm:px-4 sm:text-[12px]"
                 >
                   {markingAll
                     ? "Marking..."
@@ -402,14 +402,11 @@ export default function NotificationsPage() {
                   }
                   className={`relative min-h-11 shrink-0 rounded-full px-4 text-[13px] font-semibold transition-colors ${
                     active
-                      ? "text-[var(--wk-text)]"
+                      ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
                       : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
                   }`}
                 >
                   {label}
-                  {active && (
-                    <span className="absolute bottom-0 left-1/2 h-[3px] w-14 -translate-x-1/2 rounded-full bg-[var(--wk-brand)]" />
-                  )}
                 </button>
               );
             })}
@@ -499,22 +496,8 @@ export default function NotificationsPage() {
                       />
                     )}
 
-                    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[var(--wk-surface-raised)]">
-                      {notification.actor?.avatarUrl ? (
-                        <img
-                          src={
-                            notification.actor.avatarUrl
-                          }
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-[var(--wk-text-muted)]">
-                          <i
-                            className={`${icon} text-[18px]`}
-                          />
-                        </span>
-                      )}
+                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" aria-hidden="true">
+                      <i className={`${icon} text-[19px]`} />
                     </div>
 
                     <div className="min-w-0 flex-1">
@@ -589,22 +572,6 @@ export default function NotificationsPage() {
           </div>
         )}
 
-        {unreadCount > 0 && (
-          <div className="border-t border-[var(--wk-border)] px-5 py-4 sm:hidden">
-            <button
-              type="button"
-              disabled={markingAll}
-              onClick={() =>
-                void handleMarkAll()
-              }
-              className="min-h-11 w-full rounded-full border border-[var(--wk-border)] text-[12px] font-black text-[var(--wk-brand)] disabled:opacity-50"
-            >
-              {markingAll
-                ? "Marking..."
-                : "Mark All Read"}
-            </button>
-          </div>
-        )}
       </section>
     </main>
   );
