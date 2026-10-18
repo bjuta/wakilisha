@@ -38,6 +38,11 @@ async function reserveFreePort() {
   });
 }
 
+// Public-route visual acceptance must NEVER inherit production credentials.
+// Actual React screens render with explicit unavailable/offline data states.
+process.env.VITE_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
+process.env.VITE_PUBLIC_SUPABASE_ANON_KEY = "ui-browser-offline-public-only";
+
 const browserPort = await reserveFreePort();
 
 const server = await createServer({
