@@ -1,14 +1,9 @@
 import { WakilishaAccountMark } from "@/components/brand/WakilishaAccountMark";
 import {
-  useEffect,
-} from "react";
-import {
   Link,
   useLocation,
 } from "react-router-dom";
-import {
-  Portal,
-} from "@/components/base/Portal";
+import { Dialog, Modal as AriaModal, ModalOverlay } from "react-aria-components";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WAKILISHA_NAVIGATION, isWakilishaNavCurrent, type WkNavDestination } from "@/components/navigation/wakilishaNavigation";
 import {
@@ -17,9 +12,7 @@ import {
 import {
   useAuthUser,
 } from "@/hooks/useAuthUser";
-import {
-  useScrollLock,
-} from "@/hooks/useScrollLock";
+import { useSessionSignOut } from "@/hooks/useSessionSignOut";
 
 function DrawerNavLink({
   item,
@@ -36,7 +29,7 @@ function DrawerNavLink({
       to={item.to}
       onClick={onNavigate}
       className={[
-        "flex min-h-12 items-center gap-4 rounded-2xl px-3.5 py-2.5 text-[15px] font-black transition-colors",
+        "flex min-h-12 items-center gap-4 rounded-2xl px-3.5 py-2.5 text-[15px] font-bold transition-colors",
         active
           ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
           : "text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]",
@@ -59,6 +52,7 @@ export function MobileAccountDrawer({
 }) {
   const authUser = useAuthUser();
   const { theme, toggle } = useTheme();
+  const { signOut, signingOut, signOutError } = useSessionSignOut("/auth");
   const signedIn = Boolean(authUser.id);
   const displayName = signedIn
     ? authUser.name?.trim()
@@ -68,42 +62,26 @@ export function MobileAccountDrawer({
   const initial =
     displayName.slice(0, 1).toUpperCase() || "W";
 
-  useScrollLock(open);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose, open]);
-
   if (!open) return null;
 
   return (
-    <Portal>
-      <div className="fixed inset-0 z-[170]" role="presentation">
-        <button
-          type="button"
-          className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
-          onClick={onClose}
-          aria-label="Close account menu"
-        />
-
-        <aside
-          data-scroll-lock="container"
-          role="dialog"
-          aria-modal="true"
-          aria-label="WAKILISHA Menu"
-          id="wk-workbook-sidebar"
-          className="absolute inset-y-0 left-0 flex w-[min(82vw,360px)] flex-col overflow-hidden border-r border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl"
-          style={{
-            paddingTop: "max(env(safe-area-inset-top), 12px)",
-            paddingBottom: "max(env(safe-area-inset-bottom), 12px)",
-            animation: "wkAccountDrawerIn 220ms cubic-bezier(.16,1,.3,1)",
-          }}
-        >
+    <ModalOverlay
+      isOpen={open}
+      isDismissable
+      onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}
+      className="fixed inset-0 z-[170] bg-black/50 backdrop-blur-[2px]"
+    >
+      <AriaModal
+        data-scroll-lock="container"
+        id="wk-workbook-sidebar"
+        className="absolute inset-y-0 left-0 flex w-[min(82vw,360px)] flex-col overflow-hidden border-r border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl"
+        style={{
+          paddingTop: "max(env(safe-area-inset-top), 12px)",
+          paddingBottom: "max(env(safe-area-inset-bottom), 12px)",
+          animation: "wkAccountDrawerIn 220ms cubic-bezier(.16,1,.3,1)",
+        }}
+      >
+        <Dialog aria-label="WAKILISHA Menu" className="flex min-h-0 flex-1 flex-col outline-none">
           <div className="flex items-start justify-between gap-4 px-5 pb-4 pt-2">
             <div className="min-w-0">
               <div className="h-14 w-14 overflow-hidden rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] shadow-sm">
@@ -204,16 +182,23 @@ export function MobileAccountDrawer({
               <WkIcon name={signedIn ? "User" : "LogIn"} size={20} />
               <span>{signedIn ? "Profile" : "Sign In"}</span>
             </Link>
+            {signedIn ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void signOut().then((success) => { if (success) onClose(); })}
+                  disabled={signingOut}
+                  className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3.5 py-2.5 text-left text-[14px] font-semibold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] disabled:cursor-wait disabled:opacity-60"
+                >
+                  <WkIcon name="LogOut" size={20} />
+                  <span>{signingOut ? "Signing out" : "Sign out"}</span>
+                </button>
+                {signOutError ? <p role="alert" className="px-3.5 pb-2 text-[12px] text-[var(--wk-danger)]">{signOutError}</p> : null}
+              </>
+            ) : null}
           </div>
-        </aside>
-      </div>
-
-      <style>{`
-        @keyframes wkAccountDrawerIn {
-          from { transform: translateX(-18px); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-      `}</style>
-    </Portal>
+        </Dialog>
+      </AriaModal>
+    </ModalOverlay>
   );
 }
