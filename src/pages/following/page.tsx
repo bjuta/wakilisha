@@ -2188,7 +2188,7 @@ export default function FollowingPage() {
                 Following
               </h1>
               <p className="mt-2 text-[13px] leading-relaxed text-[var(--wk-text-muted)] md:text-[14px]">
-                What’s moving through your circle.
+                New work from the people you follow.
               </p>
             </div>
 
