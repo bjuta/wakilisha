@@ -110,8 +110,8 @@ export default function PublicAudioPage() {
         </div>
         {loading && (
           <div className="mt-8 grid gap-5 lg:grid-cols-[1.2fr_.85fr]" aria-busy="true">
-            <div className="h-[370px] animate-pulse rounded-[20px] bg-[#1c1c1c]" />
-            <div className="h-[370px] animate-pulse rounded-[20px] bg-[#1c1c1c]" />
+            <div className="h-[370px] animate-pulse rounded-[20px] bg-[var(--wk-surface-raised)]" />
+            <div className="h-[370px] animate-pulse rounded-[20px] bg-[var(--wk-surface-raised)]" />
           </div>
         )}
         {!loading && message && <p className="py-12 text-[14px] text-[var(--wk-text-muted)]" role="alert">Audio is temporarily unavailable.</p>}
@@ -154,8 +154,8 @@ export default function PublicAudioPage() {
                     <Link key={show.resourceId} to={show.canonicalPath} className="wk-reference-audio-station group">
                       <span aria-hidden="true" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] font-bold text-[#f5f5f4] group-hover:text-[#85c441]">{show.title}</span>
-                        <span className="mt-1 block truncate text-[12px] text-[#a4a4a4]">{show.episodeCount} episodes</span>
+                        <span className="block truncate text-[15px] font-bold text-[#f5f5f4] group-hover:text-[var(--wk-brand)]">{show.title}</span>
+                        <span className="mt-1 block truncate text-[12px] text-[var(--wk-text-muted)]">{show.episodeCount} episodes</span>
                       </span>
                       <WkIcon name="ArrowUpRight" size={17} />
                     </Link>
