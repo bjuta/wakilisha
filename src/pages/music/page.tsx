@@ -314,10 +314,10 @@ function FollowingMiniList({
           className="mb-3 text-[var(--wk-brand)]"
         />
         <div className="text-[11px] font-black text-[var(--wk-text)]">
-          Your people, here.
+          No new music yet.
         </div>
         <p className="mt-2 max-w-[24ch] text-[10px] font-medium leading-relaxed text-[var(--wk-text-muted)]">
-          Follow Artists and people to bring their new music and Posts into this space.
+          Follow artists and people to see what they release.
         </p>
       </Link>
     );
