@@ -3,8 +3,6 @@ import { createRoot } from "react-dom/client";
 import "@/index.css";
 import "@/design-system/wakilisha.tokens.css";
 import "@/design-system/wakilisha.elements.foundation.css";
-import "@/design-system/wakilisha.elements.product.css";
-import "@/design-system/wakilisha.elements.content.css";
 import "@/design-system/wakilisha.viewport-integrity.css";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 import { WkRadio, WkRadioGroup } from "@/components/design-system/primitives/Radio";

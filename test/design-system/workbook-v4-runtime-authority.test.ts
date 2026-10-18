@@ -15,6 +15,18 @@ describe("Workbook v4 is the only active product design authority", () => {
       "src/components/design-system/player/playerChrome.css",
     ]) expect(existsSync(path)).toBe(false);
     expect(root).not.toMatch(/wakilisha-fonts\.css|mobile-v5|mobile-ch53-75/);
+    const app = read("src/App.tsx");
+    for(const removed of [
+      "wakilisha.elements.product.css",
+      "wakilisha.elements.content.css",
+      "wakilisha.elements.mobile.css",
+    ]) {
+      expect(app).not.toContain(removed);
+      expect(existsSync("src/design-system/"+removed)).toBe(false);
+    }
+    expect(read("src/design-system/wakilisha.elements.foundation.css")).toContain("width: 44px;");
+    expect(read("test/ui-browser/fixtures/interaction.tsx")).not.toContain("wakilisha.elements.content.css");
+
     expect(read("src/components/mobile/ResponsiveAppLayout.tsx")).not.toContain("playerChrome.css");
   });
   it("preserves authentic, hash-checked fonts and never imports a font fallback system", () => {

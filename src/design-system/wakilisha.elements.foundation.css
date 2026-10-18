@@ -88,3 +88,30 @@ input.wk-input:-webkit-autofill:focus{
   box-shadow:0 0 0 1000px var(--wk-surface) inset;
   transition:background-color 9999s ease-out 0s;
 }
+
+
+/* Shared public identity social-link primitive. */
+.wk-identity-socials {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.wk-identity-social-link {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--wk-r-control);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wk-text-muted);
+  background: var(--wk-surface-raised);
+  border: 1px solid var(--wk-border);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.wk-identity-social-link:hover {
+  color: var(--wk-brand);
+  border-color: var(--wk-brand);
+  background: var(--wk-brand-soft);
+}
