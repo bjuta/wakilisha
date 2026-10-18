@@ -103,6 +103,8 @@
 /* P7: familiar private correspondence, list left and thread right. */
 [data-wk-workbook-screen="messages"] [data-wk-message-list] {
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
   background: var(--wk-surface);
 }
 [data-wk-workbook-screen="messages"] [data-wk-messages-list-header] {
@@ -265,11 +267,15 @@
   [data-wk-workbook-screen="following"] [data-wk-following-composer-entry] {
     padding: 12px;
   }
-  [data-wk-workbook-screen="messages"] [data-wk-message-thread] {
-    min-height: calc(100dvh - 120px);
+  [data-wk-workbook-screen="messages"] [data-wk-message-thread][data-wk-thread-selected="true"] {
+    min-height: 0;
+    height: calc(100dvh - 64px);
+    overflow: hidden;
   }
   [data-wk-workbook-screen="messages"] [data-wk-message-history] {
     min-height: 0;
+    flex: 1;
+    overflow-y: auto;
   }
   [data-wk-workbook-screen="messages"] [data-wk-message-composer] {
     position: sticky;
