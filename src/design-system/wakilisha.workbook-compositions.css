@@ -42,3 +42,6 @@
 [data-wk-workbook-screen=messages] textarea{font-family:var(--wk-font-ui)}
 [data-wk-workbook-screen=notifications] nav button[aria-current=page]{background:var(--wk-brand-soft);color:var(--wk-brand)}
 [data-wk-workbook-screen=notifications] nav button[aria-current=page] span{display:none}
+
+/* Podcast/show pages get square source-truthful covers and episode-led rows. */
+.wk-editorial-frame[data-wk-artwork-ratio=square]{border:1px solid var(--wk-border)}
