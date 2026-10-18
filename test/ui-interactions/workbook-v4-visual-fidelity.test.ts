@@ -200,7 +200,7 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(messages).toContain('aria-label="Conversation actions"');
     expect(notifications).toContain('data-wk-notification-type={notification.notificationType}');
     expect(notifications).toContain('wk-notification-event-icon');
-    expect(notifications).toContain('new_release: "ri-disc-3-line"');
+    expect(notifications).toContain('new_release: "ri-disc-line"');
     expect(notifications).toContain('post_like: "ri-heart-line"');
     expect(notifications).toContain('reply: "ri-chat-3-line"');
     expect(notifications).toContain('notification.actor?.avatarUrl');
