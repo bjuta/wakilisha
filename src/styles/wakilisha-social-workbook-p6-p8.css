@@ -1,0 +1,277 @@
+/*
+ * WAKILISHA Brand Workbook P6 Following, P7 Messages, P8 Notifications.
+ * Reproduce the workbook's geometry, type hierarchy, event grammar and
+ * screen relationships. Live records, permissions and controls remain canonical.
+ * Both palettes use existing WAKILISHA tokens. No prototype content.
+ */
+
+[data-wk-workbook-screen="following"],
+[data-wk-workbook-screen="messages"],
+[data-wk-workbook-screen="notifications"] {
+  min-width: 0;
+  background: var(--wk-bg);
+  color: var(--wk-text);
+  font-family: "Figtree", "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-wk-workbook-screen="following"] [data-wk-following-layout] {
+  background: var(--wk-surface);
+  border-inline: 1px solid var(--wk-divider);
+}
+[data-wk-workbook-screen="following"] [data-following-masthead] {
+  min-height: 56px;
+}
+[data-wk-workbook-screen="following"] [data-wk-following-timeline] {
+  min-width: 0;
+}
+[data-wk-workbook-screen="following"] [data-wk-following-composer] {
+  background: var(--wk-surface);
+}
+[data-wk-workbook-screen="following"] [data-wk-following-composer-entry] button:focus-visible,
+[data-wk-workbook-screen="following"] [data-following-masthead] button:focus-visible {
+  outline: 2px solid var(--wk-brand);
+  outline-offset: -2px;
+}
+[data-wk-workbook-screen="following"] article[data-following-activity] {
+  grid-template-columns: 44px minmax(0,1fr);
+  column-gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--wk-divider);
+  scroll-margin-top: 70px;
+}
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-header] {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0;
+}
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-caption],
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-media],
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-body] {
+  grid-column: 2;
+  min-width: 0;
+  margin-left: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-caption] {
+  padding-top: 7px;
+}
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-media] {
+  margin-top: 10px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+[data-wk-workbook-screen="following"] article[data-following-activity] [data-following-body] {
+  padding-top: 10px;
+}
+[data-wk-workbook-screen="following"] article[data-following-activity] [data-following-body] h2 {
+  font-size: 17px;
+  font-weight: 750;
+  line-height: 1.25;
+  letter-spacing: -.025em;
+}
+[data-wk-workbook-screen="following"] article[data-following-activity] [data-following-caption] p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+[data-wk-workbook-screen="following"] [data-following-actions] {
+  border-top: none;
+  margin-top: 10px;
+  padding-top: 0;
+  gap: 5px;
+}
+[data-wk-workbook-screen="following"] [data-following-actions] :is(a,button) {
+  min-width: 34px;
+  min-height: 38px;
+  padding: 6px;
+  color: var(--wk-text-muted);
+}
+[data-wk-workbook-screen="following"] [data-following-actions] :is(a,button):hover {
+  color: var(--wk-brand);
+}
+[data-wk-workbook-screen="following"] [data-wk-following-discovery] {
+  background: var(--wk-surface);
+  align-self: start;
+  position: sticky;
+  top: 12px;
+}
+[data-wk-workbook-screen="following"] [data-wk-following-discovery] h2 {
+  font-size: 19px;
+  line-height: 1.25;
+}
+
+/* P7: familiar private correspondence, list left and thread right. */
+[data-wk-workbook-screen="messages"] [data-wk-message-list] {
+  min-width: 0;
+  background: var(--wk-surface);
+}
+[data-wk-workbook-screen="messages"] [data-wk-messages-list-header] {
+  height: 56px;
+}
+[data-wk-workbook-screen="messages"] [data-wk-messages-list-header] h1 {
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -.025em;
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-folders] {
+  min-width: 0;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-folders] button {
+  font-size: 11px;
+  min-height: 34px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-search] {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-conversation] {
+  min-height: 68px;
+  align-items: flex-start;
+  line-height: 1.4;
+  border-bottom: 1px solid var(--wk-divider);
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-conversation] [class*="font-bold"] {
+  font-weight: 750;
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-conversation][aria-current="true"] {
+  background: var(--wk-surface-raised);
+  border-left-color: var(--wk-brand);
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-thread] {
+  min-height: 0;
+  background: var(--wk-bg);
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-thread-header] {
+  height: 56px;
+  background: var(--wk-surface);
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-history] {
+  min-height: 260px;
+  overscroll-behavior: contain;
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-bubble] {
+  max-width: min(76%, 520px);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  box-shadow: none;
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-composer] {
+  flex-shrink: 0;
+  background: var(--wk-surface);
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-composer] textarea {
+  min-width: 0;
+  color: var(--wk-text);
+  background: transparent;
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-composer] textarea::placeholder {
+  color: var(--wk-text-muted);
+}
+
+/* P8: event first, then actual actor, copy, time and actionable destination. */
+[data-wk-workbook-screen="notifications"] > div {
+  background: var(--wk-surface);
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-row] {
+  gap: 14px;
+  min-height: 72px;
+  border-bottom: 1px solid var(--wk-divider);
+  background: var(--wk-surface);
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-row]:hover {
+  background: var(--wk-surface-raised);
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-row] .wk-notification-event-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--wk-surface-raised);
+  color: var(--wk-text-muted);
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="reply"] .wk-notification-event-icon,
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="new_comment"] .wk-notification-event-icon,
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="mention"] .wk-notification-event-icon,
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="post_mention"] .wk-notification-event-icon {
+  color: #22A6CD;
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="follow"] .wk-notification-event-icon {
+  color: #A18CEF;
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="contribution_approved"] .wk-notification-event-icon,
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="contribution_merged"] .wk-notification-event-icon,
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="credit_confirmation_request"] .wk-notification-event-icon,
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="credit_confirmation_response"] .wk-notification-event-icon {
+  color: var(--wk-brand);
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-type="direct_message"] .wk-notification-event-icon {
+  color: #D3A346;
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-row] p {
+  overflow-wrap: anywhere;
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notifications-preferences] {
+  align-self: start;
+  position: sticky;
+  top: 12px;
+  border-left: 1px solid var(--wk-divider);
+  min-height: 460px;
+  background: var(--wk-surface);
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notifications-preferences] h2 {
+  font-size: 19px;
+  letter-spacing: -.025em;
+}
+[data-wk-workbook-screen="notifications"] nav[aria-label="Notification filters"] button {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+[data-wk-workbook-screen="notifications"] nav[aria-label="Notification filters"] button[aria-current="page"] {
+  background: var(--wk-text);
+  color: var(--wk-bg);
+}
+[data-wk-workbook-screen="notifications"] nav[aria-label="Notification filters"] button:not([aria-current="page"]) {
+  color: var(--wk-text-muted);
+}
+
+/* Mobile follows the reference's single timeline, independent thread,
+   scrollable filters and persistent full-width composer. */
+@media (max-width: 1023px) {
+  [data-wk-workbook-screen="following"] [data-wk-following-layout] {
+    border: 0;
+  }
+  [data-wk-workbook-screen="following"] [data-wk-following-timeline] {
+    width: 100%;
+  }
+  [data-wk-workbook-screen="notifications"] [data-wk-notification-row] {
+    padding-inline: 16px;
+  }
+}
+@media (max-width: 639px) {
+  [data-wk-workbook-screen="following"] article[data-following-activity] {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 10px;
+    padding: 14px 12px;
+  }
+  [data-wk-workbook-screen="following"] [data-wk-following-composer-entry] {
+    padding: 12px;
+  }
+  [data-wk-workbook-screen="messages"] [data-wk-message-thread] {
+    min-height: calc(100dvh - 120px);
+  }
+  [data-wk-workbook-screen="messages"] [data-wk-message-history] {
+    min-height: 0;
+  }
+  [data-wk-workbook-screen="messages"] [data-wk-message-composer] {
+    position: sticky;
+    bottom: 0;
+    z-index: 15;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  [data-wk-workbook-screen="notifications"] [data-wk-notification-row] {
+    padding: 14px 12px;
+    gap: 10px;
+  }
+}
