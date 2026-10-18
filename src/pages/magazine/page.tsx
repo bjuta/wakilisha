@@ -344,22 +344,6 @@ export default function Magazine() {
       render: () => <FeaturedGuideSpotlight />,
     });
 
-    // Newsletter
-    defs.push({
-      id: "newsletter",
-      render: () => (
-        <NewsletterSubscribe
-          formId="magazine-newsletter-form"
-          headline="Read with us"
-          description="Get weekly analysis, chart commentary, and industry signals delivered to your inbox."
-          contextFields={{ wk_page_type: "magazine", wk_source_section: "newsletter_footer" }}
-          analytics={{
-            pageType: "magazine",
-          }}
-        />
-      ),
-    });
-
     // Order: prefer saved order, fall back to default
     if (sectionOrder.length > 0) {
       const ordered = sectionOrder
@@ -609,6 +593,10 @@ export default function Magazine() {
           </div>
         )}
 
+        <div data-wk-magazine-newsletter className="mx-auto w-full max-w-[800px] border-t border-[var(--wk-border)] pt-10">
+          <NewsletterCTA />
+        </div>
+
         {/* ── Footer ── */}
         <footer className="border-t border-[var(--wk-border)] pt-14 pb-8 text-center">
           <span className="text-[9px] font-black uppercase tracking-[0.24em] text-[var(--wk-brand)] mb-3 block">
@@ -682,9 +670,9 @@ function CompactCardFill({ story, rank }: { story: MagazineArticle; rank: number
   return (
     <Link
       to={url}
-      className="group flex gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 hover:border-[var(--wk-border-strong)] hover:bg-[var(--wk-surface-raised)] transition-all duration-300 w-full h-full"
+      className="group flex h-full w-full gap-4 border-b border-[var(--wk-border)] py-4"
     >
-      <div className="w-24 shrink-0 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)] self-stretch min-h-[90px]">
+      <div className="aspect-[3/2] w-[38%] shrink-0 overflow-hidden rounded-[12px] bg-[var(--wk-surface-raised)]">
         {story.heroUrl ? (
           <ResponsiveMediaImage
             src={story.heroUrl}
@@ -708,7 +696,7 @@ function CompactCardFill({ story, rank }: { story: MagazineArticle; rank: number
           <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">{story.section}</span>
           <span className="text-[10px] font-bold text-[var(--wk-text-faint)] opacity-40">#{rank}</span>
         </div>
-        <h4 className="text-[14px] font-black tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
+        <h4 className="line-clamp-2 text-[17px] font-bold leading-[1.25] tracking-[-0.02em] text-[var(--wk-text)] group-hover:text-[var(--wk-brand)]">
           {story.title}
         </h4>
         {story.dek && (
@@ -733,7 +721,7 @@ function NewsletterCTA() {
       <NewsletterSubscribe
         formId="magazine-newsletter-form"
         headline="Read with us"
-        description="Get weekly analysis, chart commentary, and industry signals delivered to your inbox."
+        description="Get new stories and charts in your inbox."
         contextFields={{ wk_page_type: "magazine", wk_source_section: "newsletter_footer" }}
       />
     </section>
