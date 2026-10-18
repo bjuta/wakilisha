@@ -262,7 +262,7 @@ export default function MobileArticle() {
 
         <div
           key="mobile-article-content-shell"
-          className="relative z-10 min-h-[360px] rounded-t-[24px] bg-[var(--wk-bg)]"
+          className="relative z-10 min-h-[360px] bg-[var(--wk-bg)]"
           style={{
             marginTop: "-60px",
           }}
@@ -363,7 +363,7 @@ export default function MobileArticle() {
       {/* ── Floating content card ── */}
       <div
         key="mobile-article-content-shell"
-        className="relative z-10 min-h-[360px] bg-[var(--wk-bg)]"
+        className="wk-workbook-article-paper relative z-10 min-h-[360px]"
       >
         <div className="px-5 pt-8 pb-6">
           {/* Section pill + stats */}
