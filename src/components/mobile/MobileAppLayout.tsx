@@ -25,7 +25,7 @@ export function MobileAppLayout() {
       data-wk-workbook-mobile-shell="v4"
       style={{
         paddingBottom: !shellless && currentTrack
-          ? "calc(72px + env(safe-area-inset-bottom))"
+          ? "calc(84px + env(safe-area-inset-bottom))"
           : undefined,
       }}
     >
