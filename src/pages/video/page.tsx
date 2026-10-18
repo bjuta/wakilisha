@@ -102,6 +102,11 @@ export default function VideoIndexPage() {
             </div>
           </div>
 
+          {!featured && (
+            <header className="px-5 pb-5 pt-3 sm:px-9">
+              <h1 className="text-[clamp(38px,5vw,62px)] font-extrabold uppercase leading-[.95] tracking-[-.05em] text-[var(--wk-text)]">Video</h1>
+            </header>
+          )}
           {featured && (
             <Link to={featured.canonicalPath} className="wk-reference-media-hero group" aria-label={`Watch ${featured.title}`}>
               <WkEditorialArtworkFrame src={featured.poster?.url} alt={featured.title} ratio="cinema" />
