@@ -1,0 +1,347 @@
+/* Direct implementation authority: uploaded WAKILISHA workbook P1-P3, P6-P11.
+   P4 Artists and P5 Artist detail are excluded.
+   The original screens use night #0b0b0b, Figtree, 232px side rail,
+   square music art, 16:9 motion, 9:16 shorts, 3:2 editorial photography.
+   UI copy and imagery come from live services, never demonstration records. */
+
+:is(
+  [data-wk-workbook-screen="video"],
+  [data-wk-workbook-screen="audio"],
+  [data-wk-workbook-screen="podcasts"],
+  [data-wk-workbook-screen="following"],
+  [data-wk-workbook-screen="messages"],
+  [data-wk-workbook-screen="notifications"],
+  [data-wk-workbook-screen="music"],
+  [data-wk-workbook-screen="magazine"],
+  [data-wk-workbook-screen="magazine-mobile"]
+) {
+  --wk-bg: #0b0b0b;
+  --wk-bg-subtle: #101010;
+  --wk-surface: #151515;
+  --wk-surface-raised: #1c1c1c;
+  --wk-surface-strong: #262626;
+  --wk-text: #f5f5f4;
+  --wk-text-soft: #d0d0cf;
+  --wk-text-muted: #a4a4a4;
+  --wk-text-faint: #898989;
+  --wk-border: rgba(255, 255, 255, .09);
+  --wk-border-2: rgba(255, 255, 255, .14);
+  --wk-border-strong: rgba(255, 255, 255, .2);
+  --wk-divider: rgba(255, 255, 255, .09);
+  --wk-brand: #85c441;
+  --wk-brand-soft: rgba(133,196,65,.14);
+  --wk-brand-on: #0b0b0b;
+  background: #0b0b0b;
+  color: #f5f5f4;
+  font-family: "Figtree", sans-serif;
+}
+:is(
+  [data-wk-workbook-screen="video"],
+  [data-wk-workbook-screen="audio"],
+  [data-wk-workbook-screen="podcasts"],
+  [data-wk-workbook-screen="following"],
+  [data-wk-workbook-screen="messages"],
+  [data-wk-workbook-screen="notifications"],
+  [data-wk-workbook-screen="music"],
+  [data-wk-workbook-screen="magazine"],
+  [data-wk-workbook-screen="magazine-mobile"]
+) :is(button,a):focus-visible {
+  outline: 2px solid #85c441;
+  outline-offset: 3px;
+}
+:is(
+ [data-wk-workbook-screen="video"],
+ [data-wk-workbook-screen="audio"],
+ [data-wk-workbook-screen="podcasts"]
+) .wk-editorial-intro {
+  padding: 44px 0 26px;
+}
+:is(
+ [data-wk-workbook-screen="video"],
+ [data-wk-workbook-screen="audio"],
+ [data-wk-workbook-screen="podcasts"]
+) .wk-editorial-title {
+  font-size: clamp(50px, 7vw, 76px);
+  line-height: .97;
+  font-weight: 800;
+  letter-spacing: -.055em;
+  text-transform: uppercase;
+}
+:is(
+ [data-wk-workbook-screen="video"],
+ [data-wk-workbook-screen="audio"],
+ [data-wk-workbook-screen="podcasts"]
+) .wk-editorial-dek {
+  max-width: 60ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: rgba(245,245,244,.72);
+}
+.wk-reference-pills {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-block: 8px;
+}
+.wk-reference-pills::-webkit-scrollbar { display:none; }
+.wk-reference-pill {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 0 15px;
+  border-radius: 999px;
+  background: #1c1c1c;
+  color: #c9c9c9;
+  font-size: 12px;
+  font-weight: 600;
+}
+.wk-reference-pill[aria-pressed="true"], .wk-reference-pill[aria-current="page"] {
+  background: #f5f5f4;
+  color: #0b0b0b;
+}
+.wk-reference-section-heading {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -.025em;
+  line-height: 1.18;
+  color: #f5f5f4;
+}
+.wk-reference-media-hero {
+  position: relative;
+  display: grid;
+  min-height: min(430px, 70vw);
+  overflow: hidden;
+  align-items: end;
+  background: #101010;
+  isolation: isolate;
+}
+.wk-reference-media-hero .wk-editorial-frame {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  z-index: -2;
+}
+.wk-reference-media-hero .wk-editorial-frame-image {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+.wk-reference-media-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(0deg,rgba(0,0,0,.9) 0%,rgba(0,0,0,.42) 48%,rgba(0,0,0,.12) 100%);
+}
+.wk-reference-media-hero-copy {
+  max-width: 860px;
+  padding: clamp(24px,4vw,48px);
+}
+.wk-reference-media-hero-title {
+  max-width: 13ch;
+  font-size: clamp(40px, 6.1vw, 82px);
+  font-weight: 800;
+  line-height: .92;
+  letter-spacing: -.052em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.wk-reference-hero-caption {
+  max-width: 55ch;
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #d9d9d9;
+}
+.wk-reference-media-grid {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 14px;
+}
+.wk-reference-media-grid [data-wk-video-card] { min-width: 0; }
+.wk-reference-media-grid :is(img,video) { object-fit: cover; }
+.wk-reference-podcast-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: linear-gradient(145deg,#996535,#351e08 70%,#17130f);
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.wk-reference-audio-art {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(145deg,#319f93,#084639 68%,#132b28);
+}
+.wk-reference-audio-art button {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f5f5f4;
+  color: #0b0b0b;
+}
+.wk-reference-audio-station {
+  display: flex;
+  align-items: center;
+  min-height: 72px;
+  gap: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  background: #151515;
+  padding: 12px;
+}
+.wk-reference-audio-station > :first-child {
+  width: 56px;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background: linear-gradient(150deg,#b87554,#4b240f);
+}
+[data-wk-workbook-screen="magazine"] {
+  --wk-story-category-ink: #85c441;
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) :is(.mag-cover,.wk-magazine-cover) {
+  color: #f5f5f4;
+  background: #111;
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-story] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-story] img {
+  border-radius: 12px;
+  object-fit: cover;
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-story]:not(.group.relative) [class*="aspect-"] {
+  aspect-ratio: 3 / 2;
+  border-radius: 12px;
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-story] span[class*="uppercase"] {
+  color: var(--wk-story-category-ink,#85c441);
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-newsletter] {
+  border-top: 0;
+  background: #0b0b0b;
+  color: #f5f5f4;
+  text-align: center;
+  padding: 72px 18px;
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-newsletter] > :is(div,section) {
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-newsletter] :is(h2,h3) {
+  font-size: clamp(26px, 3.5vw, 36px);
+  line-height: 1.1;
+  font-weight: 800;
+  color: #f5f5f4;
+  text-transform: none;
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-newsletter] button[type="submit"] {
+  background: #f5f5f4;
+  color: #0b0b0b;
+}
+[data-wk-workbook-screen="notifications"] > div {
+  max-width: none;
+}
+[data-wk-workbook-screen="notifications"] :is(aside[aria-label="Notification preferences"],section) {
+  background: #0b0b0b;
+  border-color: rgba(255,255,255,.09);
+}
+[data-wk-workbook-screen="notifications"] aside[aria-label="Notification preferences"] {
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 20px;
+  padding: 24px;
+  margin-top: 8px;
+}
+[data-wk-workbook-screen="notifications"] aside[aria-label="Notification preferences"] > h2 { font-size: 20px; font-weight: 800; }
+[data-wk-workbook-screen="notifications"] h1 { font-size: 20px; font-weight: 800; }
+[data-wk-workbook-screen="notifications"] article {
+  border-color: rgba(255,255,255,.09);
+}
+[data-wk-workbook-screen="messages"] {
+  min-height: calc(100dvh - 70px);
+}
+[data-wk-workbook-screen="messages"] h1 {
+  font-size: 20px;
+  font-weight: 800;
+}
+[data-wk-workbook-screen="messages"] [aria-label="Conversation"] {
+  min-height: min(75dvh,900px);
+  background: #0b0b0b;
+}
+[data-wk-workbook-screen="messages"] input,
+[data-wk-workbook-screen="messages"] textarea {
+  color: #f5f5f4;
+  background: #1c1c1c;
+}
+[data-wk-workbook-screen="following"] [data-following-activity] {
+  border-bottom: 1px solid rgba(255,255,255,.09);
+}
+[data-wk-workbook-screen="following"] :is(h1,h2,h3) {
+  color: #f5f5f4;
+}
+[data-wk-workbook-screen="following"] [data-following-activity] img {
+  border-radius: 12px;
+}
+[data-wk-workbook-screen="music"] {
+  --wk-bg: #0b0b0b;
+}
+[data-wk-workbook-screen="music"] .wk-music-hero {
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+  background: #171108;
+}
+[data-wk-workbook-screen="music"] .wk-music-hero h1 {
+  font-size: clamp(52px,7vw,86px);
+  line-height: .9;
+  font-weight: 800;
+}
+[data-wk-workbook-screen="music"] #music-genres {
+  border-bottom: 0;
+}
+[data-wk-workbook-screen="music"] #music-genres [class*="aspect-square"] {
+  aspect-ratio: 1;
+  border-radius: 16px;
+}
+[data-wk-workbook-screen="music"] .wk-reference-pill,
+[data-wk-workbook-screen="music"] nav[aria-label="Music discovery"] a {
+  background: #1c1c1c;
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+}
+[data-wk-workbook-screen="music"] nav[aria-label="Music discovery"] {
+  border: 0;
+  padding-top: 18px;
+}
+[data-wk-workbook-screen="music"] nav[aria-label="Music discovery"] a:first-child {
+  background: #f5f5f4;
+  color: #0b0b0b;
+}
+@media(max-width:767px) {
+  .wk-reference-media-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .wk-reference-media-hero { min-height: 500px; }
+  .wk-reference-media-hero-title { font-size: clamp(38px,10vw,54px); }
+  [data-wk-workbook-screen="music"] .wk-music-hero { border-radius:0; }
+  [data-wk-workbook-screen="notifications"] aside[aria-label="Notification preferences"] { display:none; }
+}
