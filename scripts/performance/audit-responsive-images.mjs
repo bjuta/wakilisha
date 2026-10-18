@@ -32,7 +32,7 @@ const targets = [
   },
   {
     path: "src/pages/mobile/magazine/page.tsx",
-    expected: 7,
+    expected: 1,
   },
   {
     path: "src/pages/magazine/article/page.tsx",
@@ -41,12 +41,12 @@ const targets = [
   {
     path:
       "src/pages/magazine/article/components/ArticleRelated.tsx",
-    expected: 2,
+    expected: 1,
   },
   {
     path:
       "src/pages/mobile/magazine/article/page.tsx",
-    expected: 3,
+    expected: 2,
   },
 ];
 
@@ -80,6 +80,26 @@ for (const marker of [
   }
 }
 
+const magazineCard = read(
+  "src/pages/magazine/components/MagazineCard.tsx",
+);
+
+const mobileMagazine = read(
+  "src/pages/mobile/magazine/page.tsx",
+);
+
+// The mobile Magazine now composes all non-hero images from its shared card.
+// Their responsive load authority remains enforced, not merely counted.
+if (
+  !mobileMagazine.includes(
+    'import { MagazineCard } from "@/pages/magazine/components/MagazineCard";',
+  )
+  || !mobileMagazine.includes("<MagazineCard")
+  || !magazineCard.includes('fetchPriority="low"')
+) {
+  fail("Mobile Magazine secondary imagery must retain shared low-priority card authority");
+}
+
 const articlePage = read(
   "src/pages/magazine/article/page.tsx",
 );
@@ -104,10 +124,10 @@ const articleRelated = read(
 
 for (const marker of [
   'preset="feature"',
-  'preset="thumbnail"',
   'loading="lazy"',
   'fetchPriority="low"',
   'decoding="async"',
+  'aspect-[3/2]',
 ]) {
   if (!articleRelated.includes(marker)) {
     fail(
@@ -122,11 +142,11 @@ const mobileArticlePage = read(
 
 for (const marker of [
   'preset="hero"',
-  'preset="thumbnail"',
   'loading="eager"',
   'fetchPriority="high"',
   'decoding="async"',
   'data-wakilisha-article-hero="true"',
+  '<ArticleRelated',
 ]) {
   if (!mobileArticlePage.includes(marker)) {
     fail(
@@ -212,19 +232,25 @@ if (
   );
 }
 
+// Both mobile Article states retain their keyed 360px content geometry.
+// Workbook v4 deliberately removes the former rounded floating sheet.
 if (
   !mobileArticlePage.includes(
-    'className="relative z-10 min-h-[360px] rounded-t-[24px] bg-[var(--wk-bg)]"',
+    'key="mobile-article-content-shell"\n          className="relative z-10 min-h-[360px] bg-[var(--wk-bg)]"',
   )
+  || !mobileArticlePage.includes(
+    'className="wk-workbook-article-paper relative z-10 min-h-[360px]"',
+  )
+  || mobileArticlePage.includes('rounded-t-[24px]')
 ) {
   fail(
-    "Mobile Article content shell must preserve its 360px minimum geometry through loading-to-ready reconciliation",
+    "Mobile Article loading/ready shells must preserve 360px flat editorial geometry",
   );
 }
 
 const mobileArticleReadyRootIndex =
   mobileArticlePage.lastIndexOf(
-    '<div className="min-h-screen bg-[var(--wk-bg)]">',
+    '<div data-wk-workbook-screen="article-mobile" className="min-h-screen bg-[var(--wk-bg)]">',
   );
 
 const mobileArticleReadyHeroIndex =
@@ -435,7 +461,7 @@ const articleReadyMainIndex =
 
 const articleReadyHeroIndex =
   articlePage.lastIndexOf(
-    '<section key="article-hero-shell"',
+    '<section data-wk-workbook-hero="article" key="article-hero-shell"',
   );
 
 const articleMetaIndex =

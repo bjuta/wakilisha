@@ -74,9 +74,11 @@ export function ArticleRelated({ stories, loading, issueContext }: ArticleRelate
                   {story.heroUrl ? (
                     <ResponsiveMediaImage
                       src={story.heroUrl}
-                      preset="thumbnail"
+                      preset="feature"
                       alt=""
                       loading="lazy"
+                      fetchPriority="low"
+                      decoding="async"
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     />
                   ) : (
