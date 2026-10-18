@@ -37,7 +37,8 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(mobile.indexOf("<MobileNewsletterCTA />")).toBeGreaterThan(
       mobile.indexOf('aria-live="polite"'),
     );
-    expect(article).toContain('className="relative aspect-[3/2] overflow-hidden"');
+    expect(article).toContain('className="relative flex h-[min(50vw,520px)]');
+    expect(article).toContain('wk-reference-article-columns');
     expect(articleMobile).toContain('className="relative aspect-[4/5] overflow-hidden"');
     const articleCss = read("src/styles/wakilisha-article-prose.css");
     expect(articleCss).toContain("font-size: 19px;");
@@ -72,6 +73,14 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(css).toContain('border-radius: 24px');
     expect(css).toContain('color: var(--wk-text)');
     expect(css).not.toMatch(/--wk-bg\\s*:/);
+    const workbookCss = read("src/styles/wakilisha-workbook-p1-p11-authority.css");
+    const magazineCss = read("src/styles/wakilisha-magazine-38-44.css");
+    for (const stylesheet of [css, workbookCss, magazineCss]) {
+      expect(stylesheet).not.toMatch(/^\\s*--wk-(bg|text|brand)\\s*:/m);
+    }
+    expect(workbookCss).toContain("background: var(--wk-bg)");
+    expect(workbookCss).toContain("color: var(--wk-text)");
+    expect(workbookCss).toContain(".wk-reference-article-columns");
     const theme = read("src/design-system/wakilisha.tokens.css");
     expect(theme).toContain("[data-wk-theme='dark']");
     expect(theme).toContain("[data-wk-theme='light']");
