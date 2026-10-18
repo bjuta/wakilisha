@@ -762,18 +762,12 @@
 }
 
 
-/* Workbook magazine article visual fidelity 2026. The editorial body is warm
-   paper after the dark full-bleed cover. Photographs stay rectangular. */
+/* P11 workbook reading surface: warm paper in light mode; night ink in dark.
+   The photographed cover remains separate from the reading canvas. */
 .wk-workbook-article-paper {
-  --wk-bg: #f5f2ec;
-  --wk-surface: #f5f2ec;
-  --wk-surface-raised: #eeebe4;
-  --wk-text: #202020;
-  --wk-text-soft: #414141;
-  --wk-text-muted: #5c5c5c;
-  --wk-border: #dcd7cd;
-  --wk-editorial-category-ink: #4e7425;
-  background: #f5f2ec;
+  --wk-editorial-category-ink: var(--wk-brand);
+  background: var(--wk-wb-article-paper, var(--wk-bg));
+  color: var(--wk-text);
   border-radius: 0;
 }
 [data-wk-article-category*="album"] { --wk-editorial-category-ink: #93552e; }
@@ -817,7 +811,7 @@
   border-radius: 0;
 }
 [data-wk-article-newsletter] {
-  background: #fcfcfb;
+  background: var(--wk-wb-article-paper, var(--wk-bg));
 }
 [data-wk-article-newsletter] :is(h2, h3) {
   font-size: clamp(26px, 3vw, 34px);
@@ -837,11 +831,11 @@
 }
 
 .wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) blockquote {
-  border-left: 4px solid #202020;
+  border-left: 4px solid var(--wk-wb-quote-rule, var(--wk-text));
   padding: 10px 0 10px 20px;
   margin-block: 36px;
   background: transparent;
-  color: #202020;
+  color: var(--wk-text);
   font-size: clamp(20px, 3vw, 28px);
   font-weight: 600;
   line-height: 1.38;
@@ -860,6 +854,6 @@
 }
 [data-wk-article-newsletter] button[type="submit"] {
   min-height: 48px;
-  background: #202020;
-  color: #fff;
+  background: var(--wk-text);
+  color: var(--wk-bg);
 }
