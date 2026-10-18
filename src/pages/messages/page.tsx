@@ -602,7 +602,7 @@ export default function MessagesPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-80px)] bg-[var(--wk-bg)]">
+    <main data-wk-workbook-screen="messages" className="min-h-[calc(100dvh-80px)] bg-[var(--wk-bg)]">
       <div className="mx-auto w-full max-w-[1280px] px-3 pb-24 pt-5 sm:px-6 lg:pb-10 lg:pt-8">
         <div className="mb-4 flex items-end justify-between gap-4 px-1">
           <div>

@@ -5,9 +5,7 @@ import {
 import {
   Link,
 } from "react-router-dom";
-import {
-  AudioHero,
-} from "@/components/design-system/audio/AudioHero";
+import { WkEditorialIntro } from "@/components/design-system/layout/WorkbookEditorial";
 import {
   WkIcon,
 } from "@/components/design-system/Icon";
@@ -116,17 +114,9 @@ export default function PublicAudioPage() {
 
   return (
     <div className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
-      <AudioHero
-        eyebrow="WAKILISHA Audio"
-        title="Listen Deeper"
-        description="Stories, conversations, and sound-led work from WAKILISHA."
-        meta={[
-          { label: "Original Audio", icon: "Mic2" },
-          { label: "Shows & Episodes", icon: "ListMusic" },
-        ]}
-        visualLabel="WAKILISHA Audio"
-      />
-
+      <div className="wk-container-max px-6 md:px-10">
+        <WkEditorialIntro eyebrow="Listen" title="Audio" description="Radio, DJ mixes, documentaries, field recordings, and published audio. Every recording links to its source." />
+      </div>
       <div className="wk-container-max px-6 py-12 md:px-10 md:py-16">
         {loading ? (
           <div className="rounded-[28px] border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8 text-[14px] font-bold text-[var(--wk-text-muted)]" aria-busy="true">

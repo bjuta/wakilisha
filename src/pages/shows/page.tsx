@@ -1,3 +1,4 @@
+import { WkEditorialIntro } from "@/components/design-system/layout/WorkbookEditorial";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { MetaTags } from "@/components/seo/MetaTags";
@@ -40,24 +41,13 @@ export default function PublicShowsPage() {
   return (
     <>
       <MetaTags
-        title="Shows | WAKILISHA"
-        description="Watch and listen to WAKILISHA Shows."
+        title="Podcasts | WAKILISHA"
+        description="Podcasts and shows from WAKILISHA."
         url={`${SITE_URL}/shows`}
       />
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-20 pt-10 sm:px-6 lg:px-8 lg:pt-14">
-        <header className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-wk-brand">
-            Shows
-          </p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-[-0.035em] text-wk-text sm:text-5xl">
-            Stories that continue
-          </h1>
-          <p className="mt-4 text-base leading-7 text-wk-text-muted">
-            Watch, listen, and follow Episodes under one shared Show identity.
-          </p>
-        </header>
-
+        <WkEditorialIntro eyebrow="Listen and follow" title="Podcasts" description="Shows and episodes with their own histories. Listen, watch, and follow the people behind each story." />
         {loading ? (
           <div
             className="mt-10 grid gap-4 md:grid-cols-2"

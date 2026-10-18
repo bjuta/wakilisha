@@ -334,7 +334,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-6rem)] bg-[var(--wk-bg)] pb-28 md:pb-12">
+    <main data-wk-workbook-screen="notifications" className="min-h-[calc(100dvh-6rem)] bg-[var(--wk-bg)] pb-12">
       <section className="mx-auto min-h-[calc(100dvh-6rem)] w-full max-w-[760px] border-x border-[var(--wk-border)] bg-[var(--wk-surface)]">
         <header className="sticky top-0 z-20 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 backdrop-blur-xl">
           <div className="flex min-h-[72px] items-center justify-between gap-4 px-5 sm:px-6">

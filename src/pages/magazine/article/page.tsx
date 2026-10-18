@@ -492,7 +492,7 @@ export default function ArticlePage() {
 
 
 
-      <div className="relative z-10 rounded-t-[28px] bg-[var(--wk-bg)]" style={{ marginTop: "-64px", boxShadow: "0 -4px 32px -8px rgba(0,0,0,0.10), 0 4px 16px -4px rgba(0,0,0,0.06)" }}>
+      <div className="wk-workbook-article-paper relative z-10 rounded-t-[28px]" style={{ marginTop: "-64px" }}>
         <ArticleFloatHeader article={article} />
         <div className="max-w-[740px] mx-auto px-6 lg:px-8"><div className="h-px bg-[var(--wk-border)] mb-10" /></div>
         <article className="max-w-[740px] mx-auto px-6 lg:px-8 pb-12">

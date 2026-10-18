@@ -2169,7 +2169,7 @@ export default function FollowingPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
+    <main data-wk-workbook-screen="following" className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
       <MetaTags
         title="Following"
         description="What’s moving through your circle on WAKILISHA."
