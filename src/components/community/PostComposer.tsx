@@ -82,6 +82,7 @@ export function PostComposer({
   editingPost = null,
   quotedPost = null,
   defaultOpen = false,
+  compactFollowing = false,
   onSaved,
   onCancelEdit,
   onError,
@@ -90,6 +91,7 @@ export function PostComposer({
   editingPost?: CommunityPost | null;
   quotedPost?: CommunityPost | null;
   defaultOpen?: boolean;
+  compactFollowing?: boolean;
   onSaved?: (post: CommunityPost) => void | Promise<void>;
   onCancelEdit?: () => void;
   onError?: (message: string) => void;
@@ -637,6 +639,39 @@ export function PostComposer({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!open && compactFollowing) {
+    return (
+      <div data-wk-following-composer-entry className="flex min-w-0 gap-3 px-4 py-4 sm:px-5">
+        <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[var(--wk-brand-soft)]">
+          {actor.imageUrl ? (
+            <img src={actor.imageUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-[14px] font-bold text-[var(--wk-brand)]">{actor.name[0]?.toUpperCase() || "W"}</span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <button type="button" onClick={() => setOpen(true)} className="flex min-h-11 w-full items-center text-left text-[17px] font-normal text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+            What are you listening to?
+          </button>
+          <div className="flex min-h-11 items-center justify-between gap-2">
+            <div className="flex items-center gap-1 text-[var(--wk-brand)]">
+              {([["Image", "Add Photo"], ["Music", "Add Track"], ["Video", "Add Video"], ["Link", "Add Link"]] as const).map(([icon, label]) => (
+                <button key={label} type="button" onClick={() => setOpen(true)} aria-label={label} className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[var(--wk-brand-soft)]">
+                  <WkIcon name={icon} size={17} />
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setDraftsOpen(true)} className="text-[11px] font-medium text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">Drafts</button>
+              <button type="button" onClick={() => setOpen(true)} className="rounded-full bg-[var(--wk-text)] px-4 py-2 text-[12px] font-bold text-[var(--wk-bg)] transition-colors hover:bg-[var(--wk-brand)] hover:text-[var(--wk-brand-on)]">Post</button>
+            </div>
+          </div>
+        </div>
+        {draftsOpen ? <PostDraftsDialog actor={actor} onSelect={loadDraftGroup} onClose={() => setDraftsOpen(false)} /> : null}
+      </div>
+    );
   }
 
   if (!open) {
