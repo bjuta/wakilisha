@@ -149,7 +149,7 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(mobile).toContain('aria-pressed={activeSection === sec}');
     expect(desktop).toContain('stories.filter((story) => story.section === selectedMagazineSection)');
     expect(mobile).toContain('(story.section || "Article") === activeSection');
-    expect(mobile).not.toContain('useMagazineArticles(24)');
+    expect(mobile).toContain('useMagazineArticles(24)');
     expect(mobile).not.toContain('Stories should feel edited, sequenced, and alive.');
     expect(card).not.toContain('whyThisStoryMatters');
     expect(card).not.toContain('ri-bookmark-line');
