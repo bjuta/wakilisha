@@ -22,21 +22,16 @@ function AuthorBadge({ author }: { author: string }) {
   );
 }
 
-function whyThisStoryMatters(story: MagazineArticle) {
-  if (story.dek) return story.dek;
-  if (story.section) return `This opens a ${story.section.toLowerCase()} thread inside the magazine.`;
-  return "This story gives the issue another way in.";
-}
-
 export function MagazineCard({ story, variant = "standard", rank }: MagazineCardProps) {
   const url = `/magazine/${story.slug}`;
-  const why = whyThisStoryMatters(story);
+  const why = story.dek || "";
 
   /* ── hero: large dark-overlay card, for primary featured spots ── */
   if (variant === "hero") {
     return (
       <Link
         to={url}
+        data-wk-magazine-story
         className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-[#0a0a0a] outline-none transition-transform duration-500 hover:-translate-y-1 focus-visible:-translate-y-1 focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
         style={{ minHeight: "clamp(340px, 42vw, 480px)" }}
       >
@@ -64,11 +59,6 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             {rank}
           </span>
         )}
-
-        {/* Bookmark icon */}
-        <div className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/25 text-white/60 backdrop-blur-sm transition-colors hover:text-white/90">
-          <i className="ri-bookmark-line text-[14px]" />
-        </div>
 
         <div className="relative z-10 mt-auto p-6 text-white lg:p-8">
           <span className="inline-block rounded-full bg-black/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--wk-brand)] backdrop-blur-sm transition-transform duration-300 group-hover:-translate-y-0.5">
@@ -104,6 +94,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
     return (
       <Link
         to={url}
+        data-wk-magazine-story
         className="group flex flex-col gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all duration-300 hover:-translate-y-1 hover:border-[var(--wk-border-strong)] hover:bg-[var(--wk-surface-raised)] focus-visible:-translate-y-1 focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)] sm:flex-row"
       >
         <div className="aspect-[16/10] shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)] sm:h-full sm:w-[45%] sm:aspect-auto">
@@ -159,6 +150,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
     return (
       <Link
         to={url}
+        data-wk-magazine-story
         className="group flex gap-3.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 transition-all duration-300 hover:-translate-y-1 hover:border-[var(--wk-border-strong)] hover:bg-[var(--wk-surface-raised)] focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
       >
         {rank !== undefined && (
@@ -174,7 +166,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             {story.title}
           </h4>
           <span className="hidden text-[10px] font-bold text-[var(--wk-brand)] opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 sm:inline">
-            Why it matters: {why}
+            {why}
           </span>
           <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)]">
             <ArticleAuthorIdentity
@@ -217,6 +209,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
   return (
     <Link
       to={url}
+      data-wk-magazine-story
       className="group flex h-full flex-col overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--wk-border-strong)] hover:shadow-xl focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
     >
       <div className="aspect-[16/10] overflow-hidden bg-[var(--wk-surface-raised)]">
