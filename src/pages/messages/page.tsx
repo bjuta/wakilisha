@@ -373,6 +373,7 @@ export default function MessagesPage() {
   const [composer, setComposer] = useState("");
   const [sending, setSending] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  const [threadActionsOpen, setThreadActionsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<MessageRecipientSuggestion[]>([]);
   const [recipient, setRecipient] = useState<MessageRecipientSuggestion | null>(null);
@@ -725,21 +726,37 @@ export default function MessagesPage() {
                     <div className="text-[11px] font-medium leading-relaxed text-[var(--wk-text-muted)]">{messageUsername(selectedSummary.other_participant?.presentation) ? `@${messageUsername(selectedSummary.other_participant?.presentation)}` : "Private conversation"}</div>
                   </div>
                   {detail.conversation.first_contact_state !== "pending" && selectedSummary.other_participant?.person_resource_id && (
-                    <details className="relative shrink-0">
-                      <summary aria-label="Conversation actions" className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
+                    <div
+                      className="relative shrink-0"
+                      onKeyDown={(event) => { if (event.key === "Escape") setThreadActionsOpen(false); }}
+                      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setThreadActionsOpen(false); }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setThreadActionsOpen((current) => !current)}
+                        aria-label="Conversation actions"
+                        aria-expanded={threadActionsOpen}
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
+                      >
                         <i className="ri-more-2-fill text-[19px]" aria-hidden="true" />
-                      </summary>
-                      <div className="absolute right-0 top-11 z-30 w-[230px] rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2 shadow-xl">
-                        <button
-                          type="button"
-                          onClick={() => void revokeMessageSenderApproval(selectedSummary.other_participant!.person_resource_id).catch((err) => setError(err instanceof Error ? err.message : "Could not revoke approval."))}
-                          className="w-full rounded-lg px-3 py-2.5 text-left text-[12px] font-medium text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
-                          title="This revokes future Inbox approval. It does not delete this conversation."
-                        >
-                          Revoke future approval
-                        </button>
-                      </div>
-                    </details>
+                      </button>
+                      {threadActionsOpen ? (
+                        <div role="menu" className="absolute right-0 top-11 z-30 w-[230px] rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2 shadow-xl">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setThreadActionsOpen(false);
+                              void revokeMessageSenderApproval(selectedSummary.other_participant!.person_resource_id).catch((err) => setError(err instanceof Error ? err.message : "Could not revoke approval."));
+                            }}
+                            className="w-full rounded-lg px-3 py-2.5 text-left text-[12px] font-medium text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
+                            title="This revokes future Inbox approval. It does not delete this conversation."
+                          >
+                            Revoke future approval
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   )}
                 </header>
 
