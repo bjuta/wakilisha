@@ -171,3 +171,135 @@ export async function loadMiziziCaseQuestionsV1(
     return {kind:"unavailable"};
   }
 }
+
+
+/** QV2 steward-only append, authorized and serialized by the existing server RPC.
+ * The same stable question and hypothesis IDs must be retained on ambiguous retry.
+ * This client cannot issue Registry, ACH, publication, or rights authority.
+ */
+export type QuestionFreezeInputV1=Readonly<{
+ questionId:string;expectedQuestionRevision:number;question:string;
+ hypotheses:readonly Readonly<{id:string;label:string}>[];reason:string;
+}>;
+export type QuestionFreezeResultV1=
+ | Readonly<{kind:"recorded";questionId:string;questionRevision:number;fingerprint:string;outcome:"created"|"revised"|"replayed"}>
+ | Readonly<{kind:"denied"|"stale"|"unavailable"|"invalid"}>;
+
+export async function freezeMiziziQuestionV1(
+ scope:QuestionReadScopeV1,
+ input:QuestionFreezeInputV1,
+ rpc?:QuestionRpcV1,
+):Promise<QuestionFreezeResultV1>{
+ let caseId:string,questionId:string,questionText:string,reason:string;
+ let hypotheses:{id:string;label:string}[];
+ try {
+  caseId=uuid(scope.caseId);
+  revision(scope.caseRevision);uuid(scope.workspaceId);
+  questionId=uuid(input.questionId);
+  if(!Number.isSafeInteger(input.expectedQuestionRevision)||
+     input.expectedQuestionRevision<0||input.expectedQuestionRevision>=20)
+   throw new TypeError("Invalid expected question revision");
+  questionText=label(input.question,20,500);
+  reason=label(input.reason,12,1000);
+  if(!Array.isArray(input.hypotheses)||input.hypotheses.length<2||
+     input.hypotheses.length>12)throw new TypeError("Invalid hypothesis count");
+  hypotheses=input.hypotheses.map(h=>({id:uuid(h.id),label:label(h.label,3,200)}));
+  distinct(hypotheses,h=>h.id);
+  distinct(hypotheses,h=>h.label.toLocaleLowerCase());
+ }catch{return {kind:"invalid"};}
+ try{
+  const call:QuestionRpcV1=rpc??(async(name,args)=>{
+   const {supabase}=await import("@/lib/supabase");
+   const result=await supabase.rpc(name,args);
+   return {data:result.data,error:result.error};
+  });
+  const {data,error}=await call("admin_mizizi_freeze_case_question_v1",{
+   p_case_id:caseId,p_expected_case_revision:scope.caseRevision,
+   p_question_id:questionId,
+   p_expected_question_revision:input.expectedQuestionRevision,
+   p_question_text:questionText,p_hypotheses:hypotheses,p_reason:reason,
+  });
+  if(error){
+   if(error.code==="42501")return {kind:"denied"};
+   if(error.code==="PT409")return {kind:"stale"};
+   return {kind:"unavailable"};
+  }
+  const result=object(data);
+  exact(result,["questionId","questionRevision","caseId","caseRevision","questionFingerprint","outcome"]);
+  if(uuid(result.questionId)!==questionId||uuid(result.caseId)!==caseId||
+   revision(result.caseRevision)!==scope.caseRevision||
+   revision(result.questionRevision)!==input.expectedQuestionRevision+1||
+   !["created","revised","replayed"].includes(String(result.outcome)))
+   return {kind:"unavailable"};
+  return {kind:"recorded",questionId,
+   questionRevision:input.expectedQuestionRevision+1,
+   fingerprint:sha(result.questionFingerprint),
+   outcome:result.outcome as "created"|"revised"|"replayed"};
+ }catch{return {kind:"unavailable"};}
+}
+
+/** QV3 private metadata projection. Human family attestation is never
+ * independently verified evidence or a permission to grade an ACH cell.
+ */
+export type QuestionAttestationReadV1=
+ | Readonly<{kind:"not_recorded"|"denied"|"stale"|"unavailable"}>
+ | Readonly<{kind:"requires_review";rows:readonly Readonly<{
+    attestationId:string;assertionId:string;sourceVersionId:string;
+    sourceFamilyKey:string;reviewRevision:number;
+    decision:"human_reviewed"|"unavailable_or_revoked";
+    receiptFingerprint:string;
+   }>[];independentlyVerifiedFamilies:0;achAssessmentsAllowed:0}>;
+
+export async function loadMiziziSourceAttestationsV1(
+ scope:QuestionReadScopeV1,questionId:string,questionRevision:number,
+ rpc?:QuestionRpcV1,
+):Promise<QuestionAttestationReadV1>{
+ let id:string;
+ try{uuid(scope.workspaceId);uuid(scope.caseId);revision(scope.caseRevision);
+  id=uuid(questionId);revision(questionRevision);}
+ catch{return {kind:"unavailable"};}
+ try {
+  const call:QuestionRpcV1=rpc??(async(name,args)=>{
+   const {supabase}=await import("@/lib/supabase");
+   const result=await supabase.rpc(name,args);
+   return {data:result.data,error:result.error};
+  });
+  const {data,error}=await call("admin_mizizi_question_source_attestations_v1",{
+   p_case_id:scope.caseId,p_expected_case_revision:scope.caseRevision,
+   p_question_id:id,p_question_revision:questionRevision,
+  });
+  if(error){
+   if(error.code==="42501")return {kind:"denied"};
+   if(error.code==="PT409")return {kind:"stale"};
+   return {kind:"unavailable"};
+  }
+  const record=object(data);
+  exact(record,["contract","kind","caseId","caseRevision","questionId","questionRevision","rows","independentlyVerifiedFamilies","achAssessmentsAllowed"]);
+  if(record.contract!=="mizizi.source_attestation_read.v1"||
+    uuid(record.caseId)!==uuid(scope.caseId)||
+    revision(record.caseRevision)!==scope.caseRevision||
+    uuid(record.questionId)!==id||
+    revision(record.questionRevision)!==questionRevision||
+    record.independentlyVerifiedFamilies!==0||record.achAssessmentsAllowed!==0||
+    !Array.isArray(record.rows)||record.rows.length>100)
+   return {kind:"unavailable"};
+  const rows=record.rows.map(raw=>{
+   const row=object(raw);
+   exact(row,["attestationId","assertionId","sourceVersionId","sourceFamilyKey","reviewRevision","decision","receiptFingerprint"]);
+   if(!["human_reviewed","unavailable_or_revoked"].includes(String(row.decision)))
+    throw new TypeError("Unknown source status");
+   return Object.freeze({
+    attestationId:uuid(row.attestationId),assertionId:uuid(row.assertionId),
+    sourceVersionId:uuid(row.sourceVersionId),sourceFamilyKey:label(row.sourceFamilyKey,8,140),
+    reviewRevision:revision(row.reviewRevision),
+    decision:row.decision as "human_reviewed"|"unavailable_or_revoked",
+    receiptFingerprint:sha(row.receiptFingerprint),
+   });
+  });
+  distinct(rows,r=>r.assertionId);
+  if(record.kind==="not_recorded"&&rows.length===0)return {kind:"not_recorded"};
+  if(record.kind!=="requires_review"||rows.length===0)return {kind:"unavailable"};
+  return {kind:"requires_review",rows:Object.freeze(rows),
+   independentlyVerifiedFamilies:0,achAssessmentsAllowed:0};
+ }catch{return {kind:"unavailable"};}
+}
