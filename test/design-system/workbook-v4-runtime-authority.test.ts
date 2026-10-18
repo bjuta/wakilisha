@@ -162,7 +162,7 @@ describe("Workbook v4 is the only active product design authority", () => {
     const mobile = read("src/pages/mobile/magazine/article/page.tsx");
     const related = read("src/pages/magazine/article/components/ArticleRelated.tsx");
     const articleHeader = read("src/pages/magazine/article/components/ArticleFloatHeader.tsx");
-    const css = read("src/styles/wakilisha-magazine-38-44.css");
+    const css = read("src/styles/wakilisha-article-prose.css");
 
     expect(desktop).toContain('<ArticleFloatHeader article={article} />');
     expect(articleHeader).toContain('<SharePopover');
@@ -176,6 +176,10 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(mobile).toContain('<ArticleRelated');
     expect(related).toContain('aspect-[3/2]');
     expect(related).toContain('max-w-[1060px]');
+    expect(related).toContain('preset="feature"');
+    expect(related).toContain('loading="lazy"');
+    expect(related).toContain('fetchPriority="low"');
+    expect(related).toContain('decoding="async"');
     expect(related).not.toContain('rounded-2xl');
     expect(css).toContain('[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper');
   });
