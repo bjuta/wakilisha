@@ -707,7 +707,7 @@ function NewsletterCTA() {
   return (
     <section className="wk-reveal">
       <NewsletterSubscribe
-          variant="compact"
+          variant="default"
         formId="magazine-newsletter-form"
         headline="One email a week. The stories, the films and what changed in the record."
         description=""
