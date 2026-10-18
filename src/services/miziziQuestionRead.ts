@@ -134,3 +134,40 @@ export function projectMiziziQuestionReadV1(scope:QuestionReadScopeV1,raw:unknow
   distinct(questions,q=>q.questionId);
   return Object.freeze({kind:"ready",questions:Object.freeze(questions)});
 }
+
+
+/**
+ * Read-only bridge to the existing authenticated QV1 SQL projection.
+ * Server RLS/capability checks, not this client parser, decide access.
+ * A missing RPC, malformed response or network failure is unavailable,
+ * never an empty or independently verified dossier.
+ */
+export type QuestionRpcV1 = (
+  name: string,
+  args: Record<string, unknown>,
+) => Promise<{data: unknown;error: {code?: string | null;message:string} | null}>;
+
+export async function loadMiziziCaseQuestionsV1(
+  scope:QuestionReadScopeV1,
+  rpc?:QuestionRpcV1,
+):Promise<QuestionReadV1> {
+  try {
+    const call:QuestionRpcV1=rpc ?? (async(name,args)=>{
+      const {supabase}=await import("@/lib/supabase");
+      const result=await supabase.rpc(name,args);
+      return {data:result.data,error:result.error};
+    });
+    const {data,error}=await call("admin_mizizi_case_questions_v1",{
+      p_case_id:scope.caseId,
+      p_expected_case_revision:scope.caseRevision,
+    });
+    if(error){
+      if(error.code==="42501")return {kind:"denied"};
+      if(error.code==="PT409")return {kind:"stale"};
+      return {kind:"unavailable"};
+    }
+    return projectMiziziQuestionReadV1(scope,data);
+  }catch{
+    return {kind:"unavailable"};
+  }
+}
