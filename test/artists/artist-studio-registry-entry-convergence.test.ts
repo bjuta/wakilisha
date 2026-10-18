@@ -49,6 +49,15 @@ function readMigration() {
 const shell = read(
   "src/components/music/MusicDesktopShell.tsx",
 );
+const sharedNavigation = read(
+  "src/components/navigation/wakilishaNavigation.ts",
+);
+const desktopDrawer = read(
+  "src/components/music/MusicDesktopShell.tsx",
+);
+const mobileDrawer = read(
+  "src/components/mobile/MobileAccountDrawer.tsx",
+);
 const mobileShell = read(
   "src/components/mobile/MobileAppLayout.tsx",
 );
@@ -154,23 +163,20 @@ describe(
         expect(lazyPublic).toContain(
           "../pages/artist-studio/page",
         );
-        expect(shell).toContain(
-          'to="/artist-studio"',
-        );
-        expect(shell).toContain(
-          'label="Magazine"',
-        );
-        expect(shell).not.toContain(
-          'label="Posts"',
-        );
-        expect(shell).not.toContain(
-          "studioLauncherOpen",
-        );
-        expect(
-          mobileShell,
-        ).toContain(
+        expect(sharedNavigation).toContain(
           '{ label: "Artist Studio", to: "/artist-studio"',
         );
+        expect(sharedNavigation).toContain(
+          '{ label: "Magazine", to: "/magazine"',
+        );
+        expect(sharedNavigation).not.toContain(
+          '{ label: "Posts",',
+        );
+        expect(shell).toContain("WAKILISHA_NAVIGATION.map");
+        expect(mobileDrawer).toContain("WAKILISHA_NAVIGATION.map");
+        expect(desktopDrawer).toContain("MobileAccountDrawer");
+        expect(mobileShell).not.toContain("MobileBottomNav");
+        expect(shell).not.toContain("studioLauncherOpen");
 
         for (const duplicate of [
           "MobileTopBar",
