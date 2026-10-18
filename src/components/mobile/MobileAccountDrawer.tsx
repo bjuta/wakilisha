@@ -9,10 +9,8 @@ import {
 import {
   Portal,
 } from "@/components/base/Portal";
-import {
-  WkIcon,
-  type WkIconName,
-} from "@/components/design-system/Icon";
+import { WkIcon } from "@/components/design-system/Icon";
+import { WAKILISHA_NAVIGATION, isWakilishaNavCurrent, type WkNavDestination } from "@/components/navigation/wakilishaNavigation";
 import {
   useTheme,
 } from "@/components/design-system/theme/ThemeProvider";
@@ -23,42 +21,15 @@ import {
   useScrollLock,
 } from "@/hooks/useScrollLock";
 
-type DrawerLink = {
-  label: string;
-  to: string;
-  icon: WkIconName;
-};
-
-const PRIMARY_LINKS: DrawerLink[] = [
-  { label: "Music", to: "/music", icon: "AudioLines" },
-  { label: "Following", to: "/following", icon: "Heart" },
-  { label: "Charts", to: "/charts", icon: "BarChart3" },
-  { label: "Playlists", to: "/playlists", icon: "ListMusic" },
-  { label: "Artists", to: "/artists", icon: "Users" },
-  { label: "Releases", to: "/releases", icon: "Disc3" },
-  { label: "Posts", to: "/", icon: "NotebookText" },
-];
-
-const DISCOVER_LINKS: DrawerLink[] = [
-  { label: "New This Week", to: "/music?section=new-this-week", icon: "CirclePlus" },
-  { label: "On The Radar", to: "/music?section=on-the-radar", icon: "Radar" },
-  { label: "Scenes", to: "/music?section=scenes", icon: "RadioTower" },
-  { label: "From The Registry", to: "/music?section=registry", icon: "BadgeCheck" },
-  { label: "Go Deeper", to: "/music?section=go-deeper", icon: "Compass" },
-];
-
 function DrawerNavLink({
   item,
   onNavigate,
 }: {
-  item: DrawerLink;
+  item: WkNavDestination;
   onNavigate: () => void;
 }) {
   const location = useLocation();
-  const active = item.to === "/"
-    ? location.pathname === "/"
-    : location.pathname === item.to.split("?")[0]
-      || location.pathname.startsWith(`${item.to.split("?")[0]}/`);
+  const active = isWakilishaNavCurrent(location.pathname, item.to);
 
   return (
     <Link
@@ -125,7 +96,8 @@ export function MobileAccountDrawer({
           role="dialog"
           aria-modal="true"
           aria-label="WAKILISHA Menu"
-          className="absolute inset-y-0 left-0 flex w-[min(88vw,360px)] flex-col overflow-hidden border-r border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl"
+          id="wk-workbook-sidebar"
+          className="absolute inset-y-0 left-0 flex w-[min(82vw,360px)] flex-col overflow-hidden border-r border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl"
           style={{
             paddingTop: "max(env(safe-area-inset-top), 12px)",
             paddingBottom: "max(env(safe-area-inset-bottom), 12px)",
@@ -162,7 +134,7 @@ export function MobileAccountDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
               aria-label="Close account menu"
             >
               <WkIcon name="X" size={18} />
@@ -185,20 +157,18 @@ export function MobileAccountDrawer({
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
             <nav aria-label="WAKILISHA">
-              <div className="space-y-0.5">
-                {PRIMARY_LINKS.map((item) => (
-                  <DrawerNavLink key={item.label} item={item} onNavigate={onClose} />
-                ))}
-              </div>
-
-              <div className="mb-2 mt-5 px-3.5 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-text-faint)]">
-                Discover
-              </div>
-              <div className="space-y-0.5">
-                {DISCOVER_LINKS.map((item) => (
-                  <DrawerNavLink key={item.label} item={item} onNavigate={onClose} />
-                ))}
-              </div>
+              {WAKILISHA_NAVIGATION.map((group) => (
+                <div key={group.label}>
+                  <div className="mb-2 mt-5 px-3.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--wk-text-faint)]">
+                    {group.label}
+                  </div>
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => (
+                      <DrawerNavLink key={item.to} item={item} onNavigate={onClose} />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </nav>
           </div>
 

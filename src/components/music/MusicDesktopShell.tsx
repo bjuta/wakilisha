@@ -1,3 +1,4 @@
+import { WAKILISHA_NAVIGATION, isWakilishaNavCurrent } from "@/components/navigation/wakilishaNavigation";
 import {
   useEffect,
   useMemo,
@@ -107,7 +108,7 @@ function AppNavLink({
       aria-label={label}
       title={collapsed ? label : undefined}
       className={[
-        "relative flex h-10 items-center rounded-lg text-[13px] font-semibold transition-colors",
+        "relative flex min-h-11 items-center rounded-xl text-[13px] font-semibold transition-colors",
         collapsed
           ? "justify-center px-0"
           : "gap-3 px-3",
@@ -438,7 +439,7 @@ export function MusicDesktopShell({
             aria-label="Search"
             title={sidebarCollapsed ? "Search" : undefined}
             className={[
-              "relative flex h-10 w-full items-center rounded-lg text-[13px] font-semibold transition-colors",
+              "relative flex min-h-11 w-full items-center rounded-xl text-[13px] font-semibold transition-colors",
               sidebarCollapsed
                 ? "justify-center px-0"
                 : "gap-3 px-3",
@@ -462,119 +463,24 @@ export function MusicDesktopShell({
             {!sidebarCollapsed ? <span>Search</span> : null}
           </button>
 
-          <AppNavLink
-            to="/music"
-            icon="AudioLines"
-            label="Music"
-            collapsed={sidebarCollapsed}
-            active={
-              activeSection ===
-              "music"
-            }
-          />
-          <AppNavLink
-            to="/following"
-            icon="Heart"
-            label="Following"
-            collapsed={sidebarCollapsed}
-            active={
-              activeSection ===
-              "following"
-            }
-          />
-          <AppNavLink
-            to="/charts"
-            icon="ChartNoAxesColumnIncreasing"
-            label="Charts"
-            collapsed={sidebarCollapsed}
-            active={
-              activeSection ===
-              "charts"
-            }
-          />
-          <AppNavLink
-            to="/playlists"
-            icon="ListMusic"
-            label="Playlists"
-            collapsed={sidebarCollapsed}
-            active={
-              activeSection ===
-              "playlists"
-            }
-          />
-          <AppNavLink
-            to="/artists"
-            icon="Users"
-            label="Artists"
-            collapsed={sidebarCollapsed}
-            active={
-              activeSection ===
-              "artists"
-            }
-          />
-          <AppNavLink
-            to="/releases"
-            icon="Disc3"
-            label="Releases"
-            collapsed={sidebarCollapsed}
-            active={
-              activeSection ===
-              "releases"
-            }
-          />
-          <AppNavLink
-            to="/magazine"
-            icon="NotebookText"
-            label="Magazine"
-            collapsed={sidebarCollapsed}
-            active={
-              activeSection ===
-              "magazine"
-            }
-          />
+          {WAKILISHA_NAVIGATION.map((group) => (
+            <div key={group.label}>
+              {!sidebarCollapsed && (
+                <p className="mb-1 mt-5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
+                  {group.label}
+                </p>
+              )}
+              {group.items.map((item) => (
+                <AppNavLink
+                  key={item.to}
+                  {...item}
+                  collapsed={sidebarCollapsed}
+                  active={isWakilishaNavCurrent(location.pathname, item.to)}
+                />
+              ))}
+            </div>
+          ))}
         </nav>
-
-        {!sidebarCollapsed ? (
-          <div className="mt-6 px-6 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
-            Discover
-          </div>
-        ) : (
-          <div className="mx-4 mt-5 h-px bg-[var(--wk-divider)]" />
-        )}
-
-        <nav className="mt-2 space-y-0.5 px-3">
-          <DiscoveryLink
-            to="/music#fresh-arrivals"
-            icon="PlusCircle"
-            label="New This Week"
-            collapsed={sidebarCollapsed}
-          />
-          <DiscoveryLink
-            to="/music#on-the-radar"
-            icon="Radar"
-            label="On The Radar"
-            collapsed={sidebarCollapsed}
-          />
-          <DiscoveryLink
-            to="/genres"
-            icon="Radio"
-            label="Scenes"
-            collapsed={sidebarCollapsed}
-          />
-          <DiscoveryLink
-            to="/artists"
-            icon="BadgeCheck"
-            label="From The Registry"
-            collapsed={sidebarCollapsed}
-          />
-          <DiscoveryLink
-            to="/music#go-deeper"
-            icon="Compass"
-            label="Go Deeper"
-            collapsed={sidebarCollapsed}
-          />
-        </nav>
-
         <div
           className={[
             "mt-auto",
