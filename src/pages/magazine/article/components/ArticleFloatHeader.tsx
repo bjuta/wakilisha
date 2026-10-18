@@ -35,7 +35,8 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
       {/* Section + stats chips */}
       <div className="flex items-center gap-3 mb-7 flex-wrap">
         <span
-          className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--wk-brand)]"
+          data-wk-article-section
+          className="text-[12px] font-bold uppercase tracking-[0.12em] text-[var(--wk-brand)]"
         >
           {article.section}
         </span>
@@ -56,13 +57,13 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
       </div>
 
       {/* Title */}
-      <h1 className="text-[clamp(30px,4.5vw,52px)] font-black leading-[0.93] tracking-[-0.045em] text-[var(--wk-text)] mb-5">
+      <h1 className="mb-6 max-w-[18ch] text-[clamp(36px,4.7vw,62px)] font-bold leading-[1.02] tracking-[-0.045em] text-[var(--wk-text)]">
         {article.title}
       </h1>
 
       {/* Dek */}
       {article.dek && (
-        <p className="text-[17px] lg:text-[19px] leading-relaxed text-[var(--wk-text-soft)] mb-8 font-normal">
+        <p className="mb-9 max-w-[54ch] text-[18px] font-normal leading-[1.55] text-[var(--wk-text-soft)] lg:text-[21px]">
           {article.dek}
         </p>
       )}
@@ -103,7 +104,7 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
             <button
               ref={shareBtnRef}
               onClick={() => setSharePopoverOpen(!sharePopoverOpen)}
-              className="inline-flex min-h-11 items-center gap-2 border border-[var(--wk-border)] px-4 text-[13px] font-semibold text-[var(--wk-text)] transition-colors hover:border-[var(--wk-brand)] cursor-pointer whitespace-nowrap"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 text-[13px] font-semibold text-[var(--wk-text)] transition-colors hover:border-[var(--wk-brand)] cursor-pointer whitespace-nowrap"
             >
               <i className="ri-share-forward-line text-[15px]" />
               Share
