@@ -1448,14 +1448,32 @@ describe(
             "const sectionBlockStories = stories.slice(10);",
           );
 
+        // The cover, picks, latest and category blocks stay disjoint.
+        // A selected section filters the full published set, including
+        // cover stories, rather than only the old latest subset.
         expect(mobileMagazine)
           .toContain(
-            "filteredLatest",
+            "selectedStories = useMemo",
           );
-
         expect(mobileMagazine)
           .toContain(
-            "Filter Stories",
+            'activeSection === "All" ? stories :',
+          );
+        expect(mobileMagazine)
+          .toContain(
+            '(story.section || "Article") === activeSection',
+          );
+        expect(mobileMagazine)
+          .toContain(
+            'aria-label="Magazine sections"',
+          );
+        expect(mobileMagazine)
+          .toContain(
+            'aria-pressed={activeSection === sec}',
+          );
+        expect(mobileMagazine)
+          .toContain(
+            'selectedStories.map((story)',
           );
 
         expect(mobileMagazine)
