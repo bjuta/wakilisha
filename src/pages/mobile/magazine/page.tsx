@@ -10,7 +10,7 @@ import { Chapter19FallbackImage } from "@/components/media/Chapter19FallbackImag
 import { ResponsiveMediaImage } from "@/components/media/ResponsiveMediaImage";
 import { trackEvent, getAnalyticsSessionId, getCanonicalPageUrl } from "@/services/analytics";
 import { BRIEFING_SLUGS, briefingInterest, subscribeToBriefings } from "@/services/audienceSubscriptionService";
-import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
+import { MagazineHeroMeta } from "@/pages/magazine/components/MagazineHeroMeta";
 
 function computeIssueInfo(articles: MagazineArticle[]) {
   if (!articles.length) return { number: 1, date: "June 2026" };
@@ -196,28 +196,19 @@ export default function MobileMagazine() {
           </h1>
 
           {heroStory.dek && (
-            <p className="mt-4 text-[14px] leading-relaxed text-white/55 max-w-[48ch]">
+            <p className="mt-4 max-w-[48ch] text-[14px] leading-[1.55] text-white/85">
               {heroStory.dek}
             </p>
           )}
 
-          <Link to={heroArticleUrl} className="mt-5 inline-flex min-h-11 items-center gap-2 bg-white px-5 text-[13px] font-bold text-black">Read the story <span aria-hidden="true">→</span></Link>
+          <Link to={heroArticleUrl} className="mt-5 inline-flex min-h-11 items-center gap-3 self-start rounded-full border border-white/45 bg-black/25 px-5 text-[13px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white hover:text-[#111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Read the story <span aria-hidden="true" className="text-[17px]">→</span></Link>
 
-          <div className="flex items-center gap-2 mt-5 text-[11px] flex-wrap">
-            <ArticleAuthorIdentity name={heroStory.author} personPath={heroStory.authorPersonPath}
-
-              className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/85 font-semibold px-3 py-1.5 hover:bg-white/18 hover:text-white transition-all"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {heroStory.author}
-            </ArticleAuthorIdentity>
-            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/65 px-3 py-1.5">
-              {heroStory.date || issueDate}
-            </span>
-            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/65 px-3 py-1.5">
-              {heroStory.readingTime} min read
-            </span>
-          </div>
+          <MagazineHeroMeta
+            author={heroStory.author}
+            authorPersonPath={heroStory.authorPersonPath}
+            date={heroStory.date || issueDate}
+            readingTime={heroStory.readingTime}
+          />
         </div>
       </div>
 
