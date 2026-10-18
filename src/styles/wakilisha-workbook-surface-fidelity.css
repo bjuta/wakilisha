@@ -58,10 +58,6 @@
   text-transform: none;
 }
 
-[data-wk-workbook-screen="music"] .wk-music-hero img {
-  object-fit: cover;
-}
-
 [data-wk-workbook-screen="music"] main article {
   box-shadow: none;
 }
