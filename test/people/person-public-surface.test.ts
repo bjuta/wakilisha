@@ -1425,8 +1425,9 @@ describe(
           expect(navigation).toContain(`to: "${route}"`);
         }
 
-        expect(drawer).toContain("WAKILISHA_NAVIGATION.map");
-        expect(desktop).toContain("WAKILISHA_NAVIGATION.map");
+        expect(drawer).toContain("navigation.map");
+        expect(drawer).toContain("visibleWakilishaNavigation");
+        expect(desktop).toContain("navigation.map");
         expect(mobileTop).toContain('aria-label="Open WAKILISHA menu"');
         expect(mobileAppLayout).not.toContain("MobileBottomNav");
         expect(mobileAppLayout).not.toContain("phn-nav");
