@@ -783,7 +783,7 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
       (from, to) =>
         db
           .from("registry_releases")
-          .select("*")
+          .select("id, slug, metadata, updated_at")
           .in("status", ["active", "draft"])
           .order("id", { ascending: true })
           .range(from, to),
@@ -793,7 +793,7 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
       (from, to) =>
         db
           .from("registry_tracks")
-          .select("*")
+          .select("id, slug, updated_at")
           .eq("status", "active")
           .order("id", { ascending: true })
           .range(from, to),
@@ -1908,17 +1908,35 @@ async function buildProviderImageMap(db: ReturnType<typeof createClient>, entity
   return imageByEntityId;
 }
 
+const SEO_METADATA_DETAIL_PROJECTIONS: Record<string, string> = {
+  registry_tracks: "id, slug, title, normalized_title, artwork_url, metadata, created_at, updated_at",
+  registry_releases: "id, slug, title, normalized_title, release_date, artwork_url, description, metadata, created_at, updated_at",
+};
+
 async function fetchRowsById(db: ReturnType<typeof createClient>, table: string, ids: string[]) {
   const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
   if (!uniqueIds.length) return new Map<string, Record<string, unknown>>();
 
-  const { data, error } = await db.from(table).select("*").in("id", uniqueIds).limit(5000);
-  if (error) {
-    console.warn(`SEO metadata lookup failed for ${table}: ${error.message}`);
-    return new Map<string, Record<string, unknown>>();
+  const projection = SEO_METADATA_DETAIL_PROJECTIONS[table] || "*";
+  const batchSize = SEO_METADATA_DETAIL_PROJECTIONS[table] ? 250 : 5000;
+  const rows: Record<string, unknown>[] = [];
+
+  for (let offset = 0; offset < uniqueIds.length; offset += batchSize) {
+    const batch = uniqueIds.slice(offset, offset + batchSize);
+    const { data, error } = await db.from(table)
+      .select(projection)
+      .in("id", batch)
+      .limit(batch.length);
+
+    if (error) {
+      console.warn(`SEO metadata lookup failed for ${table}: ${error.message}`);
+      return new Map<string, Record<string, unknown>>();
+    }
+
+    rows.push(...(data || []));
   }
 
-  return new Map((data || []).map((row: any) => [String(row.id), row as Record<string, unknown>]));
+  return new Map(rows.map((row) => [String(row.id), row]));
 }
 
 async function fetchRowsBySlug(db: ReturnType<typeof createClient>, table: string, slugs: string[]) {
