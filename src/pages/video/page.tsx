@@ -50,7 +50,7 @@ export default function VideoIndexPage() {
       ]
         .join(" ")
         .toLowerCase()
-        .includes(normalized)))
+        .includes(normalized))
     );
   }, [index?.items, query, format]);
 
