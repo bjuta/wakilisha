@@ -58,7 +58,7 @@
     "audit:runtime-identifiers": "node scripts/control-plane/verify-runtime-identifiers.mjs",
     "analytics:audit": "node scripts/analytics/audit-ga4-implementation.mjs",
     "analytics:audit:dist": "node scripts/analytics/audit-ga4-build-output.mjs",
-    "performance:audit": "node scripts/performance/audit-home-delivery.mjs && node scripts/performance/generate-wakilisha-icon-sprite.mjs --check && node scripts/performance/generate-wakilisha-remixicon-compat.mjs --check && node scripts/performance/audit-css-important-debt.mjs && node scripts/performance/audit-font-delivery.mjs",
+    "performance:audit": "node scripts/performance/audit-home-delivery.mjs && node scripts/performance/generate-wakilisha-icon-sprite.mjs --check && node scripts/performance/generate-wakilisha-remixicon-compat.mjs --check && node scripts/performance/audit-css-important-debt.mjs && node scripts/performance/audit-font-delivery.mjs && npm run performance:audit:images",
     "icons:generate": "node scripts/performance/generate-wakilisha-icon-sprite.mjs",
     "performance:audit:routes": "node scripts/performance/audit-admin-route-splitting.mjs",
     "performance:audit:images": "node scripts/performance/audit-responsive-images.mjs",
