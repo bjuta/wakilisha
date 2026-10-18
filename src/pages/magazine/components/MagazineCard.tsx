@@ -249,7 +249,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
         <h3 className="line-clamp-3 text-[19px] font-bold leading-[1.22] tracking-[-0.025em] text-[var(--wk-text)] transition-colors group-hover:text-[var(--wk-brand)] lg:text-[21px]">
           {story.title}
         </h3>
-        <p className="line-clamp-2 text-[14px] leading-[1.5] text-[var(--wk-text-soft)]">
+        <p className="line-clamp-2 text-[15px] leading-[1.55] text-[var(--wk-text-soft)]">
           {why}
         </p>
         <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-[var(--wk-text-faint)]">
