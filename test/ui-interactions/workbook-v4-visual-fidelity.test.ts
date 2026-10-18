@@ -33,7 +33,11 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(css).toContain('data-wk-magazine-category*="opinion"');
     expect(desktop).toContain('text-[clamp(22px,2.5vw,30px)]');
     expect(mobile).toContain('text-[22px] font-bold');
-    expect(mobile).toContain('grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2');
+    expect(mobile).toContain('data-wk-magazine-story-rail');
+    expect(mobile).toContain('snap-x snap-mandatory');
+    expect(mobile).toContain('useMagazineArticles(24)');
+    expect(card).toContain('data-wk-magazine-feature="true"');
+    expect(card).not.toContain('line-clamp-3 text-[clamp(20px,2.6vw,30px)]');
     expect(mobile).toContain('useMagazineArticles(24)');
     expect(mobile).not.toContain('useMagazineArticles(500)');
   });
@@ -45,6 +49,7 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     const articleMobile = read("src/pages/mobile/magazine/article/page.tsx");
 
     expect(desktop.match(/<NewsletterSubscribe/g)).toHaveLength(1);
+    expect(desktop).toContain('variant="default"');
     expect(desktop).not.toContain('id: "newsletter"');
     expect(desktop.match(/<NewsletterCTA \/>/g)).toHaveLength(1);
     expect(mobile.match(/<MobileNewsletterCTA \/>/g)).toHaveLength(1);
@@ -59,7 +64,7 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(articleCss).toContain("line-height: 1.7;");
     for (const source of [article, articleMobile]) {
       expect(source.match(/<NewsletterSubscribe/g)).toHaveLength(1);
-      expect(source).toContain('variant="compact"');
+      expect(source).toContain('variant="default"');
       expect(source).toContain('data-wk-article-newsletter');
       expect(source).toContain('<ArticleRelated');
       expect(source.indexOf("data-wk-article-newsletter")).toBeGreaterThan(
@@ -77,10 +82,14 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(music).toContain('aria-label="Music discovery"');
     expect(music).toContain('listGenres()');
     expect(music).toContain('genre.artistImageUrl');
+    expect(music).toContain('hasImage(genre.artistImageUrl)');
+    expect(music).not.toContain('bg-[radial-gradient(circle_at_25%_20%');
     expect(music).toContain('to={`/genres/${genre.slug}`}');
     expect(music).toContain('<ChartMiniList entries={chartEntries} />');
     expect(music).toContain('onPlay(release, "fresh-arrivals")');
     expect(music).toContain('handlePlayRelease(');
+    expect(music).toContain('onError={() => setFailedSrc(src)}');
+    expect(music).toContain('loading="eager"');
     expect(music).not.toContain('aria-label="Previous arrivals"');
     expect(music).not.toContain('aria-label="Next arrivals"');
     expect(css).toContain('background-color: var(--wk-bg)');
@@ -111,7 +120,10 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(css).toContain('--wk-bg:#0B0B0B;');
     expect(css).toContain('--wk-brand:#4E7425;');
     expect(css).toContain('--wk-brand:#85C441;');
-    expect(css).toContain('--wk-bg:#F5F2EC;');
+    expect(css).not.toContain('--wk-bg:#F5F2EC;');
+    expect(css).toContain('--wk-surface:#FFFFFF;');
+    expect(css).toContain('[data-following-header]');
+    expect(css).toContain('[data-wk-message-bubble]');
     expect(css).toContain('.wk-workbook-article-paper');
     expect(css).not.toContain('[data-wk-workbook-screen="artist"]');
     expect(css).not.toContain('[data-wk-workbook-screen="artist-detail"]');
@@ -132,6 +144,10 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(notifications).toContain('aria-label="Notification filters"');
     expect(notifications).toContain('handleMarkAll()');
     expect(notifications).toContain('notificationTarget(');
+    expect(notifications).toContain('notification.actor?.avatarUrl');
+    expect(notifications).toContain('data-wk-notification-row');
+    expect(messages).toContain('data-wk-message-conversation');
+    expect(messages).toContain('data-wk-message-bubble');
     expect(messages).toContain('listMessageConversations(nextFolder)');
     expect(messages).toContain('sendMessage(selectedId, composer.trim())');
     expect(messages).toContain('bg-[var(--wk-brand)] text-[var(--wk-brand-on)]');
@@ -141,6 +157,9 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
   it("retains authentic Following actions and respects source media ratios", () => {
     const following = read("src/pages/following/page.tsx");
     expect(following).toContain('data-following-activity');
+    expect(following).toContain('data-following-header');
+    expect(following).toContain('data-following-media');
+    expect(following).toContain('data-following-body');
     expect(following).toContain('mx-auto aspect-square w-full max-w-[520px]');
     expect(following).toContain('mx-auto aspect-[3/2] w-full max-w-[680px]');
     expect(following).toContain('aria-label="Following feed filters"');

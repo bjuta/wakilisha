@@ -463,12 +463,12 @@
   --wk-brand-on:#0B0B0B;
   --wk-workbook-cover-scrim:linear-gradient(0deg,rgba(0,0,0,.89),rgba(0,0,0,.32) 60%,rgba(0,0,0,.10));
 }
-/* P11 article: workbook warm paper in light, a fully readable ink
-   counterpart in dark. Photographic hero scrims remain dark in either mode. */
+/* P11 Article: normal WAKILISHA canvas in both themes.
+   Photographic hero scrims stay dark in either mode. */
 :where([data-wk-theme="light"]) .wk-workbook-article-paper {
-  --wk-bg:#F5F2EC;
-  --wk-surface:#F5F2EC;
-  --wk-surface-raised:#EEEAE2;
+  --wk-bg:#FCFCFB;
+  --wk-surface:#FFFFFF;
+  --wk-surface-raised:#F4F4F2;
   --wk-text:#202020;
   --wk-text-soft:#414141;
   --wk-text-muted:#5C5C5C;
@@ -495,3 +495,193 @@
 .wk-reference-media-hero-copy .wk-reference-media-hero-title { color:#FFFFFF; }
 .wk-reference-media-hero-copy .wk-reference-hero-caption { color:rgba(255,255,255,.84); }
 .wk-reference-media-hero-copy .wk-reference-play-button { background:#FFFFFF;color:#0B0B0B; }
+
+
+/* Live workbook refinement: retain the normal product canvas for Article P11.
+   Neutral backgrounds and readable ink follow the actual WAKILISHA theme. */
+:where([data-wk-theme="light"]) .wk-workbook-article-paper {
+  --wk-bg: #FCFCFB;
+  --wk-bg-subtle: #FAFAF9;
+  --wk-surface: #FFFFFF;
+  --wk-surface-raised: #F4F4F2;
+  --wk-text: #202020;
+  --wk-text-soft: #414141;
+  --wk-text-muted: #595959;
+  --wk-border: rgba(12,13,10,.11);
+  --wk-brand: #4E7425;
+  background: var(--wk-bg);
+}
+:where([data-wk-theme="dark"],:root:not([data-wk-theme="light"])) .wk-workbook-article-paper {
+  background: #0B0B0B;
+}
+
+/* Editorial subscription: a headline above a single intentional form.
+   Restrict corrections to Magazine and Article. Other newsletter instances
+   retain their own design and established submission contract. */
+:is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) {
+  color: var(--wk-text);
+  background: var(--wk-bg);
+}
+:is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) > :is(div,section) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+[data-wk-magazine-newsletter] > section > div,
+[data-wk-article-newsletter] > div {
+  padding: 0;
+}
+:is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) h2 {
+  max-width: 34ch;
+  margin-inline: auto;
+  text-align: center;
+  color: var(--wk-text);
+  font-size: clamp(26px,3.4vw,38px);
+  line-height: 1.16;
+  overflow-wrap: break-word;
+}
+:is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) form {
+  width: min(100%,560px);
+  margin: 24px auto 0;
+}
+:is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) input[type="email"] {
+  min-width: 0;
+  border: 1px solid var(--wk-border);
+  background: var(--wk-surface);
+  color: var(--wk-text);
+}
+:is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) input[type="email"]::placeholder {
+  color: var(--wk-text-muted);
+}
+:is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) button[type="submit"] {
+  background: var(--wk-text);
+  color: var(--wk-bg);
+}
+:is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) p {
+  color: var(--wk-text-muted);
+}
+
+/* Big editorial features are photographed covers, not fixed-height text masks. */
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-feature="true"] {
+  align-self: stretch;
+  min-width: 0;
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-feature="true"] span[class*="uppercase"] {
+  color: #B6EB79;
+}
+:is([data-wk-workbook-screen="magazine"],[data-wk-workbook-screen="magazine-mobile"]) [data-wk-magazine-feature="true"] :is(h3,p) {
+  overflow-wrap: anywhere;
+}
+[data-wk-magazine-story-rail]:focus-visible {
+  outline: 2px solid var(--wk-brand);
+  outline-offset: -2px;
+}
+
+/* Timeline grammar: avatar at the start of the actor's row, then content
+   and actions aligned to the same text column. No fictional activity. */
+[data-wk-workbook-screen="following"] article[data-following-activity] {
+  display: grid;
+  grid-template-columns: 56px minmax(0,1fr);
+  column-gap: 16px;
+  padding-block: 22px;
+}
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-header] {
+  grid-column: 1 / -1;
+}
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-media],
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-caption],
+[data-wk-workbook-screen="following"] article[data-following-activity] > [data-following-body] {
+  grid-column: 2;
+  min-width: 0;
+}
+[data-wk-workbook-screen="following"] [data-following-actions] {
+  justify-content: space-between;
+}
+[data-wk-workbook-screen="following"] [data-following-actions] button {
+  min-height: 38px;
+  padding-inline: 7px;
+  font-size: 12px;
+}
+[data-wk-workbook-screen="following"] [data-following-actions] i {
+  font-size: 18px;
+}
+[data-wk-workbook-screen="following"] [data-following-activity] :is(a,button):focus-visible {
+  outline: 2px solid var(--wk-brand);
+  outline-offset: 2px;
+}
+
+/* Quiet correspondence with visible selected conversation and legible
+   incoming/outgoing messages across both theme palettes. */
+[data-wk-workbook-screen="messages"] [data-wk-message-list] {
+  background: var(--wk-surface);
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-conversation][aria-current="true"] {
+  background: var(--wk-brand-soft);
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-thread] {
+  background: var(--wk-bg);
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-bubble] {
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+[data-wk-workbook-screen="messages"] [data-wk-message-composer] textarea {
+  color: var(--wk-text);
+  background: transparent;
+}
+
+/* An activity feed uses precise type glyphs and a real actor portrait when
+   known; a missing portrait remains a legitimate icon, not a fake person. */
+[data-wk-workbook-screen="notifications"] [data-wk-notification-row] {
+  border-bottom: 1px solid var(--wk-divider);
+}
+[data-wk-workbook-screen="notifications"] [data-wk-notification-row] :is(img,i) {
+  flex-shrink: 0;
+}
+[data-wk-workbook-screen="notifications"] nav[aria-label="Notification filters"] button[aria-current="page"] {
+  background: var(--wk-text);
+  color: var(--wk-bg);
+}
+[data-wk-workbook-screen="notifications"] nav[aria-label="Notification filters"] button:not([aria-current="page"]) {
+  color: var(--wk-text-soft);
+}
+@media (min-width:768px) {
+  [data-wk-workbook-screen="following"] article[data-following-activity] {
+    grid-template-columns: 48px minmax(0,1fr);
+    column-gap: 12px;
+  }
+}
+@media (max-width:639px) {
+  :is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) {
+    padding-inline: 16px;
+  }
+  :is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) form > div {
+    flex-direction: column;
+  }
+  :is([data-wk-magazine-newsletter],[data-wk-article-newsletter]) button[type="submit"] {
+    width: 100%;
+  }
+}
+
+
+/* The Podcasts index has a typographic cover when no approved show art exists.
+   Keep that actual title visible in both theme palettes. */
+[data-wk-workbook-screen="podcasts"] .wk-reference-podcast-cover {
+  background: #1B1B1B;
+  color: #FFFFFF;
+}
+[data-wk-workbook-screen="podcasts"] .wk-reference-podcast-cover > span {
+  color: #FFFFFF;
+  padding: 24px;
+}
+[data-wk-workbook-screen="video"] .wk-reference-media-hero-copy .wk-reference-play-button {
+  background: #FFFFFF;
+  color: #0B0B0B;
+}
+
+
+/* Square release artwork keeps its complete approved cover. The general
+   Music editorial-photo cover rule must not override explicit containment. */
+[data-wk-workbook-screen="music"] main article img.object-contain {
+  object-fit: contain;
+}

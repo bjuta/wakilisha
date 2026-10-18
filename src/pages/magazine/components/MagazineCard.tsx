@@ -32,9 +32,10 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
       <Link
         to={url}
         data-wk-magazine-story
-      data-wk-magazine-category={story.section.trim().toLowerCase()}
+        data-wk-magazine-feature="true"
+        data-wk-magazine-category={story.section.trim().toLowerCase()}
         className="group relative flex h-full flex-col overflow-hidden rounded-[16px] bg-[#0a0a0a] outline-none focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
-        style={{ minHeight: "clamp(340px, 42vw, 480px)" }}
+        style={{ minHeight: "clamp(430px, 44vw, 560px)" }}
       >
         {story.heroUrl ? (
           <ResponsiveMediaImage
@@ -61,17 +62,17 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           </span>
         )}
 
-        <div className="relative z-10 mt-auto p-6 text-white lg:p-8">
+        <div className="relative z-10 mt-auto px-6 pb-7 pt-24 text-white lg:px-8 lg:pb-9 lg:pt-32">
           <span className="inline-block rounded-full bg-black/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--wk-brand)] backdrop-blur-sm transition-transform duration-300 group-hover:-translate-y-0.5">
             {story.section}
           </span>
-          <h3 className="mb-3 mt-3 line-clamp-3 text-[clamp(20px,2.6vw,30px)] font-black leading-[1.06] tracking-[-0.04em] transition-colors group-hover:text-white/90">
+          <h3 className="mb-3 mt-3 break-words text-[clamp(20px,2.6vw,30px)] font-black leading-[1.12] tracking-[-0.04em] text-white transition-colors group-hover:text-white/90">
             {story.title}
           </h3>
-          <p className="max-w-[52ch] text-[13px] leading-relaxed text-white/55 line-clamp-2 lg:text-[14px]">
+          <p className="max-w-[52ch] text-[13px] leading-[1.55] text-white/85 lg:text-[14px]">
             {why}
           </p>
-          <div className="mt-4 flex items-center gap-2.5 text-[12px] text-white/45">
+          <div className="mt-4 flex flex-wrap items-center gap-2.5 text-[12px] text-white/80">
             <ArticleAuthorIdentity
               name={story.author}
               personPath={story.authorPersonPath}
@@ -80,7 +81,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
               plainClassName="flex items-center gap-2"
             >
               <AuthorBadge author={story.author} />
-              <span className="font-semibold text-white/70">{story.author}</span>
+              <span className="font-semibold text-white/90">{story.author}</span>
             </ArticleAuthorIdentity>
             <span className="text-white/20">·</span>
             <span>{story.readingTime} min read</span>

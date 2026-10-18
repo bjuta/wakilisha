@@ -247,22 +247,18 @@ export default function MobileMagazine() {
             {picks.length ? (
               <section className="wk-reveal">
                 <MobileSectionLabel>Editor’s Picks</MobileSectionLabel>
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <MagazineCard variant="hero" story={picks[0]} />
-                  {picks.slice(1).map((story) => (
-                    <MagazineCard key={story.slug} variant="standard" story={story} />
-                  ))}
-                </div>
+                <MagazineCard variant="hero" story={picks[0]} />
+                {picks.length > 1 ? (
+                  <div className="mt-5">
+                    <MobileStoryRail label="Editor’s Picks" stories={picks.slice(1)} />
+                  </div>
+                ) : null}
               </section>
             ) : null}
             {latest.length ? (
               <section className="wk-reveal">
                 <MobileSectionLabel>Latest Stories</MobileSectionLabel>
-                <div className="grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2">
-                  {latest.map((story) => (
-                    <MagazineCard key={story.slug} variant="standard" story={story} />
-                  ))}
-                </div>
+                <MobileStoryRail label="Latest Stories" stories={latest} />
               </section>
             ) : null}
             {topSections.map((section) => {
@@ -271,11 +267,7 @@ export default function MobileMagazine() {
               return (
                 <section key={section} className="wk-reveal">
                   <MobileSectionLabel count={items.length}>{section}</MobileSectionLabel>
-                  <div className="grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2">
-                    {items.map((story) => (
-                      <MagazineCard key={story.slug} variant="standard" story={story} />
-                    ))}
-                  </div>
+                  <MobileStoryRail label={section} stories={items} />
                 </section>
               );
             })}
@@ -294,6 +286,27 @@ export default function MobileMagazine() {
         <MobileNewsletterCTA />
 
       </div>
+    </div>
+  );
+}
+
+/** Horizontal story shelves preserve Magazine's editorial scan on narrow screens.
+ * Tabs still filter the full published set; shelves never duplicate editorial data.
+ */
+function MobileStoryRail({ label, stories }: { label: string; stories: MagazineArticle[] }) {
+  return (
+    <div
+      role="region"
+      aria-label={`${label} stories`}
+      tabIndex={0}
+      data-wk-magazine-story-rail
+      className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overscroll-x-contain px-4 pb-4 [scrollbar-width:thin] sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0"
+    >
+      {stories.map((story) => (
+        <div key={story.slug} className="w-[84vw] max-w-[365px] shrink-0 snap-start sm:w-auto sm:max-w-none">
+          <MagazineCard variant="standard" story={story} />
+        </div>
+      ))}
     </div>
   );
 }

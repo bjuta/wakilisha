@@ -466,7 +466,7 @@ export default function ArticlePage() {
       <ArticleRelated stories={related.filter((item) => item.slug !== article.slug)} loading={relatedLoading} />
       <div data-wk-article-newsletter className="mx-auto w-full max-w-[780px] border-t border-[var(--wk-border)] px-5 py-12 sm:px-8">
         <NewsletterSubscribe
-          variant="compact"
+          variant="default"
           formId="article-newsletter"
           headline="Read with us"
           description="Get new stories and charts in your inbox."

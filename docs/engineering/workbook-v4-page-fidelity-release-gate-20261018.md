@@ -5,10 +5,10 @@
 **Branch / PR:** `feat/workbook-v4-visual-fidelity-convergence-20261018` / #1255. Supersedes neither the workbook nor merged source PR #1253.
 
 ## Nonnegotiable design
-- WAKILISHA uses editorial Figtree/Plex typography. The workbook has TWO authored theme palettes, not a generic inversion: light canvas #FCFCFB, white surface, ink text, brand #4E7425; dark canvas #0B0B0B, charcoal surfaces, soft-white text, brand #85C441. The live app theme switch must apply the respective workbook palette to every redesigned route, element, field, card and state. Dark photographic hero overlays are allowed in either theme to preserve text contrast. The light article reading surface uses warm paper #F5F2EC; dark article body uses its intentionally designed dark counterpart. Don't invent content, awards, or endorsement states.
+- WAKILISHA uses editorial Figtree/Plex typography. The workbook has TWO authored theme palettes, not a generic inversion: light canvas #FCFCFB, white surface, ink text, brand #4E7425; dark canvas #0B0B0B, charcoal surfaces, soft-white text, brand #85C441. The live app theme switch must apply the respective workbook palette to every redesigned route, element, field, card and state. Dark photographic hero overlays are allowed in either theme to preserve text contrast. **Owner's post-Production correction (PR #1256):** Article now uses the standard WAKILISHA light canvas #FCFCFB (not warm paper) and standard dark canvas #0B0B0B. Don't invent content, awards, or endorsement states.
 - Full release/playlist covers are square and **uncropped**. Standard editorial photographs are 3:2; Magazine inline video retains its own ratio; artist portraits are 4:5. Single-article hero is 3:2 desktop and 4:5 phone, with a genuine aspect-ratio container in loaded and loading states. Never let a global object-fit rule override artwork's contained fit.
 - Magazine order: cover, Editor's Picks, Latest, artists, published-content sections, guide, one newsletter CTA. Sections are content-backed filters of the initial 24-story set, never dummy tabs or an expensive full-archive fetch. Editorial card: image, category ink, readable title, visible excerpt where supplied, byline. Newsletter never appears in the admin-reorderable region.
-- Article body: warm paper in light theme and dark counterpart in dark theme; 680px inner measure, desktop 19px/1.7 body, readable lede and heading levels, theme-contrasted pull-quote rule, unboxed inline media, source-backed release/artist/track embeds, author/credit and community, one existing share action per routed viewport, related story imagery 3:2, one compact newsletter after related stories.
+- Article body: standard WAKILISHA light and dark canvases as directed in the post-Production review; 680px inner measure, desktop 19px/1.7 body, readable lede and heading levels, theme-contrasted pull-quote rule, unboxed inline media, source-backed release/artist/track embeds, author/credit and community, one existing share action per routed viewport, related story imagery 3:2, one balanced stacked newsletter after related stories.
 - Music: release-first hero with uncropped cover and real Play/Share/Release actions, published releases, ranked chart entries, published genre tiles, usable discovery links. No inert carousel arrows, generic repeated 'go deeper' tiles, or invented genre names.
 - Following: readable one-column feed, user composer and interactions, media framing by type, genuine All / Artists Only filter based on followed artist matching, not fabricated posts.
 - Messages: conversation list left, messages right on desktop; own messages green, incoming grey, live request/spam/archive, sender approval controls, reporting, message/reference rendering and composer. Do not shortcut messaging authority or drop existing functional actions.
@@ -19,7 +19,7 @@
 | Page | Contract |
 | --- | --- |
 | Magazine desktop/mobile | 3:2 image frames, rounded editorial photography, readable headline/excerpt, category ink, bounded mobile initial article set, one plain final newsletter form |
-| Article desktop/mobile | Real 3:2 and 4:5 hero frames, 19px desktop editorial body, flat inline images, related 3:2 imagery and one final CTA |
+| Article desktop/mobile | Real 3:2 and 4:5 hero frames, standard WAKILISHA themed reading canvas, 19px desktop editorial body, flat inline images, related 3:2 imagery and one final stacked CTA |
 | Music | Workbook-authored night and paper themes, contained 1:1 featured cover, real releases, charts and genres, source-backed navigation, no inert arrival arrows |
 | Notifications | Content list, grouped timeline and real desktop preference toggles for supported settings; full settings link |
 | Messages | Larger correspondence type and clear message colour hierarchy, all existing folder/action and security behavior kept |
@@ -36,3 +36,8 @@
 **Deployment classification:** SQL no. Edge no. Frontend yes, pending protected merge and actual Lightsail activation. Production Finish Update no separate action. PR #1255 source only until gates pass.
 
 This document records requirements and current implementation, **not** Production acceptance.
+
+
+## Owner's post-Production correction, PR #1256
+
+The owner-provided live captures of 18 October supersede this release's former warm-paper article canvas and compact in-line newsletter layout. Magazine mobile navigation must include genuinely swipeable source-backed story shelves rather than a category-by-category long wall. See `docs/engineering/workbook-v4-live-fidelity-refinement-20261018.md` for the later detailed visual requirements and acceptance record. The original PR #1255 historical outcomes remain unchanged.

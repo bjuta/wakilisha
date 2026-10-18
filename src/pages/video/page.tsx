@@ -119,7 +119,7 @@ export default function VideoIndexPage() {
                 </span>
                 <h1 className="wk-reference-media-hero-title mt-4">{featured.title}</h1>
                 {featured.summary && <p className="wk-reference-hero-caption line-clamp-3">{featured.summary}</p>}
-                <span className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#f5f5f4] px-5 text-[14px] font-bold text-[#0b0b0b]">
+                <span className="wk-reference-play-button mt-6 inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-bold text-[#0b0b0b]">
                   Watch <span aria-hidden="true">↗</span>
                 </span>
               </div>

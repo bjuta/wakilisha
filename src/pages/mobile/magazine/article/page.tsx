@@ -442,7 +442,7 @@ export default function MobileArticle() {
       <ArticleRelated stories={relatedStories} loading={relatedLoading} />
       <div data-wk-article-newsletter className="border-t border-[var(--wk-border)] px-5 py-10">
         <NewsletterSubscribe
-          variant="compact"
+          variant="default"
           formId="article-newsletter-mobile"
           headline="Read with us"
           description="Get new stories and charts in your inbox."

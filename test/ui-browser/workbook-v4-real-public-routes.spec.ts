@@ -22,6 +22,31 @@ async function waitForSettledMedia(page: Page, name: string) {
       ).toBe(true);
     }
   }
+  if (name === "music") {
+    const coverSlot = surface.locator(".wk-music-hero [data-wk-music-artwork-state]").last();
+    if (await coverSlot.count()) {
+      // The Registry image host can stall or reject a CI client. The UI must
+      // paint either decoded cover art or its labelled fallback immediately;
+      // this browser test does not claim external-image availability.
+      await expect(coverSlot).toBeVisible();
+      const state = await coverSlot.getAttribute("data-wk-music-artwork-state");
+      expect(["recorded", "fallback"]).toContain(state);
+      if (state === "fallback") {
+        const fallback = coverSlot.locator("[data-wk-music-artwork-fallback]");
+        await expect(fallback).toBeVisible();
+        const colours = await fallback.evaluate((node) => ({
+          background: getComputedStyle(node).backgroundColor,
+          ink: getComputedStyle(node.querySelector("span") ?? node.querySelector("svg") ?? node).color,
+        }));
+        expect(colours.background).toBe("rgb(27, 27, 27)");
+        expect(colours.ink).not.toBe(colours.background);
+      } else {
+        const image = coverSlot.locator("img");
+        await expect(image).toHaveCount(1);
+        expect(await image.evaluate((node) => node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0)).toBe(true);
+      }
+    }
+  }
 }
 
 /**
@@ -190,6 +215,22 @@ for (const route of [
       expect(actual.background).toBe(background);
       expect(actual.brand).toBe(brand);
       expect(actual.text).not.toBe(actual.background);
+      if (route.name === "podcasts") {
+        const cover = surface.locator(".wk-reference-podcast-cover");
+        if (await cover.count()) {
+          // The light theme previously rendered a white title on a white cover.
+          // Check the actual browser-computed pixels, not just theme tokens.
+          const colours = await cover.evaluate((node) => {
+            const heading = node.querySelector("span");
+            return {
+              background: getComputedStyle(node).backgroundColor,
+              title: heading ? getComputedStyle(heading).color : "",
+            };
+          });
+          expect(colours.background).toBe("rgb(27, 27, 27)");
+          expect(colours.title).toBe("rgb(255, 255, 255)");
+        }
+      }
       await page.screenshot({
         path: testInfo.outputPath(`workbook-v4-${route.name}-${mode}-390.png`),
         animations: "disabled",
