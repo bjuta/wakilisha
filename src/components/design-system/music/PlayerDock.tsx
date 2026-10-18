@@ -115,6 +115,7 @@ export function PlayerDock() {
   if (isMusicRoute) {
     return createPortal(
       <div
+        data-wk-player-dock
         className={[
           "fixed inset-x-0 bottom-0 z-[100] border-t border-[var(--wk-border-2)] bg-[var(--wk-overlay)] text-[var(--wk-text)] shadow-[0_-18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl",
           isFullPlayerOpen ? "hidden" : "",
@@ -279,7 +280,7 @@ export function PlayerDock() {
   }
 
   return (
-    <div className={`sticky bottom-0 border-t border-[var(--wk-border)] bg-[var(--wk-surface)] ${isFullPlayerOpen ? 'z-[100]' : 'z-[80]'}`}>
+    <div data-wk-player-dock className={`sticky bottom-0 border-t border-[var(--wk-border)] bg-[var(--wk-surface)] ${isFullPlayerOpen ? 'z-[100]' : 'z-[80]'}`}>
       {/* Universal seek bar */}
       <div
         role="slider"

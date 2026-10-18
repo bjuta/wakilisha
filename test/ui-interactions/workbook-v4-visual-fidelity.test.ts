@@ -149,7 +149,7 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(notifications).toContain('contributionNotifications');
     expect(notifications).not.toContain('saveAll(');
     expect(notifications).toContain('to="/settings?section=Notifications"');
-    expect(notifications).toContain('hidden self-start border-l border-[var(--wk-border)]');
+    expect(notifications).toContain('data-wk-notifications-preferences');
     expect(notifications).toContain('aria-label="Notification filters"');
     expect(notifications).toContain('handleMarkAll()');
     expect(notifications).toContain('notificationTarget(');
@@ -169,6 +169,43 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(messages).toContain('whitespace-pre-wrap break-words text-[15px]');
   });
 
+  it("preserves P6 P7 P8 workbook geometry and both theme token bindings", () => {
+    const css = read("src/styles/wakilisha-social-workbook-p6-p8.css");
+    const following = read("src/pages/following/page.tsx");
+    const messages = read("src/pages/messages/page.tsx");
+    const notifications = read("src/pages/notifications/page.tsx");
+    const composer = read("src/components/community/PostComposer.tsx");
+
+    expect(css).toContain('grid-template-columns: 44px minmax(0,1fr)');
+    expect(css).toContain('[data-wk-following-discovery]');
+    expect(css).toContain('[data-wk-message-bubble]');
+    expect(css).toContain('[data-wk-notifications-preferences]');
+    expect(css).toContain('background: var(--wk-surface)');
+    expect(css).toContain('color: var(--wk-text)');
+    expect(css).toContain('@media (max-width: 639px)');
+
+    expect(following).toContain('lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)]');
+    expect(notifications).toContain('lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)]');
+    expect(following).toContain('["all", "Following"]');
+    expect(following).toContain('["artists", "Artists only"]');
+    expect(following).toContain('ActivityAnchorAvatar subject={person}');
+    expect(composer).toContain('What are you listening to?');
+    expect(composer).toContain('compactFollowing?: boolean;');
+    expect(composer).toContain('data-wk-following-mobile-compose');
+    expect(messages).toContain('minmax(280px,34%)_minmax(0,1fr)');
+    expect(messages).toContain('selectedId ? "flex" : "hidden lg:flex"');
+    expect(messages).toContain('data-wk-thread-selected={selectedId ? "true" : "false"}');
+    expect(read("src/components/design-system/music/PlayerDock.tsx")).toContain("data-wk-player-dock");
+    expect(css).toContain('body:has([data-wk-workbook-screen="messages"]');
+    expect(messages).toContain('aria-label="Conversation actions"');
+    expect(notifications).toContain('data-wk-notification-type={notification.notificationType}');
+    expect(notifications).toContain('wk-notification-event-icon');
+    expect(notifications).toContain('new_release: "ri-disc-line"');
+    expect(notifications).toContain('post_like: "ri-heart-line"');
+    expect(notifications).toContain('reply: "ri-chat-3-line"');
+    expect(notifications).toContain('notification.actor?.avatarUrl');
+  });
+
   it("retains authentic Following actions and respects source media ratios", () => {
     const following = read("src/pages/following/page.tsx");
     expect(following).toContain('data-following-activity');
@@ -182,7 +219,12 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(following).toContain('visibleItems.map((item)');
     expect(following).toContain('PostActions');
     expect(following).toContain('<FollowingShareAction');
-    expect(following).toContain('New work from the people you follow.');
+    expect(following).toContain('data-wk-following-layout');
+    expect(following).toContain('data-wk-following-discovery');
+    expect(following).toContain('Your circle');
+    expect(following).toContain('compactFollowing');
+    expect(following).toContain('Artists only');
+    expect(following).not.toContain('max-w-[850px] pb-10 pt-6');
     expect(following).not.toContain('Your People Are Still Here');
   });
 });

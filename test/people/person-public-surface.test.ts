@@ -1043,7 +1043,7 @@ describe(
 
         expect(followingFeedPage)
           .toContain(
-            "New work from the people you follow.",
+            "New work from people you follow will appear here.",
           );
 
         expect(followingFeedPage)
@@ -1313,7 +1313,7 @@ describe(
       () => {
         expect(followingFeedPage)
           .toContain(
-            "data-following-activity-anchors",
+            'aria-label="People in your feed"',
           );
 
         expect(followingFeedPage)

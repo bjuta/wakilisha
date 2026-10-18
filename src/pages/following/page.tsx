@@ -1,5 +1,6 @@
 import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import "@/styles/wakilisha-workbook-surface-fidelity.css";
+import "@/styles/wakilisha-social-workbook-p6-p8.css";
 import {
   useCallback,
   useEffect,
@@ -2188,116 +2189,32 @@ export default function FollowingPage() {
         robots="noindex,nofollow"
       />
 
-      <div className="mx-auto w-full max-w-[850px] pb-10 pt-6 md:pb-16 md:pt-12">
-        <header
-          data-following-masthead
-          className="px-4 pb-4 md:px-0 md:pb-6"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="text-[38px] font-black leading-none tracking-[-0.05em] md:text-[50px]">
-                Following
-              </h1>
-              <p className="mt-2 text-[13px] leading-relaxed text-[var(--wk-text-muted)] md:text-[14px]">
-                New work from the people you follow.
-              </p>
-            </div>
-
-            {isSignedIn && (
-              <Link
-                to="/profile"
-                aria-label="Manage Following"
-                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-[var(--wk-border)] px-3 py-2 text-[11px] font-black text-[var(--wk-text)] transition-colors hover:border-[var(--wk-border-2)] sm:px-4"
-              >
-                <i
-                  className="ri-user-settings-line text-[15px]"
-                  aria-hidden="true"
-                />
-                <span className="hidden sm:inline">
-                  Manage Following
-                </span>
-                <span className="sm:hidden">
-                  Manage
-                </span>
-              </Link>
-            )}
-          </div>
-
-          {isSignedIn && (
-            <nav aria-label="Following feed filters" className="mt-5 flex items-center gap-2">
+      <div data-wk-following-layout className={isSignedIn ? "mx-auto grid w-full max-w-[1180px] grid-cols-1 lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)]" : "mx-auto w-full max-w-[850px]"}>
+        <div data-wk-following-timeline className="min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r">
+        <header data-following-masthead className="sticky top-0 z-20 border-b border-[var(--wk-divider)] bg-[var(--wk-surface)]/95 backdrop-blur-xl">
+          {isSignedIn ? (
+            <nav aria-label="Following feed filters" className="grid h-14 grid-cols-2">
               {([
-                ["all", "All"],
-                ["artists", "Artists Only"],
+                ["all", "Following"],
+                ["artists", "Artists only"],
               ] as const).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFeedFilter(value)}
+                <button key={value} type="button" onClick={() => setFeedFilter(value)}
                   aria-pressed={feedFilter === value}
-                  className={`wk-reference-pill ${feedFilter === value ? "bg-[var(--wk-text)] text-[var(--wk-bg)]" : ""}`}
-                >
+                  className={`relative flex items-center justify-center px-3 text-[14px] transition-colors ${feedFilter === value ? "font-bold text-[var(--wk-text)]" : "font-medium text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"}`}>
                   {label}
+                  {feedFilter === value ? <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-[var(--wk-brand)]" /> : null}
                 </button>
               ))}
             </nav>
+          ) : (
+            <div className="flex h-14 items-center px-5 text-[18px] font-bold">Following</div>
           )}
-          {isSignedIn &&
-            !loading &&
-            feedFilter === "all" &&
-            activityAnchors.length > 0 && (
-              <nav
-                data-following-activity-anchors
-                aria-label="Activity anchors"
-                className="-mx-4 mt-5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden"
-              >
-                <div className="flex w-max items-start gap-4 pr-2">
-                  {activityAnchors.map(
-                    (anchorItem) => {
-                      const active =
-                        anchorItem.key ===
-                        activeAnchorKey;
-
-                      return (
-                        <button
-                          key={anchorItem.key}
-                          type="button"
-                          onClick={() =>
-                            scrollToAnchor(
-                              anchorItem.key,
-                            )
-                          }
-                          aria-current={
-                            active
-                              ? "true"
-                              : undefined
-                          }
-                          className="group flex w-[68px] shrink-0 flex-col items-center gap-1.5 text-center"
-                        >
-                          <ActivityAnchorAvatar
-                            subject={anchorItem}
-                            active={active}
-                          />
-                          <span
-                            className={`w-full truncate text-[10px] font-bold transition-colors ${
-                              active
-                                ? "text-[var(--wk-text)]"
-                                : "text-[var(--wk-text-muted)] group-hover:text-[var(--wk-text)]"
-                            }`}
-                          >
-                            {anchorItem.title}
-                          </span>
-                        </button>
-                      );
-                    },
-                  )}
-                </div>
-              </nav>
-            )}
         </header>
 
         {isSignedIn && viewerActor?.type === "person" && (
-          <section className="px-4 pb-6 md:px-0">
+          <section data-wk-following-composer className="border-b border-[var(--wk-divider)]">
             <PostComposer
+              compactFollowing
               actor={viewerActor}
               onSaved={() => {
                 setActionError(null);
@@ -2479,6 +2396,55 @@ export default function FollowingPage() {
             )}
           </>
         )}
+        </div>
+        {isSignedIn ? (
+          <aside data-wk-following-discovery className="hidden min-w-0 px-5 py-5 lg:block" aria-label="Your Following circle">
+            <Link to="/search" className="flex min-h-11 items-center gap-3 rounded-full bg-[var(--wk-surface-raised)] px-4 text-[13px] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+              <i className="ri-search-line text-[16px]" aria-hidden="true" /> Search WAKILISHA
+            </Link>
+            <section className="mt-4 rounded-[18px] border border-[var(--wk-border)] px-4 py-4" aria-label="New releases from your circle">
+              <h2 className="text-[19px] font-bold tracking-[-0.02em] text-[var(--wk-text)]">Out this week</h2>
+              {items.filter((item) => item.itemType === "release" && Date.now() - new Date(item.publishedAt).getTime() < 7 * 24 * 60 * 60 * 1000).slice(0, 3).length ? (
+                <div className="mt-3 grid gap-1">
+                  {items.filter((item) => item.itemType === "release" && Date.now() - new Date(item.publishedAt).getTime() < 7 * 24 * 60 * 60 * 1000).slice(0, 3).map((release) => (
+                    <Link key={release.itemKey} to={release.canonicalPath} className="flex min-h-14 items-center gap-3 rounded-xl px-1 py-1.5 hover:bg-[var(--wk-surface-raised)]">
+                      {release.imageUrl ? (
+                        <img src={release.imageUrl} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-md object-contain" />
+                      ) : (
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
+                          <i className="ri-album-line text-lg" aria-hidden="true" />
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--wk-text)]">{release.title}</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-[12px] leading-relaxed text-[var(--wk-text-muted)]">No new releases from your circle this week.</p>
+              )}
+            </section>
+            <section className="mt-3 rounded-[18px] border border-[var(--wk-border)] px-4 py-4" aria-label="People in your feed">
+              <h2 className="text-[19px] font-bold tracking-[-0.02em] text-[var(--wk-text)]">Your circle</h2>
+              {activityAnchors.length > 0 ? (
+                <div className="mt-3 grid gap-1">
+                  {activityAnchors.slice(0, 6).map((person) => (
+                    <button key={person.key} type="button" onClick={() => scrollToAnchor(person.key)} aria-current={person.key === activeAnchorKey ? "true" : undefined} className="flex min-h-[58px] w-full items-center gap-3 rounded-xl px-1 text-left transition-colors hover:bg-[var(--wk-surface-raised)]">
+                      <ActivityAnchorAvatar subject={person} active={person.key === activeAnchorKey} />
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--wk-text)]">{person.title}</span>
+                      <i className="ri-arrow-right-up-line text-[15px] text-[var(--wk-text-faint)]" aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-[13px] leading-relaxed text-[var(--wk-text-muted)]">New work from people you follow will appear here.</p>
+              )}
+              <Link to="/artists" className="mt-4 inline-flex min-h-11 items-center text-[13px] font-semibold text-[var(--wk-brand)] hover:underline">Discover artists</Link>
+            </section>
+            <Link to="/profile" className="mt-4 inline-flex min-h-11 items-center gap-2 text-[12px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+              <i className="ri-user-settings-line text-[16px]" aria-hidden="true" /> Manage Following
+            </Link>
+          </aside>
+        ) : null}
       </div>
     </main>
   );
