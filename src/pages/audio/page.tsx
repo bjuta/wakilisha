@@ -39,8 +39,8 @@ function AudioCard({
   const credit = publicationCredit(publication);
 
   return (
-    <article className="group overflow-hidden rounded-[26px] border border-[var(--wk-border)] bg-[var(--wk-surface)]">
-      <div className="aspect-[16/10] bg-[radial-gradient(circle_at_25%_20%,color-mix(in_srgb,var(--wk-brand)_30%,transparent),transparent_38%),linear-gradient(145deg,var(--wk-surface-raised),var(--wk-bg))] p-5">
+    <article data-wk-workbook-audio-card className="group overflow-hidden bg-[var(--wk-bg)]">
+      <div className="aspect-square max-h-[340px] bg-[var(--wk-surface-raised)] p-5">
         <div className="flex h-full items-end justify-between gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] shadow-lg">
             <WkIcon name="AudioLines" size={21} />
@@ -64,7 +64,7 @@ function AudioCard({
           </button>
         </div>
       </div>
-      <Link to={publication.canonicalPath} className="block p-5">
+      <Link to={publication.canonicalPath} className="block py-4">
         <div className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
           {publication.publicationKind === "episode" ? "Episode" : "Audio"}
         </div>
@@ -113,9 +113,9 @@ export default function PublicAudioPage() {
   const shows = index?.shows ?? [];
 
   return (
-    <div className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
+    <div data-wk-workbook-screen="audio" className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
       <div className="wk-container-max px-6 md:px-10">
-        <WkEditorialIntro eyebrow="Listen" title="Audio" description="Radio, DJ mixes, documentaries, field recordings, and published audio. Every recording links to its source." />
+        <WkEditorialIntro eyebrow="Listen" title="Audio" description="Listen to published audio and shows. Each recording stays connected to its source and credits." />
       </div>
       <div className="wk-container-max px-6 py-12 md:px-10 md:py-16">
         {loading ? (
@@ -128,7 +128,7 @@ export default function PublicAudioPage() {
           <div className="rounded-[28px] border border-[var(--wk-border)] bg-[var(--wk-surface)] p-8">
             <h2 className="text-[24px] font-black tracking-[-0.03em]">Audio</h2>
             <p className="mt-2 max-w-xl text-[14px] leading-6 text-[var(--wk-text-muted)]">
-              This environment does not have the public Audio directory authority yet. Individual published Audio remains available from its canonical link.
+              Audio is temporarily unavailable. Please try again.
             </p>
           </div>
         ) : null}
@@ -160,12 +160,12 @@ export default function PublicAudioPage() {
                 <Link
                   key={show.show.resourceId}
                   to={show.show.canonicalPath}
-                  className="group rounded-[28px] border border-[var(--wk-border)] bg-[var(--wk-surface)] p-6 transition-transform hover:-translate-y-0.5"
+                  className="group flex flex-col items-start border-t border-[var(--wk-border)] bg-[var(--wk-bg)] py-5 transition-colors hover:text-[var(--wk-brand)]"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
+                  <div className="flex h-12 w-12 items-center justify-center bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
                     <WkIcon name="Radio" size={21} />
                   </div>
-                  <h3 className="mt-7 text-[24px] font-black tracking-[-0.03em] group-hover:text-[var(--wk-brand)]">
+                  <h3 className="mt-4 text-[24px] font-black tracking-[-0.03em] group-hover:text-[var(--wk-brand)]">
                     {show.show.title}
                   </h3>
                   <div className="mt-1 text-[12px] font-bold text-[var(--wk-text-muted)]">
