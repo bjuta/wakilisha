@@ -350,7 +350,7 @@ export default function ArticlePage() {
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      <section data-wk-workbook-hero="article" key="article-hero-shell" className="relative flex h-[min(50vw,520px)] min-h-[420px] items-end justify-center overflow-hidden bg-[#0b0b0b]">
+      <section data-wk-workbook-hero="article" key="article-hero-shell" className="relative flex aspect-[3/2] items-end justify-center overflow-hidden bg-[#0b0b0b]">
         {article.heroUrl ? (
           <ResponsiveMediaImage
             key="article-hero-media"
