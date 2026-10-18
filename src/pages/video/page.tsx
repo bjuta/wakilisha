@@ -75,7 +75,7 @@ export default function VideoIndexPage() {
         description="Watch documentaries, sessions, series, shorts and live video from WAKILISHA."
         url="https://wakilisha.africa/video"
       />
-      <main data-wk-workbook-screen="video" className="min-h-screen">
+      <main data-wk-workbook-screen="video" className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
         <div className="mx-auto w-full max-w-[1320px]">
           <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-9">
             <nav aria-label="Video formats" className="wk-reference-pills">
