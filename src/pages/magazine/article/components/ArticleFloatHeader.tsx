@@ -5,23 +5,6 @@ import type { MagazineArticle } from "@/services/magazineArticles";
 import { SharePopover } from "@/components/design-system/share/ShareSheet";
 import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
 
-const SECTION_COLORS: Record<string, string> = {
-  Analysis: "#C44A3B",
-  Focus: "#D97706",
-  Industry: "#78716C",
-  Culture: "#BE185D",
-  Interview: "#256B5A",
-  Music: "#4F46E5",
-  Lifestyle: "#0891B2",
-  Art: "#DC2626",
-  Opinion: "#7C3AED",
-  News: "#1D4ED8",
-};
-
-function sectionColor(section: string): string {
-  return SECTION_COLORS[section] || "var(--wk-brand)";
-}
-
 interface ArticleFloatHeaderProps {
   article: MagazineArticle;
 }
@@ -52,8 +35,7 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
       {/* Section + stats chips */}
       <div className="flex items-center gap-3 mb-7 flex-wrap">
         <span
-          className="rounded-full px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white"
-          style={{ background: sectionColor(article.section) }}
+          className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--wk-brand)]"
         >
           {article.section}
         </span>
@@ -121,12 +103,12 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
             <button
               ref={shareBtnRef}
               onClick={() => setSharePopoverOpen(!sharePopoverOpen)}
-              className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-[var(--wk-brand)] text-white text-[13px] font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              className="inline-flex min-h-11 items-center gap-2 border border-[var(--wk-border)] px-4 text-[13px] font-semibold text-[var(--wk-text)] transition-colors hover:border-[var(--wk-brand)] cursor-pointer whitespace-nowrap"
             >
               <i className="ri-share-forward-line text-[15px]" />
               Share
               {totalShares > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-[6px] rounded-full bg-white/20 text-white text-[11px] font-bold">
+                <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-[6px] rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)] text-[11px] font-bold">
                   {totalShares.toLocaleString()}
                 </span>
               )}

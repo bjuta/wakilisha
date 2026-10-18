@@ -34,6 +34,7 @@ import {
 } from "@/services/messages";
 import { MessageSafetyReportButton } from "./MessageSafetyReportButton";
 import { MessageSafetyState } from "./MessageSafetyState";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
 
 const FOLDERS: Array<{ key: MessageFolder; label: string; icon: string }> = [
   { key: "inbox", label: "Inbox", icon: "ri-inbox-line" },
@@ -358,6 +359,7 @@ export default function MessagesPage() {
   const requestedPresentation = searchParams.get("presentation");
   const requestedWorkflow = searchParams.get("workflow");
   const [folder, setFolder] = useState<MessageFolder>("inbox");
+  const [conversationQuery, setConversationQuery] = useState("");
   const [conversations, setConversations] = useState<MessageConversationSummary[]>([]);
   const [unread, setUnread] = useState<Record<MessageFolder, number>>({ inbox: 0, requests: 0, spam: 0, archived: 0 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -377,6 +379,16 @@ export default function MessagesPage() {
     useState<MessageResourceReference | null>(null);
   const [workflowProjection, setWorkflowProjection] =
     useState<MessagePlaylistReviewProjection | null>(null);
+
+  const visibleConversations = useMemo(() => {
+    const search = conversationQuery.trim().toLowerCase();
+    if (!search) return conversations;
+    return conversations.filter((summary) => [
+      messageDisplayName(summary.other_participant?.presentation),
+      messageUsername(summary.other_participant?.presentation),
+      summary.latest_message?.body || "",
+    ].join(" ").toLowerCase().includes(search));
+  }, [conversations, conversationQuery]);
 
   const selectedSummary = useMemo(
     () => conversations.find((item) => item.conversation_id === selectedId) ?? null,
@@ -642,21 +654,24 @@ export default function MessagesPage() {
           ))}
         </div>
 
-        <div className="overflow-hidden rounded-none border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:min-h-[650px] lg:grid-cols-[340px_minmax(0,1fr)] lg:rounded-[24px] lg:border">
-          <section className={`${selectedId ? "hidden lg:block" : "block"} border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
+        <div className="overflow-hidden border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:min-h-[650px] lg:grid-cols-[340px_minmax(0,1fr)] lg:border">
+          <section className={`${selectedId ? "hidden lg:block" : "block"} min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
+            <div className="border-b border-[var(--wk-divider)] px-3 py-3">
+              <WkSearchField value={conversationQuery} onChange={setConversationQuery} ariaLabel="Search conversations" placeholder="Search messages" inputClassName="min-h-11 rounded-md border-[var(--wk-border)] bg-[var(--wk-bg)] text-[16px]" />
+            </div>
             {loadingList ? (
               <div className="space-y-2 p-3" aria-busy="true">
                 {[0, 1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-[var(--wk-surface-raised)]" />)}
               </div>
-            ) : conversations.length === 0 ? (
+            ) : visibleConversations.length === 0 ? (
               <div className="flex min-h-[360px] flex-col items-center justify-center px-8 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"><i className="ri-mail-line text-xl" /></div>
                 <h2 className="mt-4 text-[14px] font-black text-[var(--wk-text)]">Nothing here</h2>
-                <p className="mt-1 max-w-[240px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">This folder is quiet.</p>
+                <p className="mt-1 max-w-[240px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{conversationQuery.trim() ? "No matching conversations." : "This folder is quiet."}</p>
               </div>
             ) : (
               <div className="divide-y divide-[var(--wk-divider)]">
-                {conversations.map((summary) => {
+                {visibleConversations.map((summary) => {
                   const name = messageDisplayName(summary.other_participant?.presentation);
                   const username = messageUsername(summary.other_participant?.presentation);
                   return (

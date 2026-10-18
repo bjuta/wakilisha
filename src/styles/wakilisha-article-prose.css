@@ -722,3 +722,41 @@
   width: auto !important;
   height: auto !important;
 }
+
+/* Workbook P11 single-article paper: one editorial canvas, unboxed images and
+   consistent spacing across the two routed desktop/mobile implementations. */
+.wk-workbook-article-paper {
+  margin-top: 0;
+  border-radius: 0;
+  background: var(--wk-bg);
+}
+.wk-workbook-article-paper .article-content-v2 img,
+.wk-workbook-article-paper .article-content-v2 figure,
+.wk-workbook-article-paper .article-content-v2 .wp-block-image,
+.wk-workbook-article-paper .article-content-v2 .wp-caption {
+  border-radius: 0;
+}
+.wk-workbook-article-paper .article-content-v2 figure {
+  overflow: visible;
+}
+[data-wk-workbook-related="articles"] img {
+  border-radius: 0;
+}
+
+/* Mobile uses a distinct React article route, but the same flat Workbook P11 paper. */
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile img,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile figure,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile .wp-block-image,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile .wp-caption {
+  border-radius: 0;
+}
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile figure {
+  overflow: visible;
+}
+
+@media (max-width: 640px) {
+  [data-wk-workbook-related="articles"] {
+    padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  }
+}

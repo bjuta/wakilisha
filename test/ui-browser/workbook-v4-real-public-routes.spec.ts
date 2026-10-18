@@ -75,3 +75,37 @@ test("Workbook sidebar uses accessible modal focus and replaces the old mobile b
   await expect(drawer).toHaveCount(0);
   await expect(menu).toBeFocused();
 });
+
+
+/**
+ * Media landing pages reuse their existing live index services. These
+ * screenshots prove the actual React shells and responsive geometry, not
+ * publication data availability or authenticated Production acceptance.
+ */
+for (const width of [390, 1440]) {
+  for (const surface of [
+    { path: "/video", name: "video" },
+    { path: "/audio", name: "audio" },
+    { path: "/shows", name: "podcasts" },
+    { path: "/music", name: "music" },
+  ]) {
+    test(`Workbook v4 actual ${surface.name} route fits at ${width}px`, async ({ page }, testInfo) => {
+      test.setTimeout(45_000);
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(surface.path, { waitUntil: "domcontentloaded" });
+      await expect(page.locator(`[data-wk-workbook-screen="${surface.name}"]`)).toBeVisible({ timeout: 25_000 });
+
+      const overflow = await page.evaluate(() => {
+        const root = document.documentElement;
+        return Math.max(root.scrollWidth, document.body.scrollWidth) - root.clientWidth;
+      });
+      expect(overflow).toBeLessThanOrEqual(2);
+
+      await page.screenshot({
+        path: testInfo.outputPath(`workbook-v4-${surface.name}-${width}.png`),
+        animations: "disabled",
+        fullPage: false,
+      });
+    });
+  }
+}

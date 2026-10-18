@@ -240,3 +240,91 @@
 @media(max-width:900px){.pg-layout.cols-2,.pg-layout.cols-3,.pg-layout.sidebar-r,.pg-layout.sidebar-l,.genre-featured,.artist-featured{grid-template-columns:1fr}.pg-hero-bg{min-height:300px;padding:var(--wk-s-5)}.mag-grid,.mag-grid.trio,.mag-grid.asymm{grid-template-columns:1fr}.directory-toolbar{top:0}.directory-search{width:100%;min-width:0}.share-destinations{grid-template-columns:repeat(3,1fr)}.artist-feature-card{min-height:360px}}
 @media(max-width:640px){.pg-hero{margin:0;border-radius:0}.pg-hero-bg{min-height:280px;padding:84px 20px 26px}.pg-hero-title{font-size:42px}.pg-hero-actions{display:grid}.genre-grid{grid-template-columns:1fr 1fr;gap:10px}.artist-directory-grid{grid-template-columns:1fr 1fr;gap:10px}.genre-feature-card{min-height:240px}.artist-feature-card{min-height:320px}.share-sheet{border-radius:24px 24px 0 0;padding:18px}.share-og-card{grid-template-columns:88px 1fr}.share-og-img{height:88px}}
 @media(max-width:767px){.directory-search{height:44px;font-size:16px;width:100%;min-width:0}.directory-filter{height:38px;padding:0 15px;font-size:12px}.view-toggle{height:44px}.view-toggle button{width:44px}.directory-tools{width:100%}.directory-tools .relative{flex:1}}
+
+
+/* Workbook v4 P1/P2/P3/P7/P8/P9: real product content, existing actions.
+   These selectors are intentionally confined to the named public screens. */
+[data-wk-workbook-screen="video"] .wk-editorial-intro,
+[data-wk-workbook-screen="audio"] .wk-editorial-intro,
+[data-wk-workbook-screen="podcasts"] .wk-editorial-intro {
+  max-width: 860px;
+}
+[data-wk-workbook-screen="video"] .wk-editorial-media-feature {
+  border-radius: 0;
+}
+[data-wk-workbook-screen="video"] .wk-editorial-media-feature .wk-editorial-frame[data-wk-artwork-ratio="cinema"] {
+  aspect-ratio: 2.39 / 1;
+}
+[data-wk-workbook-screen="video"] .wk-editorial-feature-copy h2 {
+  max-width: 28ch;
+}
+[data-wk-workbook-screen="video"] a.group > div[class*="rounded-2xl"] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+[data-wk-workbook-screen="video"] a.group > div[class*="rounded-2xl"] > div:last-child {
+  padding: 12px 0 0;
+}
+[data-wk-workbook-screen="video"] a.group > div[class*="rounded-2xl"] > div:first-child {
+  border-radius: 0;
+}
+[data-wk-workbook-screen="audio"] [data-wk-workbook-audio-card] {
+  max-width: 460px;
+}
+[data-wk-workbook-screen="audio"] [data-wk-workbook-audio-card] > div:first-child {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+[data-wk-workbook-screen="audio"] [data-wk-workbook-audio-card] h2 {
+  line-height: 1.15;
+}
+[data-wk-workbook-screen="podcasts"] a.group {
+  border-radius: 0;
+  background: transparent;
+}
+[data-wk-workbook-screen="messages"] [aria-label$="conversations"] {
+  min-width: 0;
+}
+[data-wk-workbook-screen="messages"] [aria-label="Conversation"] {
+  min-height: 0;
+}
+[data-wk-workbook-screen="messages"] [aria-label$="conversations"] button {
+  min-height: 70px;
+}
+[data-wk-workbook-screen="notifications"] nav[aria-label="Notification filters"] {
+  gap: 4px;
+}
+[data-wk-workbook-screen="notifications"] nav[aria-label="Notification filters"] button[aria-current="page"] {
+  background: var(--wk-brand-soft);
+  color: var(--wk-brand);
+}
+[data-wk-workbook-screen="music"] .wk-music-hero {
+  min-height: 0;
+}
+[data-wk-workbook-screen="music"] .wk-music-hero h1 {
+  text-transform: none;
+  line-height: .99;
+  letter-spacing: -.045em;
+}
+[data-wk-workbook-screen="music"] .wk-music-hero > div:first-child img {
+  filter: blur(34px) saturate(.8);
+  transform: scale(1.14);
+}
+[data-wk-workbook-screen="music"] .wk-music-hero > div:first-child + div {
+  min-height: 470px;
+}
+[data-wk-workbook-screen="music"] .wk-music-hero a[aria-label^="Open "] img {
+  object-fit: contain;
+}
+@media (max-width: 639px) {
+  [data-wk-workbook-screen="video"] .wk-editorial-media-feature .wk-editorial-frame[data-wk-artwork-ratio="cinema"] {
+    aspect-ratio: 2.39 / 1;
+  }
+  [data-wk-workbook-screen="music"] .wk-music-hero > div:first-child + div {
+    min-height: 0;
+  }
+  [data-wk-workbook-screen="messages"] [aria-label="Conversation"] {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}

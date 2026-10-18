@@ -130,7 +130,7 @@ export default function Magazine() {
       : error
         ? "error"
         : "ready";
-  const [activeSection, setActiveSection] = useState("All");
+  const [selectedMagazineSection, setSelectedMagazineSection] = useState("All");
   const heroRef = useRef<HTMLDivElement>(null);
   const heroImgRef = useRef<HTMLImageElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -380,62 +380,20 @@ export default function Magazine() {
   sectionIdsRef.current = sectionIds;
   const showDragHandles = isAdmin && orderedSections.length > 1;
 
-  /* ── Scroll-spy: track which section is in view ── */
-  useEffect(() => {
-    if (status !== "ready") return;
-    const els = document.querySelectorAll("[data-mag-section]");
-    if (els.length === 0) return;
+  // Only show source-backed section filters. Workbook P10 filters, never scroll-jumps.
+  const magazineSections = useMemo(() => {
+    const sections = new Set(stories.map((story) => story.section).filter(Boolean));
+    const preferred = ["Music", "Film", "Fashion", "Food", "Language", "Places"];
+    return ["All", ...preferred.filter((section) => sections.has(section)),
+      ...Array.from(sections).filter((section) => !preferred.includes(section)).sort()];
+  }, [stories]);
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Find the first section whose top is above the nav (roughly 80px from top)
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length > 0) {
-          const id = visible[0].target.getAttribute("data-mag-section");
-          if (id) setActiveSection(id);
-        }
-      },
-      { rootMargin: "-80px 0px -60% 0px", threshold: 0 },
-    );
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [status, orderedSections]);
-
-  /* ── Human-readable label for each section ID ── */
-  const sectionNavItems = useMemo(() => {
-    const LABELS: Record<string, string> = {
-      picks: "Editor’s Picks",
-      latest: "Latest",
-      artists: "Featured Artists",
-      guides: "Featured Guide",
-      newsletter: "Newsletter",
-    };
-    return [
-      { id: "All", label: "All" },
-      ...orderedSections.map((s) => ({
-        id: s.id,
-        label: s.id.startsWith("block-") ? s.id.replace("block-", "") : (LABELS[s.id] || s.id),
-      })),
-    ];
-  }, [orderedSections]);
-
-  const scrollToSection = useCallback((id: string) => {
-    if (id === "All") {
-      const el = contentRef.current;
-      if (el) {
-        const top = el.getBoundingClientRect().top + window.scrollY - 80;
-        window.scrollTo({ top, behavior: "smooth" });
-      }
-      return;
-    }
-    const el = document.querySelector(`[data-mag-section="${id}"]`);
-    if (el) {
-      setActiveSection(id);
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, []);
+  const filteredMagazineStories = useMemo(
+    () => selectedMagazineSection === "All"
+      ? stories
+      : stories.filter((story) => story.section === selectedMagazineSection),
+    [selectedMagazineSection, stories],
+  );
 
   if (status === "loading") {
     return <SkeletonMagazinePage />;
@@ -518,7 +476,7 @@ export default function Magazine() {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--wk-bg)]">
+    <main data-wk-workbook-screen="magazine" className="min-h-screen bg-[var(--wk-bg)]">
 
       {/* ═══════════════════════ HERO ═══════════════════════ */}
       <div
@@ -528,7 +486,7 @@ export default function Magazine() {
         onClick={handleHeroOpen}
         onKeyDown={handleHeroKeyDown}
         aria-label={`Read ${heroStory.title}`}
-        className="relative min-h-[88vh] flex items-end overflow-hidden bg-[#0a0a0a] block group cursor-pointer -mt-16"
+        className="relative min-h-[78vh] flex items-end overflow-hidden bg-[#0a0a0a] block group cursor-pointer"
       >
         {heroStory.heroUrl ? (
           <ResponsiveMediaImage
@@ -553,6 +511,7 @@ export default function Magazine() {
 
         <div className="relative z-10 w-full max-w-[1280px] mx-auto px-6 lg:px-8 pb-16 pt-28 text-white">
 
+          <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand)]">{heroStory.section} · Cover story</p>
           <h1 className="text-[clamp(40px,6vw,80px)] font-black tracking-[-0.05em] leading-[0.92] max-w-[16ch] group-hover:opacity-90 transition-opacity duration-500">
             {heroStory.title}
           </h1>
@@ -560,6 +519,10 @@ export default function Magazine() {
           <p className="mt-5 text-[16px] lg:text-[18px] leading-relaxed text-white/60 max-w-[52ch]">
             {heroStory.dek}
           </p>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Link to={heroArticleUrl} className="inline-flex min-h-11 items-center gap-2 bg-white px-5 text-[13px] font-bold text-black transition-opacity hover:opacity-85">Read the story <span aria-hidden="true">→</span></Link>
+          </div>
 
           <div className="flex items-center gap-2 mt-6 text-[12px] flex-wrap">
             <ArticleAuthorIdentity name={heroStory.author} personPath={heroStory.authorPersonPath}
@@ -583,35 +546,43 @@ export default function Magazine() {
         </div>
       </div>
 
-      {/* ═══════════════════════ STICKY SECTION NAV ═══════════════════════ */}
-      <div className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[color-mix(in_srgb,var(--wk-surface)_92%,transparent)] backdrop-blur-[20px]">
-        <div className="max-w-[1280px] mx-auto px-6 lg:px-8 flex items-center gap-5 overflow-x-auto scrollbar-none py-3.5">
-          <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)] shrink-0 hidden lg:flex items-center gap-2">
-            <span className="w-6 h-px bg-[var(--wk-brand)]" />
-            Sections
-          </span>
-          <div className="flex gap-1.5 shrink-0">
-            {sectionNavItems.map(({ id, label }) => (
-              <button
-                key={id}
-                onClick={() => scrollToSection(id)}
-                className={`px-4 py-2 rounded-full text-[13px] font-bold tracking-[-0.005em] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  activeSection === id
-                    ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                    : "text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] bg-transparent border border-transparent hover:border-[var(--wk-border)]"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+      {/* Source-backed Magazine section filters, Workbook P10 */}
+      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 backdrop-blur-lg">
+        <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto px-5 py-3 [scrollbar-width:none] sm:px-8">
+          {magazineSections.map((section) => (
+            <button
+              key={section}
+              type="button"
+              aria-pressed={selectedMagazineSection === section}
+              onClick={() => setSelectedMagazineSection(section)}
+              className={`min-h-11 shrink-0 border-b-2 px-3 text-[13px] font-semibold transition-colors ${selectedMagazineSection === section
+                ? "border-[var(--wk-brand)] text-[var(--wk-text)]"
+                : "border-transparent text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"}`}
+            >
+              {section}
+            </button>
+          ))}
         </div>
-      </div>
+      </nav>
 
       {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
-      <div ref={contentRef} data-mag-content className="max-w-[1280px] mx-auto px-6 lg:px-8 flex flex-col gap-20 py-16">
+      <div ref={contentRef} data-mag-content className="max-w-[1280px] mx-auto px-5 sm:px-8 flex flex-col gap-14 lg:gap-20 py-10 lg:py-16">
 
-        {showDragHandles ? (
+        {selectedMagazineSection !== "All" ? (
+          <section aria-live="polite" className="min-h-[260px]">
+            <div className="mb-6 flex items-baseline justify-between border-b border-[var(--wk-border)] pb-4">
+              <h2 className="text-[26px] font-black tracking-[-0.04em] text-[var(--wk-text)]">
+                {selectedMagazineSection}
+              </h2>
+              <span className="text-[12px] text-[var(--wk-text-muted)]">{filteredMagazineStories.length} stories</span>
+            </div>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredMagazineStories.map((story) => (
+                <MagazineCard key={story.slug} variant="standard" story={story} />
+              ))}
+            </div>
+          </section>
+        ) : showDragHandles ? (
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}

@@ -79,41 +79,12 @@ export default function MobileMagazine() {
     return ["All", ...sects.filter((s) => s !== "All")];
   }, [stories]);
 
-  const sectionCounts = useMemo(() => {
-    const cts: Record<string, number> = {};
-    for (const s of stories) {
-      const sec = s.section || "Article";
-      cts[sec] = (cts[sec] || 0) + 1;
-    }
-    return cts;
-  }, [stories]);
-
   const { number: issueNum, date: issueDate } = useMemo(() => computeIssueInfo(stories), [stories]);
 
   const heroStory = stories[0];
   const picks = stories.slice(1, 4);
   const latest = stories.slice(4, 10);
   const sectionBlockStories = stories.slice(10);
-
-  // ── Filter content based on active section tab ──
-  const filteredPicks = useMemo(() => {
-    if (activeSection === "All") return picks;
-    return picks.filter((s) => (s.section || "Article") === activeSection);
-  }, [picks, activeSection]);
-
-  const filteredLatest = useMemo(() => {
-    if (activeSection === "All") return latest;
-    return latest.filter(
-      (story) =>
-        (story.section || "Article")
-        === activeSection,
-    );
-  }, [latest, activeSection]);
-
-  const filteredSectionBlockStories = useMemo(() => {
-    if (activeSection === "All") return sectionBlockStories;
-    return sectionBlockStories.filter((s) => (s.section || "Article") === activeSection);
-  }, [sectionBlockStories, activeSection]);
 
   const sectionMap = useMemo(() => {
     const map: Record<string, MagazineArticle[]> = {};
@@ -142,10 +113,11 @@ export default function MobileMagazine() {
     [sectionMap],
   );
 
-  const filteredTopSections = useMemo(() => {
-    if (activeSection === "All") return topSections;
-    return topSections.filter((s) => s === activeSection);
-  }, [topSections, activeSection]);
+  const selectedStories = useMemo(
+    () => activeSection === "All" ? stories :
+      stories.filter((story) => (story.section || "Article") === activeSection),
+    [activeSection, stories],
+  );
 
   const navigate = useNavigate();
   const heroArticleUrl = heroStory ? `/magazine/${heroStory.slug}` : "/magazine";
@@ -180,7 +152,7 @@ export default function MobileMagazine() {
   }
 
   return (
-    <div className="wk-mobile min-h-screen bg-[var(--wk-bg)]">
+    <div data-wk-workbook-screen="magazine-mobile" className="wk-mobile min-h-screen bg-[var(--wk-bg)]">
 
       {/* ═══════════════════════ HERO ═══════════════════════ */}
       <div
@@ -190,7 +162,7 @@ export default function MobileMagazine() {
         onClick={handleHeroOpen}
         onKeyDown={handleHeroKeyDown}
         aria-labelledby="wk-mobile-magazine-hero-title"
-        className="relative h-screen flex items-end overflow-hidden bg-[#0a0a0a] block -mt-16 cursor-pointer"
+        className="relative min-h-[580px] h-[78dvh] flex items-end overflow-hidden bg-[#0a0a0a] block cursor-pointer"
       >
         {heroStory.heroUrl ? (
           <ResponsiveMediaImage
@@ -214,6 +186,7 @@ export default function MobileMagazine() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
 
         <div className="relative z-10 w-full px-5 pb-12 pt-24 text-white">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand)]">{heroStory.section} · Cover story</p>
           <h1
             id="wk-mobile-magazine-hero-title"
             className="text-[34px] sm:text-[42px] font-black tracking-[-0.05em] leading-[0.94]"
@@ -226,6 +199,8 @@ export default function MobileMagazine() {
               {heroStory.dek}
             </p>
           )}
+
+          <Link to={heroArticleUrl} className="mt-5 inline-flex min-h-11 items-center gap-2 bg-white px-5 text-[13px] font-bold text-black">Read the story <span aria-hidden="true">→</span></Link>
 
           <div className="flex items-center gap-2 mt-5 text-[11px] flex-wrap">
             <ArticleAuthorIdentity name={heroStory.author} personPath={heroStory.authorPersonPath}
@@ -245,400 +220,77 @@ export default function MobileMagazine() {
         </div>
       </div>
 
-      {/* ═══════════════════════ STICKY SECTION NAV ═══════════════════════ */}
-      <div className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[color-mix(in_srgb,var(--wk-surface)_92%,transparent)] backdrop-blur-[20px]" style={{ WebkitBackdropFilter: "blur(20px)" }}>
-        <div className="px-4 pt-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
-          Filter Stories
-        </div>
-        <div
-          className="px-4 flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-3 pt-2"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
-        >
+      {/* Published Magazine sections, not scroll markers or future categories. */}
+      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-surface)] backdrop-blur-lg">
+        <div className="flex items-center gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none]">
           {sectionNames.map((sec) => (
             <button
+              type="button"
               key={sec}
+              aria-pressed={activeSection === sec}
               onClick={() => setActiveSection(sec)}
-              className={`px-3.5 py-2 rounded-full text-[12px] font-bold tracking-[-0.005em] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                activeSection === sec
-                  ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]"
-                  : "text-[var(--wk-text-soft)] hover:text-[var(--wk-text)] bg-transparent border border-transparent hover:border-[var(--wk-border)]"
-              }`}
+              className={`min-h-11 shrink-0 border-b-2 px-3 text-[13px] font-semibold transition-colors ${activeSection === sec
+                ? "border-[var(--wk-brand)] text-[var(--wk-text)]"
+                : "border-transparent text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"}`}
             >
               {sec}
             </button>
           ))}
         </div>
-      </div>
+      </nav>
 
       {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
       <div className="px-4 py-8 flex flex-col gap-12">
 
-        {/* ── Editor’s Picks ── */}
-        {filteredPicks.length > 0 && (
-          <section className="wk-reveal">
-            <MobileSectionLabel>Editor’s Picks</MobileSectionLabel>
-            <div className="flex flex-col gap-3">
-              <MagazineCard variant="hero" story={filteredPicks[0]} rank={1} />
-              {filteredPicks.slice(1, 3).map((story, i) => (
-                <MagazineCard key={story.slug} variant="compact" story={story} rank={i + 2} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ── Latest Stories ── */}
-        {filteredLatest.length > 0 && (
-          <section className="wk-reveal">
-            <MobileSectionLabel href="/magazine">Latest Stories</MobileSectionLabel>
-            <div className="grid grid-cols-2 gap-3">
-              {filteredLatest.map((story) => (
-                <Link
-                  key={story.slug}
-                  to={`/magazine/${story.slug}`}
-                  className="group flex flex-col rounded-xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)] hover:border-[var(--wk-border-strong)] active:scale-[0.98] transition-all duration-200"
-                >
-                  <div className="aspect-[4/5] overflow-hidden bg-[var(--wk-surface-raised)]">
-                    {story.heroUrl ? (
-                      <ResponsiveMediaImage
-                        src={story.heroUrl}
-                        preset="card"
-                        alt={story.title}
-                        loading="lazy"
-                        fetchPriority="low"
-                        decoding="async"
-                        className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                      />
-                    ) : (
-                      <Chapter19FallbackImage
-                        id={story.id}
-                        slug={story.slug}
-                        name={story.title}
-                      />
-                    )}
-                  </div>
-                  <div className="p-2.5 flex flex-col gap-1 flex-1">
-                    <h3 className="text-[12px] sm:text-[13px] font-black tracking-[-0.015em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-3">
-                      {story.title}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)] mt-auto">
-                      <span className="font-semibold text-[var(--wk-text-muted)] truncate">{story.author}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ── Pullquote ── */}
-        <div className="wk-reveal border-y border-[var(--wk-border)] py-10">
-          <div className="max-w-[600px] mx-auto text-center">
-            <div className="w-10 h-0.5 rounded-full bg-[var(--wk-brand)] mx-auto mb-5" />
-            <p className="text-[24px] sm:text-[30px] font-black tracking-[-0.04em] leading-[0.96] text-[var(--wk-text)]">
-              Stories should feel edited, sequenced, and alive.
-            </p>
-            <div className="w-10 h-0.5 rounded-full bg-[var(--wk-brand)] mx-auto mt-5" />
-          </div>
-        </div>
-
-        {/* ── Section Blocks ── */}
-        {filteredTopSections.length > 0 ? (
-          filteredTopSections.map((section, sectionIndex) => {
-            const secStories = sectionMap[section] || [];
-            if (secStories.length === 0) return null;
-
-            // Layout 0: Carousel: image-overlay portrait cards, horizontal scroll
-            if (sectionIndex === 0) {
-              return (
-                <section key={section} className="wk-reveal">
-                  <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
-                  <div
-                    className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory -mx-4 px-4"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                  >
-                    {secStories.map((story) => (
-                      <Link
-                        key={story.slug}
-                        to={`/magazine/${story.slug}`}
-                        className="group relative shrink-0 snap-start w-[260px] sm:w-[300px] aspect-[4/5] rounded-2xl overflow-hidden bg-[#0a0a0a]"
-                      >
-                        {story.heroUrl ? (
-                          <ResponsiveMediaImage
-                            src={story.heroUrl}
-                            preset="card"
-                            alt={story.title}
-                            loading="lazy"
-                            fetchPriority="low"
-                            decoding="async"
-                            className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
-                          />
-                        ) : (
-                          <Chapter19FallbackImage
-                            id={story.id}
-                            slug={story.slug}
-                            name={story.title}
-                          />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-black/10" />
-                        <div className="absolute top-3 left-3 z-10">
-                          <span className="inline-block text-[9px] font-black uppercase tracking-[0.18em] text-white/80 bg-black/35 backdrop-blur-sm px-2.5 py-1 rounded-full">
-                            {story.section}
-                          </span>
-                        </div>
-                        <div className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-black/25 backdrop-blur-sm flex items-center justify-center text-white/50 hover:text-white/85 transition-colors cursor-pointer">
-                          <i className="ri-bookmark-line text-[13px]" />
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
-                          <h3 className="text-[15px] sm:text-[16px] font-black tracking-[-0.025em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-3 mb-2">
-                            {story.title}
-                          </h3>
-                          {story.dek && (
-                            <p className="text-[11px] sm:text-[12px] leading-relaxed text-white/55 line-clamp-2 mb-3">
-                              {story.dek}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-white/40">
-                            <ArticleAuthorIdentity
-                              name={story.author}
-                              personPath={story.authorPersonPath}
-                              nested
-                              className="flex items-center gap-1.5 font-semibold text-white/60 hover:text-white/90 transition-colors cursor-pointer"
-                              plainClassName="flex items-center gap-1.5 font-semibold text-white/60"
-                            >
-                              <span className="w-4 h-4 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[7px] font-black text-[var(--wk-brand-on)] shrink-0">
-                                {story.author.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                              </span>
-                              {story.author}
-                            </ArticleAuthorIdentity>
-                            <span className="text-white/15">·</span>
-                            <span>{story.readingTime} min</span>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              );
-            }
-
-            // Layout 1: Wide Landscape Scroll: cinematic widescreen cards, horizontal scroll
-            if (sectionIndex === 1) {
-              return (
-                <section key={section} className="wk-reveal">
-                  <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
-                  <div
-                    className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory -mx-4 px-4"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                  >
-                    {secStories.map((story) => (
-                      <Link
-                        key={story.slug}
-                        to={`/magazine/${story.slug}`}
-                        className="group relative shrink-0 snap-start w-[300px] sm:w-[360px] aspect-[3/2] rounded-2xl overflow-hidden bg-[#0a0a0a]"
-                      >
-                        {story.heroUrl ? (
-                          <ResponsiveMediaImage
-                            src={story.heroUrl}
-                            preset="feature"
-                            alt={story.title}
-                            loading="lazy"
-                            fetchPriority="low"
-                            decoding="async"
-                            className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
-                          />
-                        ) : (
-                          <Chapter19FallbackImage
-                            id={story.id}
-                            slug={story.slug}
-                            name={story.title}
-                          />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/10" />
-                        <div className="absolute top-3 left-3 z-10">
-                          <span className="inline-block text-[9px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)] bg-black/35 backdrop-blur-sm px-2.5 py-1 rounded-full">
-                            {story.section}
-                          </span>
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
-                          <h3 className="text-[16px] sm:text-[18px] font-black tracking-[-0.03em] leading-snug text-white group-hover:text-white/90 transition-colors line-clamp-3 mb-1.5">
-                            {story.title}
-                          </h3>
-                          <div className="flex items-center gap-2 text-[11px] text-white/40">
-                            <span className="font-semibold text-white/60">{story.author}</span>
-                            <span className="text-white/15">·</span>
-                            <span>{story.readingTime} min</span>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              );
-            }
-
-            // Layout 2: 2-Column Grid: image-forward vertical cards with taller images
-            if (sectionIndex === 2) {
-              return (
-                <section key={section} className="wk-reveal">
-                  <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
-                  <div className="grid grid-cols-2 gap-3">
-                    {secStories.slice(0, 6).map((story) => (
-                      <Link
-                        key={story.slug}
-                        to={`/magazine/${story.slug}`}
-                        className="group flex flex-col rounded-xl overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)] hover:border-[var(--wk-border-strong)] hover:-translate-y-0.5 transition-all duration-300"
-                      >
-                        <div className="aspect-[3/4] overflow-hidden bg-[var(--wk-surface-raised)]">
-                          {story.heroUrl ? (
-                            <ResponsiveMediaImage
-                              src={story.heroUrl}
-                              preset="card"
-                              alt={story.title}
-                              loading="lazy"
-                              fetchPriority="low"
-                              decoding="async"
-                              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                            />
-                          ) : (
-                            <Chapter19FallbackImage
-                              id={story.id}
-                              slug={story.slug}
-                              name={story.title}
-                            />
-                          )}
-                        </div>
-                        <div className="p-3 flex flex-col gap-1.5 flex-1">
-                          <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
-                            {story.section}
-                          </span>
-                          <h3 className="text-[13px] sm:text-[14px] font-black tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-3">
-                            {story.title}
-                          </h3>
-                          {story.dek && (
-                            <p className="text-[10px] sm:text-[11px] leading-relaxed text-[var(--wk-text-soft)] line-clamp-2">
-                              {story.dek}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)] mt-auto pt-1">
-                            <span className="font-semibold">{story.author}</span>
-                            <span className="text-[var(--wk-border-strong)]">·</span>
-                            <span>{story.readingTime} min</span>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              );
-            }
-
-            // Layout 3: Hero + Compact List: one big image-overlay hero, rest as thumb rows
-            const [heroItem, ...restItems] = secStories;
-            return (
-              <section key={section} className="wk-reveal">
-                <MobileSectionLabel count={secStories.length} href="/magazine">{section}</MobileSectionLabel>
-                <div className="flex flex-col gap-3">
-                  {heroItem && (
-                    <Link
-                      to={`/magazine/${heroItem.slug}`}
-                      className="group relative overflow-hidden rounded-2xl bg-[#0a0a0a] aspect-[16/10]"
-                    >
-                      {heroItem.heroUrl ? (
-                        <ResponsiveMediaImage
-                          src={heroItem.heroUrl}
-                          preset="feature"
-                          alt={heroItem.title}
-                          loading="lazy"
-                          fetchPriority="low"
-                          decoding="async"
-                          className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
-                        />
-                      ) : (
-                        <Chapter19FallbackImage
-                          id={heroItem.id}
-                          slug={heroItem.slug}
-                          name={heroItem.title}
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/10" />
-                      <div className="absolute top-3 left-3 z-10">
-                        <span className="inline-block text-[9px] font-black uppercase tracking-[0.18em] text-white/80 bg-black/35 backdrop-blur-sm px-2.5 py-1 rounded-full">
-                          {heroItem.section}
-                        </span>
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-5">
-                        <h3 className="text-[18px] sm:text-[20px] font-black tracking-[-0.035em] leading-snug text-white line-clamp-2 mb-1.5">
-                          {heroItem.title}
-                        </h3>
-                        {heroItem.dek && (
-                          <p className="text-[12px] leading-relaxed text-white/55 line-clamp-2 mb-2">
-                            {heroItem.dek}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 text-[11px] text-white/40">
-                          <span className="font-semibold text-white/60">{heroItem.author}</span>
-                          <span className="text-white/15">·</span>
-                          <span>{heroItem.readingTime} min</span>
-                        </div>
-                      </div>
-                    </Link>
-                  )}
-                  {restItems.slice(0, 3).map((story) => (
-                    <Link
-                      key={story.slug}
-                      to={`/magazine/${story.slug}`}
-                      className="group flex gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 hover:border-[var(--wk-border-strong)] hover:bg-[var(--wk-surface-raised)] transition-all duration-300"
-                    >
-                      <div className="w-[72px] h-[72px] shrink-0 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)]">
-                        {story.heroUrl ? (
-                          <ResponsiveMediaImage
-                            src={story.heroUrl}
-                            preset="thumbnail"
-                            alt=""
-                            loading="lazy"
-                            fetchPriority="low"
-                            decoding="async"
-                            className="w-full h-full object-cover object-top transition-transform duration-400 group-hover:scale-110"
-                          />
-                        ) : (
-                          <Chapter19FallbackImage
-                            id={story.id}
-                            slug={story.slug}
-                            name={story.title}
-                          />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                        <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
-                          {story.section}
-                        </span>
-                        <h3 className="text-[14px] font-bold tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-3">
-                          {story.title}
-                        </h3>
-                        <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)]">
-                          <span className="font-semibold">{story.author}</span>
-                          <span className="text-[var(--wk-border-strong)]">·</span>
-                          <span>{story.readingTime} min</span>
-                        </div>
-                      </div>
-                    </Link>
+        {activeSection === "All" ? (
+          <>
+            {picks.length ? (
+              <section className="wk-reveal">
+                <MobileSectionLabel>Editor’s Picks</MobileSectionLabel>
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <MagazineCard variant="hero" story={picks[0]} />
+                  {picks.slice(1).map((story) => (
+                    <MagazineCard key={story.slug} variant="standard" story={story} />
                   ))}
                 </div>
               </section>
-            );
-          })
-        ) : activeSection !== "All" ? (
-          <section className="wk-reveal py-16 text-center">
-            <div className="w-12 h-12 rounded-full bg-[var(--wk-surface)] flex items-center justify-center mx-auto mb-4">
-              <i className="ri-article-line text-[20px] text-[var(--wk-text-faint)]" />
+            ) : null}
+            {latest.length ? (
+              <section className="wk-reveal">
+                <MobileSectionLabel>Latest Stories</MobileSectionLabel>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-6">
+                  {latest.map((story) => (
+                    <MagazineCard key={story.slug} variant="standard" story={story} />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+            {topSections.map((section) => {
+              const items = sectionMap[section] || [];
+              if (!items.length) return null;
+              return (
+                <section key={section} className="wk-reveal">
+                  <MobileSectionLabel count={items.length}>{section}</MobileSectionLabel>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-6">
+                    {items.map((story) => (
+                      <MagazineCard key={story.slug} variant="standard" story={story} />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+            <MobileNewsletterCTA />
+          </>
+        ) : (
+          <section className="wk-reveal" aria-live="polite">
+            <MobileSectionLabel count={selectedStories.length}>{activeSection}</MobileSectionLabel>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-6">
+              {selectedStories.map((story) => (
+                <MagazineCard key={story.slug} variant="standard" story={story} />
+              ))}
             </div>
-            <p className="text-[14px] font-bold text-[var(--wk-text-muted)] mb-1">No stories in {activeSection}</p>
-            <p className="text-[12px] text-[var(--wk-text-faint)]">Check back soon or browse All stories.</p>
           </section>
-        ) : null}
-
-        {/* ── Newsletter ── */}
-        <MobileNewsletterCTA />
+        )}
 
         {/* ── Footer ── */}
         <footer className="border-t border-[var(--wk-border)] pt-10 pb-4 text-center">

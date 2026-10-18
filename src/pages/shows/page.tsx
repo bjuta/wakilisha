@@ -2,6 +2,7 @@ import { WkEditorialIntro } from "@/components/design-system/layout/WorkbookEdit
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { WkIcon } from "@/components/design-system/Icon";
 import type { PublicShowHeader } from "@/services/shows/showPublicModel";
 import { getPublicShowIndex } from "@/services/shows/showPublicService";
 
@@ -46,7 +47,7 @@ export default function PublicShowsPage() {
         url={`${SITE_URL}/shows`}
       />
 
-      <main className="mx-auto w-full max-w-6xl px-4 pb-20 pt-10 sm:px-6 lg:px-8 lg:pt-14">
+      <main data-wk-workbook-screen="podcasts" className="mx-auto w-full max-w-6xl px-5 pb-20 pt-10 sm:px-8 lg:pt-14">
         <WkEditorialIntro eyebrow="Listen and follow" title="Podcasts" description="Shows and episodes with their own histories. Listen, watch, and follow the people behind each story." />
         {loading ? (
           <div
@@ -69,7 +70,7 @@ export default function PublicShowsPage() {
               Shows unavailable
             </h2>
             <p className="mt-2 text-sm leading-6 text-wk-text-muted">
-              {error}
+              Please try again later.
             </p>
           </div>
         ) : null}
@@ -88,12 +89,14 @@ export default function PublicShowsPage() {
               <Link
                 key={show.resourceId}
                 to={show.canonicalPath}
-                className="group rounded-3xl border border-wk-border bg-wk-surface p-6 transition hover:border-wk-brand hover:bg-wk-surface-raised"
+                className="group flex items-start gap-5 border-t border-wk-border py-6 transition-colors hover:text-wk-brand"
               >
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-wk-text-faint">
-                  Show
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-wk-text group-hover:text-wk-brand">
+                <div className="flex aspect-square w-[112px] shrink-0 items-center justify-center bg-wk-surface-raised text-wk-brand sm:w-[152px]" aria-hidden="true">
+                  <WkIcon name="Radio" size={32} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-wk-brand">Podcast · Show</p>
+                <h2 className="mt-2 text-[22px] font-black leading-tight tracking-[-0.03em] text-wk-text group-hover:text-wk-brand">
                   {show.title}
                 </h2>
                 {show.description ? (
@@ -111,6 +114,7 @@ export default function PublicShowsPage() {
                   {show.audioEpisodeCount ? (
                     <span>· {show.audioEpisodeCount} Listen</span>
                   ) : null}
+                </div>
                 </div>
               </Link>
             ))}
