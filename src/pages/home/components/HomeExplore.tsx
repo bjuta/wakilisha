@@ -23,7 +23,7 @@ const DESTINATIONS: DestinationCard[] = [
     sub: "Profiles, chart moments, and full discographies.",
     href: "/artists",
     img: "https://wakilisha.africa/api/search-image?query=Abstract%20artistic%20portrait%20composition%20with%20warm%20golden%20amber%20light%20rays%20intersecting%20organic%20flowing%20forms%20dark%20background%20with%20rich%20earthy%20tones%20terracotta%20and%20ochre%20contemporary%20fine%20art%20aesthetic%20cultural%20depth%20sophisticated%20minimal%20gallery%20quality%20refined%20texture%20subtle%20human%20presence%20suggested%20through%20light%20and%20form&width=800&height=500&seq=explore-artists-wk26&orientation=landscape",
-    acc: "var(--wk-v-music)",
+    accent: "var(--wk-v-music)",
     icon: "ri-mic-line",
   },
   {
@@ -106,7 +106,7 @@ export function HomeExplore() {
                 <div
                   className="absolute inset-0 transition-opacity duration-400"
                   style={{
-                    background: `linear-gradient(135deg, ${dest.accent}15 0%, transparent 50%, rgba(8,9,8,0.75) 100%)`,
+                    background: `linear-gradient(135deg, color-mix(in srgb, ${dest.accent} 12%, transparent) 0%, transparent 50%, rgba(8,9,8,0.75) 100%)`,
                   }}
                 />
               </div>
@@ -116,7 +116,7 @@ export function HomeExplore() {
                 <div className="flex items-center gap-3 mb-2.5">
                   <div
                     className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: `${dest.accent}18`, color: dest.accent }}
+                    style={{ backgroundColor: `color-mix(in srgb, ${dest.accent} 12%, transparent)`, color: dest.accent }}
                   >
                     <i className={`${dest.icon} text-base`} />
                   </div>

@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import type { ChartEditionEntry } from "@/services/chartsPublic/types";
 import type { PublicStory } from "@/services/publicContent/client";
@@ -184,30 +183,31 @@ function RegistryPortalCard() {
 }
 
 export function HomeHero({ chartEntries, stories, loading }: Props) {
-  const [scrollY, setScrollY] = useState(0);
-
-  useEffect(() => {
-    const on = () => setScrollY(window.scrollY);
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
-  }, []);
+  // The hero is editorial: use recorded story/track artwork, never a
+  // fabricated cultural portrait or remote generated background.
+  const heroArtwork = stories.find((story) => Boolean(story.heroUrl))?.heroUrl
+    || chartEntries.find((entry) => Boolean(entry.artworkUrl))?.artworkUrl
+    || null;
 
   return (
     <section className="relative overflow-hidden md:-mt-16" style={{ minHeight: "100vh" }}>
-      {/* Background image */}
-      <div className="absolute inset-0">
-        <img
-          src="https://wakilisha.africa/api/search-image?query=Abstract%20artistic%20composition%20inspired%20by%20African%20cultural%20patterns%20and%20textures%20warm%20earthy%20tones%20deep%20ochre%20amber%20terracotta%20rich%20dark%20green%20subtle%20gold%20accents%20flowing%20organic%20shapes%20contemporary%20art%20gallery%20quality%20cinematic%20lighting%20with%20soft%20volumetric%20rays%20dramatic%20shadows%20artistic%20installation%20photography%20refined%20sophisticated%20aesthetic%20cultural%20depth%20modern%20minimal%20composition&width=1600&height=1100&seq=hero-main-wk26-v2&orientation=landscape"
-          alt=""
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-          className="w-full h-full object-cover"
-          style={{
-            transform: `scale(1.08) translateY(${scrollY * 0.04}px)`,
-            transition: "transform 0.1s linear",
-          }}
-        />
+      {/* Actual editorial/chart artwork or a neutral, nonrepresentational surface. */}
+      <div
+        className="absolute inset-0 bg-[var(--wk-surface-strong)]"
+        data-wk-hero-artwork={heroArtwork ? "recorded" : "unavailable"}
+      >
+        {heroArtwork ? (
+          <img
+            src={heroArtwork}
+            alt=""
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            className="h-full w-full object-cover opacity-75"
+          />
+        ) : (
+          <div className="h-full w-full bg-[linear-gradient(135deg,var(--wk-surface-strong),var(--wk-bg-subtle))]" />
+        )}
       </div>
 
       {/* Overlay */}
@@ -218,9 +218,7 @@ export function HomeHero({ chartEntries, stories, loading }: Props) {
       <div className="absolute top-0 left-0 right-0 z-10 md:hidden pt-[calc(16px+env(safe-area-inset-top))] px-5">
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-white font-bold text-[22px] tracking-tight" style={{ fontFamily: "var(--wk-font-display)" }}>
-              WAKILISHA
-            </div>
+            <img src="/assets/logos/wakilisha-logo-dark.svg" alt="WAKILISHA" className="h-7 w-auto max-w-[164px] object-contain" />
             <span className="text-[11px] text-white/60 font-medium tracking-wide">
               Culture. Music. Charts. Editorial.
             </span>
@@ -244,7 +242,7 @@ export function HomeHero({ chartEntries, stories, loading }: Props) {
                 fontWeight: 600,
               }}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--wk-brand)]" style={{ boxShadow: "0 0 0 4px rgba(132,194,65,0.18)" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--wk-brand)]" style={{ boxShadow: "0 0 0 4px rgba(var(--wk-brand-rgb),0.18)" }} />
               African creative life, starting with music
             </div>
 
@@ -269,13 +267,13 @@ export function HomeHero({ chartEntries, stories, loading }: Props) {
 
           {/* Portal cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ perspective: "1000px" }}>
-            <div style={{ transform: `translateY(${scrollY * -0.015}px)`, transition: "transform 0.1s linear" }}>
+            <div >
               <ChartPortalCard entries={chartEntries} loading={loading} />
             </div>
-            <div style={{ transform: `translateY(${scrollY * -0.01}px)`, transition: "transform 0.1s linear" }}>
+            <div >
               <MagazinePortalCard stories={stories} loading={loading} />
             </div>
-            <div style={{ transform: `translateY(${scrollY * -0.005}px)`, transition: "transform 0.1s linear" }}>
+            <div >
               <RegistryPortalCard />
             </div>
           </div>

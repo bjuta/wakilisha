@@ -30,6 +30,16 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(read("src/design-system/wakilisha.elements.motion.css"))
       .not.toContain("wakilisha.elements.charts-directory.css");
     expect(read("src/design-system/chapters/pageBlueprints.ts")).not.toContain("mob-cdir");
+    const homeHero = read("src/pages/home/components/HomeHero.tsx");
+    expect(homeHero).not.toContain("/api/search-image");
+    expect(homeHero).toContain('data-wk-hero-artwork');
+    expect(homeHero).toContain("/assets/logos/wakilisha-logo-dark.svg");
+    expect(read("src/pages/charts/directory/page.tsx")).not.toContain("HERO_FALLBACK");
+    expect(read("src/pages/home/components/HomeExplore.tsx")).not.toContain('acc: "');
+    expect(read("src/pages/home/components/HomeExplore.tsx")).toContain("color-mix(in srgb");
+    expect(existsSync("src/pages/home/components/HomeFeatured.tsx")).toBe(false);
+    expect(existsSync("src/pages/home/components/HomeCollage.tsx")).toBe(false);
+
 
 
     expect(read("src/components/mobile/ResponsiveAppLayout.tsx")).not.toContain("playerChrome.css");
