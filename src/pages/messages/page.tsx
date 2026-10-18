@@ -706,7 +706,7 @@ export default function MessagesPage() {
             )}
           </section>
 
-          <section data-wk-message-thread className={`${selectedId ? "block" : "hidden lg:flex"} min-w-0 flex-col`} aria-label="Conversation">
+          <section data-wk-message-thread className={`${selectedId ? "flex" : "hidden lg:flex"} min-w-0 flex-col`} aria-label="Conversation">
             {!selectedId ? (
               <div className="flex min-h-[650px] flex-1 flex-col items-center justify-center px-8 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"><i className="ri-chat-3-line text-2xl" /></div>
@@ -722,17 +722,24 @@ export default function MessagesPage() {
                   <Avatar summary={selectedSummary} size="h-9 w-9" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[15px] font-bold text-[var(--wk-text)]">{messageDisplayName(selectedSummary.other_participant?.presentation)}</div>
-                    <div className="text-[11px] font-medium leading-relaxed text-[var(--wk-text-muted)]">{detail.conversation.security_classification}</div>
+                    <div className="text-[11px] font-medium leading-relaxed text-[var(--wk-text-muted)]">{messageUsername(selectedSummary.other_participant?.presentation) ? `@${messageUsername(selectedSummary.other_participant?.presentation)}` : "Private conversation"}</div>
                   </div>
                   {detail.conversation.first_contact_state !== "pending" && selectedSummary.other_participant?.person_resource_id && (
-                    <button
-                      type="button"
-                      onClick={() => void revokeMessageSenderApproval(selectedSummary.other_participant!.person_resource_id).catch((err) => setError(err instanceof Error ? err.message : "Could not revoke approval."))}
-                      className="hidden rounded-full border border-[var(--wk-border)] px-3 py-2 text-[10px] font-black text-[var(--wk-text-muted)] sm:block"
-                      title="This revokes future Inbox approval. It does not silently delete this Conversation."
-                    >
-                      Revoke future approval
-                    </button>
+                    <details className="relative shrink-0">
+                      <summary aria-label="Conversation actions" className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
+                        <i className="ri-more-2-fill text-[19px]" aria-hidden="true" />
+                      </summary>
+                      <div className="absolute right-0 top-11 z-30 w-[230px] rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2 shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => void revokeMessageSenderApproval(selectedSummary.other_participant!.person_resource_id).catch((err) => setError(err instanceof Error ? err.message : "Could not revoke approval."))}
+                          className="w-full rounded-lg px-3 py-2.5 text-left text-[12px] font-medium text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
+                          title="This revokes future Inbox approval. It does not delete this conversation."
+                        >
+                          Revoke future approval
+                        </button>
+                      </div>
+                    </details>
                   )}
                 </header>
 
