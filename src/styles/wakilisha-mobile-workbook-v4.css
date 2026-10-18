@@ -180,7 +180,7 @@
   .phn-section-hd,.spec-section-hd,.home-section-title{font:800 10px/1 var(--wk-font-ui);letter-spacing:.18em;text-transform:uppercase;color:var(--wk-text-faint);}
 
   /* CH53/55/56: mobile ergonomics */
-  .wk-thumb-primary{position:fixed;left:16px;right:16px;bottom:calc(128px + env(safe-area-inset-bottom));z-index:55;}
+
   .wk-mobile .btn,.wk-mobile .auth-btn,.wk-mobile .phn-btn-primary,.wk-mobile .phn-btn-secondary{min-height:44px;border-radius:var(--wk-r-pill);}
   .wk-mobile input,.wk-mobile textarea,.wk-mobile select{min-height:44px;font-size:16px;}
   .wk-mobile .chart-row,.wk-mobile .lbl-row,.wk-mobile .atrow,.wk-mobile .mag-card,.wk-mobile .mob-card-horiz{min-height:56px;}
@@ -188,7 +188,7 @@
   /* Workbook v4 has no mobile tab navigation; the only bottom surface is the player. */
   .wk-app-shell main{min-height:0;}
 
-  /* CH57/58: mini player, permanent above nav — respects safe-area */
+  /* Current compact player anchors to the device safe area without bottom navigation. */
   
   .phn-mp-progress{position:absolute;top:0;left:0;right:0;height:2px;background:var(--wk-divider);overflow:hidden;}
   .phn-mp-progress span{display:block;height:100%;width:100%;background:var(--wk-brand);transform-origin:left center;}
