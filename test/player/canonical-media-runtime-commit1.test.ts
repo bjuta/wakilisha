@@ -114,7 +114,7 @@ describe(
           "utf8",
         );
         expect(drawer).toContain("useScrollLock(open)");
-        expect(drawer).toContain("WAKILISHA_NAVIGATION.map");
+        expect(drawer).toContain("navigation.map");
         expect(mobileLayout).not.toContain("MobileBottomNav");
         expect(mobileLayout).not.toContain("useScrollLock(moreOpen)");
       },
