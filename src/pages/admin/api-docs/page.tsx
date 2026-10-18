@@ -38,12 +38,12 @@ const REDOC_OPTIONS = {
       primary: { main: "#1a1a1a" },
     },
     typography: {
-      fontFamily: "'Inter', 'DM Sans', sans-serif",
+      fontFamily: "'Figtree', 'Figtree', sans-serif",
       headings: {
-        fontFamily: "'Inter', 'DM Sans', sans-serif",
+        fontFamily: "'Figtree', 'Figtree', sans-serif",
       },
       code: {
-        fontFamily: "'DM Mono', monospace",
+        fontFamily: "'IBM Plex Mono', monospace",
         fontSize: "13px",
         lineHeight: "1.5",
       },
