@@ -441,7 +441,7 @@ export default function Magazine() {
             WAKILISHA Magazine
           </span>
           <p className="text-[24px] lg:text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)] leading-snug max-w-[420px] mx-auto">
-            Stories that move East African culture forward.
+            Music, art, and stories from East Africa.
           </p>
         </footer>
       </main>
@@ -603,7 +603,7 @@ export default function Magazine() {
             WAKILISHA Magazine
           </span>
           <p className="text-[24px] lg:text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)] leading-snug max-w-[420px] mx-auto">
-            Stories that move East African culture forward.
+            Music, art, and stories from East Africa.
           </p>
           <p className="mt-3 text-[12px] text-[var(--wk-text-faint)]">
             Issue {issueNum} · {issueDate}
