@@ -172,8 +172,8 @@ describe(
         expect(sharedNavigation).not.toContain(
           '{ label: "Posts",',
         );
-        expect(shell).toContain("WAKILISHA_NAVIGATION.map");
-        expect(mobileDrawer).toContain("WAKILISHA_NAVIGATION.map");
+        expect(shell).toContain("navigation.map");
+        expect(mobileDrawer).toContain("navigation.map");
         expect(desktopDrawer).toContain("MobileAccountDrawer");
         expect(mobileShell).not.toContain("MobileBottomNav");
         expect(shell).not.toContain("studioLauncherOpen");
