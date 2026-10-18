@@ -155,7 +155,7 @@ for (const route of [
       expect(actual.brand).toBe(brand);
       expect(actual.text).not.toBe(actual.background);
       await page.screenshot({
-        path: testInfo.outputPath(`workbook-${route.name}-${mode}-390.png`),
+        path: testInfo.outputPath(`workbook-v4-${route.name}-${mode}-390.png`),
         animations: "disabled",
         fullPage: false,
       });
