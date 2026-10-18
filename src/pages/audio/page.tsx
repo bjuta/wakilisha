@@ -118,7 +118,7 @@ export default function PublicAudioPage() {
         {!loading && !message && featured && (
           <section id="audio-listen" className="mt-7 grid gap-5 lg:grid-cols-[1.23fr_.88fr]">
             <div className="relative flex min-h-[365px] flex-col justify-end overflow-hidden rounded-[20px] bg-[linear-gradient(145deg,#ab655a,#5b2917_56%,#17110f)] p-7 sm:p-9">
-              <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#f5f5f4]">
+              <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-white">
                 {featured.publicationKind === "episode" ? "Episode" : "Listen"}
               </span>
               <h2 className="mt-4 max-w-[17ch] text-[clamp(30px,4vw,51px)] font-extrabold uppercase leading-[.94] tracking-[-.045em]">
@@ -129,7 +129,7 @@ export default function PublicAudioPage() {
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#f5f5f4] px-5 text-[14px] font-bold text-[#0b0b0b]"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-bold text-[#0b0b0b]"
                   onClick={() => {
                     const track = publicAudioPlayerItem(featured);
                     playTrack(track, [track], {
@@ -143,7 +143,7 @@ export default function PublicAudioPage() {
                 >
                   <WkIcon name="Play" size={16} fill="currentColor" /> Listen
                 </button>
-                <Link to={featured.canonicalPath} className="inline-flex min-h-11 items-center text-[13px] font-semibold text-[#f5f5f4]">Recording details ↗</Link>
+                <Link to={featured.canonicalPath} className="inline-flex min-h-11 items-center text-[13px] font-semibold text-white">Recording details ↗</Link>
               </div>
             </div>
             {shows.length > 0 && (
@@ -154,7 +154,7 @@ export default function PublicAudioPage() {
                     <Link key={show.resourceId} to={show.canonicalPath} className="wk-reference-audio-station group">
                       <span aria-hidden="true" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] font-bold text-[#f5f5f4] group-hover:text-[var(--wk-brand)]">{show.title}</span>
+                        <span className="block truncate text-[15px] font-bold text-[var(--wk-text)] group-hover:text-[var(--wk-brand)]">{show.title}</span>
                         <span className="mt-1 block truncate text-[12px] text-[var(--wk-text-muted)]">{show.episodeCount} episodes</span>
                       </span>
                       <WkIcon name="ArrowUpRight" size={17} />
