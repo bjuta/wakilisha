@@ -52,6 +52,13 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(foundation).not.toContain(".btn,.wk-action");
     expect(foundation).not.toContain(".wk-ds-panel,.panel");
     expect(read("src/components/design-system/primitives/Button.tsx")).toContain("data-wk-button");
+    const shell = read("src/components/music/MusicDesktopShell.tsx");
+    expect(shell).toContain("resolvedLogoUrl");
+    expect(shell).toContain("/assets/logos/wakilisha-logo-dark.svg");
+    expect(shell).toContain("/assets/logos/wakilisha-logo-light.svg");
+    expect(shell).not.toContain("{showLogo ? (");
+    expect(shell).not.toContain("h-9 w-9");
+
   });
   it("maintains at least 44px interactive targets in the shared Workbook controls", () => {
     const field=read("src/components/design-system/primitives/Field.tsx");

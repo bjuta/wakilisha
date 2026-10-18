@@ -152,7 +152,7 @@ function DiscoveryLink({
       aria-label={label}
       title={collapsed ? label : undefined}
       className={[
-        "flex h-9 items-center rounded-lg text-[12px] font-semibold text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]",
+        "flex h-11 items-center rounded-full text-[12px] font-semibold text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]",
         collapsed
           ? "justify-center px-0"
           : "gap-3 px-3",
@@ -219,11 +219,12 @@ export function MusicDesktopShell({
     identity.siteName.trim() ||
     "WAKILISHA";
 
-  const showLogo =
-    selectedLogoUrl
-      .trim()
-      .length > 0 &&
-    !logoError;
+  const resolvedLogoUrl =
+    !logoError && selectedLogoUrl.trim()
+      ? selectedLogoUrl
+      : theme === "dark"
+        ? "/assets/logos/wakilisha-logo-dark.svg"
+        : "/assets/logos/wakilisha-logo-light.svg";
 
   useEffect(() => {
     setLogoError(false);
@@ -389,20 +390,14 @@ export function MusicDesktopShell({
               aria-label={displayName}
               className="flex min-w-0 items-center"
             >
-              {showLogo ? (
-                <img
-                  src={selectedLogoUrl}
+              {<img
+                  src={resolvedLogoUrl}
                   alt={displayName}
                   onError={() =>
                     setLogoError(true)
                   }
                   className="h-8 max-w-[158px] object-contain object-left"
-                />
-              ) : (
-                <span className="text-[22px] font-black tracking-[-0.045em] text-[var(--wk-text)]">
-                  {displayName}
-                </span>
-              )}
+                />}
             </Link>
           ) : null}
 
@@ -423,7 +418,7 @@ export function MusicDesktopShell({
                 ? "Expand sidebar"
                 : "Collapse sidebar"
             }
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
           >
             <WkIcon
               name={
@@ -598,7 +593,7 @@ export function MusicDesktopShell({
               </p>
               <Link
                 to="/artist-studio"
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[var(--wk-surface-raised)] px-3 py-2 text-[11px] font-bold text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-strong)]"
+                className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--wk-surface-raised)] px-3 py-2 text-[11px] font-bold text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-strong)]"
               >
                 Artist Studio
                 <WkIcon
@@ -625,7 +620,7 @@ export function MusicDesktopShell({
                   ? "Switch to light mode"
                   : "Switch to dark mode"
               }
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
             >
               <WkIcon
                 name={
@@ -641,7 +636,7 @@ export function MusicDesktopShell({
               <NotificationBell
                 userId={authUser.id}
                 className={[
-                  "h-9 w-9 border border-[var(--wk-border)]",
+                  "h-11 w-11 border border-[var(--wk-border)]",
                   activeSection === "notifications"
                     ? "bg-[var(--wk-brand-soft)] ring-1 ring-[var(--wk-brand)]"
                     : "",
@@ -652,7 +647,7 @@ export function MusicDesktopShell({
             <Link
               to="/settings"
               aria-label="Settings"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
             >
               <WkIcon
                 name="Settings"
@@ -663,7 +658,7 @@ export function MusicDesktopShell({
             <Link
               to="/profile"
               aria-label="Profile"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
             >
               <WkIcon
                 name="UserRound"
@@ -681,7 +676,7 @@ export function MusicDesktopShell({
                 title={sidebarCollapsed ? "Sign out" : undefined}
                 aria-label={sidebarCollapsed ? "Sign out" : undefined}
                 className={[
-                  "flex h-9 items-center rounded-lg border border-[var(--wk-border)] text-[12px] font-bold text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)] disabled:cursor-wait disabled:opacity-60",
+                  "flex h-11 items-center rounded-full border border-[var(--wk-border)] text-[12px] font-bold text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)] disabled:cursor-wait disabled:opacity-60",
                   sidebarCollapsed
                     ? "w-full justify-center px-0"
                     : "w-full justify-start gap-2.5 px-3",
@@ -705,25 +700,19 @@ export function MusicDesktopShell({
       <div className="min-w-0 flex-1 pb-24">
         <div className="sticky top-0 z-40 flex h-[64px] items-center gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-overlay)] px-4 backdrop-blur-xl lg:hidden">
           <Link to="/music" aria-label={displayName} className="min-w-0 flex-1">
-            {showLogo ? (
-              <img
-                src={selectedLogoUrl}
+            {<img
+                src={resolvedLogoUrl}
                 alt={displayName}
                 onError={() => setLogoError(true)}
                 className="h-7 max-w-[128px] object-contain object-left"
-              />
-            ) : (
-              <span className="truncate text-[17px] font-black tracking-[-0.04em] text-[var(--wk-text)]">
-                {displayName}
-              </span>
-            )}
+              />}
           </Link>
 
           <button
             type="button"
             onClick={() => setGlobalSearchOpen(true)}
             aria-label="Search"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]"
           >
             <WkIcon name="Search" size={16} />
           </button>
@@ -731,7 +720,7 @@ export function MusicDesktopShell({
           <Link
             to="/profile"
             aria-label="Profile"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]"
           >
             <WkIcon name="UserRound" size={16} />
           </Link>
