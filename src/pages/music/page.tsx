@@ -22,10 +22,12 @@ import {
 import {
   getRelease,
   listArtists,
+  listGenres,
   listReleasesPaginated,
   releaseUrl,
   slugify,
   type PublicArtist,
+  type PublicGenre,
   type PublicRelease,
 } from "@/services/publicContent/client";
 import {
@@ -257,7 +259,7 @@ function ChartMiniList({
 
   return (
     <div className="space-y-2">
-      {entries.slice(0, 3).map((entry) => (
+      {entries.slice(0, 10).map((entry) => (
         <div
           key={entry.id}
           className="flex items-center gap-2 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2"
@@ -461,7 +463,7 @@ async function loadChartEntries() {
         if (latest.data.entries.length) {
           return latest.data.entries.slice(
             0,
-            3,
+            10,
           );
         }
       } catch {
@@ -495,6 +497,7 @@ export default function MusicDiscoveryPage() {
     >([]);
   const [chartEntries, setChartEntries] =
     useState<ChartEditionEntry[]>([]);
+  const [genres, setGenres] = useState<PublicGenre[]>([]);
   const [followingItems, setFollowingItems] =
     useState<FollowingFeedItem[]>([]);
   const [loading, setLoading] =
@@ -516,6 +519,7 @@ export default function MusicDiscoveryPage() {
         playlistResult,
         chartResult,
         followingResult,
+        genreResult,
       ] =
         await Promise.allSettled([
           listReleasesPaginated({
@@ -531,6 +535,7 @@ export default function MusicDiscoveryPage() {
           getFollowingFeed({
             limit: 3,
           }),
+          listGenres(),
         ]);
 
       if (cancelled) return;
@@ -578,6 +583,10 @@ export default function MusicDiscoveryPage() {
         setFollowingItems(
           followingResult.value.items,
         );
+      }
+
+      if (genreResult.status === "fulfilled") {
+        setGenres(genreResult.value.filter((genre) => genre.name && genre.slug));
       }
 
       setLoading(false);
@@ -951,6 +960,21 @@ export default function MusicDiscoveryPage() {
               )}
             </section>
 
+            <nav aria-label="Music discovery" className="flex gap-1.5 overflow-x-auto border-b border-[var(--wk-border)] px-5 py-3 sm:px-8 [scrollbar-width:none]">
+              {[
+                { label: "For You", to: "/following" },
+                { label: "New", to: "#fresh-arrivals" },
+                { label: "Charts", to: "/charts" },
+                { label: "Genres", to: "#music-genres" },
+                { label: "Playlists", to: "/playlists" },
+                { label: "Labels", to: "/labels" },
+              ].map((item) => (
+                <Link key={item.label} to={item.to} className="inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-[13px] font-semibold text-[var(--wk-text-muted)] transition hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]">
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+
             <section
               id="fresh-arrivals"
               className="border-b border-[var(--wk-border)] px-5 py-5 sm:px-8"
@@ -992,6 +1016,47 @@ export default function MusicDiscoveryPage() {
                     />
                   ),
                 )}
+              </div>
+            </section>
+
+
+            <section id="music-genres" className="border-b border-[var(--wk-border)] px-5 py-8 sm:px-8">
+              <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.12fr)] lg:gap-12">
+                <div>
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <h2 className="text-[24px] font-bold tracking-[-0.04em] text-[var(--wk-text)]">On the Charts</h2>
+                    <Link to="/charts" className="text-[12px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">All Charts →</Link>
+                  </div>
+                  <ChartMiniList entries={chartEntries} />
+                </div>
+                <div>
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <h2 className="text-[24px] font-bold tracking-[-0.04em] text-[var(--wk-text)]">Genres</h2>
+                    <Link to="/genres" className="text-[12px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">All Genres →</Link>
+                  </div>
+                  {genres.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {genres.slice(0, 6).map((genre) => (
+                        <Link
+                          key={genre.id}
+                          to={`/genres/${genre.slug}`}
+                          aria-label={`Explore ${genre.name}`}
+                          className="group relative aspect-square overflow-hidden rounded-[12px] bg-[var(--wk-surface-raised)]"
+                        >
+                          <MusicArtwork src={genre.artistImageUrl} alt="" />
+                          <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" aria-hidden="true" />
+                          <span className="absolute inset-x-0 bottom-0 p-3 text-[15px] font-bold leading-tight text-white sm:text-[18px]">
+                            {genre.name}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <Link to="/genres" className="inline-flex min-h-11 items-center text-[14px] text-[var(--wk-text-muted)] underline-offset-4 hover:underline">
+                      Browse Genres
+                    </Link>
+                  )}
+                </div>
               </div>
             </section>
 
@@ -1057,25 +1122,6 @@ export default function MusicDiscoveryPage() {
                     </div>
                     <EditorialArtistCard
                       artist={registryArtist}
-                    />
-                  </div>
-                ) : null}
-
-                {chartEntries.length ? (
-                  <div className="min-w-[262px] flex-[1_0_262px] lg:max-w-[330px]">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <h2 className="truncate text-[14px] font-black uppercase tracking-[-0.025em]">
-                        On The Charts
-                      </h2>
-                      <Link
-                        to="/charts"
-                        className="shrink-0 text-[9px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-                      >
-                        See All
-                      </Link>
-                    </div>
-                    <ChartMiniList
-                      entries={chartEntries}
                     />
                   </div>
                 ) : null}
