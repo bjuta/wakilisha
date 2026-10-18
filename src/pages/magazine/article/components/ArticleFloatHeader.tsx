@@ -31,105 +31,47 @@ export function ArticleFloatHeader({ article }: ArticleFloatHeaderProps) {
     .toUpperCase();
 
   return (
-    <div className="max-w-[740px] mx-auto px-6 lg:px-8 pt-12 pb-8">
-      {/* Section + stats chips */}
-      <div className="flex items-center gap-3 mb-7 flex-wrap">
-        <span
-          data-wk-article-section
-          className="text-[12px] font-bold uppercase tracking-[0.12em] text-[var(--wk-brand)]"
-        >
-          {article.section}
-        </span>
-        <div className="flex items-center gap-1.5 text-[12px] text-[var(--wk-text-faint)] font-medium">
-          <div className="w-4 h-4 flex items-center justify-center">
-            <WkIcon name="Clock" size={13} />
-          </div>
-          {article.readingTime} min read
-        </div>
-        {article.readCount > 0 && (
-          <div className="flex items-center gap-1.5 text-[12px] text-[var(--wk-text-faint)] font-medium">
-            <div className="w-4 h-4 flex items-center justify-center">
-              <WkIcon name="Eye" size={13} />
-            </div>
-            {article.readCount.toLocaleString()} reads
-          </div>
-        )}
-      </div>
-
-      {/* Title */}
-      <h1 className="mb-6 max-w-[18ch] text-[clamp(36px,4.7vw,62px)] font-bold leading-[1.02] tracking-[-0.045em] text-[var(--wk-text)]">
-        {article.title}
-      </h1>
-
-      {/* Dek */}
-      {article.dek && (
-        <p className="mb-9 max-w-[54ch] text-[18px] font-normal leading-[1.55] text-[var(--wk-text-soft)] lg:text-[21px]">
-          {article.dek}
-        </p>
-      )}
-
-      {/* Divider */}
-      <div className="h-px bg-[var(--wk-border)] mb-7" />
-
-      {/* Author row + share actions */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        {/* Author */}
-        <div className="flex items-center gap-3">
+    <aside className="wk-reference-article-byline" aria-label="Article author and actions">
+      <div className="flex items-center gap-3">
+        <ArticleAuthorIdentity
+          name={article.author}
+          personPath={article.authorPersonPath}
+          organizationPath={article.authorOrganizationPath}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[13px] font-bold text-[var(--wk-text)]"
+          plainClassName="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[13px] font-bold text-[var(--wk-text)]"
+        >{initials}</ArticleAuthorIdentity>
+        <div className="min-w-0">
           <ArticleAuthorIdentity
             name={article.author}
             personPath={article.authorPersonPath}
             organizationPath={article.authorOrganizationPath}
-            className="w-11 h-11 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] flex items-center justify-center text-[13px] font-bold text-[var(--wk-text)] hover:opacity-80 transition-opacity shrink-0"
-            plainClassName="w-11 h-11 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] flex items-center justify-center text-[13px] font-bold text-[var(--wk-text)] shrink-0"
-          >
-            {initials}
-          </ArticleAuthorIdentity>
-          <div>
-            <ArticleAuthorIdentity
-              name={article.author}
-              personPath={article.authorPersonPath}
-            organizationPath={article.authorOrganizationPath}
-              className="text-[14px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors block leading-tight"
-              plainClassName="text-[14px] font-bold text-[var(--wk-text)] block leading-tight"
-            >
-              {article.author}
-            </ArticleAuthorIdentity>
-            <span className="text-[12px] text-[var(--wk-text-muted)]">{article.date}</span>
-          </div>
-        </div>
-
-        {/* Share actions */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <button
-              ref={shareBtnRef}
-              onClick={() => setSharePopoverOpen(!sharePopoverOpen)}
-              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 text-[13px] font-semibold text-[var(--wk-text)] transition-colors hover:border-[var(--wk-brand)] cursor-pointer whitespace-nowrap"
-            >
-              <i className="ri-share-forward-line text-[15px]" />
-              Share
-              {totalShares > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-[6px] rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)] text-[11px] font-bold">
-                  {totalShares.toLocaleString()}
-                </span>
-              )}
-            </button>
-
-            <SharePopover
-              open={sharePopoverOpen}
-              onClose={() => setSharePopoverOpen(false)}
-              item={{
-                title: article.title,
-                subtitle: article.dek,
-                url: pageUrl,
-                type: "article",
-                imageUrl: article.heroUrl,
-              }}
-              triggerRef={shareBtnRef as React.RefObject<HTMLElement>}
-            />
-          </div>
+            className="block truncate text-[13px] font-bold text-[var(--wk-text)]"
+            plainClassName="block truncate text-[13px] font-bold text-[var(--wk-text)]"
+          >{article.author}</ArticleAuthorIdentity>
+          <p className="mt-1 text-[12px] text-[var(--wk-text-muted)]">{article.date}</p>
         </div>
       </div>
-    </div>
+      <div className="mt-4 text-[12px] leading-[1.5] text-[var(--wk-text-muted)]">
+        {article.readingTime} min read
+        {article.readCount > 0 ? ` · ${article.readCount.toLocaleString()} reads` : ""}
+      </div>
+      <div className="mt-5 relative border-t border-[var(--wk-border)] pt-4">
+        <button
+          type="button"
+          ref={shareBtnRef}
+          onClick={() => setSharePopoverOpen(!sharePopoverOpen)}
+          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 text-[13px] font-semibold text-[var(--wk-text)] hover:border-[var(--wk-brand)]"
+        >
+          <WkIcon name="Share2" size={16} /> Share
+          {totalShares > 0 && <span className="text-[11px] text-[var(--wk-text-muted)]">{totalShares.toLocaleString()}</span>}
+        </button>
+        <SharePopover
+          open={sharePopoverOpen}
+          onClose={() => setSharePopoverOpen(false)}
+          item={{ title: article.title, subtitle: article.dek, url: pageUrl, type: "article", imageUrl: article.heroUrl }}
+          triggerRef={shareBtnRef as React.RefObject<HTMLElement>}
+        />
+      </div>
+    </aside>
   );
 }
