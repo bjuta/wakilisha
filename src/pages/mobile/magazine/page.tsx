@@ -258,7 +258,7 @@ export default function MobileMagazine() {
             {latest.length ? (
               <section className="wk-reveal">
                 <MobileSectionLabel>Latest Stories</MobileSectionLabel>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-6">
+                <div className="grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2">
                   {latest.map((story) => (
                     <MagazineCard key={story.slug} variant="standard" story={story} />
                   ))}
@@ -271,7 +271,7 @@ export default function MobileMagazine() {
               return (
                 <section key={section} className="wk-reveal">
                   <MobileSectionLabel count={items.length}>{section}</MobileSectionLabel>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-6">
+                  <div className="grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2">
                     {items.map((story) => (
                       <MagazineCard key={story.slug} variant="standard" story={story} />
                     ))}
@@ -279,18 +279,19 @@ export default function MobileMagazine() {
                 </section>
               );
             })}
-            <MobileNewsletterCTA />
           </>
         ) : (
           <section className="wk-reveal" aria-live="polite">
             <MobileSectionLabel count={selectedStories.length}>{activeSection}</MobileSectionLabel>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-6">
+            <div className="grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2">
               {selectedStories.map((story) => (
                 <MagazineCard key={story.slug} variant="standard" story={story} />
               ))}
             </div>
           </section>
         )}
+
+        <MobileNewsletterCTA />
 
         {/* ── Footer ── */}
         <footer className="border-t border-[var(--wk-border)] pt-10 pb-4 text-center">
@@ -347,7 +348,7 @@ function MobileNewsletterCTA() {
   };
 
   return (
-    <section className="wk-reveal rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
+    <section data-wk-magazine-newsletter className="wk-reveal border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
       {done ? (
         <div className="py-12 px-5 text-center">
           <div className="w-12 h-12 rounded-full bg-[var(--wk-brand)] flex items-center justify-center mx-auto mb-4">
@@ -355,18 +356,18 @@ function MobileNewsletterCTA() {
           </div>
           <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You’re on the list</h2>
           <p className="text-[13px] text-[var(--wk-text-muted)] max-w-[320px] mx-auto leading-relaxed">
-            Expect WAKILISHA stories, charts, and cultural dispatches. No noise.
+            Look out for the next edition.
           </p>
         </div>
       ) : (
         <div className="py-10 px-5 text-center">
           <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-3">
             <i className="ri-mail-line text-[14px]" />
-            WAKILISHA Editorial
+            Magazine
           </span>
           <h2 className="text-[26px] font-black tracking-[-0.04em] text-[var(--wk-text)] leading-tight mb-2">Read with us</h2>
           <p className="text-[13px] text-[var(--wk-text-muted)] leading-relaxed mb-6">
-            Get weekly analysis, chart commentary, and industry signals delivered to your inbox.
+            Get new stories and charts in your inbox.
           </p>
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <input type="hidden" name="wk_page_type" value="magazine" />
@@ -383,7 +384,7 @@ function MobileNewsletterCTA() {
                 className="w-full h-12 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] pl-10 pr-4 text-[14px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] transition-colors"
               />
             </div>
-            <button type="submit" disabled={subscribing} className="h-12 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[14px] font-extrabold hover:-translate-y-0.5 transition-transform whitespace-nowrap cursor-pointer disabled:opacity-60">
+            <button type="submit" disabled={subscribing} className="min-h-12 rounded-full bg-[var(--wk-text)] px-6 text-[14px] font-bold text-[var(--wk-bg)] disabled:opacity-60">
               {subscribing ? "Subscribing..." : "Subscribe"}
             </button>
           </form>
