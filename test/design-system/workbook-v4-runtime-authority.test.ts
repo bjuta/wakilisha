@@ -137,4 +137,73 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(read("src/components/design-system/primitives/Tabs.tsx")).toContain("min-h-11");
     expect(read("src/components/design-system/primitives/WakilishaToggle.tsx")).toContain("h-11 w-11");
   });
+
+  it("keeps both Magazine routes source-backed, editorial and filterable", () => {
+    const desktop = read("src/pages/magazine/page.tsx");
+    const mobile = read("src/pages/mobile/magazine/page.tsx");
+    const card = read("src/pages/magazine/components/MagazineCard.tsx");
+
+    expect(desktop).toContain('data-wk-workbook-screen="magazine"');
+    expect(mobile).toContain('data-wk-workbook-screen="magazine-mobile"');
+    expect(desktop).toContain('aria-pressed={selectedMagazineSection === section}');
+    expect(mobile).toContain('aria-pressed={activeSection === sec}');
+    expect(desktop).toContain('stories.filter((story) => story.section === selectedMagazineSection)');
+    expect(mobile).toContain('(story.section || "Article") === activeSection');
+    expect(mobile).not.toContain('useMagazineArticles(24)');
+    expect(mobile).not.toContain('Stories should feel edited, sequenced, and alive.');
+    expect(card).not.toContain('whyThisStoryMatters');
+    expect(card).not.toContain('ri-bookmark-line');
+    expect(card).toContain('const why = story.dek || ""');
+    expect(card.match(/data-wk-magazine-story/g)).toHaveLength(4);
+  });
+
+  it("presents one share affordance on each article route without rounded paper", () => {
+    const desktop = read("src/pages/magazine/article/page.tsx");
+    const mobile = read("src/pages/mobile/magazine/article/page.tsx");
+    const related = read("src/pages/magazine/article/components/ArticleRelated.tsx");
+    const articleHeader = read("src/pages/magazine/article/components/ArticleFloatHeader.tsx");
+    const css = read("src/styles/wakilisha-magazine-38-44.css");
+
+    expect(desktop).toContain('<ArticleFloatHeader article={article} />');
+    expect(articleHeader).toContain('<ShareMenu');
+    expect(desktop).not.toContain('ArticleBottomShare');
+    expect(desktop).not.toContain('handleNavCopy');
+    expect(mobile.match(/<MobileShareButton/g)).toHaveLength(1);
+    expect(mobile).not.toContain('Share this article');
+    expect(mobile).not.toContain('rounded-t-[24px]');
+    expect(mobile).not.toContain('marginTop: "-60px"');
+    expect(desktop).toContain('<ArticleRelated');
+    expect(mobile).toContain('<ArticleRelated');
+    expect(related).toContain('aspect-[3/2]');
+    expect(related).toContain('max-w-[1060px]');
+    expect(related).not.toContain('rounded-2xl');
+    expect(css).toContain('[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper');
+  });
+
+  it("preserves production media and communication behavior on workbook surfaces", () => {
+    const video = read("src/pages/video/page.tsx");
+    const audio = read("src/pages/audio/page.tsx");
+    const shows = read("src/pages/shows/page.tsx");
+    const music = read("src/pages/music/page.tsx");
+    const messages = read("src/pages/messages/page.tsx");
+    const notifications = read("src/pages/notifications/page.tsx");
+
+    expect(video).toContain('getPublicVideoIndex()');
+    expect(video).toContain('aria-label="Video formats"');
+    expect(video).toContain('const latestItems = query.trim() || format !== "all" ? items : items.slice(1)');
+    expect(audio).toContain('getPublicAudioIndex(24)');
+    expect(audio).toContain('publicAudioPlayerItem(publication)');
+    expect(shows).toContain('getPublicShowIndex(48)');
+    expect(shows).toContain('to={show.canonicalPath}');
+    expect(music).toContain('to={releaseUrl(hero)}');
+    expect(music).toContain('handlePlayRelease(');
+    expect(music).not.toContain('In Focus');
+    expect(messages).toContain('listMessageConversations(nextFolder)');
+    expect(messages).toContain('ariaLabel="Search conversations"');
+    expect(messages).toContain('visibleConversations.map((summary)');
+    expect(messages).toContain('sendMessage(selectedId, composer.trim())');
+    expect(notifications).toContain('handleMarkAll()');
+    expect(notifications).toContain('notificationTarget(');
+  });
+
 });
