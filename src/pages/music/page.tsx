@@ -76,10 +76,12 @@ function MusicArtwork({
   src,
   alt,
   className = "",
+  fit = "cover",
 }: {
   src?: string | null;
   alt: string;
   className?: string;
+  fit?: "cover" | "contain";
 }) {
   if (!src) {
     return (
@@ -98,7 +100,7 @@ function MusicArtwork({
       src={src}
       alt={alt}
       loading="lazy"
-      className={`h-full w-full object-cover ${className}`}
+      className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${className}`}
     />
   );
 }
@@ -944,7 +946,8 @@ export default function MusicDiscoveryPage() {
                       <MusicArtwork
                         src={hero.artworkUrl}
                         alt={`${hero.title} cover artwork`}
-                        className="h-full w-full object-contain"
+                        fit="contain"
+                        className="h-full w-full"
                       />
                     </Link>
                   </div>
