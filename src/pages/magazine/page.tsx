@@ -532,7 +532,7 @@ export default function Magazine() {
       </div>
 
       {/* Source-backed Magazine section filters, Workbook P10 */}
-      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[#0b0b0b]/95 backdrop-blur-lg">
+      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 backdrop-blur-lg">
         <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto px-5 py-3 [scrollbar-width:none] sm:px-8">
           {magazineSections.map((section) => (
             <button
@@ -541,7 +541,7 @@ export default function Magazine() {
               data-wk-magazine-filter={section.toLowerCase()}
               aria-pressed={selectedMagazineSection === section}
               onClick={() => setSelectedMagazineSection(section)}
-              className={`wk-reference-pill ${selectedMagazineSection === section ? "bg-[#f5f5f4] text-[#0b0b0b]" : ""}`}
+              className={`wk-reference-pill ${selectedMagazineSection === section ? "bg-[var(--wk-text)] text-[var(--wk-bg)]" : ""}`}
             >
               {section}
             </button>
