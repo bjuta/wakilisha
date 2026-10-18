@@ -43,12 +43,14 @@ export function AccentProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const apply = () => {
       const prefs = readAppearance();
-      if (!prefs?.accent) return;
-
-      const rgb = hexToRgb(prefs.accent);
-      if (!rgb) return;
-
+      const rgb = prefs?.accent ? hexToRgb(prefs.accent) : null;
       const root = document.documentElement;
+      if (!rgb) {
+        root.style.removeProperty("--wk-user-accent");
+        root.style.removeProperty("--wk-user-accent-rgb");
+        root.style.removeProperty("--wk-profile-cover");
+        return;
+      }
 
       // Workbook brand colour is immutable. Personal appearance is separate.
       root.style.setProperty("--wk-user-accent", prefs.accent);

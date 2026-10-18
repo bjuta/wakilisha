@@ -7,6 +7,7 @@ export default {
   ],
   theme: {
     extend: {
+      fontWeight: { black: "800" },
       fontFamily: {
         display: ["var(--wk-font-display)", "Figtree", "system-ui", "sans-serif"],
         body: ["var(--wk-font-body)", "Figtree", "system-ui", "sans-serif"],

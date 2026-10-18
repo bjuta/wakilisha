@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { briefingService } from "@/services/briefingService";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 
 export default function BriefingIssuePage() {
+  const { theme } = useTheme();
   const { issueId } = useParams<{ issueId: string }>();
   const [issueHtml, setIssueHtml] = useState<string | null>(null);
   const [issueTitle, setIssueTitle] = useState<string>("");
@@ -85,7 +87,7 @@ export default function BriefingIssuePage() {
           gap: 12,
         }}>
           <Link to="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
-            <img src="/assets/logos/wakilisha-logo-light.svg" alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain dark:brightness-0 dark:invert" />
+            <img src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"} alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain" />
           </Link>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Link

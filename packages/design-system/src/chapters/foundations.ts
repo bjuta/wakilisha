@@ -55,7 +55,7 @@ export const foundationsChapters: WkDesignChapterSpec[] = [
     summary: 'The custom WAKILISHA SVG masthead must be used correctly across dark, light, photo, and brand surfaces. Theme-aware SVG variants are required. Clear-space rules apply. The bolt mark is the fallback below 10px.',
     adminSections: ['Design system preview', 'Brand asset panel'],
     implementationRules: [
-      'Never recreate WAKILISHA in a system font except as a temporary bug fallback.',
+      'Always render WAKILISHA using the approved vector artwork. Never replace the logo with a font stand-in.',
       'Dark mode uses white letters and green bolt. Light mode uses black letters and green bolt.',
       'Clear space equals the height of the bolt glyph; 1.5x for print and event posters.',
       'Below 10px logo height, switch to bolt-only mark.',
@@ -101,7 +101,7 @@ export const foundationsChapters: WkDesignChapterSpec[] = [
     summary: 'Figtree 400–800 carries person-facing text across both brands. IBM Plex Mono 400/500 is reserved for exact IDs, hashes, grades and timestamps. WAKILISHA editorial heroes may be poster-uppercase; original song, artist and place casing remains intact.',
     adminSections: ['Typography scale preview', 'Token inspector', 'Specimen wall'],
     implementationRules: [
-      'Only Figtree and IBM Plex Mono belong to the shared Workbook font scale; retained route exceptions require explicit parity review.',
+      'Only Figtree and IBM Plex Mono belong to the shared Workbook font scale; no legacy design font exceptions remain in the runtime.',
       'Headlines and buttons use sentence case. Eyebrows/status can use uppercase with tracking.',
       'Artist, track, place, and title casing must preserve source casing.',
       'Use clamp display scale for heroes, page titles, section titles, and article heads.',

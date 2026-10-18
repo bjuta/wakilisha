@@ -27,7 +27,7 @@ export const wakilishaElementRegistry: WakilishaElement[] = [
     primaryClasses: ['logo-spec', 'logo-spec-inner', 'logo-spec-meta'],
     productRoutes: ['global nav', 'footer', 'auth', 'marketing', 'admin'],
     implementationNotes: [
-      'Use the inline SVG wordmark or a shared Logo component; never recreate WAKILISHA in a system font except as a temporary fallback.',
+      'Use the approved vector wordmark or a shared logo component. Never use a font-rendered replacement.',
       'Dark mode uses white letters plus green bolt; light mode uses black letters plus green bolt.',
       'Photography placements require a scrim behind the logo.'
     ]

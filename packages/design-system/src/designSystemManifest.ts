@@ -10,7 +10,7 @@ export type WkDesignChapter = {
 
 export const wakilishaDesignSystemMeta = {
   name: 'WAKILISHA Design System',
-  version: 'Workbook v4 (foundation migration)',
+  version: 'Workbook v4',
   sourceDocument: 'MIZIZI WAKILISHA Brand Workbook.dc.html',
   northStar: 'One system. Every WAKILISHA surface.',
   principles: [
@@ -57,7 +57,7 @@ export const wakilishaDesignChapters: WkDesignChapter[] = [
     title: 'Logo',
     purpose: 'Use the custom WAKILISHA SVG masthead correctly across dark, light, photo, and brand surfaces.',
     implementationRules: [
-      'Never recreate WAKILISHA in a system font except as a temporary bug fallback.',
+      'Always render WAKILISHA using the approved vector artwork. Never replace the logo with a font stand-in.',
       'Dark mode uses white letters and green bolt. Light mode uses black letters and green bolt.',
       'Clear space equals the height of the bolt glyph; 1.5x for print and event posters.',
       'Below 10px logo height, switch to bolt-only mark.'
@@ -85,7 +85,7 @@ export const wakilishaDesignChapters: WkDesignChapter[] = [
     title: 'Typography',
     purpose: 'Figtree is the person-facing family; IBM Plex Mono is for IDs, versions, hashes and grades.',
     implementationRules: [
-      'Workbook v4 typography is Figtree and IBM Plex Mono; legacy route exceptions require explicit migration and proof.',
+      'Workbook v4 typography is Figtree and IBM Plex Mono; all live routes must use the Workbook families.',
       'Headlines and buttons use sentence case. Eyebrows/status can use uppercase with tracking.',
       'Artist, track, place, and title casing must preserve source casing.',
       'Use clamp display scale for heroes, page titles, section titles, and article heads.'
