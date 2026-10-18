@@ -155,6 +155,15 @@ describe(
         "min-h-[calc(100dvh-6rem)]",
       );
       expect(page).toContain(
+        'aria-label="Notification filters"',
+      );
+      expect(page).toContain(
+        'aria-current={',
+      );
+      expect(page).toContain(
+        'bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]',
+      );
+      expect(page).not.toContain(
         "w-14 -translate-x-1/2",
       );
       expect(page).not.toContain(
