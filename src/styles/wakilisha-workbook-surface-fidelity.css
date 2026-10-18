@@ -1,7 +1,7 @@
 /* WAKILISHA Workbook v4: real public product surfaces.
    Brand workbook: Music is night-first; communications and social are quiet paper.
    The only WAKILISHA green is #85C441 (light-ground ink #4E7425).
-   No !important overrides, prototype content, or decorative browser chrome. */
+   No forced-specificity overrides, prototype content, or decorative browser chrome. */
 
 [data-wk-workbook-screen="music"] {
   --wk-bg: #0b0b0b;
