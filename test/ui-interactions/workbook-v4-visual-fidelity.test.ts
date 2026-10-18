@@ -88,6 +88,8 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(music).toContain('<ChartMiniList entries={chartEntries} />');
     expect(music).toContain('onPlay(release, "fresh-arrivals")');
     expect(music).toContain('handlePlayRelease(');
+    expect(music).toContain('onError={() => setFailedSrc(src)}');
+    expect(music).toContain('loading="eager"');
     expect(music).not.toContain('aria-label="Previous arrivals"');
     expect(music).not.toContain('aria-label="Next arrivals"');
     expect(css).toContain('background-color: var(--wk-bg)');
