@@ -46,7 +46,7 @@ function MobileSectionLabel({ children, count, href }: { children: string; count
 }
 
 export default function MobileMagazine() {
-  const { articles: stories, loading, error } = useMagazineArticles();
+  const { articles: stories, loading, error } = useMagazineArticles(24);
   const status: "loading" | "ready" | "error" =
     loading
       ? "loading"
