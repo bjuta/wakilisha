@@ -617,11 +617,13 @@ export default function MessagesPage() {
 
   return (
     <main data-wk-workbook-screen="messages" className="min-h-[calc(100dvh-80px)] bg-[var(--wk-bg)]">
-      <div className="mx-auto w-full max-w-[1280px] px-0 pb-8 pt-5 sm:px-5 lg:pb-10 lg:pt-8">
-        <div className="mb-4 flex items-end justify-between gap-4 px-1">
+      <div className="mx-auto w-full max-w-[1280px] px-0 pb-8 pt-0 lg:pb-10">
+        <div className="overflow-hidden border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:min-h-[650px] lg:grid-cols-[360px_minmax(0,1fr)] lg:border">
+          <section className={`${selectedId ? "hidden lg:block" : "block"} min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--wk-border)] px-4 py-4">
           <div>
-            <p className="text-[12px] font-semibold text-[var(--wk-text-muted)]">Inbox</p>
-            <h1 className="mt-1 text-[32px] font-bold leading-[1.1] tracking-[-0.035em] text-[var(--wk-text)]">Messages</h1>
+            
+            <h1 className="text-[20px] font-extrabold leading-[1.2] text-[var(--wk-text)]">Messages</h1>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/settings?section=Messages" className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]" aria-label="Messages settings">
@@ -639,13 +641,13 @@ export default function MessagesPage() {
 
         <MessageSafetyState />
 
-        <div className="mb-4 grid grid-cols-4 gap-1 rounded-[12px] border border-[var(--wk-border)] bg-[var(--wk-surface)] p-1 lg:max-w-[560px]">
+        <div className="flex gap-1 overflow-x-auto border-b border-[var(--wk-border)] px-3 py-2 [scrollbar-width:none]">
           {FOLDERS.map((item) => (
             <button
               key={item.key}
               type="button"
               onClick={() => { setFolder(item.key); setSelectedId(null); setDetail(null); }}
-              className={`relative flex min-h-11 items-center justify-center gap-1.5 rounded-[10px] px-2 text-[12px] font-semibold transition-colors ${folder === item.key ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"}`}
+              className={`relative flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition-colors ${folder === item.key ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"}`}
             >
               <i className={`${item.icon} text-sm`} />
               <span>{item.label}</span>
@@ -656,8 +658,7 @@ export default function MessagesPage() {
           ))}
         </div>
 
-        <div className="overflow-hidden border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:min-h-[650px] lg:grid-cols-[340px_minmax(0,1fr)] lg:border">
-          <section className={`${selectedId ? "hidden lg:block" : "block"} min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
+
             <div className="border-b border-[var(--wk-divider)] px-3 py-3">
               <WkSearchField value={conversationQuery} onChange={setConversationQuery} ariaLabel="Search conversations" placeholder="Search messages" inputClassName="min-h-11 rounded-md border-[var(--wk-border)] bg-[var(--wk-bg)] text-[16px]" />
             </div>
