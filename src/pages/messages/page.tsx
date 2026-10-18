@@ -619,7 +619,7 @@ export default function MessagesPage() {
   return (
     <main data-wk-workbook-screen="messages" className="min-h-[calc(100dvh-80px)] bg-[var(--wk-bg)]">
       <div className="mx-auto w-full max-w-[1180px] px-0 pb-8 pt-0 lg:pb-10">
-        <div className="overflow-hidden border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:min-h-[min(780px,calc(100dvh-110px))] lg:grid-cols-[minmax(280px,34%)_minmax(0,1fr)] lg:border">
+        <div className="overflow-hidden border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:h-[min(780px,calc(100dvh-110px))] lg:grid-cols-[minmax(280px,34%)_minmax(0,1fr)] lg:border">
           <section data-wk-message-list className={`${selectedId ? "hidden lg:block" : "block"} min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
         <div data-wk-messages-list-header className="flex min-h-14 items-center justify-between gap-3 border-b border-[var(--wk-border)] px-4 py-2">
           <div>
