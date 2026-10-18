@@ -345,3 +345,69 @@
   [data-wk-workbook-screen="music"] .wk-music-hero { border-radius:0; }
   [data-wk-workbook-screen="notifications"] aside[aria-label="Notification preferences"] { display:none; }
 }
+
+/* P11: the workbook's article reading surface is black, not paper. */
+.wk-workbook-article-paper {
+  --wk-bg:#0b0b0b;
+  --wk-surface:#151515;
+  --wk-surface-raised:#1c1c1c;
+  --wk-text:#f5f5f4;
+  --wk-text-soft:#d0d0cf;
+  --wk-text-muted:#a4a4a4;
+  --wk-text-faint:#898989;
+  --wk-border:rgba(255,255,255,.1);
+  --wk-brand:#85c441;
+  --wk-brand-soft:rgba(133,196,65,.15);
+  --wk-brand-on:#0b0b0b;
+  --wk-editorial-category-ink:#85c441;
+  background: #0b0b0b;
+  color:#f5f5f4;
+  border-radius:0;
+}
+.wk-workbook-article-paper [data-wk-article-section] { color:#85c441; }
+.wk-workbook-article-paper :is(.article-content-v2,.article-content-v2-mobile) {
+  color:#d0d0cf;
+  font-size:17px;
+  line-height:1.75;
+}
+.wk-workbook-article-paper :is(.article-content-v2,.article-content-v2-mobile) :is(p,li) {
+  color:#d0d0cf;
+}
+.wk-workbook-article-paper :is(.article-content-v2,.article-content-v2-mobile) :is(h1,h2,h3,strong) {
+  color:#f5f5f4;
+}
+.wk-workbook-article-paper :is(.article-content-v2,.article-content-v2-mobile) blockquote {
+  border-left:3px solid #85c441;
+  background:transparent;
+  color:#f5f5f4;
+  font-size:clamp(24px,3vw,31px);
+  font-weight:800;
+  line-height:1.18;
+  padding:6px 0 6px 21px;
+}
+.wk-workbook-article-paper :is(.article-content-v2,.article-content-v2-mobile) img {
+  border-radius:0;
+  max-width:100%;
+  height:auto;
+}
+.wk-reference-article-byline {
+  align-self:start;
+  position:sticky;
+  top:82px;
+  min-width:0;
+}
+.wk-reference-article-columns .article-content-v2 { max-width:100%; }
+[data-wk-article-newsletter] {
+  background:#0b0b0b;
+  color:#f5f5f4;
+  border-color:rgba(255,255,255,.1);
+}
+[data-wk-article-newsletter] :is(h2,h3) { color:#f5f5f4; }
+[data-wk-article-newsletter] button[type="submit"] { background:#f5f5f4;color:#0b0b0b; }
+@media(min-width:1024px) {
+  .wk-workbook-article-paper .article-content-v2 {font-size:19px;line-height:1.7;}
+}
+@media(max-width:1023px) {
+  .wk-reference-article-columns { grid-template-columns:minmax(0,1fr); }
+  .wk-reference-article-byline { position:static; }
+}
