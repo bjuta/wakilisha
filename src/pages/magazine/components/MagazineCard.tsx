@@ -12,7 +12,7 @@ interface MagazineCardProps {
 
 function AuthorBadge({ author }: { author: string }) {
   return (
-    <div className="w-5 h-5 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[8px] font-black text-[var(--wk-brand-on)] shrink-0">
+    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold text-white">
       {author
         .split(" ")
         .map((n) => n[0])
