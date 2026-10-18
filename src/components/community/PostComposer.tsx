@@ -643,7 +643,8 @@ export function PostComposer({
 
   if (!open && compactFollowing) {
     return (
-      <div data-wk-following-composer-entry className="flex min-w-0 gap-3 px-4 py-4 sm:px-5">
+      <>
+      <div data-wk-following-composer-entry className="hidden min-w-0 gap-3 px-4 py-4 sm:flex sm:px-5">
         <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[var(--wk-brand-soft)]">
           {actor.imageUrl ? (
             <img src={actor.imageUrl} alt="" className="h-full w-full object-cover" />
@@ -657,7 +658,7 @@ export function PostComposer({
           </button>
           <div className="flex min-h-11 items-center justify-between gap-2">
             <div className="flex items-center gap-1 text-[var(--wk-brand)]">
-              {([["Image", "Add Photo"], ["Music", "Add Track"], ["Video", "Add Video"], ["Link", "Add Link"]] as const).map(([icon, label]) => (
+              {([["Image", "Add Photo"], ["Music", "Add Track"], ["Video", "Share video link"], ["Link", "Add Link"]] as const).map(([icon, label]) => (
                 <button key={label} type="button" onClick={() => setOpen(true)} aria-label={label} className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[var(--wk-brand-soft)]">
                   <WkIcon name={icon} size={17} />
                 </button>
@@ -669,8 +670,18 @@ export function PostComposer({
             </div>
           </div>
         </div>
-        {draftsOpen ? <PostDraftsDialog actor={actor} onSelect={loadDraftGroup} onClose={() => setDraftsOpen(false)} /> : null}
       </div>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        data-wk-following-mobile-compose
+        aria-label="Create Post"
+        className="fixed bottom-[100px] right-4 z-[58] flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] shadow-xl sm:hidden"
+      >
+        <WkIcon name="Pencil" size={23} />
+      </button>
+      {draftsOpen ? <PostDraftsDialog actor={actor} onSelect={loadDraftGroup} onClose={() => setDraftsOpen(false)} /> : null}
+      </>
     );
   }
 
