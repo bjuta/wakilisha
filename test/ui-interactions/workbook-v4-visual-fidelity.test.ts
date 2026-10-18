@@ -120,7 +120,7 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(notifications).toContain('notificationTarget(');
     expect(messages).toContain('listMessageConversations(nextFolder)');
     expect(messages).toContain('sendMessage(selectedId, composer.trim())');
-    expect(messages).toContain('bg-[#4E7425] text-white');
+    expect(messages).toContain('bg-[var(--wk-brand)] text-[var(--wk-brand-on)]');
     expect(messages).toContain('whitespace-pre-wrap break-words text-[15px]');
   });
 
