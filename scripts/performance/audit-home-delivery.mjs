@@ -32,15 +32,7 @@ const publicClient = read(
   "src/services/publicContent/client.ts",
 );
 
-const home = read("src/pages/home/page.tsx");
-
-const mobileHome = read(
-  "src/pages/mobile/home/page.tsx",
-);
-
-const homeHero = read(
-  "src/pages/home/components/HomeHero.tsx",
-);
+const publicRoutes = read("src/router/config.tsx");
 
 const magazine = read(
   "src/pages/magazine/page.tsx",
@@ -175,30 +167,29 @@ if (
   );
 }
 
+// The actual root route is Magazine on both breakpoints. Old home
+// components and their generated-artwork UI are retired, not alternate
+// rendering authorities. Preserve the Magazine LCP/priority checks below.
 if (
-  !home.includes(
-    "listMagazineStories(24)",
-  ) ||
-  !mobileHome.includes(
-    "listMagazineStories(24)",
+  !publicRoutes.includes(
+    '{ path: "/", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> }',
   )
 ) {
-  fail(
-    "home still requests the full magazine archive",
-  );
+  fail("the real / route must use the accepted responsive Magazine entry");
 }
-
-if (
-  !homeHero.includes(
-    'fetchPriority="high"',
-  ) ||
-  !homeHero.includes(
-    'loading="eager"',
-  )
-) {
-  fail(
-    "homepage hero is not prioritized",
-  );
+for (const file of [
+  "src/pages/home/page.tsx",
+  "src/pages/mobile/home/page.tsx",
+  "src/pages/home/components/HomeHero.tsx",
+  "src/pages/home/components/HomeExplore.tsx",
+  "src/pages/home/components/HomeRightNow.tsx",
+  "src/pages/home/components/HomeMarquee.tsx",
+  "src/pages/home/components/HomeMission.tsx",
+  "src/pages/home/components/HomeNav.tsx",
+]) {
+  if (fs.existsSync(file)) {
+    fail("retired unrouted homepage implementation still exists: " + file);
+  }
 }
 
 if (

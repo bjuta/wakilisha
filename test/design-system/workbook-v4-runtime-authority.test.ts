@@ -30,13 +30,22 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(read("src/design-system/wakilisha.elements.motion.css"))
       .not.toContain("wakilisha.elements.charts-directory.css");
     expect(read("src/design-system/chapters/pageBlueprints.ts")).not.toContain("mob-cdir");
-    const homeHero = read("src/pages/home/components/HomeHero.tsx");
-    expect(homeHero).not.toContain("/api/search-image");
-    expect(homeHero).toContain('data-wk-hero-artwork');
-    expect(homeHero).toContain("/assets/logos/wakilisha-logo-dark.svg");
+    expect(read("src/router/config.tsx")).toContain(
+      '{ path: "/", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> }'
+    );
+    for (const file of [
+      "src/pages/home/page.tsx",
+      "src/pages/mobile/home/page.tsx",
+      "src/pages/home/components/HomeHero.tsx",
+      "src/pages/home/components/HomeExplore.tsx",
+      "src/pages/home/components/HomeRightNow.tsx",
+      "src/pages/home/components/HomeMarquee.tsx",
+      "src/pages/home/components/HomeMission.tsx",
+      "src/pages/home/components/HomeNav.tsx",
+      "src/pages/home/components/HomeFeatured.tsx",
+      "src/pages/home/components/HomeCollage.tsx",
+    ]) expect(existsSync(file)).toBe(false);
     expect(read("src/pages/charts/directory/page.tsx")).not.toContain("HERO_FALLBACK");
-    expect(read("src/pages/home/components/HomeExplore.tsx")).not.toContain('acc: "');
-    expect(read("src/pages/home/components/HomeExplore.tsx")).toContain("color-mix(in srgb");
     for (const name of ["dark", "light"]) {
       const svg = read(`public/assets/logos/wakilisha-logo-${name}.svg`);
       expect(svg.toLowerCase()).toContain("#85c441");
