@@ -187,7 +187,7 @@
 
 /* ── Headings ── */
 .fg-h-section {
-  font: 900 clamp(36px, 5vw, 56px)/0.95 var(--wk-font-display);
+  font: 800 clamp(36px, 5vw, 56px)/0.95 var(--wk-font-display);
   letter-spacing: -0.04em;
   color: var(--wk-text);
   margin-bottom: 32px;
@@ -288,7 +288,7 @@
 }
 
 .fg-cover-title {
-  font: 900 clamp(48px, 8vw, 96px)/0.9 var(--wk-font-display);
+  font: 800 clamp(48px, 8vw, 96px)/0.9 var(--wk-font-display);
   letter-spacing: -0.05em;
   color: var(--wk-text);
   margin-bottom: 32px;
@@ -337,7 +337,7 @@
 
 .fg-cover-stat-number {
   display: block;
-  font: 900 36px/1 var(--wk-font-display);
+  font: 800 36px/1 var(--wk-font-display);
   color: var(--wk-brand);
   margin-bottom: 8px;
 }
@@ -415,7 +415,7 @@
 }
 
 .fg-quote-spread-text {
-  font: 900 clamp(40px, 6vw, 72px)/0.95 var(--wk-font-display);
+  font: 800 clamp(40px, 6vw, 72px)/0.95 var(--wk-font-display);
   letter-spacing: -0.04em;
   color: var(--wk-text);
   margin-bottom: 24px;
@@ -749,7 +749,7 @@
 
 /* ── Country + Title ── */
 .fg-pavilion-dossier-country {
-  font: 900 22px/1.15 var(--wk-font-display);
+  font: 800 22px/1.15 var(--wk-font-display);
   color: var(--wk-text);
   letter-spacing: -0.02em;
   padding: 20px 20px 4px;
@@ -1109,7 +1109,7 @@
 }
 
 .fg-closing-title {
-  font: 900 clamp(36px, 5vw, 64px)/0.95 var(--wk-font-display);
+  font: 800 clamp(36px, 5vw, 64px)/0.95 var(--wk-font-display);
   letter-spacing: -0.04em;
   color: var(--wk-text);
   margin-bottom: 40px;

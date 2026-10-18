@@ -61,7 +61,7 @@
   margin-bottom: 20px;
 }
 .genre43-hero-title {
-  font: 900 clamp(52px,9vw,128px)/.84 var(--wk-font-display);
+  font: 800 clamp(52px,9vw,128px)/.84 var(--wk-font-display);
   letter-spacing: -.065em;
   color: #F0EFE8;
   margin-bottom: 16px;
@@ -129,7 +129,7 @@
 }
 .genre43-hero-stat-val {
   display: block;
-  font: 900 26px/1 var(--wk-font-display);
+  font: 800 26px/1 var(--wk-font-display);
   letter-spacing: -.035em;
   color: #F0EFE8;
 }
@@ -334,7 +334,7 @@
   margin-bottom: 10px;
 }
 .genre43-spot-title {
-  font: 900 clamp(26px,4vw,48px)/.92 var(--wk-font-display);
+  font: 800 clamp(26px,4vw,48px)/.92 var(--wk-font-display);
   letter-spacing: -.045em;
   color: #F0EFE8;
   margin-bottom: 10px;
@@ -409,7 +409,7 @@
   letter-spacing: .06em;
 }
 .genre43-compact-name {
-  font: 900 14px/1.15 var(--wk-font-display);
+  font: 800 14px/1.15 var(--wk-font-display);
   letter-spacing: -.02em;
   color: var(--wk-text);
   transition: color var(--wk-d-fast);
@@ -488,7 +488,7 @@
   right: 0;
   z-index: 1;
   padding: 12px 14px;
-  font: 900 18px/1.1 var(--wk-font-display);
+  font: 800 18px/1.1 var(--wk-font-display);
   letter-spacing: -.025em;
   color: #F0EFE8;
   background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,.55) 100%);
@@ -513,7 +513,7 @@
 }
 .genre43-card-stat-pill strong {
   display: block;
-  font: 900 17px/1 var(--wk-font-display);
+  font: 800 17px/1 var(--wk-font-display);
   letter-spacing: -.02em;
   color: var(--wk-text);
 }
@@ -560,7 +560,7 @@
   margin: 0 auto;
 }
 .genre43-pullquote-text {
-  font: 900 clamp(26px,3.5vw,44px)/1.02 var(--wk-font-display);
+  font: 800 clamp(26px,3.5vw,44px)/1.02 var(--wk-font-display);
   letter-spacing: -.04em;
   color: var(--wk-text);
   margin: 22px 0;
@@ -592,7 +592,7 @@
   display: block;
 }
 .genre43-context-title {
-  font: 900 22px/1.08 var(--wk-font-display);
+  font: 800 22px/1.08 var(--wk-font-display);
   letter-spacing: -.03em;
   color: var(--wk-text);
   margin-bottom: 10px;
@@ -663,7 +663,7 @@
 }
 .genre43-context-stat-val {
   display: block;
-  font: 900 22px/1 var(--wk-font-display);
+  font: 800 22px/1 var(--wk-font-display);
   letter-spacing: -.03em;
   color: var(--wk-brand);
 }
@@ -702,7 +702,7 @@
   margin-bottom: 12px;
 }
 .genre43-footer-tagline {
-  font: 900 22px/1.25 var(--wk-font-display);
+  font: 800 22px/1.25 var(--wk-font-display);
   letter-spacing: -.03em;
   color: var(--wk-text);
   max-width: 380px;
