@@ -13,6 +13,7 @@ export default function VideoIndexPage() {
   const [index, setIndex] = useState<PublicVideoIndex | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [format, setFormat] = useState("all");
 
   useEffect(() => {
     let alive = true;
@@ -35,11 +36,13 @@ export default function VideoIndexPage() {
     };
   }, []);
 
+  const formats = useMemo(() => Array.from(new Set((index?.items ?? []).map((item) => item.classification).filter(Boolean))).sort(), [index?.items]);
+
   const items = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return index?.items ?? [];
     return (index?.items ?? []).filter((publication) =>
-      [
+      (format === "all" || publication.classification === format)
+      && (!normalized || [
         publication.title,
         publication.summary || "",
         publication.show?.title || "",
@@ -47,9 +50,11 @@ export default function VideoIndexPage() {
       ]
         .join(" ")
         .toLowerCase()
-        .includes(normalized)
+        .includes(normalized)))
     );
-  }, [index?.items, query]);
+  }, [index?.items, query, format]);
+
+  const latestItems = query.trim() || format !== "all" ? items : items.slice(1);
 
   return (
     <>
@@ -59,17 +64,27 @@ export default function VideoIndexPage() {
         url="https://wakilisha.africa/video"
       />
 
-      <main className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
+      <main data-wk-workbook-screen="video" className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
         <div className="mx-auto max-w-[1180px] px-4 sm:px-6">
           <WkEditorialIntro eyebrow="Watch" title="Video" description="Films, sessions, documentaries, shorts, and live performances. Music and the people behind it stay connected.">
             <div className="mt-6 max-w-[420px]">
               <WkSearchField value={query} onChange={setQuery} ariaLabel="Search Video" placeholder="Search Video"
-                inputClassName="min-h-11 rounded-full border-[var(--wk-border)] bg-[var(--wk-surface)] text-[16px] text-[var(--wk-text)]" />
+                inputClassName="min-h-11 rounded-md border-[var(--wk-border)] bg-[var(--wk-surface)] text-[16px] text-[var(--wk-text)]" />
             </div>
           </WkEditorialIntro>
+          {formats.length > 1 && (
+            <nav aria-label="Video formats" className="mb-7 flex flex-wrap gap-2">
+              {["all", ...formats].map((item) => (
+                <button key={item} type="button" aria-pressed={format === item} onClick={() => setFormat(item)}
+                  className={`min-h-11 px-4 text-[12px] font-semibold capitalize transition-colors ${format === item ? "bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "border border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:border-[var(--wk-brand)]"}`}>
+                  {item === "all" ? "All" : item.replace(/[_-]+/g, " ")}
+                </button>
+              ))}
+            </nav>
+          )}
         </div>
         <section className="mx-auto max-w-[1180px] px-4 pb-14 sm:px-6 lg:pb-20">
-          {!query.trim() && items.length > 0 ? (
+          {!query.trim() && format === "all" && items.length > 0 ? (
             <Link to={items[0].canonicalPath} className="wk-editorial-media-feature" aria-label={`Watch ${items[0].title}`}>
               <WkEditorialArtworkFrame src={items[0].poster?.url} alt={items[0].title} ratio="cinema" />
               <div className="wk-editorial-feature-copy">
@@ -113,19 +128,19 @@ export default function VideoIndexPage() {
             </div>
           ) : null}
 
-          {items.length ? (
+          {latestItems.length ? (
             <>
               <div className="mt-10 flex items-center justify-between border-b border-[var(--wk-border)] pb-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
                   {query.trim() ? "Search results" : "Latest Video"}
                 </p>
                 <span className="text-[11px] font-semibold text-[var(--wk-text-faint)]">
-                  {items.length} {items.length === 1 ? "Video" : "Videos"}
+                  {latestItems.length} {latestItems.length === 1 ? "Video" : "Videos"}
                 </span>
               </div>
 
               <div className="mt-5 space-y-3 sm:hidden">
-                {items.map((publication) => (
+                {latestItems.map((publication) => (
                   <PublicVideoCard
                     key={publication.versionId}
                     publication={publication}
@@ -135,7 +150,7 @@ export default function VideoIndexPage() {
               </div>
 
               <div className="mt-6 hidden grid-cols-2 gap-x-5 gap-y-8 sm:grid lg:grid-cols-3">
-                {items.map((publication) => (
+                {latestItems.map((publication) => (
                   <PublicVideoCard
                     key={publication.versionId}
                     publication={publication}
