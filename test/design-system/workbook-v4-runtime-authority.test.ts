@@ -102,6 +102,11 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(shell).not.toContain("h-9 w-9");
     const mobile = read("src/components/mobile/MobileAppLayout.tsx");
     expect(mobile).not.toContain("MobileBottomNav");
+    const compact = read("src/components/design-system/player/PlayerCompactSurface.tsx");
+    expect(compact).toContain("calc(env(safe-area-inset-bottom) + 8px)");
+    expect(compact).not.toContain("calc(52px + max(env(safe-area-inset-bottom)");
+    expect(mobile).toContain("calc(84px + env(safe-area-inset-bottom))");
+
     expect(mobile).not.toContain("WAKILISHA_THUNDERBOLT_URL");
     const mobileStyles = read("src/styles/wakilisha-mobile-workbook-v4.css");
     expect(mobileStyles).not.toContain(".phn-nav--compact");
