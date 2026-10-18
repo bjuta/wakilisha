@@ -283,9 +283,6 @@
   border-radius: 0;
   background: transparent;
 }
-[data-wk-workbook-screen="messages"] .lg\\:rounded-\\[24px\\] {
-  border-radius: 0;
-}
 [data-wk-workbook-screen="messages"] [aria-label$="conversations"] {
   min-width: 0;
 }
