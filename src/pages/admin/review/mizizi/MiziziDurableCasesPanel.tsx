@@ -1,4 +1,5 @@
 import { buildRedactedHeadquartersAuditV1 } from "@/services/miziziRedactedAudit";
+import { loadMiziziCaseQuestionsV1, type QuestionReadV1 } from "@/services/miziziQuestionRead";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { useCallback, useEffect, useState } from "react";
 import { TextArea, TextField, Label } from "react-aria-components";
@@ -33,6 +34,53 @@ function ReasonField({value,onChange,label}:{value:string;onChange:(v:string)=>v
     <Label className="mb-1 block text-[12px] font-semibold text-wk-text">{label}</Label>
     <TextArea rows={2} className="wk-input min-w-0 w-full resize-y rounded-xl border-wk-border bg-wk-surface p-3 text-[13px] text-wk-text" />
   </TextField>;
+}
+
+/** Shows only authenticated, frozen QV1 questions. No source/ACH verdict is inferred. */
+function MiziziRecordedQuestions({record}: {record:HeadquartersDurableCase}) {
+  const [result,setResult]=useState<QuestionReadV1 | {kind:"loading"}>({kind:"loading"});
+  useEffect(()=>{
+    let active=true;
+    setResult({kind:"loading"});
+    void loadMiziziCaseQuestionsV1({
+      workspaceId:record.workspaceId,
+      caseId:record.caseId,
+      caseRevision:record.caseRevision,
+    }).then(questions=>{if(active)setResult(questions);});
+    return ()=>{active=false;};
+  },[record.workspaceId,record.caseId,record.caseRevision]);
+  if(result.kind==="loading")
+    return <p role="status">Checking frozen questions for this case…</p>;
+  if(result.kind==="not_recorded")
+    return <p role="status">No independently reviewed question set is connected to this case yet.</p>;
+  if(result.kind==="stale")
+    return <p role="status">The case revision has changed. Refresh Records to read its current questions.</p>;
+  if(result.kind==="denied")
+    return <p role="status">Your account cannot read this case's frozen questions.</p>;
+  if(result.kind==="unavailable")
+    return <p role="alert">The question record could not be verified. No finding is shown.</p>;
+  return <section aria-label="Frozen investigation questions" className="mt-4">
+    <p className="text-[12px] text-wk-text-muted">
+      {result.questions.length} frozen {result.questions.length===1?"question":"questions"}.
+      These are competing explanations, not reviewed evidence findings.
+    </p>
+    <ol className="mt-3 space-y-4">
+      {result.questions.map(question=><li key={question.questionId}
+        className="rounded-xl border border-wk-border bg-wk-surface p-4">
+        <p className="mz-case-eyebrow">Question revision {question.questionRevision}</p>
+        <h4 className="mt-2 text-[16px] font-semibold text-wk-text">{question.question}</h4>
+        <ul aria-label="Competing explanations" className="mt-3 space-y-2">
+          {question.hypotheses.map(hypothesis=><li key={hypothesis.id}
+            className="rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text">
+            {hypothesis.label}
+          </li>)}
+        </ul>
+        <p className="mt-3 text-[12px] text-wk-text-muted">
+          No independently assessed source grades or findings are recorded by this reader.
+        </p>
+      </li>)}
+    </ol>
+  </section>;
 }
 
 /** The Registry queue above remains the source of review facts.
@@ -225,7 +273,7 @@ export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
               <section className="mz-case-focus">
             <div className="mz-case-section-head"><span className="mz-case-eyebrow">Linked review lead</span><span className="mz-case-unresolved">Not adjudicated here</span></div>
             <h3>{sourceReview?.title || displayClaim(focusedCase.claimFamily)}</h3>
-            <p role="status">No independently reviewed question set is connected to this case yet.</p>
+            <MiziziRecordedQuestions key={`${focusedCase.caseId}:${focusedCase.caseRevision}:${refreshToken}`} record={focusedCase} />
             <p>The attached Registry review is a research lead. Inspect its original record before choosing an explanation. A review's status does not establish independent evidence or ownership.</p>
           </section>
               <footer className="mz-case-next">
