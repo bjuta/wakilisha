@@ -57,7 +57,9 @@ describe("shared Show and Video public route convergence", () => {
   it("renders a real shared Show directory and cross-media Episode product", () => {
     expect(lazyPublic).toContain("PublicShowsPage");
     expect(showService).toContain("get_public_show_index");
-    expect(showIndex).toContain("Watch and listen to WAKILISHA Shows.");
+    expect(showIndex).toContain("getPublicShow(first.slug)");
+    expect(showIndex).toContain("featuredShow?.episodes.length");
+    expect(showIndex).toContain("episode.canonicalPath");
     expect(showDetail).toContain("Watch latest");
     expect(showDetail).toContain("Listen to latest");
     expect(showEpisode).toContain("PublicVideoWatchingSurface");
