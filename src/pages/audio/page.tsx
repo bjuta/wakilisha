@@ -1,3 +1,4 @@
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import {
   useEffect,
   useState,
