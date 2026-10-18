@@ -86,6 +86,23 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(theme).toContain("[data-wk-theme='light']");
   });
 
+  it("switches complete workbook palettes with the app theme without touching Artists", () => {
+    const css = read("src/styles/wakilisha-workbook-p1-p11-authority.css");
+    const tokens = read("src/design-system/wakilisha.tokens.css");
+    expect(tokens).toContain("[data-wk-theme='light']");
+    expect(tokens).toContain("[data-wk-theme='dark']");
+    expect(css).toContain(':where([data-wk-theme="light"]) :is(');
+    expect(css).toContain(':where([data-wk-theme="dark"],:root:not([data-wk-theme="light"])) :is(');
+    expect(css).toContain('--wk-bg:#FCFCFB;');
+    expect(css).toContain('--wk-bg:#0B0B0B;');
+    expect(css).toContain('--wk-brand:#4E7425;');
+    expect(css).toContain('--wk-brand:#85C441;');
+    expect(css).toContain('--wk-bg:#F5F2EC;');
+    expect(css).toContain('.wk-workbook-article-paper');
+    expect(css).not.toContain('[data-wk-workbook-screen="artist"]');
+    expect(css).not.toContain('[data-wk-workbook-screen="artist-detail"]');
+  });
+
   it("preserves readable inboxes, active actions and a real desktop notification settings panel", () => {
     const notifications = read("src/pages/notifications/page.tsx");
     const messages = read("src/pages/messages/page.tsx");
