@@ -22,7 +22,7 @@ export const WAKILISHA_NAVIGATION: readonly WkNavGroup[] = [
       { label: "Music", to: "/music", icon: "AudioLines" },
       { label: "Video", to: "/video", icon: "Video" },
       { label: "Audio", to: "/audio", icon: "Radio" },
-      { label: "Podcasts", to: "/shows", icon: "Mic" },
+      { label: "Podcasts", to: "/shows", icon: "Mic2" },
       { label: "Magazine", to: "/magazine", icon: "NotebookText" },
       { label: "Artists", to: "/artists", icon: "Users" },
       { label: "Following", to: "/following", icon: "Heart" },
@@ -49,7 +49,7 @@ export const WAKILISHA_NAVIGATION: readonly WkNavGroup[] = [
     items: [
       { label: "About", to: "/about", icon: "Info" },
       { label: "Contact", to: "/contact", icon: "Mail" },
-      { label: "FAQs", to: "/faqs", icon: "CircleHelp" },
+      { label: "FAQs", to: "/faqs", icon: "HelpCircle" },
       { label: "Privacy", to: "/privacy", icon: "ShieldCheck" },
       { label: "Terms", to: "/terms", icon: "FileText" },
       { label: "Settings", to: "/settings", icon: "Settings" },
