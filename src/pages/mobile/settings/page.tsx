@@ -356,7 +356,7 @@ export default function MobileSettingsPage() {
                 style={{
                   background: profile.coverUrl
                     ? "var(--wk-surface-raised)"
-                    : "linear-gradient(135deg, #123908 0%, #245714 45%, #86c343 100%)",
+                    : "linear-gradient(135deg, var(--wk-surface-raised), var(--wk-surface-strong))",
                 }}
               >
                 {profile.coverUrl && (

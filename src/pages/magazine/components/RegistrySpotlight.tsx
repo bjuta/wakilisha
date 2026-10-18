@@ -7,7 +7,7 @@ import type { MagazineSiteArtist, MagazineSiteRelease, MagazineSiteChartEntry } 
 
 /* ── Section accent map ── */
 const SECTION_ACCENT: Record<string, string> = {
-  Music: "#84C241",
+  Music: "var(--wk-brand)",
   Film: "#D6766A",
   Fashion: "#C7A06D",
   Food: "#E8A23A",
@@ -17,7 +17,7 @@ const SECTION_ACCENT: Record<string, string> = {
 
 /* ═══════════════════════ ARTIST SPOTLIGHT ═══════════════════════ */
 export function ArtistSpotlightSpread({ artists, mood, sectionColor }: { artists: MagazineSiteArtist[]; mood: string; sectionColor?: string }) {
-  const accent = sectionColor ?? SECTION_ACCENT["Music"] ?? "#84C241";
+  const accent = sectionColor ?? SECTION_ACCENT["Music"] ?? "var(--wk-brand)";
   const display = artists.slice(0, 4);
 
   if (!display.length) return null;
@@ -60,7 +60,7 @@ export function ArtistSpotlightSpread({ artists, mood, sectionColor }: { artists
 
 /* ═══════════════════════ RELEASE SPOTLIGHT ═══════════════════════ */
 export function ReleaseSpotlightSpread({ releases, mood, sectionColor }: { releases: MagazineSiteRelease[]; mood: string; sectionColor?: string }) {
-  const accent = sectionColor ?? SECTION_ACCENT["Music"] ?? "#84C241";
+  const accent = sectionColor ?? SECTION_ACCENT["Music"] ?? "var(--wk-brand)";
   const display = releases.slice(0, 4);
 
   if (!display.length) return null;
@@ -104,7 +104,7 @@ export function ReleaseSpotlightSpread({ releases, mood, sectionColor }: { relea
 
 /* ═══════════════════════ CHART HIGHLIGHT SPOTLIGHT ═══════════════════════ */
 export function ChartHighlightSpread({ highlights, mood, sectionColor }: { highlights: MagazineSiteChartEntry[]; mood: string; sectionColor?: string }) {
-  const accent = sectionColor ?? SECTION_ACCENT["Music"] ?? "#84C241";
+  const accent = sectionColor ?? SECTION_ACCENT["Music"] ?? "var(--wk-brand)";
   const display = highlights.slice(0, 6);
 
   if (!display.length) return null;

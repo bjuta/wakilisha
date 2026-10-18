@@ -25,7 +25,7 @@ function readAppearance(): AppearancePrefs | null {
  */
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const clean = hex.replace("#", "");
-  if (clean.length !== 6) return null;
+  if (!/^[a-fA-F0-9]{6}$/.test(clean)) return null;
   return {
     r: parseInt(clean.substring(0, 2), 16),
     g: parseInt(clean.substring(2, 4), 16),
