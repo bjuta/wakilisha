@@ -1,4 +1,5 @@
 import "@/styles/wakilisha-magazine-38-44.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
