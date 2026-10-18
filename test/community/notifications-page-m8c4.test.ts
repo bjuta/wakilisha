@@ -110,7 +110,7 @@ describe(
 
     it("keeps Notifications reachable in the canonical sidebar without restoring the retired mobile tab bar", () => {
       expect(navigation).toContain(
-        '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
+        '{ label: "Notifications", to: "/notifications", icon: "Bell", audience: "signed-in" }',
       );
       expect(navigation).toContain(
         '{ label: "Artists", to: "/artists", icon: "Users" }',
