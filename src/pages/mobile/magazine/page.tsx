@@ -173,7 +173,7 @@ export default function MobileMagazine() {
       <div className="wk-mobile flex min-h-screen items-center justify-center px-5 text-center bg-[var(--wk-bg)]">
         <div>
           <i className="ri-error-warning-line text-[var(--wk-text-faint)] text-[36px] mb-3 block" />
-          <p className="text-[14px] font-bold text-[var(--wk-text-muted)]">{error || "No stories yet."}</p>
+          <h1 className="text-[20px] font-bold text-[var(--wk-text-muted)]">{error || "No stories yet."}</h1>
         </div>
       </div>
     );
