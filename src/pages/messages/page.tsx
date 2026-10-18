@@ -619,7 +619,7 @@ export default function MessagesPage() {
     <main data-wk-workbook-screen="messages" className="min-h-[calc(100dvh-80px)] bg-[var(--wk-bg)]">
       <div className="mx-auto w-full max-w-[1280px] px-0 pb-8 pt-0 lg:pb-10">
         <div className="overflow-hidden border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:min-h-[650px] lg:grid-cols-[360px_minmax(0,1fr)] lg:border">
-          <section className={`${selectedId ? "hidden lg:block" : "block"} min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
+          <section data-wk-message-list className={`${selectedId ? "hidden lg:block" : "block"} min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
         <div className="flex items-center justify-between gap-3 border-b border-[var(--wk-border)] px-4 py-4">
           <div>
             
@@ -682,7 +682,9 @@ export default function MessagesPage() {
                       key={summary.conversation_id}
                       type="button"
                       onClick={() => void openConversation(summary.conversation_id)}
-                      className={`flex w-full gap-3 px-4 py-4 text-left transition-colors hover:bg-[var(--wk-surface-raised)] ${selectedId === summary.conversation_id ? "bg-[var(--wk-brand-soft)]" : ""}`}
+                      aria-current={selectedId === summary.conversation_id ? "true" : undefined}
+                      data-wk-message-conversation
+                      className={`flex w-full items-start gap-3 border-l-[3px] border-transparent px-4 py-4 text-left transition-colors hover:bg-[var(--wk-surface-raised)] ${selectedId === summary.conversation_id ? "border-l-[var(--wk-brand)] bg-[var(--wk-brand-soft)]" : ""}`}
                     >
                       <Avatar summary={summary} />
                       <div className="min-w-0 flex-1">
@@ -703,7 +705,7 @@ export default function MessagesPage() {
             )}
           </section>
 
-          <section className={`${selectedId ? "block" : "hidden lg:flex"} min-w-0 flex-col`} aria-label="Conversation">
+          <section data-wk-message-thread className={`${selectedId ? "block" : "hidden lg:flex"} min-w-0 flex-col`} aria-label="Conversation">
             {!selectedId ? (
               <div className="flex min-h-[650px] flex-1 flex-col items-center justify-center px-8 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"><i className="ri-chat-3-line text-2xl" /></div>
@@ -749,7 +751,7 @@ export default function MessagesPage() {
                       const mine = Boolean(otherId && message.sender_person_resource_id !== otherId);
                       return (
                         <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[86%] rounded-[16px] px-4 py-3 sm:max-w-[74%] ${mine ? "rounded-br-[4px] bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "rounded-bl-[4px] bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
+                          <div data-wk-message-bubble className={`max-w-[86%] rounded-[18px] px-4 py-3 sm:max-w-[76%] ${mine ? "rounded-br-[5px] bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "rounded-bl-[5px] bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
                             <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.55]">{message.body}</p>
                             {message.resource_references?.length > 0 && (
                               <div className={`mt-2 space-y-2 border-t pt-2 ${mine ? "border-white/20" : "border-[var(--wk-divider)]"}`}>
@@ -780,7 +782,7 @@ export default function MessagesPage() {
                 </div>
 
                 {detail.conversation.first_contact_state !== "pending" && messagesAccess.can_send && (
-                  <div className="border-t border-[var(--wk-divider)] p-3 sm:p-4">
+                  <div data-wk-message-composer className="border-t border-[var(--wk-divider)] bg-[var(--wk-surface)] p-3 sm:p-4">
                     <div className="mx-auto flex max-w-[760px] items-end gap-2 rounded-[20px] border border-[var(--wk-border)] bg-[var(--wk-bg)] p-2 focus-within:border-[var(--wk-brand)]">
                       <textarea
                         value={composer}
