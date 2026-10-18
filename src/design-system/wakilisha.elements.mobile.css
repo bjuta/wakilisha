@@ -1,7 +1,7 @@
 /* WAKILISHA mobile styles — theme-aware utilities, no phone frame. Used in responsive mobile pages. */
 
 /* ========== Bottom nav ========== */
-/* .phn-nav styles now live in wakilisha-mobile-ch53-75.css */
+/* Canonical mobile navigation styles are in wakilisha-mobile-workbook-v4.css. */
 
 /* ========== More menu bottom sheet ========== */
 .phn-more-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.50);z-index:60;backdrop-filter:blur(4px);animation:fadeIn 0.2s ease-out;transition:opacity 0.3s ease}
@@ -28,13 +28,7 @@
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 
 /* ========== Mini player ========== */
-/* .phn-miniplayer styles now live in wakilisha-mobile-ch53-75.css */
-
-/* ========== Full player ========== */
-/* Removed — uses design tokens inline */
-
-/* ========== Scroll row for horizontal shelves ========== */
-.mobile-scroll-row{display:flex;gap:var(--wk-s-3);overflow-x:auto;padding-bottom:var(--wk-s-2);scrollbar-width:none}
+/* 
 .mobile-scroll-row::-webkit-scrollbar{display:none}
 
 /* ========== Card utilities ========== */

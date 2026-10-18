@@ -27,10 +27,6 @@ const responsiveShell = readFileSync(
   "src/components/mobile/ResponsiveAppLayout.tsx",
   "utf8",
 );
-const playerChrome = readFileSync(
-  "src/components/design-system/player/playerChrome.css",
-  "utf8",
-);
 const history = readFileSync(
   "src/services/listeningHistory.ts",
   "utf8",
@@ -125,8 +121,8 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     );
     expect(responsiveShell).toContain("isFullPlayerOpen");
     expect(full).toContain('data-wk-provider-media-host={mode}');
-    expect(playerChrome).toContain(".phn-miniplayer");
-    expect(playerChrome).toContain("display: none !important");
+    expect(responsiveShell).not.toContain("playerChrome.css");
+    expect(responsiveShell).not.toContain("phn-miniplayer");
   });
 
   it("counts full playback by availability rather than provider backend", () => {

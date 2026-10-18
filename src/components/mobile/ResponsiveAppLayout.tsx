@@ -4,7 +4,6 @@ import { MobileAppLayout } from "@/components/mobile/MobileAppLayout";
 import {
   PlayerCompactSurface,
 } from "@/components/design-system/player/PlayerCompactSurface";
-import "@/components/design-system/player/playerChrome.css";
 import { usePlayer } from "@/context/PlayerContext";
 import { useMobileDetect } from "@/hooks/useMobileDetect";
 import { RegistryOnboardingGate } from "@/components/auth/RegistryOnboardingGate";
