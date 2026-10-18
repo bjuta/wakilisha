@@ -57,19 +57,19 @@ const NOTIFICATION_ICONS: Record<
   string,
   string
 > = {
-  reply: "ri-reply-line",
-  new_comment: "ri-chat-1-line",
+  reply: "ri-chat-3-line",
+  new_comment: "ri-chat-3-line",
   mention: "ri-at-line",
   post_mention: "ri-at-line",
   pin: "ri-pushpin-line",
   editor_pick: "ri-star-line",
-  contribution_approved: "ri-check-double-line",
+  contribution_approved: "ri-checkbox-circle-line",
   contribution_merged: "ri-git-merge-line",
   follow: "ri-user-follow-line",
   post_repost: "ri-repeat-2-line",
   post_quote: "ri-double-quotes-l",
   direct_message: "ri-mail-line",
-  credit_confirmation_request: "ri-music-2-line",
+  credit_confirmation_request: "ri-checkbox-circle-line",
   credit_confirmation_response: "ri-checkbox-circle-line",
 };
 
@@ -604,41 +604,19 @@ export default function NotificationsPage() {
                     )}
 
                     <div className="wk-notification-event-icon relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" aria-hidden="true">
-                      {notification.actor?.avatarUrl ? (
-                        <>
-                          <img src={notification.actor.avatarUrl} alt="" loading="lazy" className="h-11 w-11 rounded-full object-cover" />
-                          <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[var(--wk-surface)] bg-[var(--wk-brand-soft)]">
-                            <i className={`${icon} text-[13px]`} />
-                          </span>
-                        </>
-                      ) : (
-                        <i className={`${icon} text-[19px]`} />
-                      )}
+                      <i className={`${icon} text-[18px]`} />
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] leading-[1.45] text-[var(--wk-text)]">
-                        <span className="font-bold">
-                          {actorName}
-                        </span>{" "}
-                        <span className="font-medium">
-                          {label}
-                        </span>
-                      </p>
-
-                      <div className="mt-1 flex items-center gap-2 text-[11px] font-medium text-[var(--wk-text-muted)]">
-                        <span>
-                          {timeAgo(
-                            notification.createdAt,
-                          )}
-                        </span>
-                        <span aria-hidden="true">
-                          ·
-                        </span>
-                        <i
-                          className={`${icon} text-[13px]`}
-                          aria-hidden="true"
-                        />
+                      <div className="flex items-start gap-2.5">
+                        {notification.actor?.avatarUrl ? <img src={notification.actor.avatarUrl} alt="" loading="lazy" className="h-7 w-7 shrink-0 rounded-full object-cover" /> : null}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] leading-[1.45] text-[var(--wk-text)]">
+                            <span className="font-bold">{actorName}</span>{" "}
+                            <span className="font-medium">{label}</span>
+                          </p>
+                          <span className="mt-1 block text-[11px] font-medium text-[var(--wk-text-muted)]">{timeAgo(notification.createdAt)}</span>
+                        </div>
                       </div>
                     </div>
 
