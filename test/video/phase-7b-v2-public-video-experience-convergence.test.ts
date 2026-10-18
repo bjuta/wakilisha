@@ -131,7 +131,9 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(indexPage).toContain("var(--wk-bg)");
     expect(indexPage).toContain("var(--wk-surface)");
     expect(indexPage).toContain("Search Video");
-    expect(indexPage).toContain("Latest Video");
+    expect(indexPage).toContain("Films & documentaries");
+    expect(indexPage).toContain("groupedItems.map((group)");
+    expect(indexPage).toContain("Shorts");
     expect(indexPage).not.toContain("Watch the culture move.");
     expect(detailPage).toContain("<PublicVideoWatchingSurface");
   });
