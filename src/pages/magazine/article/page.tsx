@@ -288,11 +288,7 @@ export default function ArticlePage() {
         <section
           key="article-hero-shell"
           data-wakilisha-article-loading-hero="true"
-          className="relative overflow-hidden"
-          style={{
-            height: "70vh",
-            minHeight: "480px",
-          }}
+          className="relative aspect-[3/2] overflow-hidden"
         >
           {prerenderedArticleHeroSource ? (
             <ResponsiveMediaImage
@@ -353,7 +349,7 @@ export default function ArticlePage() {
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      <section data-wk-workbook-hero="article" key="article-hero-shell" className="relative overflow-hidden" style={{ height: "70vh", minHeight: "480px" }}>
+      <section data-wk-workbook-hero="article" key="article-hero-shell" className="relative aspect-[3/2] overflow-hidden">
         {article.heroUrl ? (
           <ResponsiveMediaImage
             key="article-hero-media"
