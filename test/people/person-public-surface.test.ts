@@ -111,7 +111,7 @@ const mobileAppLayout =
 
 const mobileChromeCss =
   readFileSync(
-    "src/styles/wakilisha-mobile-ch53-75.css",
+    "src/styles/wakilisha-mobile-workbook-v4.css",
     "utf8",
   );
 

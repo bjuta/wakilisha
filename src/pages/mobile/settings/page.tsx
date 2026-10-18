@@ -243,7 +243,7 @@ export default function MobileSettingsPage() {
 
   if (loading || authLoading) {
     return (
-      <div className="wk-mobile-v5 min-h-[100dvh]">
+      <div className="wk-mobile min-h-[100dvh]">
         <div className="px-5 pt-12 pb-4">
           <div className="animate-pulse space-y-3">
             <div className="h-5 w-24 bg-[var(--wk-surface-raised)] rounded" />
@@ -261,7 +261,7 @@ export default function MobileSettingsPage() {
   }
 
   return (
-    <div className="wk-mobile-v5 min-h-[100dvh] pb-28">
+    <div className="wk-mobile min-h-[100dvh] pb-28">
       {/* Header */}
       <div className="px-5 pt-12 pb-2">
         <button

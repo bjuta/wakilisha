@@ -71,7 +71,7 @@ const mobileAppLayout = read(
 );
 
 const mobileCss = read(
-  "src/styles/wakilisha-mobile-ch53-75.css",
+  "src/styles/wakilisha-mobile-workbook-v4.css",
 );
 
 const appShell = read(
