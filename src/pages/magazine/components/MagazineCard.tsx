@@ -194,7 +194,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
               loading="lazy"
             fetchPriority="low"
             decoding="async"
-              className="h-full w-full object-cover object-top transition-transform duration-400 group-hover:scale-110 group-hover:rotate-[1deg]"
+              className="h-full w-full object-cover object-top transition-transform duration-400 group-hover:scale-[1.015]"
             />
           ) : (
             <Chapter19FallbackImage
