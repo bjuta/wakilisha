@@ -121,7 +121,7 @@ export default function PublicAudioPage() {
               <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-white">
                 {featured.publicationKind === "episode" ? "Episode" : "Listen"}
               </span>
-              <h2 className="mt-4 max-w-[17ch] text-[clamp(30px,4vw,51px)] font-extrabold uppercase leading-[.94] tracking-[-.045em]">
+              <h2 className="mt-4 max-w-[17ch] text-[clamp(30px,4vw,51px)] font-extrabold uppercase leading-[.94] tracking-[-.045em] text-white">
                 {featured.title}
               </h2>
               <p className="mt-3 text-[14px] text-white/75">{publicationCredit(featured)}</p>
