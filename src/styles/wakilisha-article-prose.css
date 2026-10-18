@@ -846,3 +846,20 @@
   font-weight: 600;
   line-height: 1.38;
 }
+
+[data-wk-article-newsletter] > div {
+  border: none;
+  border-radius: 0;
+  padding: 8px 0;
+  background: transparent;
+  box-shadow: none;
+}
+[data-wk-article-newsletter] input[type="email"] {
+  min-height: 48px;
+  font-size: 16px;
+}
+[data-wk-article-newsletter] button[type="submit"] {
+  min-height: 48px;
+  background: #202020;
+  color: #fff;
+}
