@@ -2481,3 +2481,39 @@
     padding-bottom: calc(90px + env(safe-area-inset-bottom));
   }
 }
+
+
+/* Mobile uses a distinct React article route, but the same flat Workbook P11 paper. */
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile img,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile figure,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile .wp-block-image,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile .wp-caption {
+  border-radius: 0;
+}
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile figure {
+  overflow: visible;
+}
+[data-wk-workbook-screen="magazine-mobile"] a[data-wk-magazine-story] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+[data-wk-workbook-screen="magazine-mobile"] a[data-wk-magazine-story]:hover,
+[data-wk-workbook-screen="magazine-mobile"] a[data-wk-magazine-story]:focus-visible {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+[data-wk-workbook-screen="magazine-mobile"] a[data-wk-magazine-story] > div[class*="aspect-"] {
+  aspect-ratio: 3 / 2;
+  border-radius: 0;
+}
+[data-wk-workbook-screen="magazine-mobile"] a[data-wk-magazine-story] > div[class*="p-4"]:last-child {
+  padding: 12px 0 0;
+}
+[data-wk-workbook-screen="magazine-mobile"] a[data-wk-magazine-story] img {
+  border-radius: 0;
+}
