@@ -801,7 +801,7 @@ export default function MusicDiscoveryPage() {
     );
 
   return (
-    <div className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
+    <div data-wk-workbook-screen="music" className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
       <style>{`
         .wk-music-hero {
           --wk-text: #ffffff;
@@ -827,10 +827,10 @@ export default function MusicDiscoveryPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
                   </div>
 
-                  <div className="relative grid min-h-[430px] gap-8 px-5 py-8 sm:px-8 xl:grid-cols-[minmax(0,1fr)_290px] xl:items-center xl:px-10">
+                  <div className="relative grid min-h-[430px] gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(260px,410px)] lg:items-center lg:gap-12 lg:px-10">
                     <div className="max-w-[720px] self-center">
                       <div className="mb-4 inline-flex items-center rounded bg-[var(--wk-brand)]/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--wk-brand)]">
-                        Now Playing At WAKILISHA
+                        Featured release
                       </div>
 
                       <h1 className="max-w-[11ch] text-[clamp(46px,6vw,86px)] font-black uppercase leading-[0.87] tracking-[-0.055em] text-[var(--wk-text)]">
@@ -844,11 +844,6 @@ export default function MusicDiscoveryPage() {
                         className="mt-4 inline-flex items-center gap-2 text-[24px] font-black tracking-[-0.035em] text-[var(--wk-text)] hover:text-[var(--wk-brand)]"
                       >
                         {hero.artist}
-                        <WkIcon
-                          name="BadgeCheck"
-                          size={17}
-                          className="text-[var(--wk-brand)]"
-                        />
                       </Link>
 
                       <p className="mt-3 max-w-[42ch] text-[13px] font-medium leading-relaxed text-[var(--wk-text-muted)]">
@@ -931,56 +926,17 @@ export default function MusicDiscoveryPage() {
                       </div>
                     </div>
 
-                    <div className="hidden xl:block">
-                      <div className="rounded-xl border border-[var(--wk-border)] bg-black/55 p-4 shadow-2xl backdrop-blur-xl">
-                        <div className="text-[9px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
-                          In Focus
-                        </div>
-                        <div className="mt-2 text-[18px] font-black text-[var(--wk-text)]">
-                          {hero.artist}
-                        </div>
-                        <div className="mt-1 text-[11px] font-medium text-[var(--wk-text-muted)]">
-                          {hero.releaseType ||
-                            "Release"}
-                        </div>
-
-                        <div className="mt-4 flex items-center gap-3">
-                          <div className="h-[104px] w-[104px] shrink-0 overflow-hidden rounded-lg">
-                            <MusicArtwork
-                              src={
-                                hero.artworkUrl
-                              }
-                              alt={`${hero.title} artwork`}
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
-                              Featured Release
-                            </div>
-                            <div className="mt-1 line-clamp-2 text-[13px] font-black leading-tight text-[var(--wk-text)]">
-                              {hero.title}
-                            </div>
-                            <div className="mt-2 text-[9px] font-medium text-[var(--wk-text-faint)]">
-                              {hero.labelName ||
-                                "From The Registry"}
-                            </div>
-                          </div>
-                        </div>
-
-                        <Link
-                          to={releaseUrl(
-                            hero,
-                          )}
-                          className="mt-4 flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--wk-border-2)] text-[10px] font-bold text-[var(--wk-text-soft)] transition hover:bg-[var(--wk-surface-raised)]"
-                        >
-                          Explore Feature
-                          <WkIcon
-                            name="ChevronRight"
-                            size={13}
-                          />
-                        </Link>
-                      </div>
-                    </div>
+                    <Link
+                      to={releaseUrl(hero)}
+                      aria-label={`Open ${hero.title}`}
+                      className="order-first mx-auto block aspect-square w-full max-w-[410px] overflow-hidden bg-black/50 shadow-2xl lg:order-last"
+                    >
+                      <MusicArtwork
+                        src={hero.artworkUrl}
+                        alt={`${hero.title} cover artwork`}
+                        className="h-full w-full object-contain"
+                      />
+                    </Link>
                   </div>
                 </>
               ) : (
