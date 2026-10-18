@@ -1,5 +1,6 @@
 import "@/styles/wakilisha-workbook-surface-fidelity.css";
 import "@/styles/wakilisha-workbook-p1-p11-authority.css";
+import "@/styles/wakilisha-social-workbook-p6-p8.css";
 import {
   useCallback,
   useEffect,
@@ -262,8 +263,8 @@ function NotificationPreferencesSidebar({ userId }: { userId: string | null | un
   }, [userId, prefs, pending]);
 
   return (
-    <aside className="hidden self-start border-l border-[var(--wk-border)] pl-8 pt-5 lg:block" aria-label="Notification preferences">
-      <h2 className="text-[19px] font-bold leading-[1.15] tracking-[-0.03em] text-[var(--wk-text)]">Tell me about</h2>
+    <aside data-wk-notifications-preferences className="hidden self-start px-6 py-5 lg:block" aria-label="Notification preferences">
+      <h2 className="text-[19px] font-bold leading-[1.2] tracking-[-0.03em] text-[var(--wk-text)]">Tell me about</h2>
       <p className="mt-2 text-[13px] leading-[1.6] text-[var(--wk-text-muted)]">
         Choose the updates that matter to you.
       </p>
@@ -432,12 +433,12 @@ export default function NotificationsPage() {
 
   return (
     <main data-wk-workbook-screen="notifications" className="min-h-[calc(100dvh-6rem)] bg-[var(--wk-bg)] pb-12">
-      <div className="mx-auto grid w-full max-w-[1180px] gap-0 lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-9 lg:px-8 lg:pt-9">
-        <section className="min-h-[calc(100dvh-6rem)] min-w-0 border-x border-[var(--wk-border)] bg-[var(--wk-surface)]">
+      <div className="mx-auto grid w-full max-w-[1180px] gap-0 lg:grid-cols-[minmax(0,1fr)_310px] lg:gap-0 lg:px-0 lg:pt-0">
+        <section className="min-h-[calc(100dvh-6rem)] min-w-0 border-r border-[var(--wk-border)] bg-[var(--wk-surface)]">
         <header className="sticky top-0 z-20 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 backdrop-blur-xl">
-          <div className="flex min-h-[72px] items-center justify-between gap-4 px-5 sm:px-6">
+          <div className="flex min-h-14 items-center justify-between gap-4 px-5">
             <div>
-              <h1 className="text-[28px] font-bold leading-[1.08] tracking-[-0.035em] text-[var(--wk-text)] sm:text-[34px]">
+              <h1 className="text-[20px] font-bold leading-[1.2] tracking-[-0.02em] text-[var(--wk-text)]">
                 Notifications
               </h1>
               {unreadCount > 0 && (
@@ -477,7 +478,7 @@ export default function NotificationsPage() {
           </div>
 
           <nav
-            className="flex gap-2 overflow-x-auto px-5 py-3 [scrollbar-width:none] sm:px-6"
+            className="flex gap-2 overflow-x-auto border-b border-[var(--wk-divider)] px-5 py-2 [scrollbar-width:none]"
             aria-label="Notification filters"
           >
             {(
@@ -504,9 +505,9 @@ export default function NotificationsPage() {
                   onClick={() =>
                     setFilter(value)
                   }
-                  className={`relative min-h-11 shrink-0 rounded-full px-4 text-[13px] font-semibold transition-colors ${
+                  className={`relative min-h-9 shrink-0 rounded-full px-3 text-[12px] font-semibold transition-colors ${
                     active
-                      ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
+                      ? "bg-[var(--wk-text)] text-[var(--wk-bg)]"
                       : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
                   }`}
                 >
@@ -588,7 +589,8 @@ export default function NotificationsPage() {
                 const row = (
                   <div
                     data-wk-notification-row
-                    className={`relative flex items-start gap-3 px-5 py-4 transition-colors sm:gap-4 sm:px-6 ${
+                    data-wk-notification-type={notification.notificationType}
+                    className={`relative flex items-start gap-3.5 px-5 py-4 transition-colors ${
                       unread
                         ? "bg-[var(--wk-brand-soft)]/30"
                         : "hover:bg-[var(--wk-surface-raised)]"
@@ -601,7 +603,7 @@ export default function NotificationsPage() {
                       />
                     )}
 
-                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" aria-hidden="true">
+                    <div className="wk-notification-event-icon relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" aria-hidden="true">
                       {notification.actor?.avatarUrl ? (
                         <>
                           <img src={notification.actor.avatarUrl} alt="" loading="lazy" className="h-11 w-11 rounded-full object-cover" />
@@ -615,7 +617,7 @@ export default function NotificationsPage() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-[14px] leading-[1.55] text-[var(--wk-text)] sm:text-[15px]">
+                      <p className="text-[13px] leading-[1.45] text-[var(--wk-text)]">
                         <span className="font-bold">
                           {actorName}
                         </span>{" "}
@@ -641,7 +643,7 @@ export default function NotificationsPage() {
                     </div>
 
                     {unread && (
-                      <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--wk-brand)]" />
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--wk-brand)]" />
                     )}
                   </div>
                 );
