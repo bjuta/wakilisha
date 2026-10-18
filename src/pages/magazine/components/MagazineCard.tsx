@@ -32,6 +32,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
       <Link
         to={url}
         data-wk-magazine-story
+      data-wk-magazine-category={story.section.trim().toLowerCase()}
         className="group relative flex h-full flex-col overflow-hidden rounded-[16px] bg-[#0a0a0a] outline-none focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
         style={{ minHeight: "clamp(340px, 42vw, 480px)" }}
       >
@@ -95,6 +96,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
       <Link
         to={url}
         data-wk-magazine-story
+      data-wk-magazine-category={story.section.trim().toLowerCase()}
         className="group flex flex-col gap-4 border-b border-[var(--wk-border)] pb-5 focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)] sm:flex-row"
       >
         <div className="aspect-[3/2] shrink-0 overflow-hidden rounded-[12px] bg-[var(--wk-surface-raised)] sm:w-[45%]">
@@ -151,6 +153,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
       <Link
         to={url}
         data-wk-magazine-story
+      data-wk-magazine-category={story.section.trim().toLowerCase()}
         className="group flex gap-3.5 border-b border-[var(--wk-border)] py-3 focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
       >
         {rank !== undefined && (
@@ -210,6 +213,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
     <Link
       to={url}
       data-wk-magazine-story
+      data-wk-magazine-category={story.section.trim().toLowerCase()}
       className="group flex h-full flex-col gap-3 focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
     >
       <div className="aspect-[3/2] overflow-hidden rounded-[12px] bg-[var(--wk-surface-raised)]">
