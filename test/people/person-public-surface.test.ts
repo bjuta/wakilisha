@@ -1449,7 +1449,7 @@ describe(
           );
 
         // The cover, picks, latest and category blocks stay disjoint.
-        // A selected section filters the full published set, including
+        // A selected section filters the bounded published set, including
         // cover stories, rather than only the old latest subset.
         expect(mobileMagazine)
           .toContain(
