@@ -4,7 +4,6 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   useMagazineArticle,
   useMagazineArticles,
-  type MagazineArticle,
 } from "@/services/magazineArticles";
 import { transformReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
 import { transformArtistShortcodes } from "@/utils/transformArtistShortcodes";
@@ -263,9 +262,6 @@ export default function MobileArticle() {
         <div
           key="mobile-article-content-shell"
           className="relative z-10 min-h-[360px] bg-[var(--wk-bg)]"
-          style={{
-            marginTop: "-60px",
-          }}
         />
       </div>
     );
