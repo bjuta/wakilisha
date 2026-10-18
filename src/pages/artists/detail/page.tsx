@@ -214,11 +214,11 @@ export default function ArtistDetail() {
   const [status, setStatus] = useState<"loading" | "core" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [postsRevision, setPostsRevision] = useState(0);
-  const [activeTab, setActiveTab] =
-    useState<ArtistProfileTab>("posts");
+  const [selectedTab, setSelectedTab] =
+    useState<ArtistProfileTab | null>(null);
 
   useEffect(() => {
-    setActiveTab("posts");
+    setSelectedTab(null);
   }, [slug]);
 
   useEffect(() => {
@@ -424,6 +424,10 @@ export default function ArtistDetail() {
     hasVideos ||
     hasChartEntries ||
     hasMusicProvenance;
+  // Show an Artist's already-published catalogue before an empty Posts feed.
+  // A deliberate tab selection stays put while slower discography reads land.
+  const activeTab = selectedTab ??
+    (hasMusicContent || artist.trackCount > 0 || artist.releaseCount > 0 ? "music" : "posts");
   const heroBio = cleanBioExcerpt(displayFullBio || displayBio);
   const bioForSeo = cleanBioExcerpt(displayFullBio || displayBio);
   const seoDescription = bioForSeo || `Explore ${artist.name} on WAKILISHA: songs, releases, chart moments, and more.`;
@@ -509,7 +513,7 @@ export default function ArtistDetail() {
         navigation={
           <ArtistProfileTabs
             activeTab={activeTab}
-            onChange={setActiveTab}
+            onChange={setSelectedTab}
           />
         }
         showComposer={
@@ -550,7 +554,7 @@ export default function ArtistDetail() {
         {activeTab === "music" && (
           <div className="wk-container px-6 py-10 md:py-14">
             <div className="max-w-5xl space-y-14 md:space-y-16">
-              {!hasMusicContent && (
+              {status === "ready" && !hasMusicContent && (
                 <div className="rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-12 text-center sm:px-10">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
                     <i
