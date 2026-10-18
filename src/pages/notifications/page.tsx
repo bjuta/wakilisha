@@ -20,6 +20,9 @@ import type {
   CommunityProfile,
 } from "@/services/community";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
+import { supabase } from "@/lib/supabase";
+import type { UserNotificationPrefs } from "@/hooks/useUserSettings";
 
 type NotificationFilter = "all" | "mentions" | "releases" | "credits" | "live";
 
@@ -195,6 +198,104 @@ function NotificationSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+
+/** Scoped preferences read/write. Never use Settings' profile-wide save here. */
+function NotificationPreferencesSidebar({ userId }: { userId: string | null | undefined }) {
+  const [prefs, setPrefs] = useState<UserNotificationPrefs | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    let current = true;
+    void supabase.rpc("community_get_notification_prefs", { p_user_id: userId })
+      .then(({ data, error: loadError }) => {
+        if (!current) return;
+        if (loadError || !data) {
+          setError("Could not load notification settings.");
+          return;
+        }
+        setPrefs({
+          emailDigest: data.email_digest ?? true,
+          chartAlerts: data.chart_alerts ?? true,
+          artistDrops: data.artist_drops ?? true,
+          replyNotifications: data.reply_notifications ?? true,
+          mentionNotifications: data.mention_notifications ?? true,
+          followNotifications: data.follow_notifications ?? false,
+          contributionNotifications: data.contribution_notifications ?? false,
+          marketingEmails: data.marketing_emails ?? false,
+        });
+      })
+      .catch(() => { if (current) setError("Could not load notification settings."); });
+    return () => { current = false; };
+  }, [userId]);
+
+  const updatePreference = useCallback(async (key: keyof UserNotificationPrefs, value: boolean) => {
+    if (!userId || !prefs || pending) return;
+    setPending(true);
+    setError(null);
+    const next = { ...prefs, [key]: value };
+    try {
+      const { error: saveError } = await supabase.rpc("community_update_notification_prefs", {
+        p_user_id: userId,
+        p_email_digest: next.emailDigest,
+        p_chart_alerts: next.chartAlerts,
+        p_artist_drops: next.artistDrops,
+        p_reply_notifications: next.replyNotifications,
+        p_mention_notifications: next.mentionNotifications,
+        p_follow_notifications: next.followNotifications,
+        p_contribution_notifications: next.contributionNotifications,
+        p_marketing_emails: next.marketingEmails,
+      });
+      if (saveError) throw saveError;
+      setPrefs(next);
+      try { localStorage.setItem("wk-notifications-v2", JSON.stringify(next)); } catch { /* unavailable */ }
+    } catch {
+      setError("Could not save that preference. Try again.");
+    } finally {
+      setPending(false);
+    }
+  }, [userId, prefs, pending]);
+
+  return (
+    <aside className="hidden self-start border-l border-[var(--wk-border)] pl-8 pt-5 lg:block" aria-label="Notification preferences">
+      <h2 className="text-[19px] font-bold leading-[1.15] tracking-[-0.03em] text-[var(--wk-text)]">Tell me about</h2>
+      <p className="mt-2 text-[13px] leading-[1.6] text-[var(--wk-text-muted)]">
+        Choose the updates that matter to you.
+      </p>
+      {prefs ? (
+        <div className="mt-4 divide-y divide-[var(--wk-border)]">
+          {([
+            ["New releases from artists I follow", "artistDrops"],
+            ["Replies to my comments", "replyNotifications"],
+            ["Mentions", "mentionNotifications"],
+            ["Contribution updates", "contributionNotifications"],
+          ] as const).map(([label, key]) => (
+            <div key={key} className="flex min-h-[58px] items-center justify-between gap-2 py-2">
+              <span className="text-[13px] leading-[1.4] text-[var(--wk-text)]">{label}</span>
+              <WakilishaToggle
+                size="sm"
+                ariaLabel={label}
+                value={prefs[key]}
+                onChange={(next) => void updatePreference(key, next)}
+                disabled={pending}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {error && <p className="mt-3 text-[12px] leading-relaxed text-[var(--wk-danger)]" role="status">{error}</p>}
+      {pending && <p className="mt-2 text-[12px] text-[var(--wk-text-muted)]" role="status">Saving...</p>}
+      <Link
+        to="/settings?section=Notifications"
+        className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 text-[13px] font-semibold text-[var(--wk-text)] transition-colors hover:border-[var(--wk-brand)]"
+      >
+        All notification settings <WkIcon name="ArrowUpRight" size={14} />
+      </Link>
+    </aside>
   );
 }
 
@@ -576,24 +677,8 @@ export default function NotificationsPage() {
 
         </section>
 
-        <aside className="hidden self-start border-l border-[var(--wk-border)] pl-8 pt-5 lg:block" aria-label="Notification preferences">
-          <h2 className="text-[19px] font-bold leading-[1.15] tracking-[-0.03em] text-[var(--wk-text)]">Tell me about</h2>
-          <p className="mt-2 text-[13px] leading-[1.6] text-[var(--wk-text-muted)]">
-            Choose the updates that matter to you.
-          </p>
-          <div className="mt-6 space-y-5 text-[13px] leading-[1.45] text-[var(--wk-text)]">
-            <p>New releases from artists I follow</p>
-            <p>Replies and mentions</p>
-            <p>Credit and MIZIZI updates</p>
-            <p>Live events and listening parties</p>
-          </div>
-          <Link
-            to="/settings?section=Notifications"
-            className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 text-[13px] font-semibold text-[var(--wk-text)] transition-colors hover:border-[var(--wk-brand)]"
-          >
-            Manage notifications <WkIcon name="ArrowUpRight" size={14} />
-          </Link>
-        </aside>
+        <NotificationPreferencesSidebar userId={authUser.id} />
+
       </div>
     </main>
   );
