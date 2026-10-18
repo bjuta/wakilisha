@@ -2402,7 +2402,28 @@ export default function FollowingPage() {
             <Link to="/search" className="flex min-h-11 items-center gap-3 rounded-full bg-[var(--wk-surface-raised)] px-4 text-[13px] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
               <i className="ri-search-line text-[16px]" aria-hidden="true" /> Search WAKILISHA
             </Link>
-            <section className="mt-4 rounded-[18px] border border-[var(--wk-border)] px-4 py-4" aria-label="People in your feed">
+            <section className="mt-4 rounded-[18px] border border-[var(--wk-border)] px-4 py-4" aria-label="New releases from your circle">
+              <h2 className="text-[19px] font-bold tracking-[-0.02em] text-[var(--wk-text)]">Out this week</h2>
+              {items.filter((item) => item.itemType === "release" && Date.now() - new Date(item.publishedAt).getTime() < 7 * 24 * 60 * 60 * 1000).slice(0, 3).length ? (
+                <div className="mt-3 grid gap-1">
+                  {items.filter((item) => item.itemType === "release" && Date.now() - new Date(item.publishedAt).getTime() < 7 * 24 * 60 * 60 * 1000).slice(0, 3).map((release) => (
+                    <Link key={release.itemKey} to={release.canonicalPath} className="flex min-h-14 items-center gap-3 rounded-xl px-1 py-1.5 hover:bg-[var(--wk-surface-raised)]">
+                      {release.imageUrl ? (
+                        <img src={release.imageUrl} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-md object-contain" />
+                      ) : (
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
+                          <i className="ri-album-line text-lg" aria-hidden="true" />
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--wk-text)]">{release.title}</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-[12px] leading-relaxed text-[var(--wk-text-muted)]">No new releases from your circle this week.</p>
+              )}
+            </section>
+            <section className="mt-3 rounded-[18px] border border-[var(--wk-border)] px-4 py-4" aria-label="People in your feed">
               <h2 className="text-[19px] font-bold tracking-[-0.02em] text-[var(--wk-text)]">Your circle</h2>
               {activityAnchors.length > 0 ? (
                 <div className="mt-3 grid gap-1">
