@@ -115,7 +115,7 @@ describe(
       expect(navigation).toContain(
         '{ label: "Artists", to: "/artists", icon: "Users" }',
       );
-      expect(mobileDrawer).toContain("WAKILISHA_NAVIGATION");
+      expect(mobileDrawer).toContain("visibleWakilishaNavigation");
       expect(mobileDrawer).toContain("item.to");
       expect(mobileHeader).toContain("<NotificationBell");
       expect(mobile).toContain("<MobileTopBar");
