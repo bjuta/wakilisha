@@ -37,7 +37,7 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(mobile.indexOf("<MobileNewsletterCTA />")).toBeGreaterThan(
       mobile.indexOf('aria-live="polite"'),
     );
-    expect(article).toContain('className="relative flex h-[min(50vw,520px)]');
+    expect(article).toContain('aspect-[3/2] items-end justify-center overflow-hidden');
     expect(article).toContain('wk-reference-article-columns');
     expect(articleMobile).toContain('className="relative aspect-[4/5] overflow-hidden"');
     const articleCss = read("src/styles/wakilisha-article-prose.css");
