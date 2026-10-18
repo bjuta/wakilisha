@@ -1,4 +1,6 @@
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import "@/styles/wakilisha-magazine-38-44.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
@@ -226,11 +228,7 @@ export default function MobileArticle() {
         <section
           key="mobile-article-hero-shell"
           data-wakilisha-mobile-article-loading-hero="true"
-          className="relative overflow-hidden"
-          style={{
-            height: "62dvh",
-            minHeight: "380px",
-          }}
+          className="relative aspect-[4/5] overflow-hidden"
         >
           {prerenderedArticleHeroSource ? (
             <ResponsiveMediaImage
@@ -288,7 +286,7 @@ export default function MobileArticle() {
     <div data-wk-workbook-screen="article-mobile" className="min-h-screen bg-[var(--wk-bg)]">
       {previewNonce ? <ArticlePreviewModeBanner /> : null}
 
-      <section key="mobile-article-hero-shell" className="relative overflow-hidden" style={{ height: "62dvh", minHeight: "380px" }}>
+      <section key="mobile-article-hero-shell" className="relative aspect-[4/5] overflow-hidden">
         {article.heroUrl ? (
           <ResponsiveMediaImage
             key="mobile-article-hero-media"
@@ -328,6 +326,16 @@ export default function MobileArticle() {
 
           </div>
         </div>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-black/30 to-black/10" />
+        <div className="absolute inset-x-0 bottom-0 z-10 px-5 pb-8 text-[#f5f5f4]">
+          <p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#85c441]">
+            {article.section} · {article.readingTime} min read
+          </p>
+          <h1 className="mt-3 max-w-[18ch] text-[clamp(34px,9vw,52px)] font-extrabold leading-[.99] tracking-[-.048em]">
+            {article.title}
+          </h1>
+          <p className="mt-3 text-[12px] text-white/75">{article.author}</p>
+        </div>
       </section>
 
       {/* Reading progress */}
@@ -359,50 +367,16 @@ export default function MobileArticle() {
       {/* ── Floating content card ── */}
       <div
         key="mobile-article-content-shell"
+        data-wk-article-category={article.section.trim().toLowerCase()}
         className="wk-workbook-article-paper relative z-10 min-h-[360px]"
       >
         <div className="px-5 pt-8 pb-6">
-          {/* Section pill + stats */}
-          <div className="flex items-center gap-2 mb-5 flex-wrap">
-            <span
-              className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand)]"
-            >
-              {article.section}
-            </span>
-            <span className="flex items-center gap-1 text-[11px] text-[var(--wk-text-faint)]">
-              <i className="ri-time-line text-[11px]" /> {article.readingTime} min
-            </span>
-            {article.readCount > 0 && (
-              <span className="flex items-center gap-1 text-[11px] text-[var(--wk-text-faint)]">
-                <i className="ri-eye-line text-[11px]" /> {formatReadCount(article.readCount)}
-              </span>
-            )}
-          </div>
-
-          {/* Title */}
-          <h1
-            className="font-black leading-[0.93] tracking-[-0.045em] text-[var(--wk-text)] mb-4"
-            style={{ fontSize: "clamp(26px, 7.5vw, 40px)" }}
-          >
-            {article.title}
-          </h1>
-
-          {/* Dek */}
-          {article.dek && (
-            <p className="text-[15px] leading-relaxed text-[var(--wk-text-soft)] mb-6">
-              {article.dek}
-            </p>
-          )}
-
-          {/* Divider */}
-          <div className="h-px bg-[var(--wk-border)] mb-5" />
-
           {/* Author row — avatar, name, share action */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <ArticleAuthorIdentity name={article.author} personPath={article.authorPersonPath} organizationPath={article.authorOrganizationPath}
 
-                className="w-9 h-9 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[11px] font-black text-[var(--wk-brand-on)] shrink-0"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[11px] font-bold text-[var(--wk-text)]"
               >
                 {initials}
               </ArticleAuthorIdentity>
@@ -426,7 +400,7 @@ export default function MobileArticle() {
                 imageUrl: article.heroUrl,
                 type: "article",
               }}
-              variant="light"
+              variant="dark"
               size="sm"
             />
           </div>
@@ -466,6 +440,15 @@ export default function MobileArticle() {
       )}
 
       <ArticleRelated stories={relatedStories} loading={relatedLoading} />
+      <div data-wk-article-newsletter className="border-t border-[var(--wk-border)] px-5 py-10">
+        <NewsletterSubscribe
+          variant="compact"
+          formId="article-newsletter-mobile"
+          headline="Read with us"
+          description="Get new stories and charts in your inbox."
+          contextFields={{ wk_page_type: "article", wk_source_section: "article_footer" }}
+        />
+      </div>
 
       {/* Community Action Sheet */}
       {actionEntity && (

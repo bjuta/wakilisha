@@ -760,3 +760,100 @@
     padding-bottom: calc(90px + env(safe-area-inset-bottom));
   }
 }
+
+
+/* P11 workbook reading surface: warm paper in light mode; night ink in dark.
+   The photographed cover remains separate from the reading canvas. */
+.wk-workbook-article-paper {
+  --wk-editorial-category-ink: var(--wk-brand);
+  background: var(--wk-wb-article-paper, var(--wk-bg));
+  color: var(--wk-text);
+  border-radius: 0;
+}
+[data-wk-article-category*="album"] { --wk-editorial-category-ink: #93552e; }
+[data-wk-article-category*="opinion"] { --wk-editorial-category-ink: #66538e; }
+[data-wk-article-category*="lifestyle"] { --wk-editorial-category-ink: #8f4666; }
+[data-wk-article-category*="art"] { --wk-editorial-category-ink: #906322; }
+[data-wk-article-category*="news"] { --wk-editorial-category-ink: #426d7b; }
+[data-wk-article-category*="film"] { --wk-editorial-category-ink: #61548e; }
+[data-wk-article-category*="sport"] { --wk-editorial-category-ink: #3b697e; }
+[data-wk-article-category*="literature"] { --wk-editorial-category-ink: #73518b; }
+
+.wk-workbook-article-paper [data-wk-article-section] {
+  color: var(--wk-editorial-category-ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) {
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--wk-text);
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) p {
+  margin-bottom: 1.5em;
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) h2 {
+  font-size: clamp(23px, 2.4vw, 29px);
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -.025em;
+  margin-top: 2.1em;
+  margin-bottom: .85em;
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) figure {
+  margin-block: 32px 40px;
+  border-radius: 0;
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0;
+}
+[data-wk-article-newsletter] {
+  background: var(--wk-wb-article-paper, var(--wk-bg));
+}
+[data-wk-article-newsletter] :is(h2, h3) {
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1.1;
+  letter-spacing: -.035em;
+  font-weight: 700;
+}
+[data-wk-article-newsletter] p {
+  max-width: 48ch;
+  margin-inline: auto;
+}
+@media (min-width: 768px) {
+  .wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) {
+    font-size: 19px;
+    line-height: 1.7;
+  }
+}
+
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) blockquote {
+  border-left: 4px solid var(--wk-wb-quote-rule, var(--wk-text));
+  padding: 10px 0 10px 20px;
+  margin-block: 36px;
+  background: transparent;
+  color: var(--wk-text);
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 600;
+  line-height: 1.38;
+}
+
+[data-wk-article-newsletter] > div {
+  border: none;
+  border-radius: 0;
+  padding: 8px 0;
+  background: transparent;
+  box-shadow: none;
+}
+[data-wk-article-newsletter] input[type="email"] {
+  min-height: 48px;
+  font-size: 16px;
+}
+[data-wk-article-newsletter] button[type="submit"] {
+  min-height: 48px;
+  background: var(--wk-text);
+  color: var(--wk-bg);
+}

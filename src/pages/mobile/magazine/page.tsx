@@ -1,4 +1,5 @@
 import "@/styles/wakilisha-magazine-38-44.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -27,7 +28,7 @@ function MobileSectionLabel({ children, count, href }: { children: string; count
   return (
     <div className="flex items-end justify-between mb-5 gap-3">
       <div className="flex items-center gap-2.5">
-        <h2 className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
+        <h2 className="text-[22px] font-bold leading-tight tracking-[-0.035em] text-[var(--wk-text)]">
           {children}
         </h2>
         {count !== undefined && (
@@ -162,7 +163,7 @@ export default function MobileMagazine() {
         onClick={handleHeroOpen}
         onKeyDown={handleHeroKeyDown}
         aria-labelledby="wk-mobile-magazine-hero-title"
-        className="relative min-h-[580px] h-[78dvh] flex items-end overflow-hidden bg-[#0a0a0a] block cursor-pointer"
+        className="relative flex h-[min(61dvh,510px)] min-h-[420px] cursor-pointer items-end overflow-hidden bg-[#0a0a0a]"
       >
         {heroStory.heroUrl ? (
           <ResponsiveMediaImage
@@ -186,7 +187,7 @@ export default function MobileMagazine() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
 
         <div className="relative z-10 w-full px-5 pb-12 pt-24 text-white">
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand)]">{heroStory.section} · Cover story</p>
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand-dot)]">{heroStory.section} · Cover story</p>
           <h1
             id="wk-mobile-magazine-hero-title"
             className="text-[34px] sm:text-[42px] font-black tracking-[-0.05em] leading-[0.94]"
@@ -221,17 +222,16 @@ export default function MobileMagazine() {
       </div>
 
       {/* Published Magazine sections, not scroll markers or future categories. */}
-      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-surface)] backdrop-blur-lg">
+      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-bg)] backdrop-blur-lg">
         <div className="flex items-center gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none]">
           {sectionNames.map((sec) => (
             <button
               type="button"
               key={sec}
+              data-wk-magazine-filter={sec.toLowerCase()}
               aria-pressed={activeSection === sec}
               onClick={() => setActiveSection(sec)}
-              className={`min-h-11 shrink-0 border-b-2 px-3 text-[13px] font-semibold transition-colors ${activeSection === sec
-                ? "border-[var(--wk-brand)] text-[var(--wk-text)]"
-                : "border-transparent text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"}`}
+              className={`wk-reference-pill ${activeSection === sec ? "bg-[var(--wk-text)] text-[var(--wk-bg)]" : ""}`}
             >
               {sec}
             </button>
@@ -240,7 +240,7 @@ export default function MobileMagazine() {
       </nav>
 
       {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
-      <div className="px-4 py-8 flex flex-col gap-12">
+      <div className="flex flex-col gap-10 px-4 py-8">
 
         {activeSection === "All" ? (
           <>
@@ -258,7 +258,7 @@ export default function MobileMagazine() {
             {latest.length ? (
               <section className="wk-reveal">
                 <MobileSectionLabel>Latest Stories</MobileSectionLabel>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-6">
+                <div className="grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2">
                   {latest.map((story) => (
                     <MagazineCard key={story.slug} variant="standard" story={story} />
                   ))}
@@ -271,7 +271,7 @@ export default function MobileMagazine() {
               return (
                 <section key={section} className="wk-reveal">
                   <MobileSectionLabel count={items.length}>{section}</MobileSectionLabel>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-6">
+                  <div className="grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2">
                     {items.map((story) => (
                       <MagazineCard key={story.slug} variant="standard" story={story} />
                     ))}
@@ -279,12 +279,11 @@ export default function MobileMagazine() {
                 </section>
               );
             })}
-            <MobileNewsletterCTA />
           </>
         ) : (
           <section className="wk-reveal" aria-live="polite">
             <MobileSectionLabel count={selectedStories.length}>{activeSection}</MobileSectionLabel>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-6">
+            <div className="grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2">
               {selectedStories.map((story) => (
                 <MagazineCard key={story.slug} variant="standard" story={story} />
               ))}
@@ -292,18 +291,8 @@ export default function MobileMagazine() {
           </section>
         )}
 
-        {/* ── Footer ── */}
-        <footer className="border-t border-[var(--wk-border)] pt-10 pb-4 text-center">
-          <span className="text-[9px] font-black uppercase tracking-[0.24em] text-[var(--wk-brand)] mb-2 block">
-            WAKILISHA Magazine
-          </span>
-          <p className="text-[20px] font-black tracking-[-0.035em] text-[var(--wk-text)] leading-snug max-w-[320px] mx-auto">
-            Stories that move East African culture forward.
-          </p>
-          <p className="mt-2 text-[11px] text-[var(--wk-text-muted)]">
-            Issue {issueNum} &middot; {issueDate}
-          </p>
-        </footer>
+        <MobileNewsletterCTA />
+
       </div>
     </div>
   );
@@ -347,7 +336,7 @@ function MobileNewsletterCTA() {
   };
 
   return (
-    <section className="wk-reveal rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden">
+    <section data-wk-magazine-newsletter className="wk-reveal border-t border-[var(--wk-border)] bg-[var(--wk-bg)]">
       {done ? (
         <div className="py-12 px-5 text-center">
           <div className="w-12 h-12 rounded-full bg-[var(--wk-brand)] flex items-center justify-center mx-auto mb-4">
@@ -355,19 +344,17 @@ function MobileNewsletterCTA() {
           </div>
           <h2 className="text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] mb-2">You’re on the list</h2>
           <p className="text-[13px] text-[var(--wk-text-muted)] max-w-[320px] mx-auto leading-relaxed">
-            Expect WAKILISHA stories, charts, and cultural dispatches. No noise.
+            Look out for the next edition.
           </p>
         </div>
       ) : (
         <div className="py-10 px-5 text-center">
           <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-3">
             <i className="ri-mail-line text-[14px]" />
-            WAKILISHA Editorial
+            Magazine
           </span>
-          <h2 className="text-[26px] font-black tracking-[-0.04em] text-[var(--wk-text)] leading-tight mb-2">Read with us</h2>
-          <p className="text-[13px] text-[var(--wk-text-muted)] leading-relaxed mb-6">
-            Get weekly analysis, chart commentary, and industry signals delivered to your inbox.
-          </p>
+          <h2 className="text-[26px] font-black tracking-[-0.04em] text-[var(--wk-text)] leading-tight mb-2">One email a week. The stories, the films and what changed in the record.</h2>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <input type="hidden" name="wk_page_type" value="magazine" />
             <input type="hidden" name="wk_source_section" value="mobile_footer" />
@@ -378,16 +365,16 @@ function MobileNewsletterCTA() {
                 name="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+                placeholder="Your email address"
                 required
-                className="w-full h-12 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] pl-10 pr-4 text-[14px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] transition-colors"
+                className="w-full h-12 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] pl-10 pr-4 text-[16px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] transition-colors"
               />
             </div>
-            <button type="submit" disabled={subscribing} className="h-12 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] text-[14px] font-extrabold hover:-translate-y-0.5 transition-transform whitespace-nowrap cursor-pointer disabled:opacity-60">
+            <button type="submit" disabled={subscribing} className="min-h-12 rounded-full bg-[var(--wk-text)] px-6 text-[14px] font-bold text-[var(--wk-bg)] disabled:opacity-60">
               {subscribing ? "Subscribing..." : "Subscribe"}
             </button>
           </form>
-          <p className="mt-3 text-[10px] font-semibold text-[var(--wk-text-faint)]">No spam. Unsubscribe anytime.</p>
+
         </div>
       )}
     </section>

@@ -2427,7 +2427,7 @@
 }
 [data-wk-workbook-screen="magazine"] a[data-wk-magazine-story] > div[class*="aspect-"] {
   aspect-ratio: 3 / 2;
-  border-radius: 0;
+  border-radius: 12px;
 }
 [data-wk-workbook-screen="magazine"] a[data-wk-magazine-story] > div[class*="p-4"]:last-child {
   padding: 14px 0 0;
@@ -2436,7 +2436,7 @@
   padding: 18px 0 0;
 }
 [data-wk-workbook-screen="magazine"] a[data-wk-magazine-story] img {
-  border-radius: 0;
+  border-radius: 12px;
 }
 [data-wk-workbook-screen="magazine"] .wk-reveal,
 [data-wk-workbook-screen="magazine"] [data-mag-section] {
@@ -2478,11 +2478,99 @@
 }
 [data-wk-workbook-screen="magazine-mobile"] a[data-wk-magazine-story] > div[class*="aspect-"] {
   aspect-ratio: 3 / 2;
-  border-radius: 0;
+  border-radius: 12px;
 }
 [data-wk-workbook-screen="magazine-mobile"] a[data-wk-magazine-story] > div[class*="p-4"]:last-child {
   padding: 12px 0 0;
 }
 [data-wk-workbook-screen="magazine-mobile"] a[data-wk-magazine-story] img {
+  border-radius: 12px;
+}
+
+
+/* Workbook editorial categories are compact ink labels, not decorative pills.
+   All categories originate in published Magazine records. */
+[data-wk-magazine-story] {
+  --wk-story-category-ink: #4E7425;
+}
+[data-wk-magazine-story][data-wk-magazine-category*="album"] {
+  --wk-story-category-ink: #93552e;
+}
+[data-wk-magazine-story][data-wk-magazine-category*="opinion"] {
+  --wk-story-category-ink: #66538e;
+}
+[data-wk-magazine-story][data-wk-magazine-category*="lifestyle"] {
+  --wk-story-category-ink: #8f4666;
+}
+[data-wk-magazine-story][data-wk-magazine-category*="art"] {
+  --wk-story-category-ink: #906322;
+}
+[data-wk-magazine-story][data-wk-magazine-category*="news"] {
+  --wk-story-category-ink: #426d7b;
+}
+[data-wk-magazine-story][data-wk-magazine-category*="film"] {
+  --wk-story-category-ink: #61548e;
+}
+[data-wk-magazine-story][data-wk-magazine-category*="sport"] {
+  --wk-story-category-ink: #3b697e;
+}
+[data-wk-magazine-story][data-wk-magazine-category*="literature"] {
+  --wk-story-category-ink: #73518b;
+}
+[data-wk-magazine-story] span[class*="uppercase"] {
+  color: var(--wk-story-category-ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+}
+[data-wk-magazine-story].group.relative {
+  border-radius: 16px;
+}
+[data-wk-magazine-story].group.relative span[class*="uppercase"] {
+  color: #85C441;
+}
+[data-wk-workbook-screen="magazine"],
+[data-wk-workbook-screen="magazine-mobile"] {
+  background: var(--wk-bg);
+  color: var(--wk-text);
+}
+[data-wk-magazine-newsletter] {
+  max-width: 780px;
+  margin-inline: auto;
+}
+[data-wk-magazine-newsletter] :is(h2, h3) {
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+}
+[data-wk-magazine-newsletter] p {
+  max-width: 48ch;
+  margin-inline: auto;
+  line-height: 1.55;
+}
+@media (max-width: 640px) {
+  [data-wk-workbook-screen="magazine-mobile"] a[data-wk-magazine-story] h3 {
+    font-size: 20px;
+    line-height: 1.25;
+  }
+}
+
+[data-wk-magazine-newsletter] :is(section > div, section > div > div) {
+  box-shadow: none;
+}
+[data-wk-magazine-newsletter] > section > div {
+  border: none;
   border-radius: 0;
+  background: transparent;
+  padding: 28px 0;
+}
+[data-wk-magazine-newsletter] input[type="email"] {
+  min-height: 48px;
+  font-size: 16px;
+}
+[data-wk-magazine-newsletter] button[type="submit"] {
+  min-height: 48px;
+  background: var(--wk-text);
+  color: var(--wk-bg);
 }

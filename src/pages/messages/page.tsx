@@ -1,3 +1,5 @@
+import "@/styles/wakilisha-workbook-surface-fidelity.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuthUser } from "@/hooks/useAuthUser";
@@ -615,11 +617,13 @@ export default function MessagesPage() {
 
   return (
     <main data-wk-workbook-screen="messages" className="min-h-[calc(100dvh-80px)] bg-[var(--wk-bg)]">
-      <div className="mx-auto w-full max-w-[1280px] px-0 pb-8 pt-5 sm:px-5 lg:pb-10 lg:pt-8">
-        <div className="mb-4 flex items-end justify-between gap-4 px-1">
+      <div className="mx-auto w-full max-w-[1280px] px-0 pb-8 pt-0 lg:pb-10">
+        <div className="overflow-hidden border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:min-h-[650px] lg:grid-cols-[360px_minmax(0,1fr)] lg:border">
+          <section className={`${selectedId ? "hidden lg:block" : "block"} min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--wk-border)] px-4 py-4">
           <div>
-            <div className="text-[10px] font-black tracking-[0.18em] text-[var(--wk-brand)]">Private communication</div>
-            <h1 className="mt-1 text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)]">Messages</h1>
+            
+            <h1 className="text-[20px] font-extrabold leading-[1.2] text-[var(--wk-text)]">Messages</h1>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/settings?section=Messages" className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]" aria-label="Messages settings">
@@ -637,13 +641,13 @@ export default function MessagesPage() {
 
         <MessageSafetyState />
 
-        <div className="mb-3 grid grid-cols-4 gap-1 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-1.5 lg:max-w-[520px]">
+        <div className="flex gap-1 overflow-x-auto border-b border-[var(--wk-border)] px-3 py-2 [scrollbar-width:none]">
           {FOLDERS.map((item) => (
             <button
               key={item.key}
               type="button"
               onClick={() => { setFolder(item.key); setSelectedId(null); setDetail(null); }}
-              className={`relative flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 text-[11px] font-black transition-colors ${folder === item.key ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"}`}
+              className={`relative flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition-colors ${folder === item.key ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"}`}
             >
               <i className={`${item.icon} text-sm`} />
               <span>{item.label}</span>
@@ -654,8 +658,7 @@ export default function MessagesPage() {
           ))}
         </div>
 
-        <div className="overflow-hidden border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:min-h-[650px] lg:grid-cols-[340px_minmax(0,1fr)] lg:border">
-          <section className={`${selectedId ? "hidden lg:block" : "block"} min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
+
             <div className="border-b border-[var(--wk-divider)] px-3 py-3">
               <WkSearchField value={conversationQuery} onChange={setConversationQuery} ariaLabel="Search conversations" placeholder="Search messages" inputClassName="min-h-11 rounded-md border-[var(--wk-border)] bg-[var(--wk-bg)] text-[16px]" />
             </div>
@@ -684,12 +687,12 @@ export default function MessagesPage() {
                       <Avatar summary={summary} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-3">
-                          <div className="truncate text-[13px] font-black text-[var(--wk-text)]">{name}</div>
+                          <div className="truncate text-[15px] font-bold text-[var(--wk-text)]">{name}</div>
                           <span className="shrink-0 text-[10px] font-bold text-[var(--wk-text-faint)]">{when(summary.last_activity_at)}</span>
                         </div>
                         {username && <div className="truncate text-[10px] font-bold text-[var(--wk-text-faint)]">@{username}</div>}
                         <div className="mt-1 flex items-center gap-2">
-                          <p className="min-w-0 flex-1 truncate text-[11px] text-[var(--wk-text-muted)]">{summary.latest_message?.body || "Message"}</p>
+                          <p className="min-w-0 flex-1 truncate text-[13px] text-[var(--wk-text-muted)]">{summary.latest_message?.body || "Message"}</p>
                           {summary.unread_count > 0 && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--wk-brand)]" aria-label={`${summary.unread_count} unread`} />}
                         </div>
                       </div>
@@ -705,7 +708,7 @@ export default function MessagesPage() {
               <div className="flex min-h-[650px] flex-1 flex-col items-center justify-center px-8 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"><i className="ri-chat-3-line text-2xl" /></div>
                 <h2 className="mt-4 text-[16px] font-black text-[var(--wk-text)]">Choose a conversation</h2>
-                <p className="mt-1 max-w-[300px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">Your conversations stay inside WAKILISHA Messages.</p>
+                <p className="mt-1 max-w-[300px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">Select a conversation to read your messages.</p>
               </div>
             ) : loadingDetail || !detail || !selectedSummary ? (
               <div className="min-h-[650px] flex-1 animate-pulse bg-[var(--wk-surface-raised)]/30" aria-busy="true" />
@@ -715,7 +718,7 @@ export default function MessagesPage() {
                   <button type="button" onClick={() => { setSelectedId(null); setDetail(null); }} className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] lg:hidden" aria-label="Back to conversations"><i className="ri-arrow-left-line" /></button>
                   <Avatar summary={selectedSummary} size="h-9 w-9" />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-black text-[var(--wk-text)]">{messageDisplayName(selectedSummary.other_participant?.presentation)}</div>
+                    <div className="truncate text-[15px] font-bold text-[var(--wk-text)]">{messageDisplayName(selectedSummary.other_participant?.presentation)}</div>
                     <div className="text-[10px] font-bold tracking-[0.12em] text-[var(--wk-text-faint)]">{detail.conversation.security_classification}</div>
                   </div>
                   {detail.conversation.first_contact_state !== "pending" && selectedSummary.other_participant?.person_resource_id && (
@@ -746,8 +749,8 @@ export default function MessagesPage() {
                       const mine = Boolean(otherId && message.sender_person_resource_id !== otherId);
                       return (
                         <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[82%] rounded-2xl px-4 py-3 sm:max-w-[70%] ${mine ? "rounded-br-md bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "rounded-bl-md bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
-                            <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">{message.body}</p>
+                          <div className={`max-w-[86%] rounded-[16px] px-4 py-3 sm:max-w-[74%] ${mine ? "rounded-br-[4px] bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "rounded-bl-[4px] bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
+                            <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.55]">{message.body}</p>
                             {message.resource_references?.length > 0 && (
                               <div className={`mt-2 space-y-2 border-t pt-2 ${mine ? "border-white/20" : "border-[var(--wk-divider)]"}`}>
                                 {message.resource_references.map((reference) => (
@@ -854,7 +857,7 @@ export default function MessagesPage() {
                     {recipient.avatar_url ? <img src={recipient.avatar_url} alt="" className="h-full w-full object-cover" /> : <span className="font-black text-[var(--wk-brand)]">{recipient.display_name.slice(0, 1)}</span>}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-black text-[var(--wk-text)]">{recipient.display_name}</div>
+                    <div className="truncate text-[15px] font-bold text-[var(--wk-text)]">{recipient.display_name}</div>
                     {recipient.handle && <div className="truncate text-[10px] font-bold text-[var(--wk-text-faint)]">@{recipient.handle}</div>}
                   </div>
                   <button type="button" onClick={() => { setRecipient(null); setQuery(""); }} className="text-[11px] font-black text-[var(--wk-text-muted)]">Change</button>

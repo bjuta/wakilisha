@@ -1,4 +1,6 @@
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import "@/styles/wakilisha-magazine-38-44.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -287,11 +289,7 @@ export default function ArticlePage() {
         <section
           key="article-hero-shell"
           data-wakilisha-article-loading-hero="true"
-          className="relative overflow-hidden"
-          style={{
-            height: "70vh",
-            minHeight: "480px",
-          }}
+          className="relative aspect-[3/2] overflow-hidden"
         >
           {prerenderedArticleHeroSource ? (
             <ResponsiveMediaImage
@@ -352,7 +350,7 @@ export default function ArticlePage() {
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      <section data-wk-workbook-hero="article" key="article-hero-shell" className="relative overflow-hidden" style={{ height: "70vh", minHeight: "480px" }}>
+      <section data-wk-workbook-hero="article" key="article-hero-shell" className="relative flex aspect-[3/2] items-end justify-center overflow-hidden bg-[#0b0b0b]">
         {article.heroUrl ? (
           <ResponsiveMediaImage
             key="article-hero-media"
@@ -385,6 +383,12 @@ export default function ArticlePage() {
 
           </div>
         </div>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-black/50 to-black/15" />
+        <div className="relative z-10 mx-auto max-w-[820px] px-6 pb-12 text-center text-[#f5f5f4]">
+          <p className="text-[11px] font-bold uppercase tracking-[.15em] text-[#85c441]">{article.section} · {article.readingTime} min read</p>
+          <h1 className="mx-auto mt-4 max-w-[17ch] text-[clamp(42px,5.5vw,72px)] font-extrabold leading-[.97] tracking-[-.055em]">{article.title}</h1>
+          {article.dek && <p className="mx-auto mt-5 max-w-[60ch] text-[16px] leading-[1.55] text-white/80">{article.dek}</p>}
+        </div>
       </section>
 
       {previewNonce ? <ArticlePreviewModeBanner /> : null}
@@ -412,12 +416,30 @@ export default function ArticlePage() {
 
 
 
-      <div className="wk-workbook-article-paper relative z-10">
-        <ArticleFloatHeader article={article} />
-        <article className="max-w-[740px] mx-auto px-6 lg:px-8 pb-12">
-          <ArticleContentRenderer segments={displaySegments} videos={videoEmbeds} releases={finalReleases} artists={artistEmbeds} tracks={trackEmbeds} articleSlug={article.slug} />
-        </article>
-        <div className="max-w-[740px] mx-auto px-6 lg:px-8 pb-16">
+      <div data-wk-article-category={article.section.trim().toLowerCase()}
+        className="wk-workbook-article-paper relative z-10">
+        <div className="wk-reference-article-columns mx-auto grid w-full max-w-[1260px] gap-8 px-5 pt-9 lg:grid-cols-[190px_minmax(0,680px)_190px] lg:gap-10 lg:px-8">
+          <ArticleFloatHeader article={article} />
+          <article className="min-w-0 pb-12">
+            <ArticleContentRenderer segments={displaySegments} videos={videoEmbeds} releases={finalReleases} artists={artistEmbeds} tracks={trackEmbeds} articleSlug={article.slug} />
+          </article>
+          <aside className="hidden self-start lg:block" aria-label="People in this story">
+            {artistEmbeds.length > 0 && (
+              <>
+                <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[.14em] text-[var(--wk-text-muted)]">In this story</h2>
+                <div className="space-y-4">
+                  {artistEmbeds.slice(0,6).map((artist) => (
+                    <Link key={artist.slug} to={`/artists/${artist.slug}`} className="flex items-center gap-2.5 text-[13px] font-semibold text-[var(--wk-text)] hover:text-[var(--wk-brand)]">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">{artist.name.charAt(0)}</span>
+                      <span className="line-clamp-2">{artist.name}</span>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+          </aside>
+        </div>
+        <div className="mx-auto max-w-[740px] px-6 pb-16 lg:px-8">
           {article.categories?.length > 0 && <TagBlock label="Categories" items={article.categories} basePath="/categories" />}
           {article.tags?.length > 0 && <TagBlock label="Topics" items={article.tags} basePath="/tags" />}
         </div>
@@ -442,6 +464,15 @@ export default function ArticlePage() {
       </div>
 
       <ArticleRelated stories={related.filter((item) => item.slug !== article.slug)} loading={relatedLoading} />
+      <div data-wk-article-newsletter className="mx-auto w-full max-w-[780px] border-t border-[var(--wk-border)] px-5 py-12 sm:px-8">
+        <NewsletterSubscribe
+          variant="compact"
+          formId="article-newsletter"
+          headline="Read with us"
+          description="Get new stories and charts in your inbox."
+          contextFields={{ wk_page_type: "article", wk_source_section: "article_footer" }}
+        />
+      </div>
 
     </main>
   );

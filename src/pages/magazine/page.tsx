@@ -1,4 +1,5 @@
 import "@/styles/wakilisha-magazine-38-44.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useScrollRevealElements } from "@/hooks/useScrollReveal";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -50,9 +51,9 @@ function SectionLabel({ children, count, href }: { children: string; count?: num
   return (
     <div className="flex items-end justify-between mb-8 gap-4 flex-wrap">
       <div className="flex items-center gap-3">
-        <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)]">
+        <h2 className="text-[clamp(22px,2.5vw,30px)] font-bold leading-[1.15] tracking-[-0.035em] text-[var(--wk-text)]">
           {children}
-        </span>
+        </h2>
         {count !== undefined && (
           <span className="text-[11px] font-semibold text-[var(--wk-text-faint)] bg-[var(--wk-surface)] border border-[var(--wk-border)] px-2.5 py-0.5 rounded-full">
             {count} {count === 1 ? "story" : "stories"}
@@ -344,22 +345,6 @@ export default function Magazine() {
       render: () => <FeaturedGuideSpotlight />,
     });
 
-    // Newsletter
-    defs.push({
-      id: "newsletter",
-      render: () => (
-        <NewsletterSubscribe
-          formId="magazine-newsletter-form"
-          headline="Read with us"
-          description="Get weekly analysis, chart commentary, and industry signals delivered to your inbox."
-          contextFields={{ wk_page_type: "magazine", wk_source_section: "newsletter_footer" }}
-          analytics={{
-            pageType: "magazine",
-          }}
-        />
-      ),
-    });
-
     // Order: prefer saved order, fall back to default
     if (sectionOrder.length > 0) {
       const ordered = sectionOrder
@@ -457,7 +442,7 @@ export default function Magazine() {
             WAKILISHA Magazine
           </span>
           <p className="text-[24px] lg:text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)] leading-snug max-w-[420px] mx-auto">
-            Stories that move East African culture forward.
+            Music, art, and stories from East Africa.
           </p>
         </footer>
       </main>
@@ -486,7 +471,7 @@ export default function Magazine() {
         onClick={handleHeroOpen}
         onKeyDown={handleHeroKeyDown}
         aria-label={`Read ${heroStory.title}`}
-        className="relative min-h-[78vh] flex items-end overflow-hidden bg-[#0a0a0a] block group cursor-pointer"
+        className="group relative flex h-[min(65vw,520px)] min-h-[400px] cursor-pointer items-end overflow-hidden bg-[#0a0a0a]"
       >
         {heroStory.heroUrl ? (
           <ResponsiveMediaImage
@@ -511,7 +496,7 @@ export default function Magazine() {
 
         <div className="relative z-10 w-full max-w-[1280px] mx-auto px-6 lg:px-8 pb-16 pt-28 text-white">
 
-          <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand)]">{heroStory.section} · Cover story</p>
+          <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand-dot)]">{heroStory.section} · Cover story</p>
           <h1 className="text-[clamp(40px,6vw,80px)] font-black tracking-[-0.05em] leading-[0.92] max-w-[16ch] group-hover:opacity-90 transition-opacity duration-500">
             {heroStory.title}
           </h1>
@@ -547,17 +532,16 @@ export default function Magazine() {
       </div>
 
       {/* Source-backed Magazine section filters, Workbook P10 */}
-      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 backdrop-blur-lg">
+      <nav aria-label="Magazine sections" className="sticky top-0 z-40 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 backdrop-blur-lg">
         <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto px-5 py-3 [scrollbar-width:none] sm:px-8">
           {magazineSections.map((section) => (
             <button
               key={section}
               type="button"
+              data-wk-magazine-filter={section.toLowerCase()}
               aria-pressed={selectedMagazineSection === section}
               onClick={() => setSelectedMagazineSection(section)}
-              className={`min-h-11 shrink-0 border-b-2 px-3 text-[13px] font-semibold transition-colors ${selectedMagazineSection === section
-                ? "border-[var(--wk-brand)] text-[var(--wk-text)]"
-                : "border-transparent text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"}`}
+              className={`wk-reference-pill ${selectedMagazineSection === section ? "bg-[var(--wk-text)] text-[var(--wk-bg)]" : ""}`}
             >
               {section}
             </button>
@@ -566,7 +550,7 @@ export default function Magazine() {
       </nav>
 
       {/* ═══════════════════════ CONTENT BODY ═══════════════════════ */}
-      <div ref={contentRef} data-mag-content className="max-w-[1280px] mx-auto px-5 sm:px-8 flex flex-col gap-14 lg:gap-20 py-10 lg:py-16">
+      <div ref={contentRef} data-mag-content className="mx-auto flex max-w-[1280px] flex-col gap-10 px-5 py-9 sm:px-8 lg:gap-12 lg:py-12">
 
         {selectedMagazineSection !== "All" ? (
           <section aria-live="polite" className="min-h-[260px]">
@@ -609,18 +593,10 @@ export default function Magazine() {
           </div>
         )}
 
-        {/* ── Footer ── */}
-        <footer className="border-t border-[var(--wk-border)] pt-14 pb-8 text-center">
-          <span className="text-[9px] font-black uppercase tracking-[0.24em] text-[var(--wk-brand)] mb-3 block">
-            WAKILISHA Magazine
-          </span>
-          <p className="text-[24px] lg:text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)] leading-snug max-w-[420px] mx-auto">
-            Stories that move East African culture forward.
-          </p>
-          <p className="mt-3 text-[12px] text-[var(--wk-text-faint)]">
-            Issue {issueNum} · {issueDate}
-          </p>
-        </footer>
+        <div data-wk-magazine-newsletter className="mx-auto w-full max-w-[800px] border-t border-[var(--wk-border)] pt-10">
+          <NewsletterCTA />
+        </div>
+
       </div>
     </main>
   );
@@ -682,9 +658,9 @@ function CompactCardFill({ story, rank }: { story: MagazineArticle; rank: number
   return (
     <Link
       to={url}
-      className="group flex gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 hover:border-[var(--wk-border-strong)] hover:bg-[var(--wk-surface-raised)] transition-all duration-300 w-full h-full"
+      className="group flex h-full w-full gap-4 border-b border-[var(--wk-border)] py-4"
     >
-      <div className="w-24 shrink-0 rounded-lg overflow-hidden bg-[var(--wk-surface-raised)] self-stretch min-h-[90px]">
+      <div className="aspect-[3/2] w-[38%] shrink-0 overflow-hidden rounded-[12px] bg-[var(--wk-surface-raised)]">
         {story.heroUrl ? (
           <ResponsiveMediaImage
             src={story.heroUrl}
@@ -708,7 +684,7 @@ function CompactCardFill({ story, rank }: { story: MagazineArticle; rank: number
           <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">{story.section}</span>
           <span className="text-[10px] font-bold text-[var(--wk-text-faint)] opacity-40">#{rank}</span>
         </div>
-        <h4 className="text-[14px] font-black tracking-[-0.02em] leading-snug text-[var(--wk-text)] group-hover:text-[var(--wk-brand)] transition-colors line-clamp-2">
+        <h4 className="line-clamp-2 text-[17px] font-bold leading-[1.25] tracking-[-0.02em] text-[var(--wk-text)] group-hover:text-[var(--wk-brand)]">
           {story.title}
         </h4>
         {story.dek && (
@@ -731,9 +707,10 @@ function NewsletterCTA() {
   return (
     <section className="wk-reveal">
       <NewsletterSubscribe
+          variant="compact"
         formId="magazine-newsletter-form"
-        headline="Read with us"
-        description="Get weekly analysis, chart commentary, and industry signals delivered to your inbox."
+        headline="One email a week. The stories, the films and what changed in the record."
+        description=""
         contextFields={{ wk_page_type: "magazine", wk_source_section: "newsletter_footer" }}
       />
     </section>
