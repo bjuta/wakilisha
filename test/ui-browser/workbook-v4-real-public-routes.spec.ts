@@ -51,3 +51,27 @@ for (const width of [390, 768, 1440]) {
     });
   }
 }
+
+
+test("Workbook sidebar uses accessible modal focus and replaces the old mobile bottom tabs", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const menu = page.getByRole("button", { name: "Open WAKILISHA menu" });
+  await expect(menu).toBeVisible({ timeout: 20000 });
+  const bottomTabs = page.getByRole("navigation", { name: "Primary mobile navigation" });
+  await expect(bottomTabs).toHaveCount(0);
+
+  await menu.click();
+  const drawer = page.getByRole("dialog", { name: "WAKILISHA Menu" });
+  await expect(drawer).toBeVisible();
+  const sidebar = drawer.getByRole("navigation", { name: "WAKILISHA" });
+  await expect(sidebar.getByRole("link", { name: "Video" })).toHaveAttribute("href", "/video");
+  await expect(sidebar.getByRole("link", { name: "Audio" })).toHaveAttribute("href", "/audio");
+  await expect(sidebar.getByRole("link", { name: "Podcasts" })).toHaveAttribute("href", "/shows");
+  await expect(sidebar.getByRole("link", { name: "Following" })).toHaveAttribute("href", "/following");
+  await expect(sidebar.getByRole("link", { name: "Messages" })).toHaveAttribute("href", "/messages");
+  await expect(sidebar.getByRole("link", { name: "Notifications" })).toHaveAttribute("href", "/notifications");
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(menu).toBeFocused();
+});
