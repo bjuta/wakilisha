@@ -1,11 +1,11 @@
--- Read-only MIZIZI 231 Preview Registry evidence confidentiality verifier.
+-- Read-only MIZIZI Registry evidence verifier; retain exact 231 anchor after forward migrations.
 -- No fixture, review decision, grant, operation, DDL or source mutation.
 BEGIN TRANSACTION READ ONLY;
 DO $wk_reader_catalog$
 DECLARE v_table text; v_policy text; v_qual text;
 BEGIN
-  IF (SELECT count(*) FROM supabase_migrations.schema_migrations)<>231
-     OR (SELECT max(version) FROM supabase_migrations.schema_migrations)<>'20261015091718'
+  IF (SELECT count(*) FROM supabase_migrations.schema_migrations)<231
+     OR (SELECT max(version) FROM supabase_migrations.schema_migrations)<'20261015091718'
      OR (SELECT count(*) FROM supabase_migrations.schema_migrations
           WHERE version='20261015091718' AND name='mizizi_registry_review_reader_rls_v1')<>1
   THEN RAISE EXCEPTION 'WK_READER_231_EXACT_LEDGER_MISMATCH'; END IF;
