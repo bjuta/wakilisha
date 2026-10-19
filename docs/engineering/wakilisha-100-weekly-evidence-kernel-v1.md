@@ -44,3 +44,21 @@ The test suite covers EAT/UTC boundaries, daily and six-hour cadence, weekly upd
 7. Independently archive/checksum the historical 18 editions and demonstrate restoration before proposing the separate irreversible deletion operation to the owner.
 
 No scheduled jobs, migrations, database writes, chart-scoring changes, publication, or deletion are included in this source-only slice.
+
+## Native public-source parser boundary (follow-on source work)
+
+`supabase/functions/_shared/chart-public-source-observations.mjs` contains conservative, pure parsers for the already investigated Kenya chart surfaces: Mdundo Top Charts, Audiomack Geo Chart, Boomplay chart-list links, Shazam CSV, Apple public Top 100 RSS and YouTube Charts weekly tracks. It reuses the *technical observations* from the archived September soak and D11B Preview without resurrecting research routes, tables, methodology or scheduling authority.
+
+The parsers produce distinct source-native observations:
+
+- Mdundo, Audiomack, Boomplay and Apple: observed ordinal ranks only, not counts of plays or national audience.
+- Shazam: discovery/identification ranks, not streaming.
+- YouTube: ordered weekly video observations with source-native view counts; these are not audio streams.
+
+Each output explicitly includes `candidate_only: true`, `eligible_for_scoring: false`, and `native_period: 'unknown'` unless a separate source-specific field reports an unverified period label/key. Provider scope, territorial basis, update timing, native period, officiality, access authorization, and live HTML/JSON schema must be proven separately before receipts may be marked successfully collected or any source admitted to production scoring. In particular, HTML song anchors may include unrelated presentation links; these parsers alone cannot prove chart officiality or row coverage. No provider fetch or persistent database write is included.
+
+The same existing weekly kernel test file now guards the distinct source measurement contracts using bounded synthetic fixtures. It does **not** claim current provider protocol acceptance. Before wiring a scheduler or publishing an edition, verify live response semantics and acceptance under real provider access rules, obtain a current source-set decision, and use the canonical Supabase CLI migration + runtime pathway.
+
+### Reporting-week alignment safety
+
+A provider's native weekly chart may span a different interval from WAKILISHA's edition tracking week (for example, a Friday–Thursday provider week versus an initially configured Monday–Sunday tracking week). A publication day is **not** a tracking-period specification. The kernel now records native periods outside or crossing the declared edition window and blocks required sources pending an explicit approved alignment rule. Do not infer compatibility merely because the retrieval occurred during the current week. The product's inaugural tracking window and Monday publication/reconciliation cadence must be settled before a collector is allowed to qualify evidence.

@@ -230,6 +230,7 @@ export async function prepareWeeklyEvidenceFreeze({
   for (const source of sources) {
     const slots = checkpointsForSource(week_start_eat, source);
     let healthy = 0, changed = 0, lastHash = null, unknownPeriods = 0;
+    let periodsOutsideWeek = 0, periodsCrossingWeekBoundary = 0;
     const failures = [];
     for (const slot of slots) {
       const receipt = byCheckpoint.get(slot.checkpoint_key);
@@ -240,6 +241,14 @@ export async function prepareWeeklyEvidenceFreeze({
       frozenReceipts.push(receipt);
       if (receipt.status === 'succeeded') {
         if (receipt.source_native_period === 'unknown') unknownPeriods++;
+        else {
+          const start = utcMs(receipt.source_native_period.starts_at, 'native period start');
+          const end = utcMs(receipt.source_native_period.ends_at, 'native period end');
+          const ws = utcMs(week.starts_at, 'week starts');
+          const we = utcMs(week.ends_at, 'week ends');
+          if (end <= ws || start >= we) periodsOutsideWeek++;
+          else if (start < ws || end > we) periodsCrossingWeekBoundary++;
+        }
         healthy++;
         if (receipt.payload_sha256 !== lastHash) changed++;
         lastHash = receipt.payload_sha256;
@@ -250,14 +259,19 @@ export async function prepareWeeklyEvidenceFreeze({
       source_key: source.source_key, behavior: source.behavior, metric: source.metric,
       required: source.required, planned_checkpoints: slots.length, received_checkpoints: slots.length - slots.filter(s=>!byCheckpoint.has(s.checkpoint_key)).length,
       healthy_checkpoints: healthy, distinct_consecutive_payloads: changed,
-      minimum_healthy_checkpoints: source.minimum_healthy_checkpoints, unknown_native_periods: unknownPeriods, failures,
+      minimum_healthy_checkpoints: source.minimum_healthy_checkpoints, unknown_native_periods: unknownPeriods,
+      periods_outside_week: periodsOutsideWeek, periods_crossing_week_boundary: periodsCrossingWeekBoundary, failures,
       status: meetsMinimum ? (failures.length ? 'degraded' : 'healthy') : 'insufficient',
     };
     summaries.push(summary);
     if (!meetsMinimum && source.required) blocking.push(`${source.source_key}: insufficient healthy checkpoints`);
     if (unknownPeriods > 0 && source.required) blocking.push(`${source.source_key}: upstream period semantics unverified`);
+    if (periodsOutsideWeek && source.required) blocking.push(`${source.source_key}: source native period outside tracking week`);
+    if (periodsCrossingWeekBoundary && source.required) blocking.push(`${source.source_key}: source native period crosses tracking week; explicit alignment policy required`);
     if (failures.length) warnings.push(`${source.source_key}: ${failures.length} missing or degraded checkpoints`);
     if (unknownPeriods) warnings.push(`${source.source_key}: ${unknownPeriods} unverified native periods`);
+    if (periodsOutsideWeek) warnings.push(`${source.source_key}: ${periodsOutsideWeek} outside-week native periods`);
+    if (periodsCrossingWeekBoundary) warnings.push(`${source.source_key}: ${periodsCrossingWeekBoundary} cross-boundary native periods`);
   }
   frozenReceipts.sort((a, b) => a.source_key.localeCompare(b.source_key) || a.scheduled_at.localeCompare(b.scheduled_at));
   const content = { schema_version:'wk-chart-weekly-evidence-v1', week, constitution_version, methodology_version, source_contracts:sources, source_summary:summaries, receipts:frozenReceipts };
