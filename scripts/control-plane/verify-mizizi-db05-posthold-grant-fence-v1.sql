@@ -1,4 +1,4 @@
--- Read-only DB05 invariant. Accept exact reviewed 228-231 forward ledgers.
+-- Read-only DB05 invariant. Retain exact reviewed 228-231 anchors even after later forward migrations.
 -- Same retained authority and ACL checks. No tables modified.
 DO $wk_228$
 DECLARE v_definition text; n integer; latest text;
@@ -8,8 +8,13 @@ BEGIN
  IF NOT ((n=228 AND latest='20261014094213')
       OR (n=229 AND latest='20261014134759')
       OR (n=230 AND latest='20261014182214')
-      OR (n=231 AND latest='20261015091718')) THEN
-   RAISE EXCEPTION 'STOP_DB05_EXPECTED_228_TO_231_EXACT_LEDGER_REQUIRED';
+      OR (n>=231 AND latest>='20261015091718'
+        AND (select count(*) from supabase_migrations.schema_migrations m
+             where (m.version='20261014094213' and m.name='mizizi_db05_hold_supersedes_prior_registry_grants_v1')
+                or (m.version='20261014134759' and m.name='mizizi_db02_observation_completion_authority_v1')
+                or (m.version='20261014182214' and m.name='mizizi_db02_prior_observation_replay_fence_v1')
+                or (m.version='20261015091718' and m.name='mizizi_registry_review_reader_rls_v1'))=4)) THEN
+   RAISE EXCEPTION 'STOP_DB05_EXPECTED_REVIEWED_228_TO_231_ANCHORS';
  END IF;
  SELECT pg_get_functiondef(
    'platform_private.registry_execution_grant_has_current_authority(uuid)'::regprocedure)
