@@ -52,10 +52,14 @@ jobs:
           bash -n scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh
           bash -n scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh
 
+      # CLI 2.107.0 local Docker Storage predates hosted Storage bucket
+      # metadata (versioning_status/lifecycle_configuration). Replaying the
+      # *unchanged* CLI-minted migration 233 requires the compatible local stack.
+      # Keep Production/remote schema tooling at its independently pinned CLI.
       - name: Install pinned Supabase CLI for local-only Docker
         uses: supabase/setup-cli@v1
         with:
-          version: 2.107.0
+          version: 2.121.0
 
       - name: Start disposable local database and replay migrations
         shell: bash
@@ -117,7 +121,7 @@ jobs:
       - name: Install pinned local Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.107.0
+          version: 2.121.0
 
       - name: Install Node dependencies for genuine HTTP Supabase Auth client
         uses: actions/setup-node@v4

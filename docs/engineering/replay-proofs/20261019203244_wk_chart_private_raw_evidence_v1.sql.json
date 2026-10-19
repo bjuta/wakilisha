@@ -1,0 +1,19 @@
+{
+  "migration_file": "supabase/migrations/20261019203244_wk_chart_private_raw_evidence_v1.sql",
+  "migration_sha256": "dea04f3e21ed8980388e035924dfe9d5cf37dab6e455741641e46476b5e5e0b0",
+  "base_main_sha": "5ac753fa92be084f83bf473806cb6b98f8e34f36",
+  "preview_project_ref": "zogdfvoizohrhwmovlpv",
+  "preview_branch_id": "2d1b19ed-d469-4f4b-a44f-f4f848b2ad66",
+  "preview_migration_head": "20261019203244",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-wk-chart-private-raw-evidence-v1.sql",
+  "schema_types_sha256": "91deffcb2e7a6987032dea1a69f3c1bbbfa3d8c48bbae1e62f8c8fb55595647d",
+  "schema_migration_count": 233,
+  "schema_migration_head": "20261019203244",
+  "verified_at": "2026-10-19T21:27:23.746Z",
+  "baseline_replay_evidence": "Accepted prior migration 232 clean-replay receipt in merged PR #1263, same zero-data Preview identity, then exactly one native CLI 2.107.0 forward application of migration 233. Repository recorder independently reconciled all 233 local and Preview ledger versions and schema types. This is an incremental 233 replay on the accepted clean 232 Preview, not an assertion of a newly created 233 baseline environment.",
+  "preview_candidate_apply": "Owner Mac native Supabase CLI 2.107.0 confirmed exactly one pending migration, applied 20261019203244 to the approved preview, observed WK100_RAW_EVIDENCE_PRIVATE_BUCKET_NO_OBJECTS_NO_SCHEDULE=PASS, and verified zero pending.",
+  "preview_independent_verifier": "Read-only SQL Preview verification PASS for 233 exact migration head and private Storage ACLs. Transactional rollback-only anon/auth/service SQL role probe PASS. Actual Preview Storage REST API contract PASS: create-only, service readback byte/SHA256, duplicate rejection with unchanged bytes, public and anon denies, exact fixture deletion. Independent post-test SQL confirms zero raw objects; no provider responses fetched or database capture receipts written. Genuine signed-in HTTP probe and physical WORM/retention are NOT proven by this migration."
+}
