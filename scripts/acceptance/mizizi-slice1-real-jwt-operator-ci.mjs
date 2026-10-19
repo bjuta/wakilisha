@@ -4,7 +4,7 @@
 // Surrounding workflow MUST destroy the local Docker volumes on every outcome.
 import {createClient} from "@supabase/supabase-js";
 import {execFileSync,spawnSync} from "node:child_process";
-import {readFileSync,existsSync} from "node:fs";
+import {readFileSync,existsSync,readdirSync} from "node:fs";
 import {randomBytes,randomUUID} from "node:crypto";
 
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
@@ -60,9 +60,18 @@ async function main(){
   "(SELECT count(*) FROM mizizi_private.cases)||'|'||"+
   "(SELECT count(*) FROM mizizi_private.write_holds)||'|'||"+
   "(SELECT count(*) FROM public.registry_releases);",db);
- assert(baseline==="231|20261015091718|0|0|0|0|0",
-  "STOP_AUTH_NOT_FRESH_LOCAL_MIZIZI_READER_RLS");
- console.log("WK_AUTH_EMPTY_231_UNLINKED_LOCAL_BASELINE=PASS");
+ const activeMigrations=readdirSync("supabase/migrations")
+  .filter(name=>/^\d{14}_.+\.sql$/.test(name)).sort();
+ const expectedHead=activeMigrations.at(-1)?.slice(0,14);
+ const baselineCells=baseline.split("|");
+ const readerAnchor=localSql("SELECT count(*)::text FROM "+
+  "supabase_migrations.schema_migrations WHERE version='20261015091718' "+
+  "AND name='mizizi_registry_review_reader_rls_v1';",db);
+ assert(activeMigrations.length>=231&&/^\d{14}$/.test(expectedHead||"")&&
+  baselineCells.slice(0,2).join("|")===activeMigrations.length+"|"+expectedHead&&
+  baselineCells.slice(2).join("|")==="0|0|0|0|0"&&readerAnchor==="1",
+  "STOP_AUTH_NOT_FRESH_REPOSITORY_MATCHED_MIZIZI_READER_RLS");
+ console.log("WK_AUTH_EMPTY_REPOSITORY_MATCHED_LOCAL_BASELINE=PASS");
 
  const admin=client(api,values.SERVICE_ROLE_KEY),people=[];
  for(const label of ["first","second"]){
