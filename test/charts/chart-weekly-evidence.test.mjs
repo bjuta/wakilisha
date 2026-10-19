@@ -98,6 +98,12 @@ test('native source periods require typed provider boundaries and evidence',asyn
   const p=assemble();
   await assert.rejects(()=>prepareWeeklyEvidenceFreeze({...p,receipts:[{...p.receipts[0],source_native_period:{authority:'provider_defined',starts_at:'2026-10-25T21:00:00Z',ends_at:'2026-10-18T21:00:00Z',evidence_ref:'a'}},...p.receipts.slice(1)]}),/positive interval/);
 });
+test('source and receipt fields fail closed on unexpected confidential or untyped payloads',async()=>{
+  const p=assemble();
+  await assert.rejects(()=>prepareWeeklyEvidenceFreeze({...p,source_contracts:[{...p.source_contracts[0],credential:'never-store'}]}),/unexpected field/);
+  await assert.rejects(()=>prepareWeeklyEvidenceFreeze({...p,receipts:[{...p.receipts[0],api_token:'never-store'},...p.receipts.slice(1)]}),/unexpected field/);
+  await assert.rejects(()=>prepareWeeklyEvidenceFreeze({...p,receipts:[{...p.receipts[0],source_native_period:{...p.receipts[0].source_native_period,raw_api_reply:{secret:'x'}}},...p.receipts.slice(1)]}),/unexpected field/);
+});
 test('the kernel has no policy for converting native rank to stream counts',()=>{
   assert.notEqual(day().metric,weekly().metric);
   assert.notEqual(day().behavior,weekly().behavior);
