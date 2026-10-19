@@ -108,3 +108,81 @@ test('the kernel has no policy for converting native rank to stream counts',()=>
   assert.notEqual(day().metric,weekly().metric);
   assert.notEqual(day().behavior,weekly().behavior);
 });
+
+// Source-native parser boundary: this is NOT an admission test and exercises
+// static fixtures, not the current provider HTTP surfaces.
+import {
+  parseMdundoKenya, parseAudiomackKenya, parseBoomplayKenya,
+  parseShazamKenya, parseAppleKenya, parseYouTubeKenyaWeekly,
+} from '../../supabase/functions/_shared/chart-public-source-observations.mjs';
+
+test('Mdundo parses explicit Kenya playlist ranks, and rejects unexplained rank gaps',()=>{
+  const html='<div class="md-playlist-song-item" data-index="1" data-id="543" data-playlist-url="/top-charts/ke" data-title="Song A" data-artist="A"></div>'+
+    '<div class="md-playlist-song-item" data-index="2" data-id="544" data-playlist-url="/top-charts/ke" data-title="Song B" data-artist="B"></div>';
+  const r=parseMdundoKenya(html);
+  assert.equal(r.behavior,'consumption');assert.equal(r.native_period,'unknown');assert.equal(r.eligible_for_scoring,false);
+  assert.equal(r.rows[0].provider_track_id,'543');assert.equal(r.rows[1].rank,2);
+  assert.throws(()=>parseMdundoKenya(html.replace('data-index="2"','data-index="3"')),/duplicate_or_invalid_rank|noncontiguous_rank/);
+});
+
+test('Audiomack observations preserve ordered provider song IDs and partial depth',()=>{
+  const html='<script>{"track_count":3}</script><meta property="music:song" content="https://audiomack.com/ke-artist/song-1"><meta property="music:song" content="https://audiomack.com/ke-artist/song-2">';
+  const r=parseAudiomackKenya(html);
+  assert.equal(r.status,'partial_depth');assert.equal(r.chart_depth,3);
+  assert.equal(r.rows[0].provider_track_id,'ke-artist/song-1');
+  assert.throws(()=>parseAudiomackKenya(html.replace('https://audiomack.com/ke-artist/song-2','https://evil.example/song-2')),/untrusted_song_origin/);
+});
+
+test('Boomplay page repeats do not become extra ranked observations; scope stays unverified',()=>{
+  const html='<a href="/songs/41">A</a><a href="/songs/41">A again</a><a href="/songs/44">B</a>';
+  const r=parseBoomplayKenya(html);
+  assert.equal(r.rows.length,2);assert.equal(r.rows[1].provider_track_id,'44');
+  assert.equal(r.officiality,'unverified');assert.equal(r.native_period,'unknown');
+});
+
+test('Shazam quoted comma is parsed and evidence remains discovery, not streaming',()=>{
+  const r=parseShazamKenya('Shazam Top 200 Kenya\n2026-W42\nRank,Artist,Title\n1,"Artist, Guest","Tune, Mix"\n2,Other,Second\n');
+  assert.equal(r.behavior,'discovery');assert.equal(r.metric,'rank');
+  assert.equal(r.rows[0].artist,'Artist, Guest');assert.equal(r.rows[0].title,'Tune, Mix');
+  assert.equal(r.provider_period_label,'2026-W42');assert.equal(r.native_period,'unknown');
+  assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,A,X\n1,B,Y\n'),/duplicate_or_invalid_rank/);
+});
+
+test('Apple public most-played is not inferred to be a seven-day consumption total',()=>{
+  const payload={feed:{country:'KE',updated:'2026-10-19T00:00:00Z',results:[{id:'121',name:'Song',artistName:'Artist',artistId:'22'}]}};
+  const r=parseAppleKenya(payload);
+  assert.equal(r.metric,'rank');assert.equal(r.native_period,'unknown');
+  assert.equal(r.provider_updated_at,'2026-10-19T00:00:00Z');
+  assert.throws(()=>parseAppleKenya({...payload,feed:{...payload.feed,country:'US'}}),/territory_unverified/);
+});
+
+test('YouTube provider weekly observation retains views, exact target period and separate behavior',()=>{
+  const target='weekly:20261016:20261022:ke';
+  const payload={metadata:{periodKey:target},charts:{trackViews:[
+    {encryptedVideoId:'xyz',name:'Track',artists:[{name:'Singer'}],viewCount:'12,400',chartEntryMetadata:{currentPosition:1}}
+  ]}};
+  const r=parseYouTubeKenyaWeekly(payload,target);
+  assert.equal(r.metric,'rank_and_count');assert.equal(r.behavior,'video_consumption');
+  assert.equal(r.rows[0].view_count,12400);assert.equal(r.source_period_key,target);
+  assert.throws(()=>parseYouTubeKenyaWeekly(payload,'weekly:20261009:20261015:ke'),/target_period_unavailable/);
+});
+
+test('YouTube rejects absent counts, duplicated ranks and invented provider periods',()=>{
+  const target='weekly:20261016:20261022:ke';
+  const payload={period:target,trackViews:[
+    {encryptedVideoId:'a',viewCount:0,chartEntryMetadata:{currentPosition:1}},
+    {encryptedVideoId:'b',viewCount:1,chartEntryMetadata:{currentPosition:2}},
+  ]};
+  assert.equal(parseYouTubeKenyaWeekly(payload,target).rows[0].view_count,0);
+  assert.throws(()=>parseYouTubeKenyaWeekly({...payload,trackViews:[payload.trackViews[0],{...payload.trackViews[1],viewCount:'NaN'}]},target),/missing_native_view_count/);
+  assert.throws(()=>parseYouTubeKenyaWeekly({...payload,trackViews:[payload.trackViews[0],{...payload.trackViews[1],chartEntryMetadata:{currentPosition:1}}]},target),/duplicate_or_invalid_rank/);
+});
+
+test('all source parsers fail closed on empty inputs and never assign a country-level audience estimate',()=>{
+  for (const f of [parseMdundoKenya,parseAudiomackKenya,parseBoomplayKenya,parseShazamKenya])
+    assert.throws(()=>f(''),Error);
+  assert.throws(()=>parseAppleKenya({}),/invalid_feed/);
+  assert.throws(()=>parseYouTubeKenyaWeekly({},'weekly:20261016:20261022:ke'),/target_period_unavailable/);
+  const r=parseShazamKenya('Rank,Artist,Title\n1,A,B\n');
+  assert.equal('plays' in r,false);assert.equal('estimated_listeners' in r,false);
+});
