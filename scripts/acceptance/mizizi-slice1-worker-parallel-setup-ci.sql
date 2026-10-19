@@ -1,5 +1,5 @@
 -- WAKILISHA Slice 1 true-concurrency fixture. CI-only disposable database.
--- Fresh local 231 migration replay only. NEVER on linked, Preview or Production DB.
+-- Fresh unlinked local repository-matched migration replay only. NEVER on hosted DB.
 -- SET SESSION AUTHORIZATION is a local simulator, NOT a real service JWT/JIT login.
 -- This separate fixture must COMMIT to become visible to two independent DB sessions.
 -- Never run on a linked or hosted database. The CI job destroys its local volume.
@@ -11,7 +11,10 @@ DO $guard$
 DECLARE n integer; head text;
 BEGIN
  SELECT count(*),max(version) INTO n,head FROM supabase_migrations.schema_migrations;
- IF n<>231 OR head<>'20261015091718'
+ IF n<231 OR head<'20261015091718'
+   OR (SELECT count(*) FROM supabase_migrations.schema_migrations
+       WHERE version='20261015091718'
+         AND name='mizizi_registry_review_reader_rls_v1')<>1
    OR session_user<>'supabase_admin' OR current_user<>'supabase_admin'
    OR NOT (SELECT rolsuper FROM pg_roles WHERE rolname='supabase_admin')
    OR (SELECT count(*) FROM mizizi_private.cases)<>0
