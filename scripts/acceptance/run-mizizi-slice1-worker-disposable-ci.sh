@@ -45,8 +45,15 @@ snapshot() {
         WHERE status='active');"
 }
 BEFORE="$(snapshot)" || { echo 'STOP_LOCAL_PRE_SNAPSHOT_FAILED'; exit 22; }
-[ "$BEFORE" = '231|20261015091718|1|0|0|0|0|0|0|0|0|0|0|0|0|0' ] || {
-  echo 'STOP_LOCAL_NOT_EXACT_EMPTY_MIGRATION_231'; exit 22;
+MIGRATION_FILES="$(git -C "$ROOT" ls-files -- 'supabase/migrations/*.sql' | LC_ALL=C sort)"
+EXPECTED_MIGRATION_COUNT="$(printf '%s\n' "$MIGRATION_FILES" | grep -c .)"
+LATEST_MIGRATION="$(printf '%s\n' "$MIGRATION_FILES" | tail -n 1)"
+EXPECTED_MIGRATION_HEAD="$(printf '%s\n' "$LATEST_MIGRATION" | sed -E 's@.*/([0-9]{14})_.*@\1@')"
+[ "$EXPECTED_MIGRATION_COUNT" -ge 231 ] &&
+[[ "$EXPECTED_MIGRATION_HEAD" =~ ^[0-9]{14}$ ]] &&
+[ "$BEFORE" = "$EXPECTED_MIGRATION_COUNT|$EXPECTED_MIGRATION_HEAD|1|0|0|0|0|0|0|0|0|0|0|0|0|0" ] &&
+[ "$(docker exec -i "$CONTAINER" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c   "select count(*) from supabase_migrations.schema_migrations where version='20261015091718' and name='mizizi_registry_review_reader_rls_v1';")" = "1" ] || {
+  echo 'STOP_LOCAL_NOT_EXACT_EMPTY_REPOSITORY_MIGRATION_LEDGER'; exit 22;
 }
 printf 'WK_CI_BEFORE_SHA256=%s\n' "$(printf %s "$BEFORE" | sha256sum | awk '{print $1}')"
 set +e
