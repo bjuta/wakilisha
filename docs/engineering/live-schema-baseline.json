@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-15T09:39:15Z",
-  "typesSha256": "2806dd9e7fe3913c067e5945a627db397e2f1b07641447af1c31fb7c0453d6b9",
+  "generatedAt": "2026-10-19T18:59:15Z",
+  "typesSha256": "91deffcb2e7a6987032dea1a69f3c1bbbfa3d8c48bbae1e62f8c8fb55595647d",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 231,
-  "latestMigration": "20261015091718_mizizi_registry_review_reader_rls_v1.sql",
+  "migrationCount": 232,
+  "latestMigration": "20261019152307_wk_chart_observation_receipts_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "nkgfoppunmnkcumalxqp",
-    "migrationHead": "20261015091718",
-    "baseMainSha": "cff8e57222ac735b5c2e8c3b7a17ee50c49da3dd",
-    "previewBranchId": "8c0affc1-b43b-44ac-b2eb-66715ed40252"
+    "sourceProjectRef": "zogdfvoizohrhwmovlpv",
+    "migrationHead": "20261019152307",
+    "baseMainSha": "2db7d1505c926a5e51529453feda7af8799481a7",
+    "previewBranchId": "2d1b19ed-d469-4f4b-a44f-f4f848b2ad66"
   }
 }
