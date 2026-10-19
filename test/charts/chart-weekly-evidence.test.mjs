@@ -186,3 +186,24 @@ test('all source parsers fail closed on empty inputs and never assign a country-
   const r=parseShazamKenya('Rank,Artist,Title\n1,A,B\n');
   assert.equal('plays' in r,false);assert.equal('estimated_listeners' in r,false);
 });
+
+
+test('a provider-native chart interval cannot silently replace the edition tracking week',async()=>{
+  const p=assemble();
+  p.receipts[0]={...p.receipts[0],source_native_period:{...p.receipts[0].source_native_period,
+    starts_at:'2026-10-11T21:00:00Z',ends_at:'2026-10-18T21:00:00Z'}};
+  const out=await prepareWeeklyEvidenceFreeze(p);
+  assert.equal(out.state,'blocked');
+  assert.equal(out.source_summary[0].periods_outside_week,1);
+  assert.match(out.blocking.join(';'),/outside tracking week/);
+
+  const q=assemble();
+  // YouTube may use a provider-native Friday–Thursday week while a product
+  // edition uses a different window; the relation needs explicit authority.
+  q.receipts[0]={...q.receipts[0],source_native_period:{...q.receipts[0].source_native_period,
+    starts_at:'2026-10-15T21:00:00Z',ends_at:'2026-10-22T21:00:00Z'}};
+  const partial=await prepareWeeklyEvidenceFreeze(q);
+  assert.equal(partial.state,'blocked');
+  assert.equal(partial.source_summary[0].periods_crossing_week_boundary,1);
+  assert.match(partial.blocking.join(';'),/explicit alignment policy required/);
+});
