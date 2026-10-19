@@ -1,5 +1,5 @@
 -- WAKILISHA Slice 1: 32 distinct approved Track-source gateway scenarios.
--- Only fresh, unlinked local 231-migration GitHub CI PostgreSQL may run this.
+-- Only fresh, unlinked local repository-matched GitHub CI PostgreSQL may run this.
 -- Actual source broker and case admission; executor session is LOCAL SIM, not JIT.
 -- No Production, Preview, Auth bootstrap, provider credentials or external ingress.
 -- All fixture artists/tracks/reviews/cases and credentials are ROLLED BACK.
@@ -13,7 +13,10 @@ DECLARE v_count integer; v_head text;
 BEGIN
  SELECT count(*),max(version) INTO v_count,v_head
  FROM supabase_migrations.schema_migrations;
- IF v_count<>231 OR v_head<>'20261015091718'
+ IF v_count<231 OR v_head<'20261015091718'
+  OR (SELECT count(*) FROM supabase_migrations.schema_migrations
+       WHERE version='20261015091718'
+         AND name='mizizi_registry_review_reader_rls_v1')<>1
   OR session_user<>'supabase_admin' OR current_user<>'supabase_admin'
   OR NOT (SELECT rolsuper FROM pg_roles WHERE rolname='supabase_admin')
   OR (SELECT count(*) FROM mizizi_private.cases)<>0
