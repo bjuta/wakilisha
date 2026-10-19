@@ -18,6 +18,18 @@ function requireValue(value, message) {
   if (!value) throw new Error(message);
 }
 
+const SOURCE_FIELDS = new Set(['source_key','behavior','metric','market','depth','adapter_version',
+  'source_contract_version','required','cadence','minimum_healthy_checkpoints']);
+const CADENCE_FIELDS = new Set(['kind','hours','eat_hour','eat_minute','weekday_eat']);
+const RECEIPT_FIELDS = new Set(['source_key','scheduled_at','fetched_at','status','payload_sha256',
+  'observed_depth','record_count','source_native_period','metric','adapter_version',
+  'contract_version','market','upstream_reference','failure_code']);
+const NATIVE_PERIOD_FIELDS = new Set(['starts_at','ends_at','authority','evidence_ref']);
+
+function onlyFields(value, allowed, label) {
+  requireValue(Object.keys(value).every(k => allowed.has(k)), `${label}: unexpected field`);
+}
+
 function utcMs(value, label) {
   requireValue(typeof value === 'string' && ISO_UTC.test(value), `${label}: exact UTC timestamp required`);
   const ms = Date.parse(value);
@@ -55,6 +67,7 @@ export function trackingWeek(weekStartEat) {
  */
 export function validateSourceContract(source) {
   requireValue(source && typeof source === 'object' && !Array.isArray(source), 'source contract required');
+  onlyFields(source, SOURCE_FIELDS, 'source contract');
   cleanText(source.source_key, 'source_key');
   requireValue(BEHAVIORS.has(source.behavior), `${source.source_key}: unknown behavior`);
   requireValue(METRICS.has(source.metric), `${source.source_key}: unknown metric`);
@@ -64,6 +77,7 @@ export function validateSourceContract(source) {
   requireValue(typeof source.required === 'boolean', `${source.source_key}: required flag must be explicit`);
   requireValue(Number.isInteger(source.depth) && source.depth >= 1 && source.depth <= 1000, `${source.source_key}: depth out of bounds`);
   requireValue(source.cadence && typeof source.cadence === 'object', `${source.source_key}: cadence required`);
+  onlyFields(source.cadence, CADENCE_FIELDS, `${source.source_key} cadence`);
   const { kind, hours, eat_hour, eat_minute, weekday_eat } = source.cadence;
   requireValue(Number.isInteger(eat_hour) && eat_hour >= 0 && eat_hour <= 23, `${source.source_key}: invalid EAT hour`);
   requireValue(Number.isInteger(eat_minute) && eat_minute >= 0 && eat_minute <= 59, `${source.source_key}: invalid EAT minute`);
@@ -107,6 +121,7 @@ export function checkpointsForSource(weekStartEat, source) {
  */
 export function validateReceipt(receipt, contract, week) {
   requireValue(receipt && typeof receipt === 'object', 'receipt object required');
+  onlyFields(receipt, RECEIPT_FIELDS, 'receipt');
   requireValue(receipt.source_key === contract.source_key, 'receipt source does not match contract');
   requireValue(STATUS.has(receipt.status), 'unrecognized receipt status');
   const fetched = utcMs(receipt.fetched_at, 'fetched_at');
@@ -121,6 +136,7 @@ export function validateReceipt(receipt, contract, week) {
      receipt.source_native_period.authority === 'provider_defined'),
     'source-native period must carry provider-defined interval or unknown');
   if (receipt.source_native_period !== 'unknown') {
+    onlyFields(receipt.source_native_period, NATIVE_PERIOD_FIELDS, 'native period');
     const ps = utcMs(receipt.source_native_period.starts_at, 'native period start');
     const pe = utcMs(receipt.source_native_period.ends_at, 'native period end');
     requireValue(ps < pe, 'native period must be a positive interval');
