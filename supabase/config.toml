@@ -56,3 +56,6 @@ allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]
 
 [functions.music-work-resolver]
 verify_jwt = true
+
+[functions.wk-chart-capture]
+verify_jwt = true
