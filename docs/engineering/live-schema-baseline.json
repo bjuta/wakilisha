@@ -1,8 +1,8 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-20T11:00:50.414Z",
-  "typesSha256": "91deffcb2e7a6987032dea1a69f3c1bbbfa3d8c48bbae1e62f8c8fb55595647d",
+  "generatedAt": "2026-10-20T11:43:00Z",
+  "typesSha256": "f660fb63a89481f88ccc7a385540b3061fa66229b4e21d7590d7140899833560",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 234,
   "latestMigration": "20261020072800_wk_chart_capture_runtime_v1.sql",

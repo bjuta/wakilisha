@@ -28154,6 +28154,52 @@ export type Database = {
         }
         Returns: Json
       }
+      wk_chart_runtime_advance_v1: {
+        Args: {
+          p_action: string
+          p_byte_length?: number
+          p_content_type?: string
+          p_fetched_at?: string
+          p_lease_id: string
+          p_object_key?: string
+          p_payload_sha256?: string
+          p_reservation_id: string
+        }
+        Returns: Json
+      }
+      wk_chart_runtime_commit_v1: {
+        Args: {
+          p_failure_code?: string
+          p_lease_id: string
+          p_native_period_end?: string
+          p_native_period_evidence_ref?: string
+          p_native_period_start?: string
+          p_outcome: string
+          p_reservation_id: string
+          p_rows: Json
+          p_upstream_reference: string
+        }
+        Returns: Json
+      }
+      wk_chart_runtime_fail_v1: {
+        Args: {
+          p_failure_code: string
+          p_lease_id: string
+          p_outcome: string
+          p_reservation_id: string
+          p_upstream_reference: string
+        }
+        Returns: Json
+      }
+      wk_chart_runtime_reserve_v1: {
+        Args: {
+          p_attempt_number: number
+          p_contract_id: string
+          p_scheduled_at: string
+          p_week_start_eat: string
+        }
+        Returns: Json
+      }
       wk_first_jsonb_text: {
         Args: { a: Json; b: Json; keys: string[] }
         Returns: string
