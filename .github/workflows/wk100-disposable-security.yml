@@ -1,0 +1,83 @@
+name: WK100 Disposable SQL Concurrency and Signed-in Storage ACL
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/wk100-disposable-security.yml'
+      - 'scripts/acceptance/run-wk100-two-session-disposable-ci.sh'
+      - 'scripts/acceptance/wk100-genuine-auth-storage-disposable-ci.mjs'
+      - 'supabase/migrations/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wk100-disposable-security-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  disposable-wk100-security:
+    name: disposable-two-session-and-signed-in-acl
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Prove no linked or credentialed remote target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = pull_request
+          test -z "$(printenv SUPABASE_PROJECT_REF || true)"
+          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
+          test ! -e supabase/.temp/project-ref
+          test -f supabase/migrations/20261020072800_wk_chart_capture_runtime_v1.sql
+          bash -n scripts/acceptance/run-wk100-two-session-disposable-ci.sh
+          node --check scripts/acceptance/wk100-genuine-auth-storage-disposable-ci.mjs
+          echo WK100_CI_DISPOSABLE_NO_REMOTE_TARGET=PASS
+
+      # This local CLI supports the Storage bucket metadata used in 233.
+      # Production deployment CLI stays independently pinned at 2.107.0.
+      - name: Install compatible disposable Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked JS dependencies
+        shell: bash
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Start UNLINKED local database Auth Storage and REST
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase start -x realtime,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          echo WK100_CI_LOCAL_FULL_MIGRATION_REPLAY=PASS
+
+      - name: Prove two independent WK100 PostgreSQL sessions compete for one lease
+        shell: bash
+        run: bash scripts/acceptance/run-wk100-two-session-disposable-ci.sh
+
+      - name: Prove real signed-in JWT cannot read or list private WK100 raw object
+        shell: bash
+        run: node scripts/acceptance/wk100-genuine-auth-storage-disposable-ci.mjs
+
+      - name: Destroy disposable database Auth Storage containers and volumes
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase stop --no-backup
+          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
+          echo WK100_CI_LOCAL_AUTH_STORAGE_CONTRACT_AND_LEASE_VOLUME_DESTROYED=PASS
