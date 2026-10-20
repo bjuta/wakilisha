@@ -207,3 +207,101 @@ test('a provider-native chart interval cannot silently replace the edition track
   assert.equal(partial.source_summary[0].periods_crossing_week_boundary,1);
   assert.match(partial.blocking.join(';'),/explicit alignment policy required/);
 });
+
+// WAKILISHA 100 candidate-only source transport/private-byte contract.
+// Consolidated into the existing chart kernel suite, not a new permanent test.
+import {
+  CandidateCaptureError, fetchCandidateBytes, archiveCandidateBytes, sha256Hex,
+} from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
+
+const wkCapUrl = 'https://example.org/chart/ke';
+const wkCapAuthority = { source_key:'mdundo_ke', exact_endpoint:wkCapUrl,
+  authorization_ref:'wk-source-access-v1/fixture', purpose:'candidate_raw_evidence' };
+const wkCapBytes = new TextEncoder().encode('<html>KE source fixture</html>');
+const wkCapWeek = '2026-10-19';
+const wkCapSlot = '2026-10-19T09:00:00Z';
+const wkCapInput = (overrides={}) => ({sourceKey:'mdundo_ke',endpoint:wkCapUrl,
+  accessDecision:wkCapAuthority,verifyAccess:async()=>true,
+  fetchImpl:async (_url,opts)=>{
+    assert.equal(opts.redirect,'manual');
+    assert.equal(opts.credentials,'omit');
+    return new Response(wkCapBytes,{status:200,headers:{'content-type':'text/html'}});
+  },now:()=>new Date('2026-10-19T09:02:00Z'),...overrides});
+const wkCapReject = (fn,code)=>assert.rejects(fn,
+  e=>e instanceof CandidateCaptureError && e.code===code);
+const wkCapStorage = () => {
+  const objects=new Map(),events=[],entries=[];
+  const storage={
+    async putCreateOnly(key,bytes,config) {
+      events.push('put');assert.equal(config.upsert,false);
+      if(objects.has(key))throw Error('collision');objects.set(key,new Uint8Array(bytes));
+    },
+    async readPrivate(key){events.push('read');return objects.get(key);},
+  };
+  const ledger={async record(entry){events.push(entry.state);entries.push(entry);}};
+  return {objects,events,entries,storage,ledger};
+};
+
+test('candidate capture never runs before exact externally verified source access',async()=>{
+  let calls=0;
+  const transport=async()=>{calls++;return new Response(wkCapBytes);};
+  await wkCapReject(()=>fetchCandidateBytes(wkCapInput({verifyAccess:async()=>false,fetchImpl:transport})), 'source_access_not_authorized');
+  await wkCapReject(()=>fetchCandidateBytes(wkCapInput({verifyAccess:null,fetchImpl:transport})), 'source_access_verifier_required');
+  await wkCapReject(()=>fetchCandidateBytes(wkCapInput({accessDecision:{...wkCapAuthority,source_key:'apple_ke'},fetchImpl:transport})), 'source_access_invalid');
+  for(const url of ['http://example.org/chart/ke','https://127.0.0.1/a','https://host.local/a','https://evil.com@valid.org/a','https://example.org:9000/a'])
+    await wkCapReject(()=>fetchCandidateBytes(wkCapInput({endpoint:url,fetchImpl:transport})), 'endpoint_invalid');
+  assert.equal(calls,0);
+  // A delayed approval must not start a request after the deadline expires.
+  let grantLateAccess;
+  const lateAccess = new Promise(resolve => { grantLateAccess = resolve; });
+  await wkCapReject(() => fetchCandidateBytes(wkCapInput({
+    timeoutMs: 100, verifyAccess: () => lateAccess, fetchImpl: transport,
+  })), 'transport_timeout');
+  grantLateAccess(true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls,0);
+});
+
+test('candidate HTTP evidence retains exact bytes but refuses redirect, MIME, overage and timeout',async()=>{
+  const captured=await fetchCandidateBytes(wkCapInput());
+  assert.deepEqual(captured.bytes,wkCapBytes);
+  assert.equal(captured.payload_sha256,await sha256Hex(wkCapBytes));
+  assert.equal(captured.byte_length,wkCapBytes.length);
+  assert.equal('can_publish' in captured,false);
+  const fixtureResponse=(body,status,type,extra={})=>async()=>new Response(body,{status,headers:{'content-type':type,...extra}});
+  await wkCapReject(()=>fetchCandidateBytes(wkCapInput({fetchImpl:fixtureResponse(null,302,'text/html',{location:'https://wrong.tld'})})), 'redirect_forbidden');
+  await wkCapReject(()=>fetchCandidateBytes(wkCapInput({fetchImpl:fixtureResponse('oops',503,'text/html')})), 'upstream_http_unaccepted');
+  await wkCapReject(()=>fetchCandidateBytes(wkCapInput({fetchImpl:fixtureResponse('oops',200,'text/plain')})), 'upstream_content_type_unaccepted');
+  await wkCapReject(()=>fetchCandidateBytes(wkCapInput({fetchImpl:fixtureResponse(new Uint8Array(4_194_305),200,'application/octet-stream')})), 'raw_body_too_large');
+  await wkCapReject(()=>fetchCandidateBytes(wkCapInput({timeoutMs:100,fetchImpl:async()=>new Promise(()=>{})})), 'transport_timeout');
+});
+
+test('candidate private archive persists reservation before create-only, rechecks bytes and never publishes',async()=>{
+  const capture=await fetchCandidateBytes(wkCapInput());
+  const f=wkCapStorage();
+  const args={capture,weekStartEat:wkCapWeek,scheduledAt:wkCapSlot,attemptNumber:1,storage:f.storage,ledger:f.ledger};
+  const result=await archiveCandidateBytes(args);
+  assert.deepEqual(f.events,['reserved','put','uploaded_unverified','read','verified']);
+  assert.match(result.object_key,/^v1\/2026-10-19\/mdundo_ke\/20261019T090000Z-1\/[a-f0-9]{64}\.html$/);
+  assert.equal(result.status,'candidate_only_verified');
+  assert.equal(result.can_publish,false);
+  assert.equal(f.objects.size,1);
+  await wkCapReject(()=>archiveCandidateBytes(args),'raw_storage_create_failed');
+  assert.equal(f.objects.size,1);
+  assert.equal(f.entries.at(-1).state,'reserved');
+});
+
+test('candidate archive stops on digest, missing ledger, corrupt readback and invalid EAT slot',async()=>{
+  const capture=await fetchCandidateBytes(wkCapInput());
+  const f=wkCapStorage();
+  const args={capture,weekStartEat:wkCapWeek,scheduledAt:wkCapSlot,attemptNumber:1,storage:f.storage,ledger:f.ledger};
+  await wkCapReject(()=>archiveCandidateBytes({...args,capture:{...capture,payload_sha256:'0'.repeat(64)}}),'capture_digest_mismatch');
+  await wkCapReject(()=>archiveCandidateBytes({...args,scheduledAt:'2026-10-25T21:00:00Z'}),'slot_outside_eat_week');
+  await wkCapReject(()=>archiveCandidateBytes({...args,attemptNumber:9}),'attempt_number_invalid');
+  assert.deepEqual(f.events,[]);
+  await assert.rejects(()=>archiveCandidateBytes({...args,ledger:{record:async()=>{throw Error('durability unavailable')}}}),/durability unavailable/);
+  assert.equal(f.objects.size,0);
+  await wkCapReject(()=>archiveCandidateBytes({...args,storage:{...f.storage,readPrivate:async(key)=>new Uint8Array((await f.storage.readPrivate(key)).length)}}),'raw_storage_integrity_mismatch');
+  assert.equal(f.objects.size,1); // retained for explicit reconciliation, never deleted
+  assert.deepEqual(f.entries.map(x=>x.state),['reserved','uploaded_unverified']);
+});
