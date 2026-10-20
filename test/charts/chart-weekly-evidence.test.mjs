@@ -305,3 +305,135 @@ test('candidate archive stops on digest, missing ledger, corrupt readback and in
   assert.equal(f.objects.size,1); // retained for explicit reconciliation, never deleted
   assert.deepEqual(f.entries.map(x=>x.state),['reserved','uploaded_unverified']);
 });
+
+// Integrated WK100 candidate-only collector contract. Existing chart suite owner.
+import { runCandidateCapture,validateCaptureSlot } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
+const wkRuntimeSlot='2026-10-19T09:00:00Z';
+const wkRuntimeWeek='2026-10-19';
+const wkRuntimeBytes=new TextEncoder().encode('<div class="md-playlist-song-item" data-index="1" data-id="123" data-playlist-url="/top-charts/ke" data-title="Song" data-artist="Singer"></div>');
+const wkRuntimeContract={id:'10000000-0000-4000-8000-000000000001',source_key:'mdundo_ke',contract_version:'fixture-v1',
+  admission_state:'candidate',market:'KE',behavior:'consumption',native_metric:'rank',expected_depth:1,
+  cadence_kind:'daily',interval_hours:null,eat_hour:12,eat_minute:0,weekday_eat:null,
+  minimum_healthy_checkpoints:1,adapter_version:'fixture-v1'};
+const wkRuntimeAccess={source_key:'mdundo_ke',endpoint:'https://example.org/chart/ke',
+  authorization_ref:'WK100-ACCESS-TEST-1'};
+function wkRuntimeHarness(extra={}) {
+  const events=[],objects=new Map();
+  const db={
+    async reserve() {events.push('reserve');return {state:'reserved',reservation_id:'reservation1',lease_id:'lease1'};},
+    async advance(p){events.push(`advance:${p.p_action}`);return {accepted:true};},
+    async commit(p){events.push('commit');assert.equal(p.p_rows.length,p.p_outcome==='succeeded'?1:0);
+      return {status:p.p_outcome,receipt_id:'receipt1'};},
+    async fail(p){events.push('fail');return {status:p.p_outcome,receipt_id:'failed1'};},
+  };
+  const storage={
+    async putCreateOnly(key,bytes,options){events.push('put');assert.equal(options.upsert,false);
+      if(objects.has(key))throw Error('duplicate');objects.set(key,new Uint8Array(bytes));},
+    async readPrivate(key){events.push('read');const bytes=objects.get(key);
+      if(!bytes)throw Error('missing');return new Uint8Array(bytes);},
+  };
+  const args={contract:wkRuntimeContract,weekStartEat:wkRuntimeWeek,
+    scheduledAt:wkRuntimeSlot,attemptNumber:1,access:wkRuntimeAccess,
+    verifyAccess:async()=>{events.push('authorize');return true;},
+    db,storage,enabled:true,
+    clock:()=>new Date('2026-10-19T09:02:00Z'),
+    fetchImpl:async()=>{events.push('fetch');return new Response(wkRuntimeBytes,{status:200,headers:{'content-type':'text/html'}});},
+    ...extra};
+  return {events,objects,db,storage,args};
+}
+
+test('WK100 integrated collector authorizes source before durable slot claim, stores and commits without publishing',async()=>{
+  const f=wkRuntimeHarness();const r=await runCandidateCapture(f.args);
+  assert.deepEqual(f.events,['authorize','reserve','authorize','fetch','advance:bind','put','advance:uploaded','read','advance:verified','commit']);
+  assert.equal(r.status,'succeeded');assert.equal(r.can_publish,false);
+  assert.equal(f.objects.size,1);
+  assert.match(r.raw_object_key,/^v1\/2026-10-19\/mdundo_ke\/20261019T090000Z-1\/[a-f0-9]{64}\.html$/);
+});
+
+test('WK100 integrated collector rejects inactive, unapproved and mistimed sources before any claim',async()=>{
+  const f=wkRuntimeHarness();
+  await assert.rejects(()=>runCandidateCapture({...f.args,enabled:false}),/capture_not_enabled/);
+  await assert.rejects(()=>runCandidateCapture({...f.args,verifyAccess:async()=>false}),/source_access_not_authorized/);
+  await assert.rejects(()=>runCandidateCapture({...f.args,scheduledAt:'2026-10-19T10:00:00Z'}),/slot_unexpected/);
+  await assert.rejects(()=>runCandidateCapture({...f.args,clock:()=>new Date('2026-10-19T09:21:00Z')}),/slot_outside_capture_window/);
+  assert.deepEqual(f.events,[]);
+});
+
+test('WK100 integrated collector resumes bound original bytes, never silently polls a changed provider',async()=>{
+  const f=wkRuntimeHarness();
+  const digest=await (await import('../../supabase/functions/_shared/chart-candidate-capture.mjs')).sha256Hex(wkRuntimeBytes);
+  const key=`v1/${wkRuntimeWeek}/mdundo_ke/20261019T090000Z-1/${digest}.html`;
+  f.objects.set(key,new Uint8Array(wkRuntimeBytes));
+  f.args.db.reserve=async()=>({state:'bound',reservation_id:'reservation1',lease_id:'lease1',
+    object_key:key,payload_sha256:digest,byte_length:wkRuntimeBytes.length,
+    content_type:'text/html',fetched_at:'2026-10-19T09:01:00.000Z'});
+  f.args.fetchImpl=async()=>{throw Error('provider must NOT be polled on restart');};
+  const result=await runCandidateCapture(f.args);
+  assert.equal(result.status,'succeeded');assert.equal(result.can_publish,false);
+  assert(!f.events.includes('fetch'));assert.deepEqual(f.events,['authorize','read','advance:uploaded','advance:verified','commit']);
+  f.objects.set(key,new Uint8Array([0,1,2]));
+  await assert.rejects(()=>runCandidateCapture(f.args),/reconciliation_digest_mismatch/);
+});
+
+test('WK100 integrated collector persists a transport failure and never commits truncated raw rows',async()=>{
+  const f=wkRuntimeHarness({fetchImpl:async()=>new Response('blocked',{status:503,headers:{'content-type':'text/html'}})});
+  const result=await runCandidateCapture(f.args);
+  assert.equal(result.status,'transport_failed');assert.equal(result.can_publish,false);
+  assert(f.events.includes('fail'));assert(!f.events.includes('commit'));assert.equal(f.objects.size,0);
+  const g=wkRuntimeHarness();
+  g.storage.readPrivate=async()=>{g.events.push('read');return new Uint8Array([1,2,3]);};
+  await assert.rejects(()=>runCandidateCapture(g.args),/raw_storage_integrity_mismatch/);
+  assert(!g.events.includes('commit'));assert.equal(g.objects.size,1);
+});
+
+
+// The Edge gateway authenticates the signature. These tests seal the handler's
+// additional fail-closed checks; decoding alone is NEVER a signature verifier.
+import { readFileSync } from 'node:fs';
+import { isGatewayVerifiedServiceRole, runtimeProjectApiUrl } from
+  '../../supabase/functions/_shared/chart-capture-gateway-role.mjs';
+
+const wkJwt = (role='service_role',exp=2_108_002_896,iss='supabase',ref='zogdfvoizohrhwmovlpv') => {
+  const base64=x=>Buffer.from(JSON.stringify(x)).toString('base64url');
+  return base64({alg:'HS256',typ:'JWT'})+'.'+base64({role,exp,iss,ref})+'.'+('a'.repeat(43));
+};
+
+test('WK100 Edge gateway service identity rejects anon, malformed, expired and mismatched keys',()=>{
+  const valid=wkJwt(),now=1_792_480_000_000;
+  assert.equal(isGatewayVerifiedServiceRole(valid,valid,now),true);
+  assert.equal(isGatewayVerifiedServiceRole(wkJwt('anon'),wkJwt('anon'),now),false);
+  assert.equal(isGatewayVerifiedServiceRole(wkJwt('service_role',123),wkJwt('service_role',123),now),false);
+  assert.equal(isGatewayVerifiedServiceRole(wkJwt('service_role',2_108_002_896,'unknown'),wkJwt('service_role',2_108_002_896,'unknown'),now),false);
+  assert.equal(isGatewayVerifiedServiceRole(valid,'wrong',now),false);
+  assert.equal(isGatewayVerifiedServiceRole('not-a-jwt','not-a-jwt',now),false);
+  assert.equal(isGatewayVerifiedServiceRole('',valid,now),false);
+});
+
+test('WK100 Edge runtime authorization is inseparable from verified gateway and project origin',()=>{
+  const config=readFileSync(new URL('../../supabase/config.toml',import.meta.url),'utf8');
+  assert.match(config,/\[functions\.wk-chart-capture\]\s*verify_jwt\s*=\s*true/);
+  const edge=readFileSync(new URL('../../supabase/functions/wk-chart-capture/index.ts',import.meta.url),'utf8');
+  assert.match(edge,/isGatewayVerifiedServiceRole\(bearer,req\.headers\.get\('apikey'\)\)/);
+  assert.match(edge,/runtimeProjectApiUrl\(bearer,Deno\.env\.get\('WK100_CAPTURE_PROJECT_REF'\)\)/);
+  assert.match(edge,/createClient\(url,bearer,/);
+  assert.doesNotMatch(edge,/Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)/);
+  const ref='zogdfvoizohrhwmovlpv', production='pgzizndxdyhqmtyywjmt';
+  const now=1_792_480_000_000;
+  const valid=wkJwt();
+  assert.equal(runtimeProjectApiUrl(valid,ref,now),'https://'+ref+'.supabase.co');
+  assert.equal(runtimeProjectApiUrl(wkJwt('anon'),ref,now),null);
+  assert.equal(runtimeProjectApiUrl(wkJwt('service_role',123),ref,now),null);
+  assert.equal(runtimeProjectApiUrl(wkJwt('service_role',2_108_002_896,'bad'),ref,now),null);
+  assert.equal(runtimeProjectApiUrl(wkJwt('service_role',2_108_002_896,'supabase','invalid'),ref,now),null);
+  assert.equal(runtimeProjectApiUrl('invalid',ref,now),null);
+  // The helper only decodes claims. The hosted gateway MUST verify signatures
+  // and the separate platform-configured project identity must agree as well.
+  assert.equal(runtimeProjectApiUrl(wkJwt('service_role',2_108_002_896,'supabase',production),ref,now),null);
+  assert.equal(runtimeProjectApiUrl(valid,production,now),null);
+  assert.equal(runtimeProjectApiUrl(valid,'',now),null);
+  assert.equal(runtimeProjectApiUrl(valid,'invalid',now),null);
+  assert.equal(runtimeProjectApiUrl(valid,undefined,now),null);
+  assert.doesNotMatch(edge,/Deno\.env\.get\('SUPABASE_URL'\)/);
+  assert.doesNotMatch(edge,/runtimeProjectApiUrl\(bearer,req\.url\)/);
+  assert(edge.indexOf("candidate_collector_disabled") < edge.indexOf("WK100_CAPTURE_PROJECT_REF"));
+});
