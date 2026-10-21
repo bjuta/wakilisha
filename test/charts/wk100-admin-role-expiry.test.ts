@@ -12,15 +12,24 @@ const fixtures = vi.hoisted(() => ({ assignments: [] as RoleRow[] }));
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     from(table: string) {
+      let queriedRoles: string[] = [];
       const response = () => {
         if (table === "user_role_assignments") return { data: fixtures.assignments, error: null };
-        if (table === "role_capabilities") return { data: [{ capability_key: "view_charts_admin" }, { capability_key: "manage_charts" }], error: null };
+        if (table === "role_capabilities") {
+          const capabilities = queriedRoles.includes("administrator")
+            ? ["view_charts_admin", "manage_charts"]
+            : ["view_public_account"];
+          return { data: capabilities.map((capability_key) => ({ capability_key })), error: null };
+        }
         return { data: [], error: null };
       };
       const query = {
         select() { return query; },
         eq() { return query; },
-        in() { return query; },
+        in(column: string, values: string[]) {
+          if (table === "role_capabilities" && column === "role_key") queriedRoles = values;
+          return query;
+        },
         maybeSingle: async () => ({ data: { display_name: "Synthetic Test" }, error: null }),
         then(resolve: (value: ReturnType<typeof response>) => unknown, reject?: (reason: unknown) => unknown) {
           return Promise.resolve(response()).then(resolve, reject);
