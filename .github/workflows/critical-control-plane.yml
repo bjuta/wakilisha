@@ -196,7 +196,9 @@ jobs:
         run: node --test test/charts/wk100-offline-intake-authority.test.mjs
 
       - name: Verify WK100 server-only Admin preview and confidentiality
-        run: node --test test/charts/wk100-private-admin-preview.test.mjs
+        run: |
+          node --test test/charts/wk100-private-admin-preview.test.mjs
+          npx vitest run test/charts/wk100-admin-role-expiry.test.ts
 
       - name: Enforce Post draft and authored Thread authority
         run: >-
