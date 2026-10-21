@@ -189,6 +189,9 @@ jobs:
       - name: Run critical security and lifecycle tests
         run: npm run test:critical
 
+      - name: Verify WK100 local confidential preview fail-closed contract
+        run: node --test test/charts/wk100-private-preview.test.mjs
+
       - name: Enforce Post draft and authored Thread authority
         run: >-
           npx vitest run
