@@ -158,6 +158,10 @@ export const AdminChartsReviewQueue = lazy(() =>
   import("../pages/admin/charts/review-queue/page"),
 );
 
+export const Wk100PrivateAdminPreview = lazy(() =>
+  import('../pages/admin/charts/wk100-preview/page'),
+);
+
 export const AdminChartsScoringRuns = lazy(() =>
   import("../pages/admin/charts/scoring-runs/page"),
 );

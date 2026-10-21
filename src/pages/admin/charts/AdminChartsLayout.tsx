@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { AdminAccessGate } from "@/components/auth/AdminAccessGate";
+import { useAdminUser } from "@/hooks/useAdminUser";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { WkIcon } from "@/components/design-system/Icon";
 import type { WkIconName } from "@/components/design-system/Icon";
@@ -29,9 +30,13 @@ const MORE_ITEMS: NavItem[] = [
   { path: "/admin/charts/ingest-health", label: "API Health", icon: "HeartPulse", requiredCapability: "view_charts_admin" },
 ];
 
-const ALL_ITEMS = [...PRIMARY_TABS, ...MORE_ITEMS];
+const PRIVATE_WK100_ITEM: NavItem = { path: "/admin/charts/wk100-preview", label: "WAKILISHA 100", icon: "ShieldCheck", requiredCapability: "manage_charts" };
 
 function ChartsLayoutInner() {
+  const user = useAdminUser();
+  const showPrivatePreview = user.role === "super_admin" || user.role === "administrator";
+  const visibleMoreItems = showPrivatePreview ? [...MORE_ITEMS, PRIVATE_WK100_ITEM] : MORE_ITEMS;
+  const visibleItems = [...PRIMARY_TABS, ...visibleMoreItems];
   const { theme, toggle } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -53,8 +58,8 @@ function ChartsLayoutInner() {
   }, [moreOpen]);
 
   const isActive = (path: string) => currentPath === path || currentPath.startsWith(`${path}/`);
-  const activeMoreItem = MORE_ITEMS.find((i) => isActive(i.path));
-  const getPageTitle = () => ALL_ITEMS.find((i) => isActive(i.path))?.label || "Charts Admin";
+  const activeMoreItem = visibleMoreItems.find((i) => isActive(i.path));
+  const getPageTitle = () => visibleItems.find((i) => isActive(i.path))?.label || "Charts Admin";
 
   const TabLink = ({ item, compact }: { item: NavItem; compact?: boolean }) => {
     const active = isActive(item.path);
@@ -120,7 +125,7 @@ function ChartsLayoutInner() {
           </button>
           {moreOpen && (
             <div className="absolute left-0 top-full z-[var(--wk-z-popover)] mt-1 w-52 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] p-1 shadow-lg">
-              {MORE_ITEMS.map((item) => (
+              {visibleMoreItems.map((item) => (
                 <TabLink key={item.path} item={item} compact />
               ))}
             </div>
@@ -147,7 +152,7 @@ function ChartsLayoutInner() {
               <div><h1 className="truncate text-[13px] font-black tracking-tight text-[var(--wk-text)]">WAKILISHA</h1><p className="truncate text-[10px] text-[var(--wk-text-muted)]">Charts Admin</p></div>
             </div>
             <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-              {ALL_ITEMS.map((item) => (
+              {visibleItems.map((item) => (
                 <button
                   key={item.path}
                   onClick={() => { navigate(item.path); setMobileOpen(false); }}

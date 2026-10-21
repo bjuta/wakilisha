@@ -59,3 +59,6 @@ verify_jwt = true
 
 [functions.wk-chart-capture]
 verify_jwt = true
+
+[functions.wk100-private-admin-preview]
+verify_jwt = true
