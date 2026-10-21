@@ -10,18 +10,18 @@ const origins=new Set([
   'https://staging.wakilisha.africa',
   'http://localhost:5173',
 ]);
-function headers(req) {
+function headers(req:Request):Record<string,string> {
   const origin=req.headers.get('origin')??'';
   const h:Record<string,string>={'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff','vary':'Origin'};
   if(origins.has(origin)) h['access-control-allow-origin']=origin;
   return h;
 }
-function reply(req,status,body){return new Response(JSON.stringify(body),{status,headers:headers(req)});}
-function validBinding(url,ref) {
+function reply(req:Request,status:number,body:unknown):Response{return new Response(JSON.stringify(body),{status,headers:headers(req)});}
+function validBinding(url:string,ref:string|undefined):boolean {
   if(typeof ref!=='string'||!/^[a-z0-9]{20}$/.test(ref)) return false;
   try {const u=new URL(url);return u.protocol==='https:'&&u.hostname===ref+'.supabase.co'&&!u.username&&!u.password;} catch{return false;}
 }
-async function sha256(s) {
+async function sha256(s:string):Promise<string> {
   const encoded=new TextEncoder().encode(s);
   const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',encoded));
   return [...digest].map(v=>v.toString(16).padStart(2,'0')).join('');
