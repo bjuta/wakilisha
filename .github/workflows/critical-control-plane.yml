@@ -195,6 +195,9 @@ jobs:
       - name: Verify WK100 offline authority-bound intake
         run: node --test test/charts/wk100-offline-intake-authority.test.mjs
 
+      - name: Verify WK100 server-only Admin preview and confidentiality
+        run: node --test test/charts/wk100-private-admin-preview.test.mjs
+
       - name: Enforce Post draft and authored Thread authority
         run: >-
           npx vitest run
