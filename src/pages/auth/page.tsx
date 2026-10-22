@@ -9,6 +9,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
+import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { resendVerificationEmail } from "@/services/auth/accountVerification";
 import {
   getRegistryOnboardingArtists,
@@ -140,6 +141,7 @@ type AuthArtistFieldDrag = {
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [choice, setChoice] = useState<Choice>("charts");
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
@@ -813,8 +815,12 @@ export default function AuthPage() {
   const brandPanel = (
     <section className="hidden lg:flex flex-col justify-between relative overflow-hidden" style={{ width: "46%", background: "var(--wk-surface)" }}>
       <div className="relative z-10 p-10 md:p-14">
-        <div className="flex h-14 w-14 items-center justify-center rounded-[20px] text-[22px] font-black mb-6" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", boxShadow: "0 18px 60px rgba(var(--wk-brand-rgb), 0.22)" }}>W</div>
-        <div className="font-black tracking-[-.05em]" style={{ fontFamily: "var(--wk-font-display)", fontSize: "clamp(36px, 4vw, 52px)", lineHeight: 0.94, color: "var(--wk-text)" }}>WAKILISHA</div>
+        <img
+          src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"}
+          alt="WAKILISHA"
+          className="mb-6 h-9 w-auto max-w-[230px] object-contain"
+          data-wk-public-auth-logo="desktop"
+        />
       </div>
 
       <div
@@ -1001,8 +1007,12 @@ export default function AuthPage() {
       <section className="relative z-10 flex flex-1 flex-col justify-start bg-[var(--wk-bg)] px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-8 sm:px-10 sm:py-12 md:px-16 lg:justify-center lg:bg-transparent lg:px-20 lg:py-16">
         <div className="relative w-full max-w-[420px] mx-auto px-1 py-5 sm:px-2 sm:py-7 lg:max-w-[400px] lg:px-0 lg:py-0">
           <AuthMobileTextClearing className="lg:hidden mb-10 w-fit">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[16px] text-[18px] font-black mb-5" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", boxShadow: "0 14px 40px rgba(var(--wk-brand-rgb), 0.18)" }}>W</div>
-            <div className="font-black tracking-[-.05em] text-[28px]" style={{ fontFamily: "var(--wk-font-display)", color: "var(--wk-text)" }}>WAKILISHA</div>
+            <img
+              src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"}
+              alt="WAKILISHA"
+              className="mb-5 h-8 w-auto max-w-[200px] object-contain"
+              data-wk-public-auth-logo="mobile"
+            />
           </AuthMobileTextClearing>
 
           <AuthMobileTextClearing className="mb-8">
