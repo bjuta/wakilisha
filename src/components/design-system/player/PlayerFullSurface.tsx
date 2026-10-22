@@ -563,8 +563,8 @@ export function PlayerFullSurface({
   ) {
     contextActions.push({
       key: "moments",
-      label: "Create Moment",
-      description: "Start a Moment from the time you are hearing now.",
+      label: "Comment at Current Time",
+      description: "Comment on the part of this track you’re hearing.",
       icon: "MessageCirclePlus",
       onClick: () => {
         setPanel("none");
@@ -697,9 +697,23 @@ export function PlayerFullSurface({
                   : "max-w-[480px] text-left",
               ].join(" ")}
             >
-              <h1 className="text-balance text-[25px] font-black leading-tight tracking-[-0.035em] md:text-[30px]">
-                {currentTrack.title}
-              </h1>
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="min-w-0 text-balance text-[25px] font-black leading-tight tracking-[-0.035em] md:text-[30px]">
+                  {currentTrack.title}
+                </h1>
+                {!experience.spokenAudio && experience.capabilities.save ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleSave()}
+                    aria-label={saved ? "Saved track" : "Save track"}
+                    aria-pressed={saved}
+                    disabled={savePending}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] disabled:opacity-40"
+                  >
+                    <WkIcon name="Heart" size={21} fill={saved ? "currentColor" : "none"} />
+                  </button>
+                ) : null}
+              </div>
               <p className="mt-2 truncate text-[14px] font-bold text-[var(--wk-text-muted)]">
                 {experience.creatorLabel}
               </p>
@@ -789,7 +803,7 @@ export function PlayerFullSurface({
               )}
             </div>
 
-            <div className="mt-6 grid grid-cols-4 gap-2">
+            <div className={`mt-6 grid gap-2 ${experience.spokenAudio ? "grid-cols-4" : "grid-cols-3"}`}>
               {experience.spokenAudio ? (
                 <>
                   <PlayerUtilityButton
@@ -829,36 +843,23 @@ export function PlayerFullSurface({
               ) : (
                 <>
                   <PlayerUtilityButton
-                    icon="ListMusic"
-                    label="Queue"
-                    onClick={() => setPanel("queue")}
-                    active={panel === "queue"}
-                    disabled={!experience.capabilities.queue}
-                  />
-                  <PlayerUtilityButton
                     icon="MicVocal"
                     label="Lyrics"
-                    onClick={() =>
-                      setPanel(
-                        panel === "lyrics"
-                          ? "none"
-                          : "lyrics",
-                      )
-                    }
+                    onClick={() => setPanel(panel === "lyrics" ? "none" : "lyrics")}
                     active={panel === "lyrics"}
                   />
                   <PlayerUtilityButton
-                    icon="Heart"
-                    label={saved ? "Saved" : "Save"}
-                    onClick={() => void handleSave()}
-                    active={saved}
-                    disabled={!experience.capabilities.save || savePending}
-                  />
-                  <PlayerUtilityButton
-                    icon="MessageCirclePlus"
-                    label="Moments"
+                    icon="MessageCircle"
+                    label="Comments"
                     onClick={() => setMomentOpen(true)}
                     disabled={!experience.capabilities.moments}
+                  />
+                  <PlayerUtilityButton
+                    icon="ListMusic"
+                    label="Queue"
+                    onClick={() => setPanel(panel === "queue" ? "none" : "queue")}
+                    active={panel === "queue"}
+                    disabled={!experience.capabilities.queue}
                   />
                 </>
               )}
