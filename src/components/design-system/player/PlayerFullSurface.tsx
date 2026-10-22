@@ -664,7 +664,7 @@ export function PlayerFullSurface({
           <section className="flex w-full max-w-[520px] flex-col items-center">
             <div
               className={[
-                "aspect-square w-full overflow-hidden bg-[var(--wk-surface-raised)] shadow-[0_30px_90px_rgba(0,0,0,0.38)]",
+                `${usesProviderMedia ? "aspect-video" : "aspect-square"} w-full overflow-hidden bg-[var(--wk-surface-raised)] shadow-[0_30px_90px_rgba(0,0,0,0.38)]`,
                 isMobile
                   ? "max-w-[min(82vw,420px)] rounded-[28px]"
                   : "max-w-[480px] rounded-[30px]",
@@ -717,6 +717,20 @@ export function PlayerFullSurface({
               <p className="mt-2 truncate text-[14px] font-bold text-[var(--wk-text-muted)]">
                 {experience.creatorLabel}
               </p>
+              {!experience.spokenAudio ? (
+                <p className={`mt-1 text-[12px] font-semibold ${experience.availability === "excerpt"
+                  ? "text-[#C68B35]" : "text-[var(--wk-text-faint)]"}`}>
+                  {experience.availability === "excerpt"
+                    ? "Preview"
+                    : playbackBackend === "youtube"
+                      ? "YouTube"
+                      : playbackBackend === "soundcloud"
+                        ? "SoundCloud"
+                        : experience.availability === "unavailable"
+                          ? "Not available to play"
+                          : "Now Playing"}
+                </p>
+              ) : null>
             </div>
           </section>
 
@@ -731,7 +745,7 @@ export function PlayerFullSurface({
               />
               <div className="flex items-center justify-between text-[11px] font-semibold tabular-nums text-[var(--wk-text-faint)]">
                 <span>{formatPlayerClock(currentTime)}</span>
-                <span>{formatPlayerClock(duration)}</span>
+                <span>{`−${formatPlayerClock(Math.max(0, duration - currentTime))}`}</span>
               </div>
             </div>
 
