@@ -119,7 +119,7 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
                       {authUser.avatarUrl ? <img src={authUser.avatarUrl} alt="" className="h-full w-full object-cover" /> : initial}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-[var(--wk-text)]">{displayName}</span>
-                    <WkIcon name="ChevronsUpDown" size={17} />
+                    <WkIcon name="ChevronDown" size={17} />
                   </button>
                 ) : (
                   <>
