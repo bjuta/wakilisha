@@ -56,6 +56,23 @@ export function PlayerCompactSurface({
     isFullPlayerOpen,
   } = usePlayer();
 
+  const isMobile = mode === "mobile";
+  const [browserGap, setBrowserGap] = useState(0);
+  useEffect(() => {
+    if (!isMobile || !window.visualViewport) return;
+    const viewport = window.visualViewport;
+    const update = () => setBrowserGap(
+      Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop),
+    );
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+    };
+  }, [isMobile]);
+
   if (
     !currentTrack ||
     isFullPlayerOpen
@@ -93,22 +110,6 @@ export function PlayerCompactSurface({
     );
   };
 
-  const isMobile = mode === "mobile";
-  const [browserGap, setBrowserGap] = useState(0);
-  useEffect(() => {
-    if (!isMobile || !window.visualViewport) return;
-    const viewport = window.visualViewport;
-    const update = () => setBrowserGap(
-      Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop),
-    );
-    update();
-    viewport.addEventListener("resize", update);
-    viewport.addEventListener("scroll", update);
-    return () => {
-      viewport.removeEventListener("resize", update);
-      viewport.removeEventListener("scroll", update);
-    };
-  }, [isMobile]);
   const miniStatus = experience.availability === "excerpt"
     ? "Preview"
     : experience.availability === "unavailable"
