@@ -1779,7 +1779,7 @@ describe("public discovery final refinement regressions", () => {
         "src/components/navigation/wakilishaNavigation.ts", "utf8",
       );
       expect(canonical).toContain('{ label: "Home", to: "/", icon: "Home" }');
-      expect(canonical).toContain('{ label: "Following", to: "/following", icon: "Heart" }');
+      expect(canonical).toContain('{ label: "Following", to: "/following", icon: "Heart", audience: "signed-in" }');
       expect(canonical).toContain('{ label: "Charts", to: "/charts", icon: "ChartNoAxesColumnIncreasing" }');
       expect(mobileAppLayoutFinal).toContain('data-wk-workbook-mobile-shell="v4"');
       expect(mobileAppLayoutFinal).not.toContain("MobileBottomNav");
