@@ -4,6 +4,24 @@ import { describe, expect, it } from "vitest";
 const read = (name: string) => readFileSync(name, "utf8");
 
 describe("Workbook v4 is the only active product design authority", () => {
+  it("renders canonical light-only 600px email shells without changing Auth tokens", () => {
+    const adminSender = read("supabase/functions/admin-user-ops/index.ts");
+    const briefingSender = read("supabase/functions/briefing-handler/index.ts");
+    expect(adminSender).toContain('max-width:600px');
+    expect(adminSender).toContain('meta name="color-scheme" content="light"');
+    expect(briefingSender).toContain("max-width:600px!important");
+    expect(briefingSender).not.toContain("fonts.googleapis.com/css2?family=Inter");
+    for (const template of ["confirm-signup", "magic-link", "reset-password", "change-email"]) {
+      const html = read(`docs/email/templates/${template}.html`);
+      expect(html).toContain('max-width:600px');
+      expect(html).toContain('meta name="color-scheme" content="light"');
+      expect(html).toContain("{{ .ConfirmationURL }}");
+      expect(html).toContain("/assets/logos/wakilisha-logo-light.svg");
+      expect(html).not.toContain("fonts.googleapis.com");
+    }
+  });
+
+
   it("has no split v5 mobile sheet, CSS player suppressor or old font faces", () => {
     const root = read("src/index.css");
     expect(root).toContain('wakilisha-mobile-workbook-v4.css');
@@ -100,24 +118,36 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(shell).toContain("/assets/logos/wakilisha-logo-light.svg");
     expect(shell).not.toContain("{showLogo ? (");
     expect(shell).not.toContain("h-9 w-9");
+    const studioLogin = read("src/pages/admin/login/page.tsx");
+    expect(studioLogin).toContain("data-wk-studio-brand");
+    expect(studioLogin).toContain('src="/assets/logos/wakilisha-logo-dark.svg"');
+    expect(studioLogin).toContain("roleCanAccessAdmin");
+    expect(studioLogin).toContain("signInWithPassword");
+    const publicLogin = read("src/pages/auth/page.tsx");
+    expect(publicLogin).toContain('data-wk-public-auth-logo="desktop"');
+    expect(publicLogin).toContain('data-wk-public-auth-logo="mobile"');
+    expect(publicLogin).toContain("handleEmailAuth");
+    const resetPassword = read("src/pages/auth/reset-password/page.tsx");
+    expect(resetPassword).toContain("data-wk-reset-password-brand");
+    expect(resetPassword).toContain("supabase.auth.updateUser");
     const mobile = read("src/components/mobile/MobileAppLayout.tsx");
     expect(mobile).not.toContain("MobileBottomNav");
     const desktop = read("src/components/music/MusicDesktopShell.tsx");
     expect(desktop).toContain("const compactSidebar = sidebarCollapsed || tabletRail;");
     expect(desktop).toContain("md:flex");
     expect(desktop).toContain("w-[80px]");
-    expect(desktop).toContain("w-[272px]");
+    expect(desktop).toContain("w-[256px]");
     expect(desktop).toContain("md:hidden");
     expect(desktop).toContain("navigation.map");
     expect(desktop).toContain("visibleWakilishaNavigation");
     const menu = read("src/components/navigation/wakilishaNavigation.ts");
     expect(menu).not.toContain('{ label: "Settings", to: "/settings"');
     expect(read("src/components/mobile/MobileAccountDrawer.tsx")).toContain('to="/settings"');
-    expect(desktop).toContain('to="/settings"');
+    expect(desktop).toContain('startInYou');
 
 
     const compact = read("src/components/design-system/player/PlayerCompactSurface.tsx");
-    expect(compact).toContain("calc(env(safe-area-inset-bottom) + 8px)");
+    expect(compact).toContain("window.visualViewport");
     expect(compact).not.toContain("calc(52px + max(env(safe-area-inset-bottom)");
     expect(mobile).toContain("calc(84px + env(safe-area-inset-bottom))");
 

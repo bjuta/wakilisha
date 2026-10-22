@@ -338,8 +338,16 @@ describe("WAKILISHA M8C.4 Mention product UI", () => {
     expect(notificationBell).not.toContain(
       "Alerts",
     );
-    expect(sharedNavigation).toContain(
-      '{ label: "Notifications", to: "/notifications", icon: "Bell", audience: "signed-in" }',
+    const accountDrawer = readFileSync(
+      "src/components/mobile/MobileAccountDrawer.tsx",
+      "utf8",
+    );
+    expect(accountDrawer).toContain(
+      '{ to: "/notifications", icon: "Bell"',
+    );
+    expect(accountDrawer).toContain("available: signedIn");
+    expect(sharedNavigation).not.toContain(
+      '{ label: "Notifications", to: "/notifications"',
     );
     expect(mobileLayout).not.toContain("MobileBottomNav");
     expect(mobileLayout).not.toContain(

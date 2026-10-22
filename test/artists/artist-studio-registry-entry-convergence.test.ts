@@ -163,8 +163,8 @@ describe(
         expect(lazyPublic).toContain(
           "../pages/artist-studio/page",
         );
-        expect(sharedNavigation).toContain(
-          '{ label: "Artist Studio", to: "/artist-studio"',
+        expect(mobileDrawer).toContain(
+          '{ to: "/artist-studio", icon: "Mic2"',
         );
         expect(sharedNavigation).toContain(
           '{ label: "Magazine", to: "/magazine"',

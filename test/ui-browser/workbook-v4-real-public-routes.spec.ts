@@ -89,7 +89,7 @@ for (const width of [390, 768, 1440]) {
         const sidebar = page.locator(".wk-music-app-shell > aside").first();
         await expect(sidebar).toBeVisible();
         const widthInPixels = await sidebar.evaluate((node) => node.getBoundingClientRect().width);
-        expect(widthInPixels).toBe(width === 768 ? 80 : 272);
+        expect(widthInPixels).toBe(width < 1280 ? 80 : 256);
       }
 
       await page.screenshot({
@@ -113,12 +113,14 @@ test("Workbook sidebar uses accessible modal focus and replaces the old mobile b
   await menu.click();
   const drawer = page.getByRole("dialog", { name: "WAKILISHA Menu" });
   await expect(drawer).toBeVisible();
-  const sidebar = drawer.getByRole("navigation", { name: "WAKILISHA" });
+  const sidebar = drawer.getByRole("navigation", { name: "WAKILISHA places" });
   await expect(sidebar.getByRole("link", { name: "Video" })).toHaveAttribute("href", "/video");
   await expect(sidebar.getByRole("link", { name: "Audio" })).toHaveAttribute("href", "/audio");
-  await expect(sidebar.getByRole("link", { name: "Podcasts" })).toHaveAttribute("href", "/shows");
-  await expect(sidebar.getByRole("link", { name: "Following" })).toHaveAttribute("href", "/following");
-  // Guest discovery may include Following signup, never private inboxes.
+  await expect(sidebar.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+  await expect(sidebar.getByRole("link", { name: "Music" })).toHaveAttribute("href", "/music");
+  await expect(sidebar.getByRole("link", { name: "Charts" })).toHaveAttribute("href", "/charts");
+  await expect(sidebar.getByRole("link", { name: "Following" })).toHaveCount(0);
+  // Signed-out viewers see the eight public places; private actions live in You.
   await expect(sidebar.getByRole("link", { name: "Messages" })).toHaveCount(0);
   await expect(sidebar.getByRole("link", { name: "Notifications" })).toHaveCount(0);
   await page.keyboard.press("Escape");

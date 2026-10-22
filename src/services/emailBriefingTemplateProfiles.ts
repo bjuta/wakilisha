@@ -36,7 +36,7 @@ export const EMAIL_BRIEFING_TEMPLATE_PROFILES: Record<BriefingTemplateSlug, Brie
   culture_dispatch: {
     slug: "culture_dispatch",
     title: "Culture Dispatch",
-    accentColor: "#5C8E25",
+    accentColor: "#85C441",
     family: "culture",
     editorialIntent: "card-led magazine routes, chart movement, artist attention, archive entry points",
     headlinePattern: "A route through what culture left behind this week.",
@@ -48,7 +48,7 @@ export const EMAIL_BRIEFING_TEMPLATE_PROFILES: Record<BriefingTemplateSlug, Brie
   charts_digest: {
     slug: "charts_digest",
     title: "Charts Digest",
-    accentColor: "#5C8E25",
+    accentColor: "#85C441",
     family: "charts",
     editorialIntent: "album-art chart leader, compact ranked artwork tiles, movement board",
     headlinePattern: "The chart has a story this week.",
@@ -84,7 +84,7 @@ export const EMAIL_BRIEFING_TEMPLATE_PROFILES: Record<BriefingTemplateSlug, Brie
   artist_signals: {
     slug: "artist_signals",
     title: "Artist Signals",
-    accentColor: "#5C8E25",
+    accentColor: "#85C441",
     family: "artists",
     editorialIntent: "image-first artist wall, short artist notes, minimal metadata",
     headlinePattern: "Artists worth keeping close.",

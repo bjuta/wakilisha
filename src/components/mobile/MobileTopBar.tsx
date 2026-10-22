@@ -8,14 +8,8 @@ import {
   useLocation,
 } from "react-router-dom";
 import {
-  NotificationBell,
-} from "@/components/feature/community/NotificationBell";
-import {
   GlobalSearchSurface,
 } from "@/components/search/GlobalSearchSurface";
-import {
-  useAuthUser,
-} from "@/hooks/useAuthUser";
 import {
   MobileAccountDrawer,
 } from "./MobileAccountDrawer";
@@ -24,11 +18,8 @@ import {
 export function MobileTopBar() {
   const location = useLocation();
   const { theme } = useTheme();
-  const authUser = useAuthUser();
   const [searchOpen, setSearchOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-
-  const signedIn = Boolean(authUser.id);
 
   if (location.pathname === "/auth") return null;
 
@@ -60,21 +51,6 @@ export function MobileTopBar() {
           >
             <WkIcon name="Search" size={20} />
           </button>
-          {signedIn ? (
-            <NotificationBell
-              userId={authUser.id}
-              className="h-11 w-11 border border-[var(--wk-border)]"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAccountOpen(true)}
-              aria-label="Account"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text)]"
-            >
-              <WkIcon name="UserRound" size={20} />
-            </button>
-          )}
         </div>
       </header>
 

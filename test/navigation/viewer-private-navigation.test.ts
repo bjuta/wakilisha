@@ -1,40 +1,41 @@
 import { describe, expect, it } from "vitest";
 import {
   WAKILISHA_NAVIGATION,
+  WAKILISHA_FOOT_LINKS,
+  WAKILISHA_MORE_DESTINATIONS,
   visibleWakilishaNavigation,
 } from "@/components/navigation/wakilishaNavigation";
 
 const urls = (signedIn: boolean, messagesVisible: boolean) =>
   visibleWakilishaNavigation({ signedIn, messagesVisible })
-    .flatMap((group) => group.items.map((item) => item.to));
+    .flatMap(group => group.items.map(item => item.to));
 
-describe("WAKILISHA viewer-specific navigation", () => {
-  it("hides private destinations from anonymous visitors on both shells", () => {
-    const guest = urls(false, false);
-    expect(guest).toContain("/magazine");
-    expect(guest).toContain("/artists");
-    expect(guest).toContain("/following");
-    expect(guest).not.toContain("/messages");
-    expect(guest).not.toContain("/notifications");
-    // Never trust a stale access state if the viewer has signed out.
-    expect(urls(false, true)).toEqual(guest);
+describe("Workbook places and private You navigation", () => {
+  it("shows eight places to guests, nine to signed-in listeners", () => {
+    expect(urls(false, false)).toEqual([
+      "/", "/music", "/video", "/audio", "/magazine", "/artists", "/charts", "/credits",
+    ]);
+    expect(urls(true, false)).toEqual([
+      "/", "/following", "/music", "/video", "/audio", "/magazine", "/artists", "/charts", "/credits",
+    ]);
+    expect(urls(false, true)).toEqual(urls(false, false));
   });
 
-  it("only advertises Messages after granted viewer access", () => {
-    const signedInWithoutAccess = urls(true, false);
-    expect(signedInWithoutAccess).toContain("/notifications");
-    expect(signedInWithoutAccess).not.toContain("/messages");
-
-    const eligible = urls(true, true);
-    expect(eligible).toContain("/notifications");
-    expect(eligible).toContain("/messages");
+  it("keeps private destinations outside the public places map", () => {
+    for (const path of ["/messages", "/notifications", "/settings", "/artist-studio", "/field"]) {
+      expect(urls(false, false)).not.toContain(path);
+      expect(urls(true, true)).not.toContain(path);
+    }
+    expect(WAKILISHA_NAVIGATION).toHaveLength(1);
   });
 
-  it("keeps the canonical route order and does not mutate the shared map", () => {
-    const before = WAKILISHA_NAVIGATION.flatMap((group) => group.items.map((item) => item.to));
-    urls(false, false);
-    urls(true, true);
-    const after = WAKILISHA_NAVIGATION.flatMap((group) => group.items.map((item) => item.to));
-    expect(after).toEqual(before);
+  it("retains existing secondary destinations and legal links", () => {
+    const more = WAKILISHA_MORE_DESTINATIONS.map(item => item.to);
+    for (const path of ["/shows", "/releases", "/playlists", "/genres", "/labels", "/guides", "/field"]) {
+      expect(more).toContain(path);
+    }
+    expect(WAKILISHA_FOOT_LINKS.map(item => item.to)).toEqual([
+      "/about", "/contact", "/faqs", "/privacy", "/terms",
+    ]);
   });
 });

@@ -37,6 +37,7 @@ export function PlayerPanelSheet({
   if (!open) return null;
 
   const mobile = mode === "mobile";
+  const fullScreenLyrics = mobile && title === "Lyrics";
 
   return (
     <Portal>
@@ -56,10 +57,12 @@ export function PlayerPanelSheet({
         <section
           data-scroll-lock="container"
           className={[
-            "absolute overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl",
-            mobile
-              ? "inset-x-0 bottom-0 max-h-[88dvh] rounded-t-[30px]"
-              : "bottom-5 right-5 top-5 w-[min(440px,calc(100vw-40px))] rounded-[28px]",
+            "absolute flex flex-col overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl",
+            fullScreenLyrics
+              ? "inset-0 h-[100dvh] rounded-none border-0"
+              : mobile
+                ? "inset-x-0 bottom-0 max-h-[88dvh] rounded-t-[30px]"
+                : "bottom-5 right-5 top-5 w-[min(440px,calc(100vw-40px))] rounded-[28px]",
           ].join(" ")}
           style={
             mobile
@@ -69,7 +72,7 @@ export function PlayerPanelSheet({
               : undefined
           }
         >
-          {mobile ? (
+          {mobile && !fullScreenLyrics ? (
             <div className="flex justify-center pb-1 pt-2.5">
               <span className="h-1 w-10 rounded-full bg-[var(--wk-text-faint)]/45" />
             </div>
@@ -91,13 +94,15 @@ export function PlayerPanelSheet({
               type="button"
               onClick={onClose}
               aria-label={`Close ${title}`}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] transition-colors hover:text-[var(--wk-text)]"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] transition-colors hover:text-[var(--wk-text)]"
             >
-              <WkIcon name="X" size={17} />
+              <WkIcon name={fullScreenLyrics ? "ChevronDown" : "X"} size={20} />
             </button>
           </div>
 
-          <div className="max-h-[calc(88dvh-78px)] overflow-y-auto overscroll-contain p-4 md:p-5">
+          <div className={fullScreenLyrics
+            ? "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-7"
+            : "max-h-[calc(88dvh-78px)] overflow-y-auto overscroll-contain p-4 md:p-5"}>
             {children}
           </div>
         </section>

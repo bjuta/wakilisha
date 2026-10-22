@@ -15,6 +15,7 @@ export function SeekRail({
   onSeek,
   variant = "inline",
   step = 5,
+  tone = "brand",
 }: {
   label: string;
   currentTime: number;
@@ -23,6 +24,7 @@ export function SeekRail({
   onSeek: (time: number) => void;
   variant?: SeekRailVariant;
   step?: number;
+  tone?: "brand" | "full" | "preview";
 }) {
   const draggingRef = useRef(false);
   const safeDuration =
@@ -170,7 +172,10 @@ export function SeekRail({
         ].join(" ")}
       >
         <div
-          className="h-full rounded-full bg-[var(--wk-brand)]"
+          className={[
+            "h-full rounded-full",
+            tone === "preview" ? "bg-[#C68B35]" : tone === "full" ? "bg-[var(--wk-text)]" : "bg-[var(--wk-brand)]",
+          ].join(" ")}
           style={{
             width: `${ratio * 100}%`,
           }}

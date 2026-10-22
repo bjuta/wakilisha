@@ -238,7 +238,7 @@ export function TrackMomentDrawer({
       <button
         type="button"
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        aria-label="Close moment comments"
+        aria-label="Close comments"
         onClick={onClose}
       />
 
@@ -250,7 +250,7 @@ export function TrackMomentDrawer({
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--wk-brand)]">
                 <WkIcon name="MessageCircle" size={12} />
-                Moment comments
+                Comments at this time
               </div>
               <h2 className="mt-2 text-[22px] font-black leading-none tracking-[-0.04em] text-[var(--wk-text)]">
                 {selectedLabel} in {track.title}
@@ -328,7 +328,7 @@ export function TrackMomentDrawer({
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]">
                 <WkIcon name="Clock3" size={20} />
               </div>
-              <p className="text-[14px] font-black text-[var(--wk-text)]">No comments at this moment yet</p>
+              <p className="text-[14px] font-black text-[var(--wk-text)]">No comments at this time yet</p>
               <p className="mx-auto mt-1 max-w-[260px] text-[12px] leading-relaxed text-[var(--wk-text-muted)]">
                 Start the conversation around the exact part of the song people should hear.
               </p>
@@ -397,7 +397,7 @@ export function TrackMomentSummary({
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/20 bg-[var(--wk-brand-soft)]/40 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)]">
             <WkIcon name="MessageCircle" size={12} />
-            Most discussed moments
+            Most discussed parts
           </div>
           <p className="mt-2 text-[13px] font-semibold text-[var(--wk-text-muted)]">
             Timestamped comments from listeners.

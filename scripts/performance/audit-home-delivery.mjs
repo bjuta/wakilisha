@@ -340,11 +340,12 @@ if (
   !/<h1[^>]*>\s*Notifications\s*<\/h1>/m.test(
     notificationsPage,
   ) ||
-  !canonicalNavigation.includes(
-    '{ label: "Notifications", to: "/notifications", icon: "Bell", audience: "signed-in" }',
-  ) ||
-  (!mobileSidebar.includes("navigation.map") || !mobileSidebar.includes("visibleWakilishaNavigation")) ||
-  !mobileTopBar.includes("<NotificationBell") ||
+  !mobileSidebar.includes('{ to: "/notifications", icon: "Bell"') ||
+  !mobileSidebar.includes("available: signedIn") ||
+  !canonicalNavigation.includes('{ label: "Home", to: "/", icon: "Home" }') ||
+  !mobileSidebar.includes("visibleWakilishaNavigation") ||
+  !mobileSidebar.includes('aria-label="Your WAKILISHA"') ||
+  mobileTopBar.includes("<NotificationBell") ||
   !mobileTopBar.includes('aria-label="Open WAKILISHA menu"')
 ) {
   fail(
@@ -357,8 +358,8 @@ if (
   mobileCss.includes(".phn-nav--compact") ||
   mobileCss.includes(".phn-nav-primary-core") ||
   !mobileAppLayout.includes("<MobileTopBar") ||
-  !mobileSidebar.includes('aria-label="WAKILISHA Menu"') ||
-  !mobileSidebar.includes('aria-label="WAKILISHA"')
+  !mobileSidebar.includes('aria-label={youOpen ? "You" : "WAKILISHA Menu"}') ||
+  !mobileSidebar.includes('aria-label="WAKILISHA places"')
 ) {
   fail(
     "Workbook v4 must render one accessible mobile sidebar and no legacy bottom navigation",

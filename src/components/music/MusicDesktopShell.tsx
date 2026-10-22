@@ -15,9 +15,6 @@ import {
   WkIcon,
 } from "@/components/design-system/Icon";
 import {
-  NotificationBell,
-} from "@/components/feature/community/NotificationBell";
-import {
   useTheme,
 } from "@/components/design-system/theme/ThemeProvider";
 import {
@@ -29,7 +26,6 @@ import type {
 import { GlobalSearchSurface } from "@/components/search/GlobalSearchSurface";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useMessagesAccess } from "@/hooks/useMessagesAccess";
-import { useSessionSignOut } from "@/hooks/useSessionSignOut";
 
 const MUSIC_APP_PREFIXES = [
   "/music",
@@ -109,6 +105,7 @@ function AppNavLink({
     <Link
       to={to}
       aria-label={label}
+      aria-current={active ? "page" : undefined}
       title={collapsed ? label : undefined}
       className={[
         "relative flex min-h-11 items-center rounded-xl text-[13px] font-semibold transition-colors",
@@ -181,10 +178,7 @@ export function MusicDesktopShell({
 }) {
   const location = useLocation();
   const identity = useSiteIdentity();
-  const {
-    theme,
-    toggle,
-  } = useTheme();
+  const { theme } = useTheme();
   const authUser = useAuthUser();
   const isSignedIn = !authUser.loading && authUser.id.length > 0;
   const messagesAccess = useMessagesAccess();
@@ -192,7 +186,6 @@ export function MusicDesktopShell({
     signedIn: isSignedIn,
     messagesVisible: !messagesAccess.loading && messagesAccess.visible,
   });
-  const { signOut, signingOut, signOutError } = useSessionSignOut("/auth");
   const [logoError, setLogoError] =
     useState(false);
   const [
@@ -214,14 +207,15 @@ export function MusicDesktopShell({
     setGlobalSearchOpen,
   ] = useState(false);
   const [smallScreenMenuOpen, setSmallScreenMenuOpen] = useState(false);
-  // Workbook: 768–1023px is a permanent 80px icon rail, not a phone drawer.
-  // Keep the user's desktop-expanded preference untouched for >=1024px.
+  const [menuStartsInYou, setMenuStartsInYou] = useState(false);
+  // Workbook: 768 to 1279px uses the permanent 80px icon rail.
+  // Keep the user’s expanded desktop preference at widths of 1280px and above.
   const [tabletRail, setTabletRail] = useState(() =>
     typeof window !== "undefined" &&
-    window.matchMedia("(min-width: 768px) and (max-width: 1023px)").matches
+    window.matchMedia("(min-width: 768px) and (max-width: 1279px)").matches
   );
   useEffect(() => {
-    const query = window.matchMedia("(min-width: 768px) and (max-width: 1023px)");
+    const query = window.matchMedia("(min-width: 768px) and (max-width: 1279px)");
     const update = () => setTabletRail(query.matches);
     update();
     query.addEventListener("change", update);
@@ -398,7 +392,7 @@ export function MusicDesktopShell({
           "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-[var(--wk-border)] bg-[var(--wk-surface)] transition-[width] duration-200 ease-out [scrollbar-width:thin] md:flex",
           compactSidebar
             ? "w-[80px]"
-            : "w-[272px]",
+            : "w-[256px]",
         ].join(" ")}
       >
         <div
@@ -492,11 +486,6 @@ export function MusicDesktopShell({
 
           {navigation.map((group) => (
             <div key={group.label}>
-              {!compactSidebar && (
-                <p className="mb-1 mt-5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--wk-text-faint)]">
-                  {group.label}
-                </p>
-              )}
               {group.items.map((item) => (
                 <AppNavLink
                   key={item.to}
@@ -516,117 +505,28 @@ export function MusicDesktopShell({
               : "p-4",
           ].join(" ")}
         >
-          {!compactSidebar ? (
-            <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-4">
-              <div className="text-[11px] font-black text-[var(--wk-brand)]">
-                Are you an Artist?
-              </div>
-              <p className="mt-2 text-[11px] font-medium leading-relaxed text-[var(--wk-text-muted)]">
-                Put your music in front of people discovering WAKILISHA.
-              </p>
-              <Link
-                to="/artist-studio"
-                className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--wk-surface-raised)] px-3 py-2 text-[11px] font-bold text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-strong)]"
-              >
-                Artist Studio
-                <WkIcon
-                  name="ArrowUpRight"
-                  size={13}
-                />
-              </Link>
-            </div>
-          ) : null}
-
-          <div
-            className={[
-              "border-t border-[var(--wk-divider)] pt-4",
-              compactSidebar
-                ? "flex flex-col items-center gap-2"
-                : "mt-5 flex items-center gap-2",
-            ].join(" ")}
-          >
+          <div className="border-t border-[var(--wk-divider)] px-2 pt-3">
             <button
               type="button"
-              onClick={toggle}
-              aria-label={
-                theme === "dark"
-                  ? "Switch to light mode"
-                  : "Switch to dark mode"
-              }
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
+              onClick={() => { setMenuStartsInYou(true); setSmallScreenMenuOpen(true); }}
+              aria-label="Open You"
+              title="You"
+              className={["flex min-h-12 w-full items-center rounded-xl text-left text-[13px] font-semibold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]",
+                compactSidebar ? "justify-center" : "gap-3 px-2"].join(" ")}
             >
-              <WkIcon
-                name={
-                  theme === "dark"
-                    ? "Sun"
-                    : "Moon"
-                }
-                size={15}
-              />
+              {authUser.avatarUrl ? (
+                <img src={authUser.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
+                  <WakilishaAccountMark size={21} />
+                </span>
+              )}
+              {!compactSidebar ? <span className="min-w-0 flex-1 truncate">
+                {isSignedIn ? (authUser.name || authUser.email || "You") : "Sign In"}
+              </span> : null}
+              {!compactSidebar ? <WkIcon name="ChevronDown" size={16} /> : null}
             </button>
-
-            {authUser.id ? (
-              <NotificationBell
-                userId={authUser.id}
-                className={[
-                  "h-11 w-11 border border-[var(--wk-border)]",
-                  activeSection === "notifications"
-                    ? "bg-[var(--wk-brand-soft)] ring-1 ring-[var(--wk-brand)]"
-                    : "",
-                ].join(" ")}
-              />
-            ) : null}
-
-            <Link
-              to="/settings"
-              aria-label="Settings"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-            >
-              <WkIcon
-                name="Settings"
-                size={15}
-              />
-            </Link>
-
-            <Link
-              to="/profile"
-              aria-label="Profile"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-            >
-              <WkIcon
-                name="UserRound"
-                size={15}
-              />
-            </Link>
           </div>
-
-          {isSignedIn ? (
-            <div className={compactSidebar ? "mt-2" : "mt-3"}>
-              <button
-                type="button"
-                onClick={() => void signOut()}
-                disabled={signingOut}
-                title={compactSidebar ? "Sign out" : undefined}
-                aria-label={compactSidebar ? "Sign out" : undefined}
-                className={[
-                  "flex h-11 items-center rounded-full border border-[var(--wk-border)] text-[12px] font-bold text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)] disabled:cursor-wait disabled:opacity-60",
-                  compactSidebar
-                    ? "w-full justify-center px-0"
-                    : "w-full justify-start gap-2.5 px-3",
-                ].join(" ")}
-              >
-                <WkIcon name="LogOut" size={15} />
-                {!compactSidebar ? (
-                  <span>{signingOut ? "Signing out" : "Sign out"}</span>
-                ) : null}
-              </button>
-              {!compactSidebar && signOutError ? (
-                <p role="alert" className="mt-2 text-[11px] font-semibold text-[var(--wk-danger)]">
-                  {signOutError}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       </aside>
 
@@ -637,7 +537,7 @@ export function MusicDesktopShell({
             aria-label="Open WAKILISHA menu"
             aria-expanded={smallScreenMenuOpen}
             aria-controls="wk-workbook-sidebar"
-            onClick={() => setSmallScreenMenuOpen(true)}
+            onClick={() => { setMenuStartsInYou(false); setSmallScreenMenuOpen(true); }}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text)]"
           >
             <WkIcon name="Menu" size={20} />
@@ -660,13 +560,7 @@ export function MusicDesktopShell({
             <WkIcon name="Search" size={16} />
           </button>
 
-          <Link
-            to="/profile"
-            aria-label="Profile"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]"
-          >
-            <WkIcon name="UserRound" size={16} />
-          </Link>
+
         </div>
 
         <div className="min-h-screen">
@@ -677,6 +571,8 @@ export function MusicDesktopShell({
         open={smallScreenMenuOpen}
         onClose={() => setSmallScreenMenuOpen(false)}
         onSearch={() => setGlobalSearchOpen(true)}
+        startInYou={menuStartsInYou && isSignedIn}
+        rail={compactSidebar}
       />
       <GlobalSearchSurface
         open={globalSearchOpen}

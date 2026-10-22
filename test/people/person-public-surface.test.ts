@@ -988,7 +988,7 @@ describe(
 
         expect(readFileSync("src/components/navigation/wakilishaNavigation.ts", "utf8"))
           .toContain(
-            '{ label: "Following", to: "/following", icon: "Heart" }',
+            '{ label: "Following", to: "/following", icon: "Heart", audience: "signed-in" }',
           );
       },
     );
@@ -1409,7 +1409,7 @@ describe(
     );
 
     it(
-      "keeps all public destinations in one identical desktop and mobile sidebar",
+      "keeps public places shared and private, secondary and legal routes reachable through You",
       () => {
         const navigation = readFileSync("src/components/navigation/wakilishaNavigation.ts", "utf8");
         const desktop = readFileSync("src/components/music/MusicDesktopShell.tsx", "utf8");
@@ -1417,15 +1417,18 @@ describe(
         const mobileTop = readFileSync("src/components/mobile/MobileTopBar.tsx", "utf8");
 
         for (const route of [
-          "/music", "/video", "/audio", "/shows", "/magazine",
-          "/following", "/messages", "/notifications", "/artists",
-          "/charts", "/playlists", "/releases", "/genres", "/labels",
-          "/guides", "/credits", "/field", "/artist-studio",
-          "/about", "/contact", "/faqs", "/privacy", "/terms",
+          "/music", "/video", "/audio", "/magazine", "/following",
+          "/artists", "/charts", "/credits",
+          "/shows", "/playlists", "/releases", "/genres", "/labels",
+          "/guides", "/field", "/about", "/contact", "/faqs",
+          "/privacy", "/terms",
         ]) {
           expect(navigation).toContain(`to: "${route}"`);
         }
-
+        for (const route of ["/messages", "/notifications", "/artist-studio", "/profile", "/settings"]) {
+          expect(drawer).toContain(`to: "${route}"`);
+        }
+        expect(drawer).toContain("messagesAccess.visible");
         expect(drawer).toContain("navigation.map");
         expect(drawer).toContain("visibleWakilishaNavigation");
         expect(desktop).toContain("navigation.map");
@@ -1779,7 +1782,7 @@ describe("public discovery final refinement regressions", () => {
         "src/components/navigation/wakilishaNavigation.ts", "utf8",
       );
       expect(canonical).toContain('{ label: "Home", to: "/", icon: "Home" }');
-      expect(canonical).toContain('{ label: "Following", to: "/following", icon: "Heart" }');
+      expect(canonical).toContain('{ label: "Following", to: "/following", icon: "Heart", audience: "signed-in" }');
       expect(canonical).toContain('{ label: "Charts", to: "/charts", icon: "ChartNoAxesColumnIncreasing" }');
       expect(mobileAppLayoutFinal).toContain('data-wk-workbook-mobile-shell="v4"');
       expect(mobileAppLayoutFinal).not.toContain("MobileBottomNav");
@@ -1972,15 +1975,21 @@ describe("Viewer-aware universal navigation", () => {
     const guest = destinations(false, false);
     expect(guest).toContain("/magazine");
     expect(guest).toContain("/artists");
-    expect(guest).toContain("/following");
+    expect(guest).not.toContain("/following");
     expect(guest).not.toContain("/messages");
     expect(guest).not.toContain("/notifications");
     expect(destinations(false, true)).toEqual(guest);
   });
 
-  it("keeps the right destinations for eligible authenticated listeners", () => {
-    expect(destinations(true, false)).toContain("/notifications");
+  it("keeps private notification and messaging actions in You, gated by access", () => {
+    expect(destinations(true, false)).toContain("/following");
+    expect(destinations(true, false)).not.toContain("/notifications");
     expect(destinations(true, false)).not.toContain("/messages");
-    expect(destinations(true, true)).toContain("/messages");
+    expect(destinations(true, true)).not.toContain("/messages");
+    const you = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
+    expect(you).toContain('to: "/notifications"');
+    expect(you).toContain('to: "/messages"');
+    expect(you).toContain("messagesAccess.visible");
+    expect(you).toContain("signedIn && !messagesAccess.loading");
   });
 });
