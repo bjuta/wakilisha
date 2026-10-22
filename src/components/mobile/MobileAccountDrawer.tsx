@@ -37,10 +37,12 @@ function DrawerNavLink({ item, onNavigate }: {
   );
 }
 
-export function MobileAccountDrawer({ open, onClose, onSearch }: {
+export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = false, rail = false }: {
   open: boolean;
   onClose: () => void;
   onSearch: () => void;
+  startInYou?: boolean;
+  rail?: boolean;
 }) {
   const [youOpen, setYouOpen] = useState(false);
   const authUser = useAuthUser();
@@ -58,7 +60,7 @@ export function MobileAccountDrawer({ open, onClose, onSearch }: {
   const initial = displayName.slice(0, 1).toUpperCase() || "W";
 
   useScrollLock(open);
-  useEffect(() => { if (!open) setYouOpen(false); }, [open]);
+  useEffect(() => { setYouOpen(open && startInYou); }, [open, startInYou]);
   if (!open) return null;
 
   const close = () => {
@@ -79,7 +81,8 @@ export function MobileAccountDrawer({ open, onClose, onSearch }: {
     <ModalOverlay isOpen={open} isDismissable onOpenChange={(value) => { if (!value) close(); }}
       className="fixed inset-0 z-[170] bg-black/55 backdrop-blur-[2px]">
       <AriaModal id="wk-workbook-sidebar" data-scroll-lock="container"
-        className="absolute inset-y-0 left-0 flex w-[min(300px,90vw)] flex-col overflow-hidden border-r border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl"
+        className={["absolute inset-y-0 left-0 flex w-[min(300px,90vw)] flex-col overflow-hidden border-r border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl",
+          startInYou ? `md:inset-y-auto md:bottom-5 md:h-[min(680px,calc(100dvh-40px))] md:rounded-2xl md:border ${rail ? "md:left-[80px]" : "md:left-[256px]"}` : ""].join(" ")}
         style={{ paddingTop: "max(env(safe-area-inset-top), 12px)", paddingBottom: "max(env(safe-area-inset-bottom), 12px)" }}>
         <Dialog aria-label={youOpen ? "You" : "WAKILISHA Menu"} className="flex min-h-0 flex-1 flex-col outline-none">
           <header className="flex min-h-[64px] items-center justify-between gap-3 px-5">
