@@ -524,7 +524,7 @@ export function MusicDesktopShell({
               {!compactSidebar ? <span className="min-w-0 flex-1 truncate">
                 {isSignedIn ? (authUser.name || authUser.email || "You") : "Sign In"}
               </span> : null}
-              {!compactSidebar ? <WkIcon name="ChevronsUpDown" size={16} /> : null}
+              {!compactSidebar ? <WkIcon name="ChevronDown" size={16} /> : null}
             </button>
           </div>
         </div>
