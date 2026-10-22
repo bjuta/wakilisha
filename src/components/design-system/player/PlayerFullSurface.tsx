@@ -664,7 +664,7 @@ export function PlayerFullSurface({
           <section className="flex w-full max-w-[520px] flex-col items-center">
             <div
               className={[
-                `${usesProviderMedia ? "aspect-video" : "aspect-square"} w-full overflow-hidden bg-[var(--wk-surface-raised)] shadow-[0_30px_90px_rgba(0,0,0,0.38)]`,
+                `${playbackBackend === "youtube" ? "aspect-video" : "aspect-square"} w-full overflow-hidden bg-[var(--wk-surface-raised)] shadow-[0_30px_90px_rgba(0,0,0,0.38)]`,
                 isMobile
                   ? "max-w-[min(82vw,420px)] rounded-[28px]"
                   : "max-w-[480px] rounded-[30px]",
