@@ -105,6 +105,13 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(studioLogin).toContain('src="/assets/logos/wakilisha-logo-dark.svg"');
     expect(studioLogin).toContain("roleCanAccessAdmin");
     expect(studioLogin).toContain("signInWithPassword");
+    const publicLogin = read("src/pages/auth/page.tsx");
+    expect(publicLogin).toContain('data-wk-public-auth-logo="desktop"');
+    expect(publicLogin).toContain('data-wk-public-auth-logo="mobile"');
+    expect(publicLogin).toContain("handleEmailAuth");
+    const resetPassword = read("src/pages/auth/reset-password/page.tsx");
+    expect(resetPassword).toContain("data-wk-reset-password-brand");
+    expect(resetPassword).toContain("supabase.auth.updateUser");
     const mobile = read("src/components/mobile/MobileAppLayout.tsx");
     expect(mobile).not.toContain("MobileBottomNav");
     const desktop = read("src/components/music/MusicDesktopShell.tsx");
