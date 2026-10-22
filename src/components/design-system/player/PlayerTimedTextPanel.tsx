@@ -56,7 +56,7 @@ export function PlayerTimedTextPanel({
     if (activeIndex < 0) return;
     activeRef.current?.scrollIntoView({
       block: "nearest",
-      behavior: "smooth",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
     });
   }, [activeIndex]);
 
@@ -124,6 +124,8 @@ export function PlayerTimedTextPanel({
               ref={active ? activeRef : null}
               type="button"
               disabled={!timed}
+              title={timed ? `Jump to ${formatPlayerClock(line.startSeconds ?? 0)}` : undefined}
+              aria-label={timed ? `${line.text}. Jump to ${formatPlayerClock(line.startSeconds ?? 0)}` : line.text}
               onClick={() => {
                 if (line.startSeconds !== null) {
                   onSeek(line.startSeconds);
@@ -131,9 +133,15 @@ export function PlayerTimedTextPanel({
               }}
               className={[
                 "flex w-full gap-3 rounded-2xl px-3 py-2.5 text-left transition-all disabled:cursor-default",
-                active
-                  ? "bg-[var(--wk-brand-soft)] text-[var(--wk-text)]"
-                  : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg)] hover:text-[var(--wk-text)] disabled:hover:bg-transparent",
+                variant === "lyrics"
+                  ? active
+                    ? "text-[var(--wk-text)] opacity-100"
+                    : index < activeIndex
+                      ? "text-[var(--wk-text)] opacity-40"
+                      : "text-[var(--wk-text)] opacity-60 hover:opacity-100"
+                  : active
+                    ? "bg-[var(--wk-brand-soft)] text-[var(--wk-text)]"
+                    : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg)] hover:text-[var(--wk-text)] disabled:hover:bg-transparent",
                 stanzaStart
                   ? "mt-5"
                   : variant === "lyrics" && index > 0
@@ -141,7 +149,7 @@ export function PlayerTimedTextPanel({
                     : "",
               ].join(" ")}
             >
-              {timed ? (
+              {timed && variant !== "lyrics" ? (
                 <span className="w-12 shrink-0 pt-1 font-mono text-[10px] font-bold text-[var(--wk-brand)]">
                   {formatPlayerClock(line.startSeconds ?? 0)}
                 </span>
@@ -150,7 +158,7 @@ export function PlayerTimedTextPanel({
                 className={[
                   "min-w-0 flex-1",
                   variant === "lyrics"
-                    ? "text-[18px] font-black leading-7 tracking-[-0.02em]"
+                    ? "text-[clamp(22px,3vw,30px)] font-semibold leading-[1.45] tracking-[-0.02em]"
                     : "text-[13px] leading-6",
                 ].join(" ")}
               >
