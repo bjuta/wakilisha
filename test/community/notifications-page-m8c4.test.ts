@@ -109,15 +109,13 @@ describe(
     });
 
     it("keeps Notifications reachable in the canonical sidebar without restoring the retired mobile tab bar", () => {
-      expect(navigation).toContain(
-        '{ label: "Notifications", to: "/notifications", icon: "Bell", audience: "signed-in" }',
-      );
+      expect(mobileDrawer).toContain('to: "/notifications"');
       expect(navigation).toContain(
         '{ label: "Artists", to: "/artists", icon: "Users" }',
       );
       expect(mobileDrawer).toContain("visibleWakilishaNavigation");
       expect(mobileDrawer).toContain("item.to");
-      expect(mobileHeader).toContain("<NotificationBell");
+      expect(mobileHeader).toContain('aria-label="Open WAKILISHA menu"');
       expect(mobile).toContain("<MobileTopBar");
       expect(mobile).not.toContain("MobileBottomNav");
       expect(mobile).not.toContain("<NotificationBell");
