@@ -174,7 +174,7 @@ export function SeekRail({
         <div
           className={[
             "h-full rounded-full",
-            tone === "preview" ? "bg-[#C68B35]" : tone === "full" ? "bg-white" : "bg-[var(--wk-brand)]",
+            tone === "preview" ? "bg-[#C68B35]" : tone === "full" ? "bg-[var(--wk-text)]" : "bg-[var(--wk-brand)]",
           ].join(" ")}
           style={{
             width: `${ratio * 100}%`,
