@@ -77,15 +77,15 @@ function ChartsLayoutInner() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[var(--wk-bg)] text-[var(--wk-text)]">
       {/* Top header bar */}
-      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 px-4 backdrop-blur md:px-6">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] md:hidden">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 pl-16 pr-4 backdrop-blur md:pr-6 lg:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <button type="button" aria-label="Open Charts navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] md:hidden">
             <WkIcon name="Menu" size={18} />
           </button>
-          <div className="flex items-center gap-2 text-[13px] text-[var(--wk-text-muted)]">
+          <div className="flex min-w-0 items-center gap-2 text-[13px] text-[var(--wk-text-muted)]">
             <span className="font-semibold text-[var(--wk-brand)]">Admin</span>
             <WkIcon name="ChevronRight" size={12} />
-            <span className="text-[var(--wk-text-soft)]">{getPageTitle()}</span>
+            <span className="truncate text-[var(--wk-text-soft)]">{getPageTitle()}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
