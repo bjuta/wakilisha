@@ -190,7 +190,10 @@ test("mobile administrator sees restricted navigation and an intact disabled sta
   await page.goto(TARGET, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "No approved preview configured" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("button", { name: "Refresh Preview" })).toBeVisible();
-  await page.locator("header button").first().click();
+  const chartsMenu = page.getByRole("button", { name: "Open Charts navigation" });
+  await expect(chartsMenu).toHaveAttribute("aria-expanded", "false");
+  await chartsMenu.click();
+  await expect(chartsMenu).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator("aside").getByRole("button", { name: "WAKILISHA 100" })).toBeVisible();
   const main = page.locator("main").first();
   expect(await main.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(2);
