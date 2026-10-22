@@ -106,14 +106,14 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(desktop).toContain("const compactSidebar = sidebarCollapsed || tabletRail;");
     expect(desktop).toContain("md:flex");
     expect(desktop).toContain("w-[80px]");
-    expect(desktop).toContain("w-[272px]");
+    expect(desktop).toContain("w-[256px]");
     expect(desktop).toContain("md:hidden");
     expect(desktop).toContain("navigation.map");
     expect(desktop).toContain("visibleWakilishaNavigation");
     const menu = read("src/components/navigation/wakilishaNavigation.ts");
     expect(menu).not.toContain('{ label: "Settings", to: "/settings"');
     expect(read("src/components/mobile/MobileAccountDrawer.tsx")).toContain('to="/settings"');
-    expect(desktop).toContain('to="/settings"');
+    expect(desktop).toContain('startInYou');
 
 
     const compact = read("src/components/design-system/player/PlayerCompactSurface.tsx");
