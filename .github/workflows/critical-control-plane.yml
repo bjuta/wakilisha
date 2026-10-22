@@ -229,7 +229,7 @@ jobs:
         run: npm run schema:verify
 
       - name: Build application
-        run: npm run performance:audit && npm run build:app
+        run: npm run performance:audit && npm run performance:audit:routes && npm run build:app
 
   critical-browser:
     name: critical-browser
