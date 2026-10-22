@@ -512,6 +512,26 @@ describe(
         expect(
           publicQueryNginx,
         ).toContain(
+          "resolver 127.0.0.53 valid=30s ipv6=off;",
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          "set $wk_public_query_upstream_host __SUPABASE_PROJECT_REF__.supabase.co;",
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          "proxy_ssl_name __SUPABASE_PROJECT_REF__.supabase.co;",
+        );
+        expect(
+          publicQueryNginx,
+        ).toContain(
+          "proxy_pass https://$wk_public_query_upstream_host;",
+        );
+        expect(
+          publicQueryNginx,
+        ).not.toContain(
           "proxy_pass https://__SUPABASE_PROJECT_REF__.supabase.co;",
         );
       },
