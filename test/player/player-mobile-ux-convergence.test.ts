@@ -96,7 +96,7 @@ describe("Player and mobile media UX convergence", () => {
     expect(mobileTopBar).toContain("h-14");
     expect(mobileTopBar).toContain('aria-label="Open WAKILISHA menu"');
     expect(mobileTopBar).toContain('aria-label="Search"');
-    expect(mobileTopBar).toContain("NotificationBell");
+    expect(mobileTopBar).not.toContain("NotificationBell");
   });
 
   it("opens a left account drawer from the listener control instead of navigating", () => {
@@ -105,7 +105,7 @@ describe("Player and mobile media UX convergence", () => {
     expect(mobileTopBar).toContain("GlobalSearchSurface");
     expect(mobileTopBar).toContain("NotificationBell");
     expect(accountDrawer).toContain("WAKILISHA Menu");
-    expect(accountDrawer).toContain("translateX(-18px)");
+    expect(accountDrawer).toContain("ModalOverlay");
 
 
 
