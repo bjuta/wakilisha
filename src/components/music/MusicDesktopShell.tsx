@@ -207,6 +207,7 @@ export function MusicDesktopShell({
     setGlobalSearchOpen,
   ] = useState(false);
   const [smallScreenMenuOpen, setSmallScreenMenuOpen] = useState(false);
+  const [menuStartsInYou, setMenuStartsInYou] = useState(false);
   // Workbook: 768 to 1279px uses the permanent 80px icon rail.
   // Keep the user’s expanded desktop preference at widths of 1280px and above.
   const [tabletRail, setTabletRail] = useState(() =>
@@ -507,7 +508,7 @@ export function MusicDesktopShell({
           <div className="border-t border-[var(--wk-divider)] px-2 pt-3">
             <button
               type="button"
-              onClick={() => setSmallScreenMenuOpen(true)}
+              onClick={() => { setMenuStartsInYou(true); setSmallScreenMenuOpen(true); }}
               aria-label="Open You"
               title="You"
               className={["flex min-h-12 w-full items-center rounded-xl text-left text-[13px] font-semibold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]",
@@ -536,7 +537,7 @@ export function MusicDesktopShell({
             aria-label="Open WAKILISHA menu"
             aria-expanded={smallScreenMenuOpen}
             aria-controls="wk-workbook-sidebar"
-            onClick={() => setSmallScreenMenuOpen(true)}
+            onClick={() => { setMenuStartsInYou(false); setSmallScreenMenuOpen(true); }}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text)]"
           >
             <WkIcon name="Menu" size={20} />
@@ -570,7 +571,7 @@ export function MusicDesktopShell({
         open={smallScreenMenuOpen}
         onClose={() => setSmallScreenMenuOpen(false)}
         onSearch={() => setGlobalSearchOpen(true)}
-        startInYou={isSignedIn}
+        startInYou={menuStartsInYou && isSignedIn}
         rail={compactSidebar}
       />
       <GlobalSearchSurface
