@@ -33,9 +33,15 @@ Source hierarchy: accepted deployed and security/runtime contracts; current acce
 
 ## First bounded implementation on this branch
 
-Only `src/pages/admin/login/page.tsx` changes, with an assertion in the existing workbook design-system test. The Studio form now uses the official self-hosted WAKILISHA dark-surface wordmark and a Studio label instead of a generic lock mark, and avoids the promotional green staff eyebrow. The existing role checks, redirects, password/OTP/Google actions and denied state remain unchanged.
+The three existing authentication presentation components receive the official logo without changing their state machines:
 
-**Verification still required:** exact-head CI/build, keyboard and form-state acceptance, signed-in allowed/denied behavior, responsive visual review, and the normal frontend release controls. The branch does not claim the other requested sections are adopted.
+- `src/pages/auth/page.tsx`: real WAKILISHA light/dark wordmark for desktop and mobile, in place of an isolated “W” and typographic stand-in. Existing Registry artist presentation, email/password, Google, sign-up, verification and recovery controls remain in place.
+- `src/pages/auth/reset-password/page.tsx`: official wordmark in the existing recovery form. Existing recovery session verification, password update and redirect behavior remain.
+- `src/pages/admin/login/page.tsx`: official dark-surface wordmark and Studio label in place of the generic lock emblem, with neutral staff eyebrow styling. Existing role checks, redirects, password/OTP/Google actions and denied state remain.
+
+The existing workbook design-system test now guards the official mark and the preserved flow names. This is **identity convergence only**, not acceptance of the workbook's one-email-door branching or new security-event emails.
+
+**Verification still required:** exact-head CI/build, keyboard and form-state acceptance, signed-in allowed/denied behavior, responsive visual review, and the normal frontend release controls. The branch does not claim navigation, player or email template implementation is complete. The player work is in separate draft PR #1280.
 
 ## Release classification
 
