@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Dialog, Modal as AriaModal, ModalOverlay } from "react-aria-components";
 import { WakilishaAccountMark } from "@/components/brand/WakilishaAccountMark";
 import { WkIcon } from "@/components/design-system/Icon";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useMessagesAccess } from "@/hooks/useMessagesAccess";
@@ -179,18 +180,18 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
                     ))}
                   </div>
                 </div>
-                <details className="border-t border-[var(--wk-divider)] px-3 py-3">
-                  <summary className="min-h-11 cursor-pointer py-3 text-[13px] font-bold text-[var(--wk-text-muted)]">
-                    More WAKILISHA
-                  </summary>
-                  <div className="grid grid-cols-2 gap-2 pb-3">
-                    {WAKILISHA_MORE_DESTINATIONS.map(item => (
-                      <Link key={item.to} to={item.to} onClick={close} className="min-h-10 text-[12px] text-[var(--wk-text-muted)]">
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                </details>
+                <WkDisclosure
+                  summary="More WAKILISHA"
+                  className="border-t border-[var(--wk-divider)] px-3 py-3"
+                  triggerClassName="flex min-h-11 w-full items-center text-left text-[13px] font-bold text-[var(--wk-text-muted)]"
+                  contentClassName="grid grid-cols-2 gap-2 pb-3"
+                >
+                  {WAKILISHA_MORE_DESTINATIONS.map(item => (
+                    <Link key={item.to} to={item.to} onClick={close} className="flex min-h-11 items-center text-[12px] text-[var(--wk-text-muted)]">
+                      {item.label}
+                    </Link>
+                  ))}
+                </WkDisclosure>
                 {footLinks}
                 <button type="button" onClick={() => { void signOut().then(success => { if (success) close(); }); }}
                   disabled={signingOut}
