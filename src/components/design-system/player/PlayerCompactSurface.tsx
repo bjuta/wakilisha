@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { SeekRail } from "./SeekRail";
@@ -93,6 +94,30 @@ export function PlayerCompactSurface({
   };
 
   const isMobile = mode === "mobile";
+  const [browserGap, setBrowserGap] = useState(0);
+  useEffect(() => {
+    if (!isMobile || !window.visualViewport) return;
+    const viewport = window.visualViewport;
+    const update = () => setBrowserGap(
+      Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop),
+    );
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+    };
+  }, [isMobile]);
+  const miniStatus = experience.availability === "excerpt"
+    ? "Preview"
+    : experience.availability === "unavailable"
+      ? "Can’t play here"
+      : playbackBackend === "youtube"
+        ? "YouTube"
+        : playbackBackend === "soundcloud"
+          ? "SoundCloud"
+          : null;
 
   return createPortal(
     <aside
@@ -101,34 +126,24 @@ export function PlayerCompactSurface({
       className={[
         "fixed z-[100] overflow-hidden border border-[var(--wk-border)] bg-[color:var(--wk-surface)]/96 text-[var(--wk-text)] shadow-2xl backdrop-blur-xl",
         isMobile
-          ? "left-2 right-2 rounded-[18px]"
+          ? "left-2 right-2 rounded-[16px] transition-[bottom] duration-[240ms] motion-reduce:transition-none"
           : "inset-x-0 bottom-0 border-x-0 border-b-0",
       ].join(" ")}
       style={
         isMobile
           ? {
-              bottom:
-                "calc(env(safe-area-inset-bottom) + 8px)",
+              bottom: browserGap > 0
+                ? `${browserGap + 8}px`
+                : "max(8px, calc(env(safe-area-inset-bottom) - 13px))",
             }
           : undefined
       }
     >
-      {isMobile ? (
-        <SeekRail
-          label={`Seek ${currentTrack.title}`}
-          currentTime={currentTime}
-          duration={duration}
-          progress={progress}
-          onSeek={seek}
-          variant="edge"
-        />
-      ) : null}
-
       <div
         className={[
           "flex items-center gap-3",
           isMobile
-            ? "min-h-[66px] px-3 py-2"
+            ? "min-h-[62px] px-2.5 py-1"
             : "min-h-[76px] px-5 py-2",
         ].join(" ")}
       >
@@ -164,10 +179,16 @@ export function PlayerCompactSurface({
               {currentTrack.title}
             </div>
             <div className="mt-0.5 truncate text-[11px] font-medium text-[var(--wk-text-muted)]">
-              {experience.creatorLabel}
-              {experience.contextLabel
+              {miniStatus ? (
+                <span className={experience.availability === "excerpt" ? "text-[#C68B35]" : ""}>{miniStatus}</span>
+              ) : experience.creatorLabel}
+              {experience.availability === "excerpt" ? (
+                duration > 0 ? ` · ${formatPlayerClock(Math.max(0, duration - currentTime))} left` : ""
+              ) : experience.contextLabel && !miniStatus
                 ? ` · ${experience.contextLabel}`
-                : ""}
+                : miniStatus
+                  ? ` · ${experience.creatorLabel}`
+                  : ""}
             </div>
           </div>
         </button>
@@ -225,7 +246,7 @@ export function PlayerCompactSurface({
             </>
           ) : (
             <>
-              {canGoPrev ? (
+              {!isMobile && canGoPrev ? (
                 <button
                   type="button"
                   onClick={prev}
@@ -271,6 +292,17 @@ export function PlayerCompactSurface({
           </button>
         </div>
       </div>
+      {isMobile ? (
+        <SeekRail
+          label={`Seek ${currentTrack.title}`}
+          currentTime={currentTime}
+          duration={duration}
+          progress={progress}
+          onSeek={seek}
+          variant="edge"
+          tone={experience.availability === "excerpt" ? "preview" : "full"}
+        />
+      ) : null}
     </aside>,
     document.body,
   );
