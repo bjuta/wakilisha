@@ -138,5 +138,16 @@ describe("Player and mobile media UX convergence", () => {
     expect(full).toContain("View Transcript");
     expect(full).toContain("AddToPlaylistButton");
     expect(full).toContain("TrackMomentDrawer");
+    expect(full).toContain('aria-pressed={saved}');
+    expect(full).toContain('label="Comments"');
+    expect(full).toContain('label="Lyrics"');
+    expect(full).toContain('label="Queue"');
+    const anchoredComments = readFileSync(
+      "src/components/feature/community/TrackMomentDrawer.tsx",
+      "utf8",
+    );
+    expect(anchoredComments).toContain("Comments at this time");
+    expect(anchoredComments).toContain("createTrackMomentComment");
+    expect(anchoredComments).toContain("anchorTimeMs: selectedTimeMs");
   });
 });
