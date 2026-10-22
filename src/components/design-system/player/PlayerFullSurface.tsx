@@ -730,7 +730,7 @@ export function PlayerFullSurface({
                           ? "Not available to play"
                           : "Now Playing"}
                 </p>
-              ) : null>
+              ) : null}
             </div>
           </section>
 
