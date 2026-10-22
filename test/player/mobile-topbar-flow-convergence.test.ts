@@ -18,7 +18,7 @@ describe("Workbook v4 mobile header and sidebar flow", () => {
     expect(header).toContain("Open WAKILISHA menu");
     expect(header).toContain('aria-controls="wk-workbook-sidebar"');
     expect(drawer).toContain("navigation.map");
-    expect(drawer).toContain('aria-modal="true"');
+    expect(drawer).toContain("ModalOverlay");
     expect(layout).not.toContain("MobileBottomNav");
     expect(layout).not.toContain("phn-nav");
   });
@@ -26,7 +26,7 @@ describe("Workbook v4 mobile header and sidebar flow", () => {
   it("keeps search, notification, profile entry and appearance accessible", () => {
     expect(header).toContain('aria-label="Search"');
     expect(header).toContain("GlobalSearchSurface");
-    expect(header).toContain("NotificationBell");
+    expect(header).not.toContain("NotificationBell");
     expect(header).toContain('aria-label="Account"');
     expect(drawer).toContain("Appearance");
     expect(drawer).toContain('to="/settings"');
