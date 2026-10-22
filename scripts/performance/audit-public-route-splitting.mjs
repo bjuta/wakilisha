@@ -450,13 +450,17 @@ const routePaths = [
  * - /credits
  * - /credits/invite/:inviteRef
  *
- * Current route authority is therefore 180 paths. Removing the Credits paths,
+ * PR #1274 adds one private WK100 Admin Charts path:
+ * - wk100-preview
+ *
+ * Current route authority is therefore 181 paths. Removing the Credits paths,
  * the Messages paths, the Artist Studio path, the Field intake path, the Admin
  * MIZIZI path, the five declared public Audio and Show paths, the two K5B Admin
  * Video paths, and the two public Video paths reproduces the exact 163-path
  * preserved pre-M1 sequence.
  */
-const expectedRoutePathCount = 180;
+const expectedRoutePathCount = 181;
+const wk100PrivateChartsPath = "wk100-preview";
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -479,6 +483,11 @@ if (routePaths.length !== expectedRoutePathCount) {
   fail(
     `expected ${expectedRoutePathCount} route paths, found ${routePaths.length}`,
   );
+}
+
+if (routePaths.filter((path) => path === wk100PrivateChartsPath).length !== 1 ||
+    !config.includes('{ path: "wk100-preview", element: <Wk100PrivateAdminPreview /> }')) {
+  fail("accepted private WK100 Admin Charts route must appear exactly once");
 }
 
 for (const retiredRoutePath of [
@@ -556,6 +565,7 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== adminMessagesPath &&
     routePath !== adminFieldPath &&
     routePath !== adminMiziziPath &&
+    routePath !== wk100PrivateChartsPath &&
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&

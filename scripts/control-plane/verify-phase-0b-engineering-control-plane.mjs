@@ -1040,7 +1040,7 @@ const workflow = fs.readFileSync(
 for (const fragment of [
   "npm run test:critical",
   "npm run schema:verify",
-  "npm run build:app",
+  "        run: npm run build",
   "SUPABASE_ACCESS_TOKEN",
 ]) {
   if (!workflow.includes(fragment)) {

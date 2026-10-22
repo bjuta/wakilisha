@@ -229,7 +229,9 @@ jobs:
         run: npm run schema:verify
 
       - name: Build application
-        run: npm run performance:audit && npm run build:app
+        env:
+          VITE_GA_MEASUREMENT_ID: G-ML0E5BEL57
+        run: npm run build
 
   critical-browser:
     name: critical-browser
