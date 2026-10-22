@@ -4,8 +4,15 @@ import { describe, expect, it } from "vitest";
 const layout = readFileSync("src/components/mobile/MobileAppLayout.tsx", "utf8");
 const header = readFileSync("src/components/mobile/MobileTopBar.tsx", "utf8");
 const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
+const desktop = readFileSync("src/components/music/MusicDesktopShell.tsx", "utf8");
 
 describe("Workbook v4 mobile header and sidebar flow", () => {
+  it("opens places from the phone menu, not the private You view", () => {
+    expect(desktop).toContain("setMenuStartsInYou(false)");
+    expect(desktop).toContain("setMenuStartsInYou(true)");
+    expect(desktop).toContain("startInYou={menuStartsInYou && isSignedIn}");
+  });
+
   it("places the 56px application header in normal content flow", () => {
     expect(header).toContain("sticky top-0");
     expect(header).toContain("h-14");
