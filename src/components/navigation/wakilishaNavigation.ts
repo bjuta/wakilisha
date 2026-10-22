@@ -17,7 +17,7 @@ export type WkNavGroup = Readonly<{
 export const WAKILISHA_NAVIGATION: readonly WkNavGroup[] = [{
   label: "Places",
   items: [
-    { label: "Home", to: "/", icon: "House" },
+    { label: "Home", to: "/", icon: "Home" },
     { label: "Following", to: "/following", icon: "Heart", audience: "signed-in" },
     { label: "Music", to: "/music", icon: "AudioLines" },
     { label: "Video", to: "/video", icon: "Video" },
