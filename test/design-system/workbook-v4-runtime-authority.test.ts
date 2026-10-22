@@ -4,6 +4,23 @@ import { describe, expect, it } from "vitest";
 const read = (name: string) => readFileSync(name, "utf8");
 
 describe("Workbook v4 is the only active product design authority", () => {
+  it("renders canonical light-only 600px email shells without changing Auth tokens", () => {
+    const adminSender = read("supabase/functions/admin-user-ops/index.ts");
+    const briefingSender = read("supabase/functions/briefing-handler/index.ts");
+    expect(adminSender).toContain('max-width:600px');
+    expect(adminSender).toContain('meta name="color-scheme" content="light"');
+    expect(briefingSender).toContain("max-width:600px!important");
+    expect(briefingSender).not.toContain("fonts.googleapis.com/css2?family=Inter");
+    for (const template of ["confirm-signup", "magic-link", "reset-password", "change-email"]) {
+      const html = read(`docs/email/templates/${template}.html`);
+      expect(html).toContain('max-width:600px');
+      expect(html).toContain('meta name="color-scheme" content="light"');
+      expect(html).toContain("{{ .ConfirmationURL }}");
+      expect(html).toContain("/assets/logos/wakilisha-logo-light.svg");
+      expect(html).not.toContain("fonts.googleapis.com");
+    }
+  });
+
   it("has no split v5 mobile sheet, CSS player suppressor or old font faces", () => {
     const root = read("src/index.css");
     expect(root).toContain('wakilisha-mobile-workbook-v4.css');
