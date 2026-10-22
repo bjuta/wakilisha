@@ -15,9 +15,6 @@ import {
   WkIcon,
 } from "@/components/design-system/Icon";
 import {
-  NotificationBell,
-} from "@/components/feature/community/NotificationBell";
-import {
   useTheme,
 } from "@/components/design-system/theme/ThemeProvider";
 import {
@@ -29,7 +26,6 @@ import type {
 import { GlobalSearchSurface } from "@/components/search/GlobalSearchSurface";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useMessagesAccess } from "@/hooks/useMessagesAccess";
-import { useSessionSignOut } from "@/hooks/useSessionSignOut";
 
 const MUSIC_APP_PREFIXES = [
   "/music",
@@ -183,10 +179,7 @@ export function MusicDesktopShell({
 }) {
   const location = useLocation();
   const identity = useSiteIdentity();
-  const {
-    theme,
-    toggle,
-  } = useTheme();
+  const { theme } = useTheme();
   const authUser = useAuthUser();
   const isSignedIn = !authUser.loading && authUser.id.length > 0;
   const messagesAccess = useMessagesAccess();
@@ -194,7 +187,6 @@ export function MusicDesktopShell({
     signedIn: isSignedIn,
     messagesVisible: !messagesAccess.loading && messagesAccess.visible,
   });
-  const { signOut, signingOut, signOutError } = useSessionSignOut("/auth");
   const [logoError, setLogoError] =
     useState(false);
   const [
