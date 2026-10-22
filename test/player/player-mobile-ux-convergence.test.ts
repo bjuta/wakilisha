@@ -9,6 +9,14 @@ const full = readFileSync(
   "src/components/design-system/player/PlayerFullSurface.tsx",
   "utf8",
 );
+const compact = readFileSync(
+  "src/components/design-system/player/PlayerCompactSurface.tsx",
+  "utf8",
+);
+const seekRail = readFileSync(
+  "src/components/design-system/player/SeekRail.tsx",
+  "utf8",
+);
 const topBar = readFileSync(
   "src/components/design-system/player/PlayerTopBar.tsx",
   "utf8",
@@ -47,6 +55,25 @@ const accountDrawer = readFileSync(
 );
 
 describe("Player and mobile media UX convergence", () => {
+  it("keeps the small player above browser chrome with bottom preview progress", () => {
+    expect(compact).toContain("window.visualViewport");
+    expect(compact).toContain("browserGap + 8");
+    expect(compact).toContain('variant="edge"');
+    expect(compact).toContain('tone={experience.availability === "excerpt" ? "preview" : "full"}');
+    expect(compact).toContain('min-h-[62px]');
+    expect(seekRail).toContain('tone?: "brand" | "full" | "preview"');
+  });
+
+  it("expands Lyrics on phones without exposing timestamps as visual chrome", () => {
+    expect(panelSheet).toContain('const fullScreenLyrics = mobile && title === "Lyrics";');
+    expect(panelSheet).toContain("h-[100dvh]");
+    expect(timedText).toContain('timed && variant !== "lyrics"');
+    expect(timedText).toContain("aria-label={timed");
+    expect(timedText).toContain("prefers-reduced-motion");
+    expect(full).toContain('playbackBackend === "youtube" ? "aspect-video"');
+  });
+
+
   it("turns the player ellipsis into a real contextual action surface without exposing diagnostics", () => {
     expect(full).toContain("PlayerTopBar");
     expect(full).toContain('onMore={() => setPanel("more")}');
@@ -103,7 +130,7 @@ describe("Player and mobile media UX convergence", () => {
     expect(mobileTopBar).toContain("MobileAccountDrawer");
     expect(mobileTopBar).toContain("setAccountOpen(true)");
     expect(mobileTopBar).toContain("GlobalSearchSurface");
-    expect(mobileTopBar).toContain("NotificationBell");
+    expect(mobileTopBar).not.toContain("NotificationBell");
     expect(accountDrawer).toContain("WAKILISHA Menu");
     expect(accountDrawer).toContain("ModalOverlay");
 
@@ -138,5 +165,16 @@ describe("Player and mobile media UX convergence", () => {
     expect(full).toContain("View Transcript");
     expect(full).toContain("AddToPlaylistButton");
     expect(full).toContain("TrackMomentDrawer");
+    expect(full).toContain('aria-pressed={saved}');
+    expect(full).toContain('label="Comments"');
+    expect(full).toContain('label="Lyrics"');
+    expect(full).toContain('label="Queue"');
+    const anchoredComments = readFileSync(
+      "src/components/feature/community/TrackMomentDrawer.tsx",
+      "utf8",
+    );
+    expect(anchoredComments).toContain("Comments at this time");
+    expect(anchoredComments).toContain("createTrackMomentComment");
+    expect(anchoredComments).toContain("anchorTimeMs: selectedTimeMs");
   });
 });

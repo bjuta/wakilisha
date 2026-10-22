@@ -1,12 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { WkIcon } from "@/components/design-system/Icon";
+
 import { WkPasswordField } from "@/components/design-system/primitives/Field";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { supabase } from "@/lib/supabase";
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState<"checking" | "ready" | "done" | "error">("checking");
@@ -75,9 +77,12 @@ export default function ResetPasswordPage() {
     <main className="flex min-h-screen items-center justify-center bg-wk-bg px-4 py-12 text-wk-text">
       <WkSurface className="w-full max-w-md p-6 sm:p-8">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-wk-brand text-wk-brand-on">
-            <WkIcon name="LockKeyhole" size={26} />
-          </div>
+          <img
+            src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"}
+            alt="WAKILISHA"
+            className="mx-auto mb-5 h-8 w-auto max-w-[200px] object-contain"
+            data-wk-reset-password-brand
+          />
           <h1 className="text-[24px] font-black tracking-tight">Reset your password</h1>
           <p className="mt-2 text-[13px] leading-6 text-wk-text-muted">Enter a new password for your WAKILISHA account.</p>
         </div>
