@@ -151,7 +151,6 @@ function DiscoveryLink({
     <Link
       to={to}
       aria-label={label}
-      aria-current={active ? "page" : undefined}
       title={collapsed ? label : undefined}
       className={[
         "flex h-11 items-center rounded-full text-[12px] font-semibold text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]",
