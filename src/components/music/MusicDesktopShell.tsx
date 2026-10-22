@@ -208,8 +208,8 @@ export function MusicDesktopShell({
     setGlobalSearchOpen,
   ] = useState(false);
   const [smallScreenMenuOpen, setSmallScreenMenuOpen] = useState(false);
-  // Workbook: 768–1023px is a permanent 80px icon rail, not a phone drawer.
-  // Keep the user's desktop-expanded preference untouched for >=1024px.
+  // Workbook: 768 to 1279px uses the permanent 80px icon rail.
+  // Keep the user’s expanded desktop preference at widths of 1280px and above.
   const [tabletRail, setTabletRail] = useState(() =>
     typeof window !== "undefined" &&
     window.matchMedia("(min-width: 768px) and (max-width: 1279px)").matches
@@ -571,7 +571,7 @@ export function MusicDesktopShell({
         open={smallScreenMenuOpen}
         onClose={() => setSmallScreenMenuOpen(false)}
         onSearch={() => setGlobalSearchOpen(true)}
-        startInYou
+        startInYou={isSignedIn}
         rail={compactSidebar}
       />
       <GlobalSearchSurface
