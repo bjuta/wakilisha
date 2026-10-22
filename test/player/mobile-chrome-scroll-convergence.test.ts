@@ -35,7 +35,7 @@ describe("Workbook v4 mobile shell and safe-area convergence", () => {
   it("keeps Search and notification actions in real app controls", () => {
     expect(header).toContain('aria-label="Search"');
     expect(header).toContain("GlobalSearchSurface");
-    expect(header).toContain("NotificationBell");
+    expect(header).not.toContain("NotificationBell");
     expect(drawer).toContain("onSearch");
   });
 });
