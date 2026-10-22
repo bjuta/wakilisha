@@ -571,6 +571,8 @@ export function MusicDesktopShell({
         open={smallScreenMenuOpen}
         onClose={() => setSmallScreenMenuOpen(false)}
         onSearch={() => setGlobalSearchOpen(true)}
+        startInYou
+        rail={compactSidebar}
       />
       <GlobalSearchSurface
         open={globalSearchOpen}
