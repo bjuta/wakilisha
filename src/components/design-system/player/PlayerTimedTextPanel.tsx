@@ -56,7 +56,7 @@ export function PlayerTimedTextPanel({
     if (activeIndex < 0) return;
     activeRef.current?.scrollIntoView({
       block: "nearest",
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
     });
   }, [activeIndex]);
 
