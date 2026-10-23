@@ -27,7 +27,12 @@ export function MobileAppLayout() {
     || /^\/releases\/[^/]+\/[^/]+\/?$/.test(location.pathname)
     || /^\/genres\/[^/]+\/?$/.test(location.pathname)
     || /^\/labels\/[^/]+\/?$/.test(location.pathname)
-    || /^\/guides\/[^/]+\/?$/.test(location.pathname);
+    || /^\/guides\/[^/]+\/?$/.test(location.pathname)
+    || /^\/tracks\/[^/]+\/[^/]+\/?$/.test(location.pathname)
+    || /^\/playlists\/[^/]+\/?$/.test(location.pathname)
+    || /^\/u\/[^/]+(?:\/playlists\/[^/]+)?\/?$/.test(location.pathname)
+    || /^\/people\/[^/]+\/?$/.test(location.pathname)
+    || /^\/organizations\/[^/]+\/?$/.test(location.pathname);
   const socialRoute = ["/following", "/messages", "/notifications"].includes(location.pathname);
   const reserveHeaderSpace = !shellless && !heroRoute && !socialRoute;
   usePendingCommunityActionReplay(
