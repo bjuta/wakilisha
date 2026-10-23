@@ -1068,7 +1068,7 @@ export function RichTextEditor({
     let candidate: { from: number; to: number; value: number; standAlone: boolean } | null = null;
     editor.state.doc.descendants((node, pos, parent) => {
       if (candidate || !node.isText) return;
-      const match = /\bRating:\s*([1-5](?:\.[05])?)\s*out of\s*5\b/i.exec(node.text || "");
+      const match = /\bRating:\s*([1-5](?:[.,][05])?)\s*out of\s*5\b/i.exec(node.text || "");
       if (!match) return;
       const score = canonicalRating(match[1]);
       if (score === null) return;

@@ -16,7 +16,9 @@ const picker = read("src/components/admin/editor/RatingComposerModal.tsx");
 describe("Workbook (3), Chapter 24 rating authority", () => {
   it("admits only nine whole and half steps from 1 to 5", () => {
     for (let value = 1; value <= 5; value += 0.5) expect(canonicalRating(value)).toBe(value);
-    for (const value of [0, 0.5, 1.25, 3.75, 5.5, NaN, Infinity, null, true, "", "bad"]) expect(canonicalRating(value)).toBeNull();
+    expect(canonicalRating("2,5")).toBe(2.5);
+    expect(canonicalRating("3,5")).toBe(3.5);
+    for (const value of [0, 0.5, 1.25, 3.75, 5.5, NaN, Infinity, null, true, "", "bad", "2,50"]) expect(canonicalRating(value)).toBeNull();
   });
   it("renders an atomic, accessible five-star rating with normalized numbers", () => {
     const html = ratingHtml({value:3.5,role:"inline",display:"both",label:"",subject:"",breakdown:[]});
@@ -95,6 +97,7 @@ describe("Workbook (3), Chapter 24 rating authority", () => {
     expect(editor).toContain("<RatingComposerModal");
     expect(editor).toContain("tr.insert(tr.doc.content.size");
     expect(editor).toContain("onClick={convertWrittenRating}");
+    expect(editor).toContain("[.,][05]");
     expect(editor).toContain("handleClickOn: (_view, _clickedPos, node, nodePos)");
     expect(editor).toContain("setEditingRatingPosition(nodePos)");
     expect(read("src/components/design-system/editorial/editorCommandRegistry.ts")).toContain('"insertRating"');
