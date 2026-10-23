@@ -40,8 +40,8 @@ export function MobileTopBar() {
         >
           <WkIcon name="Menu" size={21} />
         </button>
-        <Link to="/" aria-label="WAKILISHA home" className="pointer-events-auto flex min-w-0 flex-1 justify-center mix-blend-difference">
-          <img src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"} alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain brightness-0 invert" />
+        <Link to="/" aria-label="WAKILISHA home" className="pointer-events-auto flex min-w-0 flex-1 justify-center">
+          <img src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"} alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain" />
         </Link>
         <div className="flex items-center gap-1">
           <button

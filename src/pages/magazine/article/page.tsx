@@ -371,11 +371,13 @@ export default function ArticlePage() {
             name={article.title}
           />
         )}
-        <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between">
-          <Link to="/magazine" className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/85 hover:bg-black/45 transition-all whitespace-nowrap"><WkIcon name="ArrowLeft" size={13} />Magazine</Link>
+        <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-end">
+          
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setCommunitySheetOpen(true)}
+              aria-label="Article actions"
               className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/45 transition-all cursor-pointer whitespace-nowrap"
             >
               <i className="ri-more-2-line text-[16px]" />

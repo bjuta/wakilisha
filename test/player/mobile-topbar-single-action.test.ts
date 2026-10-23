@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const topBar = readFileSync("src/components/mobile/MobileTopBar.tsx", "utf8");
 const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
+const musicShell = readFileSync("src/components/music/MusicDesktopShell.tsx", "utf8");
 
 describe("Workbook phone chrome", () => {
   it("contains only menu, real wordmark, and search", () => {
@@ -25,9 +26,12 @@ describe("Workbook phone chrome", () => {
     expect(topBar).toContain("h-14");
     expect(topBar).toContain("bg-transparent");
     expect(topBar).toContain("mix-blend-difference");
-    expect(topBar).toContain("brightness-0 invert");
+    expect(topBar).not.toContain("brightness-0 invert");
+    expect(topBar).toContain('className="pointer-events-auto flex min-w-0 flex-1 justify-center"');
     expect(topBar).toContain("pointer-events-auto");
     expect(topBar).not.toContain("backdrop-blur-xl");
     expect(topBar).not.toContain("border-b border-[var(--wk-border)]");
+    expect(musicShell).not.toContain("brightness-0 invert");
+    expect(musicShell).not.toContain('className="pointer-events-auto min-w-0 flex-1 mix-blend-difference"');
   });
 });
