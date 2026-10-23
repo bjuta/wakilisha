@@ -5,18 +5,15 @@ import {
   useState,
 } from "react";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { CountryIdentityMark } from "@/components/design-system/CountryIdentityMark";
 import {
   getCountryNameForIso2,
   getSortedCountryCodes,
 } from "@/utils/countries";
-import {
-  getCountryFlagEmoji,
-} from "@/utils/claimantPhone";
 
 type ArtistCountryOption = {
   iso2: string;
   countryName: string;
-  flag: string;
 };
 
 export function ArtistCountryPicker({
@@ -43,10 +40,6 @@ export function ArtistCountryPicker({
             iso2,
             countryName:
               getCountryNameForIso2(
-                iso2,
-              ),
-            flag:
-              getCountryFlagEmoji(
                 iso2,
               ),
           }),
@@ -138,12 +131,7 @@ export function ArtistCountryPicker({
           className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-4 py-3 text-left text-[14px] text-[var(--wk-text)] transition-colors focus:border-[var(--wk-brand)] focus:outline-none focus:ring-2 focus:ring-[var(--wk-brand)]/15"
         >
           <span className="flex min-w-0 items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="shrink-0 text-[19px]"
-            >
-              {selected?.flag ?? "🌐"}
-            </span>
+            <CountryIdentityMark code={selected?.iso2} compact />
             <span className="truncate font-semibold">
               {selected?.countryName ??
                 "Not Set"}
@@ -210,12 +198,7 @@ export function ArtistCountryPicker({
                       }}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-[var(--wk-surface-raised)]"
                     >
-                      <span
-                        aria-hidden="true"
-                        className="text-[19px]"
-                      >
-                        {country.flag}
-                      </span>
+                      <CountryIdentityMark code={country.iso2} compact />
                       <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-[var(--wk-text)]">
                         {
                           country.countryName
