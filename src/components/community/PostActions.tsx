@@ -270,7 +270,7 @@ export function PostActions({
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)] disabled:opacity-50"
                 >
-                  <i className="ri-repeat-2-line text-[17px]" aria-hidden="true" />
+                  <WkIcon name="Repeat2" size={17} aria-hidden="true" />
                   {viewerReposted ? "Undo Repost" : "Repost"}
                 </button>
 
@@ -282,7 +282,7 @@ export function PostActions({
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)]"
                 >
-                  <i className="ri-double-quotes-l text-[17px]" aria-hidden="true" />
+                  <WkIcon name="Quote" size={17} aria-hidden="true" />
                   Quote Post
                 </button>
               </div>
@@ -324,7 +324,7 @@ export function PostActions({
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)]"
                 >
-                  <i className="ri-external-link-line text-[17px]" aria-hidden="true" />
+                  <WkIcon name="ExternalLink" size={17} aria-hidden="true" />
                   Open Post
                 </button>
 
@@ -333,7 +333,7 @@ export function PostActions({
                   onClick={() => void handleCopyLink()}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)]"
                 >
-                  <i className="ri-link text-[17px]" aria-hidden="true" />
+                  <WkIcon name="Link2" size={17} aria-hidden="true" />
                   {linkCopied ? "Link Copied" : "Copy Link"}
                 </button>
 
@@ -349,7 +349,7 @@ export function PostActions({
                       }}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)]"
                     >
-                      <i className="ri-edit-line text-[17px]" aria-hidden="true" />
+                      <WkIcon name="Pencil" size={17} aria-hidden="true" />
                       Edit Post
                     </button>
 
@@ -363,7 +363,7 @@ export function PostActions({
                       }}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-danger)] hover:bg-[var(--wk-danger-soft)] disabled:opacity-50"
                     >
-                      <i className="ri-delete-bin-line text-[17px]" aria-hidden="true" />
+                      <WkIcon name="Trash2" size={17} aria-hidden="true" />
                       Delete Post
                     </button>
                   </>
@@ -379,10 +379,7 @@ export function PostActions({
                         }}
                         className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)] disabled:opacity-50"
                       >
-                        <i
-                          className={followed ? "ri-user-unfollow-line text-[17px]" : "ri-user-follow-line text-[17px]"}
-                          aria-hidden="true"
-                        />
+                        <WkIcon name={followed ? "UserMinus" : "UserPlus"} size={17} aria-hidden="true" />
                         {followed ? `Unfollow ${post.actor.name}` : `Follow ${post.actor.name}`}
                       </button>
                     )}
@@ -394,10 +391,7 @@ export function PostActions({
                         onClick={handleBlock}
                         className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)] disabled:opacity-50"
                       >
-                        <i
-                          className={blocked ? "ri-forbid-2-line text-[17px]" : "ri-forbid-line text-[17px]"}
-                          aria-hidden="true"
-                        />
+                        <WkIcon name={blocked ? "ShieldCheck" : "ShieldOff"} size={17} aria-hidden="true" />
                         {blocked ? `Unblock ${post.actor.name}` : `Block ${post.actor.name}`}
                       </button>
                     )}
@@ -412,7 +406,7 @@ export function PostActions({
                         }}
                         className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-danger)] hover:bg-[var(--wk-danger-soft)] disabled:opacity-50"
                       >
-                        <i className="ri-flag-line text-[17px]" aria-hidden="true" />
+                        <WkIcon name="Flag" size={17} aria-hidden="true" />
                         Report Post
                       </button>
                     )}

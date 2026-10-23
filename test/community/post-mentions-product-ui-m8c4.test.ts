@@ -221,7 +221,7 @@ describe("WAKILISHA M8C.4 Mention product UI", () => {
 
   it("presents Post Mention notifications and the stored Mention preference in human language", () => {
     expect(notificationsPage).toContain(
-      'post_mention: "ri-at-line"',
+      'post_mention: "AtSign"',
     );
     expect(notificationsPage).toContain(
       'post_mention: "mentioned you in a Post"',

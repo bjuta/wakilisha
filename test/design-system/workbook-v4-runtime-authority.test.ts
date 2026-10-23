@@ -265,6 +265,38 @@ describe("Workbook v4 is the only active product design authority", () => {
     }
   });
 
+  it("keeps WAKILISHA interface icons off platform emoji and native chrome", () => {
+    const icon = read("src/components/design-system/Icon.tsx");
+    const country = read("src/components/design-system/CountryIdentityMark.tsx");
+    const reactions = read("src/components/feature/community/CommunityReactionPicker.tsx");
+    const desktop = read("src/components/music/MusicDesktopShell.tsx");
+    const mobile = read("src/components/mobile/MobileAccountDrawer.tsx");
+
+    expect(icon).toContain("wakilisha-lucide.svg?url");
+    expect(icon).toContain("<use");
+    expect(country).toContain('<WkIcon name="Globe2"');
+    expect(country).toContain('data-wk-country-identity-mark');
+    for (const path of [
+      "src/components/artists/ClaimantPhoneFields.tsx",
+      "src/components/artists/ArtistCountryPicker.tsx",
+      "src/pages/guides/detail/sections/PavilionsGridSection.tsx",
+      "src/pages/guides/detail/components/GuidePavilionsSection.tsx",
+    ]) {
+      const source = read(path);
+      expect(source).toContain("<CountryIdentityMark");
+      expect(source).not.toContain("getFlagEmoji");
+      expect(source).not.toContain("getCountryFlagEmoji");
+      expect(source).not.toContain("🌐");
+      expect(source).not.toContain("country.flag");
+    }
+    expect(reactions).toContain("QUICK_REACTION_ICONS");
+    expect(reactions).toContain("<WkIcon name={QUICK_REACTION_ICONS[emoji]}");
+    expect(desktop).not.toContain('<Link to="/settings"');
+    expect(mobile).not.toContain('<Link to="/settings"');
+    expect(mobile).toContain('label: "Settings", available: signedIn');
+    expect(read("src/main.tsx")).toContain("wakilisha-remixicon-compat.css");
+  });
+
   it("preserves production media and communication behavior on workbook surfaces", () => {
     const video = read("src/pages/video/page.tsx");
     const audio = read("src/pages/audio/page.tsx");

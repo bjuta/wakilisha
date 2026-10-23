@@ -159,6 +159,11 @@ test("Workbook sidebar uses accessible modal focus and replaces the old mobile b
   // Signed-out viewers see the eight public places; private actions live in You.
   await expect(sidebar.getByRole("link", { name: "Messages" })).toHaveCount(0);
   await expect(sidebar.getByRole("link", { name: "Notifications" })).toHaveCount(0);
+  await expect(drawer.getByRole("link", { name: "Settings" })).toHaveCount(0);
+  await expect(drawer.getByRole("link", { name: "Sign In" })).toHaveAttribute("href", "/auth");
+  const mobileMenuIcon = menu.locator("svg use");
+  await expect(mobileMenuIcon).toHaveCount(1);
+  await expect(mobileMenuIcon).toHaveAttribute("href", /wakilisha-lucide.*#wk-lucide-menu/);
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await expect(menu).toBeFocused();
@@ -174,7 +179,7 @@ test("Signed-out visitors cannot open private messaging or notifications", async
   await expect(navigation.getByRole("link", { name: "Notifications" })).toHaveCount(0);
   const guestSignIn = page.locator(".wk-music-app-shell > aside").getByRole("link", { name: "Sign In" });
   await expect(guestSignIn).toHaveAttribute("href", "/auth");
-  await expect(page.locator(".wk-music-app-shell > aside").getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+  await expect(page.locator(".wk-music-app-shell > aside").getByRole("link", { name: "Settings" })).toHaveCount(0);
   const themeSwitch = page.locator(".wk-music-app-shell > aside").getByRole("button", { name: "Switch to light mode" });
   await expect(themeSwitch).toBeVisible();
   await themeSwitch.click();
@@ -268,7 +273,7 @@ for (const route of [
       await openMenu.click();
       const guestMenu = page.getByRole("dialog", { name: "WAKILISHA Menu" });
       await expect(guestMenu.getByRole("link", { name: "Sign In" })).toBeVisible();
-      await expect(guestMenu.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+      await expect(guestMenu.getByRole("link", { name: "Settings" })).toHaveCount(0);
       const sidebarLogo = guestMenu.locator('img[alt="WAKILISHA"]');
       const appearance = guestMenu.getByRole("switch", { name: "Dark mode" });
       await expect(appearance).toBeVisible();

@@ -21,7 +21,7 @@ import type {
   CommunityNotification,
   CommunityProfile,
 } from "@/services/community";
-import { WkIcon } from "@/components/design-system/Icon";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import { supabase } from "@/lib/supabase";
 import { listMessageConversations } from "@/services/messages";
@@ -60,30 +60,27 @@ const NOTIFICATION_LABELS: Record<
   credit_confirmation_response: "responded to your music credit request",
 };
 
-const NOTIFICATION_ICONS: Record<
-  string,
-  string
-> = {
-  reply: "ri-chat-3-line",
-  new_comment: "ri-chat-3-line",
-  mention: "ri-at-line",
-  post_mention: "ri-at-line",
-  pin: "ri-pushpin-line",
-  editor_pick: "ri-star-line",
-  contribution_approved: "ri-checkbox-circle-line",
-  contribution_merged: "ri-git-merge-line",
-  follow: "ri-user-follow-line",
-  post_repost: "ri-repeat-2-line",
-  post_quote: "ri-double-quotes-l",
-  direct_message: "ri-mail-line",
-  new_release: "ri-disc-line",
-  release_published: "ri-disc-line",
-  live: "ri-video-line",
-  live_started: "ri-video-line",
-  post_like: "ri-heart-line",
-  post_reaction: "ri-heart-line",
-  credit_confirmation_request: "ri-checkbox-circle-line",
-  credit_confirmation_response: "ri-checkbox-circle-line",
+const NOTIFICATION_ICONS: Record<string, WkIconName> = {
+  reply: "MessageSquare",
+  new_comment: "MessageSquare",
+  mention: "AtSign",
+  post_mention: "AtSign",
+  pin: "Pin",
+  editor_pick: "Star",
+  contribution_approved: "CheckCircle",
+  contribution_merged: "GitMerge",
+  follow: "UserPlus",
+  post_repost: "Repeat2",
+  post_quote: "Quote",
+  direct_message: "Mail",
+  new_release: "Disc",
+  release_published: "Disc",
+  live: "Video",
+  live_started: "Video",
+  post_like: "Heart",
+  post_reaction: "Heart",
+  credit_confirmation_request: "CheckCircle",
+  credit_confirmation_response: "CheckCircle",
 };
 
 function timeAgo(value: string): string {
@@ -598,7 +595,7 @@ export default function NotificationsPage() {
                   NOTIFICATION_ICONS[
                     notification.notificationType
                   ]
-                  || "ri-notification-3-line";
+                  || "Bell";
                 const metadata =
                   notification.metadata as
                     | Record<string, unknown>
@@ -651,7 +648,7 @@ export default function NotificationsPage() {
                     )}
 
                     <div className="wk-notification-event-icon relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" aria-hidden="true">
-                      <i className={`${icon} text-[18px]`} />
+                      <WkIcon name={icon} size={18} aria-hidden="true" />
                     </div>
 
                     <div data-wk-notification-copy className="min-w-0 flex-1">

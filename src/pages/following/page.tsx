@@ -2190,10 +2190,7 @@ export default function FollowingPage() {
           <section className="mx-4 rounded-3xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-14 text-center md:mx-0">
             {guestIntentError ? (
               <>
-                <i
-                  className="ri-error-warning-line text-2xl text-[var(--wk-text-faint)]"
-                  aria-hidden="true"
-                />
+                <WkIcon name="TriangleAlert" size={24} className="text-[var(--wk-text-faint)]" aria-hidden="true" />
                 <h2 className="mt-4 text-[20px] font-black tracking-[-0.03em]">
                   We couldn’t finish following
                 </h2>
@@ -2226,10 +2223,7 @@ export default function FollowingPage() {
           </section>
         ) : error && items.length === 0 ? (
           <section className="mx-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-14 text-center md:mx-0">
-            <i
-              className="ri-error-warning-line text-2xl text-[var(--wk-text-faint)]"
-              aria-hidden="true"
-            />
+            <WkIcon name="TriangleAlert" size={24} className="text-[var(--wk-text-faint)]" aria-hidden="true" />
             <p className="mt-3 text-[13px] font-bold text-[var(--wk-text-muted)]">
               {error}
             </p>
@@ -2248,10 +2242,7 @@ export default function FollowingPage() {
         ) : visibleItems.length === 0 ? (
           <section className="mx-4 rounded-3xl border border-dashed border-[var(--wk-border)] bg-[var(--wk-surface)] px-6 py-14 text-center md:mx-0">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
-              <i
-                className="ri-radar-line text-2xl"
-                aria-hidden="true"
-              />
+              <WkIcon name="Radar" size={24} aria-hidden="true" />
             </div>
             <h2 className="mt-5 text-[20px] font-black tracking-[-0.03em]">
               {matureFollows.length === 0
@@ -2355,7 +2346,7 @@ export default function FollowingPage() {
         {isSignedIn ? (
           <aside data-wk-following-discovery className="hidden min-w-0 px-5 py-5 lg:block" aria-label="Your Following circle">
             <Link to="/search" className="flex min-h-11 items-center gap-3 rounded-full bg-[var(--wk-surface-raised)] px-4 text-[13px] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
-              <i className="ri-search-line text-[16px]" aria-hidden="true" /> Search WAKILISHA
+              <WkIcon name="Search" size={16} aria-hidden="true" /> Search WAKILISHA
             </Link>
             <section className="mt-4 rounded-[18px] border border-[var(--wk-border)] px-4 py-4" aria-label="New releases from your circle">
               <h2 className="text-[19px] font-bold tracking-[-0.02em] text-[var(--wk-text)]">Out this week</h2>
@@ -2367,7 +2358,7 @@ export default function FollowingPage() {
                         <img src={release.imageUrl} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-md object-contain" />
                       ) : (
                         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]">
-                          <i className="ri-album-line text-lg" aria-hidden="true" />
+                          <WkIcon name="Album" size={18} aria-hidden="true" />
                         </span>
                       )}
                       <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--wk-text)]">{release.title}</span>
@@ -2386,7 +2377,7 @@ export default function FollowingPage() {
                     <button key={person.key} type="button" onClick={() => scrollToAnchor(person.key)} aria-current={person.key === activeAnchorKey ? "true" : undefined} className="flex min-h-[58px] w-full items-center gap-3 rounded-xl px-1 text-left transition-colors hover:bg-[var(--wk-surface-raised)]">
                       <ActivityAnchorAvatar subject={person} active={person.key === activeAnchorKey} />
                       <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--wk-text)]">{person.title}</span>
-                      <i className="ri-arrow-right-up-line text-[15px] text-[var(--wk-text-faint)]" aria-hidden="true" />
+                      <WkIcon name="ArrowUpRight" size={15} className="text-[var(--wk-text-faint)]" aria-hidden="true" />
                     </button>
                   ))}
                 </div>
@@ -2396,7 +2387,7 @@ export default function FollowingPage() {
               <Link to="/artists" className="mt-4 inline-flex min-h-11 items-center text-[13px] font-semibold text-[var(--wk-brand)] hover:underline">Discover artists</Link>
             </section>
             <Link to="/profile" className="mt-4 inline-flex min-h-11 items-center gap-2 text-[12px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
-              <i className="ri-user-settings-line text-[16px]" aria-hidden="true" /> Manage Following
+              <WkIcon name="Settings2" size={16} aria-hidden="true" /> Manage Following
             </Link>
           </aside>
         ) : null}
