@@ -2376,6 +2376,18 @@ export function RichTextEditor({
           viewMode === "split" ? "grid grid-cols-2 divide-x divide-[var(--wk-border)]" : ""
         }
       >
+        {/* Conversion is a writer action; typed prose is never silently rewritten. */}
+        {showEditor && conversionCandidate && !readOnly && (
+          <div className="col-span-full flex flex-wrap items-center justify-between gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-5 py-3">
+            <span className="text-[12px] text-[var(--wk-text-muted)]">
+              This looks like a rating. Convert it to WAKILISHA's editable stars?
+            </span>
+            <button type="button" onClick={convertWrittenRating}
+              className="min-h-11 rounded-full border border-[var(--wk-brand)] px-4 text-[12px] font-bold text-[var(--wk-text)]">
+              Convert Rating
+            </button>
+          </div>
+        )}
         {/* Visual Editor */}
         {showEditor && (
           <div className={viewMode === "split" ? "" : ""}>
