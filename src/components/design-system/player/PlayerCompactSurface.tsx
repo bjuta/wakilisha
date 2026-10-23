@@ -54,6 +54,8 @@ export function PlayerCompactSurface({
     canGoPrev,
     seek,
     isFullPlayerOpen,
+    volume,
+    setVolume,
   } = usePlayer();
 
   const isMobile = mode === "mobile";
@@ -224,6 +226,39 @@ export function PlayerCompactSurface({
             <span className="w-10 text-[10px] tabular-nums text-[var(--wk-text-faint)]">
               {formatPlayerClock(duration)}
             </span>
+          </div>
+        ) : null}
+
+        {!isMobile ? (
+          <div className="hidden shrink-0 items-center gap-1 xl:flex">
+            {!experience.spokenAudio ? (
+              <>
+                <button type="button" onClick={() => openFullPlayer("lyrics")}
+                  aria-label="Open Lyrics" title="Lyrics"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+                  <WkIcon name="MicVocal" size={19} />
+                </button>
+                {experience.capabilities.moments ? (
+                  <button type="button" onClick={() => openFullPlayer("comments")}
+                    aria-label="Open Comments" title="Comments"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+                    <WkIcon name="MessageCircle" size={19} />
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+            {experience.capabilities.queue ? (
+              <button type="button" onClick={() => openFullPlayer("queue")}
+                aria-label="Open Queue" title="Queue"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+                <WkIcon name="ListMusic" size={19} />
+              </button>
+            ) : null}
+            <WkIcon name="Volume2" size={17} className="ml-2 text-[var(--wk-text-faint)]" />
+            <div className="w-20">
+              <SeekRail label="Volume" currentTime={volume} duration={1}
+                progress={volume} onSeek={setVolume} step={0.01} />
+            </div>
           </div>
         ) : null}
 
