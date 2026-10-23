@@ -19,28 +19,8 @@ export type ClaimantPhoneCountryOption = {
   iso2: string;
   countryName: string;
   callingCode: string;
-  flag: string;
   label: string;
 };
-
-export function getCountryFlagEmoji(
-  iso2: string,
-) {
-  const clean =
-    iso2.trim().toUpperCase();
-
-  if (!/^[A-Z]{2}$/.test(clean)) {
-    return "🌐";
-  }
-
-  return String.fromCodePoint(
-    ...Array.from(clean).map(
-      (letter) =>
-        127397 +
-        letter.charCodeAt(0),
-    ),
-  );
-}
 
 export function getClaimantPhoneCountryOptions(): ClaimantPhoneCountryOption[] {
   return getSortedCountryCodes().flatMap(
@@ -60,10 +40,6 @@ export function getClaimantPhoneCountryOptions(): ClaimantPhoneCountryOption[] {
             iso2,
             countryName,
             callingCode,
-            flag:
-              getCountryFlagEmoji(
-                iso2,
-              ),
             label:
               `${countryName} (${callingCode})`,
           },
