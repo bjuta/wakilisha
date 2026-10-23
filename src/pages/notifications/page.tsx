@@ -351,14 +351,20 @@ export default function NotificationsPage() {
   ]);
 
   const visibleNotifications = useMemo(() => {
-    if (filter === "all") return notifications;
-    return notifications.filter((notification) => {
+    const filtered = notifications.filter((notification) => {
       const type = notification.notificationType;
+      if (filter === "all") return true;
       if (filter === "mentions") return type === "mention" || type === "post_mention";
       if (filter === "credits") return type.startsWith("credit_") || type.startsWith("contribution_");
       if (filter === "releases") return type.startsWith("release_") || type === "new_release";
       return type.startsWith("live_") || type === "live";
     });
+    // The workbook's New group is genuinely unread activity, not a guessed
+    // 24-hour interval. Do not overwrite server-owned read state.
+    return filtered.sort((a, b) =>
+      Number(Boolean(a.readAt)) - Number(Boolean(b.readAt))
+      || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }, [filter, notifications]);
 
   const unreadCount =
@@ -477,12 +483,12 @@ export default function NotificationsPage() {
 
               <Link
                 to="/settings?section=Notifications"
-                aria-label="Notification Settings"
+                aria-label="Notification settings and preferences"
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-raised)]"
               >
                 <WkIcon
-                  name="Settings"
-                  size={18}
+                  name="MoreHorizontal"
+                  size={20}
                 />
               </Link>
             </div>
@@ -589,13 +595,11 @@ export default function NotificationsPage() {
                   || metadataSenderName
                   || "Someone";
 
-                const recent = Date.now() - new Date(notification.createdAt).getTime() < 24 * 60 * 60 * 1000;
+                const recent = !notification.readAt;
                 const previous = index > 0 ? visibleNotifications[index - 1] : null;
-                const previousRecent = previous
-                  ? Date.now() - new Date(previous.createdAt).getTime() < 24 * 60 * 60 * 1000
-                  : null;
+                const previousRecent = previous ? !previous.readAt : null;
                 const groupHeading = !previous || recent !== previousRecent
-                  ? <h2 className="px-5 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">{recent ? "New" : "Earlier"}</h2>
+                  ? <h2 data-wk-notification-group className="px-5 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">{recent ? "New" : "Earlier"}</h2>
                   : null;
                 const row = (
                   <div
@@ -618,7 +622,7 @@ export default function NotificationsPage() {
                       <i className={`${icon} text-[18px]`} />
                     </div>
 
-                    <div className="min-w-0 flex-1">
+                    <div data-wk-notification-copy className="min-w-0 flex-1">
                       <div className="flex items-start gap-2.5">
                         {notification.actor?.avatarUrl ? <img src={notification.actor.avatarUrl} alt="" loading="lazy" className="h-7 w-7 shrink-0 rounded-full object-cover" /> : null}
                         <div className="min-w-0 flex-1">
@@ -626,13 +630,19 @@ export default function NotificationsPage() {
                             <span className="font-bold">{actorName}</span>{" "}
                             <span className="font-medium">{label}</span>
                           </p>
-                          <span className="mt-1 block text-[11px] font-medium text-[var(--wk-text-muted)]">{timeAgo(notification.createdAt)}</span>
                         </div>
                       </div>
                     </div>
 
+                    <time
+                      data-wk-notification-time
+                      dateTime={notification.createdAt}
+                      className="shrink-0 text-[11px] font-medium text-[var(--wk-text-muted)]"
+                    >
+                      {timeAgo(notification.createdAt)}
+                    </time>
                     {unread && (
-                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--wk-brand)]" />
+                      <span className="sr-only">Unread notification</span>
                     )}
                   </div>
                 );
