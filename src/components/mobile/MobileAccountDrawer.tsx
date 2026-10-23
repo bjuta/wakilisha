@@ -140,9 +140,6 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
                       <WakilishaAccountMark size={22} /> Sign In
                     </Link>
                     {appearanceControls}
-                    <Link to="/settings" onClick={close} className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]">
-                      <WkIcon name="Settings" size={20} /> Settings
-                    </Link>
                     {footLinks}
                   </>
                 )}
@@ -170,7 +167,7 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
                     { to: "/messages", icon: "MessageSquare" as const, label: "Messages", available: signedIn && !messagesAccess.loading && messagesAccess.visible },
                     { to: "/profile", icon: "UserRound" as const, label: "Profile", available: signedIn },
                     { to: "/artist-studio", icon: "Mic2" as const, label: "Artist Studio", available: signedIn },
-                    { to: "/settings", icon: "Settings" as const, label: "Settings", available: true },
+                    { to: "/settings", icon: "Settings" as const, label: "Settings", available: signedIn },
                   ]).filter(item => item.available).map(item => (
                     <Link key={item.to} to={item.to} onClick={close}
                       className="flex min-h-12 items-center gap-4 rounded-xl px-3 text-[14px] font-semibold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]">
