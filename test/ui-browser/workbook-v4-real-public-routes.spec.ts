@@ -285,7 +285,8 @@ for (const route of [
 for (const width of [390, 1440]) {
   test(`Now Playing stays viewport-anchored over a scrolled article at ${width}px`, async ({ page }) => {
     test.setTimeout(55_000);
-    await page.setViewportSize({ width, height: 720 });
+    // Deliberately short viewports prove the player can scroll independently.
+    await page.setViewportSize({ width, height: 540 });
     await page.goto("/test/ui-browser/fixtures/player-viewport.html", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Persistent scrolled article" })).toBeVisible({ timeout: 20_000 });
 
