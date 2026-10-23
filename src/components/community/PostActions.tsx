@@ -9,7 +9,6 @@ import {
 } from "react-router-dom";
 import {
   CommunityReactionPicker,
-  getReactionGlyph,
 } from "@/components/feature/community/CommunityReactionPicker";
 import {
   ShareSheet,
@@ -31,6 +30,7 @@ import type {
   ReportReason,
 } from "@/services/community";
 import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
+import { WkIcon } from "@/components/design-system/Icon";
 
 const PUBLIC_ORIGIN = "https://wakilisha.africa";
 
@@ -95,8 +95,6 @@ export function PostActions({
 
   const activeReactions =
     reactionState?.reactions.filter((reaction) => reaction.viewerReacted).map((reaction) => reaction.reactionType) ?? [];
-  const visibleReactions =
-    reactionState?.reactions.filter((reaction) => reaction.count > 0).slice(0, 3) ?? [];
   const reactionCount = reactionState?.reactionCount ?? 0;
   const repostCount = repostState?.repostCount ?? 0;
   const viewerReposted = repostState?.viewerReposted ?? false;
@@ -159,17 +157,19 @@ export function PostActions({
     <>
       <div data-post-actions className="mt-4 flex flex-wrap items-center gap-1 border-t border-[var(--wk-divider)] pt-2">
         <Link
+          data-wk-post-action="reply"
           to={`${post.canonicalPath}#community-section`}
           title="Reply"
           aria-label="Reply"
           className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
         >
-          <i className="ri-chat-3-line text-[18px]" aria-hidden="true" />
+          <WkIcon name="MessageCircle" size={19} />
           <span className="sr-only">Reply</span>
         </Link>
 
         {onToggleSave && (
           <button
+            data-wk-post-action="save"
             type="button"
             disabled={saving}
             onClick={onToggleSave}
@@ -181,10 +181,7 @@ export function PostActions({
                 : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
             } disabled:opacity-55`}
           >
-            <i
-              className={saved ? "ri-bookmark-fill text-[17px]" : "ri-bookmark-line text-[17px]"}
-              aria-hidden="true"
-            />
+            <WkIcon name="Bookmark" size={19} />
             <span className="sr-only">
               {saved ? "Bookmarked" : "Bookmark"}
             </span>
@@ -192,7 +189,7 @@ export function PostActions({
         )}
 
         {onReact && (
-          <div className="relative">
+          <div data-wk-post-action="react" className="relative">
             <button
               ref={reactionTriggerRef}
               type="button"
@@ -215,17 +212,7 @@ export function PostActions({
               }
               aria-expanded={reactionOpen}
             >
-              {visibleReactions.length > 0 ? (
-                <span className="inline-flex items-center gap-0.5" aria-hidden="true">
-                  {visibleReactions.map((reaction) => (
-                    <span key={reaction.reactionType} className="text-[16px] leading-none">
-                      {getReactionGlyph(reaction.reactionType)}
-                    </span>
-                  ))}
-                </span>
-              ) : (
-                <i className="ri-emotion-happy-line text-[17px]" aria-hidden="true" />
-              )}
+              <WkIcon name="Heart" size={19} />
               {reactionCount > 0 && (
                 <span className="text-[10px] font-black tabular-nums">
                   {reactionCount}
@@ -249,7 +236,7 @@ export function PostActions({
         )}
 
         {showRepost && (
-          <div className="relative">
+          <div data-wk-post-action="repost" className="relative">
             <button
               type="button"
               disabled={reposting}
@@ -263,7 +250,7 @@ export function PostActions({
                   : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
               } disabled:opacity-55`}
             >
-              <i className="ri-repeat-2-line text-[17px]" aria-hidden="true" />
+              <WkIcon name="Repeat2" size={19} />
               {repostCount > 0 && (
                 <span className="text-[10px] font-black tabular-nums">
                   {repostCount}
@@ -304,18 +291,19 @@ export function PostActions({
         )}
 
         <button
+          data-wk-post-action="share"
           type="button"
           onClick={() => setShareOpen(true)}
           title="Share"
           aria-label="Share"
           className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
         >
-          <i className="ri-share-forward-line text-[18px]" aria-hidden="true" />
+          <WkIcon name="Share2" size={19} />
           <span className="sr-only">Share</span>
         </button>
 
         {showMenu && (
-          <div className="relative ml-auto">
+          <div data-wk-post-action="more" className="relative ml-auto">
             <button
               type="button"
               aria-label="More Post actions"
@@ -323,7 +311,7 @@ export function PostActions({
               onClick={() => setMenuOpen((current) => !current)}
               className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
             >
-              <i className="ri-more-line text-[19px]" aria-hidden="true" />
+              <WkIcon name="MoreHorizontal" size={20} />
             </button>
 
             {menuOpen && (
