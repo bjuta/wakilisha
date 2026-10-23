@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import type { ReactNode } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ResponsiveAppLayout } from "@/components/mobile/ResponsiveAppLayout";
@@ -13,7 +14,7 @@ vi.mock("@/hooks/useMobileDetect", () => ({
   useMobileDetect: () => state.mobile,
 }));
 vi.mock("@/components/auth/RegistryOnboardingGate", () => ({
-  RegistryOnboardingGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  RegistryOnboardingGate: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/components/mobile/MobileAppLayout", () => ({
   MobileAppLayout: () => <main><input aria-label="Retained mobile page input" data-testid="mobile-route" /></main>,
@@ -27,7 +28,7 @@ vi.mock("@/components/layout/AppLayout", () => ({
   ),
 }));
 vi.mock("@/components/design-system/player/PlayerCompactSurface", () => ({
-  PlayerCompactSurface: () => <div data-testid="mini-player" />,
+  PlayerCompactSurface: () => state.open ? null : <div data-testid="mini-player" />,
 }));
 vi.mock("@/components/design-system/player/PlayerFullSurface", () => ({
   PlayerFullSurface: ({ mode }: { mode: string }) => <div data-testid={`full-${mode}`}>Now Playing</div>,
@@ -56,7 +57,7 @@ describe("WAKILISHA player presentation lifecycle", () => {
     await screen.findByTestId("full-mobile");
     expect(screen.getByTestId("mobile-route")).toBe(pageInput);
     expect(pageInput).toHaveValue("Keep this page");
-    expect(screen.getByTestId("mini-player")).toBeInTheDocument();
+    expect(screen.queryByTestId("mini-player")).not.toBeInTheDocument();
 
     state.open = false;
     rerender(<ResponsiveAppLayout />);
