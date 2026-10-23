@@ -19,7 +19,7 @@ import { ExtendedImage } from "@/components/admin/editor/ExtendedImage";
 import { FloatingImageToolbar } from "@/components/admin/editor/FloatingImageToolbar";
 import { ImageEditDialog } from "@/components/admin/editor/ImageEditDialog";
 import { SlashCommandExtension } from "@/components/admin/editor/SlashCommandSuggestion";
-import { useReleaseSearchData } from "@/hooks/useReleaseSearchData";
+import { searchEditorialReleases, type EditorialReleaseHit } from "@/services/articles/editorialReleaseSearch";
 import { useArtistSearchData } from "@/hooks/useArtistSearchData";
 
 import { releaseUrl } from "@/utils/releaseUrl";
@@ -183,6 +183,7 @@ export function RichTextEditor({
   const [trackPickerOpen, setTrackPickerOpen] = useState(false);
   const [trackSearch, setTrackSearch] = useState("");
 
+  const [editorReleaseResults, setEditorReleaseResults] = useState<EditorialReleaseHit[]>([]);
   const [playlistReleaseResults, setPlaylistReleaseResults] =
     useState<RegistryReleaseSearchResult[]>([]);
   const [playlistArtistResults, setPlaylistArtistResults] =
@@ -211,40 +212,15 @@ export function RichTextEditor({
   readOnlyRef.current = readOnly;
   onChangeRef.current = onChange;
 
-  const { data: releases, loading: releasesLoading } =
-    useReleaseSearchData(!playlistDescriptionMode);
+
   const { data: artists, loading: artistsLoading } =
     useArtistSearchData(!playlistDescriptionMode);
   // The Registry exceeds the client query default limit. Track selection
   // uses bounded server-side search for both articles and playlists.
 
-  const filteredReleases = useMemo(() => {
-    if (playlistDescriptionMode) {
-      return playlistReleaseResults;
-    }
-
-    if (!releaseSearch.trim()) {
-      return releases;
-    }
-
-    const q =
-      releaseSearch.toLowerCase();
-
-    return releases.filter(
-      (release) =>
-        release.title
-          .toLowerCase()
-          .includes(q) ||
-        release.artistName
-          .toLowerCase()
-          .includes(q),
-    );
-  }, [
-    playlistDescriptionMode,
-    playlistReleaseResults,
-    releases,
-    releaseSearch,
-  ]);
+  const filteredReleases: EditorialReleaseHit[] = playlistDescriptionMode
+    ? playlistReleaseResults.map((release) => ({ ...release, status: "active" as const }))
+    : editorReleaseResults;
 
   const filteredArtists = useMemo(() => {
     if (playlistDescriptionMode) {
@@ -307,10 +283,7 @@ export function RichTextEditor({
       previewUrl: track.previewUrl,
     })), [playlistTrackResults]);
 
-  const releasePickerLoading =
-    playlistDescriptionMode
-      ? playlistReleaseLoading
-      : releasesLoading;
+  const releasePickerLoading = playlistReleaseLoading;
   const artistPickerLoading =
     playlistDescriptionMode
       ? playlistArtistLoading
@@ -319,7 +292,6 @@ export function RichTextEditor({
 
   useEffect(() => {
     if (
-      !playlistDescriptionMode ||
       !releasePickerOpen
     ) {
       return;
@@ -328,7 +300,7 @@ export function RichTextEditor({
     const query =
       releaseSearch.trim();
 
-    if (query.length < 2) {
+    if (playlistDescriptionMode && query.length < 2) {
       setPlaylistReleaseResults([]);
       setPlaylistReleaseLoading(false);
       setPlaylistReleaseError(null);
@@ -341,18 +313,20 @@ export function RichTextEditor({
         setPlaylistReleaseLoading(true);
         setPlaylistReleaseError(null);
 
-        searchRegistryReleases(query)
+        (playlistDescriptionMode ? searchRegistryReleases(query) : searchEditorialReleases(query))
           .then((results) => {
-            if (alive) {
-              setPlaylistReleaseResults(
-                results,
-              );
+            if (!alive) return;
+            if (playlistDescriptionMode) {
+              setPlaylistReleaseResults(results as RegistryReleaseSearchResult[]);
+            } else {
+              setEditorReleaseResults(results as EditorialReleaseHit[]);
             }
           })
           .catch((reason) => {
             if (!alive) return;
 
             setPlaylistReleaseResults([]);
+            setEditorReleaseResults([]);
             setPlaylistReleaseError(
               reason instanceof Error
                 ? reason.message
@@ -2025,20 +1999,20 @@ export function RichTextEditor({
           setReleasePickerOpen(false);
           setReleaseSearch("");
         }}
-        title={playlistDescriptionMode ? "Link EP or Album" : "Insert Release Shortcode"}
+        title={playlistDescriptionMode ? "Link EP or Album" : "Insert Release from Registry"}
       >
               <input
                 type="text"
                 value={releaseSearch}
                 onChange={(e) => setReleaseSearch(e.target.value)}
-                placeholder="Search EPs and Albums by title or artist..."
+                placeholder="Search releases by title or artist..."
                 className="mb-3 w-full rounded-md border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 py-3 text-[16px] text-[var(--wk-text)] placeholder:text-[var(--wk-text-faint)] outline-none focus:border-[var(--wk-brand)] sm:py-2 sm:text-[13px]"
                 onKeyDown={(e) => {
                   if (e.key === "Escape") { setReleasePickerOpen(false); setReleaseSearch(""); }
                 }}
               />
               <div className="min-h-0 max-h-[50dvh] space-y-2 overflow-y-auto overscroll-contain pr-1 sm:max-h-[320px]">
-                {playlistDescriptionMode && playlistReleaseError ? (
+                {playlistReleaseError ? (
                   <div className="py-6 text-center text-[12px] text-wk-danger">
                     {playlistReleaseError}
                   </div>
@@ -2052,8 +2026,8 @@ export function RichTextEditor({
                     {playlistDescriptionMode && releaseSearch.trim().length < 2
                       ? "Enter at least two characters to search EPs and Albums."
                       : releaseSearch.trim()
-                        ? "No EPs or Albums match your search."
-                        : "No EPs or Albums found yet."}
+                        ? "No releases match your search."
+                        : "No recently ingested releases found."}
                   </div>
                 ) : (
                   filteredReleases.map((release) => (
@@ -2082,11 +2056,11 @@ export function RichTextEditor({
                           return;
                         }
 
-                        handleInsertReleaseShortcode(
-                          release.slug,
-                        );
+                        if (release.status === "active") {
+                          handleInsertReleaseShortcode(release.slug);
+                        }
                       }}
-                      disabled={
+                      disabled={release.status !== "active" || (
                         playlistDescriptionMode &&
                         releaseUrl({
                           slug: release.slug,
@@ -2095,7 +2069,7 @@ export function RichTextEditor({
                           trackCount: release.trackCount,
                           releaseType: release.releaseType,
                         }) === "/releases"
-                      }
+                      )}
                       className="flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-2.5 text-left transition-all cursor-pointer hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)] sm:gap-3 sm:p-3"
                     >
                       <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)] sm:h-12 sm:w-12">
@@ -2113,9 +2087,10 @@ export function RichTextEditor({
                         <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--wk-text-faint)]">
                           <span className="rounded-full bg-[var(--wk-brand-soft)]/40 px-1.5 py-0.5 text-[var(--wk-brand)] font-bold">{release.releaseType}</span>
                           <span>{release.trackCount} {release.trackCount === 1 ? "track" : "tracks"}</span>
+                          {release.status !== "active" && <span className="font-bold text-[var(--wk-text-muted)]">Draft · available after Registry activation</span>}
                         </div>
                       </div>
-                      <i className="ri-add-circle-line text-[var(--wk-brand)] text-[18px] shrink-0" />
+                      <WkIcon name={release.status === "active" ? "Plus" : "Lock"} size={18} className="shrink-0 text-[var(--wk-text-muted)]" aria-hidden="true" />
                     </button>
                   ))
                 )}
