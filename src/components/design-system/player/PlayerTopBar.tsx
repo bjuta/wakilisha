@@ -1,9 +1,6 @@
 import {
   WkIcon,
 } from "@/components/design-system/Icon";
-import {
-  useScrollDirection,
-} from "@/hooks/useScrollDirection";
 
 export function PlayerTopBar({
   mode,
@@ -16,9 +13,10 @@ export function PlayerTopBar({
   onClose: () => void;
   onMore: () => void;
 }) {
-  const scrollChrome = useScrollDirection();
   const mobile = mode === "mobile";
-  const visible = !mobile || scrollChrome.topVisible;
+  // Now Playing always keeps its exit control available. The page scroll
+  // direction must never hide the only way to collapse a full-screen player.
+  const visible = true;
 
   return (
     <div
