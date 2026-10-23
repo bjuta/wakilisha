@@ -273,7 +273,7 @@ for (const route of [
       await openMenu.click();
       const guestMenu = page.getByRole("dialog", { name: "WAKILISHA Menu" });
       await expect(guestMenu.getByRole("link", { name: "Sign In" })).toBeVisible();
-      await expect(guestMenu.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+      await expect(guestMenu.getByRole("link", { name: "Settings" })).toHaveCount(0);
       const sidebarLogo = guestMenu.locator('img[alt="WAKILISHA"]');
       const appearance = guestMenu.getByRole("switch", { name: "Dark mode" });
       await expect(appearance).toBeVisible();
