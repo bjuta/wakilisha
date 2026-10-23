@@ -158,7 +158,7 @@ export function TrackMomentDrawer({
   }, [open, loadMomentComments, hasLoadedOnce]);
 
   useEffect(() => {
-    if (!open || typeof document === "undefined") return;
+    if (!open || inlineDesktop || typeof document === "undefined") return;
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -166,7 +166,7 @@ export function TrackMomentDrawer({
     return () => {
       document.body.style.overflow = originalOverflow;
     };
-  }, [open]);
+  }, [open, inlineDesktop]);
 
   const handlePostMoment = useCallback(
     async (body: string) => {
