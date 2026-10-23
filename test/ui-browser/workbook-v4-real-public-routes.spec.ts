@@ -87,11 +87,23 @@ for (const width of [390, 768, 1440]) {
         await expect(floatingBar).toBeVisible();
         await expect(floatingBar).toHaveAttribute("data-wk-mobile-nav-transparency", "global");
         expect(await floatingBar.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+        // Media on these public routes comes from the live Registry. When
+        // there is no published cover or edition, assert the settled empty/
+        // error state rather than inventing an image for visual acceptance.
         const topHero = pageSpec.path === "/"
           ? page.locator('[data-wk-workbook-screen="magazine-mobile"] > [role="link"]').first()
           : page.locator("section.relative").first();
-        await expect(topHero).toBeVisible();
-        expect(Math.abs(await topHero.evaluate((node) => node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
+        if (await topHero.count()) {
+          await expect(topHero).toBeVisible();
+          expect(Math.abs(await topHero.evaluate((node) => node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
+        } else {
+          if (pageSpec.path === "/") {
+            await expect(page.locator('[data-wk-workbook-screen="magazine-mobile"]')).toHaveCount(0);
+            await expect(heading).toBeVisible();
+          } else {
+            await expect(heading).toContainText(/No charts out yet|Charts unavailable right now/);
+          }
+        }
         await expect(page.getByRole("navigation", { name: "Primary mobile navigation" })).toHaveCount(0);
       } else {
         const sidebar = page.locator(".wk-music-app-shell > aside").first();
@@ -341,8 +353,8 @@ for (const width of [390, 1440]) {
       await expect(nav).toHaveAttribute("data-wk-mobile-header-visible", "false");
       await expect.poll(() => nav.evaluate((node) => node.getBoundingClientRect().bottom)).toBeLessThanOrEqual(2);
 
-      // Reverse direction without returning to the top: show navigation
-      // promptly, with a real theme surface and contrast-safe icon colours.
+      // Reverse direction without returning to the top: reveal the
+      // transparent bar with individually contrast-blended Menu/Search glyphs.
       await page.evaluate(() => window.scrollBy(0, -44));
       await expect(nav).toHaveAttribute("data-wk-mobile-header-visible", "true");
       await expect.poll(() => nav.evaluate((node) => Math.abs(node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
@@ -359,8 +371,8 @@ for (const width of [390, 1440]) {
         };
       });
       expect(chrome.position).toBe("fixed");
-      expect(chrome.background).not.toBe("rgba(0, 0, 0, 0)");
-      expect(chrome.menuBlend).toBe("normal");
+      expect(chrome.background).toBe("rgba(0, 0, 0, 0)");
+      expect(chrome.menuBlend).toBe("difference");
       expect(chrome.logoCount).toBe(0);
       expect(chrome.searchCount).toBe(1);
       expect(Math.abs(chrome.headerTop)).toBeLessThanOrEqual(2);
