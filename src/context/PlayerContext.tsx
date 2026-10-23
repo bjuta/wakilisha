@@ -198,7 +198,8 @@ interface PlayerContextValue {
   setPlaybackRate: (rate: number) => void;
   toggleRepeat: () => void;
   toggleShuffle: () => void;
-  openFullPlayer: () => void;
+  openFullPlayer: (panel?: "lyrics" | "comments" | "queue") => void;
+  requestedPlayerPanel: "lyrics" | "comments" | "queue" | null;
   closeFullPlayer: () => void;
   canGoNext: boolean;
   canGoPrev: boolean;
@@ -219,6 +220,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
   const [isShuffle, setIsShuffle] = useState(false);
   const [isFullPlayerOpen, setIsFullPlayerOpen] = useState(false);
+  const [requestedPlayerPanel, setRequestedPlayerPanel] = useState<"lyrics" | "comments" | "queue" | null>(null);
   const [playbackBackend, setPlaybackBackend] = useState<PlaybackBackend>("audio");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -2115,7 +2117,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   ]);
 
   // ─── Full player ───
-  const openFullPlayer = useCallback(() => setIsFullPlayerOpen(true), []);
+  const openFullPlayer = useCallback((panel?: "lyrics" | "comments" | "queue") => {
+    setRequestedPlayerPanel(panel ?? null);
+    setIsFullPlayerOpen(true);
+  }, []);
   const closeFullPlayer = useCallback(() => setIsFullPlayerOpen(false), []);
 
   const queueOrder = resolveQueueOrder(
@@ -2182,6 +2187,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     toggleRepeat,
     toggleShuffle,
     openFullPlayer,
+    requestedPlayerPanel,
     closeFullPlayer,
     canGoNext,
     canGoPrev,
