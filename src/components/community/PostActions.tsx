@@ -379,10 +379,7 @@ export function PostActions({
                         }}
                         className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)] disabled:opacity-50"
                       >
-                        <i
-                          className={followed ? "ri-user-unfollow-line text-[17px]" : "ri-user-follow-line text-[17px]"}
-                          aria-hidden="true"
-                        />
+                        <WkIcon name={followed ? "UserMinus" : "UserPlus"} size={17} aria-hidden="true" />
                         {followed ? `Unfollow ${post.actor.name}` : `Follow ${post.actor.name}`}
                       </button>
                     )}
@@ -394,10 +391,7 @@ export function PostActions({
                         onClick={handleBlock}
                         className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] font-black text-[var(--wk-text)] hover:bg-[var(--wk-bg)] disabled:opacity-50"
                       >
-                        <i
-                          className={blocked ? "ri-forbid-2-line text-[17px]" : "ri-forbid-line text-[17px]"}
-                          aria-hidden="true"
-                        />
+                        <WkIcon name={blocked ? "ShieldCheck" : "ShieldOff"} size={17} aria-hidden="true" />
                         {blocked ? `Unblock ${post.actor.name}` : `Block ${post.actor.name}`}
                       </button>
                     )}
