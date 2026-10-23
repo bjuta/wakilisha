@@ -254,6 +254,13 @@ jobs:
 
       - name: Run WAKILISHA real-browser interaction acceptance
         run: npm run test:ui-browser
+      - name: Exercise shared authoring editor in isolated real Chromium
+        env:
+          WK_EDITORIAL_FIXTURE: "1"
+          VITE_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          VITE_PUBLIC_SUPABASE_ANON_KEY: wk-test-synthetic-no-credentials
+        run: npm run test:ui-browser -- test/ui-browser/editorial-rating-workflow.spec.ts
+
       - name: Preserve actual-route visual evidence
         if: always()
         uses: actions/upload-artifact@v4
