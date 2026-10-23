@@ -56,15 +56,15 @@ export function RatingComposerModal({ open, onClose, onApply, initial }: Props) 
             role="group"
             aria-label="Choose a rating from 1 to 5 in half-star steps"
             onKeyDown={keyDown}
-            className="flex items-center gap-2"
+            className="flex flex-wrap items-center gap-1 sm:gap-2"
           >
             {Array.from({ length: 5 }, (_, star) => (
-              <div key={star} className="relative h-11 w-11 shrink-0 text-[var(--wk-text)]">
-                <svg viewBox="0 0 24 24" className="absolute inset-0 h-11 w-11 opacity-20" aria-hidden="true">
+              <div key={star} className="relative h-12 w-12 shrink-0 text-[var(--wk-text)]">
+                <svg viewBox="0 0 24 24" className="absolute inset-0 h-12 w-12 opacity-20" aria-hidden="true">
                   <path d={WK_STAR_PATH} fill="currentColor" />
                 </svg>
                 <span className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: String(Math.max(0, Math.min(1, value - star)) * 100) + "%" }}>
-                  <svg viewBox="0 0 24 24" className="h-11 w-11 max-w-none" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="h-12 w-12 max-w-none" aria-hidden="true">
                     <path d={WK_STAR_PATH} fill="currentColor" />
                   </svg>
                 </span>
@@ -77,7 +77,7 @@ export function RatingComposerModal({ open, onClose, onApply, initial }: Props) 
                       aria-label={"Set rating to " + score.toFixed(1) + " out of 5"}
                       aria-pressed={score === value}
                       onClick={() => changeValue(score)}
-                      className="h-11 w-[22px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)]"
+                      className="h-12 w-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)]"
                     />;
                   })}
                 </div>

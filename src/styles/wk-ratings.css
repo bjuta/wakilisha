@@ -1,5 +1,6 @@
 /* Workbook (3), Chapter 24 — a single native SVG rating language, all workspaces. */
 .wk-rating{--wk-rating-star:15px;display:inline-flex;align-items:center;gap:.28em;vertical-align:-.13em;white-space:nowrap;color:var(--wk-text,currentColor);font-variant-numeric:tabular-nums;max-width:100%;line-height:1.2}
+.wk-rating--inline{margin-inline:.22em}
 .wk-rating-stars{display:inline-flex;gap:2px;align-items:center;white-space:nowrap}
 .wk-rating-star{position:relative;display:inline-block;width:var(--wk-rating-star);height:var(--wk-rating-star);flex:none}
 .wk-rating-star-empty,.wk-rating-star-filled{position:absolute;top:0;left:0;bottom:0;display:block;overflow:hidden;height:100%}

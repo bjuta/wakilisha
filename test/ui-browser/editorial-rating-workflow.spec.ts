@@ -28,10 +28,19 @@ test("Insert → Rating inserts a live editable star node, persists and reopens"
       await openInsert(page, "Rating");
       const picker = page.getByRole("dialog", { name: "Insert Rating" });
       await expect(picker).toBeVisible();
+      const pickerWidth = await picker.evaluate((node) => ({
+        content: node.clientWidth, overflow: node.scrollWidth - node.clientWidth,
+      }));
+      expect(pickerWidth.overflow).toBeLessThanOrEqual(2);
+      const targets = await picker.getByRole("button", { name: /^Set rating to/ }).evaluateAll((buttons) =>
+        buttons.map((button) => button.getBoundingClientRect().width)
+      );
+      expect(Math.min(...targets)).toBeGreaterThanOrEqual(24);
       await picker.getByRole("button", { name: "Set rating to 3.5 out of 5" }).click();
       await expect(picker.getByText("3.5 / 5")).toBeVisible();
       await picker.getByRole("button", { name: "Insert Rating", exact: true }).click();
       const atom = prose.locator('[data-wk-rating][data-wk-rating-value="3.5"]');
+      await expect(atom).toHaveCSS("margin-left", /[1-9]/);
       await expect(atom).toHaveCount(1);
       await expect(atom.locator("svg")).toHaveCount(10);
       const svgNamespaces = await atom.locator("svg").evaluateAll((icons) =>
