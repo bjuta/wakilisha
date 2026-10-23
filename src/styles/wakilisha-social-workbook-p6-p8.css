@@ -16,7 +16,7 @@
 
 [data-wk-workbook-screen="following"] [data-wk-following-layout] {
   background: var(--wk-surface);
-  border-inline: 1px solid var(--wk-divider);
+  border-inline: 0;
 }
 [data-wk-workbook-screen="following"] [data-following-masthead] {
   min-height: 56px;
@@ -582,7 +582,7 @@
     display: none;
   }
   [data-wk-workbook-screen="messages"] [data-wk-message-list] {
-    padding-top: 56px;
+    padding-top: 0;
   }
   [data-wk-workbook-screen="messages"] [data-wk-message-thread][data-wk-thread-selected="true"] {
     height: 100dvh;
@@ -607,12 +607,7 @@
   padding-top: 0;
   margin-top: 18px;
 }
-[data-wk-social-brand-row] {
-  flex: 0 0 auto;
-  border-bottom: 1px solid var(--wk-divider);
-  background: var(--wk-surface);
-}
-@media (max-width: 1023px) {
+@media (max-width: 767px) {
   [data-wk-workbook-screen="following"],
   [data-wk-workbook-screen="notifications"],
   [data-wk-workbook-screen="messages"] {

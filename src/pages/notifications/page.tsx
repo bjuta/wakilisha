@@ -1,5 +1,4 @@
 import "@/styles/wakilisha-workbook-surface-fidelity.css";
-import { WakilishaSectionLogo } from "@/components/design-system/branding/WakilishaSectionLogo";
 import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import "@/styles/wakilisha-social-workbook-p6-p8.css";
 import {
@@ -25,6 +24,7 @@ import type {
 import { WkIcon } from "@/components/design-system/Icon";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import { supabase } from "@/lib/supabase";
+import { listMessageConversations } from "@/services/messages";
 import type { UserNotificationPrefs } from "@/hooks/useUserSettings";
 
 type NotificationFilter = "all" | "mentions" | "releases" | "credits" | "live";
@@ -138,6 +138,10 @@ function notificationTarget(
       return canonicalPath;
     }
 
+    const conversationId = (notification.metadata as Record<string, unknown> | null)?.conversation_id;
+    if (typeof conversationId === "string" && /^[0-9a-f-]{36}$/i.test(conversationId)) {
+      return `/messages?conversation=${encodeURIComponent(conversationId)}`;
+    }
     return "/messages";
   }
 
@@ -323,6 +327,8 @@ export default function NotificationsPage() {
     useState(true);
   const [markingAll, setMarkingAll] =
     useState(false);
+  const [dmUnreadByConversation, setDmUnreadByConversation] =
+    useState<Record<string, number>>({});
 
   const loadNotifications =
     useCallback(async () => {
@@ -336,6 +342,23 @@ export default function NotificationsPage() {
             100,
           );
         setNotifications(rows);
+        // Per-conversation counts come from Messages authority, not
+        // the number of unread entries in Community Notifications.
+        const folders = await Promise.allSettled([
+          listMessageConversations("inbox"),
+          listMessageConversations("requests"),
+        ]);
+        const counts: Record<string, number> = {};
+        for (const result of folders) {
+          if (result.status !== "fulfilled") continue;
+          for (const conversation of result.value) {
+            const unread = Number(conversation.unread_count);
+            if (Number.isFinite(unread) && unread > 0) {
+              counts[conversation.conversation_id] = unread;
+            }
+          }
+        }
+        setDmUnreadByConversation(counts);
       } finally {
         setLoading(false);
       }
@@ -454,17 +477,11 @@ export default function NotificationsPage() {
       <div className="mx-auto grid w-full max-w-[1180px] gap-0 lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)] lg:gap-0 lg:px-0 lg:pt-0">
         <section className="min-h-[calc(100dvh-6rem)] min-w-0 border-r border-[var(--wk-border)] bg-[var(--wk-surface)]">
         <header className="sticky top-0 z-20 border-b border-[var(--wk-border)] bg-[var(--wk-surface)] backdrop-blur-xl">
-          <div data-wk-social-brand-row className="flex h-11 items-center px-5"><WakilishaSectionLogo /></div>
           <div className="flex min-h-14 items-center justify-between gap-4 px-5">
             <div>
               <h1 className="text-[20px] font-bold leading-[1.2] tracking-[-0.02em] text-[var(--wk-text)]">
                 Notifications
               </h1>
-              {unreadCount > 0 && (
-                <p className="mt-0.5 text-[11px] font-bold text-[var(--wk-text-muted)]">
-                  {unreadCount} unread
-                </p>
-              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -597,6 +614,19 @@ export default function NotificationsPage() {
                   || metadataSenderName
                   || "Someone";
 
+                const conversationId = typeof metadata?.conversation_id === "string"
+                  ? metadata.conversation_id
+                  : null;
+                const alreadyListed = conversationId && visibleNotifications
+                  .slice(0, index)
+                  .some((earlier) => (
+                    earlier.notificationType === "direct_message"
+                    && (earlier.metadata as Record<string, unknown> | null)?.conversation_id === conversationId
+                  ));
+                const dmUnread = notification.notificationType === "direct_message"
+                  && conversationId && !alreadyListed
+                  ? dmUnreadByConversation[conversationId] || 0
+                  : 0;
                 const recent = !notification.readAt;
                 const previous = index > 0 ? visibleNotifications[index - 1] : null;
                 const previousRecent = previous ? !previous.readAt : null;
@@ -631,6 +661,11 @@ export default function NotificationsPage() {
                           <p className="text-[13px] leading-[1.45] text-[var(--wk-text)]">
                             <span className="font-bold">{actorName}</span>{" "}
                             <span className="font-medium">{label}</span>
+                            {dmUnread > 0 ? (
+                              <span data-wk-dm-unread-count className="ml-2 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[var(--wk-brand)] px-1.5 text-[11px] font-bold text-[var(--wk-brand-on)]" aria-label={`${dmUnread} unread messages in this conversation`}>
+                                {dmUnread > 99 ? "99+" : dmUnread}
+                              </span>
+                            ) : null}
                           </p>
                         </div>
                       </div>

@@ -102,6 +102,22 @@ for (const width of [390, 768, 1440]) {
 }
 
 
+test("Mobile Following renders its sole WAKILISHA wordmark inside the shared navbar", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/following", { waitUntil: "domcontentloaded" });
+  const nav = page.locator('[data-wk-mobile-app-header="v4"]');
+  const feed = page.locator('[data-wk-workbook-screen="following"]');
+  await expect(nav).toBeVisible();
+  await expect(feed).toBeVisible();
+  await expect(nav.locator('[data-wk-social-wordmark]')).toHaveCount(1);
+  await expect(feed.locator('[data-wk-social-brand-row]')).toHaveCount(0);
+  const navBottom = await nav.evaluate((node) => node.getBoundingClientRect().bottom);
+  const feedTop = await feed.locator("[data-following-masthead]").evaluate((node) => node.getBoundingClientRect().top);
+  expect(feedTop).toBeGreaterThanOrEqual(navBottom - 1);
+  await expect(nav.getByRole("button", { name: "Open WAKILISHA menu" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Search" })).toBeVisible();
+});
+
 test("Workbook sidebar uses accessible modal focus and replaces the old mobile bottom tabs", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/", { waitUntil: "domcontentloaded" });

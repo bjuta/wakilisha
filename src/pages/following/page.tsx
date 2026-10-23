@@ -1,5 +1,4 @@
 import "@/styles/wakilisha-workbook-p1-p11-authority.css";
-import { WakilishaSectionLogo } from "@/components/design-system/branding/WakilishaSectionLogo";
 import "@/styles/wakilisha-workbook-surface-fidelity.css";
 import "@/styles/wakilisha-social-workbook-p6-p8.css";
 import {
@@ -2145,10 +2144,9 @@ export default function FollowingPage() {
         robots="noindex,nofollow"
       />
 
-      <div data-wk-following-layout className={isSignedIn ? "mx-auto grid w-full max-w-[1180px] grid-cols-1 lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)]" : "mx-auto w-full max-w-[850px]"}>
+      <div data-wk-following-layout className={isSignedIn ? "grid w-full grid-cols-1 lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)]" : "w-full"}>
         <div data-wk-following-timeline className="min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r">
         <header data-following-masthead className="sticky top-0 z-20 border-b border-[var(--wk-divider)] bg-[var(--wk-surface)] backdrop-blur-xl">
-          <div data-wk-social-brand-row className="flex h-11 items-center px-5"><WakilishaSectionLogo /></div>
           {isSignedIn ? (
             <nav aria-label="Following feed filters" className="grid h-14 grid-cols-2">
               {([
