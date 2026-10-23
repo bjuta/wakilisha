@@ -37,6 +37,10 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(mobile).toContain('snap-x snap-mandatory');
     expect(mobile).toContain('useMagazineArticles(24)');
     expect(card).toContain('data-wk-magazine-feature="true"');
+    expect(mobile).toContain('min-h-[max(500px,70dvh)]');
+    expect(mobile).toContain('px-5 pb-12 pt-28 text-white');
+    expect(desktop).toContain('h-[min(70vw,580px)] min-h-[440px]');
+    expect(desktop).toContain('pb-16 pt-32 text-white');
     expect(card).not.toContain('line-clamp-3 text-[clamp(20px,2.6vw,30px)]');
     const byline = read("src/pages/magazine/components/MagazineHeroMeta.tsx");
     for (const page of [desktop, mobile]) {

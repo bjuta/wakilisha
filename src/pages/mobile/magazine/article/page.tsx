@@ -305,20 +305,6 @@ export default function MobileArticle() {
             name={article.title}
           />
         )}
-        {/* Floating nav */}
-        <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-safe-top py-4 flex items-center justify-end">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCommunitySheetOpen(true)}
-              className="flex items-center justify-center w-8 h-8 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm text-white/80 hover:bg-black/45 transition-all cursor-pointer"
-              aria-label="Article actions"
-            >
-              <i className="ri-more-2-line text-[16px]" />
-            </button>
-
-          </div>
-        </div>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-black/30 to-black/10" />
         <div className="absolute inset-x-0 bottom-0 z-10 px-5 pb-8 text-[#f5f5f4]">
           <p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#85c441]">
@@ -364,7 +350,7 @@ export default function MobileArticle() {
         className="wk-workbook-article-paper relative z-10 min-h-[360px]"
       >
         <div className="px-5 pt-8 pb-6">
-          {/* Author row — avatar, name and publication date */}
+          {/* Author details and contextual article actions */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <ArticleAuthorIdentity name={article.author} personPath={article.authorPersonPath} organizationPath={article.authorOrganizationPath}
@@ -383,9 +369,19 @@ export default function MobileArticle() {
                 <span className="text-[11px] text-[var(--wk-text-muted)]">{article.date}</span>
               </div>
             </div>
+            <button
+              type="button"
+              data-wk-article-actions-trigger="byline"
+              aria-label="Article actions"
+              aria-haspopup="dialog"
+              aria-expanded={communitySheetOpen}
+              onClick={() => setCommunitySheetOpen(true)}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-raised)]"
+            >
+              <i className="ri-more-2-line text-[18px]" aria-hidden="true" />
+            </button>
           </div>
         </div>
-
 
         {/* Article body */}
         <div className="px-5 pb-10">

@@ -210,6 +210,12 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(desktop).not.toContain('handleNavCopy');
     expect(mobile).not.toContain('<MobileShareButton');
     expect(mobile).not.toContain('to="/magazine"');
+    expect(mobile).not.toContain('pt-safe-top py-4 flex items-center justify-end');
+    expect(mobile).toContain('data-wk-article-actions-trigger="byline"');
+    expect(mobile).toContain('aria-expanded={communitySheetOpen}');
+    expect(mobile).toContain('aria-haspopup="dialog"');
+    expect(mobile.indexOf('data-wk-article-actions-trigger="byline"')).toBeGreaterThan(mobile.indexOf("{/* Author details and contextual article actions */}"));
+    expect(mobile.indexOf('data-wk-article-actions-trigger="byline"')).toBeLessThan(mobile.indexOf("{/* Article body */}"));
     // Hero geometry is explicitly outside this patch.
     expect(desktop).toContain('className="relative z-10 mx-auto max-w-[820px] px-6 pb-12 text-center text-[#f5f5f4]"');
     expect(mobile).toContain('className="absolute inset-x-0 bottom-0 z-10 px-5 pb-8 text-[#f5f5f4]"');
