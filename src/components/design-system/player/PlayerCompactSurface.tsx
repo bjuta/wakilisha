@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { SeekRail } from "./SeekRail";
@@ -54,10 +54,23 @@ export function PlayerCompactSurface({
     canGoPrev,
     seek,
     isFullPlayerOpen,
+    volume,
+    setVolume,
   } = usePlayer();
 
   const isMobile = mode === "mobile";
   const [browserGap, setBrowserGap] = useState(0);
+  const [desktopSidebarWidth, setDesktopSidebarWidth] = useState(256);
+  useLayoutEffect(() => {
+    if (isMobile) return;
+    const aside = document.querySelector<HTMLElement>(".wk-music-app-shell > aside");
+    if (!aside) { setDesktopSidebarWidth(0); return; }
+    const update = () => setDesktopSidebarWidth(aside.getBoundingClientRect().width);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(aside);
+    return () => observer.disconnect();
+  }, [isMobile]);
   useEffect(() => {
     if (!isMobile || !window.visualViewport) return;
     const viewport = window.visualViewport;
@@ -128,7 +141,7 @@ export function PlayerCompactSurface({
         "fixed z-[100] overflow-hidden border border-[var(--wk-border)] bg-[color:var(--wk-surface)]/96 text-[var(--wk-text)] shadow-2xl backdrop-blur-xl",
         isMobile
           ? "left-2 right-2 rounded-[16px] transition-[bottom] duration-[240ms] motion-reduce:transition-none"
-          : "inset-x-0 bottom-0 border-x-0 border-b-0",
+          : "rounded-2xl",
       ].join(" ")}
       style={
         isMobile
@@ -137,7 +150,11 @@ export function PlayerCompactSurface({
                 ? `${browserGap + 8}px`
                 : "max(8px, calc(env(safe-area-inset-bottom) - 13px))",
             }
-          : undefined
+          : {
+              left: desktopSidebarWidth + 16,
+              right: 16,
+              bottom: 16,
+            }
       }
     >
       <div
@@ -209,6 +226,39 @@ export function PlayerCompactSurface({
             <span className="w-10 text-[10px] tabular-nums text-[var(--wk-text-faint)]">
               {formatPlayerClock(duration)}
             </span>
+          </div>
+        ) : null}
+
+        {!isMobile ? (
+          <div className="hidden shrink-0 items-center gap-1 xl:flex">
+            {!experience.spokenAudio ? (
+              <>
+                <button type="button" onClick={() => openFullPlayer("lyrics")}
+                  aria-label="Open Lyrics" title="Lyrics"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+                  <WkIcon name="MicVocal" size={19} />
+                </button>
+                {experience.capabilities.moments ? (
+                  <button type="button" onClick={() => openFullPlayer("comments")}
+                    aria-label="Open Comments" title="Comments"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+                    <WkIcon name="MessageCircle" size={19} />
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+            {experience.capabilities.queue ? (
+              <button type="button" onClick={() => openFullPlayer("queue")}
+                aria-label="Open Queue" title="Queue"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+                <WkIcon name="ListMusic" size={19} />
+              </button>
+            ) : null}
+            <WkIcon name="Volume2" size={17} className="ml-2 text-[var(--wk-text-faint)]" />
+            <div className="w-20">
+              <SeekRail label="Volume" currentTime={volume} duration={1}
+                progress={volume} onSeek={setVolume} step={0.01} />
+            </div>
           </div>
         ) : null}
 

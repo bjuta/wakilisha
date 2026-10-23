@@ -61,6 +61,8 @@ export function TrackMomentDrawer({
   duration,
   onSeek,
   initialTimeMs,
+  inlineDesktop = false,
+  inlineHost,
 }: {
   open: boolean;
   onClose: () => void;
@@ -69,6 +71,8 @@ export function TrackMomentDrawer({
   duration?: number;
   onSeek?: (time: number) => void;
   initialTimeMs?: number | null;
+  inlineDesktop?: boolean;
+  inlineHost?: Element | null;
 }) {
   const user = useAuthUser();
   const userId = user.id || undefined;
@@ -156,7 +160,7 @@ export function TrackMomentDrawer({
   }, [open, loadMomentComments, hasLoadedOnce]);
 
   useEffect(() => {
-    if (!open || typeof document === "undefined") return;
+    if (!open || inlineDesktop || typeof document === "undefined") return;
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -164,7 +168,7 @@ export function TrackMomentDrawer({
     return () => {
       document.body.style.overflow = originalOverflow;
     };
-  }, [open]);
+  }, [open, inlineDesktop]);
 
   const handlePostMoment = useCallback(
     async (body: string) => {
@@ -234,17 +238,17 @@ export function TrackMomentDrawer({
     : 0;
 
   const drawer = (
-    <div className="fixed inset-0 z-[140]">
-      <button
+    <div className={inlineDesktop ? "h-full min-h-0 overflow-hidden bg-[var(--wk-bg)]" : "fixed inset-0 z-[140]"}>
+      {!inlineDesktop ? <button
         type="button"
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         aria-label="Close comments"
         onClick={onClose}
-      />
+      /> : null}
 
-      <div className="absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-[30px] border border-[var(--wk-border)] bg-[var(--wk-bg)] shadow-2xl">
+      <div className={inlineDesktop ? "h-full overflow-y-auto overscroll-contain bg-[var(--wk-bg)]" : "absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-[30px] border border-[var(--wk-border)] bg-[var(--wk-bg)] shadow-2xl"}>
         <div className="sticky top-0 z-10 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 px-5 py-4 backdrop-blur">
-          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--wk-border)]" />
+          {!inlineDesktop ? <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--wk-border)]" /> : null}
 
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -354,7 +358,8 @@ export function TrackMomentDrawer({
     </div>
   );
 
-  return createPortal(drawer, document.body);
+  const target = inlineDesktop ? inlineHost : document.body;
+  return target ? createPortal(drawer, target) : null;
 }
 
 export function TrackMomentSummary({

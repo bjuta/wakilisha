@@ -34,9 +34,10 @@ describe("Workbook v4 mobile header and sidebar flow", () => {
     expect(header).toContain('aria-label="Search"');
     expect(header).toContain("GlobalSearchSurface");
     expect(header).not.toContain("NotificationBell");
-    expect(header).toContain('aria-label="Account"');
+    expect(header).toContain('aria-label="Open WAKILISHA menu"');
     expect(drawer).toContain("Appearance");
     expect(drawer).toContain('to="/settings"');
+    expect(drawer).toContain("data-wk-appearance-controls");
     expect(drawer).toContain("Profile");
   });
 });

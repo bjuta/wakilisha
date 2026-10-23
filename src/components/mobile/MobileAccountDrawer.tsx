@@ -78,6 +78,22 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
       ))}
     </div>
   );
+  const appearanceControls = (
+    <div className="border-t border-[var(--wk-divider)] px-3 py-3" data-wk-appearance-controls>
+      <div className="mb-2 text-[13px] font-bold text-[var(--wk-text)]">Appearance</div>
+      <div role="group" aria-label="Appearance" className="flex gap-2">
+        {(["light", "dark"] as const).map(mode => (
+          <button key={mode} type="button" onClick={() => setTheme(mode)}
+            aria-pressed={theme === mode}
+            className={`min-h-11 flex-1 rounded-full border px-4 text-[13px] font-semibold ${theme === mode
+              ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] text-[var(--wk-text)]"
+              : "border-[var(--wk-border)] text-[var(--wk-text-muted)]"}`}>
+            {mode === "light" ? "Light" : "Dark"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
   return (
     <ModalOverlay isOpen={open} isDismissable onOpenChange={(value) => { if (!value) close(); }}
       className="fixed inset-0 z-[170] bg-black/55 backdrop-blur-[2px]">
@@ -127,6 +143,10 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
                     <Link to="/auth" onClick={close} className="flex min-h-12 items-center gap-3 rounded-xl px-3 font-bold text-[var(--wk-text)]">
                       <WakilishaAccountMark size={22} /> Sign In
                     </Link>
+                    {appearanceControls}
+                    <Link to="/settings" onClick={close} className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]">
+                      <WkIcon name="Settings" size={20} /> Settings
+                    </Link>
                     {footLinks}
                   </>
                 )}
@@ -166,20 +186,7 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
                     <WkIcon name="Search" size={20}/><span>Search</span>
                   </button>
                 </nav>
-                <div className="mt-4 border-t border-[var(--wk-divider)] px-3 py-4">
-                  <div className="mb-2 text-[13px] font-bold text-[var(--wk-text)]">Appearance</div>
-                  <div role="group" aria-label="Appearance" className="flex gap-2">
-                    {(["light", "dark"] as const).map(mode => (
-                      <button key={mode} type="button" onClick={() => setTheme(mode)}
-                        aria-pressed={theme === mode}
-                        className={`min-h-11 flex-1 rounded-full border px-4 text-[13px] font-semibold ${theme === mode
-                          ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] text-[var(--wk-text)]"
-                          : "border-[var(--wk-border)] text-[var(--wk-text-muted)]"}`}>
-                        {mode === "light" ? "Light" : "Dark"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {appearanceControls}
                 <WkDisclosure
                   summary="More WAKILISHA"
                   className="border-t border-[var(--wk-divider)] px-3 py-3"

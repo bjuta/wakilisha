@@ -178,7 +178,7 @@ export function MusicDesktopShell({
 }) {
   const location = useLocation();
   const identity = useSiteIdentity();
-  const { theme } = useTheme();
+  const { theme, toggle } = useTheme();
   const authUser = useAuthUser();
   const isSignedIn = !authUser.loading && authUser.id.length > 0;
   const messagesAccess = useMessagesAccess();
@@ -506,26 +506,47 @@ export function MusicDesktopShell({
           ].join(" ")}
         >
           <div className="border-t border-[var(--wk-divider)] px-2 pt-3">
-            <button
-              type="button"
-              onClick={() => { setMenuStartsInYou(true); setSmallScreenMenuOpen(true); }}
-              aria-label="Open You"
-              title="You"
-              className={["flex min-h-12 w-full items-center rounded-xl text-left text-[13px] font-semibold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]",
-                compactSidebar ? "justify-center" : "gap-3 px-2"].join(" ")}
-            >
-              {authUser.avatarUrl ? (
-                <img src={authUser.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
-              ) : (
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
+            {isSignedIn ? (
+              <button
+                type="button"
+                onClick={() => { setMenuStartsInYou(true); setSmallScreenMenuOpen(true); }}
+                aria-label="Open You"
+                title="You"
+                className={["flex min-h-12 w-full items-center rounded-xl text-left text-[13px] font-semibold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]",
+                  compactSidebar ? "justify-center" : "gap-3 px-2"].join(" ")}
+              >
+                {authUser.avatarUrl ? (
+                  <img src={authUser.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">
+                    <WakilishaAccountMark size={21} />
+                  </span>
+                )}
+                {!compactSidebar ? <span className="min-w-0 flex-1 truncate">
+                  {authUser.name || authUser.email || "You"}
+                </span> : null}
+                {!compactSidebar ? <WkIcon name="ChevronDown" size={16} /> : null}
+              </button>
+            ) : (
+              <div className={["flex items-center gap-1", compactSidebar ? "flex-col" : ""].join(" ")}>
+                <Link to="/auth" aria-label="Sign In"
+                  className={["flex min-h-11 min-w-11 items-center rounded-xl text-[13px] font-semibold text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]",
+                    compactSidebar ? "justify-center" : "flex-1 gap-3 px-2"].join(" ")}>
                   <WakilishaAccountMark size={21} />
-                </span>
-              )}
-              {!compactSidebar ? <span className="min-w-0 flex-1 truncate">
-                {isSignedIn ? (authUser.name || authUser.email || "You") : "Sign In"}
-              </span> : null}
-              {!compactSidebar ? <WkIcon name="ChevronDown" size={16} /> : null}
-            </button>
+                  {!compactSidebar ? "Sign In" : null}
+                </Link>
+                <button type="button" onClick={toggle}
+                  aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                  title={theme === "dark" ? "Light mode" : "Dark mode"}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]">
+                  <WkIcon name={theme === "dark" ? "Sun" : "Moon"} size={20} />
+                </button>
+                <Link to="/settings" aria-label="Settings" title="Settings"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]">
+                  <WkIcon name="Settings" size={20} />
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </aside>
