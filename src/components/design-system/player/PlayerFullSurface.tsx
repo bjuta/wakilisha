@@ -484,7 +484,12 @@ export function PlayerFullSurface({
     canonicalShareUrl(experience.canonicalPath);
 
   const openPanel = (nextPanel: PlayerPanel) => {
+    setMomentOpen(false);
     setPanel(nextPanel);
+  };
+  const togglePanel = (nextPanel: PlayerPanel) => {
+    setMomentOpen(false);
+    setPanel(panel === nextPanel ? "none" : nextPanel);
   };
 
   const goTo = (path: string) => {
@@ -632,7 +637,7 @@ export function PlayerFullSurface({
     });
   }
 
-  const desktopPanelOpen = !isMobile && ["lyrics", "queue", "transcript", "chapters"].includes(panel);
+  const desktopPanelOpen = !isMobile && (momentOpen || ["lyrics", "queue", "transcript", "chapters"].includes(panel));
 
   return (
     <main
@@ -882,19 +887,20 @@ export function PlayerFullSurface({
                   <PlayerUtilityButton
                     icon="MicVocal"
                     label="Lyrics"
-                    onClick={() => setPanel(panel === "lyrics" ? "none" : "lyrics")}
+                    onClick={() => togglePanel("lyrics")}
                     active={panel === "lyrics"}
                   />
                   <PlayerUtilityButton
                     icon="MessageCircle"
                     label="Comments"
-                    onClick={() => setMomentOpen(true)}
+                    onClick={() => { setPanel("none"); setMomentOpen(value => !value); }}
+                    active={momentOpen}
                     disabled={!experience.capabilities.moments}
                   />
                   <PlayerUtilityButton
                     icon="ListMusic"
                     label="Queue"
-                    onClick={() => setPanel(panel === "queue" ? "none" : "queue")}
+                    onClick={() => togglePanel("queue")}
                     active={panel === "queue"}
                     disabled={!experience.capabilities.queue}
                   />
@@ -902,7 +908,7 @@ export function PlayerFullSurface({
               )}
             </div>
 
-            <div className="mt-6 flex items-center gap-3">
+            <div className={isMobile ? "hidden" : "mt-6 flex items-center gap-3"}>
               <WkIcon
                 name="Volume2"
                 size={16}
@@ -963,7 +969,7 @@ export function PlayerFullSurface({
 
       {desktopPanelOpen ? (
         <aside data-wk-player-panel-host
-          className="relative z-20 hidden h-[100dvh] w-[min(440px,42vw)] shrink-0 overflow-hidden border-l border-[var(--wk-border)] bg-[var(--wk-surface)] lg:block"
+          className="relative z-20 hidden h-[100dvh] w-[min(440px,42vw)] shrink-0 overflow-hidden border-l border-[var(--wk-border)] bg-[var(--wk-surface)] md:block"
         />
       ) : null}
 
@@ -1151,6 +1157,7 @@ export function PlayerFullSurface({
       {!experience.spokenAudio &&
       experience.capabilities.moments ? (
         <TrackMomentDrawer
+          inlineDesktop={!isMobile}
           open={momentOpen}
           onClose={() => setMomentOpen(false)}
           track={currentTrack}
