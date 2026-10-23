@@ -671,7 +671,7 @@ export function PlayerFullSurface({
         className={`relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-5 pb-8 md:px-8 md:pb-10 ${desktopPanelOpen ? "min-w-0 flex-1 !max-w-none" : ""}`}
         style={{
           paddingTop: isMobile
-            ? "max(env(safe-area-inset-top), 16px)"
+            ? "calc(80px + env(safe-area-inset-top))"
             : "24px",
         }}
       >

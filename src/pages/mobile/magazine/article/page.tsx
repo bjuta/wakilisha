@@ -313,7 +313,6 @@ export default function MobileArticle() {
           <h1 className="mt-3 max-w-[18ch] text-[clamp(34px,9vw,52px)] font-extrabold leading-[.99] tracking-[-.048em]">
             {article.title}
           </h1>
-          <p className="mt-3 text-[12px] text-white/75">{article.author}</p>
         </div>
       </section>
 
