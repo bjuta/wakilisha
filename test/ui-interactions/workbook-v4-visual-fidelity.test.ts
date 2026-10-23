@@ -17,8 +17,9 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(brand).toContain('theme === "dark"');
     expect(brand).toContain("wakilisha-logo-dark.svg");
     expect(brand).toContain("wakilisha-logo-light.svg");
+    expect(nav).toContain("<WakilishaSectionLogo />");
     for (const screen of [following, messages, notifications]) {
-      expect(screen).toContain("<WakilishaSectionLogo />");
+      expect(screen).not.toContain("<WakilishaSectionLogo />");
     }
     expect(nav).toContain("bg-[var(--wk-surface)]");
     expect(nav).toContain("text-[var(--wk-text)]");
@@ -28,6 +29,12 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(mobilePlayer).toContain("calc(80px + env(safe-area-inset-top))");
     expect(article).not.toContain('text-white/75">{article.author}');
     expect(article).toContain("ArticleAuthorIdentity");
+    expect(nav).toContain("data-wk-article-hero-overlay");
+    expect(article).toContain("max-md:-mt-[56px]");
+    expect(messages).not.toContain("data-wk-social-brand-row");
+    expect(notifications).not.toContain("{unreadCount} unread");
+    expect(notifications).toContain("data-wk-dm-unread-count");
+    expect(notifications).toContain("listMessageConversations");
     expect(css).toContain('border-top: 0;');
     expect(css).toContain('position: relative;');
     expect(css).toContain('padding-top: calc(56px + env(safe-area-inset-top));');

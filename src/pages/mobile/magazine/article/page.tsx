@@ -282,7 +282,7 @@ export default function MobileArticle() {
   const initials = article.author.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div data-wk-workbook-screen="article-mobile" className="min-h-screen bg-[var(--wk-bg)]">
+    <div data-wk-workbook-screen="article-mobile" className="min-h-screen bg-[var(--wk-bg)] max-md:-mt-[56px]">
       {previewNonce ? <ArticlePreviewModeBanner /> : null}
 
       <section key="mobile-article-hero-shell" className="relative aspect-[4/5] overflow-hidden">
