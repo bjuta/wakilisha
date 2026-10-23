@@ -147,6 +147,7 @@ export function PlayerFullSurface({
 
   const [panel, setPanel] =
     useState<PlayerPanel>(mode === "desktop" ? "lyrics" : "none");
+  const [inlinePanelHost, setInlinePanelHost] = useState<HTMLElement | null>(null);
   const [appleConnected, setAppleConnected] = useState(
     () => getApplePlaybackPrefsSnapshot().appleMusicConnected,
   );
@@ -967,14 +968,17 @@ export function PlayerFullSurface({
         </div>
       </div>
 
-      {desktopPanelOpen ? (
-        <aside data-wk-player-panel-host
-          className="relative z-20 hidden h-[100dvh] w-[min(440px,42vw)] shrink-0 overflow-hidden border-l border-[var(--wk-border)] bg-[var(--wk-surface)] md:block"
+      {!isMobile ? (
+        <aside ref={setInlinePanelHost} data-wk-player-panel-host
+          className={desktopPanelOpen
+            ? "relative z-20 hidden h-[100dvh] w-[min(440px,42vw)] shrink-0 overflow-hidden border-l border-[var(--wk-border)] bg-[var(--wk-surface)] md:block"
+            : "hidden"}
         />
       ) : null}
 
       <PlayerPanelSheet
         inlineDesktop
+        inlineHost={inlinePanelHost}
         open={panel === "queue"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -1000,6 +1004,7 @@ export function PlayerFullSurface({
 
       <PlayerPanelSheet
         inlineDesktop
+        inlineHost={inlinePanelHost}
         open={panel === "lyrics"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -1051,6 +1056,7 @@ export function PlayerFullSurface({
 
       <PlayerPanelSheet
         inlineDesktop
+        inlineHost={inlinePanelHost}
         open={panel === "transcript"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -1071,6 +1077,7 @@ export function PlayerFullSurface({
 
       <PlayerPanelSheet
         inlineDesktop
+        inlineHost={inlinePanelHost}
         open={panel === "chapters"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -1158,6 +1165,7 @@ export function PlayerFullSurface({
       experience.capabilities.moments ? (
         <TrackMomentDrawer
           inlineDesktop={!isMobile}
+          inlineHost={inlinePanelHost}
           open={momentOpen}
           onClose={() => setMomentOpen(false)}
           track={currentTrack}
