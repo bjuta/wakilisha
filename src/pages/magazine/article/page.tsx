@@ -11,6 +11,7 @@ import {
 } from "@/services/magazineArticles";
 
 import { transformReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
+import { extractPublishedReviewVerdict } from "@/utils/editorialRating";
 import { transformArtistShortcodes } from "@/utils/transformArtistShortcodes";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ArticleFloatHeader } from "./components/ArticleFloatHeader";
@@ -123,6 +124,7 @@ export default function ArticlePage() {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const lastScrollState = useRef(false);
   const rawContentHtml = useMemo(() => article?.contentHtml ?? "", [article?.contentHtml]);
+  const publishedVerdict = useMemo(() => extractPublishedReviewVerdict(rawContentHtml), [rawContentHtml]);
   const shortcodeMarked = useMemo(
     () => transformTrackShortcodes(transformReleaseShortcodes(transformArtistShortcodes(rawContentHtml))),
     [rawContentHtml]
@@ -411,6 +413,20 @@ export default function ArticlePage() {
           url: typeof window !== "undefined" ? window.location.href : undefined,
         }}
       />
+      {publishedVerdict && article.author && !previewNonce ? (
+        <SchemaOrg data={{
+          "@type": "Review",
+          name: article.title,
+          author: { "@type": "Person", name: article.author },
+          itemReviewed: { "@type": "CreativeWork", name: publishedVerdict.subject },
+          reviewRating: {
+            "@type": "Rating", ratingValue: publishedVerdict.value,
+            bestRating: 5, worstRating: 1,
+          },
+          publisher: { "@type": "Organization", name: "WAKILISHA" },
+          datePublished: article.date,
+        }} />
+      ) : null}
       <div className="article-progress" ref={progressBarRef}><span style={{ transform: "scaleX(0)" }} /></div>
       <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"} bg-[var(--wk-bg)]/95 backdrop-blur-md border-b border-[var(--wk-border)]`}>
         <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center gap-4"><Link to="/magazine" className="flex items-center gap-1.5 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap shrink-0"><WkIcon name="ArrowLeft" size={14} />Magazine</Link><div className="h-4 w-px bg-[var(--wk-border)] shrink-0" /><h2 className="text-[13px] font-bold text-[var(--wk-text)] flex-1 min-w-0 truncate">{article.title}</h2></div>
