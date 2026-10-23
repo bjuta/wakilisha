@@ -4,9 +4,11 @@ import {
   useRef,
 } from "react";
 import type { CommunityComment, CommunityProfile, ReactionType } from "@/services/community";
+import { WkIcon } from "@/components/design-system/Icon";
 import {
   CommunityReactionPicker,
   getReactionGlyph,
+  getReactionDisplayIcon,
 } from "./CommunityReactionPicker";
 
 interface CommentCardProps {
@@ -381,11 +383,9 @@ export function CommentCard({
                               }
                               className="text-[16px] leading-none"
                             >
-                              {
-                                getReactionGlyph(
-                                  type,
-                                )
-                              }
+                              {getReactionDisplayIcon(type) ? (
+                                <WkIcon name={getReactionDisplayIcon(type)!} size={16} aria-hidden="true" />
+                              ) : getReactionGlyph(type)}
                             </span>
                           ),
                         )}
