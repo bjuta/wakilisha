@@ -650,20 +650,22 @@ export function PlayerFullSurface({
       data-wk-player-full={mode}
       className={`relative min-h-[100dvh] overflow-x-clip bg-[var(--wk-bg)] text-[var(--wk-text)] ${desktopPanelOpen ? "flex" : ""}`}
     >
-      <div
-        aria-hidden="true"
-        className="absolute inset-[-8%] opacity-45 blur-[110px] saturate-150"
-        style={{
-          backgroundImage:
-            currentTrack.artworkUrl
+      {/* Clip artwork and its gradient together. The blurred image must never
+          bleed past the gradient's end into the independent scroll viewport. */}
+      <div data-wk-player-backdrop aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -inset-[8%] opacity-45 blur-[110px] saturate-150"
+          style={{
+            backgroundImage: currentTrack.artworkUrl
               ? `url(${currentTrack.artworkUrl})`
               : undefined,
-          backgroundPosition: "center",
-          backgroundSize: "cover",
-          transform: "scale(1.18)",
-        }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-[var(--wk-bg)]/84 to-[var(--wk-bg)]" />
+            backgroundPosition: "center",
+            backgroundSize: "cover",
+            transform: "scale(1.18)",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-[var(--wk-bg)]/84 to-[var(--wk-bg)]" />
+      </div>
 
       <div
         className={`relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-5 pb-8 md:px-8 md:pb-10 ${desktopPanelOpen ? "min-w-0 flex-1 !max-w-none" : ""}`}
@@ -976,7 +978,7 @@ export function PlayerFullSurface({
       {!isMobile ? (
         <aside ref={setInlinePanelHost} data-wk-player-panel-host
           className={desktopPanelOpen
-            ? "relative z-20 hidden h-[100dvh] w-[min(440px,42vw)] shrink-0 overflow-hidden border-l border-[var(--wk-border)] bg-[var(--wk-surface)] md:block"
+            ? "sticky top-0 z-20 hidden h-[100dvh] w-[min(440px,42vw)] shrink-0 self-start overflow-hidden border-l border-[var(--wk-border)] bg-[var(--wk-surface)] md:block"
             : "hidden"}
         />
       ) : null}
