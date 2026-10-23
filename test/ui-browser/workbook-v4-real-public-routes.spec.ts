@@ -89,11 +89,9 @@ for (const width of [390, 768, 1440]) {
         expect(await floatingBar.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
         const topHero = pageSpec.path === "/"
           ? page.locator('[data-wk-workbook-screen="magazine-mobile"] > [role="link"]').first()
-          : page.locator('[data-wk-workbook-screen] > section.relative.min-h-\\[480px\\]').first();
-        if (pageSpec.path === "/") {
-          await expect(topHero).toBeVisible();
-          expect(Math.abs(await topHero.evaluate((node) => node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
-        }
+          : page.locator("section.relative").first();
+        await expect(topHero).toBeVisible();
+        expect(Math.abs(await topHero.evaluate((node) => node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
         await expect(page.getByRole("navigation", { name: "Primary mobile navigation" })).toHaveCount(0);
       } else {
         const sidebar = page.locator(".wk-music-app-shell > aside").first();
