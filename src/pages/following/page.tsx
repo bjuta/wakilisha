@@ -17,6 +17,7 @@ import {
 import { MetaTags } from "@/components/seo/MetaTags";
 import { PostComposer } from "@/components/community/PostComposer";
 import { PostActions } from "@/components/community/PostActions";
+import { WkIcon } from "@/components/design-system/Icon";
 import { PostBody } from "@/components/community/PostBody";
 import { QuotedPostCard } from "@/components/community/QuotedPostCard";
 import { PostLinkAttachment } from "@/components/community/PostLinkAttachment";
@@ -25,7 +26,6 @@ import { PlaylistCoverPresentation } from "@/components/media/PlaylistCoverPrese
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import {
   CommunityReactionPicker,
-  getReactionGlyph,
 } from "@/components/feature/community/CommunityReactionPicker";
 import {
   SharePopover,
@@ -592,13 +592,11 @@ function ActivityMedia({
 }
 
 function ActivityAction({
-  icon,
   label,
   active = false,
   disabled = false,
   onClick,
 }: {
-  icon: string;
   label: string;
   active?: boolean;
   disabled?: boolean;
@@ -615,10 +613,7 @@ function ActivityAction({
           : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
       } disabled:cursor-wait disabled:opacity-55`}
     >
-      <i
-        className={`${icon} text-[17px]`}
-        aria-hidden="true"
-      />
+      <WkIcon name="Bookmark" size={19} />
       <span>{label}</span>
     </button>
   );
@@ -706,10 +701,7 @@ function FollowingShareAction({
           sheetOpen
         }
       >
-        <i
-          className="ri-share-forward-line text-[17px]"
-          aria-hidden="true"
-        />
+        <WkIcon name="Share2" size={19} />
         <span>Share</span>
       </button>
 
@@ -766,14 +758,6 @@ function FollowingReactionAction({
           reaction.reactionType,
       ) ?? [];
 
-  const visibleReactions =
-    state?.reactions
-      .filter(
-        (reaction) =>
-          reaction.count > 0,
-      )
-      .slice(0, 3) ?? [];
-
   const reactionCount =
     state?.reactionCount ?? 0;
 
@@ -806,31 +790,7 @@ function FollowingReactionAction({
         }
         aria-expanded={showPicker}
       >
-        {visibleReactions.length > 0 ? (
-          <span
-            className="inline-flex items-center gap-0.5"
-            aria-hidden="true"
-          >
-            {visibleReactions.map(
-              (reaction) => (
-                <span
-                  key={reaction.reactionType}
-                  className="text-[16px] leading-none"
-                >
-                  {getReactionGlyph(
-                    reaction.reactionType,
-                  )}
-                </span>
-              ),
-            )}
-          </span>
-        ) : (
-          <i
-            className="ri-emotion-happy-line text-[17px]"
-            aria-hidden="true"
-          />
-        )}
-
+        <WkIcon name="Heart" size={19} />
         <span>
           {reactionCount > 0
             ? reactionCount
@@ -1206,11 +1166,6 @@ function FollowingActivity({
             className="mt-4 flex items-center justify-between gap-1 border-t border-[var(--wk-divider)] pt-2 md:mt-5"
           >
             <ActivityAction
-              icon={
-                saved
-                  ? "ri-bookmark-fill"
-                  : "ri-bookmark-line"
-              }
               label={
                 saved
                   ? "Saved"
