@@ -221,14 +221,15 @@ for (const route of [
       const guestMenu = page.getByRole("dialog", { name: "WAKILISHA Menu" });
       await expect(guestMenu.getByRole("link", { name: "Sign In" })).toBeVisible();
       await expect(guestMenu.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
-      const appearance = guestMenu.getByRole("group", { name: "Appearance" });
+      const appearance = guestMenu.getByRole("switch", { name: "Dark mode" });
       await expect(appearance).toBeVisible();
-      // A guest must change the real theme without a forced sign-in or reload.
+      // Use the real single design-system switch; never force a page reload.
       await page.evaluate(() => document.documentElement.setAttribute("data-wk-theme-session", "preserved"));
-      await appearance.getByRole("button", { name: mode === "light" ? "Light" : "Dark" }).click();
+      const wasDark = (await appearance.getAttribute("aria-checked")) === "true";
+      if (wasDark !== (mode === "dark")) await appearance.click();
       await expect(page.locator("html")).toHaveAttribute("data-wk-theme", mode);
       await expect(page.locator("html")).toHaveAttribute("data-wk-theme-session", "preserved");
-      await expect(appearance.getByRole("button", { name: mode === "light" ? "Light" : "Dark" })).toHaveAttribute("aria-pressed", "true");
+      await expect(appearance).toHaveAttribute("aria-checked", String(mode === "dark"));
       await expect.poll(() => page.evaluate(() => localStorage.getItem("wk-theme"))).toBe(mode);
       await page.keyboard.press("Escape");
       await expect(guestMenu).toHaveCount(0);
