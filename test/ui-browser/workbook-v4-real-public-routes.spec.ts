@@ -289,6 +289,7 @@ for (const width of [390, 1440]) {
     await page.goto("/test/ui-browser/fixtures/player-viewport.html", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Persistent scrolled article" })).toBeVisible({ timeout: 20_000 });
 
+    await page.getByRole("button", { name: "Prepare player" }).click();
     const compact = page.locator("[data-wk-player-compact]");
     await expect(compact).toBeVisible({ timeout: 20_000 });
     await page.evaluate(() => window.scrollTo(0, 1150));
