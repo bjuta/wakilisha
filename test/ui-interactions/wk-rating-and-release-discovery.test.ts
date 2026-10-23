@@ -57,6 +57,10 @@ describe("Workbook (3), Chapter 24 rating authority", () => {
     const serialized = original.getHTML();
     expect(serialized).toContain('data-wk-rating-value="3.5"');
     expect(serialized).toContain("wk-rating-stars");
+    const svg = original.view.dom.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg?.namespaceURI).toBe("http://www.w3.org/2000/svg");
+    expect(svg?.querySelector("path")?.namespaceURI).toBe("http://www.w3.org/2000/svg");
     const restored = new Editor({ extensions: [StarterKit, RatingNode], content: serialized });
     const nodes = restored.getJSON().content?.[0]?.content ?? [];
     expect(nodes.some((node) => node.type === "wkRating" && node.attrs?.value === 3.5)).toBe(true);

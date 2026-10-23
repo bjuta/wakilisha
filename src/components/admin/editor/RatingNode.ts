@@ -35,7 +35,7 @@ function stars(value: number): DOMOutputSpec {
   return ["span", { class: "wk-rating-stars", "aria-hidden": "true" },
     ...Array.from({ length: 5 }, (_, index): DOMOutputSpec => {
       const fill = Math.max(0, Math.min(1, value - index)) * 100;
-      const shape: DOMOutputSpec = ["svg", { viewBox: "0 0 24 24", xmlns: "http://www.w3.org/2000/svg", focusable: "false" },
+      const shape: DOMOutputSpec = ["http://www.w3.org/2000/svg svg", { viewBox: "0 0 24 24", focusable: "false" },
         ["path", { d: WK_STAR_PATH, fill: "currentColor" }]];
       return ["span", { class: "wk-rating-star" },
         ["span", { class: "wk-rating-star-empty" }, shape],
