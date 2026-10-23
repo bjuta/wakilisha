@@ -297,10 +297,16 @@ for (const width of [390, 1440]) {
     expect(fullHeight).toBeGreaterThan(3000);
     await page.evaluate(() => window.scrollTo(0, 1150));
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
-    const articleScrollY = await page.evaluate(() => window.scrollY);
     if (width === 390) {
       const nav = page.locator('[data-wk-mobile-app-header="v4"]');
-      await expect(nav).toBeVisible();
+      await expect(nav).toHaveAttribute("data-wk-mobile-header-visible", "false");
+      await expect.poll(() => nav.evaluate((node) => node.getBoundingClientRect().bottom)).toBeLessThanOrEqual(2);
+
+      // Reverse direction without returning to the top: show navigation
+      // promptly, but do not introduce any backdrop or recolor the SVG.
+      await page.evaluate(() => window.scrollBy(0, -44));
+      await expect(nav).toHaveAttribute("data-wk-mobile-header-visible", "true");
+      await expect.poll(() => nav.evaluate((node) => Math.abs(node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
       const chrome = await nav.evaluate((node) => {
         const style = getComputedStyle(node);
         const button = node.querySelector("button");
@@ -310,15 +316,18 @@ for (const width of [390, 1440]) {
           background: style.backgroundColor,
           menuBlend: button ? getComputedStyle(button).mixBlendMode : "",
           logoBlend: logo?.parentElement ? getComputedStyle(logo.parentElement).mixBlendMode : "",
+          logoFilter: logo ? getComputedStyle(logo).filter : "",
           headerTop: node.getBoundingClientRect().top,
         };
       });
       expect(chrome.position).toBe("fixed");
       expect(chrome.background).toBe("rgba(0, 0, 0, 0)");
       expect(chrome.menuBlend).toBe("difference");
-      expect(chrome.logoBlend).toBe("difference");
+      expect(chrome.logoBlend).toBe("normal");
+      expect(chrome.logoFilter).toBe("none");
       expect(Math.abs(chrome.headerTop)).toBeLessThanOrEqual(2);
     }
+    const articleScrollY = await page.evaluate(() => window.scrollY);
     await compact.getByRole("button").first().click();
 
     const overlay = page.locator("[data-wk-player-overlay]");
