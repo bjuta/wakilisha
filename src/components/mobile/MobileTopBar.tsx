@@ -1,13 +1,9 @@
-import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { WkIcon } from "@/components/design-system/Icon";
 import {
   useEffect,
   useState,
 } from "react";
-import {
-  Link,
-  useLocation,
-} from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
   GlobalSearchSurface,
 } from "@/components/search/GlobalSearchSurface";
@@ -18,10 +14,6 @@ import {
 
 export function MobileTopBar() {
   const location = useLocation();
-  // Article actions already occupy the hero's top-right position. Keep the
-  // global Search reachable through Menu without covering article actions.
-  const isMagazineArticle = /^\/magazine\/[^/]+\/?$/.test(location.pathname);
-  const { theme } = useTheme();
   const [searchOpen, setSearchOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
@@ -87,23 +79,14 @@ export function MobileTopBar() {
         >
           <WkIcon name="Menu" size={21} />
         </button>
-        <Link to="/" aria-label="WAKILISHA home" className="pointer-events-auto flex min-w-0 flex-1 justify-center">
-          <img src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"} alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain" />
-        </Link>
-        <div className="flex items-center gap-1">
-          {isMagazineArticle ? (
-            <span aria-hidden="true" className="h-11 w-11" />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              aria-label="Search"
-              className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference transition-opacity hover:opacity-75"
-            >
-              <WkIcon name="Search" size={20} />
-            </button>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          aria-label="Search"
+          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference transition-opacity hover:opacity-75"
+        >
+          <WkIcon name="Search" size={20} />
+        </button>
       </header>
 
       <MobileAccountDrawer

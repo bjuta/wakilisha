@@ -563,20 +563,11 @@ export function MusicDesktopShell({
           >
             <WkIcon name="Menu" size={20} />
           </button>
-          <Link to="/music" aria-label={displayName} className="pointer-events-auto min-w-0 flex-1">
-            {<img
-                src={resolvedLogoUrl}
-                alt={displayName}
-                onError={() => setLogoError(true)}
-                className="h-7 max-w-[128px] object-contain object-left"
-              />}
-          </Link>
-
           <button
             type="button"
             onClick={() => setGlobalSearchOpen(true)}
             aria-label="Search"
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference"
+            className="pointer-events-auto ml-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference"
           >
             <WkIcon name="Search" size={16} />
           </button>
