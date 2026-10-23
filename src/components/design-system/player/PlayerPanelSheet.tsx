@@ -3,6 +3,7 @@ import {
   type ReactNode,
 } from "react";
 import { Portal } from "@/components/base/Portal";
+import { createPortal } from "react-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollLock } from "@/hooks/useScrollLock";
 
@@ -12,6 +13,7 @@ export function PlayerPanelSheet({
   mode,
   title,
   eyebrow,
+  inlineDesktop = false,
   children,
 }: {
   open: boolean;
@@ -19,6 +21,7 @@ export function PlayerPanelSheet({
   mode: "desktop" | "mobile";
   title: string;
   eyebrow?: string | null;
+  inlineDesktop?: boolean;
   children: ReactNode;
 }) {
   useScrollLock(open);
@@ -37,6 +40,33 @@ export function PlayerPanelSheet({
   if (!open) return null;
 
   const mobile = mode === "mobile";
+  if (!mobile && inlineDesktop) {
+    const target = document.querySelector("[data-wk-player-panel-host]");
+    if (target) {
+      return createPortal(
+        <section role="region" aria-label={title}
+          data-wk-player-inline-panel={title}
+          className="flex h-full min-h-0 flex-col bg-[var(--wk-surface)] text-[var(--wk-text)]">
+          <header className="sticky top-0 z-10 flex min-h-[76px] items-center justify-between gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-surface)] px-5">
+            <div className="min-w-0">
+              {eyebrow ? <p className="truncate text-[11px] text-[var(--wk-text-muted)]">{eyebrow}</p> : null}
+              <h2 className="text-[18px] font-black">{title}</h2>
+            </div>
+            <button type="button" onClick={onClose}
+              aria-label={`Close ${title}`}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-[var(--wk-surface-raised)]">
+              <WkIcon name="X" size={20} />
+            </button>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
+            {children}
+          </div>
+        </section>, target,
+      );
+    }
+  }
+
+
   const fullScreenLyrics = mobile && title === "Lyrics";
 
   return (
