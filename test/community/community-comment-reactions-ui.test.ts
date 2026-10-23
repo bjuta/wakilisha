@@ -100,6 +100,9 @@ describe(
           .toContain(
             "h-9 w-9",
           );
+        expect(picker).toContain("QUICK_REACTION_ICONS");
+        expect(picker).toContain("<WkIcon name={QUICK_REACTION_ICONS[emoji]}");
+        expect(picker).not.toContain("{emoji}\n              </button>");
 
         expect(picker)
           .not.toContain(
