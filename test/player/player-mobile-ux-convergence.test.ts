@@ -122,7 +122,7 @@ describe("Player and mobile media UX convergence", () => {
     expect(mobileLayout).not.toContain("useScrollDirection()");
     expect(mobileTopBar).toContain('data-wk-mobile-app-header="v4"');
     expect(mobileTopBar).toContain("fixed inset-x-0 top-0");
-    expect(mobileTopBar).toContain("bg-[var(--wk-surface)]");
+    expect(mobileTopBar).toContain("bg-transparent");
     expect(mobileTopBar).toContain("mix-blend-difference");
     expect(mobileTopBar).toContain("h-14");
     expect(mobileTopBar).toContain('aria-label="Open WAKILISHA menu"');
