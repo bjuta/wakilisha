@@ -24,7 +24,7 @@ export function PlayerPanelSheet({
   inlineDesktop?: boolean;
   children: ReactNode;
 }) {
-  useScrollLock(open);
+  useScrollLock(open && (mode === "mobile" || !inlineDesktop));
 
   useEffect(() => {
     if (!open) return;
