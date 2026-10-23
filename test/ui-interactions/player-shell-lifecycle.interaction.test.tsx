@@ -8,7 +8,7 @@ import { ResponsiveAppLayout } from "@/components/mobile/ResponsiveAppLayout";
 const state = vi.hoisted(() => ({ mobile: true, open: false }));
 
 vi.mock("@/context/PlayerContext", () => ({
-  usePlayer: () => ({ isFullPlayerOpen: state.open }),
+  usePlayer: () => ({ isFullPlayerOpen: state.open, closeFullPlayer: () => { state.open = false; } }),
 }));
 vi.mock("@/hooks/useMobileDetect", () => ({
   useMobileDetect: () => state.mobile,
@@ -47,6 +47,39 @@ beforeEach(() => {
 });
 
 describe("WAKILISHA player presentation lifecycle", () => {
+  it("portals Now Playing outside the article and restores the document scroll state", async () => {
+    const root = document.documentElement;
+    const previousOverflow = root.style.overflow;
+    const previousOverscroll = root.style.overscrollBehaviorY;
+    root.style.overflow = "scroll";
+    root.style.overscrollBehaviorY = "auto";
+    root.scrollTop = 720;
+    const { rerender, unmount } = render(<ResponsiveAppLayout />);
+    const article = screen.getByTestId("mobile-route");
+
+    state.open = true;
+    rerender(<ResponsiveAppLayout />);
+    await screen.findByTestId("full-mobile");
+    const overlay = screen.getByRole("region", { name: "Now Playing" });
+    expect(overlay).toHaveAttribute("data-wk-player-overlay");
+    expect(overlay.parentElement).toBe(document.body);
+    expect(overlay.className).toContain("overflow-y-auto");
+    expect(root.style.overflow).toBe("hidden");
+    expect(root.style.overscrollBehaviorY).toBe("none");
+    expect(root.scrollTop).toBe(720);
+    expect(screen.getByTestId("mobile-route")).toBe(article);
+
+    state.open = false;
+    rerender(<ResponsiveAppLayout />);
+    expect(screen.queryByRole("region", { name: "Now Playing" })).not.toBeInTheDocument();
+    expect(root.style.overflow).toBe("scroll");
+    expect(root.style.overscrollBehaviorY).toBe("auto");
+    expect(root.scrollTop).toBe(720);
+    unmount();
+    root.style.overflow = previousOverflow;
+    root.style.overscrollBehaviorY = previousOverscroll;
+  });
+
   it("keeps mobile route DOM and local input state through repeated mini/full switches", async () => {
     const { rerender } = render(<ResponsiveAppLayout />);
     const pageInput = screen.getByTestId("mobile-route") as HTMLInputElement;
