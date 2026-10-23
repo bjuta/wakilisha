@@ -56,7 +56,7 @@ function when(value: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function Avatar({ summary, size = "h-10 w-10" }: { summary: MessageConversationSummary; size?: string }) {
+function Avatar({ summary, size = "h-11 w-11" }: { summary: MessageConversationSummary; size?: string }) {
   const presentation = summary.other_participant?.presentation;
   const avatar = messageAvatar(presentation);
   const name = messageDisplayName(presentation);
@@ -148,10 +148,10 @@ function GovernedResourceReferenceCard({
   }, [resolveReference]);
 
   const shellClass = mine
-    ? "border-white/20 bg-white/10 text-white"
+    ? "border-black/15 bg-black/10 text-[var(--wk-brand-on)]"
     : "border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)]";
   const mutedClass = mine
-    ? "text-white/75"
+    ? "text-[var(--wk-brand-on)]/70"
     : "text-[var(--wk-text-muted)]";
 
   async function performPlaylistDecision(
@@ -622,7 +622,7 @@ export default function MessagesPage() {
       <div className="mx-auto w-full max-w-[1180px] px-0 pb-8 pt-0 lg:pb-10">
         <div className="overflow-hidden border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:h-[min(780px,calc(100dvh-110px))] lg:grid-cols-[minmax(280px,34%)_minmax(0,1fr)] lg:border">
           <section data-wk-message-list className={`${selectedId ? "hidden lg:block" : "block"} min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
-        <div data-wk-messages-list-header className="flex min-h-14 items-center justify-between gap-3 border-b border-[var(--wk-border)] px-4 py-2">
+        <div data-wk-messages-list-header className="flex min-h-14 items-center justify-between gap-3 border-b border-[var(--wk-border)] px-5 py-2">
           <div>
             
             <h1 className="text-[20px] font-extrabold leading-[1.2] text-[var(--wk-text)]">Messages</h1>
@@ -686,7 +686,7 @@ export default function MessagesPage() {
                       onClick={() => void openConversation(summary.conversation_id)}
                       aria-current={selectedId === summary.conversation_id ? "true" : undefined}
                       data-wk-message-conversation
-                      className={`flex w-full items-start gap-3 border-l-[3px] border-transparent px-4 py-3.5 text-left transition-colors hover:bg-[var(--wk-surface-raised)] ${selectedId === summary.conversation_id ? "border-l-[var(--wk-brand)] bg-[var(--wk-surface-raised)]" : ""}`}
+                      className={`flex w-full items-center gap-3 border-l-[3px] border-transparent px-4 py-4 text-left transition-colors hover:bg-[var(--wk-surface-raised)] ${selectedId === summary.conversation_id ? "border-l-[var(--wk-brand)] bg-[var(--wk-surface-raised)]" : ""}`}
                     >
                       <Avatar summary={summary} />
                       <div className="min-w-0 flex-1">
@@ -718,7 +718,7 @@ export default function MessagesPage() {
               <div className="min-h-[650px] flex-1 animate-pulse bg-[var(--wk-surface-raised)]/30" aria-busy="true" />
             ) : (
               <>
-                <header data-wk-message-thread-header className="flex min-h-14 items-center gap-3 border-b border-[var(--wk-divider)] px-3 py-2 sm:px-5">
+                <header data-wk-message-thread-header className="flex min-h-14 items-center gap-3 border-b border-[var(--wk-divider)] px-4 py-2 sm:px-6">
                   <button type="button" onClick={() => { setSelectedId(null); setDetail(null); }} className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] lg:hidden" aria-label="Back to conversations"><i className="ri-arrow-left-line" /></button>
                   <Avatar summary={selectedSummary} size="h-9 w-9" />
                   <div className="min-w-0 flex-1">
@@ -769,17 +769,31 @@ export default function MessagesPage() {
                   </div>
                 )}
 
-                <div data-wk-message-history className="min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-5">
-                  <div className="mx-auto flex max-w-[760px] flex-col gap-2.5">
-                    {[...detail.messages].reverse().map((message) => {
+                <div data-wk-message-history className="min-h-0 flex-1 overflow-y-auto px-3 py-6 sm:px-6">
+                  <div className="mx-auto flex max-w-[760px] flex-col gap-3.5">
+                    {[...detail.messages].reverse().map((message, index, orderedMessages) => {
                       const otherId = selectedSummary.other_participant?.person_resource_id;
                       const mine = Boolean(otherId && message.sender_person_resource_id !== otherId);
+                      const lastOutgoing = mine && !orderedMessages.slice(index + 1).some(
+                        (later) => later.sender_person_resource_id !== otherId,
+                      );
+                      const day = new Date(message.accepted_at);
+                      const previous = index > 0 ? new Date(orderedMessages[index - 1]!.accepted_at) : null;
+                      const startsDay = !previous || day.toDateString() !== previous.toDateString();
                       return (
-                        <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                          <div data-wk-message-bubble className={`max-w-[85%] rounded-[14px] px-3.5 py-2.5 sm:max-w-[76%] ${mine ? "rounded-br-[5px] bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "rounded-bl-[5px] bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
+                        <div key={message.id} className="flex w-full flex-col">
+                          {startsDay && !Number.isNaN(day.getTime()) ? (
+                            <time dateTime={message.accepted_at} className="my-3 text-center text-[11px] font-medium text-[var(--wk-text-muted)]">
+                              {day.toDateString() === new Date().toDateString()
+                                ? "Today"
+                                : day.toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
+                            </time>
+                          ) : null}
+                          <div className={`flex w-full ${mine ? "justify-end" : "justify-start"}`}>
+                          <div data-wk-message-bubble data-message-owner={mine ? "self" : "other"} className={`max-w-[85%] rounded-[18px] px-4 py-3 sm:max-w-[76%] ${mine ? "rounded-br-[5px] bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "rounded-bl-[5px] bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
                             <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.55]">{message.body}</p>
                             {message.resource_references?.length > 0 && (
-                              <div className={`mt-2 space-y-2 border-t pt-2 ${mine ? "border-white/20" : "border-[var(--wk-divider)]"}`}>
+                              <div data-wk-message-reference className={`mt-3 space-y-2 border-t pt-3 ${mine ? "border-black/15" : "border-[var(--wk-divider)]"}`}>
                                 {message.resource_references.map((reference) => (
                                   <GovernedResourceReferenceCard
                                     key={`${reference.presentation_kind}:${reference.resource_id}:${reference.resource_version_id ?? "resource"}`}
@@ -794,12 +808,15 @@ export default function MessagesPage() {
                                 ))}
                               </div>
                             )}
-                            <div className={`mt-1.5 flex items-center justify-end gap-2 text-[9px] font-bold ${mine ? "text-white/70" : "text-[var(--wk-text-faint)]"}`}>
+                            <div className={`mt-2 flex items-center justify-end gap-2 text-[10px] font-medium ${mine ? "text-[var(--wk-brand-on)]/70" : "text-[var(--wk-text-faint)]"}`}>
                               <span>{when(message.accepted_at)}</span>
-                              {mine && message.recipient_read_at && <span>· Read</span>}
                               {!mine && <MessageSafetyReportButton messageId={message.id} />}
                             </div>
                           </div>
+                          </div>
+                          {lastOutgoing && message.recipient_read_at ? (
+                            <span data-wk-message-receipt>Seen {when(message.recipient_read_at)}</span>
+                          ) : null}
                         </div>
                       );
                     })}
@@ -807,7 +824,7 @@ export default function MessagesPage() {
                 </div>
 
                 {detail.conversation.first_contact_state !== "pending" && messagesAccess.can_send && (
-                  <div data-wk-message-composer className="border-t border-[var(--wk-divider)] bg-[var(--wk-surface)] p-3 sm:p-4">
+                  <div data-wk-message-composer className="border-t border-[var(--wk-divider)] bg-[var(--wk-surface)] px-3 py-4 sm:px-5">
                     <div className="mx-auto flex max-w-[760px] items-end gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] p-1.5 focus-within:border-[var(--wk-brand)]">
                       <textarea
                         value={composer}

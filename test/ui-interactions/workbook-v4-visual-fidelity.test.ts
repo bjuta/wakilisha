@@ -4,6 +4,46 @@ import { describe, expect, it } from "vitest";
 const read = (file: string) => readFileSync(file, "utf8");
 
 describe("Workbook v4 source-backed public visual fidelity", () => {
+  it("follows the P6/P7/P8 source order and verified UI-only bounds", () => {
+    const css = read("src/styles/wakilisha-social-workbook-p6-p8.css");
+    const posts = read("src/components/community/PostActions.tsx");
+    const following = read("src/pages/following/page.tsx");
+    const messages = read("src/pages/messages/page.tsx");
+    const notifs = read("src/pages/notifications/page.tsx");
+    const contract = read("src/services/messages.ts");
+
+    expect(css).toContain('article[data-following-activity] {');
+    expect(css).toContain('display: grid;');
+    expect(css).toContain('justify-content: space-between;');
+    for (const action of ["reply", "repost", "react", "save", "share"]) {
+      expect(posts).toContain(`data-wk-post-action="${action}"`);
+    }
+    for (const icon of ["MessageCircle", "Repeat2", "Heart", "Bookmark", "Share2"]) {
+      expect(posts).toContain(`name="${icon}"`);
+    }
+    expect(following).toContain("compactFollowing");
+    expect(read("src/components/community/PostComposer.tsx")).toContain("What are you listening to?");
+    expect(following).toContain("FollowingReactionAction");
+    expect(messages).toContain('data-message-owner={mine ? "self" : "other"}');
+    expect(messages).toContain("data-wk-message-receipt");
+    expect(messages).toContain("data-wk-message-reference");
+    expect(messages).toContain("message.recipient_read_at");
+    expect(css).toContain('height: 100dvh;');
+    expect(css).toContain('[data-wk-mobile-app-header]');
+
+    expect(notifs).toContain("const recent = !notification.readAt;");
+    expect(notifs).toContain("data-wk-notification-group");
+    expect(notifs).toContain("data-wk-notification-time");
+    expect(notifs).toContain("data-wk-notification-copy");
+    expect(notifs).toContain('name="MoreHorizontal"');
+    expect(notifs).toContain("community_update_notification_prefs");
+    // Voice recordings need an authorized media-message contract before send.
+    expect(contract).toContain('presentation_kind: "resource" | "version"');
+    expect(messages).toContain("sendMessage(selectedId, composer.trim())");
+    expect(messages).not.toContain("MediaRecorder");
+    expect(posts).not.toContain('name="BadgeCheck"');
+  });
+
 
   it("keeps authored Video and Podcasts page identity in loading and empty states", () => {
     const video = read("src/pages/video/page.tsx");
