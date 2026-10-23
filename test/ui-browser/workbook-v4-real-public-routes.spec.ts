@@ -278,26 +278,22 @@ for (const route of [
 
 
 /**
- * This is an actual long, published Magazine article with Registry music embeds.
- * Player testing must start while the document is scrolled, not only at page top:
- * a fixed overlay inside a transformed route subtree appears at document origin.
+ * Real PlayerProvider + ResponsiveAppLayout, seeded with a harmless in-memory
+ * recording inside a deterministic 3400px article. This exercises the exact
+ * browser bug even when the live Registry is unavailable to CI.
  */
 for (const width of [390, 1440]) {
-  test(`Now Playing stays viewport-anchored over a scrolled Magazine article at ${width}px`, async ({ page }) => {
-    test.setTimeout(90_000);
+  test(`Now Playing stays viewport-anchored over a scrolled article at ${width}px`, async ({ page }) => {
+    test.setTimeout(55_000);
     await page.setViewportSize({ width, height: 720 });
-    await page.goto("/magazine/ep-review-the-lick-back-by-nikita-kering", { waitUntil: "domcontentloaded" });
-
-    const recording = page.locator('[data-wk-article-media="track"]')
-      .getByRole("button", { name: /Play Give Me My Money/i });
-    await expect(recording).toBeVisible({ timeout: 30_000 });
-    await recording.scrollIntoViewIfNeeded();
-    await recording.click();
+    await page.goto("/test/ui-browser/fixtures/player-viewport.html", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Persistent scrolled article" })).toBeVisible({ timeout: 20_000 });
 
     const compact = page.locator("[data-wk-player-compact]");
-    await expect(compact).toBeVisible({ timeout: 15_000 });
+    await expect(compact).toBeVisible({ timeout: 20_000 });
+    await page.evaluate(() => window.scrollTo(0, 1150));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
     const articleScrollY = await page.evaluate(() => window.scrollY);
-    expect(articleScrollY).toBeGreaterThan(300);
     await compact.getByRole("button").first().click();
 
     const overlay = page.locator("[data-wk-player-overlay]");
@@ -330,6 +326,6 @@ for (const width of [390, 1440]) {
     await expect(overlay).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(articleScrollY);
     await expect(page.locator("[data-wk-player-compact]")).toBeVisible();
-    await expect(recording).toBeVisible();
+    await expect(page.locator("#article-state")).toHaveValue("preserve-this");
   });
 }
