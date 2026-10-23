@@ -45,6 +45,9 @@ describe(
           .toContain(
             "getReactionGlyph",
           );
+        expect(card).toContain("getReactionDisplayIcon(type)");
+        expect(card).toContain("<WkIcon name={getReactionDisplayIcon(type)!}");
+        expect(picker).toContain("getReactionDisplayIcon");
 
         expect(card)
           .toContain(
