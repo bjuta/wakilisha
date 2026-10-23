@@ -1,4 +1,8 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
+import { Editor } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import { RatingNode } from "@/components/admin/editor/RatingNode";
 import { readFileSync } from "node:fs";
 import { canonicalRating, ratingHtml, ratingParts } from "@/components/admin/editor/RatingNode";
 import { extractPublishedReviewVerdict } from "@/utils/editorialRating";
@@ -20,6 +24,20 @@ describe("Workbook (3), Chapter 24 rating authority", () => {
     expect(attrs["data-wk-rating-value"]).toBe("3.5");
     expect(attrs["aria-label"]).toBe("Rated 3.5 out of 5");
     expect(JSON.stringify(html)).not.toMatch(/★|☆|⭐/);
+  });
+  it("survives TipTap HTML save, reopen and document JSON roundtrip", () => {
+    const original = new Editor({
+      extensions: [StarterKit, RatingNode],
+      content: '<p>The final score: <span data-wk-rating="" data-wk-rating-value="3.5" data-wk-rating-role="inline" data-wk-rating-display="both" data-wk-rating-label="" data-wk-rating-subject="" data-wk-rating-breakdown="[]"></span></p>',
+    });
+    const serialized = original.getHTML();
+    expect(serialized).toContain('data-wk-rating-value="3.5"');
+    expect(serialized).toContain("wk-rating-stars");
+    const restored = new Editor({ extensions: [StarterKit, RatingNode], content: serialized });
+    const nodes = restored.getJSON().content?.[0]?.content ?? [];
+    expect(nodes.some((node) => node.type === "wkRating" && node.attrs?.value === 3.5)).toBe(true);
+    original.destroy();
+    restored.destroy();
   });
   it("rejects malformed breakdown entries", () => {
     expect(ratingParts([{label:"Production",value:3.5},{label:"Quarter",value:2.25},{label:"",value:4}]))
