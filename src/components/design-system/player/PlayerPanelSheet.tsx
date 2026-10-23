@@ -14,6 +14,7 @@ export function PlayerPanelSheet({
   title,
   eyebrow,
   inlineDesktop = false,
+  inlineHost,
   children,
 }: {
   open: boolean;
@@ -22,6 +23,7 @@ export function PlayerPanelSheet({
   title: string;
   eyebrow?: string | null;
   inlineDesktop?: boolean;
+  inlineHost?: Element | null;
   children: ReactNode;
 }) {
   useScrollLock(open && (mode === "mobile" || !inlineDesktop));
@@ -41,7 +43,7 @@ export function PlayerPanelSheet({
 
   const mobile = mode === "mobile";
   if (!mobile && inlineDesktop) {
-    const target = document.querySelector("[data-wk-player-panel-host]");
+    const target = inlineHost;
     if (target) {
       return createPortal(
         <section role="region" aria-label={title}
@@ -64,6 +66,7 @@ export function PlayerPanelSheet({
         </section>, target,
       );
     }
+    return null;
   }
 
 
