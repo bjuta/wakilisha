@@ -22,7 +22,8 @@ describe("Workbook v4 mobile shell and safe-area convergence", () => {
     expect(layout).not.toContain("useScrollDirection()");
     expect(header).not.toContain("useScrollDirection()");
     expect(header).not.toContain("scrollVisible");
-    expect(header).toContain("sticky top-0");
+    expect(header).toContain("fixed inset-x-0 top-0");
+    expect(header).toContain("bg-transparent");
     expect(header).toContain("h-14");
   });
 

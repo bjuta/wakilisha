@@ -298,6 +298,27 @@ for (const width of [390, 1440]) {
     await page.evaluate(() => window.scrollTo(0, 1150));
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
     const articleScrollY = await page.evaluate(() => window.scrollY);
+    if (width === 390) {
+      const nav = page.locator('[data-wk-mobile-app-header="v4"]');
+      await expect(nav).toBeVisible();
+      const chrome = await nav.evaluate((node) => {
+        const style = getComputedStyle(node);
+        const button = node.querySelector("button");
+        const logo = node.querySelector("img");
+        return {
+          position: style.position,
+          background: style.backgroundColor,
+          menuBlend: button ? getComputedStyle(button).mixBlendMode : "",
+          logoBlend: logo?.parentElement ? getComputedStyle(logo.parentElement).mixBlendMode : "",
+          headerTop: node.getBoundingClientRect().top,
+        };
+      });
+      expect(chrome.position).toBe("fixed");
+      expect(chrome.background).toBe("rgba(0, 0, 0, 0)");
+      expect(chrome.menuBlend).toBe("difference");
+      expect(chrome.logoBlend).toBe("difference");
+      expect(Math.abs(chrome.headerTop)).toBeLessThanOrEqual(2);
+    }
     await compact.getByRole("button").first().click();
 
     const overlay = page.locator("[data-wk-player-overlay]");
@@ -320,9 +341,26 @@ for (const width of [390, 1440]) {
     expect(Math.abs(position.bottom - position.viewportHeight)).toBeLessThanOrEqual(2);
     expect(position.underlayScroll).toBe(articleScrollY);
     expect(position.scrollableExtent).toBeGreaterThan(20);
+    const backdrop = overlay.locator("[data-wk-player-backdrop]");
+    await expect(backdrop).toBeVisible();
+    expect(await backdrop.evaluate((node) => getComputedStyle(node).overflowX)).toBe("hidden");
+    if (width === 390) {
+      const exit = overlay.getByRole("button", { name: "Close Player" });
+      const menu = overlay.getByRole("button", { name: "More Player actions" });
+      await expect(exit).toBeVisible();
+      await expect(menu).toBeVisible();
+      expect(await exit.evaluate(node => getComputedStyle(node).mixBlendMode)).toBe("difference");
+      expect(await exit.evaluate(node => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+    }
 
     await overlay.evaluate(node => { node.scrollTop = node.scrollHeight; });
     await expect.poll(() => overlay.evaluate(node => node.scrollTop)).toBeGreaterThan(20);
+    if (width === 1440) {
+      const panel = overlay.locator("[data-wk-player-panel-host]");
+      await expect(panel).toBeVisible();
+      const rect = await panel.evaluate(node => node.getBoundingClientRect());
+      expect(Math.abs(rect.top)).toBeLessThanOrEqual(2);
+    }
     await overlay.evaluate(node => { node.scrollTop = 0; });
     await expect.poll(() => overlay.evaluate(node => node.scrollTop)).toBe(0);
 

@@ -20,9 +20,14 @@ describe("Workbook phone chrome", () => {
     expect(drawer).toContain("onSearch();");
     expect(drawer).toContain('name="Search"');
   });
-  it("keeps the solid 56px bar without fake browser chrome", () => {
-    expect(topBar).toContain("sticky top-0");
+  it("floats a transparent 56px bar above real content without a fake browser strip", () => {
+    expect(topBar).toContain("pointer-events-none fixed inset-x-0 top-0");
     expect(topBar).toContain("h-14");
-    expect(topBar).not.toContain("pointer-events-none fixed inset-x-0 top-0");
+    expect(topBar).toContain("bg-transparent");
+    expect(topBar).toContain("mix-blend-difference");
+    expect(topBar).toContain("brightness-0 invert");
+    expect(topBar).toContain("pointer-events-auto");
+    expect(topBar).not.toContain("backdrop-blur-xl");
+    expect(topBar).not.toContain("border-b border-[var(--wk-border)]");
   });
 });

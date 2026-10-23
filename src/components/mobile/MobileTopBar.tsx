@@ -26,28 +26,29 @@ export function MobileTopBar() {
   return (
     <>
       <header
-        className="sticky top-0 z-[78] flex h-14 w-full items-center justify-between gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 px-4 backdrop-blur-xl"
+        className="pointer-events-none fixed inset-x-0 top-0 z-[78] flex h-14 w-full items-center justify-between gap-3 bg-transparent px-4"
         data-wk-mobile-app-header="v4"
+        style={{ paddingTop: "env(safe-area-inset-top)", height: "calc(56px + env(safe-area-inset-top))" }}
       >
         <button
           type="button"
           onClick={() => setAccountOpen(true)}
-          className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
+          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference transition-opacity hover:opacity-75"
           aria-label="Open WAKILISHA menu"
           aria-controls="wk-workbook-sidebar"
           aria-expanded={accountOpen}
         >
           <WkIcon name="Menu" size={21} />
         </button>
-        <Link to="/" aria-label="WAKILISHA home" className="flex min-w-0 flex-1 justify-center">
-          <img src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"} alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain" />
+        <Link to="/" aria-label="WAKILISHA home" className="pointer-events-auto flex min-w-0 flex-1 justify-center mix-blend-difference">
+          <img src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"} alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain brightness-0 invert" />
         </Link>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
             aria-label="Search"
-            className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text)]"
+            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference transition-opacity hover:opacity-75"
           >
             <WkIcon name="Search" size={20} />
           </button>

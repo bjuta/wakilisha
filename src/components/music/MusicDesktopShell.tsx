@@ -552,23 +552,23 @@ export function MusicDesktopShell({
       </aside>
 
       <div className="min-w-0 flex-1 pb-24">
-        <div className="sticky top-0 z-40 flex h-[64px] items-center gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-overlay)] px-4 backdrop-blur-xl md:hidden">
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[78] flex h-[64px] items-center gap-3 bg-transparent px-4 md:hidden">
           <button
             type="button"
             aria-label="Open WAKILISHA menu"
             aria-expanded={smallScreenMenuOpen}
             aria-controls="wk-workbook-sidebar"
             onClick={() => { setMenuStartsInYou(false); setSmallScreenMenuOpen(true); }}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text)]"
+            className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference"
           >
             <WkIcon name="Menu" size={20} />
           </button>
-          <Link to="/music" aria-label={displayName} className="min-w-0 flex-1">
+          <Link to="/music" aria-label={displayName} className="pointer-events-auto min-w-0 flex-1 mix-blend-difference">
             {<img
                 src={resolvedLogoUrl}
                 alt={displayName}
                 onError={() => setLogoError(true)}
-                className="h-7 max-w-[128px] object-contain object-left"
+                className="h-7 max-w-[128px] object-contain object-left brightness-0 invert"
               />}
           </Link>
 
@@ -576,7 +576,7 @@ export function MusicDesktopShell({
             type="button"
             onClick={() => setGlobalSearchOpen(true)}
             aria-label="Search"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]"
+            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference"
           >
             <WkIcon name="Search" size={16} />
           </button>
