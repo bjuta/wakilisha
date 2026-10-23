@@ -66,7 +66,7 @@ export function ArtistDetailHero({
       <>
         <section
           data-wakilisha-artist-loading-hero="true"
-          className="relative -mt-16 flex min-h-[420px] items-end overflow-hidden bg-[var(--wk-surface-raised)] pt-16 md:min-h-[600px]"
+          className="relative mt-0 md:-mt-16 flex min-h-[420px] items-end overflow-hidden bg-[var(--wk-surface-raised)] pt-16 md:min-h-[600px]"
         >
           {imageUrl && (
             <ResponsiveMediaImage
@@ -105,7 +105,7 @@ export function ArtistDetailHero({
 
   return (
     <>
-    <section className="relative -mt-16 pt-16 min-h-[420px] md:min-h-[600px] flex items-end overflow-hidden">
+    <section className="relative mt-0 md:-mt-16 pt-16 min-h-[420px] md:min-h-[600px] flex items-end overflow-hidden">
 
       {/* Full-bleed Artist hero — explicit image ownership keeps LCP machine-discoverable. */}
       {imageUrl && (

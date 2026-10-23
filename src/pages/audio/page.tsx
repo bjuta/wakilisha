@@ -98,8 +98,8 @@ export default function PublicAudioPage() {
 
   return (
     <main data-wk-workbook-screen="audio" className="min-h-screen pb-24">
-      <div className="mx-auto w-full max-w-[1320px] px-5 pt-9 sm:px-9">
-        <div className="flex flex-wrap items-end justify-between gap-5">
+      <div className="mx-auto w-full max-w-[1320px] px-5 pt-9 sm:px-9 max-md:flex max-md:flex-col max-md:px-0 max-md:pt-0">
+        <div className={`max-md:order-2 flex flex-wrap items-end justify-between gap-5 max-md:px-5 ${featured ? "max-md:pt-6" : "max-md:pt-[calc(70px+env(safe-area-inset-top))]"}`}>
           <h1 className="text-[clamp(48px,6vw,76px)] font-extrabold uppercase leading-[.95] tracking-[-.055em] text-[var(--wk-text)]">Audio</h1>
           <nav aria-label="Audio discovery" className="wk-reference-pills">
             <a href="#audio-listen" className="wk-reference-pill" aria-current="page">All</a>
@@ -109,15 +109,15 @@ export default function PublicAudioPage() {
           </nav>
         </div>
         {loading && (
-          <div className="mt-8 grid gap-5 lg:grid-cols-[1.2fr_.85fr]" aria-busy="true">
+          <div className="max-md:order-1 mt-8 grid gap-5 lg:grid-cols-[1.2fr_.85fr] max-md:mt-0" aria-busy="true">
             <div className="h-[370px] animate-pulse rounded-[20px] bg-[var(--wk-surface-raised)]" />
             <div className="h-[370px] animate-pulse rounded-[20px] bg-[var(--wk-surface-raised)]" />
           </div>
         )}
-        {!loading && message && <p className="py-12 text-[14px] text-[var(--wk-text-muted)]" role="alert">Audio is temporarily unavailable.</p>}
+        {!loading && message && <p className="max-md:order-3 py-12 text-[14px] text-[var(--wk-text-muted)] max-md:px-5" role="alert">Audio is temporarily unavailable.</p>}
         {!loading && !message && featured && (
-          <section id="audio-listen" className="mt-7 grid gap-5 lg:grid-cols-[1.23fr_.88fr]">
-            <div className="relative flex min-h-[365px] flex-col justify-end overflow-hidden rounded-[20px] bg-[linear-gradient(145deg,#ab655a,#5b2917_56%,#17110f)] p-7 sm:p-9">
+          <section id="audio-listen" className="max-md:order-1 mt-7 grid gap-5 lg:grid-cols-[1.23fr_.88fr] max-md:mt-0" data-wk-mobile-top-hero="audio">
+            <div className="relative flex min-h-[365px] flex-col justify-end overflow-hidden rounded-[20px] bg-[linear-gradient(145deg,#ab655a,#5b2917_56%,#17110f)] p-7 sm:p-9 max-md:rounded-none">
               <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-white">
                 {featured.publicationKind === "episode" ? "Episode" : "Listen"}
               </span>
@@ -147,7 +147,7 @@ export default function PublicAudioPage() {
               </div>
             </div>
             {shows.length > 0 && (
-              <div id="audio-shows">
+              <div id="audio-shows" className="max-md:px-5">
                 <h2 className="wk-reference-section-heading mb-3">Shows</h2>
                 <div className="grid gap-3">
                   {shows.slice(0,4).map(({ show }) => (
@@ -166,7 +166,7 @@ export default function PublicAudioPage() {
           </section>
         )}
         {!loading && !message && mixes.length > 0 && (
-          <section id="audio-mixes" className="mt-9">
+          <section id="audio-mixes" className="max-md:order-3 mt-9 max-md:px-5">
             <h2 className="wk-reference-section-heading mb-4">Listen next</h2>
             <div className="grid grid-cols-2 gap-x-4 gap-y-7 md:grid-cols-3 xl:grid-cols-5">
               {mixes.map((publication) => <AudioCard key={publication.publicationId} publication={publication} />)}
@@ -174,7 +174,7 @@ export default function PublicAudioPage() {
           </section>
         )}
         {!loading && !message && shows.length > 4 && (
-          <section className="mt-10">
+          <section className="max-md:order-3 mt-10 max-md:px-5">
             <h2 className="wk-reference-section-heading mb-4">More shows</h2>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {shows.slice(4).map(({show}) => (
@@ -190,7 +190,7 @@ export default function PublicAudioPage() {
           </section>
         )}
         {!loading && !message && !standalone.length && !shows.length && (
-          <p className="py-12 text-[14px] text-[var(--wk-text-muted)]">No public audio has been released yet.</p>
+          <p className="max-md:order-3 py-12 text-[14px] text-[var(--wk-text-muted)] max-md:px-5">No public audio has been released yet.</p>
         )}
       </div>
     </main>

@@ -2305,7 +2305,7 @@ export default function PublicPlaylistDetailPage() {
       />
 
       <main className="min-h-screen bg-[var(--wk-bg)] pb-28">
-        <section className="relative -mt-16 min-h-[470px] overflow-hidden pt-16 md:min-h-[520px]">
+        <section className="relative mt-0 md:-mt-16 min-h-[470px] overflow-hidden pt-16 md:min-h-[520px]">
           {
             playlist.cover?.url
               ? (

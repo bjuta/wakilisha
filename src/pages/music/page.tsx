@@ -778,7 +778,7 @@ export default function MusicDiscoveryPage() {
         }
       `}</style>
       <main>
-            <section className="wk-music-hero relative min-h-[430px] overflow-hidden rounded-[24px] bg-[#0a0a0a]">
+            <section className="wk-music-hero relative min-h-[430px] overflow-hidden rounded-[24px] max-md:rounded-none bg-[#0a0a0a]">
               {hero ? (
                 <>
                   <div className="absolute inset-0">

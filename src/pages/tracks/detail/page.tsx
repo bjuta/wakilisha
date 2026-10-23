@@ -1083,7 +1083,7 @@ export default function TrackDetail() {
         }}
       />
 
-      <section className="relative -mt-16 pt-16 overflow-hidden">
+      <section className="relative mt-0 md:-mt-16 pt-16 overflow-hidden">
         {track.artworkUrl && (
           <div className="absolute inset-0 opacity-20 scale-110" style={{ backgroundImage: `url("${track.artworkUrl}")`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(90px) saturate(1.4)" }} />
         )}

@@ -111,7 +111,7 @@ export default function GenreDetail() {
         }}
       />
 
-      <section className="relative -mt-16 pt-16 flex min-h-[380px] items-end overflow-hidden md:min-h-[520px]">
+      <section className="relative mt-0 md:-mt-16 pt-16 flex min-h-[380px] items-end overflow-hidden md:min-h-[520px]">
         <div className="absolute inset-0" style={{ background: heroBg }} />
         {heroArtistImage && (
           <div className="absolute inset-0">

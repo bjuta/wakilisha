@@ -57,7 +57,7 @@ export default function PublicShowsPage() {
         url={`${SITE_URL}/shows`}
       />
       <main data-wk-workbook-screen="podcasts" className="min-h-screen pb-24">
-        <div className="mx-auto w-full max-w-[1320px] px-5 py-9 sm:px-9">
+        <div className={`mx-auto w-full max-w-[1320px] px-5 pb-9 md:px-9 md:pt-9 ${!shows[0] ? "pt-[calc(56px+env(safe-area-inset-top))]" : "pt-0"}`}>
           {!shows[0] && (
             <h1 className="mb-6 text-[clamp(38px,5vw,62px)] font-extrabold uppercase leading-[.95] tracking-[-.05em] text-[var(--wk-text)]">Podcasts</h1>
           )}
@@ -74,7 +74,7 @@ export default function PublicShowsPage() {
           {!loading && !error && shows[0] && (
             <div className="grid gap-9 lg:grid-cols-[.74fr_1.26fr] lg:gap-11">
               <section className="min-w-0">
-                <Link to={shows[0].canonicalPath} className="wk-reference-podcast-cover group" style={{ background: "#1B1B1B", color: "#FFFFFF" }} aria-label={`Open ${shows[0].title}`}>
+                <Link to={shows[0].canonicalPath} className="wk-reference-podcast-cover group max-md:-mx-5 max-md:rounded-none" style={{ background: "#1B1B1B", color: "#FFFFFF" }} aria-label={`Open ${shows[0].title}`}>
                   <span className="max-w-[80%] break-words text-center text-[clamp(32px,5vw,56px)] font-extrabold leading-[1.06] tracking-[-.05em] text-white">
                     {shows[0].title}
                   </span>

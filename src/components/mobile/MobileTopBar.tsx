@@ -18,10 +18,8 @@ export function MobileTopBar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
-  const [articleHeroVisible, setArticleHeroVisible] = useState(true);
   const isSocialRoute = ["/following", "/messages", "/notifications"].includes(location.pathname);
   const isArticleRoute = /^\/magazine\/[^/]+\/?$/.test(location.pathname);
-  const overArticleHero = isArticleRoute && articleHeroVisible;
 
   useEffect(() => {
     // One real app header, not a simulated browser toolbar. Begin visible
@@ -32,10 +30,6 @@ export function MobileTopBar() {
     let travelled = 0;
 
     const onScroll = () => {
-      if (isArticleRoute) {
-        const hero = document.querySelector('[data-wk-workbook-screen="article-mobile"] section');
-        setArticleHeroVisible(hero ? hero.getBoundingClientRect().bottom > 64 : window.scrollY < 48);
-      }
       const y = Math.max(0, window.scrollY);
       const delta = y - lastY;
       lastY = y;
@@ -66,24 +60,25 @@ export function MobileTopBar() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [location.pathname, accountOpen, searchOpen, isArticleRoute]);
+  }, [location.pathname, accountOpen, searchOpen]);
 
   if (location.pathname === "/auth") return null;
 
   return (
     <>
       <header
-        className={`pointer-events-none fixed inset-x-0 top-0 z-[78] h-14 w-full items-center gap-3 px-4 transition-[transform,background-color] duration-200 ease-out motion-reduce:transition-none ${isSocialRoute ? "grid grid-cols-[44px_minmax(0,1fr)_44px]" : "flex justify-between"} ${overArticleHero ? "border-transparent bg-transparent text-white" : "border-b border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] shadow-sm"} ${headerVisible ? "translate-y-0" : "-translate-y-full"}`}
+        className={`pointer-events-none fixed inset-x-0 top-0 z-[78] h-14 w-full items-center gap-3 bg-transparent px-4 text-white transition-transform duration-200 ease-out motion-reduce:transition-none ${isSocialRoute ? "grid grid-cols-[44px_minmax(0,1fr)_44px]" : "flex justify-between"} ${headerVisible ? "translate-y-0" : "-translate-y-full"}`}
         data-wk-mobile-app-header="v4"
         data-wk-mobile-header-visible={headerVisible ? "true" : "false"}
-        data-wk-article-hero-overlay={overArticleHero ? "true" : "false"}
+        data-wk-article-hero-overlay={isArticleRoute ? "true" : "false"}
+        data-wk-mobile-nav-transparency="global"
         onFocusCapture={() => setHeaderVisible(true)}
         style={{ paddingTop: "env(safe-area-inset-top)", height: "calc(56px + env(safe-area-inset-top))" }}
       >
         <button
           type="button"
           onClick={() => setAccountOpen(true)}
-          className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent transition-colors ${overArticleHero ? "text-white drop-shadow-[0_1px_4px_rgba(0,0,0,.65)] hover:bg-black/25" : "text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-brand)]"}`}
+          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference transition-opacity hover:opacity-75"
           aria-label="Open WAKILISHA menu"
           aria-controls="wk-workbook-sidebar"
           aria-expanded={accountOpen}
@@ -97,7 +92,7 @@ export function MobileTopBar() {
           type="button"
           onClick={() => setSearchOpen(true)}
           aria-label="Search"
-          className={`pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-transparent transition-colors ${overArticleHero ? "text-white drop-shadow-[0_1px_4px_rgba(0,0,0,.65)] hover:bg-black/25" : "text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-brand)]"}`}
+          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference transition-opacity hover:opacity-75"
         >
           <WkIcon name="Search" size={20} />
         </button>
