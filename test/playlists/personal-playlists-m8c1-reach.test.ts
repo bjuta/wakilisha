@@ -27,6 +27,8 @@ const trackSearch = read("src/hooks/useTrackSearchData.ts");
 const chartSearch = read("src/hooks/useChartSearchData.ts");
 const searchPage = read("src/pages/search/page.tsx");
 const articleTracks = read("src/pages/magazine/article/components/ArticleTrackEmbeds.tsx");
+const articleReleases = read("src/pages/magazine/article/components/ArticleReleaseEmbeds.tsx");
+const editorialEditor = read("src/components/design-system/editorial/RichTextEditor.tsx");
 const chartEdge = read("supabase/functions/public-content-read/index.ts");
 const chartTypes = read("src/services/chartsPublic/types.ts");
 const chartAdapter = read("src/services/chartsPublic/v2Adapter.ts");
@@ -74,6 +76,20 @@ describe("M8C.1 Track curation reach", () => {
     expect(articleTracks).toContain("trackId={track.id}");
     expect(playerDock).toContain("currentTrack.registryTrackId");
     expect(mobilePlayer).toContain("currentTrack.registryTrackId");
+  });
+
+  it("searches the full active Registry for article Track embeds and keeps shared media cards", () => {
+    expect(editorialEditor).toContain("searchRegistryTracks(query)");
+    expect(editorialEditor).toContain("if (query.length < 2)");
+    expect(editorialEditor).not.toContain("useTrackSearchData(!playlistDescriptionMode)");
+    expect(editorialEditor).not.toContain("return tracks.filter(");
+    expect(articleTracks).toContain('data-wk-article-media="track"');
+    expect(articleTracks).toContain("<PlayableArtwork");
+    expect(articleTracks).toContain("registryTrackId: track.id");
+    expect(articleTracks).toContain("trackId={track.id}");
+    expect(articleReleases).toContain('data-wk-article-media="release"');
+    expect(articleReleases).toContain("<PlayableArtwork");
+    expect(articleReleases).toContain("handlePlayReleasePreview");
   });
 
   it("threads canonical Chart Track ids from Edge authority into Chart curation", () => {

@@ -6,6 +6,7 @@ import { slugify } from "@/utils/releaseUrl";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
+import { WkIcon } from "@/components/design-system/Icon";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -246,20 +247,18 @@ function formatDuration(ms?: number): string {
 
 export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; articleSlug?: string }) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
-  const [imgLoaded, setImgLoaded] = useState(false);
 
-  const trackUrl = track.slug
-    ? track.artistSlug
-      ? `/tracks/${track.artistSlug}/${track.slug}`
-      : `/tracks/${track.slug}`
-    : undefined;
-  const artistUrl = track.artistSlug ? `/artists/${track.artistSlug}` : undefined;
-  const hasAppleCatalog = Boolean(track.appleMusicCatalogId || track.appleMusicId);
-  const hasPlayableSource = Boolean(track.previewUrl || hasAppleCatalog);
+  const trackUrl = track.artistSlug
+    ? `/tracks/${track.artistSlug}/${track.slug}`
+    : `/tracks/${track.slug}`;
+  const artistUrl = track.artistSlug ? `/artists/${track.artistSlug}` : null;
+  const hasPlayableSource = Boolean(
+    track.previewUrl || track.appleMusicCatalogId || track.appleMusicId,
+  );
+  const active = currentTrack?.id === track.slug;
 
   const handlePlayTrack = () => {
     if (!hasPlayableSource) return;
-
     const playerTrack = {
       id: track.slug,
       registryTrackId: track.id,
@@ -273,14 +272,9 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
       album: track.labelName || "",
       artistSlug: track.artistSlug,
       trackSlug: track.slug,
-      isPlayable: hasPlayableSource,
+      isPlayable: true,
     };
-
-    if (currentTrack?.id === playerTrack.id) {
-      togglePlay();
-      return;
-    }
-
+    if (active) { togglePlay(); return; }
     playTrack(playerTrack, [playerTrack], articleSlug ? {
       pageType: "article",
       entitySlug: articleSlug,
@@ -289,79 +283,42 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
     } : undefined);
   };
 
-  const isThisTrack = currentTrack?.id === track.slug;
-  const isPlayingThis = isThisTrack && isPlaying;
-
   return (
-    <div className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden my-6">
-      <div className="flex items-center gap-3 p-3 md:p-4">
-        {/* Artwork owns playback. */}
-        <PlayableArtwork
-          label={track.title}
-          onPlay={(event) => {
-            event.stopPropagation();
-            handlePlayTrack();
-          }}
-          isPlaying={isPlayingThis}
-          disabled={!hasPlayableSource}
-          className="h-[52px] w-[52px] rounded-lg bg-[var(--wk-surface-raised)] md:h-[60px] md:w-[60px]"
-        >
-          {track.artworkUrl ? (
-            <img
-              src={track.artworkUrl}
-              alt=""
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
-              onLoad={() => setImgLoaded(true)}
-              onError={() => setImgLoaded(true)}
-            />
-          ) : (
-            <Ch19GradientImage slug={track.slug} name={track.title} />
-          )}
-        </PlayableArtwork>
+    <div data-wk-article-media="track"
+      className="my-7 flex min-w-0 items-center gap-3 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 text-[var(--wk-text)] sm:gap-4 sm:p-4">
+      <PlayableArtwork
+        label={track.title}
+        onPlay={(event) => { event.stopPropagation(); handlePlayTrack(); }}
+        isPlaying={active && isPlaying}
+        disabled={!hasPlayableSource}
+        className="h-16 w-16 shrink-0 rounded-xl bg-[var(--wk-surface-raised)] sm:h-[72px] sm:w-[72px]"
+      >
+        {track.artworkUrl
+          ? <img src={track.artworkUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+          : <Ch19GradientImage slug={track.slug} name={track.title} />}
+      </PlayableArtwork>
 
-        {/* Track info */}
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] md:text-[14px] font-bold text-[var(--wk-text)] truncate">
-            {track.title}
-          </div>
-          <div className="text-[11px] text-[var(--wk-text-muted)] truncate mt-0.5">
-            {artistUrl ? (
-              <Link to={artistUrl} className="hover:text-[var(--wk-brand)] transition-colors">
-                {track.artistName}
-              </Link>
-            ) : (
-              track.artistName
-            )}
-          </div>
-          <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--wk-text-faint)]">
-            {hasAppleCatalog && (
-              <span className="rounded-full bg-[var(--wk-brand-soft)]/40 px-2 py-0.5 text-[var(--wk-brand)] font-bold">
-                Full track
-              </span>
-            )}
-            {track.primaryGenre && (
-              <span className="rounded-full bg-[var(--wk-brand-soft)]/40 px-2 py-0.5 text-[var(--wk-brand)] font-bold">
-                {track.primaryGenre}
-              </span>
-            )}
-            {track.labelName && <span>{track.labelName}</span>}
-            {track.durationMs && <span>{formatDuration(track.durationMs)}</span>}
-          </div>
+      <div className="min-w-0 flex-1">
+        <Link to={trackUrl}
+          className="block truncate text-[15px] font-bold leading-snug text-[var(--wk-text)] hover:underline sm:text-[16px]">
+          {track.title}
+        </Link>
+        <div className="mt-1 truncate text-[13px] text-[var(--wk-text-muted)]">
+          {artistUrl ? <Link to={artistUrl} className="hover:underline">{track.artistName}</Link> : track.artistName}
         </div>
-
-        {/* Curation, play, and link actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <AddToPlaylistButton trackId={track.id} trackTitle={track.title} compact iconOnly />
-          {trackUrl && (
-            <Link
-              to={trackUrl}
-              className="flex items-center justify-center w-8 h-8 rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all"
-              title={`View ${track.title}`}
-            >
-              <i className="ri-external-link-line text-[12px]" />
-            </Link>
-          )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--wk-text-faint)]">
+          {track.previewUrl ? <span className="font-semibold text-[#A86D21] dark:text-[#D6A054]">Preview</span>
+            : hasPlayableSource ? <span>Apple Music</span> : <span>Unavailable</span>}
+          {track.primaryGenre ? <span>{track.primaryGenre}</span> : null}
+          {track.durationMs ? <span className="tabular-nums">{formatDuration(track.durationMs)}</span> : null}
         </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <AddToPlaylistButton trackId={track.id} trackTitle={track.title} compact iconOnly />
+        <Link to={trackUrl} title={`Open ${track.title}`} aria-label={`Open ${track.title}`}
+          className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]">
+          <WkIcon name="ArrowUpRight" size={19} />
+        </Link>
       </div>
     </div>
   );

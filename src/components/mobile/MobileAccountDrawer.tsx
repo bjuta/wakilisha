@@ -4,6 +4,7 @@ import { Dialog, Modal as AriaModal, ModalOverlay } from "react-aria-components"
 import { WakilishaAccountMark } from "@/components/brand/WakilishaAccountMark";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
+import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useMessagesAccess } from "@/hooks/useMessagesAccess";
@@ -79,19 +80,14 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
     </div>
   );
   const appearanceControls = (
-    <div className="border-t border-[var(--wk-divider)] px-3 py-3" data-wk-appearance-controls>
-      <div className="mb-2 text-[13px] font-bold text-[var(--wk-text)]">Appearance</div>
-      <div role="group" aria-label="Appearance" className="flex gap-2">
-        {(["light", "dark"] as const).map(mode => (
-          <button key={mode} type="button" onClick={() => setTheme(mode)}
-            aria-pressed={theme === mode}
-            className={`min-h-11 flex-1 rounded-full border px-4 text-[13px] font-semibold ${theme === mode
-              ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)] text-[var(--wk-text)]"
-              : "border-[var(--wk-border)] text-[var(--wk-text-muted)]"}`}>
-            {mode === "light" ? "Light" : "Dark"}
-          </button>
-        ))}
-      </div>
+    <div data-wk-appearance-controls className="flex min-h-12 items-center justify-between gap-3 border-t border-[var(--wk-divider)] px-3">
+      <span className="text-[13px] font-semibold text-[var(--wk-text)]">Dark mode</span>
+      <WakilishaToggle
+        value={theme === "dark"}
+        onChange={(isDark) => setTheme(isDark ? "dark" : "light")}
+        ariaLabel="Dark mode"
+        size="sm"
+      />
     </div>
   );
   return (
@@ -188,18 +184,18 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
                 </nav>
                 {appearanceControls}
                 <WkDisclosure
-                  summary="More WAKILISHA"
-                  className="border-t border-[var(--wk-divider)] px-3 py-3"
-                  triggerClassName="flex min-h-11 w-full items-center text-left text-[13px] font-bold text-[var(--wk-text-muted)]"
-                  contentClassName="grid grid-cols-2 gap-2 pb-3"
+                  summary="Browse more"
+                  className="border-t border-[var(--wk-divider)] px-3 py-2"
+                  triggerClassName="flex min-h-11 w-full items-center text-left text-[13px] font-semibold text-[var(--wk-text-muted)]"
+                  contentClassName="flex flex-col pb-2"
                 >
-                  {WAKILISHA_MORE_DESTINATIONS.map(item => (
-                    <Link key={item.to} to={item.to} onClick={close} className="flex min-h-11 items-center text-[12px] text-[var(--wk-text-muted)]">
+                  {[...WAKILISHA_MORE_DESTINATIONS, ...WAKILISHA_FOOT_LINKS].map(item => (
+                    <Link key={item.to} to={item.to} onClick={close}
+                      className="flex min-h-10 items-center rounded-lg px-2 text-[13px] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]">
                       {item.label}
                     </Link>
                   ))}
                 </WkDisclosure>
-                {footLinks}
                 <button type="button" onClick={() => { void signOut().then(success => { if (success) close(); }); }}
                   disabled={signingOut}
                   className="flex min-h-12 w-full items-center gap-4 rounded-xl px-3 text-left text-[14px] font-semibold text-[var(--wk-text)] disabled:opacity-50">

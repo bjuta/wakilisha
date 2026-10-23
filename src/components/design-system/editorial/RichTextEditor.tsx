@@ -21,7 +21,7 @@ import { ImageEditDialog } from "@/components/admin/editor/ImageEditDialog";
 import { SlashCommandExtension } from "@/components/admin/editor/SlashCommandSuggestion";
 import { useReleaseSearchData } from "@/hooks/useReleaseSearchData";
 import { useArtistSearchData } from "@/hooks/useArtistSearchData";
-import { useTrackSearchData } from "@/hooks/useTrackSearchData";
+
 import { releaseUrl } from "@/utils/releaseUrl";
 import { trackUrl } from "@/utils/trackUrl";
 import {
@@ -215,8 +215,8 @@ export function RichTextEditor({
     useReleaseSearchData(!playlistDescriptionMode);
   const { data: artists, loading: artistsLoading } =
     useArtistSearchData(!playlistDescriptionMode);
-  const { data: tracks, loading: tracksLoading } =
-    useTrackSearchData(!playlistDescriptionMode);
+  // The Registry exceeds the client query default limit. Track selection
+  // uses bounded server-side search for both articles and playlists.
 
   const filteredReleases = useMemo(() => {
     if (playlistDescriptionMode) {
@@ -291,55 +291,21 @@ export function RichTextEditor({
     playlistDescriptionMode,
   ]);
 
-  const filteredTracks = useMemo(() => {
-    if (playlistDescriptionMode) {
-      return playlistTrackResults.map(
-        (track) => ({
-          id: track.id,
-          slug: track.slug,
-          artistSlug:
-            track.artistSlug || "",
-          title: track.title,
-          artist:
-            track.artistNames.join(", ") ||
-            "Artist unresolved",
-          genre: "",
-          artworkUrl:
-            track.artworkUrl || "",
-          isPlayable:
-            Boolean(track.previewUrl),
-          source: "registry",
-          label:
-            track.releaseTitle || "",
-          contextText: "",
-          previewUrl:
-            track.previewUrl,
-        }),
-      );
-    }
-
-    if (!trackSearch.trim()) {
-      return tracks;
-    }
-
-    const q =
-      trackSearch.toLowerCase();
-
-    return tracks.filter(
-      (track) =>
-        track.title
-          .toLowerCase()
-          .includes(q) ||
-        track.artist
-          .toLowerCase()
-          .includes(q),
-    );
-  }, [
-    playlistDescriptionMode,
-    playlistTrackResults,
-    trackSearch,
-    tracks,
-  ]);
+  const filteredTracks = useMemo(() =>
+    playlistTrackResults.map((track) => ({
+      id: track.id,
+      slug: track.slug,
+      artistSlug: track.artistSlug || "",
+      title: track.title,
+      artist: track.artistNames.join(", ") || "Artist unresolved",
+      genre: "",
+      artworkUrl: track.artworkUrl || "",
+      isPlayable: Boolean(track.previewUrl),
+      source: "registry",
+      label: track.releaseTitle || "",
+      contextText: "",
+      previewUrl: track.previewUrl,
+    })), [playlistTrackResults]);
 
   const releasePickerLoading =
     playlistDescriptionMode
@@ -349,10 +315,7 @@ export function RichTextEditor({
     playlistDescriptionMode
       ? playlistArtistLoading
       : artistsLoading;
-  const trackPickerLoading =
-    playlistDescriptionMode
-      ? playlistTrackLoading
-      : tracksLoading;
+  const trackPickerLoading = playlistTrackLoading;
 
   useEffect(() => {
     if (
@@ -478,7 +441,6 @@ export function RichTextEditor({
 
   useEffect(() => {
     if (
-      !playlistDescriptionMode ||
       !trackPickerOpen
     ) {
       return;
@@ -532,7 +494,6 @@ export function RichTextEditor({
       window.clearTimeout(timeout);
     };
   }, [
-    playlistDescriptionMode,
     trackPickerOpen,
     trackSearch,
   ]);
@@ -2261,7 +2222,7 @@ export function RichTextEditor({
                 }}
               />
               <div className="min-h-0 max-h-[50dvh] space-y-2 overflow-y-auto overscroll-contain pr-1 sm:max-h-[320px]">
-                {playlistDescriptionMode && playlistTrackError ? (
+                {playlistTrackError ? (
                   <div className="py-6 text-center text-[12px] text-wk-danger">
                     {playlistTrackError}
                   </div>
@@ -2272,11 +2233,11 @@ export function RichTextEditor({
                   </div>
                 ) : filteredTracks.length === 0 ? (
                   <div className="py-6 text-center text-[12px] text-[var(--wk-text-faint)]">
-                    {playlistDescriptionMode && trackSearch.trim().length < 2
+                    {trackSearch.trim().length < 2
                       ? "Enter at least two characters to search Tracks."
                       : trackSearch.trim()
                         ? "No tracks match your search."
-                        : "No tracks found yet."}
+                        : "Search the Registry for a recording to embed."}
                   </div>
                 ) : (
                   filteredTracks.map((track) => (
