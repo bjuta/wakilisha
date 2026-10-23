@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { canonicalRating } from "@/utils/ratingValue";
 import type { DOMOutputSpec } from "@tiptap/pm/model";
 
 /** Workbook (3), Chapter 24: locally rendered, portable rating document atom. */
@@ -17,11 +18,7 @@ export interface RatingAttrs {
 export const WK_STAR_PATH =
   "M12 2.4c.3 0 .55.17.69.45l2.74 5.58 6.16.9c.65.09.91.89.44 1.35l-4.46 4.36 1.05 6.15c.11.66-.59 1.15-1.17.84L12 19.14l-5.45 2.89c-.58.31-1.28-.18-1.17-.84l1.05-6.15-4.46-4.36c-.47-.46-.21-1.26.44-1.35l6.16-.9 2.74-5.58c.14-.28.39-.45.69-.45Z";
 
-export function canonicalRating(value: unknown): number | null {
-  const v = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(v) && v >= 1 && v <= 5 && v * 2 === Math.round(v * 2)
-    ? v : null;
-}
+export { canonicalRating } from "@/utils/ratingValue";
 
 export function ratingParts(value: unknown): RatingPart[] {
   if (!Array.isArray(value)) return [];

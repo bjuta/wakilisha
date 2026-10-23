@@ -11,7 +11,7 @@ const picker = read("src/components/admin/editor/RatingComposerModal.tsx");
 describe("Workbook (3), Chapter 24 rating authority", () => {
   it("admits only nine whole and half steps from 1 to 5", () => {
     for (let value = 1; value <= 5; value += 0.5) expect(canonicalRating(value)).toBe(value);
-    for (const value of [0, 0.5, 1.25, 3.75, 5.5, NaN, Infinity]) expect(canonicalRating(value)).toBeNull();
+    for (const value of [0, 0.5, 1.25, 3.75, 5.5, NaN, Infinity, null, true, "", "bad"]) expect(canonicalRating(value)).toBeNull();
   });
   it("renders an atomic, accessible five-star rating with normalized numbers", () => {
     const html = ratingHtml({value:3.5,role:"inline",display:"both",label:"",subject:"",breakdown:[]});
@@ -24,6 +24,10 @@ describe("Workbook (3), Chapter 24 rating authority", () => {
   it("rejects malformed breakdown entries", () => {
     expect(ratingParts([{label:"Production",value:3.5},{label:"Quarter",value:2.25},{label:"",value:4}]))
       .toEqual([{label:"Production",value:3.5}]);
+  });
+  it("keeps public rating validation isolated from rich-text editor dependencies", () => {
+    expect(read("src/utils/editorialRating.ts")).toContain('from "@/utils/ratingValue"');
+    expect(read("src/utils/editorialRating.ts")).not.toContain("@/components/admin/editor/");
   });
   it("syndicates only an attributed verdict", () => {
     const valid = '<span data-wk-rating="" data-wk-rating-value="3.5" data-wk-rating-role="verdict" data-wk-rating-subject="Forever to Never by Charisma"></span>';
