@@ -163,7 +163,7 @@ export default function MobileMagazine() {
         onClick={handleHeroOpen}
         onKeyDown={handleHeroKeyDown}
         aria-labelledby="wk-mobile-magazine-hero-title"
-        className="relative flex h-[min(61dvh,510px)] min-h-[420px] cursor-pointer items-end overflow-hidden bg-[#0a0a0a]"
+        className="relative flex min-h-[max(500px,70dvh)] cursor-pointer items-end overflow-hidden bg-[#0a0a0a]"
       >
         {heroStory.heroUrl ? (
           <ResponsiveMediaImage
@@ -186,7 +186,7 @@ export default function MobileMagazine() {
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
 
-        <div className="relative z-10 w-full px-5 pb-12 pt-24 text-white">
+        <div className="relative z-10 w-full px-5 pb-12 pt-28 text-white">
           <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand-dot)]">{heroStory.section} · Cover story</p>
           <h1
             id="wk-mobile-magazine-hero-title"

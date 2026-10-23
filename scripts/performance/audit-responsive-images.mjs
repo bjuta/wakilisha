@@ -361,8 +361,16 @@ if (
 const mobileTopBar = read(
   "src/components/mobile/MobileTopBar.tsx",
 );
-if (!mobileTopBar.includes('/assets/logos/wakilisha-logo-dark.svg')) {
-  fail("The Workbook v4 mobile header must use the approved vector mark.");
+const mobileDrawer = read(
+  "src/components/mobile/MobileAccountDrawer.tsx",
+);
+if (mobileTopBar.includes("<img") || mobileTopBar.includes("isMagazineArticle")
+  || !mobileTopBar.includes('aria-label="Search"')) {
+  fail("The Workbook v4 mobile header must contain only Menu and Search.");
+}
+if (!mobileDrawer.includes('/assets/logos/wakilisha-logo-dark.svg')
+  || !mobileDrawer.includes('/assets/logos/wakilisha-logo-light.svg')) {
+  fail("The approved vector wordmark must remain in the sidebar menu.");
 }
 const mobileNavigation = read(
   "src/components/mobile/MobileAppLayout.tsx",

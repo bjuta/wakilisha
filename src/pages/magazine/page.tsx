@@ -471,7 +471,7 @@ export default function Magazine() {
         onClick={handleHeroOpen}
         onKeyDown={handleHeroKeyDown}
         aria-label={`Read ${heroStory.title}`}
-        className="group relative flex h-[min(65vw,520px)] min-h-[400px] cursor-pointer items-end overflow-hidden bg-[#0a0a0a]"
+        className="group relative flex h-[min(70vw,580px)] min-h-[440px] cursor-pointer items-end overflow-hidden bg-[#0a0a0a]"
       >
         {heroStory.heroUrl ? (
           <ResponsiveMediaImage
@@ -494,7 +494,7 @@ export default function Magazine() {
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
 
-        <div className="relative z-10 w-full max-w-[1280px] mx-auto px-6 lg:px-8 pb-16 pt-28 text-white">
+        <div className="relative z-10 w-full max-w-[1280px] mx-auto px-6 lg:px-8 pb-16 pt-32 text-white">
 
           <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand-dot)]">{heroStory.section} · Cover story</p>
           <h1 className="text-[clamp(40px,6vw,80px)] font-black tracking-[-0.05em] leading-[0.92] max-w-[16ch] group-hover:opacity-90 transition-opacity duration-500">

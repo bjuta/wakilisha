@@ -6,9 +6,10 @@ const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "ut
 const mark = readFileSync("src/components/brand/WakilishaAccountMark.tsx", "utf8");
 
 describe("Signed-out WAKILISHA menu brand", () => {
-  it("uses the official wordmark in topbar and menu", () => {
-    expect(topBar).toContain("/assets/logos/wakilisha-logo-dark.svg");
-    expect(topBar).toContain("/assets/logos/wakilisha-logo-light.svg");
+  it("keeps the official SVG wordmark in the sidebar, not the mobile top bar", () => {
+    expect(topBar).not.toContain("<img");
+    expect(topBar).not.toContain("/assets/logos/wakilisha-logo-dark.svg");
+    expect(topBar).not.toContain("/assets/logos/wakilisha-logo-light.svg");
     expect(drawer).toContain("/assets/logos/wakilisha-logo-dark.svg");
     expect(drawer).toContain("/assets/logos/wakilisha-logo-light.svg");
     expect(drawer).toContain("WakilishaAccountMark");
