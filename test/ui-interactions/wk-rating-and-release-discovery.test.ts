@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { RatingNode } from "@/components/admin/editor/RatingNode";
+import { EDITOR_MENU_REGISTRY } from "@/components/design-system/editorial/editorCommandRegistry";
 import { readFileSync } from "node:fs";
 import { canonicalRating, ratingHtml, ratingParts } from "@/components/admin/editor/RatingNode";
 import { extractPublishedReviewVerdict } from "@/utils/editorialRating";
@@ -25,6 +26,29 @@ describe("Workbook (3), Chapter 24 rating authority", () => {
     expect(attrs["aria-label"]).toBe("Rated 3.5 out of 5");
     expect(JSON.stringify(html)).not.toMatch(/★|☆|⭐/);
   });
+  it("offers Rating in the same Insert menu as Release, Artist and Track, and inserts an actual atom", () => {
+    const menu = EDITOR_MENU_REGISTRY.find((item) => item.id === "insert");
+    expect(menu).toBeDefined();
+    const actions = menu!.items.map((item) => item.command);
+    for (const name of ["insertRating", "insertRelease", "insertArtist", "insertTrack"]) {
+      expect(actions).toContain(name);
+    }
+    const editorInstance = new Editor({
+      extensions: [StarterKit, RatingNode],
+      content: "<p>A record deserving a proper rating. </p>",
+    });
+    expect(editorInstance.commands.insertContent({
+      type: "wkRating",
+      attrs: { value: 2.5, role: "inline", display: "both", label: "", subject: "", breakdown: [] },
+    })).toBe(true);
+    const html = editorInstance.getHTML();
+    expect(html).toContain('data-wk-rating-value="2.5"');
+    expect(html).toContain("wk-rating-stars");
+    expect(html).not.toContain("[wk-rating");
+    expect(html).not.toContain("★");
+    editorInstance.destroy();
+  });
+
   it("survives TipTap HTML save, reopen and document JSON roundtrip", () => {
     const original = new Editor({
       extensions: [StarterKit, RatingNode],
