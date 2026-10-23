@@ -21,7 +21,8 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     for (const icon of ["MessageCircle", "Repeat2", "Heart", "Bookmark", "Share2"]) {
       expect(posts).toContain(`name="${icon}"`);
     }
-    expect(following).toContain("What are you listening to?");
+    expect(following).toContain("compactFollowing");
+    expect(read("src/components/community/PostComposer.tsx")).toContain("What are you listening to?");
     expect(following).toContain("FollowingReactionAction");
     expect(messages).toContain('data-message-owner={mine ? "self" : "other"}');
     expect(messages).toContain("data-wk-message-receipt");
