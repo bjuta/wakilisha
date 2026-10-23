@@ -38,12 +38,13 @@ import {
 import { MessageSafetyReportButton } from "./MessageSafetyReportButton";
 import { MessageSafetyState } from "./MessageSafetyState";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 
-const FOLDERS: Array<{ key: MessageFolder; label: string; icon: string }> = [
-  { key: "inbox", label: "Inbox", icon: "ri-inbox-line" },
-  { key: "requests", label: "Requests", icon: "ri-mail-add-line" },
-  { key: "spam", label: "Spam", icon: "ri-spam-2-line" },
-  { key: "archived", label: "Archive", icon: "ri-archive-line" },
+const FOLDERS: Array<{ key: MessageFolder; label: string; icon: WkIconName }> = [
+  { key: "inbox", label: "Inbox", icon: "Inbox" },
+  { key: "requests", label: "Requests", icon: "Mail" },
+  { key: "spam", label: "Spam", icon: "ShieldAlert" },
+  { key: "archived", label: "Archive", icon: "Archive" },
 ];
 
 function when(value: string): string {
@@ -212,7 +213,7 @@ function GovernedResourceReferenceCard({
             </div>
           </div>
           <span className="shrink-0 text-[9px] font-black">
-            Open in Field <i className="ri-arrow-right-up-line" />
+            Open in Field <WkIcon name="ArrowUpRight" size={18} aria-hidden="true" />
           </span>
         </div>
       </Link>
@@ -245,7 +246,7 @@ function GovernedResourceReferenceCard({
             to={`/admin/content/playlists/${encodeURIComponent(playlist.playlist_id)}`}
             className="shrink-0 text-[9px] font-black"
           >
-            Open Playlist <i className="ri-arrow-right-up-line" />
+            Open Playlist <WkIcon name="ArrowUpRight" size={18} aria-hidden="true" />
           </Link>
         </div>
 
@@ -629,10 +630,10 @@ export default function MessagesPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link to="/settings?section=Messages" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]" aria-label="Messages settings">
-              <i className="ri-settings-3-line text-base" />
+              <WkIcon name="Settings" size={16} aria-hidden="true" />
             </Link>
             <button type="button" onClick={() => setNewOpen(true)} disabled={!messagesAccess.can_start} aria-label="New message" className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] disabled:opacity-45">
-              <i className="ri-edit-2-line text-[18px]" aria-hidden="true" /><span className="sr-only">New message</span>
+              <WkIcon name="Edit" size={18} aria-hidden="true" /><span className="sr-only">New message</span>
             </button>
           </div>
         </div>
@@ -651,7 +652,7 @@ export default function MessagesPage() {
               onClick={() => { setFolder(item.key); setSelectedId(null); setDetail(null); }}
               className={`relative flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition-colors ${folder === item.key ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"}`}
             >
-              <i className={`${item.icon} text-sm`} />
+              <WkIcon name={item.icon} size={14} aria-hidden="true" />
               <span>{item.label}</span>
               {unread[item.key] > 0 && (
                 <span className="min-w-5 rounded-full bg-[var(--wk-brand)] px-1.5 py-0.5 text-[9px] font-black text-[var(--wk-brand-on)]">{unread[item.key]}</span>
@@ -670,7 +671,7 @@ export default function MessagesPage() {
               </div>
             ) : visibleConversations.length === 0 ? (
               <div className="flex min-h-[360px] flex-col items-center justify-center px-8 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"><i className="ri-mail-line text-xl" /></div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"><WkIcon name="Mail" size={20} aria-hidden="true" /></div>
                 <h2 className="mt-4 text-[14px] font-black text-[var(--wk-text)]">Nothing here</h2>
                 <p className="mt-1 max-w-[240px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{conversationQuery.trim() ? "No matching conversations." : "This folder is quiet."}</p>
               </div>
@@ -710,7 +711,7 @@ export default function MessagesPage() {
           <section data-wk-message-thread data-wk-thread-selected={selectedId ? "true" : "false"} className={`${selectedId ? "flex" : "hidden lg:flex"} min-w-0 flex-col`} aria-label="Conversation">
             {!selectedId ? (
               <div className="flex min-h-[650px] flex-1 flex-col items-center justify-center px-8 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"><i className="ri-chat-3-line text-2xl" /></div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"><WkIcon name="MessageSquare" size={24} aria-hidden="true" /></div>
                 <h2 className="mt-4 text-[16px] font-black text-[var(--wk-text)]">Choose a conversation</h2>
                 <p className="mt-1 max-w-[300px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">Select a conversation to read your messages.</p>
               </div>
@@ -719,7 +720,7 @@ export default function MessagesPage() {
             ) : (
               <>
                 <header data-wk-message-thread-header className="flex min-h-14 items-center gap-3 border-b border-[var(--wk-divider)] px-4 py-2 sm:px-6">
-                  <button type="button" onClick={() => { setSelectedId(null); setDetail(null); }} className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] lg:hidden" aria-label="Back to conversations"><i className="ri-arrow-left-line" /></button>
+                  <button type="button" onClick={() => { setSelectedId(null); setDetail(null); }} className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] lg:hidden" aria-label="Back to conversations"><WkIcon name="ArrowLeft" size={18} aria-hidden="true" /></button>
                   <Avatar summary={selectedSummary} size="h-9 w-9" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[15px] font-bold text-[var(--wk-text)]">{messageDisplayName(selectedSummary.other_participant?.presentation)}</div>
@@ -738,7 +739,7 @@ export default function MessagesPage() {
                         aria-expanded={threadActionsOpen}
                         className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
                       >
-                        <i className="ri-more-2-fill text-[19px]" aria-hidden="true" />
+                        <WkIcon name="MoreVertical" size={19} aria-hidden="true" />
                       </button>
                       {threadActionsOpen ? (
                         <div role="menu" className="absolute right-0 top-11 z-30 w-[230px] rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2 shadow-xl">
@@ -840,7 +841,7 @@ export default function MessagesPage() {
                         placeholder="Message"
                         className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-2 py-2 text-[16px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
                       />
-                      <button type="button" onClick={() => void handleSend()} disabled={!composer.trim() || sending} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] disabled:opacity-40" aria-label="Send message"><i className="ri-send-plane-fill" /></button>
+                      <button type="button" onClick={() => void handleSend()} disabled={!composer.trim() || sending} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] disabled:opacity-40" aria-label="Send message"><WkIcon name="Send" size={18} aria-hidden="true" /></button>
                     </div>
                     <div className="mx-auto mt-2 flex max-w-[760px] justify-end gap-2">
                       {folder === "archived" ? (
@@ -890,7 +891,7 @@ export default function MessagesPage() {
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
                 aria-label="Close"
               >
-                <i className="ri-close-line" />
+                <WkIcon name="X" size={18} aria-hidden="true" />
               </button>
             </div>
 
@@ -908,7 +909,7 @@ export default function MessagesPage() {
                 </div>
               ) : (
                 <div className="relative">
-                  <i className="ri-search-line absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--wk-text-faint)]" />
+                  <WkIcon name="Search" size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--wk-text-faint)]" aria-hidden="true" />
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
