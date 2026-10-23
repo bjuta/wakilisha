@@ -50,6 +50,23 @@ const QUICK_REACTION_ICONS: Record<(typeof QUICK_REACTIONS)[number], WkIconName>
   "👀": "Eye",
 };
 
+const LEGACY_REACTION_ICONS: Record<string, WkIconName> = {
+  signal: "Zap",
+  memory: "BookOpen",
+  context: "Lightbulb",
+  fire: "Flame",
+  agree: "CheckCircle",
+};
+
+/** Used by the comment reaction toolbar; arbitrary user emoji remains content. */
+export function getReactionDisplayIcon(reaction: ReactionType): WkIconName | null {
+  if (LEGACY_REACTION_ICONS[reaction]) return LEGACY_REACTION_ICONS[reaction];
+  const glyph = getReactionGlyph(reaction);
+  return (QUICK_REACTIONS as readonly string[]).includes(glyph)
+    ? QUICK_REACTION_ICONS[glyph as (typeof QUICK_REACTIONS)[number]]
+    : null;
+}
+
 const LEGACY_REACTION_GLYPHS:
   Record<string, string> = {
     signal: "⚡",
