@@ -10,6 +10,7 @@ export interface RatingAttrs {
   role: RatingRole;
   display: RatingDisplay;
   label: string;
+  subject?: string;
   breakdown: RatingPart[];
 }
 
@@ -63,6 +64,7 @@ export function ratingHtml(attrs: RatingAttrs): DOMOutputSpec {
     "data-wk-rating-role": role,
     "data-wk-rating-display": display,
     "data-wk-rating-label": text,
+    "data-wk-rating-subject": (attrs.subject || "").trim().slice(0, 160),
     "data-wk-rating-breakdown": JSON.stringify(parts),
     class: "wk-rating wk-rating--" + role + " wk-rating--" + display,
     role: "img",
@@ -97,6 +99,7 @@ export const RatingNode = Node.create({
       role: { default: "inline", parseHTML: (el: HTMLElement) => el.getAttribute("data-wk-rating-role") || "inline" },
       display: { default: "both", parseHTML: (el: HTMLElement) => el.getAttribute("data-wk-rating-display") || "both" },
       label: { default: "", parseHTML: (el: HTMLElement) => el.getAttribute("data-wk-rating-label") || "" },
+      subject: { default: "", parseHTML: (el: HTMLElement) => el.getAttribute("data-wk-rating-subject") || "" },
       breakdown: { default: [], parseHTML: (el: HTMLElement) => {
         try { return ratingParts(JSON.parse(el.getAttribute("data-wk-rating-breakdown") || "[]")); }
         catch { return []; }

@@ -17,6 +17,7 @@ export function RatingComposerModal({ open, onClose, onApply, initial }: Props) 
   const [role, setRole] = useState<RatingRole>("inline");
   const [display, setDisplay] = useState<RatingDisplay>("both");
   const [label, setLabel] = useState("");
+  const [subject, setSubject] = useState("");
   const [breakdown, setBreakdown] = useState<RatingPart[]>([]);
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export function RatingComposerModal({ open, onClose, onApply, initial }: Props) 
     setRole(initial?.role ?? "inline");
     setDisplay(initial?.display ?? "both");
     setLabel(initial?.label ?? "");
+    setSubject(initial?.subject ?? "");
     setBreakdown(initial?.breakdown ?? []);
   }, [open, initial]);
 
@@ -118,6 +120,15 @@ export function RatingComposerModal({ open, onClose, onApply, initial }: Props) 
             placeholder="e.g. Production or A confident closing track"
             className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 py-3 text-base outline-none focus:border-[var(--wk-brand)]" />
         </div>
+        {(role === "verdict" || role === "breakdown") && (
+          <div>
+            <label htmlFor="wk-rating-subject" className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Work being reviewed</label>
+            <input id="wk-rating-subject" value={subject} maxLength={160} onChange={(event) => setSubject(event.target.value)}
+              placeholder="e.g. Forever to Never by Charisma"
+              className="w-full rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-3 py-3 text-base outline-none focus:border-[var(--wk-brand)]" />
+            <p className="mt-1 text-xs text-[var(--wk-text-muted)]">Required before the verdict can be shared as structured review data.</p>
+          </div>
+        )}
         {role === "breakdown" && (
           <div>
             <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Scored parts</p>
@@ -147,7 +158,7 @@ export function RatingComposerModal({ open, onClose, onApply, initial }: Props) 
         <div className="flex justify-end gap-2 border-t border-[var(--wk-border)] pt-4">
           <button type="button" onClick={onClose} className="min-h-11 rounded-full px-4 text-sm">Cancel</button>
           <button type="button"
-            onClick={() => onApply({value,role,display,label:label.trim(),breakdown:role === "breakdown" ? breakdown : []})}
+            onClick={() => onApply({value,role,display,label:label.trim(),subject:subject.trim(),breakdown:role === "breakdown" ? breakdown : []})}
             className="min-h-11 rounded-full bg-[var(--wk-text)] px-5 font-bold text-[var(--wk-bg)]">
             {initial ? "Update Rating" : "Insert Rating"}
           </button>

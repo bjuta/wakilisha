@@ -528,7 +528,7 @@ export function RichTextEditor({
         if (node.type.name !== "wkRating" || readOnlyRef.current) return false;
         const attrs = node.attrs as RatingAttrs;
         setEditingRatingPosition(pos);
-        setRatingInitial({ value: attrs.value, role: attrs.role, display: attrs.display, label: attrs.label, breakdown: attrs.breakdown });
+        setRatingInitial({ value: attrs.value, role: attrs.role, display: attrs.display, label: attrs.label, subject: attrs.subject, breakdown: attrs.breakdown });
         setRatingModalOpen(true);
         return true;
       },
@@ -1086,7 +1086,7 @@ export function RichTextEditor({
     if (!editor || !conversionCandidate) return;
     const role = conversionCandidate.standAlone ? "block" : "inline";
     const atom = editor.schema.nodes.wkRating.create({
-      value: conversionCandidate.value, role, display: "both", label: "", breakdown: [],
+      value: conversionCandidate.value, role, display: "both", label: "", subject: "", breakdown: [],
     });
     editor.view.dispatch(editor.state.tr.replaceWith(conversionCandidate.from, conversionCandidate.to, atom));
   }, [editor, conversionCandidate]);
