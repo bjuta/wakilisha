@@ -12,8 +12,6 @@ interface Props {
   initial: RatingAttrs | null;
 }
 
-const VALUES = Array.from({ length: 9 }, (_, index) => (index + 2) / 2);
-
 export function RatingComposerModal({ open, onClose, onApply, initial }: Props) {
   const [value, setValue] = useState(3.5);
   const [role, setRole] = useState<RatingRole>("inline");
@@ -128,10 +126,17 @@ export function RatingComposerModal({ open, onClose, onApply, initial }: Props) 
                 <input aria-label={"Category " + (index + 1)} value={part.label}
                   onChange={(event) => setBreakdown((items) => items.map((item, i) => i === index ? {...item,label:event.target.value} : item))}
                   className="min-w-0 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-2 text-base" />
-                <select aria-label={"Score for " + part.label} value={part.value} onChange={(event) => setBreakdown((items) => items.map((item, i) => i === index ? {...item,value:Number(event.target.value)} : item))}
-                  className="rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] px-2 text-base">
-                  {VALUES.map((v) => <option value={v} key={v}>{v.toFixed(1)}</option>)}
-                </select>
+                <div role="group" aria-label={"Score for " + part.label} className="flex items-center gap-1">
+                  <button type="button" aria-label={"Decrease score for " + part.label}
+                    disabled={part.value <= 1}
+                    onClick={() => setBreakdown((items) => items.map((item, i) => i === index ? {...item,value:Math.max(1,item.value - 0.5)} : item))}
+                    className="h-11 w-9 rounded-full border border-[var(--wk-border)] disabled:opacity-40">−</button>
+                  <output className="w-8 text-center text-sm font-bold tabular-nums">{part.value.toFixed(1)}</output>
+                  <button type="button" aria-label={"Increase score for " + part.label}
+                    disabled={part.value >= 5}
+                    onClick={() => setBreakdown((items) => items.map((item, i) => i === index ? {...item,value:Math.min(5,item.value + 0.5)} : item))}
+                    className="h-11 w-9 rounded-full border border-[var(--wk-border)] disabled:opacity-40">+</button>
+                </div>
                 <button type="button" aria-label={"Remove " + part.label} onClick={() => setBreakdown((items) => items.filter((_, i) => i !== index))} className="min-h-11 px-2 text-sm">Remove</button>
               </div>
             ))}
