@@ -13,10 +13,11 @@ describe("Workbook v4 mobile header and sidebar flow", () => {
     expect(desktop).toContain("startInYou={menuStartsInYou && isSignedIn}");
   });
 
-  it("floats a logo-free header and reveals it on upward scroll", () => {
+  it("shows a theme-contrasting logo-free header and reveals it on upward scroll", () => {
     expect(header).toContain("pointer-events-none fixed inset-x-0 top-0");
-    expect(header).toContain("bg-transparent");
-    expect(header).toContain("mix-blend-difference");
+    expect(header).toContain("bg-[var(--wk-surface)]");
+    expect(header).toContain("text-[var(--wk-text)]");
+    expect(header).not.toContain("mix-blend-difference");
     expect(header).not.toContain("<img");
     expect(header).not.toContain("useTheme");
     expect(drawer).toContain("/assets/logos/wakilisha-logo-light.svg");

@@ -15,15 +15,15 @@ export function PlayerTopBar({
 }) {
   const mobile = mode === "mobile";
   // The exit must remain visible while the independent canvas scrolls.
-  // White difference-blended mobile controls invert on light/dark backgrounds.
+  // Each mobile control uses the same theme contrast contract as its canvas.
 
   return (
     <div
       className={[
-        "pointer-events-none z-20 flex items-center justify-between",
+        "pointer-events-none z-20 items-center justify-between",
         mobile
           ? "fixed inset-x-0 top-0 grid min-h-[64px] grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-bg)]/95 px-5 backdrop-blur-xl"
-          : "absolute inset-x-0 top-0 px-6 pt-5",
+          : "absolute inset-x-0 top-0 flex px-6 pt-5",
       ].join(" ")}
       style={
         mobile

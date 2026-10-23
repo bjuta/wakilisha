@@ -122,7 +122,8 @@ describe("Player and mobile media UX convergence", () => {
     expect(mobileLayout).not.toContain("useScrollDirection()");
     expect(mobileTopBar).toContain('data-wk-mobile-app-header="v4"');
     expect(mobileTopBar).toContain("fixed inset-x-0 top-0");
-    expect(mobileTopBar).toContain("mix-blend-difference");
+    expect(mobileTopBar).toContain("bg-[var(--wk-surface)]");
+    expect(mobileTopBar).not.toContain("mix-blend-difference");
     expect(mobileTopBar).toContain("h-14");
     expect(mobileTopBar).toContain('aria-label="Open WAKILISHA menu"');
     expect(mobileTopBar).toContain('aria-label="Search"');
@@ -150,8 +151,10 @@ describe("Player and mobile media UX convergence", () => {
   it("keeps the expanded Player exit control visible even when the article has scrolled", () => {
     expect(topBar).not.toContain("useScrollDirection()");
     expect(topBar).toContain('aria-label="Close Player"');
-    expect(topBar).toContain("mix-blend-difference");
-    expect(topBar).toContain("bg-transparent");
+    expect(topBar).toContain("grid-cols-[44px_minmax(0,1fr)_44px]");
+    expect(topBar).not.toContain("mix-blend-difference");
+    expect(topBar).toContain("bg-[var(--wk-bg)]/95");
+    expect(full).toContain("calc(80px + env(safe-area-inset-top))");
     expect(topBar).toContain('aria-label="Close Player"');
     expect(topBar).toContain("pointer-events-none");
     expect(topBar).toContain("pointer-events-auto");
