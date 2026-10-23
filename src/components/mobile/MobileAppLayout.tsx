@@ -18,12 +18,16 @@ export function MobileAppLayout() {
   // Text-first routes reserve its height exactly once; social pages already
   // reserve it in their own P6-P8 layout, and open DMs own their thread chrome.
   const heroRoute = location.pathname === "/"
-    || ["/magazine", "/music", "/video", "/audio", "/shows", "/charts"].includes(location.pathname)
+    || ["/magazine", "/music", "/video", "/audio", "/shows", "/charts", "/releases", "/genres", "/labels", "/guides", "/artists"].includes(location.pathname)
     || /^\/magazine\/[^/]+\/?$/.test(location.pathname)
     || /^\/artists\/[^/]+\/?$/.test(location.pathname)
     || /^\/video\/[^/]+\/?$/.test(location.pathname)
     || /^\/shows\/[^/]+(?:\/[^/]+)?\/?$/.test(location.pathname)
-    || /^\/charts\/[^/]+/.test(location.pathname);
+    || /^\/charts\/[^/]+/.test(location.pathname)
+    || /^\/releases\/[^/]+\/[^/]+\/?$/.test(location.pathname)
+    || /^\/genres\/[^/]+\/?$/.test(location.pathname)
+    || /^\/labels\/[^/]+\/?$/.test(location.pathname)
+    || /^\/guides\/[^/]+\/?$/.test(location.pathname);
   const socialRoute = ["/following", "/messages", "/notifications"].includes(location.pathname);
   const reserveHeaderSpace = !shellless && !heroRoute && !socialRoute;
   usePendingCommunityActionReplay(
