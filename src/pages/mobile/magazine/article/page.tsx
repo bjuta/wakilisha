@@ -2,7 +2,7 @@ import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import "@/styles/wakilisha-magazine-38-44.css";
 import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   useMagazineArticle,
   useMagazineArticles,
@@ -19,7 +19,6 @@ import { resolveArtistMarkers } from "@/pages/magazine/article/components/Articl
 import { resolveTrackMarkers } from "@/pages/magazine/article/components/ArticleTrackEmbeds";
 import { buildContentSegments } from "@/pages/magazine/article/components/ArticleEmbedUtils";
 import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
-import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 import { CommunityActionSheet } from "@/components/feature/community/CommunityActionSheet";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
@@ -307,19 +306,13 @@ export default function MobileArticle() {
           />
         )}
         {/* Floating nav */}
-        <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-safe-top py-4 flex items-center justify-between">
-          <Link
-            to="/magazine"
-            className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white/85 whitespace-nowrap"
-          >
-            <i className="ri-arrow-left-line text-[12px]" />
-            Magazine
-          </Link>
+        <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-safe-top py-4 flex items-center justify-end">
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setCommunitySheetOpen(true)}
               className="flex items-center justify-center w-8 h-8 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm text-white/80 hover:bg-black/45 transition-all cursor-pointer"
-              aria-label="Actions"
+              aria-label="Article actions"
             >
               <i className="ri-more-2-line text-[16px]" />
             </button>
@@ -371,7 +364,7 @@ export default function MobileArticle() {
         className="wk-workbook-article-paper relative z-10 min-h-[360px]"
       >
         <div className="px-5 pt-8 pb-6">
-          {/* Author row — avatar, name, share action */}
+          {/* Author row — avatar, name and publication date */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <ArticleAuthorIdentity name={article.author} personPath={article.authorPersonPath} organizationPath={article.authorOrganizationPath}
@@ -390,19 +383,6 @@ export default function MobileArticle() {
                 <span className="text-[11px] text-[var(--wk-text-muted)]">{article.date}</span>
               </div>
             </div>
-
-            {/* Share button — opens the full share sheet */}
-            <MobileShareButton
-              item={{
-                title: article.title,
-                subtitle: article.author,
-                description: article.dek || article.title,
-                imageUrl: article.heroUrl,
-                type: "article",
-              }}
-              variant="dark"
-              size="sm"
-            />
           </div>
         </div>
 

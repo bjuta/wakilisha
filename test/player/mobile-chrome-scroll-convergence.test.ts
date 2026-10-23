@@ -17,7 +17,7 @@ describe("Workbook v4 mobile shell and safe-area convergence", () => {
     expect(drawer).toContain("useScrollLock(open)");
   });
 
-  it("has no bottom tabs or scroll-driven imitation browser chrome", () => {
+  it("shows the one real header on upward scroll, hides on downward scroll, and adds no browser imitation", () => {
     expect(layout).not.toContain("MobileBottomNav");
     expect(layout).not.toContain("useScrollDirection()");
     expect(header).not.toContain("useScrollDirection()");
@@ -25,6 +25,13 @@ describe("Workbook v4 mobile shell and safe-area convergence", () => {
     expect(header).toContain("fixed inset-x-0 top-0");
     expect(header).toContain("bg-transparent");
     expect(header).toContain("h-14");
+    expect(header).toContain('data-wk-mobile-header-visible={headerVisible ? "true" : "false"}');
+    expect(header).toContain('window.addEventListener("scroll", onScroll, { passive: true })');
+    expect(header).toContain('nextDirection < 0 && travelled >= 6');
+    expect(header).toContain('nextDirection > 0 && y > 96 && travelled >= 18');
+    expect(header).toContain('headerVisible ? "translate-y-0" : "-translate-y-full"');
+    expect(header).toContain("motion-reduce:transition-none");
+    expect(header).toContain("onFocusCapture");
   });
 
   it("reserves only the canonical compact player above the bottom safe area", () => {

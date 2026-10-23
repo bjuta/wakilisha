@@ -563,12 +563,12 @@ export function MusicDesktopShell({
           >
             <WkIcon name="Menu" size={20} />
           </button>
-          <Link to="/music" aria-label={displayName} className="pointer-events-auto min-w-0 flex-1 mix-blend-difference">
+          <Link to="/music" aria-label={displayName} className="pointer-events-auto min-w-0 flex-1">
             {<img
                 src={resolvedLogoUrl}
                 alt={displayName}
                 onError={() => setLogoError(true)}
-                className="h-7 max-w-[128px] object-contain object-left brightness-0 invert"
+                className="h-7 max-w-[128px] object-contain object-left"
               />}
           </Link>
 

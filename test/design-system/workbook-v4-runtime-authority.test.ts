@@ -196,10 +196,23 @@ describe("Workbook v4 is the only active product design authority", () => {
     const css = read("src/styles/wakilisha-article-prose.css");
 
     expect(desktop).toContain('<ArticleFloatHeader article={article} />');
-    expect(articleHeader).toContain('<SharePopover');
+    const actions = read("src/components/feature/community/CommunityActionSheet.tsx");
+    for (const page of [desktop, mobile]) {
+      expect(page).toContain('aria-label="Article actions"');
+      expect(page).toContain('onClick={() => setCommunitySheetOpen(true)}');
+      expect(page).toContain('<CommunityActionSheet');
+    }
+    expect(actions).toContain('label="Share"');
+    expect(actions).toContain('<ShareSheet');
+    expect(articleHeader).not.toContain('<SharePopover');
+    expect(articleHeader).toContain('personPath={article.authorPersonPath}');
     expect(desktop).not.toContain('ArticleBottomShare');
     expect(desktop).not.toContain('handleNavCopy');
-    expect(mobile.match(/<MobileShareButton/g)).toHaveLength(1);
+    expect(mobile).not.toContain('<MobileShareButton');
+    expect(mobile).not.toContain('to="/magazine"');
+    // Hero geometry is explicitly outside this patch.
+    expect(desktop).toContain('className="relative z-10 mx-auto max-w-[820px] px-6 pb-12 text-center text-[#f5f5f4]"');
+    expect(mobile).toContain('className="absolute inset-x-0 bottom-0 z-10 px-5 pb-8 text-[#f5f5f4]"');
     expect(mobile).not.toContain('Share this article');
     expect(mobile).not.toContain('rounded-t-[24px]');
     expect(mobile).not.toContain('marginTop: "-60px"');
