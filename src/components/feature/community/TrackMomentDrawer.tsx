@@ -62,6 +62,7 @@ export function TrackMomentDrawer({
   onSeek,
   initialTimeMs,
   inlineDesktop = false,
+  inlineHost,
 }: {
   open: boolean;
   onClose: () => void;
@@ -71,6 +72,7 @@ export function TrackMomentDrawer({
   onSeek?: (time: number) => void;
   initialTimeMs?: number | null;
   inlineDesktop?: boolean;
+  inlineHost?: Element | null;
 }) {
   const user = useAuthUser();
   const userId = user.id || undefined;
@@ -356,9 +358,7 @@ export function TrackMomentDrawer({
     </div>
   );
 
-  const target = inlineDesktop
-    ? document.querySelector("[data-wk-player-panel-host]")
-    : document.body;
+  const target = inlineDesktop ? inlineHost : document.body;
   return target ? createPortal(drawer, target) : null;
 }
 
