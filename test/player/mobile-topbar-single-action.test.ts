@@ -6,10 +6,14 @@ const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "ut
 const musicShell = readFileSync("src/components/music/MusicDesktopShell.tsx", "utf8");
 
 describe("Workbook phone chrome", () => {
-  it("contains only menu, real wordmark, and search", () => {
+  it("contains only Menu and Search; official wordmark lives in the sidebar", () => {
     expect(topBar).toContain('aria-label="Open WAKILISHA menu"');
     expect(topBar).toContain('aria-label="Search"');
-    expect(topBar).toContain('/assets/logos/wakilisha-logo-dark.svg');
+    expect(topBar).not.toContain("<img");
+    expect(topBar).not.toContain("isMagazineArticle");
+    expect(topBar).not.toContain('aria-label="WAKILISHA home"');
+    expect(drawer).toContain('/assets/logos/wakilisha-logo-dark.svg');
+    expect(drawer).toContain('/assets/logos/wakilisha-logo-light.svg');
     expect(topBar).not.toContain("NotificationBell");
     expect(topBar).not.toContain('aria-label="Account"');
   });
@@ -27,9 +31,9 @@ describe("Workbook phone chrome", () => {
     expect(topBar).toContain("bg-transparent");
     expect(topBar).toContain("mix-blend-difference");
     expect(topBar).not.toContain("brightness-0 invert");
-    expect(topBar).toContain('className="pointer-events-auto flex min-w-0 flex-1 justify-center"');
-    expect(topBar).toContain('const isMagazineArticle =');
-    expect(topBar).toContain('<span aria-hidden="true" className="h-11 w-11" />');
+    expect(topBar).not.toContain('<span aria-hidden="true" className="h-11 w-11" />');
+    expect(musicShell).not.toContain('className="h-7 max-w-[128px] object-contain object-left"');
+    expect(musicShell).toContain("pointer-events-auto ml-auto flex h-11 w-11");
     expect(drawer).toContain("onSearch();");
     expect(topBar).toContain("pointer-events-auto");
     expect(topBar).not.toContain("backdrop-blur-xl");
