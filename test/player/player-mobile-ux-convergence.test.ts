@@ -144,13 +144,13 @@ describe("Player and mobile media UX convergence", () => {
     expect(accountDrawer).toContain("Profile");
   });
 
-  it("makes expanded Player top chrome use the same mobile scroll formula", () => {
-    expect(topBar).toContain("useScrollDirection()");
-    expect(topBar).toContain("scrollChrome.topVisible");
-    expect(topBar).toContain("translateY(-16px)");
+  it("keeps the expanded Player exit control visible even when the article has scrolled", () => {
+    expect(topBar).not.toContain("useScrollDirection()");
+    expect(topBar).toContain("const visible = true;");
+    expect(topBar).toContain('aria-label="Close Player"');
     expect(topBar).toContain("pointer-events-none");
+    expect(topBar).toContain("pointer-events-auto");
     expect(topBar).toContain("bg-black/20");
-    expect(topBar).not.toContain("w-full rounded");
   });
 
   it("keeps Music and spoken Audio transport grammars distinct", () => {
