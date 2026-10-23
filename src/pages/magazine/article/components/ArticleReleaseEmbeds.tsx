@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
+import { WkIcon } from "@/components/design-system/Icon";
 import { usePlayer } from "@/context/PlayerContext";
 import { releaseUrl, slugify } from "@/utils/releaseUrl";
 import { supabase } from "@/lib/supabase";
@@ -525,7 +527,6 @@ export async function resolveRegistryReleaseMarkers(
 
 export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmbedData; articleSlug?: string }) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
-  const [imgLoaded, setImgLoaded] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const resolvedReleaseUrl =
@@ -606,148 +607,89 @@ export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmb
   };
 
   const displayTracks = expanded ? release.tracks : release.tracks.slice(0, 3);
+  const hasPreview = release.tracks.some((track) => Boolean(track.previewUrl));
 
   return (
-    <div className="rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] overflow-hidden my-10">
-      {/* Header — Cover + Meta */}
-      <div className="flex gap-4 p-4 md:p-5">
-        <div className="relative w-[120px] h-[120px] md:w-[140px] md:h-[140px] shrink-0 rounded-xl overflow-hidden bg-[var(--wk-surface-raised)]">
-          {release.artworkUrl && (
-            <img
-              src={release.artworkUrl}
-              alt={release.title}
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
-              onLoad={() => setImgLoaded(true)}
-              onError={() => setImgLoaded(true)}
-            />
+    <section data-wk-article-media="release"
+      className="my-8 overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)]">
+      <div className="flex min-w-0 items-center gap-3 p-3 sm:gap-4 sm:p-4">
+        <PlayableArtwork label={release.title}
+          onPlay={(event) => { event.stopPropagation(); handlePlayReleasePreview(); }}
+          disabled={!hasPreview}
+          isPlaying={Boolean(currentTrack && release.tracks.some((track) =>
+            currentTrack.id === (track.isrc || `${release.title}-${track.title}`))) && isPlaying}
+          className="h-[76px] w-[76px] shrink-0 rounded-xl bg-[var(--wk-surface-raised)] sm:h-[96px] sm:w-[96px]">
+          {release.artworkUrl ? (
+            <img src={release.artworkUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center"><WkIcon name="Disc3" size={28} /></span>
           )}
-          {!imgLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <i className="ri-album-line text-3xl text-[var(--wk-text-faint)]" />
-            </div>
-          )}
+        </PlayableArtwork>
+        <div className="min-w-0 flex-1">
+          {resolvedReleaseUrl ? (
+            <Link to={resolvedReleaseUrl}
+              className="block truncate text-[16px] font-bold leading-tight hover:underline sm:text-[19px]">{release.title}</Link>
+          ) : <h3 className="truncate text-[16px] font-bold leading-tight sm:text-[19px]">{release.title}</h3>}
+          <div className="mt-1 truncate text-[13px] text-[var(--wk-text-muted)]">
+            {artistUrl ? <Link to={artistUrl} className="hover:underline">{release.artist}</Link> : release.artist}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-[var(--wk-text-faint)]">
+            <span>{release.releaseType}</span>
+            {release.releaseDate ? <span>{release.releaseDate}</span> : null}
+            {release.trackCount > 0 ? <span>{release.trackCount} tracks</span> : null}
+            {hasPreview ? <span className="text-[#A86D21]">Previews available</span> : null}
+          </div>
         </div>
-
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <h3 className="text-[17px] md:text-[20px] font-black text-[var(--wk-text)] leading-tight truncate">
-            {release.title}
-          </h3>
-          <div className="mt-1 text-[13px] font-semibold text-[var(--wk-text-muted)]">
-            {artistUrl ? (
-              <Link to={artistUrl} className="hover:text-[var(--wk-brand)] transition-colors">
-                {release.artist}
-              </Link>
-            ) : (
-              release.artist
-            )}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--wk-text-faint)] font-medium">
-            <span className="inline-flex items-center rounded-full bg-[var(--wk-brand-soft)]/40 px-2 py-0.5 text-[var(--wk-brand)] font-bold">
-              {release.releaseType}
-            </span>
-            {release.releaseDate && <span>{release.releaseDate}</span>}
-            {release.trackCount > 0 && (
-              <span>
-                {release.trackCount} {release.trackCount === 1 ? "track" : "tracks"}
-              </span>
-            )}
-            {release.totalDuration && <span>{release.totalDuration}</span>}
-            {release.labelName && <span>{release.labelName}</span>}
-          </div>
-
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              onClick={handlePlayReleasePreview}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] px-3.5 py-2 text-[12px] font-bold hover:opacity-90 transition-opacity cursor-pointer whitespace-nowrap"
-            >
-              <i className="ri-play-fill text-[13px]" />
-              Play preview
+        <div className="flex shrink-0 items-center gap-0.5">
+          {hasPreview ? (
+            <button type="button" onClick={handlePlayReleasePreview} aria-label={`Play ${release.title} previews`}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wk-text)] text-[var(--wk-bg)]">
+              <WkIcon name="Play" size={20} />
             </button>
-            {resolvedReleaseUrl && (
-              <Link
-                to={resolvedReleaseUrl}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--wk-border)] bg-[var(--wk-bg)] text-[var(--wk-text-soft)] px-3.5 py-2 text-[12px] font-bold hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all whitespace-nowrap"
-              >
-                <i className="ri-external-link-line text-[13px]" />
-                View release
-              </Link>
-            )}
-          </div>
+          ) : null}
+          {resolvedReleaseUrl ? (
+            <Link to={resolvedReleaseUrl} title="Open release" aria-label={`Open ${release.title}`}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
+              <WkIcon name="ArrowUpRight" size={20} />
+            </Link>
+          ) : null}
         </div>
       </div>
-
-      {/* Track list */}
-      {release.tracks.length > 0 && (
+      {release.tracks.length > 0 ? (
         <div className="border-t border-[var(--wk-border)]">
           {displayTracks.map((track, idx) => {
             const trackId = track.isrc || `${release.title}-${track.title}`;
-            const isThisTrack = currentTrack?.id === trackId;
-            const isPlayingThis = isThisTrack && isPlaying;
+            const playingThis = currentTrack?.id === trackId && isPlaying;
             return (
-              <div
-                key={idx}
-                className="group flex items-center gap-3 px-4 py-2.5 md:px-5 border-b border-[var(--wk-border)]/60 last:border-b-0 hover:bg-[var(--wk-surface-raised)]/50 transition-colors"
-              >
-                <div className="w-6 text-center shrink-0">
-                  {isPlayingThis ? (
-                    <button
-                      onClick={() => togglePlay()}
-                      className="flex items-center justify-center w-6 h-6 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] cursor-pointer"
-                      aria-label={`Pause ${track.title}`}
-                    >
-                      <i className="ri-pause-fill text-[10px]" />
-                    </button>
-                  ) : track.previewUrl ? (
-                    <button
-                      onClick={() => handlePlayTrack(track, idx)}
-                      className="hidden group-hover:inline-flex items-center justify-center w-6 h-6 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] cursor-pointer"
-                      aria-label={`Play ${track.title}`}
-                    >
-                      <i className="ri-play-fill text-[10px]" />
-                    </button>
-                  ) : null}
-                  <span className={`text-[12px] font-bold text-[var(--wk-text-faint)] tabular-nums ${track.previewUrl ? "group-hover:hidden" : ""} ${isPlayingThis ? "hidden" : ""}`}>
-                    {track.trackNumber}
-                  </span>
+              <div key={`${trackId}-${idx}`}
+                className="flex min-h-12 items-center gap-3 border-b border-[var(--wk-border)]/60 px-3 py-2 last:border-b-0 sm:px-4">
+                <span className="w-6 shrink-0 text-center text-[12px] tabular-nums text-[var(--wk-text-faint)]">{track.trackNumber}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold">{track.title}</div>
+                  <div className="truncate text-[11px] text-[var(--wk-text-muted)]">{track.artist}</div>
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className={`text-[13px] font-bold truncate ${isPlayingThis ? "text-[var(--wk-brand)]" : "text-[var(--wk-text)]"}`}>
-                    {track.title}
-                  </div>
-                  <div className="text-[11px] text-[var(--wk-text-muted)] truncate">
-                    {track.artist}
-                  </div>
-                </div>
-
-                <div className="text-[11px] font-semibold text-[var(--wk-text-faint)] tabular-nums">
-                  {track.duration}
-                </div>
+                {track.duration ? <span className="text-[11px] tabular-nums text-[var(--wk-text-faint)]">{track.duration}</span> : null}
+                {track.previewUrl ? (
+                  <button type="button" onClick={() => handlePlayTrack(track, idx)}
+                    aria-label={`${playingThis ? "Pause" : "Preview"} ${track.title}`}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]">
+                    <WkIcon name={playingThis ? "Pause" : "Play"} size={18} />
+                  </button>
+                ) : null}
               </div>
             );
           })}
-
-          {release.tracks.length > 3 && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)]/50 transition-all cursor-pointer border-t border-[var(--wk-border)]/60"
-            >
-              {expanded ? (
-                <>
-                  <i className="ri-arrow-up-s-line text-[14px]" />
-                  Show fewer tracks
-                </>
-              ) : (
-                <>
-                  <i className="ri-arrow-down-s-line text-[14px]" />
-                  View all {release.tracks.length} tracks
-                </>
-              )}
+          {release.tracks.length > 3 ? (
+            <button type="button" onClick={() => setExpanded((value) => !value)}
+              aria-expanded={expanded}
+              className="flex min-h-11 w-full items-center justify-center gap-2 border-t border-[var(--wk-border)] px-4 text-[12px] font-semibold text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]">
+              {expanded ? "Show fewer tracks" : `View all ${release.tracks.length} tracks`}
+              <WkIcon name={expanded ? "ChevronUp" : "ChevronDown"} size={16} />
             </button>
-          )}
+          ) : null}
         </div>
-      )}
-    </div>
+      ) : null}
+    </section>
   );
 }
 
