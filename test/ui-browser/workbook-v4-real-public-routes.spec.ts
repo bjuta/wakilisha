@@ -275,3 +275,61 @@ for (const route of [
     }
   });
 }
+
+
+/**
+ * Real PlayerProvider + ResponsiveAppLayout, seeded with a harmless in-memory
+ * recording inside a deterministic 3400px article. This exercises the exact
+ * browser bug even when the live Registry is unavailable to CI.
+ */
+for (const width of [390, 1440]) {
+  test(`Now Playing stays viewport-anchored over a scrolled article at ${width}px`, async ({ page }) => {
+    test.setTimeout(55_000);
+    // Deliberately short viewports prove the player can scroll independently.
+    await page.setViewportSize({ width, height: 540 });
+    await page.goto("/test/ui-browser/fixtures/player-viewport.html", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Persistent scrolled article" })).toBeVisible({ timeout: 20_000 });
+
+    await page.getByRole("button", { name: "Prepare player" }).click();
+    const compact = page.locator("[data-wk-player-compact]");
+    await expect(compact).toBeVisible({ timeout: 20_000 });
+    const fullHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+    expect(fullHeight).toBeGreaterThan(3000);
+    await page.evaluate(() => window.scrollTo(0, 1150));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
+    const articleScrollY = await page.evaluate(() => window.scrollY);
+    await compact.getByRole("button").first().click();
+
+    const overlay = page.locator("[data-wk-player-overlay]");
+    await expect(overlay).toBeVisible({ timeout: 15_000 });
+    await expect(overlay.locator("[data-wk-player-full]")).toBeVisible({ timeout: 15_000 });
+
+    const position = await overlay.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        parentIsBody: node.parentElement === document.body,
+        top: rect.top,
+        bottom: rect.bottom,
+        viewportHeight: window.innerHeight,
+        scrollableExtent: node.scrollHeight - node.clientHeight,
+        underlayScroll: window.scrollY,
+      };
+    });
+    expect(position.parentIsBody).toBe(true);
+    expect(Math.abs(position.top)).toBeLessThanOrEqual(2);
+    expect(Math.abs(position.bottom - position.viewportHeight)).toBeLessThanOrEqual(2);
+    expect(position.underlayScroll).toBe(articleScrollY);
+    expect(position.scrollableExtent).toBeGreaterThan(20);
+
+    await overlay.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await expect.poll(() => overlay.evaluate(node => node.scrollTop)).toBeGreaterThan(20);
+    await overlay.evaluate(node => { node.scrollTop = 0; });
+    await expect.poll(() => overlay.evaluate(node => node.scrollTop)).toBe(0);
+
+    await overlay.getByRole("button", { name: "Close Player" }).click();
+    await expect(overlay).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(articleScrollY);
+    await expect(page.locator("[data-wk-player-compact]")).toBeVisible();
+    await expect(page.locator("#article-state")).toHaveValue("preserve-this");
+  });
+}

@@ -60,7 +60,7 @@ export function PlayerPanelSheet({
               <WkIcon name="X" size={20} />
             </button>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
+          <div data-wk-player-panel-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
             {children}
           </div>
         </section>, target,
@@ -133,7 +133,7 @@ export function PlayerPanelSheet({
             </button>
           </div>
 
-          <div className={fullScreenLyrics
+          <div data-wk-player-panel-scroll className={fullScreenLyrics
             ? "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-7"
             : "max-h-[calc(88dvh-78px)] overflow-y-auto overscroll-contain p-4 md:p-5"}>
             {children}

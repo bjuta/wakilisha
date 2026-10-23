@@ -1,4 +1,5 @@
-import { Component, lazy, Suspense, useLayoutEffect, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MobileAppLayout } from "@/components/mobile/MobileAppLayout";
 import {
@@ -50,6 +51,22 @@ export function ResponsiveAppLayout() {
   const { isFullPlayerOpen, closeFullPlayer } = usePlayer();
   const [sidebarWidth, setSidebarWidth] = useState(256);
 
+  // The normal route must remain mounted and at its existing scroll position.
+  // Lock only the document scroller, not the body with position:fixed; the
+  // independently scrollable Now Playing viewport is portaled to document.body.
+  useEffect(() => {
+    if (!isFullPlayerOpen) return;
+    const root = document.documentElement;
+    const originalOverflow = root.style.overflow;
+    const originalOverscroll = root.style.overscrollBehaviorY;
+    root.style.overflow = "hidden";
+    root.style.overscrollBehaviorY = "none";
+    return () => {
+      root.style.overflow = originalOverflow;
+      root.style.overscrollBehaviorY = originalOverscroll;
+    };
+  }, [isFullPlayerOpen]);
+
   useLayoutEffect(() => {
     if (isMobile || !isFullPlayerOpen) return;
     const sidebar = document.querySelector<HTMLElement>(
@@ -87,10 +104,12 @@ export function ResponsiveAppLayout() {
           <AppLayout />
         )}
       </div>
-      {isFullPlayerOpen ? (
+      {isFullPlayerOpen && typeof document !== "undefined" ? createPortal(
         <div
           data-wk-player-overlay
-          className="fixed inset-y-0 right-0 z-[110] h-[100dvh] touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain bg-[var(--wk-bg)]"
+          role="region"
+          aria-label="Now Playing"
+          className="fixed inset-y-0 right-0 z-[110] h-[100dvh] min-h-0 touch-pan-y overflow-x-clip overflow-y-auto overscroll-contain bg-[var(--wk-bg)]"
           style={{ left: isMobile ? 0 : sidebarWidth }}
         >
           <PlayerPresentationBoundary onClose={closeFullPlayer}>
@@ -108,7 +127,8 @@ export function ResponsiveAppLayout() {
               <LazyPlayerFullSurface mode={isMobile ? "mobile" : "desktop"} />
             </Suspense>
           </PlayerPresentationBoundary>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </RegistryOnboardingGate>
   );

@@ -109,7 +109,9 @@ describe("Player and mobile media UX convergence", () => {
     expect(panelSheet).toContain('mode: "desktop" | "mobile"');
     expect(panelSheet).toContain("rounded-t-[30px]");
     expect(panelSheet).toContain("rounded-[28px]");
-    expect(timedText).toContain("scrollIntoView");
+    expect(panelSheet).toContain("data-wk-player-panel-scroll");
+    expect(timedText).toContain('closest<HTMLElement>("[data-wk-player-panel-scroll]")');
+    expect(timedText).not.toContain("activeRef.current?.scrollIntoView(");
     expect(timedText).toContain('variant: "lyrics" | "transcript"');
   });
 

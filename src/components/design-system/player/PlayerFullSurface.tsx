@@ -648,7 +648,7 @@ export function PlayerFullSurface({
   return (
     <main
       data-wk-player-full={mode}
-      className={`relative min-h-[100dvh] overflow-x-hidden bg-[var(--wk-bg)] text-[var(--wk-text)] ${desktopPanelOpen ? "flex" : ""}`}
+      className={`relative min-h-[100dvh] overflow-x-clip bg-[var(--wk-bg)] text-[var(--wk-text)] ${desktopPanelOpen ? "flex" : ""}`}
     >
       <div
         aria-hidden="true"
