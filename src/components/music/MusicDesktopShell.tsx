@@ -541,6 +541,10 @@ export function MusicDesktopShell({
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]">
                   <WkIcon name={theme === "dark" ? "Sun" : "Moon"} size={20} />
                 </button>
+                <Link to="/settings" aria-label="Settings" title="Settings"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]">
+                  <WkIcon name="Settings" size={20} />
+                </Link>
               </div>
             )}
           </div>
