@@ -30,7 +30,7 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
     expect(article).not.toContain('text-white/75">{article.author}');
     expect(article).toContain("ArticleAuthorIdentity");
     expect(nav).toContain("data-wk-article-hero-overlay");
-    expect(article).toContain("max-md:-mt-[56px]");
+    expect(article).toContain('section key="mobile-article-hero-shell"');
     expect(messages).not.toContain("data-wk-social-brand-row");
     expect(notifications).not.toContain("{unreadCount} unread");
     expect(notifications).toContain("data-wk-dm-unread-count");

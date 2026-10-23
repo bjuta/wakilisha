@@ -7,8 +7,8 @@
 
 ## Visual corrections
 1. Mobile Menu/Search now occupy a legible surface with theme-token ink. Preserve the sole start-edge menu, global search, safe-area and hide-on-scroll behavior.
-2. Following, Messages and Notifications use the same theme-aware, branded logo row, inside their authentic page sections.
-3. Following and Notifications reserve the real 56px global mobile header; mobile section tabs remain in document flow to avoid clipping actors and content. Following's Post actions retain generous spacing without a separator.
+2. Following, Messages and Notifications place the theme-aware wordmark in the existing mobile nav bar, between Menu and Search. There is no page-level brand row or desktop duplicate.
+3. Following and Notifications reserve the real 56px global mobile header; mobile section tabs remain in document flow to avoid clipping actors and content. The desktop feed starts directly beside the sidebar, and Post actions keep their spacing without a separator.
 4. Mobile Player top bar is a real three-lane control (close, truncatable title, ellipsis) occupying reserved layout height and using theme-token contrast in both palettes.
 5. Article author is shown once, in the proper author/date/action byline below the mobile hero; structured author metadata is untouched.
 
@@ -28,3 +28,10 @@ The existing `supabase/functions/media-upload-api/index.ts` permits ordinary aut
 The UI fix does not pretend private media messages are already supported. It neither changes admin Media rights nor exposes audio/video upload in the Message composer. A dedicated governed data / Media / Messages slice is required before shipping a microphone or video action.
 
 No SQL, Edge, Media origin or Registry writes are introduced in this visual patch. Protected Critical Core, Browser and aggregate checks must pass before merging. Production activation uses the accepted exact-merged-main runner, not a Preview deployment.
+
+## October 23 workbook correction
+PR #1291 accidentally placed an extra WAKILISHA wordmark row inside the Following, Notifications and Messages pages. This corrective release removes those rows on all breakpoints, and instead shows one wordmark inside the existing mobile app bar. Messages also removes the extra 56px list padding.
+
+The Notifications heading no longer displays the aggregate unread total. Conversation-specific unread numbers are sourced from the existing Messages API and associated with the matching conversation ID in each DM notification. The first notification for each conversation displays that number, and the link opens the corresponding conversation. Mark All Read still changes Notification read state, never DM read receipts.
+
+Magazine article routes return the same nav bar to transparent, white-on-hero overlay styling while the hero remains behind it. It becomes a contrast-safe solid surface once the hero scrolls away. No negative article offset, extra nav, or desktop logo is introduced.
