@@ -524,10 +524,10 @@ export function RichTextEditor({
         class:
           "prose prose-sm max-w-none outline-none focus:outline-none min-h-[var(--editor-min-h)]",
       },
-      handleClickOn: (_view, pos, node) => {
+      handleClickOn: (_view, _clickedPos, node, nodePos) => {
         if (node.type.name !== "wkRating" || readOnlyRef.current) return false;
         const attrs = node.attrs as RatingAttrs;
-        setEditingRatingPosition(pos);
+        setEditingRatingPosition(nodePos);
         setRatingInitial({ value: attrs.value, role: attrs.role, display: attrs.display, label: attrs.label, subject: attrs.subject, breakdown: attrs.breakdown });
         setRatingModalOpen(true);
         return true;

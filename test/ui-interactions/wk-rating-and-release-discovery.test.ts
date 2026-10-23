@@ -95,6 +95,8 @@ describe("Workbook (3), Chapter 24 rating authority", () => {
     expect(editor).toContain("<RatingComposerModal");
     expect(editor).toContain("tr.insert(tr.doc.content.size");
     expect(editor).toContain("onClick={convertWrittenRating}");
+    expect(editor).toContain("handleClickOn: (_view, _clickedPos, node, nodePos)");
+    expect(editor).toContain("setEditingRatingPosition(nodePos)");
     expect(read("src/components/design-system/editorial/editorCommandRegistry.ts")).toContain('"insertRating"');
     expect(read("src/components/admin/editor/SlashCommandSuggestion.ts")).toContain('id: "rating"');
     expect(picker).toContain("ArrowRight");
