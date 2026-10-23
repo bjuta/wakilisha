@@ -29,6 +29,18 @@ describe("Workbook places and private You navigation", () => {
     expect(WAKILISHA_NAVIGATION).toHaveLength(1);
   });
 
+  it("hides signed-out Settings in both sidebar presentations", async () => {
+    const { readFileSync } = await import("node:fs");
+    const desktop = readFileSync("src/components/music/MusicDesktopShell.tsx", "utf8");
+    const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
+    const guestDesktop = desktop.split("            ) : (")[1]?.split("\n            )}")[0] ?? "";
+    const guestDrawer = drawer.split("                ) : (")[1]?.split("\n                )}")[0] ?? "";
+    expect(guestDesktop).not.toContain('to="/settings"');
+    expect(guestDrawer).not.toContain('to="/settings"');
+    expect(drawer).toContain('{ to: "/settings", icon: "Settings" as const, label: "Settings", available: signedIn }');
+    expect(drawer).toContain('{appearanceControls}');
+  });
+
   it("retains existing secondary destinations and legal links", () => {
     const more = WAKILISHA_MORE_DESTINATIONS.map(item => item.to);
     for (const path of ["/shows", "/releases", "/playlists", "/genres", "/labels", "/guides", "/field"]) {
