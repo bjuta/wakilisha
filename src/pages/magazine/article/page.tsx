@@ -32,6 +32,7 @@ import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { CommunitySection } from "./components/CommunitySection";
 import { CommunityActionSheet } from "@/components/feature/community/CommunityActionSheet";
+import { ArticleEndCredits } from "./components/ArticleEndCredits";
 import { ArticlePreviewModeBanner } from "./components/ArticlePreviewModeBanner";
 
 /* Remove InlineMediaGallery — captions now render inline alongside their images */
@@ -443,6 +444,13 @@ export default function ArticlePage() {
         <div className="mx-auto max-w-[740px] px-6 pb-16 lg:px-8">
           {article.categories?.length > 0 && <TagBlock label="Categories" items={article.categories} basePath="/categories" />}
           {article.tags?.length > 0 && <TagBlock label="Topics" items={article.tags} basePath="/tags" />}
+          <div className="pt-3">
+            <ArticleEndCredits
+              article={article}
+              actionsOpen={communitySheetOpen}
+              onOpenActions={() => setCommunitySheetOpen(true)}
+            />
+          </div>
         </div>
 
         {communityEntity && (
