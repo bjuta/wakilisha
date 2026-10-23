@@ -85,9 +85,20 @@ test("Insert Release discovers draft records with no active memberships, but can
     } else if (table === "registry_release_tracks") {
       data = []; // Draft deliberately has zero active track memberships.
     }
+    // Supabase sends apikey/Authorization headers; Chromium performs CORS
+    // preflight even though this is a synthetic, isolated Registry source.
+    const cors = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, OPTIONS",
+      "access-control-allow-headers": "apikey, authorization, content-type, x-client-info, prefer",
+    };
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: cors });
+      return;
+    }
     await route.fulfill({
       status: 200, contentType: "application/json",
-      headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(data),
+      headers: cors, body: JSON.stringify(data),
     });
   });
   await page.goto(PAGE);
