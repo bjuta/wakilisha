@@ -28,6 +28,9 @@ describe("Workbook phone chrome", () => {
     expect(topBar).toContain("mix-blend-difference");
     expect(topBar).not.toContain("brightness-0 invert");
     expect(topBar).toContain('className="pointer-events-auto flex min-w-0 flex-1 justify-center"');
+    expect(topBar).toContain('const isMagazineArticle =');
+    expect(topBar).toContain('<span aria-hidden="true" className="h-11 w-11" />');
+    expect(drawer).toContain("onSearch();");
     expect(topBar).toContain("pointer-events-auto");
     expect(topBar).not.toContain("backdrop-blur-xl");
     expect(topBar).not.toContain("border-b border-[var(--wk-border)]");

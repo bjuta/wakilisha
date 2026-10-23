@@ -17,6 +17,9 @@ import {
 
 export function MobileTopBar() {
   const location = useLocation();
+  // Article actions already occupy the hero's top-right position. Keep the
+  // global Search reachable through Menu without covering article actions.
+  const isMagazineArticle = /^\/magazine\/[^/]+\/?$/.test(location.pathname);
   const { theme } = useTheme();
   const [searchOpen, setSearchOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -44,14 +47,18 @@ export function MobileTopBar() {
           <img src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"} alt="WAKILISHA" className="h-7 w-auto max-w-[160px] object-contain" />
         </Link>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            aria-label="Search"
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference transition-opacity hover:opacity-75"
-          >
-            <WkIcon name="Search" size={20} />
-          </button>
+          {isMagazineArticle ? (
+            <span aria-hidden="true" className="h-11 w-11" />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search"
+              className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference transition-opacity hover:opacity-75"
+            >
+              <WkIcon name="Search" size={20} />
+            </button>
+          )}
         </div>
       </header>
 

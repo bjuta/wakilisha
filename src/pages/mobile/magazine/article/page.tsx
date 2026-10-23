@@ -307,7 +307,6 @@ export default function MobileArticle() {
         )}
         {/* Floating nav */}
         <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-safe-top py-4 flex items-center justify-end">
-          
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -384,8 +383,6 @@ export default function MobileArticle() {
                 <span className="text-[11px] text-[var(--wk-text-muted)]">{article.date}</span>
               </div>
             </div>
-
-
           </div>
         </div>
 
