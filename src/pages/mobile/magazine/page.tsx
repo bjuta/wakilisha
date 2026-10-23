@@ -187,7 +187,7 @@ export default function MobileMagazine() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/90" />
 
         <div className="relative z-10 w-full px-5 pb-12 pt-28 text-white">
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--wk-brand-dot)]">{heroStory.section} · Cover story</p>
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--wk-brand-dot)]">{heroStory.section}</p>
           <h1
             id="wk-mobile-magazine-hero-title"
             className="text-[34px] sm:text-[42px] font-black tracking-[-0.05em] leading-[0.94]"

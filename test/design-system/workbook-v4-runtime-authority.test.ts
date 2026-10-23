@@ -234,6 +234,37 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(css).toContain('[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper');
   });
 
+  it("places closing author credits and the existing ellipsis immediately before Community on both article layouts", () => {
+    const desktop = read("src/pages/magazine/article/page.tsx");
+    const mobile = read("src/pages/mobile/magazine/article/page.tsx");
+    const endCredits = read("src/pages/magazine/article/components/ArticleEndCredits.tsx");
+    const desktopHome = read("src/pages/magazine/page.tsx");
+    const mobileHome = read("src/pages/mobile/magazine/page.tsx");
+
+    for (const page of [desktop, mobile]) {
+      const footer = page.indexOf("<ArticleEndCredits");
+      const topics = page.indexOf("article.tags");
+      const community = page.indexOf("<CommunitySection");
+      expect(topics).toBeGreaterThan(0);
+      expect(footer).toBeGreaterThan(topics);
+      expect(community).toBeGreaterThan(footer);
+      expect(page).toContain("actionsOpen={communitySheetOpen}");
+      expect(page).toContain("onOpenActions={() => setCommunitySheetOpen(true)}");
+    }
+    expect(mobile).toContain('data-wk-article-actions-trigger="byline"');
+    expect(desktop).toContain("<ArticleFloatHeader article={article} />");
+    expect(endCredits).toContain('data-wk-article-end-credits');
+    expect(endCredits).toContain('data-wk-article-actions-trigger="footer"');
+    expect(endCredits).toContain('aria-haspopup="dialog"');
+    expect(endCredits).toContain("personPath={article.authorPersonPath}");
+    expect(endCredits).toContain("organizationPath={article.authorOrganizationPath}");
+    for (const home of [desktopHome, mobileHome]) {
+      expect(home).toContain("{heroStory.section}</p>");
+      expect(home).not.toContain("{heroStory.section} · Cover story");
+      expect(home).toContain("text-[10px]");
+    }
+  });
+
   it("preserves production media and communication behavior on workbook surfaces", () => {
     const video = read("src/pages/video/page.tsx");
     const audio = read("src/pages/audio/page.tsx");

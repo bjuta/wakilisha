@@ -26,6 +26,7 @@ import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { ArticlePreviewModeBanner } from "@/pages/magazine/article/components/ArticlePreviewModeBanner";
 import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
+import { ArticleEndCredits } from "@/pages/magazine/article/components/ArticleEndCredits";
 import { ArticleRelated } from "@/pages/magazine/article/components/ArticleRelated";
 
 function formatReadCount(count: number): string {
@@ -404,6 +405,14 @@ export default function MobileArticle() {
           </div>
         )}
 
+        {/* Closing credits sit after Topics and directly before Community. */}
+        <div className="px-5 pb-10 pt-2">
+          <ArticleEndCredits
+            article={article}
+            actionsOpen={communitySheetOpen}
+            onOpenActions={() => setCommunitySheetOpen(true)}
+          />
+        </div>
       </div>
 
       {/* Community Section */}
