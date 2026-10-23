@@ -1278,7 +1278,7 @@ describe(
 
         expect(followingFeedPage)
           .toContain(
-            "getReactionGlyph",
+            'name="Heart"',
           );
 
         expect(followingFeedPage)
