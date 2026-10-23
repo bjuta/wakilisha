@@ -83,7 +83,17 @@ for (const width of [390, 768, 1440]) {
       expect(state.brand.toLowerCase()).toBe("#85c441");
       expect(state.font).toContain("Figtree");
       if (width === 390) {
-        await expect(page.locator('[data-wk-mobile-app-header="v4"]')).toBeVisible();
+        const floatingBar = page.locator('[data-wk-mobile-app-header="v4"]');
+        await expect(floatingBar).toBeVisible();
+        await expect(floatingBar).toHaveAttribute("data-wk-mobile-nav-transparency", "global");
+        expect(await floatingBar.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+        const topHero = pageSpec.path === "/"
+          ? page.locator('[data-wk-workbook-screen="magazine-mobile"] > [role="link"]').first()
+          : page.locator('[data-wk-workbook-screen] > section.relative.min-h-\\[480px\\]').first();
+        if (pageSpec.path === "/") {
+          await expect(topHero).toBeVisible();
+          expect(Math.abs(await topHero.evaluate((node) => node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
+        }
         await expect(page.getByRole("navigation", { name: "Primary mobile navigation" })).toHaveCount(0);
       } else {
         const sidebar = page.locator(".wk-music-app-shell > aside").first();
@@ -192,6 +202,18 @@ for (const width of [390, 1440]) {
         return Math.max(root.scrollWidth, document.body.scrollWidth) - root.clientWidth;
       });
       expect(overflow).toBeLessThanOrEqual(2);
+
+      if (width === 390) {
+        const floatingBar = page.locator('[data-wk-mobile-app-header="v4"]');
+        await expect(floatingBar).toHaveAttribute("data-wk-mobile-nav-transparency", "global");
+        expect(await floatingBar.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+        const hero = surface.name === "music"
+          ? page.locator(".wk-music-hero").first()
+          : page.locator('[data-wk-mobile-top-hero], .wk-reference-podcast-cover').first();
+        if (await hero.count()) {
+          expect(Math.abs(await hero.evaluate((node) => node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
+        }
+      }
 
       if (surface.name === "music") {
         const background = await page.locator('[data-wk-workbook-screen="music"]').evaluate(
