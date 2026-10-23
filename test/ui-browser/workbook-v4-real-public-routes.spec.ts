@@ -138,6 +138,7 @@ test("Signed-out visitors cannot open private messaging or notifications", async
   await expect(navigation.getByRole("link", { name: "Notifications" })).toHaveCount(0);
   const guestSignIn = page.locator(".wk-music-app-shell > aside").getByRole("link", { name: "Sign In" });
   await expect(guestSignIn).toHaveAttribute("href", "/auth");
+  await expect(page.locator(".wk-music-app-shell > aside").getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
   const themeSwitch = page.locator(".wk-music-app-shell > aside").getByRole("button", { name: "Switch to light mode" });
   await expect(themeSwitch).toBeVisible();
   await themeSwitch.click();
@@ -219,6 +220,7 @@ for (const route of [
       await openMenu.click();
       const guestMenu = page.getByRole("dialog", { name: "WAKILISHA Menu" });
       await expect(guestMenu.getByRole("link", { name: "Sign In" })).toBeVisible();
+      await expect(guestMenu.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
       const appearance = guestMenu.getByRole("group", { name: "Appearance" });
       await expect(appearance).toBeVisible();
       // A guest must change the real theme without a forced sign-in or reload.
