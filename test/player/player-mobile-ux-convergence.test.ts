@@ -138,7 +138,8 @@ describe("Player and mobile media UX convergence", () => {
 
     expect(accountDrawer).toContain("navigation.map");
     expect(accountDrawer).toContain("useScrollLock(open)");
-    expect(accountDrawer).toContain("Appearance");
+    expect(accountDrawer).toContain("WakilishaToggle");
+    expect(accountDrawer).toContain('ariaLabel="Dark mode"');
     expect(accountDrawer).toContain("Settings");
     expect(accountDrawer).toContain("Profile");
   });
