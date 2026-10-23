@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
@@ -145,7 +146,7 @@ export function PlayerFullSurface({
   } = usePlayer();
 
   const [panel, setPanel] =
-    useState<PlayerPanel>("none");
+    useState<PlayerPanel>(mode === "desktop" ? "lyrics" : "none");
   const [appleConnected, setAppleConnected] = useState(
     () => getApplePlaybackPrefsSnapshot().appleMusicConnected,
   );
@@ -154,10 +155,12 @@ export function PlayerFullSurface({
     useState<string | null>(null);
   const [unlockDismissed, setUnlockDismissed] = useState(false);
   const [lyrics, setLyrics] = useState<TrackLyricsDocument | null>(null);
+  const lyricsRequests = useRef(new Map<string, Promise<TrackLyricsDocument | null>>());
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [lyricsError, setLyricsError] = useState<string | null>(null);
   const [transcript, setTranscript] =
     useState<TimedTextDocument | null>(null);
+  const transcriptRequests = useRef(new Map<string, Promise<TimedTextDocument>>());
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const [transcriptError, setTranscriptError] =
     useState<string | null>(null);
@@ -183,7 +186,7 @@ export function PlayerFullSurface({
       ) === "1",
     );
     setAppleConnectError(null);
-    setPanel("none");
+    setPanel(mode === "desktop" ? "lyrics" : "none");
     setLyrics(null);
     setLyricsError(null);
     setTranscript(null);
@@ -232,11 +235,19 @@ export function PlayerFullSurface({
     setLyricsLoading(true);
     setLyricsError(null);
 
-    fetchPublicTrackLyrics(currentTrack.registryTrackId)
+    const key = currentTrack.registryTrackId;
+    let request = lyricsRequests.current.get(key);
+    if (!request) {
+      request = fetchPublicTrackLyrics(key);
+      if (lyricsRequests.current.size >= 8) lyricsRequests.current.clear();
+      lyricsRequests.current.set(key, request);
+    }
+    request
       .then((document) => {
         if (alive) setLyrics(document);
       })
       .catch((error) => {
+        lyricsRequests.current.delete(key);
         if (alive) {
           setLyricsError(
             error instanceof Error
@@ -271,11 +282,19 @@ export function PlayerFullSurface({
     setTranscriptLoading(true);
     setTranscriptError(null);
 
-    fetchTimedTextDocument(experience.transcript.url)
+    const key = experience.transcript.url;
+    let request = transcriptRequests.current.get(key);
+    if (!request) {
+      request = fetchTimedTextDocument(key);
+      if (transcriptRequests.current.size >= 8) transcriptRequests.current.clear();
+      transcriptRequests.current.set(key, request);
+    }
+    request
       .then((document) => {
         if (alive) setTranscript(document);
       })
       .catch((error) => {
+        transcriptRequests.current.delete(key);
         if (alive) {
           setTranscriptError(
             error instanceof Error
@@ -613,10 +632,12 @@ export function PlayerFullSurface({
     });
   }
 
+  const desktopPanelOpen = !isMobile && ["lyrics", "queue", "transcript", "chapters"].includes(panel);
+
   return (
     <main
       data-wk-player-full={mode}
-      className="relative min-h-[100dvh] overflow-hidden bg-[var(--wk-bg)] text-[var(--wk-text)]"
+      className={`relative min-h-[100dvh] overflow-hidden bg-[var(--wk-bg)] text-[var(--wk-text)] ${desktopPanelOpen ? "flex" : ""}`}
     >
       <div
         aria-hidden="true"
@@ -634,7 +655,7 @@ export function PlayerFullSurface({
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-[var(--wk-bg)]/84 to-[var(--wk-bg)]" />
 
       <div
-        className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-5 pb-8 md:px-8 md:pb-10"
+        className={`relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-5 pb-8 md:px-8 md:pb-10 ${desktopPanelOpen ? "min-w-0 flex-1 !max-w-none" : ""}`}
         style={{
           paddingTop: isMobile
             ? "max(env(safe-area-inset-top), 16px)"
@@ -643,7 +664,7 @@ export function PlayerFullSurface({
       >
         <PlayerTopBar
           mode={mode}
-          label={
+          contextLabel={
             experience.contextLabel ||
             (experience.spokenAudio
               ? "WAKILISHA Audio"
@@ -658,7 +679,9 @@ export function PlayerFullSurface({
             "flex flex-1 items-center justify-center gap-7 py-5 md:py-7",
             isMobile
               ? "flex-col"
-              : "flex-col lg:flex-row lg:gap-14",
+              : desktopPanelOpen
+                ? "flex-col"
+                : "flex-col lg:flex-row lg:gap-14",
           ].join(" ")}
         >
           <section className="flex w-full max-w-[520px] flex-col items-center">
@@ -938,7 +961,14 @@ export function PlayerFullSurface({
         </div>
       </div>
 
+      {desktopPanelOpen ? (
+        <aside data-wk-player-panel-host
+          className="relative z-20 hidden h-[100dvh] w-[min(440px,42vw)] shrink-0 overflow-hidden border-l border-[var(--wk-border)] bg-[var(--wk-surface)] lg:block"
+        />
+      ) : null}
+
       <PlayerPanelSheet
+        inlineDesktop
         open={panel === "queue"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -963,6 +993,7 @@ export function PlayerFullSurface({
       </PlayerPanelSheet>
 
       <PlayerPanelSheet
+        inlineDesktop
         open={panel === "lyrics"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -1013,6 +1044,7 @@ export function PlayerFullSurface({
       </PlayerPanelSheet>
 
       <PlayerPanelSheet
+        inlineDesktop
         open={panel === "transcript"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -1032,6 +1064,7 @@ export function PlayerFullSurface({
       </PlayerPanelSheet>
 
       <PlayerPanelSheet
+        inlineDesktop
         open={panel === "chapters"}
         onClose={() => setPanel("none")}
         mode={mode}
