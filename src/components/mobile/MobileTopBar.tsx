@@ -63,7 +63,7 @@ export function MobileTopBar() {
   return (
     <>
       <header
-        className={`pointer-events-none fixed inset-x-0 top-0 z-[78] flex h-14 w-full items-center justify-between gap-3 bg-transparent px-4 transition-transform duration-200 ease-out motion-reduce:transition-none ${headerVisible ? "translate-y-0" : "-translate-y-full"}`}
+        className={`pointer-events-none fixed inset-x-0 top-0 z-[78] flex h-14 w-full items-center justify-between gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] px-4 shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none ${headerVisible ? "translate-y-0" : "-translate-y-full"}`}
         data-wk-mobile-app-header="v4"
         data-wk-mobile-header-visible={headerVisible ? "true" : "false"}
         onFocusCapture={() => setHeaderVisible(true)}
@@ -72,7 +72,7 @@ export function MobileTopBar() {
         <button
           type="button"
           onClick={() => setAccountOpen(true)}
-          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference transition-opacity hover:opacity-75"
+          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-transparent text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-brand)]"
           aria-label="Open WAKILISHA menu"
           aria-controls="wk-workbook-sidebar"
           aria-expanded={accountOpen}
@@ -83,7 +83,7 @@ export function MobileTopBar() {
           type="button"
           onClick={() => setSearchOpen(true)}
           aria-label="Search"
-          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-transparent text-white mix-blend-difference transition-opacity hover:opacity-75"
+          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-transparent text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-brand)]"
         >
           <WkIcon name="Search" size={20} />
         </button>

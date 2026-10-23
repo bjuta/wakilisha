@@ -306,7 +306,7 @@ for (const width of [390, 1440]) {
       await expect.poll(() => nav.evaluate((node) => node.getBoundingClientRect().bottom)).toBeLessThanOrEqual(2);
 
       // Reverse direction without returning to the top: show navigation
-      // promptly, but do not introduce any backdrop or recolor the SVG.
+      // promptly, with a real theme surface and contrast-safe icon colours.
       await page.evaluate(() => window.scrollBy(0, -44));
       await expect(nav).toHaveAttribute("data-wk-mobile-header-visible", "true");
       await expect.poll(() => nav.evaluate((node) => Math.abs(node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
@@ -323,8 +323,8 @@ for (const width of [390, 1440]) {
         };
       });
       expect(chrome.position).toBe("fixed");
-      expect(chrome.background).toBe("rgba(0, 0, 0, 0)");
-      expect(chrome.menuBlend).toBe("difference");
+      expect(chrome.background).not.toBe("rgba(0, 0, 0, 0)");
+      expect(chrome.menuBlend).toBe("normal");
       expect(chrome.logoCount).toBe(0);
       expect(chrome.searchCount).toBe(1);
       expect(Math.abs(chrome.headerTop)).toBeLessThanOrEqual(2);
@@ -360,7 +360,7 @@ for (const width of [390, 1440]) {
       const menu = overlay.getByRole("button", { name: "More Player actions" });
       await expect(exit).toBeVisible();
       await expect(menu).toBeVisible();
-      expect(await exit.evaluate(node => getComputedStyle(node).mixBlendMode)).toBe("difference");
+      expect(await exit.evaluate(node => getComputedStyle(node).mixBlendMode)).toBe("normal");
       expect(await exit.evaluate(node => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
     }
 

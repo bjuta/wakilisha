@@ -4,6 +4,35 @@ import { describe, expect, it } from "vitest";
 const read = (file: string) => readFileSync(file, "utf8");
 
 describe("Workbook v4 source-backed public visual fidelity", () => {
+  it("keeps Oct 23 screenshot corrections and true theme wordmark identity", () => {
+    const css = read("src/styles/wakilisha-social-workbook-p6-p8.css");
+    const brand = read("src/components/design-system/branding/WakilishaSectionLogo.tsx");
+    const following = read("src/pages/following/page.tsx");
+    const messages = read("src/pages/messages/page.tsx");
+    const notifications = read("src/pages/notifications/page.tsx");
+    const nav = read("src/components/mobile/MobileTopBar.tsx");
+    const playerTop = read("src/components/design-system/player/PlayerTopBar.tsx");
+    const mobilePlayer = read("src/components/design-system/player/PlayerFullSurface.tsx");
+    const article = read("src/pages/mobile/magazine/article/page.tsx");
+    expect(brand).toContain('theme === "dark"');
+    expect(brand).toContain("wakilisha-logo-dark.svg");
+    expect(brand).toContain("wakilisha-logo-light.svg");
+    for (const screen of [following, messages, notifications]) {
+      expect(screen).toContain("<WakilishaSectionLogo />");
+    }
+    expect(nav).toContain("bg-[var(--wk-surface)]");
+    expect(nav).toContain("text-[var(--wk-text)]");
+    expect(nav).not.toContain("mix-blend-difference");
+    expect(playerTop).toContain("grid-cols-[44px_minmax(0,1fr)_44px]");
+    expect(playerTop).toContain("text-[var(--wk-text)]");
+    expect(mobilePlayer).toContain("calc(80px + env(safe-area-inset-top))");
+    expect(article).not.toContain('text-white/75">{article.author}');
+    expect(article).toContain("ArticleAuthorIdentity");
+    expect(css).toContain('border-top: 0;');
+    expect(css).toContain('position: relative;');
+    expect(css).toContain('padding-top: calc(56px + env(safe-area-inset-top));');
+  });
+
   it("follows the P6/P7/P8 source order and verified UI-only bounds", () => {
     const css = read("src/styles/wakilisha-social-workbook-p6-p8.css");
     const posts = read("src/components/community/PostActions.tsx");
