@@ -6,6 +6,8 @@ import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import LinkExtension from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
+import { RatingNode, canonicalRating, type RatingAttrs } from "@/components/design-system/editorial/RatingNode";
+import { RatingComposerModal } from "@/components/design-system/editorial/RatingComposerModal";
 import { WkIcon } from "@/components/design-system/Icon";
 import {
   EditorialMenuBar,
@@ -176,6 +178,9 @@ export function RichTextEditor({
     title: string;
     assetId?: string;
   } | null>(null);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [editingRatingPosition, setEditingRatingPosition] = useState<number | null>(null);
+  const [ratingInitial, setRatingInitial] = useState<RatingAttrs | null>(null);
   const [releasePickerOpen, setReleasePickerOpen] = useState(false);
   const [releaseSearch, setReleaseSearch] = useState("");
   const [artistPickerOpen, setArtistPickerOpen] = useState(false);
@@ -483,6 +488,7 @@ export function RichTextEditor({
         },
       }),
       Underline,
+      RatingNode,
       LinkExtension.configure({
         openOnClick: false,
         HTMLAttributes: {
@@ -518,6 +524,14 @@ export function RichTextEditor({
         class:
           "prose prose-sm max-w-none outline-none focus:outline-none min-h-[var(--editor-min-h)]",
       },
+      handleClickOn: (_view, pos, node) => {
+        if (node.type.name !== "wkRating" || readOnlyRef.current) return false;
+        const attrs = node.attrs as RatingAttrs;
+        setEditingRatingPosition(pos);
+        setRatingInitial({ value: attrs.value, role: attrs.role, display: attrs.display, label: attrs.label, breakdown: attrs.breakdown });
+        setRatingModalOpen(true);
+        return true;
+      },
       handleKeyDown: (_view, event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === "k") {
           event.preventDefault();
@@ -551,6 +565,11 @@ export function RichTextEditor({
       if (readOnly || playlistDescriptionMode) return;
       const detail = (e as CustomEvent).detail as { command: string };
       switch (detail.command) {
+        case "rating":
+          setEditingRatingPosition(null);
+          setRatingInitial(null);
+          setRatingModalOpen(true);
+          break;
         case "release":
           setReleasePickerOpen(true);
           break;
@@ -1010,6 +1029,68 @@ export function RichTextEditor({
     [editor],
   );
 
+  const applyRating = useCallback((attrs: RatingAttrs) => {
+    if (!editor || readOnly) return;
+    const score = canonicalRating(attrs.value);
+    if (score === null) return;
+    const normalized = { ...attrs, value: score };
+    const ratingType = editor.schema.nodes.wkRating;
+    if (!ratingType) return;
+    if (normalized.role === "verdict") {
+      // A verdict is singular and always comes at the end.
+      const ranges: Array<{ from: number; to: number }> = [];
+      editor.state.doc.descendants((node, pos) => {
+        if (node.type.name === "wkRating" &&
+            (node.attrs.role === "verdict" || pos === editingRatingPosition)) {
+          ranges.push({ from: pos, to: pos + node.nodeSize });
+        }
+      });
+      const tr = editor.state.tr;
+      for (const range of ranges.reverse()) tr.delete(range.from, range.to);
+      tr.insert(tr.doc.content.size, editor.schema.nodes.paragraph.create(null, ratingType.create(normalized)));
+      editor.view.dispatch(tr);
+    } else if (editingRatingPosition !== null) {
+      editor.view.dispatch(editor.state.tr.setNodeMarkup(editingRatingPosition, undefined, normalized));
+    } else if (normalized.role === "inline") {
+      editor.chain().focus().insertContent({ type: "wkRating", attrs: normalized }).run();
+    } else {
+      editor.chain().focus().insertContent({
+        type: "paragraph", content: [{ type: "wkRating", attrs: normalized }],
+      }).run();
+    }
+    setRatingModalOpen(false);
+    setEditingRatingPosition(null);
+    setRatingInitial(null);
+  }, [editor, editingRatingPosition, readOnly]);
+
+  const conversionCandidate = useMemo(() => {
+    if (!editor || readOnly) return null;
+    let candidate: { from: number; to: number; value: number; standAlone: boolean } | null = null;
+    editor.state.doc.descendants((node, pos, parent) => {
+      if (candidate || !node.isText) return;
+      const match = /\bRating:\s*([1-5](?:\.[05])?)\s*out of\s*5\b/i.exec(node.text || "");
+      if (!match) return;
+      const score = canonicalRating(match[1]);
+      if (score === null) return;
+      candidate = {
+        from: pos + match.index,
+        to: pos + match.index + match[0].length,
+        value: score,
+        standAlone: parent?.textContent.trim() === match[0],
+      };
+    });
+    return candidate;
+  }, [editor, value, readOnly]);
+
+  const convertWrittenRating = useCallback(() => {
+    if (!editor || !conversionCandidate) return;
+    const role = conversionCandidate.standAlone ? "block" : "inline";
+    const atom = editor.schema.nodes.wkRating.create({
+      value: conversionCandidate.value, role, display: "both", label: "", breakdown: [],
+    });
+    editor.view.dispatch(editor.state.tr.replaceWith(conversionCandidate.from, conversionCandidate.to, atom));
+  }, [editor, conversionCandidate]);
+
   const handleInsertReleaseShortcode = useCallback(
     (slug: string) => {
       if (!editor) return;
@@ -1295,6 +1376,16 @@ export function RichTextEditor({
               editor?.isActive(
                 "codeBlock",
               ) ?? false,
+            disabled: !editable,
+          };
+
+        case "insertRating":
+          return {
+            onSelect: () => {
+              setEditingRatingPosition(null);
+              setRatingInitial(null);
+              setRatingModalOpen(true);
+            },
             disabled: !editable,
           };
 
@@ -1712,6 +1803,11 @@ export function RichTextEditor({
                 }
               />
 
+              <ToolbarBtn icon="Star" label="Insert Rating" active={false} onClick={() => {
+                setRatingInitial(null);
+                setEditingRatingPosition(null);
+                setRatingModalOpen(true);
+              }} />
               <div className="mx-1 h-6 w-px shrink-0 bg-wk-border" />
 
               {hasTextSelection ? (
@@ -1991,6 +2087,13 @@ export function RichTextEditor({
           />
         </>
       ) : null}
+
+      <RatingComposerModal
+        open={ratingModalOpen}
+        onClose={() => { setRatingModalOpen(false); setRatingInitial(null); setEditingRatingPosition(null); }}
+        initial={ratingInitial}
+        onApply={applyRating}
+      />
 
       {/* Release Picker Modal */}
       <Modal
