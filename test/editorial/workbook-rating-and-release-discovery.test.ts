@@ -39,6 +39,14 @@ describe("Workbook (3), Chapter 24 rating authority", () => {
     original.destroy();
     restored.destroy();
   });
+  it("speaks each scored part and uses the correct breakdown heading", () => {
+    const content = ratingHtml({
+      value: 3.5, role: "breakdown", display: "both", label: "",
+      subject: "Forever to Never", breakdown: [{label: "Production", value: 4.0}],
+    });
+    expect((content[1] as Record<string, string>)["aria-label"]).toContain("Production: 4.0 out of 5");
+    expect(JSON.stringify(content)).toContain("Rating Breakdown");
+  });
   it("rejects malformed breakdown entries", () => {
     expect(ratingParts([{label:"Production",value:3.5},{label:"Quarter",value:2.25},{label:"",value:4}]))
       .toEqual([{label:"Production",value:3.5}]);

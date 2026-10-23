@@ -65,11 +65,13 @@ export function ratingHtml(attrs: RatingAttrs): DOMOutputSpec {
     "data-wk-rating-breakdown": JSON.stringify(parts),
     class: "wk-rating wk-rating--" + role + " wk-rating--" + display,
     role: "img",
-    "aria-label": (text ? text + ": " : "") + "Rated " + score.toFixed(1) + " out of 5",
+    "aria-label": (role === "verdict" ? "Verdict: " : role === "breakdown" ? "Rating breakdown: " : "") +
+      (text ? text + ": " : "") + "Rated " + score.toFixed(1) + " out of 5" +
+      (role === "breakdown" && parts.length ? "; " + parts.map((part) => part.label + ": " + part.value.toFixed(1) + " out of 5").join("; ") : ""),
     contenteditable: "false",
   },
     ...(role === "verdict" || role === "breakdown"
-      ? [["span", { class: "wk-rating-heading" }, "Verdict"] as DOMOutputSpec] : []),
+      ? [["span", { class: "wk-rating-heading" }, role === "breakdown" ? "Rating Breakdown" : "Verdict"] as DOMOutputSpec] : []),
     ...(display !== "number" ? [stars(score)] : []),
     label(score, display),
     ...(role === "verdict" || role === "breakdown"
