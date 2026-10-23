@@ -51,7 +51,7 @@ export async function searchEditorialReleases(query: string): Promise<EditorialR
   if (!releaseIds.length) return [];
   const [releases, artists, memberships] = await Promise.all([
     supabase.from("registry_releases")
-      .select("id,slug,title,status,artwork_url,release_date,created_at")
+      .select("id,slug,title,status,release_type,artwork_url,release_date,created_at")
       .in("id", releaseIds).in("status", ["active", "draft"]),
     supabase.from("registry_release_artists")
       .select("release_id,artist_name_text,artist_slug")
@@ -81,7 +81,16 @@ export async function searchEditorialReleases(query: string): Promise<EditorialR
   const result: EditorialReleaseHit[] = [];
   for (const release of releases.data ?? []) {
     const trackCount = tracksByRelease.get(release.id)?.size ?? 0;
-    const kind = releaseTypeLabelFromActiveTrackCount(trackCount);
+    // The Registry's declared release type is identity authority. Draft ingestions
+    // may not yet have active track memberships, and must remain discoverable.
+    const declaredType = String(release.release_type ?? "").toLowerCase();
+    const kind = declaredType === "single"
+      ? "Single" as const
+      : declaredType === "ep"
+        ? "EP" as const
+        : declaredType === "album"
+          ? "Album" as const
+          : releaseTypeLabelFromActiveTrackCount(trackCount);
     if (!kind) continue;
     const artist = artistByRelease.get(release.id);
     result.push({

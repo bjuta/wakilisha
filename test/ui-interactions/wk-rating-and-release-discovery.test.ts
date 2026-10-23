@@ -110,6 +110,10 @@ describe("Live Registry Insert authority", () => {
     expect(discovery).toContain('.ilike("artist_name_text", pattern)');
     expect(discovery).toContain('.order("created_at", { ascending: false })');
     expect(discovery).not.toContain(".limit(200)");
+    expect(discovery).toContain("release_type,artwork_url,release_date");
+    expect(discovery).toContain('declaredType === "ep"');
+    expect(discovery).toContain('declaredType === "album"');
+    expect(discovery).toContain('declaredType === "single"');
   });
   it("displays drafts but forbids premature embed insertion", () => {
     expect(discovery).toContain('.in("status", ["active", "draft"])');
