@@ -57,7 +57,7 @@ export default function PublicShowsPage() {
         url={`${SITE_URL}/shows`}
       />
       <main data-wk-workbook-screen="podcasts" className="min-h-screen pb-24">
-        <div className={`mx-auto w-full max-w-[1320px] px-5 pb-9 sm:px-9 sm:pt-9 ${!shows[0] ? "pt-[calc(56px+env(safe-area-inset-top))]" : "pt-0"}`}>
+        <div className={`mx-auto w-full max-w-[1320px] px-5 pb-9 md:px-9 md:pt-9 ${!shows[0] ? "pt-[calc(56px+env(safe-area-inset-top))]" : "pt-0"}`}>
           {!shows[0] && (
             <h1 className="mb-6 text-[clamp(38px,5vw,62px)] font-extrabold uppercase leading-[.95] tracking-[-.05em] text-[var(--wk-text)]">Podcasts</h1>
           )}
