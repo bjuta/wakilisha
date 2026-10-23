@@ -476,7 +476,7 @@ export function CommunityReactionPicker({
           }
           title="More reactions"
         >
-          <i className="ri-add-line text-[18px]" />
+          <WkIcon name="Plus" size={18} aria-hidden="true" />
         </button>
       </div>
 

@@ -19,6 +19,7 @@ const picker =
     "src/components/feature/community/CommunityReactionPicker.tsx",
     "utf8",
   );
+const postActions = readFileSync("src/components/community/PostActions.tsx", "utf8");
 
 describe(
   "shared Community emoji reaction UX",
@@ -104,6 +105,9 @@ describe(
             "h-9 w-9",
           );
         expect(picker).toContain("QUICK_REACTION_ICONS");
+        expect(picker).toContain('<WkIcon name="Plus" size={18}');
+        expect(picker).not.toMatch(/<i\s+className="ri-/);
+        expect(postActions).not.toMatch(/<i\s+className="ri-/);
         expect(picker).toContain("<WkIcon name={QUICK_REACTION_ICONS[emoji]}");
         expect(picker).not.toContain("{emoji}\n              </button>");
 
