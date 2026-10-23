@@ -292,6 +292,8 @@ for (const width of [390, 1440]) {
     await page.getByRole("button", { name: "Prepare player" }).click();
     const compact = page.locator("[data-wk-player-compact]");
     await expect(compact).toBeVisible({ timeout: 20_000 });
+    const fullHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+    expect(fullHeight).toBeGreaterThan(3000);
     await page.evaluate(() => window.scrollTo(0, 1150));
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
     const articleScrollY = await page.evaluate(() => window.scrollY);
