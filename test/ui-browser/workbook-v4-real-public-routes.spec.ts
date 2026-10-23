@@ -221,6 +221,7 @@ for (const route of [
       const guestMenu = page.getByRole("dialog", { name: "WAKILISHA Menu" });
       await expect(guestMenu.getByRole("link", { name: "Sign In" })).toBeVisible();
       await expect(guestMenu.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+      const sidebarLogo = guestMenu.locator('img[alt="WAKILISHA"]');
       const appearance = guestMenu.getByRole("switch", { name: "Dark mode" });
       await expect(appearance).toBeVisible();
       // Use the real single design-system switch; never force a page reload.
@@ -228,6 +229,10 @@ for (const route of [
       const wasDark = (await appearance.getAttribute("aria-checked")) === "true";
       if (wasDark !== (mode === "dark")) await appearance.click();
       await expect(page.locator("html")).toHaveAttribute("data-wk-theme", mode);
+      await expect(sidebarLogo).toHaveAttribute(
+        "src",
+        mode === "light" ? "/assets/logos/wakilisha-logo-light.svg" : "/assets/logos/wakilisha-logo-dark.svg",
+      );
       await expect(page.locator("html")).toHaveAttribute("data-wk-theme-session", "preserved");
       await expect(appearance).toHaveAttribute("aria-checked", String(mode === "dark"));
       await expect.poll(() => page.evaluate(() => localStorage.getItem("wk-theme"))).toBe(mode);
@@ -235,11 +240,9 @@ for (const route of [
       await expect(guestMenu).toHaveCount(0);
       await expect(surface).toBeVisible({ timeout: 25_000 });
       await waitForSettledMedia(page, route.name);
-      const logo = page.locator('[data-wk-mobile-app-header="v4"] img[alt="WAKILISHA"]');
-      await expect(logo).toHaveAttribute(
-        "src",
-        mode === "light" ? "/assets/logos/wakilisha-logo-light.svg" : "/assets/logos/wakilisha-logo-dark.svg",
-      );
+      const mobileHeader = page.locator('[data-wk-mobile-app-header="v4"]');
+      await expect(mobileHeader.locator("img")).toHaveCount(0);
+      await expect(mobileHeader.getByRole("button", { name: "Search" })).toBeVisible();
       const actual = await surface.evaluate((node) => {
         const css = getComputedStyle(node);
         return {
@@ -310,21 +313,20 @@ for (const width of [390, 1440]) {
       const chrome = await nav.evaluate((node) => {
         const style = getComputedStyle(node);
         const button = node.querySelector("button");
-        const logo = node.querySelector("img");
         return {
           position: style.position,
           background: style.backgroundColor,
           menuBlend: button ? getComputedStyle(button).mixBlendMode : "",
-          logoBlend: logo?.parentElement ? getComputedStyle(logo.parentElement).mixBlendMode : "",
-          logoFilter: logo ? getComputedStyle(logo).filter : "",
+          logoCount: node.querySelectorAll("img").length,
+          searchCount: node.querySelectorAll('button[aria-label="Search"]').length,
           headerTop: node.getBoundingClientRect().top,
         };
       });
       expect(chrome.position).toBe("fixed");
       expect(chrome.background).toBe("rgba(0, 0, 0, 0)");
       expect(chrome.menuBlend).toBe("difference");
-      expect(chrome.logoBlend).toBe("normal");
-      expect(chrome.logoFilter).toBe("none");
+      expect(chrome.logoCount).toBe(0);
+      expect(chrome.searchCount).toBe(1);
       expect(Math.abs(chrome.headerTop)).toBeLessThanOrEqual(2);
     }
     const articleScrollY = await page.evaluate(() => window.scrollY);
