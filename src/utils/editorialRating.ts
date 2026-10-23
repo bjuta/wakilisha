@@ -1,5 +1,5 @@
 import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
-import { canonicalRating } from "@/components/design-system/editorial/RatingNode";
+import { canonicalRating } from "@/components/admin/editor/RatingNode";
 
 export interface PublishedReviewVerdict {
   value: number;

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { canonicalRating, ratingHtml, ratingParts } from "@/components/design-system/editorial/RatingNode";
+import { canonicalRating, ratingHtml, ratingParts } from "@/components/admin/editor/RatingNode";
 import { extractPublishedReviewVerdict } from "@/utils/editorialRating";
 
 const read = (path: string) => readFileSync(path, "utf8");
 const editor = read("src/components/design-system/editorial/RichTextEditor.tsx");
 const discovery = read("src/services/articles/editorialReleaseSearch.ts");
-const picker = read("src/components/design-system/editorial/RatingComposerModal.tsx");
+const picker = read("src/components/admin/editor/RatingComposerModal.tsx");
 
 describe("Workbook (3), Chapter 24 rating authority", () => {
   it("admits only nine whole and half steps from 1 to 5", () => {

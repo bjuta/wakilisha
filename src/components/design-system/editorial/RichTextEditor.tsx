@@ -6,8 +6,8 @@ import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import LinkExtension from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
-import { RatingNode, canonicalRating, type RatingAttrs } from "@/components/design-system/editorial/RatingNode";
-import { RatingComposerModal } from "@/components/design-system/editorial/RatingComposerModal";
+import { RatingNode, canonicalRating, type RatingAttrs } from "@/components/admin/editor/RatingNode";
+import { RatingComposerModal } from "@/components/admin/editor/RatingComposerModal";
 import { WkIcon } from "@/components/design-system/Icon";
 import {
   EditorialMenuBar,
