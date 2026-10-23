@@ -275,3 +275,61 @@ for (const route of [
     }
   });
 }
+
+
+/**
+ * This is an actual long, published Magazine article with Registry music embeds.
+ * Player testing must start while the document is scrolled, not only at page top:
+ * a fixed overlay inside a transformed route subtree appears at document origin.
+ */
+for (const width of [390, 1440]) {
+  test(`Now Playing stays viewport-anchored over a scrolled Magazine article at ${width}px`, async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width, height: 720 });
+    await page.goto("/magazine/ep-review-the-lick-back-by-nikita-kering", { waitUntil: "domcontentloaded" });
+
+    const recording = page.locator('[data-wk-article-media="track"]')
+      .getByRole("button", { name: /Play Give Me My Money/i });
+    await expect(recording).toBeVisible({ timeout: 30_000 });
+    await recording.scrollIntoViewIfNeeded();
+    await recording.click();
+
+    const compact = page.locator("[data-wk-player-compact]");
+    await expect(compact).toBeVisible({ timeout: 15_000 });
+    const articleScrollY = await page.evaluate(() => window.scrollY);
+    expect(articleScrollY).toBeGreaterThan(300);
+    await compact.getByRole("button").first().click();
+
+    const overlay = page.locator("[data-wk-player-overlay]");
+    await expect(overlay).toBeVisible({ timeout: 15_000 });
+    await expect(overlay.locator("[data-wk-player-full]")).toBeVisible({ timeout: 15_000 });
+
+    const position = await overlay.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        parentIsBody: node.parentElement === document.body,
+        top: rect.top,
+        bottom: rect.bottom,
+        viewportHeight: window.innerHeight,
+        scrollableExtent: node.scrollHeight - node.clientHeight,
+        underlayScroll: window.scrollY,
+      };
+    });
+    expect(position.parentIsBody).toBe(true);
+    expect(Math.abs(position.top)).toBeLessThanOrEqual(2);
+    expect(Math.abs(position.bottom - position.viewportHeight)).toBeLessThanOrEqual(2);
+    expect(position.underlayScroll).toBe(articleScrollY);
+    expect(position.scrollableExtent).toBeGreaterThan(20);
+
+    await overlay.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await expect.poll(() => overlay.evaluate(node => node.scrollTop)).toBeGreaterThan(20);
+    await overlay.evaluate(node => { node.scrollTop = 0; });
+    await expect.poll(() => overlay.evaluate(node => node.scrollTop)).toBe(0);
+
+    await overlay.getByRole("button", { name: "Close Player" }).click();
+    await expect(overlay).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(articleScrollY);
+    await expect(page.locator("[data-wk-player-compact]")).toBeVisible();
+    await expect(recording).toBeVisible();
+  });
+}
