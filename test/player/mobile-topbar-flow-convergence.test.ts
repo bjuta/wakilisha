@@ -13,11 +13,12 @@ describe("Workbook v4 mobile header and sidebar flow", () => {
     expect(desktop).toContain("startInYou={menuStartsInYou && isSignedIn}");
   });
 
-  it("places the 56px application header in normal content flow", () => {
-    expect(header).toContain("sticky top-0");
-    expect(header).toContain("h-14");
+  it("floats the application header over content with real light/dark contrast", () => {
+    expect(header).toContain("pointer-events-none fixed inset-x-0 top-0");
+    expect(header).toContain("bg-transparent");
+    expect(header).toContain("mix-blend-difference");
+    expect(header).toContain('style={{ paddingTop: "env(safe-area-inset-top)"');
     expect(layout).toContain("<MobileTopBar");
-    expect(header).not.toContain("pointer-events-none fixed inset-x-0 top-0");
     expect(layout).not.toContain("scrollVisible");
   });
 
