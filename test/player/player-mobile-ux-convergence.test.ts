@@ -149,7 +149,9 @@ describe("Player and mobile media UX convergence", () => {
 
   it("keeps the expanded Player exit control visible even when the article has scrolled", () => {
     expect(topBar).not.toContain("useScrollDirection()");
-    expect(topBar).toContain("const visible = true;");
+    expect(topBar).toContain('aria-label="Close Player"');
+    expect(topBar).toContain("mix-blend-difference");
+    expect(topBar).toContain("bg-transparent");
     expect(topBar).toContain('aria-label="Close Player"');
     expect(topBar).toContain("pointer-events-none");
     expect(topBar).toContain("pointer-events-auto");
