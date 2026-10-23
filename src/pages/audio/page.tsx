@@ -99,7 +99,7 @@ export default function PublicAudioPage() {
   return (
     <main data-wk-workbook-screen="audio" className="min-h-screen pb-24">
       <div className="mx-auto w-full max-w-[1320px] px-5 pt-9 sm:px-9 max-md:flex max-md:flex-col max-md:px-0 max-md:pt-0">
-        <div className="max-md:order-2 flex flex-wrap items-end justify-between gap-5 max-md:px-5 max-md:pt-6">
+        <div className={`max-md:order-2 flex flex-wrap items-end justify-between gap-5 max-md:px-5 ${featured ? "max-md:pt-6" : "max-md:pt-[calc(70px+env(safe-area-inset-top))]"}`}>
           <h1 className="text-[clamp(48px,6vw,76px)] font-extrabold uppercase leading-[.95] tracking-[-.055em] text-[var(--wk-text)]">Audio</h1>
           <nav aria-label="Audio discovery" className="wk-reference-pills">
             <a href="#audio-listen" className="wk-reference-pill" aria-current="page">All</a>
