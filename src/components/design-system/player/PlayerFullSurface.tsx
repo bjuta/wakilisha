@@ -128,6 +128,7 @@ export function PlayerFullSurface({
     playbackRate,
     togglePlay,
     closeFullPlayer,
+    requestedPlayerPanel,
     next,
     prev,
     canGoNext,
@@ -146,7 +147,9 @@ export function PlayerFullSurface({
   } = usePlayer();
 
   const [panel, setPanel] =
-    useState<PlayerPanel>(mode === "desktop" ? "lyrics" : "none");
+    useState<PlayerPanel>(mode === "desktop"
+      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
+      : "none");
   const [inlinePanelHost, setInlinePanelHost] = useState<HTMLElement | null>(null);
   const [appleConnected, setAppleConnected] = useState(
     () => getApplePlaybackPrefsSnapshot().appleMusicConnected,
@@ -166,7 +169,7 @@ export function PlayerFullSurface({
   const [transcriptError, setTranscriptError] =
     useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
-  const [momentOpen, setMomentOpen] = useState(false);
+  const [momentOpen, setMomentOpen] = useState(mode === "desktop" && requestedPlayerPanel === "comments");
   const [saved, setSaved] = useState(false);
 
   const {
@@ -187,15 +190,17 @@ export function PlayerFullSurface({
       ) === "1",
     );
     setAppleConnectError(null);
-    setPanel(mode === "desktop" ? "lyrics" : "none");
+    setPanel(mode === "desktop"
+      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
+      : "none");
     setLyrics(null);
     setLyricsError(null);
     setTranscript(null);
     setTranscriptError(null);
     setShareOpen(false);
-    setMomentOpen(false);
+    setMomentOpen(mode === "desktop" && requestedPlayerPanel === "comments");
     setSaved(false);
-  }, [currentTrack?.id]);
+  }, [currentTrack?.id, mode, requestedPlayerPanel]);
 
   useEffect(() => {
     const sync = () =>
