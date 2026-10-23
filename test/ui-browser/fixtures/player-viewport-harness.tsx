@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { I18nextProvider } from "react-i18next";
@@ -21,25 +20,22 @@ import "@/design-system/wakilisha.viewport-integrity.css";
  */
 function LongArticleFixture() {
   const { playTrack } = usePlayer();
-  const seeded = useRef(false);
-
-  useEffect(() => {
-    if (seeded.current) return;
-    seeded.current = true;
-    playTrack({
-      id: "viewport-test-only",
-      title: "Viewport test recording",
-      artist: "WAKILISHA acceptance",
-      duration: 100,
-      isPlayable: false,
-    });
-  }, [playTrack]);
+  // Trigger after PlayerProvider mounts its audio element. No network read or
+  // playback permission is needed for this presentation-only fixture.
+  const preparePlayer = () => playTrack({
+    id: "viewport-test-only",
+    title: "Viewport test recording",
+    artist: "WAKILISHA acceptance",
+    duration: 100,
+    isPlayable: false,
+  });
 
   return (
     <article data-wk-test-scrolled-article
       className="mx-auto min-h-[3400px] max-w-[900px] px-6 pt-24 text-[var(--wk-text)]">
       <h1 className="text-3xl font-bold">Persistent scrolled article</h1>
       <p>The route remains mounted beneath the viewport-level player.</p>
+      <button type="button" onClick={preparePlayer} className="mt-4 min-h-11 rounded bg-[var(--wk-text)] px-4 text-[var(--wk-bg)]">Prepare player</button>
       <div className="h-[1020px]" />
       <label htmlFor="article-state" className="block">Retained article input</label>
       <input id="article-state" defaultValue="preserve-this" className="w-full rounded border p-4" />
