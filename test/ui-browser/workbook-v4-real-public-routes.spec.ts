@@ -136,6 +136,13 @@ test("Signed-out visitors cannot open private messaging or notifications", async
   await expect(navigation).toBeVisible({ timeout: 25_000 });
   await expect(navigation.getByRole("link", { name: "Messages" })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Notifications" })).toHaveCount(0);
+  const guestSignIn = page.locator(".wk-music-app-shell > aside").getByRole("link", { name: "Sign In" });
+  await expect(guestSignIn).toHaveAttribute("href", "/auth");
+  const themeSwitch = page.locator(".wk-music-app-shell > aside").getByRole("button", { name: "Switch to light mode" });
+  await expect(themeSwitch).toBeVisible();
+  await themeSwitch.click();
+  await expect(page.locator("html")).toHaveAttribute("data-wk-theme", "light");
+  await expect(page.locator(".wk-music-app-shell > aside").getByRole("button", { name: "Switch to dark mode" })).toBeVisible();
 
   for (const privatePath of ["/messages", "/notifications"]) {
     await page.goto(privatePath, { waitUntil: "domcontentloaded" });
