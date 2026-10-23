@@ -32,14 +32,14 @@ function LongArticleFixture() {
 
   return (
     <article data-wk-test-scrolled-article
-      className="mx-auto min-h-[3400px] max-w-[900px] px-6 pt-24 text-[var(--wk-text)]">
+      style={{ minHeight: "3400px", maxWidth: "900px", margin: "0 auto", padding: "96px 24px 24px", color: "var(--wk-text)" }}>
       <h1 className="text-3xl font-bold">Persistent scrolled article</h1>
       <p>The route remains mounted beneath the viewport-level player.</p>
       <button type="button" onClick={preparePlayer} className="mt-4 min-h-11 rounded bg-[var(--wk-text)] px-4 text-[var(--wk-bg)]">Prepare player</button>
-      <div className="h-[1020px]" />
+      <div style={{ height: "1020px" }} />
       <label htmlFor="article-state" className="block">Retained article input</label>
       <input id="article-state" defaultValue="preserve-this" className="w-full rounded border p-4" />
-      <div className="h-[1750px]" />
+      <div style={{ height: "1750px" }} />
       <p>Article footer</p>
     </article>
   );
