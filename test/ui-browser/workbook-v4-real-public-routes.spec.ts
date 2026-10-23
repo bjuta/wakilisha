@@ -208,13 +208,21 @@ for (const route of [
       ["light", "rgb(252, 252, 251)", "#4e7425"],
       ["dark", "rgb(11, 11, 11)", "#85c441"],
     ] as const) {
-      await page.evaluate((theme) => {
-        localStorage.setItem("wk-theme", theme);
-      }, mode);
-      // Mount ThemeProvider with the chosen user preference, not just a
-      // changed DOM attribute. Header logos are rendered from React context.
-      await page.reload({ waitUntil: "domcontentloaded" });
+      const openMenu = page.getByRole("button", { name: "Open WAKILISHA menu" });
+      await openMenu.click();
+      const guestMenu = page.getByRole("dialog", { name: "WAKILISHA Menu" });
+      await expect(guestMenu.getByRole("link", { name: "Sign In" })).toBeVisible();
+      const appearance = guestMenu.getByRole("group", { name: "Appearance" });
+      await expect(appearance).toBeVisible();
+      // A guest must change the real theme without a forced sign-in or reload.
+      await page.evaluate(() => document.documentElement.setAttribute("data-wk-theme-session", "preserved"));
+      await appearance.getByRole("button", { name: mode === "light" ? "Light" : "Dark" }).click();
       await expect(page.locator("html")).toHaveAttribute("data-wk-theme", mode);
+      await expect(page.locator("html")).toHaveAttribute("data-wk-theme-session", "preserved");
+      await expect(appearance.getByRole("button", { name: mode === "light" ? "Light" : "Dark" })).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(() => page.evaluate(() => localStorage.getItem("wk-theme"))).toBe(mode);
+      await page.keyboard.press("Escape");
+      await expect(guestMenu).toHaveCount(0);
       await expect(surface).toBeVisible({ timeout: 25_000 });
       await waitForSettledMedia(page, route.name);
       const logo = page.locator('[data-wk-mobile-app-header="v4"] img[alt="WAKILISHA"]');
