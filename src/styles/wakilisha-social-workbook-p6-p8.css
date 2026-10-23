@@ -573,3 +573,29 @@
     padding-inline: 16px;
   }
 }
+
+/* P7 phone conversation opens as the sole correspondence surface. Its own
+ * Back control returns to the Inbox. The global app header and player dock
+ * must not steal space from a message or its bottom composer. */
+@media (max-width: 639px) {
+  body:has([data-wk-workbook-screen="messages"] [data-wk-message-thread][data-wk-thread-selected="true"]) [data-wk-mobile-app-header] {
+    display: none;
+  }
+  [data-wk-workbook-screen="messages"] [data-wk-message-list] {
+    padding-top: 56px;
+  }
+  [data-wk-workbook-screen="messages"] [data-wk-message-thread][data-wk-thread-selected="true"] {
+    height: 100dvh;
+    min-height: 100dvh;
+    background: var(--wk-bg);
+  }
+  [data-wk-workbook-screen="messages"] [data-wk-message-thread-header] {
+    height: auto;
+    min-height: calc(56px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+  [data-wk-workbook-screen="messages"] [data-wk-message-composer] {
+    bottom: 0;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
