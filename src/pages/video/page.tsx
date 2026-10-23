@@ -77,6 +77,30 @@ export default function VideoIndexPage() {
       />
       <main data-wk-workbook-screen="video" className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
         <div className="mx-auto w-full max-w-[1320px]">
+          {!featured && (
+            <header className="px-5 pb-5 pt-[calc(70px+env(safe-area-inset-top))] sm:px-9 sm:pt-3">
+              <h1 className="text-[clamp(38px,5vw,62px)] font-extrabold uppercase leading-[.95] tracking-[-.05em] text-[var(--wk-text)]">Video</h1>
+            </header>
+          )}
+          {featured && (
+            <Link to={featured.canonicalPath} className="wk-reference-media-hero group" data-wk-mobile-top-hero="video" aria-label={`Watch ${featured.title}`}>
+              <WkEditorialArtworkFrame src={featured.poster?.url} alt={featured.title} ratio="cinema" />
+              <div className="wk-reference-media-hero-copy">
+                <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#85c441]">
+                  {featured.classification.replace(/[_-]+/g, " ")}
+                  {featured.delivery.kind === "native_media" && featured.delivery.durationSeconds
+                    ? ` · ${Math.round(featured.delivery.durationSeconds / 60)} min`
+                    : ""}
+                </span>
+                <h1 className="wk-reference-media-hero-title mt-4">{featured.title}</h1>
+                {featured.summary && <p className="wk-reference-hero-caption line-clamp-3">{featured.summary}</p>}
+                <span className="wk-reference-play-button mt-6 inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-bold text-[#0b0b0b]">
+                  Watch <span aria-hidden="true">↗</span>
+                </span>
+              </div>
+            </Link>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-9">
             <nav aria-label="Video formats" className="wk-reference-pills">
               {["all", ...formats].map((value) => (
@@ -101,30 +125,6 @@ export default function VideoIndexPage() {
               />
             </div>
           </div>
-
-          {!featured && (
-            <header className="px-5 pb-5 pt-3 sm:px-9">
-              <h1 className="text-[clamp(38px,5vw,62px)] font-extrabold uppercase leading-[.95] tracking-[-.05em] text-[var(--wk-text)]">Video</h1>
-            </header>
-          )}
-          {featured && (
-            <Link to={featured.canonicalPath} className="wk-reference-media-hero group" aria-label={`Watch ${featured.title}`}>
-              <WkEditorialArtworkFrame src={featured.poster?.url} alt={featured.title} ratio="cinema" />
-              <div className="wk-reference-media-hero-copy">
-                <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#85c441]">
-                  {featured.classification.replace(/[_-]+/g, " ")}
-                  {featured.delivery.kind === "native_media" && featured.delivery.durationSeconds
-                    ? ` · ${Math.round(featured.delivery.durationSeconds / 60)} min`
-                    : ""}
-                </span>
-                <h1 className="wk-reference-media-hero-title mt-4">{featured.title}</h1>
-                {featured.summary && <p className="wk-reference-hero-caption line-clamp-3">{featured.summary}</p>}
-                <span className="wk-reference-play-button mt-6 inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-bold text-[#0b0b0b]">
-                  Watch <span aria-hidden="true">↗</span>
-                </span>
-              </div>
-            </Link>
-          )}
 
           {error && (
             <p className="mx-5 my-8 border-l-2 border-[var(--wk-brand)] pl-4 text-[14px] text-[var(--wk-text-muted)]" role="alert">
