@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { SeekRail } from "./SeekRail";
@@ -58,6 +58,17 @@ export function PlayerCompactSurface({
 
   const isMobile = mode === "mobile";
   const [browserGap, setBrowserGap] = useState(0);
+  const [desktopSidebarWidth, setDesktopSidebarWidth] = useState(256);
+  useLayoutEffect(() => {
+    if (isMobile) return;
+    const aside = document.querySelector<HTMLElement>(".wk-music-app-shell > aside");
+    if (!aside) { setDesktopSidebarWidth(0); return; }
+    const update = () => setDesktopSidebarWidth(aside.getBoundingClientRect().width);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(aside);
+    return () => observer.disconnect();
+  }, [isMobile]);
   useEffect(() => {
     if (!isMobile || !window.visualViewport) return;
     const viewport = window.visualViewport;
@@ -128,7 +139,7 @@ export function PlayerCompactSurface({
         "fixed z-[100] overflow-hidden border border-[var(--wk-border)] bg-[color:var(--wk-surface)]/96 text-[var(--wk-text)] shadow-2xl backdrop-blur-xl",
         isMobile
           ? "left-2 right-2 rounded-[16px] transition-[bottom] duration-[240ms] motion-reduce:transition-none"
-          : "inset-x-0 bottom-0 border-x-0 border-b-0",
+          : "rounded-2xl",
       ].join(" ")}
       style={
         isMobile
@@ -137,7 +148,11 @@ export function PlayerCompactSurface({
                 ? `${browserGap + 8}px`
                 : "max(8px, calc(env(safe-area-inset-bottom) - 13px))",
             }
-          : undefined
+          : {
+              left: desktopSidebarWidth + 16,
+              right: 16,
+              bottom: 16,
+            }
       }
     >
       <div
