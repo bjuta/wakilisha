@@ -117,7 +117,7 @@ export default function PublicAudioPage() {
         {!loading && message && <p className="max-md:order-3 py-12 text-[14px] text-[var(--wk-text-muted)] max-md:px-5" role="alert">Audio is temporarily unavailable.</p>}
         {!loading && !message && featured && (
           <section id="audio-listen" className="max-md:order-1 mt-7 grid gap-5 lg:grid-cols-[1.23fr_.88fr] max-md:mt-0" data-wk-mobile-top-hero="audio">
-            <div className="relative flex min-h-[365px] flex-col justify-end overflow-hidden rounded-[20px] max-md:rounded-none" bg-[linear-gradient(145deg,#ab655a,#5b2917_56%,#17110f)] p-7 sm:p-9">
+            <div className="relative flex min-h-[365px] flex-col justify-end overflow-hidden rounded-[20px] bg-[linear-gradient(145deg,#ab655a,#5b2917_56%,#17110f)] p-7 sm:p-9 max-md:rounded-none">
               <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-white">
                 {featured.publicationKind === "episode" ? "Episode" : "Listen"}
               </span>
