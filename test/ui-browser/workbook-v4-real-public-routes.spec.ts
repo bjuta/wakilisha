@@ -360,7 +360,7 @@ for (const width of [390, 1440]) {
       const menu = overlay.getByRole("button", { name: "More Player actions" });
       await expect(exit).toBeVisible();
       await expect(menu).toBeVisible();
-      expect(await exit.evaluate(node => getComputedStyle(node).mixBlendMode)).toBe("difference");
+      expect(await exit.evaluate(node => getComputedStyle(node).mixBlendMode)).toBe("normal");
       expect(await exit.evaluate(node => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
     }
 
