@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { WkIcon } from "@/components/design-system/Icon";
 import type { SuggestionKeyDownProps } from "@tiptap/suggestion";
 
 interface CommandItem {
@@ -88,7 +89,7 @@ export const SlashCommandList = forwardRef<SlashCommandListRef, SlashCommandList
                 ? "bg-[var(--wk-brand)]/10 text-[var(--wk-brand)]"
                 : "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
             }`}>
-              <i className={`${item.icon} text-[15px]`} />
+              <WkIcon name={item.icon as never} size={15} aria-hidden="true" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-[12px] font-bold">{item.label}</div>
