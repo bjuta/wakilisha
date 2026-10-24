@@ -24,8 +24,10 @@ describe("Workbook v4 mobile shell and safe-area convergence", () => {
     expect(header).not.toContain("scrollVisible");
     expect(header).toContain("fixed inset-x-0 top-0");
     expect(header).toContain("bg-transparent");
-    expect(header).toContain("bg-[var(--wk-surface)]");
-    expect(header).toContain("text-[var(--wk-text)]");
+    expect(header).toContain("border-0 bg-transparent");
+    expect(header).toContain("drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]");
+    expect(header).not.toContain("bg-[var(--wk-surface)]");
+    expect(header).toContain("text-white");
     expect(header).toContain("h-14");
     expect(header).toContain('data-wk-mobile-header-visible={headerVisible ? "true" : "false"}');
     expect(header).toContain('window.addEventListener("scroll", onScroll, { passive: true })');
