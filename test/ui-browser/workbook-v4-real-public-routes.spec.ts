@@ -147,7 +147,7 @@ for (const width of [390, 768, 1440]) {
         for (const action of ["Open WAKILISHA menu", "Search"]) {
           const contrast = await topBar.getByRole("button", { name: action }).evaluate((node) => {
             const style = getComputedStyle(node);
-            const channels = (colour: string) => (colour.match(/[\\d.]+/g) || []).slice(0, 3).map(Number);
+            const channels = (colour: string) => (colour.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
             const luminance = (colour: string) => {
               const [red, green, blue] = channels(colour);
               return [red, green, blue]
