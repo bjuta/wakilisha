@@ -125,11 +125,51 @@ for (const width of [390, 768, 1440]) {
         expect(contentLeft).toBe(0);
       }
 
-      await page.screenshot({
-        path: testInfo.outputPath(`workbook-v4-${pageSpec.slug}-${width}.png`),
-        animations: "disabled",
-        fullPage: false,
-      });
+      // Capture *actual public React routes* with the same live drawer and
+      // theme switch at each viewport. The drawer and closed page are separate
+      // review evidence. A screenshot is not signed-in Production acceptance.
+      for (const mode of ["light", "dark"] as const) {
+        const topBar = page.locator('[data-wk-mobile-app-header="v4"]');
+        const menu = topBar.getByRole("button", { name: "Open WAKILISHA menu" });
+        await expect(menu).toBeVisible();
+        await menu.click();
+        const drawer = page.getByRole("dialog", { name: "WAKILISHA Menu" });
+        await expect(drawer).toBeVisible();
+        await expect(menu).toHaveAttribute("aria-expanded", "true");
+        const themeSwitch = drawer.getByRole("switch", { name: "Dark mode" });
+        await expect(themeSwitch).toBeVisible();
+        if ((await themeSwitch.getAttribute("aria-checked")) !== String(mode === "dark")) {
+          await themeSwitch.click();
+        }
+        await expect(page.locator("html")).toHaveAttribute("data-wk-theme", mode);
+        await expect(drawer.locator('img[alt="WAKILISHA"]')).toHaveAttribute(
+          "src",
+          mode === "dark"
+            ? "/assets/logos/wakilisha-logo-dark.svg"
+            : "/assets/logos/wakilisha-logo-light.svg",
+        );
+        const sheet = await drawer.evaluate((node) => {
+          const rect = node.closest("#wk-workbook-sidebar")?.getBoundingClientRect();
+          return { left: rect?.left ?? -1, width: rect?.width ?? -1 };
+        });
+        expect(Math.abs(sheet.left)).toBeLessThanOrEqual(2);
+        expect(sheet.width).toBeGreaterThan(220);
+        expect(sheet.width).toBeLessThanOrEqual(Math.min(300, width));
+        await page.screenshot({
+          path: testInfo.outputPath(`workbook-v4-nav-${pageSpec.slug}-${width}-${mode}-open.png`),
+          animations: "disabled",
+          fullPage: false,
+        });
+        await page.keyboard.press("Escape");
+        await expect(drawer).toHaveCount(0);
+        await expect(menu).toBeFocused();
+        await expect(menu).toHaveAttribute("aria-expanded", "false");
+        await page.screenshot({
+          path: testInfo.outputPath(`workbook-v4-nav-${pageSpec.slug}-${width}-${mode}-closed.png`),
+          animations: "disabled",
+          fullPage: false,
+        });
+      }
     });
   }
 }
