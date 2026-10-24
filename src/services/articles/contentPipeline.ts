@@ -10,6 +10,7 @@
 
 import { sanitizeVcShortcodes } from "@/utils/sanitizeVcShortcodes";
 import { embedRichMedia } from "@/utils/embedRichMedia";
+import { normalizeArticleMediaCaptions } from "@/utils/normalizeArticleMediaCaptions";
 import { decodeHtmlEntities } from "@/utils/decodeHtmlEntities";
 import { generateExcerpt as generateExcerptUtil } from "@/utils/generateExcerpt";
 import { transformReleaseShortcodes, stripReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
@@ -29,7 +30,7 @@ export function processArticleContent(rawHtml: string | null | undefined): strin
   html = transformArtistShortcodes(html);
   html = transformTrackShortcodes(html);
   html = embedRichMedia(html);
-  return html;
+  return normalizeArticleMediaCaptions(html, "display");
 }
 
 /**
@@ -42,7 +43,7 @@ export function processArticleContentForEditor(rawHtml: string | null | undefine
   let html = rawHtml;
   html = sanitizeVcShortcodes(html);
   html = decodeHtmlEntities(html);
-  return html;
+  return normalizeArticleMediaCaptions(html, "editor");
 }
 
 /**
