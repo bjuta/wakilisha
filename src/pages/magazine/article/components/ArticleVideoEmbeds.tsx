@@ -78,12 +78,18 @@ export function ArticleContentRenderer({
           const videoIdx = videos.indexOf(seg.data);
           return (
             <div key={`seg-${i}`} className="article-embed-spacing">
-              <VideoCard
-                video={seg.data}
-                index={videoIdx}
-                total={videos.length}
-                onPlay={handlePlay}
-              />
+              <figure className="wk-article-video-figure">
+                <VideoCard
+                  video={seg.data}
+                  index={videoIdx}
+                  total={videos.length}
+                  onPlay={handlePlay}
+                  className="my-0"
+                />
+                {seg.data.caption ? (
+                  <figcaption className="wk-figcaption">{seg.data.caption}</figcaption>
+                ) : null}
+              </figure>
             </div>
           );
         }

@@ -11,6 +11,8 @@ export interface VideoEmbedData extends CanonicalVideoProviderSource {
   title: string;
   platform: string;
   thumbnail: string | null;
+  /** Editorial figure caption, distinct from subtitles and player title. */
+  caption?: string | null;
 }
 
 export type VideoMode = "lightbox" | "pip" | "closed";
@@ -84,13 +86,23 @@ export function transformArticleHtmlForVideoEmbeds(
     const title =
       iframe.getAttribute("title") ||
       `${providerLabel(resolvedSource.providerKey)} video`;
+    const figure = iframe.closest("figure");
+    const figureCaption = figure?.querySelector("figcaption")?.textContent?.trim() || "";
+    const caption = iframe.getAttribute("data-caption")?.trim() || figureCaption || null;
     const markerIndex = videos.length;
     const marker = doc.createComment(
       `${VIDEO_MARKER_PREFIX}${markerIndex}`,
     );
 
     const parent = iframe.parentElement;
-    if (
+    // Replace the whole provider figure so its caption can travel with the
+    // resolved video card, rather than becoming editable-looking body copy.
+    const simpleFigure = figure &&
+      figure.querySelectorAll("iframe, video").length === 1 &&
+      (figure.textContent ?? "").trim() === figureCaption;
+    if (simpleFigure) {
+      figure.replaceWith(marker);
+    } else if (
       parent &&
       parent.tagName === "P" &&
       parent.childNodes.length === 1 &&
@@ -109,6 +121,7 @@ export function transformArticleHtmlForVideoEmbeds(
       title,
       platform: providerLabel(resolvedSource.providerKey),
       thumbnail: getThumbnail(src),
+      caption,
     });
   });
 
