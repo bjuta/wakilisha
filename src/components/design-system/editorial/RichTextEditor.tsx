@@ -18,6 +18,7 @@ import type {
 } from "@/components/design-system/editorial/editorCommandRegistry";
 import { MediaPickerModal } from "@/components/admin/MediaPickerModal";
 import { ExtendedImage } from "@/components/admin/editor/ExtendedImage";
+import { normalizeArticleMediaCaptions } from "@/utils/normalizeArticleMediaCaptions";
 import { FloatingImageToolbar } from "@/components/admin/editor/FloatingImageToolbar";
 import { ImageEditDialog } from "@/components/admin/editor/ImageEditDialog";
 import { SlashCommandExtension } from "@/components/admin/editor/SlashCommandSuggestion";
@@ -517,7 +518,7 @@ export function RichTextEditor({
         ? []
         : [SlashCommandExtension]),
     ],
-    content: value || "",
+    content: playlistDescriptionMode ? value || "" : normalizeArticleMediaCaptions(value || "", "editor"),
     editable: !readOnly,
     editorProps: {
       attributes: {
@@ -599,10 +600,8 @@ export function RichTextEditor({
      * replace the editor document.
      */
     if (currentHTML !== value) {
-      editor.commands.setContent(
-        value || "",
-        false,
-      );
+      const incomingHtml = playlistDescriptionMode ? (value || "") : normalizeArticleMediaCaptions(value || "", "editor");
+      if (currentHTML !== incomingHtml) editor.commands.setContent(incomingHtml, false);
     }
 
     hydratedHtmlRef.current =

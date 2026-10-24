@@ -228,3 +228,35 @@
     margin: 28px 0;
   }
 }
+/* One editorial visual unit: media and its attribution travel together. */
+.ProseMirror .wk-figure {
+  display: block;
+  max-width: 100%;
+  margin: 24px 0 34px;
+}
+.ProseMirror .wk-figure > img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+}
+.ProseMirror .wk-figure > .wk-figcaption,
+.wk-article-video-figure > .wk-figcaption {
+  display: block;
+  margin: 0;
+  padding: 11px 2px 0;
+  color: var(--wk-text-muted);
+  font: 500 12.5px/1.5 var(--wk-font-ui);
+  text-align: left;
+  font-style: normal;
+  letter-spacing: 0;
+}
+.ProseMirror .wk-figure > .wk-figcaption {
+  cursor: default;
+  user-select: none;
+}
+.wk-article-video-figure {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+}
