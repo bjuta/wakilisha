@@ -125,6 +125,8 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
     appWidth:workspace?.getBoundingClientRect().width||0,
     productShellPresent:Boolean(productShell),
     nestedAdminPresent:Boolean(nestedAdmin),
+    publicHeaderPresent:Boolean(document.querySelector("[data-wk-mobile-app-header]")),
+    publicShellPresent:Boolean(document.querySelector("[data-wk-unified-public-shell]")),
     brandWidth:brand?.getBoundingClientRect().width||0,
     brandTop:brand?.getBoundingClientRect().top??0,
     toolbarTop:toolbar?.getBoundingClientRect().top??0,
@@ -136,17 +138,16 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
     caseWidth:caseStory?.getBoundingClientRect().width||0,
    };
   });
-  assert(v.productShellPresent&&!v.nestedAdminPresent,
-   "STOP_MIZIZI_NESTED_STUDIO_SHELL_"+width+"_"+JSON.stringify(v));
-  assert(v.appWidth>0&&v.caseWidth>0,
+  assert(v.productShellPresent&&!v.nestedAdminPresent&&
+   !v.publicHeaderPresent&&!v.publicShellPresent,
+   "STOP_MIZIZI_DOUBLE_APPLICATION_CHROME_"+width+"_"+JSON.stringify(v));
+  assert(v.appWidth>0&&v.caseWidth>0&&Math.abs(v.appWidth-width)<=2,
    "STOP_MIZIZI_M1_VISIBLE_CASE_MISSING_"+width+"_"+JSON.stringify(v));
   assert(v.documentWidth<=v.viewportWidth+3,
    "STOP_MIZIZI_M1_VIEWPORT_OVERFLOW_"+width+"_"+JSON.stringify(v));
   assert(v.firstTabHeight>=43.5,
    "STOP_MIZIZI_M1_NAV_TARGET_BELOW_44_"+width);
   if(width>768){
-   assert(Math.abs(v.appWidth-width)<=2,
-    "STOP_MIZIZI_M1_NOT_FULL_WIDTH_"+width+"_"+JSON.stringify(v));
    assert(v.brandVisible&&Math.abs(v.brandWidth-248)<=2&&
     Math.abs(v.tablistWidth-248)<=2&&v.tablistDirection==="column"&&
     v.toolbarHeight>=63.5&&Math.abs(v.brandTop)<=2&&Math.abs(v.toolbarTop)<=2,
