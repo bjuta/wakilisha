@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MobileAppLayout } from "@/components/mobile/MobileAppLayout";
@@ -49,8 +49,6 @@ const LazyPlayerFullSurface = lazy(async () => {
 export function ResponsiveAppLayout() {
   const isMobile = useMobileDetect();
   const { isFullPlayerOpen, closeFullPlayer } = usePlayer();
-  const [sidebarWidth, setSidebarWidth] = useState(256);
-
   // The normal route must remain mounted and at its existing scroll position.
   // Lock only the document scroller, not the body with position:fixed; the
   // independently scrollable Now Playing viewport is portaled to document.body.
@@ -67,26 +65,6 @@ export function ResponsiveAppLayout() {
     };
   }, [isFullPlayerOpen]);
 
-  useLayoutEffect(() => {
-    if (isMobile || !isFullPlayerOpen) return;
-    const sidebar = document.querySelector<HTMLElement>(
-      ".wk-music-app-shell > aside",
-    );
-    if (!sidebar) {
-      setSidebarWidth(0);
-      return;
-    }
-    const measure = () => setSidebarWidth(sidebar.getBoundingClientRect().width);
-    measure();
-    // Follow the accepted 80px rail / 256px sidebar, including user collapse.
-    if (typeof ResizeObserver === "undefined") {
-      window.addEventListener("resize", measure);
-      return () => window.removeEventListener("resize", measure);
-    }
-    const observer = new ResizeObserver(measure);
-    observer.observe(sidebar);
-    return () => observer.disconnect();
-  }, [isMobile, isFullPlayerOpen]);
 
   return (
     <RegistryOnboardingGate>
@@ -110,7 +88,7 @@ export function ResponsiveAppLayout() {
           role="region"
           aria-label="Now Playing"
           className="fixed inset-y-0 right-0 z-[110] h-[100dvh] min-h-0 touch-pan-y overflow-x-clip overflow-y-auto overscroll-contain bg-[var(--wk-bg)]"
-          style={{ left: isMobile ? 0 : sidebarWidth }}
+          style={{ left: 0 }}
         >
           <PlayerPresentationBoundary onClose={closeFullPlayer}>
             <Suspense fallback={
