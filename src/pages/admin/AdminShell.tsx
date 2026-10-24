@@ -460,8 +460,9 @@ export function AdminShell() {
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />
       ) : null}
 
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex-col border-r border-wk-border bg-wk-surface transition-all duration-300 ${isMiziziProductRoute ? "hidden" : "flex"} ${collapsed ? "w-16" : "w-64"} ${sidebarPositionClass}`}>
+      {/* Sidebar: WAKILISHA Studio navigation never nests into MIZIZI. */}
+      {!isMiziziProductRoute ? (
+      <aside data-wk-admin-studio-sidebar className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-wk-border bg-wk-surface transition-all duration-300 ${collapsed ? "w-16" : "w-64"} ${sidebarPositionClass}`}>
         {/* Sidebar Header */}
         <div className="flex h-16 items-center gap-3 border-b border-wk-border px-4">
           <button onClick={() => navigate("/admin")} className="flex min-w-0 items-center gap-3">
@@ -551,9 +552,10 @@ export function AdminShell() {
           ) : null}
         </div>
       </aside>
+      ) : null}
 
       {/* Main */}
-      <main className={`min-h-screen transition-all duration-300 ${mainOffsetClass}`}>
+      <main data-wk-mizizi-product-shell={isMiziziProductRoute ? "true" : undefined} className={`min-h-screen transition-all duration-300 ${mainOffsetClass}`}>
         <div className={mainContentClass}>
           <Outlet />
         </div>
