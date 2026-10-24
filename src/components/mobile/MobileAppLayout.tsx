@@ -3,6 +3,7 @@ import { usePlayer } from "@/context/PlayerContext";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { usePendingCommunityActionReplay } from "@/hooks/usePendingCommunityActionReplay";
 import { MobileTopBar } from "./MobileTopBar";
+import { shouldReserveWakilishaHeaderSpace } from "@/components/navigation/wakilishaHeaderSpace";
 
 /**
  * Workbook v4: one start-edge sidebar sheet; no bottom navigation,
@@ -14,27 +15,7 @@ export function MobileAppLayout() {
   const { currentTrack } = usePlayer();
   const authUser = useAuthUser();
   const shellless = location.pathname === "/auth";
-  // Full-bleed hero surfaces begin behind the one transparent mobile bar.
-  // Text-first routes reserve its height exactly once; social pages already
-  // reserve it in their own P6-P8 layout, and open DMs own their thread chrome.
-  const heroRoute = location.pathname === "/"
-    || ["/magazine", "/music", "/video", "/audio", "/shows", "/charts", "/releases", "/genres", "/labels", "/guides", "/artists"].includes(location.pathname)
-    || /^\/magazine\/[^/]+\/?$/.test(location.pathname)
-    || /^\/artists\/[^/]+\/?$/.test(location.pathname)
-    || /^\/video\/[^/]+\/?$/.test(location.pathname)
-    || /^\/shows\/[^/]+(?:\/[^/]+)?\/?$/.test(location.pathname)
-    || /^\/charts\/[^/]+/.test(location.pathname)
-    || /^\/releases\/[^/]+\/[^/]+\/?$/.test(location.pathname)
-    || /^\/genres\/[^/]+\/?$/.test(location.pathname)
-    || /^\/labels\/[^/]+\/?$/.test(location.pathname)
-    || /^\/guides\/[^/]+\/?$/.test(location.pathname)
-    || /^\/tracks\/[^/]+\/[^/]+\/?$/.test(location.pathname)
-    || /^\/playlists\/[^/]+\/?$/.test(location.pathname)
-    || /^\/u\/[^/]+(?:\/playlists\/[^/]+)?\/?$/.test(location.pathname)
-    || /^\/people\/[^/]+\/?$/.test(location.pathname)
-    || /^\/organizations\/[^/]+\/?$/.test(location.pathname);
-  const socialRoute = ["/following", "/messages", "/notifications"].includes(location.pathname);
-  const reserveHeaderSpace = !shellless && !heroRoute && !socialRoute;
+  const reserveHeaderSpace = !shellless && shouldReserveWakilishaHeaderSpace(location.pathname);
   usePendingCommunityActionReplay(
     !authUser.loading ? authUser.id : undefined,
     !authUser.loading && authUser.isEmailVerified,
