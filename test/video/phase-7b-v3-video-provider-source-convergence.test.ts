@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { getThumbnail } from "@/components/video/types";
 
 function read(file: string): string {
   return fs.readFileSync(path.resolve(file), "utf8");
@@ -81,6 +82,26 @@ describe("Phase 7B V3 Video provider source convergence", () => {
     expect(canvas).not.toContain("embedUrl: string");
     expect(overlay).not.toContain("embedUrl:");
     expect(overlay).toContain("providerObjectId: video.providerObjectId");
+  });
+
+  it("gives legacy Article YouTube cards real provider previews without changing playback", () => {
+    const id = "dQw4w9WgXcQ";
+    const preview = `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+    expect(getThumbnail(`https://www.youtube.com/embed/${id}`)).toBe(preview);
+    expect(getThumbnail(`https://youtu.be/${id}`)).toBe(preview);
+    expect(getThumbnail(`https://www.youtube.com/watch?v=${id}`)).toBe(preview);
+    expect(getThumbnail("https://player.vimeo.com/video/123456")).toBeNull();
+
+    expect(providerSource).toContain("providerThumbnailUrl");
+    expect(types).toContain("providerThumbnailUrl(source)");
+    expect(types).toContain("thumbnail: getThumbnail(src)");
+
+    const card = read("src/components/video/VideoCard.tsx");
+    const frame = read("src/components/video/VideoCardFrame.tsx");
+    expect(card).toContain("thumbnail={video.thumbnail}");
+    expect(frame).toContain("onError={() => setImgError(true)}");
+    expect(desktopArticle).toContain("<ArticleContentRenderer");
+    expect(mobileArticle).toContain("<ArticleContentRenderer");
   });
 
   it("makes Articles consume canonical provider descriptors without rewriting HTML", () => {
