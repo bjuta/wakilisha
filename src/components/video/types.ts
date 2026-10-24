@@ -3,6 +3,7 @@ import {
   providerLabel,
   providerSourceKey,
   providerThumbnailUrl,
+  providerThumbnailUrls,
   type CanonicalVideoProviderSource,
 } from "./providerSource";
 
@@ -12,6 +13,8 @@ export interface VideoEmbedData extends CanonicalVideoProviderSource {
   title: string;
   platform: string;
   thumbnail: string | null;
+  /** Unavailable or tiny YouTube artwork falls back without changing playback. */
+  thumbnailFallbacks?: string[];
   /** Editorial figure caption, distinct from subtitles and player title. */
   caption?: string | null;
 }
@@ -121,6 +124,7 @@ export function transformArticleHtmlForVideoEmbeds(
       title,
       platform: providerLabel(resolvedSource.providerKey),
       thumbnail: getThumbnail(src),
+      thumbnailFallbacks: providerThumbnailUrls(resolvedSource).slice(1),
       ...(caption ? { caption } : {}),
     });
   });
