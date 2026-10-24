@@ -246,9 +246,9 @@ export function MiziziEvidenceWorkbench({
       <div className="core-list">
         <div className="top">
           <div>
-            <h2 className="text-[17px] font-black text-wk-text">{mode === "history" ? "History" : "Cores"}</h2>
+            <h2 className="text-[17px] font-black text-wk-text">{mode === "history" ? "History" : "Workbench"}</h2>
             <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
-              {mode === "history" ? "Recorded review outcomes and receipts, not an outbound-delivery ledger." : "A claim, its recorded evidence and its current disposition."}
+              {mode === "history" ? "Recorded review outcomes and receipts, not an outbound-delivery ledger." : "A claim, its recorded evidence and current review state. A resolved review is not proof of music rights."}
             </p>
           </div>
           <WkSearchField ariaLabel="Find a Registry claim" value={query}
