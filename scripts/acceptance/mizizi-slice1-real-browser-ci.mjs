@@ -15,6 +15,20 @@ async function signedIn(page,base,identity){
  await page.getByRole("textbox",{name:"Admin email"}).fill(identity.email,{timeout:30000});
  await page.getByLabel("Password",{exact:true}).fill(identity.password,{timeout:30000});
  await page.getByRole("button",{name:"Enter Admin Studio"}).click();
+ // v3 Workbench intentionally places operations behind an accessible Disclosure.
+ // Verify the real case-first view and explicitly open controls for legacy JWT probes.
+ await page.locator('article[aria-label="Selected investigation"]').waitFor({
+  state:"visible",timeout:45000,
+ });
+ const controls=page.getByRole("button",{
+  name:"Case controls, complete journal and Hold Writes",
+ });
+ await controls.waitFor({state:"visible",timeout:30000});
+ assert(await controls.getAttribute("aria-expanded")==="false",
+  "STOP_MIZIZI_CASE_CONTROLS_NOT_CLOSED_AT_REST");
+ await controls.click();
+ assert(await controls.getAttribute("aria-expanded")==="true",
+  "STOP_MIZIZI_CASE_CONTROLS_DID_NOT_EXPAND");
  await page.locator("[data-wk-mizizi-durable-cases]").waitFor({
   state:"visible",timeout:45000,
  });
@@ -156,7 +170,13 @@ export async function verifyLocalHeadquartersBrowsersV1({
    const desk=await desktop.newPage(),phone=await mobile.newPage();
    await signedIn(desk,base,first);
    await signedIn(phone,base,second);
+   const controlName="Case controls, complete journal and Hold Writes";
+   await desk.getByRole("button",{name:controlName}).click();
+   await phone.getByRole("button",{name:controlName}).click();
    await verifyCanonicalWorkbenchViewportsV1(desk,phone);
+   await desk.getByRole("button",{name:controlName}).click();
+   await phone.getByRole("button",{name:controlName}).click();
+   await desk.locator("[data-wk-mizizi-durable-cases]").waitFor({state:"visible",timeout:30000});
    await desk.getByRole("button",{name:"View Recorded Case Journal"}).click();
    const actual=desk.locator('section[aria-label="Immutable case event timeline"]');
    await actual.getByText("Revision 2").waitFor({timeout:30000});
