@@ -31,6 +31,7 @@ export function FloatingImageToolbar({ editor }: Props) {
 
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [captionOpen, setCaptionOpen] = useState(false);
   const [editAsset, setEditAsset] = useState<MediaAsset | null>(null);
   const [editAssetLoading, setEditAssetLoading] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -142,12 +143,12 @@ export function FloatingImageToolbar({ editor }: Props) {
 
   // Keep modalOpenRef in sync
   useEffect(() => {
-    modalOpenRef.current = replaceOpen || editOpen;
-  }, [replaceOpen, editOpen]);
+    modalOpenRef.current = replaceOpen || editOpen || captionOpen;
+  }, [replaceOpen, editOpen, captionOpen]);
 
   /* ─── Hide toolbar only on clicks outside BOTH the toolbar AND the image ─── */
   useEffect(() => {
-    if (!selectedImage || replaceOpen || editOpen) return;
+    if (!selectedImage || replaceOpen || editOpen || captionOpen) return;
 
     const handleMouseDown = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -171,7 +172,7 @@ export function FloatingImageToolbar({ editor }: Props) {
       document.removeEventListener("mousedown", handleMouseDown, {
         capture: true,
       });
-  }, [selectedImage, replaceOpen, editOpen]);
+  }, [selectedImage, replaceOpen, editOpen, captionOpen]);
 
   /* ─── Actions ─── */
   const handleReplace = useCallback(
@@ -204,11 +205,12 @@ export function FloatingImageToolbar({ editor }: Props) {
           alt: meta.alt || null,
           caption: meta.caption || null,
           title: meta.title || null,
-          alignment: meta.alignment || null,
+          alignment: selectedImage.meta.alignment || null,
           "data-asset-id": meta.assetId || null,
         })
         .run();
       setEditOpen(false);
+      setCaptionOpen(false);
       requestAnimationFrame(detectImage);
     },
     [editor, selectedImage, detectImage]
@@ -316,8 +318,8 @@ export function FloatingImageToolbar({ editor }: Props) {
   const getToolbarStyle = (): React.CSSProperties => {
     if (!selectedImage) return { display: "none" };
     const rect = selectedImage.rect;
-    const toolbarWidth = 340;
-    const toolbarHeight = 40;
+    const toolbarWidth = Math.min(420, Math.max(280, window.innerWidth - 16));
+    const toolbarHeight = toolbarRef.current?.offsetHeight || 40;
     const padding = 8;
 
     let left = rect.left + rect.width / 2 - toolbarWidth / 2;
@@ -349,7 +351,7 @@ export function FloatingImageToolbar({ editor }: Props) {
       <div
         ref={toolbarRef}
         style={getToolbarStyle()}
-        className="flex items-center gap-1 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-lg px-2 py-1.5"
+        className="flex flex-wrap items-center gap-1 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-lg px-2 py-1.5"
         // Prevent clicks inside the toolbar from bubbling to the document mousedown
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -421,6 +423,19 @@ export function FloatingImageToolbar({ editor }: Props) {
 
         <div className="w-px h-4 bg-[var(--wk-border)]" />
 
+        {/* Article-local caption editing, separate from shared Media Library edits. */}
+        <button
+          type="button"
+          onClick={() => setCaptionOpen(true)}
+          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-[var(--wk-text-muted)] hover:bg-[var(--wk-brand-soft)] hover:text-[var(--wk-brand)]"
+          title="Edit caption in this article"
+        >
+          <WkIcon name="FileText" size={12} />
+          Caption
+        </button>
+
+        <div className="w-px h-4 bg-[var(--wk-border)]" />
+
         {/* Delete */}
         <button
           onClick={handleDelete}
@@ -446,6 +461,15 @@ export function FloatingImageToolbar({ editor }: Props) {
         title="Replace Image"
         currentUrl={selectedImage.meta.src}
       />
+
+      {captionOpen && (
+        <ImageEditDialog
+          open={captionOpen}
+          meta={selectedImage.meta}
+          onClose={() => { setCaptionOpen(false); requestAnimationFrame(detectImage); }}
+          onSave={handleEditSave}
+        />
+      )}
 
       {/* Edit Modal — full MediaEditModal when we resolved an asset, fallback otherwise */}
       {editOpen && editAsset && (
