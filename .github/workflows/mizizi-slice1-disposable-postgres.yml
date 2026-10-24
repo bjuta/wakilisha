@@ -276,3 +276,100 @@ jobs:
           test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
           test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
           echo "WK_CI_LOCAL_AUTH_USERS_MEMBERSHIPS_AND_VOLUMES_DESTROYED=PASS"
+
+  phase1-nine-migration-forward-replay:
+    name: phase1-nine-migration-${{ matrix.start }}
+    if: github.event.pull_request.base.ref == 'feat/mizizi-governed-question-freeze-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        start: [preview-first, production-first]
+    env:
+      START_KIND: ${{ matrix.start }}
+    steps:
+      - name: Checkout exact MIZIZI branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Checkout immutable merged main migration source
+        uses: actions/checkout@v4
+        with:
+          ref: 216f142f22fe4b55532e8944e4e2758ac5357ca5
+          path: _phase1_main
+          persist-credentials: false
+      - name: Pin local-only Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+      - name: Replay exact Preview-first and Production-first versions forward only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e supabase/.temp/project-ref
+          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
+          test -z "$(printenv SUPABASE_PROJECT_REF || true)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git -C _phase1_main rev-parse HEAD)" = 216f142f22fe4b55532e8944e4e2758ac5357ca5
+          shared=0
+          for f in _phase1_main/supabase/migrations/*.sql; do
+            version="$(basename "$f" | cut -d_ -f1)"
+            if [[ "$version" < "20261016000000" ]]; then
+              cmp "$f" "supabase/migrations/$(basename "$f")"
+              shared=$((shared+1))
+            fi
+          done
+          test "$shared" -eq 231
+          echo WK_MIZIZI_231_BASELINE_SQL_BYTES_MATCH=PASS
+          chart=(20261019152307_wk_chart_observation_receipts_v1.sql 20261019203244_wk_chart_private_raw_evidence_v1.sql 20261020072800_wk_chart_capture_runtime_v1.sql)
+          research=(20261016064245_mizizi_research_pass_memory_v1.sql 20261016092731_mizizi_external_wikidata_research_intake_v1.sql 20261016114918_mizizi_research_job_retry_budget_v1.sql 20261017185928_mizizi_question_assessment_authority_v1.sql 20261017202800_mizizi_governed_question_freeze_v1.sql 20261017212255_mizizi_source_family_attestation_v1.sql)
+          mkdir -p "$RUNNER_TEMP/wk-mizizi-6-deferred"
+          for f in "${chart[@]}"; do
+            test -f "_phase1_main/supabase/migrations/$f"
+            test ! -e "supabase/migrations/$f"
+          done
+          for f in "${research[@]}"; do test -f "supabase/migrations/$f"; done
+          if test "$START_KIND" = production-first; then
+            for f in "${research[@]}"; do mv "supabase/migrations/$f" "$RUNNER_TEMP/wk-mizizi-6-deferred/$f"; done
+            for f in "${chart[@]}"; do cp "_phase1_main/supabase/migrations/$f" "supabase/migrations/$f"; done
+            expected=234
+          else
+            test "$START_KIND" = preview-first
+            expected=237
+          fi
+          count="$(find supabase/migrations -maxdepth 1 -name '*.sql' -type f | wc -l | tr -d ' ')"
+          test "$count" -eq "$expected"
+          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          count="$(docker exec -i "$DB" psql -X -q -t -A -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c 'select count(*) from supabase_migrations.schema_migrations')"
+          test "$count" = "$expected"
+          echo "WK_MIZIZI_INITIAL_$START_KIND_LEDGER=PASS"
+          if test "$START_KIND" = preview-first; then
+            for f in "${chart[@]}"; do cp "_phase1_main/supabase/migrations/$f" "supabase/migrations/$f"; done
+            supabase migration up --local
+          else
+            for f in "${research[@]}"; do mv "$RUNNER_TEMP/wk-mizizi-6-deferred/$f" "supabase/migrations/$f"; done
+            supabase migration up --local --include-all
+          fi
+          count="$(docker exec -i "$DB" psql -X -q -t -A -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c 'select count(*) from supabase_migrations.schema_migrations')"
+          test "$count" = 240
+          for v in 20261016064245 20261016092731 20261016114918 20261017185928 20261017202800 20261017212255 20261019152307 20261019203244 20261020072800; do
+            n="$(docker exec -i "$DB" psql -X -q -t -A -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c "select count(*) from supabase_migrations.schema_migrations where version='$v'")"
+            test "$n" = 1
+          done
+          invalid="$(docker exec -i "$DB" psql -X -q -t -A -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='mizizi_private' and c.relkind='r' and (not c.relrowsecurity or not c.relforcerowsecurity)")"
+          test "$invalid" = 0
+          for sql in scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql scripts/control-plane/verify-mizizi-question-version-reader-v1.sql scripts/control-plane/verify-mizizi-question-freeze-v1.sql scripts/control-plane/verify-mizizi-question-source-attestations-v1.sql; do
+            docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres < "$sql"
+          done
+          echo "WK_MIZIZI_240_FORWARD_MIGRATIONS_$START_KIND=PASS"
+      - name: Destroy all disposable databases and volumes
+        if: always()
+        shell: bash
+        run: |
+          supabase stop --no-backup
+          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
