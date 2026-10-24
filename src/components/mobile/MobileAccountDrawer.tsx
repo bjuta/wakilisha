@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import { Dialog, Modal as AriaModal, ModalOverlay } from "react-aria-components";
 import { WakilishaAccountMark } from "@/components/brand/WakilishaAccountMark";
 import { WkIcon } from "@/components/design-system/Icon";
-import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { useAuthUser } from "@/hooks/useAuthUser";
@@ -47,6 +46,7 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
   rail?: boolean;
 }) {
   const [youOpen, setYouOpen] = useState(false);
+  const [browseOpen, setBrowseOpen] = useState(false);
   const authUser = useAuthUser();
   const { theme, setTheme } = useTheme();
   const { signOut, signingOut, signOutError } = useSessionSignOut("/auth");
@@ -62,10 +62,14 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
   const initial = displayName.slice(0, 1).toUpperCase() || "W";
 
   useScrollLock(open);
-  useEffect(() => { setYouOpen(open && startInYou); }, [open, startInYou]);
+  useEffect(() => {
+    setYouOpen(open && startInYou);
+    setBrowseOpen(false);
+  }, [open, startInYou]);
   if (!open) return null;
 
   const close = () => {
+    setBrowseOpen(false);
     setYouOpen(false);
     onClose();
   };
@@ -97,9 +101,15 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
         className={["absolute inset-y-0 left-0 flex w-[min(300px,90vw)] flex-col overflow-hidden border-r border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl",
           startInYou ? `md:inset-y-auto md:bottom-5 md:h-[min(680px,calc(100dvh-40px))] md:rounded-2xl md:border ${rail ? "md:left-[80px]" : "md:left-[256px]"}` : ""].join(" ")}
         style={{ paddingTop: "max(env(safe-area-inset-top), 12px)", paddingBottom: "max(env(safe-area-inset-bottom), 12px)" }}>
-        <Dialog aria-label={youOpen ? "You" : "WAKILISHA Menu"} className="flex min-h-0 flex-1 flex-col outline-none">
+        <Dialog aria-label={browseOpen ? "Browse more" : youOpen ? "You" : "WAKILISHA Menu"} className="flex min-h-0 flex-1 flex-col outline-none">
           <header className="flex min-h-[64px] items-center justify-between gap-3 px-5">
-            {youOpen ? (
+            {browseOpen ? (
+              <button type="button" onClick={() => setBrowseOpen(false)}
+                aria-label="Back to You"
+                className="flex min-h-11 items-center gap-2 rounded-lg px-1 text-[14px] font-bold text-[var(--wk-text)] focus-visible:outline-2 focus-visible:outline-[var(--wk-brand)]">
+                <WkIcon name="ChevronLeft" size={20} /> You
+              </button>
+            ) : youOpen ? (
               <button type="button" onClick={() => setYouOpen(false)}
                 className="flex h-11 items-center gap-2 text-[14px] font-bold text-[var(--wk-text)]">
                 <WkIcon name="ChevronLeft" size={20} /> Menu
@@ -145,6 +155,38 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
                 )}
               </div>
             </>
+          ) : browseOpen ? (
+            <div data-wk-browse-more-panel className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-3">
+              <div className="px-1 pb-5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--wk-brand)]">Explore</p>
+                <h2 className="mt-1 text-[22px] font-extrabold tracking-tight text-[var(--wk-text)]">More to explore</h2>
+                <p className="mt-1 text-[12px] leading-5 text-[var(--wk-text-muted)]">
+                  Find music, stories and more from WAKILISHA.
+                </p>
+              </div>
+              <nav aria-label="More WAKILISHA destinations" className="space-y-6">
+                {([
+                  { heading: "Music and culture", items: WAKILISHA_MORE_DESTINATIONS },
+                  { heading: "About WAKILISHA", items: WAKILISHA_FOOT_LINKS },
+                ] as const).map((group) => (
+                  <section key={group.heading} aria-label={group.heading}>
+                    <h3 className="mb-2 px-1 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--wk-text-muted)]">
+                      {group.heading}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {group.items.map((item) => (
+                        <Link key={item.to} to={item.to} onClick={close}
+                          aria-current={isWakilishaNavCurrent(location.pathname, item.to) ? "page" : undefined}
+                          className={`flex min-h-[52px] items-center justify-between gap-1 rounded-xl border border-[var(--wk-border)] px-3 py-2 text-[13px] font-semibold leading-5 text-[var(--wk-text)] transition-colors hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--wk-brand)] ${isWakilishaNavCurrent(location.pathname, item.to) ? "border-[var(--wk-brand)] bg-[var(--wk-brand-soft)]" : "bg-[var(--wk-bg)]"}`}>
+                          <span>{item.label}</span>
+                          <WkIcon name="ArrowUpRight" size={14} aria-hidden="true" className="shrink-0 text-[var(--wk-text-muted)]" />
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </nav>
+            </div>
           ) : (
             <>
               <div className="border-b border-[var(--wk-divider)] px-5 py-4">
@@ -180,19 +222,16 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
                   </button>
                 </nav>
                 {appearanceControls}
-                <WkDisclosure
-                  summary="Browse more"
-                  className="border-t border-[var(--wk-divider)] px-3 py-2"
-                  triggerClassName="flex min-h-11 w-full items-center text-left text-[13px] font-semibold text-[var(--wk-text-muted)]"
-                  contentClassName="flex flex-col pb-2"
-                >
-                  {[...WAKILISHA_MORE_DESTINATIONS, ...WAKILISHA_FOOT_LINKS].map(item => (
-                    <Link key={item.to} to={item.to} onClick={close}
-                      className="flex min-h-10 items-center rounded-lg px-2 text-[13px] text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]">
-                      {item.label}
-                    </Link>
-                  ))}
-                </WkDisclosure>
+                <button type="button" onClick={() => setBrowseOpen(true)}
+                  aria-label="Browse more"
+                  className="mt-2 flex min-h-[58px] w-full items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-left transition-colors hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--wk-brand)]">
+                  <WkIcon name="Compass" size={21} aria-hidden="true" className="shrink-0 text-[var(--wk-brand)]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-bold text-[var(--wk-text)]">Browse more</span>
+                    <span className="block text-[11px] leading-4 text-[var(--wk-text-muted)]">Music, guides and WAKILISHA</span>
+                  </span>
+                  <WkIcon name="ChevronRight" size={17} aria-hidden="true" className="shrink-0 text-[var(--wk-text-muted)]" />
+                </button>
                 <button type="button" onClick={() => { void signOut().then(success => { if (success) close(); }); }}
                   disabled={signingOut}
                   className="flex min-h-12 w-full items-center gap-4 rounded-xl px-3 text-left text-[14px] font-semibold text-[var(--wk-text)] disabled:opacity-50">
