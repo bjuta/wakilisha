@@ -114,6 +114,9 @@ describe("MIZIZI reference-inspired, live-data operational workspace", () => {
     }
     expect(css).not.toContain("/assets/fonts/mizizi/");
     expect(css).not.toContain("@font-face");
+    // Standalone product shell: no legacy Admin Studio padding compensation,
+    // including the previously overlooked <=680px media rule.
+    expect(css).not.toMatch(/\[data-wk-mizizi-workspace\]\s*\{[^}]*\bmargin\s*:\s*-/);
     expect(css).toContain("var(--wk-font-body, Figtree");
     expect(sharedCss).toContain("font-family:'Figtree'");
     expect(sharedCss).toContain("font-family:'IBM Plex Mono'");
