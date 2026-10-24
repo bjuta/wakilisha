@@ -232,7 +232,8 @@ describe("WAKILISHA image and video caption ownership", () => {
     const card = fs.readFileSync("src/components/video/VideoCard.tsx", "utf8");
     const frame = fs.readFileSync("src/components/video/VideoCardFrame.tsx", "utf8");
     expect(card).toContain("thumbnail={video.thumbnail}");
-    expect(frame).toContain("onError={() => setImgError(true)}");
+    expect(frame).toContain("onError={advanceThumbnail}");
+    expect(frame).toContain("naturalWidth <= 120");
   });
 
   it("binds provider video captions to their player cards and removes redundant body paragraphs", () => {
