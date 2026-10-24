@@ -20,7 +20,7 @@ export function ArticleFloatHeader({
     .toUpperCase();
 
   return (
-    <aside className="wk-reference-article-byline lg:w-[260px]" aria-label="Article author and actions">
+    <aside className="wk-reference-article-byline lg:w-[230px]" aria-label="Article author and actions">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-3">
           <ArticleAuthorIdentity
