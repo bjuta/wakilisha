@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.18"
+    PostgrestVersion: "14.5"
   }
   editorial: {
     Tables: {
@@ -20486,6 +20486,25 @@ export type Database = {
         Args: { p_artist_id: string; p_staging_id: string }
         Returns: Json
       }
+      admin_mizizi_attest_question_source_v1: {
+        Args: {
+          p_attestation_id: string
+          p_case_id: string
+          p_decision: string
+          p_editorial_source_version_id: string
+          p_expected_case_revision: number
+          p_expected_registry_fingerprint: string
+          p_expected_source_fingerprint: string
+          p_independence_reason: string
+          p_question_id: string
+          p_question_revision: number
+          p_registry_assertion_id: string
+          p_review_reason: string
+          p_source_correlation_reason: string
+          p_source_family_key: string
+        }
+        Returns: Json
+      }
       admin_mizizi_begin_case_research_v1: {
         Args: {
           p_case_id: string
@@ -20542,6 +20561,15 @@ export type Database = {
       admin_mizizi_list_workspace_holds_v1: {
         Args: { p_limit?: number }
         Returns: Json[]
+      }
+      admin_mizizi_question_source_attestations_v1: {
+        Args: {
+          p_case_id: string
+          p_expected_case_revision: number
+          p_question_id: string
+          p_question_revision: number
+        }
+        Returns: Json
       }
       admin_mizizi_release_workspace_hold_v1: {
         Args: {
