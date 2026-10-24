@@ -126,6 +126,7 @@ test("Insert Release discovers draft records with no active memberships, but can
 });
 
 test("media-bound captions remain attached after a real browser edit and save", async ({ page }, info) => {
+  page.on("pageerror", (error) => console.log("WK_CAPTION_PAGE_ERROR", error.message));
   // Tiptap rejects data: image URLs by default. Serve the synthetic artwork
   // through Chromium so the fixture exercises the real editor image contract.
   await page.route("**/wk-editorial-caption-artwork.svg", (route) =>
@@ -150,6 +151,18 @@ test("media-bound captions remain attached after a real browser edit and save", 
       await expect(caption).toHaveCSS("font-size", /^(12|12.5|13)px$/);
       await editor.locator("figure.wk-figure img").click();
       await page.getByRole("button", { name: "Caption", exact: true }).click();
+      // Diagnostic evidence before the modal assertion. Remove after the
+      // ownership failure is identified and the editor passes this test.
+      console.log("WK_CAPTION_AFTER_CLICK", JSON.stringify(await page.evaluate(() => ({
+        dialogs: Array.from(document.querySelectorAll('[role="dialog"]')).map((el) => ({
+          label: el.getAttribute("aria-label"),
+          text: el.textContent?.slice(0, 100),
+        })),
+        panels: document.querySelectorAll("[data-wk-modal-panel]").length,
+        captionButtons: Array.from(document.querySelectorAll("button")).filter((el) =>
+          el.textContent?.trim() === "Caption").length,
+        images: document.querySelectorAll(".ProseMirror figure.wk-figure img").length,
+      }))));
       const mediaDetails = page.getByRole("dialog", { name: "Image Details" });
       await expect(mediaDetails).toBeVisible();
       await mediaDetails.locator("textarea").fill("Edited attribution, this article only.");
