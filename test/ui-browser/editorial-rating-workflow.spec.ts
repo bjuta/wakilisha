@@ -173,6 +173,11 @@ test("media-bound captions remain attached after a real browser edit and save", 
       await editor.locator("p").last().click();
       await page.keyboard.type(" Edited.");
       await page.getByRole("button", { name: "Save draft" }).click();
+      console.log("WK_MEDIA_AFTER_SAVE", JSON.stringify(await page.evaluate(() => ({
+        savedHtml: document.querySelector("[data-wk-saved-html]")?.textContent?.slice(0, 1200),
+        editorHtml: document.querySelector(".ProseMirror")?.innerHTML.slice(0, 1200),
+        savedNodes: document.querySelector("[data-wk-saved-article]")?.innerHTML.slice(0, 1200),
+      }))));
       await expect(page.locator("[data-wk-saved-article] figure > figcaption")).toHaveCount(1);
       await expect(page.locator("[data-wk-saved-article] p")).toHaveCount(2);
       await page.getByRole("button", { name: "Reopen saved draft" }).click();
