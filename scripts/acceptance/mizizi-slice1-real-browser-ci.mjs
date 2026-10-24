@@ -108,8 +108,13 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
   });
   await page.evaluate(async()=>{
    await document.fonts.ready;
-   window.scrollTo(0,0);
+   // The app may use smooth scrolling. Capture from a stable, actual top
+   // rather than stitching a full-page screenshot mid-scroll after disclosure.
+   document.documentElement.style.scrollBehavior="auto";
+   document.body.style.scrollBehavior="auto";
+   window.scrollTo({top:0,left:0,behavior:"instant"});
   });
+  await page.waitForFunction(()=>window.scrollY===0,undefined,{timeout:10000});
   const v=await page.evaluate(()=>{
    const workspace=document.querySelector('[data-wk-mizizi-workspace].mz-port');
    const productShell=document.querySelector('main[data-wk-mizizi-product-shell="true"]');
@@ -120,6 +125,7 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
    const tab=workspace?.querySelector(".mz-v3-rail [role='tab']");
    const caseStory=workspace?.querySelector('article[aria-label="Selected investigation"]');
    return {
+    windowScrollY:window.scrollY,
     documentWidth:document.documentElement.scrollWidth,
     viewportWidth:document.documentElement.clientWidth,
     appWidth:workspace?.getBoundingClientRect().width||0,
@@ -133,11 +139,14 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
     brandVisible:brand?getComputedStyle(brand).display!=="none":false,
     toolbarHeight:toolbar?.getBoundingClientRect().height||0,
     tablistWidth:tabs?.getBoundingClientRect().width||0,
+    tablistTop:tabs?.getBoundingClientRect().top??-1,
     tablistDirection:tabs?getComputedStyle(tabs).flexDirection:"",
     firstTabHeight:tab?.getBoundingClientRect().height||0,
     caseWidth:caseStory?.getBoundingClientRect().width||0,
    };
   });
+  assert(v.windowScrollY===0,
+   "STOP_MIZIZI_M1_SCREENSHOT_NOT_TOP_"+width+"_"+JSON.stringify(v));
   assert(v.productShellPresent&&!v.nestedAdminPresent&&
    !v.publicHeaderPresent&&!v.publicShellPresent,
    "STOP_MIZIZI_DOUBLE_APPLICATION_CHROME_"+width+"_"+JSON.stringify(v));
@@ -153,9 +162,18 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
     v.toolbarHeight>=63.5&&Math.abs(v.brandTop)<=2&&Math.abs(v.toolbarTop)<=2,
     "STOP_MIZIZI_M1_DESKTOP_RAIL_TOOLBAR_DRIFT_"+width+"_"+JSON.stringify(v));
   }else{
-   assert(!v.brandVisible&&v.tablistDirection==="row",
-    "STOP_MIZIZI_M1_MOBILE_NAV_DRIFT_"+width+"_"+JSON.stringify(v));
+   assert(!v.brandVisible&&v.tablistDirection==="row"&&
+    Math.abs(v.toolbarTop)<=2&&
+    v.tablistTop>=v.toolbarHeight-2&&
+    v.tablistTop<=v.toolbarHeight+2,
+    "STOP_MIZIZI_M1_MOBILE_TOP_CHROME_DRIFT_"+width+"_"+JSON.stringify(v));
   }
+  // First fold is separately reviewable and avoids a fullPage sticky capture
+  // being mistaken for actual visual position.
+  await page.screenshot({
+   path:"test-results/mizizi-phase1-m1/workbench-"+width+"-fold.png",
+   fullPage:false,
+  });
   await page.screenshot({
    path:"test-results/mizizi-phase1-m1/workbench-"+width+".png",
    fullPage:true,
