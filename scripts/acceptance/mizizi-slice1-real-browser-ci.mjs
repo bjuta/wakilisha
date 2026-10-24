@@ -199,6 +199,17 @@ export async function verifyLocalHeadquartersBrowsersV1({
    await mobileOverflow(phone);
    console.log("WK_BROWSER_MOBILE_390PX_NO_DOCUMENT_OVERFLOW=PASS");
 
+   // The case-first v3 Workbench deliberately collapses the separate Registry
+   // inventory. Open it as an operator would; review-session behavior below
+   // remains the same real authenticated, bounded interaction.
+   const inventoryTrigger=desk.locator(".mz-review-inventory-trigger");
+   await inventoryTrigger.waitFor({state:"visible",timeout:30000});
+   assert(await inventoryTrigger.getAttribute("aria-expanded")==="false",
+    "STOP_MIZIZI_REGISTRY_INVENTORY_NOT_COLLAPSED_AT_REST");
+   await inventoryTrigger.click();
+   assert(await inventoryTrigger.getAttribute("aria-expanded")==="true",
+    "STOP_MIZIZI_REGISTRY_INVENTORY_DISCLOSURE_DID_NOT_OPEN");
+
    // Original Slice 1 time-box and Done for Now: real authenticated UI.
    // This exits the bounded review session; it DOES NOT approve the Registry
    // source or mark a durable case done_for_now. Those are separate authorities.
