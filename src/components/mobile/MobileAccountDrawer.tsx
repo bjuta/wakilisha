@@ -47,6 +47,7 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
 }) {
   const [youOpen, setYouOpen] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
+  const location = useLocation();
   const authUser = useAuthUser();
   const { theme, setTheme } = useTheme();
   const { signOut, signingOut, signOutError } = useSessionSignOut("/auth");
