@@ -346,7 +346,7 @@ jobs:
           test -n "$DB"
           count="$(docker exec -i "$DB" psql -X -q -t -A -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c 'select count(*) from supabase_migrations.schema_migrations')"
           test "$count" = "$expected"
-          echo "WK_MIZIZI_INITIAL_$START_KIND_LEDGER=PASS"
+          echo "WK_MIZIZI_INITIAL_${START_KIND}_LEDGER=PASS"
           if test "$START_KIND" = preview-first; then
             for f in "${chart[@]}"; do cp "_phase1_main/supabase/migrations/$f" "supabase/migrations/$f"; done
             supabase migration up --local
