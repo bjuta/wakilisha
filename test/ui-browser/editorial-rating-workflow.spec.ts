@@ -124,3 +124,38 @@ test("Insert Release discovers draft records with no active memberships, but can
   expect(requests).toContain("/rest/v1/registry_releases");
   await expect(page.locator(".ProseMirror")).not.toContainText("[release");
 });
+
+test("media-bound captions remain attached after a real browser edit and save", async ({ page }, info) => {
+  for (const width of [390, 1440]) {
+    for (const theme of ["light", "dark"]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(PAGE + "?media");
+      await page.locator("html").evaluate((node, value) =>
+        node.setAttribute("data-wk-theme", value), theme);
+      const editor = page.locator(".ProseMirror[contenteditable=true]");
+      await expect(editor.locator("figure.wk-figure > img")).toHaveCount(1);
+      const caption = editor.locator("figure.wk-figure > figcaption.wk-figcaption");
+      await expect(caption).toHaveCount(1);
+      expect(await caption.getAttribute("contenteditable")).toBe("false");
+      await expect(editor.locator("p")).toHaveCount(2);
+      await expect(caption).toHaveCSS("font-size", /^(12|12.5|13)px$/);
+      await editor.locator("p").last().click();
+      await page.keyboard.type(" Edited.");
+      await page.getByRole("button", { name: "Save draft" }).click();
+      await expect(page.locator("[data-wk-saved-article] figure > figcaption")).toHaveCount(1);
+      await expect(page.locator("[data-wk-saved-article] p")).toHaveCount(2);
+      await page.getByRole("button", { name: "Reopen saved draft" }).click();
+      await expect(editor.locator("figure > figcaption")).toHaveCount(1);
+      await expect(editor.locator("p")).toHaveCount(2);
+      const overflow = await page.evaluate(() =>
+        Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) -
+        document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(2);
+      await page.screenshot({
+        path: info.outputPath("media-caption-" + width + "-" + theme + ".png"),
+        animations: "disabled",
+        fullPage: false,
+      });
+    }
+  }
+});
