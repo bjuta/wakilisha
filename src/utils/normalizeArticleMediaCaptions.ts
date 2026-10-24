@@ -45,6 +45,9 @@ export function normalizeArticleMediaCaptions(
   assets: Map<string, MediaCaptionEntry> = new Map(),
 ): string {
   if (!html || !/<(?:img|iframe|video|figure)\b/i.test(html)) return html;
+  // Leave unrelated markup byte-for-byte unchanged; only media with actual
+  // caption evidence needs normalization.
+  if (!/data-caption\s*=|<figcaption\b/i.test(html) && assets.size === 0) return html;
   if (typeof DOMParser === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
 
