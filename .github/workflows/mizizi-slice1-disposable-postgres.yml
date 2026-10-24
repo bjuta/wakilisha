@@ -17,6 +17,7 @@ on:
       - "scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql"
       - "scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql"
       - "scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql"
+      - "scripts/control-plane/verify-mizizi-question-version-reader-v1.sql"
       - "supabase/migrations/**"
       - "scripts/registry/agents/mizizi/runtime/**"
 
@@ -70,6 +71,9 @@ jobs:
           test -f supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
           mv supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql "$RUNNER_TEMP/wk-mizizi-db06.sql"
           test ! -e supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+          test -f supabase/migrations/20261017185928_mizizi_question_assessment_authority_v1.sql
+          mv supabase/migrations/20261017185928_mizizi_question_assessment_authority_v1.sql "$RUNNER_TEMP/wk-mizizi-qv1.sql"
+          test ! -e supabase/migrations/20261017185928_mizizi_question_assessment_authority_v1.sql
 
       - name: Start disposable local database and replay migrations
         shell: bash
@@ -106,9 +110,13 @@ jobs:
           mv "$RUNNER_TEMP/wk-mizizi-db05.sql" supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
           test -f "$RUNNER_TEMP/wk-mizizi-db06.sql"
           mv "$RUNNER_TEMP/wk-mizizi-db06.sql" supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+          test -f "$RUNNER_TEMP/wk-mizizi-qv1.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-qv1.sql" supabase/migrations/20261017185928_mizizi_question_assessment_authority_v1.sql
           supabase migration up --local
           DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
           test -n "$DB"
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-question-version-reader-v1.sql
           docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
             < scripts/acceptance/mizizi-adaptive-pass-disposable-ci.sql
 
@@ -182,6 +190,9 @@ jobs:
           test -f supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
           mv supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql "$RUNNER_TEMP/wk-mizizi-db06.sql"
           test ! -e supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+          test -f supabase/migrations/20261017185928_mizizi_question_assessment_authority_v1.sql
+          mv supabase/migrations/20261017185928_mizizi_question_assessment_authority_v1.sql "$RUNNER_TEMP/wk-mizizi-qv1.sql"
+          test ! -e supabase/migrations/20261017185928_mizizi_question_assessment_authority_v1.sql
 
       - name: Start disposable local database, Auth and REST gateway
         shell: bash
@@ -200,6 +211,25 @@ jobs:
             < scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql
           docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
             < scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql
+
+      - name: Restore researched migrations and QV1 after original 231 verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$RUNNER_TEMP/wk-mizizi-db04.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-db04.sql" supabase/migrations/20261016064245_mizizi_research_pass_memory_v1.sql
+          test -f "$RUNNER_TEMP/wk-mizizi-db05.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-db05.sql" supabase/migrations/20261016092731_mizizi_external_wikidata_research_intake_v1.sql
+          test -f "$RUNNER_TEMP/wk-mizizi-db06.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-db06.sql" supabase/migrations/20261016114918_mizizi_research_job_retry_budget_v1.sql
+          test -f "$RUNNER_TEMP/wk-mizizi-qv1.sql"
+          mv "$RUNNER_TEMP/wk-mizizi-qv1.sql" supabase/migrations/20261017185928_mizizi_question_assessment_authority_v1.sql
+          supabase migration up --local
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-question-version-reader-v1.sql
+          echo "WK_MIZIZI_LOCAL_235_FOR_GENUINE_JWT=PASS"
 
       - name: Exercise genuine JWT operator bootstrap, case and competing hold RPCs
         shell: bash

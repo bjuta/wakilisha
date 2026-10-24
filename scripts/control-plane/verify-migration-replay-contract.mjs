@@ -365,6 +365,7 @@ function parseNameStatus(raw) {
 
 function collectChangedMigrations(
   mergeBase,
+  candidateHead,
 ) {
   const committed =
     parseNameStatus(
@@ -372,7 +373,7 @@ function collectChangedMigrations(
         "diff",
         "--name-status",
         "--find-renames",
-        `${mergeBase}...HEAD`,
+        `${mergeBase}...${candidateHead}`,
         "--",
         MIGRATIONS_DIR,
       ]).stdout,
@@ -475,12 +476,49 @@ function readJson(
   }
 }
 
+/**
+ * On pull_request GitHub checks out refs/pull/N/merge by default.
+ * That synthetic commit contains the *current* main ancestry, which can
+ * advance after a migration preview receipt was legitimately minted.
+ * Validate migration provenance against the actual SHA from GitHub's
+ * trusted event payload, not that synthetic merge commit.
+ *
+ * The worktree is still the merged tree for build, types, and browser CI.
+ * Outside GitHub PR jobs we retain the normal HEAD behavior.
+ */
+function migrationCandidateHead() {
+  if (process.env.GITHUB_EVENT_NAME !== "pull_request") return "HEAD";
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!eventPath || !fs.existsSync(eventPath)) {
+    fail("Pull-request migration authority requires its event payload.");
+  }
+  let event;
+  try {
+    event = JSON.parse(fs.readFileSync(eventPath, "utf8"));
+  } catch (error) {
+    fail("Invalid GitHub PR authority event.", String(error));
+  }
+  const source = event?.pull_request?.head;
+  const sha = source?.sha;
+  if (!/^[0-9a-f]{40}$/.test(sha ?? "") ||
+      source?.repo?.full_name !== process.env.GITHUB_REPOSITORY ||
+      source?.ref !== process.env.GITHUB_HEAD_REF) {
+    fail("GitHub PR candidate head or repository authority mismatch.");
+  }
+  const object = runGit(["cat-file", "-e", `${sha}^{commit}`], {allowFailure:true});
+  if (object.status !== 0) {
+    fail("Trusted PR candidate commit is absent from full checkout.", sha);
+  }
+  return sha;
+}
+
 function main() {
+  const candidateHead = migrationCandidateHead();
   const mergeBaseResult =
     runGit(
       [
         "merge-base",
-        "HEAD",
+        candidateHead,
         BASE_REF,
       ],
       {
@@ -517,6 +555,7 @@ function main() {
   const changed =
     collectChangedMigrations(
       mergeBase,
+      candidateHead,
     );
 
   if (

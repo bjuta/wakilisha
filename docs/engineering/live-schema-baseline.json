@@ -1,15 +1,15 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-10-16T15:02:08.188Z",
-  "typesSha256": "639f0e9f3c80ac20d0927fa8bff601dcf39c91f9fc48c975abf9725bf48f226a",
+  "generatedAt": "2026-10-17T19:45:20.897Z",
+  "typesSha256": "52b79a1fe2c17395c20f10cd517dde5b838fb3e13729b3f20d3dce2bff6b16db",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 234,
-  "latestMigration": "20261016114918_mizizi_research_job_retry_budget_v1.sql",
+  "migrationCount": 235,
+  "latestMigration": "20261017185928_mizizi_question_assessment_authority_v1.sql",
   "schemaSeal": {
     "mode": "preview",
     "sourceProjectRef": "nkgfoppunmnkcumalxqp",
-    "migrationHead": "20261016114918",
+    "migrationHead": "20261017185928",
     "baseMainSha": "aed0323cb3baa34313dede0d5d08b8af35c4f7a7",
     "previewBranchId": "8c0affc1-b43b-44ac-b2eb-66715ed40252"
   }
