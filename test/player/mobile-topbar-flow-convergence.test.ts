@@ -19,8 +19,9 @@ describe("Workbook v4 shared public header and drawer flow", () => {
   it("shows a theme-contrasting logo-free header and reveals it on upward scroll", () => {
     expect(header).toContain("pointer-events-none fixed inset-x-0 top-0");
     expect(header).toContain("bg-transparent");
-    expect(header).toContain("text-white");
-    expect(header).toContain("mix-blend-difference");
+    expect(header).toContain("text-[var(--wk-text)]");
+    expect(header).toContain("bg-[var(--wk-surface)]");
+    expect(header).not.toContain("mix-blend-difference");
     expect(header).not.toContain("<img");
     expect(header).not.toContain("useTheme");
     expect(drawer).toContain("/assets/logos/wakilisha-logo-light.svg");
