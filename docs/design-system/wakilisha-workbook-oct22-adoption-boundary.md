@@ -1,5 +1,7 @@
 # WAKILISHA brand workbook: 22 October 2026 adoption boundary
 
+> **24 October 2026, MIZIZI scope confirmation:** The newer MIZIZI workbook defines the **canonical M1–M13 UI and UX** but explicitly does **not** authorize the unrelated Distribution or payout/ingestion business in its combined HTML. Apply this file's existing **preserve accepted architecture and runtime authority** conflict rule to MIZIZI as well: review approval never automatically grants Registry mutation; source presence never proves lawful reuse; a mock record never becomes public fact. The current [MIZIZI Phase 1 authority](../engineering/mizizi-product-phase1-reconciliation-20261024.md) incorporates source fingerprint distinctions and the four substantive completion phases. The previous Oct 22 auth, player and email notes below remain independently scoped, not retroactive MIZIZI signoffs.
+
 **Status:** owner design instruction and engineering interpretation. This document does not authorize Production deployment, replacement of domain authority, or acceptance of untested UI.
 
 **Source:** `MIZIZI WAKILISHA Brand Workbook (2).html`, SHA-256 `97642ffa40c6815c152c64eea6daa963b67ef91200c201db0467641b4acec36e`, provided 22 October 2026. The unpacked source includes Sections 14 (Navigation), 17 (Media and playback), 21 (Pages), 22 (Accounts and onboarding), and 23 (Email). It is an editable design reference, not production code, canonical records, security policy, or a change authorization for Supabase.

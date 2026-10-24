@@ -1,5 +1,9 @@
 # WAKILISHA × MIZIZI — Four-phase design and product closure
 
+> **24 October 2026, superseding product/release status:** The owner-approved [MIZIZI Product and Phase 1 Authority](./mizizi-product-phase1-reconciliation-20261024.md) and [documentation authority index](./mizizi-documentation-authority-index-20261024.md) are the current MIZIZI programme and release interpretation. Historic claims, migration receipts, source hashes, dated design checkpoints and prior CI outcomes below are retained as evidence, not rewritten. Live read-only Supabase census: Production **234** migrations through `20261020072800`, Preview **237** through `20261017212255`; Preview is **not** a linear Production superset. #1246 **merged**; #1243, #1244 and #1248–#1251 remain draft. No SQL, Edge or Production change is authorized by this documentation update.
+> 
+> **Current four-phase naming supersedes the October 18 planning layout:** **Phase 1** source/design/architecture and environment convergence (merged WAKILISHA shared design reused, live MIZIZI-specific parity outstanding); **Phase 2** authentic Headquarters M1–M5 intelligence; **Phase 3** M6–M13 Field, Contributions, public Record, reviewers, Settings and scoped organizations; **Phase 4** integrated Production release and final closure. These are delivery outcomes, not new micro-PR programmes. The prior October 18 Phase 1 code implementation and its separately recorded release history remain valid but do not establish completion of today's MIZIZI Phase 1.
+
 **Adopted scope:** 18 October 2026. **Status:** executable engineering programme, not approval to merge or deploy. **Starting delivery branch:** existing Workbook v4 PR #1246. This document travels with #1246 until its protected merge, then remains on main. No new parallel programme PRs.
 
 ## Authority and exclusions
