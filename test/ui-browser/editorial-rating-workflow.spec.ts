@@ -127,6 +127,7 @@ test("Insert Release discovers draft records with no active memberships, but can
 
 test("media-bound captions remain attached after a real browser edit and save", async ({ page }, info) => {
   page.on("pageerror", (error) => console.log("WK_CAPTION_PAGE_ERROR", error.message));
+  page.on("console", (message) => { if (message.text().startsWith("WK_CAPTION_")) console.log(message.text()); });
   // Tiptap rejects data: image URLs by default. Serve the synthetic artwork
   // through Chromium so the fixture exercises the real editor image contract.
   await page.route("**/wk-editorial-caption-artwork.svg", (route) =>
@@ -161,6 +162,7 @@ test("media-bound captions remain attached after a real browser edit and save", 
         panels: document.querySelectorAll("[data-wk-modal-panel]").length,
         captionButtons: Array.from(document.querySelectorAll("button")).filter((el) =>
           el.textContent?.trim() === "Caption").length,
+        captionOpen: document.querySelector("[data-wk-caption-open]")?.getAttribute("data-wk-caption-open"),
         images: document.querySelectorAll(".ProseMirror figure.wk-figure img").length,
       }))));
       const mediaDetails = page.getByRole("dialog", { name: "Image Details" });
