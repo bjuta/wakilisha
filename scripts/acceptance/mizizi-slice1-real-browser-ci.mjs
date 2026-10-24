@@ -87,11 +87,22 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
  const sizes=[390,480,768,1024,1280,1440];
  mkdirSync("test-results/mizizi-phase1-m1",{recursive:true});
  for(const width of sizes){
-  const page=width===390?mobile:desktop;
-  await page.setViewportSize({width,height:width===390?844:900});
-  await page.locator('[data-wk-mizizi-workspace].mz-port').waitFor({
+  // 390/480 are real touch-client contexts. Width 768 deliberately probes
+  // the mobile-to-desktop shell boundary using the same authenticated client.
+  const page=width<=768?mobile:desktop;
+  await page.setViewportSize({width,height:width<768?844:900});
+  await page.locator('article[aria-label="Selected investigation"]').waitFor({
    state:"visible",timeout:30000,
   });
+  // Resizing across the 768px mobile breakpoint remounts ResponsiveAppLayout.
+  // Wait for that authenticated layout to settle, not an outgoing shell's DOM.
+  await page.waitForFunction((w)=>{
+   const app=document.querySelector('[data-wk-mizizi-workspace].mz-port');
+   const story=app?.querySelector('article[aria-label="Selected investigation"]');
+   const appWidth=app?.getBoundingClientRect().width||0;
+   const storyWidth=story?.getBoundingClientRect().width||0;
+   return storyWidth>0&&(w>=768||appWidth>=w-40);
+  },width,{timeout:30000});
   await page.getByRole("tab",{name:"Workbench"}).waitFor({
    state:"visible",timeout:30000,
   });
