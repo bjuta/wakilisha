@@ -9,7 +9,7 @@ import { RichTextEditor } from "@/components/design-system/editorial/RichTextEdi
 
 const MEDIA_CAPTION = "EP Artwork for Charisma’s Forever to Never. | Image: Charisma";
 const MEDIA_ORIGINAL = '<p>Before the artwork.</p>' +
-  '<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22800%22 height=%22450%22%3E%3Crect width=%22800%22 height=%22450%22 fill=%22%23334658%22/%3E%3C/svg%3E" alt="Artwork" data-caption="' + MEDIA_CAPTION + '">' +
+  '<img src="/wk-editorial-caption-artwork.svg" alt="Artwork" data-caption="' + MEDIA_CAPTION + '">' +
   '<p>' + MEDIA_CAPTION + '</p><p>The music review continues.</p>';
 const ORIGINAL = new URLSearchParams(window.location.search).has("media")
   ? MEDIA_ORIGINAL : "<p>Album review begins here. The production holds its own.</p>";
