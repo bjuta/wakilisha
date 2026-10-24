@@ -78,10 +78,15 @@ export const ExtendedImage = Image.extend({
     };
   },
 
-  renderHTML({ HTMLAttributes }) {
-    const { caption, alignment, ...imgAttrs } = HTMLAttributes;
-    // The attribute and semantic caption always travel with the same image atom.
-    if (caption) imgAttrs["data-caption"] = caption;
+  renderHTML({ node, HTMLAttributes }) {
+    // addAttributes().renderHTML maps these values to data-* keys, so
+    // reading HTMLAttributes.caption/alignment silently loses the figure.
+    // The canonical author values live on the TipTap image node.
+    const caption = typeof node.attrs.caption === 'string' ? node.attrs.caption.trim() : '';
+    const alignment = ['left', 'center', 'right'].includes(node.attrs.alignment)
+      ? node.attrs.alignment as string : '';
+    const imgAttrs = { ...HTMLAttributes };
+    if (caption) imgAttrs['data-caption'] = caption;
     const alignClass = alignment ? `align-${alignment}` : '';
 
     if (caption) {
