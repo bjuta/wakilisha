@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Dialog, Modal as AriaModal, ModalOverlay } from "react-aria-components";
 import { WakilishaAccountMark } from "@/components/brand/WakilishaAccountMark";
@@ -47,6 +47,7 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
 }) {
   const [youOpen, setYouOpen] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
+  const browseTriggerRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
   const authUser = useAuthUser();
   const { theme, setTheme } = useTheme();
@@ -105,7 +106,10 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
         <Dialog aria-label={browseOpen ? "Browse more" : youOpen ? "You" : "WAKILISHA Menu"} className="flex min-h-0 flex-1 flex-col outline-none">
           <header className="flex min-h-[64px] items-center justify-between gap-3 px-5">
             {browseOpen ? (
-              <button type="button" onClick={() => setBrowseOpen(false)}
+              <button type="button" onClick={() => {
+                setBrowseOpen(false);
+                requestAnimationFrame(() => browseTriggerRef.current?.focus());
+              }}
                 aria-label="Back to You"
                 className="flex min-h-11 items-center gap-2 rounded-lg px-1 text-[14px] font-bold text-[var(--wk-text)] focus-visible:outline-2 focus-visible:outline-[var(--wk-brand)]">
                 <WkIcon name="ChevronLeft" size={20} /> You
@@ -223,7 +227,7 @@ export function MobileAccountDrawer({ open, onClose, onSearch, startInYou = fals
                   </button>
                 </nav>
                 {appearanceControls}
-                <button type="button" onClick={() => setBrowseOpen(true)}
+                <button ref={browseTriggerRef} type="button" onClick={() => setBrowseOpen(true)}
                   aria-label="Browse more"
                   className="mt-2 flex min-h-[58px] w-full items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg)] px-3 text-left transition-colors hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--wk-brand)]">
                   <WkIcon name="Compass" size={21} aria-hidden="true" className="shrink-0 text-[var(--wk-brand)]" />
