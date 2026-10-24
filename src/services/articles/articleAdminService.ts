@@ -17,7 +17,7 @@ import {
   generateExcerpt,
   normalizeTaxonomyTerms,
 } from "@/services/articles/contentPipeline";
-import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
+import { prepareMediaCaptionsForEditor, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
 import { getAdminMediaAssetsByIds } from "@/services/adminMediaReadService";
 
 /* ─── Raw Supabase Row ─── */
@@ -249,7 +249,7 @@ export async function fetchArticleForAdmin(slug: string): Promise<AdminArticleDe
           const assetMap =
             buildAssetCaptionMap(captionEntries);
           contentHtml =
-            injectMediaCaptions(contentHtml, assetMap);
+            prepareMediaCaptionsForEditor(contentHtml, assetMap);
         }
       } catch {
         // Non-blocking — captions are a nice-to-have
