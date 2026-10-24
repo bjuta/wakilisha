@@ -358,8 +358,10 @@ if (
   mobileCss.includes(".phn-nav--compact") ||
   mobileCss.includes(".phn-nav-primary-core") ||
   !mobileAppLayout.includes("<MobileTopBar") ||
-  !mobileSidebar.includes('aria-label={youOpen ? "You" : "WAKILISHA Menu"}') ||
-  !mobileSidebar.includes('aria-label="WAKILISHA places"')
+  !mobileSidebar.includes('aria-label={browseOpen ? "Browse more" : youOpen ? "You" : "WAKILISHA Menu"}') ||
+  !mobileSidebar.includes('aria-label="WAKILISHA places"') ||
+  !mobileSidebar.includes('aria-label="More WAKILISHA destinations"') ||
+  !mobileSidebar.includes('aria-label="Back to You"')
 ) {
   fail(
     "Workbook v4 must render one accessible mobile sidebar and no legacy bottom navigation",

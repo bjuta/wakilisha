@@ -39,6 +39,23 @@ describe("Workbook places and private You navigation", () => {
     expect(drawer).toContain('{appearanceControls}');
   });
 
+  it("gives signed-in Browse more its own compact grouped panel instead of expanding the You sidebar", async () => {
+    const { readFileSync } = await import("node:fs");
+    const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
+    expect(drawer).toContain('aria-label="Browse more"');
+    expect(drawer).toContain("setBrowseOpen(true)");
+    expect(drawer).toContain('data-wk-browse-more-panel');
+    expect(drawer).toContain('aria-label="More WAKILISHA destinations"');
+    expect(drawer).toContain('heading: "Music and culture", items: WAKILISHA_MORE_DESTINATIONS');
+    expect(drawer).toContain('heading: "About WAKILISHA", items: WAKILISHA_FOOT_LINKS');
+    expect(drawer).toContain('grid grid-cols-2 gap-2');
+    expect(drawer).toContain('aria-label="Back to You"');
+    expect(drawer).toContain("browseTriggerRef.current?.focus()");
+    expect(drawer).toContain("aria-current={isWakilishaNavCurrent(location.pathname, item.to)");
+    expect(drawer).not.toContain("WkDisclosure");
+    expect([...WAKILISHA_MORE_DESTINATIONS, ...WAKILISHA_FOOT_LINKS].map(item => item.to).length).toBe(12);
+  });
+
   it("retains existing secondary destinations and legal links", () => {
     const more = WAKILISHA_MORE_DESTINATIONS.map(item => item.to);
     for (const path of ["/shows", "/releases", "/playlists", "/genres", "/labels", "/guides", "/field"]) {

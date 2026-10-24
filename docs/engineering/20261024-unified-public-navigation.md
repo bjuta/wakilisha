@@ -21,3 +21,11 @@ Use existing critical tests and actual public browser route captures at 390, 768
 ## Visual evidence correction
 
 The first actual-route screenshots exposed faint Menu and Search glyphs on light pages. White ink with CSS difference blending is not reliable over a fixed transformed header on a plain light page. The shared controls now use the existing theme text and surface tokens without blend mode, preserving the transparent header while ensuring legible controls. Real Chromium checks enforce at least 4.5:1 computed foreground-to-control-background contrast in both modes. Navigation images must be uploaded before the isolated editor browser invocation clears the test output directory.
+
+## Signed-in Browse more composition (24 October 2026)
+
+The old signed-in `You → Browse more` disclosure expanded 12 mixed destinations as oversized vertical rows inside the account sidebar. This made discovery look like an unstructured afterthought and pushed account actions far below the fold.
+
+The signed-in You panel now presents a single compact **Browse more** entry. Activating it opens a dedicated, internally scrollable drawer view with two clearly labelled groups: **Music and culture** (7 existing destinations) and **About WAKILISHA** (5 existing informational/legal links). Destinations use a touch-accessible two-column grid; the existing route URLs remain unchanged. A **You** back affordance restores focus to the Browse more entry. Selecting a destination closes the drawer. Opening the global menu afresh resets the nested view.
+
+No new route, auth permission, server dependency or data mutation is introduced. Public guest navigation and the first-level menu are unchanged. Responsive acceptance should cover 390/768/1440-width drawers, dark and light themes, keyboard focus/back, Escape dismissal, and preservation of all 12 links.
