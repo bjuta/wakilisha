@@ -1431,7 +1431,8 @@ describe(
         expect(drawer).toContain("messagesAccess.visible");
         expect(drawer).toContain("navigation.map");
         expect(drawer).toContain("visibleWakilishaNavigation");
-        expect(desktop).toContain("navigation.map");
+        expect(desktop).toContain("<MobileTopBar />");
+        expect(desktop).not.toContain("<aside");
         expect(mobileTop).toContain('aria-label="Open WAKILISHA menu"');
         expect(mobileAppLayout).not.toContain("MobileBottomNav");
         expect(mobileAppLayout).not.toContain("phn-nav");
