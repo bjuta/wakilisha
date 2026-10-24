@@ -142,8 +142,30 @@ for (const width of [390, 768, 1440]) {
           await themeSwitch.click();
         }
         await expect(page.locator("html")).toHaveAttribute("data-wk-theme", mode);
-        // Static accessible roles are not enough: check the actual foreground
-        // against the now-opaque theme-aware button surface in Chromium.
+        await expect(drawer.locator('img[alt="WAKILISHA"]')).toHaveAttribute(
+          "src",
+          mode === "dark"
+            ? "/assets/logos/wakilisha-logo-dark.svg"
+            : "/assets/logos/wakilisha-logo-light.svg",
+        );
+        const sheet = await drawer.evaluate((node) => {
+          const rect = node.closest("#wk-workbook-sidebar")?.getBoundingClientRect();
+          return { left: rect?.left ?? -1, width: rect?.width ?? -1 };
+        });
+        expect(Math.abs(sheet.left)).toBeLessThanOrEqual(2);
+        expect(sheet.width).toBeGreaterThan(220);
+        expect(sheet.width).toBeLessThanOrEqual(Math.min(300, width));
+        await page.screenshot({
+          path: testInfo.outputPath(`workbook-v4-nav-${pageSpec.slug}-${width}-${mode}-open.png`),
+          animations: "disabled",
+          fullPage: false,
+        });
+        await page.keyboard.press("Escape");
+        await expect(drawer).toHaveCount(0);
+        await expect(menu).toBeFocused();
+        await expect(menu).toHaveAttribute("aria-expanded", "false");
+        // Measure *visible* Menu and Search after the drawer closes, not
+        // hidden controls under its modal scrim or during an in-flight theme change.
         for (const action of ["Open WAKILISHA menu", "Search"]) {
           const contrast = await topBar.getByRole("button", { name: action }).evaluate((node) => {
             const style = getComputedStyle(node);
@@ -176,28 +198,6 @@ for (const width of [390, 768, 1440]) {
           expect(contrast.background).not.toBe("rgba(0, 0, 0, 0)");
           expect(contrast.blend).toBe("normal");
         }
-        await expect(drawer.locator('img[alt="WAKILISHA"]')).toHaveAttribute(
-          "src",
-          mode === "dark"
-            ? "/assets/logos/wakilisha-logo-dark.svg"
-            : "/assets/logos/wakilisha-logo-light.svg",
-        );
-        const sheet = await drawer.evaluate((node) => {
-          const rect = node.closest("#wk-workbook-sidebar")?.getBoundingClientRect();
-          return { left: rect?.left ?? -1, width: rect?.width ?? -1 };
-        });
-        expect(Math.abs(sheet.left)).toBeLessThanOrEqual(2);
-        expect(sheet.width).toBeGreaterThan(220);
-        expect(sheet.width).toBeLessThanOrEqual(Math.min(300, width));
-        await page.screenshot({
-          path: testInfo.outputPath(`workbook-v4-nav-${pageSpec.slug}-${width}-${mode}-open.png`),
-          animations: "disabled",
-          fullPage: false,
-        });
-        await page.keyboard.press("Escape");
-        await expect(drawer).toHaveCount(0);
-        await expect(menu).toBeFocused();
-        await expect(menu).toHaveAttribute("aria-expanded", "false");
         await page.screenshot({
           path: testInfo.outputPath(`workbook-v4-nav-${pageSpec.slug}-${width}-${mode}-closed.png`),
           animations: "disabled",
