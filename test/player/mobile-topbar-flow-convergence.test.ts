@@ -6,11 +6,14 @@ const header = readFileSync("src/components/mobile/MobileTopBar.tsx", "utf8");
 const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
 const desktop = readFileSync("src/components/music/MusicDesktopShell.tsx", "utf8");
 
-describe("Workbook v4 mobile header and sidebar flow", () => {
-  it("opens places from the phone menu, not the private You view", () => {
-    expect(desktop).toContain("setMenuStartsInYou(false)");
-    expect(desktop).toContain("setMenuStartsInYou(true)");
-    expect(desktop).toContain("startInYou={menuStartsInYou && isSignedIn}");
+describe("Workbook v4 shared public header and drawer flow", () => {
+  it("shares one Menu and private You flow across viewport classes", () => {
+    expect(desktop).toContain("<MobileTopBar />");
+    expect(desktop).not.toContain("<aside");
+    expect(header).toContain("setAccountOpen(true)");
+    expect(header).toContain("MobileAccountDrawer");
+    expect(drawer).toContain("setYouOpen(true)");
+    expect(drawer).toContain("visibleWakilishaNavigation");
   });
 
   it("shows a theme-contrasting logo-free header and reveals it on upward scroll", () => {
