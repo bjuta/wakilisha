@@ -2,6 +2,7 @@ import {
   parseLegacyProviderUrl,
   providerLabel,
   providerSourceKey,
+  providerThumbnailUrl,
   type CanonicalVideoProviderSource,
 } from "./providerSource";
 
@@ -36,10 +37,9 @@ export function detectPlatform(url: string): string {
   return source ? providerLabel(source.providerKey) : "Video";
 }
 
-export function getThumbnail(_url: string): string | null {
-  // Avoid noisy 404s from old, private, or deleted provider thumbnails.
-  // Provider-backed surfaces may supply a known thumbnail explicitly.
-  return null;
+export function getThumbnail(url: string): string | null {
+  const source = parseLegacyProviderUrl(url);
+  return source ? providerThumbnailUrl(source) : null;
 }
 
 export function platformIcon(platform: string): string {
