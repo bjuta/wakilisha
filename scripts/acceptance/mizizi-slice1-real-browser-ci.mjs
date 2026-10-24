@@ -5,7 +5,7 @@
  */
 import { chromium } from "@playwright/test";
 import { createServer } from "vite";
-import { readFileSync } from "node:fs";
+import { readFileSync,mkdirSync } from "node:fs";
 
 const assert=(ok,code)=>{if(!ok)throw new Error(code);};
 async function signedIn(page,base,identity){
@@ -63,6 +63,69 @@ async function mobileOverflow(page){
  assert(metrics.full<=metrics.width+3&&metrics.panel>0,
   "STOP_BROWSER_MOBILE_HEADQUARTERS_HORIZONTAL_OVERFLOW");
 }
+
+/**
+ * Phase 1 workbook M1 shell geometry: genuine signed-in local Supabase data,
+ * actual Chromium CSS and font loading, no mocked RPC responses or hosted calls.
+ * Captures reflect viewport/layout only; NOT public/production visual acceptance.
+ */
+async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
+ const sizes=[390,480,768,1024,1280,1440];
+ mkdirSync("test-results/mizizi-phase1-m1",{recursive:true});
+ for(const width of sizes){
+  const page=width===390?mobile:desktop;
+  await page.setViewportSize({width,height:width===390?844:900});
+  await page.locator('[data-wk-mizizi-workspace].mz-port').waitFor({
+   state:"visible",timeout:30000,
+  });
+  await page.getByRole("tab",{name:"Workbench"}).waitFor({
+   state:"visible",timeout:30000,
+  });
+  await page.evaluate(async()=>{await document.fonts.ready;});
+  const v=await page.evaluate(()=>{
+   const workspace=document.querySelector('[data-wk-mizizi-workspace].mz-port');
+   const brand=workspace?.querySelector(".mz-v3-rail-brand");
+   const toolbar=workspace?.querySelector(".mz-head");
+   const tabs=workspace?.querySelector(".mz-v3-tabs > [role='tablist']");
+   const tab=workspace?.querySelector(".mz-v3-rail [role='tab']");
+   const panel=workspace?.querySelector("[data-wk-mizizi-durable-cases]");
+   return {
+    documentWidth:document.documentElement.scrollWidth,
+    viewportWidth:document.documentElement.clientWidth,
+    appWidth:workspace?.getBoundingClientRect().width||0,
+    brandWidth:brand?.getBoundingClientRect().width||0,
+    brandVisible:brand?getComputedStyle(brand).display!=="none":false,
+    toolbarHeight:toolbar?.getBoundingClientRect().height||0,
+    tablistWidth:tabs?.getBoundingClientRect().width||0,
+    tablistDirection:tabs?getComputedStyle(tabs).flexDirection:"",
+    firstTabHeight:tab?.getBoundingClientRect().height||0,
+    panelWidth:panel?.getBoundingClientRect().width||0,
+   };
+  });
+  assert(v.appWidth>0&&v.panelWidth>0&&
+   v.documentWidth<=v.viewportWidth+3,
+   "STOP_MIZIZI_M1_VIEWPORT_OVERFLOW_"+width+"_"+JSON.stringify(v));
+  assert(v.firstTabHeight>=43.5,
+   "STOP_MIZIZI_M1_NAV_TARGET_BELOW_44_"+width);
+  if(width>768){
+   assert(v.brandVisible&&Math.abs(v.brandWidth-248)<=2&&
+    Math.abs(v.tablistWidth-248)<=2&&v.tablistDirection==="column"&&
+    v.toolbarHeight>=63.5,
+    "STOP_MIZIZI_M1_DESKTOP_RAIL_TOOLBAR_DRIFT_"+width+"_"+JSON.stringify(v));
+  }else{
+   assert(!v.brandVisible&&v.tablistDirection==="row",
+    "STOP_MIZIZI_M1_MOBILE_NAV_DRIFT_"+width+"_"+JSON.stringify(v));
+  }
+  await page.screenshot({
+   path:"test-results/mizizi-phase1-m1/workbench-"+width+".png",
+   fullPage:true,
+  });
+  console.log("WK_MIZIZI_REAL_JWT_M1_VIEWPORT_"+width+"=PASS "+JSON.stringify(v));
+ }
+ await desktop.setViewportSize({width:1440,height:900});
+ await mobile.setViewportSize({width:390,height:844});
+}
+
 export async function verifyLocalHeadquartersBrowsersV1({
  api,anonKey,first,second,caseId,
 }){
@@ -93,6 +156,7 @@ export async function verifyLocalHeadquartersBrowsersV1({
    const desk=await desktop.newPage(),phone=await mobile.newPage();
    await signedIn(desk,base,first);
    await signedIn(phone,base,second);
+   await verifyCanonicalWorkbenchViewportsV1(desk,phone);
    await desk.getByRole("button",{name:"View Recorded Case Journal"}).click();
    const actual=desk.locator('section[aria-label="Immutable case event timeline"]');
    await actual.getByText("Revision 2").waitFor({timeout:30000});
