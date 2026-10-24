@@ -106,10 +106,16 @@ for (const width of [390, 768, 1440]) {
         }
         await expect(page.getByRole("navigation", { name: "Primary mobile navigation" })).toHaveCount(0);
       } else {
-        const sidebar = page.locator(".wk-music-app-shell > aside").first();
-        await expect(sidebar).toBeVisible();
-        const widthInPixels = await sidebar.evaluate((node) => node.getBoundingClientRect().width);
-        expect(widthInPixels).toBe(width < 1280 ? 80 : 256);
+        // Desktop and tablet now share the phone's top-left Menu and Search.
+        await expect(page.locator(".wk-music-app-shell > aside")).toHaveCount(0);
+        const header = page.locator('[data-wk-mobile-app-header="v4"]');
+        await expect(header).toBeVisible();
+        await expect(header.getByRole("button", { name: "Open WAKILISHA menu" })).toBeVisible();
+        await expect(header.getByRole("button", { name: "Search" })).toBeVisible();
+        const contentLeft = await page.locator(".wk-music-app-shell > main").evaluate(
+          (node) => node.getBoundingClientRect().left,
+        );
+        expect(contentLeft).toBe(0);
       }
 
       await page.screenshot({
@@ -173,18 +179,26 @@ test("Workbook sidebar uses accessible modal focus and replaces the old mobile b
 test("Signed-out visitors cannot open private messaging or notifications", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/magazine", { waitUntil: "domcontentloaded" });
-  const navigation = page.locator(".wk-music-app-shell > aside nav").first();
-  await expect(navigation).toBeVisible({ timeout: 25_000 });
+  await expect(page.locator(".wk-music-app-shell > aside")).toHaveCount(0);
+  const menu = page.getByRole("button", { name: "Open WAKILISHA menu" });
+  await expect(menu).toBeVisible({ timeout: 25_000 });
+  await menu.click();
+  const drawer = page.getByRole("dialog", { name: "WAKILISHA Menu" });
+  await expect(drawer).toBeVisible();
+  await expect(menu).toHaveAttribute("aria-expanded", "true");
+  const navigation = drawer.getByRole("navigation", { name: "WAKILISHA places" });
   await expect(navigation.getByRole("link", { name: "Messages" })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Notifications" })).toHaveCount(0);
-  const guestSignIn = page.locator(".wk-music-app-shell > aside").getByRole("link", { name: "Sign In" });
-  await expect(guestSignIn).toHaveAttribute("href", "/auth");
-  await expect(page.locator(".wk-music-app-shell > aside").getByRole("link", { name: "Settings" })).toHaveCount(0);
-  const themeSwitch = page.locator(".wk-music-app-shell > aside").getByRole("button", { name: "Switch to light mode" });
+  await expect(drawer.getByRole("link", { name: "Sign In" })).toHaveAttribute("href", "/auth");
+  await expect(drawer.getByRole("link", { name: "Settings" })).toHaveCount(0);
+  const themeSwitch = drawer.getByRole("switch", { name: "Dark mode" });
   await expect(themeSwitch).toBeVisible();
+  const initialTheme = await page.locator("html").getAttribute("data-wk-theme");
   await themeSwitch.click();
-  await expect(page.locator("html")).toHaveAttribute("data-wk-theme", "light");
-  await expect(page.locator(".wk-music-app-shell > aside").getByRole("button", { name: "Switch to dark mode" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-wk-theme", initialTheme === "dark" ? "light" : "dark");
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(menu).toBeFocused();
 
   for (const privatePath of ["/messages", "/notifications"]) {
     await page.goto(privatePath, { waitUntil: "domcontentloaded" });
