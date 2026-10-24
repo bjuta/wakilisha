@@ -374,19 +374,6 @@ export default function ArticlePage() {
             name={article.title}
           />
         )}
-        <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-end">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCommunitySheetOpen(true)}
-              aria-label="Article actions"
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/45 transition-all cursor-pointer whitespace-nowrap"
-            >
-              <i className="ri-more-2-line text-[16px]" />
-            </button>
-
-          </div>
-        </div>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-black/50 to-black/15" />
         <div className="relative z-10 mx-auto max-w-[820px] px-6 pb-12 text-center text-[#f5f5f4]">
           <p className="text-[11px] font-bold uppercase tracking-[.15em] text-[#85c441]">{article.section} · {article.readingTime} min read</p>
@@ -437,7 +424,7 @@ export default function ArticlePage() {
       <div data-wk-article-category={article.section.trim().toLowerCase()}
         className="wk-workbook-article-paper relative z-10">
         <div className="wk-reference-article-columns mx-auto grid w-full max-w-[1260px] gap-8 px-5 pt-9 lg:grid-cols-[190px_minmax(0,680px)_190px] lg:gap-10 lg:px-8">
-          <ArticleFloatHeader article={article} />
+          <ArticleFloatHeader article={article} actionsOpen={communitySheetOpen} onOpenActions={() => setCommunitySheetOpen(true)} />
           <article className="min-w-0 pb-12">
             <ArticleContentRenderer segments={displaySegments} videos={videoEmbeds} releases={finalReleases} artists={artistEmbeds} tracks={trackEmbeds} articleSlug={article.slug} />
           </article>
