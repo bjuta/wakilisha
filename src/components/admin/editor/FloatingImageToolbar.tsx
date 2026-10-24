@@ -428,6 +428,9 @@ export function FloatingImageToolbar({ editor }: Props) {
         {/* Article-local caption editing, separate from shared Media Library edits. */}
         <button
           type="button"
+          // Keep ProseMirror's image NodeSelection stable between pointer down
+          // and click. Otherwise the toolbar can rerender before onClick fires.
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => {
             console.info("WK_CAPTION_TRIGGER", Boolean(selectedImage));
             // Set this synchronously: a queued editor selection frame can run
