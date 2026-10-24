@@ -102,7 +102,7 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
    const toolbar=workspace?.querySelector(".mz-head");
    const tabs=workspace?.querySelector(".mz-v3-tabs > [role='tablist']");
    const tab=workspace?.querySelector(".mz-v3-rail [role='tab']");
-   const panel=workspace?.querySelector("[data-wk-mizizi-durable-cases]");
+   const caseStory=workspace?.querySelector('article[aria-label="Selected investigation"]');
    return {
     documentWidth:document.documentElement.scrollWidth,
     viewportWidth:document.documentElement.clientWidth,
@@ -113,11 +113,12 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
     tablistWidth:tabs?.getBoundingClientRect().width||0,
     tablistDirection:tabs?getComputedStyle(tabs).flexDirection:"",
     firstTabHeight:tab?.getBoundingClientRect().height||0,
-    panelWidth:panel?.getBoundingClientRect().width||0,
+    caseWidth:caseStory?.getBoundingClientRect().width||0,
    };
   });
-  assert(v.appWidth>0&&v.panelWidth>0&&
-   v.documentWidth<=v.viewportWidth+3,
+  assert(v.appWidth>0&&v.caseWidth>0,
+   "STOP_MIZIZI_M1_VISIBLE_CASE_MISSING_"+width+"_"+JSON.stringify(v));
+  assert(v.documentWidth<=v.viewportWidth+3,
    "STOP_MIZIZI_M1_VIEWPORT_OVERFLOW_"+width+"_"+JSON.stringify(v));
   assert(v.firstTabHeight>=43.5,
    "STOP_MIZIZI_M1_NAV_TARGET_BELOW_44_"+width);
