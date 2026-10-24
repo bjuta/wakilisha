@@ -121,7 +121,7 @@ export function transformArticleHtmlForVideoEmbeds(
       title,
       platform: providerLabel(resolvedSource.providerKey),
       thumbnail: getThumbnail(src),
-      caption,
+      ...(caption ? { caption } : {}),
     });
   });
 
