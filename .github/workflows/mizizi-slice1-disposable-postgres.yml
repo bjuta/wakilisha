@@ -159,6 +159,15 @@ jobs:
         shell: bash
         run: node scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs
 
+      - name: Retain scoped MIZIZI M1 real-JWT viewport captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mizizi-phase1-authenticated-workbench-m1
+          path: test-results/mizizi-phase1-m1/workbench-*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Destroy all disposable local Auth and database volumes
         if: always()
         shell: bash
