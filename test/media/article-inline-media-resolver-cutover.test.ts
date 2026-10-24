@@ -206,7 +206,7 @@ describe("WAKILISHA image and video caption ownership", () => {
 
   it("shows the actual YouTube preview for both legacy embed and short-link URLs", () => {
     const id = "dQw4w9WgXcQ";
-    const expected = `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+    const expected = `https://img.youtube.com/vi/${id}/maxresdefault.jpg`;
     expect(getThumbnail(`https://www.youtube.com/embed/${id}`)).toBe(expected);
     expect(getThumbnail(`https://youtu.be/${id}`)).toBe(expected);
     expect(getThumbnail(`https://www.youtube.com/watch?v=${id}`)).toBe(expected);
@@ -221,6 +221,10 @@ describe("WAKILISHA image and video caption ownership", () => {
       providerKey: "youtube",
       providerObjectId: id,
       thumbnail: expected,
+      thumbnailFallbacks: [
+        `https://img.youtube.com/vi/${id}/sddefault.jpg`,
+        `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
+      ],
     });
 
     // The same shared card supports both desktop and mobile Article routes,
