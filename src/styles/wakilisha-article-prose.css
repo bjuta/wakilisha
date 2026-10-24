@@ -857,3 +857,26 @@
   background: var(--wk-text);
   color: var(--wk-bg);
 }
+
+/* Media captions are part of the figure, not a continuation of Article prose. */
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) figure.wk-figure {
+  margin: 32px 0 40px;
+  overflow: visible;
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) figure.wk-figure > figcaption,
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) .wp-caption-text {
+  display: block;
+  margin: 0;
+  padding: 12px 0 0;
+  color: var(--wk-text-muted);
+  font: 500 13px/1.5 var(--wk-font-ui);
+  text-align: left;
+  font-style: normal;
+  letter-spacing: 0;
+}
+@media (max-width: 640px) {
+  .wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) figure.wk-figure > figcaption {
+    padding-top: 9px;
+    font-size: 12px;
+  }
+}
