@@ -110,8 +110,15 @@ for (const width of [390, 768, 1440]) {
         await expect(page.locator(".wk-music-app-shell > aside")).toHaveCount(0);
         const header = page.locator('[data-wk-mobile-app-header="v4"]');
         await expect(header).toBeVisible();
-        await expect(header.getByRole("button", { name: "Open WAKILISHA menu" })).toBeVisible();
+        const menu = header.getByRole("button", { name: "Open WAKILISHA menu" });
+        await expect(menu).toBeVisible();
         await expect(header.getByRole("button", { name: "Search" })).toBeVisible();
+        await menu.click();
+        const drawer = page.getByRole("dialog", { name: "WAKILISHA Menu" });
+        await expect(drawer.getByRole("navigation", { name: "WAKILISHA places" })).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(drawer).toHaveCount(0);
+        await expect(menu).toBeFocused();
         const contentLeft = await page.locator(".wk-music-app-shell > main").evaluate(
           (node) => node.getBoundingClientRect().left,
         );
