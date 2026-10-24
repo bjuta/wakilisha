@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from "react-router-dom";
+import { isMiziziProductRoute } from "@/services/miziziProductRoute";
 import { usePlayer } from "@/context/PlayerContext";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { usePendingCommunityActionReplay } from "@/hooks/usePendingCommunityActionReplay";
@@ -14,7 +15,7 @@ export function MobileAppLayout() {
   const location = useLocation();
   const { currentTrack } = usePlayer();
   const authUser = useAuthUser();
-  const shellless = location.pathname === "/auth";
+  const shellless = location.pathname === "/auth" || isMiziziProductRoute(location.pathname);
   const reserveHeaderSpace = !shellless && shouldReserveWakilishaHeaderSpace(location.pathname);
   usePendingCommunityActionReplay(
     !authUser.loading ? authUser.id : undefined,
