@@ -78,12 +78,12 @@ export function MobileTopBar() {
         <button
           type="button"
           onClick={() => setAccountOpen(true)}
-          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] shadow-sm hover:bg-[var(--wk-surface-raised)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)]"
+          className="pointer-events-auto flex h-11 w-11 items-center justify-center border-0 bg-transparent p-0 text-white shadow-none hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)]"
           aria-label="Open WAKILISHA menu"
           aria-controls="wk-workbook-sidebar"
           aria-expanded={accountOpen}
         >
-          <WkIcon name="Menu" size={21} />
+          <WkIcon name="Menu" size={21} className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]" />
         </button>
         {isSocialRoute ? (
           <div className="pointer-events-none flex min-w-0 items-center justify-center"><WakilishaSectionLogo /></div>
@@ -92,9 +92,9 @@ export function MobileTopBar() {
           type="button"
           onClick={() => setSearchOpen(true)}
           aria-label="Search"
-          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] shadow-sm hover:bg-[var(--wk-surface-raised)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)]"
+          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center border-0 bg-transparent p-0 text-white shadow-none hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)]"
         >
-          <WkIcon name="Search" size={20} />
+          <WkIcon name="Search" size={20} className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]" />
         </button>
       </header>
 
