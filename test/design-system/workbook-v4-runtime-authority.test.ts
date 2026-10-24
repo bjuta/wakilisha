@@ -113,9 +113,10 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(foundation).not.toContain(".wk-ds-panel,.panel");
     expect(read("src/components/design-system/primitives/Button.tsx")).toContain("data-wk-button");
     const shell = read("src/components/music/MusicDesktopShell.tsx");
-    expect(shell).toContain("resolvedLogoUrl");
-    expect(shell).toContain("/assets/logos/wakilisha-logo-dark.svg");
-    expect(shell).toContain("/assets/logos/wakilisha-logo-light.svg");
+    const drawer = read("src/components/mobile/MobileAccountDrawer.tsx");
+    expect(shell).toContain("<MobileTopBar />");
+    expect(drawer).toContain("/assets/logos/wakilisha-logo-dark.svg");
+    expect(drawer).toContain("/assets/logos/wakilisha-logo-light.svg");
     expect(shell).not.toContain("{showLogo ? (");
     expect(shell).not.toContain("h-9 w-9");
     const studioLogin = read("src/pages/admin/login/page.tsx");
@@ -133,17 +134,16 @@ describe("Workbook v4 is the only active product design authority", () => {
     const mobile = read("src/components/mobile/MobileAppLayout.tsx");
     expect(mobile).not.toContain("MobileBottomNav");
     const desktop = read("src/components/music/MusicDesktopShell.tsx");
-    expect(desktop).toContain("const compactSidebar = sidebarCollapsed || tabletRail;");
-    expect(desktop).toContain("md:flex");
-    expect(desktop).toContain("w-[80px]");
-    expect(desktop).toContain("w-[256px]");
-    expect(desktop).toContain("md:hidden");
-    expect(desktop).toContain("navigation.map");
-    expect(desktop).toContain("visibleWakilishaNavigation");
+    expect(desktop).toContain("<MobileTopBar />");
+    expect(desktop).not.toContain("<aside");
+    expect(desktop).not.toContain("sidebarCollapsed");
+    expect(desktop).toContain("shouldReserveWakilishaHeaderSpace");
+    expect(drawer).toContain("navigation.map");
+    expect(drawer).toContain("visibleWakilishaNavigation");
     const menu = read("src/components/navigation/wakilishaNavigation.ts");
     expect(menu).not.toContain('{ label: "Settings", to: "/settings"');
     expect(read("src/components/mobile/MobileAccountDrawer.tsx")).toContain('to="/settings"');
-    expect(desktop).toContain('startInYou');
+    expect(drawer).toContain('startInYou');
 
 
     const compact = read("src/components/design-system/player/PlayerCompactSurface.tsx");
