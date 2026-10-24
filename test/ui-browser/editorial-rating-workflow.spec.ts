@@ -126,6 +126,15 @@ test("Insert Release discovers draft records with no active memberships, but can
 });
 
 test("media-bound captions remain attached after a real browser edit and save", async ({ page }, info) => {
+  // Tiptap rejects data: image URLs by default. Serve the synthetic artwork
+  // through Chromium so the fixture exercises the real editor image contract.
+  await page.route("**/wk-editorial-caption-artwork.svg", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="#334658"/></svg>',
+    })
+  );
   for (const width of [390, 1440]) {
     for (const theme of ["light", "dark"]) {
       await page.setViewportSize({ width, height: 900 });
