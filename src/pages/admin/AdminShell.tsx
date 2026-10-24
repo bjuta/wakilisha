@@ -419,6 +419,13 @@ export function AdminShell() {
     );
   }
 
+  // Headquarters owns the 248px MIZIZI rail and the 64px toolbar. Retain the
+  // existing authenticated AdminShell gate above; do not nest a second admin
+  // navigation shell or impose Studio page padding on the product workspace.
+  const isMiziziProductRoute =
+    location.pathname === "/admin/review/mizizi" ||
+    location.pathname.startsWith("/admin/review/mizizi/");
+
   const visibleGroups = NAV_GROUPS.filter((group) => group.visible(user.can)).map((group) => ({ ...group, items: group.items.filter((item) => !item.requiredCapability || user.can(item.requiredCapability)) }));
 
   const sidebarPositionClass =
@@ -428,31 +435,33 @@ export function AdminShell() {
         ? "translate-x-0"
         : "-translate-x-full lg:translate-x-0";
 
-  const mainOffsetClass = editorFocusMode
+  const mainOffsetClass = isMiziziProductRoute || editorFocusMode
     ? "lg:pl-0"
     : collapsed
       ? "lg:pl-16"
       : "lg:pl-64";
 
-  const mainContentClass = editorFocusMode
-    ? "max-w-none px-3 py-3 sm:px-4 lg:px-6"
-    : "mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8";
+  const mainContentClass = isMiziziProductRoute
+    ? "max-w-none p-0"
+    : editorFocusMode
+      ? "max-w-none px-3 py-3 sm:px-4 lg:px-6"
+      : "mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8";
 
 
   return (
     <div className="min-h-screen bg-wk-bg text-wk-text">
       {/* Mobile menu trigger */}
-      {!editorFocusMode ? (
+      {!editorFocusMode && !isMiziziProductRoute ? (
         <button onClick={() => setMobileOpen(true)} className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-wk-border bg-wk-surface shadow-lg lg:hidden"><WkIcon name="Menu" size={20} /></button>
       ) : null}
 
       {/* Mobile overlay */}
-      {!editorFocusMode && mobileOpen ? (
+      {!editorFocusMode && !isMiziziProductRoute && mobileOpen ? (
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />
       ) : null}
 
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-wk-border bg-wk-surface transition-all duration-300 ${collapsed ? "w-16" : "w-64"} ${sidebarPositionClass}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex-col border-r border-wk-border bg-wk-surface transition-all duration-300 ${isMiziziProductRoute ? "hidden" : "flex"} ${collapsed ? "w-16" : "w-64"} ${sidebarPositionClass}`}>
         {/* Sidebar Header */}
         <div className="flex h-16 items-center gap-3 border-b border-wk-border px-4">
           <button onClick={() => navigate("/admin")} className="flex min-w-0 items-center gap-3">
