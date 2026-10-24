@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import { normalizeArticleMediaCaptions } from "@/utils/normalizeArticleMediaCaptions";
 import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
-import { transformArticleHtmlForVideoEmbeds } from "@/components/video/types";
+import { getThumbnail, transformArticleHtmlForVideoEmbeds } from "@/components/video/types";
 import { ExtendedImage } from "@/components/admin/editor/ExtendedImage";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
@@ -202,6 +202,33 @@ describe("WAKILISHA image and video caption ownership", () => {
     expect(reopened.getJSON().content?.find(n => n.type === "image")?.attrs?.caption).toBe(caption);
     editor.destroy();
     reopened.destroy();
+  });
+
+  it("shows the actual YouTube preview for both legacy embed and short-link URLs", () => {
+    const id = "dQw4w9WgXcQ";
+    const expected = `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+    expect(getThumbnail(`https://www.youtube.com/embed/${id}`)).toBe(expected);
+    expect(getThumbnail(`https://youtu.be/${id}`)).toBe(expected);
+    expect(getThumbnail(`https://www.youtube.com/watch?v=${id}`)).toBe(expected);
+    expect(getThumbnail("https://example.com/not-a-youtube-video")).toBeNull();
+    expect(getThumbnail("https://player.vimeo.com/video/123456")).toBeNull();
+
+    const { videos } = transformArticleHtmlForVideoEmbeds(
+      `<figure><iframe title="Music video" src="https://www.youtube.com/embed/${id}"></iframe></figure>`,
+    );
+    expect(videos).toHaveLength(1);
+    expect(videos[0]).toMatchObject({
+      providerKey: "youtube",
+      providerObjectId: id,
+      thumbnail: expected,
+    });
+
+    // The same shared card supports both desktop and mobile Article routes,
+    // and already has a safe visual fallback when an image cannot load.
+    const card = fs.readFileSync("src/components/video/VideoCard.tsx", "utf8");
+    const frame = fs.readFileSync("src/components/video/VideoCardFrame.tsx", "utf8");
+    expect(card).toContain("thumbnail={video.thumbnail}");
+    expect(frame).toContain("onError={() => setImgError(true)}");
   });
 
   it("binds provider video captions to their player cards and removes redundant body paragraphs", () => {
