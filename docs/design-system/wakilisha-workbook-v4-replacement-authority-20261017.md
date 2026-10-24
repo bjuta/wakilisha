@@ -1,5 +1,7 @@
 # WAKILISHA × MIZIZI — Brand Workbook v4 replacement authority
 
+> **24 October 2026, current MIZIZI source extension:** The owner has supplied newer **M1–M13** workbook/design HTML, with separately recorded SHA-256s in [MIZIZI product authority](../engineering/mizizi-product-phase1-reconciliation-20261024.md). The three original 17 October `.dc.html` hashes below remain genuine historical source fingerprints; they are **not** fingerprints of the newer attachment. The current MIZIZI screen set has 13 screens including desktop Field/Contributions/Record, Reviewer Profile and Settings. Exclude the separate Distribution, payout and ingestion business screens. Joint tokens, font, logo, media and visual behavior remain shared WAKILISHA authority; accepted Registry, privacy, role, source and execution contracts outrank prototype behavior. #1246 is merged; completing MIZIZI pixel/runtime acceptance remains Phase 1 work. See the [repo documentation index](../engineering/mizizi-documentation-authority-index-20261024.md).
+
 **Status:** design/documentation authority proposal, 17 October 2026. No runtime switch or release accepted by this document.
 
 ## Binding source hierarchy
