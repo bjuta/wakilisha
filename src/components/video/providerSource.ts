@@ -61,20 +61,37 @@ export function providerEmbedUrl(
   return null;
 }
 
+/**
+ * Best available public YouTube poster first, with finite historical fallbacks.
+ * Some unavailable maxres/sd posters decode as a 120px placeholder instead of
+ * raising an image error. The card checks decoded dimensions before displaying.
+ */
+export function providerThumbnailUrls(
+  source: Pick<
+    CanonicalVideoProviderSource,
+    "providerKey" | "providerObjectId"
+  >,
+): string[] {
+  const key = cleanProviderKey(source.providerKey);
+  const id = source.providerObjectId.trim();
+
+  if (key !== "youtube" || !YOUTUBE_ID.test(id)) return [];
+
+  const base = `https://img.youtube.com/vi/${encodeURIComponent(id)}`;
+  return [
+    `${base}/maxresdefault.jpg`,
+    `${base}/sddefault.jpg`,
+    `${base}/hqdefault.jpg`,
+  ];
+}
+
 export function providerThumbnailUrl(
   source: Pick<
     CanonicalVideoProviderSource,
     "providerKey" | "providerObjectId"
   >,
 ): string | null {
-  const key = cleanProviderKey(source.providerKey);
-  const id = source.providerObjectId.trim();
-
-  if (key === "youtube" && YOUTUBE_ID.test(id)) {
-    return `https://img.youtube.com/vi/${encodeURIComponent(id)}/mqdefault.jpg`;
-  }
-
-  return null;
+  return providerThumbnailUrls(source)[0] ?? null;
 }
 
 export function parseLegacyProviderUrl(

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface VideoCardFrameProps {
   title: string;
   thumbnail?: string | null;
+  thumbnailFallbacks?: string[];
   badge?: string | null;
   counter?: string | null;
   duration?: string | null;
@@ -13,6 +14,7 @@ interface VideoCardFrameProps {
 export function VideoCardFrame({
   title,
   thumbnail,
+  thumbnailFallbacks,
   badge,
   counter,
   duration,
@@ -21,6 +23,28 @@ export function VideoCardFrame({
 }: VideoCardFrameProps) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [thumbnailIndex, setThumbnailIndex] = useState(0);
+  const fallbackKey = thumbnailFallbacks?.join("|") ?? "";
+
+  useEffect(() => {
+    setImgLoaded(false);
+    setImgError(false);
+    setThumbnailIndex(0);
+  }, [thumbnail, fallbackKey]);
+
+  const thumbnailSources = thumbnail
+    ? [thumbnail, ...(thumbnailFallbacks ?? [])]
+    : [];
+  const currentThumbnail = thumbnailSources[thumbnailIndex] ?? null;
+
+  const advanceThumbnail = () => {
+    setImgLoaded(false);
+    if (thumbnailIndex + 1 < thumbnailSources.length) {
+      setThumbnailIndex(thumbnailIndex + 1);
+    } else {
+      setImgError(true);
+    }
+  };
 
   return (
     <div
@@ -37,15 +61,24 @@ export function VideoCardFrame({
             : "relative aspect-video w-full overflow-hidden bg-[var(--wk-surface-raised)]"
         }
       >
-        {thumbnail && !imgError ? (
+        {currentThumbnail && !imgError ? (
           <>
             <img
-              src={thumbnail}
+              key={currentThumbnail}
+              src={currentThumbnail}
               alt=""
               className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-[1.035] ${imgLoaded ? "opacity-100" : "opacity-0"}`}
               loading="lazy"
-              onLoad={() => setImgLoaded(true)}
-              onError={() => setImgError(true)}
+              onLoad={(event) => {
+                // A missing YouTube HD size can decode as a tiny valid JPEG.
+                // Never stretch that placeholder into an article hero.
+                if (thumbnailSources.length > 1 && event.currentTarget.naturalWidth <= 120) {
+                  advanceThumbnail();
+                } else {
+                  setImgLoaded(true);
+                }
+              }}
+              onError={advanceThumbnail}
             />
             {!imgLoaded ? (
               <div className="absolute inset-0 animate-pulse bg-[var(--wk-surface-raised)]" />
