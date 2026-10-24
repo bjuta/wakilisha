@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { SeekRail } from "./SeekRail";
@@ -60,17 +60,6 @@ export function PlayerCompactSurface({
 
   const isMobile = mode === "mobile";
   const [browserGap, setBrowserGap] = useState(0);
-  const [desktopSidebarWidth, setDesktopSidebarWidth] = useState(256);
-  useLayoutEffect(() => {
-    if (isMobile) return;
-    const aside = document.querySelector<HTMLElement>(".wk-music-app-shell > aside");
-    if (!aside) { setDesktopSidebarWidth(0); return; }
-    const update = () => setDesktopSidebarWidth(aside.getBoundingClientRect().width);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(aside);
-    return () => observer.disconnect();
-  }, [isMobile]);
   useEffect(() => {
     if (!isMobile || !window.visualViewport) return;
     const viewport = window.visualViewport;
@@ -151,7 +140,7 @@ export function PlayerCompactSurface({
                 : "max(8px, calc(env(safe-area-inset-bottom) - 13px))",
             }
           : {
-              left: desktopSidebarWidth + 16,
+              left: 16,
               right: 16,
               bottom: 16,
             }
