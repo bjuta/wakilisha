@@ -139,6 +139,13 @@ test("media-bound captions remain attached after a real browser edit and save", 
       expect(await caption.getAttribute("contenteditable")).toBe("false");
       await expect(editor.locator("p")).toHaveCount(2);
       await expect(caption).toHaveCSS("font-size", /^(12|12.5|13)px$/);
+      await editor.locator("figure.wk-figure img").click();
+      await page.getByRole("button", { name: "Caption", exact: true }).click();
+      const mediaDetails = page.getByRole("dialog", { name: "Image Details" });
+      await expect(mediaDetails).toBeVisible();
+      await mediaDetails.locator("textarea").fill("Edited attribution, this article only.");
+      await mediaDetails.getByRole("button", { name: "Save Details" }).click();
+      await expect(editor.locator("figure.wk-figure > figcaption")).toHaveText("Edited attribution, this article only.");
       await editor.locator("p").last().click();
       await page.keyboard.type(" Edited.");
       await page.getByRole("button", { name: "Save draft" }).click();

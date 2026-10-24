@@ -176,6 +176,13 @@ describe("WAKILISHA image and video caption ownership", () => {
     expect(injectMediaCaptions(html, map)).toBe(html);
   });
 
+  it("retains a separate authoring caption action without updating global asset metadata", () => {
+    const floatingToolbar = fs.readFileSync("src/components/admin/editor/FloatingImageToolbar.tsx", "utf8");
+    expect(floatingToolbar).toContain('title="Edit caption in this article"');
+    expect(floatingToolbar).toContain("onSave={handleEditSave}");
+    expect(floatingToolbar).toContain("setCaptionOpen(false)");
+  });
+
   it("loads media-bound captions as one TipTap image atom, not an editable paragraph", () => {
     const authored = normalizeArticleMediaCaptions(legacy, "editor");
     const editor = new Editor({ extensions: [StarterKit, ExtendedImage], content: authored });

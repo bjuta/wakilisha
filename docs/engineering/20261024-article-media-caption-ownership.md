@@ -6,6 +6,7 @@ The Charisma article's saved draft contains one image with `data-caption`, follo
 
 ## Canonical contract
 
+- A selected image exposes an Article-local **Caption** action using Image Details. It changes the document node and leaves the shared Media Library asset untouched. The older **Edit** action remains available for Media Library metadata.
 - Captions belong to the media element. The authored image node persists `data-caption` and serializes a single semantic `figure > img + figcaption`. The figcaption is noneditable as body text; writers use Image Details to change the caption.
 - Normalization has two explicit paths. The **editor** receives an image atom with `data-caption`; the **reader** receives a semantic figure. Neither path writes to the database merely by opening a draft.
 - Only a plain, immediately adjacent paragraph whose **entire content exactly equals** the caption is removed as a known import duplicate. Unrelated paragraphs, partial matches, and prose further away are preserved.
