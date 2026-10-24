@@ -91,6 +91,21 @@ Design: Figtree human copy; IBM Plex Mono **only** exact technical values; green
 
 `main` inventory at the audited ref: 10 Headquarters UI files, 7 MIZIZI service files, 16 agent/runtime files, 30 MIZIZI-named migrations and 22 MIZIZI Registry test files. Draft branch contents must not be represented as merged `main` or deployed Production code.
 
+## Phase 1 source comparison: real MIZIZI UI drift
+
+Read-only inspection compared actual `main` and the source in draft `ui/mizizi-orion-workbench-20261017` (PR #1244, head `8e7fe6bb883564b68311814abb222bd0b0ac706f`). These are source-level findings; no real signed-in visual parity has been inferred.
+
+| Observed current code | Phase 1 decision |
+| --- | --- |
+| `main` uses `WkTabs` with `Field` as a graph tab; draft #1244 renames the graph tab `Orion`, and adds a separate **disabled** Field capture tab | Preserve Orion rename, preserve truthful disabled Field capture until M6/M9 backend and custody exist, eliminate duplicate top-button/tab after real navigation acceptance |
+| Draft page still composes historical Registry review list, `MiziziHeadquartersBrief` and `WkSplitWorkspace` under a horizontal tab bar | Not final v3 248px rail / 64px case-toolbar M1. Design and navigation need a deliberate layout refactor, not another layer on the old review page |
+| `main` `mizizi-html.css` uses `Figtree` fallbacks; draft CSS still contains `Inter` fallbacks in the MIZIZI workspace and wordmark | Rebase draft on merged WAKILISHA Workbook fonts/tokens; retire legacy Inter fallback rather than relying on incidental global CSS |
+| `main` CSS `.mz-rootband` uses a brand/info/warning decorative linear gradient; draft retains the same pattern | Do not use semantic evidence/status colours decoratively. Review for replacement after reference screenshot comparison |
+| The real route/component home is `src/pages/admin/review/mizizi/page.tsx` | Preserve real route and deep-link/permission contract until any intentional router change is separately accepted; file-path routing assumptions are stale |
+| `MiziziReviewField` graph has exact-ID Registry links, gestures and accessible review list | Reuse within Orion, keep the credit-not-rights disclaimer, and separate review status from five evidence standings |
+
+**Disposition:** source mismatch inventory captured, not fixed or accepted as a visual release. Actual build/browser validation, exact layout and responsive comparisons remain an open Phase 1 gate. Any corrective MIZIZI frontend work should rebase/integrate the existing #1244 branch and existing protected browser checks, never a parallel fake-data UI.
+
 ## Four phases, and what constitutes closure
 
 ### Phase 1: source/design and environment convergence
