@@ -106,9 +106,14 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
   await page.getByRole("tab",{name:"Workbench"}).waitFor({
    state:"visible",timeout:30000,
   });
-  await page.evaluate(async()=>{await document.fonts.ready;});
+  await page.evaluate(async()=>{
+   await document.fonts.ready;
+   window.scrollTo(0,0);
+  });
   const v=await page.evaluate(()=>{
    const workspace=document.querySelector('[data-wk-mizizi-workspace].mz-port');
+   const productShell=document.querySelector('main[data-wk-mizizi-product-shell="true"]');
+   const nestedAdmin=document.querySelector("[data-wk-admin-studio-sidebar]");
    const brand=workspace?.querySelector(".mz-v3-rail-brand");
    const toolbar=workspace?.querySelector(".mz-head");
    const tabs=workspace?.querySelector(".mz-v3-tabs > [role='tablist']");
@@ -118,7 +123,11 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
     documentWidth:document.documentElement.scrollWidth,
     viewportWidth:document.documentElement.clientWidth,
     appWidth:workspace?.getBoundingClientRect().width||0,
+    productShellPresent:Boolean(productShell),
+    nestedAdminPresent:Boolean(nestedAdmin),
     brandWidth:brand?.getBoundingClientRect().width||0,
+    brandTop:brand?.getBoundingClientRect().top??0,
+    toolbarTop:toolbar?.getBoundingClientRect().top??0,
     brandVisible:brand?getComputedStyle(brand).display!=="none":false,
     toolbarHeight:toolbar?.getBoundingClientRect().height||0,
     tablistWidth:tabs?.getBoundingClientRect().width||0,
@@ -127,6 +136,8 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
     caseWidth:caseStory?.getBoundingClientRect().width||0,
    };
   });
+  assert(v.productShellPresent&&!v.nestedAdminPresent,
+   "STOP_MIZIZI_NESTED_STUDIO_SHELL_"+width+"_"+JSON.stringify(v));
   assert(v.appWidth>0&&v.caseWidth>0,
    "STOP_MIZIZI_M1_VISIBLE_CASE_MISSING_"+width+"_"+JSON.stringify(v));
   assert(v.documentWidth<=v.viewportWidth+3,
@@ -134,9 +145,11 @@ async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
   assert(v.firstTabHeight>=43.5,
    "STOP_MIZIZI_M1_NAV_TARGET_BELOW_44_"+width);
   if(width>768){
+   assert(Math.abs(v.appWidth-width)<=2,
+    "STOP_MIZIZI_M1_NOT_FULL_WIDTH_"+width+"_"+JSON.stringify(v));
    assert(v.brandVisible&&Math.abs(v.brandWidth-248)<=2&&
     Math.abs(v.tablistWidth-248)<=2&&v.tablistDirection==="column"&&
-    v.toolbarHeight>=63.5,
+    v.toolbarHeight>=63.5&&Math.abs(v.brandTop)<=2&&Math.abs(v.toolbarTop)<=2,
     "STOP_MIZIZI_M1_DESKTOP_RAIL_TOOLBAR_DRIFT_"+width+"_"+JSON.stringify(v));
   }else{
    assert(!v.brandVisible&&v.tablistDirection==="row",
