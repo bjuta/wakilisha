@@ -7,7 +7,12 @@ import "@/design-system/wakilisha.elements.foundation.css";
 import "@/styles/wk-ratings.css";
 import { RichTextEditor } from "@/components/design-system/editorial/RichTextEditor";
 
-const ORIGINAL = "<p>Album review begins here. The production holds its own.</p>";
+const MEDIA_CAPTION = "EP Artwork for Charisma’s Forever to Never. | Image: Charisma";
+const MEDIA_ORIGINAL = '<p>Before the artwork.</p>' +
+  '<img src="/wk-editorial-caption-artwork.svg" alt="Artwork" data-caption="' + MEDIA_CAPTION + '">' +
+  '<p>' + MEDIA_CAPTION + '</p><p>The music review continues.</p>';
+const ORIGINAL = new URLSearchParams(window.location.search).has("media")
+  ? MEDIA_ORIGINAL : "<p>Album review begins here. The production holds its own.</p>";
 
 function EditorialRatingFixture() {
   const [html, setHtml] = useState(ORIGINAL);
