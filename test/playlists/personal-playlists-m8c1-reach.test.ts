@@ -22,6 +22,7 @@ const siblingTracks = read("src/pages/tracks/detail/components/TrackReleaseTrack
 const artistTopSongs = read("src/pages/artists/detail/components/ArtistTopSongs.tsx");
 const artistAuthorityPanel = read("src/pages/artists/detail/components/ArtistAuthorityPanel.tsx");
 const musicDesktopShell = read("src/components/music/MusicDesktopShell.tsx");
+const publicTopBar = read("src/components/mobile/MobileTopBar.tsx");
 const globalSearch = read("src/components/search/GlobalSearchSurface.tsx");
 const trackSearch = read("src/hooks/useTrackSearchData.ts");
 const chartSearch = read("src/hooks/useChartSearchData.ts");
@@ -172,10 +173,11 @@ describe("M8C.1 Track curation reach", () => {
     expect(artistAuthorityPanel).not.toContain("Managed by the Artist or their team.");
   });
 
-  it("keeps global Search directly actionable from the shared rail without a false Mac-only shortcut", () => {
-    expect(musicDesktopShell).toContain("GlobalSearchSurface");
-    expect(musicDesktopShell).toContain('aria-label="Search"');
-    expect(musicDesktopShell).toContain("setGlobalSearchOpen(true)");
+  it("keeps global Search actionable from the shared top bar without a Mac-only shortcut", () => {
+    expect(musicDesktopShell).toContain("<MobileTopBar />");
+    expect(publicTopBar).toContain("GlobalSearchSurface");
+    expect(publicTopBar).toContain('aria-label="Search"');
+    expect(publicTopBar).toContain("setSearchOpen(true)");
     expect(globalSearch).toContain("Search artists, tracks, releases, scenes…");
     expect(globalSearch).toContain("See All Results");
     expect(musicDesktopShell).not.toContain("⌘ K");

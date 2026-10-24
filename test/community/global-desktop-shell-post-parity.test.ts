@@ -29,7 +29,7 @@ describe(
   "global desktop shell and universal Post parity",
   () => {
     it(
-      "makes the sidebar shell the default desktop AppLayout",
+      "makes the shared topbar shell the default desktop AppLayout",
       () => {
         expect(appLayout).toContain(
           "<MusicDesktopShell>",
@@ -84,45 +84,23 @@ describe(
     );
 
     it(
-      "keeps Notifications in the desktop global utility cluster",
+      "routes desktop private actions through the shared WAKILISHA drawer",
       () => {
-        expect(desktopShell).toContain(
-          "NotificationBell",
+        const topBar = readFileSync(
+          "src/components/mobile/MobileTopBar.tsx",
+          "utf8",
         );
-
-        expect(desktopShell).toContain(
-          "userId={authUser.id}",
+        const drawer = readFileSync(
+          "src/components/mobile/MobileAccountDrawer.tsx",
+          "utf8",
         );
-
-        expect(desktopShell).toContain(
-          '"/notifications"',
-        );
-
-        expect(desktopShell).toContain(
-          'activeSection === "notifications"',
-        );
-
-        const notificationSlot =
-          desktopShell.indexOf(
-            "<NotificationBell",
-          );
-
-        const settingsSlot =
-          desktopShell.indexOf(
-            'to="/settings"',
-          );
-
-        const profileSlot =
-          desktopShell.indexOf(
-            'to="/profile"',
-          );
-
-        expect(notificationSlot)
-          .toBeGreaterThan(-1);
-        expect(settingsSlot)
-          .toBeGreaterThan(notificationSlot);
-        expect(profileSlot)
-          .toBeGreaterThan(settingsSlot);
+        expect(desktopShell).toContain("<MobileTopBar />");
+        expect(desktopShell).not.toContain("<aside");
+        expect(topBar).toContain("MobileAccountDrawer");
+        expect(drawer).toContain('to: "/notifications"');
+        expect(drawer).toContain('to: "/messages"');
+        expect(drawer).toContain('to: "/settings"');
+        expect(drawer).toContain('to: "/profile"');
       },
     );
 

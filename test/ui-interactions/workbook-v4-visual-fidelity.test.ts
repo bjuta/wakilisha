@@ -22,8 +22,9 @@ describe("Workbook v4 source-backed public visual fidelity", () => {
       expect(screen).not.toContain("<WakilishaSectionLogo />");
     }
     expect(nav).toContain("bg-transparent");
-    expect(nav).toContain("text-white");
-    expect(nav).toContain("mix-blend-difference");
+    expect(nav).toContain("text-[var(--wk-text)]");
+    expect(nav).toContain("bg-[var(--wk-surface)]");
+    expect(nav).not.toContain("mix-blend-difference");
     expect(playerTop).toContain("grid-cols-[44px_minmax(0,1fr)_44px]");
     expect(playerTop).toContain("text-[var(--wk-text)]");
     expect(mobilePlayer).toContain("calc(80px + env(safe-area-inset-top))");

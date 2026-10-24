@@ -106,17 +106,104 @@ for (const width of [390, 768, 1440]) {
         }
         await expect(page.getByRole("navigation", { name: "Primary mobile navigation" })).toHaveCount(0);
       } else {
-        const sidebar = page.locator(".wk-music-app-shell > aside").first();
-        await expect(sidebar).toBeVisible();
-        const widthInPixels = await sidebar.evaluate((node) => node.getBoundingClientRect().width);
-        expect(widthInPixels).toBe(width < 1280 ? 80 : 256);
+        // Desktop and tablet now share the phone's top-left Menu and Search.
+        await expect(page.locator(".wk-music-app-shell > aside")).toHaveCount(0);
+        const header = page.locator('[data-wk-mobile-app-header="v4"]');
+        await expect(header).toBeVisible();
+        const menu = header.getByRole("button", { name: "Open WAKILISHA menu" });
+        await expect(menu).toBeVisible();
+        await expect(header.getByRole("button", { name: "Search" })).toBeVisible();
+        await menu.click();
+        const drawer = page.getByRole("dialog", { name: "WAKILISHA Menu" });
+        await expect(drawer.getByRole("navigation", { name: "WAKILISHA places" })).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(drawer).toHaveCount(0);
+        await expect(menu).toBeFocused();
+        const contentLeft = await page.locator(".wk-music-app-shell > main").evaluate(
+          (node) => node.getBoundingClientRect().left,
+        );
+        expect(contentLeft).toBe(0);
       }
 
-      await page.screenshot({
-        path: testInfo.outputPath(`workbook-v4-${pageSpec.slug}-${width}.png`),
-        animations: "disabled",
-        fullPage: false,
-      });
+      // Capture *actual public React routes* with the same live drawer and
+      // theme switch at each viewport. The drawer and closed page are separate
+      // review evidence. A screenshot is not signed-in Production acceptance.
+      for (const mode of ["light", "dark"] as const) {
+        const topBar = page.locator('[data-wk-mobile-app-header="v4"]');
+        const menu = topBar.getByRole("button", { name: "Open WAKILISHA menu" });
+        await expect(menu).toBeVisible();
+        await menu.click();
+        const drawer = page.getByRole("dialog", { name: "WAKILISHA Menu" });
+        await expect(drawer).toBeVisible();
+        await expect(menu).toHaveAttribute("aria-expanded", "true");
+        const themeSwitch = drawer.getByRole("switch", { name: "Dark mode" });
+        await expect(themeSwitch).toBeVisible();
+        if ((await themeSwitch.getAttribute("aria-checked")) !== String(mode === "dark")) {
+          await themeSwitch.click();
+        }
+        await expect(page.locator("html")).toHaveAttribute("data-wk-theme", mode);
+        await expect(drawer.locator('img[alt="WAKILISHA"]')).toHaveAttribute(
+          "src",
+          mode === "dark"
+            ? "/assets/logos/wakilisha-logo-dark.svg"
+            : "/assets/logos/wakilisha-logo-light.svg",
+        );
+        const sheet = await drawer.evaluate((node) => {
+          const rect = node.closest("#wk-workbook-sidebar")?.getBoundingClientRect();
+          return { left: rect?.left ?? -1, width: rect?.width ?? -1 };
+        });
+        expect(Math.abs(sheet.left)).toBeLessThanOrEqual(2);
+        expect(sheet.width).toBeGreaterThan(220);
+        expect(sheet.width).toBeLessThanOrEqual(Math.min(300, width));
+        await page.screenshot({
+          path: testInfo.outputPath(`workbook-v4-nav-${pageSpec.slug}-${width}-${mode}-open.png`),
+          animations: "disabled",
+          fullPage: false,
+        });
+        await page.keyboard.press("Escape");
+        await expect(drawer).toHaveCount(0);
+        await expect(menu).toBeFocused();
+        await expect(menu).toHaveAttribute("aria-expanded", "false");
+        // Measure *visible* Menu and Search after the drawer closes, not
+        // hidden controls under its modal scrim or during an in-flight theme change.
+        for (const action of ["Open WAKILISHA menu", "Search"]) {
+          const contrast = await topBar.getByRole("button", { name: action }).evaluate((node) => {
+            const style = getComputedStyle(node);
+            const luminance = (colour: string) => {
+              // Theme tokens include OKLCH. Let the actual Chromium canvas
+              // resolve the CSS colour before measuring linear RGB luminance.
+              const canvas = document.createElement("canvas");
+              canvas.width = 1;
+              canvas.height = 1;
+              const context = canvas.getContext("2d", { willReadFrequently: true });
+              if (!context) throw new Error("Canvas 2D unavailable for colour validation");
+              context.fillStyle = colour;
+              context.fillRect(0, 0, 1, 1);
+              const [red, green, blue, alpha] = context.getImageData(0, 0, 1, 1).data;
+              if (alpha !== 255) throw new Error("Control colour is not opaque");
+              const linear = [red, green, blue]
+                .map((value) => value / 255)
+                .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+              return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+            };
+            const foreground = luminance(style.color);
+            const background = luminance(style.backgroundColor);
+            return {
+              ratio: (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05),
+              background: style.backgroundColor,
+              blend: style.mixBlendMode,
+            };
+          });
+          expect(contrast.ratio, `${mode}/${width}/${action}: ${JSON.stringify(contrast)}`).toBeGreaterThanOrEqual(4.5);
+          expect(contrast.background).not.toBe("rgba(0, 0, 0, 0)");
+          expect(contrast.blend).toBe("normal");
+        }
+        await page.screenshot({
+          path: testInfo.outputPath(`workbook-v4-nav-${pageSpec.slug}-${width}-${mode}-closed.png`),
+          animations: "disabled",
+          fullPage: false,
+        });
+      }
     });
   }
 }
@@ -173,18 +260,26 @@ test("Workbook sidebar uses accessible modal focus and replaces the old mobile b
 test("Signed-out visitors cannot open private messaging or notifications", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/magazine", { waitUntil: "domcontentloaded" });
-  const navigation = page.locator(".wk-music-app-shell > aside nav").first();
-  await expect(navigation).toBeVisible({ timeout: 25_000 });
+  await expect(page.locator(".wk-music-app-shell > aside")).toHaveCount(0);
+  const menu = page.getByRole("button", { name: "Open WAKILISHA menu" });
+  await expect(menu).toBeVisible({ timeout: 25_000 });
+  await menu.click();
+  const drawer = page.getByRole("dialog", { name: "WAKILISHA Menu" });
+  await expect(drawer).toBeVisible();
+  await expect(menu).toHaveAttribute("aria-expanded", "true");
+  const navigation = drawer.getByRole("navigation", { name: "WAKILISHA places" });
   await expect(navigation.getByRole("link", { name: "Messages" })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Notifications" })).toHaveCount(0);
-  const guestSignIn = page.locator(".wk-music-app-shell > aside").getByRole("link", { name: "Sign In" });
-  await expect(guestSignIn).toHaveAttribute("href", "/auth");
-  await expect(page.locator(".wk-music-app-shell > aside").getByRole("link", { name: "Settings" })).toHaveCount(0);
-  const themeSwitch = page.locator(".wk-music-app-shell > aside").getByRole("button", { name: "Switch to light mode" });
+  await expect(drawer.getByRole("link", { name: "Sign In" })).toHaveAttribute("href", "/auth");
+  await expect(drawer.getByRole("link", { name: "Settings" })).toHaveCount(0);
+  const themeSwitch = drawer.getByRole("switch", { name: "Dark mode" });
   await expect(themeSwitch).toBeVisible();
+  const initialTheme = await page.locator("html").getAttribute("data-wk-theme");
   await themeSwitch.click();
-  await expect(page.locator("html")).toHaveAttribute("data-wk-theme", "light");
-  await expect(page.locator(".wk-music-app-shell > aside").getByRole("button", { name: "Switch to dark mode" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-wk-theme", initialTheme === "dark" ? "light" : "dark");
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(menu).toBeFocused();
 
   for (const privatePath of ["/messages", "/notifications"]) {
     await page.goto(privatePath, { waitUntil: "domcontentloaded" });
@@ -359,7 +454,7 @@ for (const width of [390, 1440]) {
       await expect.poll(() => nav.evaluate((node) => node.getBoundingClientRect().bottom)).toBeLessThanOrEqual(2);
 
       // Reverse direction without returning to the top: reveal the
-      // transparent bar with individually contrast-blended Menu/Search glyphs.
+      // transparent bar with contrast-safe, theme-aware Menu/Search controls.
       await page.evaluate(() => window.scrollBy(0, -44));
       await expect(nav).toHaveAttribute("data-wk-mobile-header-visible", "true");
       await expect.poll(() => nav.evaluate((node) => Math.abs(node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
@@ -377,7 +472,7 @@ for (const width of [390, 1440]) {
       });
       expect(chrome.position).toBe("fixed");
       expect(chrome.background).toBe("rgba(0, 0, 0, 0)");
-      expect(chrome.menuBlend).toBe("difference");
+      expect(chrome.menuBlend).toBe("normal");
       expect(chrome.logoCount).toBe(0);
       expect(chrome.searchCount).toBe(1);
       expect(Math.abs(chrome.headerTop)).toBeLessThanOrEqual(2);
