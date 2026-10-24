@@ -195,11 +195,17 @@ describe("Workbook v4 is the only active product design authority", () => {
     const articleHeader = read("src/pages/magazine/article/components/ArticleFloatHeader.tsx");
     const css = read("src/styles/wakilisha-article-prose.css");
 
-    expect(desktop).toContain('<ArticleFloatHeader article={article} />');
+    expect(desktop).toContain('<ArticleFloatHeader article={article} actionsOpen={communitySheetOpen} onOpenActions={() => setCommunitySheetOpen(true)} />');
     const actions = read("src/components/feature/community/CommunityActionSheet.tsx");
+    expect(articleHeader).toContain('data-wk-article-actions-trigger="byline"');
+    expect(articleHeader).toContain('aria-label="Article actions"');
+    expect(articleHeader).toContain('aria-expanded={actionsOpen}');
+    expect(articleHeader).toContain('onClick={onOpenActions}');
+    expect(articleHeader).toContain("justify-between");
+    expect(desktop).not.toContain('className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-end"');
+    expect(mobile).toContain('aria-label="Article actions"');
+    expect(mobile).toContain('onClick={() => setCommunitySheetOpen(true)}');
     for (const page of [desktop, mobile]) {
-      expect(page).toContain('aria-label="Article actions"');
-      expect(page).toContain('onClick={() => setCommunitySheetOpen(true)}');
       expect(page).toContain('<CommunityActionSheet');
     }
     expect(actions).toContain('label="Share"');
@@ -252,7 +258,7 @@ describe("Workbook v4 is the only active product design authority", () => {
       expect(page).toContain("onOpenActions={() => setCommunitySheetOpen(true)}");
     }
     expect(mobile).toContain('data-wk-article-actions-trigger="byline"');
-    expect(desktop).toContain("<ArticleFloatHeader article={article} />");
+    expect(desktop).toContain('<ArticleFloatHeader article={article} actionsOpen={communitySheetOpen} onOpenActions={() => setCommunitySheetOpen(true)} />');
     expect(endCredits).toContain('data-wk-article-end-credits');
     expect(endCredits).toContain('data-wk-article-actions-trigger="footer"');
     expect(endCredits).toContain('aria-haspopup="dialog"');

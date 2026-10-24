@@ -164,39 +164,28 @@ for (const width of [390, 768, 1440]) {
         await expect(drawer).toHaveCount(0);
         await expect(menu).toBeFocused();
         await expect(menu).toHaveAttribute("aria-expanded", "false");
-        // Measure *visible* Menu and Search after the drawer closes, not
-        // hidden controls under its modal scrim or during an in-flight theme change.
+        // Both global controls remain bare over artwork and plain pages.
+        // Their white SVG strokes carry a dark contour for contrast without
+        // manufacturing a circular button background.
         for (const action of ["Open WAKILISHA menu", "Search"]) {
-          const contrast = await topBar.getByRole("button", { name: action }).evaluate((node) => {
-            const style = getComputedStyle(node);
-            const luminance = (colour: string) => {
-              // Theme tokens include OKLCH. Let the actual Chromium canvas
-              // resolve the CSS colour before measuring linear RGB luminance.
-              const canvas = document.createElement("canvas");
-              canvas.width = 1;
-              canvas.height = 1;
-              const context = canvas.getContext("2d", { willReadFrequently: true });
-              if (!context) throw new Error("Canvas 2D unavailable for colour validation");
-              context.fillStyle = colour;
-              context.fillRect(0, 0, 1, 1);
-              const [red, green, blue, alpha] = context.getImageData(0, 0, 1, 1).data;
-              if (alpha !== 255) throw new Error("Control colour is not opaque");
-              const linear = [red, green, blue]
-                .map((value) => value / 255)
-                .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
-              return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
-            };
-            const foreground = luminance(style.color);
-            const background = luminance(style.backgroundColor);
+          const chrome = await topBar.getByRole("button", { name: action }).evaluate((node) => {
+            const button = getComputedStyle(node);
+            const icon = node.querySelector("svg");
+            if (!icon) throw new Error("Global navigation icon is missing");
+            const glyph = getComputedStyle(icon);
             return {
-              ratio: (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05),
-              background: style.backgroundColor,
-              blend: style.mixBlendMode,
+              background: button.backgroundColor,
+              border: button.borderTopWidth,
+              color: glyph.color,
+              shadow: glyph.filter,
+              blend: button.mixBlendMode,
             };
           });
-          expect(contrast.ratio, `${mode}/${width}/${action}: ${JSON.stringify(contrast)}`).toBeGreaterThanOrEqual(4.5);
-          expect(contrast.background).not.toBe("rgba(0, 0, 0, 0)");
-          expect(contrast.blend).toBe("normal");
+          expect(chrome.background).toBe("rgba(0, 0, 0, 0)");
+          expect(chrome.border).toBe("0px");
+          expect(chrome.color).toBe("rgb(255, 255, 255)");
+          expect(chrome.shadow).toContain("drop-shadow(");
+          expect(chrome.blend).toBe("normal");
         }
         await page.screenshot({
           path: testInfo.outputPath(`workbook-v4-nav-${pageSpec.slug}-${width}-${mode}-closed.png`),
