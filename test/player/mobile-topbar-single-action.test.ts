@@ -34,7 +34,8 @@ describe("Workbook phone chrome", () => {
     expect(topBar).not.toContain("brightness-0 invert");
     expect(topBar).not.toContain('<span aria-hidden="true" className="h-11 w-11" />');
     expect(musicShell).not.toContain('className="h-7 max-w-[128px] object-contain object-left"');
-    expect(musicShell).toContain("pointer-events-auto ml-auto flex h-11 w-11");
+    expect(musicShell).toContain("<MobileTopBar />");
+    expect(musicShell).not.toContain("<aside");
     expect(drawer).toContain("onSearch();");
     expect(topBar).toContain("pointer-events-auto");
     expect(topBar).not.toContain("backdrop-blur-xl");
