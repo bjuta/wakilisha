@@ -142,6 +142,31 @@ for (const width of [390, 768, 1440]) {
           await themeSwitch.click();
         }
         await expect(page.locator("html")).toHaveAttribute("data-wk-theme", mode);
+        // Static accessible roles are not enough: check the actual foreground
+        // against the now-opaque theme-aware button surface in Chromium.
+        for (const action of ["Open WAKILISHA menu", "Search"]) {
+          const contrast = await topBar.getByRole("button", { name: action }).evaluate((node) => {
+            const style = getComputedStyle(node);
+            const channels = (colour: string) => (colour.match(/[\\d.]+/g) || []).slice(0, 3).map(Number);
+            const luminance = (colour: string) => {
+              const [red, green, blue] = channels(colour);
+              return [red, green, blue]
+                .map((value) => value / 255)
+                .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
+                .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+            };
+            const foreground = luminance(style.color);
+            const background = luminance(style.backgroundColor);
+            return {
+              ratio: (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05),
+              background: style.backgroundColor,
+              blend: style.mixBlendMode,
+            };
+          });
+          expect(contrast.ratio).toBeGreaterThanOrEqual(4.5);
+          expect(contrast.background).not.toBe("rgba(0, 0, 0, 0)");
+          expect(contrast.blend).toBe("normal");
+        }
         await expect(drawer.locator('img[alt="WAKILISHA"]')).toHaveAttribute(
           "src",
           mode === "dark"
@@ -420,7 +445,7 @@ for (const width of [390, 1440]) {
       await expect.poll(() => nav.evaluate((node) => node.getBoundingClientRect().bottom)).toBeLessThanOrEqual(2);
 
       // Reverse direction without returning to the top: reveal the
-      // transparent bar with individually contrast-blended Menu/Search glyphs.
+      // transparent bar with contrast-safe, theme-aware Menu/Search controls.
       await page.evaluate(() => window.scrollBy(0, -44));
       await expect(nav).toHaveAttribute("data-wk-mobile-header-visible", "true");
       await expect.poll(() => nav.evaluate((node) => Math.abs(node.getBoundingClientRect().top))).toBeLessThanOrEqual(2);
@@ -438,7 +463,7 @@ for (const width of [390, 1440]) {
       });
       expect(chrome.position).toBe("fixed");
       expect(chrome.background).toBe("rgba(0, 0, 0, 0)");
-      expect(chrome.menuBlend).toBe("difference");
+      expect(chrome.menuBlend).toBe("normal");
       expect(chrome.logoCount).toBe(0);
       expect(chrome.searchCount).toBe(1);
       expect(Math.abs(chrome.headerTop)).toBeLessThanOrEqual(2);
