@@ -429,11 +429,13 @@ export function FloatingImageToolbar({ editor }: Props) {
         <button
           type="button"
           onClick={() => {
+            console.info("WK_CAPTION_TRIGGER", Boolean(selectedImage));
             // Set this synchronously: a queued editor selection frame can run
             // before React commits the dialog and its modalOpenRef effect.
             modalOpenRef.current = true;
             setCaptionOpen(true);
           }}
+          data-wk-caption-open={String(captionOpen)}
           className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-[var(--wk-text-muted)] hover:bg-[var(--wk-brand-soft)] hover:text-[var(--wk-brand)]"
           title="Edit caption in this article"
         >
@@ -473,7 +475,7 @@ export function FloatingImageToolbar({ editor }: Props) {
         <ImageEditDialog
           open={captionOpen}
           meta={selectedImage.meta}
-          onClose={() => { setCaptionOpen(false); requestAnimationFrame(detectImage); }}
+          onClose={() => { console.info("WK_CAPTION_CLOSE"); setCaptionOpen(false); requestAnimationFrame(detectImage); }}
           onSave={handleEditSave}
         />
       )}
