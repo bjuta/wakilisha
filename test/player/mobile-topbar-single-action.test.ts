@@ -29,8 +29,10 @@ describe("Workbook phone chrome", () => {
     expect(topBar).toContain("pointer-events-none fixed inset-x-0 top-0");
     expect(topBar).toContain("h-14");
     expect(topBar).toContain("bg-transparent");
-    expect(topBar).toContain("text-[var(--wk-text)]");
-    expect(topBar).toContain("bg-[var(--wk-surface)]");
+    expect(topBar).toContain("text-white");
+    expect(topBar).toContain("border-0 bg-transparent");
+    expect(topBar).toContain("drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]");
+    expect(topBar).not.toContain("bg-[var(--wk-surface)]");
     expect(topBar).not.toContain("mix-blend-difference");
     expect(topBar).not.toContain("brightness-0 invert");
     expect(topBar).not.toContain('<span aria-hidden="true" className="h-11 w-11" />');
