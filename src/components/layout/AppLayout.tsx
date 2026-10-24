@@ -2,6 +2,7 @@ import {
   Outlet,
   useLocation,
 } from "react-router-dom";
+import { isMiziziProductRoute } from "@/services/miziziProductRoute";
 import {
   PlayerCompactSurface,
 } from "@/components/design-system/player/PlayerCompactSurface";
@@ -19,6 +20,7 @@ function isShelllessDesktopPath(
   pathname: string,
 ): boolean {
   return (
+    isMiziziProductRoute(pathname) ||
     pathname === "/auth" ||
     pathname.startsWith("/preview/") ||
     pathname.includes(
