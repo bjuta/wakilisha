@@ -78,7 +78,7 @@ export function MobileTopBar() {
         <button
           type="button"
           onClick={() => setAccountOpen(true)}
-          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] shadow-sm transition-colors hover:bg-[var(--wk-surface-raised)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)]"
+          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] shadow-sm hover:bg-[var(--wk-surface-raised)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)]"
           aria-label="Open WAKILISHA menu"
           aria-controls="wk-workbook-sidebar"
           aria-expanded={accountOpen}
@@ -92,7 +92,7 @@ export function MobileTopBar() {
           type="button"
           onClick={() => setSearchOpen(true)}
           aria-label="Search"
-          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] shadow-sm transition-colors hover:bg-[var(--wk-surface-raised)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)]"
+          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] shadow-sm hover:bg-[var(--wk-surface-raised)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wk-brand)]"
         >
           <WkIcon name="Search" size={20} />
         </button>
