@@ -110,7 +110,7 @@
 .article-content-v2 > div:first-child > p:first-child::first-letter,
 .article-content-v2-mobile > div:first-child > p:first-child::first-letter {
   float: left;
-  font: 900 76px / 0.78 var(--wk-font-display);
+  font: 800 76px / 0.78 var(--wk-font-display);
   color: var(--wk-brand);
   padding-right: 10px;
   margin-top: 4px;
@@ -450,7 +450,7 @@
 
 .article-content-v2 > p:first-child::first-letter {
   float: left;
-  font: 900 84px / 0.78 var(--wk-font-display);
+  font: 800 84px / 0.78 var(--wk-font-display);
   color: var(--wk-brand);
   padding-right: 12px;
   margin-top: 6px;
@@ -487,7 +487,7 @@
   border-left: 4px solid var(--wk-brand);
   padding: 8px 0 8px 28px;
   margin: 36px 0;
-  font: 900 26px / 1.2 var(--wk-font-display);
+  font: 800 26px / 1.2 var(--wk-font-display);
   letter-spacing: -0.03em;
   color: var(--wk-text);
 }
@@ -578,7 +578,7 @@
 
 .article-content-v2-mobile > p:first-child::first-letter {
   float: left;
-  font: 900 72px / 0.78 var(--wk-font-display);
+  font: 800 72px / 0.78 var(--wk-font-display);
   color: var(--wk-brand);
   padding-right: 10px;
   margin-top: 4px;
@@ -615,7 +615,7 @@
   border-left: 3px solid var(--wk-brand);
   padding: 6px 0 6px 20px;
   margin: 28px 0;
-  font: 900 22px / 1.2 var(--wk-font-display);
+  font: 800 22px / 1.2 var(--wk-font-display);
   letter-spacing: -0.02em;
   color: var(--wk-text);
 }
@@ -721,4 +721,162 @@
   max-width: 100% !important;
   width: auto !important;
   height: auto !important;
+}
+
+/* Workbook P11 single-article paper: one editorial canvas, unboxed images and
+   consistent spacing across the two routed desktop/mobile implementations. */
+.wk-workbook-article-paper {
+  margin-top: 0;
+  border-radius: 0;
+  background: var(--wk-bg);
+}
+.wk-workbook-article-paper .article-content-v2 img,
+.wk-workbook-article-paper .article-content-v2 figure,
+.wk-workbook-article-paper .article-content-v2 .wp-block-image,
+.wk-workbook-article-paper .article-content-v2 .wp-caption {
+  border-radius: 0;
+}
+.wk-workbook-article-paper .article-content-v2 figure {
+  overflow: visible;
+}
+[data-wk-workbook-related="articles"] img {
+  border-radius: 0;
+}
+
+/* Mobile uses a distinct React article route, but the same flat Workbook P11 paper. */
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile img,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile figure,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile .wp-block-image,
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile .wp-caption {
+  border-radius: 0;
+}
+[data-wk-workbook-screen="article-mobile"] .wk-workbook-article-paper .article-content-v2-mobile figure {
+  overflow: visible;
+}
+
+@media (max-width: 640px) {
+  [data-wk-workbook-related="articles"] {
+    padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  }
+}
+
+
+/* P11 workbook reading surface: warm paper in light mode; night ink in dark.
+   The photographed cover remains separate from the reading canvas. */
+.wk-workbook-article-paper {
+  --wk-editorial-category-ink: var(--wk-brand);
+  background: var(--wk-wb-article-paper, var(--wk-bg));
+  color: var(--wk-text);
+  border-radius: 0;
+}
+[data-wk-article-category*="album"] { --wk-editorial-category-ink: #93552e; }
+[data-wk-article-category*="opinion"] { --wk-editorial-category-ink: #66538e; }
+[data-wk-article-category*="lifestyle"] { --wk-editorial-category-ink: #8f4666; }
+[data-wk-article-category*="art"] { --wk-editorial-category-ink: #906322; }
+[data-wk-article-category*="news"] { --wk-editorial-category-ink: #426d7b; }
+[data-wk-article-category*="film"] { --wk-editorial-category-ink: #61548e; }
+[data-wk-article-category*="sport"] { --wk-editorial-category-ink: #3b697e; }
+[data-wk-article-category*="literature"] { --wk-editorial-category-ink: #73518b; }
+
+.wk-workbook-article-paper [data-wk-article-section] {
+  color: var(--wk-editorial-category-ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) {
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--wk-text);
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) p {
+  margin-bottom: 1.5em;
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) h2 {
+  font-size: clamp(23px, 2.4vw, 29px);
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -.025em;
+  margin-top: 2.1em;
+  margin-bottom: .85em;
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) figure {
+  margin-block: 32px 40px;
+  border-radius: 0;
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0;
+}
+[data-wk-article-newsletter] {
+  background: var(--wk-wb-article-paper, var(--wk-bg));
+}
+[data-wk-article-newsletter] :is(h2, h3) {
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1.1;
+  letter-spacing: -.035em;
+  font-weight: 700;
+}
+[data-wk-article-newsletter] p {
+  max-width: 48ch;
+  margin-inline: auto;
+}
+@media (min-width: 768px) {
+  .wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) {
+    font-size: 19px;
+    line-height: 1.7;
+  }
+}
+
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) blockquote {
+  border-left: 4px solid var(--wk-wb-quote-rule, var(--wk-text));
+  padding: 10px 0 10px 20px;
+  margin-block: 36px;
+  background: transparent;
+  color: var(--wk-text);
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 600;
+  line-height: 1.38;
+}
+
+[data-wk-article-newsletter] > div {
+  border: none;
+  border-radius: 0;
+  padding: 8px 0;
+  background: transparent;
+  box-shadow: none;
+}
+[data-wk-article-newsletter] input[type="email"] {
+  min-height: 48px;
+  font-size: 16px;
+}
+[data-wk-article-newsletter] button[type="submit"] {
+  min-height: 48px;
+  background: var(--wk-text);
+  color: var(--wk-bg);
+}
+
+/* Media captions are part of the figure, not a continuation of Article prose. */
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) figure.wk-figure {
+  margin: 32px 0 40px;
+  overflow: visible;
+}
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) figure.wk-figure > figcaption,
+.wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) .wp-caption-text {
+  display: block;
+  margin: 0;
+  padding: 12px 0 0;
+  color: var(--wk-text-muted);
+  font: 500 13px/1.5 var(--wk-font-ui);
+  text-align: left;
+  font-style: normal;
+  letter-spacing: 0;
+}
+@media (max-width: 640px) {
+  .wk-workbook-article-paper :is(.article-content-v2, .article-content-v2-mobile) figure.wk-figure > figcaption {
+    padding-top: 9px;
+    font-size: 12px;
+  }
 }

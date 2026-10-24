@@ -189,6 +189,17 @@ jobs:
       - name: Run critical security and lifecycle tests
         run: npm run test:critical
 
+      - name: Verify WK100 local confidential preview fail-closed contract
+        run: node --test test/charts/wk100-private-preview.test.mjs
+
+      - name: Verify WK100 offline authority-bound intake
+        run: node --test test/charts/wk100-offline-intake-authority.test.mjs
+
+      - name: Verify WK100 server-only Admin preview and confidentiality
+        run: |
+          node --test test/charts/wk100-private-admin-preview.test.mjs
+          npx vitest run test/charts/wk100-admin-role-expiry.test.ts
+
       - name: Enforce Post draft and authored Thread authority
         run: >-
           npx vitest run
@@ -243,6 +254,33 @@ jobs:
 
       - name: Run WAKILISHA real-browser interaction acceptance
         run: npm run test:ui-browser
+
+      # A second Playwright invocation clears test-results. Preserve the actual
+      # public route captures before launching the isolated authoring fixture.
+      - name: Preserve actual public-route visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workbook-v4-public-route-browser-captures
+          path: test-results/**/workbook-v4-*.png
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Exercise shared authoring editor in isolated real Chromium
+        env:
+          WK_EDITORIAL_FIXTURE: "1"
+          VITE_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          VITE_PUBLIC_SUPABASE_ANON_KEY: wk-test-synthetic-no-credentials
+        run: npm run test:ui-browser -- test/ui-browser/editorial-rating-workflow.spec.ts
+
+      - name: Preserve isolated authoring screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workbook-v4-editorial-browser-captures
+          path: test-results/**/workbook-v4-editor-rating-*.png
+          if-no-files-found: ignore
+          retention-days: 7
 
   critical:
     name: critical

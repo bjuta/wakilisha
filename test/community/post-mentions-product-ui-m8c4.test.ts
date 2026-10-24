@@ -72,6 +72,11 @@ const mobileLayout = readFileSync(
   "src/components/mobile/MobileAppLayout.tsx",
   "utf8",
 );
+const sharedNavigation = readFileSync(
+  "src/components/navigation/wakilishaNavigation.ts",
+  "utf8",
+);
+
 import {
   applyPostMentionSuggestion,
   findPostMentionComposerQuery,
@@ -216,7 +221,7 @@ describe("WAKILISHA M8C.4 Mention product UI", () => {
 
   it("presents Post Mention notifications and the stored Mention preference in human language", () => {
     expect(notificationsPage).toContain(
-      'post_mention: "ri-at-line"',
+      'post_mention: "AtSign"',
     );
     expect(notificationsPage).toContain(
       'post_mention: "mentioned you in a Post"',
@@ -333,9 +338,18 @@ describe("WAKILISHA M8C.4 Mention product UI", () => {
     expect(notificationBell).not.toContain(
       "Alerts",
     );
-    expect(mobileLayout).toContain(
-      '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
+    const accountDrawer = readFileSync(
+      "src/components/mobile/MobileAccountDrawer.tsx",
+      "utf8",
     );
+    expect(accountDrawer).toContain(
+      '{ to: "/notifications", icon: "Bell"',
+    );
+    expect(accountDrawer).toContain("available: signedIn");
+    expect(sharedNavigation).not.toContain(
+      '{ label: "Notifications", to: "/notifications"',
+    );
+    expect(mobileLayout).not.toContain("MobileBottomNav");
     expect(mobileLayout).not.toContain(
       "Alerts",
     );

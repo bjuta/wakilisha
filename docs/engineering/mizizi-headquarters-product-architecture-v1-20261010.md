@@ -1,5 +1,9 @@
 # MIZIZI Headquarters — Complete Product and System Architecture V1
 
+> **24 October 2026, superseding product/release status:** The owner-approved [MIZIZI Product and Phase 1 Authority](./mizizi-product-phase1-reconciliation-20261024.md) and [documentation authority index](./mizizi-documentation-authority-index-20261024.md) are the current MIZIZI programme and release interpretation. Historic claims, migration receipts, source hashes, dated design checkpoints and prior CI outcomes below are retained as evidence, not rewritten. Live read-only Supabase census: Production **234** migrations through `20261020072800`, Preview **237** through `20261017212255`; Preview is **not** a linear Production superset. #1246 **merged**; #1243, #1244 and #1248–#1251 remain draft. No SQL, Edge or Production change is authorized by this documentation update.
+> 
+> **Architectural decision:** This document continues to own the five cultural-intelligence loops and the distinctions among Registry canonical entities, evidence, judgment, execution and public disclosure. The October 24 source extends the original eight-screen visual inventory to thirteen screens. The old 10 October hypothetical enterprise HTML and original early migration numbers remain dated historical references. All working security/worker/case/hold components are preserved; the review-first UI is now a transitional implementation to be refactored into case-first Workbench, Review, Orion, Evidence and Outcomes.
+
 ## Current Product Authority: 15 October 2026
 
 **Read this first:** [enterprise product and current release authority](mizizi-enterprise-product-and-release-authority-20261015.md). The 10 October heading, baseline, and closing statement below describe the original **documentation-only architecture approval**, not the current implementation. This document remains the domain architecture, not a claim that the full system is deployed.

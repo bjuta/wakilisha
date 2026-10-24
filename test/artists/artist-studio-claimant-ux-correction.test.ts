@@ -7,7 +7,6 @@ import {
 } from "vitest";
 import {
   findClaimantPhoneCountryOptions,
-  getCountryFlagEmoji,
 } from "../../src/utils/claimantPhone";
 
 const root = process.cwd();
@@ -115,12 +114,6 @@ describe(
     it(
       "uses a joined flag and calling-code picker instead of two full-width country fields",
       () => {
-        expect(
-          getCountryFlagEmoji("KE"),
-        ).toBe("🇰🇪");
-        expect(
-          getCountryFlagEmoji("NG"),
-        ).toBe("🇳🇬");
 
         expect(
           findClaimantPhoneCountryOptions(
@@ -167,7 +160,7 @@ describe(
         expect(
           artistCountryPicker,
         ).toContain(
-          "getCountryFlagEmoji",
+          "CountryIdentityMark",
         );
         expect(
           artistCountryPicker,

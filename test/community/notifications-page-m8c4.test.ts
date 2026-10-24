@@ -19,6 +19,18 @@ const mobile = readFileSync(
   "src/components/mobile/MobileAppLayout.tsx",
   "utf8",
 );
+const mobileDrawer = readFileSync(
+  "src/components/mobile/MobileAccountDrawer.tsx",
+  "utf8",
+);
+const mobileHeader = readFileSync(
+  "src/components/mobile/MobileTopBar.tsx",
+  "utf8",
+);
+const navigation = readFileSync(
+  "src/components/navigation/wakilishaNavigation.ts",
+  "utf8",
+);
 const router = readFileSync(
   "src/router/config.tsx",
   "utf8",
@@ -63,8 +75,10 @@ describe(
         '["mentions", "Mentions"]',
       );
       expect(page).toMatch(
-        /notification\.notificationType\s*===\s*"post_mention"/,
+        /type\s*===\s*"post_mention"/,
       );
+      expect(page).toContain("const type = notification.notificationType;");
+      expect(page).toContain('type === "mention" || type === "post_mention"');
     });
 
     it("keeps unread treatment and read actions on the durable feed", () => {
@@ -94,16 +108,17 @@ describe(
       );
     });
 
-    it("puts Notifications directly in signed-in mobile navigation", () => {
-      expect(mobile).toContain(
-        '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
+    it("keeps Notifications reachable in the canonical sidebar without restoring the retired mobile tab bar", () => {
+      expect(mobileDrawer).toContain('to: "/notifications"');
+      expect(navigation).toContain(
+        '{ label: "Artists", to: "/artists", icon: "Users" }',
       );
-      expect(mobile).toContain(
-        'to="/artists"',
-      );
-      expect(mobile).not.toContain(
-        "<NotificationBell",
-      );
+      expect(mobileDrawer).toContain("visibleWakilishaNavigation");
+      expect(mobileDrawer).toContain("item.to");
+      expect(mobileHeader).toContain('aria-label="Open WAKILISHA menu"');
+      expect(mobile).toContain("<MobileTopBar");
+      expect(mobile).not.toContain("MobileBottomNav");
+      expect(mobile).not.toContain("<NotificationBell");
     });
 
     it("deep-links notification settings to the existing preferences pane", () => {
@@ -138,6 +153,15 @@ describe(
         "min-h-[calc(100dvh-6rem)]",
       );
       expect(page).toContain(
+        'aria-label="Notification filters"',
+      );
+      expect(page).toContain(
+        'aria-current={',
+      );
+      expect(page).toContain(
+        'bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]',
+      );
+      expect(page).not.toContain(
         "w-14 -translate-x-1/2",
       );
       expect(page).not.toContain(

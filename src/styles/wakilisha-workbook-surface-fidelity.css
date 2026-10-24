@@ -1,0 +1,130 @@
+/* WAKILISHA Workbook v4: real public product surfaces.
+   Brand workbook: Music is night-first; communications and social are quiet paper.
+   The only WAKILISHA green is #85C441 (light-ground ink #4E7425).
+   No forced-specificity overrides, prototype content, or decorative browser chrome. */
+
+[data-wk-workbook-screen="music"] {
+  color: var(--wk-text);
+  background-color: var(--wk-bg);
+  min-height: 100dvh;
+}
+
+[data-wk-workbook-screen="music"] main {
+  max-width: 1600px;
+  margin-inline: auto;
+}
+
+[data-wk-workbook-screen="music"] .wk-music-hero {
+  margin: 24px 24px 0;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,.1);
+}
+
+[data-wk-workbook-screen="music"] .wk-music-hero h1 {
+  font-weight: 800;
+  line-height: .92;
+  letter-spacing: -.05em;
+  color: #fff;
+}
+
+[data-wk-workbook-screen="music"] main > section:not(.wk-music-hero) {
+  border-bottom-color: var(--wk-border);
+  padding-top: 28px;
+  padding-bottom: 32px;
+}
+
+[data-wk-workbook-screen="music"] main h2 {
+  color: var(--wk-text);
+  font-size: clamp(20px, 2.1vw, 26px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -.03em;
+  text-transform: none;
+}
+
+[data-wk-workbook-screen="music"] main article {
+  box-shadow: none;
+}
+
+[data-wk-workbook-screen="music"] main article img {
+  object-fit: cover;
+}
+
+[data-wk-workbook-screen="music"] :is(button, a):focus-visible {
+  outline: 2px solid #85c441;
+  outline-offset: 3px;
+}
+
+[data-wk-workbook-screen="notifications"],
+[data-wk-workbook-screen="messages"],
+[data-wk-workbook-screen="following"] {
+  color: var(--wk-text);
+  background: var(--wk-bg);
+}
+
+[data-wk-workbook-screen="notifications"] aside nav button {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+
+[data-wk-workbook-screen="notifications"] h1,
+[data-wk-workbook-screen="messages"] h1,
+[data-wk-workbook-screen="following"] h1 {
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -.035em;
+}
+
+[data-wk-workbook-screen="notifications"] :is(button, a):focus-visible,
+[data-wk-workbook-screen="messages"] :is(button, a):focus-visible,
+[data-wk-workbook-screen="following"] :is(button, a):focus-visible {
+  outline: 2px solid var(--wk-brand);
+  outline-offset: 2px;
+}
+
+[data-wk-workbook-screen="notifications"] [aria-label="Notification preferences"] {
+  padding-top: 20px;
+}
+
+[data-wk-workbook-screen="messages"] [aria-label="Conversation"] {
+  min-height: min(72dvh, 860px);
+}
+
+[data-wk-workbook-screen="messages"] [aria-label="Conversation"] p {
+  line-height: 1.55;
+}
+
+[data-wk-workbook-screen="following"] [data-following-activity] {
+  padding-block: 30px;
+}
+
+[data-wk-workbook-screen="following"] [data-following-activity] > a img {
+  object-fit: cover;
+}
+
+@media (max-width: 767px) {
+  [data-wk-workbook-screen="music"] .wk-music-hero {
+    margin: 0 0 16px;
+    border-radius: 0 0 24px 24px;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+  }
+  [data-wk-workbook-screen="music"] main > section:not(.wk-music-hero) {
+    padding-top: 24px;
+    padding-bottom: 28px;
+  }
+  [data-wk-workbook-screen="following"] [data-following-activity] {
+    padding-block: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-wk-workbook-screen="music"] *,
+  [data-wk-workbook-screen="following"] * {
+    scroll-behavior: auto;
+    transition-duration: .01ms;
+    animation-duration: .01ms;
+  }
+}

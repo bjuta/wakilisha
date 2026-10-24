@@ -1,3 +1,6 @@
+import "@/styles/wakilisha-workbook-surface-fidelity.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
+import "@/styles/wakilisha-social-workbook-p6-p8.css";
 import {
   useCallback,
   useEffect,
@@ -18,11 +21,13 @@ import type {
   CommunityNotification,
   CommunityProfile,
 } from "@/services/community";
-import { WkIcon } from "@/components/design-system/Icon";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
+import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
+import { supabase } from "@/lib/supabase";
+import { listMessageConversations } from "@/services/messages";
+import type { UserNotificationPrefs } from "@/hooks/useUserSettings";
 
-type NotificationFilter =
-  | "all"
-  | "mentions";
+type NotificationFilter = "all" | "mentions" | "releases" | "credits" | "live";
 
 interface NotificationWithActor
   extends CommunityNotification {
@@ -45,28 +50,37 @@ const NOTIFICATION_LABELS: Record<
   post_repost: "reposted your Post",
   post_quote: "quoted your Post",
   direct_message: "sent you a message",
+  new_release: "released new music",
+  release_published: "published a release",
+  live: "is live",
+  live_started: "started a live session",
+  post_like: "liked your Post",
+  post_reaction: "reacted to your Post",
   credit_confirmation_request: "asked you to confirm a music credit",
   credit_confirmation_response: "responded to your music credit request",
 };
 
-const NOTIFICATION_ICONS: Record<
-  string,
-  string
-> = {
-  reply: "ri-reply-line",
-  new_comment: "ri-chat-1-line",
-  mention: "ri-at-line",
-  post_mention: "ri-at-line",
-  pin: "ri-pushpin-line",
-  editor_pick: "ri-star-line",
-  contribution_approved: "ri-check-double-line",
-  contribution_merged: "ri-git-merge-line",
-  follow: "ri-user-follow-line",
-  post_repost: "ri-repeat-2-line",
-  post_quote: "ri-double-quotes-l",
-  direct_message: "ri-mail-line",
-  credit_confirmation_request: "ri-music-2-line",
-  credit_confirmation_response: "ri-checkbox-circle-line",
+const NOTIFICATION_ICONS: Record<string, WkIconName> = {
+  reply: "MessageSquare",
+  new_comment: "MessageSquare",
+  mention: "AtSign",
+  post_mention: "AtSign",
+  pin: "Pin",
+  editor_pick: "Star",
+  contribution_approved: "CheckCircle",
+  contribution_merged: "GitMerge",
+  follow: "UserPlus",
+  post_repost: "Repeat2",
+  post_quote: "Quote",
+  direct_message: "Mail",
+  new_release: "Disc",
+  release_published: "Disc",
+  live: "Video",
+  live_started: "Video",
+  post_like: "Heart",
+  post_reaction: "Heart",
+  credit_confirmation_request: "CheckCircle",
+  credit_confirmation_response: "CheckCircle",
 };
 
 function timeAgo(value: string): string {
@@ -121,6 +135,10 @@ function notificationTarget(
       return canonicalPath;
     }
 
+    const conversationId = (notification.metadata as Record<string, unknown> | null)?.conversation_id;
+    if (typeof conversationId === "string" && /^[0-9a-f-]{36}$/i.test(conversationId)) {
+      return `/messages?conversation=${encodeURIComponent(conversationId)}`;
+    }
     return "/messages";
   }
 
@@ -199,6 +217,103 @@ function NotificationSkeleton() {
   );
 }
 
+
+/** Scoped preferences read/write. Never use Settings' profile-wide save here. */
+function NotificationPreferencesSidebar({ userId }: { userId: string | null | undefined }) {
+  const [prefs, setPrefs] = useState<UserNotificationPrefs | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    let current = true;
+    void supabase.rpc("community_get_notification_prefs", { p_user_id: userId })
+      .then(({ data, error: loadError }) => {
+        if (!current) return;
+        if (loadError || !data) {
+          setError("Could not load notification settings.");
+          return;
+        }
+        setPrefs({
+          emailDigest: data.email_digest ?? true,
+          chartAlerts: data.chart_alerts ?? true,
+          artistDrops: data.artist_drops ?? true,
+          replyNotifications: data.reply_notifications ?? true,
+          mentionNotifications: data.mention_notifications ?? true,
+          followNotifications: data.follow_notifications ?? false,
+          contributionNotifications: data.contribution_notifications ?? false,
+          marketingEmails: data.marketing_emails ?? false,
+        });
+      })
+      .catch(() => { if (current) setError("Could not load notification settings."); });
+    return () => { current = false; };
+  }, [userId]);
+
+  const updatePreference = useCallback(async (key: keyof UserNotificationPrefs, value: boolean) => {
+    if (!userId || !prefs || pending) return;
+    setPending(true);
+    setError(null);
+    const next = { ...prefs, [key]: value };
+    try {
+      const { error: saveError } = await supabase.rpc("community_update_notification_prefs", {
+        p_user_id: userId,
+        p_email_digest: next.emailDigest,
+        p_chart_alerts: next.chartAlerts,
+        p_artist_drops: next.artistDrops,
+        p_reply_notifications: next.replyNotifications,
+        p_mention_notifications: next.mentionNotifications,
+        p_follow_notifications: next.followNotifications,
+        p_contribution_notifications: next.contributionNotifications,
+        p_marketing_emails: next.marketingEmails,
+      });
+      if (saveError) throw saveError;
+      setPrefs(next);
+      try { localStorage.setItem("wk-notifications-v2", JSON.stringify(next)); } catch { /* unavailable */ }
+    } catch {
+      setError("Could not save that preference. Try again.");
+    } finally {
+      setPending(false);
+    }
+  }, [userId, prefs, pending]);
+
+  return (
+    <aside data-wk-notifications-preferences className="mx-4 mt-4 hidden self-start rounded-[18px] border border-[var(--wk-border)] px-5 py-5 lg:block" aria-label="Notification preferences">
+      <h2 className="text-[19px] font-bold leading-[1.2] tracking-[-0.03em] text-[var(--wk-text)]">Tell me about</h2>
+
+      {prefs ? (
+        <div className="mt-4 divide-y divide-[var(--wk-border)]">
+          {([
+            ["New releases from artists I follow", "artistDrops"],
+            ["Chart updates", "chartAlerts"],
+            ["Replies to my comments", "replyNotifications"],
+            ["Mentions", "mentionNotifications"],
+            ["Credit and MIZIZI updates", "contributionNotifications"],
+          ] as const).map(([label, key]) => (
+            <div key={key} className="flex min-h-[58px] items-center justify-between gap-2 py-2">
+              <span className="text-[13px] leading-[1.4] text-[var(--wk-text)]">{label}</span>
+              <WakilishaToggle
+                size="sm"
+                ariaLabel={label}
+                value={prefs[key]}
+                onChange={(next) => void updatePreference(key, next)}
+                disabled={pending}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {error && <p className="mt-3 text-[12px] leading-relaxed text-[var(--wk-danger)]" role="status">{error}</p>}
+      {pending && <p className="mt-2 text-[12px] text-[var(--wk-text-muted)]" role="status">Saving...</p>}
+      <Link
+        to="/settings?section=Notifications"
+        className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--wk-border)] px-4 text-[13px] font-semibold text-[var(--wk-text)] transition-colors hover:border-[var(--wk-brand)]"
+      >
+        All notification settings <WkIcon name="ArrowUpRight" size={14} />
+      </Link>
+    </aside>
+  );
+}
+
 export default function NotificationsPage() {
   const authUser = useAuthUser();
   const [filter, setFilter] =
@@ -209,6 +324,8 @@ export default function NotificationsPage() {
     useState(true);
   const [markingAll, setMarkingAll] =
     useState(false);
+  const [dmUnreadByConversation, setDmUnreadByConversation] =
+    useState<Record<string, number>>({});
 
   const loadNotifications =
     useCallback(async () => {
@@ -222,6 +339,23 @@ export default function NotificationsPage() {
             100,
           );
         setNotifications(rows);
+        // Per-conversation counts come from Messages authority, not
+        // the number of unread entries in Community Notifications.
+        const folders = await Promise.allSettled([
+          listMessageConversations("inbox"),
+          listMessageConversations("requests"),
+        ]);
+        const counts: Record<string, number> = {};
+        for (const result of folders) {
+          if (result.status !== "fulfilled") continue;
+          for (const conversation of result.value) {
+            const unread = Number(conversation.unread_count);
+            if (Number.isFinite(unread) && unread > 0) {
+              counts[conversation.conversation_id] = unread;
+            }
+          }
+        }
+        setDmUnreadByConversation(counts);
       } finally {
         setLoading(false);
       }
@@ -237,20 +371,22 @@ export default function NotificationsPage() {
     loadNotifications,
   ]);
 
-  const visibleNotifications =
-    useMemo(
-      () =>
-        filter === "mentions"
-          ? notifications.filter(
-              (notification) =>
-                notification.notificationType
-                  === "mention"
-                || notification.notificationType
-                  === "post_mention",
-            )
-          : notifications,
-      [filter, notifications],
+  const visibleNotifications = useMemo(() => {
+    const filtered = notifications.filter((notification) => {
+      const type = notification.notificationType;
+      if (filter === "all") return true;
+      if (filter === "mentions") return type === "mention" || type === "post_mention";
+      if (filter === "credits") return type.startsWith("credit_") || type.startsWith("contribution_");
+      if (filter === "releases") return type.startsWith("release_") || type === "new_release";
+      return type.startsWith("live_") || type === "live";
+    });
+    // The workbook's New group is genuinely unread activity, not a guessed
+    // 24-hour interval. Do not overwrite server-owned read state.
+    return filtered.sort((a, b) =>
+      Number(Boolean(a.readAt)) - Number(Boolean(b.readAt))
+      || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
+  }, [filter, notifications]);
 
   const unreadCount =
     notifications.filter(
@@ -334,19 +470,15 @@ export default function NotificationsPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-6rem)] bg-[var(--wk-bg)] pb-28 md:pb-12">
-      <section className="mx-auto min-h-[calc(100dvh-6rem)] w-full max-w-[760px] border-x border-[var(--wk-border)] bg-[var(--wk-surface)]">
-        <header className="sticky top-0 z-20 border-b border-[var(--wk-border)] bg-[var(--wk-surface)]/95 backdrop-blur-xl">
-          <div className="flex min-h-[72px] items-center justify-between gap-4 px-5 sm:px-6">
+    <main data-wk-workbook-screen="notifications" className="min-h-[calc(100dvh-6rem)] bg-[var(--wk-bg)] pb-12">
+      <div className="mx-auto grid w-full max-w-[1180px] gap-0 lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)] lg:gap-0 lg:px-0 lg:pt-0">
+        <section className="min-h-[calc(100dvh-6rem)] min-w-0 border-r border-[var(--wk-border)] bg-[var(--wk-surface)]">
+        <header className="sticky top-0 z-20 border-b border-[var(--wk-border)] bg-[var(--wk-surface)] backdrop-blur-xl">
+          <div className="flex min-h-14 items-center justify-between gap-4 px-5">
             <div>
-              <h1 className="text-[24px] font-black tracking-[-0.035em] text-[var(--wk-text)] sm:text-[28px]">
+              <h1 className="text-[20px] font-bold leading-[1.2] tracking-[-0.02em] text-[var(--wk-text)]">
                 Notifications
               </h1>
-              {unreadCount > 0 && (
-                <p className="mt-0.5 text-[11px] font-bold text-[var(--wk-text-muted)]">
-                  {unreadCount} unread
-                </p>
-              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -357,7 +489,7 @@ export default function NotificationsPage() {
                   onClick={() =>
                     void handleMarkAll()
                   }
-                  className="hidden min-h-10 rounded-full px-4 text-[12px] font-black text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)] disabled:opacity-50 sm:inline-flex sm:items-center"
+                  className="inline-flex min-h-11 items-center rounded-full px-3 text-[11px] font-bold text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)] disabled:opacity-50 sm:px-4 sm:text-[12px]"
                 >
                   {markingAll
                     ? "Marking..."
@@ -367,25 +499,28 @@ export default function NotificationsPage() {
 
               <Link
                 to="/settings?section=Notifications"
-                aria-label="Notification Settings"
+                aria-label="Notification settings and preferences"
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-raised)]"
               >
                 <WkIcon
-                  name="Settings"
-                  size={18}
+                  name="MoreHorizontal"
+                  size={20}
                 />
               </Link>
             </div>
           </div>
 
           <nav
-            className="grid grid-cols-2"
+            className="flex gap-2 overflow-x-auto border-b border-[var(--wk-divider)] px-5 py-2 [scrollbar-width:none]"
             aria-label="Notification filters"
           >
             {(
               [
                 ["all", "All"],
                 ["mentions", "Mentions"],
+                ["releases", "Releases"],
+                ["credits", "Credits"],
+                ["live", "Live"],
               ] as const
             ).map(([value, label]) => {
               const active =
@@ -403,16 +538,13 @@ export default function NotificationsPage() {
                   onClick={() =>
                     setFilter(value)
                   }
-                  className={`relative min-h-12 text-[13px] font-black transition-colors ${
+                  className={`relative min-h-9 shrink-0 rounded-full px-3 text-[12px] font-semibold transition-colors ${
                     active
-                      ? "text-[var(--wk-text)]"
+                      ? "bg-[var(--wk-text)] text-[var(--wk-bg)]"
                       : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
                   }`}
                 >
                   {label}
-                  {active && (
-                    <span className="absolute bottom-0 left-1/2 h-[3px] w-14 -translate-x-1/2 rounded-full bg-[var(--wk-brand)]" />
-                  )}
                 </button>
               );
             })}
@@ -447,7 +579,7 @@ export default function NotificationsPage() {
         ) : (
           <div className="divide-y divide-[var(--wk-border)]">
             {visibleNotifications.map(
-              (notification) => {
+              (notification, index) => {
                 const target =
                   notificationTarget(
                     notification,
@@ -463,7 +595,7 @@ export default function NotificationsPage() {
                   NOTIFICATION_ICONS[
                     notification.notificationType
                   ]
-                  || "ri-notification-3-line";
+                  || "Bell";
                 const metadata =
                   notification.metadata as
                     | Record<string, unknown>
@@ -479,9 +611,30 @@ export default function NotificationsPage() {
                   || metadataSenderName
                   || "Someone";
 
+                const conversationId = typeof metadata?.conversation_id === "string"
+                  ? metadata.conversation_id
+                  : null;
+                const alreadyListed = conversationId && visibleNotifications
+                  .slice(0, index)
+                  .some((earlier) => (
+                    earlier.notificationType === "direct_message"
+                    && (earlier.metadata as Record<string, unknown> | null)?.conversation_id === conversationId
+                  ));
+                const dmUnread = notification.notificationType === "direct_message"
+                  && conversationId && !alreadyListed
+                  ? dmUnreadByConversation[conversationId] || 0
+                  : 0;
+                const recent = !notification.readAt;
+                const previous = index > 0 ? visibleNotifications[index - 1] : null;
+                const previousRecent = previous ? !previous.readAt : null;
+                const groupHeading = !previous || recent !== previousRecent
+                  ? <h2 data-wk-notification-group className="px-5 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">{recent ? "New" : "Earlier"}</h2>
+                  : null;
                 const row = (
                   <div
-                    className={`relative flex gap-4 px-5 py-5 transition-colors sm:px-6 ${
+                    data-wk-notification-row
+                    data-wk-notification-type={notification.notificationType}
+                    className={`relative flex items-start gap-3.5 px-5 py-4 transition-colors ${
                       unread
                         ? "bg-[var(--wk-brand-soft)]/30"
                         : "hover:bg-[var(--wk-surface-raised)]"
@@ -494,60 +647,45 @@ export default function NotificationsPage() {
                       />
                     )}
 
-                    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[var(--wk-surface-raised)]">
-                      {notification.actor?.avatarUrl ? (
-                        <img
-                          src={
-                            notification.actor.avatarUrl
-                          }
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-[var(--wk-text-muted)]">
-                          <i
-                            className={`${icon} text-[18px]`}
-                          />
-                        </span>
-                      )}
+                    <div className="wk-notification-event-icon relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" aria-hidden="true">
+                      <WkIcon name={icon} size={18} aria-hidden="true" />
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] leading-5 text-[var(--wk-text)]">
-                        <span className="font-black">
-                          {actorName}
-                        </span>{" "}
-                        <span className="font-medium">
-                          {label}
-                        </span>
-                      </p>
-
-                      <div className="mt-1.5 flex items-center gap-2 text-[11px] font-semibold text-[var(--wk-text-faint)]">
-                        <span>
-                          {timeAgo(
-                            notification.createdAt,
-                          )}
-                        </span>
-                        <span aria-hidden="true">
-                          ·
-                        </span>
-                        <i
-                          className={`${icon} text-[13px]`}
-                          aria-hidden="true"
-                        />
+                    <div data-wk-notification-copy className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2.5">
+                        {notification.actor?.avatarUrl ? <img src={notification.actor.avatarUrl} alt="" loading="lazy" className="h-7 w-7 shrink-0 rounded-full object-cover" /> : null}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] leading-[1.45] text-[var(--wk-text)]">
+                            <span className="font-bold">{actorName}</span>{" "}
+                            <span className="font-medium">{label}</span>
+                            {dmUnread > 0 ? (
+                              <span data-wk-dm-unread-count className="ml-2 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[var(--wk-brand)] px-1.5 text-[11px] font-bold text-[var(--wk-brand-on)]" aria-label={`${dmUnread} unread messages in this conversation`}>
+                                {dmUnread > 99 ? "99+" : dmUnread}
+                              </span>
+                            ) : null}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
+                    <time
+                      data-wk-notification-time
+                      dateTime={notification.createdAt}
+                      className="shrink-0 text-[11px] font-medium text-[var(--wk-text-muted)]"
+                    >
+                      {timeAgo(notification.createdAt)}
+                    </time>
                     {unread && (
-                      <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--wk-brand)]" />
+                      <span className="sr-only">Unread notification</span>
                     )}
                   </div>
                 );
 
                 if (!target) {
                   return (
+                    <div key={notification.id}>
+                      {groupHeading}
                     <button
-                      key={notification.id}
                       type="button"
                       onClick={() =>
                         void handleOpen(
@@ -558,12 +696,14 @@ export default function NotificationsPage() {
                     >
                       {row}
                     </button>
+                    </div>
                   );
                 }
 
                 return (
+                  <div key={notification.id}>
+                    {groupHeading}
                   <Link
-                    key={notification.id}
                     to={target}
                     onClick={() =>
                       void handleOpen(
@@ -574,29 +714,18 @@ export default function NotificationsPage() {
                   >
                     {row}
                   </Link>
+                  </div>
                 );
               },
             )}
           </div>
         )}
 
-        {unreadCount > 0 && (
-          <div className="border-t border-[var(--wk-border)] px-5 py-4 sm:hidden">
-            <button
-              type="button"
-              disabled={markingAll}
-              onClick={() =>
-                void handleMarkAll()
-              }
-              className="min-h-11 w-full rounded-full border border-[var(--wk-border)] text-[12px] font-black text-[var(--wk-brand)] disabled:opacity-50"
-            >
-              {markingAll
-                ? "Marking..."
-                : "Mark All Read"}
-            </button>
-          </div>
-        )}
-      </section>
+        </section>
+
+        <NotificationPreferencesSidebar userId={authUser.id} />
+
+      </div>
     </main>
   );
 }

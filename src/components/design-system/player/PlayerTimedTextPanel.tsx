@@ -54,10 +54,26 @@ export function PlayerTimedTextPanel({
 
   useEffect(() => {
     if (activeIndex < 0) return;
-    activeRef.current?.scrollIntoView({
-      block: "nearest",
-      behavior: "smooth",
-    });
+    // scrollIntoView walks every ancestor, including the document and the
+    // expanded player's viewport. Keep timed-text following inside its
+    // dedicated panel scroller so an advancing cue never moves the article or
+    // the main Now Playing presentation.
+    const active = activeRef.current;
+    const scroller = active?.closest<HTMLElement>("[data-wk-player-panel-scroll]");
+    if (!active || !scroller) return;
+    const panelRect = scroller.getBoundingClientRect();
+    const cueRect = active.getBoundingClientRect();
+    const delta = cueRect.top < panelRect.top
+      ? cueRect.top - panelRect.top
+      : cueRect.bottom > panelRect.bottom
+        ? cueRect.bottom - panelRect.bottom
+        : 0;
+    if (delta !== 0) {
+      scroller.scrollTo({
+        top: scroller.scrollTop + delta,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+    }
   }, [activeIndex]);
 
   if (loading) {
@@ -124,6 +140,8 @@ export function PlayerTimedTextPanel({
               ref={active ? activeRef : null}
               type="button"
               disabled={!timed}
+              title={timed ? `Jump to ${formatPlayerClock(line.startSeconds ?? 0)}` : undefined}
+              aria-label={timed ? `${line.text}. Jump to ${formatPlayerClock(line.startSeconds ?? 0)}` : line.text}
               onClick={() => {
                 if (line.startSeconds !== null) {
                   onSeek(line.startSeconds);
@@ -131,9 +149,15 @@ export function PlayerTimedTextPanel({
               }}
               className={[
                 "flex w-full gap-3 rounded-2xl px-3 py-2.5 text-left transition-all disabled:cursor-default",
-                active
-                  ? "bg-[var(--wk-brand-soft)] text-[var(--wk-text)]"
-                  : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg)] hover:text-[var(--wk-text)] disabled:hover:bg-transparent",
+                variant === "lyrics"
+                  ? active
+                    ? "text-[var(--wk-text)] opacity-100"
+                    : index < activeIndex
+                      ? "text-[var(--wk-text)] opacity-40"
+                      : "text-[var(--wk-text)] opacity-60 hover:opacity-100"
+                  : active
+                    ? "bg-[var(--wk-brand-soft)] text-[var(--wk-text)]"
+                    : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-bg)] hover:text-[var(--wk-text)] disabled:hover:bg-transparent",
                 stanzaStart
                   ? "mt-5"
                   : variant === "lyrics" && index > 0
@@ -141,7 +165,7 @@ export function PlayerTimedTextPanel({
                     : "",
               ].join(" ")}
             >
-              {timed ? (
+              {timed && variant !== "lyrics" ? (
                 <span className="w-12 shrink-0 pt-1 font-mono text-[10px] font-bold text-[var(--wk-brand)]">
                   {formatPlayerClock(line.startSeconds ?? 0)}
                 </span>
@@ -150,7 +174,7 @@ export function PlayerTimedTextPanel({
                 className={[
                   "min-w-0 flex-1",
                   variant === "lyrics"
-                    ? "text-[18px] font-black leading-7 tracking-[-0.02em]"
+                    ? "text-[clamp(22px,3vw,30px)] font-semibold leading-[1.45] tracking-[-0.02em]"
                     : "text-[13px] leading-6",
                 ].join(" ")}
               >

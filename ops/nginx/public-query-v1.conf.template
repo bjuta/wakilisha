@@ -7,11 +7,15 @@
 # strips user credentials and Origin before proxying to the public transport
 # adapter so this cacheable endpoint cannot vary on authenticated user state.
 #
-# Keep proxy_pass itself static. The incoming query string is preserved by the
-# rewrite because the replacement contains no new arguments.
+# Resolve the Supabase hostname at request time, not Nginx startup.
+# Keep the rewritten Edge URI and incoming query string unchanged.
+# This location-scoped resolver avoids a duplicate server-scoped Audio resolver.
 
 location = /api/public/v1/search {
+    resolver 127.0.0.53 valid=30s ipv6=off;
+    set $wk_public_query_upstream_host __SUPABASE_PROJECT_REF__.supabase.co;
     proxy_ssl_server_name on;
+    proxy_ssl_name __SUPABASE_PROJECT_REF__.supabase.co;
     proxy_set_header Host __SUPABASE_PROJECT_REF__.supabase.co;
     proxy_set_header X-Forwarded-Host $host;
     proxy_set_header X-Forwarded-Proto https;
@@ -33,5 +37,5 @@ location = /api/public/v1/search {
     proxy_pass_request_body off;
     proxy_set_header Content-Length "";
     rewrite ^ /functions/v1/public-query-v1 break;
-    proxy_pass https://__SUPABASE_PROJECT_REF__.supabase.co;
+    proxy_pass https://$wk_public_query_upstream_host;
 }

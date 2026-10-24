@@ -132,7 +132,7 @@ function WkSelectItem({ option }: { option: WkSelectOption }) {
       textValue={option.label}
       isDisabled={option.disabled}
       className={({ isFocused, isSelected, isDisabled }) =>
-        `flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors ${
+        `flex min-h-11 w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left outline-none transition-colors ${
           isDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"
         } ${
           isFocused
@@ -248,7 +248,7 @@ export function WkSelect({
         aria-label={ariaLabel ?? nativeAriaLabel ?? placeholder}
         style={style}
         className={({ isFocusVisible, isPressed }) =>
-          `wk-input flex w-full items-center justify-between gap-3 rounded-xl border-wk-border bg-wk-surface px-3 text-[13px] text-wk-text transition-colors ${
+          `wk-input flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border-wk-border bg-wk-surface px-3 text-[16px] text-wk-text transition-colors ${
             isFocusVisible ? "ring-2 ring-wk-brand/20" : ""
           } ${isPressed ? "bg-wk-surface-raised" : ""} ${triggerClassName}`
         }

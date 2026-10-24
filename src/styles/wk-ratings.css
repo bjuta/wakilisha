@@ -1,0 +1,26 @@
+/* Workbook (3), Chapter 24 — a single native SVG rating language, all workspaces. */
+.wk-rating{--wk-rating-star:15px;display:inline-flex;align-items:center;gap:.28em;vertical-align:-.13em;white-space:nowrap;color:var(--wk-text,currentColor);font-variant-numeric:tabular-nums;max-width:100%;line-height:1.2}
+.wk-rating--inline{margin-inline:.22em}
+.wk-rating-stars{display:inline-flex;gap:2px;align-items:center;white-space:nowrap}
+.wk-rating-star{position:relative;display:inline-block;width:var(--wk-rating-star);height:var(--wk-rating-star);flex:none}
+.wk-rating-star-empty,.wk-rating-star-filled{position:absolute;top:0;left:0;bottom:0;display:block;overflow:hidden;height:100%}
+.wk-rating-star-empty{width:100%;opacity:.18}
+.wk-rating-star-filled{color:inherit}
+.wk-rating-star svg{display:block;width:var(--wk-rating-star);height:var(--wk-rating-star);stroke:currentColor;stroke-width:.35;stroke-linejoin:round}
+.wk-rating-number{font-size:1em;font-weight:800;letter-spacing:-.015em}
+.wk-rating--stars .wk-rating-number{display:none}
+.wk-rating--number .wk-rating-stars{display:none}
+.wk-rating--block,.wk-rating--breakdown,.wk-rating--verdict{--wk-rating-star:22px;display:flex;flex-wrap:wrap;gap:.45em;padding:.75em 0;white-space:normal}
+.wk-rating--block .wk-rating-heading{display:none}
+.wk-rating--verdict,.wk-rating--breakdown{--wk-rating-star:28px;gap:.5em;padding:1.2em 0;border-top:1px solid var(--wk-border,#ccc);border-bottom:1px solid var(--wk-border,#ccc)}
+.wk-rating-heading{font-size:.75em;font-weight:900;letter-spacing:.1em;text-transform:uppercase;width:100%}
+.wk-rating--verdict .wk-rating-number,.wk-rating--breakdown .wk-rating-number{font-size:clamp(2.5rem,7vw,5.5rem);line-height:1;font-weight:800}
+.wk-rating-out-of{font-weight:700;opacity:.65;align-self:end}
+.wk-rating-caption{font-size:.9em;width:100%;white-space:normal}
+.wk-rating-breakdown{display:grid;width:100%;gap:.4em}
+.wk-rating-breakdown-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:1em;align-items:center;min-height:2rem;font-size:.9em}
+.wk-rating-breakdown-score{font-variant-numeric:tabular-nums;font-weight:800}
+.wk-rating--breakdown .wk-rating-breakdown{--wk-rating-star:16px}
+.ProseMirror-selectednode.wk-rating{outline:2px solid var(--wk-brand,#85c441);outline-offset:2px;border-radius:4px}
+@media(max-width:480px){.wk-rating--verdict,.wk-rating--breakdown{--wk-rating-star:22px}.wk-rating--verdict .wk-rating-number,.wk-rating--breakdown .wk-rating-number{font-size:3rem}}
+@media(prefers-reduced-motion:no-preference){.wk-rating-star-filled{transition:width .12s ease-out}}

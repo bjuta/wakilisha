@@ -32,15 +32,7 @@ const publicClient = read(
   "src/services/publicContent/client.ts",
 );
 
-const home = read("src/pages/home/page.tsx");
-
-const mobileHome = read(
-  "src/pages/mobile/home/page.tsx",
-);
-
-const homeHero = read(
-  "src/pages/home/components/HomeHero.tsx",
-);
+const publicRoutes = read("src/router/config.tsx");
 
 const magazine = read(
   "src/pages/magazine/page.tsx",
@@ -48,6 +40,10 @@ const magazine = read(
 
 const mobileMagazine = read(
   "src/pages/mobile/magazine/page.tsx",
+);
+
+const magazineCard = read(
+  "src/pages/magazine/components/MagazineCard.tsx",
 );
 
 const magazineFallbackBuilder = read(
@@ -70,8 +66,16 @@ const mobileAppLayout = read(
   "src/components/mobile/MobileAppLayout.tsx",
 );
 
+const canonicalNavigation = read(
+  "src/components/navigation/wakilishaNavigation.ts",
+);
+
+const mobileSidebar = read(
+  "src/components/mobile/MobileAccountDrawer.tsx",
+);
+
 const mobileCss = read(
-  "src/styles/wakilisha-mobile-ch53-75.css",
+  "src/styles/wakilisha-mobile-workbook-v4.css",
 );
 
 const appShell = read(
@@ -175,30 +179,29 @@ if (
   );
 }
 
+// The actual root route is Magazine on both breakpoints. Old home
+// components and their generated-artwork UI are retired, not alternate
+// rendering authorities. Preserve the Magazine LCP/priority checks below.
 if (
-  !home.includes(
-    "listMagazineStories(24)",
-  ) ||
-  !mobileHome.includes(
-    "listMagazineStories(24)",
+  !publicRoutes.includes(
+    '{ path: "/", element: <ResponsivePage mobile={<MobileMagazine />} desktop={<Magazine />} /> }',
   )
 ) {
-  fail(
-    "home still requests the full magazine archive",
-  );
+  fail("the real / route must use the accepted responsive Magazine entry");
 }
-
-if (
-  !homeHero.includes(
-    'fetchPriority="high"',
-  ) ||
-  !homeHero.includes(
-    'loading="eager"',
-  )
-) {
-  fail(
-    "homepage hero is not prioritized",
-  );
+for (const file of [
+  "src/pages/home/page.tsx",
+  "src/pages/mobile/home/page.tsx",
+  "src/pages/home/components/HomeHero.tsx",
+  "src/pages/home/components/HomeExplore.tsx",
+  "src/pages/home/components/HomeRightNow.tsx",
+  "src/pages/home/components/HomeMarquee.tsx",
+  "src/pages/home/components/HomeMission.tsx",
+  "src/pages/home/components/HomeNav.tsx",
+]) {
+  if (fs.existsSync(file)) {
+    fail("retired unrouted homepage implementation still exists: " + file);
+  }
 }
 
 if (
@@ -281,11 +284,19 @@ if (
   );
 }
 
+// The cover image lives in MobileMagazine; all secondary story images
+// live in the shared MagazineCard used by that route. Verify both halves.
 if (
   !mobileMagazine.includes(
     'fetchPriority="high"',
   ) ||
   !mobileMagazine.includes(
+    'import { MagazineCard } from "@/pages/magazine/components/MagazineCard";',
+  ) ||
+  !mobileMagazine.includes(
+    "<MagazineCard",
+  ) ||
+  !magazineCard.includes(
     'fetchPriority="low"',
   )
 ) {
@@ -300,13 +311,22 @@ if (mobileMagazine.includes("<h4")) {
   );
 }
 
+// The workbook replaces the old text footer with exactly one genuine,
+// theme-aware newsletter after all editorial sections. Verify that final
+// component uses readable muted text rather than recreating retired UI.
 if (
   !mobileMagazine.includes(
-    'className="mt-2 text-[11px] text-[var(--wk-text-muted)]"',
+    '<MobileNewsletterCTA />',
+  )
+  || !mobileMagazine.includes(
+    'data-wk-magazine-newsletter',
+  )
+  || !mobileMagazine.includes(
+    'text-[13px] text-[var(--wk-text-muted)]',
   )
 ) {
   fail(
-    "mobile magazine footer contrast was not raised",
+    "mobile magazine final newsletter lacks workbook contrast authority",
   );
 }
 
@@ -320,9 +340,13 @@ if (
   !/<h1[^>]*>\s*Notifications\s*<\/h1>/m.test(
     notificationsPage,
   ) ||
-  !mobileAppLayout.includes(
-    '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
-  )
+  !mobileSidebar.includes('{ to: "/notifications", icon: "Bell"') ||
+  !mobileSidebar.includes("available: signedIn") ||
+  !canonicalNavigation.includes('{ label: "Home", to: "/", icon: "Home" }') ||
+  !mobileSidebar.includes("visibleWakilishaNavigation") ||
+  !mobileSidebar.includes('aria-label="Your WAKILISHA"') ||
+  mobileTopBar.includes("<NotificationBell") ||
+  !mobileTopBar.includes('aria-label="Open WAKILISHA menu"')
 ) {
   fail(
     "Notifications destination, visible label, or accessible name is incomplete",
@@ -330,12 +354,17 @@ if (
 }
 
 if (
-  !mobileCss.includes(
-    "color:var(--wk-text-muted);position:relative;",
-  )
+  mobileAppLayout.includes("MobileBottomNav") ||
+  mobileCss.includes(".phn-nav--compact") ||
+  mobileCss.includes(".phn-nav-primary-core") ||
+  !mobileAppLayout.includes("<MobileTopBar") ||
+  !mobileSidebar.includes('aria-label={browseOpen ? "Browse more" : youOpen ? "You" : "WAKILISHA Menu"}') ||
+  !mobileSidebar.includes('aria-label="WAKILISHA places"') ||
+  !mobileSidebar.includes('aria-label="More WAKILISHA destinations"') ||
+  !mobileSidebar.includes('aria-label="Back to You"')
 ) {
   fail(
-    "inactive mobile navigation still uses faint text",
+    "Workbook v4 must render one accessible mobile sidebar and no legacy bottom navigation",
   );
 }
 
@@ -376,7 +405,7 @@ if (
 
 for (const [name, sourceText] of [
   ["mobile top bar", mobileTopBar],
-  ["mobile bottom navigation", mobileAppLayout],
+  ["mobile app shell", mobileAppLayout],
 ]) {
   if (
     sourceText.includes("translateZ(0)")

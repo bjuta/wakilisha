@@ -4,9 +4,11 @@ import {
   useRef,
 } from "react";
 import type { CommunityComment, CommunityProfile, ReactionType } from "@/services/community";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 import {
   CommunityReactionPicker,
   getReactionGlyph,
+  getReactionDisplayIcon,
 } from "./CommunityReactionPicker";
 
 interface CommentCardProps {
@@ -61,21 +63,21 @@ function getCommentAnchorBadge(comment: CommunityComment): { label: string; icon
 
     return {
       label: comment.anchorType === "time_range" && end ? `${start}-${end}` : start,
-      icon: "ri-time-line",
+      icon: "Clock",
     };
   }
 
   if (comment.anchorType === "release_track") {
     return {
       label: comment.contextLabel || comment.anchorLabel || "Release track",
-      icon: "ri-album-line",
+      icon: "Album",
     };
   }
 
   if (comment.anchorType === "chart_entry") {
     return {
       label: comment.contextLabel || comment.anchorLabel || "Chart entry",
-      icon: "ri-bar-chart-grouped-line",
+      icon: "BarChart3",
     };
   }
 
@@ -259,7 +261,7 @@ export function CommentCard({
               } ${!currentUserId ? "opacity-40 cursor-not-allowed" : ""}`}
               aria-label="Upvote"
             >
-              <i className="ri-arrow-up-s-line text-[15px]" />
+              <WkIcon name="ChevronUp" size={15} aria-hidden="true" />
             </button>
             <span className={`text-[12px] font-bold tabular-nums leading-none py-0.5 ${
               voteScore > 0 ? "text-[var(--wk-brand)]" : voteScore < 0 ? "text-[var(--wk-danger)]" : "text-[var(--wk-text-muted)]"
@@ -276,7 +278,7 @@ export function CommentCard({
               } ${!currentUserId ? "opacity-40 cursor-not-allowed" : ""}`}
               aria-label="Downvote"
             >
-              <i className="ri-arrow-down-s-line text-[15px]" />
+              <WkIcon name="ChevronDown" size={15} aria-hidden="true" />
             </button>
           </div>
 
@@ -288,7 +290,7 @@ export function CommentCard({
                 {author?.avatarUrl ? (
                   <img src={author.avatarUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <i className="ri-user-line text-[11px] text-[var(--wk-text-faint)]" />
+                  <WkIcon name="User" size={11} className="text-[var(--wk-text-faint)]" aria-hidden="true" />
                 )}
               </div>
               <span className="text-[12px] font-bold text-[var(--wk-text)] truncate">
@@ -307,7 +309,7 @@ export function CommentCard({
               <span className="text-[11px] text-[var(--wk-text-faint)]">{timeAgo(comment.createdAt)}</span>
               {anchorBadge && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--wk-brand-soft)] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-[var(--wk-brand)]">
-                  <i className={`${anchorBadge.icon} text-[11px]`} />
+                  <WkIcon name={anchorBadge.icon as WkIconName} size={11} aria-hidden="true" />
                   {anchorBadge.label}
                 </span>
               )}
@@ -337,7 +339,7 @@ export function CommentCard({
                     : "text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] hover:bg-[var(--wk-surface)]"
                 }`}
               >
-                <i className="ri-reply-line text-[13px]" />
+                <WkIcon name="Reply" size={13} aria-hidden="true" />
                 Reply
               </button>
 
@@ -381,20 +383,15 @@ export function CommentCard({
                               }
                               className="text-[16px] leading-none"
                             >
-                              {
-                                getReactionGlyph(
-                                  type,
-                                )
-                              }
+                              {getReactionDisplayIcon(type) ? (
+                                <WkIcon name={getReactionDisplayIcon(type)!} size={16} aria-hidden="true" />
+                              ) : getReactionGlyph(type)}
                             </span>
                           ),
                         )}
                     </span>
                   ) : (
-                    <i
-                      className="ri-emotion-happy-line text-[14px]"
-                      aria-hidden="true"
-                    />
+                    <WkIcon name="Heart" size={14} aria-hidden="true" />
                   )}
 
                   {visibleReactionCount > 0 && (
@@ -437,7 +434,7 @@ export function CommentCard({
                   onClick={() => onSuggestCorrection(comment.id)}
                   className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] hover:bg-[var(--wk-brand-soft)] transition-colors cursor-pointer whitespace-nowrap"
                 >
-                  <i className="ri-edit-line text-[12px]" />
+                  <WkIcon name="Edit" size={12} aria-hidden="true" />
                   Suggest Correction
                 </button>
               )}
@@ -505,12 +502,12 @@ export function CommentCard({
           >
             {loadingReplies ? (
               <>
-                <i className="ri-loader-4-line animate-spin text-[13px]" />
+                <WkIcon name="Loader2" size={13} className="animate-spin" aria-hidden="true" />
                 Loading...
               </>
             ) : (
               <>
-                <i className="ri-arrow-down-s-line text-[14px]" />
+                <WkIcon name="ChevronDown" size={14} aria-hidden="true" />
                 Show {comment.replyCount - (comment.children?.length ?? 0)} {comment.replyCount - (comment.children?.length ?? 0) === 1 ? "reply" : "replies"}
               </>
             )}
@@ -523,7 +520,7 @@ export function CommentCard({
             onClick={() => setExpandedReplies(false)}
             className="ml-10 sm:ml-12 mt-2 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)] cursor-pointer whitespace-nowrap"
           >
-            <i className="ri-arrow-up-s-line text-[14px]" />
+            <WkIcon name="ChevronUp" size={14} aria-hidden="true" />
             Hide replies
           </button>
         )}

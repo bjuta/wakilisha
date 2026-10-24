@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
@@ -127,6 +128,7 @@ export function PlayerFullSurface({
     playbackRate,
     togglePlay,
     closeFullPlayer,
+    requestedPlayerPanel,
     next,
     prev,
     canGoNext,
@@ -145,7 +147,10 @@ export function PlayerFullSurface({
   } = usePlayer();
 
   const [panel, setPanel] =
-    useState<PlayerPanel>("none");
+    useState<PlayerPanel>(mode === "desktop"
+      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
+      : "none");
+  const [inlinePanelHost, setInlinePanelHost] = useState<HTMLElement | null>(null);
   const [appleConnected, setAppleConnected] = useState(
     () => getApplePlaybackPrefsSnapshot().appleMusicConnected,
   );
@@ -154,15 +159,17 @@ export function PlayerFullSurface({
     useState<string | null>(null);
   const [unlockDismissed, setUnlockDismissed] = useState(false);
   const [lyrics, setLyrics] = useState<TrackLyricsDocument | null>(null);
+  const lyricsRequests = useRef(new Map<string, Promise<TrackLyricsDocument | null>>());
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [lyricsError, setLyricsError] = useState<string | null>(null);
   const [transcript, setTranscript] =
     useState<TimedTextDocument | null>(null);
+  const transcriptRequests = useRef(new Map<string, Promise<TimedTextDocument>>());
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const [transcriptError, setTranscriptError] =
     useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
-  const [momentOpen, setMomentOpen] = useState(false);
+  const [momentOpen, setMomentOpen] = useState(mode === "desktop" && requestedPlayerPanel === "comments");
   const [saved, setSaved] = useState(false);
 
   const {
@@ -183,15 +190,17 @@ export function PlayerFullSurface({
       ) === "1",
     );
     setAppleConnectError(null);
-    setPanel("none");
+    setPanel(mode === "desktop"
+      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
+      : "none");
     setLyrics(null);
     setLyricsError(null);
     setTranscript(null);
     setTranscriptError(null);
     setShareOpen(false);
-    setMomentOpen(false);
+    setMomentOpen(mode === "desktop" && requestedPlayerPanel === "comments");
     setSaved(false);
-  }, [currentTrack?.id]);
+  }, [currentTrack?.id, mode, requestedPlayerPanel]);
 
   useEffect(() => {
     const sync = () =>
@@ -232,11 +241,19 @@ export function PlayerFullSurface({
     setLyricsLoading(true);
     setLyricsError(null);
 
-    fetchPublicTrackLyrics(currentTrack.registryTrackId)
+    const key = currentTrack.registryTrackId;
+    let request = lyricsRequests.current.get(key);
+    if (!request) {
+      request = fetchPublicTrackLyrics(key);
+      if (lyricsRequests.current.size >= 8) lyricsRequests.current.clear();
+      lyricsRequests.current.set(key, request);
+    }
+    request
       .then((document) => {
         if (alive) setLyrics(document);
       })
       .catch((error) => {
+        lyricsRequests.current.delete(key);
         if (alive) {
           setLyricsError(
             error instanceof Error
@@ -271,11 +288,19 @@ export function PlayerFullSurface({
     setTranscriptLoading(true);
     setTranscriptError(null);
 
-    fetchTimedTextDocument(experience.transcript.url)
+    const key = experience.transcript.url;
+    let request = transcriptRequests.current.get(key);
+    if (!request) {
+      request = fetchTimedTextDocument(key);
+      if (transcriptRequests.current.size >= 8) transcriptRequests.current.clear();
+      transcriptRequests.current.set(key, request);
+    }
+    request
       .then((document) => {
         if (alive) setTranscript(document);
       })
       .catch((error) => {
+        transcriptRequests.current.delete(key);
         if (alive) {
           setTranscriptError(
             error instanceof Error
@@ -465,7 +490,12 @@ export function PlayerFullSurface({
     canonicalShareUrl(experience.canonicalPath);
 
   const openPanel = (nextPanel: PlayerPanel) => {
+    setMomentOpen(false);
     setPanel(nextPanel);
+  };
+  const togglePanel = (nextPanel: PlayerPanel) => {
+    setMomentOpen(false);
+    setPanel(panel === nextPanel ? "none" : nextPanel);
   };
 
   const goTo = (path: string) => {
@@ -563,8 +593,8 @@ export function PlayerFullSurface({
   ) {
     contextActions.push({
       key: "moments",
-      label: "Create Moment",
-      description: "Start a Moment from the time you are hearing now.",
+      label: "Comment at Current Time",
+      description: "Comment on the part of this track you’re hearing.",
       icon: "MessageCirclePlus",
       onClick: () => {
         setPanel("none");
@@ -613,37 +643,41 @@ export function PlayerFullSurface({
     });
   }
 
+  const desktopPanelOpen = !isMobile && (momentOpen || ["lyrics", "queue", "transcript", "chapters"].includes(panel));
+
   return (
     <main
       data-wk-player-full={mode}
-      className="relative min-h-[100dvh] overflow-hidden bg-[var(--wk-bg)] text-[var(--wk-text)]"
+      className={`relative min-h-[100dvh] overflow-x-clip bg-[var(--wk-bg)] text-[var(--wk-text)] ${desktopPanelOpen ? "flex" : ""}`}
     >
-      <div
-        aria-hidden="true"
-        className="absolute inset-[-8%] opacity-45 blur-[110px] saturate-150"
-        style={{
-          backgroundImage:
-            currentTrack.artworkUrl
+      {/* Clip artwork and its gradient together. The blurred image must never
+          bleed past the gradient's end into the independent scroll viewport. */}
+      <div data-wk-player-backdrop aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -inset-[8%] opacity-45 blur-[110px] saturate-150"
+          style={{
+            backgroundImage: currentTrack.artworkUrl
               ? `url(${currentTrack.artworkUrl})`
               : undefined,
-          backgroundPosition: "center",
-          backgroundSize: "cover",
-          transform: "scale(1.18)",
-        }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-[var(--wk-bg)]/84 to-[var(--wk-bg)]" />
+            backgroundPosition: "center",
+            backgroundSize: "cover",
+            transform: "scale(1.18)",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-[var(--wk-bg)]/84 to-[var(--wk-bg)]" />
+      </div>
 
       <div
-        className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-5 pb-8 md:px-8 md:pb-10"
+        className={`relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-5 pb-8 md:px-8 md:pb-10 ${desktopPanelOpen ? "min-w-0 flex-1 !max-w-none" : ""}`}
         style={{
           paddingTop: isMobile
-            ? "max(env(safe-area-inset-top), 16px)"
+            ? "calc(80px + env(safe-area-inset-top))"
             : "24px",
         }}
       >
         <PlayerTopBar
           mode={mode}
-          label={
+          contextLabel={
             experience.contextLabel ||
             (experience.spokenAudio
               ? "WAKILISHA Audio"
@@ -658,13 +692,15 @@ export function PlayerFullSurface({
             "flex flex-1 items-center justify-center gap-7 py-5 md:py-7",
             isMobile
               ? "flex-col"
-              : "flex-col lg:flex-row lg:gap-14",
+              : desktopPanelOpen
+                ? "flex-col"
+                : "flex-col lg:flex-row lg:gap-14",
           ].join(" ")}
         >
           <section className="flex w-full max-w-[520px] flex-col items-center">
             <div
               className={[
-                "aspect-square w-full overflow-hidden bg-[var(--wk-surface-raised)] shadow-[0_30px_90px_rgba(0,0,0,0.38)]",
+                `${playbackBackend === "youtube" ? "aspect-video" : "aspect-square"} w-full overflow-hidden bg-[var(--wk-surface-raised)] shadow-[0_30px_90px_rgba(0,0,0,0.38)]`,
                 isMobile
                   ? "max-w-[min(82vw,420px)] rounded-[28px]"
                   : "max-w-[480px] rounded-[30px]",
@@ -697,12 +733,40 @@ export function PlayerFullSurface({
                   : "max-w-[480px] text-left",
               ].join(" ")}
             >
-              <h1 className="text-balance text-[25px] font-black leading-tight tracking-[-0.035em] md:text-[30px]">
-                {currentTrack.title}
-              </h1>
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="min-w-0 text-balance text-[25px] font-black leading-tight tracking-[-0.035em] md:text-[30px]">
+                  {currentTrack.title}
+                </h1>
+                {!experience.spokenAudio && experience.capabilities.save ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleSave()}
+                    aria-label={saved ? "Saved track" : "Save track"}
+                    aria-pressed={saved}
+                    disabled={savePending}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] disabled:opacity-40"
+                  >
+                    <WkIcon name="Heart" size={21} fill={saved ? "currentColor" : "none"} />
+                  </button>
+                ) : null}
+              </div>
               <p className="mt-2 truncate text-[14px] font-bold text-[var(--wk-text-muted)]">
                 {experience.creatorLabel}
               </p>
+              {!experience.spokenAudio ? (
+                <p className={`mt-1 text-[12px] font-semibold ${experience.availability === "excerpt"
+                  ? "text-[#C68B35]" : "text-[var(--wk-text-faint)]"}`}>
+                  {experience.availability === "excerpt"
+                    ? "Preview"
+                    : playbackBackend === "youtube"
+                      ? "YouTube"
+                      : playbackBackend === "soundcloud"
+                        ? "SoundCloud"
+                        : experience.availability === "unavailable"
+                          ? "Not available to play"
+                          : "Now Playing"}
+                </p>
+              ) : null}
             </div>
           </section>
 
@@ -717,7 +781,7 @@ export function PlayerFullSurface({
               />
               <div className="flex items-center justify-between text-[11px] font-semibold tabular-nums text-[var(--wk-text-faint)]">
                 <span>{formatPlayerClock(currentTime)}</span>
-                <span>{formatPlayerClock(duration)}</span>
+                <span>{`−${formatPlayerClock(Math.max(0, duration - currentTime))}`}</span>
               </div>
             </div>
 
@@ -789,7 +853,7 @@ export function PlayerFullSurface({
               )}
             </div>
 
-            <div className="mt-6 grid grid-cols-4 gap-2">
+            <div className={`mt-6 grid gap-2 ${experience.spokenAudio ? "grid-cols-4" : "grid-cols-3"}`}>
               {experience.spokenAudio ? (
                 <>
                   <PlayerUtilityButton
@@ -829,42 +893,30 @@ export function PlayerFullSurface({
               ) : (
                 <>
                   <PlayerUtilityButton
-                    icon="ListMusic"
-                    label="Queue"
-                    onClick={() => setPanel("queue")}
-                    active={panel === "queue"}
-                    disabled={!experience.capabilities.queue}
-                  />
-                  <PlayerUtilityButton
                     icon="MicVocal"
                     label="Lyrics"
-                    onClick={() =>
-                      setPanel(
-                        panel === "lyrics"
-                          ? "none"
-                          : "lyrics",
-                      )
-                    }
+                    onClick={() => togglePanel("lyrics")}
                     active={panel === "lyrics"}
                   />
                   <PlayerUtilityButton
-                    icon="Heart"
-                    label={saved ? "Saved" : "Save"}
-                    onClick={() => void handleSave()}
-                    active={saved}
-                    disabled={!experience.capabilities.save || savePending}
+                    icon="MessageCircle"
+                    label="Comments"
+                    onClick={() => { setPanel("none"); setMomentOpen(value => !value); }}
+                    active={momentOpen}
+                    disabled={!experience.capabilities.moments}
                   />
                   <PlayerUtilityButton
-                    icon="MessageCirclePlus"
-                    label="Moments"
-                    onClick={() => setMomentOpen(true)}
-                    disabled={!experience.capabilities.moments}
+                    icon="ListMusic"
+                    label="Queue"
+                    onClick={() => togglePanel("queue")}
+                    active={panel === "queue"}
+                    disabled={!experience.capabilities.queue}
                   />
                 </>
               )}
             </div>
 
-            <div className="mt-6 flex items-center gap-3">
+            <div className={isMobile ? "hidden" : "mt-6 flex items-center gap-3"}>
               <WkIcon
                 name="Volume2"
                 size={16}
@@ -923,7 +975,17 @@ export function PlayerFullSurface({
         </div>
       </div>
 
+      {!isMobile ? (
+        <aside ref={setInlinePanelHost} data-wk-player-panel-host
+          className={desktopPanelOpen
+            ? "sticky top-0 z-20 hidden h-[100dvh] w-[min(440px,42vw)] shrink-0 self-start overflow-hidden border-l border-[var(--wk-border)] bg-[var(--wk-surface)] md:block"
+            : "hidden"}
+        />
+      ) : null}
+
       <PlayerPanelSheet
+        inlineDesktop
+        inlineHost={inlinePanelHost}
         open={panel === "queue"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -948,6 +1010,8 @@ export function PlayerFullSurface({
       </PlayerPanelSheet>
 
       <PlayerPanelSheet
+        inlineDesktop
+        inlineHost={inlinePanelHost}
         open={panel === "lyrics"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -998,6 +1062,8 @@ export function PlayerFullSurface({
       </PlayerPanelSheet>
 
       <PlayerPanelSheet
+        inlineDesktop
+        inlineHost={inlinePanelHost}
         open={panel === "transcript"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -1017,6 +1083,8 @@ export function PlayerFullSurface({
       </PlayerPanelSheet>
 
       <PlayerPanelSheet
+        inlineDesktop
+        inlineHost={inlinePanelHost}
         open={panel === "chapters"}
         onClose={() => setPanel("none")}
         mode={mode}
@@ -1103,6 +1171,8 @@ export function PlayerFullSurface({
       {!experience.spokenAudio &&
       experience.capabilities.moments ? (
         <TrackMomentDrawer
+          inlineDesktop={!isMobile}
+          inlineHost={inlinePanelHost}
           open={momentOpen}
           onClose={() => setMomentOpen(false)}
           track={currentTrack}

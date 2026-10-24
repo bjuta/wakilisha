@@ -15,7 +15,7 @@ interface Props {
   checkUsernameAvailability: (value: string) => Promise<UsernameAvailability>;
 }
 
-const coverFallback = "linear-gradient(135deg, #123908 0%, #245714 45%, #86c343 100%)";
+const coverFallback = "linear-gradient(135deg, var(--wk-surface-raised), var(--wk-surface-strong))";
 
 export function AccountSettingsPane({
   profile,

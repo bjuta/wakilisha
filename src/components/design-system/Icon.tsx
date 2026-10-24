@@ -225,7 +225,6 @@ export type WkIconName =
   | "Quote"
   | "Radar"
   | "Radio"
-  | "RadioTower"
   | "Radius"
   | "Redo"
   | "Redo2"

@@ -182,7 +182,7 @@ export function SpecimenWall() {
               Section title
             </div>
             <p className="text-[14px] leading-relaxed text-[var(--wk-text-soft)]">
-              Body copy at standard size. DM Sans for warmth and editorial credibility across the WAKILISHA platform.
+              Body copy at standard size. Figtree for warmth and editorial credibility across the WAKILISHA platform.
               This text represents the reading body used in articles, descriptions, and editorial content.
             </p>
             <div className="flex flex-wrap gap-4">

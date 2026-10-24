@@ -27,6 +27,17 @@ describe("WAKILISHA no-browser-chrome control plane", () => {
     expect(baseline.version).toBe(1);
     expect(baseline.violations).toBeTypeOf("object");
     expect(summary).toEqual(baseline.violations);
+    for (const path of [
+      "src/pages/following/page.tsx",
+      "src/pages/messages/page.tsx",
+      "src/pages/notifications/page.tsx",
+      "src/components/feature/community/CommentCard.tsx",
+      "src/components/community/PostActions.tsx",
+      "src/components/feature/community/CommunityReactionPicker.tsx",
+    ]) {
+      const source = fs.readFileSync(path, "utf8");
+      expect(source, `${path}: use WAKILISHA SVG controls`).not.toMatch(/\bri-[a-z][\w-]*/);
+    }
   });
   it("pins the approved React Aria interaction runtime exactly", () => {
     const packageJson = JSON.parse(

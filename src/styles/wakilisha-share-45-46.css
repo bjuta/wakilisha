@@ -2,8 +2,7 @@
 
 /* ═══════════════════════════════════════════════════════════════
    BACKDROP + SHEET SHELL
-   z-index must exceed all app chrome (nav: 80, miniplayer: 82,
-   full-player: 90, more-menu: 61). Use 300 to stay well above.
+   z-index is assigned above the shared player and navigation chrome ( more-menu: 61). Use 300 to stay well above.
    ═══════════════════════════════════════════════════════════════ */
 
 .share-sheet-backdrop {
@@ -107,7 +106,7 @@
 }
 
 .share-title {
-  font: 900 22px/1.1 var(--wk-font-display);
+  font: 800 22px/1.1 var(--wk-font-display);
   letter-spacing: -0.04em;
   color: var(--wk-text);
 }
@@ -148,7 +147,7 @@
 
 .share-preview-art:empty::before {
   content: 'W';
-  font: 900 24px/1 var(--wk-font-display);
+  font: 800 24px/1 var(--wk-font-display);
   color: var(--wk-brand);
 }
 
@@ -163,7 +162,7 @@
 }
 
 .share-preview-title {
-  font: 900 15px/1.2 var(--wk-font-ui);
+  font: 800 15px/1.2 var(--wk-font-ui);
   color: var(--wk-text);
   letter-spacing: -0.02em;
   overflow: hidden;

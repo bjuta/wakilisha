@@ -27,11 +27,14 @@ const lazy = readFileSync(
 );
 
 describe("Public Audio hero convergence", () => {
-  it("uses one hero primitive for the Audio index and published Audio detail", () => {
+  it("keeps the Audio detail's canonical hero while the workbook index uses real listen actions", () => {
     expect(hero).toContain("data-wk-audio-hero");
-    expect(indexPage).toContain("AudioHero");
     expect(detail).toContain("AudioHero");
     expect(detail).toContain("Ch19GradientImage");
+    expect(indexPage).toContain("publicAudioPlayerItem(featured)");
+    expect(indexPage).toContain("playTrack(track, [track]");
+    expect(indexPage).toContain("openFullPlayer()");
+    expect(indexPage).toContain("wk-reference-audio-station");
   });
 
   it("keeps listening authority in the existing persistent player", () => {

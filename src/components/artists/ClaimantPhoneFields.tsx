@@ -5,6 +5,7 @@ import {
   useState,
 } from "react";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { CountryIdentityMark } from "@/components/design-system/CountryIdentityMark";
 import {
   findClaimantPhoneCountryOptions,
   getClaimantPhoneCountryOptions,
@@ -117,13 +118,7 @@ export function ClaimantPhoneFields({
             }}
             className="flex min-w-[108px] shrink-0 items-center justify-center gap-2 px-3 text-[14px] font-bold text-[var(--wk-text)]"
           >
-            <span
-              aria-hidden="true"
-              className="text-[18px]"
-            >
-              {selectedCountry?.flag ??
-                "🌐"}
-            </span>
+            <CountryIdentityMark code={selectedCountry?.iso2} compact />
             <span>
               {selectedCountry
                 ?.callingCode ??
@@ -196,12 +191,7 @@ export function ClaimantPhoneFields({
                       }}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-[var(--wk-surface-raised)]"
                     >
-                      <span
-                        aria-hidden="true"
-                        className="text-[19px]"
-                      >
-                        {country.flag}
-                      </span>
+                      <CountryIdentityMark code={country.iso2} compact />
                       <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-[var(--wk-text)]">
                         {
                           country.countryName

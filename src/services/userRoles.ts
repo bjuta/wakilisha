@@ -186,13 +186,17 @@ async function fetchRoleCapabilities(
 
 export async function fetchUserRole(userId: string): Promise<UserRoleRecord | null> {
   const { data: profile } = await supabase.from("user_profiles").select("user_id, display_name, bio, status, created_at, updated_at").eq("user_id", userId).maybeSingle();
-  const { data: assignments, error: assignmentError } = await supabase.from("user_role_assignments").select("id, role_key, status, created_at, updated_at").eq("user_id", userId).eq("status", "active");
-  if (!assignmentError && assignments && assignments.length > 0) {
-    const roles = assignments.map((row) => normalizeRole(row.role_key as string));
+  const { data: assignments, error: assignmentError } = await supabase.from("user_role_assignments").select("id, role_key, status, expires_at, created_at, updated_at").eq("user_id", userId).eq("status", "active");
+  const now = Date.now();
+  const liveAssignments = (assignments ?? []).filter((row) =>
+    row.expires_at == null || (typeof row.expires_at === "string" && Date.parse(row.expires_at) > now)
+  );
+  if (!assignmentError && liveAssignments.length > 0) {
+    const roles = liveAssignments.map((row) => normalizeRole(row.role_key as string));
     const role = primaryRole(roles);
     const capabilities = await fetchRoleCapabilities(roles);
     const { data: scopes } = await supabase.from("user_access_scopes").select("id, role_key, scope_type, scope_value, can_view, can_edit, can_publish, status").eq("user_id", userId).eq("status", "active");
-    return { id: String(assignments[0].id), user_id: userId, role, roles, capabilities, scopes: (scopes ?? []) as AccessScope[], display_name: (profile?.display_name as string | null | undefined) ?? null, bio: (profile?.bio as string | null | undefined) ?? null, status: (profile?.status as string | null | undefined) ?? "active", created_at: String(profile?.created_at ?? assignments[0].created_at ?? new Date().toISOString()), updated_at: String(profile?.updated_at ?? assignments[0].updated_at ?? new Date().toISOString()) };
+    return { id: String(liveAssignments[0].id), user_id: userId, role, roles, capabilities, scopes: (scopes ?? []) as AccessScope[], display_name: (profile?.display_name as string | null | undefined) ?? null, bio: (profile?.bio as string | null | undefined) ?? null, status: (profile?.status as string | null | undefined) ?? "active", created_at: String(profile?.created_at ?? liveAssignments[0].created_at ?? new Date().toISOString()), updated_at: String(profile?.updated_at ?? liveAssignments[0].updated_at ?? new Date().toISOString()) };
   }
 
   if (assignmentError) console.warn("Durable role lookup failed; defaulting to subscriber:", assignmentError);

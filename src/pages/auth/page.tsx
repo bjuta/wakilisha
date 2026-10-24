@@ -9,6 +9,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
+import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { resendVerificationEmail } from "@/services/auth/accountVerification";
 import {
   getRegistryOnboardingArtists,
@@ -140,6 +141,7 @@ type AuthArtistFieldDrag = {
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [choice, setChoice] = useState<Choice>("charts");
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
@@ -760,16 +762,16 @@ export default function AuthPage() {
                             "transform, opacity",
                         }}
                       >
-                        <div className="rounded-full bg-[var(--wk-border)] p-[3px] shadow-[0_12px_36px_rgba(0,0,0,0.08)]">
-                          <div className="rounded-full bg-[var(--wk-surface)] p-[2px]">
+                        <div className="rounded-xl bg-[var(--wk-border)] p-[2px] shadow-[0_12px_36px_rgba(0,0,0,0.08)]">
+                          <div className="rounded-xl bg-[var(--wk-surface)] p-[2px]">
                             <img
                               src={artist.imageUrl}
                               alt=""
                               draggable={false}
-                              className="rounded-full object-cover"
+                              className="rounded-xl object-cover"
                               style={{
                                 width: slot.size,
-                                height: slot.size,
+                                height: Math.round(slot.size * 1.25),
                               }}
                             />
                           </div>
@@ -788,12 +790,12 @@ export default function AuthPage() {
                 (slot, index) => (
                   <div
                     key={`auth-mobile-field-placeholder-${index}`}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--wk-surface-raised)]"
+                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-xl bg-[var(--wk-surface-raised)]"
                     style={{
                       left: `${slot.left}%`,
                       top: `${slot.top}%`,
                       width: slot.size,
-                      height: slot.size,
+                      height: Math.round(slot.size * 1.25),
                     }}
                   />
                 ))}
@@ -813,8 +815,12 @@ export default function AuthPage() {
   const brandPanel = (
     <section className="hidden lg:flex flex-col justify-between relative overflow-hidden" style={{ width: "46%", background: "var(--wk-surface)" }}>
       <div className="relative z-10 p-10 md:p-14">
-        <div className="flex h-14 w-14 items-center justify-center rounded-[20px] text-[22px] font-black mb-6" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", boxShadow: "0 18px 60px rgba(var(--wk-brand-rgb), 0.22)" }}>W</div>
-        <div className="font-black tracking-[-.05em]" style={{ fontFamily: "var(--wk-font-display)", fontSize: "clamp(36px, 4vw, 52px)", lineHeight: 0.94, color: "var(--wk-text)" }}>WAKILISHA</div>
+        <img
+          src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"}
+          alt="WAKILISHA"
+          className="mb-6 h-9 w-auto max-w-[230px] object-contain"
+          data-wk-public-auth-logo="desktop"
+        />
       </div>
 
       <div
@@ -911,7 +917,7 @@ export default function AuthPage() {
                       >
                         <div className="relative flex flex-col items-center">
                           <div
-                            className={`rounded-full p-[3px] transition-all duration-500 group-hover:scale-110 group-hover:bg-[var(--wk-brand)] ${
+                            className={`rounded-xl p-[2px] transition-all duration-500 group-hover:scale-[1.03] group-hover:bg-[var(--wk-brand)] ${
                               index % 5 === 0
                                 ? "bg-[var(--wk-brand)]"
                                 : "bg-[var(--wk-border)]"
@@ -923,15 +929,15 @@ export default function AuthPage() {
                                   : "0 14px 38px rgba(0, 0, 0, 0.08)",
                             }}
                           >
-                            <div className="rounded-full bg-[var(--wk-surface)] p-[2px]">
+                            <div className="rounded-xl bg-[var(--wk-surface)] p-[2px]">
                               <img
                                 src={artist.imageUrl}
                                 alt=""
                                 draggable={false}
-                                className="rounded-full object-cover transition-all duration-500 group-hover:brightness-105"
+                                className="rounded-xl object-cover transition-all duration-500 group-hover:brightness-105"
                                 style={{
                                   width: slot.size,
-                                  height: slot.size,
+                                  height: Math.round(slot.size * 1.25),
                                 }}
                               />
                             </div>
@@ -960,12 +966,12 @@ export default function AuthPage() {
                   (slot, index) => (
                     <div
                       key={`auth-field-placeholder-${index}`}
-                      className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--wk-surface-raised)]"
+                      className="absolute -translate-x-1/2 -translate-y-1/2 rounded-xl bg-[var(--wk-surface-raised)]"
                       style={{
                         left: `${slot.left}%`,
                         top: `${slot.top}%`,
                         width: slot.size,
-                        height: slot.size,
+                        height: Math.round(slot.size * 1.25),
                         opacity:
                           0.36
                           + (
@@ -991,7 +997,7 @@ export default function AuthPage() {
     return <main className="flex min-h-screen items-center justify-center" style={{ background: "var(--wk-bg)", color: "var(--wk-text)" }}><div className="text-[13px]" style={{ color: "var(--wk-text-muted)" }}>Checking auth link…</div></main>;
   }
 
-  const heading = isRecovery ? "Reset your password" : mode === "verify" ? "Verify your email" : mode === "forgot" ? "Forgot password?" : mode === "magic" ? "Get a magic link" : mode === "signin" ? "Welcome back" : "Create your account";
+  const heading = isRecovery ? "Reset your password" : mode === "verify" ? "Verify your email" : mode === "forgot" ? "Forgot password?" : mode === "magic" ? "Get a magic link" : mode === "signin" ? (showEmailForm ? "Welcome back" : "Your people are here.") : "Join WAKILISHA";
   const subcopy = isRecovery ? "Enter a new password for your WAKILISHA account." : mode === "verify" ? "Confirm your email to use saves, follows, comments, replies, and community actions." : mode === "forgot" ? "Enter your email and we will send a secure reset link." : mode === "magic" ? "Enter your email and we will send a one-time sign-in link." : mode === "signin" ? "Sign in to continue to your WAKILISHA account." : "Join WAKILISHA and connect with African culture.";
 
   return (
@@ -1001,8 +1007,12 @@ export default function AuthPage() {
       <section className="relative z-10 flex flex-1 flex-col justify-start bg-[var(--wk-bg)] px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-8 sm:px-10 sm:py-12 md:px-16 lg:justify-center lg:bg-transparent lg:px-20 lg:py-16">
         <div className="relative w-full max-w-[420px] mx-auto px-1 py-5 sm:px-2 sm:py-7 lg:max-w-[400px] lg:px-0 lg:py-0">
           <AuthMobileTextClearing className="lg:hidden mb-10 w-fit">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[16px] text-[18px] font-black mb-5" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", boxShadow: "0 14px 40px rgba(var(--wk-brand-rgb), 0.18)" }}>W</div>
-            <div className="font-black tracking-[-.05em] text-[28px]" style={{ fontFamily: "var(--wk-font-display)", color: "var(--wk-text)" }}>WAKILISHA</div>
+            <img
+              src={theme === "dark" ? "/assets/logos/wakilisha-logo-dark.svg" : "/assets/logos/wakilisha-logo-light.svg"}
+              alt="WAKILISHA"
+              className="mb-5 h-8 w-auto max-w-[200px] object-contain"
+              data-wk-public-auth-logo="mobile"
+            />
           </AuthMobileTextClearing>
 
           <AuthMobileTextClearing className="mb-8">
@@ -1031,7 +1041,7 @@ export default function AuthPage() {
   placeholder="New password"
   required
   minLength={8}
-  inputClassName="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors"
+  inputClassName="w-full h-[52px] rounded-[14px] px-5 text-[16px] outline-none transition-colors"
   inputStyle={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}
 />
                   <WkPasswordField
@@ -1043,7 +1053,7 @@ export default function AuthPage() {
   placeholder="Confirm new password"
   required
   minLength={8}
-  inputClassName="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors"
+  inputClassName="w-full h-[52px] rounded-[14px] px-5 text-[16px] outline-none transition-colors"
   inputStyle={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}
 />
                   <button type="submit" disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98] disabled:opacity-50" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", fontFamily: "var(--wk-font-ui)" }}>{loading ? "Updating..." : "Update password"}</button>
@@ -1074,7 +1084,7 @@ export default function AuthPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors"
+                className="w-full h-[52px] rounded-[14px] px-5 text-[16px] outline-none transition-colors"
                 style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}
               />
 
@@ -1098,20 +1108,20 @@ export default function AuthPage() {
             </form>
           ) : mode === "forgot" ? (
             <form onSubmit={handlePasswordReset} className="flex flex-col gap-3 mb-6">
-              <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
+              <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-[52px] rounded-[14px] px-5 text-[16px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
               <button type="submit" disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98] disabled:opacity-50" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", fontFamily: "var(--wk-font-ui)" }}>{loading ? "Sending..." : "Send password reset"}</button>
               <button type="button" onClick={() => { clearMessages(); setMode("signin"); }} className="w-full h-[44px] rounded-[14px] flex items-center justify-center gap-2 font-semibold text-[13px]" style={{ background: "transparent", color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}>Back to login</button>
             </form>
           ) : mode === "magic" ? (
             <form onSubmit={handleMagicLink} className="flex flex-col gap-3 mb-6">
-              <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
+              <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-[52px] rounded-[14px] px-5 text-[16px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
               <button type="submit" disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98] disabled:opacity-50" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", fontFamily: "var(--wk-font-ui)" }}>{loading ? "Sending..." : "Send magic link"}</button>
               <button type="button" onClick={() => { clearMessages(); setMode("signin"); }} className="w-full h-[44px] rounded-[14px] flex items-center justify-center gap-2 font-semibold text-[13px]" style={{ background: "transparent", color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}>Back to login</button>
             </form>
           ) : showEmailForm ? (
             <form onSubmit={handleEmailAuth} className="flex flex-col gap-3 mb-6">
-              {mode === "signup" && <input type="text" placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />}
-              <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
+              {mode === "signup" && <input type="text" placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full h-[52px] rounded-[14px] px-5 text-[16px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />}
+              <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full h-[52px] rounded-[14px] px-5 text-[16px] outline-none transition-colors" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }} />
               <WkPasswordField
   value={password}
   onChange={(nextValue) => setPassword(nextValue)}
@@ -1121,7 +1131,7 @@ export default function AuthPage() {
   placeholder="Password"
   required
   minLength={6}
-  inputClassName="w-full h-[52px] rounded-[14px] px-5 text-[14px] outline-none transition-colors"
+  inputClassName="w-full h-[52px] rounded-[14px] px-5 text-[16px] outline-none transition-colors"
   inputStyle={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}
 />
               <AuthMobileTextClearing interactive>
@@ -1136,8 +1146,8 @@ export default function AuthPage() {
           ) : (
             <div className="flex flex-col gap-3 mb-6">
               <button onClick={() => setShowEmailForm(true)} disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98]" style={{ background: "var(--wk-brand)", color: "var(--wk-brand-on)", fontFamily: "var(--wk-font-ui)" }}><WkIcon name="Mail" size={17} />Continue with email</button>
-              <button onClick={() => goToMode("magic")} disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98]" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}><WkIcon name="MailCheck" size={17} />Email me a magic link</button>
               <button onClick={handleGoogleAuth} disabled={loading} className="w-full h-[52px] rounded-[14px] flex items-center justify-center gap-3 font-bold text-[14px] whitespace-nowrap transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98] disabled:opacity-50" style={{ background: "var(--wk-surface-raised)", border: "1px solid var(--wk-border)", color: "var(--wk-text)", fontFamily: "var(--wk-font-ui)" }}>{loading ? "Loading..." : <><WkIcon name="Chrome" size={17} />Continue with Google</>}</button>
+              <button onClick={() => goToMode("magic")} disabled={loading} className="w-full min-h-11 rounded-full flex items-center justify-center gap-2 px-3 font-semibold text-[13px] underline-offset-4 hover:underline disabled:opacity-50" style={{ color: "var(--wk-text-muted)", fontFamily: "var(--wk-font-ui)" }}><WkIcon name="MailCheck" size={17} />Email me a sign-in link</button>
               <div className="flex items-center gap-3 my-1">
                 <span className="flex-1 h-px" style={{ background: "var(--wk-divider)" }} />
                 <span className="relative z-10 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ fontFamily: "var(--wk-font-ui)", color: "var(--wk-text-faint)", background: "color-mix(in srgb, var(--wk-bg) 88%, transparent)" }}>or</span>
@@ -1151,7 +1161,7 @@ export default function AuthPage() {
 
           <AuthMobileTextClearing interactive className="mt-1">
             {!isRecovery && !["forgot", "magic", "verify"].includes(mode) && <button onClick={toggleMode} className="w-full text-center mb-4 text-[13px] font-semibold cursor-pointer hover:opacity-80 transition-opacity" style={{ fontFamily: "var(--wk-font-ui)", color: "var(--wk-brand)" }}>{mode === "signin" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}</button>}
-            <p className="text-center leading-relaxed" style={{ fontFamily: "var(--wk-font-ui)", fontSize: "11px", color: "var(--wk-text-faint)" }}>By continuing, you agree to WAKILISHA's <a href="#" className="font-semibold hover:underline" style={{ color: "var(--wk-brand)" }}>Terms</a> and <a href="#" className="font-semibold hover:underline" style={{ color: "var(--wk-brand)" }}>Privacy Policy</a>.</p>
+            <p className="text-center leading-relaxed" style={{ fontFamily: "var(--wk-font-ui)", fontSize: "11px", color: "var(--wk-text-faint)" }}>By continuing, you agree to WAKILISHA's <Link to="/terms" className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--wk-text)" }}>Terms</Link> and <Link to="/privacy" className="font-semibold underline-offset-4 hover:underline" style={{ color: "var(--wk-text)" }}>Privacy Policy</Link>.</p>
           </AuthMobileTextClearing>
         </div>
       </section>

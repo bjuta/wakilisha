@@ -1,5 +1,7 @@
 # MIZIZI Cultural Data Steward
 
+> **24 October 2026 product scope note:** This Registry document preserves the historical MIZIZI **steward agent** operation, rule, execution and Production acceptance contract. It is not the exhaustive MIZIZI Headquarters or enterprise cultural-intelligence product contract. See [current product/Phase 1 authority](../engineering/mizizi-product-phase1-reconciliation-20261024.md) and [repository docs reconciliation](../engineering/mizizi-documentation-authority-index-20261024.md). The owner has approved a four-phase completion plan covering M1–M13 UX, source-aware research, human adjudication, Field, Contributions and public Record. Historical Registry Slice 2/Slice 3 closures are **not** closure of those new product phases. All original recorded operations, exact grants, disabled-at-rest boundaries and receipts below remain unchanged.
+
 ## Status
 
 MIZIZI is the permanent WAKILISHA Registry data-hygiene agent.

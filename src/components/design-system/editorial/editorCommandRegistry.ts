@@ -20,6 +20,7 @@ export type EditorialCommandId =
   | "insertDivider"
   | "insertBlockquote"
   | "insertCodeBlock"
+  | "insertRating"
   | "insertRelease"
   | "insertArtist"
   | "insertTrack"
@@ -106,6 +107,9 @@ export const EDITOR_COMMAND_META: Record<
   },
   insertCodeBlock: {
     label: "Code Block",
+  },
+  insertRating: {
+    label: "Rating · 1–5",
   },
   insertRelease: {
     label: "Release",
@@ -238,6 +242,11 @@ export const EDITOR_MENU_REGISTRY: readonly EditorialMenuDefinition[] = [
       {
         key: "insert-image",
         command: "insertImage",
+      },
+      {
+        key: "insert-rating",
+        command: "insertRating",
+        dividerBefore: true,
       },
       {
         key: "insert-release",

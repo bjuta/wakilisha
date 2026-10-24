@@ -1,12 +1,12 @@
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import "@/styles/wakilisha-magazine-38-44.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   useMagazineArticle,
   useMagazineArticles,
-  type MagazineArticle,
 } from "@/services/magazineArticles";
-import { getShareCounts, getTotalShareCount } from "@/services/shareTracking";
 import { transformReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
 import { transformArtistShortcodes } from "@/utils/transformArtistShortcodes";
 import { transformTrackShortcodes } from "@/utils/transformTrackShortcodes";
@@ -19,7 +19,6 @@ import { resolveArtistMarkers } from "@/pages/magazine/article/components/Articl
 import { resolveTrackMarkers } from "@/pages/magazine/article/components/ArticleTrackEmbeds";
 import { buildContentSegments } from "@/pages/magazine/article/components/ArticleEmbedUtils";
 import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
-import { MobileShareButton } from "@/components/design-system/share/ShareSheet";
 import { CommunityActionSheet } from "@/components/feature/community/CommunityActionSheet";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
@@ -27,6 +26,8 @@ import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { ArticlePreviewModeBanner } from "@/pages/magazine/article/components/ArticlePreviewModeBanner";
 import { ArticleAuthorIdentity } from "@/components/design-system/editorial/ArticleAuthorIdentity";
+import { ArticleEndCredits } from "@/pages/magazine/article/components/ArticleEndCredits";
+import { ArticleRelated } from "@/pages/magazine/article/components/ArticleRelated";
 
 function formatReadCount(count: number): string {
   if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
@@ -34,54 +35,6 @@ function formatReadCount(count: number): string {
 }
 
 
-
-const SECTION_COLORS: Record<string, string> = {
-  Analysis: "#C44A3B", Focus: "#D97706", Industry: "#78716C",
-  Culture: "#BE185D", Interview: "#256B5A", Music: "#4F46E5",
-  Lifestyle: "#0891B2", Art: "#DC2626", Opinion: "#7C3AED",
-};
-
-function sectionColor(s: string) { return SECTION_COLORS[s] || "var(--wk-brand)"; }
-
-function RelatedCard({ story }: { story: MagazineArticle }) {
-  return (
-    <Link
-      to={`/magazine/${story.slug}`}
-      className="group flex gap-3 active:scale-[0.98] transition-transform"
-    >
-      <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden bg-[var(--wk-surface-raised)]">
-        {story.heroUrl ? (
-          <ResponsiveMediaImage
-            src={story.heroUrl}
-            preset="thumbnail"
-            alt={story.title}
-            loading="lazy"
-            fetchPriority="low"
-            decoding="async"
-            className="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-110"
-          />
-        ) : (
-          <Chapter19FallbackImage
-            id={story.id}
-            slug={story.slug}
-            name={story.title}
-          />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <span className="text-[9px] font-black uppercase tracking-wider text-[var(--wk-brand)]">
-          {story.section}
-        </span>
-        <h3 className="mt-0.5 text-[15px] font-bold leading-snug text-[var(--wk-text)] line-clamp-2">
-          {story.title}
-        </h3>
-        <div className="mt-1 text-[11px] text-[var(--wk-text-muted)]">
-          {story.author} · {story.readingTime} min
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 function getPrerenderedMobileArticleHeroSource(
   slug: string | undefined,
@@ -161,13 +114,11 @@ export default function MobileArticle() {
   });
 
   const { article, loading, error } = useMagazineArticle(slug, previewNonce);
-  const { articles: allArticles } = useMagazineArticles();
+  const { articles: allArticles, loading: relatedLoading } = useMagazineArticles();
   const authUser = useAuthUser();
   const isLoggedIn = !authUser.loading && authUser.id.length > 0;
 
-  const [copyToast, setCopyToast] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [shareCounts, setShareCounts] = useState<Record<string, number>>();
   const [communitySheetOpen, setCommunitySheetOpen] = useState(false);
 
   const scrollToCommunity = useCallback(() => {
@@ -232,14 +183,6 @@ export default function MobileArticle() {
 
   const displaySegments = captionedHtml ? captionedSegments : segments;
 
-  useEffect(() => { setCopyToast(false); }, [slug]);
-
-  // Fetch share counts on mount
-  useEffect(() => {
-    const baseUrl = window.location.href;
-    getShareCounts(baseUrl).then(setShareCounts).catch(() => {});
-  }, []);
-
   useEffect(() => {
     const onScroll = () => {
       const doc = document.documentElement;
@@ -251,7 +194,6 @@ export default function MobileArticle() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const totalShares = getTotalShareCount(shareCounts);
 
   // Memoize community entities so useCommunityThread doesn't re-fetch on every scroll
   const communityEntity = useMemo(() => {
@@ -286,11 +228,7 @@ export default function MobileArticle() {
         <section
           key="mobile-article-hero-shell"
           data-wakilisha-mobile-article-loading-hero="true"
-          className="relative overflow-hidden"
-          style={{
-            height: "62dvh",
-            minHeight: "380px",
-          }}
+          className="relative aspect-[4/5] overflow-hidden"
         >
           {prerenderedArticleHeroSource ? (
             <ResponsiveMediaImage
@@ -321,10 +259,7 @@ export default function MobileArticle() {
 
         <div
           key="mobile-article-content-shell"
-          className="relative z-10 min-h-[360px] rounded-t-[24px] bg-[var(--wk-bg)]"
-          style={{
-            marginTop: "-60px",
-          }}
+          className="relative z-10 min-h-[360px] bg-[var(--wk-bg)]"
         />
       </div>
     );
@@ -348,10 +283,10 @@ export default function MobileArticle() {
   const initials = article.author.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[var(--wk-bg)]">
+    <div data-wk-workbook-screen="article-mobile" className="min-h-screen bg-[var(--wk-bg)]">
       {previewNonce ? <ArticlePreviewModeBanner /> : null}
 
-      <section key="mobile-article-hero-shell" className="relative overflow-hidden" style={{ height: "62dvh", minHeight: "380px" }}>
+      <section key="mobile-article-hero-shell" className="relative aspect-[4/5] overflow-hidden">
         {article.heroUrl ? (
           <ResponsiveMediaImage
             key="mobile-article-hero-media"
@@ -371,33 +306,14 @@ export default function MobileArticle() {
             name={article.title}
           />
         )}
-        {/* Floating nav */}
-        <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-safe-top py-4 flex items-center justify-between">
-          <Link
-            to="/magazine"
-            className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white/85 whitespace-nowrap"
-          >
-            <i className="ri-arrow-left-line text-[12px]" />
-            Magazine
-          </Link>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCommunitySheetOpen(true)}
-              className="flex items-center justify-center w-8 h-8 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm text-white/80 hover:bg-black/45 transition-all cursor-pointer"
-              aria-label="Actions"
-            >
-              <i className="ri-more-2-line text-[16px]" />
-            </button>
-            <MobileShareButton
-              item={{
-                title: article.title,
-                subtitle: article.author,
-                description: article.dek || article.title,
-                imageUrl: article.heroUrl,
-                type: "article",
-              }}
-            />
-          </div>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-black/30 to-black/10" />
+        <div className="absolute inset-x-0 bottom-0 z-10 px-5 pb-8 text-[#f5f5f4]">
+          <p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#85c441]">
+            {article.section} · {article.readingTime} min read
+          </p>
+          <h1 className="mt-3 max-w-[18ch] text-[clamp(34px,9vw,52px)] font-extrabold leading-[.99] tracking-[-.048em]">
+            {article.title}
+          </h1>
         </div>
       </section>
 
@@ -430,55 +346,16 @@ export default function MobileArticle() {
       {/* ── Floating content card ── */}
       <div
         key="mobile-article-content-shell"
-        className="relative z-10 min-h-[360px] rounded-t-[24px] bg-[var(--wk-bg)]"
-        style={{
-          marginTop: "-60px",
-          boxShadow: "0 -6px 32px -8px rgba(0,0,0,0.12)",
-        }}
+        data-wk-article-category={article.section.trim().toLowerCase()}
+        className="wk-workbook-article-paper relative z-10 min-h-[360px]"
       >
         <div className="px-5 pt-8 pb-6">
-          {/* Section pill + stats */}
-          <div className="flex items-center gap-2 mb-5 flex-wrap">
-            <span
-              className="rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-white"
-              style={{ background: sectionColor(article.section) }}
-            >
-              {article.section}
-            </span>
-            <span className="flex items-center gap-1 text-[11px] text-[var(--wk-text-faint)]">
-              <i className="ri-time-line text-[11px]" /> {article.readingTime} min
-            </span>
-            {article.readCount > 0 && (
-              <span className="flex items-center gap-1 text-[11px] text-[var(--wk-text-faint)]">
-                <i className="ri-eye-line text-[11px]" /> {formatReadCount(article.readCount)}
-              </span>
-            )}
-          </div>
-
-          {/* Title */}
-          <h1
-            className="font-black leading-[0.93] tracking-[-0.045em] text-[var(--wk-text)] mb-4"
-            style={{ fontSize: "clamp(26px, 7.5vw, 40px)" }}
-          >
-            {article.title}
-          </h1>
-
-          {/* Dek */}
-          {article.dek && (
-            <p className="text-[15px] leading-relaxed text-[var(--wk-text-soft)] mb-6">
-              {article.dek}
-            </p>
-          )}
-
-          {/* Divider */}
-          <div className="h-px bg-[var(--wk-border)] mb-5" />
-
-          {/* Author row — avatar, name, share action */}
+          {/* Author details and contextual article actions */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <ArticleAuthorIdentity name={article.author} personPath={article.authorPersonPath} organizationPath={article.authorOrganizationPath}
 
-                className="w-9 h-9 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[11px] font-black text-[var(--wk-brand-on)] shrink-0"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[11px] font-bold text-[var(--wk-text)]"
               >
                 {initials}
               </ArticleAuthorIdentity>
@@ -492,24 +369,19 @@ export default function MobileArticle() {
                 <span className="text-[11px] text-[var(--wk-text-muted)]">{article.date}</span>
               </div>
             </div>
-
-            {/* Share button — opens the full share sheet */}
-            <MobileShareButton
-              item={{
-                title: article.title,
-                subtitle: article.author,
-                description: article.dek || article.title,
-                imageUrl: article.heroUrl,
-                type: "article",
-              }}
-              variant="light"
-              size="sm"
-            />
+            <button
+              type="button"
+              data-wk-article-actions-trigger="byline"
+              aria-label="Article actions"
+              aria-haspopup="dialog"
+              aria-expanded={communitySheetOpen}
+              onClick={() => setCommunitySheetOpen(true)}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)] transition-colors hover:bg-[var(--wk-surface-raised)]"
+            >
+              <i className="ri-more-2-line text-[18px]" aria-hidden="true" />
+            </button>
           </div>
         </div>
-
-        {/* Divider into body */}
-        <div className="h-px bg-[var(--wk-divider)] mx-5 mb-8" />
 
         {/* Article body */}
         <div className="px-5 pb-10">
@@ -533,24 +405,13 @@ export default function MobileArticle() {
           </div>
         )}
 
-        {/* Share CTA */}
-        <div className="mx-5 mb-10 rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] p-5 text-center">
-          <p className="text-[14px] font-bold text-[var(--wk-text)] mb-1">Enjoyed this piece?</p>
-          <p className="text-[12px] text-[var(--wk-text-muted)] mb-4">Share it with someone.</p>
-          <div className="flex items-center justify-center">
-            <MobileShareButton
-              item={{
-                title: article.title,
-                subtitle: article.author,
-                description: article.dek || article.title,
-                imageUrl: article.heroUrl,
-                type: "article",
-              }}
-              variant="brand"
-              size="label"
-              label="Share this article"
-            />
-          </div>
+        {/* Closing credits sit after Topics and directly before Community. */}
+        <div className="px-5 pb-10 pt-2">
+          <ArticleEndCredits
+            article={article}
+            actionsOpen={communitySheetOpen}
+            onOpenActions={() => setCommunitySheetOpen(true)}
+          />
         </div>
       </div>
 
@@ -562,40 +423,16 @@ export default function MobileArticle() {
         />
       )}
 
-      {/* Read next */}
-      {relatedStories.length > 0 && (
-        <section className="border-t border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] py-10">
-          <div className="px-5">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="text-[9px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)] flex items-center gap-2">
-                <span className="w-5 h-px bg-[var(--wk-brand)]" />
-                Read next
-              </div>
-              <div className="h-px flex-1 bg-[var(--wk-divider)]" />
-            </div>
-            <div className="space-y-4">
-              {relatedStories.map((story) => <RelatedCard key={story.slug} story={story} />)}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Footer CTA */}
-      <section className="py-12 px-5 text-center bg-[var(--wk-surface)] border-t border-[var(--wk-border)]">
-        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)] mb-3">
-          WAKILISHA Magazine
-        </p>
-        <h3 className="text-[19px] font-black leading-snug tracking-[-0.03em] text-[var(--wk-text)] mb-5">
-          Stories that move East African culture forward.
-        </h3>
-        <Link
-          to="/magazine"
-          className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] px-5 py-3 text-[13px] font-black text-[var(--wk-brand-on)] active:scale-[0.97] transition-transform whitespace-nowrap"
-        >
-          Explore all stories
-          <i className="ri-arrow-right-line" />
-        </Link>
-      </section>
+      <ArticleRelated stories={relatedStories} loading={relatedLoading} />
+      <div data-wk-article-newsletter className="border-t border-[var(--wk-border)] px-5 py-10">
+        <NewsletterSubscribe
+          variant="default"
+          formId="article-newsletter-mobile"
+          headline="Read with us"
+          description="Get new stories and charts in your inbox."
+          contextFields={{ wk_page_type: "article", wk_source_section: "article_footer" }}
+        />
+      </div>
 
       {/* Community Action Sheet */}
       {actionEntity && (

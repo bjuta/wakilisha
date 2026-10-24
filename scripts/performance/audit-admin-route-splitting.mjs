@@ -83,14 +83,26 @@ const lazyImportCount = (
  * Dedicated MIZIZI Admin workflow adds one lazy Review route:
  * - AdminMiziziWorkspacePage
  *
- * The current authority is therefore 101 lazy imports.
+ * PR #1274 adds one private WK100 Charts Admin route:
+ * - Wk100PrivateAdminPreview
+ *
+ * It remains lazy-loaded inside the existing guarded Admin Charts tree.
+ * The current authority is therefore 102 lazy imports.
  */
-const expectedLazyImportCount = 101;
+const expectedLazyImportCount = 102;
 
 if (lazyImportCount !== expectedLazyImportCount) {
   fail(
     `expected ${expectedLazyImportCount} lazy Admin Studio imports, found ${lazyImportCount}`,
   );
+}
+
+if (
+  !lazyAdmin.includes("export const Wk100PrivateAdminPreview = lazy(") ||
+  !lazyAdmin.includes("import('../pages/admin/charts/wk100-preview/page')") ||
+  !config.includes('{ path: "wk100-preview", element: <Wk100PrivateAdminPreview /> }')
+) {
+  fail("accepted WK100 Admin Charts route is missing or no longer lazy");
 }
 
 for (const retiredMarker of [

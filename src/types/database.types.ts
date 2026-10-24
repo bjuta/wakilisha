@@ -17803,6 +17803,190 @@ export type Database = {
         }
         Relationships: []
       }
+      wk_chart_capture_attempts_v1: {
+        Row: {
+          attempt_number: number
+          contract_id: string
+          created_at: string
+          failure_code: string | null
+          fetched_at: string | null
+          http_status: number | null
+          id: string
+          native_period_authority: string
+          native_period_end: string | null
+          native_period_evidence_ref: string | null
+          native_period_start: string | null
+          observed_depth: number
+          observed_market: string
+          payload_sha256: string | null
+          raw_object_key: string | null
+          record_count: number
+          scheduled_at: string
+          status: string
+          upstream_reference: string
+          week_start_eat: string
+        }
+        Insert: {
+          attempt_number: number
+          contract_id: string
+          created_at?: string
+          failure_code?: string | null
+          fetched_at?: string | null
+          http_status?: number | null
+          id?: string
+          native_period_authority?: string
+          native_period_end?: string | null
+          native_period_evidence_ref?: string | null
+          native_period_start?: string | null
+          observed_depth?: number
+          observed_market?: string
+          payload_sha256?: string | null
+          raw_object_key?: string | null
+          record_count?: number
+          scheduled_at: string
+          status: string
+          upstream_reference: string
+          week_start_eat: string
+        }
+        Update: {
+          attempt_number?: number
+          contract_id?: string
+          created_at?: string
+          failure_code?: string | null
+          fetched_at?: string | null
+          http_status?: number | null
+          id?: string
+          native_period_authority?: string
+          native_period_end?: string | null
+          native_period_evidence_ref?: string | null
+          native_period_start?: string | null
+          observed_depth?: number
+          observed_market?: string
+          payload_sha256?: string | null
+          raw_object_key?: string | null
+          record_count?: number
+          scheduled_at?: string
+          status?: string
+          upstream_reference?: string
+          week_start_eat?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wk_chart_capture_attempts_v1_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "wk_chart_capture_contracts_v1"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wk_chart_capture_contracts_v1: {
+        Row: {
+          adapter_sha256: string
+          adapter_version: string
+          admission_state: string
+          behavior: string
+          cadence_kind: string
+          contract_version: string
+          created_at: string
+          eat_hour: number
+          eat_minute: number
+          expected_depth: number
+          id: string
+          interval_hours: number | null
+          market: string
+          minimum_healthy_checkpoints: number
+          native_metric: string
+          provider_key: string
+          source_key: string
+          source_surface: string
+          weekday_eat: number | null
+        }
+        Insert: {
+          adapter_sha256: string
+          adapter_version: string
+          admission_state?: string
+          behavior: string
+          cadence_kind: string
+          contract_version: string
+          created_at?: string
+          eat_hour: number
+          eat_minute: number
+          expected_depth: number
+          id?: string
+          interval_hours?: number | null
+          market?: string
+          minimum_healthy_checkpoints: number
+          native_metric: string
+          provider_key: string
+          source_key: string
+          source_surface: string
+          weekday_eat?: number | null
+        }
+        Update: {
+          adapter_sha256?: string
+          adapter_version?: string
+          admission_state?: string
+          behavior?: string
+          cadence_kind?: string
+          contract_version?: string
+          created_at?: string
+          eat_hour?: number
+          eat_minute?: number
+          expected_depth?: number
+          id?: string
+          interval_hours?: number | null
+          market?: string
+          minimum_healthy_checkpoints?: number
+          native_metric?: string
+          provider_key?: string
+          source_key?: string
+          source_surface?: string
+          weekday_eat?: number | null
+        }
+        Relationships: []
+      }
+      wk_chart_capture_rows_v1: {
+        Row: {
+          artist_observed: string | null
+          attempt_id: string
+          created_at: string
+          id: string
+          provider_track_id: string | null
+          source_native_count: number | null
+          source_rank: number
+          title_observed: string | null
+        }
+        Insert: {
+          artist_observed?: string | null
+          attempt_id: string
+          created_at?: string
+          id?: string
+          provider_track_id?: string | null
+          source_native_count?: number | null
+          source_rank: number
+          title_observed?: string | null
+        }
+        Update: {
+          artist_observed?: string | null
+          attempt_id?: string
+          created_at?: string
+          id?: string
+          provider_track_id?: string | null
+          source_native_count?: number | null
+          source_rank?: number
+          title_observed?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wk_chart_capture_rows_v1_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "wk_chart_capture_attempts_v1"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wk_chart_editions_v2: {
         Row: {
           carry_forward_count: number
@@ -18562,6 +18746,51 @@ export type Database = {
           id?: string | null
           source_count?: number | null
           source_name?: string | null
+        }
+        Relationships: []
+      }
+      wk_chart_weekly_freezes_v1: {
+        Row: {
+          blocking_summary: string
+          can_publish: boolean
+          constitution_version: string
+          created_at: string
+          freeze_schema_version: string
+          freeze_state: string
+          id: string
+          manifest_sha256: string
+          methodology_version: string
+          receipt_ids: string[]
+          receipts_sha256: string
+          week_start_eat: string
+        }
+        Insert: {
+          blocking_summary: string
+          can_publish?: boolean
+          constitution_version: string
+          created_at?: string
+          freeze_schema_version?: string
+          freeze_state?: string
+          id?: string
+          manifest_sha256: string
+          methodology_version: string
+          receipt_ids?: string[]
+          receipts_sha256: string
+          week_start_eat: string
+        }
+        Update: {
+          blocking_summary?: string
+          can_publish?: boolean
+          constitution_version?: string
+          created_at?: string
+          freeze_schema_version?: string
+          freeze_state?: string
+          id?: string
+          manifest_sha256?: string
+          methodology_version?: string
+          receipt_ids?: string[]
+          receipts_sha256?: string
+          week_start_eat?: string
         }
         Relationships: []
       }
@@ -27922,6 +28151,52 @@ export type Database = {
           p_reason: string
           p_source_id: string
           p_withdrawal_public_mode?: string
+        }
+        Returns: Json
+      }
+      wk_chart_runtime_advance_v1: {
+        Args: {
+          p_action: string
+          p_byte_length?: number
+          p_content_type?: string
+          p_fetched_at?: string
+          p_lease_id: string
+          p_object_key?: string
+          p_payload_sha256?: string
+          p_reservation_id: string
+        }
+        Returns: Json
+      }
+      wk_chart_runtime_commit_v1: {
+        Args: {
+          p_failure_code?: string
+          p_lease_id: string
+          p_native_period_end?: string
+          p_native_period_evidence_ref?: string
+          p_native_period_start?: string
+          p_outcome: string
+          p_reservation_id: string
+          p_rows: Json
+          p_upstream_reference: string
+        }
+        Returns: Json
+      }
+      wk_chart_runtime_fail_v1: {
+        Args: {
+          p_failure_code: string
+          p_lease_id: string
+          p_outcome: string
+          p_reservation_id: string
+          p_upstream_reference: string
+        }
+        Returns: Json
+      }
+      wk_chart_runtime_reserve_v1: {
+        Args: {
+          p_attempt_number: number
+          p_contract_id: string
+          p_scheduled_at: string
+          p_week_start_eat: string
         }
         Returns: Json
       }

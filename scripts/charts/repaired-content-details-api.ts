@@ -144,10 +144,6 @@ function readingTime(...values: string[]): number {
   return Math.max(1, Math.min(18, Math.ceil((text ? text.split(" ").length : 480) / 220)));
 }
 
-function placeholder(type: string, id: string): string {
-  return `https://picsum.photos/seed/wakilisha-${type}-${id || "item"}/800/800`;
-}
-
 function rowsToArray(value: unknown): string[] {
   if (!value) return [];
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
@@ -393,14 +389,14 @@ async function getArtistDetail(slug: string): Promise<Record<string, unknown>> {
     releases: releaseRows.map((release) => ({
       slug: s(release, "slug"), title: s(release, "title"), releaseType: s(release, "release_type") || "unknown",
       year: s(release, "release_date").slice(0, 4), releaseDate: s(release, "release_date"), trackCount: n(release, "track_count"),
-      artworkUrl: s(release, "artwork_url") || placeholder("release", s(release, "id")),
+      artworkUrl: s(release, "artwork_url") || ""),
       artistLine: s(release, "release_artist_line"),
       tracks: [],
     })),
     appearances: appearanceRows.map((release) => ({
       slug: s(release, "slug"), title: s(release, "title"), releaseType: s(release, "release_type") || "unknown",
       year: s(release, "release_date").slice(0, 4), releaseDate: s(release, "release_date"),
-      artworkUrl: s(release, "artwork_url") || placeholder("release", s(release, "id")),
+      artworkUrl: s(release, "artwork_url") || ""),
       artistLine: s(release, "release_artist_line"),
       tracks: [],
     })),
@@ -436,7 +432,7 @@ async function getReleaseDetail(_artistSlug: string, releaseSlug: string): Promi
   const totalDuration = tracks.reduce((sum, track) => sum + n(track, "duration_ms"), 0);
   return { release: {
     id: s(row, "id"), slug: s(row, "slug"), title: s(row, "title"), artist: s(row, "artist"), year: s(row, "release_date").slice(0, 4), releaseDate: s(row, "release_date"),
-    releaseType: s(row, "release_type") || "unknown", labelName: s(row, "label_name"), labelSlug: s(row, "label_slug"), artworkUrl: s(row, "artwork_url") || placeholder("release", s(row, "id")),
+    releaseType: s(row, "release_type") || "unknown", labelName: s(row, "label_name"), labelSlug: s(row, "label_slug"), artworkUrl: s(row, "artwork_url") || ""),
     trackCount: tracks.length, totalDuration, description: s(row, "description"), metadata: parsePayload(row.metadata),
     tracks: tracks.map((track, index) => ({ id: s(track, "id"), slug: s(track, "slug") || slugify(s(track, "title")), title: s(track, "title"), artist: s(row, "artist"), duration: n(track, "duration_ms"), trackNumber: index + 1, artworkUrl: s(track, "artwork_url") || s(row, "artwork_url") || "" })),
   } };
@@ -631,7 +627,7 @@ async function getTrackDetail(slug: string, artistSlug = ""): Promise<Record<str
         isrc: maybe(row, "isrc"),
         duration: n(row, "duration_ms"),
         explicit: row.explicit === true || String(row.explicit).toLowerCase() === "true",
-        artworkUrl: s(row, "artwork_url") || s(row, "release_artwork_url") || placeholder("track", s(row, "id")),
+        artworkUrl: s(row, "artwork_url") || s(row, "release_artwork_url") || ""),
         previewUrl: maybe(row, "preview_url"),
         metadata: parsePayload(row.metadata),
         release: s(row, "release_slug") ? { slug: s(row, "release_slug"), title: s(row, "release_title") } : null,
@@ -684,7 +680,7 @@ async function getTrackDetail(slug: string, artistSlug = ""): Promise<Record<str
           isrc: null,
           duration: 0,
           explicit: false,
-          artworkUrl: s(chart, "artwork_url") || placeholder("track", s(chart, "slug")),
+          artworkUrl: s(chart, "artwork_url") || ""),
           previewUrl: null,
           metadata: {
             source: "wk_chart_entries_v2",

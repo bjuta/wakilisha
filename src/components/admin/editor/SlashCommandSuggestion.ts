@@ -8,28 +8,35 @@ interface SuggestionItem {
   label: string;
   icon: string;
   description: string;
-  command: "release" | "artist" | "track";
+  command: "release" | "artist" | "track" | "rating";
 }
 
 const COMMANDS: SuggestionItem[] = [
   {
+    id: "rating",
+    label: "Rating",
+    icon: "Star",
+    description: "Insert a 1–5 star rating with half steps",
+    command: "rating",
+  },
+  {
     id: "release",
     label: "Release",
-    icon: "ri-album-line",
+    icon: "Album",
     description: "Embed a release from the registry",
     command: "release",
   },
   {
     id: "artist",
     label: "Artist",
-    icon: "ri-user-star-line",
+    icon: "User",
     description: "Embed an artist mini-profile",
     command: "artist",
   },
   {
     id: "track",
     label: "Track",
-    icon: "ri-music-line",
+    icon: "Music",
     description: "Embed a track with play button",
     command: "track",
   },

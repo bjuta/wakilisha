@@ -451,7 +451,7 @@ function generateRichEmailHtml(
   visualConfig?: { accent_color?: string; header_style?: string }, templateProfile?: TemplateProfile
 ): string {
   const s = eH;
-  const accent = templateProfile?.accentColor || visualConfig?.accent_color || "#5C8E25";
+  const accent = templateProfile?.accentColor || visualConfig?.accent_color || "#85C441";
   const primaryModules = templateProfile?.primaryModules || ["featured_routes", "chart_pulse", "artist_motion", "archive_routes", "keep_going"];
   const headlinePattern = templateProfile?.headlinePattern || "";
   const deckPattern = templateProfile?.deckPattern || "";
@@ -467,8 +467,8 @@ function generateRichEmailHtml(
 
   const logoImg = branding.brandLogoUrl
     ? `<img src="${s(branding.brandLogoUrl)}" alt="${s(branding.brandName)}" width="180" style="display:block;width:180px;max-width:180px;height:auto;margin:0 0 32px;">`
-    : `<div style="font-weight:900;letter-spacing:-0.04em;font-size:22px;color:#0C0D0A;margin:0 0 32px;font-family:${FNT};">${s(branding.brandName)}</div>`;
-  rows.push(`<tr><td class="wk-pad" style="padding:40px 48px 44px;background:#F7F8F3;border-bottom:1px solid rgba(12,13,10,.08);">${logoImg}
+    : `<img src="https://wakilisha.africa/assets/logos/wakilisha-logo-light.svg" alt="WAKILISHA" width="180" style="display:block;width:180px;max-width:100%;height:auto;margin:0 0 32px;color:#0B0B0B;font-size:18px;font-weight:700;">`;
+  rows.push(`<tr><td class="wk-pad" style="padding:40px 48px 44px;background:#FCFCFB;border-bottom:1px solid rgba(12,13,10,.08);">${logoImg}
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;"><span style="display:inline-block;width:24px;height:1px;background:${s(accent)};flex:none;"></span><span style="font-family:${FNT};font-size:10px;line-height:1;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:${s(accent)};">${s(effectiveTitle)}</span></div>
 <h1 class="wk-h1" style="margin:0 0 16px;font-family:${FNT};font-size:52px;line-height:.94;font-weight:900;letter-spacing:-.045em;color:#0C0D0A;">${s(headline)}</h1>
 <p class="wk-body" style="margin:0;font-family:${FNT};font-size:16px;line-height:1.55;color:#3F4138;">${s(deck)}</p>
@@ -481,7 +481,7 @@ function generateRichEmailHtml(
   }
 
   rows.push(`<tr><td class="wk-pad" style="padding:32px 48px;background:#EEF1E8;font-family:${FNT};font-size:13px;line-height:1.6;color:#6B6E62;">
-${branding.brandLogoUrl ? `<img src="${s(branding.brandLogoUrl)}" alt="${s(branding.brandName)}" width="140" style="display:block;width:140px;height:auto;margin:0 0 12px;">` : `<div style="font-weight:900;font-size:16px;color:#0C0D0A;margin:0 0 12px;">${s(branding.brandName)}</div>`}
+${branding.brandLogoUrl ? `<img src="${s(branding.brandLogoUrl)}" alt="${s(branding.brandName)}" width="140" style="display:block;width:140px;height:auto;margin:0 0 12px;">` : `<img src="https://wakilisha.africa/assets/logos/wakilisha-logo-light.svg" alt="WAKILISHA" width="140" style="display:block;width:140px;height:auto;margin:0 0 12px;">`}
 <p style="margin:0 0 12px;">Culture, charts, stories and the wider creative record.</p>
 <p style="margin:0;"><a href="{{preferences_url}}" style="color:${s(accent)};font-weight:700;">Manage preferences</a> &middot; <a href="{{unsubscribe_url}}" style="color:${s(accent)};font-weight:700;">Unsubscribe</a> &middot; <a href="https://wakilisha.africa/privacy" style="color:${s(accent)};font-weight:700;">Privacy</a></p>
 </td></tr>`);
@@ -1534,9 +1534,9 @@ function getIsoWeek(d: Date): string { const tmp = new Date(d.getTime()); tmp.se
 
 function wrapBriefingHtml(bodyHtml: string, title: string, email: string, unsubToken: string, origin: string, branding: Branding = defaultBranding): string {
   const s = eH; const unsubUrl = `${origin}/briefing/unsubscribe?token=${unsubToken}`; const prefsUrl = `${origin}/briefing/preferences?token=${unsubToken}`;
-  const accent = "#5C8E25";
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting"><title>${s(title)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  const accent = "#85C441";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${s(title)}</title>
+
 <style>
 body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
 *{box-sizing:border-box}
@@ -1545,11 +1545,11 @@ table{max-width:100%;table-layout:fixed}
 img{-ms-interpolation-mode:bicubic;border:0;outline:none;text-decoration:none;display:block;max-width:100%;height:auto}
 body{margin:0!important;padding:0!important;width:100%!important;background:#F7F8F3;color:#0C0D0A;font-family:${FNT}}
 a{color:${s(accent)};text-decoration:none;overflow-wrap:anywhere;word-break:break-word}
-.wk-shell{width:100%!important;max-width:760px!important}
+.wk-shell{width:100%!important;max-width:600px!important}
 .wk-card{width:100%!important;max-width:100%!important;table-layout:fixed!important;border:1px solid rgba(12,13,10,.14);border-radius:14px;overflow:hidden;background:#FFFFFF}
 .wk-card td{max-width:100%!important;min-width:0!important}
 .wk-eyebrow{font-family:${FNT};font-size:10px;line-height:1;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:${s(accent)};display:flex;align-items:center;gap:8px;overflow-wrap:anywhere;word-break:break-word}
-.wk-h1{font-family:${FNT};font-size:52px;line-height:.94;font-weight:900;letter-spacing:-.045em;color:#0C0D0A}
+.wk-h1{font-family:${FNT};font-size:34px;line-height:.94;font-weight:900;letter-spacing:-.045em;color:#0C0D0A}
 .wk-h2{font-family:${FNT};font-size:30px;line-height:1.02;font-weight:900;letter-spacing:-.038em;color:#0C0D0A}
 .wk-h3{font-family:${FNT};font-size:20px;line-height:1.15;font-weight:800;letter-spacing:-.02em;color:#0C0D0A}
 .wk-h1,.wk-h2,.wk-h3,h1,h2,h3,p,div,span{max-width:100%;overflow-wrap:anywhere;word-break:break-word}

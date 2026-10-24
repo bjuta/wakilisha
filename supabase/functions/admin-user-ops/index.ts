@@ -39,7 +39,49 @@ function emailShell(title: string, intro: string, ctaLabel: string, ctaUrl: stri
   const safeCta = escapeHtml(ctaLabel);
   const safeFooter = escapeHtml(footer);
   const safeUrl = escapeHtml(ctaUrl);
-  return `<!doctype html><html><body style="margin:0;background:#f6f4ef;font-family:Inter,Arial,sans-serif;color:#1f1d1b"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f4ef;padding:32px 16px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #e8e1d8"><tr><td style="padding:28px 28px 8px"><div style="font-weight:900;letter-spacing:-0.04em;font-size:24px;color:#111">WAKILISHA</div></td></tr><tr><td style="padding:12px 28px 8px"><h1 style="margin:0;font-size:28px;line-height:1.05;letter-spacing:-0.04em;color:#111">${safeTitle}</h1></td></tr><tr><td style="padding:8px 28px 20px"><p style="margin:0;font-size:15px;line-height:1.65;color:#5f5850">${safeIntro}</p></td></tr><tr><td style="padding:0 28px 26px"><a href="${safeUrl}" style="display:inline-block;background:#85C441;color:#111;text-decoration:none;font-weight:800;font-size:14px;border-radius:14px;padding:14px 18px">${safeCta}</a></td></tr><tr><td style="padding:0 28px 24px"><p style="margin:0;font-size:12px;line-height:1.6;color:#8a8178">If the button does not work, copy this link into your browser:<br><span style="word-break:break-all;color:#5f5850">${safeUrl}</span></p></td></tr><tr><td style="padding:18px 28px;background:#faf8f4;border-top:1px solid #eee7df"><p style="margin:0;font-size:12px;line-height:1.6;color:#8a8178">${safeFooter}</p></td></tr></table></td></tr></table></body></html>`;
+  // Workbook 23: table-safe, light-only 600px email shell. The official
+  // self-hosted wordmark has an accessible text fallback when images are blocked.
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>${safeTitle}</title>
+</head>
+<body style="margin:0;padding:0;background:#ECEBE8;color:#0B0B0B;font-family:Arial,Helvetica,sans-serif">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ECEBE8" style="width:100%;background:#ECEBE8">
+<tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#FFFFFF" style="width:100%;max-width:600px;background:#FFFFFF;border-collapse:collapse">
+<tr><td style="padding:32px 28px 24px;border-bottom:1px solid #E3E3E0">
+<a href="https://wakilisha.africa/" style="display:inline-block;text-decoration:none;color:#0B0B0B;font-size:19px;font-weight:700">
+<img src="https://wakilisha.africa/assets/logos/wakilisha-logo-light.svg" width="199" height="30" border="0" alt="WAKILISHA" style="display:block;width:199px;max-width:100%;height:auto;border:0;color:#0B0B0B;font-size:19px;font-weight:700">
+</a>
+</td></tr>
+<tr><td style="padding:36px 28px 12px">
+<h1 style="margin:0;color:#0B0B0B;font-family:Arial,Helvetica,sans-serif;font-size:32px;line-height:1.15;font-weight:700;letter-spacing:-.02em">${safeTitle}</h1>
+</td></tr>
+<tr><td style="padding:0 28px 28px">
+<p style="margin:0;color:#42423D;font-size:16px;line-height:1.6">${safeIntro}</p>
+</td></tr>
+<tr><td style="padding:0 28px 32px">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td bgcolor="#85C441" style="background:#85C441;border-radius:999px">
+<a href="${safeUrl}" style="display:inline-block;min-height:48px;box-sizing:border-box;padding:14px 26px;color:#0B0B0B;text-decoration:none;font-size:15px;line-height:20px;font-weight:700;text-align:center">${safeCta}</a>
+</td></tr></table>
+</td></tr>
+<tr><td style="padding:0 28px 36px">
+<p style="margin:0 0 8px;color:#5E5E57;font-size:12px;line-height:1.6">Button not working? Paste this link into your browser:</p>
+<p style="margin:0;overflow-wrap:anywhere;word-break:break-word;color:#4E7425;font-size:12px;line-height:1.6"><a href="${safeUrl}" style="color:#4E7425;text-decoration:underline">${safeUrl}</a></p>
+</td></tr>
+<tr><td bgcolor="#F6F4F0" style="padding:24px 28px;background:#F6F4F0;border-top:1px solid #E3E3E0">
+<p style="margin:0 0 12px;color:#5E5E57;font-size:12px;line-height:1.6">${safeFooter}</p>
+<p style="margin:0;color:#707068;font-size:11px;line-height:1.5">WAKILISHA · Nairobi, Kenya</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
 }
 
 function inviteEmail(to: string, actionLink: string, roleKey: string, displayName?: string | null): EmailPayload {

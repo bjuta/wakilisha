@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { SeekRail } from "./SeekRail";
@@ -53,7 +54,26 @@ export function PlayerCompactSurface({
     canGoPrev,
     seek,
     isFullPlayerOpen,
+    volume,
+    setVolume,
   } = usePlayer();
+
+  const isMobile = mode === "mobile";
+  const [browserGap, setBrowserGap] = useState(0);
+  useEffect(() => {
+    if (!isMobile || !window.visualViewport) return;
+    const viewport = window.visualViewport;
+    const update = () => setBrowserGap(
+      Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop),
+    );
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+    };
+  }, [isMobile]);
 
   if (
     !currentTrack ||
@@ -92,7 +112,15 @@ export function PlayerCompactSurface({
     );
   };
 
-  const isMobile = mode === "mobile";
+  const miniStatus = experience.availability === "excerpt"
+    ? "Preview"
+    : experience.availability === "unavailable"
+      ? "Can’t play here"
+      : playbackBackend === "youtube"
+        ? "YouTube"
+        : playbackBackend === "soundcloud"
+          ? "SoundCloud"
+          : null;
 
   return createPortal(
     <aside
@@ -101,34 +129,28 @@ export function PlayerCompactSurface({
       className={[
         "fixed z-[100] overflow-hidden border border-[var(--wk-border)] bg-[color:var(--wk-surface)]/96 text-[var(--wk-text)] shadow-2xl backdrop-blur-xl",
         isMobile
-          ? "left-2 right-2 rounded-[18px]"
-          : "inset-x-0 bottom-0 border-x-0 border-b-0",
+          ? "left-2 right-2 rounded-[16px] transition-[bottom] duration-[240ms] motion-reduce:transition-none"
+          : "rounded-2xl",
       ].join(" ")}
       style={
         isMobile
           ? {
-              bottom:
-                "calc(52px + max(env(safe-area-inset-bottom), 8px) + 8px)",
+              bottom: browserGap > 0
+                ? `${browserGap + 8}px`
+                : "max(8px, calc(env(safe-area-inset-bottom) - 13px))",
             }
-          : undefined
+          : {
+              left: 16,
+              right: 16,
+              bottom: 16,
+            }
       }
     >
-      {isMobile ? (
-        <SeekRail
-          label={`Seek ${currentTrack.title}`}
-          currentTime={currentTime}
-          duration={duration}
-          progress={progress}
-          onSeek={seek}
-          variant="edge"
-        />
-      ) : null}
-
       <div
         className={[
           "flex items-center gap-3",
           isMobile
-            ? "min-h-[66px] px-3 py-2"
+            ? "min-h-[62px] px-2.5 py-1"
             : "min-h-[76px] px-5 py-2",
         ].join(" ")}
       >
@@ -164,10 +186,16 @@ export function PlayerCompactSurface({
               {currentTrack.title}
             </div>
             <div className="mt-0.5 truncate text-[11px] font-medium text-[var(--wk-text-muted)]">
-              {experience.creatorLabel}
-              {experience.contextLabel
+              {miniStatus ? (
+                <span className={experience.availability === "excerpt" ? "text-[#C68B35]" : ""}>{miniStatus}</span>
+              ) : experience.creatorLabel}
+              {experience.availability === "excerpt" ? (
+                duration > 0 ? ` · ${formatPlayerClock(Math.max(0, duration - currentTime))} left` : ""
+              ) : experience.contextLabel && !miniStatus
                 ? ` · ${experience.contextLabel}`
-                : ""}
+                : miniStatus
+                  ? ` · ${experience.creatorLabel}`
+                  : ""}
             </div>
           </div>
         </button>
@@ -187,6 +215,39 @@ export function PlayerCompactSurface({
             <span className="w-10 text-[10px] tabular-nums text-[var(--wk-text-faint)]">
               {formatPlayerClock(duration)}
             </span>
+          </div>
+        ) : null}
+
+        {!isMobile ? (
+          <div className="hidden shrink-0 items-center gap-1 xl:flex">
+            {!experience.spokenAudio ? (
+              <>
+                <button type="button" onClick={() => openFullPlayer("lyrics")}
+                  aria-label="Open Lyrics" title="Lyrics"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+                  <WkIcon name="MicVocal" size={19} />
+                </button>
+                {experience.capabilities.moments ? (
+                  <button type="button" onClick={() => openFullPlayer("comments")}
+                    aria-label="Open Comments" title="Comments"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+                    <WkIcon name="MessageCircle" size={19} />
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+            {experience.capabilities.queue ? (
+              <button type="button" onClick={() => openFullPlayer("queue")}
+                aria-label="Open Queue" title="Queue"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">
+                <WkIcon name="ListMusic" size={19} />
+              </button>
+            ) : null}
+            <WkIcon name="Volume2" size={17} className="ml-2 text-[var(--wk-text-faint)]" />
+            <div className="w-20">
+              <SeekRail label="Volume" currentTime={volume} duration={1}
+                progress={volume} onSeek={setVolume} step={0.01} />
+            </div>
           </div>
         ) : null}
 
@@ -225,7 +286,7 @@ export function PlayerCompactSurface({
             </>
           ) : (
             <>
-              {canGoPrev ? (
+              {!isMobile && canGoPrev ? (
                 <button
                   type="button"
                   onClick={prev}
@@ -271,6 +332,17 @@ export function PlayerCompactSurface({
           </button>
         </div>
       </div>
+      {isMobile ? (
+        <SeekRail
+          label={`Seek ${currentTrack.title}`}
+          currentTime={currentTime}
+          duration={duration}
+          progress={progress}
+          onSeek={seek}
+          variant="edge"
+          tone={experience.availability === "excerpt" ? "preview" : "full"}
+        />
+      ) : null}
     </aside>,
     document.body,
   );

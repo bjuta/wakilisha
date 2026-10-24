@@ -1,3 +1,6 @@
+import "@/styles/wakilisha-workbook-surface-fidelity.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
+import "@/styles/wakilisha-social-workbook-p6-p8.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuthUser } from "@/hooks/useAuthUser";
@@ -34,12 +37,14 @@ import {
 } from "@/services/messages";
 import { MessageSafetyReportButton } from "./MessageSafetyReportButton";
 import { MessageSafetyState } from "./MessageSafetyState";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 
-const FOLDERS: Array<{ key: MessageFolder; label: string; icon: string }> = [
-  { key: "inbox", label: "Inbox", icon: "ri-inbox-line" },
-  { key: "requests", label: "Requests", icon: "ri-mail-add-line" },
-  { key: "spam", label: "Spam", icon: "ri-spam-2-line" },
-  { key: "archived", label: "Archive", icon: "ri-archive-line" },
+const FOLDERS: Array<{ key: MessageFolder; label: string; icon: WkIconName }> = [
+  { key: "inbox", label: "Inbox", icon: "Inbox" },
+  { key: "requests", label: "Requests", icon: "Mail" },
+  { key: "spam", label: "Spam", icon: "ShieldAlert" },
+  { key: "archived", label: "Archive", icon: "Archive" },
 ];
 
 function when(value: string): string {
@@ -52,7 +57,7 @@ function when(value: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function Avatar({ summary, size = "h-10 w-10" }: { summary: MessageConversationSummary; size?: string }) {
+function Avatar({ summary, size = "h-11 w-11" }: { summary: MessageConversationSummary; size?: string }) {
   const presentation = summary.other_participant?.presentation;
   const avatar = messageAvatar(presentation);
   const name = messageDisplayName(presentation);
@@ -144,10 +149,10 @@ function GovernedResourceReferenceCard({
   }, [resolveReference]);
 
   const shellClass = mine
-    ? "border-white/20 bg-white/10 text-white"
+    ? "border-black/15 bg-black/10 text-[var(--wk-brand-on)]"
     : "border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text)]";
   const mutedClass = mine
-    ? "text-white/75"
+    ? "text-[var(--wk-brand-on)]/70"
     : "text-[var(--wk-text-muted)]";
 
   async function performPlaylistDecision(
@@ -208,7 +213,7 @@ function GovernedResourceReferenceCard({
             </div>
           </div>
           <span className="shrink-0 text-[9px] font-black">
-            Open in Field <i className="ri-arrow-right-up-line" />
+            Open in Field <WkIcon name="ArrowUpRight" size={18} aria-hidden="true" />
           </span>
         </div>
       </Link>
@@ -241,7 +246,7 @@ function GovernedResourceReferenceCard({
             to={`/admin/content/playlists/${encodeURIComponent(playlist.playlist_id)}`}
             className="shrink-0 text-[9px] font-black"
           >
-            Open Playlist <i className="ri-arrow-right-up-line" />
+            Open Playlist <WkIcon name="ArrowUpRight" size={18} aria-hidden="true" />
           </Link>
         </div>
 
@@ -358,6 +363,7 @@ export default function MessagesPage() {
   const requestedPresentation = searchParams.get("presentation");
   const requestedWorkflow = searchParams.get("workflow");
   const [folder, setFolder] = useState<MessageFolder>("inbox");
+  const [conversationQuery, setConversationQuery] = useState("");
   const [conversations, setConversations] = useState<MessageConversationSummary[]>([]);
   const [unread, setUnread] = useState<Record<MessageFolder, number>>({ inbox: 0, requests: 0, spam: 0, archived: 0 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -368,6 +374,7 @@ export default function MessagesPage() {
   const [composer, setComposer] = useState("");
   const [sending, setSending] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  const [threadActionsOpen, setThreadActionsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<MessageRecipientSuggestion[]>([]);
   const [recipient, setRecipient] = useState<MessageRecipientSuggestion | null>(null);
@@ -377,6 +384,16 @@ export default function MessagesPage() {
     useState<MessageResourceReference | null>(null);
   const [workflowProjection, setWorkflowProjection] =
     useState<MessagePlaylistReviewProjection | null>(null);
+
+  const visibleConversations = useMemo(() => {
+    const search = conversationQuery.trim().toLowerCase();
+    if (!search) return conversations;
+    return conversations.filter((summary) => [
+      messageDisplayName(summary.other_participant?.presentation),
+      messageUsername(summary.other_participant?.presentation),
+      summary.latest_message?.body || "",
+    ].join(" ").toLowerCase().includes(search));
+  }, [conversations, conversationQuery]);
 
   const selectedSummary = useMemo(
     () => conversations.find((item) => item.conversation_id === selectedId) ?? null,
@@ -602,19 +619,21 @@ export default function MessagesPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-80px)] bg-[var(--wk-bg)]">
-      <div className="mx-auto w-full max-w-[1280px] px-3 pb-24 pt-5 sm:px-6 lg:pb-10 lg:pt-8">
-        <div className="mb-4 flex items-end justify-between gap-4 px-1">
+    <main data-wk-workbook-screen="messages" className="min-h-[calc(100dvh-80px)] bg-[var(--wk-bg)]">
+      <div className="mx-auto w-full max-w-[1180px] px-0 pb-8 pt-0 lg:pb-10">
+        <div className="overflow-hidden border-y border-[var(--wk-border)] bg-[var(--wk-surface)] lg:grid lg:h-[min(780px,calc(100dvh-110px))] lg:grid-cols-[minmax(280px,34%)_minmax(0,1fr)] lg:border">
+          <section data-wk-message-list className={`${selectedId ? "hidden lg:block" : "block"} min-w-0 border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
+        <div data-wk-messages-list-header className="flex min-h-14 items-center justify-between gap-3 border-b border-[var(--wk-border)] px-5 py-2">
           <div>
-            <div className="text-[10px] font-black tracking-[0.18em] text-[var(--wk-brand)]">Private communication</div>
-            <h1 className="mt-1 text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)]">Messages</h1>
+            
+            <h1 className="text-[20px] font-extrabold leading-[1.2] text-[var(--wk-text)]">Messages</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/settings?section=Messages" className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[var(--wk-text-muted)]" aria-label="Messages settings">
-              <i className="ri-settings-3-line text-base" />
+            <Link to="/settings?section=Messages" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]" aria-label="Messages settings">
+              <WkIcon name="Settings" size={16} aria-hidden="true" />
             </Link>
-            <button type="button" onClick={() => setNewOpen(true)} disabled={!messagesAccess.can_start} className="wk-button wk-button-sm wk-button-primary disabled:opacity-45">
-              <i className="ri-edit-2-line" /> New message
+            <button type="button" onClick={() => setNewOpen(true)} disabled={!messagesAccess.can_start} aria-label="New message" className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)] disabled:opacity-45">
+              <WkIcon name="Edit" size={18} aria-hidden="true" /><span className="sr-only">New message</span>
             </button>
           </div>
         </div>
@@ -625,15 +644,15 @@ export default function MessagesPage() {
 
         <MessageSafetyState />
 
-        <div className="mb-3 grid grid-cols-4 gap-1 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-1.5 lg:max-w-[520px]">
+        <div data-wk-message-folders className="flex gap-1 overflow-x-auto border-b border-[var(--wk-border)] px-3 py-2 [scrollbar-width:none]">
           {FOLDERS.map((item) => (
             <button
               key={item.key}
               type="button"
               onClick={() => { setFolder(item.key); setSelectedId(null); setDetail(null); }}
-              className={`relative flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 text-[11px] font-black transition-colors ${folder === item.key ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"}`}
+              className={`relative flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition-colors ${folder === item.key ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]" : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"}`}
             >
-              <i className={`${item.icon} text-sm`} />
+              <WkIcon name={item.icon} size={14} aria-hidden="true" />
               <span>{item.label}</span>
               {unread[item.key] > 0 && (
                 <span className="min-w-5 rounded-full bg-[var(--wk-brand)] px-1.5 py-0.5 text-[9px] font-black text-[var(--wk-brand-on)]">{unread[item.key]}</span>
@@ -642,21 +661,23 @@ export default function MessagesPage() {
           ))}
         </div>
 
-        <div className="overflow-hidden rounded-[24px] border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-sm lg:grid lg:min-h-[650px] lg:grid-cols-[340px_minmax(0,1fr)]">
-          <section className={`${selectedId ? "hidden lg:block" : "block"} border-r-0 border-[var(--wk-divider)] lg:border-r`} aria-label={`${folder} conversations`}>
+
+            <div data-wk-message-search className="border-b border-[var(--wk-divider)] px-3 py-3">
+              <WkSearchField value={conversationQuery} onChange={setConversationQuery} ariaLabel="Search conversations" placeholder="Search messages" inputClassName="min-h-10 rounded-full border-transparent bg-[var(--wk-surface-raised)] text-[14px]" />
+            </div>
             {loadingList ? (
               <div className="space-y-2 p-3" aria-busy="true">
                 {[0, 1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-[var(--wk-surface-raised)]" />)}
               </div>
-            ) : conversations.length === 0 ? (
+            ) : visibleConversations.length === 0 ? (
               <div className="flex min-h-[360px] flex-col items-center justify-center px-8 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"><i className="ri-mail-line text-xl" /></div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"><WkIcon name="Mail" size={20} aria-hidden="true" /></div>
                 <h2 className="mt-4 text-[14px] font-black text-[var(--wk-text)]">Nothing here</h2>
-                <p className="mt-1 max-w-[240px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">This folder is quiet.</p>
+                <p className="mt-1 max-w-[240px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">{conversationQuery.trim() ? "No matching conversations." : "This folder is quiet."}</p>
               </div>
             ) : (
               <div className="divide-y divide-[var(--wk-divider)]">
-                {conversations.map((summary) => {
+                {visibleConversations.map((summary) => {
                   const name = messageDisplayName(summary.other_participant?.presentation);
                   const username = messageUsername(summary.other_participant?.presentation);
                   return (
@@ -664,18 +685,20 @@ export default function MessagesPage() {
                       key={summary.conversation_id}
                       type="button"
                       onClick={() => void openConversation(summary.conversation_id)}
-                      className={`flex w-full gap-3 px-4 py-4 text-left transition-colors hover:bg-[var(--wk-surface-raised)] ${selectedId === summary.conversation_id ? "bg-[var(--wk-brand-soft)]" : ""}`}
+                      aria-current={selectedId === summary.conversation_id ? "true" : undefined}
+                      data-wk-message-conversation
+                      className={`flex w-full items-center gap-3 border-l-[3px] border-transparent px-4 py-4 text-left transition-colors hover:bg-[var(--wk-surface-raised)] ${selectedId === summary.conversation_id ? "border-l-[var(--wk-brand)] bg-[var(--wk-surface-raised)]" : ""}`}
                     >
                       <Avatar summary={summary} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-3">
-                          <div className="truncate text-[13px] font-black text-[var(--wk-text)]">{name}</div>
+                          <div className="truncate text-[15px] font-bold text-[var(--wk-text)]">{name}</div>
                           <span className="shrink-0 text-[10px] font-bold text-[var(--wk-text-faint)]">{when(summary.last_activity_at)}</span>
                         </div>
                         {username && <div className="truncate text-[10px] font-bold text-[var(--wk-text-faint)]">@{username}</div>}
                         <div className="mt-1 flex items-center gap-2">
-                          <p className="min-w-0 flex-1 truncate text-[11px] text-[var(--wk-text-muted)]">{summary.latest_message?.body || "Message"}</p>
-                          {summary.unread_count > 0 && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--wk-brand)]" aria-label={`${summary.unread_count} unread`} />}
+                          <p className="min-w-0 flex-1 truncate text-[13px] text-[var(--wk-text-muted)]">{summary.latest_message?.body || "Message"}</p>
+                          {summary.unread_count > 0 && <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] px-1 text-[10px] font-bold text-[var(--wk-brand-on)]" aria-label={`${summary.unread_count} unread`}>{summary.unread_count > 99 ? "99+" : summary.unread_count}</span>}
                         </div>
                       </div>
                     </button>
@@ -685,33 +708,56 @@ export default function MessagesPage() {
             )}
           </section>
 
-          <section className={`${selectedId ? "block" : "hidden lg:flex"} min-w-0 flex-col`} aria-label="Conversation">
+          <section data-wk-message-thread data-wk-thread-selected={selectedId ? "true" : "false"} className={`${selectedId ? "flex" : "hidden lg:flex"} min-w-0 flex-col`} aria-label="Conversation">
             {!selectedId ? (
               <div className="flex min-h-[650px] flex-1 flex-col items-center justify-center px-8 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"><i className="ri-chat-3-line text-2xl" /></div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"><WkIcon name="MessageSquare" size={24} aria-hidden="true" /></div>
                 <h2 className="mt-4 text-[16px] font-black text-[var(--wk-text)]">Choose a conversation</h2>
-                <p className="mt-1 max-w-[300px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">Your conversations stay inside WAKILISHA Messages.</p>
+                <p className="mt-1 max-w-[300px] text-[11px] leading-relaxed text-[var(--wk-text-muted)]">Select a conversation to read your messages.</p>
               </div>
             ) : loadingDetail || !detail || !selectedSummary ? (
               <div className="min-h-[650px] flex-1 animate-pulse bg-[var(--wk-surface-raised)]/30" aria-busy="true" />
             ) : (
               <>
-                <header className="flex items-center gap-3 border-b border-[var(--wk-divider)] px-3 py-3 sm:px-5">
-                  <button type="button" onClick={() => { setSelectedId(null); setDetail(null); }} className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] lg:hidden" aria-label="Back to conversations"><i className="ri-arrow-left-line" /></button>
+                <header data-wk-message-thread-header className="flex min-h-14 items-center gap-3 border-b border-[var(--wk-divider)] px-4 py-2 sm:px-6">
+                  <button type="button" onClick={() => { setSelectedId(null); setDetail(null); }} className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] lg:hidden" aria-label="Back to conversations"><WkIcon name="ArrowLeft" size={18} aria-hidden="true" /></button>
                   <Avatar summary={selectedSummary} size="h-9 w-9" />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-black text-[var(--wk-text)]">{messageDisplayName(selectedSummary.other_participant?.presentation)}</div>
-                    <div className="text-[10px] font-bold tracking-[0.12em] text-[var(--wk-text-faint)]">{detail.conversation.security_classification}</div>
+                    <div className="truncate text-[15px] font-bold text-[var(--wk-text)]">{messageDisplayName(selectedSummary.other_participant?.presentation)}</div>
+                    <div className="text-[11px] font-medium leading-relaxed text-[var(--wk-text-muted)]">{messageUsername(selectedSummary.other_participant?.presentation) ? `@${messageUsername(selectedSummary.other_participant?.presentation)}` : "Private conversation"}</div>
                   </div>
                   {detail.conversation.first_contact_state !== "pending" && selectedSummary.other_participant?.person_resource_id && (
-                    <button
-                      type="button"
-                      onClick={() => void revokeMessageSenderApproval(selectedSummary.other_participant!.person_resource_id).catch((err) => setError(err instanceof Error ? err.message : "Could not revoke approval."))}
-                      className="hidden rounded-full border border-[var(--wk-border)] px-3 py-2 text-[10px] font-black text-[var(--wk-text-muted)] sm:block"
-                      title="This revokes future Inbox approval. It does not silently delete this Conversation."
+                    <div
+                      className="relative shrink-0"
+                      onKeyDown={(event) => { if (event.key === "Escape") setThreadActionsOpen(false); }}
+                      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setThreadActionsOpen(false); }}
                     >
-                      Revoke future approval
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setThreadActionsOpen((current) => !current)}
+                        aria-label="Conversation actions"
+                        aria-expanded={threadActionsOpen}
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
+                      >
+                        <WkIcon name="MoreVertical" size={19} aria-hidden="true" />
+                      </button>
+                      {threadActionsOpen ? (
+                        <div role="menu" className="absolute right-0 top-11 z-30 w-[230px] rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2 shadow-xl">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setThreadActionsOpen(false);
+                              void revokeMessageSenderApproval(selectedSummary.other_participant!.person_resource_id).catch((err) => setError(err instanceof Error ? err.message : "Could not revoke approval."));
+                            }}
+                            className="w-full rounded-lg px-3 py-2.5 text-left text-[12px] font-medium text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]"
+                            title="This revokes future Inbox approval. It does not delete this conversation."
+                          >
+                            Revoke future approval
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   )}
                 </header>
 
@@ -724,17 +770,31 @@ export default function MessagesPage() {
                   </div>
                 )}
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-6">
-                  <div className="mx-auto flex max-w-[760px] flex-col gap-3">
-                    {[...detail.messages].reverse().map((message) => {
+                <div data-wk-message-history className="min-h-0 flex-1 overflow-y-auto px-3 py-6 sm:px-6">
+                  <div className="mx-auto flex max-w-[760px] flex-col gap-3.5">
+                    {[...detail.messages].reverse().map((message, index, orderedMessages) => {
                       const otherId = selectedSummary.other_participant?.person_resource_id;
                       const mine = Boolean(otherId && message.sender_person_resource_id !== otherId);
+                      const lastOutgoing = mine && !orderedMessages.slice(index + 1).some(
+                        (later) => later.sender_person_resource_id !== otherId,
+                      );
+                      const day = new Date(message.accepted_at);
+                      const previous = index > 0 ? new Date(orderedMessages[index - 1]!.accepted_at) : null;
+                      const startsDay = !previous || day.toDateString() !== previous.toDateString();
                       return (
-                        <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[82%] rounded-2xl px-4 py-3 sm:max-w-[70%] ${mine ? "rounded-br-md bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "rounded-bl-md bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
-                            <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">{message.body}</p>
+                        <div key={message.id} className="flex w-full flex-col">
+                          {startsDay && !Number.isNaN(day.getTime()) ? (
+                            <time dateTime={message.accepted_at} className="my-3 text-center text-[11px] font-medium text-[var(--wk-text-muted)]">
+                              {day.toDateString() === new Date().toDateString()
+                                ? "Today"
+                                : day.toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
+                            </time>
+                          ) : null}
+                          <div className={`flex w-full ${mine ? "justify-end" : "justify-start"}`}>
+                          <div data-wk-message-bubble data-message-owner={mine ? "self" : "other"} className={`max-w-[85%] rounded-[18px] px-4 py-3 sm:max-w-[76%] ${mine ? "rounded-br-[5px] bg-[var(--wk-brand)] text-[var(--wk-brand-on)]" : "rounded-bl-[5px] bg-[var(--wk-surface-raised)] text-[var(--wk-text)]"}`}>
+                            <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.55]">{message.body}</p>
                             {message.resource_references?.length > 0 && (
-                              <div className={`mt-2 space-y-2 border-t pt-2 ${mine ? "border-white/20" : "border-[var(--wk-divider)]"}`}>
+                              <div data-wk-message-reference className={`mt-3 space-y-2 border-t pt-3 ${mine ? "border-black/15" : "border-[var(--wk-divider)]"}`}>
                                 {message.resource_references.map((reference) => (
                                   <GovernedResourceReferenceCard
                                     key={`${reference.presentation_kind}:${reference.resource_id}:${reference.resource_version_id ?? "resource"}`}
@@ -749,12 +809,15 @@ export default function MessagesPage() {
                                 ))}
                               </div>
                             )}
-                            <div className={`mt-1.5 flex items-center justify-end gap-2 text-[9px] font-bold ${mine ? "text-white/70" : "text-[var(--wk-text-faint)]"}`}>
+                            <div className={`mt-2 flex items-center justify-end gap-2 text-[10px] font-medium ${mine ? "text-[var(--wk-brand-on)]/70" : "text-[var(--wk-text-faint)]"}`}>
                               <span>{when(message.accepted_at)}</span>
-                              {mine && message.recipient_read_at && <span>· Read</span>}
                               {!mine && <MessageSafetyReportButton messageId={message.id} />}
                             </div>
                           </div>
+                          </div>
+                          {lastOutgoing && message.recipient_read_at ? (
+                            <span data-wk-message-receipt>Seen {when(message.recipient_read_at)}</span>
+                          ) : null}
                         </div>
                       );
                     })}
@@ -762,8 +825,8 @@ export default function MessagesPage() {
                 </div>
 
                 {detail.conversation.first_contact_state !== "pending" && messagesAccess.can_send && (
-                  <div className="border-t border-[var(--wk-divider)] p-3 sm:p-4">
-                    <div className="mx-auto flex max-w-[760px] items-end gap-2 rounded-[20px] border border-[var(--wk-border)] bg-[var(--wk-bg)] p-2 focus-within:border-[var(--wk-brand)]">
+                  <div data-wk-message-composer className="border-t border-[var(--wk-divider)] bg-[var(--wk-surface)] px-3 py-4 sm:px-5">
+                    <div className="mx-auto flex max-w-[760px] items-end gap-2 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] p-1.5 focus-within:border-[var(--wk-brand)]">
                       <textarea
                         value={composer}
                         onChange={(event) => setComposer(event.target.value)}
@@ -775,10 +838,10 @@ export default function MessagesPage() {
                         }}
                         rows={1}
                         maxLength={10000}
-                        placeholder="Write a message"
-                        className="max-h-32 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-[13px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
+                        placeholder="Message"
+                        className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-2 py-2 text-[16px] text-[var(--wk-text)] outline-none placeholder:text-[var(--wk-text-faint)]"
                       />
-                      <button type="button" onClick={() => void handleSend()} disabled={!composer.trim() || sending} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] disabled:opacity-40" aria-label="Send message"><i className="ri-send-plane-fill" /></button>
+                      <button type="button" onClick={() => void handleSend()} disabled={!composer.trim() || sending} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] disabled:opacity-40" aria-label="Send message"><WkIcon name="Send" size={18} aria-hidden="true" /></button>
                     </div>
                     <div className="mx-auto mt-2 flex max-w-[760px] justify-end gap-2">
                       {folder === "archived" ? (
@@ -828,7 +891,7 @@ export default function MessagesPage() {
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
                 aria-label="Close"
               >
-                <i className="ri-close-line" />
+                <WkIcon name="X" size={18} aria-hidden="true" />
               </button>
             </div>
 
@@ -839,14 +902,14 @@ export default function MessagesPage() {
                     {recipient.avatar_url ? <img src={recipient.avatar_url} alt="" className="h-full w-full object-cover" /> : <span className="font-black text-[var(--wk-brand)]">{recipient.display_name.slice(0, 1)}</span>}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-black text-[var(--wk-text)]">{recipient.display_name}</div>
+                    <div className="truncate text-[15px] font-bold text-[var(--wk-text)]">{recipient.display_name}</div>
                     {recipient.handle && <div className="truncate text-[10px] font-bold text-[var(--wk-text-faint)]">@{recipient.handle}</div>}
                   </div>
                   <button type="button" onClick={() => { setRecipient(null); setQuery(""); }} className="text-[11px] font-black text-[var(--wk-text-muted)]">Change</button>
                 </div>
               ) : (
                 <div className="relative">
-                  <i className="ri-search-line absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--wk-text-faint)]" />
+                  <WkIcon name="Search" size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--wk-text-faint)]" aria-hidden="true" />
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}

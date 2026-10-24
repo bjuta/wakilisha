@@ -106,7 +106,7 @@ export default function LabelDetail() {
         }}
       />
 
-      <section className="relative -mt-16 pt-16 flex min-h-[320px] items-end overflow-hidden md:min-h-[460px]">
+      <section className="relative mt-0 md:-mt-16 pt-16 flex min-h-[320px] items-end overflow-hidden md:min-h-[460px]">
         {heroRosterImage ? (
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroRosterImage})` }} />
         ) : (

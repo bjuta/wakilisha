@@ -26,6 +26,7 @@ export function VideoCard({
       <VideoCardFrame
         title={video.title}
         thumbnail={video.thumbnail}
+        thumbnailFallbacks={video.thumbnailFallbacks}
         badge={video.platform}
         counter={total > 1 ? `${index + 1} / ${total}` : null}
       />

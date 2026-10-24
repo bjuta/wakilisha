@@ -2,225 +2,53 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const INDEX = "index.html";
-const ROOT_CSS = "src/index.css";
-const FONT_CSS = "src/styles/wakilisha-fonts.css";
-const FIELD_CSS = "src/pages/guides/field-guide/styles.css";
-const MANIFEST =
-  "public/assets/fonts/wakilisha-font-manifest.json";
-
-const index = fs.readFileSync(INDEX, "utf8");
-const rootCss = fs.readFileSync(ROOT_CSS, "utf8");
-const fontCss = fs.readFileSync(FONT_CSS, "utf8");
-const fieldCss = fs.readFileSync(FIELD_CSS, "utf8");
-const manifest = JSON.parse(
-  fs.readFileSync(MANIFEST, "utf8"),
-);
-
-const runtimeFiles = [];
-
-function walk(current) {
-  for (const entry of fs.readdirSync(current, {
-    withFileTypes: true,
-  })) {
-    const full = path.join(current, entry.name);
-
-    if (entry.isDirectory()) {
-      walk(full);
-      continue;
-    }
-
-    if (
-      entry.isFile()
-      && [
-        ".css",
-        ".html",
-        ".js",
-        ".jsx",
-        ".ts",
-        ".tsx",
-      ].includes(path.extname(entry.name))
-    ) {
-      runtimeFiles.push(full);
-    }
-  }
+const fail=(text)=>{console.error("Workbook font delivery audit failed: "+text);process.exit(1);};
+const read=(file)=>fs.readFileSync(file,"utf8");
+const index=read("index.html");
+const root=read("src/index.css");
+const css=read("src/styles/wakilisha-workbook-fonts.css");
+const field=read("src/pages/guides/field-guide/styles.css");
+const source=read("src/design-system/wakilisha.tokens.css");
+const distributed=read("packages/design-system/src/wakilisha.tokens.css");
+const manifest=JSON.parse(read("public/assets/fonts/wakilisha-font-manifest.json"));
+if(source!==distributed)fail("source and distributed design tokens diverge");
+if(!root.includes('@import "./styles/wakilisha-workbook-fonts.css";')||
+ root.includes("wakilisha-fonts.css")||root.includes("mobile-v5.css")||
+ root.includes("mobile-ch53-75.css"))fail("retired stylesheet still imported");
+if(!index.includes("font-src 'self'")||!index.includes("style-src 'self'")||
+ /fonts.googleapis.com|fonts.gstatic.com/.test(index))fail("CSP or external font regression");
+if(field.includes("@font-face"))fail("obsolete field guide font declaration");
+const actualPreloads=[...index.matchAll(/rel="preload" href="([^"]+)" as="font" type="font\/woff2" crossorigin/g)].map(x=>x[1]);
+if(actualPreloads.length!==1||actualPreloads[0]!==manifest.root_preload||
+ manifest.root_preload!=="/assets/fonts/workbook/figtree-latin.woff2")fail("root preload authority mismatch");
+if(manifest.schema!==2||manifest.assets.length!==6||manifest.faces.length!==2)fail("unrecognized Workbook font manifest");
+const allowed=new Map([["/assets/fonts/workbook/figtree-latin.woff2","8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928"],["/assets/fonts/workbook/figtree-latin-ext.woff2","f153aa07c1b16fbb12391c2512860c97819a0a9fd014f338b2b3f12496479d13"],["/assets/fonts/workbook/plexmono-400-latin.woff2","c36f509c0a8f9f85f29cb44bc8701d8a9e0b14c499e77a884f789ead7093a7ac"],["/assets/fonts/workbook/plexmono-400-latin-ext.woff2","f1050dc5317b43434c0aeda599d4624c774ffc162e87a8cf204b949b6a85816d"],["/assets/fonts/workbook/plexmono-500-latin.woff2","a76f53ca6612e7b3828eec2311098675b7f9849ae4169a8bcef6302aec02a6c0"],["/assets/fonts/workbook/plexmono-500-latin-ext.woff2","77f03e26f981c582bdba3a7abed4baa2d3149211c01366bb3ab3ba7622ec4ae5"]]);
+for(const asset of manifest.assets){
+ if(!allowed.has(asset.file)||allowed.get(asset.file)!==asset.sha256)fail("font manifest not source-verified: "+asset.file);
+ const disk=path.join("public",asset.file.slice(1));if(!fs.existsSync(disk))fail("font missing: "+disk);
+ const bytes=fs.readFileSync(disk);
+ if(bytes.toString("ascii",0,4)!=="wOF2"||
+  crypto.createHash("sha256").update(bytes).digest("hex")!==asset.sha256)fail("font bytes not authentic: "+disk);
+ if(!css.includes(asset.file))fail("font not declared: "+asset.file);
 }
-
-walk("src");
-runtimeFiles.push(INDEX);
-
-for (const file of runtimeFiles) {
-  const source = fs.readFileSync(file, "utf8");
-
-  for (const host of [
-    "fonts.googleapis.com",
-    "fonts.gstatic.com",
-  ]) {
-    if (source.includes(host)) {
-      console.error(
-        `Font delivery audit failed: ${host} remains in ${file}`,
-      );
-      process.exit(1);
-    }
-  }
+for(const file of manifest.licences){
+ const disk=path.join("public",file.slice(1));
+ if(!/SIL OPEN FONT LICENSE/i.test(read(disk)))fail("font license missing: "+file);
 }
-
-const fontImport =
-  '@import "./styles/wakilisha-fonts.css";';
-
-if (
-  rootCss.split(fontImport).length - 1
-  !== 1
-) {
-  console.error(
-    "Font delivery audit failed: root local font CSS import must exist exactly once.",
-  );
-  process.exit(1);
+for(const value of ["--wk-font-body:'Figtree'","--wk-font-mono:'IBM Plex Mono'","--wk-brand:#85C441"]){
+ if(!source.includes(value))fail("Workbook token missing: "+value);
 }
-
-if (
-  !fontCss.includes("@font-face")
-  || fontCss.includes("https://")
-) {
-  console.error(
-    "Font delivery audit failed: local root font CSS is missing faces or contains external URLs.",
-  );
-  process.exit(1);
+for(const file of fs.readdirSync("public/assets/fonts")){
+ if(/^wk-font-[a-f\d]+\.woff2$/.test(file))fail("retired design font remains: "+file);
 }
-
-if (
-  !fieldCss.includes("@font-face")
-  || !fieldCss.includes("Cormorant Garamond")
-  || fieldCss.includes("@import url(")
-) {
-  console.error(
-    "Font delivery audit failed: Field Guide Cormorant authority is not route-local.",
-  );
-  process.exit(1);
+const forbidden=new RegExp("\\b(DM Sans|DM Mono|Cormorant Garamond)\\b|wk-font-[a-f0-9]{16}\\.woff2");
+function scan(dir){
+ for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+  const full=path.join(dir,entry.name);
+  if(entry.isDirectory())scan(full);
+  else if(/\.(css|tsx|jsx|ts|js)$/.test(entry.name)&&
+   forbidden.test(read(full)))fail("old font authority remains in runtime: "+full);
+ }
 }
-
-if (
-  index.includes("fonts.googleapis.com")
-  || index.includes("fonts.gstatic.com")
-) {
-  console.error(
-    "Font delivery audit failed: Google font hosts remain in index.html/CSP.",
-  );
-  process.exit(1);
-}
-
-if (
-  !index.includes("font-src 'self'")
-  || !index.includes("style-src 'self'")
-) {
-  console.error(
-    "Font delivery audit failed: local CSP authority is missing.",
-  );
-  process.exit(1);
-}
-
-const expectedFamilies = new Set([
-  "Inter",
-  "DM Sans",
-  "DM Mono",
-  "Cormorant Garamond",
-]);
-
-const actualFamilies = new Set(
-  manifest.faces.map((face) => face.family),
-);
-
-for (const family of expectedFamilies) {
-  if (!actualFamilies.has(family)) {
-    console.error(
-      `Font delivery audit failed: manifest missing ${family}.`,
-    );
-    process.exit(1);
-  }
-}
-
-if (
-  !Array.isArray(manifest.preloads)
-  || manifest.preloads.length !== 2
-) {
-  console.error(
-    "Font delivery audit failed: expected exactly two critical root font preloads.",
-  );
-  process.exit(1);
-}
-
-for (const preload of manifest.preloads) {
-  const needle =
-    `rel="preload" href="${preload.file}" as="font" type="font/woff2" crossorigin`;
-
-  if (!index.includes(needle)) {
-    console.error(
-      `Font delivery audit failed: missing preload ${preload.file}.`,
-    );
-    process.exit(1);
-  }
-}
-
-for (const asset of manifest.assets) {
-  const relative = asset.file.replace(/^\//, "");
-  const file = path.join("public", relative);
-
-  if (!fs.existsSync(file)) {
-    console.error(
-      `Font delivery audit failed: missing ${file}.`,
-    );
-    process.exit(1);
-  }
-
-  const data = fs.readFileSync(file);
-  const digest = crypto
-    .createHash("sha256")
-    .update(data)
-    .digest("hex");
-
-  if (digest !== asset.sha256) {
-    console.error(
-      `Font delivery audit failed: SHA mismatch for ${file}.`,
-    );
-    process.exit(1);
-  }
-
-  if (data.byteLength !== asset.bytes) {
-    console.error(
-      `Font delivery audit failed: byte-size mismatch for ${file}.`,
-    );
-    process.exit(1);
-  }
-
-  if (data.subarray(0, 4).toString("ascii") !== "wOF2") {
-    console.error(
-      `Font delivery audit failed: ${file} is not WOFF2.`,
-    );
-    process.exit(1);
-  }
-}
-
-for (const file of [
-  "public/assets/fonts/licenses/INTER-OFL.txt",
-  "public/assets/fonts/licenses/DM-SANS-OFL.txt",
-  "public/assets/fonts/licenses/DM-MONO-OFL.txt",
-  "public/assets/fonts/licenses/CORMORANT-OFL.txt",
-]) {
-  const license = fs.readFileSync(file, "utf8");
-
-  if (!/SIL OPEN FONT LICENSE/i.test(license)) {
-    console.error(
-      `Font delivery audit failed: invalid license sidecar ${file}.`,
-    );
-    process.exit(1);
-  }
-}
-
-const totalBytes = manifest.assets.reduce(
-  (sum, asset) => sum + asset.bytes,
-  0,
-);
-
-console.log(
-  `WAKILISHA_FONT_DELIVERY_AUDIT_PASS assets=${manifest.assets.length} bytes=${totalBytes} preloads=${manifest.preloads.length}`,
-);
+scan("src");
+console.log("WAKILISHA_FONT_DELIVERY_AUDIT_PASS Workbook-v4=6 legacy=0");

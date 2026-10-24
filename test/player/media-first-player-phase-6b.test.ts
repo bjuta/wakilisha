@@ -27,10 +27,6 @@ const responsiveShell = readFileSync(
   "src/components/mobile/ResponsiveAppLayout.tsx",
   "utf8",
 );
-const playerChrome = readFileSync(
-  "src/components/design-system/player/playerChrome.css",
-  "utf8",
-);
 const history = readFileSync(
   "src/services/listeningHistory.ts",
   "utf8",
@@ -77,7 +73,7 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(compact).not.toContain("AddToPlaylistButton");
     expect(compact).not.toContain("Connect Apple Music");
     expect(compact).not.toContain('>Full<');
-    expect(compact).not.toContain("Preview");
+    expect(compact).toContain("Preview");
   });
 
   it("makes provider acquisition contextual, late, and dismissible in the expanded player", () => {
@@ -119,14 +115,18 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(responsiveShell).toContain(
       'import(\n    "@/components/design-system/player/PlayerFullSurface"',
     );
-    expect(responsiveShell).toContain("<Suspense fallback={baseLayout}>");
+    expect(responsiveShell).toContain("<Suspense fallback={null}>");
+    expect(responsiveShell).toContain("data-wk-player-underlay");
+    expect(responsiveShell).toContain("data-wk-player-overlay");
+    expect(responsiveShell).toContain("ResizeObserver");
+    expect(responsiveShell).not.toContain("const layout = isFullPlayerOpen ? (");
     expect(responsiveShell).not.toContain(
       'from "@/components/design-system/player/PlayerFullSurface"',
     );
     expect(responsiveShell).toContain("isFullPlayerOpen");
     expect(full).toContain('data-wk-provider-media-host={mode}');
-    expect(playerChrome).toContain(".phn-miniplayer");
-    expect(playerChrome).toContain("display: none !important");
+    expect(responsiveShell).not.toContain("playerChrome.css");
+    expect(responsiveShell).not.toContain("phn-miniplayer");
   });
 
   it("counts full playback by availability rather than provider backend", () => {

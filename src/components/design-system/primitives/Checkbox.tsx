@@ -49,7 +49,7 @@ export function WkCheckbox({
       name={name}
       value={value}
       className={({ isDisabled, isFocusVisible }) =>
-        `inline-flex items-start gap-2.5 text-[13px] text-wk-text outline-none ${
+        `inline-flex min-h-11 items-center gap-2.5 text-[14px] text-wk-text outline-none ${
           isDisabled ? "cursor-not-allowed opacity-45" : "cursor-pointer"
         } ${isFocusVisible ? "rounded-lg ring-2 ring-wk-brand/20" : ""} ${className}`
       }
@@ -58,7 +58,7 @@ export function WkCheckbox({
         <>
           <span
             aria-hidden="true"
-            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+            className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors ${
               isSelected || isIndeterminate
                 ? "border-wk-brand bg-wk-brand text-wk-brand-on"
                 : "border-wk-border-strong bg-wk-surface text-transparent"

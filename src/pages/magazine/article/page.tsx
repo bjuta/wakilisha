@@ -1,4 +1,6 @@
+import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import "@/styles/wakilisha-magazine-38-44.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -9,6 +11,7 @@ import {
 } from "@/services/magazineArticles";
 
 import { transformReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
+import { extractPublishedReviewVerdict } from "@/utils/editorialRating";
 import { transformArtistShortcodes } from "@/utils/transformArtistShortcodes";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ArticleFloatHeader } from "./components/ArticleFloatHeader";
@@ -26,76 +29,14 @@ import { checkArticleScheduling } from "@/services/articles/articleAdminService"
 import { resolveTrackMarkers } from "./components/ArticleTrackEmbeds";
 import { transformTrackShortcodes } from "@/utils/transformTrackShortcodes";
 import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
-import { SharePopover } from "@/components/design-system/share/ShareSheet";
-import { getShareCounts, getTotalShareCount } from "@/services/shareTracking";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { CommunitySection } from "./components/CommunitySection";
 import { CommunityActionSheet } from "@/components/feature/community/CommunityActionSheet";
+import { ArticleEndCredits } from "./components/ArticleEndCredits";
 import { ArticlePreviewModeBanner } from "./components/ArticlePreviewModeBanner";
 
 /* Remove InlineMediaGallery — captions now render inline alongside their images */
-
-// ── Inline share count badge (reused in hero and bottom) ─────────────────
-
-function useArticleShareCount(pageUrl: string) {
-  const [totalShares, setTotalShares] = useState(0);
-
-  useEffect(() => {
-    if (!pageUrl) return;
-    let cancelled = false;
-    getShareCounts(pageUrl).then((counts) => {
-      if (cancelled) return;
-      setTotalShares(getTotalShareCount(counts));
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [pageUrl]);
-
-  return totalShares;
-}
-
-function ArticleBottomShare({ article, shareText, onComment }: { article: MagazineArticle; shareText: string; onComment?: () => void }) {
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
-  const totalShares = useArticleShareCount(pageUrl);
-
-  return (
-    <div className="rounded-2xl bg-[var(--wk-surface)] border border-[var(--wk-border)] p-6 lg:p-8 text-center">
-      <p className="text-[15px] font-bold text-[var(--wk-text)] mb-1">Enjoyed this piece?</p>
-      <p className="text-[13px] text-[var(--wk-text-muted)] mb-6">Share it with someone who cares about African creative life.</p>
-      <div className="relative inline-block">
-        <button
-          ref={buttonRef as React.RefObject<HTMLButtonElement>}
-          onClick={() => setPopoverOpen(!popoverOpen)}
-          className="inline-flex items-center gap-2 h-11 px-6 rounded-full bg-[var(--wk-brand)] text-white text-[14px] font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-        >
-          <i className="ri-share-forward-line text-[16px]" />
-          Share this article
-          {totalShares > 0 && (
-            <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-[6px] rounded-full bg-white/20 text-white text-[11px] font-bold">
-              {totalShares.toLocaleString()}
-            </span>
-          )}
-        </button>
-
-        <SharePopover
-          open={popoverOpen}
-          onClose={() => setPopoverOpen(false)}
-          item={{
-            title: article.title,
-            subtitle: article.dek,
-            url: pageUrl,
-            type: "article",
-            imageUrl: article.heroUrl,
-          }}
-          triggerRef={buttonRef as React.RefObject<HTMLElement>}
-          onComment={onComment}
-        />
-      </div>
-    </div>
-  );
-}
 
 function getPrerenderedArticleHeroSource(
   slug: string | undefined,
@@ -180,10 +121,10 @@ export default function ArticlePage() {
   const [related, setRelated] = useState<MagazineArticle[]>([]);
   const [relatedLoading, setRelatedLoading] = useState(true);
   const [scrolled, setScrolled] = useState(false);
-  const [copyDone, setCopyDone] = useState(false);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const lastScrollState = useRef(false);
   const rawContentHtml = useMemo(() => article?.contentHtml ?? "", [article?.contentHtml]);
+  const publishedVerdict = useMemo(() => extractPublishedReviewVerdict(rawContentHtml), [rawContentHtml]);
   const shortcodeMarked = useMemo(
     () => transformTrackShortcodes(transformReleaseShortcodes(transformArtistShortcodes(rawContentHtml))),
     [rawContentHtml]
@@ -310,12 +251,6 @@ export default function ArticlePage() {
     return () => { window.removeEventListener("scroll", onScroll); if (rafId !== null) cancelAnimationFrame(rafId); };
   }, []);
 
-  const handleNavCopy = () => {
-    navigator.clipboard?.writeText(window.location.href);
-    setCopyDone(true);
-    setTimeout(() => setCopyDone(false), 2500);
-  };
-
   const [communitySheetOpen, setCommunitySheetOpen] = useState(false);
 
   const scrollToCommunity = useCallback(() => {
@@ -325,9 +260,6 @@ export default function ArticlePage() {
     }
   }, []);
 
-  const shareText = article?.title ?? "";
-  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
-  const heroShareCount = useArticleShareCount(pageUrl);
 
   // Memoize community entities so useCommunityThread doesn't re-fetch on every scroll
   const communityEntity = useMemo(() => {
@@ -360,11 +292,7 @@ export default function ArticlePage() {
         <section
           key="article-hero-shell"
           data-wakilisha-article-loading-hero="true"
-          className="relative overflow-hidden"
-          style={{
-            height: "70vh",
-            minHeight: "480px",
-          }}
+          className="relative aspect-[3/2] overflow-hidden"
         >
           {prerenderedArticleHeroSource ? (
             <ResponsiveMediaImage
@@ -425,7 +353,7 @@ export default function ArticlePage() {
 
   return (
     <main className="min-h-screen bg-[var(--wk-bg)]">
-      <section key="article-hero-shell" className="relative overflow-hidden" style={{ height: "70vh", minHeight: "480px" }}>
+      <section data-wk-workbook-hero="article" key="article-hero-shell" className="relative flex aspect-[3/2] items-end justify-center overflow-hidden bg-[#0b0b0b]">
         {article.heroUrl ? (
           <ResponsiveMediaImage
             key="article-hero-media"
@@ -446,24 +374,11 @@ export default function ArticlePage() {
             name={article.title}
           />
         )}
-        <div className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between">
-          <Link to="/magazine" className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/85 hover:bg-black/45 transition-all whitespace-nowrap"><WkIcon name="ArrowLeft" size={13} />Magazine</Link>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCommunitySheetOpen(true)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/45 transition-all cursor-pointer whitespace-nowrap"
-            >
-              <i className="ri-more-2-line text-[16px]" />
-            </button>
-            <button onClick={handleNavCopy} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 backdrop-blur-sm px-3 py-2 text-[11px] font-bold text-white/80 hover:bg-black/45 transition-all cursor-pointer whitespace-nowrap">
-              <i className="ri-share-line" />{copyDone ? "Copied!" : "Share"}
-              {heroShareCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-[4px] rounded-full bg-white/20 text-white text-[10px] font-bold">
-                  {heroShareCount.toLocaleString()}
-                </span>
-              )}
-            </button>
-          </div>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-black/50 to-black/15" />
+        <div className="relative z-10 mx-auto max-w-[820px] px-6 pb-12 text-center text-[#f5f5f4]">
+          <p className="text-[11px] font-bold uppercase tracking-[.15em] text-[#85c441]">{article.section} · {article.readingTime} min read</p>
+          <h1 className="mx-auto mt-4 max-w-[17ch] text-[clamp(42px,5.5vw,72px)] font-extrabold leading-[.97] tracking-[-.055em]">{article.title}</h1>
+          {article.dek && <p className="mx-auto mt-5 max-w-[60ch] text-[16px] leading-[1.55] text-white/80">{article.dek}</p>}
         </div>
       </section>
 
@@ -485,23 +400,60 @@ export default function ArticlePage() {
           url: typeof window !== "undefined" ? window.location.href : undefined,
         }}
       />
+      {publishedVerdict && article.author && !previewNonce ? (
+        <SchemaOrg data={{
+          "@type": "Review",
+          name: article.title,
+          author: { "@type": "Person", name: article.author },
+          itemReviewed: { "@type": "CreativeWork", name: publishedVerdict.subject },
+          reviewRating: {
+            "@type": "Rating", ratingValue: publishedVerdict.value,
+            bestRating: 5, worstRating: 1,
+          },
+          publisher: { "@type": "Organization", name: "WAKILISHA" },
+          datePublished: article.date,
+        }} />
+      ) : null}
       <div className="article-progress" ref={progressBarRef}><span style={{ transform: "scaleX(0)" }} /></div>
       <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-full pointer-events-none"} bg-[var(--wk-bg)]/95 backdrop-blur-md border-b border-[var(--wk-border)]`}>
-        <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center gap-4"><Link to="/magazine" className="flex items-center gap-1.5 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap shrink-0"><WkIcon name="ArrowLeft" size={14} />Magazine</Link><div className="h-4 w-px bg-[var(--wk-border)] shrink-0" /><h2 className="text-[13px] font-bold text-[var(--wk-text)] flex-1 min-w-0 truncate">{article.title}</h2><button onClick={handleNavCopy} className="ml-auto shrink-0 h-8 px-3 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)] text-[11px] font-semibold text-[var(--wk-text-soft)] hover:border-[var(--wk-brand)] hover:text-[var(--wk-brand)] transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"><i className="ri-link-m" />{copyDone ? "Copied!" : "Share"}</button></div>
+        <div className="max-w-[1180px] mx-auto px-6 h-14 flex items-center gap-4"><Link to="/magazine" className="flex items-center gap-1.5 text-[12px] font-bold text-[var(--wk-text-muted)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap shrink-0"><WkIcon name="ArrowLeft" size={14} />Magazine</Link><div className="h-4 w-px bg-[var(--wk-border)] shrink-0" /><h2 className="text-[13px] font-bold text-[var(--wk-text)] flex-1 min-w-0 truncate">{article.title}</h2></div>
       </div>
 
 
 
-      <div className="relative z-10 rounded-t-[28px] bg-[var(--wk-bg)]" style={{ marginTop: "-64px", boxShadow: "0 -4px 32px -8px rgba(0,0,0,0.10), 0 4px 16px -4px rgba(0,0,0,0.06)" }}>
-        <ArticleFloatHeader article={article} />
-        <div className="max-w-[740px] mx-auto px-6 lg:px-8"><div className="h-px bg-[var(--wk-border)] mb-10" /></div>
-        <article className="max-w-[740px] mx-auto px-6 lg:px-8 pb-12">
-          <ArticleContentRenderer segments={displaySegments} videos={videoEmbeds} releases={finalReleases} artists={artistEmbeds} tracks={trackEmbeds} articleSlug={article.slug} />
-        </article>
-        <div className="max-w-[740px] mx-auto px-6 lg:px-8 pb-16">
+      <div data-wk-article-category={article.section.trim().toLowerCase()}
+        className="wk-workbook-article-paper relative z-10">
+        <div className="wk-reference-article-columns mx-auto grid w-full max-w-[1260px] gap-8 px-5 pt-9 lg:grid-cols-[190px_minmax(0,680px)_190px] lg:gap-10 lg:px-8">
+          <ArticleFloatHeader article={article} actionsOpen={communitySheetOpen} onOpenActions={() => setCommunitySheetOpen(true)} />
+          <article className="min-w-0 pb-12">
+            <ArticleContentRenderer segments={displaySegments} videos={videoEmbeds} releases={finalReleases} artists={artistEmbeds} tracks={trackEmbeds} articleSlug={article.slug} />
+          </article>
+          <aside className="hidden self-start lg:block" aria-label="People in this story">
+            {artistEmbeds.length > 0 && (
+              <>
+                <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[.14em] text-[var(--wk-text-muted)]">In this story</h2>
+                <div className="space-y-4">
+                  {artistEmbeds.slice(0,6).map((artist) => (
+                    <Link key={artist.slug} to={`/artists/${artist.slug}`} className="flex items-center gap-2.5 text-[13px] font-semibold text-[var(--wk-text)] hover:text-[var(--wk-brand)]">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)]">{artist.name.charAt(0)}</span>
+                      <span className="line-clamp-2">{artist.name}</span>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+          </aside>
+        </div>
+        <div className="mx-auto max-w-[740px] px-6 pb-16 lg:px-8">
           {article.categories?.length > 0 && <TagBlock label="Categories" items={article.categories} basePath="/categories" />}
           {article.tags?.length > 0 && <TagBlock label="Topics" items={article.tags} basePath="/tags" />}
-          <ArticleBottomShare article={article} shareText={shareText} onComment={scrollToCommunity} />
+          <div className="pt-3">
+            <ArticleEndCredits
+              article={article}
+              actionsOpen={communitySheetOpen}
+              onOpenActions={() => setCommunitySheetOpen(true)}
+            />
+          </div>
         </div>
 
         {communityEntity && (
@@ -523,8 +475,17 @@ export default function ArticlePage() {
         )}
       </div>
 
-      <ArticleRelated stories={related} loading={relatedLoading} />
-      <section className="bg-[var(--wk-surface)] border-t border-[var(--wk-border)] py-16 px-6 text-center"><div className="max-w-[480px] mx-auto"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--wk-brand)] mb-3">WAKILISHA Magazine</p><h3 className="text-[24px] lg:text-[28px] font-black tracking-[-0.035em] text-[var(--wk-text)] mb-6 leading-snug">Stories that move African creative life forward.</h3><Link to="/magazine" className="inline-flex items-center gap-2 rounded-full bg-[var(--wk-brand)] text-[var(--wk-brand-on)] px-7 py-3.5 text-[14px] font-black transition-all hover:-translate-y-0.5 whitespace-nowrap">Back to Magazine<WkIcon name="ArrowRight" size={16} /></Link></div></section>
+      <ArticleRelated stories={related.filter((item) => item.slug !== article.slug)} loading={relatedLoading} />
+      <div data-wk-article-newsletter className="mx-auto w-full max-w-[780px] border-t border-[var(--wk-border)] px-5 py-12 sm:px-8">
+        <NewsletterSubscribe
+          variant="default"
+          formId="article-newsletter"
+          headline="Read with us"
+          description="Get new stories and charts in your inbox."
+          contextFields={{ wk_page_type: "article", wk_source_section: "article_footer" }}
+        />
+      </div>
+
     </main>
   );
 }

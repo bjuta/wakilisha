@@ -1,6 +1,7 @@
 import {
   readFileSync,
 } from "node:fs";
+import { visibleWakilishaNavigation } from "@/components/navigation/wakilishaNavigation";
 import {
   describe,
   expect,
@@ -111,7 +112,7 @@ const mobileAppLayout =
 
 const mobileChromeCss =
   readFileSync(
-    "src/styles/wakilisha-mobile-ch53-75.css",
+    "src/styles/wakilisha-mobile-workbook-v4.css",
     "utf8",
   );
 
@@ -985,9 +986,9 @@ describe(
             'to="/following"',
           );
 
-        expect(mobileAppLayout)
+        expect(readFileSync("src/components/navigation/wakilishaNavigation.ts", "utf8"))
           .toContain(
-            '{ label: "Following", to: "/following", icon: "UserPlus" }',
+            '{ label: "Following", to: "/following", icon: "Heart", audience: "signed-in" }',
           );
       },
     );
@@ -1042,7 +1043,7 @@ describe(
 
         expect(followingFeedPage)
           .toContain(
-            "What’s moving through your circle.",
+            "New work from people you follow will appear here.",
           );
 
         expect(followingFeedPage)
@@ -1277,7 +1278,7 @@ describe(
 
         expect(followingFeedPage)
           .toContain(
-            "getReactionGlyph",
+            'name="Heart"',
           );
 
         expect(followingFeedPage)
@@ -1312,7 +1313,7 @@ describe(
       () => {
         expect(followingFeedPage)
           .toContain(
-            "data-following-activity-anchors",
+            'aria-label="People in your feed"',
           );
 
         expect(followingFeedPage)
@@ -1408,90 +1409,35 @@ describe(
     );
 
     it(
-      "keeps secondary public destinations globally reachable on mobile",
+      "keeps public places shared and private, secondary and legal routes reachable through You",
       () => {
-        expect(mobileAppLayout)
-          .toContain(
-            "const MORE_LINKS",
-          );
+        const navigation = readFileSync("src/components/navigation/wakilishaNavigation.ts", "utf8");
+        const desktop = readFileSync("src/components/music/MusicDesktopShell.tsx", "utf8");
+        const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
+        const mobileTop = readFileSync("src/components/mobile/MobileTopBar.tsx", "utf8");
 
-        for (
-          const route of [
-            "/genres",
-            "/labels",
-            "/guides",
-            "/about",
-            "/contact",
-            "/faqs",
-            "/privacy",
-            "/terms",
-          ]
-        ) {
-          expect(mobileAppLayout)
-            .toContain(
-              `to: "${route}"`,
-            );
+        for (const route of [
+          "/music", "/video", "/audio", "/magazine", "/following",
+          "/artists", "/charts", "/credits",
+          "/shows", "/playlists", "/releases", "/genres", "/labels",
+          "/guides", "/field", "/about", "/contact", "/faqs",
+          "/privacy", "/terms",
+        ]) {
+          expect(navigation).toContain(`to: "${route}"`);
         }
-
-        expect(mobileAppLayout)
-          .toContain(
-            'aria-label="More"',
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "useScrollLock(moreOpen)",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "Appearance",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "SIGNED_IN_NAV",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "SIGNED_OUT_NAV",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            "prominent: true",
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            'className="phn-nav phn-nav--compact"',
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            '{ label: "Notifications", to: "/notifications", icon: "Bell" }',
-          );
-
-        expect(mobileAppLayout)
-          .toContain(
-            'to="/artists"',
-          );
-
-        expect(mobileAppLayout)
-          .not.toContain(
-            "<NotificationBell",
-          );
-
-        expect(mobileChromeCss)
-          .toContain(
-            "compact five-slot mobile nav",
-          );
-
-        expect(mobileChromeCss)
-          .toContain(
-            ".phn-nav-primary-core",
-          );
+        for (const route of ["/messages", "/notifications", "/artist-studio", "/profile", "/settings"]) {
+          expect(drawer).toContain(`to: "${route}"`);
+        }
+        expect(drawer).toContain("messagesAccess.visible");
+        expect(drawer).toContain("navigation.map");
+        expect(drawer).toContain("visibleWakilishaNavigation");
+        expect(desktop).toContain("<MobileTopBar />");
+        expect(desktop).not.toContain("<aside");
+        expect(mobileTop).toContain('aria-label="Open WAKILISHA menu"');
+        expect(mobileAppLayout).not.toContain("MobileBottomNav");
+        expect(mobileAppLayout).not.toContain("phn-nav");
+        expect(mobileChromeCss).not.toContain(".phn-nav-primary-core");
+        expect(mobileChromeCss).not.toContain(".phn-nav--compact");
       },
     );
 
@@ -1508,14 +1454,32 @@ describe(
             "const sectionBlockStories = stories.slice(10);",
           );
 
+        // The cover, picks, latest and category blocks stay disjoint.
+        // A selected section filters the bounded published set, including
+        // cover stories, rather than only the old latest subset.
         expect(mobileMagazine)
           .toContain(
-            "filteredLatest",
+            "selectedStories = useMemo",
           );
-
         expect(mobileMagazine)
           .toContain(
-            "Filter Stories",
+            'activeSection === "All" ? stories :',
+          );
+        expect(mobileMagazine)
+          .toContain(
+            '(story.section || "Article") === activeSection',
+          );
+        expect(mobileMagazine)
+          .toContain(
+            'aria-label="Magazine sections"',
+          );
+        expect(mobileMagazine)
+          .toContain(
+            'aria-pressed={activeSection === sec}',
+          );
+        expect(mobileMagazine)
+          .toContain(
+            'selectedStories.map((story)',
           );
 
         expect(mobileMagazine)
@@ -1545,7 +1509,7 @@ describe(
 
         expect(magazineCard)
           .toContain(
-            'className="line-clamp-3 text-[15px] font-black',
+            'className="line-clamp-3 text-[19px] font-bold',
           );
       },
     );
@@ -1813,50 +1777,17 @@ describe("public discovery final refinement regressions", () => {
   );
 
   it(
-    "keeps Home central while reusing the existing WAKILISHA thunderbolt",
+    "uses the shared Workbook navigation without a simulated mobile tab bar",
     () => {
-      const followingIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Following", to: "/following", icon: "UserPlus" }',
-        );
-
-      const chartsIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Charts", to: "/charts", icon: "BarChart3" }',
-        );
-
-      const homeIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Home", to: "/", icon: "Home", prominent: true }',
-        );
-
-      const artistsIndex =
-        mobileAppLayoutFinal.indexOf(
-          '{ label: "Artists", to: "/artists", icon: "Mic2" }',
-        );
-
-      expect(followingIndex)
-        .toBeGreaterThanOrEqual(0);
-
-      expect(followingIndex)
-        .toBeLessThan(
-          chartsIndex,
-        );
-
-      expect(chartsIndex)
-        .toBeLessThan(
-          homeIndex,
-        );
-
-      expect(homeIndex)
-        .toBeLessThan(
-          artistsIndex,
-        );
-
-      expect(mobileAppLayoutFinal)
-        .toContain(
-          "wakilisha-thunderbolt.png",
-        );
+      const canonical = readFileSync(
+        "src/components/navigation/wakilishaNavigation.ts", "utf8",
+      );
+      expect(canonical).toContain('{ label: "Home", to: "/", icon: "Home" }');
+      expect(canonical).toContain('{ label: "Following", to: "/following", icon: "Heart", audience: "signed-in" }');
+      expect(canonical).toContain('{ label: "Charts", to: "/charts", icon: "ChartNoAxesColumnIncreasing" }');
+      expect(mobileAppLayoutFinal).toContain('data-wk-workbook-mobile-shell="v4"');
+      expect(mobileAppLayoutFinal).not.toContain("MobileBottomNav");
+      expect(mobileAppLayoutFinal).not.toContain("wakilisha-thunderbolt.png");
     },
   );
 });
@@ -2034,4 +1965,32 @@ describe("chart edition collapsed-versus-expanded hierarchy regression", () => {
         );
     },
   );
+});
+
+describe("Viewer-aware universal navigation", () => {
+  const destinations = (signedIn: boolean, messagesVisible: boolean) =>
+    visibleWakilishaNavigation({ signedIn, messagesVisible })
+      .flatMap((group) => group.items.map((item) => item.to));
+
+  it("does not advertise private messaging or notifications to incognito visitors", () => {
+    const guest = destinations(false, false);
+    expect(guest).toContain("/magazine");
+    expect(guest).toContain("/artists");
+    expect(guest).not.toContain("/following");
+    expect(guest).not.toContain("/messages");
+    expect(guest).not.toContain("/notifications");
+    expect(destinations(false, true)).toEqual(guest);
+  });
+
+  it("keeps private notification and messaging actions in You, gated by access", () => {
+    expect(destinations(true, false)).toContain("/following");
+    expect(destinations(true, false)).not.toContain("/notifications");
+    expect(destinations(true, false)).not.toContain("/messages");
+    expect(destinations(true, true)).not.toContain("/messages");
+    const you = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
+    expect(you).toContain('to: "/notifications"');
+    expect(you).toContain('to: "/messages"');
+    expect(you).toContain("messagesAccess.visible");
+    expect(you).toContain("signedIn && !messagesAccess.loading");
+  });
 });

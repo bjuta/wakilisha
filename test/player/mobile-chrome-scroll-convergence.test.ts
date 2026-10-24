@@ -1,96 +1,53 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const layout = readFileSync(
-  "src/components/mobile/MobileAppLayout.tsx",
-  "utf8",
-);
+const layout = readFileSync("src/components/mobile/MobileAppLayout.tsx", "utf8");
+const header = readFileSync("src/components/mobile/MobileTopBar.tsx", "utf8");
+const drawer = readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8");
+const player = readFileSync("src/components/design-system/player/PlayerCompactSurface.tsx", "utf8");
 
-const topBar = readFileSync(
-  "src/components/mobile/MobileTopBar.tsx",
-  "utf8",
-);
-
-describe("Mobile chrome scroll convergence", () => {
-  it("owns one scroll-direction signal for the mobile chrome stack", () => {
-    expect(
-      layout.match(/useScrollDirection\(\)/g)?.length,
-    ).toBe(1);
-    expect(layout).toContain(
-      "const scrollChrome = useScrollDirection();",
-    );
-    expect(layout).toContain(
-      "<MobileTopBar",
-    );
-    expect(layout).toContain(
-      "scrollVisible={scrollChrome.topVisible}",
-    );
-    expect(layout).toContain(
-      "scrollVisible={scrollChrome.visible}",
-    );
+describe("Workbook v4 mobile shell and safe-area convergence", () => {
+  it("uses exactly one persistent app header and an accessible start-edge menu", () => {
+    expect(layout).toContain("<MobileTopBar");
+    expect(header).toContain('data-wk-mobile-app-header="v4"');
+    expect(header).toContain('aria-controls="wk-workbook-sidebar"');
+    expect(header).toContain('aria-label="Open WAKILISHA menu"');
+    expect(drawer).toContain('id="wk-workbook-sidebar"');
+    expect(drawer).toContain("navigation.map");
+    expect(drawer).toContain("useScrollLock(open)");
   });
 
-  it("keeps top chrome available at rest and on short pages", () => {
-    const scrollDirection = readFileSync(
-      "src/hooks/useScrollDirection.ts",
-      "utf8",
-    );
-
-    expect(scrollDirection).toContain(
-      "useState(true);",
-    );
-    expect(scrollDirection).toContain(
-      "if (y <= 32)",
-    );
-    expect(scrollDirection).toContain(
-      "setTopVisible(true);",
-    );
+  it("shows the one real header on upward scroll, hides on downward scroll, and adds no browser imitation", () => {
+    expect(layout).not.toContain("MobileBottomNav");
+    expect(layout).not.toContain("useScrollDirection()");
+    expect(header).not.toContain("useScrollDirection()");
+    expect(header).not.toContain("scrollVisible");
+    expect(header).toContain("fixed inset-x-0 top-0");
+    expect(header).toContain("bg-transparent");
+    expect(header).toContain("border-0 bg-transparent");
+    expect(header).toContain("drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]");
+    expect(header).not.toContain("bg-[var(--wk-surface)]");
+    expect(header).toContain("text-white");
+    expect(header).toContain("h-14");
+    expect(header).toContain('data-wk-mobile-header-visible={headerVisible ? "true" : "false"}');
+    expect(header).toContain('window.addEventListener("scroll", onScroll, { passive: true })');
+    expect(header).toContain('nextDirection < 0 && travelled >= 6');
+    expect(header).toContain('nextDirection > 0 && y > 96 && travelled >= 18');
+    expect(header).toContain('headerVisible ? "translate-y-0" : "-translate-y-full"');
+    expect(header).toContain("motion-reduce:transition-none");
+    expect(header).toContain("onFocusCapture");
   });
 
-  it("keeps top chrome transient while bottom navigation keeps the shared scroll signal", () => {
-    expect(layout).toContain(
-      "scrollChrome.topVisible",
-    );
-    expect(layout).toContain(
-      "scrollChrome.visible",
-    );
-    expect(layout).toContain(
-      "scrollVisible || moreOpen",
-    );
+  it("reserves only the canonical compact player above the bottom safe area", () => {
+    expect(layout).toContain("calc(84px + env(safe-area-inset-bottom))");
+    expect(player).toContain("calc(env(safe-area-inset-bottom) + 8px)");
+    expect(player).not.toContain("calc(52px + max(env(safe-area-inset-bottom)");
   });
 
-  it("keeps top Search out of persistent chrome while preserving drawer Search", () => {
-    expect(topBar).not.toContain(
-      'aria-label="Search"',
-    );
-    expect(topBar).not.toContain(
-      '<WkIcon name="Search"',
-    );
-    expect(topBar).toContain(
-      "NotificationBell",
-    );
-    expect(topBar).toContain(
-      "onSearch={() => setSearchOpen(true)}",
-    );
-  });
-
-  it("does not create another independent top-bar scroll authority", () => {
-    expect(topBar).not.toContain(
-      "useScrollDirection()",
-    );
-    expect(topBar).toContain(
-      "scrollVisible || searchOpen || accountOpen",
-    );
-  });
-
-  it("keeps top chrome out of content flow and leaves its middle empty", () => {
-    expect(topBar).toContain(
-      "pointer-events-none fixed inset-x-0 top-0",
-    );
-    expect(topBar).not.toContain("sectionLabel");
-    expect(topBar).not.toContain("{label}");
-    expect(topBar).not.toContain(
-      "left-1/2 top-1/2",
-    );
+  it("keeps Search and notification actions in real app controls", () => {
+    expect(header).toContain('aria-label="Search"');
+    expect(header).toContain("GlobalSearchSurface");
+    expect(header).not.toContain("NotificationBell");
+    expect(drawer).toContain("onSearch");
   });
 });

@@ -67,14 +67,14 @@ export function Modal({
         >
           {title ? (
             <div className="flex shrink-0 items-center justify-between border-b border-[var(--wk-border)] px-5 py-4">
-              <h2 className="min-w-0 text-[15px] font-bold text-[var(--wk-text)]">
+              <h2 className="min-w-0 text-[18px] font-bold text-[var(--wk-text)]">
                 {title}
               </h2>
               {showClose ? (
                 <Button
                   slot="close"
                   aria-label="Close"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] focus:outline-none focus-visible:ring-2 focus-visible:ring-wk-brand/20"
                 >
                   <i aria-hidden="true" className="ri-close-line" />
                 </Button>

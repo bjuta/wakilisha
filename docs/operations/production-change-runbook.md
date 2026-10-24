@@ -65,6 +65,26 @@ This rule is especially important when exact live hashes already prove that the 
 - Restore the previous frontend build when public delivery is responsible.
 - Never delete production evidence required to diagnose the incident.
 
+## 21 October 2026 public origin outage and recovery
+
+The 2026-10-21 06:58 UTC unattended Ubuntu upgrade restarted Nginx and
+systemd-resolved together. Nginx could not resolve the static Supabase
+hostname during its startup validation and remained stopped. Cloudflare
+returned HTTP 521 for all public pages while Supabase remained healthy.
+On 2026-10-22, restoring Nginx returned origin and public HTTPS to 200.
+
+Prevent recurrence by using a variable-based upstream and a location-local
+resolver for `/api/public/v1/search`, retaining the exact rewrite URI,
+query arguments, anonymous credential stripping, TLS SNI, and ETag contract.
+The bounded recovery drop-in is tracked at
+`ops/systemd/20-wakilisha-recovery.conf` and installed on the origin at
+`/etc/systemd/system/nginx.service.d/20-wakilisha-recovery.conf`.
+`Restart=on-failure` handles unexpected process failure but does not
+replace the DNS-safe configuration during a package-initiated restart.
+Do not disable unattended security upgrades. Back up the live snippet,
+validate any candidate configuration before reload, and verify local
+origin, public HTTPS, and the search API before closing this incident.
+
 ## Incident response
 
 1. Record the UTC start time, affected surface, request or correlation IDs, and observed impact.

@@ -1,4 +1,4 @@
--- Read-only forward 229/230/231 verifier. No fixtures, DML or hosted mutation.
+-- Read-only forward 229/230/231 anchor verifier; safe after later forward migrations. No DML.
 -- Run only AFTER CLI-minted migration 20261014134759 is installed.
 DO $wk_229_assert$
 DECLARE
@@ -9,7 +9,7 @@ BEGIN
  FROM supabase_migrations.schema_migrations;
  IF NOT ((n=229 AND v_head='20261014134759')
        OR (n=230 AND v_head='20261014182214')
-       OR (n=231 AND v_head='20261015091718'))
+       OR (n>=231 AND v_head>='20261015091718'))
    OR NOT EXISTS(SELECT 1 FROM supabase_migrations.schema_migrations
      WHERE version='20261014134759'
        AND name='mizizi_db02_observation_completion_authority_v1')
@@ -17,7 +17,7 @@ BEGIN
        SELECT 1 FROM supabase_migrations.schema_migrations
        WHERE version='20261014182214'
         AND name='mizizi_db02_prior_observation_replay_fence_v1'))
-   OR (n=231 AND NOT EXISTS(
+   OR (n>=231 AND NOT EXISTS(
        SELECT 1 FROM supabase_migrations.schema_migrations
        WHERE version='20261015091718'
          AND name='mizizi_registry_review_reader_rls_v1'))

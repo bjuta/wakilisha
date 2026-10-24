@@ -1,3 +1,5 @@
+import "@/styles/wakilisha-workbook-surface-fidelity.css";
+import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import {
   useCallback,
   useEffect,
@@ -21,10 +23,12 @@ import {
 import {
   getRelease,
   listArtists,
+  listGenres,
   listReleasesPaginated,
   releaseUrl,
   slugify,
   type PublicArtist,
+  type PublicGenre,
   type PublicRelease,
 } from "@/services/publicContent/client";
 import {
@@ -73,30 +77,51 @@ function MusicArtwork({
   src,
   alt,
   className = "",
+  fit = "cover",
+  loading = "lazy",
 }: {
   src?: string | null;
   alt: string;
   className?: string;
+  fit?: "cover" | "contain";
+  loading?: "lazy" | "eager";
 }) {
-  if (!src) {
-    return (
-      <div
-        className={`flex h-full w-full items-end bg-[radial-gradient(circle_at_25%_20%,rgba(112,255,70,0.22),transparent_36%),linear-gradient(145deg,#262626,#090909)] p-3 ${className}`}
-      >
-        <span className="text-[11px] font-black leading-tight text-[var(--wk-text)]/65">
-          {alt}
-        </span>
-      </div>
-    );
-  }
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const recorded = Boolean(src && loadedSrc === src && failedSrc !== src);
 
+  // Draw an honest source-labelled fallback from the first paint. Network
+  // stalls and broken Registry artwork must never leave an empty rectangle.
   return (
-    <img
-      src={src}
-      alt={alt}
-      loading="lazy"
-      className={`h-full w-full object-cover ${className}`}
-    />
+    <div
+      data-wk-music-artwork-state={recorded ? "recorded" : "fallback"}
+      className={`relative h-full w-full overflow-hidden ${className}`}
+    >
+      {!recorded && (
+        <div
+          data-wk-music-artwork-fallback
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#1B1B1B] p-3 text-center"
+        >
+          <WkIcon name="Music" size={23} className="text-white/65" />
+          {alt ? (
+            <span className="line-clamp-2 max-w-full break-words text-[11px] font-semibold leading-tight text-white/80">
+              {alt}
+            </span>
+          ) : null}
+        </div>
+      )}
+      {src && failedSrc !== src ? (
+        <img
+          src={src}
+          alt={alt}
+          loading={loading}
+          fetchPriority={loading === "eager" ? "high" : undefined}
+          onLoad={() => setLoadedSrc(src)}
+          onError={() => setFailedSrc(src)}
+          className={`absolute inset-0 h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${recorded ? "opacity-100" : "opacity-0"}`}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -112,7 +137,7 @@ function CompactRelease({
   busy: boolean;
 }) {
   return (
-    <article className="group flex min-w-[260px] flex-1 overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] transition hover:bg-[var(--wk-surface-strong)]">
+    <article className="group flex min-w-[272px] flex-1 overflow-hidden rounded-[16px] border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-colors hover:bg-[var(--wk-surface-raised)]">
       <PlayableArtwork
         label={release.title}
         onPlay={(event) => {
@@ -121,12 +146,13 @@ function CompactRelease({
         }}
         isPlaying={active}
         pending={busy}
-        className="h-[88px] w-[88px]"
+        className="aspect-square w-[100px] shrink-0"
         iconClassName="h-9 w-9 text-[15px]"
       >
         <MusicArtwork
           src={release.artworkUrl}
           alt=""
+          fit="contain"
           className="transition-transform duration-500 group-hover:scale-[1.04]"
         />
       </PlayableArtwork>
@@ -135,17 +161,17 @@ function CompactRelease({
         <div className="min-w-0 flex-1">
           <Link
             to={releaseUrl(release)}
-            className="block truncate text-[12px] font-black text-[var(--wk-text)] transition hover:text-[var(--wk-brand)]"
+            className="block line-clamp-2 text-[15px] font-bold leading-tight text-[var(--wk-text)] transition hover:text-[var(--wk-brand)]"
           >
             {release.title}
           </Link>
           <Link
             to={`/artists/${slugify(release.artist)}`}
-            className="mt-1 block truncate text-[10px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-text)]"
+            className="mt-1 block truncate text-[13px] font-medium text-[var(--wk-text-soft)] hover:text-[var(--wk-text)]"
           >
             {release.artist}
           </Link>
-          <p className="mt-1.5 truncate text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--wk-text-muted)]">
+          <p className="mt-1.5 truncate text-[12px] font-medium text-[var(--wk-text-muted)]">
             {release.releaseType || "Release"}
             {release.trackCount > 1
               ? ` · ${release.trackCount} tracks`
@@ -180,7 +206,7 @@ function EditorialArtistCard({
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/5" />
       <div className="absolute inset-x-0 bottom-0 p-4">
         {eyebrow ? (
-          <div className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
+          <div className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#B6EB79]">
             {eyebrow}
           </div>
         ) : null}
@@ -219,11 +245,12 @@ function PlaylistFeature({
           playlist.coverAltText ||
           playlist.title
         }
+        fit="contain"
         className="transition-transform duration-700 group-hover:scale-[1.035]"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/5" />
       <div className="absolute inset-x-0 bottom-0 p-4">
-        <div className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)]">
+        <div className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#B6EB79]">
           {playlist.curatorLabel ||
             "WAKILISHA"}
         </div>
@@ -247,7 +274,7 @@ function ChartMiniList({
     return (
       <Link
         to="/charts"
-        className="flex h-[260px] items-center justify-center rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-5 text-center text-[11px] font-semibold text-[var(--wk-text-muted)] transition hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text-soft)]"
+        className="flex min-h-[112px] items-center justify-center rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-5 text-center text-[14px] font-semibold text-[var(--wk-text)] transition hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)]"
       >
         Open the latest WAKILISHA charts
       </Link>
@@ -256,25 +283,26 @@ function ChartMiniList({
 
   return (
     <div className="space-y-2">
-      {entries.slice(0, 3).map((entry) => (
+      {entries.slice(0, 10).map((entry) => (
         <div
           key={entry.id}
-          className="flex items-center gap-2 rounded-lg border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2"
+          className="flex min-h-[62px] items-center gap-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-2.5 transition-colors hover:bg-[var(--wk-surface-raised)]"
         >
-          <div className="w-5 shrink-0 text-center text-[12px] font-black text-[var(--wk-text-muted)]">
+          <div className="w-6 shrink-0 text-center text-[15px] font-bold text-[var(--wk-text-muted)]">
             {entry.rank}
           </div>
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
+          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
             <MusicArtwork
               src={entry.artworkUrl}
               alt={entry.trackTitle}
+              fit="contain"
             />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[10px] font-black text-[var(--wk-text)]">
+            <div className="truncate text-[13px] font-bold text-[var(--wk-text)]">
               {entry.trackTitle}
             </div>
-            <div className="mt-0.5 truncate text-[9px] font-semibold text-[var(--wk-text-soft)]">
+            <div className="mt-0.5 truncate text-[11px] font-medium text-[var(--wk-text-soft)]">
               {entry.artistNames.join(", ")}
             </div>
           </div>
@@ -305,7 +333,7 @@ function FollowingMiniList({
     return (
       <Link
         to="/following"
-        className="flex h-[260px] flex-col items-center justify-center rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-5 text-center"
+        className="flex min-h-[150px] flex-col items-center justify-center rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-5 text-center"
       >
         <WkIcon
           name="Users"
@@ -313,10 +341,10 @@ function FollowingMiniList({
           className="mb-3 text-[var(--wk-brand)]"
         />
         <div className="text-[11px] font-black text-[var(--wk-text)]">
-          Your people, here.
+          No new music yet.
         </div>
         <p className="mt-2 max-w-[24ch] text-[10px] font-medium leading-relaxed text-[var(--wk-text-muted)]">
-          Follow Artists and people to bring their new music and Posts into this space.
+          Follow artists and people to see what they release.
         </p>
       </Link>
     );
@@ -359,77 +387,6 @@ function FollowingMiniList({
   );
 }
 
-function DeepCard({
-  to,
-  title,
-  body,
-  icon,
-  image,
-}: {
-  to: string;
-  title: string;
-  body: string;
-  icon: Parameters<typeof WkIcon>[0]["name"];
-  image?: string | null;
-}) {
-  return (
-    <Link
-      to={to}
-      className="group relative min-h-[118px] overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4"
-    >
-      {image ? (
-        <>
-          <MusicArtwork
-            src={image}
-            alt=""
-            className="absolute inset-0 opacity-45 transition-transform duration-700 group-hover:scale-[1.05]"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/76 to-black/38" />
-        </>
-      ) : null}
-
-      <div className="relative">
-        <WkIcon
-          name={icon}
-          size={15}
-          className="mb-4 text-[var(--wk-brand)]"
-        />
-        <h3
-          className={[
-            "text-[13px] font-black",
-            image
-              ? "text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.44)]"
-              : "text-[var(--wk-text)]",
-          ].join(" ")}
-        >
-          {title}
-        </h3>
-        <p
-          className={[
-            "mt-1 text-[9px] font-semibold",
-            image
-              ? "text-white/76 drop-shadow-[0_1px_5px_rgba(0,0,0,0.4)]"
-              : "text-[var(--wk-text-muted)]",
-          ].join(" ")}
-        >
-          {body}
-        </p>
-      </div>
-
-      <WkIcon
-        name="ChevronRight"
-        size={15}
-        className={[
-          "absolute bottom-4 right-4 transition-transform group-hover:translate-x-0.5",
-          image
-            ? "text-white/68"
-            : "text-[var(--wk-text-muted)]",
-        ].join(" ")}
-      />
-    </Link>
-  );
-}
-
 async function loadChartEntries() {
   try {
     const familiesResult =
@@ -460,7 +417,7 @@ async function loadChartEntries() {
         if (latest.data.entries.length) {
           return latest.data.entries.slice(
             0,
-            3,
+            10,
           );
         }
       } catch {
@@ -494,6 +451,7 @@ export default function MusicDiscoveryPage() {
     >([]);
   const [chartEntries, setChartEntries] =
     useState<ChartEditionEntry[]>([]);
+  const [genres, setGenres] = useState<PublicGenre[]>([]);
   const [followingItems, setFollowingItems] =
     useState<FollowingFeedItem[]>([]);
   const [loading, setLoading] =
@@ -515,6 +473,7 @@ export default function MusicDiscoveryPage() {
         playlistResult,
         chartResult,
         followingResult,
+        genreResult,
       ] =
         await Promise.allSettled([
           listReleasesPaginated({
@@ -530,6 +489,7 @@ export default function MusicDiscoveryPage() {
           getFollowingFeed({
             limit: 3,
           }),
+          listGenres(),
         ]);
 
       if (cancelled) return;
@@ -577,6 +537,10 @@ export default function MusicDiscoveryPage() {
         setFollowingItems(
           followingResult.value.items,
         );
+      }
+
+      if (genreResult.status === "fulfilled") {
+        setGenres(genreResult.value.filter((genre) => genre.name && genre.slug));
       }
 
       setLoading(false);
@@ -801,7 +765,7 @@ export default function MusicDiscoveryPage() {
     );
 
   return (
-    <div className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
+    <div data-wk-workbook-screen="music" className="min-h-screen bg-[var(--wk-bg)] text-[var(--wk-text)]">
       <style>{`
         .wk-music-hero {
           --wk-text: #ffffff;
@@ -814,23 +778,24 @@ export default function MusicDiscoveryPage() {
         }
       `}</style>
       <main>
-            <section className="wk-music-hero relative min-h-[430px] overflow-hidden border-b border-[var(--wk-border)] bg-[#0a0a0a]">
+            <section className="wk-music-hero relative min-h-[430px] overflow-hidden rounded-[24px] max-md:rounded-none bg-[#0a0a0a]">
               {hero ? (
                 <>
                   <div className="absolute inset-0">
                     <MusicArtwork
                       src={hero.artworkUrl}
                       alt={`${hero.title} artwork`}
+                      loading="eager"
                       className="object-cover object-center opacity-75"
                     />
                     <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,4,0.98)_0%,rgba(4,4,4,0.86)_29%,rgba(4,4,4,0.18)_67%,rgba(4,4,4,0.62)_100%)]" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
                   </div>
 
-                  <div className="relative grid min-h-[430px] gap-8 px-5 py-8 sm:px-8 xl:grid-cols-[minmax(0,1fr)_290px] xl:items-center xl:px-10">
+                  <div className="relative grid min-h-[430px] gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(260px,410px)] lg:items-center lg:gap-12 lg:px-10">
                     <div className="max-w-[720px] self-center">
-                      <div className="mb-4 inline-flex items-center rounded bg-[var(--wk-brand)]/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[var(--wk-brand)]">
-                        Now Playing At WAKILISHA
+                      <div className="mb-4 inline-flex items-center rounded bg-black/50 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-[#B6EB79]">
+                        Featured release
                       </div>
 
                       <h1 className="max-w-[11ch] text-[clamp(46px,6vw,86px)] font-black uppercase leading-[0.87] tracking-[-0.055em] text-[var(--wk-text)]">
@@ -844,14 +809,9 @@ export default function MusicDiscoveryPage() {
                         className="mt-4 inline-flex items-center gap-2 text-[24px] font-black tracking-[-0.035em] text-[var(--wk-text)] hover:text-[var(--wk-brand)]"
                       >
                         {hero.artist}
-                        <WkIcon
-                          name="BadgeCheck"
-                          size={17}
-                          className="text-[var(--wk-brand)]"
-                        />
                       </Link>
 
-                      <p className="mt-3 max-w-[42ch] text-[13px] font-medium leading-relaxed text-[var(--wk-text-muted)]">
+                      <p className="mt-3 max-w-[42ch] text-[13px] font-medium leading-relaxed text-[var(--wk-text-soft)]">
                         {hero.description ||
                           `${hero.releaseType || "Release"} · ${hero.year || "From the Registry"}`}
                       </p>
@@ -904,13 +864,11 @@ export default function MusicDiscoveryPage() {
                           to={releaseUrl(
                             hero,
                           )}
-                          className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border-strong)] bg-black/20 text-[var(--wk-text-soft)] backdrop-blur transition hover:bg-white/10 hover:text-[var(--wk-text)]"
+                          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/30 bg-black/30 px-4 text-[12px] font-semibold text-white backdrop-blur transition hover:bg-white/15"
                           aria-label="Open release"
                         >
-                          <WkIcon
-                            name="Plus"
-                            size={16}
-                          />
+                          <WkIcon name="ArrowUpRight" size={16} />
+                          Release
                         </Link>
 
                         <button
@@ -931,56 +889,19 @@ export default function MusicDiscoveryPage() {
                       </div>
                     </div>
 
-                    <div className="hidden xl:block">
-                      <div className="rounded-xl border border-[var(--wk-border)] bg-black/55 p-4 shadow-2xl backdrop-blur-xl">
-                        <div className="text-[9px] font-black uppercase tracking-[0.14em] text-[var(--wk-text-faint)]">
-                          In Focus
-                        </div>
-                        <div className="mt-2 text-[18px] font-black text-[var(--wk-text)]">
-                          {hero.artist}
-                        </div>
-                        <div className="mt-1 text-[11px] font-medium text-[var(--wk-text-muted)]">
-                          {hero.releaseType ||
-                            "Release"}
-                        </div>
-
-                        <div className="mt-4 flex items-center gap-3">
-                          <div className="h-[104px] w-[104px] shrink-0 overflow-hidden rounded-lg">
-                            <MusicArtwork
-                              src={
-                                hero.artworkUrl
-                              }
-                              alt={`${hero.title} artwork`}
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
-                              Featured Release
-                            </div>
-                            <div className="mt-1 line-clamp-2 text-[13px] font-black leading-tight text-[var(--wk-text)]">
-                              {hero.title}
-                            </div>
-                            <div className="mt-2 text-[9px] font-medium text-[var(--wk-text-faint)]">
-                              {hero.labelName ||
-                                "From The Registry"}
-                            </div>
-                          </div>
-                        </div>
-
-                        <Link
-                          to={releaseUrl(
-                            hero,
-                          )}
-                          className="mt-4 flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--wk-border-2)] text-[10px] font-bold text-[var(--wk-text-soft)] transition hover:bg-[var(--wk-surface-raised)]"
-                        >
-                          Explore Feature
-                          <WkIcon
-                            name="ChevronRight"
-                            size={13}
-                          />
-                        </Link>
-                      </div>
-                    </div>
+                    <Link
+                      to={releaseUrl(hero)}
+                      aria-label={`Open ${hero.title}`}
+                      className="order-first mx-auto block aspect-square w-full max-w-[410px] overflow-hidden rounded-[16px] bg-black/50 lg:order-last"
+                    >
+                      <MusicArtwork
+                        src={hero.artworkUrl}
+                        alt={`${hero.title} cover artwork`}
+                        fit="contain"
+                        loading="eager"
+                        className="h-full w-full"
+                      />
+                    </Link>
                   </div>
                 </>
               ) : (
@@ -993,6 +914,21 @@ export default function MusicDiscoveryPage() {
                 </div>
               )}
             </section>
+
+            <nav aria-label="Music discovery" className="flex gap-1.5 overflow-x-auto border-b border-[var(--wk-border)] px-5 py-3 sm:px-8 [scrollbar-width:none]">
+              {[
+                { label: "For You", to: "/following" },
+                { label: "New", to: "#fresh-arrivals" },
+                { label: "Charts", to: "/charts" },
+                { label: "Genres", to: "#music-genres" },
+                { label: "Playlists", to: "/playlists" },
+                { label: "Labels", to: "/labels" },
+              ].map((item) => (
+                <Link key={item.label} to={item.to} className="inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-[13px] font-semibold text-[var(--wk-text-muted)] transition hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]">
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
 
             <section
               id="fresh-arrivals"
@@ -1011,28 +947,7 @@ export default function MusicDiscoveryPage() {
                   </Link>
                 </div>
 
-                <div className="hidden gap-2 sm:flex">
-                  <button
-                    type="button"
-                    aria-label="Previous arrivals"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
-                  >
-                    <WkIcon
-                      name="ChevronLeft"
-                      size={14}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Next arrivals"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]"
-                  >
-                    <WkIcon
-                      name="ChevronRight"
-                      size={14}
-                    />
-                  </button>
-                </div>
+
               </div>
 
               <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1059,6 +974,51 @@ export default function MusicDiscoveryPage() {
               </div>
             </section>
 
+
+            <section id="music-genres" className="border-b border-[var(--wk-border)] px-5 py-8 sm:px-8">
+              <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.12fr)] lg:gap-12">
+                <div>
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <h2 className="text-[24px] font-bold tracking-[-0.04em] text-[var(--wk-text)]">On the Charts</h2>
+                    <Link to="/charts" className="text-[12px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">All Charts →</Link>
+                  </div>
+                  <ChartMiniList entries={chartEntries} />
+                </div>
+                <div>
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <h2 className="text-[24px] font-bold tracking-[-0.04em] text-[var(--wk-text)]">Genres</h2>
+                    <Link to="/genres" className="text-[12px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]">All Genres →</Link>
+                  </div>
+                  {genres.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {genres.slice(0, 6).map((genre) => (
+                        <Link
+                          key={genre.id}
+                          to={`/genres/${genre.slug}`}
+                          aria-label={`Explore ${genre.name}`}
+                          className="group flex min-h-[124px] min-w-0 flex-col overflow-hidden rounded-[14px] border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-colors hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)]"
+                        >
+                          {hasImage(genre.artistImageUrl) ? (
+                            <div className="h-[92px] w-full overflow-hidden bg-[var(--wk-surface-raised)]">
+                              <MusicArtwork src={genre.artistImageUrl} alt="" className="transition-transform duration-500 group-hover:scale-[1.04]" />
+                            </div>
+                          ) : null}
+                          <span className="flex min-h-[72px] items-center justify-between gap-2 px-4 py-3">
+                            <span className="min-w-0 break-words text-[15px] font-bold leading-[1.25] text-[var(--wk-text)] sm:text-[17px]">{genre.name}</span>
+                            <WkIcon name="ArrowUpRight" size={17} className="shrink-0 text-[var(--wk-brand)]" />
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <Link to="/genres" className="inline-flex min-h-11 items-center text-[14px] text-[var(--wk-text-muted)] underline-offset-4 hover:underline">
+                      Browse Genres
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </section>
+
             <section className="border-b border-[var(--wk-border)] px-5 py-5 sm:px-8">
               <div className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {risingArtist ? (
@@ -1079,7 +1039,7 @@ export default function MusicDiscoveryPage() {
                     </div>
                     <EditorialArtistCard
                       artist={risingArtist}
-                      footer="Next up. Watch this space."
+                      
                     />
                   </div>
                 ) : null}
@@ -1125,25 +1085,6 @@ export default function MusicDiscoveryPage() {
                   </div>
                 ) : null}
 
-                {chartEntries.length ? (
-                  <div className="min-w-[262px] flex-[1_0_262px] lg:max-w-[330px]">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <h2 className="truncate text-[14px] font-black uppercase tracking-[-0.025em]">
-                        On The Charts
-                      </h2>
-                      <Link
-                        to="/charts"
-                        className="shrink-0 text-[9px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
-                      >
-                        See All
-                      </Link>
-                    </div>
-                    <ChartMiniList
-                      entries={chartEntries}
-                    />
-                  </div>
-                ) : null}
-
                 {followingItems.length ? (
                   <div className="min-w-[262px] flex-[1_0_262px] lg:max-w-[330px]">
                     <div className="mb-3 flex items-center justify-between gap-3">
@@ -1165,64 +1106,6 @@ export default function MusicDiscoveryPage() {
               </div>
             </section>
 
-            <section
-              id="go-deeper"
-              className="px-5 py-5 sm:px-8"
-            >
-              <h2 className="mb-4 text-[17px] font-black uppercase tracking-[-0.03em]">
-                Go Deeper
-              </h2>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <DeepCard
-                  to="/charts"
-                  title="Charts"
-                  body="See what is moving."
-                  icon="ChartNoAxesColumnIncreasing"
-                  image={
-                    freshArrivals[0]
-                      ?.artworkUrl
-                  }
-                />
-                <DeepCard
-                  to="/playlists"
-                  title="Playlists"
-                  body="Curated for the moment."
-                  icon="ListMusic"
-                  image={
-                    featuredPlaylist?.coverUrl
-                  }
-                />
-                <DeepCard
-                  to="/artists"
-                  title="Artists"
-                  body="Discover more Artists."
-                  icon="Users"
-                  image={
-                    registryArtist?.imageUrl
-                  }
-                />
-                <DeepCard
-                  to="/magazine"
-                  title="Stories"
-                  body="Long reads and interviews."
-                  icon="Newspaper"
-                  image={
-                    heroArtist?.imageUrl
-                  }
-                />
-                <DeepCard
-                  to="/releases"
-                  title="Releases"
-                  body="Keep digging into the catalog."
-                  icon="Disc3"
-                  image={
-                    freshArrivals[1]
-                      ?.artworkUrl
-                  }
-                />
-              </div>
-            </section>
       </main>
 
       {shareRelease ? (

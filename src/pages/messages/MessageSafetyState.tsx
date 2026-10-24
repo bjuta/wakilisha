@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { WkIcon } from "@/components/design-system/Icon";
 import {
   getMyMessageSafetyState,
   submitMessagesSafetyAppeal,
@@ -43,6 +44,7 @@ export function MessageSafetyState() {
   const [appealFor, setAppealFor] = useState<string | null>(null);
   const [appealReason, setAppealReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -84,11 +86,50 @@ export function MessageSafetyState() {
 
   if (loading || !state?.has_safety_state) return null;
 
+  // When an old warning was reversed and access is restored, its history
+  // must remain available without occupying the primary conversation rail.
+  // Any effective restriction or disabled capability remains fully visible.
+  const historyOnly =
+    state.enforcements.length > 0 &&
+    effective.length === 0 &&
+    state.can_send &&
+    state.can_start;
+
+  if (historyOnly && !showHistory) {
+    return (
+      <div className="border-b border-[var(--wk-divider)] px-4 py-2">
+        <button
+          type="button"
+          aria-expanded={false}
+          onClick={() => setShowHistory(true)}
+          className="flex min-h-11 w-full items-center justify-between gap-3 text-left text-[12px] text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
+        >
+          <span className="flex items-center gap-2">
+            <WkIcon name="ShieldCheck" size={16} className="text-[var(--wk-brand)]" />
+            Previous Messages safety activity
+          </span>
+          <WkIcon name="ChevronDown" size={15} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <section
       className="mb-4 rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4"
       aria-labelledby="my-message-safety-heading"
     >
+      {historyOnly ? (
+        <button
+          type="button"
+          onClick={() => setShowHistory(false)}
+          aria-expanded={true}
+          className="mb-3 inline-flex min-h-11 items-center gap-2 text-[12px] font-semibold text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
+        >
+          <WkIcon name="ChevronUp" size={15} />
+          Close Safety History
+        </button>
+      ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-[10px] font-black tracking-[0.14em] text-[var(--wk-brand)]">Account Safety</div>

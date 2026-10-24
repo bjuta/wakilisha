@@ -145,7 +145,7 @@ export default function AdminLoginPage() {
       <div className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-12">
         <div className="grid w-full gap-6 lg:grid-cols-[1fr_420px] lg:items-center">
           <div className="hidden lg:block">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-wk-brand/20 bg-wk-brand-soft px-3 py-1 text-[11px] font-black uppercase tracking-wider text-wk-brand">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-wk-border bg-wk-surface-raised px-3 py-1 text-[11px] font-bold tracking-wide text-wk-text-muted">
               <WkIcon name="ShieldCheck" size={14} /> Admin Studio
             </div>
             <h1 className="max-w-2xl text-[44px] font-black leading-[0.95] tracking-tight text-wk-text">Staff access is separate from public WAKILISHA accounts.</h1>
@@ -156,11 +156,18 @@ export default function AdminLoginPage() {
 
           <WkSurface className="p-6 sm:p-8">
             <div className="mb-6 text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-wk-brand text-wk-brand-on">
-                <WkIcon name={mode === "forgot" ? "Mail" : mode === "magic" ? "Mail" : "LockKeyhole"} size={26} />
+              <div className="mx-auto mb-5 flex w-fit max-w-full items-center justify-center gap-3 rounded-full bg-[#0B0B0B] px-4 py-3" data-wk-studio-brand>
+                <img
+                  src="/assets/logos/wakilisha-logo-dark.svg"
+                  alt="WAKILISHA"
+                  className="h-[21px] w-auto max-w-[155px] object-contain"
+                />
+                <span className="border-l border-white/25 pl-3 text-[12px] font-bold text-white">
+                  Studio
+                </span>
               </div>
               <h2 className="text-[22px] font-black tracking-tight text-wk-text">
-                {mode === "forgot" ? "Reset admin password" : mode === "magic" ? "Send admin magic link" : "Admin login"}
+                {mode === "forgot" ? "Reset admin password" : mode === "magic" ? "Send admin magic link" : "Sign In to Studio"}
               </h2>
               <p className="mt-1 text-[12px] leading-5 text-wk-text-muted">
                 {mode === "forgot" ? "We will email a secure password reset link." : mode === "magic" ? "Use a one-time email link to sign in without a password." : "Use an account with an active WAKILISHA admin/operator role."}

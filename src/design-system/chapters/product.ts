@@ -16,7 +16,7 @@ export const productChapters: WkDesignChapterSpec[] = [
       'Public nav: masthead + search + player capsule + user menu.',
       'Admin nav: breadcrumb bar + KPI row + tab nav + action bar.',
     ],
-    componentsRequired: ['HomeNav', 'AdminBar', 'PlayerDock', 'SearchBox', 'NavCapsule'],
+    componentsRequired: ['MusicDesktopShell', 'AdminBar', 'PlayerDock', 'SearchBox', 'NavCapsule'],
     tables: ['content_route_classification'],
     parityTargets: [
       'Implement public nav, admin nav, mobile nav, and player-aware nav capsule.',

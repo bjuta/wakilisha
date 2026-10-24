@@ -16,6 +16,7 @@ import {
 import type {
   ReactionType,
 } from "@/services/community";
+import { WkIcon, type WkIconName } from "@/components/design-system/Icon";
 
 const FullEmojiPicker =
   lazy(
@@ -35,6 +36,36 @@ const QUICK_REACTIONS = [
   "😢",
   "👀",
 ] as const;
+
+// Reaction codes remain data. Visible shortcut controls use the bundled
+// WAKILISHA SVG sprite, not platform-dependent Apple/Android emoji artwork.
+const QUICK_REACTION_ICONS: Record<(typeof QUICK_REACTIONS)[number], WkIconName> = {
+  "❤️": "Heart",
+  "😂": "MessageCircle",
+  "🔥": "Flame",
+  "👏": "Hand",
+  "👍": "CheckCircle",
+  "😮": "CircleAlert",
+  "😢": "HeartPulse",
+  "👀": "Eye",
+};
+
+const LEGACY_REACTION_ICONS: Record<string, WkIconName> = {
+  signal: "Zap",
+  memory: "BookOpen",
+  context: "Lightbulb",
+  fire: "Flame",
+  agree: "CheckCircle",
+};
+
+/** Used by the comment reaction toolbar; arbitrary user emoji remains content. */
+export function getReactionDisplayIcon(reaction: ReactionType): WkIconName | null {
+  if (LEGACY_REACTION_ICONS[reaction]) return LEGACY_REACTION_ICONS[reaction];
+  const glyph = getReactionGlyph(reaction);
+  return (QUICK_REACTIONS as readonly string[]).includes(glyph)
+    ? QUICK_REACTION_ICONS[glyph as (typeof QUICK_REACTIONS)[number]]
+    : null;
+}
 
 const LEGACY_REACTION_GLYPHS:
   Record<string, string> = {
@@ -409,7 +440,7 @@ export function CommunityReactionPicker({
                     emoji,
                   )
                 }
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[22px] leading-none transition-colors ${
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--wk-text)] transition-colors ${
                   isActive
                     ? "bg-[var(--wk-brand-soft)] ring-1 ring-inset ring-[var(--wk-brand)]"
                     : "hover:bg-[var(--wk-surface-raised)]"
@@ -420,7 +451,7 @@ export function CommunityReactionPicker({
                 }
                 title={emoji}
               >
-                {emoji}
+                <WkIcon name={QUICK_REACTION_ICONS[emoji]} size={20} aria-hidden="true" />
               </button>
             );
           },
@@ -445,7 +476,7 @@ export function CommunityReactionPicker({
           }
           title="More reactions"
         >
-          <i className="ri-add-line text-[18px]" />
+          <WkIcon name="Plus" size={18} aria-hidden="true" />
         </button>
       </div>
 

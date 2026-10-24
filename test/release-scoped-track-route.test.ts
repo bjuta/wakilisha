@@ -439,4 +439,49 @@ describe("canonical public Track and Release routes", () => {
       "artistSlug: artistSlug || track.artistSlug || undefined",
     );
   });
+  it("bounds Registry sitemap reads without losing canonical URLs or metadata", () => {
+    const seoEdge = readFileSync(
+      "supabase/functions/seo-sitemap-admin/index.ts",
+      "utf8",
+    );
+    const sitemapBuilder = readFileSync(
+      "scripts/seo/build-public-sitemap-html.mjs",
+      "utf8",
+    );
+    const buildItems = seoEdge.slice(
+      seoEdge.indexOf("async function buildInternalItems("),
+      seoEdge.indexOf("for (const row of articles.data"),
+    );
+
+    expect(buildItems).toMatch(
+      /fetchAllPages\(\s*"registry_tracks",[\s\S]*?\.select\("id, slug, updated_at"\)/,
+    );
+    expect(buildItems).toMatch(
+      /fetchAllPages\(\s*"registry_releases",[\s\S]*?\.select\("id, slug, metadata, updated_at"\)/,
+    );
+    expect(buildItems).not.toMatch(
+      /\.from\("registry_tracks"\)\s*\.select\("\*"\)/,
+    );
+    expect(buildItems).not.toMatch(
+      /\.from\("registry_releases"\)\s*\.select\("\*"\)/,
+    );
+
+    const detailLookup = seoEdge.slice(
+      seoEdge.indexOf("const SEO_METADATA_DETAIL_PROJECTIONS:"),
+      seoEdge.indexOf("async function fetchRowsBySlug("),
+    );
+    for (const field of ["title", "normalized_title", "artwork_url", "metadata", "created_at", "updated_at"]) {
+      expect(detailLookup).toContain(field);
+    }
+    expect(detailLookup).toContain('registry_releases: "id, slug, title, normalized_title, release_date, artwork_url, description, metadata, created_at, updated_at"');
+    expect(detailLookup).toContain('const batchSize = SEO_METADATA_DETAIL_PROJECTIONS[table] ? 250 : 5000;');
+    expect(detailLookup).toContain('.in("id", batch)');
+    expect(detailLookup).toContain('.limit(batch.length)');
+    expect(detailLookup).not.toContain('.select("*").in("id", uniqueIds)');
+
+    expect(seoEdge).toContain('loc: makeUrl(`/tracks/${artistSlug}/${row.slug}`)');
+    expect(seoEdge).toContain('loc: makeUrl(`/releases/${artistSlug}/${row.slug}`)');
+    expect(sitemapBuilder).toContain('if (sitemapHtmlLinkCount < 1000)');
+  });
+
 });

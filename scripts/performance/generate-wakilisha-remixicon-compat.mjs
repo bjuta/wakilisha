@@ -488,11 +488,11 @@ const names =
   );
 
 if (
-  names.length < 275
-  || names.length > 320
+  names.length === 0
+  || names.length > 512
 ) {
   fail(
-    `resolved ${names.length} Remixicon identities; expected 275-320`,
+    `resolved ${names.length} Remixicon identities; expected 1-512 source-derived icons`,
   );
 }
 

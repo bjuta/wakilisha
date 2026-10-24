@@ -8,7 +8,6 @@ import {
 import {
   findClaimantPhoneCountryOptions,
   getClaimantPhoneCountryOptions,
-  getCountryFlagEmoji,
   normalizeClaimantPhone,
 } from "../../src/utils/claimantPhone";
 import {
@@ -151,9 +150,6 @@ describe(
       "uses a compact searchable country-code picker on both claimant forms",
       () => {
         expect(
-          getCountryFlagEmoji("KE"),
-        ).toBe("🇰🇪");
-        expect(
           findClaimantPhoneCountryOptions(
             "Ken",
           ).map(
@@ -169,7 +165,7 @@ describe(
           'placeholder="Country"',
         );
         expect(phoneFields).toContain(
-          "country.flag",
+          "CountryIdentityMark",
         );
         expect(phoneFields).not.toContain(
           "Search Country",

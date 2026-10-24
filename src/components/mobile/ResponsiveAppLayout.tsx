@@ -1,13 +1,34 @@
-import { lazy, Suspense } from "react";
+import { Component, lazy, Suspense, useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MobileAppLayout } from "@/components/mobile/MobileAppLayout";
 import {
   PlayerCompactSurface,
 } from "@/components/design-system/player/PlayerCompactSurface";
-import "@/components/design-system/player/playerChrome.css";
 import { usePlayer } from "@/context/PlayerContext";
 import { useMobileDetect } from "@/hooks/useMobileDetect";
 import { RegistryOnboardingGate } from "@/components/auth/RegistryOnboardingGate";
+
+class PlayerPresentationBoundary extends Component<
+  { children: ReactNode; onClose: () => void },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error: Error) {
+    console.error("WAKILISHA Now Playing presentation could not render", error);
+  }
+  render() {
+    if (this.state.failed) {
+      return <div role="alert" className="flex min-h-[100dvh] flex-col items-center justify-center gap-5 p-6 text-center text-[var(--wk-text)]">
+        <p>Now Playing could not be opened. Your current page and playback remain available.</p>
+        <button type="button" onClick={this.props.onClose}
+          className="min-h-11 rounded-full border border-[var(--wk-border)] px-6 font-semibold">Close player</button>
+      </div>;
+    }
+    return this.props.children;
+  }
+}
 
 const LazyPlayerFullSurface = lazy(async () => {
   const module = await import(
@@ -19,38 +40,74 @@ const LazyPlayerFullSurface = lazy(async () => {
   };
 });
 
+/**
+ * Keep the active route mounted while Now Playing expands or collapses.
+ * The old conditional baseLayout/full-player tree destroyed the entire
+ * route on every toggle. This presentation overlay changes no media engine,
+ * route, user session, or queue authority.
+ */
 export function ResponsiveAppLayout() {
   const isMobile = useMobileDetect();
-  const {
-    isFullPlayerOpen,
-  } = usePlayer();
+  const { isFullPlayerOpen, closeFullPlayer } = usePlayer();
+  // The normal route must remain mounted and at its existing scroll position.
+  // Lock only the document scroller, not the body with position:fixed; the
+  // independently scrollable Now Playing viewport is portaled to document.body.
+  useEffect(() => {
+    if (!isFullPlayerOpen) return;
+    const root = document.documentElement;
+    const originalOverflow = root.style.overflow;
+    const originalOverscroll = root.style.overscrollBehaviorY;
+    root.style.overflow = "hidden";
+    root.style.overscrollBehaviorY = "none";
+    return () => {
+      root.style.overflow = originalOverflow;
+      root.style.overscrollBehaviorY = originalOverscroll;
+    };
+  }, [isFullPlayerOpen]);
 
-  const baseLayout = isMobile ? (
-    <>
-      <MobileAppLayout />
-      <PlayerCompactSurface mode="mobile" />
-    </>
-  ) : (
-    <AppLayout />
-  );
-
-  const layout = isFullPlayerOpen ? (
-    <Suspense fallback={baseLayout}>
-      <LazyPlayerFullSurface
-        mode={
-          isMobile
-            ? "mobile"
-            : "desktop"
-        }
-      />
-    </Suspense>
-  ) : (
-    baseLayout
-  );
 
   return (
     <RegistryOnboardingGate>
-      {layout}
+      <div
+        data-wk-player-underlay
+        inert={isMobile && isFullPlayerOpen}
+        aria-hidden={isMobile && isFullPlayerOpen ? true : undefined}
+      >
+        {isMobile ? (
+          <>
+            <MobileAppLayout />
+            <PlayerCompactSurface mode="mobile" />
+          </>
+        ) : (
+          <AppLayout />
+        )}
+      </div>
+      {isFullPlayerOpen && typeof document !== "undefined" ? createPortal(
+        <div
+          data-wk-player-overlay
+          role="region"
+          aria-label="Now Playing"
+          className="fixed inset-y-0 right-0 z-[110] h-[100dvh] min-h-0 touch-pan-y overflow-x-clip overflow-y-auto overscroll-contain bg-[var(--wk-bg)]"
+          style={{ left: 0 }}
+        >
+          <PlayerPresentationBoundary onClose={closeFullPlayer}>
+            <Suspense fallback={
+              <div role="status" aria-label="Opening Now Playing" className="flex min-h-[100dvh] flex-col bg-[var(--wk-bg)] px-5 py-5 text-[var(--wk-text)]">
+                <div className="flex min-h-11 items-center justify-between">
+                  <button type="button" onClick={closeFullPlayer}
+                    className="min-h-11 rounded-full px-3 text-sm font-semibold">Close player</button>
+                  <span className="text-xs font-semibold text-[var(--wk-text-muted)]">Now Playing</span>
+                </div>
+                <div className="mx-auto mt-12 aspect-square w-[min(76vw,360px)] animate-pulse rounded-2xl bg-[var(--wk-surface-raised)]" />
+                <p className="mt-6 text-center text-sm text-[var(--wk-text-muted)]">Opening Now Playing…</p>
+              </div>
+            }>
+              <LazyPlayerFullSurface mode={isMobile ? "mobile" : "desktop"} />
+            </Suspense>
+          </PlayerPresentationBoundary>
+        </div>,
+        document.body,
+      ) : null}
     </RegistryOnboardingGate>
   );
 }

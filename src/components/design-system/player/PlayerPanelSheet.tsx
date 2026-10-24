@@ -3,6 +3,7 @@ import {
   type ReactNode,
 } from "react";
 import { Portal } from "@/components/base/Portal";
+import { createPortal } from "react-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { useScrollLock } from "@/hooks/useScrollLock";
 
@@ -12,6 +13,8 @@ export function PlayerPanelSheet({
   mode,
   title,
   eyebrow,
+  inlineDesktop = false,
+  inlineHost,
   children,
 }: {
   open: boolean;
@@ -19,9 +22,11 @@ export function PlayerPanelSheet({
   mode: "desktop" | "mobile";
   title: string;
   eyebrow?: string | null;
+  inlineDesktop?: boolean;
+  inlineHost?: Element | null;
   children: ReactNode;
 }) {
-  useScrollLock(open);
+  useScrollLock(open && (mode === "mobile" || !inlineDesktop));
 
   useEffect(() => {
     if (!open) return;
@@ -37,6 +42,35 @@ export function PlayerPanelSheet({
   if (!open) return null;
 
   const mobile = mode === "mobile";
+  if (!mobile && inlineDesktop) {
+    const target = inlineHost;
+    if (target) {
+      return createPortal(
+        <section role="region" aria-label={title}
+          data-wk-player-inline-panel={title}
+          className="flex h-full min-h-0 flex-col bg-[var(--wk-surface)] text-[var(--wk-text)]">
+          <header className="sticky top-0 z-10 flex min-h-[76px] items-center justify-between gap-3 border-b border-[var(--wk-border)] bg-[var(--wk-surface)] px-5">
+            <div className="min-w-0">
+              {eyebrow ? <p className="truncate text-[11px] text-[var(--wk-text-muted)]">{eyebrow}</p> : null}
+              <h2 className="text-[18px] font-black">{title}</h2>
+            </div>
+            <button type="button" onClick={onClose}
+              aria-label={`Close ${title}`}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-[var(--wk-surface-raised)]">
+              <WkIcon name="X" size={20} />
+            </button>
+          </header>
+          <div data-wk-player-panel-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
+            {children}
+          </div>
+        </section>, target,
+      );
+    }
+    return null;
+  }
+
+
+  const fullScreenLyrics = mobile && title === "Lyrics";
 
   return (
     <Portal>
@@ -56,10 +90,12 @@ export function PlayerPanelSheet({
         <section
           data-scroll-lock="container"
           className={[
-            "absolute overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl",
-            mobile
-              ? "inset-x-0 bottom-0 max-h-[88dvh] rounded-t-[30px]"
-              : "bottom-5 right-5 top-5 w-[min(440px,calc(100vw-40px))] rounded-[28px]",
+            "absolute flex flex-col overflow-hidden border border-[var(--wk-border)] bg-[var(--wk-surface)] shadow-2xl",
+            fullScreenLyrics
+              ? "inset-0 h-[100dvh] rounded-none border-0"
+              : mobile
+                ? "inset-x-0 bottom-0 max-h-[88dvh] rounded-t-[30px]"
+                : "bottom-5 right-5 top-5 w-[min(440px,calc(100vw-40px))] rounded-[28px]",
           ].join(" ")}
           style={
             mobile
@@ -69,7 +105,7 @@ export function PlayerPanelSheet({
               : undefined
           }
         >
-          {mobile ? (
+          {mobile && !fullScreenLyrics ? (
             <div className="flex justify-center pb-1 pt-2.5">
               <span className="h-1 w-10 rounded-full bg-[var(--wk-text-faint)]/45" />
             </div>
@@ -91,13 +127,15 @@ export function PlayerPanelSheet({
               type="button"
               onClick={onClose}
               aria-label={`Close ${title}`}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] transition-colors hover:text-[var(--wk-text)]"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)] transition-colors hover:text-[var(--wk-text)]"
             >
-              <WkIcon name="X" size={17} />
+              <WkIcon name={fullScreenLyrics ? "ChevronDown" : "X"} size={20} />
             </button>
           </div>
 
-          <div className="max-h-[calc(88dvh-78px)] overflow-y-auto overscroll-contain p-4 md:p-5">
+          <div data-wk-player-panel-scroll className={fullScreenLyrics
+            ? "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-7"
+            : "max-h-[calc(88dvh-78px)] overflow-y-auto overscroll-contain p-4 md:p-5"}>
             {children}
           </div>
         </section>

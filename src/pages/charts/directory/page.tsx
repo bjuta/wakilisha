@@ -33,9 +33,6 @@ const METALLIC = {
   bronze: "#B87333",
 } as const;
 
-const HERO_FALLBACK =
-  "https://wakilisha.africa/api/search-image?query=abstract%20african%20music%20visualization%20with%20vibrant%20green%20and%20gold%20energy%20waves%20radiating%20from%20a%20central%20point%20on%20deep%20charcoal%20black%20background%20rhythmic%20geometric%20patterns%20inspired%20by%20african%20textile%20art%20premium%20cinematic%20atmosphere%20with%20subtle%20luminous%20particles%20no%20text%20high%20contrast%20editorial%20photography%20style&width=1600&height=720&seq=charts-home-hero-v2&orientation=landscape";
-
 // ─── Grouping ───
 
 interface SourceFamilyGroup {
@@ -633,10 +630,9 @@ export default function ChartsDirectory() {
   );
 
   const topTrack = activeEntries[0] ?? null;
-  const heroBg = topTrack?.artworkUrl ?? HERO_FALLBACK;
   const heroStyle = topTrack?.artworkUrl
     ? { backgroundImage: `url(${topTrack.artworkUrl})`, filter: "blur(90px) saturate(1.5)", transform: `scale(1.12) translateY(${scrollPos * 0.04}px)` }
-    : { backgroundImage: `url(${HERO_FALLBACK})`, backgroundSize: "cover", backgroundPosition: "center" };
+    : { backgroundImage: "linear-gradient(130deg, var(--wk-surface-strong), var(--wk-bg-subtle))" };
 
   const handleSourceFamilyTab = useCallback(
     (sourceSlug: string) => {
@@ -770,7 +766,7 @@ export default function ChartsDirectory() {
       {/* ═══════════════════════════════════════════
           HERO
           ═══════════════════════════════════════════ */}
-      <section className="relative min-h-[480px] md:min-h-[620px] overflow-hidden flex items-end -mt-16">
+      <section className="relative min-h-[480px] md:min-h-[620px] overflow-hidden flex items-end mt-0 md:-mt-16">
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-[var(--wk-d-slow)]"
           style={heroStyle}

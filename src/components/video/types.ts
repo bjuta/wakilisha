@@ -2,6 +2,8 @@ import {
   parseLegacyProviderUrl,
   providerLabel,
   providerSourceKey,
+  providerThumbnailUrl,
+  providerThumbnailUrls,
   type CanonicalVideoProviderSource,
 } from "./providerSource";
 
@@ -11,6 +13,10 @@ export interface VideoEmbedData extends CanonicalVideoProviderSource {
   title: string;
   platform: string;
   thumbnail: string | null;
+  /** Unavailable or tiny YouTube artwork falls back without changing playback. */
+  thumbnailFallbacks?: string[];
+  /** Editorial figure caption, distinct from subtitles and player title. */
+  caption?: string | null;
 }
 
 export type VideoMode = "lightbox" | "pip" | "closed";
@@ -34,10 +40,9 @@ export function detectPlatform(url: string): string {
   return source ? providerLabel(source.providerKey) : "Video";
 }
 
-export function getThumbnail(_url: string): string | null {
-  // Avoid noisy 404s from old, private, or deleted provider thumbnails.
-  // Provider-backed surfaces may supply a known thumbnail explicitly.
-  return null;
+export function getThumbnail(url: string): string | null {
+  const source = parseLegacyProviderUrl(url);
+  return source ? providerThumbnailUrl(source) : null;
 }
 
 export function platformIcon(platform: string): string {
@@ -84,13 +89,23 @@ export function transformArticleHtmlForVideoEmbeds(
     const title =
       iframe.getAttribute("title") ||
       `${providerLabel(resolvedSource.providerKey)} video`;
+    const figure = iframe.closest("figure");
+    const figureCaption = figure?.querySelector("figcaption")?.textContent?.trim() || "";
+    const caption = iframe.getAttribute("data-caption")?.trim() || figureCaption || null;
     const markerIndex = videos.length;
     const marker = doc.createComment(
       `${VIDEO_MARKER_PREFIX}${markerIndex}`,
     );
 
     const parent = iframe.parentElement;
-    if (
+    // Replace the whole provider figure so its caption can travel with the
+    // resolved video card, rather than becoming editable-looking body copy.
+    const simpleFigure = figure &&
+      figure.querySelectorAll("iframe, video").length === 1 &&
+      (figure.textContent ?? "").trim() === figureCaption;
+    if (simpleFigure) {
+      figure.replaceWith(marker);
+    } else if (
       parent &&
       parent.tagName === "P" &&
       parent.childNodes.length === 1 &&
@@ -109,6 +124,8 @@ export function transformArticleHtmlForVideoEmbeds(
       title,
       platform: providerLabel(resolvedSource.providerKey),
       thumbnail: getThumbnail(src),
+      thumbnailFallbacks: providerThumbnailUrls(resolvedSource).slice(1),
+      ...(caption ? { caption } : {}),
     });
   });
 

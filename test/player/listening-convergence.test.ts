@@ -11,6 +11,7 @@ const shell = readFileSync(
   "src/components/music/MusicDesktopShell.tsx",
   "utf8",
 );
+const topBar = readFileSync("src/components/mobile/MobileTopBar.tsx", "utf8");
 const globalSearch = readFileSync(
   "src/components/search/GlobalSearchSurface.tsx",
   "utf8",
@@ -39,11 +40,12 @@ const playerContext = readFileSync(
 describe(
   "WAKILISHA listening convergence",
   () => {
-    it("removes the redundant desktop utility bar and gives the rail real Search", () => {
-      expect(shell).toContain("GlobalSearchSurface");
-      expect(shell).toContain('aria-label="Search"');
+    it("uses the same Search action in the public top bar on desktop", () => {
+      expect(shell).toContain("<MobileTopBar />");
+      expect(topBar).toContain("GlobalSearchSurface");
+      expect(topBar).toContain('aria-label="Search"');
       expect(shell).not.toContain("Upload Music");
-      expect(shell).toContain('"/search"');
+      expect(topBar).toContain("setSearchOpen(true)");
     });
 
     it("keeps Search playback truthful", () => {

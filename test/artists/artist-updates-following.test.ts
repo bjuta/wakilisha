@@ -492,9 +492,9 @@ describe(
           "community_get_my_artist_representations",
         );
         expect(
-          musicShell,
+          readFileSync("src/components/mobile/MobileAccountDrawer.tsx", "utf8"),
         ).toContain(
-          'to="/artist-studio"',
+          'to: "/artist-studio"',
         );
         expect(
           musicShell,

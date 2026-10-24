@@ -533,27 +533,6 @@ export default function MobileReleaseDetail() {
         }}
       />
 
-      {/* Floating top bar */}
-      <div className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between px-4 pt-safe-top pt-4 pointer-events-none">
-        <Link
-          to="/releases"
-          className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition-all active:scale-95"
-          aria-label="Back to Releases"
-        >
-          <i className="ri-arrow-left-line text-lg" />
-        </Link>
-        <MobileShareButton
-          item={{
-            title: release?.title || "Release",
-            subtitle: release?.artist,
-            description: release ? `${release.title} by ${release.artist} — ${release.releaseType} released in ${release.year}` : undefined,
-            imageUrl: release?.artworkUrl,
-            type: "album",
-          }}
-          className="pointer-events-auto"
-        />
-      </div>
-
       {/* Hero */}
       <section
         key="mobile-release-hero-shell"

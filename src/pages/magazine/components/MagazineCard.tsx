@@ -12,7 +12,7 @@ interface MagazineCardProps {
 
 function AuthorBadge({ author }: { author: string }) {
   return (
-    <div className="w-5 h-5 rounded-full bg-[var(--wk-brand)] flex items-center justify-center text-[8px] font-black text-[var(--wk-brand-on)] shrink-0">
+    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold text-white">
       {author
         .split(" ")
         .map((n) => n[0])
@@ -22,23 +22,20 @@ function AuthorBadge({ author }: { author: string }) {
   );
 }
 
-function whyThisStoryMatters(story: MagazineArticle) {
-  if (story.dek) return story.dek;
-  if (story.section) return `This opens a ${story.section.toLowerCase()} thread inside the magazine.`;
-  return "This story gives the issue another way in.";
-}
-
 export function MagazineCard({ story, variant = "standard", rank }: MagazineCardProps) {
   const url = `/magazine/${story.slug}`;
-  const why = whyThisStoryMatters(story);
+  const why = story.dek || "";
 
   /* ── hero: large dark-overlay card, for primary featured spots ── */
   if (variant === "hero") {
     return (
       <Link
         to={url}
-        className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-[#0a0a0a] outline-none transition-transform duration-500 hover:-translate-y-1 focus-visible:-translate-y-1 focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
-        style={{ minHeight: "clamp(340px, 42vw, 480px)" }}
+        data-wk-magazine-story
+        data-wk-magazine-feature="true"
+        data-wk-magazine-category={story.section.trim().toLowerCase()}
+        className="group relative flex h-full flex-col overflow-hidden rounded-[16px] bg-[#0a0a0a] outline-none focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
+        style={{ minHeight: "clamp(430px, 44vw, 560px)" }}
       >
         {story.heroUrl ? (
           <ResponsiveMediaImage
@@ -48,7 +45,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             loading="lazy"
             fetchPriority="low"
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover object-top opacity-90 transition-transform duration-700 group-hover:scale-105 group-hover:rotate-[0.35deg] group-focus-visible:scale-105"
+            className="absolute inset-0 h-full w-full object-cover object-top opacity-90 transition-transform duration-700 group-hover:scale-[1.015]"
           />
         ) : (
           <Chapter19FallbackImage
@@ -60,27 +57,22 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10" />
 
         {rank !== undefined && (
-          <span className="absolute left-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[12px] font-black text-[var(--wk-brand-on)] shadow-lg transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
+          <span className="absolute left-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[12px] font-black text-[var(--wk-brand-on)] ">
             {rank}
           </span>
         )}
 
-        {/* Bookmark icon */}
-        <div className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/25 text-white/60 backdrop-blur-sm transition-colors hover:text-white/90">
-          <i className="ri-bookmark-line text-[14px]" />
-        </div>
-
-        <div className="relative z-10 mt-auto p-6 text-white lg:p-8">
+        <div className="relative z-10 mt-auto px-6 pb-7 pt-24 text-white lg:px-8 lg:pb-9 lg:pt-32">
           <span className="inline-block rounded-full bg-black/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--wk-brand)] backdrop-blur-sm transition-transform duration-300 group-hover:-translate-y-0.5">
             {story.section}
           </span>
-          <h3 className="mb-3 mt-3 line-clamp-3 text-[clamp(20px,2.6vw,30px)] font-black leading-[1.06] tracking-[-0.04em] transition-colors group-hover:text-white/90">
+          <h3 className="mb-3 mt-3 break-words text-[clamp(20px,2.6vw,30px)] font-black leading-[1.12] tracking-[-0.04em] text-white transition-colors group-hover:text-white/90">
             {story.title}
           </h3>
-          <p className="max-w-[52ch] text-[13px] leading-relaxed text-white/55 line-clamp-2 lg:text-[14px]">
+          <p className="max-w-[52ch] text-[13px] leading-[1.55] text-white/85 lg:text-[14px]">
             {why}
           </p>
-          <div className="mt-4 flex items-center gap-2.5 text-[12px] text-white/45">
+          <div className="mt-4 flex flex-wrap items-center gap-2.5 text-[12px] text-white/80">
             <ArticleAuthorIdentity
               name={story.author}
               personPath={story.authorPersonPath}
@@ -89,7 +81,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
               plainClassName="flex items-center gap-2"
             >
               <AuthorBadge author={story.author} />
-              <span className="font-semibold text-white/70">{story.author}</span>
+              <span className="font-semibold text-white/90">{story.author}</span>
             </ArticleAuthorIdentity>
             <span className="text-white/20">·</span>
             <span>{story.readingTime} min read</span>
@@ -104,9 +96,11 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
     return (
       <Link
         to={url}
-        className="group flex flex-col gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all duration-300 hover:-translate-y-1 hover:border-[var(--wk-border-strong)] hover:bg-[var(--wk-surface-raised)] focus-visible:-translate-y-1 focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)] sm:flex-row"
+        data-wk-magazine-story
+      data-wk-magazine-category={story.section.trim().toLowerCase()}
+        className="group flex flex-col gap-4 border-b border-[var(--wk-border)] pb-5 focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)] sm:flex-row"
       >
-        <div className="aspect-[16/10] shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)] sm:h-full sm:w-[45%] sm:aspect-auto">
+        <div className="aspect-[3/2] shrink-0 overflow-hidden rounded-[12px] bg-[var(--wk-surface-raised)] sm:w-[45%]">
           {story.heroUrl ? (
             <ResponsiveMediaImage
               src={story.heroUrl}
@@ -115,7 +109,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
               loading="lazy"
             fetchPriority="low"
             decoding="async"
-              className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105 group-hover:rotate-[0.3deg]"
+              className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.015]"
             />
           ) : (
             <Chapter19FallbackImage
@@ -159,7 +153,9 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
     return (
       <Link
         to={url}
-        className="group flex gap-3.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-3 transition-all duration-300 hover:-translate-y-1 hover:border-[var(--wk-border-strong)] hover:bg-[var(--wk-surface-raised)] focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
+        data-wk-magazine-story
+      data-wk-magazine-category={story.section.trim().toLowerCase()}
+        className="group flex gap-3.5 border-b border-[var(--wk-border)] py-3 focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
       >
         {rank !== undefined && (
           <span className="w-5 shrink-0 pt-1 text-center text-[20px] font-black leading-none text-[var(--wk-brand)] opacity-25 transition-all duration-300 group-hover:opacity-70">
@@ -174,7 +170,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             {story.title}
           </h4>
           <span className="hidden text-[10px] font-bold text-[var(--wk-brand)] opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 sm:inline">
-            Why it matters: {why}
+            {why}
           </span>
           <div className="flex items-center gap-1.5 text-[10px] text-[var(--wk-text-faint)]">
             <ArticleAuthorIdentity
@@ -199,7 +195,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
               loading="lazy"
             fetchPriority="low"
             decoding="async"
-              className="h-full w-full object-cover object-top transition-transform duration-400 group-hover:scale-110 group-hover:rotate-[1deg]"
+              className="h-full w-full object-cover object-top transition-transform duration-400 group-hover:scale-[1.015]"
             />
           ) : (
             <Chapter19FallbackImage
@@ -217,9 +213,11 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
   return (
     <Link
       to={url}
-      className="group flex h-full flex-col overflow-hidden rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--wk-border-strong)] hover:shadow-xl focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
+      data-wk-magazine-story
+      data-wk-magazine-category={story.section.trim().toLowerCase()}
+      className="group flex h-full flex-col gap-3 focus-visible:ring-2 focus-visible:ring-[var(--wk-brand)]"
     >
-      <div className="aspect-[16/10] overflow-hidden bg-[var(--wk-surface-raised)]">
+      <div className="aspect-[3/2] overflow-hidden rounded-[12px] bg-[var(--wk-surface-raised)]">
         {story.heroUrl ? (
           <ResponsiveMediaImage
             src={story.heroUrl}
@@ -228,7 +226,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             loading="lazy"
             fetchPriority="low"
             decoding="async"
-            className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105 group-hover:rotate-[0.35deg]"
+            className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.015]"
           />
         ) : (
           <Chapter19FallbackImage
@@ -238,7 +236,7 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
           />
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-2 p-4 lg:p-5">
+      <div className="flex flex-1 flex-col gap-2 pb-2">
         <div className="flex items-center gap-2">
           <span className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--wk-brand)] transition-transform duration-300 group-hover:-translate-y-0.5">
             {story.section}
@@ -249,10 +247,10 @@ export function MagazineCard({ story, variant = "standard", rank }: MagazineCard
             </span>
           )}
         </div>
-        <h3 className="line-clamp-3 text-[15px] font-black leading-snug tracking-[-0.02em] text-[var(--wk-text)] transition-colors group-hover:text-[var(--wk-brand)] lg:text-[16px]">
+        <h3 className="line-clamp-3 text-[19px] font-bold leading-[1.22] tracking-[-0.025em] text-[var(--wk-text)] transition-colors group-hover:text-[var(--wk-brand)] lg:text-[21px]">
           {story.title}
         </h3>
-        <p className="hidden text-[12px] leading-relaxed text-[var(--wk-text-soft)] line-clamp-2 lg:block">
+        <p className="line-clamp-2 text-[15px] leading-[1.55] text-[var(--wk-text-soft)]">
           {why}
         </p>
         <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-[var(--wk-text-faint)]">

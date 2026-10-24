@@ -115,20 +115,25 @@ describe("Phase 7B V2 public Video experience convergence", () => {
     expect(watching).not.toContain("Back to Video");
   });
 
-  it("keeps global top chrome transient while preserving the shared bottom-navigation signal", () => {
-    expect(scrollDirection).toContain("topVisible");
-    expect(scrollDirection).toContain("850");
-    expect(scrollDirection).toContain("setTopVisible(false)");
-    expect(mobileLayout).toContain("scrollChrome.topVisible");
-    expect(mobileLayout).toContain("scrollChrome.visible");
-    expect(mobileTopBar).toContain("scrollVisible || searchOpen || accountOpen");
+  it("keeps Video visible in the single Workbook sidebar without a mobile bottom bar", () => {
+    const nav = read("src/components/navigation/wakilishaNavigation.ts");
+    expect(nav).toContain('label: "Video", to: "/video"');
+    expect(nav).toContain('label: "Audio", to: "/audio"');
+    expect(nav).toContain('label: "Podcasts", to: "/shows"');
+    expect(mobileLayout).toContain('data-wk-workbook-mobile-shell="v4"');
+    expect(mobileLayout).not.toContain("MobileBottomNav");
+    expect(mobileLayout).not.toContain("scrollChrome.visible");
+    expect(mobileTopBar).toContain('data-wk-mobile-app-header="v4"');
+    expect(mobileTopBar).toContain('aria-label="Open WAKILISHA menu"');
   });
 
   it("keeps the Video directory aligned to existing public page conventions", () => {
     expect(indexPage).toContain("var(--wk-bg)");
     expect(indexPage).toContain("var(--wk-surface)");
     expect(indexPage).toContain("Search Video");
-    expect(indexPage).toContain("Latest Video");
+    expect(indexPage).toContain("Films & documentaries");
+    expect(indexPage).toContain("groupedItems.map((group)");
+    expect(indexPage).toContain("Shorts");
     expect(indexPage).not.toContain("Watch the culture move.");
     expect(detailPage).toContain("<PublicVideoWatchingSurface");
   });

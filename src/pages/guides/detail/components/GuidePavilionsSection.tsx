@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CountryIdentityMark } from "@/components/design-system/CountryIdentityMark";
 import { inMinorKeysData } from "../data";
 
 interface Pavilion {
@@ -17,14 +18,6 @@ interface Pavilion {
   howToRead: string;
 }
 
-function getFlagEmoji(countryCode: string): string {
-  const codePoints = countryCode
-    .toUpperCase()
-    .split("")
-    .map((char) => 127397 + char.charCodeAt(0));
-  return String.fromCodePoint(...codePoints);
-}
-
 function PavilionModal({ pavilion, isOpen, onClose }: { pavilion: Pavilion; isOpen: boolean; onClose: () => void }) {
   if (!isOpen) return null;
 
@@ -35,7 +28,7 @@ function PavilionModal({ pavilion, isOpen, onClose }: { pavilion: Pavilion; isOp
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-[var(--wk-divider)] bg-[var(--wk-bg)]/95 backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">{getFlagEmoji(pavilion.flag)}</span>
+            <CountryIdentityMark code={pavilion.flag} />
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
                 {pavilion.type} | {pavilion.route}
@@ -133,7 +126,7 @@ export default function GuidePavilionsSection() {
                 aria-haspopup="dialog"
               >
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xl">{getFlagEmoji(pavilion.flag)}</span>
+                  <CountryIdentityMark code={pavilion.flag} compact />
                   <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--wk-text-faint)]">
                     {pavilion.type}
                   </span>

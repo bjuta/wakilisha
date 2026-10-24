@@ -1,6 +1,12 @@
+// @vitest-environment jsdom
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { fireEvent, render } from "@testing-library/react";
+import { getThumbnail } from "@/components/video/types";
+import { VideoCardFrame } from "@/components/video/VideoCardFrame";
+import { providerThumbnailUrls } from "@/components/video/providerSource";
 
 function read(file: string): string {
   return fs.readFileSync(path.resolve(file), "utf8");
@@ -81,6 +87,81 @@ describe("Phase 7B V3 Video provider source convergence", () => {
     expect(canvas).not.toContain("embedUrl: string");
     expect(overlay).not.toContain("embedUrl:");
     expect(overlay).toContain("providerObjectId: video.providerObjectId");
+  });
+
+  it("gives legacy Article YouTube cards real provider previews without changing playback", () => {
+    const id = "dQw4w9WgXcQ";
+    const preview = `https://img.youtube.com/vi/${id}/maxresdefault.jpg`;
+    const sd = `https://img.youtube.com/vi/${id}/sddefault.jpg`;
+    const hq = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+    expect(providerThumbnailUrls({ providerKey: "youtube", providerObjectId: id }))
+      .toEqual([preview, sd, hq]);
+    expect(providerThumbnailUrls({ providerKey: "youtube", providerObjectId: "invalid" }))
+      .toEqual([]);
+    expect(getThumbnail(`https://www.youtube.com/embed/${id}`)).toBe(preview);
+    expect(getThumbnail(`https://youtu.be/${id}`)).toBe(preview);
+    expect(getThumbnail(`https://www.youtube.com/watch?v=${id}`)).toBe(preview);
+    expect(getThumbnail("https://player.vimeo.com/video/123456")).toBeNull();
+
+    expect(providerSource).toContain("providerThumbnailUrl");
+    expect(types).toContain("providerThumbnailUrl(source)");
+    expect(types).toContain("thumbnail: getThumbnail(src)");
+
+    const card = read("src/components/video/VideoCard.tsx");
+    const frame = read("src/components/video/VideoCardFrame.tsx");
+    expect(card).toContain("thumbnail={video.thumbnail}");
+    expect(frame).toContain("thumbnailFallbacks");
+    expect(frame).toContain("naturalWidth <= 120");
+    expect(frame).toContain("onError={advanceThumbnail}");
+    expect(desktopArticle).toContain("<ArticleContentRenderer");
+    expect(mobileArticle).toContain("<ArticleContentRenderer");
+  });
+
+  it("renders the best YouTube image and skips decoded 120px placeholder posters", () => {
+    const id = "dQw4w9WgXcQ";
+    const sources = providerThumbnailUrls({ providerKey: "youtube", providerObjectId: id });
+    const ui = render(createElement(VideoCardFrame, {
+      title: "Music video",
+      thumbnail: sources[0],
+      thumbnailFallbacks: sources.slice(1),
+    }));
+
+    const image = () => ui.container.querySelector("img") as HTMLImageElement;
+    expect(image().src).toBe(sources[0]);
+
+    Object.defineProperty(image(), "naturalWidth", { value: 120, configurable: true });
+    fireEvent.load(image());
+    expect(image().src).toBe(sources[1]);
+    expect(image().className).toContain("opacity-0");
+
+    fireEvent.error(image());
+    expect(image().src).toBe(sources[2]);
+    Object.defineProperty(image(), "naturalWidth", { value: 480, configurable: true });
+    fireEvent.load(image());
+    expect(image().className).toContain("opacity-100");
+    ui.unmount();
+  });
+
+  it("does not show a tiny placeholder when no YouTube artwork variant is available", () => {
+    const sources = providerThumbnailUrls({
+      providerKey: "youtube",
+      providerObjectId: "dQw4w9WgXcQ",
+    });
+    const ui = render(createElement(VideoCardFrame, {
+      title: "Unavailable video image",
+      thumbnail: sources[0],
+      thumbnailFallbacks: sources.slice(1),
+    }));
+    const image = () => ui.container.querySelector("img") as HTMLImageElement;
+
+    for (let index = 0; index < sources.length; index += 1) {
+      Object.defineProperty(image(), "naturalWidth", { value: 120, configurable: true });
+      fireEvent.load(image());
+    }
+
+    expect(ui.container.querySelector("img")).toBeNull();
+    expect(ui.container.querySelector(".ri-film-line")).not.toBeNull();
+    ui.unmount();
   });
 
   it("makes Articles consume canonical provider descriptors without rewriting HTML", () => {

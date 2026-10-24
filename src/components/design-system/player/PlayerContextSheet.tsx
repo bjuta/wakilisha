@@ -79,7 +79,7 @@ export function PlayerContextSheet({
             onClick={action.onClick}
             disabled={action.disabled}
             className={[
-              "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-colors",
+              "flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
               action.active
                 ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
                 : "text-[var(--wk-text)] hover:bg-[var(--wk-surface-raised)]",
@@ -90,7 +90,7 @@ export function PlayerContextSheet({
           >
             <span
               className={[
-                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
                 action.active
                   ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
                   : "bg-[var(--wk-surface-raised)] text-[var(--wk-text-muted)]",
@@ -102,11 +102,6 @@ export function PlayerContextSheet({
               <span className="block text-[13px] font-black">
                 {action.label}
               </span>
-              {action.description ? (
-                <span className="mt-0.5 block text-[11px] leading-4 text-[var(--wk-text-muted)]">
-                  {action.description}
-                </span>
-              ) : null}
             </span>
             <WkIcon
               name="ChevronRight"
