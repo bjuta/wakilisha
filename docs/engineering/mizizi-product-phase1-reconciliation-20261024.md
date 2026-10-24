@@ -33,7 +33,20 @@ The five evidence standings **Established, Supported, Unresolved, Contested, Unk
 | Historical Registry #1094 | DESIRE blocked; Ficha and Colors original reviewed repairs verified | Do not replay old operations or backdate their receipts |
 | Enterprise | Internal one-workspace proofs; no contracted customer, independently accepted cross-customer delivery, model-autonomy credential or million-scale benchmark | C17 genuine two-workspace and H37 queued canonical writer under Hold remain explicit unresolved Slice 3 tests |
 
-Migration warning: **237 vs 234 is not a linear three-migration delta**. Preview's maximum version is earlier than Production's. Before any Phase 2 promotion, enumerate the exact version sets and dependencies, identify Production-only/Preview-only versions, prove forward-safe native replay from current `main`, verify types and schema seals, and keep the existing paid Preview intact pending approved disposition. This Phase 1 documentation effort did not run a migration or change any runtime configuration.
+### Completed Phase 1 nonmutating migration version-set comparison
+
+Live read-only SQL compared the **entire shared version prefix** in both databases: exactly **231 entries** through `20261015091718`, with matching ordered-version MD5 `40d4cdaf839f0940b121c587fad96a2f`. These are ledger-version identities only, not a guarantee of row/data/runtime parity.
+
+| Only on Production (merged main) | Only on Preview (unmerged MIZIZI stack) |
+| --- | --- |
+| `20261019152307_wk_chart_observation_receipts_v1` | `20261016064245_mizizi_research_pass_memory_v1` |
+| `20261019203244_wk_chart_private_raw_evidence_v1` | `20261016092731_mizizi_external_wikidata_research_intake_v1` |
+| `20261020072800_wk_chart_capture_runtime_v1` | `20261016114918_mizizi_research_job_retry_budget_v1` |
+| | `20261017185928_mizizi_question_assessment_authority_v1` |
+| | `20261017202800_mizizi_governed_question_freeze_v1` |
+| | `20261017212255_mizizi_source_family_attestation_v1` |
+
+All three Production-only migrations are present in merged `main` source/proof tree; all six Preview-only migrations are **absent from merged `main`**. This proves a **branched migration history**, not a three-version lead. **Version-set diff: PASS; forward-safe replay, schema/type parity, security and secrets/HTTP equivalence: NOT RUN**. Before Phase 2 promotion, review and preserve the existing draft migration lineage, prove all nine changes commute or need reviewed reordering, run clean disposable native replay from current main, produce authentic schema seals, verify exact auth/RLS/DB05 and runtime dependencies, and then authorize only the necessary non-destructive Preview update. No reset, retroactive migration renaming, historical replay, Production SQL or new paid branch is approved by this inventory.
 
 ## MIZIZI UI and UX screen contract (owner's M1–M13)
 
@@ -84,7 +97,7 @@ Design: Figtree human copy; IBM Plex Mono **only** exact technical values; green
 
 - Reconcile **all docs by authority class** using the [documentation authority index](./mizizi-documentation-authority-index-20261024.md), preserving dated historical evidence.
 - Confirm latest owner's **M1–M13** screen and exclusion contract, compare actual shared fonts/components/geometry/route ownership, and publish component- and capability-level preserve/refactor/retire/build matrix.
-- Diff Preview and Production **complete** migration sets and runtime dependencies without mutating either. Determine safe onward Preview acceptance environment and exact draft-PR lineage.
+- Preserve the **completed exact version-set diff** above and independently verify migration dependency/replay compatibility, types, permissions, and runtime secrets without mutating either environment. Determine safe onward Preview acceptance environment and exact draft-PR lineage.
 - Use existing protected CI/design screenshots for meaningful acceptance; no new permanent CI workflows or gratuitous Phase-1-only test suites.
 - **Exit** only after exact source snapshot/interpretation, UI/UX mapping at 390/480/768/1024/1280/1440, route/permission inventory, non-destructive migration reconciliation, and approved clean implementation gate. **As of this document, these exits remain OPEN.**
 
@@ -107,8 +120,8 @@ Accept Field → contribution → governed investigation → reviewed action/no-
 On 24 October 2026 the following **read-only** Phase 1 steps were performed:
 - Exact GitHub `main` tree enumerated: **878 files under `docs/`, 345 Markdown/MDX/TXT files**, including 60 MIZIZI-named prose files and 497 immutable replay-proof/replay-baseline entries. Existing repo code ownership inventoried as above.
 - Current PR states verified: #1246 merged; #1243, #1244 and #1248–#1251 draft/unmerged. The existing shared four-phase programme is retained and corrected, not multiplied.
-- Both Supabase environments read without writes. Counts and migration heads are recorded in the live authority table above. The exact complete migration-set diff, runtime secret parity, and authenticated UI browser acceptance are **not performed** by this docs pass.
+- Both Supabase environments read without writes. Counts and migration heads are recorded in the live authority table above. The exact migration version-set diff **was completed read-only**; forward-native replay, schema/type and runtime secret parity, and authenticated UI browser acceptance are **not performed** by this docs pass.
 - New owner-provided source SHA fingerprints and M1–M13 contract recorded without copying Distribution into product scope.
 - No SQL, Edge, JIT toggle, Registry, Production frontend, preview reset, historical replay or admin privilege change.
 
-**Open Phase 1 gates:** (1) exact current uploaded MIZIZI-only design snapshot stored and reviewed; (2) live route/device design comparison (not authenticated in this docs-only pass); (3) exact migration set / type / runtime secret and auth parity; (4) reviewed decision on stale legacy UI/components; (5) protected CI of the actual code release before implementation claim. These must be completed within Phase 1, not silently waived or deferred to Phase 4.
+**Open Phase 1 gates:** (1) exact current uploaded MIZIZI-only design snapshot stored and reviewed; (2) live route/device design comparison (not authenticated in this docs-only pass); (3) forward-safe native replay, type, runtime-secret and auth parity after the completed version-set diff; (4) reviewed decision on stale legacy UI/components; (5) protected CI of the actual code release before implementation claim. These must be completed within Phase 1, not silently waived or deferred to Phase 4.
