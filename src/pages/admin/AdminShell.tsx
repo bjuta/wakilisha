@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
+import { isMiziziProductRoute } from "@/services/miziziProductRoute";
 import { useTheme } from "@/components/design-system/theme/ThemeProvider";
 import { WkIcon } from "@/components/design-system/Icon";
 import { AdminCommandPalette } from "@/components/admin/AdminCommandPalette";
@@ -422,9 +423,7 @@ export function AdminShell() {
   // Headquarters owns the 248px MIZIZI rail and the 64px toolbar. Retain the
   // existing authenticated AdminShell gate above; do not nest a second admin
   // navigation shell or impose Studio page padding on the product workspace.
-  const isMiziziProductRoute =
-    location.pathname === "/admin/review/mizizi" ||
-    location.pathname.startsWith("/admin/review/mizizi/");
+  const miziziProductSurface = isMiziziProductRoute(location.pathname);
 
   const visibleGroups = NAV_GROUPS.filter((group) => group.visible(user.can)).map((group) => ({ ...group, items: group.items.filter((item) => !item.requiredCapability || user.can(item.requiredCapability)) }));
 
@@ -435,13 +434,13 @@ export function AdminShell() {
         ? "translate-x-0"
         : "-translate-x-full lg:translate-x-0";
 
-  const mainOffsetClass = isMiziziProductRoute || editorFocusMode
+  const mainOffsetClass = miziziProductSurface || editorFocusMode
     ? "lg:pl-0"
     : collapsed
       ? "lg:pl-16"
       : "lg:pl-64";
 
-  const mainContentClass = isMiziziProductRoute
+  const mainContentClass = miziziProductSurface
     ? "max-w-none p-0"
     : editorFocusMode
       ? "max-w-none px-3 py-3 sm:px-4 lg:px-6"
@@ -451,17 +450,17 @@ export function AdminShell() {
   return (
     <div className="min-h-screen bg-wk-bg text-wk-text">
       {/* Mobile menu trigger */}
-      {!editorFocusMode && !isMiziziProductRoute ? (
+      {!editorFocusMode && !miziziProductSurface ? (
         <button onClick={() => setMobileOpen(true)} className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-wk-border bg-wk-surface shadow-lg lg:hidden"><WkIcon name="Menu" size={20} /></button>
       ) : null}
 
       {/* Mobile overlay */}
-      {!editorFocusMode && !isMiziziProductRoute && mobileOpen ? (
+      {!editorFocusMode && !miziziProductSurface && mobileOpen ? (
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />
       ) : null}
 
       {/* Sidebar: WAKILISHA Studio navigation never nests into MIZIZI. */}
-      {!isMiziziProductRoute ? (
+      {!miziziProductSurface ? (
       <aside data-wk-admin-studio-sidebar className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-wk-border bg-wk-surface transition-all duration-300 ${collapsed ? "w-16" : "w-64"} ${sidebarPositionClass}`}>
         {/* Sidebar Header */}
         <div className="flex h-16 items-center gap-3 border-b border-wk-border px-4">
@@ -555,7 +554,7 @@ export function AdminShell() {
       ) : null}
 
       {/* Main */}
-      <main data-wk-mizizi-product-shell={isMiziziProductRoute ? "true" : undefined} className={`min-h-screen transition-all duration-300 ${mainOffsetClass}`}>
+      <main data-wk-mizizi-product-shell={miziziProductSurface ? "true" : undefined} className={`min-h-screen transition-all duration-300 ${mainOffsetClass}`}>
         <div className={mainContentClass}>
           <Outlet />
         </div>
