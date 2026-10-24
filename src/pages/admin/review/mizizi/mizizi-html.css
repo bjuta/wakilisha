@@ -466,7 +466,6 @@
   [data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .core-list{border-right:0;border-bottom:1px solid var(--wk-border)}
 }
 @media(max-width:680px){
-  [data-wk-mizizi-workspace]{margin:-12px}
   [data-wk-mizizi-workspace] .mz-head{gap:8px;padding:10px 12px}
   [data-wk-mizizi-workspace] .mz-small,[data-wk-mizizi-workspace] .mz-context{display:none}
   [data-wk-mizizi-workspace] .mz-right{margin-left:auto}
