@@ -80,6 +80,8 @@ export const ExtendedImage = Image.extend({
 
   renderHTML({ HTMLAttributes }) {
     const { caption, alignment, ...imgAttrs } = HTMLAttributes;
+    // The attribute and semantic caption always travel with the same image atom.
+    if (caption) imgAttrs["data-caption"] = caption;
     const alignClass = alignment ? `align-${alignment}` : '';
 
     if (caption) {
@@ -87,7 +89,7 @@ export const ExtendedImage = Image.extend({
         'figure',
         { class: `wk-figure ${alignClass}`.trim() },
         ['img', imgAttrs],
-        ['figcaption', { class: 'wk-figcaption' }, caption],
+        ['figcaption', { class: 'wk-figcaption', contenteditable: 'false' }, caption],
       ];
     }
 

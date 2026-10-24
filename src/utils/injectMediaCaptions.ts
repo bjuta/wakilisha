@@ -1,3 +1,5 @@
+import { normalizeArticleMediaCaptions } from "@/utils/normalizeArticleMediaCaptions";
+
 /**
  * Inject Media Captions into HTML
  *
@@ -46,44 +48,15 @@ export function buildAssetCaptionMap(
  */
 export function injectMediaCaptions(
   html: string,
-  assetMap: Map<string, MediaCaptionEntry>
+  assetMap: Map<string, MediaCaptionEntry>,
 ): string {
-  if (!html || assetMap.size === 0) return html;
+  return normalizeArticleMediaCaptions(html, "display", assetMap);
+}
 
-  return html.replace(
-    /<img\s+([^>]*?)data-asset-id="([^"]+)"([^>]*?)(\/?)>/gi,
-    (fullMatch, beforeAttrs, assetId, afterAttrs, selfClose) => {
-      const entry = assetMap.get(assetId);
-      if (!entry || !entry.caption) return fullMatch;
-
-      const before = beforeAttrs || '';
-      const after = afterAttrs || '';
-
-      // Check if this img is already inside a <figure> or has a following <figcaption>
-      // by looking at context in the replacement — we only inject for standalone <img> tags.
-      // Since we operate on the full HTML string via regex, we can't easily check
-      // parent context. Instead, we rely on the fact that images already wrapped in
-      // <figure><figcaption> by TipTap won't match this regex because the data-asset-id
-      // attribute is stripped by renderHTML before the img tag, or the figure is already
-      // wrapping it. Actually, data-asset-id is preserved in renderHTML, so we need to
-      // guard against double-wrapping.
-
-      // Build the img tag back
-      const imgTag = `<img ${before}data-asset-id="${assetId}"${after}${selfClose ? '/' : ''}>`;
-
-      // Build figure with figcaption
-      const escapedCaption = entry.caption
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-
-      return (
-        `<figure class="wk-figure">` +
-        imgTag +
-        `<figcaption class="wk-figcaption">${escapedCaption}</figcaption>` +
-        `</figure>`
-      );
-    }
-  );
+/** Editor loading preserves the caption on a media atom, never in body text. */
+export function prepareMediaCaptionsForEditor(
+  html: string,
+  assetMap: Map<string, MediaCaptionEntry>,
+): string {
+  return normalizeArticleMediaCaptions(html, "editor", assetMap);
 }
