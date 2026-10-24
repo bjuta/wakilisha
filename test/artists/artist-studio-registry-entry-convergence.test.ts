@@ -172,9 +172,9 @@ describe(
         expect(sharedNavigation).not.toContain(
           '{ label: "Posts",',
         );
-        expect(shell).toContain("navigation.map");
+        expect(shell).toContain("<MobileTopBar />");
         expect(mobileDrawer).toContain("navigation.map");
-        expect(desktopDrawer).toContain("MobileAccountDrawer");
+        expect(desktopDrawer).toContain("shouldReserveWakilishaHeaderSpace");
         expect(mobileShell).not.toContain("MobileBottomNav");
         expect(shell).not.toContain("studioLauncherOpen");
 
