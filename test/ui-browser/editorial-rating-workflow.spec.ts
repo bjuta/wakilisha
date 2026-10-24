@@ -126,8 +126,6 @@ test("Insert Release discovers draft records with no active memberships, but can
 });
 
 test("media-bound captions remain attached after a real browser edit and save", async ({ page }, info) => {
-  page.on("pageerror", (error) => console.log("WK_CAPTION_PAGE_ERROR", error.message));
-  page.on("console", (message) => { if (message.text().startsWith("WK_CAPTION_")) console.log(message.text()); });
   // Tiptap rejects data: image URLs by default. Serve the synthetic artwork
   // through Chromium so the fixture exercises the real editor image contract.
   await page.route("**/wk-editorial-caption-artwork.svg", (route) =>
@@ -152,32 +150,25 @@ test("media-bound captions remain attached after a real browser edit and save", 
       await expect(caption).toHaveCSS("font-size", /^(12|12.5|13)px$/);
       await editor.locator("figure.wk-figure img").click();
       await page.getByRole("button", { name: "Caption", exact: true }).click();
-      // Diagnostic evidence before the modal assertion. Remove after the
-      // ownership failure is identified and the editor passes this test.
-      console.log("WK_CAPTION_AFTER_CLICK", JSON.stringify(await page.evaluate(() => ({
-        dialogs: Array.from(document.querySelectorAll('[role="dialog"]')).map((el) => ({
-          label: el.getAttribute("aria-label"),
-          text: el.textContent?.slice(0, 100),
-        })),
-        panels: document.querySelectorAll("[data-wk-modal-panel]").length,
-        captionButtons: Array.from(document.querySelectorAll("button")).filter((el) =>
-          el.textContent?.trim() === "Caption").length,
-        captionOpen: document.querySelector("[data-wk-caption-open]")?.getAttribute("data-wk-caption-open"),
-        images: document.querySelectorAll(".ProseMirror figure.wk-figure img").length,
-      }))));
       const mediaDetails = page.getByRole("dialog", { name: "Image Details" });
       await expect(mediaDetails).toBeVisible();
       await mediaDetails.locator("textarea").fill("Edited attribution, this article only.");
       await mediaDetails.getByRole("button", { name: "Save Details" }).click();
       await expect(editor.locator("figure.wk-figure > figcaption")).toHaveText("Edited attribution, this article only.");
-      await editor.locator("p").last().click();
+      // A text edit must target the existing paragraph, not the image node.
+      // Clicking the paragraph centre can leave ProseMirror's NodeSelection
+      // active at narrow widths and make typing replace the selected image.
+      await editor.locator("p").last().click({ position: { x: 12, y: 9 } });
+      await expect.poll(() => page.evaluate(() => {
+        const anchor = window.getSelection()?.anchorNode;
+        const element = anchor instanceof Element ? anchor : anchor?.parentElement;
+        return element?.closest("p")?.textContent?.trim() || "";
+      })).toContain("The music review continues.");
+      await page.keyboard.press("End");
       await page.keyboard.type(" Edited.");
+      await expect(editor.locator("figure.wk-figure > img")).toHaveCount(1);
+      await expect(editor.locator("p").last()).toContainText("Edited.");
       await page.getByRole("button", { name: "Save draft" }).click();
-      console.log("WK_MEDIA_AFTER_SAVE", JSON.stringify(await page.evaluate(() => ({
-        savedHtml: document.querySelector("[data-wk-saved-html]")?.textContent?.slice(0, 1200),
-        editorHtml: document.querySelector(".ProseMirror")?.innerHTML.slice(0, 1200),
-        savedNodes: document.querySelector("[data-wk-saved-article]")?.innerHTML.slice(0, 1200),
-      }))));
       await expect(page.locator("[data-wk-saved-article] figure > figcaption")).toHaveCount(1);
       await expect(page.locator("[data-wk-saved-article] p")).toHaveCount(2);
       await page.getByRole("button", { name: "Reopen saved draft" }).click();
