@@ -7,8 +7,8 @@
   color: var(--wk-text);
   background: var(--wk-bg);
   min-width: 0;
-  min-height: calc(100vh - 100px);
-  margin: -24px;
+  min-height: 100dvh;
+  margin: 0;
   font-family: var(--wk-font-body, Figtree, system-ui, sans-serif);
 }
 [data-wk-mizizi-workspace] .mz-head {
