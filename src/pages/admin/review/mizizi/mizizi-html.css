@@ -58,7 +58,7 @@
   min-width: 0;
   min-height: calc(100vh - 100px);
   margin: -24px;
-  font-family: var(--wk-font-body, Inter, system-ui, sans-serif);
+  font-family: var(--wk-font-body, Figtree, system-ui, sans-serif);
 }
 [data-wk-mizizi-workspace] .mz-head {
   display:flex; align-items:center; gap:12px; flex-wrap:wrap;
@@ -68,12 +68,12 @@
   border-bottom:1px solid var(--wk-border);
 }
 [data-wk-mizizi-workspace] .mz-wordmark {
-  display:flex; align-items:center; gap:8px; font:800 18px/1.2 var(--wk-font-display, Inter, sans-serif);
+  display:flex; align-items:center; gap:8px; font:800 18px/1.2 var(--wk-font-display, Figtree, sans-serif);
   letter-spacing:.025em; white-space:nowrap;
 }
 [data-wk-mizizi-workspace] .mz-wordmark svg{color:var(--wk-brand);flex:none}
 [data-wk-mizizi-workspace] .mz-small {
-  font:500 11px/1.4 var(--wk-font-ui, Inter, sans-serif);
+  font:500 11px/1.4 var(--wk-font-ui, Figtree, sans-serif);
   color:var(--wk-text-muted);letter-spacing:0;
 }
 [data-wk-mizizi-workspace] .mz-context {
@@ -151,7 +151,7 @@
 }
 [data-wk-mizizi-workspace] .night-copy{position:relative;z-index:1;max-width:960px}
 [data-wk-mizizi-workspace] .night h1{
-  margin-top:14px;font:750 clamp(26px,3.7vw,49px)/1.13 var(--wk-font-display, Inter, sans-serif);
+  margin-top:14px;font:750 clamp(26px,3.7vw,49px)/1.13 var(--wk-font-display, Figtree, sans-serif);
   letter-spacing:-.025em;color:var(--wk-text);
 }
 [data-wk-mizizi-workspace] .night h1 strong{color:var(--wk-brand)}
@@ -259,7 +259,7 @@
   display:flex;gap:12px;align-items:end;justify-content:space-between;flex-wrap:wrap;
 }
 [data-wk-mizizi-workspace] .time h2{
-  font:750 clamp(19px,2.3vw,27px)/1.25 var(--wk-font-display, Inter, sans-serif);
+  font:750 clamp(19px,2.3vw,27px)/1.25 var(--wk-font-display, Figtree, sans-serif);
   color:var(--wk-text);
 }
 [data-wk-mizizi-workspace] .choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
@@ -384,7 +384,7 @@
 }
 [data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .claim{
   margin-top:12px;max-width:25ch;
-  font:760 clamp(27px,3.15vw,43px)/1.12 var(--wk-font-display, Inter, sans-serif);
+  font:760 clamp(27px,3.15vw,43px)/1.12 var(--wk-font-display, Figtree, sans-serif);
   letter-spacing:-.035em;color:var(--wk-text);
 }
 [data-wk-mizizi-workspace] [data-wk-mizizi-evidence-workbench] .verdict{
@@ -413,7 +413,7 @@
   margin-bottom:15px;
 }
 [data-wk-mizizi-workspace] .mz-dossier-section-heading h4{
-  font:750 clamp(19px,2vw,26px)/1.25 var(--wk-font-display, Inter, sans-serif);
+  font:750 clamp(19px,2vw,26px)/1.25 var(--wk-font-display, Figtree, sans-serif);
   color:var(--wk-text);letter-spacing:-.02em;
 }
 [data-wk-mizizi-workspace] .mz-dossier-section-heading p{
