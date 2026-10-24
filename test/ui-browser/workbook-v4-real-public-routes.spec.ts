@@ -147,13 +147,22 @@ for (const width of [390, 768, 1440]) {
         for (const action of ["Open WAKILISHA menu", "Search"]) {
           const contrast = await topBar.getByRole("button", { name: action }).evaluate((node) => {
             const style = getComputedStyle(node);
-            const channels = (colour: string) => (colour.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
             const luminance = (colour: string) => {
-              const [red, green, blue] = channels(colour);
-              return [red, green, blue]
+              // Theme tokens include OKLCH. Let the actual Chromium canvas
+              // resolve the CSS colour before measuring linear RGB luminance.
+              const canvas = document.createElement("canvas");
+              canvas.width = 1;
+              canvas.height = 1;
+              const context = canvas.getContext("2d", { willReadFrequently: true });
+              if (!context) throw new Error("Canvas 2D unavailable for colour validation");
+              context.fillStyle = colour;
+              context.fillRect(0, 0, 1, 1);
+              const [red, green, blue, alpha] = context.getImageData(0, 0, 1, 1).data;
+              if (alpha !== 255) throw new Error("Control colour is not opaque");
+              const linear = [red, green, blue]
                 .map((value) => value / 255)
-                .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
-                .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+                .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+              return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
             };
             const foreground = luminance(style.color);
             const background = luminance(style.backgroundColor);
@@ -163,7 +172,7 @@ for (const width of [390, 768, 1440]) {
               blend: style.mixBlendMode,
             };
           });
-          expect(contrast.ratio).toBeGreaterThanOrEqual(4.5);
+          expect(contrast.ratio, `${mode}/${width}/${action}: ${JSON.stringify(contrast)}`).toBeGreaterThanOrEqual(4.5);
           expect(contrast.background).not.toBe("rgba(0, 0, 0, 0)");
           expect(contrast.blend).toBe("normal");
         }
