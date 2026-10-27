@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { SeekRail } from "./SeekRail";
@@ -60,6 +60,26 @@ export function PlayerCompactSurface({
 
   const isMobile = mode === "mobile";
   const [browserGap, setBrowserGap] = useState(0);
+  const longPressRef = useRef<number | null>(null);
+  const suppressClickRef = useRef(false);
+  const cancelLongPress = () => {
+    if (longPressRef.current !== null) {
+      window.clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  };
+  const beginLongPress = () => {
+    cancelLongPress();
+    suppressClickRef.current = false;
+    longPressRef.current = window.setTimeout(() => {
+      longPressRef.current = null;
+      suppressClickRef.current = true;
+      openFullPlayer("more");
+    }, 550);
+  };
+  useEffect(() => () => {
+    if (longPressRef.current !== null) window.clearTimeout(longPressRef.current);
+  }, []);
   useEffect(() => {
     if (!isMobile || !window.visualViewport) return;
     const viewport = window.visualViewport;
@@ -156,7 +176,21 @@ export function PlayerCompactSurface({
       >
         <button
           type="button"
-          onClick={openFullPlayer}
+          onClick={() => {
+            if (suppressClickRef.current) {
+              suppressClickRef.current = false;
+              return;
+            }
+            openFullPlayer();
+          }}
+          onTouchStart={isMobile ? beginLongPress : undefined}
+          onTouchEnd={isMobile ? cancelLongPress : undefined}
+          onTouchCancel={isMobile ? cancelLongPress : undefined}
+          onTouchMove={isMobile ? cancelLongPress : undefined}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            openFullPlayer("more");
+          }}
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
           <div

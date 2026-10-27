@@ -208,8 +208,8 @@ interface PlayerContextValue {
   setPlaybackRate: (rate: number) => void;
   toggleRepeat: () => void;
   toggleShuffle: () => void;
-  openFullPlayer: (panel?: "lyrics" | "comments" | "queue") => void;
-  requestedPlayerPanel: "lyrics" | "comments" | "queue" | null;
+  openFullPlayer: (panel?: "lyrics" | "comments" | "queue" | "more") => void;
+  requestedPlayerPanel: "lyrics" | "comments" | "queue" | "more" | null;
   closeFullPlayer: () => void;
   canGoNext: boolean;
   canGoPrev: boolean;
@@ -230,7 +230,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
   const [isShuffle, setIsShuffle] = useState(false);
   const [isFullPlayerOpen, setIsFullPlayerOpen] = useState(false);
-  const [requestedPlayerPanel, setRequestedPlayerPanel] = useState<"lyrics" | "comments" | "queue" | null>(null);
+  const [requestedPlayerPanel, setRequestedPlayerPanel] = useState<"lyrics" | "comments" | "queue" | "more" | null>(null);
   const [playbackBackend, setPlaybackBackend] = useState<PlaybackBackend>("audio");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1092,7 +1092,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (!playbackPrefs.autoplay) {
+      if (!playbackPrefs.autoplay && repeatMode !== "all") {
         setIsPlaying(false);
         return;
       }
@@ -2124,7 +2124,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   ]);
 
   // ─── Full player ───
-  const openFullPlayer = useCallback((panel?: "lyrics" | "comments" | "queue") => {
+  const openFullPlayer = useCallback((panel?: "lyrics" | "comments" | "queue" | "more") => {
     setRequestedPlayerPanel(panel ?? null);
     setIsFullPlayerOpen(true);
   }, []);

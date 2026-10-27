@@ -149,8 +149,8 @@ export function PlayerFullSurface({
 
   const [panel, setPanel] =
     useState<PlayerPanel>(mode === "desktop"
-      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
-      : "none");
+      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "more" ? "more" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
+      : (requestedPlayerPanel === "more" ? "more" : "none"));
   const [inlinePanelHost, setInlinePanelHost] = useState<HTMLElement | null>(null);
   const [appleConnected, setAppleConnected] = useState(
     () => getApplePlaybackPrefsSnapshot().appleMusicConnected,
@@ -192,8 +192,8 @@ export function PlayerFullSurface({
     );
     setAppleConnectError(null);
     setPanel(mode === "desktop"
-      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
-      : "none");
+      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "more" ? "more" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
+      : (requestedPlayerPanel === "more" ? "more" : "none"));
     setLyrics(null);
     setLyricsError(null);
     setTranscript(null);

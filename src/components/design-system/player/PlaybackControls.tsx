@@ -90,7 +90,12 @@ function PlaybackToggleRow({
         {detail && <div className="mt-1 text-[12px] text-[var(--wk-text-muted)]">{detail}</div>}
       </div>
       <span className={disabled ? "pointer-events-none" : ""}>
-        <WakilishaToggle value={checked && !disabled} onChange={onChange} />
+        <WakilishaToggle
+          value={checked}
+          disabled={disabled}
+          ariaLabel={label}
+          onChange={onChange}
+        />
       </span>
     </div>
   );

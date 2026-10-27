@@ -898,7 +898,13 @@ export default function TrackDetail() {
 
   const trackIntro = buildTrackHeroIntro(track);
   const seoDescription = buildTrackSeoDescription(track);
-  const isCurrentTrack = currentTrack?.id === track.slug;
+  const isCurrentTrack = Boolean(
+    currentTrack && (
+      currentTrack.registryTrackId === track.id ||
+      currentTrack.id === track.slug ||
+      currentTrack.id === track.id
+    )
+  );
   const isTrackPlaying = isCurrentTrack && isPlaying;
   const minutes = track.duration ? Math.round(track.duration / 60) : 0;
   const hasAppleCatalog = Boolean(track.appleMusicCatalogId || track.appleMusicId);
