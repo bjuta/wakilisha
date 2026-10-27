@@ -564,7 +564,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         // HTMLMediaElement.play() can resolve while Web Audio renders silence
         // (iOS suspended context or redirected, CORS-tainted media).
         // Verify non-zero decoded PCM, not merely advancing timestamps.
-        let heardAudio = false;
         let samples = 0;
         const verifyOutput = () => {
           if (!isPlaybackSessionCurrent(sessionId) || audioRef.current !== activeAudio ||
