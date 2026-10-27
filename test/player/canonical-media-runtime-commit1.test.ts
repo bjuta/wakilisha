@@ -215,7 +215,8 @@ describe(
     it(
       "keeps the Track hero compact and responsive",
       () => {
-        expect(trackDetail).toContain('w-[200px] sm:w-[240px] lg:w-[280px]');
+        expect(trackDetail).toContain('h-[232px] w-[232px]');
+        expect(trackDetail).toContain('md:h-[260px] md:w-[260px]');
         expect(trackDetail).toContain('overflowWrap: "anywhere"');
         expect(trackDetail).toContain('canonicalTrackUrl(');
       },
