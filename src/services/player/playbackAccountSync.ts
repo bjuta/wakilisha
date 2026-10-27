@@ -96,10 +96,20 @@ export function startPlaybackAccountSync(): () => void {
     }, 500);
   };
 
-  const writeLocal = (prefs: SharedPlayback, accountId: string, timestamp: number) => {
+  const writeLocal = (
+    prefs: SharedPlayback, accountId: string, timestamp: number,
+    clearProviderCredentials = false,
+  ) => {
     applyingRemote = true;
     try {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...localFull(), ...prefs }));
+      const existing = localFull();
+      if (clearProviderCredentials) {
+        // An Apple Music authorization belongs to the previous account.
+        delete existing.appleMusicToken;
+        existing.appleMusicConnected = false;
+        existing.preferApplePreviews = false;
+      }
+      localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...existing, ...prefs }));
       localStorage.setItem(TIMESTAMP_KEY, String(timestamp));
       localStorage.setItem(OWNER_KEY, accountId);
       fingerprint = JSON.stringify(prefs);
@@ -142,7 +152,7 @@ export function startPlaybackAccountSync(): () => void {
 
     // Never push person A's browser settings to person B on the same device.
     if (existingOwner && existingOwner !== accountId) {
-      writeLocal(cloud ? fromRecord(cloud) : defaults, accountId, cloudTimestamp);
+      writeLocal(cloud ? fromRecord(cloud) : defaults, accountId, cloudTimestamp, true);
       if (!cloud) save();
       return;
     }

@@ -147,9 +147,13 @@ jobs:
             test/video/phase-7b-v4b-public-adaptive-video-playback.test.ts \
             test/video/phase-7b-v4c-governed-video-quality-selection.test.ts
 
-      - name: Enforce shared Media presentation convergence
+      - name: Enforce shared Media presentation and Chapter 25 playback contracts
         run: |
-          npx vitest run             test/media/media-presentation-surface.test.ts             test/player/mobile-provider-playback-contract.test.ts
+          npx vitest run \
+            test/media/media-presentation-surface.test.ts \
+            test/player/mobile-provider-playback-contract.test.ts \
+            test/player/canonical-media-runtime-commit1.test.ts \
+            test/player/workbook-ch25-crossfade-policy.test.ts
 
       - name: Require Supabase control-plane access
         run: |

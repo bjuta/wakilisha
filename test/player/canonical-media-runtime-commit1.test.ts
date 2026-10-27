@@ -79,6 +79,10 @@ const dock = readFileSync(
   "src/components/design-system/music/PlayerDock.tsx",
   "utf8",
 );
+const accountSync = readFileSync(
+  "src/services/player/playbackAccountSync.ts",
+  "utf8",
+);
 
 describe(
   "canonical media runtime Commit 1",
@@ -204,7 +208,7 @@ describe(
         expect(trackDetail).toContain("inRelease ? releaseQueue : [playerTrack]");
         expect(articleRelease).toContain("playTrack(playerTrack, [playerTrack],");
         expect(artistTopSongs).toContain("sourceSection: \"top_songs_expanded\"");
-        expect(playerContext).toContain("if (!playbackPrefs.autoplay) {");
+        expect(playerContext).toContain('if (!playbackPrefs.autoplay && repeatMode !== "all") {');
         expect(playbackSettings).toContain("autoplay: true,");
         expect(playbackSettings).toContain("crossfade: false,");
         expect(playbackSettings).toContain("crossfadeSeconds: 6,");
@@ -217,6 +221,9 @@ describe(
         expect(full).toContain("Not available for YouTube");
         expect(compact).toContain('openFullPlayer("more")');
         expect(dock).toContain("<PlaybackMoreControls");
+        expect(accountSync).toContain('session?.user?.id !== expectedUser');
+        expect(accountSync).toContain('existingOwner !== accountId');
+        expect(accountSync).toContain('delete existing.appleMusicToken');
       },
     );
 
