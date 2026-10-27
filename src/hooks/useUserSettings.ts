@@ -55,7 +55,6 @@ export interface UserPlaybackPrefs {
   crossfade: boolean;
   crossfadeSeconds: number;
   smartMix: boolean;
-  keepAlbumsGapless: boolean;
   explicitFilter: boolean;
   playbackQuality: "Auto" | "High" | "Data saver";
   appleMusicConnected: boolean;
@@ -113,7 +112,6 @@ const DEFAULT_PLAYBACK: UserPlaybackPrefs = {
   crossfade: false,
   crossfadeSeconds: 6,
   smartMix: true,
-  keepAlbumsGapless: true,
   explicitFilter: false,
   playbackQuality: "Auto",
   appleMusicConnected: false,
