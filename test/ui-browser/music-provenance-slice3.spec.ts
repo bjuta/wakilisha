@@ -600,7 +600,7 @@ test("Chapter 25 overlaps controlled previews and switches queue at fade start",
       autoplay: true,
       crossfade: true,
       crossfadeSeconds: 3,
-      keepAlbumsGapless: false,
+      smartMix: false,
     }));
 
     // Record real HTMLAudioElements, not mocked timers or fake play events.
@@ -628,16 +628,36 @@ test("Chapter 25 overlaps controlled previews and switches queue at fade start",
   await page.getByRole("button", { name: "Play", exact: true }).first().click();
 
   // At 6 seconds, quarter-length policy caps a selected 3-second fade to 1 second.
-  await expect.poll(async () =>
-    page.evaluate(() => {
+  try {
+    await expect.poll(async () =>
+      page.evaluate(() => {
+        const decks = (window as unknown as {
+          __wkCh25AudioDecks: HTMLAudioElement[];
+        }).__wkCh25AudioDecks || [];
+        return decks.filter((audio) =>
+          !audio.paused && !audio.ended && audio.currentTime > 0
+        ).length;
+      }), { timeout: 14000, intervals: [80, 80, 120] },
+    ).toBe(2);
+  } catch (error) {
+    // Failure evidence must distinguish missing next-deck playback, source
+    // decoding, late transitions, and a failed two-deck mixing graph.
+    const diagnostics = await page.evaluate(() => {
       const decks = (window as unknown as {
         __wkCh25AudioDecks: HTMLAudioElement[];
       }).__wkCh25AudioDecks || [];
-      return decks.filter((audio) =>
-        !audio.paused && !audio.ended && audio.currentTime > 0
-      ).length;
-    }), { timeout: 14000, intervals: [80, 80, 120] },
-  ).toBe(2);
+      return decks.map((audio, index) => ({
+        index, hasSource: Boolean(audio.currentSrc),
+        sourceKind: audio.currentSrc.startsWith("data:") ? "data" : audio.currentSrc.slice(0, 48),
+        time: audio.currentTime, duration: audio.duration,
+        paused: audio.paused, ended: audio.ended,
+        readyState: audio.readyState, networkState: audio.networkState,
+        errorCode: audio.error?.code || null,
+      }));
+    });
+    console.error("CH25_FADE_BROWSER_DIAGNOSTICS=" + JSON.stringify(diagnostics));
+    throw error;
+  }
 
   await expect(page.locator(
     '[data-wk-player-compact="desktop"], [data-wk-player-dock]',

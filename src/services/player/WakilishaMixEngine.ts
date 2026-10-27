@@ -76,7 +76,7 @@ export function estimateBeatTempo(buffer: AudioBuffer): number | null {
   return bestScore >= 0.42 ? bestBpm : null;
 }
 
-type Deck = { source: MediaElementAudioSourceNode; gain: GainNode };
+type Deck = { source: MediaElementAudioSourceNode; gain: GainNode; analyser: AnalyserNode };
 
 export class WakilishaMixEngine {
   private context: AudioContext | null = null;
@@ -97,20 +97,23 @@ export class WakilishaMixEngine {
     } catch { /* Native playback remains available. */ }
   }
 
+  isRunning(): boolean { return this.context?.state === "running"; }
+
   prepare(audio: HTMLAudioElement, source: { url: string; mixable: boolean }): boolean {
-    if (!source.mixable) return false;
-    this.wake();
+    if (!source.mixable || !this.isRunning()) return false;
     if (!this.context || !this.master) return false;
     if (this.decks.has(audio)) return true;
     try {
       // Must be set before src assignment. Same-origin transport stays CORS-safe.
-      audio.crossOrigin = "anonymous";
       const node = this.context.createMediaElementSource(audio);
       const gain = this.context.createGain();
       gain.gain.value = 1;
-      node.connect(gain);
+      const analyser = this.context.createAnalyser();
+      analyser.fftSize = 1024;
+      node.connect(analyser);
+      analyser.connect(gain);
       gain.connect(this.master);
-      this.decks.set(audio, { source: node, gain });
+      this.decks.set(audio, { source: node, gain, analyser });
       audio.volume = 1;
       return true;
     } catch {
@@ -120,6 +123,17 @@ export class WakilishaMixEngine {
   }
 
   hasDeck(audio: HTMLAudioElement): boolean { return this.decks.has(audio); }
+
+  /** Actual PCM-level evidence. No CORS-silenced or suspended graph passes. */
+  hasAudioSignal(audio: HTMLAudioElement): boolean {
+    const deck = this.decks.get(audio);
+    if (!deck || !this.isRunning()) return false;
+    try {
+      const signal = new Float32Array(deck.analyser.fftSize);
+      deck.analyser.getFloatTimeDomainData(signal);
+      return signal.some((sample) => Math.abs(sample) > 0.0005);
+    } catch { return false; }
+  }
 
   setMasterVolume(volume: number): void {
     if (!this.context || !this.master) return;

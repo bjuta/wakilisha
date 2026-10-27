@@ -3,7 +3,6 @@ export interface PreviewCrossfadeRequest {
   enabled: boolean;
   continuousPlayback: boolean;
   selectedSeconds: number;
-  keepAlbumsGapless: boolean;
   sourceEntityType?: string | null;
   shuffled: boolean;
   repeatOne: boolean;
@@ -21,7 +20,6 @@ export function resolvePreviewCrossfadeSeconds(req: PreviewCrossfadeRequest): nu
   if (!req.enabled || !req.continuousPlayback || !req.automatic || req.repeatOne) return 0;
   if (req.backend !== "audio" || req.nextPrefersApple) return 0;
   if (!req.currentPreviewUrl || !req.nextPreviewUrl) return 0;
-  if (req.sourceEntityType === "release" && req.keepAlbumsGapless && !req.shuffled) return 0;
   if (!Number.isFinite(req.currentDuration) || !Number.isFinite(req.nextDuration)) return 0;
   if (req.currentDuration <= 0 || req.nextDuration <= 0) return 0;
   const quarterOfShorter = Math.floor(Math.min(req.currentDuration, req.nextDuration) / 4);

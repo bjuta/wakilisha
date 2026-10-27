@@ -84,6 +84,35 @@ const accountSync = readFileSync(
   "utf8",
 );
 
+describe("Chapter 25 audible-media and device-independent icon acceptance", () => {
+  it("routes native play first and has two independent provider-audio recovery paths", () => {
+    const play = playerContext.indexOf("await activeAudio.play()");
+    const mix = playerContext.indexOf("mixEngineRef.current.prepare(activeAudio, source)");
+    expect(play).toBeGreaterThan(-1);
+    expect(mix).toBeGreaterThan(play);
+    expect(playerContext).toContain('failedMixSourcesRef.current.add(source.url)');
+    expect(playerContext).toContain("hasAudioSignal(activeAudio)");
+    expect(playerContext).toContain("activeAudio.currentSrc === expectedMixUrl");
+    expect(playerContext).not.toContain('activeAudio.currentSrc.includes("/__wk-mix/") &&');
+    expect(playerContext).toContain("fallback.src = track.previewUrl!");
+  });
+  it("displays one compact, collapsible mode instead of a contradictory gapless toggle", () => {
+    expect(playbackControls).toContain("TransitionDisclosure");
+    expect(playbackControls).toContain('aria-expanded={expanded}');
+    expect(playbackControls).toContain('"off", label: "Off"');
+    expect(playbackControls).toContain('"crossfade", label: "Crossfade"');
+    expect(playbackControls).toContain('"smart", label: "Smart Mix"');
+    expect(playbackControls).not.toContain('label="Keep albums gapless"');
+  });
+  it("uses the bundled SVG sprite for formerly emoji-prone external-link arrows", () => {
+    for (const file of ["src/pages/video/page.tsx", "src/pages/shows/page.tsx", "src/pages/audio/page.tsx"]) {
+      const view = readFileSync(file, "utf8");
+      expect(view).toContain('name="ArrowUpRight"');
+      expect(view).not.toContain("↗");
+    }
+  });
+});
+
 describe(
   "canonical media runtime Commit 1",
   () => {
@@ -216,11 +245,10 @@ describe(
         expect(playbackSettings).toContain("autoplay: true,");
         expect(playbackSettings).toContain("crossfade: false,");
         expect(playbackSettings).toContain("crossfadeSeconds: 6,");
-        expect(playbackSettings).toContain("keepAlbumsGapless: true,");
-        expect(playbackControls).toContain("Keep albums gapless");
-        expect(playbackControls).toContain("No crossfade on albums or EPs played in order.");
-        expect(playbackControls).toContain("keepAlbumsGapless: false");
-        expect(playbackControls).toContain("Next after queue");
+        expect(playbackControls).toContain("TransitionDisclosure");
+        expect(playbackControls).toContain("Smart Mix");
+        expect(playbackControls).toContain("Queue");
+        expect(playbackControls).not.toContain("label=\"Keep albums gapless\"");
         expect(playbackControls).toContain("<WkSlider");
         expect(playerContext).toContain("Play starts the collection again.");
         expect(full).toContain("<PlaybackMoreControls");

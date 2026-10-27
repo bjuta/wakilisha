@@ -5,7 +5,6 @@ const base: PreviewCrossfadeRequest = {
   enabled: true,
   continuousPlayback: true,
   selectedSeconds: 6,
-  keepAlbumsGapless: true,
   sourceEntityType: "chart_edition",
   shuffled: false,
   repeatOne: false,
@@ -22,8 +21,8 @@ describe("Workbook Chapter 25 preview crossfade policy", () => {
   it("limits a 30-second preview transition to seven seconds", () => {
     expect(resolvePreviewCrossfadeSeconds({ ...base, selectedSeconds: 12 })).toBe(7);
   });
-  it("keeps ordered albums and EPs without overlap", () => {
-    expect(resolvePreviewCrossfadeSeconds({ ...base, sourceEntityType: "release" })).toBe(0);
+  it("crossfades ordered releases when the listener selects Crossfade or Smart Mix", () => {
+    expect(resolvePreviewCrossfadeSeconds({ ...base, sourceEntityType: "release" })).toBe(6);
     expect(resolvePreviewCrossfadeSeconds({ ...base, sourceEntityType: "release", shuffled: true })).toBe(6);
   });
   it("never fades on skips, Repeat One, or when the listener turned it off", () => {
@@ -46,9 +45,15 @@ describe("Workbook Chapter 25 preview crossfade policy", () => {
 
 
 import { describe as mixDescribe, expect as mixExpect, it as mixIt } from "vitest";
-import { equalPowerLevels, resolveMixableAudioSource, safeTempoMatchRate, estimateBeatTempo } from "@/services/player/WakilishaMixEngine";
+import { equalPowerLevels, resolveMixableAudioSource, safeTempoMatchRate, estimateBeatTempo, WakilishaMixEngine } from "@/services/player/WakilishaMixEngine";
 
 mixDescribe("Chapter 25 WAKILISHA shared Smart Mix engine", () => {
+  mixIt("does not attach a media element when audio context is absent or suspended", () => {
+    const engine = new WakilishaMixEngine();
+    mixExpect(engine.isRunning()).toBe(false);
+    const source = { url: "/__wk-mix/itunes-assets/AudioPreview221/v4/a.m4a", mixable: true };
+    mixExpect(engine.prepare({} as HTMLAudioElement, source)).toBe(false);
+  });
   mixIt("uses equal-power gain envelopes at the quarter, midpoint and endpoints", () => {
     const zero = equalPowerLevels(0), half = equalPowerLevels(0.5), end = equalPowerLevels(1);
     mixExpect(zero.outgoing).toBeCloseTo(1, 5);
