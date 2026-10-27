@@ -10,6 +10,7 @@ import {
   stopAppleMusic,
 } from "@/services/appleMusicPlayback";
 import { recordListeningEvent } from "@/services/listeningHistory";
+import { resolvePreviewCrossfadeSeconds } from "@/services/player/crossfadePolicy";
 import { ProviderPlaybackCanvas } from "@/components/design-system/music/ProviderPlaybackCanvas";
 import {
   getYouTubePlaybackSnapshot,
@@ -234,6 +235,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [playbackBackend, setPlaybackBackend] = useState<PlaybackBackend>("audio");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const standbyAudioRef = useRef<HTMLAudioElement | null>(null);
+  const previewFadeRef = useRef<{
+    outgoing: HTMLAudioElement;
+    incoming: HTMLAudioElement;
+    frame: number | null;
+    fraction: number;
+  } | null>(null);
+  const previewFadeAttemptRef = useRef(0);
+  const previewFadePendingRef = useRef(false);
+  const previewFadeEndedDuringPendingRef = useRef(false);
+  const previewFadeSuppressedRef = useRef(false);
+  const startPreviewFadeRef = useRef<(audio: HTMLAudioElement) => void>(() => {});
+  const volumeRef = useRef(0.8);
   const shuffledOrderRef = useRef<number[]>([]);
   const playbackBackendRef = useRef<PlaybackBackend>("audio");
   const applePollRef = useRef<number | null>(null);
@@ -403,6 +417,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const cancelPreviewFade = useCallback(() => {
+    previewFadeAttemptRef.current += 1;
+    previewFadePendingRef.current = false;
+    previewFadeEndedDuringPendingRef.current = false;
+    const fade = previewFadeRef.current;
+    previewFadeRef.current = null;
+    if (fade) {
+      if (fade.frame !== null) window.cancelAnimationFrame(fade.frame);
+      for (const deck of [fade.outgoing, fade.incoming]) {
+        if (deck !== audioRef.current) {
+          deck.pause();
+          deck.removeAttribute("src");
+        }
+      }
+    }
+    if (audioRef.current) audioRef.current.volume = volumeRef.current;
+  }, []);
+
   const silenceAllPlayback = useCallback(async (
     audio: HTMLAudioElement | null,
   ) => {
@@ -411,9 +443,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     pendingPlayRef.current = false;
     htmlAudioSessionRef.current = null;
+    cancelPreviewFade();
 
-    audio?.pause();
-    audio?.removeAttribute("src");
+    // Silencing the stale audio argument could leave a second deck audible.
+    for (const deck of new Set([audio, audioRef.current, standbyAudioRef.current])) {
+      deck?.pause();
+      deck?.removeAttribute("src");
+    }
 
     stopYouTube();
     stopSoundCloud();
@@ -421,6 +457,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     await stopAppleMusic()
       .catch(() => {});
   }, [
+    cancelPreviewFade,
     stopApplePolling,
     stopProviderPolling,
   ]);
@@ -850,102 +887,83 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     volume,
   ]);
 
-  // ─── Create audio element once ───
+  // One active preview deck and one standby. Both share the event contract.
+  // Only the active deck is allowed to update the public player state.
   useEffect(() => {
-    const audio = new Audio();
-    audio.preload = "auto";
-    audioRef.current = audio;
+    const first = new Audio();
+    const second = new Audio();
+    first.preload = "auto";
+    second.preload = "auto";
+    first.volume = volumeRef.current;
+    second.volume = volumeRef.current;
+    audioRef.current = first;
+    standbyAudioRef.current = second;
 
-    const isActiveHtmlAudio = () => {
+    const isActive = (audio: HTMLAudioElement) => {
       const sessionId = htmlAudioSessionRef.current;
-
-      return (
+      return audio === audioRef.current &&
         sessionId !== null &&
         playbackBackendRef.current === "audio" &&
-        playbackArbiterRef.current.isCurrent(
-          sessionId,
-        )
-      );
+        playbackArbiterRef.current.isCurrent(sessionId);
     };
-
-    const onTimeUpdate = () => {
-      if (!isActiveHtmlAudio()) {
-        return;
-      }
-
-      if (audio.duration && Number.isFinite(audio.duration)) {
-        setCurrentTime(audio.currentTime);
-      }
-    };
-
-    const onLoadedMetadata = () => {
-      if (!isActiveHtmlAudio()) {
-        return;
-      }
-
-      if (audio.duration && Number.isFinite(audio.duration) && audio.duration > 0) {
-        setDuration(audio.duration);
-      }
-    };
-
-    const onEnded = () => {
-      if (!isActiveHtmlAudio()) {
-        return;
-      }
-
-      playbackStartingRef.current = false;
-
-      setCurrentTime(
-        audio.duration || 0,
-      );
-      setIsPlaying(false);
-      handleEndedRef.current();
-    };
-
-    const onPlay = () => {
-      if (!isActiveHtmlAudio()) {
-        return;
-      }
-
-      pendingPlayRef.current = false;
-      playbackStartingRef.current = false;
-      restartInterruptedPlaybackRef.current = false;
-      setIsPlaying(true);
-    };
-
-    const onPause = () => {
-      if (!isActiveHtmlAudio()) {
-        return;
-      }
-
-      if (!audio.ended) {
+    const bindDeck = (audio: HTMLAudioElement) => {
+      const onTimeUpdate = () => {
+        if (!isActive(audio)) return;
+        if (audio.duration > 0 && Number.isFinite(audio.duration)) {
+          setCurrentTime(audio.currentTime);
+          startPreviewFadeRef.current(audio);
+        }
+      };
+      const onLoadedMetadata = () => {
+        if (isActive(audio) && audio.duration > 0 && Number.isFinite(audio.duration)) {
+          setDuration(audio.duration);
+        }
+      };
+      const onEnded = () => {
+        if (!isActive(audio)) return;
+        if (previewFadePendingRef.current) {
+          previewFadeEndedDuringPendingRef.current = true;
+          return;
+        }
+        playbackStartingRef.current = false;
+        setCurrentTime(audio.duration || 0);
         setIsPlaying(false);
-      }
+        handleEndedRef.current();
+      };
+      const onPlay = () => {
+        if (!isActive(audio)) return;
+        pendingPlayRef.current = false;
+        playbackStartingRef.current = false;
+        restartInterruptedPlaybackRef.current = false;
+        setIsPlaying(true);
+      };
+      const onPause = () => {
+        if (isActive(audio) && !audio.ended) setIsPlaying(false);
+      };
+      const onError = () => {
+        if (!isActive(audio)) return;
+        console.warn("Audio playback error:", audio.error?.message || "unknown");
+        pendingPlayRef.current = false;
+        playbackStartingRef.current = false;
+        setIsPlaying(false);
+      };
+      audio.addEventListener("timeupdate", onTimeUpdate);
+      audio.addEventListener("loadedmetadata", onLoadedMetadata);
+      audio.addEventListener("ended", onEnded);
+      audio.addEventListener("play", onPlay);
+      audio.addEventListener("pause", onPause);
+      audio.addEventListener("error", onError);
+      return () => {
+        audio.removeEventListener("timeupdate", onTimeUpdate);
+        audio.removeEventListener("loadedmetadata", onLoadedMetadata);
+        audio.removeEventListener("ended", onEnded);
+        audio.removeEventListener("play", onPlay);
+        audio.removeEventListener("pause", onPause);
+        audio.removeEventListener("error", onError);
+      };
     };
-
-    const onError = () => {
-      if (!isActiveHtmlAudio()) {
-        return;
-      }
-
-      console.warn(
-        "Audio playback error:",
-        audio.error?.message || "unknown",
-      );
-
-      pendingPlayRef.current = false;
-      playbackStartingRef.current = false;
-      setIsPlaying(false);
-    };
-
-    audio.addEventListener("timeupdate", onTimeUpdate);
-    audio.addEventListener("loadedmetadata", onLoadedMetadata);
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("play", onPlay);
-    audio.addEventListener("pause", onPause);
-    audio.addEventListener("error", onError);
-
-    // Capture first user interaction to unlock audio
+    const unbindFirst = bindDeck(first);
+    const unbindSecond = bindDeck(second);
     const unlock = () => {
       hasUserInteractedRef.current = true;
       document.removeEventListener("click", unlock);
@@ -955,20 +973,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     document.addEventListener("click", unlock);
     document.addEventListener("touchstart", unlock);
     document.addEventListener("keydown", unlock);
-
     return () => {
-      audio.pause();
-      audio.removeAttribute("src");
-      audio.removeEventListener("timeupdate", onTimeUpdate);
-      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("play", onPlay);
-      audio.removeEventListener("pause", onPause);
-      audio.removeEventListener("error", onError);
+      previewFadeAttemptRef.current += 1;
+      const fade = previewFadeRef.current;
+      if (fade?.frame !== null && fade?.frame !== undefined) {
+        window.cancelAnimationFrame(fade.frame);
+      }
+      previewFadeRef.current = null;
+      for (const audio of [first, second]) {
+        audio.pause();
+        audio.removeAttribute("src");
+      }
+      unbindFirst();
+      unbindSecond();
       document.removeEventListener("click", unlock);
       document.removeEventListener("touchstart", unlock);
       document.removeEventListener("keydown", unlock);
       audioRef.current = null;
+      standbyAudioRef.current = null;
     };
   }, []);
 
