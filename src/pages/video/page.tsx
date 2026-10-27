@@ -4,6 +4,7 @@ import { WkEditorialArtworkFrame } from "@/components/design-system/layout/Workb
 import { useEffect, useMemo, useState } from "react";
 import { WkSearchField } from "@/components/design-system/primitives/Field";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { WkIcon } from "@/components/design-system/Icon";
 import { PublicVideoCard } from "@/components/video/PublicVideoCard";
 import {
   getPublicVideoIndex,
@@ -95,7 +96,7 @@ export default function VideoIndexPage() {
                 <h1 className="wk-reference-media-hero-title mt-4">{featured.title}</h1>
                 {featured.summary && <p className="wk-reference-hero-caption line-clamp-3">{featured.summary}</p>}
                 <span className="wk-reference-play-button mt-6 inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-bold text-[#0b0b0b]">
-                  Watch <span aria-hidden="true">↗</span>
+                  Watch <WkIcon name="ArrowUpRight" size={19} aria-hidden="true" className="inline-block align-middle" />
                 </span>
               </div>
             </Link>
