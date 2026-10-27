@@ -245,6 +245,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const standbyAudioRef = useRef<HTMLAudioElement | null>(null);
   const mixEngineRef = useRef(new WakilishaMixEngine());
+  const failedMixSourcesRef = useRef(new Set<string>());
   const previewFadeRef = useRef<{
     outgoing: HTMLAudioElement;
     incoming: HTMLAudioElement;
@@ -517,7 +518,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // Never attach a media element to Web Audio until native playback succeeds.
     // A suspended AudioContext or inaccessible transport must not mute music.
     const useMixTransport = playbackPrefs.crossfade &&
-      source.mixable && mixEngineRef.current.isRunning();
+      source.mixable && mixEngineRef.current.isRunning() &&
+      !failedMixSourcesRef.current.has(source.url);
     if (useMixTransport) {
       activeAudio.crossOrigin = "anonymous";
     } else {
@@ -533,6 +535,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       } catch (initialError) {
         // Retry the original playable provider URL without a Web Audio graph.
         if (!useMixTransport || !isPlaybackSessionCurrent(sessionId)) throw initialError;
+        failedMixSourcesRef.current.add(source.url);
         activeAudio.pause();
         activeAudio.removeAttribute("crossorigin");
         activeAudio.src = track.previewUrl;
@@ -1012,6 +1015,31 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const onError = () => {
         if (!isActive(audio)) return;
         console.warn("Audio playback error:", audio.error?.message || "unknown");
+        // play() rejection handles startup failures. A later proxy/media error
+        // must restart the original URL on a clean unconnected native deck.
+        if (!pendingPlayRef.current && audio.currentSrc.includes("/__wk-mix/")) {
+          const originalUrl = currentTrackRef.current?.previewUrl;
+          if (originalUrl) {
+            const from = resolveMixableAudioSource(originalUrl);
+            failedMixSourcesRef.current.add(from.url);
+            const fallback = mixEngineRef.current.hasDeck(audio)
+              ? standbyAudioRef.current : audio;
+            if (fallback && !mixEngineRef.current.hasDeck(fallback)) {
+              audio.pause();
+              if (fallback !== audio) {
+                audioRef.current = fallback;
+                standbyAudioRef.current = audio;
+              }
+              fallback.removeAttribute("crossorigin");
+              fallback.src = originalUrl;
+              void fallback.play().catch((reason) => {
+                console.warn("Native audio fallback blocked:", reason);
+                if (audioRef.current === fallback) setIsPlaying(false);
+              });
+              return;
+            }
+          }
+        }
         pendingPlayRef.current = false;
         playbackStartingRef.current = false;
         setIsPlaying(false);
@@ -1593,7 +1621,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!candidate?.previewUrl || !standby || candidate.isPlayable === false ||
         (candidate.playbackEngine && candidate.playbackEngine !== "audio")) return;
     const source = resolveMixableAudioSource(candidate.previewUrl);
-    if (!source.mixable || !mixEngineRef.current.prepare(standby, source)) return;
+    if (!source.mixable || failedMixSourcesRef.current.has(source.url)) return;
     if (standby.src !== new URL(source.url, window.location.origin).href) {
       standby.src = source.url;
       standby.load();
