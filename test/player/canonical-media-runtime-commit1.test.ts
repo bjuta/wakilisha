@@ -101,7 +101,7 @@ describe(
         );
         expect(
           compact.match(/<SeekRail/g) ?? [],
-        ).toHaveLength(2);
+        ).toHaveLength(3);
         expect(full).toContain(
           "<SeekRail",
         );
@@ -138,8 +138,12 @@ describe(
         expect(responsive).toContain(
           'PlayerCompactSurface mode="mobile"',
         );
+        // The full player is code-split, not eagerly mounted by the shell.
         expect(responsive).toContain(
-          "<PlayerFullSurface",
+          'import("@/components/design-system/player/PlayerFullSurface")',
+        );
+        expect(responsive).toContain(
+          '<LazyPlayerFullSurface mode={isMobile ? "mobile" : "desktop"}',
         );
         expect(mobileLayout).not.toContain(
           "MobileMiniPlayer",
