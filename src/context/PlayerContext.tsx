@@ -241,6 +241,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isFullPlayerOpen, setIsFullPlayerOpen] = useState(false);
   const [requestedPlayerPanel, setRequestedPlayerPanel] = useState<"lyrics" | "comments" | "queue" | "more" | null>(null);
   const [playbackBackend, setPlaybackBackend] = useState<PlaybackBackend>("audio");
+  const [mixerDeckRevision, signalMixerDeckReady] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const standbyAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -555,6 +556,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           mixEngineRef.current.prepare(activeAudio, source)) {
         mixEngineRef.current.setMasterVolume(volumeRef.current);
         mixEngineRef.current.setLevel(activeAudio, 1, volumeRef.current);
+        // The first React play event fires before the async iOS AudioContext
+        // resume finishes. Re-evaluate standby preloading once this deck exists.
+        signalMixerDeckReady((revision) => revision + 1);
         if (playbackPrefs.smartMix) {
           mixEngineRef.current.analyzeShortAudio(source.url, track.duration || 30);
         }
@@ -1674,7 +1678,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       mixEngineRef.current.analyzeShortAudio(source.url, candidate.duration || 30);
     }
   }, [isPlaying, playbackBackend, playbackPrefs.autoplay, playbackPrefs.crossfade,
-    playbackPrefs.smartMix, isShuffle, queue, queueIndex, repeatMode]);
+    playbackPrefs.smartMix, mixerDeckRevision, isShuffle, queue, queueIndex, repeatMode]);
 
   // ─── Play a track ───
   const playTrack = useCallback((track: PlayerTrack, newQueue?: PlayerTrack[], playSource?: PlaySource) => {
