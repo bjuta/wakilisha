@@ -639,9 +639,9 @@ test("Chapter 25 overlaps controlled previews and switches queue at fade start",
     }), { timeout: 14000, intervals: [80, 80, 120] },
   ).toBe(2);
 
-  await expect(page.locator("[data-wk-player-dock]").getByText(
-    "Slice 3 Browser Track Two", { exact: true },
-  )).toBeVisible();
+  await expect(page.locator(
+    '[data-wk-player-compact="desktop"], [data-wk-player-dock]',
+  ).getByText("Slice 3 Browser Track Two", { exact: true }).first()).toBeVisible();
 });
 
 
