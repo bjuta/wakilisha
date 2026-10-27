@@ -1255,6 +1255,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       playedAtRef.current =
         Date.now();
 
+      previewFadeSuppressedRef.current = false;
       setCurrentTrack(
         nextTrack,
       );
@@ -1316,6 +1317,163 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     queueIndex,
     repeatMode,
     startYouTubePolling,
+  ]);
+
+  // Chapter 25: transitions are automatic, preview-only, and cancelled
+  // by every explicit playback action. The player state switches when
+  // the incoming audio actually starts, never at the outgoing ended event.
+  useEffect(() => {
+    startPreviewFadeRef.current = (outgoing) => {
+      if (previewFadePendingRef.current || previewFadeRef.current ||
+          previewFadeSuppressedRef.current || !isPlayingRef.current ||
+          !playbackPrefs.crossfade || !playbackPrefs.autoplay ||
+          repeatMode === "one" || queue.length < 2 ||
+          audioRef.current !== outgoing) return;
+
+      const order = isShuffle ? shuffledOrderRef.current : queue.map((_, i) => i);
+      const position = order.indexOf(queueIndex);
+      if (position < 0) return;
+      const nextIdx = order[position + 1] ?? (repeatMode === "all" ? order[0] : undefined);
+      if (nextIdx === undefined || nextIdx === queueIndex) return;
+      const nextTrack = queue[nextIdx];
+      if (!nextTrack || nextTrack.isPlayable === false ||
+          (playbackPrefs.explicitFilter && nextTrack.isExplicit) ||
+          (nextTrack.playbackEngine && nextTrack.playbackEngine !== "audio")) return;
+
+      const seconds = resolvePreviewCrossfadeSeconds({
+        enabled: playbackPrefs.crossfade,
+        continuousPlayback: playbackPrefs.autoplay,
+        selectedSeconds: playbackPrefs.crossfadeSeconds,
+        keepAlbumsGapless: playbackPrefs.keepAlbumsGapless,
+        sourceEntityType: sourceContextRef.current?.entityType,
+        shuffled: isShuffle,
+        repeatOne: repeatMode === "one",
+        automatic: true,
+        backend: playbackBackendRef.current,
+        nextPrefersApple: playbackPrefs.appleMusicConnected &&
+          Boolean(nextTrack.appleMusicCatalogId || nextTrack.appleMusicId),
+        currentPreviewUrl: currentTrackRef.current?.previewUrl,
+        nextPreviewUrl: nextTrack.previewUrl,
+        currentDuration: outgoing.duration,
+        nextDuration: nextTrack.duration || 0,
+      });
+      const remaining = outgoing.duration - outgoing.currentTime;
+      if (!seconds || remaining > seconds || remaining <= 0.05) return;
+      const incoming = standbyAudioRef.current;
+      const session = htmlAudioSessionRef.current;
+      if (!incoming || incoming === outgoing || session === null) return;
+
+      incoming.pause();
+      incoming.removeAttribute("src");
+      incoming.volume = 0;
+      // On devices where HTMLMediaElement.volume is read-only, do not
+      // risk simultaneous full-volume output; advance cleanly at end.
+      if (incoming.volume > 0.001) {
+        previewFadeSuppressedRef.current = true;
+        return;
+      }
+      incoming.playbackRate = outgoing.playbackRate;
+      incoming.src = nextTrack.previewUrl!;
+      previewFadePendingRef.current = true;
+      previewFadeEndedDuringPendingRef.current = false;
+      const attempt = ++previewFadeAttemptRef.current;
+      void incoming.play().then(() => {
+        if (attempt !== previewFadeAttemptRef.current ||
+            htmlAudioSessionRef.current !== session ||
+            !playbackArbiterRef.current.isCurrent(session) ||
+            audioRef.current !== outgoing) {
+          incoming.pause();
+          incoming.removeAttribute("src");
+          return;
+        }
+        previewFadePendingRef.current = false;
+        previewFadeEndedDuringPendingRef.current = false;
+        const finishedTrack = currentTrackRef.current;
+        const fade = { outgoing, incoming, frame: null as number | null, fraction: 0 };
+        const startTime = window.performance.now();
+        previewFadeRef.current = fade;
+        audioRef.current = incoming;
+        standbyAudioRef.current = outgoing;
+        if (finishedTrack && !skipFlagRef.current) {
+          trackEvent("player_complete", {
+            pageType: sourceContextRef.current?.pageType,
+            entitySlug: finishedTrack.id,
+            entityType: "track",
+            context: {
+              track_title: finishedTrack.title,
+              artist: finishedTrack.artist,
+              play_duration_ms: Date.now() - playedAtRef.current,
+              source_section: sourceContextRef.current?.sourceSection,
+            },
+          });
+          recordListeningEvent(finishedTrack, {
+            kind: "complete", backend: "audio", currentTime: outgoing.currentTime,
+            duration: outgoing.duration, playSource: sourceContextRef.current,
+          });
+        }
+        skipFlagRef.current = false;
+        previewFadeSuppressedRef.current = false;
+        playedAtRef.current = Date.now();
+        currentTrackRef.current = nextTrack;
+        setCurrentTrack(nextTrack);
+        setQueueIndex(nextIdx);
+        setCurrentTime(incoming.currentTime);
+        setDuration(nextTrack.duration || 0);
+        setIsPlaying(true);
+        recordListeningEvent(nextTrack, {
+          kind: "start", backend: "audio", currentTime: incoming.currentTime,
+          duration: nextTrack.duration || 0, playSource: sourceContextRef.current,
+        });
+        trackEvent("player_play", {
+          pageType: sourceContextRef.current?.pageType,
+          entitySlug: nextTrack.id,
+          entityType: "track",
+          context: {
+            track_title: nextTrack.title,
+            artist: nextTrack.artist,
+            album: nextTrack.album ?? null,
+            source: nextTrack.source ?? null,
+            source_section: sourceContextRef.current?.sourceSection,
+            queue_size: queue.length,
+            auto_advance: true,
+            crossfade_seconds: seconds,
+          },
+        });
+        const ramp = (now: number) => {
+          if (previewFadeRef.current !== fade) return;
+          fade.fraction = Math.min(1, Math.max(0, (now - startTime) / (seconds * 1000)));
+          outgoing.volume = Math.max(0, (1 - fade.fraction) * volumeRef.current);
+          incoming.volume = Math.min(1, fade.fraction * volumeRef.current);
+          if (fade.fraction < 1) {
+            fade.frame = window.requestAnimationFrame(ramp);
+          } else {
+            outgoing.pause();
+            outgoing.removeAttribute("src");
+            outgoing.volume = volumeRef.current;
+            previewFadeRef.current = null;
+          }
+        };
+        fade.frame = window.requestAnimationFrame(ramp);
+      }).catch(() => {
+        if (attempt !== previewFadeAttemptRef.current) return;
+        previewFadePendingRef.current = false;
+        previewFadeSuppressedRef.current = true;
+        incoming.pause();
+        incoming.removeAttribute("src");
+        incoming.volume = volumeRef.current;
+        if (previewFadeEndedDuringPendingRef.current &&
+            htmlAudioSessionRef.current === session) {
+          previewFadeEndedDuringPendingRef.current = false;
+          handleEndedRef.current();
+        }
+      });
+    };
+    return () => { startPreviewFadeRef.current = () => {}; };
+  }, [
+    isShuffle, playbackPrefs.appleMusicConnected, playbackPrefs.autoplay,
+    playbackPrefs.crossfade, playbackPrefs.crossfadeSeconds,
+    playbackPrefs.explicitFilter, playbackPrefs.keepAlbumsGapless,
+    queue, queueIndex, repeatMode,
   ]);
 
   // ─── Play a track ───
@@ -1380,6 +1538,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         fullQueue.length,
       );
 
+    previewFadeSuppressedRef.current = false;
+    skipFlagRef.current = false;
     setQueue(fullQueue);
     setQueueIndex(safeIdx);
     setCurrentTrack(track);
@@ -1705,6 +1865,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     playedAtRef.current = Date.now();
 
+    previewFadeSuppressedRef.current = false;
     setCurrentTrack(nextTrack);
     setQueueIndex(nextIdx);
     setCurrentTime(0);
