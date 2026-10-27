@@ -97,14 +97,14 @@ export class WakilishaMixEngine {
     } catch { /* Native playback remains available. */ }
   }
 
+  isRunning(): boolean { return this.context?.state === "running"; }
+
   prepare(audio: HTMLAudioElement, source: { url: string; mixable: boolean }): boolean {
-    if (!source.mixable) return false;
-    this.wake();
+    if (!source.mixable || !this.isRunning()) return false;
     if (!this.context || !this.master) return false;
     if (this.decks.has(audio)) return true;
     try {
       // Must be set before src assignment. Same-origin transport stays CORS-safe.
-      audio.crossOrigin = "anonymous";
       const node = this.context.createMediaElementSource(audio);
       const gain = this.context.createGain();
       gain.gain.value = 1;
