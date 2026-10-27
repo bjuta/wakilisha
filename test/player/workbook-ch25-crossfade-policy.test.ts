@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolvePreviewCrossfadeSeconds, type PreviewCrossfadeRequest } from "@/services/player/crossfadePolicy";
+import { resolvePreviewCrossfadeSeconds, supportsPreviewAudioVolume, type PreviewCrossfadeRequest } from "@/services/player/crossfadePolicy";
 
 const base: PreviewCrossfadeRequest = {
   enabled: true,
@@ -41,5 +41,18 @@ describe("Workbook Chapter 25 preview crossfade policy", () => {
     expect(resolvePreviewCrossfadeSeconds({ ...base, nextPreviewUrl: null })).toBe(0);
     expect(resolvePreviewCrossfadeSeconds({ ...base, currentDuration: NaN })).toBe(0);
     expect(resolvePreviewCrossfadeSeconds({ ...base, nextDuration: 0 })).toBe(0);
+  });
+});
+
+
+describe("HTML audio preview crossfade capability", () => {
+  it("detects iOS-style fixed volume and does not promise a fade", () => {
+    const fixed = { get volume() { return 1; }, set volume(_value: number) {} };
+    expect(supportsPreviewAudioVolume(() => fixed)).toBe(false);
+  });
+  it("allows mutable gain and fails closed on blocked setters", () => {
+    expect(supportsPreviewAudioVolume(() => ({ volume: 1 }))).toBe(true);
+    const blocked = { get volume() { return 1; }, set volume(_value: number) { throw new Error("blocked"); } };
+    expect(supportsPreviewAudioVolume(() => blocked)).toBe(false);
   });
 });
