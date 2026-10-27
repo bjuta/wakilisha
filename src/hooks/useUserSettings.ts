@@ -52,6 +52,9 @@ export interface UserNotificationPrefs {
 
 export interface UserPlaybackPrefs {
   autoplay: boolean;
+  crossfade: boolean;
+  crossfadeSeconds: number;
+  keepAlbumsGapless: boolean;
   explicitFilter: boolean;
   playbackQuality: "Auto" | "High" | "Data saver";
   appleMusicConnected: boolean;
@@ -105,7 +108,10 @@ const DEFAULT_NOTIFICATIONS: UserNotificationPrefs = {
 };
 
 const DEFAULT_PLAYBACK: UserPlaybackPrefs = {
-  autoplay: false,
+  autoplay: true,
+  crossfade: false,
+  crossfadeSeconds: 6,
+  keepAlbumsGapless: true,
   explicitFilter: false,
   playbackQuality: "Auto",
   appleMusicConnected: false,
@@ -352,6 +358,36 @@ export function useUserSettings() {
     } catch { /* storage unavailable */ }
 
     setLoading(false);
+  }, []);
+
+  // Settings, the dock and the full-player More sheet share one live value.
+  useEffect(() => {
+    const readLatest = () => {
+      try {
+        const pb = localStorage.getItem(LS_PLAYBACK);
+        return pb ? { ...DEFAULT_PLAYBACK, ...JSON.parse(pb) } : null;
+      } catch { return null; }
+    };
+    const sync = () => {
+      const latest = readLatest();
+      if (latest) setPlayback(latest);
+    };
+    const hydrate = () => {
+      const latest = readLatest();
+      if (!latest) return;
+      setPlayback(latest);
+      setSavedSnapshot((previous) => {
+        try {
+          return JSON.stringify({ ...JSON.parse(previous), playback: latest });
+        } catch { return previous; }
+      });
+    };
+    window.addEventListener("wk-playback-changed", sync);
+    window.addEventListener("wk-playback-account-loaded", hydrate);
+    return () => {
+      window.removeEventListener("wk-playback-changed", sync);
+      window.removeEventListener("wk-playback-account-loaded", hydrate);
+    };
   }, []);
 
   // ─── Sync FROM Supabase (community_profile + notification_prefs) ───

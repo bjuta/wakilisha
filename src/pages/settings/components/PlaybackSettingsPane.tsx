@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import type { UserPlaybackPrefs } from "@/hooks/useUserSettings";
+import { PlaybackSettingsControls } from "@/components/design-system/player/PlaybackControls";
 import { supabase } from "@/lib/supabase";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 
@@ -151,14 +152,7 @@ export function PlaybackSettingsPane({ playback, isSignedIn, updatePlayback }: P
         )}
       </div>
 
-      {/* Playback options */}
-      <div className="flex items-center justify-between gap-4 py-4 border-b border-[var(--wk-divider)]">
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-bold text-[var(--wk-text)]">Autoplay next track</div>
-          <div className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] mt-0.5">Continue through chart editions and playlist queues automatically.</div>
-        </div>
-        <WakilishaToggle value={playback.autoplay} onChange={(v) => updatePlayback({ autoplay: v })} />
-      </div>
+      <PlaybackSettingsControls playback={playback} updatePlayback={updatePlayback} />
       <div className="flex items-center justify-between gap-4 py-4 border-b border-[var(--wk-divider)]">
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-bold text-[var(--wk-text)]">Explicit content filter</div>

@@ -71,24 +71,21 @@ export function AlbumModal({ release, open, onClose, playSource }: AlbumModalPro
       return;
     }
 
-    playTrack(queueTracks[0], queueTracks, playSource);
+    playTrack(queueTracks[0], queueTracks, {
+      ...playSource,
+      pageType: playSource?.pageType || "release",
+      entityType: "release",
+      entitySlug: release.slug,
+      releasePath: release.trackCount > 1 ? releaseUrl(release) : undefined,
+    });
   };
 
   const handlePlayTrack = (trackIndex: number) => {
     if (!tracks.length) return;
 
-    // Build queue starting from the clicked index
-    const queueTracks = tracks.slice(trackIndex).map((t, i) => ({
-      id: `${release.slug}-${trackIndex + i}`,
-      title: t.title,
-      artist: t.artist,
-      artworkUrl: release.artworkUrl,
-      duration: parseDuration(t.duration),
-      previewUrl: t.previewUrl,
-      album: release.title,
-    }));
-
-    const remainingTracks = tracks.slice(0, trackIndex).map((t, i) => ({
+    // Keep the complete release in its original order.
+    // The selected track plays through the end unless Repeat All is enabled.
+    const queueTracks = tracks.map((t, i) => ({
       id: `${release.slug}-${i}`,
       title: t.title,
       artist: t.artist,
@@ -97,15 +94,21 @@ export function AlbumModal({ release, open, onClose, playSource }: AlbumModalPro
       previewUrl: t.previewUrl,
       album: release.title,
     }));
+    const selected = queueTracks[trackIndex];
+    if (!selected) return;
 
-    const fullQueue = [...queueTracks, ...remainingTracks];
-
-    if (currentTrack?.id === queueTracks[0].id) {
+    if (currentTrack?.id === selected.id) {
       togglePlay();
       return;
     }
 
-    playTrack(queueTracks[0], fullQueue, playSource);
+    playTrack(selected, queueTracks, {
+      ...playSource,
+      pageType: playSource?.pageType || "release",
+      entityType: "release",
+      entitySlug: release.slug,
+      releasePath: release.trackCount > 1 ? releaseUrl(release) : undefined,
+    });
   };
 
   const isThisReleasePlaying = currentTrack?.album === release.title && isPlaying;

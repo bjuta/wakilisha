@@ -128,7 +128,7 @@ export default function TrackCreditsSection({
           </div>
           <h2
             id="track-credits-heading"
-            className="mt-2 text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] md:text-[24px]"
+            className="mt-2 scroll-mt-24 text-[20px] font-black tracking-[-0.03em] text-[var(--wk-text)] md:text-[24px]"
           >
             Who worked on this
           </h2>

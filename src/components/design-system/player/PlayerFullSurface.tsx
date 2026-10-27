@@ -38,6 +38,7 @@ import {
   type PlayerContextAction,
 } from "./PlayerContextSheet";
 import { PlayerPanelSheet } from "./PlayerPanelSheet";
+import { PlaybackMoreControls, usePlaybackControls } from "./PlaybackControls";
 import { PlayerQueuePanel } from "./PlayerQueuePanel";
 import { PlayerTimedTextPanel } from "./PlayerTimedTextPanel";
 import { SeekRail } from "./SeekRail";
@@ -144,12 +145,14 @@ export function PlayerFullSurface({
     removeQueueItem,
     clearUpcoming,
     playTrack,
+    playSource,
   } = usePlayer();
 
+  const { playback: playbackControls, updatePlayback: updatePlaybackControls } = usePlaybackControls();
   const [panel, setPanel] =
     useState<PlayerPanel>(mode === "desktop"
-      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
-      : "none");
+      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "more" ? "more" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
+      : (requestedPlayerPanel === "more" ? "more" : "none"));
   const [inlinePanelHost, setInlinePanelHost] = useState<HTMLElement | null>(null);
   const [appleConnected, setAppleConnected] = useState(
     () => getApplePlaybackPrefsSnapshot().appleMusicConnected,
@@ -191,8 +194,8 @@ export function PlayerFullSurface({
     );
     setAppleConnectError(null);
     setPanel(mode === "desktop"
-      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
-      : "none");
+      ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "more" ? "more" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
+      : (requestedPlayerPanel === "more" ? "more" : "none"));
     setLyrics(null);
     setLyricsError(null);
     setTranscript(null);
@@ -630,16 +633,35 @@ export function PlayerFullSurface({
     });
   }
 
+  if (!experience.spokenAudio && playSource?.releasePath) {
+    contextActions.push({
+      key: "release",
+      label: "Go to Release",
+      description: currentTrack.album || undefined,
+      icon: "Disc3",
+      onClick: () => goTo(playSource.releasePath as string),
+    });
+  }
+
   if (
     !experience.spokenAudio &&
     currentTrack.artistSlug
   ) {
     contextActions.push({
       key: "artist",
-      label: "View Artist",
+      label: "Go to Artist",
       description: `Open ${currentTrack.artist} on WAKILISHA.`,
       icon: "UserRound",
       onClick: () => goTo(`/artists/${currentTrack.artistSlug}`),
+    });
+  }
+
+  if (!experience.spokenAudio && experience.canonicalPath) {
+    contextActions.push({
+      key: "credits",
+      label: "Credits",
+      icon: "FileText",
+      onClick: () => goTo(`${experience.canonicalPath}#track-credits-heading`),
     });
   }
 
@@ -1141,6 +1163,17 @@ export function PlayerFullSurface({
         creator={experience.creatorLabel}
         artworkUrl={currentTrack.artworkUrl}
         actions={contextActions}
+        playbackControls={!experience.spokenAudio ? (
+          <PlaybackMoreControls
+            playback={playbackControls}
+            updatePlayback={updatePlaybackControls}
+            unavailableReason={
+              playbackBackend === "youtube" ? "Not available for YouTube"
+                : playbackBackend === "soundcloud" ? "Not available for SoundCloud"
+                : playbackBackend === "apple" ? "Not available for Apple Music" : null
+            }
+          />
+        ) : null}
         playlistAction={
           !experience.spokenAudio &&
           experience.capabilities.addToPlaylist ? (

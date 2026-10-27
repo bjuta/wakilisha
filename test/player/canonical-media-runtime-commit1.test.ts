@@ -39,6 +39,50 @@ const music = readFileSync(
   "src/pages/music/page.tsx",
   "utf8",
 );
+const artistTopSongs = readFileSync(
+  "src/pages/artists/detail/components/ArtistTopSongs.tsx",
+  "utf8",
+);
+const albumModal = readFileSync(
+  "src/components/design-system/releases/AlbumModal.tsx",
+  "utf8",
+);
+const releaseTracklist = readFileSync(
+  "src/pages/releases/detail/components/ReleaseTracklist.tsx",
+  "utf8",
+);
+const mobileRelease = readFileSync(
+  "src/pages/mobile/releases/detail/page.tsx",
+  "utf8",
+);
+const trackReleaseTracklist = readFileSync(
+  "src/pages/tracks/detail/components/TrackReleaseTracklist.tsx",
+  "utf8",
+);
+const articleRelease = readFileSync(
+  "src/pages/magazine/article/components/ArticleReleaseEmbeds.tsx",
+  "utf8",
+);
+const playbackSettings = readFileSync(
+  "src/hooks/useUserSettings.ts",
+  "utf8",
+);
+const playbackControls = readFileSync(
+  "src/components/design-system/player/PlaybackControls.tsx",
+  "utf8",
+);
+const trackDetail = readFileSync(
+  "src/pages/tracks/detail/page.tsx",
+  "utf8",
+);
+const dock = readFileSync(
+  "src/components/design-system/music/PlayerDock.tsx",
+  "utf8",
+);
+const accountSync = readFileSync(
+  "src/services/player/playbackAccountSync.ts",
+  "utf8",
+);
 
 describe(
   "canonical media runtime Commit 1",
@@ -57,7 +101,7 @@ describe(
         );
         expect(
           compact.match(/<SeekRail/g) ?? [],
-        ).toHaveLength(2);
+        ).toHaveLength(3);
         expect(full).toContain(
           "<SeekRail",
         );
@@ -94,8 +138,12 @@ describe(
         expect(responsive).toContain(
           'PlayerCompactSurface mode="mobile"',
         );
+        // The full player is code-split, not eagerly mounted by the shell.
         expect(responsive).toContain(
-          "<PlayerFullSurface",
+          '"@/components/design-system/player/PlayerFullSurface"',
+        );
+        expect(responsive).toContain(
+          '<LazyPlayerFullSurface mode={isMobile ? "mobile" : "desktop"}',
         );
         expect(mobileLayout).not.toContain(
           "MobileMiniPlayer",
@@ -146,6 +194,53 @@ describe(
         expect(playerContext).toContain(
           "isPlayable === false",
         );
+      },
+    );
+
+    it(
+      "continues ordered collection playback and respects the listening preference",
+      () => {
+        expect(artistTopSongs).toContain(
+          "songs.map((song) => topSongQueueTrack(song, artistSlug))",
+        );
+        expect(artistTopSongs).toContain("playTrack(selected, queue, {");
+        expect(albumModal).toContain("playTrack(selected, queueTracks, {");
+        expect(albumModal).not.toContain("const remainingTracks =");
+        expect(releaseTracklist).toContain("playTrack(selected, queueTracks, {");
+        expect(mobileRelease).toContain("playTrack(selected, queue, {");
+        expect(trackReleaseTracklist).toContain("playTrack(selected, queueTracks, {");
+        expect(trackDetail).toContain("inRelease ? releaseQueue : [playerTrack]");
+        expect(articleRelease).toContain("playTrack(playerTrack, [playerTrack],");
+        expect(artistTopSongs).toContain("sourceSection: \"top_songs_expanded\"");
+        expect(playerContext).toContain('if (!playbackPrefs.autoplay && repeatMode !== "all") {');
+        expect(playbackSettings).toContain("autoplay: true,");
+        expect(playbackSettings).toContain("crossfade: false,");
+        expect(playbackSettings).toContain("crossfadeSeconds: 6,");
+        expect(playbackSettings).toContain("keepAlbumsGapless: true,");
+        expect(playbackControls).toContain("Keep albums gapless");
+        expect(playbackControls).toContain("Next after queue");
+        expect(playbackControls).toContain("<WkSlider");
+        expect(playerContext).toContain("Play starts the collection again.");
+        expect(full).toContain("<PlaybackMoreControls");
+        expect(full).toContain("Not available for YouTube");
+        expect(compact).toContain('openFullPlayer("more")');
+        expect(dock).toContain("<PlaybackMoreControls");
+        expect(full).toContain('label: "Go to Release"');
+        expect(full).toContain('label: "Credits"');
+        expect(playerContext).toContain("releasePath?: string");
+        expect(accountSync).toContain('session?.user?.id !== expectedUser');
+        expect(accountSync).toContain('existingOwner !== accountId');
+        expect(accountSync).toContain('delete existing.appleMusicToken');
+      },
+    );
+
+    it(
+      "keeps the Track hero compact and responsive",
+      () => {
+        expect(trackDetail).toContain('h-[232px] w-[232px]');
+        expect(trackDetail).toContain('md:h-[260px] md:w-[260px]');
+        expect(trackDetail).toContain('overflowWrap: "anywhere"');
+        expect(trackDetail).toContain('canonicalTrackUrl(');
       },
     );
 

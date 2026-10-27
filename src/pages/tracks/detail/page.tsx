@@ -16,8 +16,6 @@ import { canonicalTrackUrl } from "@/utils/trackUrl";
 import { WkIcon } from "@/components/design-system/Icon";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
-import { ShareSheet } from "@/components/design-system/share/ShareSheet";
-import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { ContributionBadges } from "@/components/feature/community/ContributionBadges";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { TrackMomentSummary } from "@/components/feature/community/TrackMomentDrawer";
@@ -728,8 +726,19 @@ export default function TrackDetail() {
   const [error, setError] = useState<string | null>(null);
   const [trackSaved, setTrackSaved] = useState(false);
   const [trackSaveError, setTrackSaveError] = useState<string | null>(null);
-  const [shareOpen, setShareOpen] = useState(false);
   const [listeningSignal, setListeningSignal] = useState<ListeningHistoryItem | null>(null);
+
+  // Credits opens from Track and player More after the async Track read.
+  useEffect(() => {
+    if (!track || location.hash !== "#track-credits-heading") return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("track-credits-heading")?.scrollIntoView({
+        block: "start",
+        behavior: "auto",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [track?.id, location.hash]);
   const [applePlaybackConnected, setApplePlaybackConnected] = useState(
     () => getApplePlaybackPrefsSnapshot().appleMusicConnected
   );
@@ -901,7 +910,13 @@ export default function TrackDetail() {
 
   const trackIntro = buildTrackHeroIntro(track);
   const seoDescription = buildTrackSeoDescription(track);
-  const isCurrentTrack = currentTrack?.id === track.slug;
+  const isCurrentTrack = Boolean(
+    currentTrack && (
+      currentTrack.registryTrackId === track.id ||
+      currentTrack.id === track.slug ||
+      currentTrack.id === track.id
+    )
+  );
   const isTrackPlaying = isCurrentTrack && isPlaying;
   const minutes = track.duration ? Math.round(track.duration / 60) : 0;
   const hasAppleCatalog = Boolean(track.appleMusicCatalogId || track.appleMusicId);
@@ -954,6 +969,7 @@ export default function TrackDetail() {
     }
     const playerTrack = {
       id: track.slug,
+      registryTrackId: track.id,
       title: track.title,
       artist: track.artist,
       artworkUrl: track.artworkUrl,
@@ -966,10 +982,27 @@ export default function TrackDetail() {
       artistSlug: artistSlug || track.artistSlug || undefined,
       trackSlug: track.slug || trackSlug || undefined,
     };
-    playTrack(playerTrack, [playerTrack], {
+    const releaseQueue = track.releaseTracks.map((related) => ({
+      id: related.id,
+      registryTrackId: related.id,
+      title: related.title,
+      artist: related.artist,
+      artworkUrl: related.artworkUrl,
+      duration: related.duration,
+      previewUrl: related.previewUrl || undefined,
+      appleMusicId: related.appleMusicId || related.appleMusicCatalogId || null,
+      appleMusicCatalogId: related.appleMusicCatalogId || related.appleMusicId || null,
+      album: track.albumTitle,
+      artistSlug: track.albumArtistSlug || track.artistSlug || undefined,
+      trackSlug: related.slug,
+    }));
+    const inRelease = releaseQueue.some((candidate) => candidate.registryTrackId === track.id);
+    playTrack(playerTrack, inRelease ? releaseQueue : [playerTrack], {
       pageType: "track_detail",
       entitySlug: trackSlug,
-      entityType: "track",
+      entityType: inRelease ? "release" : "track",
+      releasePath: track.albumArtistSlug && track.albumSlug && track.albumTotalTracks > 1
+        ? `/releases/${track.albumArtistSlug}/${track.albumSlug}` : undefined,
       sourceSection: "track_hero",
     });
   };
@@ -1083,21 +1116,16 @@ export default function TrackDetail() {
         }}
       />
 
-      <section className="relative mt-0 md:-mt-16 pt-16 overflow-hidden">
+      <section className="relative mt-0 overflow-hidden border-b border-[var(--wk-divider)] md:-mt-16 md:pt-16">
         {track.artworkUrl && (
-          <div className="absolute inset-0 opacity-20 scale-110" style={{ backgroundImage: `url("${track.artworkUrl}")`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(90px) saturate(1.4)" }} />
+          <div className="absolute inset-0 opacity-15 scale-110" style={{ backgroundImage: `url("${track.artworkUrl}")`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(90px) saturate(1.4)" }} />
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--wk-bg)]/40 via-[var(--wk-bg)]/70 to-[var(--wk-bg)]" />
 
-        <div className="relative z-10 wk-container-wide px-6 py-16 md:py-24 lg:py-28">
-          <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start lg:items-end">
-            <PlayableArtwork
-              label={track.title}
-              onPlay={() => {
-                if (hasPlayableSource) handlePlay();
-              }}
-              isPlaying={isTrackPlaying}
-              className="relative shrink-0 w-[280px] md:w-[340px] lg:w-[380px] aspect-square overflow-hidden"
+        <div className="relative z-10 wk-container-wide px-5 py-6 sm:px-6 md:py-10 lg:py-12">
+          <div className="flex flex-col items-center gap-5 md:flex-row md:items-center md:gap-9">
+            <div
+              className="relative h-[232px] w-[232px] shrink-0 overflow-hidden rounded-xl md:h-[260px] md:w-[260px]"
             >
               {track.artworkUrl ? (
                 <img
@@ -1111,21 +1139,17 @@ export default function TrackDetail() {
                   <i className="ri-music-2-line text-6xl text-[#30451f]/40" />
                 </div>
               )}
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-            </PlayableArtwork>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+            </div>
 
-            <div className="flex-1 min-w-0 pb-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/30 bg-[var(--wk-brand-soft)]/60 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-5">
-                <WkIcon name="Music" size={13} />
-                Track
-                {track.rank > 0 && <span className="ml-1 opacity-70">· #{track.rank}</span>}
-              </div>
+            <div className="min-w-0 flex-1 pb-2 text-center md:text-left">
+              <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--wk-brand)]">Track</div>
 
-              <h1 className="font-[var(--wk-font-display)] font-black text-[var(--wk-text)] leading-[0.9] tracking-[-0.05em]" style={{ fontSize: "clamp(38px, 6vw, 80px)" }}>
+              <h1 className="font-[var(--wk-font-display)] font-black text-[var(--wk-text)] leading-[0.9] tracking-[-0.05em]" style={{ fontSize: "clamp(28px, 4vw, 56px)", overflowWrap: "anywhere" }}>
                 {track.title}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-3 mt-4">
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-3 md:justify-start">
                 {track.artists.length > 0 ? track.artists.map((artist, index) => (
                   <span key={artist.slug || index} className="flex items-center gap-2">
                     {index > 0 && <span className="text-[var(--wk-text-faint)]">·</span>}
@@ -1141,14 +1165,14 @@ export default function TrackDetail() {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-5 mt-6 text-[12px] font-bold text-[var(--wk-text-muted)]">
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-y border-[var(--wk-divider)] py-3 text-[12px] font-bold text-[var(--wk-text-muted)] md:justify-start">
                 {track.releaseDate ? <span className="inline-flex items-center gap-2"><WkIcon name="Calendar" size={14} />{formatDate(track.releaseDate)}</span> : track.releaseYear ? <span className="inline-flex items-center gap-2"><WkIcon name="Calendar" size={14} />{track.releaseYear}</span> : null}
                 {minutes > 0 && <span className="inline-flex items-center gap-2"><WkIcon name="Clock3" size={14} />{minutes} min</span>}
                 {track.genre && track.genre !== "Unknown" && <span className="inline-flex items-center gap-2"><WkIcon name="Tag" size={14} />{track.genre}</span>}
                 {track.explicit && <span className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 bg-[var(--wk-text-faint)]/10 text-[10px] font-extrabold uppercase tracking-wider text-[var(--wk-text-faint)]">Explicit</span>}
               </div>
 
-              <div className="mt-8 flex items-center gap-2">
+              <div className="mt-5 flex items-center justify-center gap-2 md:justify-start">
                 <button
                   type="button"
                   onClick={handlePlay}
@@ -1158,68 +1182,31 @@ export default function TrackDetail() {
                   className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--wk-brand)] px-4 text-[13px] font-extrabold text-white transition-colors hover:bg-[var(--wk-brand)]/90 disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   <WkIcon name={isTrackPlaying ? "Pause" : "Play"} size={17} />
-                  {playButtonLabel}
+                  {isTrackPlaying ? "Pause" : "Play"}
                 </button>
 
-                <div className="inline-flex items-center gap-1 rounded-full border border-[var(--wk-border)] bg-[var(--wk-surface)]/72 p-1 backdrop-blur">
-                  <AddToPlaylistButton
-                    trackId={track.id}
-                    trackTitle={track.title}
-                    reactionStyle
-                  />
-
-                  <button
-                    type="button"
-                    onClick={handleSaveTrack}
-                    disabled={entityActionLoading}
-                    aria-label={entityActionLoading ? "Saving Track" : trackSaved ? "Saved Track" : "Save Track"}
-                    title={entityActionLoading ? "Saving Track" : trackSaved ? "Saved Track" : "Save Track"}
-                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors disabled:opacity-60 ${
-                      trackSaved
-                        ? "bg-[var(--wk-brand-soft)] text-[var(--wk-brand)]"
-                        : "text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-                    }`}
-                  >
-                    <WkIcon name="Heart" size={17} fill={trackSaved ? "currentColor" : "none"} />
-                    <span className="sr-only">{trackSaved ? "Saved Track" : "Save Track"}</span>
-                  </button>
-
-                  <Link
-                    to={lyricsContributionPath}
-                    aria-label="Contribute Lyrics"
-                    title="Contribute Lyrics"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-                  >
-                    <WkIcon name="Edit3" size={17} />
-                    <span className="sr-only">Contribute Lyrics</span>
-                  </Link>
-
-                  <button
-                    type="button"
-                    onClick={() => setShareOpen(true)}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--wk-text-muted)] transition-colors hover:bg-[var(--wk-surface-raised)] hover:text-[var(--wk-text)]"
-                    aria-label="Share"
-                    title="Share"
-                  >
-                    <WkIcon name="Share2" size={17} />
-                    <span className="sr-only">Share</span>
-                  </button>
-
-
-                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveTrack}
+                  disabled={entityActionLoading}
+                  aria-label={trackSaved ? "Saved Track" : "Save Track"}
+                  title={trackSaved ? "Saved Track" : "Save Track"}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--wk-border)] text-[var(--wk-text-muted)] disabled:opacity-50"
+                >
+                  <WkIcon name="Heart" size={18} fill={trackSaved ? "currentColor" : "none"} />
+                </button>
+                <TrackActionsMenu
+                  registryTrackId={track.id}
+                  trackTitle={track.title}
+                  artistName={track.artist}
+                  artistSlug={canonicalArtistSlug}
+                  trackSlug={canonicalTrackSlug}
+                  releaseTitle={track.albumTitle}
+                  releaseSlug={canonicalReleaseSlug}
+                  artworkUrl={track.artworkUrl}
+                  compact={false}
+                />
               </div>
-
-              <ShareSheet
-                item={{
-                  title: track.title,
-                  subtitle: track.artist,
-                  description: trackIntro || seoDescription,
-                  imageUrl: track.artworkUrl,
-                  type: "track",
-                }}
-                open={shareOpen}
-                onClose={() => setShareOpen(false)}
-              />
               {trackSaveError && (
                 <p className="mt-3 text-[12px] font-bold text-red-500">
                   {trackSaveError}
@@ -1286,6 +1273,8 @@ export default function TrackDetail() {
                 artistSlug={artistSlug || track.artistSlug}
                 currentTrackSlug={track.slug}
                 albumTitle={track.albumTitle}
+                releasePath={track.albumArtistSlug && track.albumSlug
+                  ? `/releases/${track.albumArtistSlug}/${track.albumSlug}` : undefined}
                 tracks={track.releaseTracks}
               />
             )}

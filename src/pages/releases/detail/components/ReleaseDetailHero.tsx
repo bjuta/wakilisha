@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton, ShareSheet } from "@/components/design-system/share/ShareSheet";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
@@ -19,6 +20,7 @@ export default function ReleaseDetailHero({
   const [artworkFailed, setArtworkFailed] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const { currentTrack, isPlaying, playTrack, togglePlay, toggleShuffle, isShuffle } = usePlayer();
+  const releasePath = useLocation().pathname;
 
   useEffect(() => {
     setArtworkFailed(false);
@@ -65,6 +67,7 @@ export default function ReleaseDetailHero({
       pageType: "release_detail",
       entitySlug: release.slug,
       entityType: "release",
+      releasePath,
       sourceSection: "release_hero",
     });
   };
@@ -83,6 +86,7 @@ export default function ReleaseDetailHero({
       pageType: "release_detail",
       entitySlug: release.slug,
       entityType: "release",
+      releasePath,
       sourceSection: "release_hero",
     });
   };
@@ -107,11 +111,11 @@ export default function ReleaseDetailHero({
       <div className="absolute inset-0 bg-gradient-to-b from-[var(--wk-bg)]/40 via-[var(--wk-bg)]/70 to-[var(--wk-bg)]" />
 
       {/* Content */}
-      <div className="relative z-10 wk-container-wide px-6 py-16 md:py-24 lg:py-28">
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start lg:items-end">
+      <div className="relative z-10 wk-container-wide px-5 py-8 sm:px-6 md:py-12 lg:py-14">
+        <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-10">
           {/* Album cover */}
           <div
-            className="relative flex-shrink-0 w-[280px] md:w-[340px] lg:w-[380px] aspect-square overflow-hidden"
+            className="relative h-[232px] w-[232px] shrink-0 overflow-hidden rounded-xl md:h-[260px] md:w-[260px]"
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
           >
@@ -142,7 +146,7 @@ export default function ReleaseDetailHero({
           </div>
 
           {/* Info */}
-          <div className="flex-1 min-w-0 pb-2">
+          <div className="min-w-0 flex-1 pb-2 text-center md:text-left">
             {/* Kicker */}
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wk-brand)]/30 bg-[var(--wk-brand-soft)]/60 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[var(--wk-brand)] mb-5">
               <WkIcon name="Album" size={13} />
@@ -152,13 +156,13 @@ export default function ReleaseDetailHero({
             {/* Title */}
             <h1
               className="font-[var(--wk-font-display)] font-black text-[var(--wk-text)] leading-[0.9] tracking-[-0.05em]"
-              style={{ fontSize: "clamp(40px, 6vw, 84px)" }}
+              style={{ fontSize: "clamp(30px, 4vw, 56px)", overflowWrap: "anywhere" }}
             >
               {release.title}
             </h1>
 
             {/* Artist / Label */}
-            <div className="flex flex-wrap items-center gap-3 mt-4 text-[15px] md:text-[17px] font-bold text-[var(--wk-text-muted)]">
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-[15px] font-bold text-[var(--wk-text-muted)] md:justify-start md:text-[17px]">
               <a
                 href={`/artists/${slugify(release.artist)}`}
                 className="text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors"
@@ -204,7 +208,7 @@ export default function ReleaseDetailHero({
             )}
 
             {/* Meta row */}
-            <div className="flex flex-wrap items-center gap-5 mt-6 text-[12px] font-bold text-[var(--wk-text-muted)]">
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-5 border-y border-[var(--wk-divider)] py-3 text-[12px] font-bold text-[var(--wk-text-muted)] md:justify-start">
               <span className="inline-flex items-center gap-2">
                 <WkIcon name="Calendar" size={14} />
                 {release.year}

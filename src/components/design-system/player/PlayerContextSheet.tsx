@@ -25,6 +25,7 @@ export function PlayerContextSheet({
   artworkUrl,
   actions,
   playlistAction,
+  playbackControls,
 }: {
   open: boolean;
   onClose: () => void;
@@ -35,6 +36,7 @@ export function PlayerContextSheet({
   artworkUrl?: string | null;
   actions: PlayerContextAction[];
   playlistAction?: ReactNode;
+  playbackControls?: ReactNode;
 }) {
   return (
     <PlayerPanelSheet
@@ -70,6 +72,7 @@ export function PlayerContextSheet({
         </div>
       </div>
 
+      {playbackControls}
       <div className="mt-4 space-y-1">
         {playlistAction}
         {actions.map((action) => (

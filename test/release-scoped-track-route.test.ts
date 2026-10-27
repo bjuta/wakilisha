@@ -420,11 +420,19 @@ describe("canonical public Track and Release routes", () => {
       "ConnectedArtists",
       "ContributionBadges",
       "CommunitySection",
-      "AddToPlaylistButton",
+      "TrackActionsMenu",
       "lyricsContributionPath",
     ]) {
       expect(trackPage).toContain(capability);
     }
+
+    const trackMore = readFileSync(
+      "src/components/tracks/TrackActionsMenu.tsx",
+      "utf8",
+    );
+    // Chapter 25 preserves Add to Playlist behind More, not in the hero.
+    expect(trackPage).toContain("<TrackActionsMenu");
+    expect(trackMore).toContain("<AddToPlaylistButton");
 
     expect(trackCreditsSection).toContain(
       "How we know this",

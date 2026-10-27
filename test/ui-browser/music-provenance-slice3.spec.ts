@@ -561,6 +561,89 @@ async function jsonLd(
 test.beforeEach(async ({ page }) => {
   await installPublicReadFixtures(page);
 });
+function shortWavPreview(frequency: number, seconds = 6): string {
+  const rate = 8000;
+  const count = rate * seconds;
+  const pcm = Buffer.alloc(44 + count * 2);
+  pcm.write("RIFF", 0, "ascii");
+  pcm.writeUInt32LE(36 + count * 2, 4);
+  pcm.write("WAVEfmt ", 8, "ascii");
+  pcm.writeUInt32LE(16, 16);
+  pcm.writeUInt16LE(1, 20);
+  pcm.writeUInt16LE(1, 22);
+  pcm.writeUInt32LE(rate, 24);
+  pcm.writeUInt32LE(rate * 2, 28);
+  pcm.writeUInt16LE(2, 32);
+  pcm.writeUInt16LE(16, 34);
+  pcm.write("data", 36, "ascii");
+  pcm.writeUInt32LE(count * 2, 40);
+  for (let i = 0; i < count; i += 1) {
+    const amplitude = Math.round(Math.sin((2 * Math.PI * frequency * i) / rate) * 8000);
+    pcm.writeInt16LE(amplitude, 44 + i * 2);
+  }
+  return `data:audio/wav;base64,${pcm.toString("base64")}`;
+}
+
+test("Chapter 25 overlaps controlled previews and switches queue at fade start", async ({ page }) => {
+  const previews = [shortWavPreview(220), shortWavPreview(330)];
+  const fixture = {
+    ...releaseDetail,
+    tracks: releaseDetail.tracks.map((track, index) => ({
+      ...track,
+      duration: 6,
+      previewUrl: previews[index],
+    })),
+  };
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("wk-playback-v2", JSON.stringify({
+      autoplay: true,
+      crossfade: true,
+      crossfadeSeconds: 3,
+      keepAlbumsGapless: false,
+    }));
+
+    // Record real HTMLAudioElements, not mocked timers or fake play events.
+    const NativeAudio = window.Audio;
+    const created: HTMLAudioElement[] = [];
+    Object.assign(window, { __wkCh25AudioDecks: created });
+    window.Audio = function (...args: ConstructorParameters<typeof Audio>) {
+      const audio = new NativeAudio(...args);
+      created.push(audio);
+      return audio;
+    } as typeof Audio;
+  });
+
+  await page.route(
+    "**/public-content-read/releases/slice3-browser-solo/slice3-browser-release**",
+    async (route) => {
+      await fulfillJson(route, { data: { release: fixture } });
+    },
+  );
+
+  await page.goto("/releases/slice3-browser-solo/slice3-browser-release", {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page.getByRole("heading", { level: 1, name: releaseDetail.title })).toBeVisible();
+  await page.getByRole("button", { name: "Play", exact: true }).first().click();
+
+  // At 6 seconds, quarter-length policy caps a selected 3-second fade to 1 second.
+  await expect.poll(async () =>
+    page.evaluate(() => {
+      const decks = (window as unknown as {
+        __wkCh25AudioDecks: HTMLAudioElement[];
+      }).__wkCh25AudioDecks || [];
+      return decks.filter((audio) =>
+        !audio.paused && !audio.ended && audio.currentTime > 0
+      ).length;
+    }), { timeout: 14000, intervals: [80, 80, 120] },
+  ).toBe(2);
+
+  await expect(page.locator(
+    '[data-wk-player-compact="desktop"], [data-wk-player-dock]',
+  ).getByText("Slice 3 Browser Track Two", { exact: true }).first()).toBeVisible();
+});
+
 
 test("Slice 3 emits Person JSON-LD for a canonical solo Artist", async ({
   page,

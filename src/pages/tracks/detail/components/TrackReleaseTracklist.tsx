@@ -14,6 +14,8 @@ export interface ReleaseTrackData {
   trackNumber: number;
   artworkUrl: string;
   previewUrl?: string;
+  appleMusicId?: string | null;
+  appleMusicCatalogId?: string | null;
 }
 
 function formatDuration(seconds: number): string {
@@ -27,6 +29,7 @@ interface TrackReleaseTracklistProps {
   artistSlug: string;
   currentTrackSlug: string;
   albumTitle: string;
+  releasePath?: string;
   tracks: ReleaseTrackData[];
 }
 
@@ -34,6 +37,7 @@ export default function TrackReleaseTracklist({
   artistSlug,
   currentTrackSlug,
   albumTitle,
+  releasePath,
   tracks,
 }: TrackReleaseTracklistProps) {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
@@ -49,7 +53,7 @@ export default function TrackReleaseTracklist({
       return;
     }
 
-    const queueTracks = tracks.slice(trackIndex).map((t) => ({
+    const queueTracks = tracks.map((t) => ({
       id: t.id,
       registryTrackId: t.id,
       title: t.title,
@@ -57,29 +61,19 @@ export default function TrackReleaseTracklist({
       artworkUrl: t.artworkUrl,
       duration: t.duration,
       previewUrl: t.previewUrl || undefined,
+      appleMusicId: t.appleMusicId || t.appleMusicCatalogId || null,
+      appleMusicCatalogId: t.appleMusicCatalogId || t.appleMusicId || null,
       album: albumTitle,
       artistSlug,
       trackSlug: t.slug,
     }));
-
-    const remainingTracks = tracks.slice(0, trackIndex).map((t) => ({
-      id: t.id,
-      registryTrackId: t.id,
-      title: t.title,
-      artist: t.artist,
-      artworkUrl: t.artworkUrl,
-      duration: t.duration,
-      previewUrl: t.previewUrl || undefined,
-      album: albumTitle,
-      artistSlug,
-      trackSlug: t.slug,
-    }));
-
-    const fullQueue = [...queueTracks, ...remainingTracks];
-    playTrack(queueTracks[0], fullQueue, {
+    const selected = queueTracks[trackIndex];
+    if (!selected) return;
+    playTrack(selected, queueTracks, {
       pageType: "track_detail",
       entitySlug: currentTrackSlug,
-      entityType: "track",
+      entityType: "release",
+      releasePath,
       sourceSection: "album_tracklist",
     });
   };

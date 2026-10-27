@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
@@ -26,6 +26,7 @@ export default function ReleaseTracklist({
   onDiscussTrack?: (track: PublicReleaseDetail["tracks"][number], index: number) => void;
 }) {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
+  const releasePath = useLocation().pathname;
   const { ref, revealed } = useScrollReveal<HTMLDivElement>(0.1);
 
   const handlePlayTrack = (track: typeof tracks[number], trackIndex: number) => {
@@ -35,8 +36,9 @@ export default function ReleaseTracklist({
       return;
     }
 
-    // Build queue from all tracks starting at the clicked index
-    const queueTracks = tracks.slice(trackIndex).map((t, i) => ({
+    // Preserve the canonical release order. Start at the selected index,
+    // then play forward without wrapping unless Repeat All is selected.
+    const queueTracks = tracks.map((t) => ({
       id: t.id,
       registryTrackId: t.id,
       title: t.title,
@@ -51,30 +53,14 @@ export default function ReleaseTracklist({
       artistSlug: t.artistSlug || undefined,
       trackSlug: t.slug,
     }));
+    const selected = queueTracks[trackIndex];
+    if (!selected) return;
 
-    // Also include tracks before the clicked index (for a full queue)
-    const remainingTracks = tracks.slice(0, trackIndex).map((t) => ({
-      id: t.id,
-      registryTrackId: t.id,
-      title: t.title,
-      artist: t.artist,
-      artworkUrl: t.artworkUrl,
-      duration: t.duration,
-      previewUrl: t.previewUrl,
-      appleMusicId: t.appleMusicId || t.appleMusicCatalogId || null,
-      appleMusicCatalogId: t.appleMusicCatalogId || t.appleMusicId || null,
-      album: release.title,
-      releaseId: release.id,
-      artistSlug: t.artistSlug || undefined,
-      trackSlug: t.slug,
-    }));
-
-    const fullQueue = [...queueTracks, ...remainingTracks];
-
-    playTrack(queueTracks[0], fullQueue, {
+    playTrack(selected, queueTracks, {
       pageType: "release_detail",
       entitySlug: release.slug,
       entityType: "release",
+      releasePath,
       sourceSection: "tracklist",
     });
   };
