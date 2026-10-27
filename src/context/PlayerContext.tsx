@@ -581,7 +581,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           const candidate = standbyAudioRef.current;
           const fallback = candidate && !mixEngineRef.current.hasDeck(candidate)
             ? candidate : nativeRescueAudioRef.current;
-          if (!fallback || mixEngineRef.current.hasDeck(fallback)) return;
+          if (!fallback || fallback === activeAudio ||
+              mixEngineRef.current.hasDeck(fallback)) return;
           failedMixSourcesRef.current.add(source.url);
           console.warn("Smart Mix audio graph silent; restoring native provider playback");
           activeAudio.pause();
@@ -1076,7 +1077,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               ? standbyAudioRef.current : audio;
             const fallback = candidate && !mixEngineRef.current.hasDeck(candidate)
               ? candidate : nativeRescueAudioRef.current;
-            if (fallback && !mixEngineRef.current.hasDeck(fallback)) {
+            if (fallback && fallback !== audio &&
+                !mixEngineRef.current.hasDeck(fallback)) {
               audio.pause();
               if (fallback !== audio) {
                 audioRef.current = fallback;
