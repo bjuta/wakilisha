@@ -464,6 +464,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     stopProviderPolling,
   ]);
 
+  useEffect(() => {
+    if (!playbackPrefs.crossfade &&
+        (previewFadePendingRef.current || previewFadeRef.current)) {
+      cancelPreviewFade();
+    }
+  }, [cancelPreviewFade, playbackPrefs.crossfade]);
+
   const playViaHtmlAudio = useCallback(async (
     track: PlayerTrack,
     audio: HTMLAudioElement,
@@ -1443,6 +1450,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             crossfade_seconds: seconds,
           },
         });
+        // A slow preview response may arrive after the old deck ended.
+        // In that case start audibly instead of fading in from silence.
+        if (outgoing.ended || outgoing.paused) {
+          incoming.volume = volumeRef.current;
+          outgoing.pause();
+          outgoing.removeAttribute("src");
+          previewFadeRef.current = null;
+          return;
+        }
         const ramp = (now: number) => {
           if (previewFadeRef.current !== fade) return;
           fade.fraction = Math.min(1, Math.max(0, (now - startTime) / (seconds * 1000)));
@@ -1791,6 +1807,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Next track ───
   const next = useCallback(() => {
+    previewFadeSuppressedRef.current = false;
     const audio = audioRef.current;
     if (!audio || queue.length === 0) return;
 
@@ -1904,6 +1921,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Previous track ───
   const prev = useCallback(() => {
+    previewFadeSuppressedRef.current = false;
     const audio = audioRef.current;
     if (!audio || queue.length === 0) return;
 
@@ -2065,6 +2083,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Play from queue ───
   const playFromQueue = useCallback((index: number) => {
+    previewFadeSuppressedRef.current = false;
     const audio = audioRef.current;
     if (!audio || index < 0 || index >= queue.length) return;
     const track = queue[index];
