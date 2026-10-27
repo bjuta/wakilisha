@@ -52,6 +52,9 @@ export interface UserNotificationPrefs {
 
 export interface UserPlaybackPrefs {
   autoplay: boolean;
+  crossfade: boolean;
+  crossfadeSeconds: number;
+  keepAlbumsGapless: boolean;
   explicitFilter: boolean;
   playbackQuality: "Auto" | "High" | "Data saver";
   appleMusicConnected: boolean;
@@ -106,6 +109,9 @@ const DEFAULT_NOTIFICATIONS: UserNotificationPrefs = {
 
 const DEFAULT_PLAYBACK: UserPlaybackPrefs = {
   autoplay: true,
+  crossfade: false,
+  crossfadeSeconds: 6,
+  keepAlbumsGapless: true,
   explicitFilter: false,
   playbackQuality: "Auto",
   appleMusicConnected: false,

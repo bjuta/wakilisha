@@ -80,6 +80,9 @@ export interface PlayerTrack {
 // ─── Read playback prefs from localStorage ───
 function readPlaybackPrefs(): {
   autoplay: boolean;
+  crossfade: boolean;
+  crossfadeSeconds: number;
+  keepAlbumsGapless: boolean;
   explicitFilter: boolean;
   appleMusicConnected: boolean;
   appleMusicToken: string | null;
@@ -90,6 +93,9 @@ function readPlaybackPrefs(): {
     if (!raw) {
       return {
         autoplay: true,
+        crossfade: false,
+        crossfadeSeconds: 6,
+        keepAlbumsGapless: true,
         explicitFilter: false,
         appleMusicConnected: false,
         appleMusicToken: null,
@@ -100,6 +106,10 @@ function readPlaybackPrefs(): {
     const prefs = JSON.parse(raw);
     return {
       autoplay: prefs.autoplay !== false,
+      crossfade: prefs.crossfade === true,
+      crossfadeSeconds: Number.isFinite(prefs.crossfadeSeconds)
+        ? Math.min(12, Math.max(3, Math.round(prefs.crossfadeSeconds))) : 6,
+      keepAlbumsGapless: prefs.keepAlbumsGapless !== false,
       explicitFilter: prefs.explicitFilter === true,
       appleMusicConnected: prefs.appleMusicConnected === true,
       appleMusicToken: typeof prefs.appleMusicToken === "string" ? prefs.appleMusicToken : null,

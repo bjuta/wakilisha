@@ -67,6 +67,10 @@ const playbackSettings = readFileSync(
   "src/hooks/useUserSettings.ts",
   "utf8",
 );
+const playbackControls = readFileSync(
+  "src/components/design-system/player/PlaybackControls.tsx",
+  "utf8",
+);
 const trackDetail = readFileSync(
   "src/pages/tracks/detail/page.tsx",
   "utf8",
@@ -198,6 +202,13 @@ describe(
         expect(artistTopSongs).toContain("sourceSection: \"top_songs_expanded\"");
         expect(playerContext).toContain("if (!playbackPrefs.autoplay) {");
         expect(playbackSettings).toContain("autoplay: true,");
+        expect(playbackSettings).toContain("crossfade: false,");
+        expect(playbackSettings).toContain("crossfadeSeconds: 6,");
+        expect(playbackSettings).toContain("keepAlbumsGapless: true,");
+        expect(playbackControls).toContain("Keep albums gapless");
+        expect(playbackControls).toContain("Next after queue");
+        expect(full).toContain("<PlaybackMoreControls");
+        expect(full).toContain("Not available for YouTube");
       },
     );
 

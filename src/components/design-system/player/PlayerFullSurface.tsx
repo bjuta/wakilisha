@@ -38,6 +38,7 @@ import {
   type PlayerContextAction,
 } from "./PlayerContextSheet";
 import { PlayerPanelSheet } from "./PlayerPanelSheet";
+import { PlaybackMoreControls, usePlaybackControls } from "./PlaybackControls";
 import { PlayerQueuePanel } from "./PlayerQueuePanel";
 import { PlayerTimedTextPanel } from "./PlayerTimedTextPanel";
 import { SeekRail } from "./SeekRail";
@@ -504,6 +505,7 @@ export function PlayerFullSurface({
     navigate(path);
   };
 
+  const { playback: playbackControls, updatePlayback: updatePlaybackControls } = usePlaybackControls();
   const contextActions: PlayerContextAction[] = [];
 
   if (queueAvailable) {
@@ -1141,6 +1143,17 @@ export function PlayerFullSurface({
         creator={experience.creatorLabel}
         artworkUrl={currentTrack.artworkUrl}
         actions={contextActions}
+        playbackControls={!experience.spokenAudio ? (
+          <PlaybackMoreControls
+            playback={playbackControls}
+            updatePlayback={updatePlaybackControls}
+            unavailableReason={
+              playbackBackend === "youtube" ? "Not available for YouTube"
+                : playbackBackend === "soundcloud" ? "Not available for SoundCloud"
+                : playbackBackend === "apple" ? "Not available for Apple Music" : null
+            }
+          />
+        ) : null}
         playlistAction={
           !experience.spokenAudio &&
           experience.capabilities.addToPlaylist ? (

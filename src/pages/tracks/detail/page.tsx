@@ -978,7 +978,7 @@ export default function TrackDetail() {
       appleMusicId: related.appleMusicId || related.appleMusicCatalogId || null,
       appleMusicCatalogId: related.appleMusicCatalogId || related.appleMusicId || null,
       album: track.albumTitle,
-      artistSlug: track.albumArtistSlug || related.artistSlug || track.artistSlug || undefined,
+      artistSlug: track.albumArtistSlug || track.artistSlug || undefined,
       trackSlug: related.slug,
     }));
     const inRelease = releaseQueue.some((candidate) => candidate.registryTrackId === track.id);
