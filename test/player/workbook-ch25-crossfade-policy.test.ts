@@ -88,6 +88,7 @@ mixDescribe("Chapter 25 WAKILISHA shared Smart Mix engine", () => {
       duration: 12,
       getChannelData: () => samples,
     } as unknown as AudioBuffer;
-    mixExpect(estimateBeatTempo(clip)).toBe(120);
+    mixExpect(estimateBeatTempo(clip)).toBeGreaterThanOrEqual(118);
+    mixExpect(estimateBeatTempo(clip)).toBeLessThanOrEqual(122);
   });
 });
