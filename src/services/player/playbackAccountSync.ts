@@ -12,7 +12,6 @@ interface SharedPlayback {
   crossfade: boolean;
   crossfadeSeconds: number;
   smartMix: boolean;
-  keepAlbumsGapless: boolean;
 }
 
 const defaults: SharedPlayback = {
@@ -20,7 +19,6 @@ const defaults: SharedPlayback = {
   crossfade: false,
   crossfadeSeconds: 6,
   smartMix: true,
-  keepAlbumsGapless: true,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -35,7 +33,6 @@ function fromRecord(record: Record<string, unknown>): SharedPlayback {
     crossfadeSeconds: Number.isFinite(duration)
       ? Math.max(3, Math.min(12, Math.round(duration))) : 6,
     smartMix: record.smartMix !== false,
-    keepAlbumsGapless: record.keepAlbumsGapless !== false,
   };
 }
 
