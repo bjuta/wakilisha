@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import { WkSlider } from "@/components/design-system/primitives/Slider";
 import type { UserPlaybackPrefs } from "@/hooks/useUserSettings";
-import { supportsPreviewAudioVolume } from "@/services/player/crossfadePolicy";
 
 export type PlaybackControlPrefs = Pick<
   UserPlaybackPrefs,
@@ -123,7 +122,7 @@ export function PlaybackSettingsControls({
         label="Crossfade"
         detail="Fade between tracks when supported."
         checked={playback.crossfade}
-        onChange={(crossfade) => updatePlayback({ crossfade })}
+        onChange={(crossfade) => updatePlayback({ crossfade, ...(crossfade ? { keepAlbumsGapless: false } : {}) })}
       />
       <div className={`border-b border-[var(--wk-divider)] py-4 ${!playback.crossfade ? "opacity-40" : ""}`}>
         <div className="flex items-center justify-between gap-3 text-[13px] font-bold text-[var(--wk-text)]">
@@ -169,9 +168,7 @@ export function PlaybackMoreControls({
   updatePlayback: (patch: Partial<PlaybackControlPrefs>) => void;
   unavailableReason?: string | null;
 }) {
-  const [supportsFadeVolume] = useState(supportsPreviewAudioVolume);
-  const reason = unavailableReason || (!supportsFadeVolume ? "Not available on this device" : null);
-  const unavailable = Boolean(reason);
+  const unavailable = Boolean(unavailableReason);
   const step = (change: number) =>
     updatePlayback({ crossfadeSeconds: clampFade(playback.crossfadeSeconds + change) });
   return (
@@ -184,10 +181,10 @@ export function PlaybackMoreControls({
       />
       <PlaybackToggleRow
         label="Crossfade"
-        detail={reason || (playback.keepAlbumsGapless ? "Albums and EPs play gaplessly in order." : undefined)}
+        detail={unavailableReason || (playback.keepAlbumsGapless ? "Albums and EPs play gaplessly in order." : undefined)}
         checked={playback.crossfade}
         disabled={unavailable}
-        onChange={(crossfade) => updatePlayback({ crossfade })}
+        onChange={(crossfade) => updatePlayback({ crossfade, ...(crossfade ? { keepAlbumsGapless: false } : {}) })}
       />
       <div className={`flex items-center justify-end gap-3 py-2 ${!playback.crossfade || unavailable ? "opacity-40" : ""}`}>
         <button type="button" aria-label="Reduce crossfade" onClick={() => step(-1)}
