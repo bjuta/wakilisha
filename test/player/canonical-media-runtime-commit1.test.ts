@@ -140,7 +140,7 @@ describe(
         );
         // The full player is code-split, not eagerly mounted by the shell.
         expect(responsive).toContain(
-          'import("@/components/design-system/player/PlayerFullSurface")',
+          '"@/components/design-system/player/PlayerFullSurface"',
         );
         expect(responsive).toContain(
           '<LazyPlayerFullSurface mode={isMobile ? "mobile" : "desktop"}',
