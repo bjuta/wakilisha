@@ -727,6 +727,18 @@ export default function TrackDetail() {
   const [trackSaved, setTrackSaved] = useState(false);
   const [trackSaveError, setTrackSaveError] = useState<string | null>(null);
   const [listeningSignal, setListeningSignal] = useState<ListeningHistoryItem | null>(null);
+
+  // Credits opens from Track and player More after the async Track read.
+  useEffect(() => {
+    if (!track || location.hash !== "#track-credits-heading") return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("track-credits-heading")?.scrollIntoView({
+        block: "start",
+        behavior: "auto",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [track?.id, location.hash]);
   const [applePlaybackConnected, setApplePlaybackConnected] = useState(
     () => getApplePlaybackPrefsSnapshot().appleMusicConnected
   );
