@@ -541,7 +541,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         activeAudio.src = track.previewUrl;
         await activeAudio.play();
       }
-      if (useMixTransport && activeAudio.currentSrc.includes("/__wk-mix/") &&
+      // Only attach the actual mixable source. Data/blob and same-origin audio
+      // also need a controlled deck; the previous /__wk-mix/-only check
+      // incorrectly excluded them from audible crossfade acceptance.
+      const expectedMixUrl = new URL(source.url, window.location.origin).href;
+      if (useMixTransport && activeAudio.currentSrc === expectedMixUrl &&
           mixEngineRef.current.isRunning() &&
           mixEngineRef.current.prepare(activeAudio, source)) {
         mixEngineRef.current.setMasterVolume(volumeRef.current);
@@ -1639,7 +1643,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Warm the next permitted audio source and analyze short media before n - fade.
   useEffect(() => {
     if (!playbackPrefs.autoplay || !playbackPrefs.crossfade || !isPlaying ||
-        playbackBackend !== "audio" || !mixEngineRef.current.isRunning() ||
+        playbackBackend !== "audio" ||
         previewFadePendingRef.current || previewFadeRef.current) return;
     const order = isShuffle ? shuffledOrderRef.current : queue.map((_, index) => index);
     const position = order.indexOf(queueIndex);
