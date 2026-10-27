@@ -5,13 +5,14 @@ import type { UserPlaybackPrefs } from "@/hooks/useUserSettings";
 
 export type PlaybackControlPrefs = Pick<
   UserPlaybackPrefs,
-  "autoplay" | "crossfade" | "crossfadeSeconds" | "keepAlbumsGapless"
+  "autoplay" | "crossfade" | "crossfadeSeconds" | "smartMix" | "keepAlbumsGapless"
 >;
 
 export const PLAYBACK_CONTROL_DEFAULTS: PlaybackControlPrefs = {
   autoplay: true,
   crossfade: false,
   crossfadeSeconds: 6,
+  smartMix: true,
   keepAlbumsGapless: true,
 };
 
@@ -28,6 +29,7 @@ export function readPlaybackControls(): PlaybackControlPrefs {
       crossfade: stored.crossfade === true,
       crossfadeSeconds: Number.isFinite(stored.crossfadeSeconds)
         ? Math.max(3, Math.min(12, Math.round(stored.crossfadeSeconds!))) : 6,
+      smartMix: stored.smartMix !== false,
       keepAlbumsGapless: stored.keepAlbumsGapless !== false,
     };
   } catch {
@@ -122,7 +124,14 @@ export function PlaybackSettingsControls({
         label="Crossfade"
         detail="Fade between tracks when supported."
         checked={playback.crossfade}
-        onChange={(crossfade) => updatePlayback({ crossfade })}
+        onChange={(crossfade) => updatePlayback({ crossfade, ...(crossfade ? { keepAlbumsGapless: false } : {}) })}
+      />
+      <PlaybackToggleRow
+        label="Smart Mix"
+        detail="Beat-aware tempo alignment and equal-power musical transitions when analysis is available."
+        checked={playback.smartMix !== false}
+        disabled={!playback.crossfade}
+        onChange={(smartMix) => updatePlayback({ smartMix })}
       />
       <div className={`border-b border-[var(--wk-divider)] py-4 ${!playback.crossfade ? "opacity-40" : ""}`}>
         <div className="flex items-center justify-between gap-3 text-[13px] font-bold text-[var(--wk-text)]">
@@ -147,7 +156,7 @@ export function PlaybackSettingsControls({
       </div>
       <PlaybackToggleRow
         label="Keep albums gapless"
-        detail="No crossfade on albums played in order."
+        detail="No crossfade on albums or EPs played in order."
         checked={playback.keepAlbumsGapless}
         onChange={(keepAlbumsGapless) => updatePlayback({ keepAlbumsGapless })}
       />
@@ -181,10 +190,17 @@ export function PlaybackMoreControls({
       />
       <PlaybackToggleRow
         label="Crossfade"
-        detail={unavailableReason || undefined}
+        detail={unavailableReason || (playback.keepAlbumsGapless ? "Albums and EPs play gaplessly in order." : undefined)}
         checked={playback.crossfade}
         disabled={unavailable}
-        onChange={(crossfade) => updatePlayback({ crossfade })}
+        onChange={(crossfade) => updatePlayback({ crossfade, ...(crossfade ? { keepAlbumsGapless: false } : {}) })}
+      />
+      <PlaybackToggleRow
+        label="Smart Mix"
+        detail="Match compatible tempos; preserve a natural blend otherwise."
+        checked={playback.smartMix !== false}
+        disabled={!playback.crossfade || unavailable}
+        onChange={(smartMix) => updatePlayback({ smartMix })}
       />
       <div className={`flex items-center justify-end gap-3 py-2 ${!playback.crossfade || unavailable ? "opacity-40" : ""}`}>
         <button type="button" aria-label="Reduce crossfade" onClick={() => step(-1)}
@@ -195,6 +211,12 @@ export function PlaybackMoreControls({
           disabled={!playback.crossfade || unavailable || playback.crossfadeSeconds >= 12}
           className="h-9 w-9 rounded-full border border-[var(--wk-border)] text-[var(--wk-text)] disabled:cursor-not-allowed">+</button>
       </div>
+      <PlaybackToggleRow
+        label="Keep albums gapless"
+        detail="No crossfade on albums or EPs played in order."
+        checked={playback.keepAlbumsGapless}
+        onChange={(keepAlbumsGapless) => updatePlayback({ keepAlbumsGapless })}
+      />
     </div>
   );
 }

@@ -54,6 +54,7 @@ export interface UserPlaybackPrefs {
   autoplay: boolean;
   crossfade: boolean;
   crossfadeSeconds: number;
+  smartMix: boolean;
   keepAlbumsGapless: boolean;
   explicitFilter: boolean;
   playbackQuality: "Auto" | "High" | "Data saver";
@@ -111,6 +112,7 @@ const DEFAULT_PLAYBACK: UserPlaybackPrefs = {
   autoplay: true,
   crossfade: false,
   crossfadeSeconds: 6,
+  smartMix: true,
   keepAlbumsGapless: true,
   explicitFilter: false,
   playbackQuality: "Auto",

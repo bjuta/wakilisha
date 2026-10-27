@@ -218,6 +218,8 @@ describe(
         expect(playbackSettings).toContain("crossfadeSeconds: 6,");
         expect(playbackSettings).toContain("keepAlbumsGapless: true,");
         expect(playbackControls).toContain("Keep albums gapless");
+        expect(playbackControls).toContain("No crossfade on albums or EPs played in order.");
+        expect(playbackControls).toContain("keepAlbumsGapless: false");
         expect(playbackControls).toContain("Next after queue");
         expect(playbackControls).toContain("<WkSlider");
         expect(playerContext).toContain("Play starts the collection again.");
@@ -238,6 +240,7 @@ describe(
       "keeps the Track hero compact and responsive",
       () => {
         expect(trackDetail).toContain('h-[232px] w-[232px]');
+        expect(trackDetail).toContain('px-5 pb-6 pt-12 sm:px-6 md:py-10');
         expect(trackDetail).toContain('md:h-[260px] md:w-[260px]');
         expect(trackDetail).toContain('overflowWrap: "anywhere"');
         expect(trackDetail).toContain('canonicalTrackUrl(');

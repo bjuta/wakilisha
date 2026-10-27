@@ -1122,7 +1122,7 @@ export default function TrackDetail() {
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--wk-bg)]/40 via-[var(--wk-bg)]/70 to-[var(--wk-bg)]" />
 
-        <div className="relative z-10 wk-container-wide px-5 py-6 sm:px-6 md:py-10 lg:py-12">
+        <div className="relative z-10 wk-container-wide px-5 pb-6 pt-12 sm:px-6 md:py-10 lg:py-12">
           <div className="flex flex-col items-center gap-5 md:flex-row md:items-center md:gap-9">
             <div
               className="relative h-[232px] w-[232px] shrink-0 overflow-hidden rounded-xl md:h-[260px] md:w-[260px]"

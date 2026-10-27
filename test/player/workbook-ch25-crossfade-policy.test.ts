@@ -43,3 +43,52 @@ describe("Workbook Chapter 25 preview crossfade policy", () => {
     expect(resolvePreviewCrossfadeSeconds({ ...base, nextDuration: 0 })).toBe(0);
   });
 });
+
+
+import { describe as mixDescribe, expect as mixExpect, it as mixIt } from "vitest";
+import { equalPowerLevels, resolveMixableAudioSource, safeTempoMatchRate, estimateBeatTempo } from "@/services/player/WakilishaMixEngine";
+
+mixDescribe("Chapter 25 WAKILISHA shared Smart Mix engine", () => {
+  mixIt("uses equal-power gain envelopes at the quarter, midpoint and endpoints", () => {
+    const zero = equalPowerLevels(0), half = equalPowerLevels(0.5), end = equalPowerLevels(1);
+    mixExpect(zero.outgoing).toBeCloseTo(1, 5);
+    mixExpect(zero.incoming).toBeCloseTo(0, 5);
+    mixExpect(half.incoming ** 2 + half.outgoing ** 2).toBeCloseTo(1, 5);
+    mixExpect(end.incoming).toBeCloseTo(1, 5);
+    mixExpect(end.outgoing).toBeCloseTo(0, 5);
+  });
+  mixIt("routes only exact public preview media to WAKILISHA sample-level delivery", () => {
+    const origin = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/da/cb/f3/file.plus.aac.p.m4a";
+    mixExpect(resolveMixableAudioSource(origin)).toEqual({
+      url: "/__wk-mix/itunes-assets/AudioPreview221/v4/da/cb/f3/file.plus.aac.p.m4a",
+      mixable: true,
+    });
+    for (const bad of [
+      "https://evil.example/itunes-assets/AudioPreview221/v4/x.m4a",
+      "https://audio-ssl.itunes.apple.com/secret.mp3",
+      "http://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/x.m4a",
+      "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/x.php",
+    ]) {
+      mixExpect(resolveMixableAudioSource(bad)).toEqual({ url: bad, mixable: false });
+    }
+  });
+  mixIt("aligns nearby BPM and never forces extreme time stretching", () => {
+    mixExpect(safeTempoMatchRate(120, 124)).toBeCloseTo(120 / 124, 5);
+    mixExpect(safeTempoMatchRate(90, 140)).toBe(1);
+    mixExpect(safeTempoMatchRate(null, 120)).toBe(1);
+  });
+  mixIt("extracts a strong 120 BPM pulse from synthetic short audio", () => {
+    const sampleRate = 8000;
+    const samples = new Float32Array(sampleRate * 12);
+    for (let start = 0; start < samples.length; start += sampleRate / 2) {
+      for (let j = 0; j < 160; j++) samples[start + j] = 0.8;
+    }
+    const clip = {
+      sampleRate,
+      duration: 12,
+      getChannelData: () => samples,
+    } as unknown as AudioBuffer;
+    mixExpect(estimateBeatTempo(clip)).toBeGreaterThanOrEqual(118);
+    mixExpect(estimateBeatTempo(clip)).toBeLessThanOrEqual(122);
+  });
+});
