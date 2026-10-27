@@ -2,6 +2,7 @@ import "@/styles/wakilisha-workbook-p1-p11-authority.css";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { MetaTags } from "@/components/seo/MetaTags";
+import { WkIcon } from "@/components/design-system/Icon";
 import type { PublicShowHeader, PublicShowDetail } from "@/services/shows/showPublicModel";
 import { getPublicShow, getPublicShowIndex } from "@/services/shows/showPublicService";
 
@@ -90,7 +91,7 @@ export default function PublicShowsPage() {
                 )}
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Link to={shows[0].canonicalPath} className="inline-flex min-h-11 items-center rounded-full bg-[var(--wk-text)] px-5 text-[14px] font-bold text-[var(--wk-bg)]">
-                    Explore show ↗
+                    Explore show <WkIcon name="ArrowUpRight" size={16} aria-hidden="true" className="inline-block align-middle" />
                   </Link>
                   <a href="#podcast-episodes" className="inline-flex min-h-11 items-center rounded-full border border-[var(--wk-border-2)] px-5 text-[14px] font-semibold text-[var(--wk-text)]">
                     Episodes
@@ -116,13 +117,13 @@ export default function PublicShowsPage() {
                           {episode.summary && <p className="mt-1 line-clamp-2 text-[13px] leading-[1.5] text-[var(--wk-text-muted)]">{episode.summary}</p>}
                           {video && <span className="mt-2 inline-block text-[11px] text-[var(--wk-text-muted)]">Watch or listen</span>}
                         </div>
-                        <span aria-hidden="true" className="self-center text-[23px] text-[var(--wk-text)]">↗</span>
+                        <WkIcon name="ArrowUpRight" size={22} aria-hidden="true" className="self-center text-[var(--wk-text)]" />
                       </Link>
                     ))}
                   </div>
                 ) : (
                   <Link to={shows[0].canonicalPath} className="block border-t border-[var(--wk-border)] py-5 text-[14px] font-semibold text-[var(--wk-text)]">
-                    See published episodes ↗
+                    See published episodes <WkIcon name="ArrowUpRight" size={16} aria-hidden="true" className="inline-block align-middle" />
                   </Link>
                 )}
               </section>
