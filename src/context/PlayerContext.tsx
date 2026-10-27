@@ -549,6 +549,35 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (playbackPrefs.smartMix) {
           mixEngineRef.current.analyzeShortAudio(source.url, track.duration || 30);
         }
+        // HTMLMediaElement.play() can resolve while Web Audio renders silence
+        // (iOS suspended context or redirected, CORS-tainted media).
+        // Verify non-zero decoded PCM, not merely advancing timestamps.
+        let heardAudio = false;
+        let samples = 0;
+        const verifyOutput = () => {
+          if (!isPlaybackSessionCurrent(sessionId) || audioRef.current !== activeAudio ||
+              activeAudio.paused || activeAudio.ended) return;
+          heardAudio ||= mixEngineRef.current.hasAudioSignal(activeAudio);
+          if (heardAudio) return;
+          if (++samples < 4) {
+            window.setTimeout(verifyOutput, 900);
+            return;
+          }
+          const fallback = standbyAudioRef.current;
+          if (!fallback || mixEngineRef.current.hasDeck(fallback)) return;
+          failedMixSourcesRef.current.add(source.url);
+          console.warn("Smart Mix audio graph silent; restoring native provider playback");
+          activeAudio.pause();
+          audioRef.current = fallback;
+          standbyAudioRef.current = activeAudio;
+          fallback.removeAttribute("crossorigin");
+          fallback.src = track.previewUrl!;
+          void fallback.play().catch((reason) => {
+            console.warn("Native playback retry requires a new play gesture", reason);
+            if (audioRef.current === fallback) setIsPlaying(false);
+          });
+        };
+        window.setTimeout(verifyOutput, 900);
       }
 
       if (
