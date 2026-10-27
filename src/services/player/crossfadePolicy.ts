@@ -29,3 +29,20 @@ export function resolvePreviewCrossfadeSeconds(req: PreviewCrossfadeRequest): nu
     ? Math.min(12, Math.max(3, Math.round(req.selectedSeconds))) : 6;
   return Math.max(0, Math.min(selected, quarterOfShorter));
 }
+
+/** Check actual gain control before offering HTML audio preview crossfade.
+ * iOS WebKit can ignore volume writes without throwing an exception.
+ */
+export function supportsPreviewAudioVolume(createAudio?: () => { volume: number }): boolean {
+  try {
+    if (!createAudio && typeof document === "undefined") return false;
+    const audio = createAudio ? createAudio() : document.createElement("audio");
+    const previous = audio.volume;
+    audio.volume = 0.25;
+    const supported = Math.abs(audio.volume - 0.25) < 0.001;
+    audio.volume = previous;
+    return supported;
+  } catch {
+    return false;
+  }
+}
