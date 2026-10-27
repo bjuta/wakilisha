@@ -216,9 +216,10 @@ describe(
         expect(playbackSettings).toContain("autoplay: true,");
         expect(playbackSettings).toContain("crossfade: false,");
         expect(playbackSettings).toContain("crossfadeSeconds: 6,");
-        expect(playbackControls).toContain("Keep albums gapless");
-        expect(playbackControls).toContain("No crossfade on albums or EPs played in order.");
-        expect(playbackControls).toContain("Next after queue");
+        expect(playbackControls).toContain("TransitionDisclosure");
+        expect(playbackControls).toContain("Smart Mix");
+        expect(playbackControls).toContain("Queue");
+        expect(playbackControls).not.toContain("label=\"Keep albums gapless\"");
         expect(playbackControls).toContain("<WkSlider");
         expect(playerContext).toContain("Play starts the collection again.");
         expect(full).toContain("<PlaybackMoreControls");
