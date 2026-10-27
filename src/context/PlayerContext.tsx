@@ -11,6 +11,7 @@ import {
 } from "@/services/appleMusicPlayback";
 import { recordListeningEvent } from "@/services/listeningHistory";
 import { resolvePreviewCrossfadeSeconds } from "@/services/player/crossfadePolicy";
+import { WakilishaMixEngine, equalPowerLevels, resolveMixableAudioSource, safeTempoMatchRate } from "@/services/player/WakilishaMixEngine";
 import { startPlaybackAccountSync } from "@/services/player/playbackAccountSync";
 import { ProviderPlaybackCanvas } from "@/components/design-system/music/ProviderPlaybackCanvas";
 import {
@@ -67,7 +68,8 @@ export interface PlayerTrack {
   isPlayable?: boolean;
   isExplicit?: boolean;
   source?: string; // e.g. "YouTube", "Spotify", "SoundCloud"
-  previewUrl?: string; // preview audio URL
+  previewUrl?: string; // playable URL (preview or full-length audio)
+  bpm?: number | null;
   appleMusicId?: string | null; // Apple Music catalog song id
   appleMusicCatalogId?: string | null; // Apple Music catalog song id alias
   playbackEngine?: PlaylistPlaybackEngine;
@@ -84,6 +86,7 @@ function readPlaybackPrefs(): {
   autoplay: boolean;
   crossfade: boolean;
   crossfadeSeconds: number;
+  smartMix: boolean;
   keepAlbumsGapless: boolean;
   explicitFilter: boolean;
   appleMusicConnected: boolean;
@@ -97,6 +100,7 @@ function readPlaybackPrefs(): {
         autoplay: true,
         crossfade: false,
         crossfadeSeconds: 6,
+        smartMix: true,
         keepAlbumsGapless: true,
         explicitFilter: false,
         appleMusicConnected: false,
@@ -111,6 +115,7 @@ function readPlaybackPrefs(): {
       crossfade: prefs.crossfade === true,
       crossfadeSeconds: Number.isFinite(prefs.crossfadeSeconds)
         ? Math.min(12, Math.max(3, Math.round(prefs.crossfadeSeconds))) : 6,
+      smartMix: prefs.smartMix !== false,
       keepAlbumsGapless: prefs.keepAlbumsGapless !== false,
       explicitFilter: prefs.explicitFilter === true,
       appleMusicConnected: prefs.appleMusicConnected === true,
@@ -120,6 +125,10 @@ function readPlaybackPrefs(): {
   } catch {
     return {
       autoplay: true,
+      crossfade: false,
+      crossfadeSeconds: 6,
+      smartMix: true,
+      keepAlbumsGapless: true,
       explicitFilter: false,
       appleMusicConnected: false,
       appleMusicToken: null,
@@ -239,11 +248,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const standbyAudioRef = useRef<HTMLAudioElement | null>(null);
+  const mixEngineRef = useRef(new WakilishaMixEngine());
   const previewFadeRef = useRef<{
     outgoing: HTMLAudioElement;
     incoming: HTMLAudioElement;
     frame: number | null;
     fraction: number;
+    usesMixer: boolean;
   } | null>(null);
   const previewFadeAttemptRef = useRef(0);
   const previewFadePendingRef = useRef(false);
@@ -430,7 +441,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const pending = standbyAudioRef.current;
       pending?.pause();
       pending?.removeAttribute("src");
-      if (pending) pending.volume = volumeRef.current;
+      if (pending) mixEngineRef.current.setLevel(pending, 1, volumeRef.current);
     }
     const fade = previewFadeRef.current;
     previewFadeRef.current = null;
@@ -443,7 +454,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    if (audioRef.current) audioRef.current.volume = volumeRef.current;
+    if (audioRef.current) mixEngineRef.current.setLevel(audioRef.current, 1, volumeRef.current);
   }, []);
 
   const silenceAllPlayback = useCallback(async (
@@ -506,8 +517,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     const activeAudio = audioRef.current || audio;
-    activeAudio.volume = volumeRef.current;
-    activeAudio.src = track.previewUrl;
+    const source = resolveMixableAudioSource(track.previewUrl);
+    if (source.mixable && mixEngineRef.current.prepare(activeAudio, source)) {
+      mixEngineRef.current.setMasterVolume(volumeRef.current);
+      mixEngineRef.current.setLevel(activeAudio, 1, volumeRef.current);
+    } else {
+      activeAudio.volume = volumeRef.current;
+    }
+    activeAudio.src = source.url;
+    if (playbackPrefs.smartMix && source.mixable) {
+      mixEngineRef.current.analyzeShortAudio(source.url, track.duration || 30);
+    }
     pendingPlayRef.current = true;
 
     try {
@@ -552,6 +572,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     track: PlayerTrack,
     audio: HTMLAudioElement,
   ) => {
+    // Initialize/resume the audio graph during the user activation gesture.
+    mixEngineRef.current.wake();
     const playbackSessionId =
       playbackArbiterRef.current.begin();
 
@@ -941,8 +963,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       };
       const onLoadedMetadata = () => {
-        if (isActive(audio) && audio.duration > 0 && Number.isFinite(audio.duration)) {
-          setDuration(audio.duration);
+        if (audio.duration > 0 && Number.isFinite(audio.duration)) {
+          const source = resolveMixableAudioSource(audio.currentSrc || audio.src);
+          if (source.mixable && mixEngineRef.current.hasDeck(audio)) {
+            mixEngineRef.current.analyzeShortAudio(audio.currentSrc || source.url, audio.duration);
+          }
+          if (isActive(audio)) setDuration(audio.duration);
         }
       };
       const onEnded = () => {
@@ -1017,6 +1043,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       document.removeEventListener("keydown", unlock);
       audioRef.current = null;
       standbyAudioRef.current = null;
+      mixEngineRef.current.close();
     };
   }, []);
 
@@ -1345,7 +1372,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     startYouTubePolling,
   ]);
 
-  // Chapter 25: transitions are automatic, preview-only, and cancelled
+  // Chapter 25: transitions are automatic across HTML-audio media and cancelled
   // by every explicit playback action. The player state switches when
   // the incoming audio actually starts, never at the outgoing ended event.
   useEffect(() => {
@@ -1390,21 +1417,27 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (!incoming || incoming === outgoing || session === null) return;
 
       incoming.pause();
-      incoming.removeAttribute("src");
-      // On devices where HTMLMediaElement.volume cannot be controlled,
-      // fall back to clean playback instead of two full-volume streams.
-      try {
-        incoming.volume = 0;
-      } catch {
-        previewFadeSuppressedRef.current = true;
-        return;
-      }
-      if (incoming.volume > 0.001) {
-        previewFadeSuppressedRef.current = true;
-        return;
+      // The standby deck is prepared early, so its buffer is usually warm.
+      const source = resolveMixableAudioSource(nextTrack.previewUrl!);
+      const usesMixer = source.mixable && mixEngineRef.current.prepare(incoming, source) &&
+        mixEngineRef.current.hasDeck(outgoing);
+      if (usesMixer) {
+        mixEngineRef.current.setLevel(incoming, 0, volumeRef.current);
+      } else {
+        // Never start two full-volume streams when native gain is fixed (iOS).
+        try { incoming.volume = 0; } catch { previewFadeSuppressedRef.current = true; return; }
+        if (incoming.volume > 0.001) { previewFadeSuppressedRef.current = true; return; }
       }
       incoming.playbackRate = outgoing.playbackRate;
-      incoming.src = nextTrack.previewUrl!;
+      if (playbackPrefs.smartMix) {
+        const currentSource = resolveMixableAudioSource(currentTrackRef.current?.previewUrl || "");
+        const outgoingBpm = currentTrackRef.current?.bpm || mixEngineRef.current.bpmFor(currentSource.url);
+        const incomingBpm = nextTrack.bpm || mixEngineRef.current.bpmFor(source.url);
+        const tempoRate = safeTempoMatchRate(outgoingBpm, incomingBpm);
+        incoming.playbackRate = outgoing.playbackRate * tempoRate;
+        (incoming as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+      }
+      if (incoming.src !== new URL(source.url, window.location.origin).href) incoming.src = source.url;
       previewFadePendingRef.current = true;
       previewFadeEndedDuringPendingRef.current = false;
       const attempt = ++previewFadeAttemptRef.current;
@@ -1420,7 +1453,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         previewFadePendingRef.current = false;
         previewFadeEndedDuringPendingRef.current = false;
         const finishedTrack = currentTrackRef.current;
-        const fade = { outgoing, incoming, frame: null as number | null, fraction: 0 };
+        const fade = { outgoing, incoming, frame: null as number | null, fraction: 0, usesMixer };
         const startTime = window.performance.now();
         previewFadeRef.current = fade;
         audioRef.current = incoming;
@@ -1476,25 +1509,32 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         // A slow response after the old deck ended is a clean cut, not a
         // fade from silence. The incoming track is already active.
         if (outgoing.ended || outgoing.paused) {
-          incoming.volume = volumeRef.current;
+          mixEngineRef.current.setLevel(incoming, 1, volumeRef.current);
           completeOutgoing();
           outgoing.pause();
           outgoing.removeAttribute("src");
           previewFadeRef.current = null;
           return;
         }
+        const scheduled = usesMixer && mixEngineRef.current.beginFade(outgoing, incoming, seconds);
         const ramp = (now: number) => {
           if (previewFadeRef.current !== fade) return;
           fade.fraction = Math.min(1, Math.max(0, (now - startTime) / (seconds * 1000)));
-          outgoing.volume = Math.max(0, (1 - fade.fraction) * volumeRef.current);
-          incoming.volume = Math.min(1, fade.fraction * volumeRef.current);
+          if (!scheduled) {
+            const levels = equalPowerLevels(fade.fraction);
+            mixEngineRef.current.setLevel(outgoing, levels.outgoing, volumeRef.current);
+            mixEngineRef.current.setLevel(incoming, levels.incoming, volumeRef.current);
+          }
           if (fade.fraction < 1) {
             fade.frame = window.requestAnimationFrame(ramp);
           } else {
             completeOutgoing();
             outgoing.pause();
             outgoing.removeAttribute("src");
-            outgoing.volume = volumeRef.current;
+            outgoing.playbackRate = 1;
+            mixEngineRef.current.setLevel(outgoing, 1, volumeRef.current);
+            mixEngineRef.current.setLevel(incoming, 1, volumeRef.current);
+            incoming.playbackRate = 1;
             previewFadeRef.current = null;
           }
         };
@@ -1505,7 +1545,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         previewFadeSuppressedRef.current = true;
         incoming.pause();
         incoming.removeAttribute("src");
-        incoming.volume = volumeRef.current;
+        mixEngineRef.current.setLevel(incoming, 1, volumeRef.current);
         if (previewFadeEndedDuringPendingRef.current &&
             htmlAudioSessionRef.current === session) {
           previewFadeEndedDuringPendingRef.current = false;
@@ -1516,10 +1556,35 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return () => { startPreviewFadeRef.current = () => {}; };
   }, [
     isShuffle, playbackPrefs.appleMusicConnected, playbackPrefs.autoplay,
-    playbackPrefs.crossfade, playbackPrefs.crossfadeSeconds,
+    playbackPrefs.crossfade, playbackPrefs.crossfadeSeconds, playbackPrefs.smartMix,
     playbackPrefs.explicitFilter, playbackPrefs.keepAlbumsGapless,
     queue, queueIndex, repeatMode,
   ]);
+
+
+  // Warm the next permitted audio source and analyze short media before n - fade.
+  useEffect(() => {
+    if (!playbackPrefs.autoplay || !playbackPrefs.crossfade || !isPlaying ||
+        playbackBackend !== "audio" || previewFadePendingRef.current || previewFadeRef.current) return;
+    const order = isShuffle ? shuffledOrderRef.current : queue.map((_, index) => index);
+    const position = order.indexOf(queueIndex);
+    const nextIndex = order[position + 1] ?? (repeatMode === "all" ? order[0] : undefined);
+    if (nextIndex === undefined || nextIndex === queueIndex) return;
+    const candidate = queue[nextIndex];
+    const standby = standbyAudioRef.current;
+    if (!candidate?.previewUrl || !standby || candidate.isPlayable === false ||
+        (candidate.playbackEngine && candidate.playbackEngine !== "audio")) return;
+    const source = resolveMixableAudioSource(candidate.previewUrl);
+    if (!source.mixable || !mixEngineRef.current.prepare(standby, source)) return;
+    if (standby.src !== new URL(source.url, window.location.origin).href) {
+      standby.src = source.url;
+      standby.load();
+    }
+    if (playbackPrefs.smartMix) {
+      mixEngineRef.current.analyzeShortAudio(source.url, candidate.duration || 30);
+    }
+  }, [isPlaying, playbackBackend, playbackPrefs.autoplay, playbackPrefs.crossfade,
+    playbackPrefs.smartMix, isShuffle, queue, queueIndex, repeatMode]);
 
   // ─── Play a track ───
   const playTrack = useCallback((track: PlayerTrack, newQueue?: PlayerTrack[], playSource?: PlaySource) => {
@@ -2247,13 +2312,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     volumeRef.current = clamped;
     setVolumeState(clamped);
+    mixEngineRef.current.setMasterVolume(clamped);
 
     const fade = previewFadeRef.current;
-    if (fade) {
-      fade.outgoing.volume = Math.max(0, (1 - fade.fraction) * clamped);
-      fade.incoming.volume = Math.min(1, fade.fraction * clamped);
-    } else if (audio) {
-      audio.volume = clamped;
+    if (fade && !fade.usesMixer) {
+      const levels = equalPowerLevels(fade.fraction);
+      mixEngineRef.current.setLevel(fade.outgoing, levels.outgoing, clamped);
+      mixEngineRef.current.setLevel(fade.incoming, levels.incoming, clamped);
+    } else if (!fade && audio) {
+      mixEngineRef.current.setLevel(audio, 1, clamped);
     }
 
     setYouTubeVolume(
