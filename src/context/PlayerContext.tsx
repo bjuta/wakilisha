@@ -556,9 +556,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           mixEngineRef.current.prepare(activeAudio, source)) {
         mixEngineRef.current.setMasterVolume(volumeRef.current);
         mixEngineRef.current.setLevel(activeAudio, 1, volumeRef.current);
-        // The first React play event fires before the async iOS AudioContext
-        // resume finishes. Re-evaluate standby preloading once this deck exists.
-        signalMixerDeckReady((revision) => revision + 1);
+        // Preload the second deck only once decoded PCM is confirmed.
+        // This preserves an untouched native fallback if iOS renders silence.
         if (playbackPrefs.smartMix) {
           mixEngineRef.current.analyzeShortAudio(source.url, track.duration || 30);
         }
@@ -570,8 +569,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const verifyOutput = () => {
           if (!isPlaybackSessionCurrent(sessionId) || audioRef.current !== activeAudio ||
               activeAudio.paused || activeAudio.ended) return;
-          heardAudio ||= mixEngineRef.current.hasAudioSignal(activeAudio);
-          if (heardAudio) return;
+          if (mixEngineRef.current.hasAudioSignal(activeAudio)) {
+            signalMixerDeckReady((revision) => revision + 1);
+            return;
+          }
           if (++samples < 4) {
             window.setTimeout(verifyOutput, 900);
             return;
