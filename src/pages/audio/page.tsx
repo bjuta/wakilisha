@@ -143,7 +143,7 @@ export default function PublicAudioPage() {
                 >
                   <WkIcon name="Play" size={16} fill="currentColor" /> Listen
                 </button>
-                <Link to={featured.canonicalPath} className="inline-flex min-h-11 items-center text-[13px] font-semibold text-white">Recording details ↗</Link>
+                <Link to={featured.canonicalPath} className="inline-flex min-h-11 items-center text-[13px] font-semibold text-white">Recording details <WkIcon name="ArrowUpRight" size={16} aria-hidden="true" className="ml-1 inline-block align-middle" /></Link>
               </div>
             </div>
             {shows.length > 0 && (
