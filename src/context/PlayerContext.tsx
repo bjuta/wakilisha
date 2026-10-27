@@ -11,6 +11,7 @@ import {
 } from "@/services/appleMusicPlayback";
 import { recordListeningEvent } from "@/services/listeningHistory";
 import { resolvePreviewCrossfadeSeconds } from "@/services/player/crossfadePolicy";
+import { startPlaybackAccountSync } from "@/services/player/playbackAccountSync";
 import { ProviderPlaybackCanvas } from "@/components/design-system/music/ProviderPlaybackCanvas";
 import {
   getYouTubePlaybackSnapshot,
@@ -270,6 +271,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Read user playback preferences ───
   const playbackPrefs = usePlaybackPrefs();
+  useEffect(() => startPlaybackAccountSync(), []);
 
   useEffect(() => {
     if (!playbackPrefs.appleMusicConnected) return;

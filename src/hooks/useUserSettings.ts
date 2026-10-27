@@ -360,6 +360,25 @@ export function useUserSettings() {
     setLoading(false);
   }, []);
 
+  // Keep Settings in step with account preferences hydrated by PlayerProvider.
+  useEffect(() => {
+    const sync = () => {
+      try {
+        const pb = localStorage.getItem(LS_PLAYBACK);
+        if (!pb) return;
+        const latest = { ...DEFAULT_PLAYBACK, ...JSON.parse(pb) };
+        setPlayback(latest);
+        setSavedSnapshot((previous) => {
+          try {
+            return JSON.stringify({ ...JSON.parse(previous), playback: latest });
+          } catch { return previous; }
+        });
+      } catch { /* local storage unavailable */ }
+    };
+    window.addEventListener("wk-playback-account-loaded", sync);
+    return () => window.removeEventListener("wk-playback-account-loaded", sync);
+  }, []);
+
   // ─── Sync FROM Supabase (community_profile + notification_prefs) ───
   useEffect(() => {
     if (!userId) return;
