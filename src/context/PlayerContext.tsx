@@ -554,6 +554,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const graphReady = useMixTransport &&
         (mixEngineRef.current.isRunning() ||
           await mixEngineRef.current.waitUntilRunning());
+      // An async iOS resume must never reconnect an element belonging to a
+      // superseded Play, Skip, Pause or provider session.
+      if (!isPlaybackSessionCurrent(sessionId) ||
+          htmlAudioSessionRef.current !== sessionId) return;
       if (graphReady && activeAudio.currentSrc === expectedMixUrl &&
           mixEngineRef.current.prepare(activeAudio, source)) {
         mixEngineRef.current.setMasterVolume(volumeRef.current);
