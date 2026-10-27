@@ -8,6 +8,8 @@ import { usePlayer } from "@/context/PlayerContext";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { WkSlider } from "@/components/design-system/primitives/Slider";
+import { PlayerContextSheet } from "@/components/design-system/player/PlayerContextSheet";
+import { PlaybackMoreControls, usePlaybackControls } from "@/components/design-system/player/PlaybackControls";
 
 
 export function PlayerDock() {
@@ -27,6 +29,7 @@ export function PlayerDock() {
     canGoPrev,
     isFullPlayerOpen,
     playbackSourceLabel,
+    playbackBackend,
     volume,
     setVolume,
     repeatMode,
@@ -35,6 +38,8 @@ export function PlayerDock() {
     toggleShuffle,
   } = usePlayer();
 
+  const [moreOpen, setMoreOpen] = useState(false);
+  const { playback, updatePlayback } = usePlaybackControls();
   const location = useLocation();
   const isMusicRoute =
     isMusicAppPath(
@@ -44,6 +49,29 @@ export function PlayerDock() {
   if (!currentTrack) return null;
 
   const activeSourceLabel = playbackSourceLabel || currentTrack.source || null;
+  const moreSheet = (
+    <PlayerContextSheet
+      open={moreOpen}
+      onClose={() => setMoreOpen(false)}
+      mode="desktop"
+      mediaLabel="Music"
+      title={currentTrack.title}
+      creator={currentTrack.artist}
+      artworkUrl={currentTrack.artworkUrl}
+      actions={[]}
+      playbackControls={
+        <PlaybackMoreControls
+          playback={playback}
+          updatePlayback={updatePlayback}
+          unavailableReason={
+            playbackBackend === "youtube" ? "Not available for YouTube"
+              : playbackBackend === "soundcloud" ? "Not available for SoundCloud"
+              : playbackBackend === "apple" ? "Not available for Apple Music" : null
+          }
+        />
+      }
+    />
+  );
   const hasAppleCatalog = Boolean(currentTrack.appleMusicCatalogId || currentTrack.appleMusicId);
   const hasProviderPlayback =
     currentTrack.playbackEngine ===
@@ -272,8 +300,17 @@ export function PlayerDock() {
             >
               <i className="ri-expand-diagonal-line" />
             </button>
+            <button
+              type="button"
+              onClick={() => setMoreOpen(true)}
+              aria-label="More"
+              className="flex h-9 w-9 items-center justify-center text-[var(--wk-text-muted)] hover:text-[var(--wk-text)]"
+            >
+              <i className="ri-more-2-fill" aria-hidden="true" />
+            </button>
           </div>
         </div>
+        {moreSheet}
       </div>,
       document.body,
     );
@@ -489,7 +526,16 @@ export function PlayerDock() {
         >
           <i className={isFullPlayerOpen ? "ri-arrow-down-s-line" : "ri-arrow-up-s-line"} />
         </button>
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          aria-label="More"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--wk-text-muted)] hover:bg-[var(--wk-surface-raised)]"
+        >
+          <i className="ri-more-2-fill" aria-hidden="true" />
+        </button>
       </div>
+      {moreSheet}
     </div>
   );
 }

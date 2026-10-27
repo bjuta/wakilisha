@@ -75,6 +75,10 @@ const trackDetail = readFileSync(
   "src/pages/tracks/detail/page.tsx",
   "utf8",
 );
+const dock = readFileSync(
+  "src/components/design-system/music/PlayerDock.tsx",
+  "utf8",
+);
 
 describe(
   "canonical media runtime Commit 1",
@@ -209,6 +213,8 @@ describe(
         expect(playbackControls).toContain("Next after queue");
         expect(full).toContain("<PlaybackMoreControls");
         expect(full).toContain("Not available for YouTube");
+        expect(compact).toContain('openFullPlayer("more")');
+        expect(dock).toContain("<PlaybackMoreControls");
       },
     );
 
