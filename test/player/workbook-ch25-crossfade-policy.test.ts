@@ -5,7 +5,6 @@ const base: PreviewCrossfadeRequest = {
   enabled: true,
   continuousPlayback: true,
   selectedSeconds: 6,
-  keepAlbumsGapless: true,
   sourceEntityType: "chart_edition",
   shuffled: false,
   repeatOne: false,
