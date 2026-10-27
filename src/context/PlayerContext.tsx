@@ -421,8 +421,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const cancelPreviewFade = useCallback(() => {
     previewFadeAttemptRef.current += 1;
+    const wasPending = previewFadePendingRef.current;
     previewFadePendingRef.current = false;
     previewFadeEndedDuringPendingRef.current = false;
+    if (wasPending) {
+      const pending = standbyAudioRef.current;
+      pending?.pause();
+      pending?.removeAttribute("src");
+      if (pending) pending.volume = volumeRef.current;
+    }
     const fade = previewFadeRef.current;
     previewFadeRef.current = null;
     if (fade) {
@@ -922,6 +929,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (!isActive(audio)) return;
         if (audio.duration > 0 && Number.isFinite(audio.duration)) {
           setCurrentTime(audio.currentTime);
+          // Seeking into the final seconds does not create an immediate fade.
+          // Earlier seeks allow the next natural end to blend as usual.
+          if (previewFadeSuppressedRef.current &&
+              audio.duration - audio.currentTime > 12.5) {
+            previewFadeSuppressedRef.current = false;
+          }
           startPreviewFadeRef.current(audio);
         }
       };
@@ -1376,9 +1389,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       incoming.pause();
       incoming.removeAttribute("src");
-      incoming.volume = 0;
-      // On devices where HTMLMediaElement.volume is read-only, do not
-      // risk simultaneous full-volume output; advance cleanly at end.
+      // On devices where HTMLMediaElement.volume cannot be controlled,
+      // fall back to clean playback instead of two full-volume streams.
+      try {
+        incoming.volume = 0;
+      } catch {
+        previewFadeSuppressedRef.current = true;
+        return;
+      }
       if (incoming.volume > 0.001) {
         previewFadeSuppressedRef.current = true;
         return;
@@ -1405,23 +1423,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         previewFadeRef.current = fade;
         audioRef.current = incoming;
         standbyAudioRef.current = outgoing;
-        if (finishedTrack && !skipFlagRef.current) {
-          trackEvent("player_complete", {
-            pageType: sourceContextRef.current?.pageType,
-            entitySlug: finishedTrack.id,
-            entityType: "track",
-            context: {
-              track_title: finishedTrack.title,
-              artist: finishedTrack.artist,
-              play_duration_ms: Date.now() - playedAtRef.current,
-              source_section: sourceContextRef.current?.sourceSection,
-            },
-          });
-          recordListeningEvent(finishedTrack, {
-            kind: "complete", backend: "audio", currentTime: outgoing.currentTime,
-            duration: outgoing.duration, playSource: sourceContextRef.current,
-          });
-        }
+        const outgoingPlayedAt = playedAtRef.current;
+        const completedSource = sourceContextRef.current;
         skipFlagRef.current = false;
         previewFadeSuppressedRef.current = false;
         playedAtRef.current = Date.now();
@@ -1450,10 +1453,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             crossfade_seconds: seconds,
           },
         });
-        // A slow preview response may arrive after the old deck ended.
-        // In that case start audibly instead of fading in from silence.
+        const completeOutgoing = () => {
+          if (!finishedTrack) return;
+          trackEvent("player_complete", {
+            pageType: completedSource?.pageType,
+            entitySlug: finishedTrack.id,
+            entityType: "track",
+            context: {
+              track_title: finishedTrack.title,
+              artist: finishedTrack.artist,
+              play_duration_ms: Date.now() - outgoingPlayedAt,
+              source_section: completedSource?.sourceSection,
+            },
+          });
+          recordListeningEvent(finishedTrack, {
+            kind: "complete", backend: "audio", currentTime: outgoing.duration,
+            duration: outgoing.duration, playSource: completedSource,
+          });
+        };
+        // A slow response after the old deck ended is a clean cut, not a
+        // fade from silence. The incoming track is already active.
         if (outgoing.ended || outgoing.paused) {
           incoming.volume = volumeRef.current;
+          completeOutgoing();
           outgoing.pause();
           outgoing.removeAttribute("src");
           previewFadeRef.current = null;
@@ -1467,6 +1489,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           if (fade.fraction < 1) {
             fade.frame = window.requestAnimationFrame(ramp);
           } else {
+            completeOutgoing();
             outgoing.pause();
             outgoing.removeAttribute("src");
             outgoing.volume = volumeRef.current;
