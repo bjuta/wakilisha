@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
+import { WkSlider } from "@/components/design-system/primitives/Slider";
 import type { UserPlaybackPrefs } from "@/hooks/useUserSettings";
 
 export type PlaybackControlPrefs = Pick<
@@ -125,19 +126,20 @@ export function PlaybackSettingsControls({
       />
       <div className={`border-b border-[var(--wk-divider)] py-4 ${!playback.crossfade ? "opacity-40" : ""}`}>
         <div className="flex items-center justify-between gap-3 text-[13px] font-bold text-[var(--wk-text)]">
-          <label htmlFor="wk-playback-fade-duration">Crossfade duration</label>
+          <span>Crossfade duration</span>
           <span className="tabular-nums">{clampFade(playback.crossfadeSeconds)} seconds</span>
         </div>
-        <input
-          id="wk-playback-fade-duration"
-          className="mt-3 w-full cursor-pointer accent-[var(--wk-brand)] disabled:cursor-not-allowed"
-          type="range"
+        <WkSlider
+          value={clampFade(playback.crossfadeSeconds)}
+          onChange={(crossfadeSeconds) => updatePlayback({ crossfadeSeconds })}
           min={3}
           max={12}
           step={1}
           disabled={!playback.crossfade}
-          value={clampFade(playback.crossfadeSeconds)}
-          onChange={(event) => updatePlayback({ crossfadeSeconds: clampFade(Number(event.target.value)) })}
+          ariaLabel="Crossfade duration"
+          showValueLabel={false}
+          className="mt-3"
+          formatValue={(value) => `${value} seconds`}
         />
         <div className="mt-1 flex justify-between text-[10px] text-[var(--wk-text-muted)]">
           <span>3 sec</span><span>6</span><span>9</span><span>12 sec</span>

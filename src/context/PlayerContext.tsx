@@ -1476,6 +1476,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // At the exhausted end of a list, Play starts the collection again.
+    if (
+      !isPlaying &&
+      duration > 0 &&
+      currentTime >= duration - 0.1 &&
+      queue.length > 1 &&
+      (isShuffle
+        ? shuffledOrderRef.current.indexOf(queueIndex) === shuffledOrderRef.current.length - 1
+        : queueIndex === queue.length - 1)
+    ) {
+      const startIndex = isShuffle ? shuffledOrderRef.current[0] : 0;
+      const firstTrack = queue[startIndex];
+      if (firstTrack) {
+        playTrack(firstTrack, queue, sourceContextRef.current || undefined);
+        return;
+      }
+    }
+
     if (
       restartInterruptedPlaybackRef.current
     ) {
@@ -1532,9 +1550,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {});
   }, [
     currentTrack,
+    currentTime,
+    duration,
     isPlaying,
+    isShuffle,
     pauseActivePlayback,
+    playTrack,
     playTrackSource,
+    queue,
+    queueIndex,
     startApplePolling,
     startYouTubePolling,
   ]);

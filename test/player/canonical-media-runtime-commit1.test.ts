@@ -211,6 +211,8 @@ describe(
         expect(playbackSettings).toContain("keepAlbumsGapless: true,");
         expect(playbackControls).toContain("Keep albums gapless");
         expect(playbackControls).toContain("Next after queue");
+        expect(playbackControls).toContain("<WkSlider");
+        expect(playerContext).toContain("Play starts the collection again.");
         expect(full).toContain("<PlaybackMoreControls");
         expect(full).toContain("Not available for YouTube");
         expect(compact).toContain('openFullPlayer("more")');
