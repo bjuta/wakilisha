@@ -518,20 +518,39 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     const activeAudio = audioRef.current || audio;
     const source = resolveMixableAudioSource(track.previewUrl);
-    if (source.mixable && mixEngineRef.current.prepare(activeAudio, source)) {
-      mixEngineRef.current.setMasterVolume(volumeRef.current);
-      mixEngineRef.current.setLevel(activeAudio, 1, volumeRef.current);
+    // Never attach a media element to Web Audio until native playback succeeds.
+    // A suspended AudioContext or inaccessible transport must not mute music.
+    const useMixTransport = playbackPrefs.crossfade &&
+      source.mixable && mixEngineRef.current.isRunning();
+    if (useMixTransport) {
+      activeAudio.crossOrigin = "anonymous";
     } else {
-      activeAudio.volume = volumeRef.current;
+      activeAudio.removeAttribute("crossorigin");
     }
-    activeAudio.src = source.url;
-    if (playbackPrefs.smartMix && source.mixable) {
-      mixEngineRef.current.analyzeShortAudio(source.url, track.duration || 30);
-    }
+    activeAudio.volume = volumeRef.current;
+    activeAudio.src = useMixTransport ? source.url : track.previewUrl;
     pendingPlayRef.current = true;
 
     try {
-      await activeAudio.play();
+      try {
+        await activeAudio.play();
+      } catch (initialError) {
+        // Retry the original playable provider URL without a Web Audio graph.
+        if (!useMixTransport || !isPlaybackSessionCurrent(sessionId)) throw initialError;
+        activeAudio.pause();
+        activeAudio.removeAttribute("crossorigin");
+        activeAudio.src = track.previewUrl;
+        await activeAudio.play();
+      }
+      if (useMixTransport && activeAudio.currentSrc.includes("/__wk-mix/") &&
+          mixEngineRef.current.isRunning() &&
+          mixEngineRef.current.prepare(activeAudio, source)) {
+        mixEngineRef.current.setMasterVolume(volumeRef.current);
+        mixEngineRef.current.setLevel(activeAudio, 1, volumeRef.current);
+        if (playbackPrefs.smartMix) {
+          mixEngineRef.current.analyzeShortAudio(source.url, track.duration || 30);
+        }
+      }
 
       if (
         !isPlaybackSessionCurrent(sessionId) ||
@@ -566,6 +585,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [
     isPlaybackSessionCurrent,
     silenceAllPlayback,
+    playbackPrefs.crossfade,
+    playbackPrefs.smartMix,
   ]);
 
   const playTrackSource = useCallback((
@@ -1419,8 +1440,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       incoming.pause();
       // The standby deck is prepared early, so its buffer is usually warm.
       const source = resolveMixableAudioSource(nextTrack.previewUrl!);
-      const usesMixer = source.mixable && mixEngineRef.current.prepare(incoming, source) &&
-        mixEngineRef.current.hasDeck(outgoing);
+      const usesMixer = source.mixable && mixEngineRef.current.isRunning() &&
+        mixEngineRef.current.hasDeck(outgoing) &&
+        mixEngineRef.current.prepare(incoming, source);
       if (usesMixer) {
         mixEngineRef.current.setLevel(incoming, 0, volumeRef.current);
       } else {
@@ -1565,7 +1587,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Warm the next permitted audio source and analyze short media before n - fade.
   useEffect(() => {
     if (!playbackPrefs.autoplay || !playbackPrefs.crossfade || !isPlaying ||
-        playbackBackend !== "audio" || previewFadePendingRef.current || previewFadeRef.current) return;
+        playbackBackend !== "audio" || !mixEngineRef.current.isRunning() ||
+        previewFadePendingRef.current || previewFadeRef.current) return;
     const order = isShuffle ? shuffledOrderRef.current : queue.map((_, index) => index);
     const position = order.indexOf(queueIndex);
     const nextIndex = order[position + 1] ?? (repeatMode === "all" ? order[0] : undefined);
