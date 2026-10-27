@@ -487,11 +487,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    audio.src = track.previewUrl;
+    const activeAudio = audioRef.current || audio;
+    activeAudio.volume = volumeRef.current;
+    activeAudio.src = track.previewUrl;
     pendingPlayRef.current = true;
 
     try {
-      await audio.play();
+      await activeAudio.play();
 
       if (
         !isPlaybackSessionCurrent(sessionId) ||
@@ -1612,6 +1614,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      cancelPreviewFade();
       audio?.pause();
       pauseYouTube();
       pauseSoundCloud();
@@ -1621,6 +1624,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       setIsPlaying(false);
     }, [
+      cancelPreviewFade,
       silenceAllPlayback,
       stopApplePolling,
       stopProviderPolling,
@@ -2091,6 +2095,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     playedAtRef.current = Date.now();
+    previewFadeSuppressedRef.current = false;
 
     setQueueIndex(index);
     setCurrentTrack(track);
@@ -2123,6 +2128,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audioRef.current;
 
     if (!audio) return;
+    cancelPreviewFade();
+    previewFadeSuppressedRef.current = true;
 
     const max =
       playbackBackendRef.current ===
@@ -2177,6 +2184,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       clamped,
     );
   }, [
+    cancelPreviewFade,
     duration,
   ]);
 
@@ -2191,13 +2199,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       ),
     );
 
-    setVolumeState(
-      clamped,
-    );
+    volumeRef.current = clamped;
+    setVolumeState(clamped);
 
-    if (audio) {
-      audio.volume =
-        clamped;
+    const fade = previewFadeRef.current;
+    if (fade) {
+      fade.outgoing.volume = Math.max(0, (1 - fade.fraction) * clamped);
+      fade.incoming.volume = Math.min(1, fade.fraction * clamped);
+    } else if (audio) {
+      audio.volume = clamped;
     }
 
     setYouTubeVolume(
@@ -2222,6 +2232,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (audioRef.current) {
       audioRef.current.playbackRate = clamped;
     }
+    if (standbyAudioRef.current) standbyAudioRef.current.playbackRate = clamped;
   }, []);
 
   // Sync initial volume to audio element
@@ -2229,6 +2240,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = audioRef.current;
     if (audio) {
       audio.volume = volume;
+      volumeRef.current = volume;
     }
   }, []);
 

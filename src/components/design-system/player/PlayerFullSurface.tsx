@@ -147,6 +147,7 @@ export function PlayerFullSurface({
     playTrack,
   } = usePlayer();
 
+  const { playback: playbackControls, updatePlayback: updatePlaybackControls } = usePlaybackControls();
   const [panel, setPanel] =
     useState<PlayerPanel>(mode === "desktop"
       ? (requestedPlayerPanel === "queue" ? "queue" : requestedPlayerPanel === "more" ? "more" : requestedPlayerPanel === "comments" ? "none" : "lyrics")
@@ -505,7 +506,6 @@ export function PlayerFullSurface({
     navigate(path);
   };
 
-  const { playback: playbackControls, updatePlayback: updatePlaybackControls } = usePlaybackControls();
   const contextActions: PlayerContextAction[] = [];
 
   if (queueAvailable) {
