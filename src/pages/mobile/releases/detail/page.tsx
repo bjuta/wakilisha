@@ -532,7 +532,7 @@ export default function MobileReleaseDetail() {
       {/* Hero */}
       <section
         key="mobile-release-hero-shell"
-        className="relative min-h-[420px] flex items-end overflow-hidden"
+        className="relative overflow-hidden border-b border-[var(--wk-divider)]"
       >
         {canUseArtwork ? (
           <ResponsiveMediaImage
@@ -544,7 +544,7 @@ export default function MobileReleaseDetail() {
             fetchPriority="high"
             decoding="async"
             data-wakilisha-release-hero="true"
-            className="absolute inset-0 h-full w-full object-cover object-center"
+            className="absolute inset-0 h-full w-full object-cover object-center opacity-20 blur-3xl"
             onError={() => setArtworkFailed(true)}
           />
         ) : (
@@ -552,7 +552,14 @@ export default function MobileReleaseDetail() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--wk-bg)] via-[var(--wk-bg)]/80 to-[var(--wk-bg)]/35" />
 
-        <div className="relative w-full px-5 pb-8 pt-20">
+        <div className="relative w-full px-5 py-8 text-center">
+          <div className="mx-auto mb-5 h-[232px] w-[232px] overflow-hidden rounded-xl bg-[var(--wk-surface-raised)]">
+            {canUseArtwork ? (
+              <img src={release.artworkUrl} alt={`${release.title} artwork`} className="h-full w-full object-cover" onError={() => setArtworkFailed(true)} />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-5xl font-black text-[var(--wk-brand)]">{initial}</div>
+            )}
+          </div>
           <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--wk-brand)]/90 px-3 py-1 text-[10px] font-bold text-white uppercase tracking-wider backdrop-blur">
             <i className="ri-album-line text-xs" />
             {release.releaseType}
@@ -560,7 +567,7 @@ export default function MobileReleaseDetail() {
           <h1 className="font-black leading-[0.92] tracking-[-0.055em] text-[var(--wk-text)]" style={{ fontSize: "clamp(28px, 8vw, 42px)" }}>
             {release.title}
           </h1>
-          <div className="mt-3 flex items-center gap-3">
+          <div className="mt-3 flex items-center justify-center gap-3">
             <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[var(--wk-surface-raised)] border border-[var(--wk-border)]">
               {canUseArtwork ? (
                 <img src={release.artworkUrl} alt="" className="h-full w-full object-cover" onError={() => setArtworkFailed(true)} />
@@ -579,7 +586,7 @@ export default function MobileReleaseDetail() {
               <div className="text-[11px] text-[var(--wk-text-muted)]">{release.year} · {release.trackCount} tracks{release.labelName && release.labelName !== "WAKILISHA Registry" && release.labelName !== "WAKILISHA" ? ` · ${release.labelName}` : ""}</div>
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-2">
+          <div className="mt-4 flex items-center justify-center gap-2">
             <button
               type="button"
               onClick={handlePlayRelease}
