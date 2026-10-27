@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import { WkSlider } from "@/components/design-system/primitives/Slider";
 import type { UserPlaybackPrefs } from "@/hooks/useUserSettings";
+import { supportsPreviewAudioVolume } from "@/services/player/crossfadePolicy";
 
 export type PlaybackControlPrefs = Pick<
   UserPlaybackPrefs,
@@ -147,7 +148,7 @@ export function PlaybackSettingsControls({
       </div>
       <PlaybackToggleRow
         label="Keep albums gapless"
-        detail="No crossfade on albums played in order."
+        detail="No crossfade on albums or EPs played in order."
         checked={playback.keepAlbumsGapless}
         onChange={(keepAlbumsGapless) => updatePlayback({ keepAlbumsGapless })}
       />
@@ -168,7 +169,9 @@ export function PlaybackMoreControls({
   updatePlayback: (patch: Partial<PlaybackControlPrefs>) => void;
   unavailableReason?: string | null;
 }) {
-  const unavailable = Boolean(unavailableReason);
+  const [supportsFadeVolume] = useState(supportsPreviewAudioVolume);
+  const reason = unavailableReason || (!supportsFadeVolume ? "Not available on this device" : null);
+  const unavailable = Boolean(reason);
   const step = (change: number) =>
     updatePlayback({ crossfadeSeconds: clampFade(playback.crossfadeSeconds + change) });
   return (
@@ -181,7 +184,7 @@ export function PlaybackMoreControls({
       />
       <PlaybackToggleRow
         label="Crossfade"
-        detail={unavailableReason || undefined}
+        detail={reason || (playback.keepAlbumsGapless ? "Albums and EPs play gaplessly in order." : undefined)}
         checked={playback.crossfade}
         disabled={unavailable}
         onChange={(crossfade) => updatePlayback({ crossfade })}
@@ -195,6 +198,12 @@ export function PlaybackMoreControls({
           disabled={!playback.crossfade || unavailable || playback.crossfadeSeconds >= 12}
           className="h-9 w-9 rounded-full border border-[var(--wk-border)] text-[var(--wk-text)] disabled:cursor-not-allowed">+</button>
       </div>
+      <PlaybackToggleRow
+        label="Keep albums gapless"
+        detail="No crossfade on albums or EPs played in order."
+        checked={playback.keepAlbumsGapless}
+        onChange={(keepAlbumsGapless) => updatePlayback({ keepAlbumsGapless })}
+      />
     </div>
   );
 }
