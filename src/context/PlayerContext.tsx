@@ -87,7 +87,6 @@ function readPlaybackPrefs(): {
   crossfade: boolean;
   crossfadeSeconds: number;
   smartMix: boolean;
-  keepAlbumsGapless: boolean;
   explicitFilter: boolean;
   appleMusicConnected: boolean;
   appleMusicToken: string | null;
@@ -101,7 +100,6 @@ function readPlaybackPrefs(): {
         crossfade: false,
         crossfadeSeconds: 6,
         smartMix: true,
-        keepAlbumsGapless: true,
         explicitFilter: false,
         appleMusicConnected: false,
         appleMusicToken: null,
@@ -116,7 +114,6 @@ function readPlaybackPrefs(): {
       crossfadeSeconds: Number.isFinite(prefs.crossfadeSeconds)
         ? Math.min(12, Math.max(3, Math.round(prefs.crossfadeSeconds))) : 6,
       smartMix: prefs.smartMix !== false,
-      keepAlbumsGapless: prefs.keepAlbumsGapless !== false,
       explicitFilter: prefs.explicitFilter === true,
       appleMusicConnected: prefs.appleMusicConnected === true,
       appleMusicToken: typeof prefs.appleMusicToken === "string" ? prefs.appleMusicToken : null,
@@ -128,7 +125,6 @@ function readPlaybackPrefs(): {
       crossfade: false,
       crossfadeSeconds: 6,
       smartMix: true,
-      keepAlbumsGapless: true,
       explicitFilter: false,
       appleMusicConnected: false,
       appleMusicToken: null,
@@ -1418,7 +1414,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         enabled: playbackPrefs.crossfade,
         continuousPlayback: playbackPrefs.autoplay,
         selectedSeconds: playbackPrefs.crossfadeSeconds,
-        keepAlbumsGapless: playbackPrefs.keepAlbumsGapless,
         sourceEntityType: sourceContextRef.current?.entityType,
         shuffled: isShuffle,
         repeatOne: repeatMode === "one",
@@ -1579,7 +1574,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [
     isShuffle, playbackPrefs.appleMusicConnected, playbackPrefs.autoplay,
     playbackPrefs.crossfade, playbackPrefs.crossfadeSeconds, playbackPrefs.smartMix,
-    playbackPrefs.explicitFilter, playbackPrefs.keepAlbumsGapless,
+    playbackPrefs.explicitFilter,
     queue, queueIndex, repeatMode,
   ]);
 
