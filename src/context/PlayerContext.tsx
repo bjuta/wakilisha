@@ -245,6 +245,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const standbyAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Never connect this backstop to Web Audio: createMediaElementSource is permanent.
+  const nativeRescueAudioRef = useRef<HTMLAudioElement | null>(null);
   const mixEngineRef = useRef(new WakilishaMixEngine());
   const failedMixSourcesRef = useRef(new Set<string>());
   const previewFadeRef = useRef<{
@@ -576,7 +578,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             window.setTimeout(verifyOutput, 900);
             return;
           }
-          const fallback = standbyAudioRef.current;
+          const candidate = standbyAudioRef.current;
+          const fallback = candidate && !mixEngineRef.current.hasDeck(candidate)
+            ? candidate : nativeRescueAudioRef.current;
           if (!fallback || mixEngineRef.current.hasDeck(fallback)) return;
           failedMixSourcesRef.current.add(source.url);
           console.warn("Smart Mix audio graph silent; restoring native provider playback");
@@ -996,12 +1000,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const first = new Audio();
     const second = new Audio();
+    const nativeRescue = new Audio();
     first.preload = "auto";
     second.preload = "auto";
+    nativeRescue.preload = "none";
     first.volume = volumeRef.current;
     second.volume = volumeRef.current;
+    nativeRescue.volume = volumeRef.current;
     audioRef.current = first;
     standbyAudioRef.current = second;
+    nativeRescueAudioRef.current = nativeRescue;
 
     const isActive = (audio: HTMLAudioElement) => {
       const sessionId = htmlAudioSessionRef.current;
@@ -1064,8 +1072,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           if (originalUrl) {
             const from = resolveMixableAudioSource(originalUrl);
             failedMixSourcesRef.current.add(from.url);
-            const fallback = mixEngineRef.current.hasDeck(audio)
+            const candidate = mixEngineRef.current.hasDeck(audio)
               ? standbyAudioRef.current : audio;
+            const fallback = candidate && !mixEngineRef.current.hasDeck(candidate)
+              ? candidate : nativeRescueAudioRef.current;
             if (fallback && !mixEngineRef.current.hasDeck(fallback)) {
               audio.pause();
               if (fallback !== audio) {
@@ -1103,6 +1113,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
     const unbindFirst = bindDeck(first);
     const unbindSecond = bindDeck(second);
+    const unbindRescue = bindDeck(nativeRescue);
     const unlock = () => {
       hasUserInteractedRef.current = true;
       document.removeEventListener("click", unlock);
@@ -1119,17 +1130,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         window.cancelAnimationFrame(fade.frame);
       }
       previewFadeRef.current = null;
-      for (const audio of [first, second]) {
+      for (const audio of [first, second, nativeRescue]) {
         audio.pause();
         audio.removeAttribute("src");
       }
       unbindFirst();
       unbindSecond();
+      unbindRescue();
       document.removeEventListener("click", unlock);
       document.removeEventListener("touchstart", unlock);
       document.removeEventListener("keydown", unlock);
       audioRef.current = null;
       standbyAudioRef.current = null;
+      nativeRescueAudioRef.current = null;
       mixEngineRef.current.close();
     };
   }, []);
