@@ -104,6 +104,29 @@ describe("Chapter 25 audible-media and device-independent icon acceptance", () =
     expect(playbackControls).toContain('"smart", label: "Smart Mix"');
     expect(playbackControls).not.toContain('label="Keep albums gapless"');
   });
+  it("keeps the mixer ready for iOS by preloading after verified PCM output", () => {
+    const mixEngine = readFileSync("src/services/player/WakilishaMixEngine.ts", "utf8");
+    expect(playerContext).toContain("waitUntilRunning()");
+    expect(playerContext).toContain("signalMixerDeckReady((revision) => revision + 1)");
+    expect(playerContext).toContain("mixerDeckRevision, isShuffle");
+    expect(playerContext).toContain('standby.crossOrigin = "anonymous"');
+    expect(playerContext).toContain("mixEngineRef.current.prepare(standby, source)");
+    expect(playerContext).toContain("nativeRescueAudioRef.current");
+    expect(mixEngine).toContain('this.context.state !== "running"');
+    expect(mixEngine).toContain("resumePending");
+  });
+  it("keeps help entirely inside the viewport and outside radio buttons", () => {
+    expect(playbackControls).toContain('createPortal(');
+    expect(playbackControls).toContain('window.visualViewport');
+    expect(playbackControls).toContain('role="note"');
+    expect(playbackControls).not.toContain("<details");
+    expect(playbackControls).not.toContain("<summary");
+    const smartRadio = playbackControls.indexOf('role="radio"');
+    const endRadio = playbackControls.indexOf("</button>", smartRadio);
+    const helpButton = playbackControls.indexOf('{choice.key === "smart" && <HelpTip', smartRadio);
+    expect(smartRadio).toBeGreaterThan(-1);
+    expect(helpButton).toBeGreaterThan(endRadio);
+  });
   it("uses the bundled SVG sprite for formerly emoji-prone external-link arrows", () => {
     for (const file of ["src/pages/video/page.tsx", "src/pages/shows/page.tsx", "src/pages/audio/page.tsx"]) {
       const view = readFileSync(file, "utf8");
