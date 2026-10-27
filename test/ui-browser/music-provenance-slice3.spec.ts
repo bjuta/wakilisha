@@ -665,6 +665,40 @@ test("Chapter 25 overlaps controlled previews and switches queue at fade start",
 });
 
 
+test("Chapter 25 mobile More tooltip stays inside the viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route(
+    "**/public-content-read/releases/slice3-browser-solo/slice3-browser-release**",
+    async (route) => {
+      await fulfillJson(route, { data: { release: releaseDetail } });
+    },
+  );
+  await page.goto("/releases/slice3-browser-solo/slice3-browser-release", {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page.getByRole("heading", { level: 1, name: releaseDetail.title })).toBeVisible();
+  await page.getByRole("button", { name: "Play", exact: true }).first().click();
+
+  // The same More sheet is used by the compact and expanded music players.
+  const moreButtons = page.getByRole("button", { name: "More", exact: true });
+  await expect(moreButtons.first()).toBeVisible();
+  await moreButtons.first().click();
+  await page.getByRole("button", { name: /Transitions/ }).last().click();
+  const tip = page.getByRole("button", { name: "About Smart Mix" });
+  await expect(tip).toBeVisible();
+  await tip.click();
+  const note = page.getByRole("note").filter({ hasText: "Matches nearby tempos" });
+  await expect(note).toBeVisible();
+  const box = await note.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(844);
+  await page.keyboard.press("Escape");
+  await expect(note).toHaveCount(0);
+});
+
 test("Slice 3 emits Person JSON-LD for a canonical solo Artist", async ({
   page,
 }) => {
