@@ -517,8 +517,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const source = resolveMixableAudioSource(track.previewUrl);
     // Never attach a media element to Web Audio until native playback succeeds.
     // A suspended AudioContext or inaccessible transport must not mute music.
-    const useMixTransport = playbackPrefs.crossfade &&
-      source.mixable && mixEngineRef.current.isRunning() &&
+    // Transport choice must not depend on an AudioContext resume racing iOS.
+    // Start a natively playable, same-origin source first; attach the mixer
+    // only after its graph actually resumes. Off remains the original URL.
+    const useMixTransport = playbackPrefs.crossfade && source.mixable &&
       !failedMixSourcesRef.current.has(source.url);
     if (useMixTransport) {
       activeAudio.crossOrigin = "anonymous";
@@ -534,7 +536,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         await activeAudio.play();
       } catch (initialError) {
         // Retry the original playable provider URL without a Web Audio graph.
-        if (!useMixTransport || !isPlaybackSessionCurrent(sessionId)) throw initialError;
+        if (!useMixTransport || source.url === track.previewUrl ||
+            !isPlaybackSessionCurrent(sessionId)) throw initialError;
         failedMixSourcesRef.current.add(source.url);
         activeAudio.pause();
         activeAudio.removeAttribute("crossorigin");
@@ -545,8 +548,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       // also need a controlled deck; the previous /__wk-mix/-only check
       // incorrectly excluded them from audible crossfade acceptance.
       const expectedMixUrl = new URL(source.url, window.location.origin).href;
-      if (useMixTransport && activeAudio.currentSrc === expectedMixUrl &&
-          mixEngineRef.current.isRunning() &&
+      const graphReady = useMixTransport &&
+        (mixEngineRef.current.isRunning() ||
+          await mixEngineRef.current.waitUntilRunning());
+      if (graphReady && activeAudio.currentSrc === expectedMixUrl &&
           mixEngineRef.current.prepare(activeAudio, source)) {
         mixEngineRef.current.setMasterVolume(volumeRef.current);
         mixEngineRef.current.setLevel(activeAudio, 1, volumeRef.current);
@@ -1643,7 +1648,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Warm the next permitted audio source and analyze short media before n - fade.
   useEffect(() => {
     if (!playbackPrefs.autoplay || !playbackPrefs.crossfade || !isPlaying ||
-        playbackBackend !== "audio" ||
+        playbackBackend !== "audio" || !mixEngineRef.current.isRunning() ||
+        !audioRef.current || !mixEngineRef.current.hasDeck(audioRef.current) ||
         previewFadePendingRef.current || previewFadeRef.current) return;
     const order = isShuffle ? shuffledOrderRef.current : queue.map((_, index) => index);
     const position = order.indexOf(queueIndex);
@@ -1655,10 +1661,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         (candidate.playbackEngine && candidate.playbackEngine !== "audio")) return;
     const source = resolveMixableAudioSource(candidate.previewUrl);
     if (!source.mixable || failedMixSourcesRef.current.has(source.url)) return;
+    // Pre-connect a controlled, CORS-safe deck before the transition. iOS
+    // ignores HTMLMediaElement.volume, so overlapping audio needs GainNodes.
+    standby.crossOrigin = "anonymous";
     if (standby.src !== new URL(source.url, window.location.origin).href) {
       standby.src = source.url;
       standby.load();
     }
+    if (!mixEngineRef.current.prepare(standby, source)) return;
+    mixEngineRef.current.setLevel(standby, 0, volumeRef.current);
     if (playbackPrefs.smartMix) {
       mixEngineRef.current.analyzeShortAudio(source.url, candidate.duration || 30);
     }
