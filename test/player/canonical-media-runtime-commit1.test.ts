@@ -92,6 +92,8 @@ describe("Chapter 25 audible-media and device-independent icon acceptance", () =
     expect(mix).toBeGreaterThan(play);
     expect(playerContext).toContain('failedMixSourcesRef.current.add(source.url)');
     expect(playerContext).toContain("hasAudioSignal(activeAudio)");
+    expect(playerContext).toContain("activeAudio.currentSrc === expectedMixUrl");
+    expect(playerContext).not.toContain('activeAudio.currentSrc.includes("/__wk-mix/") &&');
     expect(playerContext).toContain("fallback.src = track.previewUrl!");
   });
   it("displays one compact, collapsible mode instead of a contradictory gapless toggle", () => {
