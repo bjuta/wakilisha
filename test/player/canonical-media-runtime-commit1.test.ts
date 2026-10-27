@@ -218,8 +218,8 @@ describe(
         expect(playbackSettings).toContain("crossfadeSeconds: 6,");
         expect(playbackSettings).toContain("keepAlbumsGapless: true,");
         expect(playbackControls).toContain("Keep albums gapless");
-        expect(playbackControls).toContain("supportsPreviewAudioVolume");
         expect(playbackControls).toContain("No crossfade on albums or EPs played in order.");
+        expect(playbackControls).toContain("keepAlbumsGapless: false");
         expect(playbackControls).toContain("Next after queue");
         expect(playbackControls).toContain("<WkSlider");
         expect(playerContext).toContain("Play starts the collection again.");
