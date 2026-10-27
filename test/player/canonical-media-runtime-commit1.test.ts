@@ -225,6 +225,9 @@ describe(
         expect(full).toContain("Not available for YouTube");
         expect(compact).toContain('openFullPlayer("more")');
         expect(dock).toContain("<PlaybackMoreControls");
+        expect(full).toContain('label: "Go to Release"');
+        expect(full).toContain('label: "Credits"');
+        expect(playerContext).toContain("releasePath?: string");
         expect(accountSync).toContain('session?.user?.id !== expectedUser');
         expect(accountSync).toContain('existingOwner !== accountId');
         expect(accountSync).toContain('delete existing.appleMusicToken');

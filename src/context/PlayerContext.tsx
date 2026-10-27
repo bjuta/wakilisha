@@ -155,6 +155,7 @@ export interface PlaySource {
   entitySlug?: string;
   entityType?: string;
   sourceSection?: string;
+  releasePath?: string;
 }
 
 export function playerTrackIdentity(
@@ -196,6 +197,7 @@ interface PlayerContextValue {
   isFullPlayerOpen: boolean;
   playbackBackend: PlaybackBackend;
   playbackSourceLabel: string | null;
+  playSource: PlaySource | null;
   playTrack: (track: PlayerTrack, queue?: PlayerTrack[], playSource?: PlaySource) => void;
   togglePlay: () => void;
   pause: () => void;
@@ -2442,6 +2444,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     isFullPlayerOpen,
     playbackBackend,
     playbackSourceLabel,
+    playSource: sourceContextRef.current,
     playTrack,
     togglePlay,
     pause,

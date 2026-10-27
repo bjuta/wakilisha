@@ -29,6 +29,7 @@ interface TrackReleaseTracklistProps {
   artistSlug: string;
   currentTrackSlug: string;
   albumTitle: string;
+  releasePath?: string;
   tracks: ReleaseTrackData[];
 }
 
@@ -36,6 +37,7 @@ export default function TrackReleaseTracklist({
   artistSlug,
   currentTrackSlug,
   albumTitle,
+  releasePath,
   tracks,
 }: TrackReleaseTracklistProps) {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
@@ -71,6 +73,7 @@ export default function TrackReleaseTracklist({
       pageType: "track_detail",
       entitySlug: currentTrackSlug,
       entityType: "release",
+      releasePath,
       sourceSection: "album_tracklist",
     });
   };

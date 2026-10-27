@@ -776,6 +776,17 @@ export function TrackActionsMenu({
                 />
               ) : null}
 
+              {trackPath ? (
+                <ActionRow
+                  icon="ri-file-text-line"
+                  label="Credits"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate(`${trackPath}#track-credits-heading`);
+                  }}
+                />
+              ) : null}
+
               {onDiscuss ? (
                 <ActionRow
                   icon="ri-chat-3-line"

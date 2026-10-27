@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { ShareButton, ShareSheet } from "@/components/design-system/share/ShareSheet";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
@@ -19,6 +20,7 @@ export default function ReleaseDetailHero({
   const [artworkFailed, setArtworkFailed] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const { currentTrack, isPlaying, playTrack, togglePlay, toggleShuffle, isShuffle } = usePlayer();
+  const releasePath = useLocation().pathname;
 
   useEffect(() => {
     setArtworkFailed(false);
@@ -65,6 +67,7 @@ export default function ReleaseDetailHero({
       pageType: "release_detail",
       entitySlug: release.slug,
       entityType: "release",
+      releasePath,
       sourceSection: "release_hero",
     });
   };
@@ -83,6 +86,7 @@ export default function ReleaseDetailHero({
       pageType: "release_detail",
       entitySlug: release.slug,
       entityType: "release",
+      releasePath,
       sourceSection: "release_hero",
     });
   };

@@ -360,23 +360,34 @@ export function useUserSettings() {
     setLoading(false);
   }, []);
 
-  // Keep Settings in step with account preferences hydrated by PlayerProvider.
+  // Settings, the dock and the full-player More sheet share one live value.
   useEffect(() => {
-    const sync = () => {
+    const readLatest = () => {
       try {
         const pb = localStorage.getItem(LS_PLAYBACK);
-        if (!pb) return;
-        const latest = { ...DEFAULT_PLAYBACK, ...JSON.parse(pb) };
-        setPlayback(latest);
-        setSavedSnapshot((previous) => {
-          try {
-            return JSON.stringify({ ...JSON.parse(previous), playback: latest });
-          } catch { return previous; }
-        });
-      } catch { /* local storage unavailable */ }
+        return pb ? { ...DEFAULT_PLAYBACK, ...JSON.parse(pb) } : null;
+      } catch { return null; }
     };
-    window.addEventListener("wk-playback-account-loaded", sync);
-    return () => window.removeEventListener("wk-playback-account-loaded", sync);
+    const sync = () => {
+      const latest = readLatest();
+      if (latest) setPlayback(latest);
+    };
+    const hydrate = () => {
+      const latest = readLatest();
+      if (!latest) return;
+      setPlayback(latest);
+      setSavedSnapshot((previous) => {
+        try {
+          return JSON.stringify({ ...JSON.parse(previous), playback: latest });
+        } catch { return previous; }
+      });
+    };
+    window.addEventListener("wk-playback-changed", sync);
+    window.addEventListener("wk-playback-account-loaded", hydrate);
+    return () => {
+      window.removeEventListener("wk-playback-changed", sync);
+      window.removeEventListener("wk-playback-account-loaded", hydrate);
+    };
   }, []);
 
   // ─── Sync FROM Supabase (community_profile + notification_prefs) ───

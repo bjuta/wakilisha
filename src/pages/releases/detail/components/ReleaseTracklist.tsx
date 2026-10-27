@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
@@ -26,6 +26,7 @@ export default function ReleaseTracklist({
   onDiscussTrack?: (track: PublicReleaseDetail["tracks"][number], index: number) => void;
 }) {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
+  const releasePath = useLocation().pathname;
   const { ref, revealed } = useScrollReveal<HTMLDivElement>(0.1);
 
   const handlePlayTrack = (track: typeof tracks[number], trackIndex: number) => {
@@ -59,6 +60,7 @@ export default function ReleaseTracklist({
       pageType: "release_detail",
       entitySlug: release.slug,
       entityType: "release",
+      releasePath,
       sourceSection: "tracklist",
     });
   };

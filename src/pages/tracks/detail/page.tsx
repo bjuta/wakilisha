@@ -989,6 +989,8 @@ export default function TrackDetail() {
       pageType: "track_detail",
       entitySlug: trackSlug,
       entityType: inRelease ? "release" : "track",
+      releasePath: track.albumArtistSlug && track.albumSlug && track.albumTotalTracks > 1
+        ? `/releases/${track.albumArtistSlug}/${track.albumSlug}` : undefined,
       sourceSection: "track_hero",
     });
   };
@@ -1259,6 +1261,8 @@ export default function TrackDetail() {
                 artistSlug={artistSlug || track.artistSlug}
                 currentTrackSlug={track.slug}
                 albumTitle={track.albumTitle}
+                releasePath={track.albumArtistSlug && track.albumSlug
+                  ? `/releases/${track.albumArtistSlug}/${track.albumSlug}` : undefined}
                 tracks={track.releaseTracks}
               />
             )}

@@ -76,6 +76,7 @@ export function AlbumModal({ release, open, onClose, playSource }: AlbumModalPro
       pageType: playSource?.pageType || "release",
       entityType: "release",
       entitySlug: release.slug,
+      releasePath: release.trackCount > 1 ? releaseUrl(release) : undefined,
     });
   };
 
@@ -106,6 +107,7 @@ export function AlbumModal({ release, open, onClose, playSource }: AlbumModalPro
       pageType: playSource?.pageType || "release",
       entityType: "release",
       entitySlug: release.slug,
+      releasePath: release.trackCount > 1 ? releaseUrl(release) : undefined,
     });
   };
 

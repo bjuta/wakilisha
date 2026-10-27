@@ -342,6 +342,7 @@ export default function MobileReleaseDetail() {
       pageType: "release_detail",
       entitySlug: releaseSlug || "",
       entityType: "release",
+      releasePath: artistSlug && releaseSlug ? `/releases/${artistSlug}/${releaseSlug}` : undefined,
       sourceSection: "release_hero",
     });
   };
@@ -361,6 +362,7 @@ export default function MobileReleaseDetail() {
       pageType: "release_detail",
       entitySlug: releaseSlug || "",
       entityType: "release",
+      releasePath: artistSlug && releaseSlug ? `/releases/${artistSlug}/${releaseSlug}` : undefined,
       sourceSection: "release_hero_shuffle",
     });
   };
@@ -376,6 +378,7 @@ export default function MobileReleaseDetail() {
       pageType: "release_detail",
       entitySlug: releaseSlug || "",
       entityType: "release",
+      releasePath: artistSlug && releaseSlug ? `/releases/${artistSlug}/${releaseSlug}` : undefined,
       sourceSection: "tracklist",
     });
   };

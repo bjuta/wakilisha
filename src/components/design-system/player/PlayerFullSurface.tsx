@@ -145,6 +145,7 @@ export function PlayerFullSurface({
     removeQueueItem,
     clearUpcoming,
     playTrack,
+    playSource,
   } = usePlayer();
 
   const { playback: playbackControls, updatePlayback: updatePlaybackControls } = usePlaybackControls();
@@ -632,16 +633,35 @@ export function PlayerFullSurface({
     });
   }
 
+  if (!experience.spokenAudio && playSource?.releasePath) {
+    contextActions.push({
+      key: "release",
+      label: "Go to Release",
+      description: currentTrack.album || undefined,
+      icon: "Disc3",
+      onClick: () => goTo(playSource.releasePath as string),
+    });
+  }
+
   if (
     !experience.spokenAudio &&
     currentTrack.artistSlug
   ) {
     contextActions.push({
       key: "artist",
-      label: "View Artist",
+      label: "Go to Artist",
       description: `Open ${currentTrack.artist} on WAKILISHA.`,
       icon: "UserRound",
       onClick: () => goTo(`/artists/${currentTrack.artistSlug}`),
+    });
+  }
+
+  if (!experience.spokenAudio && experience.canonicalPath) {
+    contextActions.push({
+      key: "credits",
+      label: "Credits",
+      icon: "FileText",
+      onClick: () => goTo(`${experience.canonicalPath}#track-credits-heading`),
     });
   }
 
