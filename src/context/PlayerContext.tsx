@@ -89,7 +89,7 @@ function readPlaybackPrefs(): {
     const raw = localStorage.getItem("wk-playback-v2");
     if (!raw) {
       return {
-        autoplay: false,
+        autoplay: true,
         explicitFilter: false,
         appleMusicConnected: false,
         appleMusicToken: null,
@@ -99,7 +99,7 @@ function readPlaybackPrefs(): {
 
     const prefs = JSON.parse(raw);
     return {
-      autoplay: prefs.autoplay === true,
+      autoplay: prefs.autoplay !== false,
       explicitFilter: prefs.explicitFilter === true,
       appleMusicConnected: prefs.appleMusicConnected === true,
       appleMusicToken: typeof prefs.appleMusicToken === "string" ? prefs.appleMusicToken : null,
@@ -107,7 +107,7 @@ function readPlaybackPrefs(): {
     };
   } catch {
     return {
-      autoplay: false,
+      autoplay: true,
       explicitFilter: false,
       appleMusicConnected: false,
       appleMusicToken: null,
@@ -1082,10 +1082,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (
-        !playbackPrefs.autoplay &&
-        !continuousCollectionRef.current
-      ) {
+      if (!playbackPrefs.autoplay) {
         setIsPlaying(false);
         return;
       }

@@ -641,8 +641,8 @@ export default function MobileSettingsPage() {
 
             <div className="flex items-center justify-between gap-3 py-3.5 border-b border-[var(--wk-divider)] last:border-b-0">
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-bold text-[var(--wk-text)]">Autoplay next track</div>
-          <div className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] mt-0.5">Continue through queues automatically.</div>
+          <div className="text-[13px] font-bold text-[var(--wk-text)]">Continuous Playback</div>
+          <div className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] mt-0.5">Keep playing through albums, playlists, charts, and other track lists.</div>
         </div>
         <WakilishaToggle value={playback.autoplay} onChange={(v) => updatePlayback({ autoplay: v })} />
       </div>

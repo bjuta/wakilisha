@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { TrackActionsMenu } from "@/components/tracks/TrackActionsMenu";
-import { usePlayer } from "@/context/PlayerContext";
+import { usePlayer, type PlayerTrack } from "@/context/PlayerContext";
 import type { PublicArtistRelationship } from "@/services/publicArtistRelationships";
 import { splitMusicArtistDisplayNames } from "@/utils/musicArtistDisplay";
 
@@ -23,6 +23,20 @@ interface ArtistTopSongsProps {
   songs: Song[];
   artistSlug?: string;
   reviewedRelationships?: PublicArtistRelationship[];
+}
+
+function topSongQueueTrack(song: Song, artistSlug?: string): PlayerTrack {
+  return {
+    id: `top-song-${song.id}`,
+    registryTrackId: song.id,
+    title: song.title,
+    artist: song.artists,
+    artworkUrl: song.image,
+    isPlayable: Boolean(song.songUrl),
+    previewUrl: song.songUrl || undefined,
+    artistSlug: song.artistSlug || artistSlug,
+    trackSlug: song.slug,
+  };
 }
 
 /* ─────────────────────────────────────────────
@@ -134,10 +148,12 @@ function ArtistSongRow({
   song,
   index,
   artistSlug,
+  queue,
 }: {
   song: Song;
   index: number;
   artistSlug?: string;
+  queue: PlayerTrack[];
 }) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -153,17 +169,9 @@ function ArtistSongRow({
       togglePlay();
       return;
     }
-    playTrack({
-      id: trackId,
-      registryTrackId: song.id,
-      title: song.title,
-      artist: song.artists,
-      artworkUrl: song.image,
-      isPlayable: true,
-      previewUrl: song.songUrl,
-      artistSlug: song.artistSlug || artistSlug,
-      trackSlug: song.slug,
-    }, undefined, {
+    const selected = queue[index];
+    if (!selected || selected.isPlayable === false) return;
+    playTrack(selected, queue, {
       pageType: "artist_detail",
       entitySlug: artistSlug,
       entityType: "artist",
@@ -278,6 +286,10 @@ export function ArtistTopSongs({
   artistSlug,
 }: ArtistTopSongsProps) {
   const { ref, revealed } = useScrollReveal<HTMLElement>(0.1);
+  const queue = useMemo(
+    () => songs.map((song) => topSongQueueTrack(song, artistSlug)),
+    [songs, artistSlug],
+  );
 
   return (
     <section ref={ref} className={`${revealed ? "is-visible" : ""} reveal-up`}>
@@ -306,6 +318,7 @@ export function ArtistTopSongs({
               song={song}
               index={index}
               artistSlug={artistSlug}
+              queue={queue}
             />
           ))}
         </div>

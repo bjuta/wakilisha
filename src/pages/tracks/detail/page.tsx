@@ -1083,21 +1083,21 @@ export default function TrackDetail() {
         }}
       />
 
-      <section className="relative mt-0 md:-mt-16 pt-16 overflow-hidden">
+      <section className="relative mt-0 overflow-hidden border-b border-[var(--wk-divider)] md:-mt-16 md:pt-16">
         {track.artworkUrl && (
-          <div className="absolute inset-0 opacity-20 scale-110" style={{ backgroundImage: `url("${track.artworkUrl}")`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(90px) saturate(1.4)" }} />
+          <div className="absolute inset-0 opacity-15 scale-110" style={{ backgroundImage: `url("${track.artworkUrl}")`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(90px) saturate(1.4)" }} />
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--wk-bg)]/40 via-[var(--wk-bg)]/70 to-[var(--wk-bg)]" />
 
-        <div className="relative z-10 wk-container-wide px-6 py-16 md:py-24 lg:py-28">
-          <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start lg:items-end">
+        <div className="relative z-10 wk-container-wide px-5 py-8 sm:px-6 md:py-12 lg:py-16">
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-10 items-start lg:items-end">
             <PlayableArtwork
               label={track.title}
               onPlay={() => {
                 if (hasPlayableSource) handlePlay();
               }}
               isPlaying={isTrackPlaying}
-              className="relative shrink-0 w-[280px] md:w-[340px] lg:w-[380px] aspect-square overflow-hidden"
+              className="relative shrink-0 w-[200px] sm:w-[240px] lg:w-[280px] max-w-full aspect-square overflow-hidden rounded-xl"
             >
               {track.artworkUrl ? (
                 <img
@@ -1121,7 +1121,7 @@ export default function TrackDetail() {
                 {track.rank > 0 && <span className="ml-1 opacity-70">· #{track.rank}</span>}
               </div>
 
-              <h1 className="font-[var(--wk-font-display)] font-black text-[var(--wk-text)] leading-[0.9] tracking-[-0.05em]" style={{ fontSize: "clamp(38px, 6vw, 80px)" }}>
+              <h1 className="font-[var(--wk-font-display)] font-black text-[var(--wk-text)] leading-[0.9] tracking-[-0.05em]" style={{ fontSize: "clamp(32px, 4.5vw, 60px)", overflowWrap: "anywhere" }}>
                 {track.title}
               </h1>
 

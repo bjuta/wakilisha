@@ -39,6 +39,22 @@ const music = readFileSync(
   "src/pages/music/page.tsx",
   "utf8",
 );
+const artistTopSongs = readFileSync(
+  "src/pages/artists/detail/components/ArtistTopSongs.tsx",
+  "utf8",
+);
+const albumModal = readFileSync(
+  "src/components/design-system/releases/AlbumModal.tsx",
+  "utf8",
+);
+const playbackSettings = readFileSync(
+  "src/hooks/useUserSettings.ts",
+  "utf8",
+);
+const trackDetail = readFileSync(
+  "src/pages/tracks/detail/page.tsx",
+  "utf8",
+);
 
 describe(
   "canonical media runtime Commit 1",
@@ -146,6 +162,29 @@ describe(
         expect(playerContext).toContain(
           "isPlayable === false",
         );
+      },
+    );
+
+    it(
+      "continues ordered collection playback and respects the listening preference",
+      () => {
+        expect(artistTopSongs).toContain(
+          "songs.map((song) => topSongQueueTrack(song, artistSlug))",
+        );
+        expect(artistTopSongs).toContain("playTrack(selected, queue, {");
+        expect(albumModal).toContain("playTrack(selected, queueTracks, {");
+        expect(albumModal).not.toContain("const remainingTracks =");
+        expect(playerContext).toContain("if (!playbackPrefs.autoplay) {");
+        expect(playbackSettings).toContain("autoplay: true,");
+      },
+    );
+
+    it(
+      "keeps the Track hero compact and responsive",
+      () => {
+        expect(trackDetail).toContain('w-[200px] sm:w-[240px] lg:w-[280px]');
+        expect(trackDetail).toContain('overflowWrap: "anywhere"');
+        expect(trackDetail).toContain('canonicalTrackUrl(');
       },
     );
 

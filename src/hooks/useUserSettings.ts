@@ -105,7 +105,7 @@ const DEFAULT_NOTIFICATIONS: UserNotificationPrefs = {
 };
 
 const DEFAULT_PLAYBACK: UserPlaybackPrefs = {
-  autoplay: false,
+  autoplay: true,
   explicitFilter: false,
   playbackQuality: "Auto",
   appleMusicConnected: false,

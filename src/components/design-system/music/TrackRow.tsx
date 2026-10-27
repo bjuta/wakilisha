@@ -1,4 +1,4 @@
-import { usePlayer, type PlaySource } from "@/context/PlayerContext";
+import { usePlayer, type PlaySource, type PlayerTrack } from "@/context/PlayerContext";
 import { WkTag } from "@/components/design-system/primitives/Tag";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 
@@ -16,6 +16,7 @@ export interface TrackRowProps {
   id?: string;
   previewUrl?: string;
   playSource?: PlaySource;
+  queue?: PlayerTrack[];
 }
 
 export function TrackRow({
@@ -32,6 +33,7 @@ export function TrackRow({
   id,
   previewUrl,
   playSource,
+  queue,
 }: TrackRowProps) {
   const { currentTrack, isPlaying: isPlayingCtx, playTrack } = usePlayer();
   const trackId = id || `${title}-${artist}`.toLowerCase().replace(/\s+/g, "-");
@@ -54,7 +56,7 @@ export function TrackRow({
       source,
       previewUrl,
     };
-    playTrack(track, [track], playSource);
+    playTrack(track, queue ?? [track], playSource);
   };
 
   return (

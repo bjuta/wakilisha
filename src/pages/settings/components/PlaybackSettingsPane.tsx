@@ -154,8 +154,8 @@ export function PlaybackSettingsPane({ playback, isSignedIn, updatePlayback }: P
       {/* Playback options */}
       <div className="flex items-center justify-between gap-4 py-4 border-b border-[var(--wk-divider)]">
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-bold text-[var(--wk-text)]">Autoplay next track</div>
-          <div className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] mt-0.5">Continue through chart editions and playlist queues automatically.</div>
+          <div className="text-[13px] font-bold text-[var(--wk-text)]">Continuous Playback</div>
+          <div className="text-[11px] leading-relaxed text-[var(--wk-text-muted)] mt-0.5">Keep playing through albums, playlists, charts, and other track lists.</div>
         </div>
         <WakilishaToggle value={playback.autoplay} onChange={(v) => updatePlayback({ autoplay: v })} />
       </div>
