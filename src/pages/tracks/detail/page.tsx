@@ -954,6 +954,7 @@ export default function TrackDetail() {
     }
     const playerTrack = {
       id: track.slug,
+      registryTrackId: track.id,
       title: track.title,
       artist: track.artist,
       artworkUrl: track.artworkUrl,
@@ -966,10 +967,25 @@ export default function TrackDetail() {
       artistSlug: artistSlug || track.artistSlug || undefined,
       trackSlug: track.slug || trackSlug || undefined,
     };
-    playTrack(playerTrack, [playerTrack], {
+    const releaseQueue = track.releaseTracks.map((related) => ({
+      id: related.id,
+      registryTrackId: related.id,
+      title: related.title,
+      artist: related.artist,
+      artworkUrl: related.artworkUrl,
+      duration: related.duration,
+      previewUrl: related.previewUrl || undefined,
+      appleMusicId: related.appleMusicId || related.appleMusicCatalogId || null,
+      appleMusicCatalogId: related.appleMusicCatalogId || related.appleMusicId || null,
+      album: track.albumTitle,
+      artistSlug: track.albumArtistSlug || related.artistSlug || track.artistSlug || undefined,
+      trackSlug: related.slug,
+    }));
+    const inRelease = releaseQueue.some((candidate) => candidate.registryTrackId === track.id);
+    playTrack(playerTrack, inRelease ? releaseQueue : [playerTrack], {
       pageType: "track_detail",
       entitySlug: trackSlug,
-      entityType: "track",
+      entityType: inRelease ? "release" : "track",
       sourceSection: "track_hero",
     });
   };

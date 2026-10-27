@@ -562,8 +562,6 @@ export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmb
   const handlePlayTrack = (track: TrackEmbedData, trackIndex: number) => {
     if (!track.previewUrl) return;
 
-    const queueTracks = buildQueue();
-
     const playerTrack = {
       id: track.isrc || `${release.title}-${track.title}`,
       title: track.title,
@@ -580,7 +578,7 @@ export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmb
       return;
     }
 
-    playTrack(playerTrack, queueTracks, articleSlug ? {
+    playTrack(playerTrack, [playerTrack], articleSlug ? {
         pageType: "article",
         entitySlug: articleSlug,
         entityType: "article",
@@ -598,7 +596,7 @@ export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmb
       return;
     }
 
-    playTrack(firstTrack, queueTracks, articleSlug ? {
+    playTrack(firstTrack, [firstTrack], articleSlug ? {
         pageType: "article",
         entitySlug: articleSlug,
         entityType: "article",

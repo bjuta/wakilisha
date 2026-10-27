@@ -47,6 +47,22 @@ const albumModal = readFileSync(
   "src/components/design-system/releases/AlbumModal.tsx",
   "utf8",
 );
+const releaseTracklist = readFileSync(
+  "src/pages/releases/detail/components/ReleaseTracklist.tsx",
+  "utf8",
+);
+const mobileRelease = readFileSync(
+  "src/pages/mobile/releases/detail/page.tsx",
+  "utf8",
+);
+const trackReleaseTracklist = readFileSync(
+  "src/pages/tracks/detail/components/TrackReleaseTracklist.tsx",
+  "utf8",
+);
+const articleRelease = readFileSync(
+  "src/pages/magazine/article/components/ArticleReleaseEmbeds.tsx",
+  "utf8",
+);
 const playbackSettings = readFileSync(
   "src/hooks/useUserSettings.ts",
   "utf8",
@@ -174,6 +190,12 @@ describe(
         expect(artistTopSongs).toContain("playTrack(selected, queue, {");
         expect(albumModal).toContain("playTrack(selected, queueTracks, {");
         expect(albumModal).not.toContain("const remainingTracks =");
+        expect(releaseTracklist).toContain("playTrack(selected, queueTracks, {");
+        expect(mobileRelease).toContain("playTrack(selected, queue, {");
+        expect(trackReleaseTracklist).toContain("playTrack(selected, queueTracks, {");
+        expect(trackDetail).toContain("inRelease ? releaseQueue : [playerTrack]");
+        expect(articleRelease).toContain("playTrack(playerTrack, [playerTrack],");
+        expect(artistTopSongs).toContain("sourceSection: \"top_songs_expanded\"");
         expect(playerContext).toContain("if (!playbackPrefs.autoplay) {");
         expect(playbackSettings).toContain("autoplay: true,");
       },

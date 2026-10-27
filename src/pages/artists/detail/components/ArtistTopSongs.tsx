@@ -47,10 +47,12 @@ function SongExpandedPanel({
   song,
   rank,
   artistSlug,
+  queue,
 }: {
   song: Song;
   rank: number;
   artistSlug?: string;
+  queue: PlayerTrack[];
 }) {
   const { playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
   const artistList =
@@ -68,26 +70,14 @@ function SongExpandedPanel({
       togglePlay();
       return;
     }
-    playTrack(
-      {
-        id: trackId,
-        registryTrackId: song.id,
-        title: song.title,
-        artist: song.artists,
-        artworkUrl: song.image,
-        isPlayable: true,
-        previewUrl: song.songUrl,
-        artistSlug: song.artistSlug || artistSlug,
-        trackSlug: song.slug,
-      },
-      undefined,
-      {
-        pageType: "artist_detail",
-        entitySlug: artistSlug,
-        entityType: "artist",
-        sourceSection: "top_songs_expanded",
-      },
-    );
+    const selected = queue[rank - 1];
+    if (!selected || selected.isPlayable === false) return;
+    playTrack(selected, queue, {
+      pageType: "artist_detail",
+      entitySlug: artistSlug,
+      entityType: "artist",
+      sourceSection: "top_songs_expanded",
+    });
   };
 
   return (
@@ -272,6 +262,7 @@ function ArtistSongRow({
           song={song}
           rank={rank}
           artistSlug={artistSlug}
+          queue={queue}
         />
       </div>
     </div>

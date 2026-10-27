@@ -322,14 +322,8 @@ export default function MobileReleaseDetail() {
     trackSlug: track.slug,
   });
 
-  const buildReleaseQueue = (startIndex = 0) => {
-    if (!release) return [];
-    const tracks = release.tracks;
-    return [
-      ...tracks.slice(startIndex).map(buildPlayerTrack),
-      ...tracks.slice(0, startIndex).map(buildPlayerTrack),
-    ];
-  };
+  const buildReleaseQueue = () =>
+    release?.tracks.map(buildPlayerTrack) || [];
 
   const isThisReleasePlaying = Boolean(release?.tracks.some((track) => track.id === currentTrack?.id));
 
@@ -341,7 +335,7 @@ export default function MobileReleaseDetail() {
       return;
     }
 
-    const queue = buildReleaseQueue(0);
+    const queue = buildReleaseQueue();
     if (!queue.length) return;
 
     playTrack(queue[0], queue, {
@@ -360,10 +354,10 @@ export default function MobileReleaseDetail() {
     }
 
     const randomIndex = Math.floor(Math.random() * release.tracks.length);
-    const queue = buildReleaseQueue(randomIndex);
+    const queue = buildReleaseQueue();
     if (!queue.length) return;
 
-    playTrack(queue[0], queue, {
+    playTrack(queue[randomIndex], queue, {
       pageType: "release_detail",
       entitySlug: releaseSlug || "",
       entityType: "release",
@@ -375,8 +369,10 @@ export default function MobileReleaseDetail() {
     if (!release) return;
     if (currentTrack?.id === track.id) { togglePlay(); return; }
 
-    const queue = buildReleaseQueue(trackIndex);
-    playTrack(queue[0], queue, {
+    const queue = buildReleaseQueue();
+    const selected = queue[trackIndex];
+    if (!selected) return;
+    playTrack(selected, queue, {
       pageType: "release_detail",
       entitySlug: releaseSlug || "",
       entityType: "release",
