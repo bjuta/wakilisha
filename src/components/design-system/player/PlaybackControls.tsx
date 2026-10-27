@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import { WkSlider } from "@/components/design-system/primitives/Slider";
 import type { UserPlaybackPrefs } from "@/hooks/useUserSettings";
@@ -115,16 +116,78 @@ function modeLabel(playback: PlaybackControlPrefs): string {
 function setMode(mode: TransitionMode, update: (v: Partial<PlaybackControlPrefs>) => void) {
   update({ crossfade: mode !== "off", smartMix: mode === "smart" });
 }
+/** A bounded, dismissible popover. Portalled outside transformed mobile sheets. */
 function HelpTip({ label, text }: { label: string; text: string }) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ left: 12, top: 12, width: 248 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const tooltipId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const positionInsideViewport = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const view = window.visualViewport;
+      const leftEdge = view?.offsetLeft ?? 0;
+      const topEdge = view?.offsetTop ?? 0;
+      const widthAvailable = view?.width ?? window.innerWidth;
+      const heightAvailable = view?.height ?? window.innerHeight;
+      const width = Math.min(260, Math.max(120, widthAvailable - 24));
+      const tooltipHeight = popupRef.current?.getBoundingClientRect().height ?? 100;
+      const left = Math.min(leftEdge + widthAvailable - width - 12,
+        Math.max(leftEdge + 12, rect.left + rect.width / 2 - width / 2));
+      const above = rect.top - tooltipHeight - 10;
+      const top = above >= topEdge + 12 ? above
+        : Math.min(topEdge + heightAvailable - tooltipHeight - 12, rect.bottom + 10);
+      setPosition({ left: Math.round(left), top: Math.round(Math.max(topEdge + 12, top)), width });
+    };
+    positionInsideViewport();
+    const onOutsideClick = (event: PointerEvent) => {
+      if (triggerRef.current?.contains(event.target as Node) ||
+          popupRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    const onScroll = () => setOpen(false);
+    document.addEventListener("pointerdown", onOutsideClick, true);
+    document.addEventListener("keydown", onEscape, true);
+    document.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", positionInsideViewport);
+    window.visualViewport?.addEventListener("resize", positionInsideViewport);
+    return () => {
+      document.removeEventListener("pointerdown", onOutsideClick, true);
+      document.removeEventListener("keydown", onEscape, true);
+      document.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", positionInsideViewport);
+      window.visualViewport?.removeEventListener("resize", positionInsideViewport);
+    };
+  }, [open]);
+
   return (
-    <details className="group relative inline-flex align-middle">
-      <summary aria-label={`About ${label}`} className="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-full text-[var(--wk-text-muted)] focus-visible:outline focus-visible:outline-2">
-        <WkIcon name="Info" size={16} aria-hidden="true" />
-      </summary>
-      <span role="note" className="absolute bottom-full right-0 z-50 mb-2 w-[min(75vw,255px)] rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-[12px] font-normal leading-relaxed text-[var(--wk-text)] shadow-lg">
-        {text}
-      </span>
-    </details>
+    <>
+      <button ref={triggerRef} type="button" aria-label={`About ${label}`}
+        aria-expanded={open} aria-controls={open ? tooltipId : undefined}
+        onClick={(event) => { event.stopPropagation(); setOpen((previous) => !previous); }}
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--wk-text-muted)] focus-visible:outline focus-visible:outline-2">
+        <WkIcon name="Info" size={17} aria-hidden="true" />
+      </button>
+      {open && createPortal(
+        <div ref={popupRef} id={tooltipId} role="note"
+          style={{ position: "fixed", left: position.left, top: position.top,
+            width: position.width, maxHeight: "min(200px, calc(100dvh - 24px))",
+            overflowY: "auto", zIndex: 2147483000 }}
+          className="box-border rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] px-3 py-2 text-left text-[12px] font-normal leading-relaxed text-[var(--wk-text)] shadow-lg">
+          {text}
+        </div>, document.body)}
+    </>
   );
 }
 function TransitionOptions({ playback, updatePlayback, unavailableReason }: {
@@ -142,19 +205,21 @@ function TransitionOptions({ playback, updatePlayback, unavailableReason }: {
     <div className="border-b border-[var(--wk-divider)] px-1 pb-4">
       <div role="radiogroup" aria-label="Transitions" className="space-y-1 py-2">
         {choices.map((choice) => (
-          <button key={choice.key} type="button" role="radio" aria-checked={mode === choice.key}
-            disabled={Boolean(unavailableReason) && choice.key !== "off"}
-            onClick={() => setMode(choice.key, updatePlayback)}
-            className="flex min-h-12 w-full items-start gap-3 rounded-lg p-2 text-left hover:bg-[var(--wk-bg-subtle)] focus-visible:outline focus-visible:outline-2 disabled:opacity-40">
-            <span aria-hidden="true" className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)]">
-              {mode === choice.key && <span className="h-2 w-2 rounded-full bg-[var(--wk-brand)]" />}
-            </span>
-            <span className="min-w-0 flex-1 text-[13px] font-bold text-[var(--wk-text)]">
-              {choice.label}
-              {choice.key === "smart" && <HelpTip label="Smart Mix" text="Matches nearby tempos when analysis is reliable; otherwise uses a natural blend." />}
-              <span className="block text-[12px] font-normal text-[var(--wk-text-muted)]">{choice.description}</span>
-            </span>
-          </button>
+          <div key={choice.key} className="flex min-w-0 items-center rounded-lg hover:bg-[var(--wk-bg-subtle)]">
+            <button type="button" role="radio" aria-checked={mode === choice.key}
+              disabled={Boolean(unavailableReason) && choice.key !== "off"}
+              onClick={() => setMode(choice.key, updatePlayback)}
+              className="flex min-h-12 min-w-0 flex-1 items-start gap-3 rounded-lg p-2 text-left focus-visible:outline focus-visible:outline-2 disabled:opacity-40">
+              <span aria-hidden="true" className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)]">
+                {mode === choice.key && <span className="h-2 w-2 rounded-full bg-[var(--wk-brand)]" />}
+              </span>
+              <span className="min-w-0 flex-1 text-[13px] font-bold text-[var(--wk-text)]">
+                {choice.label}
+                <span className="block text-[12px] font-normal text-[var(--wk-text-muted)]">{choice.description}</span>
+              </span>
+            </button>
+            {choice.key === "smart" && <HelpTip label="Smart Mix" text="Matches nearby tempos when analysis is reliable; otherwise uses a natural blend." />}
+          </div>
         ))}
       </div>
       {unavailableReason && <span className="text-[12px] text-[var(--wk-text-muted)]">{unavailableReason}</span>}
