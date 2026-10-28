@@ -468,7 +468,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     cancelPreviewFade();
 
     // Silencing the stale audio argument could leave a second deck audible.
-    for (const deck of new Set([audio, audioRef.current, standbyAudioRef.current])) {
+    for (const deck of new Set([audio, audioRef.current, standbyAudioRef.current, nativeRescueAudioRef.current])) {
       deck?.pause();
       deck?.removeAttribute("src");
     }
