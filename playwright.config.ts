@@ -39,5 +39,12 @@ export default defineConfig({
       grep: /Chapter 25 overlaps controlled previews and switches queue at fade start/,
       use: { ...devices["iPhone 13"] },
     },
+    {
+      // Isolated WebKit audio-architecture feasibility; not runtime acceptance.
+      // Deliberately separate from existing Chapter 25 tests.
+      name: "webkit-buffer-architecture",
+      testMatch: "**/ch25-webkit-buffer-mixer-proof.spec.ts",
+      use: { ...devices["iPhone 13"] },
+    },
   ],
 });
