@@ -1114,3 +1114,110 @@ test("Slice 3 renders the same Release provenance contract on mobile", async ({
     }),
   ]);
 });
+
+
+test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async ({ page }) => {
+  // This is intentionally the opposite of the old pre-seeded transition test:
+  // playback starts with Crossfade OFF, then the listener changes Smart Mix
+  // through the actual mobile player UI while the first audio element plays.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const previews = [shortWavPreview(220, 12), shortWavPreview(330, 12)];
+  const fixture = {
+    ...releaseDetail,
+    tracks: releaseDetail.tracks.map((track, index) => ({
+      ...track, duration: 12, previewUrl: previews[index],
+    })),
+  };
+  await page.addInitScript(() => {
+    window.localStorage.removeItem("wk-playback-v2");
+    const NativeAudio = window.Audio;
+    const audios: HTMLAudioElement[] = [];
+    const analysers: AnalyserNode[] = [];
+    const gains: GainNode[] = [];
+    Object.assign(window, {
+      __wkHotMixAudios: audios,
+      __wkHotMixAnalysers: analysers,
+      __wkHotMixGains: gains,
+    });
+    window.Audio = function (...args: ConstructorParameters<typeof Audio>) {
+      const audio = new NativeAudio(...args);
+      audios.push(audio);
+      return audio;
+    } as typeof Audio;
+    if (window.AudioContext) {
+      const originalAnalyser = AudioContext.prototype.createAnalyser;
+      AudioContext.prototype.createAnalyser = function () {
+        const analyser = originalAnalyser.call(this);
+        analysers.push(analyser);
+        return analyser;
+      };
+      const originalGain = AudioContext.prototype.createGain;
+      AudioContext.prototype.createGain = function () {
+        const gain = originalGain.call(this);
+        gains.push(gain);
+        return gain;
+      };
+    }
+  });
+  await page.route(
+    "**/public-content-read/releases/slice3-browser-solo/slice3-browser-release",
+    async (route) => { await fulfillJson(route, { data: { release: fixture } }); },
+  );
+  await page.goto("/releases/slice3-browser-solo/slice3-browser-release", {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page.getByRole("heading", { level: 1, name: releaseDetail.title })).toBeVisible();
+  await page.getByRole("button", { name: "Play", exact: true }).first().click();
+  await expect.poll(async () => page.evaluate(() => {
+    const decks = (window as unknown as { __wkHotMixAudios: HTMLAudioElement[] }).__wkHotMixAudios || [];
+    return decks.some((a) => !a.paused && a.currentTime > 0.3);
+  }), { timeout: 8500 }).toBe(true);
+
+  const compact = page.locator('[data-wk-player-compact="mobile"]');
+  await expect(compact).toBeVisible();
+  await compact.getByRole("button", { name: /Slice 3 Browser Track/ }).first().click();
+  const expanded = page.locator("[data-wk-player-overlay]");
+  await expect(expanded).toBeVisible();
+  await expanded.getByRole("button", { name: "More Player actions" }).click();
+  await page.getByRole("button", { name: /Transitions/ }).last().click();
+  const smart = page.getByRole("radio", { name: /Smart Mix/ });
+  await smart.click();
+  await expect(smart).toHaveAttribute("aria-checked", "true");
+
+  // The source must be deliberately upgraded to a controlled mixer deck.
+  // Advancing timestamps alone do NOT prove this; sample the analyser PCM.
+  const measure = async () => page.evaluate(() => {
+    const w = window as unknown as {
+      __wkHotMixAudios: HTMLAudioElement[];
+      __wkHotMixAnalysers: AnalyserNode[];
+      __wkHotMixGains: GainNode[];
+    };
+    const peaks = (w.__wkHotMixAnalysers || []).map((analyser) => {
+      const values = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(values);
+      return values.reduce((peak, sample) => Math.max(peak, Math.abs(sample)), 0);
+    });
+    const volume = (w.__wkHotMixGains || []).map((gain) => gain.gain.value);
+    const playing = (w.__wkHotMixAudios || []).filter((a) =>
+      !a.paused && !a.ended && a.currentTime > 0.05,
+    ).length;
+    return {
+      audibleDecks: peaks.filter((peak) => peak > 0.0005).length,
+      activeGains: volume.filter((level) => level > 0.05).length,
+      playing,
+      analyserCount: peaks.length,
+    };
+  });
+  await expect.poll(async () => (await measure()).audibleDecks, {
+    timeout: 8000, intervals: [80, 80, 120],
+    message: "Hot-selecting Smart Mix must connect actual decoded PCM",
+  }).toBeGreaterThanOrEqual(1);
+  await expect.poll(async () => {
+    const m = await measure();
+    return m.playing >= 2 && m.audibleDecks >= 2 &&
+      m.activeGains >= 3 && m.analyserCount >= 2;
+  }, {
+    timeout: 18000, intervals: [80, 80, 120],
+    message: "Both real analyser signals and three nonzero gain nodes (master + two decks) must overlap",
+  }).toBe(true);
+});
