@@ -257,6 +257,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     usesMixer: boolean;
   } | null>(null);
   const previewFadeAttemptRef = useRef(0);
+  // A transition setting changed during native playback may require a safe,
+  // same-track migration onto a controlled, CORS-safe Web Audio deck.
+  const hotMixUpgradeAttemptRef = useRef(0);
+  const hotMixUpgradePendingRef = useRef<HTMLAudioElement | null>(null);
   const previewFadePendingRef = useRef(false);
   const previewFadeEndedDuringPendingRef = useRef(false);
   const previewFadeSuppressedRef = useRef(false);
@@ -457,6 +461,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (audioRef.current) mixEngineRef.current.setLevel(audioRef.current, 1, volumeRef.current);
   }, []);
 
+  const cancelHotMixUpgrade = useCallback(() => {
+    hotMixUpgradeAttemptRef.current += 1;
+    const pending = hotMixUpgradePendingRef.current;
+    hotMixUpgradePendingRef.current = null;
+    if (pending && pending !== audioRef.current) {
+      pending.pause();
+      pending.removeAttribute("src");
+    }
+  }, []);
+
   const silenceAllPlayback = useCallback(async (
     audio: HTMLAudioElement | null,
   ) => {
@@ -465,6 +479,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     pendingPlayRef.current = false;
     htmlAudioSessionRef.current = null;
+    cancelHotMixUpgrade();
     cancelPreviewFade();
 
     // Silencing the stale audio argument could leave a second deck audible.
@@ -479,6 +494,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     await stopAppleMusic()
       .catch(() => {});
   }, [
+    cancelHotMixUpgrade,
     cancelPreviewFade,
     stopApplePolling,
     stopProviderPolling,
@@ -491,6 +507,106 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [cancelPreviewFade, playbackPrefs.crossfade]);
 
+  // A listener can select Crossfade/Smart Mix after native playback began.
+  // The original remote URL must NOT be passed to createMediaElementSource:
+  // without CORS its PCM may turn silent. Keep it audible while starting a
+  // same-track /__wk-mix replacement on the standby deck at zero graph gain.
+  // This listener runs synchronously in the settings click's trusted gesture.
+  useEffect(() => {
+    const onTransitionPreferenceChange = () => {
+      cancelHotMixUpgrade();
+      const prefs = readPlaybackPrefs();
+      if (!prefs.crossfade || !prefs.autoplay ||
+          playbackBackendRef.current !== "audio" ||
+          !isPlayingRef.current || previewFadePendingRef.current ||
+          previewFadeRef.current) return;
+      const outgoing = audioRef.current;
+      const incoming = standbyAudioRef.current;
+      const track = currentTrackRef.current;
+      const session = htmlAudioSessionRef.current;
+      if (!outgoing || !incoming || incoming === outgoing ||
+          !track?.previewUrl || session === null ||
+          outgoing.paused || outgoing.ended ||
+          mixEngineRef.current.hasDeck(outgoing)) return;
+      const source = resolveMixableAudioSource(track.previewUrl);
+      if (!source.mixable || failedMixSourcesRef.current.has(source.url)) return;
+
+      // wake()/play() are intentionally invoked before returning from the
+      // direct settings event: an awaited cleanup can lose iOS user activation.
+      mixEngineRef.current.wake();
+      incoming.pause();
+      incoming.crossOrigin = "anonymous";
+      incoming.src = source.url;
+      incoming.playbackRate = outgoing.playbackRate;
+      if (!mixEngineRef.current.prepare(incoming, source)) {
+        incoming.removeAttribute("src");
+        return;
+      }
+      mixEngineRef.current.setMasterVolume(volumeRef.current);
+      mixEngineRef.current.setLevel(incoming, 0, volumeRef.current);
+      const attempt = hotMixUpgradeAttemptRef.current;
+      hotMixUpgradePendingRef.current = incoming;
+      let aligned = false;
+      const isValid = () =>
+        hotMixUpgradeAttemptRef.current === attempt &&
+        hotMixUpgradePendingRef.current === incoming &&
+        audioRef.current === outgoing &&
+        standbyAudioRef.current === incoming &&
+        htmlAudioSessionRef.current === session &&
+        playbackArbiterRef.current.isCurrent(session) &&
+        !outgoing.paused && !outgoing.ended &&
+        readPlaybackPrefs().crossfade;
+      const alignToOriginal = () => {
+        if (!isValid() || !Number.isFinite(incoming.duration)) return;
+        const position = Math.max(0, Math.min(
+          outgoing.currentTime, incoming.duration - 0.4,
+        ));
+        try {
+          incoming.currentTime = position;
+          aligned = true;
+        } catch { /* Keep original playing when the target is not seekable. */ }
+      };
+      const cleanup = () => {
+        incoming.removeEventListener("loadedmetadata", alignToOriginal);
+        if (hotMixUpgradePendingRef.current === incoming) {
+          hotMixUpgradePendingRef.current = null;
+          incoming.pause();
+          incoming.removeAttribute("src");
+        }
+      };
+      incoming.addEventListener("loadedmetadata", alignToOriginal);
+      // Calling play() here, rather than after metadata, retains the gesture.
+      void incoming.play().then(async () => {
+        if (!aligned) alignToOriginal();
+        for (let check = 0; check < 15; check++) {
+          if (!isValid()) { cleanup(); return; }
+          const drift = Math.abs(incoming.currentTime - outgoing.currentTime);
+          if (aligned && !incoming.seeking && drift < 1.5 &&
+              mixEngineRef.current.hasAudioSignal(incoming)) {
+            incoming.removeEventListener("loadedmetadata", alignToOriginal);
+            hotMixUpgradePendingRef.current = null;
+            // The replacement renders verified PCM; switch owners first so
+            // pausing the native deck cannot change public playback state.
+            audioRef.current = incoming;
+            standbyAudioRef.current = outgoing;
+            outgoing.pause();
+            outgoing.removeAttribute("src");
+            mixEngineRef.current.setLevel(incoming, 1, volumeRef.current);
+            signalMixerDeckReady((revision) => revision + 1);
+            return;
+          }
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 160));
+        }
+        cleanup(); // No verified output: original native audio stays audible.
+      }).catch(cleanup);
+    };
+    window.addEventListener("wk-playback-changed", onTransitionPreferenceChange);
+    return () => {
+      window.removeEventListener("wk-playback-changed", onTransitionPreferenceChange);
+      cancelHotMixUpgrade();
+    };
+  }, [cancelHotMixUpgrade]);
+
   const playViaHtmlAudio = useCallback(async (
     track: PlayerTrack,
     audio: HTMLAudioElement,
@@ -500,7 +616,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    await silenceAllPlayback(audio);
+    // Stops are synchronous; do not await Apple teardown before play().
+    // Safari requires its native play() to remain within the user gesture.
+    void silenceAllPlayback(audio);
 
     if (!isPlaybackSessionCurrent(sessionId)) {
       return;
@@ -690,7 +808,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
 
     void (async () => {
-      await silenceAllPlayback(audio);
+      // Preserve the original click activation through the first audio.play().
+      void silenceAllPlayback(audio);
 
       if (!isCurrentSession()) {
         return;
@@ -1530,6 +1649,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (usesMixer) {
         mixEngineRef.current.setLevel(incoming, 0, volumeRef.current);
       } else {
+        // iOS ignores HTMLMediaElement.volume even when reading it back as 0.
+        // Refuse to claim an audible overlap without verified Web Audio gains.
+        const iOS = /iP(?:hone|ad|od)/.test(navigator.userAgent) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        if (iOS) { previewFadeSuppressedRef.current = true; return; }
         // Never start two full-volume streams when native gain is fixed (iOS).
         try { incoming.volume = 0; } catch { previewFadeSuppressedRef.current = true; return; }
         if (incoming.volume > 0.001) { previewFadeSuppressedRef.current = true; return; }
