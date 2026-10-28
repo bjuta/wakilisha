@@ -1540,7 +1540,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             currentPreviewUrl: currentTrack.previewUrl,
             nextPreviewUrl: nextTrack.previewUrl,
             currentDuration: engine.duration,
-            nextDuration: nextTrack.duration || 0,
+            nextDuration: nextTrack.duration || engine.preparedDuration(nextTrack.previewUrl || ""),
           }) : 0;
       const remaining = engine.duration - secondsPlayed;
       if (previewFadeSuppressedRef.current && remaining > 12.5) {
