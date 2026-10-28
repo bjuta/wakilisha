@@ -747,9 +747,12 @@ test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade s
     console.error("CH25_BUFFER_PLAYER_DIAGNOSTICS=" + JSON.stringify(await measure()));
     throw error;
   }
-  await expect(page.locator(
-    '[data-wk-player-compact="desktop"], [data-wk-player-compact="mobile"], [data-wk-player-dock]',
-  ).getByText("Slice 3 Browser Track Two", { exact: true }).first()).toBeVisible();
+  // We opened the full mobile player above. Compact is intentionally
+  // unmounted and the dock is hidden while that overlay is active.
+  // Validate queue identity on the actual visible full-player title.
+  await expect(page.locator("[data-wk-player-overlay] [data-wk-player-full]")
+    .getByRole("heading", { level: 1, name: "Slice 3 Browser Track Two", exact: true }))
+    .toBeVisible();
 });
 
 test("Chapter 25 mobile More tooltip stays inside the viewport", async ({ page }) => {
