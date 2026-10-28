@@ -84,20 +84,40 @@ export class WakilishaMixEngine {
   private decks = new WeakMap<HTMLAudioElement, Deck>();
   private tempo = new Map<string, number | null>();
   private tempoPending = new Set<string>();
+  private resumePending: Promise<void> | null = null;
 
+  /** Call synchronously within a genuine Play gesture; never block native audio. */
   wake(): void {
     if (typeof window === "undefined" || !window.AudioContext) return;
     try {
-      if (!this.context) {
+      if (!this.context || this.context.state === "closed") {
         this.context = new AudioContext();
         this.master = this.context.createGain();
         this.master.connect(this.context.destination);
+        this.resumePending = null;
       }
-      if (this.context.state === "suspended") void this.context.resume().catch(() => {});
-    } catch { /* Native playback remains available. */ }
+      // iOS also reports "interrupted" when the tab or device was suspended.
+      // Retrying resume on gesture is safe and does not require a new player.
+      if (this.context.state !== "running" && !this.resumePending) {
+        this.resumePending = this.context.resume().then(() => {}, () => {})
+          .finally(() => { this.resumePending = null; });
+      }
+    } catch { /* Original HTMLAudioElement playback remains available. */ }
   }
 
   isRunning(): boolean { return this.context?.state === "running"; }
+
+  /** Give the user-gesture resume a bounded chance to complete while audio
+   * already plays natively. Never wait indefinitely for an iOS audio graph. */
+  async waitUntilRunning(timeoutMs = 1400): Promise<boolean> {
+    if (this.isRunning()) return true;
+    if (!this.context || !this.resumePending) return false;
+    await Promise.race([
+      this.resumePending,
+      new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs)),
+    ]);
+    return this.isRunning();
+  }
 
   prepare(audio: HTMLAudioElement, source: { url: string; mixable: boolean }): boolean {
     if (!source.mixable || !this.isRunning()) return false;
@@ -210,6 +230,8 @@ export class WakilishaMixEngine {
     if (this.context) void this.context.close().catch(() => {});
     this.context = null;
     this.master = null;
+    this.resumePending = null;
+    this.decks = new WeakMap<HTMLAudioElement, Deck>();
     this.tempo.clear();
   }
 }
