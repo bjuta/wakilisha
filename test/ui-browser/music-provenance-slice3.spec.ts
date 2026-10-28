@@ -561,8 +561,7 @@ async function jsonLd(
 test.beforeEach(async ({ page }) => {
   await installPublicReadFixtures(page);
 });
-function shortWavPreview(frequency: number, seconds = 6): string {
-  const rate = 8000;
+function shortWavPreview(frequency: number, seconds = 6, rate = 8000): string {
   const count = rate * seconds;
   const pcm = Buffer.alloc(44 + count * 2);
   pcm.write("RIFF", 0, "ascii");
@@ -585,17 +584,20 @@ function shortWavPreview(frequency: number, seconds = 6): string {
 }
 
 test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade start", async ({ page }) => {
+  test.setTimeout(70000);
   await page.setViewportSize({ width: 390, height: 844 });
+  // 16kHz is the validated format from the stand-alone WebKit buffer proof.
+  // Enough duration for the listener to open settings *before* the track ends.
   const previews = ["/__wk-mix/ch25-runtime-a.wav", "/__wk-mix/ch25-runtime-b.wav"];
   const audioByName = new Map([
-    ["ch25-runtime-a.wav", Buffer.from(shortWavPreview(220, 12).split(",")[1], "base64")],
-    ["ch25-runtime-b.wav", Buffer.from(shortWavPreview(330, 12).split(",")[1], "base64")],
+    ["ch25-runtime-a.wav", Buffer.from(shortWavPreview(220, 24, 16000).split(",")[1], "base64")],
+    ["ch25-runtime-b.wav", Buffer.from(shortWavPreview(330, 24, 16000).split(",")[1], "base64")],
   ]);
   const fixture = {
     ...releaseDetail,
     tracks: releaseDetail.tracks.map((track, index) => ({
       ...track,
-      duration: 12,
+      duration: 24,
       previewUrl: previews[index],
     })),
   };
@@ -607,7 +609,20 @@ test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade s
     const analysers: AnalyserNode[] = [];
     const gainNodes: GainNode[] = [];
     const mediaAttachments: string[] = [];
+    const gateEvents: unknown[] = [];
+    const nativeAudios: HTMLAudioElement[] = [];
+    window.addEventListener("wk-ch25-buffer-gate", (event) => {
+      gateEvents.push((event as CustomEvent).detail);
+    });
+    const NativeAudio = window.Audio;
+    window.Audio = function (...args: ConstructorParameters<typeof Audio>) {
+      const audio = new NativeAudio(...args);
+      nativeAudios.push(audio);
+      return audio;
+    } as typeof Audio;
     Object.assign(window, {
+      __wkBufferGateEvents: gateEvents,
+      __wkNativeAudioDecks: nativeAudios,
       __wkBufferSources: sourceNodes,
       __wkBufferAnalysers: analysers,
       __wkBufferGains: gainNodes,
@@ -677,6 +692,17 @@ test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade s
   await expanded.getByRole("button", { name: "More Player actions" }).click();
   await page.getByRole("button", { name: /Transitions/ }).last().click();
   const smart = page.getByRole("radio", { name: /Smart Mix/ });
+  // Selecting after the native preview already ended is not a legitimate
+  // hot-upgrade test; prove its media clock is advancing first.
+  await expect.poll(async () => page.evaluate(() => {
+    const list = (window as unknown as {
+      __wkNativeAudioDecks?: HTMLAudioElement[];
+    }).__wkNativeAudioDecks || [];
+    return list.some(a => !a.paused && !a.ended && a.currentTime > 0.3);
+  }), {
+    timeout: 7000,
+    message: "First native preview must still be playing before enabling Smart Mix",
+  }).toBe(true);
   await smart.click();
   await expect(smart).toHaveAttribute("aria-checked", "true");
 
@@ -686,6 +712,8 @@ test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade s
       __wkBufferAnalysers: AnalyserNode[];
       __wkBufferGains: GainNode[];
       __wkMediaAttachments: string[];
+      __wkBufferGateEvents: unknown[];
+      __wkNativeAudioDecks: HTMLAudioElement[];
     };
     const peaks = (w.__wkBufferAnalysers || []).map(analyser => {
       const pcm = new Float32Array(analyser.fftSize);
@@ -697,6 +725,12 @@ test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade s
       peaks,
       gains: w.__wkBufferGains.map(gain => gain.gain.value),
       mediaAttachments: w.__wkMediaAttachments,
+      gates: (w.__wkBufferGateEvents || []).slice(-25),
+      nativeDecks: (w.__wkNativeAudioDecks || []).map(a => ({
+        currentTime: Number(a.currentTime.toFixed(2)),
+        paused: a.paused, ended: a.ended,
+        readyState: a.readyState, error: a.error?.code ?? null,
+      })),
     };
   });
   try {
@@ -706,7 +740,7 @@ test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade s
         m.peaks.filter(value => value > 0.0005).length >= 2 &&
         m.gains.filter(value => value > 0.05).length >= 2 &&
         m.mediaAttachments.length === 0;
-    }, { timeout: 21000, intervals: [80, 100, 120],
+    }, { timeout: 35000, intervals: [80, 100, 120],
       message: "WebKit must mix two actual decoded AudioBufferSourceNode signals; no MediaElement source allowed",
     }).toBe(true);
   } catch (error) {
