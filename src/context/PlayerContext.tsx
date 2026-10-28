@@ -583,14 +583,28 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           const drift = Math.abs(incoming.currentTime - outgoing.currentTime);
           if (aligned && !incoming.seeking && drift < 1.5 &&
               mixEngineRef.current.hasAudioSignal(incoming)) {
+            // WebKit can render silence when an element that previously
+            // played outside Web Audio is later attached as the second
+            // MediaElementAudioSource. The untouched rescue element is a
+            // clean mixer standby; the old native deck remains an unconnected
+            // fallback. We must not silently promote a reused native deck.
+            const cleanStandby = nativeRescueAudioRef.current;
+            if (!cleanStandby || cleanStandby === outgoing ||
+                cleanStandby === incoming ||
+                mixEngineRef.current.hasDeck(cleanStandby)) {
+              cleanup();
+              return;
+            }
             incoming.removeEventListener("loadedmetadata", alignToOriginal);
             hotMixUpgradePendingRef.current = null;
             // The replacement renders verified PCM; switch owners first so
             // pausing the native deck cannot change public playback state.
             audioRef.current = incoming;
-            standbyAudioRef.current = outgoing;
+            standbyAudioRef.current = cleanStandby;
+            nativeRescueAudioRef.current = outgoing;
             outgoing.pause();
             outgoing.removeAttribute("src");
+            cleanStandby.preload = "auto";
             mixEngineRef.current.setLevel(incoming, 1, volumeRef.current);
             signalMixerDeckReady((revision) => revision + 1);
             return;
