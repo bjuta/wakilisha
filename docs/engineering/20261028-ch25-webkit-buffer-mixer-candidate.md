@@ -66,11 +66,42 @@ The owner ran the prescribed Mac gate at exact candidate SHA `f68b0c77cc7d15485b
 
 Both integrated WebKit and Chromium tests have therefore independently passed live UI Smart Mix activation, two nonzero decoded PCM signals, three nonzero gain nodes (master plus both decks), no MediaElementSource attachment, and queue transition identity on same-origin WAV *fixtures*. The verification does not yet include actual WAKILISHA public media transport or a physical iPhone.
 
-The next unproven gate is a **candidate-only real-catalogue browser test** against actual public release/track data, with no mocked catalogue or media and no Production frontend mutation. This must classify media/CORS/ingress failures separately from app defects; after that, physical-iPhone listening and control acceptance remain required.
+The real-catalogue browser test has since PASSED in WebKit and Chromium with real published data and media. Its full JSON observations and limitations are recorded below. The next open gate is a verified HTTPS candidate preview for physical-iPhone listening and control acceptance.
+
+## Real-catalogue browser acceptance: PASS (28 October 2026)
+
+The owner ran the exact SHA-256-verified `scripts/acceptance/ch25-real-catalogue-buffer-gate.mjs` fetched from GitHub. Console evidence:
+
+```text
+CH25_SCRIPT_DELIVERY=PASS
+CH25_SCRIPT_INTEGRITY=PASS
+CH25_REAL_CATALOGUE=PASS
+CH25_REAL_CATALOGUE_WEBKIT_IPHONE_PROFILE=REAL_CATALOGUE_BUFFER_PCM_OVERLAP_PASS
+CH25_WEBKIT_IPHONE_PROFILE_MAXIMUMS={"pcm":2,"gains":3,"sourceCount":2}
+CH25_REAL_CATALOGUE_CHROMIUM_MOBILE=REAL_CATALOGUE_BUFFER_PCM_OVERLAP_PASS
+CH25_CHROMIUM_MOBILE_MAXIMUMS={"pcm":2,"gains":3,"sourceCount":2}
+```
+
+The user supplied the full original log and JSON observation ledger. SHA-256 of the uploaded, reviewed artifacts:
+
+- `real-catalogue-buffer-acceptance.log`: `8413db3a542a2f7d694357b49a475ad979ad603cf8c8106c5ead3ed91771d2f8`
+- `ch25-real-catalogue-buffer-results.json`: `9f5a248631d4c528b56324f0ed56d33f19eb0bbf9fe7ee1bf8f4360edc6b24be`
+
+**Source and route authority:**
+
+- Tested locally built candidate frontend at `f68b0c77cc7d15485bacc8d9871b7ef714c410eb` in isolated Playwright browser contexts, using the production URL `https://wakilisha.africa/releases/mejja/mtoto-wa-khadija/`.
+- The browser overrode **only** the page document and built `/assets/` responses with the local candidate. Actual public catalogue, iTunes previews and WAKILISHA `/__wk-mix/` media were requested from live external origins; no catalogue or audio mocks.
+- WebKit downloaded 103 candidate assets, Chromium 73, with no missing assets. Both recorded zero page errors and console-error warnings.
+- Each engine showed native preview progress, Smart Mix selection through the actual player UI, two nonzero analyser PCM signals with three positive gains (master and both deck gains), the full-player title changing naturally from `Toxic (feat. Shee)` to `Ntampata Wapi`, and zero `MediaElementAudioSourceNode` attachments.
+- WAKILISHA mix-proxy responses were HTTP 200 in both browser engines; Apple preview requests returned HTTP 206. One cancelled Apple preview request in WebKit is consistent with handoff from native playback and did not block the test. No ingress/CORS/decode errors were recorded.
+
+**Precision and limitations:** the acceptance harness exits as soon as one sample proves both nonzero PCM streams, both deck gains, and queue-title advancement. In the uploaded JSON, exactly **one** sample per browser meets the complete condition. WebKit captured peaks `[0.51972,1.0014]`, gains `[0.8,0.99775,0.06616]`; Chromium captured peaks `[0.52088,0.93963]`, gains `[0.8,0.99707,0.07615]`. This **proves crossfade onset on real media**, not the full equal-power fade envelope, perceptual loudness consistency, post-fade deck cleanup, or physical iPhone output. Those claims remain explicitly unaccepted.
+
+**Remaining release gate:** present this **candidate**, not unchanged Production, on a verified HTTPS origin reachable from an actual iPhone, then audibly test native-to-buffer handoff, the complete fade, pause/resume, seek, volume, next/previous and unsupported-provider fallback. No candidate staging infrastructure has yet been established or authorized as the live physical-iPhone target. Do not direct the owner to test current Production for this candidate. Before any PR/merge, complete the established CI-consolidation and changed-file review. GitHub Actions is exhausted and must not be invoked.
 
 ## Acceptance status and gates
 
-**Integrated local WebKit fixture PASS; overall release acceptance remains OPEN.** The standalone WebKit architecture and actual-player WebKit dual-PCM/dual-gain tests are accepted, but real-catalogue transport, local build/regressions, physical iPhone and Production acceptance remain unverified. Before any PR, merge or deployment:
+**Integrated WebKit and Chromium, 31/31 scoped contracts, full build and real-catalogue browser onset PASS; overall release acceptance remains OPEN.** The remaining unverified gates are the full fade envelope and physical iPhone Safari playback/control acceptance, review and deployment. Before PR, merge or Production deployment:
 
 1. Mac local WebKit iPhone-profile **actual player** test must pass with two concurrent decoded-buffer PCM streams and no MediaElementAudioSource attachments.
 2. Mac Chromium and existing scoped player/queue/browser contracts must pass locally; build and diff checks must pass.
