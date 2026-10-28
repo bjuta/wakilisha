@@ -660,7 +660,7 @@ test("Chapter 25 overlaps controlled previews and switches queue at fade start",
   }
 
   await expect(page.locator(
-    '[data-wk-player-compact="desktop"], [data-wk-player-dock]',
+    '[data-wk-player-compact="desktop"], [data-wk-player-compact="mobile"], [data-wk-player-dock]',
   ).getByText("Slice 3 Browser Track Two", { exact: true }).first()).toBeVisible();
 });
 
@@ -679,10 +679,13 @@ test("Chapter 25 mobile More tooltip stays inside the viewport", async ({ page }
   await expect(page.getByRole("heading", { level: 1, name: releaseDetail.title })).toBeVisible();
   await page.getByRole("button", { name: "Play", exact: true }).first().click();
 
-  // The same More sheet is used by the compact and expanded music players.
-  const moreButtons = page.getByRole("button", { name: "More", exact: true });
-  await expect(moreButtons.first()).toBeVisible();
-  await moreButtons.first().click();
+  // Mobile compact player has no More control. Open its full player first.
+  const compact = page.locator('[data-wk-player-compact="mobile"]');
+  await expect(compact).toBeVisible();
+  await compact.getByRole("button", { name: /Slice 3 Browser Track/ }).first().click();
+  const expanded = page.locator("[data-wk-player-overlay]");
+  await expect(expanded).toBeVisible();
+  await expanded.getByRole("button", { name: "More Player actions" }).click();
   await page.getByRole("button", { name: /Transitions/ }).last().click();
   const tip = page.getByRole("button", { name: "About Smart Mix" });
   await expect(tip).toBeVisible();
