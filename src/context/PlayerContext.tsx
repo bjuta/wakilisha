@@ -12,6 +12,7 @@ import {
 import { recordListeningEvent } from "@/services/listeningHistory";
 import { resolvePreviewCrossfadeSeconds } from "@/services/player/crossfadePolicy";
 import { WakilishaMixEngine, equalPowerLevels, resolveMixableAudioSource, safeTempoMatchRate } from "@/services/player/WakilishaMixEngine";
+import { WakilishaPreviewBufferMixer } from "@/services/player/WakilishaPreviewBufferMixer";
 import { startPlaybackAccountSync } from "@/services/player/playbackAccountSync";
 import { ProviderPlaybackCanvas } from "@/components/design-system/music/ProviderPlaybackCanvas";
 import {
@@ -248,6 +249,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Never connect this backstop to Web Audio: createMediaElementSource is permanent.
   const nativeRescueAudioRef = useRef<HTMLAudioElement | null>(null);
   const mixEngineRef = useRef(new WakilishaMixEngine());
+  // BufferSourceNode transport: separate from the native HTMLAudio fallback.
+  const previewBufferRef = useRef(new WakilishaPreviewBufferMixer());
+  const bufferUpgradeSerialRef = useRef(0);
+  const bufferUpgradePendingRef = useRef(false);
+  const [bufferDeckRevision, setBufferDeckRevision] = useState(0);
   const failedMixSourcesRef = useRef(new Set<string>());
   const previewFadeRef = useRef<{
     outgoing: HTMLAudioElement;
@@ -465,6 +471,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     pendingPlayRef.current = false;
     htmlAudioSessionRef.current = null;
+    bufferUpgradeSerialRef.current += 1;
+    bufferUpgradePendingRef.current = false;
+    previewBufferRef.current.stop();
     cancelPreviewFade();
 
     // Silencing the stale audio argument could leave a second deck audible.
@@ -496,15 +505,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio: HTMLAudioElement,
     sessionId: PlaybackSessionId,
   ) => {
-    if (!isPlaybackSessionCurrent(sessionId)) {
-      return;
-    }
-
-    await silenceAllPlayback(audio);
-
-    if (!isPlaybackSessionCurrent(sessionId)) {
-      return;
-    }
+    if (!isPlaybackSessionCurrent(sessionId)) return;
+    // All synchronous stops happen before native play(). Do not await
+    // unrelated provider teardown across Safari's user-gesture boundary.
+    void silenceAllPlayback(audio);
+    if (!isPlaybackSessionCurrent(sessionId)) return;
 
     playbackBackendRef.current = "audio";
     htmlAudioSessionRef.current = sessionId;
@@ -516,135 +521,39 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // The first recording stays natively playable immediately. A separate
+    // AudioBufferSourceNode transport later adopts it only after PCM decoding.
+    // Never attach this element to MediaElementAudioSourceNode on WebKit.
     const activeAudio = audioRef.current || audio;
-    const source = resolveMixableAudioSource(track.previewUrl);
-    // Never attach a media element to Web Audio until native playback succeeds.
-    // A suspended AudioContext or inaccessible transport must not mute music.
-    // Transport choice must not depend on an AudioContext resume racing iOS.
-    // Start a natively playable, same-origin source first; attach the mixer
-    // only after its graph actually resumes. Off remains the original URL.
-    const useMixTransport = playbackPrefs.crossfade && source.mixable &&
-      !failedMixSourcesRef.current.has(source.url);
-    if (useMixTransport) {
-      activeAudio.crossOrigin = "anonymous";
-    } else {
-      activeAudio.removeAttribute("crossorigin");
-    }
+    activeAudio.removeAttribute("crossorigin");
     activeAudio.volume = volumeRef.current;
-    activeAudio.src = useMixTransport ? source.url : track.previewUrl;
+    activeAudio.src = track.previewUrl;
     pendingPlayRef.current = true;
-
     try {
-      try {
-        await activeAudio.play();
-      } catch (initialError) {
-        // Retry the original playable provider URL without a Web Audio graph.
-        if (!useMixTransport || source.url === track.previewUrl ||
-            !isPlaybackSessionCurrent(sessionId)) throw initialError;
-        failedMixSourcesRef.current.add(source.url);
-        activeAudio.pause();
-        activeAudio.removeAttribute("crossorigin");
-        activeAudio.src = track.previewUrl;
-        await activeAudio.play();
-      }
-      // Only attach the actual mixable source. Data/blob and same-origin audio
-      // also need a controlled deck; the previous /__wk-mix/-only check
-      // incorrectly excluded them from audible crossfade acceptance.
-      const expectedMixUrl = new URL(source.url, window.location.origin).href;
-      const graphReady = useMixTransport &&
-        (mixEngineRef.current.isRunning() ||
-          await mixEngineRef.current.waitUntilRunning());
-      // An async iOS resume must never reconnect an element belonging to a
-      // superseded Play, Skip, Pause or provider session.
+      await activeAudio.play();
       if (!isPlaybackSessionCurrent(sessionId) ||
           htmlAudioSessionRef.current !== sessionId) return;
-      if (graphReady && activeAudio.currentSrc === expectedMixUrl &&
-          mixEngineRef.current.prepare(activeAudio, source)) {
-        mixEngineRef.current.setMasterVolume(volumeRef.current);
-        mixEngineRef.current.setLevel(activeAudio, 1, volumeRef.current);
-        // Preload the second deck only once decoded PCM is confirmed.
-        // This preserves an untouched native fallback if iOS renders silence.
-        if (playbackPrefs.smartMix) {
-          mixEngineRef.current.analyzeShortAudio(source.url, track.duration || 30);
-        }
-        // HTMLMediaElement.play() can resolve while Web Audio renders silence
-        // (iOS suspended context or redirected, CORS-tainted media).
-        // Verify non-zero decoded PCM, not merely advancing timestamps.
-        let samples = 0;
-        const verifyOutput = () => {
-          if (!isPlaybackSessionCurrent(sessionId) || audioRef.current !== activeAudio ||
-              activeAudio.paused || activeAudio.ended) return;
-          if (mixEngineRef.current.hasAudioSignal(activeAudio)) {
-            signalMixerDeckReady((revision) => revision + 1);
-            return;
-          }
-          if (++samples < 4) {
-            window.setTimeout(verifyOutput, 900);
-            return;
-          }
-          const candidate = standbyAudioRef.current;
-          const fallback = candidate && !mixEngineRef.current.hasDeck(candidate)
-            ? candidate : nativeRescueAudioRef.current;
-          if (!fallback || fallback === activeAudio ||
-              mixEngineRef.current.hasDeck(fallback)) return;
-          failedMixSourcesRef.current.add(source.url);
-          console.warn("Smart Mix audio graph silent; restoring native provider playback");
-          activeAudio.pause();
-          audioRef.current = fallback;
-          standbyAudioRef.current = activeAudio;
-          fallback.removeAttribute("crossorigin");
-          fallback.src = track.previewUrl!;
-          void fallback.play().catch((reason) => {
-            console.warn("Native playback retry requires a new play gesture", reason);
-            if (audioRef.current === fallback) setIsPlaying(false);
-          });
-        };
-        window.setTimeout(verifyOutput, 900);
-      }
-
-      if (
-        !isPlaybackSessionCurrent(sessionId) ||
-        htmlAudioSessionRef.current !== sessionId
-      ) {
-        return;
-      }
-
       pendingPlayRef.current = false;
       playbackStartingRef.current = false;
       restartInterruptedPlaybackRef.current = false;
       setIsPlaying(true);
     } catch (err) {
-      if (
-        !isPlaybackSessionCurrent(sessionId) ||
-        htmlAudioSessionRef.current !== sessionId
-      ) {
-        return;
-      }
-
-      console.warn(
-        "Audio autoplay blocked:",
-        err instanceof Error
-          ? err.message
-          : String(err),
-      );
-
+      if (!isPlaybackSessionCurrent(sessionId) ||
+          htmlAudioSessionRef.current !== sessionId) return;
+      console.warn("Native preview playback failed:",
+        err instanceof Error ? err.message : String(err));
       pendingPlayRef.current = false;
       playbackStartingRef.current = false;
       setIsPlaying(false);
     }
-  }, [
-    isPlaybackSessionCurrent,
-    silenceAllPlayback,
-    playbackPrefs.crossfade,
-    playbackPrefs.smartMix,
-  ]);
+  }, [isPlaybackSessionCurrent, silenceAllPlayback]);
 
   const playTrackSource = useCallback((
     track: PlayerTrack,
     audio: HTMLAudioElement,
   ) => {
     // Initialize/resume the audio graph during the user activation gesture.
-    mixEngineRef.current.wake();
+    if (readPlaybackPrefs().crossfade) previewBufferRef.current.wake();
     const playbackSessionId =
       playbackArbiterRef.current.begin();
 
@@ -1025,7 +934,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
     const bindDeck = (audio: HTMLAudioElement) => {
       const onTimeUpdate = () => {
-        if (!isActive(audio)) return;
+        if (!isActive(audio) || previewBufferRef.current.isActive) return;
         if (audio.duration > 0 && Number.isFinite(audio.duration)) {
           setCurrentTime(audio.currentTime);
           // Seeking into the final seconds does not create an immediate fade.
@@ -1047,7 +956,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       };
       const onEnded = () => {
-        if (!isActive(audio)) return;
+        if (!isActive(audio) || previewBufferRef.current.isActive) return;
         if (previewFadePendingRef.current) {
           previewFadeEndedDuringPendingRef.current = true;
           return;
@@ -1058,13 +967,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         handleEndedRef.current();
       };
       const onPlay = () => {
-        if (!isActive(audio)) return;
+        if (!isActive(audio) || previewBufferRef.current.isActive) return;
         pendingPlayRef.current = false;
         playbackStartingRef.current = false;
         restartInterruptedPlaybackRef.current = false;
         setIsPlaying(true);
       };
       const onPause = () => {
+        if (previewBufferRef.current.isActive) return;
         if (isActive(audio) && !audio.ended) setIsPlaying(false);
       };
       const onError = () => {
@@ -1150,6 +1060,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       standbyAudioRef.current = null;
       nativeRescueAudioRef.current = null;
       mixEngineRef.current.close();
+      void previewBufferRef.current.close();
     };
   }, []);
 
@@ -1478,106 +1389,173 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     startYouTubePolling,
   ]);
 
-  // Chapter 25: transitions are automatic across HTML-audio media and cancelled
-  // by every explicit playback action. The player state switches when
-  // the incoming audio actually starts, never at the outgoing ended event.
+  // Chapter 25: WebKit-proven buffer transport. Native HTMLAudioElements are
+  // deliberately never connected to Web Audio: Safari may advance a second
+  // element while its MediaElementAudioSourceNode outputs silent PCM.
+  //
+  // Decode while native playback remains audible. Handoff only when the
+  // replacement buffer analyser proves PCM, then unmute the buffer and pause
+  // the native element. Failed fetch/CORS/decode leaves native playback intact.
   useEffect(() => {
-    startPreviewFadeRef.current = (outgoing) => {
-      if (previewFadePendingRef.current || previewFadeRef.current ||
-          previewFadeSuppressedRef.current || !isPlayingRef.current ||
-          !playbackPrefs.crossfade || !playbackPrefs.autoplay ||
-          repeatMode === "one" || queue.length < 2 ||
-          audioRef.current !== outgoing) return;
-
-      const order = isShuffle ? shuffledOrderRef.current : queue.map((_, i) => i);
-      const position = order.indexOf(queueIndex);
-      if (position < 0) return;
-      const nextIdx = order[position + 1] ?? (repeatMode === "all" ? order[0] : undefined);
-      if (nextIdx === undefined || nextIdx === queueIndex) return;
-      const nextTrack = queue[nextIdx];
-      if (!nextTrack || nextTrack.isPlayable === false ||
-          (playbackPrefs.explicitFilter && nextTrack.isExplicit) ||
-          (nextTrack.playbackEngine && nextTrack.playbackEngine !== "audio")) return;
-
-      const seconds = resolvePreviewCrossfadeSeconds({
-        enabled: playbackPrefs.crossfade,
-        continuousPlayback: playbackPrefs.autoplay,
-        selectedSeconds: playbackPrefs.crossfadeSeconds,
-        sourceEntityType: sourceContextRef.current?.entityType,
-        shuffled: isShuffle,
-        repeatOne: repeatMode === "one",
-        automatic: true,
-        backend: playbackBackendRef.current,
-        nextPrefersApple: playbackPrefs.appleMusicConnected &&
-          Boolean(nextTrack.appleMusicCatalogId || nextTrack.appleMusicId),
-        currentPreviewUrl: currentTrackRef.current?.previewUrl,
-        nextPreviewUrl: nextTrack.previewUrl,
-        currentDuration: outgoing.duration,
-        nextDuration: nextTrack.duration || 0,
-      });
-      const remaining = outgoing.duration - outgoing.currentTime;
-      if (!seconds || remaining > seconds || remaining <= 0.05) return;
-      const incoming = standbyAudioRef.current;
-      const session = htmlAudioSessionRef.current;
-      if (!incoming || incoming === outgoing || session === null) return;
-
-      incoming.pause();
-      // The standby deck is prepared early, so its buffer is usually warm.
-      const source = resolveMixableAudioSource(nextTrack.previewUrl!);
-      const usesMixer = source.mixable && mixEngineRef.current.isRunning() &&
-        mixEngineRef.current.hasDeck(outgoing) &&
-        mixEngineRef.current.prepare(incoming, source);
-      if (usesMixer) {
-        mixEngineRef.current.setLevel(incoming, 0, volumeRef.current);
-      } else {
-        // Never start two full-volume streams when native gain is fixed (iOS).
-        try { incoming.volume = 0; } catch { previewFadeSuppressedRef.current = true; return; }
-        if (incoming.volume > 0.001) { previewFadeSuppressedRef.current = true; return; }
-      }
-      incoming.playbackRate = outgoing.playbackRate;
-      if (playbackPrefs.smartMix) {
-        const currentSource = resolveMixableAudioSource(currentTrackRef.current?.previewUrl || "");
-        const outgoingBpm = currentTrackRef.current?.bpm || mixEngineRef.current.bpmFor(currentSource.url);
-        const incomingBpm = nextTrack.bpm || mixEngineRef.current.bpmFor(source.url);
-        const tempoRate = safeTempoMatchRate(outgoingBpm, incomingBpm);
-        incoming.playbackRate = outgoing.playbackRate * tempoRate;
-        (incoming as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
-      }
-      if (incoming.src !== new URL(source.url, window.location.origin).href) incoming.src = source.url;
-      previewFadePendingRef.current = true;
-      previewFadeEndedDuringPendingRef.current = false;
-      const attempt = ++previewFadeAttemptRef.current;
-      void incoming.play().then(() => {
-        if (attempt !== previewFadeAttemptRef.current ||
+    const allowUpgrade = playbackPrefs.crossfade && playbackPrefs.autoplay &&
+      isPlaying && playbackBackend === "audio" && queue.length > 1 &&
+      repeatMode !== "one" && !previewBufferRef.current.isActive &&
+      !previewBufferRef.current.isPaused && !bufferUpgradePendingRef.current;
+    const audio = audioRef.current;
+    const track = currentTrackRef.current;
+    if (!allowUpgrade || !audio || audio.paused || audio.ended ||
+        !track?.previewUrl ||
+        !resolveMixableAudioSource(track.previewUrl).mixable) return;
+    const engine = previewBufferRef.current;
+    if (!engine.isRunning) return;
+    const serial = ++bufferUpgradeSerialRef.current;
+    const session = htmlAudioSessionRef.current;
+    if (session === null) return;
+    bufferUpgradePendingRef.current = true;
+    void (async () => {
+      try {
+        if (!(await engine.prepare(track.previewUrl!))) return;
+        if (serial !== bufferUpgradeSerialRef.current ||
             htmlAudioSessionRef.current !== session ||
             !playbackArbiterRef.current.isCurrent(session) ||
-            audioRef.current !== outgoing) {
-          incoming.pause();
-          incoming.removeAttribute("src");
+            audioRef.current !== audio || audio.paused ||
+            !readPlaybackPrefs().crossfade) return;
+        const offset = audio.currentTime;
+        engine.setVolume(0);
+        if (!engine.startPrepared(track.previewUrl!, offset, audio.playbackRate)) return;
+        let verified = false;
+        for (let count = 0; count < 15; count++) {
+          if (serial !== bufferUpgradeSerialRef.current ||
+              htmlAudioSessionRef.current !== session ||
+              audioRef.current !== audio || audio.paused ||
+              !readPlaybackPrefs().crossfade) break;
+          if (engine.hasLivePCM("active")) { verified = true; break; }
+          await new Promise<void>(resolve => window.setTimeout(resolve, 50));
+        }
+        if (!verified) {
+          engine.stop();
           return;
         }
-        previewFadePendingRef.current = false;
-        previewFadeEndedDuringPendingRef.current = false;
-        const finishedTrack = currentTrackRef.current;
-        const fade = { outgoing, incoming, frame: null as number | null, fraction: 0, usesMixer };
-        const startTime = window.performance.now();
-        previewFadeRef.current = fade;
-        audioRef.current = incoming;
-        standbyAudioRef.current = outgoing;
-        const outgoingPlayedAt = playedAtRef.current;
-        const completedSource = sourceContextRef.current;
-        skipFlagRef.current = false;
-        previewFadeSuppressedRef.current = false;
-        playedAtRef.current = Date.now();
-        currentTrackRef.current = nextTrack;
-        setCurrentTrack(nextTrack);
-        setQueueIndex(nextIdx);
-        setCurrentTime(incoming.currentTime);
-        setDuration(nextTrack.duration || 0);
+        // Start/verify silent mixer first, then switch auditory ownership.
+        audio.pause();
+        engine.setVolume(volumeRef.current);
         setIsPlaying(true);
+        setDuration(engine.duration);
+        setBufferDeckRevision(value => value + 1);
+      } finally {
+        bufferUpgradePendingRef.current = false;
+        // Do not launch a duplicate hot-upgrade from a stale async callback.
+      }
+    })();
+    return () => {
+      // No cleanup on timeupdate rerenders: while the transfer is pending it
+      // holds a session lease; manual Play/Pause/Skip invalidates that lease.
+    };
+  }, [
+    isPlaying, playbackBackend, playbackPrefs.crossfade,
+    playbackPrefs.autoplay, queue, repeatMode,
+  ]);
+
+  // A transition-selection click must resume the AudioContext synchronously
+  // within user activation. The React playback preference effect can then
+  // decode asynchronously without ever losing native audio.
+  useEffect(() => {
+    const onChange = () => {
+      if (readPlaybackPrefs().crossfade) previewBufferRef.current.wake();
+    };
+    window.addEventListener("wk-playback-changed", onChange);
+    return () => window.removeEventListener("wk-playback-changed", onChange);
+  }, []);
+
+  // Warm only the next mixable preview; the engine caches at most two short
+  // decoded buffers. No provider stream is fetched outside the allowlist.
+  useEffect(() => {
+    const engine = previewBufferRef.current;
+    if (!engine.isActive || !playbackPrefs.crossfade || !playbackPrefs.autoplay) return;
+    const order = isShuffle ? shuffledOrderRef.current : queue.map((_, i) => i);
+    const position = order.indexOf(queueIndex);
+    const next = order[position + 1] ?? (repeatMode === "all" ? order[0] : undefined);
+    const candidate = next === undefined ? null : queue[next];
+    if (candidate?.previewUrl && candidate.isPlayable !== false &&
+        (!candidate.playbackEngine || candidate.playbackEngine === "audio")) {
+      void engine.prepare(candidate.previewUrl);
+    }
+  }, [bufferDeckRevision, queue, queueIndex, isShuffle,
+    repeatMode, playbackPrefs.crossfade, playbackPrefs.autoplay]);
+
+  // The AudioContext sample clock is the only authoritative buffer position.
+  // Switching the queue at fade start preserves WAKILISHA's previous contract.
+  useEffect(() => {
+    if (!isPlaying || playbackBackend !== "audio") return;
+    let completed = false;
+    const timer = window.setInterval(() => {
+      const engine = previewBufferRef.current;
+      if (!engine.isActive || completed) return;
+      const secondsPlayed = engine.position;
+      setCurrentTime(secondsPlayed);
+      setDuration(engine.duration);
+      if (!playbackPrefs.crossfade || !playbackPrefs.autoplay ||
+          engine.isFading || repeatMode === "one") {
+        if (secondsPlayed >= engine.duration - 0.05) {
+          completed = true;
+          engine.stop();
+          handleEndedRef.current();
+        }
+        return;
+      }
+      const order = isShuffle ? shuffledOrderRef.current : queue.map((_, i) => i);
+      const position = order.indexOf(queueIndex);
+      const nextIndex = order[position + 1] ??
+        (repeatMode === "all" ? order[0] : undefined);
+      const nextTrack = nextIndex === undefined ? null : queue[nextIndex];
+      const currentTrack = currentTrackRef.current;
+      const fadeSeconds = nextTrack && currentTrack
+        ? resolvePreviewCrossfadeSeconds({
+            enabled: playbackPrefs.crossfade,
+            continuousPlayback: playbackPrefs.autoplay,
+            selectedSeconds: playbackPrefs.crossfadeSeconds,
+            sourceEntityType: sourceContextRef.current?.entityType,
+            shuffled: isShuffle,
+            repeatOne: repeatMode === "one",
+            automatic: true,
+            backend: "audio",
+            nextPrefersApple: playbackPrefs.appleMusicConnected &&
+              Boolean(nextTrack.appleMusicCatalogId || nextTrack.appleMusicId),
+            currentPreviewUrl: currentTrack.previewUrl,
+            nextPreviewUrl: nextTrack.previewUrl,
+            currentDuration: engine.duration,
+            nextDuration: nextTrack.duration || 0,
+          }) : 0;
+      const remaining = engine.duration - secondsPlayed;
+      const eligible = nextTrack && nextTrack.previewUrl &&
+        nextTrack.isPlayable !== false &&
+        (!nextTrack.playbackEngine || nextTrack.playbackEngine === "audio") &&
+        (!playbackPrefs.explicitFilter || !nextTrack.isExplicit);
+      if (eligible && fadeSeconds && remaining <= fadeSeconds &&
+          remaining > 0.1 && engine.hasPrepared(nextTrack.previewUrl!) &&
+          engine.hasLivePCM("active") &&
+          engine.fadeToPrepared(nextTrack.previewUrl!, fadeSeconds,
+            safeTempoMatchRate(currentTrack?.bpm, nextTrack.bpm))) {
+        const previous = currentTrack;
+        currentTrackRef.current = nextTrack;
+        playedAtRef.current = Date.now();
+        setCurrentTrack(nextTrack);
+        setQueueIndex(nextIndex!);
+        setCurrentTime(0);
+        setDuration(engine.duration);
+        setBufferDeckRevision(value => value + 1);
+        if (previous) {
+          recordListeningEvent(previous, {
+            kind: "complete", backend: "audio",
+            currentTime: previous.duration || 0,
+            duration: previous.duration || 0,
+            playSource: sourceContextRef.current,
+          });
+        }
         recordListeningEvent(nextTrack, {
-          kind: "start", backend: "audio", currentTime: incoming.currentTime,
-          duration: nextTrack.duration || 0, playSource: sourceContextRef.current,
+          kind: "start", backend: "audio",
+          currentTime: 0, duration: engine.duration,
+          playSource: sourceContextRef.current,
         });
         trackEvent("player_play", {
           pageType: sourceContextRef.current?.pageType,
@@ -1586,118 +1564,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           context: {
             track_title: nextTrack.title,
             artist: nextTrack.artist,
-            album: nextTrack.album ?? null,
-            source: nextTrack.source ?? null,
-            source_section: sourceContextRef.current?.sourceSection,
             queue_size: queue.length,
             auto_advance: true,
-            crossfade_seconds: seconds,
+            crossfade_seconds: fadeSeconds,
+            transport: "decoded-buffer",
           },
         });
-        const completeOutgoing = () => {
-          if (!finishedTrack) return;
-          trackEvent("player_complete", {
-            pageType: completedSource?.pageType,
-            entitySlug: finishedTrack.id,
-            entityType: "track",
-            context: {
-              track_title: finishedTrack.title,
-              artist: finishedTrack.artist,
-              play_duration_ms: Date.now() - outgoingPlayedAt,
-              source_section: completedSource?.sourceSection,
-            },
-          });
-          recordListeningEvent(finishedTrack, {
-            kind: "complete", backend: "audio", currentTime: outgoing.duration,
-            duration: outgoing.duration, playSource: completedSource,
-          });
-        };
-        // A slow response after the old deck ended is a clean cut, not a
-        // fade from silence. The incoming track is already active.
-        if (outgoing.ended || outgoing.paused) {
-          mixEngineRef.current.setLevel(incoming, 1, volumeRef.current);
-          completeOutgoing();
-          outgoing.pause();
-          outgoing.removeAttribute("src");
-          previewFadeRef.current = null;
-          return;
-        }
-        const scheduled = usesMixer && mixEngineRef.current.beginFade(outgoing, incoming, seconds);
-        const ramp = (now: number) => {
-          if (previewFadeRef.current !== fade) return;
-          fade.fraction = Math.min(1, Math.max(0, (now - startTime) / (seconds * 1000)));
-          if (!scheduled) {
-            const levels = equalPowerLevels(fade.fraction);
-            mixEngineRef.current.setLevel(outgoing, levels.outgoing, volumeRef.current);
-            mixEngineRef.current.setLevel(incoming, levels.incoming, volumeRef.current);
-          }
-          if (fade.fraction < 1) {
-            fade.frame = window.requestAnimationFrame(ramp);
-          } else {
-            completeOutgoing();
-            outgoing.pause();
-            outgoing.removeAttribute("src");
-            outgoing.playbackRate = 1;
-            mixEngineRef.current.setLevel(outgoing, 1, volumeRef.current);
-            mixEngineRef.current.setLevel(incoming, 1, volumeRef.current);
-            incoming.playbackRate = 1;
-            previewFadeRef.current = null;
-          }
-        };
-        fade.frame = window.requestAnimationFrame(ramp);
-      }).catch(() => {
-        if (attempt !== previewFadeAttemptRef.current) return;
-        previewFadePendingRef.current = false;
-        previewFadeSuppressedRef.current = true;
-        incoming.pause();
-        incoming.removeAttribute("src");
-        mixEngineRef.current.setLevel(incoming, 1, volumeRef.current);
-        if (previewFadeEndedDuringPendingRef.current &&
-            htmlAudioSessionRef.current === session) {
-          previewFadeEndedDuringPendingRef.current = false;
-          handleEndedRef.current();
-        }
-      });
-    };
-    return () => { startPreviewFadeRef.current = () => {}; };
+        return;
+      }
+      if (secondsPlayed >= engine.duration - 0.05) {
+        completed = true;
+        engine.stop();
+        handleEndedRef.current();
+      }
+    }, 85);
+    return () => window.clearInterval(timer);
   }, [
-    isShuffle, playbackPrefs.appleMusicConnected, playbackPrefs.autoplay,
-    playbackPrefs.crossfade, playbackPrefs.crossfadeSeconds, playbackPrefs.smartMix,
-    playbackPrefs.explicitFilter,
-    queue, queueIndex, repeatMode,
+    isPlaying, playbackBackend, playbackPrefs.autoplay, playbackPrefs.crossfade,
+    playbackPrefs.crossfadeSeconds, playbackPrefs.appleMusicConnected,
+    playbackPrefs.explicitFilter, isShuffle, repeatMode, queue, queueIndex,
   ]);
-
-
-  // Warm the next permitted audio source and analyze short media before n - fade.
-  useEffect(() => {
-    if (!playbackPrefs.autoplay || !playbackPrefs.crossfade || !isPlaying ||
-        playbackBackend !== "audio" || !mixEngineRef.current.isRunning() ||
-        !audioRef.current || !mixEngineRef.current.hasDeck(audioRef.current) ||
-        previewFadePendingRef.current || previewFadeRef.current) return;
-    const order = isShuffle ? shuffledOrderRef.current : queue.map((_, index) => index);
-    const position = order.indexOf(queueIndex);
-    const nextIndex = order[position + 1] ?? (repeatMode === "all" ? order[0] : undefined);
-    if (nextIndex === undefined || nextIndex === queueIndex) return;
-    const candidate = queue[nextIndex];
-    const standby = standbyAudioRef.current;
-    if (!candidate?.previewUrl || !standby || candidate.isPlayable === false ||
-        (candidate.playbackEngine && candidate.playbackEngine !== "audio")) return;
-    const source = resolveMixableAudioSource(candidate.previewUrl);
-    if (!source.mixable || failedMixSourcesRef.current.has(source.url)) return;
-    // Pre-connect a controlled, CORS-safe deck before the transition. iOS
-    // ignores HTMLMediaElement.volume, so overlapping audio needs GainNodes.
-    standby.crossOrigin = "anonymous";
-    if (standby.src !== new URL(source.url, window.location.origin).href) {
-      standby.src = source.url;
-      standby.load();
-    }
-    if (!mixEngineRef.current.prepare(standby, source)) return;
-    mixEngineRef.current.setLevel(standby, 0, volumeRef.current);
-    if (playbackPrefs.smartMix) {
-      mixEngineRef.current.analyzeShortAudio(source.url, candidate.duration || 30);
-    }
-  }, [isPlaying, playbackBackend, playbackPrefs.autoplay, playbackPrefs.crossfade,
-    playbackPrefs.smartMix, mixerDeckRevision, isShuffle, queue, queueIndex, repeatMode]);
 
   // ─── Play a track ───
   const playTrack = useCallback((track: PlayerTrack, newQueue?: PlayerTrack[], playSource?: PlaySource) => {
@@ -1836,6 +1722,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
 
       cancelPreviewFade();
+      bufferUpgradeSerialRef.current += 1;
+      bufferUpgradePendingRef.current = false;
+      previewBufferRef.current.pause();
       audio?.pause();
       pauseYouTube();
       pauseSoundCloud();
@@ -1946,6 +1835,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     if (!currentTrack.previewUrl) {
       return;
+    }
+
+    if (previewBufferRef.current.isPaused) {
+      previewBufferRef.current.wake();
+      if (previewBufferRef.current.resume()) {
+        setIsPlaying(true);
+        return;
+      }
     }
 
     if (audio.ended) {
@@ -2356,7 +2253,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     previewFadeSuppressedRef.current = true;
 
     const max =
-      playbackBackendRef.current ===
+      previewBufferRef.current.isActive || previewBufferRef.current.isPaused
+        ? previewBufferRef.current.duration
+        : playbackBackendRef.current ===
         "audio"
         ? (
             audio.duration &&
@@ -2399,6 +2298,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       seekAppleMusic(
         clamped,
       ).catch(() => {});
+    } else if (previewBufferRef.current.isActive ||
+               previewBufferRef.current.isPaused) {
+      previewBufferRef.current.seek(clamped);
     } else {
       audio.currentTime =
         clamped;
@@ -2426,6 +2328,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     volumeRef.current = clamped;
     setVolumeState(clamped);
     mixEngineRef.current.setMasterVolume(clamped);
+    previewBufferRef.current.setVolume(clamped);
 
     const fade = previewFadeRef.current;
     if (fade && !fade.usesMixer) {
@@ -2454,6 +2357,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     );
 
     setPlaybackRateState(clamped);
+    previewBufferRef.current.setRate(clamped);
 
     if (audioRef.current) {
       audioRef.current.playbackRate = clamped;
