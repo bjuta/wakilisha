@@ -1142,7 +1142,11 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
     const analysers: AnalyserNode[] = [];
     const gains: GainNode[] = [];
     const contexts: AudioContext[] = [];
+    const playCalls: Array<{
+      time: number; source: string; state: string; error?: string;
+    }> = [];
     Object.assign(window, {
+      __wkHotMixPlayCalls: playCalls,
       __wkHotMixAudios: audios,
       __wkHotMixAnalysers: analysers,
       __wkHotMixGains: gains,
@@ -1162,6 +1166,28 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
       audios.push(audio);
       return audio;
     } as typeof Audio;
+    // Observe whether Safari rejects the automatically started standby deck.
+    // Do not alter play()'s return value, permission policy or media behavior.
+    const nativePlay = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () {
+      const call = {
+        time: Math.round(performance.now()),
+        source: (this.currentSrc || this.src).slice(0, 120),
+        state: "requested",
+        error: "",
+      };
+      playCalls.push(call);
+      const promise = nativePlay.call(this);
+      void promise.then(
+        () => { call.state = "resolved"; },
+        (error: unknown) => {
+          call.state = "rejected";
+          call.error = error instanceof Error
+            ? `${error.name}: ${error.message}` : String(error);
+        },
+      );
+      return promise;
+    };
     if (window.AudioContext) {
       const originalAnalyser = AudioContext.prototype.createAnalyser;
       AudioContext.prototype.createAnalyser = function () {
@@ -1237,6 +1263,7 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
       __wkHotMixAudios: HTMLAudioElement[];
       __wkHotMixAnalysers: AnalyserNode[];
       __wkHotMixGains: GainNode[];
+      __wkHotMixContexts: AudioContext[];
     };
     const peaks = (w.__wkHotMixAnalysers || []).map((analyser) => {
       const values = new Float32Array(analyser.fftSize);
@@ -1248,10 +1275,23 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
       !a.paused && !a.ended && a.currentTime > 0.05,
     ).length;
     return {
+      at: Math.round(performance.now()),
       audibleDecks: peaks.filter((peak) => peak > 0.0005).length,
       activeGains: volume.filter((level) => level > 0.05).length,
       playing,
       analyserCount: peaks.length,
+      peaks: peaks.map((value) => Number(value.toFixed(4))),
+      gainValues: volume.map((value) => Number(value.toFixed(4))),
+      contexts: (w.__wkHotMixContexts || []).map((c) => c.state),
+      decks: (w.__wkHotMixAudios || []).map((a) => ({
+        src: (a.currentSrc || a.src).slice(0, 90),
+        time: Number(a.currentTime.toFixed(2)),
+        duration: Number.isFinite(a.duration) ? Number(a.duration.toFixed(2)) : null,
+        paused: a.paused,
+        ended: a.ended,
+        readyState: a.readyState,
+        error: a.error?.code || null,
+      })),
     };
   });
   try {
@@ -1295,12 +1335,33 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
     console.error("CH25_WEBKIT_MIX_GRAPH_DIAGNOSTICS=" + JSON.stringify(diagnostic));
     throw error;
   }
-  await expect.poll(async () => {
-    const m = await measure();
-    return m.playing >= 2 && m.audibleDecks >= 2 &&
-      m.activeGains >= 3 && m.analyserCount >= 2;
-  }, {
-    timeout: 18000, intervals: [80, 80, 120],
-    message: "Both real analyser signals and three nonzero gain nodes (master + two decks) must overlap",
-  }).toBe(true);
+  const timeline: Array<Awaited<ReturnType<typeof measure>>> = [];
+  try {
+    await expect.poll(async () => {
+      const m = await measure();
+      timeline.push(m);
+      return m.playing >= 2 && m.audibleDecks >= 2 &&
+        m.activeGains >= 3 && m.analyserCount >= 2;
+    }, {
+      timeout: 18000, intervals: [80, 80, 120],
+      message: "Both real analyser signals and three nonzero gain nodes (master + two decks) must overlap",
+    }).toBe(true);
+  } catch (error) {
+    const playCalls = await page.evaluate(() => (
+      window as unknown as { __wkHotMixPlayCalls?: unknown[] }
+    ).__wkHotMixPlayCalls || []);
+    const maximums = timeline.reduce((totals, m) => ({
+      playing: Math.max(totals.playing, m.playing),
+      pcm: Math.max(totals.pcm, m.audibleDecks),
+      gains: Math.max(totals.gains, m.activeGains),
+      analysers: Math.max(totals.analysers, m.analyserCount),
+    }), { playing: 0, pcm: 0, gains: 0, analysers: 0 });
+    console.error("CH25_WEBKIT_OVERLAP_DIAGNOSTICS=" + JSON.stringify({
+      maximums,
+      playCalls,
+      beginning: timeline.slice(0, 3),
+      ending: timeline.slice(-16),
+    }));
+    throw error;
+  }
 });
