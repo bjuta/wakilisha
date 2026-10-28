@@ -599,7 +599,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
 
     void (async () => {
-      await silenceAllPlayback(audio);
+      // Keep the native play() inside the originating user gesture on Safari.
+      void silenceAllPlayback(audio);
 
       if (!isCurrentSession()) {
         return;
@@ -1408,13 +1409,27 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         !resolveMixableAudioSource(track.previewUrl).mixable) return;
     const engine = previewBufferRef.current;
     if (!engine.isRunning) return;
+    const order = isShuffle ? shuffledOrderRef.current : queue.map((_, i) => i);
+    const position = order.indexOf(queueIndex);
+    const nextIdx = order[position + 1] ?? (repeatMode === "all" ? order[0] : undefined);
+    const nextTrack = nextIdx === undefined ? null : queue[nextIdx];
+    // Do not hand off the first track unless the next track can ALSO be
+    // decoded in the same AudioContext. Otherwise the old native playback
+    // must remain authoritative, including for iPhone autoplay restrictions.
+    if (!nextTrack?.previewUrl || nextTrack.isPlayable === false ||
+        (nextTrack.playbackEngine && nextTrack.playbackEngine !== "audio") ||
+        (playbackPrefs.explicitFilter && nextTrack.isExplicit) ||
+        (playbackPrefs.appleMusicConnected &&
+          Boolean(nextTrack.appleMusicCatalogId || nextTrack.appleMusicId)) ||
+        !resolveMixableAudioSource(nextTrack.previewUrl).mixable) return;
     const serial = ++bufferUpgradeSerialRef.current;
     const session = htmlAudioSessionRef.current;
     if (session === null) return;
     bufferUpgradePendingRef.current = true;
     void (async () => {
       try {
-        if (!(await engine.prepare(track.previewUrl!))) return;
+        if (!(await engine.prepare(track.previewUrl!)) ||
+            !(await engine.prepare(nextTrack.previewUrl!))) return;
         if (serial !== bufferUpgradeSerialRef.current ||
             htmlAudioSessionRef.current !== session ||
             !playbackArbiterRef.current.isCurrent(session) ||
@@ -1453,7 +1468,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, [
     isPlaying, playbackBackend, playbackPrefs.crossfade,
-    playbackPrefs.autoplay, queue, repeatMode,
+    playbackPrefs.autoplay, playbackPrefs.explicitFilter,
+    playbackPrefs.appleMusicConnected, isShuffle, queue, queueIndex, repeatMode,
   ]);
 
   // A transition-selection click must resume the AudioContext synchronously
