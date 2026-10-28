@@ -1181,11 +1181,28 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
     const name = new URL(route.request().url()).pathname.split("/").pop() || "";
     const wav = wavByName.get(name);
     if (!wav) return route.fulfill({ status: 404, body: "Unknown test preview" });
+    // WebKit media loading frequently uses HTTP byte-range reads.
+    // A 200 response to a Range request can fail before audio decoding.
+    const range = route.request().headers()["range"]?.match(/^bytes=(\\d+)-(\\d*)$/);
+    const first = range ? Number(range[1]) : 0;
+    const last = range && range[2] ? Math.min(Number(range[2]), wav.length - 1) : wav.length - 1;
+    if (first >= wav.length || last < first) {
+      return route.fulfill({
+        status: 416,
+        headers: { "Content-Range": `bytes */${wav.length}` },
+      });
+    }
+    const sliced = wav.subarray(first, last + 1);
     return route.fulfill({
-      status: 200,
+      status: range ? 206 : 200,
       contentType: "audio/wav",
-      headers: { "Access-Control-Allow-Origin": "*", "Accept-Ranges": "bytes" },
-      body: wav,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Accept-Ranges": "bytes",
+        "Content-Length": String(sliced.length),
+        ...(range ? { "Content-Range": `bytes ${first}-${last}/${wav.length}` } : {}),
+      },
+      body: sliced,
     });
   });
   await page.route(
