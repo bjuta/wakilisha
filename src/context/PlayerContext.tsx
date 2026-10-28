@@ -1685,14 +1685,47 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       previewFadePendingRef.current = true;
       previewFadeEndedDuringPendingRef.current = false;
       const attempt = ++previewFadeAttemptRef.current;
-      void incoming.play().then(() => {
-        if (attempt !== previewFadeAttemptRef.current ||
-            htmlAudioSessionRef.current !== session ||
-            !playbackArbiterRef.current.isCurrent(session) ||
-            audioRef.current !== outgoing) {
+      void incoming.play().then(async () => {
+        const stillCurrent = () =>
+          attempt === previewFadeAttemptRef.current &&
+          htmlAudioSessionRef.current === session &&
+          playbackArbiterRef.current.isCurrent(session) &&
+          audioRef.current === outgoing;
+        if (!stillCurrent()) {
           incoming.pause();
           incoming.removeAttribute("src");
           return;
+        }
+        // HTMLMediaElement.play() resolves on WebKit even when a connected
+        // MediaElementAudioSourceNode produces zero PCM. Do not commit a new
+        // current track or fade the audible deck until the incoming decoder
+        // actually outputs samples. Preserve native/queue fallback on failure.
+        if (usesMixer) {
+          let decoded = false;
+          for (let check = 0; check < 14; check++) {
+            if (!stillCurrent()) {
+              incoming.pause();
+              incoming.removeAttribute("src");
+              return;
+            }
+            if (mixEngineRef.current.hasAudioSignal(incoming)) {
+              decoded = true;
+              break;
+            }
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 90));
+          }
+          if (!decoded) {
+            previewFadePendingRef.current = false;
+            previewFadeSuppressedRef.current = true;
+            incoming.pause();
+            incoming.removeAttribute("src");
+            mixEngineRef.current.setLevel(incoming, 0, volumeRef.current);
+            if (outgoing.ended || previewFadeEndedDuringPendingRef.current) {
+              previewFadeEndedDuringPendingRef.current = false;
+              handleEndedRef.current();
+            }
+            return;
+          }
         }
         previewFadePendingRef.current = false;
         previewFadeEndedDuringPendingRef.current = false;
