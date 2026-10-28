@@ -1398,6 +1398,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // replacement buffer analyser proves PCM, then unmute the buffer and pause
   // the native element. Failed fetch/CORS/decode leaves native playback intact.
   useEffect(() => {
+    // Development-only audit, consumed by the real-player WebKit test. It
+    // records the exact activation gate; never expose media URLs or user data.
+    const audit = (stage: string, reason?: string) => {
+      if (!import.meta.env.DEV) return;
+      window.dispatchEvent(new CustomEvent("wk-ch25-buffer-gate", {
+        detail: {
+          stage, reason: reason || "",
+          playing: isPlaying, backend: playbackBackend,
+          crossfade: playbackPrefs.crossfade, autoplay: playbackPrefs.autoplay,
+          queueSize: queue.length, queueIndex,
+          audioPaused: audioRef.current?.paused ?? null,
+          contextRunning: previewBufferRef.current.isRunning,
+        },
+      }));
+    };
     const allowUpgrade = playbackPrefs.crossfade && playbackPrefs.autoplay &&
       isPlaying && playbackBackend === "audio" && queue.length > 1 &&
       repeatMode !== "one" && !previewBufferRef.current.isActive &&
@@ -1406,9 +1421,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const track = currentTrackRef.current;
     if (!allowUpgrade || !audio || audio.paused || audio.ended ||
         !track?.previewUrl ||
-        !resolveMixableAudioSource(track.previewUrl).mixable) return;
+        !resolveMixableAudioSource(track.previewUrl).mixable) {
+      audit("skipped", !allowUpgrade ? "preferences-or-player-state" :
+        !audio ? "no-audio" : audio.paused ? "native-paused" :
+        audio.ended ? "native-ended" : !track?.previewUrl ? "no-preview" :
+        "source-not-mixable");
+      return;
+    }
     const engine = previewBufferRef.current;
-    if (!engine.isRunning) return;
+    if (!engine.isRunning) {
+      audit("skipped", "context-not-running");
+      return;
+    }
     const order = isShuffle ? shuffledOrderRef.current : queue.map((_, i) => i);
     const position = order.indexOf(queueIndex);
     const nextIdx = order[position + 1] ?? (repeatMode === "all" ? order[0] : undefined);
@@ -1421,23 +1445,44 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         (playbackPrefs.explicitFilter && nextTrack.isExplicit) ||
         (playbackPrefs.appleMusicConnected &&
           Boolean(nextTrack.appleMusicCatalogId || nextTrack.appleMusicId)) ||
-        !resolveMixableAudioSource(nextTrack.previewUrl).mixable) return;
+        !resolveMixableAudioSource(nextTrack.previewUrl).mixable) {
+      audit("skipped", "next-track-ineligible");
+      return;
+    }
     const serial = ++bufferUpgradeSerialRef.current;
     const session = htmlAudioSessionRef.current;
-    if (session === null) return;
+    if (session === null) {
+      audit("skipped", "no-active-audio-session");
+      return;
+    }
     bufferUpgradePendingRef.current = true;
+    audit("preparing");
     void (async () => {
       try {
-        if (!(await engine.prepare(track.previewUrl!)) ||
-            !(await engine.prepare(nextTrack.previewUrl!))) return;
+        if (!(await engine.prepare(track.previewUrl!))) {
+          audit("failed", "current-preview-fetch-or-decode");
+          return;
+        }
+        if (!(await engine.prepare(nextTrack.previewUrl!))) {
+          audit("failed", "next-preview-fetch-or-decode");
+          return;
+        }
+        audit("decoded-both");
         if (serial !== bufferUpgradeSerialRef.current ||
             htmlAudioSessionRef.current !== session ||
             !playbackArbiterRef.current.isCurrent(session) ||
             audioRef.current !== audio || audio.paused ||
-            !readPlaybackPrefs().crossfade) return;
+            !readPlaybackPrefs().crossfade) {
+          audit("aborted", "session-or-native-playback-changed");
+          return;
+        }
         const offset = audio.currentTime;
         engine.setVolume(0);
-        if (!engine.startPrepared(track.previewUrl!, offset, audio.playbackRate)) return;
+        if (!engine.startPrepared(track.previewUrl!, offset, audio.playbackRate)) {
+          audit("failed", "buffer-source-start");
+          return;
+        }
+        audit("buffer-source-started");
         let verified = false;
         for (let count = 0; count < 15; count++) {
           if (serial !== bufferUpgradeSerialRef.current ||
@@ -1448,6 +1493,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           await new Promise<void>(resolve => window.setTimeout(resolve, 50));
         }
         if (!verified) {
+          audit("failed", "active-buffer-no-pcm");
           engine.stop();
           return;
         }
@@ -1457,6 +1503,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setIsPlaying(true);
         setDuration(engine.duration);
         setBufferDeckRevision(value => value + 1);
+        audit("adopted-buffer-audio");
       } finally {
         bufferUpgradePendingRef.current = false;
         // Do not launch a duplicate hot-upgrade from a stale async callback.
