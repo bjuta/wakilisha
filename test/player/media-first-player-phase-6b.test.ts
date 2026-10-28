@@ -115,10 +115,17 @@ describe("Phase 6B media-first WAKILISHA Player", () => {
     expect(responsiveShell).toContain(
       'import(\n    "@/components/design-system/player/PlayerFullSurface"',
     );
-    expect(responsiveShell).toContain("<Suspense fallback={null}>");
+    // The responsive shell now shows an accessible loading state while the
+    // full player code-splits; the old null fallback is no longer correct.
+    expect(responsiveShell).toContain("<Suspense fallback={");
+    expect(responsiveShell).toContain('role="status" aria-label="Opening Now Playing"');
+    expect(responsiveShell).toContain("<PlayerPresentationBoundary onClose={closeFullPlayer}>");
     expect(responsiveShell).toContain("data-wk-player-underlay");
     expect(responsiveShell).toContain("data-wk-player-overlay");
-    expect(responsiveShell).toContain("ResizeObserver");
+    // The presentation overlay preserves the underlying route and locks only
+    // document scroll. The earlier ResizeObserver implementation was retired.
+    expect(responsiveShell).toContain('inert={isMobile && isFullPlayerOpen}');
+    expect(responsiveShell).toContain('root.style.overflow = "hidden"');
     expect(responsiveShell).not.toContain("const layout = isFullPlayerOpen ? (");
     expect(responsiveShell).not.toContain(
       'from "@/components/design-system/player/PlayerFullSurface"',

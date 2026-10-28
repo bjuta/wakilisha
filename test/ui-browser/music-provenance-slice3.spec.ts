@@ -561,8 +561,7 @@ async function jsonLd(
 test.beforeEach(async ({ page }) => {
   await installPublicReadFixtures(page);
 });
-function shortWavPreview(frequency: number, seconds = 6): string {
-  const rate = 8000;
+function shortWavPreview(frequency: number, seconds = 6, rate = 8000): string {
   const count = rate * seconds;
   const pcm = Buffer.alloc(44 + count * 2);
   pcm.write("RIFF", 0, "ascii");
@@ -584,86 +583,179 @@ function shortWavPreview(frequency: number, seconds = 6): string {
   return `data:audio/wav;base64,${pcm.toString("base64")}`;
 }
 
-test("Chapter 25 overlaps controlled previews and switches queue at fade start", async ({ page }) => {
-  const previews = [shortWavPreview(220), shortWavPreview(330)];
+test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade start", async ({ page }) => {
+  test.setTimeout(70000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  // 16kHz is the validated format from the stand-alone WebKit buffer proof.
+  // Enough duration for the listener to open settings *before* the track ends.
+  const previews = ["/__wk-mix/ch25-runtime-a.wav", "/__wk-mix/ch25-runtime-b.wav"];
+  const audioByName = new Map([
+    ["ch25-runtime-a.wav", Buffer.from(shortWavPreview(220, 24, 16000).split(",")[1], "base64")],
+    ["ch25-runtime-b.wav", Buffer.from(shortWavPreview(330, 24, 16000).split(",")[1], "base64")],
+  ]);
   const fixture = {
     ...releaseDetail,
     tracks: releaseDetail.tracks.map((track, index) => ({
       ...track,
-      duration: 6,
+      duration: 24,
       previewUrl: previews[index],
     })),
   };
-
   await page.addInitScript(() => {
-    window.localStorage.setItem("wk-playback-v2", JSON.stringify({
-      autoplay: true,
-      crossfade: true,
-      crossfadeSeconds: 3,
-      smartMix: false,
-    }));
-
-    // Record real HTMLAudioElements, not mocked timers or fake play events.
+    // No preseeded mix setting: the actual mobile UI must activate the engine
+    // after native playback has already started.
+    window.localStorage.removeItem("wk-playback-v2");
+    const sourceNodes: AudioBufferSourceNode[] = [];
+    const analysers: AnalyserNode[] = [];
+    const gainNodes: GainNode[] = [];
+    const mediaAttachments: string[] = [];
+    const gateEvents: unknown[] = [];
+    const nativeAudios: HTMLAudioElement[] = [];
+    window.addEventListener("wk-ch25-buffer-gate", (event) => {
+      gateEvents.push((event as CustomEvent).detail);
+    });
     const NativeAudio = window.Audio;
-    const created: HTMLAudioElement[] = [];
-    Object.assign(window, { __wkCh25AudioDecks: created });
     window.Audio = function (...args: ConstructorParameters<typeof Audio>) {
       const audio = new NativeAudio(...args);
-      created.push(audio);
+      nativeAudios.push(audio);
       return audio;
     } as typeof Audio;
+    Object.assign(window, {
+      __wkBufferGateEvents: gateEvents,
+      __wkNativeAudioDecks: nativeAudios,
+      __wkBufferSources: sourceNodes,
+      __wkBufferAnalysers: analysers,
+      __wkBufferGains: gainNodes,
+      __wkMediaAttachments: mediaAttachments,
+    });
+    const sourceFactory = AudioContext.prototype.createBufferSource;
+    AudioContext.prototype.createBufferSource = function () {
+      const source = sourceFactory.call(this);
+      sourceNodes.push(source);
+      return source;
+    };
+    const analyserFactory = AudioContext.prototype.createAnalyser;
+    AudioContext.prototype.createAnalyser = function () {
+      const analyser = analyserFactory.call(this);
+      analysers.push(analyser);
+      return analyser;
+    };
+    const gainFactory = AudioContext.prototype.createGain;
+    AudioContext.prototype.createGain = function () {
+      const gain = gainFactory.call(this);
+      gainNodes.push(gain);
+      return gain;
+    };
+    const oldMediaFactory = AudioContext.prototype.createMediaElementSource;
+    AudioContext.prototype.createMediaElementSource = function (element) {
+      mediaAttachments.push(element.currentSrc.slice(0, 80));
+      return oldMediaFactory.call(this, element);
+    };
   });
-
+  await page.route("**/__wk-mix/ch25-runtime-*.wav", async (route) => {
+    const path = new URL(route.request().url()).pathname.split("/").pop() || "";
+    const wav = audioByName.get(path);
+    if (!wav) return route.fulfill({ status: 404, body: "Unknown Ch25 fixture" });
+    const range = route.request().headers()["range"]?.match(/^bytes=(\d+)-(\d*)$/);
+    const first = range ? Number(range[1]) : 0;
+    const last = range && range[2] ? Math.min(Number(range[2]), wav.length - 1) : wav.length - 1;
+    if (first >= wav.length || last < first) {
+      return route.fulfill({ status: 416, headers: { "Content-Range": `bytes */${wav.length}` } });
+    }
+    const part = wav.subarray(first, last + 1);
+    await route.fulfill({
+      status: range ? 206 : 200, contentType: "audio/wav",
+      headers: {
+        "Access-Control-Allow-Origin": "*", "Accept-Ranges": "bytes",
+        "Content-Length": String(part.length),
+        ...(range ? { "Content-Range": `bytes ${first}-${last}/${wav.length}` } : {}),
+      },
+      body: part,
+    });
+  });
   await page.route(
     "**/public-content-read/releases/slice3-browser-solo/slice3-browser-release**",
     async (route) => {
       await fulfillJson(route, { data: { release: fixture } });
     },
   );
-
   await page.goto("/releases/slice3-browser-solo/slice3-browser-release", {
     waitUntil: "domcontentloaded",
   });
   await expect(page.getByRole("heading", { level: 1, name: releaseDetail.title })).toBeVisible();
   await page.getByRole("button", { name: "Play", exact: true }).first().click();
+  const compact = page.locator('[data-wk-player-compact="mobile"]');
+  await expect(compact).toBeVisible();
+  await compact.getByRole("button", { name: /Slice 3 Browser Track/ }).first().click();
+  const expanded = page.locator("[data-wk-player-overlay]");
+  await expect(expanded).toBeVisible();
+  await expanded.getByRole("button", { name: "More Player actions" }).click();
+  await page.getByRole("button", { name: /Transitions/ }).last().click();
+  const smart = page.getByRole("radio", { name: /Smart Mix/ });
+  // Selecting after the native preview already ended is not a legitimate
+  // hot-upgrade test; prove its media clock is advancing first.
+  await expect.poll(async () => page.evaluate(() => {
+    const list = (window as unknown as {
+      __wkNativeAudioDecks?: HTMLAudioElement[];
+    }).__wkNativeAudioDecks || [];
+    return list.some(a => !a.paused && !a.ended && a.currentTime > 0.3);
+  }), {
+    timeout: 7000,
+    message: "First native preview must still be playing before enabling Smart Mix",
+  }).toBe(true);
+  await smart.click();
+  await expect(smart).toHaveAttribute("aria-checked", "true");
 
-  // At 6 seconds, quarter-length policy caps a selected 3-second fade to 1 second.
-  try {
-    await expect.poll(async () =>
-      page.evaluate(() => {
-        const decks = (window as unknown as {
-          __wkCh25AudioDecks: HTMLAudioElement[];
-        }).__wkCh25AudioDecks || [];
-        return decks.filter((audio) =>
-          !audio.paused && !audio.ended && audio.currentTime > 0
-        ).length;
-      }), { timeout: 14000, intervals: [80, 80, 120] },
-    ).toBe(2);
-  } catch (error) {
-    // Failure evidence must distinguish missing next-deck playback, source
-    // decoding, late transitions, and a failed two-deck mixing graph.
-    const diagnostics = await page.evaluate(() => {
-      const decks = (window as unknown as {
-        __wkCh25AudioDecks: HTMLAudioElement[];
-      }).__wkCh25AudioDecks || [];
-      return decks.map((audio, index) => ({
-        index, hasSource: Boolean(audio.currentSrc),
-        sourceKind: audio.currentSrc.startsWith("data:") ? "data" : audio.currentSrc.slice(0, 48),
-        time: audio.currentTime, duration: audio.duration,
-        paused: audio.paused, ended: audio.ended,
-        readyState: audio.readyState, networkState: audio.networkState,
-        errorCode: audio.error?.code || null,
-      }));
+  const measure = () => page.evaluate(() => {
+    const w = window as unknown as {
+      __wkBufferSources: AudioBufferSourceNode[];
+      __wkBufferAnalysers: AnalyserNode[];
+      __wkBufferGains: GainNode[];
+      __wkMediaAttachments: string[];
+      __wkBufferGateEvents: unknown[];
+      __wkNativeAudioDecks: HTMLAudioElement[];
+    };
+    const peaks = (w.__wkBufferAnalysers || []).map(analyser => {
+      const pcm = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(pcm);
+      return pcm.reduce((peak, sample) => Math.max(peak, Math.abs(sample)), 0);
     });
-    console.error("CH25_FADE_BROWSER_DIAGNOSTICS=" + JSON.stringify(diagnostics));
+    return {
+      sources: w.__wkBufferSources.length,
+      peaks,
+      gains: w.__wkBufferGains.map(gain => gain.gain.value),
+      mediaAttachments: w.__wkMediaAttachments,
+      gates: (w.__wkBufferGateEvents || []).slice(-25),
+      nativeDecks: (w.__wkNativeAudioDecks || []).map(a => ({
+        currentTime: Number(a.currentTime.toFixed(2)),
+        paused: a.paused, ended: a.ended,
+        readyState: a.readyState, error: a.error?.code ?? null,
+      })),
+    };
+  });
+  try {
+    await expect.poll(async () => {
+      const m = await measure();
+      return m.sources >= 2 &&
+        m.peaks.filter(value => value > 0.0005).length >= 2 &&
+        // The master plus BOTH deck gains must be active. Two gains alone
+        // could mean master + one deck, which is not audible crossfade.
+        m.gains.filter(value => value > 0.05).length >= 3 &&
+        m.mediaAttachments.length === 0;
+    }, { timeout: 35000, intervals: [80, 100, 120],
+      message: "WebKit must mix two actual decoded AudioBufferSourceNode signals; no MediaElement source allowed",
+    }).toBe(true);
+  } catch (error) {
+    console.error("CH25_BUFFER_PLAYER_DIAGNOSTICS=" + JSON.stringify(await measure()));
     throw error;
   }
-
-  await expect(page.locator(
-    '[data-wk-player-compact="desktop"], [data-wk-player-compact="mobile"], [data-wk-player-dock]',
-  ).getByText("Slice 3 Browser Track Two", { exact: true }).first()).toBeVisible();
+  // We opened the full mobile player above. Compact is intentionally
+  // unmounted and the dock is hidden while that overlay is active.
+  // Validate queue identity on the actual visible full-player title.
+  await expect(page.locator("[data-wk-player-overlay] [data-wk-player-full]")
+    .getByRole("heading", { level: 1, name: "Slice 3 Browser Track Two", exact: true }))
+    .toBeVisible();
 });
-
 
 test("Chapter 25 mobile More tooltip stays inside the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
