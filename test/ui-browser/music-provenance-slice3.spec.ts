@@ -738,7 +738,9 @@ test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade s
       const m = await measure();
       return m.sources >= 2 &&
         m.peaks.filter(value => value > 0.0005).length >= 2 &&
-        m.gains.filter(value => value > 0.05).length >= 2 &&
+        // The master plus BOTH deck gains must be active. Two gains alone
+        // could mean master + one deck, which is not audible crossfade.
+        m.gains.filter(value => value > 0.05).length >= 3 &&
         m.mediaAttachments.length === 0;
     }, { timeout: 35000, intervals: [80, 100, 120],
       message: "WebKit must mix two actual decoded AudioBufferSourceNode signals; no MediaElement source allowed",
