@@ -157,6 +157,11 @@ export class WakilishaPreviewBufferMixer {
     return key !== null && this.cache.has(key);
   }
 
+  preparedDuration(url: string): number {
+    const key = WakilishaPreviewBufferMixer.keyFor(url);
+    return key ? this.cache.get(key)?.duration ?? 0 : 0;
+  }
+
   private buildDeck(key: string, offset: number, rate: number, level: number): BufferDeck | null {
     if (!this.context || !this.master || !this.isRunning) return null;
     const buffer = this.cache.get(key);
