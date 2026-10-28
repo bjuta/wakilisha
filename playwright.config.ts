@@ -36,7 +36,7 @@ export default defineConfig({
       // establish that a controlled two-deck Web Audio fade starts in WebKit.
       name: "webkit-mobile-audio",
       testMatch: "**/music-provenance-slice3.spec.ts",
-      grep: /Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade start/,
+      grep: /Chapter 25 (hot-enables decoded-buffer overlap and switches queue at fade start|mobile Crossfade duration appears only beneath selected mode)/,
       use: { ...devices["iPhone 13"] },
     },
   ],
