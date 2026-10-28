@@ -59,6 +59,20 @@ export class WakilishaPreviewBufferMixer {
     return this.context?.state === "running";
   }
 
+  /** The settings click resumes the graph, but Safari resolves it later.
+   * Decode only after the gesture-initiated resume succeeds. Native playback
+   * continues during this bounded wait and always remains the fallback. */
+  async waitUntilRunning(maxMs = 1800): Promise<boolean> {
+    if (this.isRunning) return true;
+    if (!this.context) return false;
+    const deadline = performance.now() + maxMs;
+    while (performance.now() < deadline) {
+      await new Promise<void>(resolve => window.setTimeout(resolve, 45));
+      if (this.isRunning) return true;
+    }
+    return this.isRunning;
+  }
+
   get isActive(): boolean {
     return this.active !== null;
   }
