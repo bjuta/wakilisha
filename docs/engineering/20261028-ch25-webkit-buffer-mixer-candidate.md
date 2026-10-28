@@ -99,6 +99,12 @@ The user supplied the full original log and JSON observation ledger. SHA-256 of 
 
 **Remaining release gate:** present this **candidate**, not unchanged Production, on a verified HTTPS origin reachable from an actual iPhone, then audibly test native-to-buffer handoff, the complete fade, pause/resume, seek, volume, next/previous and unsupported-provider fallback. No candidate staging infrastructure has yet been established or authorized as the live physical-iPhone target. Do not direct the owner to test current Production for this candidate. Before any PR/merge, complete the established CI-consolidation and changed-file review. GitHub Actions is exhausted and must not be invoked.
 
+## CI consolidation after real-catalogue PASS
+
+The branch initially carried the one-off `test/ui-browser/ch25-webkit-buffer-mixer-proof.spec.ts` and its `webkit-buffer-architecture` Playwright project. Both were retired before PR because the stronger retained `webkit-mobile-audio` project now executes the **real integrated player** with two PCM streams, both deck gains, queue advancement and no MediaElement attachment. The original stand-alone proof is retained in Git history at `1c55dc4c` and its accepted Mac output remains in this engineering record.
+
+The real-catalogue acceptance script stays in `scripts/acceptance/` as a separately invoked external-runtime acceptance procedure and does **not** enter normal browser CI. The existing `test/ui-browser/music-provenance-slice3.spec.ts` owns the integrated regression; the obsolete canonical source-string checks were updated instead of duplicated. No new GitHub Actions workflows, no new permanent standalone spec, and no changes to the previously tested candidate runtime.
+
 ## Acceptance status and gates
 
 **Integrated WebKit and Chromium, 31/31 scoped contracts, full build and real-catalogue browser onset PASS; overall release acceptance remains OPEN.** The remaining unverified gates are the full fade envelope and physical iPhone Safari playback/control acceptance, review and deployment. Before PR, merge or Production deployment:
