@@ -54,6 +54,20 @@ Repository-side review identified two test-contract classes requiring maintenanc
 
 The maintenance change affects **only those two test files and this engineering note**, not the buffer transport or player UI/runtime. Repository source-check verification found all updated literal contracts present. However, that is **not** a substitute for the Mac Vitest execution. Next: run only those three scoped test files on the exact updated branch commit. If green, continue Chromium parity and the full build without rerunning the already-green WebKit iPhone-profile test. GitHub Actions remain exhausted and must not be used.
 
+## Local scoped contracts, Chromium parity, and full build — PASS (28 October 2026)
+
+The owner ran the prescribed Mac gate at exact candidate SHA `f68b0c77cc7d15485bacc8d9871b7ef714c410eb`; console output:
+
+- `CH25_DIFF_CHECK=PASS` (earlier in local acceptance).
+- `CH25_PLAYER_CONTRACTS=PASS` — **3 test files, 31 tests passed**.
+- `CH25_CHROMIUM_PARITY=PASS` — the *same actual-player decoded-buffer Smart Mix* Playwright browser test, **1 passed (26.3s)**, in Chromium.
+- `CH25_CANDIDATE_BUILD=PASS` — full `npm run build`; SEO audit: **no hard SEO regressions**. The build reported short metadata descriptions on existing artist/person pages, non-blocking for this gate.
+- `CH25_LOCAL_REGRESSION_AND_BUILD=PASS`; `PRODUCTION_DEPLOYMENT=NONE`.
+
+Both integrated WebKit and Chromium tests have therefore independently passed live UI Smart Mix activation, two nonzero decoded PCM signals, three nonzero gain nodes (master plus both decks), no MediaElementSource attachment, and queue transition identity on same-origin WAV *fixtures*. The verification does not yet include actual WAKILISHA public media transport or a physical iPhone.
+
+The next unproven gate is a **candidate-only real-catalogue browser test** against actual public release/track data, with no mocked catalogue or media and no Production frontend mutation. This must classify media/CORS/ingress failures separately from app defects; after that, physical-iPhone listening and control acceptance remain required.
+
 ## Acceptance status and gates
 
 **Integrated local WebKit fixture PASS; overall release acceptance remains OPEN.** The standalone WebKit architecture and actual-player WebKit dual-PCM/dual-gain tests are accepted, but real-catalogue transport, local build/regressions, physical iPhone and Production acceptance remain unverified. Before any PR, merge or deployment:
