@@ -96,9 +96,14 @@ describe("Chapter 25 audible-media and device-independent icon acceptance", () =
     );
     expect(nativeStart).toContain("activeAudio.src = track.previewUrl;");
     expect(nativeStart).toContain("await activeAudio.play()");
+    expect(nativeStart.indexOf("await activeAudio.play()")).toBeGreaterThan(
+      nativeStart.indexOf("activeAudio.src = track.previewUrl;"),
+    );
     expect(nativeStart).not.toContain("mixEngineRef.current.prepare(");
     expect(playerContext).toContain("const fallbackToPreview = async");
     expect(playerContext).toContain("await playViaHtmlAudio(");
+    expect(playerContext).toContain("fallback.src = originalUrl;");
+    expect(playerContext).toContain('fallback.removeAttribute("crossorigin")');
     // Both recordings must be decoded without pausing the native output.
     expect(upgrade).toContain("await engine.prepare(track.previewUrl!)");
     expect(upgrade).toContain("await engine.prepare(nextTrack.previewUrl!)");
