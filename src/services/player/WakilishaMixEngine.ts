@@ -120,7 +120,10 @@ export class WakilishaMixEngine {
   }
 
   prepare(audio: HTMLAudioElement, source: { url: string; mixable: boolean }): boolean {
-    if (!source.mixable || !this.isRunning()) return false;
+    // A direct settings gesture may stage a silent replacement while the
+    // iOS AudioContext resume promise is pending. Its gain stays at zero
+    // until decoded PCM is verified; native audio remains the fallback.
+    if (!source.mixable || !(this.isRunning() || this.resumePending !== null)) return false;
     if (!this.context || !this.master) return false;
     if (this.decks.has(audio)) return true;
     try {
