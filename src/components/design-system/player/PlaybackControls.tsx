@@ -203,7 +203,6 @@ function TransitionOptions({ playback, updatePlayback, unavailableReason }: {
   ];
   return (
     <div className="border-b border-[var(--wk-divider)] px-1 pb-4">
-
       <div role="radiogroup" aria-label="Transitions" className="space-y-1 py-2">
         {choices.map((choice) => (
           <div key={choice.key} className={`min-w-0 rounded-xl ${
