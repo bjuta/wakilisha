@@ -18,6 +18,16 @@ A local physical-Mac Playwright **WebKit iPhone-profile** test on 28 October 202
 
 `test/ui-browser/music-provenance-slice3.spec.ts` now checks real **in-player** Smart Mix selection after native playback begins, same-origin HTTP WAV delivery with byte ranges, and simultaneous nonzero PCM through two genuine `AudioBufferSourceNode` streams, rather than merely counting `HTMLAudioElement.currentTime`.
 
+## Integrated WebKit failure and activation repair (28 October 2026)
+
+The first **integrated** browser acceptance at `595803c6` FAILED. At assertion timeout the new player created **zero** `AudioBufferSourceNode` instances, zero analysers, and one master gain node. This is *not* evidence that two buffer sources cannot mix (the separate prototype already passed): the native-to-buffer activation did not complete.
+
+The original test used two 12-second 8kHz WAV previews but did not prove native playback was still active before selecting Smart Mix. The test now uses two 24-second 16kHz WAV previews—the already proven decode format—and requires active advancing native playback immediately before enabling Smart Mix.
+
+The player previously tested `isRunning` synchronously in a React effect; Safari's gesture-initiated `AudioContext.resume()` may settle later and the effect had no reactive retry. It now performs a bounded wait for the **already gesture-woken** audio context without pausing native playback, then checks the same session lease before any decode or handoff. Development-only activation diagnostics record whether the path was skipped for state/session reasons or blocked at fetch/decode/source start. This is a plausible race correction, **not yet a proven root cause**.
+
+The next local gate is ONLY the integrated WebKit iPhone-profile actual-player test at exact candidate HEAD. On failure, `CH25_BUFFER_PLAYER_DIAGNOSTICS` includes `gates` and native-media state. Do not broaden changes or advance release gates until it passes.
+
 ## Acceptance status and gates
 
 **Candidate runtime implementation is UNVERIFIED.** A standalone WebKit prototype passing does not certify this integration. Before any PR, merge or deployment:
