@@ -205,39 +205,43 @@ function TransitionOptions({ playback, updatePlayback, unavailableReason }: {
     <div className="border-b border-[var(--wk-divider)] px-1 pb-4">
       <div role="radiogroup" aria-label="Transitions" className="space-y-1 py-2">
         {choices.map((choice) => (
-          <div key={choice.key} className="flex min-w-0 items-center rounded-lg hover:bg-[var(--wk-bg-subtle)]">
-            <button type="button" role="radio" aria-checked={mode === choice.key}
-              disabled={Boolean(unavailableReason) && choice.key !== "off"}
-              onClick={() => setMode(choice.key, updatePlayback)}
-              className="flex min-h-12 min-w-0 flex-1 items-start gap-3 rounded-lg p-2 text-left focus-visible:outline focus-visible:outline-2 disabled:opacity-40">
-              <span aria-hidden="true" className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)]">
-                {mode === choice.key && <span className="h-2 w-2 rounded-full bg-[var(--wk-brand)]" />}
-              </span>
-              <span className="min-w-0 flex-1 text-[13px] font-bold text-[var(--wk-text)]">
-                {choice.label}
-                <span className="block text-[12px] font-normal text-[var(--wk-text-muted)]">{choice.description}</span>
-              </span>
-            </button>
-            {choice.key === "smart" && <HelpTip label="Smart Mix" text="Matches nearby tempos when analysis is reliable; otherwise uses a natural blend." />}
+          <div key={choice.key} className={`min-w-0 rounded-xl ${
+            mode === choice.key ? "bg-[var(--wk-bg-subtle)]" : "hover:bg-[var(--wk-bg-subtle)]"
+          }`}>
+            <div className="flex min-w-0 items-center">
+              <button type="button" role="radio" aria-checked={mode === choice.key}
+                disabled={Boolean(unavailableReason) && choice.key !== "off"}
+                onClick={() => setMode(choice.key, updatePlayback)}
+                className="flex min-h-12 min-w-0 flex-1 items-start gap-3 rounded-lg p-2 text-left focus-visible:outline focus-visible:outline-2 disabled:opacity-40">
+                <span aria-hidden="true" className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--wk-border)]">
+                  {mode === choice.key && <span className="h-2 w-2 rounded-full bg-[var(--wk-brand)]" />}
+                </span>
+                <span className="min-w-0 flex-1 text-[13px] font-bold text-[var(--wk-text)]">
+                  {choice.label}
+                  <span className="block text-[12px] font-normal text-[var(--wk-text-muted)]">{choice.description}</span>
+                </span>
+              </button>
+              {choice.key === "smart" && <HelpTip label="Smart Mix" text="Matches nearby tempos when analysis is reliable; otherwise uses a natural blend." />}
+            </div>
+            {choice.key === "crossfade" && mode === "crossfade" && !unavailableReason && (
+              <div role="group" aria-label="Crossfade duration settings" className="pb-3 pl-9 pr-3 pt-1">
+                <div className="flex items-center justify-between gap-2 text-[13px] font-bold text-[var(--wk-text)]">
+                  <span>Crossfade duration</span>
+                  <span className="tabular-nums">{clampFade(playback.crossfadeSeconds)} seconds</span>
+                </div>
+                <WkSlider value={clampFade(playback.crossfadeSeconds)}
+                  onChange={(crossfadeSeconds) => updatePlayback({ crossfadeSeconds })}
+                  min={3} max={12} step={1} ariaLabel="Crossfade duration"
+                  showValueLabel={false} className="mt-3" formatValue={(value) => `${value} seconds`} />
+                <div className="flex justify-between text-[10px] text-[var(--wk-text-muted)]">
+                  <span>3 sec</span><span>6</span><span>9</span><span>12 sec</span>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
       {unavailableReason && <span className="text-[12px] text-[var(--wk-text-muted)]">{unavailableReason}</span>}
-      {mode === "crossfade" && !unavailableReason && (
-        <div className="px-2 pt-3">
-          <div className="flex items-center justify-between text-[13px] font-bold text-[var(--wk-text)]">
-            <span>Crossfade duration</span>
-            <span className="tabular-nums">{clampFade(playback.crossfadeSeconds)} seconds</span>
-          </div>
-          <WkSlider value={clampFade(playback.crossfadeSeconds)}
-            onChange={(crossfadeSeconds) => updatePlayback({ crossfadeSeconds })}
-            min={3} max={12} step={1} ariaLabel="Crossfade duration"
-            showValueLabel={false} className="mt-3" formatValue={(value) => `${value} seconds`} />
-          <div className="flex justify-between text-[10px] text-[var(--wk-text-muted)]">
-            <span>3 sec</span><span>6</span><span>9</span><span>12 sec</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

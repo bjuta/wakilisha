@@ -757,6 +757,70 @@ test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade s
     .toBeVisible();
 });
 
+test("Chapter 25 mobile Crossfade duration appears only beneath selected mode", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.localStorage.removeItem("wk-playback-v2");
+  });
+  await page.route(
+    "**/public-content-read/releases/slice3-browser-solo/slice3-browser-release**",
+    async (route) => {
+      await fulfillJson(route, { data: { release: releaseDetail } });
+    },
+  );
+  await page.goto("/releases/slice3-browser-solo/slice3-browser-release", {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page.getByRole("heading", { level: 1, name: releaseDetail.title })).toBeVisible();
+  await page.getByRole("button", { name: "Play", exact: true }).first().click();
+
+  const compact = page.locator('[data-wk-player-compact="mobile"]');
+  await expect(compact).toBeVisible();
+  await compact.getByRole("button", { name: /Slice 3 Browser Track/ }).first().click();
+  const expanded = page.locator("[data-wk-player-overlay]");
+  await expect(expanded).toBeVisible();
+  await expanded.getByRole("button", { name: "More Player actions" }).click();
+  await page.getByRole("button", { name: /Transitions/ }).last().click();
+
+  const modes = page.getByRole("radiogroup", { name: "Transitions" });
+  const off = modes.getByRole("radio", { name: /^Off\b/ });
+  const crossfade = modes.getByRole("radio", { name: /^Crossfade\b/ });
+  const smart = modes.getByRole("radio", { name: /^Smart Mix\b/ });
+  const slider = modes.getByRole("slider", { name: "Crossfade duration" });
+
+  // An unselected duration control must not occupy permanent space.
+  await expect(off).toHaveAttribute("aria-checked", "true");
+  await expect(slider).toHaveCount(0);
+  await crossfade.click();
+  await expect(crossfade).toHaveAttribute("aria-checked", "true");
+  await expect(slider).toBeVisible();
+  await expect(slider).toHaveAttribute("aria-valuenow", "6");
+
+  // Verify the actual vertical order, not merely DOM existence.
+  const crossfadeBox = await crossfade.boundingBox();
+  const sliderBox = await slider.boundingBox();
+  const smartBox = await smart.boundingBox();
+  expect(crossfadeBox).not.toBeNull();
+  expect(sliderBox).not.toBeNull();
+  expect(smartBox).not.toBeNull();
+  expect(sliderBox!.y).toBeGreaterThanOrEqual(crossfadeBox!.y + crossfadeBox!.height);
+  expect(smartBox!.y).toBeGreaterThan(sliderBox!.y + sliderBox!.height);
+
+  // Duration persists, but is hidden for every other transition mode.
+  await slider.focus();
+  await slider.press("End");
+  await expect(slider).toHaveAttribute("aria-valuenow", "12");
+  await smart.click();
+  await expect(smart).toHaveAttribute("aria-checked", "true");
+  await expect(slider).toHaveCount(0);
+  await off.click();
+  await expect(off).toHaveAttribute("aria-checked", "true");
+  await expect(slider).toHaveCount(0);
+  await crossfade.click();
+  await expect(slider).toBeVisible();
+  await expect(slider).toHaveAttribute("aria-valuenow", "12");
+});
+
 test("Chapter 25 mobile More tooltip stays inside the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route(
