@@ -117,7 +117,33 @@ export class WakilishaPreviewBufferMixer {
         if (!response.ok) return null;
         const declared = Number(response.headers.get("content-length") || 0);
         if (declared > MAX_BYTES) return null;
-        const bytes = await response.arrayBuffer();
+        // Bound actual network bytes even if the server omits Content-Length.
+        // Never materialize a full album, stream or untrusted large response.
+        const reader = response.body?.getReader();
+        let bytes: ArrayBuffer;
+        if (reader) {
+          const chunks: Uint8Array[] = [];
+          let total = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            total += value.byteLength;
+            if (total > MAX_BYTES) {
+              await reader.cancel().catch(() => {});
+              return null;
+            }
+            chunks.push(value);
+          }
+          const assembled = new Uint8Array(total);
+          let offset = 0;
+          for (const chunk of chunks) {
+            assembled.set(chunk, offset);
+            offset += chunk.byteLength;
+          }
+          bytes = assembled.buffer;
+        } else {
+          bytes = await response.arrayBuffer();
+        }
         if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) return null;
         const decoded = await context.decodeAudioData(bytes);
         if (!Number.isFinite(decoded.duration) || decoded.duration <= 0 ||
