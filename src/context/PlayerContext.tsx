@@ -1429,10 +1429,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const engine = previewBufferRef.current;
-    if (!engine.isRunning) {
-      audit("skipped", "context-not-running");
-      return;
-    }
+    // Safari resumes the gesture-woken AudioContext asynchronously.
+    // Do not permanently skip upgrade just because React ran the effect
+    // before that resume promise settled.
     const order = isShuffle ? shuffledOrderRef.current : queue.map((_, i) => i);
     const position = order.indexOf(queueIndex);
     const nextIdx = order[position + 1] ?? (repeatMode === "all" ? order[0] : undefined);
@@ -1459,6 +1458,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audit("preparing");
     void (async () => {
       try {
+        if (!(await engine.waitUntilRunning())) {
+          audit("failed", "gesture-audio-context-not-resumed");
+          return;
+        }
+        if (serial !== bufferUpgradeSerialRef.current ||
+            htmlAudioSessionRef.current !== session ||
+            !playbackArbiterRef.current.isCurrent(session) ||
+            audioRef.current !== audio || audio.paused ||
+            !readPlaybackPrefs().crossfade) {
+          audit("aborted", "session-changed-during-context-resume");
+          return;
+        }
+        audit("context-running");
         if (!(await engine.prepare(track.previewUrl!))) {
           audit("failed", "current-preview-fetch-or-decode");
           return;
