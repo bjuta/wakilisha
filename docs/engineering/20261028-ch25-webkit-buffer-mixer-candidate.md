@@ -43,6 +43,17 @@ The strengthened integrated test **PASSED** on the owner's Mac WebKit iPhone pro
 
 **Next:** local scoped player tests, Chromium version of the same browser assertion and full candidate build, then real-catalogue, physical iPhone and post-deploy acceptance. GitHub Actions remain unavailable/exhausted.
 
+## Local player-contract regression gate — inherited test drift and architecture migration
+
+The 28 October local Mac gate at candidate `2e03d135841c40184c45836a74f1428004afc67a` recorded `CH25_DIFF_CHECK=PASS` and `CH25_PLAYER_CONTRACTS=FAIL` with **28 passed and 3 failed** over the three requested test files. Chromium and the candidate build **were not run** because the gate stopped.
+
+Repository-side review identified two test-contract classes requiring maintenance, not a new audible-mixer runtime patch:
+
+- `test/player/canonical-media-runtime-commit1.test.ts` still required the retired `mixEngineRef.current.prepare(activeAudio, source)`, `signalMixerDeckReady`, `standby.crossOrigin`, and `mixEngineRef.current.prepare(standby, source)` MediaElement-source path. The new engine must **not** call these WebKit-incompatible methods. The two older tests were replaced with explicit native-first playback, provider recovery, both-track decoded preflight, active-session validation, nonzero PCM before native pause, bounded buffer/source semantics, and zero MediaElement source creation.
+- `test/player/media-first-player-phase-6b.test.ts` required `<Suspense fallback={null}>`, while the actual `ResponsiveAppLayout.tsx` now uses a visible `role="status"` loading placeholder inside a presentation error boundary. Both the old test and source file have **identical blob SHAs on main and the candidate**, proving this mismatch existed independently of the Chapter 25 branch. Updated the assertion to protect the current accessible loading UI instead.
+
+The maintenance change affects **only those two test files and this engineering note**, not the buffer transport or player UI/runtime. Repository source-check verification found all updated literal contracts present. However, that is **not** a substitute for the Mac Vitest execution. Next: run only those three scoped test files on the exact updated branch commit. If green, continue Chromium parity and the full build without rerunning the already-green WebKit iPhone-profile test. GitHub Actions remain exhausted and must not be used.
+
 ## Acceptance status and gates
 
 **Integrated local WebKit fixture PASS; overall release acceptance remains OPEN.** The standalone WebKit architecture and actual-player WebKit dual-PCM/dual-gain tests are accepted, but real-catalogue transport, local build/regressions, physical iPhone and Production acceptance remain unverified. Before any PR, merge or deployment:
