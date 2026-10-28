@@ -1169,7 +1169,7 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
     // Observe whether Safari rejects the automatically started standby deck.
     // Do not alter play()'s return value, permission policy or media behavior.
     const nativePlay = HTMLMediaElement.prototype.play;
-    HTMLMediaElement.prototype.play = function () {
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
       const call = {
         time: Math.round(performance.now()),
         source: (this.currentSrc || this.src).slice(0, 120),
