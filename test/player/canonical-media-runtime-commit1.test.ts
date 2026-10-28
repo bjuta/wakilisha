@@ -85,16 +85,31 @@ const accountSync = readFileSync(
 );
 
 describe("Chapter 25 audible-media and device-independent icon acceptance", () => {
-  it("routes native play first and has two independent provider-audio recovery paths", () => {
-    const play = playerContext.indexOf("await activeAudio.play()");
-    const mix = playerContext.indexOf("mixEngineRef.current.prepare(activeAudio, source)");
-    expect(play).toBeGreaterThan(-1);
-    expect(mix).toBeGreaterThan(play);
-    expect(playerContext).toContain('failedMixSourcesRef.current.add(source.url)');
-    expect(playerContext).toContain("hasAudioSignal(activeAudio)");
-    expect(playerContext).toContain("activeAudio.currentSrc === expectedMixUrl");
-    expect(playerContext).not.toContain('activeAudio.currentSrc.includes("/__wk-mix/") &&');
-    expect(playerContext).toContain("fallback.src = track.previewUrl!");
+  it("starts native previews before decoded-buffer adoption and preserves provider recovery", () => {
+    const nativeStart = playerContext.slice(
+      playerContext.indexOf("const playViaHtmlAudio ="),
+      playerContext.indexOf("const playTrackSource ="),
+    );
+    const upgrade = playerContext.slice(
+      playerContext.indexOf("// Chapter 25: WebKit-proven buffer transport."),
+      playerContext.indexOf("// ─── Play a track ───"),
+    );
+    expect(nativeStart).toContain("activeAudio.src = track.previewUrl;");
+    expect(nativeStart).toContain("await activeAudio.play()");
+    expect(nativeStart).not.toContain("mixEngineRef.current.prepare(");
+    expect(playerContext).toContain("const fallbackToPreview = async");
+    expect(playerContext).toContain("await playViaHtmlAudio(");
+    // Both recordings must be decoded without pausing the native output.
+    expect(upgrade).toContain("await engine.prepare(track.previewUrl!)");
+    expect(upgrade).toContain("await engine.prepare(nextTrack.previewUrl!)");
+    expect(upgrade).toContain("htmlAudioSessionRef.current !== session");
+    expect(upgrade).toContain("playbackArbiterRef.current.isCurrent(session)");
+    expect(upgrade).toContain('if (!verified) {');
+    expect(upgrade).toContain("engine.stop();");
+    expect(upgrade.indexOf("audio.pause();")).toBeGreaterThan(
+      upgrade.indexOf('if (!verified) {'),
+    );
+    expect(upgrade).toContain("engine.setVolume(volumeRef.current)");
   });
   it("displays one compact, collapsible mode instead of a contradictory gapless toggle", () => {
     expect(playbackControls).toContain("TransitionDisclosure");
@@ -104,16 +119,27 @@ describe("Chapter 25 audible-media and device-independent icon acceptance", () =
     expect(playbackControls).toContain('"smart", label: "Smart Mix"');
     expect(playbackControls).not.toContain('label="Keep albums gapless"');
   });
-  it("keeps the mixer ready for iOS by preloading after verified PCM output", () => {
-    const mixEngine = readFileSync("src/services/player/WakilishaMixEngine.ts", "utf8");
-    expect(playerContext).toContain("waitUntilRunning()");
-    expect(playerContext).toContain("signalMixerDeckReady((revision) => revision + 1)");
-    expect(playerContext).toContain("mixerDeckRevision, isShuffle");
-    expect(playerContext).toContain('standby.crossOrigin = "anonymous"');
-    expect(playerContext).toContain("mixEngineRef.current.prepare(standby, source)");
-    expect(playerContext).toContain("nativeRescueAudioRef.current");
-    expect(mixEngine).toContain('this.context.state !== "running"');
-    expect(mixEngine).toContain("resumePending");
+  it("uses a gesture-resumed, decoded-buffer iPhone mixer without attaching HTML audio", () => {
+    const bufferEngine = readFileSync(
+      "src/services/player/WakilishaPreviewBufferMixer.ts", "utf8",
+    );
+    expect(playerContext).toContain("previewBufferRef.current.wake()");
+    expect(playerContext).toContain("engine.waitUntilRunning()");
+    expect(playerContext).toContain("engine.hasLivePCM(\"active\")");
+    expect(playerContext).toContain("engine.fadeToPrepared(");
+    expect(playerContext).toContain("previewBufferRef.current.pause()");
+    expect(playerContext).toContain("previewBufferRef.current.seek(clamped)");
+    expect(bufferEngine).toContain("context.decodeAudioData(bytes)");
+    expect(bufferEngine).toContain("this.context.createBufferSource()");
+    expect(bufferEngine).toContain("source.connect(analyser)");
+    expect(bufferEngine).toContain("analyser.connect(gain)");
+    expect(bufferEngine).toContain("gain.connect(this.master)");
+    expect(bufferEngine).toContain("setValueCurveAtTime");
+    expect(bufferEngine).toContain("MAX_BYTES = 2_500_000");
+    expect(bufferEngine).toContain("MAX_SECONDS = 65");
+    expect(bufferEngine).toContain("MAX_CACHE = 2");
+    expect(bufferEngine).not.toContain("createMediaElementSource(");
+    expect(bufferEngine).not.toContain("new Audio(");
   });
   it("keeps help entirely inside the viewport and outside radio buttons", () => {
     expect(playbackControls).toContain('createPortal(');
