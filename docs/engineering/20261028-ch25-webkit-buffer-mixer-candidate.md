@@ -45,7 +45,7 @@ The strengthened integrated test **PASSED** on the owner's Mac WebKit iPhone pro
 
 ## Acceptance status and gates
 
-**Candidate runtime implementation is UNVERIFIED.** A standalone WebKit prototype passing does not certify this integration. Before any PR, merge or deployment:
+**Integrated local WebKit fixture PASS; overall release acceptance remains OPEN.** The standalone WebKit architecture and actual-player WebKit dual-PCM/dual-gain tests are accepted, but real-catalogue transport, local build/regressions, physical iPhone and Production acceptance remain unverified. Before any PR, merge or deployment:
 
 1. Mac local WebKit iPhone-profile **actual player** test must pass with two concurrent decoded-buffer PCM streams and no MediaElementAudioSource attachments.
 2. Mac Chromium and existing scoped player/queue/browser contracts must pass locally; build and diff checks must pass.
