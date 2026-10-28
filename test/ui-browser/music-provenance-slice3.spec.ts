@@ -1183,7 +1183,7 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
     if (!wav) return route.fulfill({ status: 404, body: "Unknown test preview" });
     // WebKit media loading frequently uses HTTP byte-range reads.
     // A 200 response to a Range request can fail before audio decoding.
-    const range = route.request().headers()["range"]?.match(/^bytes=(\\d+)-(\\d*)$/);
+    const range = route.request().headers()["range"]?.match(/^bytes=(\d+)-(\d*)$/);
     const first = range ? Number(range[1]) : 0;
     const last = range && range[2] ? Math.min(Number(range[2]), wav.length - 1) : wav.length - 1;
     if (first >= wav.length || last < first) {
