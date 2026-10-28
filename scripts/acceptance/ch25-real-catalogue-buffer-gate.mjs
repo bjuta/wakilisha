@@ -208,7 +208,7 @@ async function inspect(engineName, browserType) {
       const s=await snapshot(page,`natural-${i}`);
       result.observations.push(s);
       best.pcm=Math.max(best.pcm,s.analysers.filter(v=>v>0.0005).length);
-      best.gains=Math.max(best.gains,s.gains.filter(v=>0.05).length);
+      best.gains=Math.max(best.gains,s.gains.filter(v=>v>0.05).length);
       best.sourceCount=Math.max(best.sourceCount,s.sources);
       dual ||= s.dualPCM&&s.dualGains&&s.sources>=2&&s.mediaSourceAttachments===0;
       advanced ||= Boolean(firstTitle&&s.title&&s.title!==firstTitle);
