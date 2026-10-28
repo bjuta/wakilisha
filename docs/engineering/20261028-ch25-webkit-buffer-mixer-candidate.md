@@ -34,7 +34,14 @@ The owner ran exact candidate `537c0d4bb5823f01f23afb447975457c169796de`. The te
 
 The line-752 failure was a **test selector mismatch**, not evidence of a queue/runtime fault. The test had opened the full mobile player, which intentionally unmounts `PlayerCompactSurface` and hides the music dock. The stale final selector searched those absent/hidden surfaces rather than the visible `[data-wk-player-overlay] [data-wk-player-full]` title. Fixed the final assertion to the actual full-player `h1` title and strengthened the gain assertion to **three** simultaneous nonzero gains (master + two independent decks), alongside two live PCM analysers. These are test-only changes. No player implementation change was justified by the line-752 failure.
 
-The strengthened full test remains **unrun**. No integrated release PASS until the exact updated local WebKit test succeeds, followed by real-catalogue and physical iPhone acceptance.
+The strengthened integrated test **PASSED** on the owner's Mac WebKit iPhone profile at exact commit `f57ae854c98b023f5a8456ddfdefd62bd79b06eb`, 28 October 2026:
+- `CH25_INTEGRATED_WEBKIT_V3=PASS`
+- Playwright `webkit-mobile-audio`: **1 passed (49.0s)**, one test completed in 45.3s.
+- Started with native playback, selected Smart Mix through the real mobile full-player controls.
+- Require two simultaneous decoded PCM analyser signals, **three** nonzero gain nodes (master + both buffer decks), zero `MediaElementAudioSourceNode` attachments, and the visible full-player title advancing to the second recording.
+- This closes only the integrated **simulated iPhone WebKit local fixture** gate. It does **not** prove real-catalogue CORS/transport, all player controls, audible physical-iPhone Safari or Production readiness.
+
+**Next:** local scoped player tests, Chromium version of the same browser assertion and full candidate build, then real-catalogue, physical iPhone and post-deploy acceptance. GitHub Actions remain unavailable/exhausted.
 
 ## Acceptance status and gates
 
