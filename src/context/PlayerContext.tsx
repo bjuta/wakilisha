@@ -1838,11 +1838,23 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (previewBufferRef.current.isPaused) {
-      previewBufferRef.current.wake();
-      if (previewBufferRef.current.resume()) {
-        setIsPlaying(true);
-        return;
-      }
+      const engine = previewBufferRef.current;
+      // AudioContext.resume() may settle asynchronously on iPhone.
+      // Never start the silent/paused HTMLAudioElement in parallel.
+      engine.wake();
+      void (async () => {
+        for (let check = 0; check < 15; check++) {
+          if (!engine.isPaused) return; // superseded by explicit Stop/Next
+          if (engine.resume()) {
+            setIsPlaying(true);
+            setDuration(engine.duration);
+            return;
+          }
+          await new Promise<void>(resolve => window.setTimeout(resolve, 90));
+        }
+        console.warn("Buffer preview resume requires another Play gesture");
+      })();
+      return;
     }
 
     if (audio.ended) {
