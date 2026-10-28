@@ -1121,7 +1121,14 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
   // playback starts with Crossfade OFF, then the listener changes Smart Mix
   // through the actual mobile player UI while the first audio element plays.
   await page.setViewportSize({ width: 390, height: 844 });
-  const previews = [shortWavPreview(220, 12), shortWavPreview(330, 12)];
+  // Same-origin HTTP media reflects the real /__wk-mix delivery path.
+  // data: URLs are opaque-origin documents and can exercise a different
+  // MediaElementAudioSource CORS path in WebKit than a proxied preview.
+  const previews = ["/__wk-mix/ch25-a.wav", "/__wk-mix/ch25-b.wav"];
+  const wavByName = new Map([
+    ["ch25-a.wav", Buffer.from(shortWavPreview(220, 12).split(",")[1], "base64")],
+    ["ch25-b.wav", Buffer.from(shortWavPreview(330, 12).split(",")[1], "base64")],
+  ]);
   const fixture = {
     ...releaseDetail,
     tracks: releaseDetail.tracks.map((track, index) => ({
@@ -1134,11 +1141,22 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
     const audios: HTMLAudioElement[] = [];
     const analysers: AnalyserNode[] = [];
     const gains: GainNode[] = [];
+    const contexts: AudioContext[] = [];
     Object.assign(window, {
       __wkHotMixAudios: audios,
       __wkHotMixAnalysers: analysers,
       __wkHotMixGains: gains,
+      __wkHotMixContexts: contexts,
     });
+    const NativeAudioContext = window.AudioContext;
+    if (NativeAudioContext) {
+      window.AudioContext = class extends NativeAudioContext {
+        constructor(options?: AudioContextOptions) {
+          super(options);
+          contexts.push(this);
+        }
+      };
+    }
     window.Audio = function (...args: ConstructorParameters<typeof Audio>) {
       const audio = new NativeAudio(...args);
       audios.push(audio);
@@ -1159,8 +1177,19 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
       };
     }
   });
+  await page.route("**/__wk-mix/ch25-*.wav", async (route) => {
+    const name = new URL(route.request().url()).pathname.split("/").pop() || "";
+    const wav = wavByName.get(name);
+    if (!wav) return route.fulfill({ status: 404, body: "Unknown test preview" });
+    return route.fulfill({
+      status: 200,
+      contentType: "audio/wav",
+      headers: { "Access-Control-Allow-Origin": "*", "Accept-Ranges": "bytes" },
+      body: wav,
+    });
+  });
   await page.route(
-    "**/public-content-read/releases/slice3-browser-solo/slice3-browser-release",
+    "**/public-content-read/releases/slice3-browser-solo/slice3-browser-release**",
     async (route) => { await fulfillJson(route, { data: { release: fixture } }); },
   );
   await page.goto("/releases/slice3-browser-solo/slice3-browser-release", {
@@ -1208,10 +1237,47 @@ test("Chapter 25 hot-enables measured mixer and overlaps decoded audio", async (
       analyserCount: peaks.length,
     };
   });
-  await expect.poll(async () => (await measure()).audibleDecks, {
-    timeout: 8000, intervals: [80, 80, 120],
-    message: "Hot-selecting Smart Mix must connect actual decoded PCM",
-  }).toBeGreaterThanOrEqual(1);
+  try {
+    await expect.poll(async () => (await measure()).audibleDecks, {
+      timeout: 8000, intervals: [80, 80, 120],
+      message: "Hot-selecting Smart Mix must connect actual decoded PCM",
+    }).toBeGreaterThanOrEqual(1);
+  } catch (error) {
+    const diagnostic = await page.evaluate(() => {
+      const w = window as unknown as {
+        __wkHotMixAudios: HTMLAudioElement[];
+        __wkHotMixContexts: AudioContext[];
+        __wkHotMixAnalysers: AnalyserNode[];
+        __wkHotMixGains: GainNode[];
+      };
+      return {
+        contexts: (w.__wkHotMixContexts || []).map((context) => ({
+          state: context.state,
+          currentTime: context.currentTime,
+          sampleRate: context.sampleRate,
+        })),
+        decks: (w.__wkHotMixAudios || []).map((audio) => ({
+          src: audio.currentSrc.substring(0, 140),
+          currentTime: audio.currentTime,
+          readyState: audio.readyState,
+          networkState: audio.networkState,
+          paused: audio.paused,
+          muted: audio.muted,
+          volume: audio.volume,
+          crossOrigin: audio.crossOrigin,
+          error: audio.error?.code || null,
+        })),
+        analysers: (w.__wkHotMixAnalysers || []).map((analyser) => {
+          const data = new Float32Array(analyser.fftSize);
+          analyser.getFloatTimeDomainData(data);
+          return Math.max(...data.map((sample) => Math.abs(sample)));
+        }),
+        gains: (w.__wkHotMixGains || []).map((gain) => gain.gain.value),
+      };
+    });
+    console.error("CH25_WEBKIT_MIX_GRAPH_DIAGNOSTICS=" + JSON.stringify(diagnostic));
+    throw error;
+  }
   await expect.poll(async () => {
     const m = await measure();
     return m.playing >= 2 && m.audibleDecks >= 2 &&
