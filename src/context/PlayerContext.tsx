@@ -1543,15 +1543,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             nextDuration: nextTrack.duration || 0,
           }) : 0;
       const remaining = engine.duration - secondsPlayed;
+      if (previewFadeSuppressedRef.current && remaining > 12.5) {
+        previewFadeSuppressedRef.current = false;
+      }
       const eligible = nextTrack && nextTrack.previewUrl &&
         nextTrack.isPlayable !== false &&
         (!nextTrack.playbackEngine || nextTrack.playbackEngine === "audio") &&
         (!playbackPrefs.explicitFilter || !nextTrack.isExplicit);
       if (eligible && fadeSeconds && remaining <= fadeSeconds &&
-          remaining > 0.1 && engine.hasPrepared(nextTrack.previewUrl!) &&
+          remaining > 0.1 && !previewFadeSuppressedRef.current &&
+          engine.hasPrepared(nextTrack.previewUrl!) &&
           engine.hasLivePCM("active") &&
           engine.fadeToPrepared(nextTrack.previewUrl!, fadeSeconds,
-            safeTempoMatchRate(currentTrack?.bpm, nextTrack.bpm))) {
+            engine.rate * (playbackPrefs.smartMix
+              ? safeTempoMatchRate(currentTrack?.bpm, nextTrack.bpm)
+              : 1))) {
         const previous = currentTrack;
         currentTrackRef.current = nextTrack;
         playedAtRef.current = Date.now();
@@ -1598,7 +1604,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [
     isPlaying, playbackBackend, playbackPrefs.autoplay, playbackPrefs.crossfade,
     playbackPrefs.crossfadeSeconds, playbackPrefs.appleMusicConnected,
-    playbackPrefs.explicitFilter, isShuffle, repeatMode, queue, queueIndex,
+    playbackPrefs.smartMix, playbackPrefs.explicitFilter,
+    isShuffle, repeatMode, queue, queueIndex,
   ]);
 
   // ─── Play a track ───
