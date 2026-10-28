@@ -586,7 +586,11 @@ function shortWavPreview(frequency: number, seconds = 6): string {
 
 test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade start", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const previews = [shortWavPreview(220, 12), shortWavPreview(330, 12)];
+  const previews = ["/__wk-mix/ch25-runtime-a.wav", "/__wk-mix/ch25-runtime-b.wav"];
+  const audioByName = new Map([
+    ["ch25-runtime-a.wav", Buffer.from(shortWavPreview(220, 12).split(",")[1], "base64")],
+    ["ch25-runtime-b.wav", Buffer.from(shortWavPreview(330, 12).split(",")[1], "base64")],
+  ]);
   const fixture = {
     ...releaseDetail,
     tracks: releaseDetail.tracks.map((track, index) => ({
@@ -632,6 +636,27 @@ test("Chapter 25 hot-enables decoded-buffer overlap and switches queue at fade s
       mediaAttachments.push(element.currentSrc.slice(0, 80));
       return oldMediaFactory.call(this, element);
     };
+  });
+  await page.route("**/__wk-mix/ch25-runtime-*.wav", async (route) => {
+    const path = new URL(route.request().url()).pathname.split("/").pop() || "";
+    const wav = audioByName.get(path);
+    if (!wav) return route.fulfill({ status: 404, body: "Unknown Ch25 fixture" });
+    const range = route.request().headers()["range"]?.match(/^bytes=(\d+)-(\d*)$/);
+    const first = range ? Number(range[1]) : 0;
+    const last = range && range[2] ? Math.min(Number(range[2]), wav.length - 1) : wav.length - 1;
+    if (first >= wav.length || last < first) {
+      return route.fulfill({ status: 416, headers: { "Content-Range": `bytes */${wav.length}` } });
+    }
+    const part = wav.subarray(first, last + 1);
+    await route.fulfill({
+      status: range ? 206 : 200, contentType: "audio/wav",
+      headers: {
+        "Access-Control-Allow-Origin": "*", "Accept-Ranges": "bytes",
+        "Content-Length": String(part.length),
+        ...(range ? { "Content-Range": `bytes ${first}-${last}/${wav.length}` } : {}),
+      },
+      body: part,
+    });
   });
   await page.route(
     "**/public-content-read/releases/slice3-browser-solo/slice3-browser-release**",
