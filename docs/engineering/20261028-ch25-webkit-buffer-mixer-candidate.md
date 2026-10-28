@@ -28,6 +28,14 @@ The player previously tested `isRunning` synchronously in a React effect; Safari
 
 The next local gate is ONLY the integrated WebKit iPhone-profile actual-player test at exact candidate HEAD. On failure, `CH25_BUFFER_PLAYER_DIAGNOSTICS` includes `gates` and native-media state. Do not broaden changes or advance release gates until it passes.
 
+## Integrated WebKit V2 — dual PCM passed; final selector was wrong
+
+The owner ran exact candidate `537c0d4bb5823f01f23afb447975457c169796de`. The test failed at `test/ui-browser/music-provenance-slice3.spec.ts:752:70`, **after** the decoded-buffer overlap poll completed. No `CH25_BUFFER_PLAYER_DIAGNOSTICS` was emitted because the overlap assertion did not throw. The test proved at least two concurrently nonzero decoded buffer analysers, but its original gain condition required only two positive gains total (which could be master + one deck). Full audible dual-deck gain overlap still needed a stricter assertion.
+
+The line-752 failure was a **test selector mismatch**, not evidence of a queue/runtime fault. The test had opened the full mobile player, which intentionally unmounts `PlayerCompactSurface` and hides the music dock. The stale final selector searched those absent/hidden surfaces rather than the visible `[data-wk-player-overlay] [data-wk-player-full]` title. Fixed the final assertion to the actual full-player `h1` title and strengthened the gain assertion to **three** simultaneous nonzero gains (master + two independent decks), alongside two live PCM analysers. These are test-only changes. No player implementation change was justified by the line-752 failure.
+
+The strengthened full test remains **unrun**. No integrated release PASS until the exact updated local WebKit test succeeds, followed by real-catalogue and physical iPhone acceptance.
+
 ## Acceptance status and gates
 
 **Candidate runtime implementation is UNVERIFIED.** A standalone WebKit prototype passing does not certify this integration. Before any PR, merge or deployment:
