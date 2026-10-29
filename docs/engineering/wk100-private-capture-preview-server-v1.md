@@ -30,3 +30,27 @@ The endpoint responds only with `status`, `week_start_eat`, aggregate verified r
 ## Acceptance and release boundary
 
 All implementation checks are consolidated into `test/charts/wk100-private-preview.test.mjs`; there is no new CI workflow, schema migration, provider request or scheduling change. The new function is not configured in Production. Before any later deployment, separately verify required Edge secrets, signed-in administrator/nonadministrator behavior, project binding, private Storage ACL and a real receipt readback in the intended environment. Existing historical editions and public Charts are unaffected. This PR cannot publish or promote an Edition.
+
+## Hosted Preview authorization and fixture-lifecycle record (29 October 2026)
+
+The disposable Supabase branch `lwkvifkwtfavcjyzknmt` was created without Production data and deployed only `wk100-capture-private-preview` v1 with gateway JWT verification. The branch was **deleted after testing**; the subsequent Supabase branch inventory contained only Production `pgzizndxdyhqmtyywjmt`. This is a historical acceptance record, not an active Preview configuration or a Production rollout.
+
+The actual hosted HTTP results were:
+
+- Missing Authorization header: **401**, `UNAUTHORIZED_NO_AUTH_HEADER` from the Supabase gateway.
+- Authenticated nonadministrator: **403** from the endpoint.
+- Authenticated administrator with an active, time-bounded assignment: **503**, `preview_not_configured`. The endpoint stayed disabled and exposed no private evidence.
+- Exact Preview project binding and signed-in sessions: **PASS** in the owner's SHA-verified operator acceptance.
+- No genuine capture or private Storage readback was possible: contracts, attempts, rows and raw objects remained empty. No candidate Chart Edition was admitted.
+
+**The overall Auth fixture runner was not a clean PASS.** Its two test users could not be individually deleted through Supabase Auth Admin: `DELETE /auth/v1/admin/users/{id}` returned HTTP 500, PostgreSQL `23503`. This was caused by the intentional `editorial.person_identity_links.user_id -> public.user_profiles.user_id ON DELETE RESTRICT` historical-identity boundary, not by WK100 authorization. An isolated test's successful access assertions do not override a failed cleanup gate.
+
+### Account lifecycle authority (do not bypass)
+
+WAKILISHA already has a separate, deployed, governed account-retirement operation, `public.retire_account_identity(uuid,uuid,bigint,uuid,text,text,uuid)`. It requires an authenticated operator with **both** `manage_people_identity` and `manage_users`, refuses self-retirement and privileged targets, checks durable foreign-key blockers, preserves Person identity events and tombstones, and deletes Auth state only after governed unlink. The public Data API facade delegates to the privileged `account_identity_private` executor, which flushes deferred Person constraints inside its trusted transaction. Refer to `docs/engineering/account-identity-retirement-implementation-audit.md`, `docs/engineering/account-identity-retirement-data-api-boundary.md`, and the permanent read-only verifiers `scripts/control-plane/verify-account-identity-retirement.sql` and `scripts/control-plane/verify-account-retirement-data-api-boundary.sql`. This is the account-deletion authority, not generic Auth Admin `deleteUser` for an identity-linked account.
+
+For **disposable, data-less hosted Preview Auth fixtures**, use a recorded branch ID and project ref as the lifecycle/cleanup boundary. Before deleting, independently verify that the target branch is **nondefault**, its parent is the exact Production project, its ref and name match the acceptance ledger, and it contains no durable business evidence. Remove the *entire verified branch* when acceptance finishes; never drop the Person foreign key, modify historical identity rows, or change Production to make temporary fixtures deletable. If a Preview contains genuine evidence or other retained work, do not delete it under this protocol. Escalate for a separate, reviewed cleanup authority.
+
+For **non-disposable accounts**, use the governed retirement RPC and its existing approval, authorization, evidence and rollback controls. Do not substitute a direct Auth Admin delete or treat branch destruction as account-retirement authority.
+
+This acceptance closes the JWT, role-denial and disabled-feature gates only. It does **not** certify authorized source collection, private ranking replay, real receipts, source licensing, or any public Chart Edition. See programme #1264 and account lifecycle reconciliation #1317.
