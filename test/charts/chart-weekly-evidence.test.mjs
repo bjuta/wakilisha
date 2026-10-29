@@ -185,8 +185,10 @@ test('Shazam retains strict columns, field boundaries and rank integrity',()=>{
     /shazam_invalid_chart_row/);
   assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,A,Song,Injected\n'),
     /shazam_invalid_chart_row/);
+  // With two rows, a source rank of 3 exceeds declared depth 2 and
+  // fails the rank-range check before the subsequent contiguity check.
   assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,A,Song\n3,B,Other\n'),
-    /shazam_ke_noncontiguous_rank/);
+    /shazam_ke_duplicate_or_invalid_rank/);
 });
 
 test('Apple public most-played is not inferred to be a seven-day consumption total',()=>{
