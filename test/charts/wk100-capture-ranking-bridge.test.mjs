@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {buildWk100CaptureRankingInput as project} from '../../supabase/functions/_shared/wk100-capture-ranking-bridge.mjs';
+import {buildWk100PrivatePreview} from '../../scripts/charts/wk100-private-preview.mjs';
 const uuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`;
 const method={version:'preview-proxy-v1',behavior_weights:{consumption:0.5,video_consumption:0.5},operator_slots:{consumption:1,video_consumption:1},minimum_operators:2,minimum_behaviors:2,minimum_corrob_tracks:1,maximum_operator_share:0.9};
 function fixture(){
@@ -23,6 +24,10 @@ test('two independent operators preserve source-native ranks and exact source co
  assert.deepEqual(r.input.sources.map(s=>s.operator_key),['operator_1','operator_2']);
  assert.deepEqual(r.input.sources.map(s=>s.entries.map(e=>e.rank)),[[1,2],[1,2]]);
  assert.equal(r.provenance.length,4);
+ const preview=buildWk100PrivatePreview(r.input);
+ assert.deepEqual(preview.privateAudit.top100.map(row=>[row.position,row.operator_count,row.score]),
+   [[1,2,1],[2,2,0.5]]);
+ assert.equal(preview.privateAudit.can_publish,false);
  assert.equal(r.can_publish,false);
 });
 test('row/source reorder has stable output and provenance',()=>{
