@@ -1,15 +1,15 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {buildWk100CaptureRankingInput as project} from '../../supabase/functions/_shared/wk100-capture-ranking-bridge.mjs';
-const uuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')`;
+const uuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`;
 const method={version:'preview-proxy-v1',behavior_weights:{consumption:0.5,video_consumption:0.5},operator_slots:{consumption:1,video_consumption:1},minimum_operators:2,minimum_behaviors:2,minimum_corrob_tracks:1,maximum_operator_share:0.9};
 function fixture(){
  const mk=(n,behavior)=>({
-  contract:{id:uuid(10+n),source_key:`source_${n`,market:'KE',behavior,native_metric:'rank',expected_depth:2},
+  contract:{id:uuid(10+n),source_key:`source_${n}`,market:'KE',behavior,native_metric:'rank',expected_depth:2},
   attempt:{id:uuid(20+n),contract_id:uuid(10+n),week_start_eat:'2026-10-19',status:'succeeded',
    payload_sha256:n.toString(16).repeat(64),observed_depth:2,record_count:2,
    native_period_authority:'provider_defined',native_period_start:'2026-10-18T21:00:00.000Z',native_period_end:'2026-10-25T21:00:00.000Z',native_period_evidence_ref:'period_ke_week'},
-  operator_key:`operator_${n`, authority_ref:`authority_${n`,
+  operator_key:`operator_${n}`, authority_ref:`authority_${n}`,
   rows:[{id:uuid(30+n*2),attempt_id:uuid(20+n),source_rank:1},
    {id:uuid(31+n*2),attempt_id:uuid(20+n),source_rank:2}],
  });
