@@ -14,14 +14,14 @@ WAKILISHA 100 is an independently researched, calculated and editorially governe
 
 The fact that source observations inform the result does not transfer control of WAKILISHA's editorial or scoring decisions to a provider. Nor does ownership of our original research automatically grant rights over a provider's protected expression, complete compilation, private data, access system or contractual restrictions.
 
-**Researcher-directed public-fact collection is the operative workflow:** WAKILISHA visits publicly accessible sources, downloads publicly offered files such as CSVs where available, and uses its own efficiency tools to record, parse and archive its observations. Do not call this scraping by default, treat private research archiving as platform-controlled editorial work, or create speculative licence/partnership preconditions for observing publicly reported chart facts. If a real and relevant source-specific restriction is established, handle that concrete question separately rather than assuming a blanket prohibition or declaring an unexamined universal permission.
+**This operating baseline applies to every public-data research platform in WAKILISHA 100, not only Shazam.** Researcher-directed public-fact collection is the operative workflow: WAKILISHA visits publicly accessible sources, downloads publicly offered files such as CSVs where available, and uses its own efficiency tools to record, parse and archive its observations. Do not call this scraping by default, treat private research archiving as platform-controlled editorial work, or create speculative licence/partnership preconditions for observing publicly reported chart facts. If a real and relevant source-specific restriction is established, handle that concrete question separately rather than assuming a blanket prohibition or declaring an unexamined universal permission.
 
 ## Distinguish research activity from runtime mechanics
 
 | Activity | What it means | Required judgment |
 | --- | --- | --- |
 | Human observation | A researcher reads a publicly available chart and records source-attributed factual observations | Check accuracy, source accessibility and any applicable use restrictions; retain bounded evidence and a provenance log |
-| Researcher-directed tooling | A researcher deliberately runs WAKILISHA-written code to gather or structure observations | Assess the **actual network and extraction behavior**. Human authorship or manual initiation does not turn a scripted request into a human browser observation under applicable site rules |
+| Researcher-directed tooling | A researcher visits public source links, uses available exports, and operates WAKILISHA-written efficiency tools for observation, parsing or private archiving | Record exact observed source, acquisition method, time, original bytes and retention provenance. Do not label this research scraping by default or impose hypothetical provider-permission gates because code was used |
 | Unattended WK100 collector | Edge code repeatedly calls an exact source endpoint according to a schedule, creating durable capture receipts | Requires a separately reviewed, project-bound source decision and the existing sealed manifest, secrets, slot/lease controls and disabled-by-default activation gate |
 | Original commercial chart | WAKILISHA independently calculates and publishes its own rankings from reviewed evidence | Separate editorial, methodological, evidentiary and publication approval; avoid representing external ordinal positions as national streams |
 
@@ -45,7 +45,7 @@ Use these decision outcomes without conflating them:
 - `METHOD_DENIED`: a concrete restriction disallows the proposed method. Preserve the rejection and explore only legitimate alternatives; do not evade.
 - `UNVERIFIED`: insufficient observation or review evidence.
 
-One source can be research-qualified for limited factual observation while its bulk/scheduled collection method remains blocked. No blanket "all platforms must sign" gate and no "public therefore unrestricted" shortcut.
+Every public-data platform follows the same researcher-directed research baseline. Operational controls for a separately deployed unattended collector are a different gate from recording and processing openly offered research facts. Preserve relevant concrete constraints when identified without introducing blanket provider-licensing or scraping presumptions.
 
 ## Engineering and release separation
 
@@ -53,6 +53,6 @@ The retained source register's previous `ADMITTED` count concerns **unattended W
 
 For the existing Edge collector, retain every security boundary: exact project binding, independent source decision reference, separately SHA-256-sealed source manifest, host/path/method checks, positive reviewed collector scope, slot/lease/cadence and rate controls, 4 MiB byte cap, hash-bound private Storage, immutable capture receipts, native parser and raw-to-row replay, and `can_publish:false`. No source can be enrolled merely by setting `admission_state='candidate'`.
 
-**Next practical tranche:** qualify the existing shortlisted research surfaces one by one, starting from current documented facts and terms; identify an exact lawful observation method and unresolved access restrictions without making unauthorized requests. Build a source-specific evidence dossier, test parser/period/Registry resolution on legitimately held data where permitted, then propose a **single** bounded prospective candidate capture once its collector method has separately passed review. This work does not depend on securing agreements with all five originally hypothesized providers.
+**Next practical tranche:** process researcher-obtained public chart observations with byte-exact private archives, source attribution and UTC timestamps; verify market/native-period meaning and route ambiguous recording identities through the existing Registry review authority. Start with Shazam's publicly offered Kenya CSV and reuse this factual research discipline across the other shortlisted platforms. Activate any separately configured unattended Edge collector only through its existing technical release controls; no five-provider partnership programme is assumed.
 
 **Open today:** No live source is currently configured for unattended WK100 capture; the Production collector remains disabled and the research archive has no genuine WK100 captured raw receipts. Original publication and methodology approval remain independent future gates.
