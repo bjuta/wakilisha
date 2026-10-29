@@ -148,6 +148,33 @@ test('Shazam quoted comma is parsed and evidence remains discovery, not streamin
   assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,A,X\n1,B,Y\n'),/duplicate_or_invalid_rank/);
 });
 
+test('Shazam preserves literal interior quotes inside quoted public CSV fields',()=>{
+  const csv='Shazam Top 200 Kenya\n2026-W42\nRank,Artist,Title\n'+
+    '1,"The "Real" Artist","Song "Love" Edit"\n'+
+    '2,"The ""Official"" Artist","Song, Version"\n';
+  const r=parseShazamKenya(csv);
+  assert.equal(r.rows.length,2);
+  assert.deepEqual(r.rows.map(x=>[x.rank,x.artist,x.title]),[
+    [1,'The "Real" Artist','Song "Love" Edit'],
+    [2,'The "Official" Artist','Song, Version'],
+  ]);
+  assert.equal(r.native_period,'unknown');
+  assert.ok(r.rows.every(x=>x.provider_track_id===null));
+});
+
+test('Shazam retains strict columns, field boundaries and rank integrity',()=>{
+  assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,"Artist"tail,Song\n'),
+    /shazam_unterminated_csv_quote/);
+  assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,Artist"bad,Song\n'),
+    /shazam_invalid_quoted_csv/);
+  assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,"Artist"x",Song,Injected\n'),
+    /shazam_invalid_chart_row/);
+  assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,A,Song,Injected\n'),
+    /shazam_invalid_chart_row/);
+  assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,A,Song\n3,B,Other\n'),
+    /shazam_ke_noncontiguous_rank/);
+});
+
 test('Apple public most-played is not inferred to be a seven-day consumption total',()=>{
   const payload={feed:{country:'KE',updated:'2026-10-19T00:00:00Z',results:[{id:'121',name:'Song',artistName:'Artist',artistId:'22'}]}};
   const r=parseAppleKenya(payload);
