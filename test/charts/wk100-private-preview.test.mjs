@@ -259,22 +259,33 @@ test('preview backend binding requires the exact project hostname and HTTPS',()=
  assert.equal(validWk100CapturePreviewProjectBinding(`https://${ref}.supabase.co`, 'abcdefghijklmnopqrst'),false);
 });
 test('private candidate receipt adapter reads canonical private bucket and returns allowlisted aggregates only',async()=>{
- const x=f(), downloaded=[];
- for(let i=0;i<2;i++)x.data.wk_chart_capture_attempts_v1[i].raw_object_key=
-   `v1/${week}/source_${keys[i]}/20261019T000000Z-1/${hash}.json`;
- const storage={from(bucket){assert.equal(bucket,'wk-chart-raw-evidence-v1');return {download:async(key)=>{
-   downloaded.push(key);return {data:new Blob([bytes]),error:null};}};}};
- const manifest={schema_version:'wk100-private-capture-preview-v1',week_start_eat:week,
-   dataset_mode:'authorized_candidate',selected_attempt_ids:x.options.selected_attempt_ids,
-   constitution:x.options.constitution,method};
- const result=await runWk100PrivateCapturePreview({db:x.options.db,storage,manifest});
- assert.equal(result.status,'private_preview');assert.equal(result.can_publish,false);
- assert.equal(result.operator_count,2);assert.equal(result.recording_count,2);
- assert.equal(downloaded.length,2);
- const serialized=JSON.stringify(result);
- for(const secret of ['provider_a','source_a','operator_0','native_0_0',hash,
-   'behavior_weights','rank_input_sha256','private_audit','recording_id','contributions'])
-   assert.equal(serialized.includes(secret),false,secret);
+  const {x,archive}=authorizedReplayFixture(),downloaded=[],canonicalKeys=[];
+  for(let i=0;i<2;i++){
+    const attempt=x.data.wk_chart_capture_attempts_v1[i];
+    const raw=archive.get(attempt.raw_object_key);
+    assert.ok(raw instanceof Uint8Array);
+    archive.delete(attempt.raw_object_key);
+    attempt.raw_object_key=`v1/${week}/${x.data.wk_chart_capture_contracts_v1[i].source_key}/20261019T000000Z-1/${attempt.payload_sha256}.json`;
+    canonicalKeys.push(attempt.raw_object_key);
+    archive.set(attempt.raw_object_key,raw);
+  }
+  const storage={from(bucket){assert.equal(bucket,'wk-chart-raw-evidence-v1');return {download:async(key)=>{
+    downloaded.push(key);
+    const raw=archive.get(key);
+    return {data:raw?new Blob([raw]):null,error:raw?null:new Error('missing evidence')};
+  }};}};
+  const manifest={schema_version:'wk100-private-capture-preview-v1',week_start_eat:week,
+    dataset_mode:'authorized_candidate',selected_attempt_ids:x.options.selected_attempt_ids,
+    constitution:x.options.constitution,method};
+  const result=await runWk100PrivateCapturePreview({db:x.options.db,storage,manifest});
+  assert.equal(result.status,'private_preview');assert.equal(result.can_publish,false);
+  assert.equal(result.operator_count,2);assert.equal(result.recording_count,2);
+  assert.deepEqual(downloaded,canonicalKeys);
+  const serialized=JSON.stringify(result);
+  for(const secret of ['provider_0','apple_ke','operator_0','native_0_0',
+    ...x.data.wk_chart_capture_attempts_v1.map(a=>a.payload_sha256),
+    'behavior_weights','rank_input_sha256','private_audit','recording_id','contributions'])
+    assert.equal(serialized.includes(secret),false,secret);
 });
 test('private adapter rejects noncanonical raw paths and oversized objects before scoring',async()=>{
  const make=()=>{
@@ -311,6 +322,89 @@ test('capture-preview Edge route is JWT gated, admin-only, sealed and disabled b
  assert.match(edge,/Object\.keys\(payload\)\.length!==1\|\|payload\.action!=='read'/);
  assert.doesNotMatch(edge,/\bfetch\(/);
  assert.doesNotMatch(edge,/\.insert\(|\.upsert\(|\.delete\(/);
+});
+
+
+// WK100_NATIVE_REPLAY_CONSOLIDATED_ACCEPTANCE: immutable row-to-raw proof.
+function authorizedReplayFixture() {
+ const x=f(), encoder=new TextEncoder();
+ const sourceKeys=['apple_ke','youtube_ke'];
+ const key='weekly:20261019:20261025:ke';
+ const raw=[
+   encoder.encode(JSON.stringify({feed:{country:'KE',results:[
+     {id:'native_0_0',name:'Song 0',artistName:'Artist'},
+     {id:'native_0_1',name:'Song 1',artistName:'Artist'},
+   ]}})),
+   encoder.encode(JSON.stringify({period:key,trackViews:[
+     {chartEntryMetadata:{currentPosition:1},encryptedVideoId:'native_1_0',
+       viewCount:250,name:'Song 0',artists:[{name:'Artist'}]},
+     {chartEntryMetadata:{currentPosition:2},encryptedVideoId:'native_1_1',
+       viewCount:125,name:'Song 1',artists:[{name:'Artist'}]},
+   ]})),
+ ];
+ const archive=new Map();
+ x.options.dataset_mode='authorized_candidate';
+ for(let i=0;i<2;i++) {
+   x.data.wk_chart_capture_contracts_v1[i].source_key=sourceKeys[i];
+   x.options.constitution[i].source_key=sourceKeys[i];
+   const attempt=x.data.wk_chart_capture_attempts_v1[i];
+   attempt.payload_sha256=createHash('sha256').update(raw[i]).digest('hex');
+   attempt.raw_object_key=`wk100/private/test/evidence_${i}`;
+   archive.set(attempt.raw_object_key,raw[i]);
+ }
+ x.data.wk_chart_capture_contracts_v1[1].native_metric='rank_and_count';
+ x.data.wk_chart_capture_attempts_v1[1].native_period_evidence_ref=key;
+ for(const row of x.data.wk_chart_capture_rows_v1) {
+   row.source_native_count=row.attempt_id===x.data.wk_chart_capture_attempts_v1[1].id
+     ?(row.source_rank===1?250:125):null;
+ }
+ x.options.readRawBytes=async objectKey=>archive.get(objectKey);
+ return {x,archive};
+}
+test('authorized candidate replays exact raw Apple and weekly YouTube native rows',async()=>{
+ const {x}=authorizedReplayFixture();
+ const r=await run(x.options);
+ assert.equal(r.status,'private_preview');
+ assert.equal(r.verified_receipts,2);
+ assert.equal(r.resolved_rows,4);
+ assert.equal(r.private_audit.dataset_mode,'authorized_candidate');
+ assert.equal(r.can_publish,false);
+});
+test('authorized candidate refuses a stored title or native count not in raw bytes',async()=>{
+ const a=authorizedReplayFixture();
+ a.x.data.wk_chart_capture_rows_v1[0].title_observed='Edited title';
+ await assert.rejects(run(a.x.options),/wk100_reader_native_row_mismatch/);
+ const b=authorizedReplayFixture();
+ b.x.data.wk_chart_capture_rows_v1[2].source_native_count=999;
+ await assert.rejects(run(b.x.options),/wk100_reader_native_row_mismatch/);
+});
+test('authorized candidate refuses mismatched provider track ID and duplicate rank',async()=>{
+ const a=authorizedReplayFixture();
+ a.x.data.wk_chart_capture_rows_v1[1].provider_track_id='forged';
+ await assert.rejects(run(a.x.options),/wk100_reader_native_row_mismatch/);
+ const b=authorizedReplayFixture();
+ b.x.data.wk_chart_capture_rows_v1[1].source_rank=1;
+ await assert.rejects(run(b.x.options),/wk100_reader_native_row_mismatch/);
+});
+test('a valid raw digest cannot bless stale database rows',async()=>{
+ const a=authorizedReplayFixture(),attempt=a.x.data.wk_chart_capture_attempts_v1[0];
+ const revised=new TextEncoder().encode(JSON.stringify({feed:{country:'KE',results:[
+   {id:'native_0_0',name:'Different title',artistName:'Artist'},
+   {id:'native_0_1',name:'Song 1',artistName:'Artist'},
+ ]}}));
+ attempt.payload_sha256=createHash('sha256').update(revised).digest('hex');
+ a.archive.set(attempt.raw_object_key,revised);
+ await assert.rejects(run(a.x.options),/wk100_reader_native_row_mismatch/);
+});
+test('candidate replay rejects unsupported parser and unmatched native week key',async()=>{
+ const a=authorizedReplayFixture();
+ a.x.data.wk_chart_capture_contracts_v1[0].source_key='unreviewed_source';
+ a.x.options.constitution[0].source_key='unreviewed_source';
+ await assert.rejects(run(a.x.options),/wk100_reader_native_replay_unavailable/);
+ const b=authorizedReplayFixture();
+ b.x.data.wk_chart_capture_attempts_v1[1].native_period_evidence_ref=
+   'weekly:20261012:20261018:ke';
+ await assert.rejects(run(b.x.options),/wk100_reader_native_replay_unavailable/);
 });
 
 }
