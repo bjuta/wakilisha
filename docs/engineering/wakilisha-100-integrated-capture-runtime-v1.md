@@ -2,6 +2,14 @@
 
 **Owner:** WAKILISHA Engineering, issue #1264. **Status:** integrated implementation, not authorization to poll or publish. This replaces the earlier micro-gate plan with one code and database change, one accepted Preview proof, protected PR CI, and controlled Production promotion.
 
+## Independent research versus unattended collection (29 October 2026 clarification)
+
+WAKILISHA independently observes and reports publicly available chart facts, conducts researcher-directed work with tools it has written, archives its own research evidence, and calculates an original proprietary commercial chart. See [Independent Research and Source Qualification v1](wakilisha-100-independent-research-source-qualification-v1.md). This programme does **not** assume that every public factual observation or original WAKILISHA ranking needs a provider partnership.
+
+This specific document, however, governs an **unattended Edge collector** making HTTP requests with immutable database and Storage writes. A request is not exempt from an applicable automated-access restriction merely because a WAKILISHA researcher authored or manually launched its script. Thus the separate reviewed source-method decision, sealed source manifest, exact endpoint and permit/restriction evidence, host/quota/period checks, disabled-by-default `WK100_CAPTURE_ENABLED` and independent activation remain mandatory **for this runtime**. The `authorization_ref` is a traceable source-method decision; it is **not** a claim that all sources require a negotiated licence or that WAKILISHA's editorial authority comes from a provider.
+
+The original source shortlist is a research hypothesis, not a mandate to obtain agreements from five providers before advancing source qualification. No source is activated by this clarification.
+
 ## Existing authority
 
 Merged protected source foundation: `3bd3b8b69e93331a1c3975153846977de4f52fe8` (#1266). Production has exactly 233 migrations, head `20261019203244`, a private 4 MiB raw bucket, and four empty immutable receipt/freeze tables. No provider contracts, requests, scheduler or WAKILISHA 100 publication exist. Historic editions must not be modified.
