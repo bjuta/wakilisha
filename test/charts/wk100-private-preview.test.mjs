@@ -5,6 +5,8 @@ import { mkdtemp,writeFile,readFile,stat,rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join,resolve } from 'node:path';
 import { buildWk100PrivatePreview,previewInputDigest } from '../../scripts/charts/wk100-private-preview.mjs';
+// Consolidate capture-to-ranking bridge acceptance in the existing WK100 suite.
+import './wk100-capture-ranking-bridge.test.mjs';
 
 const uuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`;
 const p={starts_at:'2026-10-18T21:00:00Z',ends_at:'2026-10-25T21:00:00Z',evidence_ref:'period_week_2026_43'};
