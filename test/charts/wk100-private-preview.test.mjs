@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os';
 import { join,resolve } from 'node:path';
 import { buildWk100PrivatePreview,previewInputDigest } from '../../scripts/charts/wk100-private-preview.mjs';
 import {buildWk100CaptureRankingInput as project} from '../../supabase/functions/_shared/wk100-capture-ranking-bridge.mjs';
+import {createHash} from 'node:crypto';
+import {readWk100PrivateRankingEvidence as run} from '../../supabase/functions/_shared/wk100-capture-ranking-reader.mjs';
 
 const uuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`;
 const p={starts_at:'2026-10-18T21:00:00Z',ends_at:'2026-10-25T21:00:00Z',evidence_ref:'period_week_2026_43'};
@@ -161,4 +163,75 @@ test('SQL UTC offsets are normalized to scorer timestamp format',()=>{
  const f=fixture();f.sources[0].attempt.native_period_start='2026-10-19T00:00:00+03:00';
  const p=project(f);assert.equal(p.input.sources[0].native_period.starts_at,'2026-10-18T21:00:00Z');
 });
+}
+
+// WK100_READER_CONSOLIDATED_ACCEPTANCE: exact capture and Registry resolution tests.
+{
+const uuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`;
+const week='2026-10-19';
+const keys=['a','b'];
+const bytes=new TextEncoder().encode('bytes for chart');
+const hash=createHash('sha256').update(bytes).digest('hex');
+const method={version:'preview-proxy-v1',behavior_weights:{consumption:0.5,video_consumption:0.5},operator_slots:{consumption:1,video_consumption:1},minimum_operators:2,minimum_behaviors:2,minimum_corrob_tracks:1,maximum_operator_share:0.9};
+function f(){
+ const contracts=keys.map((k,i)=>({id:uuid(i+1),source_key:`source_${k}`,provider_key:`provider_${k}`,market:'KE',behavior:i?'video_consumption':'consumption',native_metric:'rank',expected_depth:2,admission_state:'candidate',contract_version:'v1'}));
+ const attempts=contracts.map((c,i)=>({id:uuid(11+i),contract_id:c.id,week_start_eat:week,scheduled_at:'2026-10-18T21:00:00+00:00',attempt_number:1,status:'succeeded',observed_market:'KE',observed_depth:2,record_count:2,payload_sha256:hash,raw_object_key:`wk100/test/private/bytes_${i}`,native_period_authority:'provider_defined',native_period_start:'2026-10-18T21:00:00Z',native_period_end:'2026-10-25T21:00:00Z',native_period_evidence_ref:'period_week_01'}));
+ const rows=attempts.flatMap((a,i)=>[0,1].map(j=>({id:uuid(21+i*2+j),attempt_id:a.id,source_rank:j+1,provider_track_id:`native_${i}_${j}`,title_observed:`Song ${j}`,artist_observed:'Artist'})));
+ const links=rows.map((r,i)=>({provider_key:contracts[Math.floor(i/2)].provider_key,provider_track_id:r.provider_track_id,track_id:uuid(101+i%2),match_status:'matched'}));
+ const tracks=[{id:uuid(101),status:'active'},{id:uuid(102),status:'active'}];
+ const data={wk_chart_capture_contracts_v1:contracts,wk_chart_capture_attempts_v1:attempts,wk_chart_capture_rows_v1:rows,registry_track_provider_links:links,provider_entity_links:[],registry_tracks:tracks};
+ const calls=[];
+ const db={from(table){calls.push(table);const criteria=[];let limit=Infinity;const query={select(){return query;},in(field,values){criteria.push(x=>values.includes(x[field]));return query;},eq(field,value){criteria.push(x=>x[field]===value);return query;},limit(n){limit=n;return Promise.resolve({data:data[table].filter(x=>criteria.every(q=>q(x))).slice(0,limit),error:null});}};return query;}};
+ const options={db,readRawBytes:async()=>bytes,week_start_eat:week,selected_attempt_ids:attempts.map(a=>a.id),constitution:contracts.map((c,i)=>({source_key:c.source_key,operator_key:`operator_${i}`,authority_ref:`authority_${i}`})),method,dataset_mode:'synthetic'};
+ return {data,calls,options};
+}
+test('exact immutable receipts resolve through existing provider links without writes',async()=>{
+ const {options,calls}=f();const result=await run(options);
+ assert.equal(result.status,'private_preview');assert.equal(result.verified_receipts,2);assert.equal(result.resolved_rows,4);assert.equal(result.can_publish,false);
+ assert.equal(result.private_audit.operator_count,2);
+ assert.deepEqual(result.private_audit.top100.map(x=>[x.position,x.operator_count,x.score]),[[1,2,1],[2,2,0.5]]);
+ assert.match(result.rank_input_sha256,/^[a-f0-9]{64}$/);
+ assert.ok(calls.every(x=>!x.startsWith('chart_ingest_')));
+});
+test('unknown provider Track produces explicit review without scoring',async()=>{
+ const x=f();x.data.registry_track_provider_links.shift();const r=await run(x.options);
+ assert.equal(r.status,'review_required');assert.equal(r.resolved_rows,3);assert.equal(r.review_rows[0].reason,'unresolved');
+});
+test('conflicting legacy provider Track prevents scoring',async()=>{
+ const x=f();x.data.provider_entity_links.push({provider:'provider_a',provider_entity_id:'native_0_0',registry_entity_id:uuid(102),registry_entity_type:'track',match_status:'confirmed'});
+ const r=await run(x.options);assert.equal(r.status,'review_required');assert.equal(r.review_rows[0].reason,'conflicting_identity');
+});
+test('non-active Registry Track produces review',async()=>{
+ const x=f();x.data.registry_tracks[0].status='archived';const r=await run(x.options);
+ assert.equal(r.status,'review_required');assert.equal(r.review_rows.length,2);assert.equal(r.review_rows[0].reason,'inactive_identity');
+});
+test('raw digest mismatch stops before scoring',async()=>{
+ const x=f();x.options.readRawBytes=async()=>new TextEncoder().encode('different');
+ await assert.rejects(run(x.options),/wk100_reader_raw_digest_mismatch/);
+});
+test('no newest-wins, duplicate selection, or duplicate operators',async()=>{
+ const x=f();x.options.selected_attempt_ids[1]=x.options.selected_attempt_ids[0];
+ await assert.rejects(run(x.options),/wk100_reader_attempt_selection_invalid/);
+ const y=f();y.options.constitution[1].operator_key=y.options.constitution[0].operator_key;
+ await assert.rejects(run(y.options),/wk100_reader_constitution_duplicate/);
+});
+test('truncated capture rows cannot be ranked',async()=>{
+ const x=f();x.data.wk_chart_capture_rows_v1.pop();
+ await assert.rejects(run(x.options),/wk100_reader_rows_incomplete/);
+});
+test('a receipt from another EAT week is not silently included',async()=>{
+ const x=f();x.data.wk_chart_capture_attempts_v1[1].week_start_eat='2026-10-26';
+ await assert.rejects(run(x.options),/wk100_reader_attempt_missing/);
+});
+test('ranking input digest is reproducible under explicit selection reorder',async()=>{
+ const x=f(),y=f();y.options.selected_attempt_ids.reverse();y.options.constitution.reverse();
+ const a=await run(x.options),b=await run(y.options);
+ assert.equal(a.rank_input_sha256,b.rank_input_sha256);
+ assert.match(a.rank_input_sha256,/^[a-f0-9]{64}$/);
+});
+test('duplicate source provider is not counted as an independent measurement',async()=>{
+ const x=f();x.data.wk_chart_capture_contracts_v1[1].provider_key='provider_a';
+ await assert.rejects(run(x.options),/wk100_reader_independent_source_duplicate/);
+});
+
 }
