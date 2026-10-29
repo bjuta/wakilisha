@@ -7,6 +7,7 @@ import { join,resolve } from 'node:path';
 import { buildWk100PrivatePreview,previewInputDigest } from '../../scripts/charts/wk100-private-preview.mjs';
 import {buildWk100CaptureRankingInput as project} from '../../supabase/functions/_shared/wk100-capture-ranking-bridge.mjs';
 import {createHash} from 'node:crypto';
+import {readWk100SealedCaptureManifest,validWk100CapturePreviewProjectBinding,makeWk100CapturePreviewSummary,runWk100PrivateCapturePreview} from '../../supabase/functions/_shared/wk100-capture-private-server.mjs';
 import {readWk100PrivateRankingEvidence as run} from '../../supabase/functions/_shared/wk100-capture-ranking-reader.mjs';
 
 const uuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`;
@@ -232,6 +233,84 @@ test('ranking input digest is reproducible under explicit selection reorder',asy
 test('duplicate source provider is not counted as an independent measurement',async()=>{
  const x=f();x.data.wk_chart_capture_contracts_v1[1].provider_key='provider_a';
  await assert.rejects(run(x.options),/wk100_reader_independent_source_duplicate/);
+});
+
+
+test('private candidate manifest requires exact sealed bytes and server-defined selections',async()=>{
+ const x=f(), config={schema_version:'wk100-private-capture-preview-v1',week_start_eat:week,
+   dataset_mode:'authorized_candidate',selected_attempt_ids:x.options.selected_attempt_ids,
+   constitution:x.options.constitution,method};
+ const raw=JSON.stringify(config), sha=createHash('sha256').update(raw).digest('hex');
+ assert.deepEqual(await readWk100SealedCaptureManifest(raw,sha),config);
+ await assert.rejects(readWk100SealedCaptureManifest(raw,'a'.repeat(64)),/manifest_digest_mismatch/);
+ await assert.rejects(readWk100SealedCaptureManifest(JSON.stringify({...config,dataset_mode:'synthetic'}),
+   createHash('sha256').update(JSON.stringify({...config,dataset_mode:'synthetic'})).digest('hex')),
+   /manifest_contract_invalid/);
+ const extra={...config,caller_url:'https://example.org'};
+ await assert.rejects(readWk100SealedCaptureManifest(JSON.stringify(extra),
+   createHash('sha256').update(JSON.stringify(extra)).digest('hex')),/manifest_contract_invalid/);
+});
+test('preview backend binding requires the exact project hostname and HTTPS',()=>{
+ const ref='pgzizndxdyhqmtyywjmt';
+ assert.equal(validWk100CapturePreviewProjectBinding(`https://${ref}.supabase.co`,ref),true);
+ assert.equal(validWk100CapturePreviewProjectBinding(`http://${ref}.supabase.co`,ref),false);
+ assert.equal(validWk100CapturePreviewProjectBinding(`https://${ref}.supabase.co.evil.com`,ref),false);
+ assert.equal(validWk100CapturePreviewProjectBinding(`https://${ref}.supabase.co/path`,ref),false);
+ assert.equal(validWk100CapturePreviewProjectBinding(`https://${ref}.supabase.co`, 'abcdefghijklmnopqrst'),false);
+});
+test('private candidate receipt adapter reads canonical private bucket and returns allowlisted aggregates only',async()=>{
+ const x=f(), downloaded=[];
+ for(let i=0;i<2;i++)x.data.wk_chart_capture_attempts_v1[i].raw_object_key=
+   `v1/${week}/source_${keys[i]}/20261019T000000Z-1/${hash}.json`;
+ const storage={from(bucket){assert.equal(bucket,'wk-chart-raw-evidence-v1');return {download:async(key)=>{
+   downloaded.push(key);return {data:new Blob([bytes]),error:null};}};}};
+ const manifest={schema_version:'wk100-private-capture-preview-v1',week_start_eat:week,
+   dataset_mode:'authorized_candidate',selected_attempt_ids:x.options.selected_attempt_ids,
+   constitution:x.options.constitution,method};
+ const result=await runWk100PrivateCapturePreview({db:x.options.db,storage,manifest});
+ assert.equal(result.status,'private_preview');assert.equal(result.can_publish,false);
+ assert.equal(result.operator_count,2);assert.equal(result.recording_count,2);
+ assert.equal(downloaded.length,2);
+ const serialized=JSON.stringify(result);
+ for(const secret of ['provider_a','source_a','operator_0','native_0_0',hash,
+   'behavior_weights','rank_input_sha256','private_audit','recording_id','contributions'])
+   assert.equal(serialized.includes(secret),false,secret);
+});
+test('private adapter rejects noncanonical raw paths and oversized objects before scoring',async()=>{
+ const make=()=>{
+   const x=f();x.data.wk_chart_capture_attempts_v1.forEach((a,i)=>a.raw_object_key=
+     `v1/${week}/source_${keys[i]}/20261019T000000Z-1/${hash}.json`);
+   const manifest={schema_version:'wk100-private-capture-preview-v1',week_start_eat:week,
+     dataset_mode:'authorized_candidate',selected_attempt_ids:x.options.selected_attempt_ids,
+     constitution:x.options.constitution,method};return {x,manifest};};
+ const a=make();a.x.data.wk_chart_capture_attempts_v1[0].raw_object_key='../private.json';
+ const storage={from(){return {download:async()=>({data:new Blob([bytes]),error:null})};}};
+ await assert.rejects(runWk100PrivateCapturePreview({db:a.x.options.db,storage,manifest:a.manifest}),
+   /wk100_capture_preview_raw_key_invalid/);
+ const b=make();const large={from(){return {download:async()=>({data:{size:5_000_000,arrayBuffer:async()=>new ArrayBuffer(0)},error:null})};}};
+ await assert.rejects(runWk100PrivateCapturePreview({db:b.x.options.db,storage:large,manifest:b.manifest}),
+   /wk100_capture_preview_raw_size_invalid/);
+});
+test('candidate review-only summary never serializes provider-native track IDs or row provenance',()=>{
+ const result=makeWk100CapturePreviewSummary({status:'review_required',week_start_eat:week,
+   verified_receipts:2,review_rows:[{source_key:'secret_source',provider_track_id:'secret_native',
+     capture_row_id:uuid(900),reason:'conflicting_identity'}],can_publish:false});
+ assert.deepEqual(result,{status:'review_required',week_start_eat:week,
+   verified_receipts:2,pending_review_rows:1,can_publish:false});
+ assert.ok(!JSON.stringify(result).includes('secret_native'));
+});
+test('capture-preview Edge route is JWT gated, admin-only, sealed and disabled by default',async()=>{
+ const edge=await readFile('supabase/functions/wk100-capture-private-preview/index.ts','utf8');
+ const config=await readFile('supabase/config.toml','utf8');
+ assert.match(config,/\[functions\.wk100-capture-private-preview\]\s*verify_jwt = true/);
+ assert.match(edge,/db\.auth\.getUser\(token\)/);
+ assert.match(edge,/\.from\('user_role_assignments'\)/);
+ assert.ok(edge.indexOf('isWk100PrivilegedReader(roles.data)')<
+   edge.indexOf("Deno.env.get('WK100_CAPTURE_PREVIEW_MANIFEST')"));
+ assert.match(edge,/WK100_CAPTURE_PREVIEW_ENABLED/);
+ assert.match(edge,/Object\.keys\(payload\)\.length!==1\|\|payload\.action!=='read'/);
+ assert.doesNotMatch(edge,/\bfetch\(/);
+ assert.doesNotMatch(edge,/\.insert\(|\.upsert\(|\.delete\(/);
 });
 
 }
