@@ -147,6 +147,11 @@ function csvRows(csv) {
     const ch=csv[i];
     if (quoted) {
       if (ch==='"' && csv[i+1]==='"') {cell+='"';i++;}
+      // The public Shazam CSV can contain literal interior quotes without
+      // RFC 4180 doubling. A quote ends a field ONLY at a true boundary.
+      // Preserve interior quotes verbatim; never alter the original raw bytes.
+      else if (ch==='"' && csv[i+1]!==',' && csv[i+1]!=='\n' &&
+        csv[i+1]!=='\r' && i+1<csv.length) {cell+='"';}
       else if (ch==='"') {quoted=false;closedQuote=true;}
       else cell+=ch;
     } else if (ch==='"') {
@@ -174,7 +179,7 @@ export function parseShazamKenya(raw) {
   for (const cols of sheet.slice(h+1)) {
     if (!cols[0]?.trim()) continue;
     const rank=positiveInt(cols[0].trim());
-    if (!rank || !text(cols[1]) || !text(cols[2])) fail('shazam_invalid_chart_row');
+    if (cols.length!==3 || !rank || !text(cols[1]) || !text(cols[2])) fail('shazam_invalid_chart_row');
     rows.push(track(rank,null,text(cols[2]),text(cols[1])));
   }
   if (!rows.length) fail('shazam_missing_chart_rows');

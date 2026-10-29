@@ -29,6 +29,37 @@ node scripts/charts/wk100-shazam-research-intake.mjs \
 
 Replace placeholders with observed values. This is an example, **not** an instruction to use a fabricated timestamp or invent a downloaded file. No data or provider request exists just because the command is documented. The stdout receipt contains only digest/count/nonpublishing state, not song titles or archive paths.
 
+## First real Shazam CSV capture and parser defect (29 October 2026)
+
+A researcher-initiated public CSV GET returned **8,210 bytes** at
+`2026-10-29T19:41:23Z`, SHA-256
+`771209bf966548f4594dab542bca1b9ffb3ec571f7441f5f41d2791c1e58ef17`.
+The accepted offline intake **correctly refused** to archive it as valid research because
+the then-current canonical parser rejected the data with `shazam_invalid_csv_after_quote`.
+The first original file remains privately quarantined on the operator Mac; it is **not**
+a validated source receipt, published observation or prospective week.
+
+A read-only diagnostic of these exact bytes verified UTF-8, CSV-like response,
+203 physical lines, exact `Rank,Artist,Title` header on line 3, no NUL bytes, and
+the first tokenizer failure at physical line 116, column 58, where a quoted
+field contains a `"` followed directly by a letter. The diagnostic did not expose
+song names or original bytes.
+
+The surgical canonical-parser correction now **preserves a bare interior double quote
+within an already quoted Shazam CSV field** if the next character is not a
+field/line terminator. RFC-style doubled quotes still decode normally, and a quote
+at a comma/CR/LF/end-of-file boundary still closes the field. Unquoted stray
+quotes, unterminated quoted cells, invalid rank sequences and rows with extra
+CSV fields remain invalid. Original downloaded bytes are **never modified** to
+make them pass.
+
+**Exact-byte acceptance is still required:** run the corrected parser against
+the existing quarantined 8,210-byte file without a new provider GET, verify
+its original digest and all 200 native ranks, rerun full regression/critical-core/
+build gates, and only then archive the byte-exact response with its original
+observed UTC timestamp. Until that acceptance passes, no genuine research
+receipt, Registry identity or chart publication can be claimed.
+
 ## Non-fuzzy Shazam row -> Registry Track decision path
 
 The public `Rank,Artist,Title` CSV lacks an immutable recording identifier, and title/artist similarity cannot prove an exact recording, remix, edit, live take or release variant. The source reader currently returns `provider_track_id: null`. **Do not fabricate Shazam track IDs**, create a parallel provider identity table, force `registry_track_provider_links` from an invented key, or write a canonical match from this intake.
