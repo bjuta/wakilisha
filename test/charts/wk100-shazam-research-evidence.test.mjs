@@ -27,6 +27,22 @@ test('Shazam provided CSV becomes byte-addressed, review-only evidence without f
  assert.ok(e.entries.every((v,i)=>v.row_ref===`${hash(csv)}:${i+1}`&&v.recording_id===null&&v.provider_track_id===null&&v.status==='review_required'));
  assert.equal(e.receipt.can_publish,false);
 });
+test('research intake preserves embedded public CSV quotes with original hash and unresolved identity',()=>{
+  const supplied=enc('Shazam Top 200 Kenya\n2026-W42\nRank,Artist,Title\n'+
+    '1,"The "Real" Artist","Song "Love" Edit"\n'+
+    '2,"The ""Official"" Artist","Song, Version"\n');
+  const evidence=prepareShazamResearchEvidence({...args,csvBytes:supplied});
+  assert.equal(evidence.receipt.raw_sha256,hash(supplied));
+  assert.equal(evidence.receipt.observed_depth,2);
+  assert.equal(evidence.entries[0].artist_observed,'The "Real" Artist');
+  assert.equal(evidence.entries[0].title_observed,'Song "Love" Edit');
+  assert.equal(evidence.entries[1].artist_observed,'The "Official" Artist');
+  assert.ok(evidence.entries.every(x=>x.provider_track_id===null&&
+    x.recording_id===null&&x.status==='review_required'));
+  assert.equal(evidence.receipt.source_native_period.authority,'unknown');
+  assert.equal(evidence.receipt.can_publish,false);
+});
+
 test('exact offered public source, observed time, operator and bounded data are enforced',()=>{
  for(const u of ['http://www.shazam.com/services/charts/csv/top-200/kenya',
  'https://evil.example.net/services/charts/csv/top-200/kenya',
