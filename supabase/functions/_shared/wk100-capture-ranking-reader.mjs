@@ -8,6 +8,7 @@
  */
 import {buildWk100CaptureRankingInput} from './wk100-capture-ranking-bridge.mjs';
 import {buildWk100PrivatePreview} from './wk100-private-preview-core.mjs';
+import {parseCaptureNativeRows} from './chart-capture-runtime.mjs';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHA=/^[a-f0-9]{64}$/;
@@ -44,6 +45,36 @@ async function verifyPrivateRaw(readRawBytes,attempt) {
     'raw_bytes_invalid');
   const digest=await digestBytes(bytes);
   demand(digest===attempt.payload_sha256,'raw_digest_mismatch');
+  return bytes;
+}
+
+/**
+ * A receipt SHA proves only the private object's bytes. For an authorized
+ * candidate, independently replay the collector's exact native parser and
+ * compare every immutable database rank/identity/measurement field. The
+ * provider's legal grant and native-period truth remain separate review gates.
+ */
+function verifyNativeRows(bytes,contract,attempt,rows) {
+  let replayed;
+  try {
+    replayed=parseCaptureNativeRows(bytes,contract,{
+      native_period_key:attempt.native_period_evidence_ref,
+    });
+  } catch {
+    fail('native_replay_unavailable');
+  }
+  demand(replayed.length===rows.length,'native_row_mismatch');
+  const byRank=new Map(rows.map(row=>[row.source_rank,row]));
+  demand(byRank.size===rows.length,'native_row_mismatch');
+  for(const native of replayed) {
+    const stored=byRank.get(native.rank);
+    demand(stored&&
+      stored.provider_track_id===native.provider_track_id&&
+      stored.title_observed===native.title&&
+      stored.artist_observed===native.artist&&
+      stored.source_native_count===(Object.hasOwn(native,'view_count')?native.view_count:null),
+      'native_row_mismatch');
+  }
 }
 
 /**
@@ -105,7 +136,9 @@ export async function readWk100PrivateRankingEvidence({
       'id,attempt_id,source_rank,provider_track_id,title_observed,artist_observed,source_native_count',
       [['eq','attempt_id',attempt.id]],200);
     demand(rows.length===contract.expected_depth,'rows_incomplete');
-    await verifyPrivateRaw(readRawBytes,attempt);
+    const rawBytes=await verifyPrivateRaw(readRawBytes,attempt);
+    if(dataset_mode==='authorized_candidate')
+      verifyNativeRows(rawBytes,contract,attempt,rows);
     selected.push({attempt,contract,authority,rows});
   }
   demand(sourcesSeen.size===constitution.length,'constitution_source_missing');
