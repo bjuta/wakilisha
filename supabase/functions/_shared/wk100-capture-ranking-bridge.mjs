@@ -13,7 +13,7 @@ const KEY = /^[a-z][a-z0-9_:-]{2,79}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const BEHAVIORS = new Set(['consumption','video_consumption','discovery','broadcast_exposure']);
 const VALID_DATASETS = new Set(['synthetic','authorized_candidate']);
-const fail = code => { throw new Error(`wk100_bridge_${code`); };
+const fail = code => { throw new Error(`wk100_bridge_${code}`); };
 const requireValue = (value, code) => { if (!value) fail(code); };
 const isObject = x => x !== null && typeof x === 'object' && !Array.isArray(x);
 const validTime = x => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(x)
