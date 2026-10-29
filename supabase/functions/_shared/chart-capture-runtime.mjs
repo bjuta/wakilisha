@@ -64,6 +64,14 @@ function normalizeNativeRows(parsed,contract) {
     return item;
   });
 }
+/** The exact source-native decoder used for collection and later private replay. */
+export function parseCaptureNativeRows(bytes,contract,access={}) {
+  requireValue(bytes instanceof Uint8Array&&bytes.byteLength>=1&&
+    bytes.byteLength<=4_194_304,'raw_bytes_invalid');
+  requireValue(contract&&PARSERS[contract.source_key],'source_unimplemented');
+  return normalizeNativeRows(PARSERS[contract.source_key](bytes,access),contract);
+}
+
 function dependency(db, names) {
   requireValue(db && names.every(n=>typeof db[n]==='function'),'capture_backend_missing');
 }
@@ -157,8 +165,7 @@ export async function runCandidateCapture({
   }
   let rows=[],outcome='parse_failed',failureCode=null;
   try {
-    const parsed=PARSERS[contract.source_key](capture.bytes,access);
-    rows=normalizeNativeRows(parsed,contract);
+    rows=parseCaptureNativeRows(capture.bytes,contract,access);
     outcome=rows.length===contract.expected_depth?'succeeded':'partial_depth';
   } catch {
     outcome='parse_failed';failureCode='source_parse_failed';
