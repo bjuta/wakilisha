@@ -14,7 +14,7 @@ WAKILISHA 100 is an independently researched, calculated and editorially governe
 
 The fact that source observations inform the result does not transfer control of WAKILISHA's editorial or scoring decisions to a provider. Nor does ownership of our original research automatically grant rights over a provider's protected expression, complete compilation, private data, access system or contractual restrictions.
 
-**No universal provider-partnership prerequisite:** observing and accurately reporting individually available chart facts does not by itself establish that a negotiated commercial data agreement is necessary. Equally, a public URL and a self-built script do not independently establish permission for every acquisition, repeated download, response archive, bulk extraction or commercial reuse. Resolve those questions for the **specific method and source**, never by assuming all research is prohibited or all research is exempt.
+**Researcher-directed public-fact collection is the operative workflow:** WAKILISHA visits publicly accessible sources, downloads publicly offered files such as CSVs where available, and uses its own efficiency tools to record, parse and archive its observations. Do not call this scraping by default, treat private research archiving as platform-controlled editorial work, or create speculative licence/partnership preconditions for observing publicly reported chart facts. If a real and relevant source-specific restriction is established, handle that concrete question separately rather than assuming a blanket prohibition or declaring an unexamined universal permission.
 
 ## Distinguish research activity from runtime mechanics
 
@@ -25,7 +25,7 @@ The fact that source observations inform the result does not transfer control of
 | Unattended WK100 collector | Edge code repeatedly calls an exact source endpoint according to a schedule, creating durable capture receipts | Requires a separately reviewed, project-bound source decision and the existing sealed manifest, secrets, slot/lease controls and disabled-by-default activation gate |
 | Original commercial chart | WAKILISHA independently calculates and publishes its own rankings from reviewed evidence | Separate editorial, methodological, evidentiary and publication approval; avoid representing external ordinal positions as national streams |
 
-These classifications are about operational facts, **not** automatic legal verdicts. A one-off script can still be automated retrieval; a manually recorded public fact can still have uncertain provenance or source meaning.
+These classifications describe how WAKILISHA performs research; they are **not** labels of scraping, automatic legal verdicts or a reason to demand provider permission by default. A researcher visiting a public site, downloading its offered CSV and using a researcher-authored tool remains researcher-directed work. Record the actual source, data, acquisition and observed period rather than imposing a contested characterization based solely on the existence of code.
 
 ## Source Research Qualification record
 
@@ -33,7 +33,7 @@ Keep a dated, private research decision for **each exact source surface and rese
 
 - **Source:** stable `source_key`, operator/entity, precise source title, HTTPS URL or other authorized delivery path, method, observed format and a source version.
 - **Factual observation:** ranking or native view/discovery/list-position metric; country/market evidence, depth, native period when actually documented, observation time and WAKILISHA EAT week as separate clocks.
-- **Access and treatment:** whether the actual acquisition is human, researcher-directed or unattended; relevant published terms and their applicability; concrete restrictions, approved account/credential requirements, quota/robots/rate/retention constraints; exact legal/commercial question still unresolved if any. A licence reference is **only** required where that source and proposed use warrant one. No speculative grant is recorded as received.
+- **Acquisition and treatment:** whether observation was direct, a publicly offered file download assisted by WAKILISHA's own tool, or a separately configured unattended collector; original public URL, timestamp, documented request/cadence and retained provenance. Record concrete restrictions only when they are established and relevant to the exact operation; do not require a speculative licence reference to log or analyze public chart facts.
 - **Evidence:** source citation, dated review, privately retained raw observation or exact-byte digest where retention is supportable, parser/version, errors, missingness and review/replay trace. Keep proprietary source rosters, weights, credentials and raw response bodies out of public GitHub.
 - **Decision:** named responsible reviewer, date, scope, expiry/review date, reason and a distinct determination for research observation and for unattended collector operation.
 

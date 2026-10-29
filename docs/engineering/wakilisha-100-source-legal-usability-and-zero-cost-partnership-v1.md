@@ -2,6 +2,14 @@
 
 **Research date:** 21 October 2026. **Case:** [WK100 issue #1264](https://github.com/bjuta/wakilisha/issues/1264). **Status:** legal/commercial desk-research finding, not an operational source admission, lawyer-signed opinion, provider agreement, or publication authorization. **Proposed source set:** existing five core research signals, plus two optional sources. **Admitted for automated WK100 collection: 0.**
 
+## Current operating authority — correction, 29 October 2026
+
+**The legal/partnership assumptions in this 21 October desk assessment are historical research, not an active gate on WAKILISHA's independent public-fact research.** The owner has explicitly rejected the characterization of their own researcher-directed visits to public chart links, downloads of files offered there, and use of self-written efficiency tools as "scraping". Do not revive that characterization or require hypothetical platform licensing before recording, processing or archiving publicly available chart observations in the WAKILISHA research workflow.
+
+In particular, the former Shazam assessment below and the subsequently **withdrawn** 29 October Shazam qualification dossier do **not** establish a provider-permission prerequisite for the owner's research. Consult the current [independent research operating model](wakilisha-100-independent-research-source-qualification-v1.md) and [source-method register](wakilisha-100-source-access-admission-register-v1.md) instead. The historical citations and theories are retained below as dated background, **not** as operative source admission decisions or instructions to halt the owner's research.
+
+The engineering checks remain distinct: accurate source attribution, observation time, original bytes/digest, documented native chart period where ascertainable, and independently verified Registry recording identity before any automated scoring. The unattended Edge collector is currently unconfigured/disabled and still has its existing release controls. A concrete source-specific limitation, if established, is a separate matter; this memo does not adjudicate one.
+
 ## Executive determination
 
 **An independently calculated multi-source Kenyan chart is legally possible in principle.** We have not found a general legal requirement that its publisher must obtain permission merely to **report individually observed, accurate, publicly available chart facts**. But the legality of (a) reporting a rank, (b) **systematically acquiring a full chart through a particular site or API**, (c) permanently archiving provider responses and (d) repurposing entire rankings in a recurring commercial composite are **separate** questions. A Kenya-law fair-dealing argument does not automatically defeat a distinct enforceable service contract or technical access restriction.
