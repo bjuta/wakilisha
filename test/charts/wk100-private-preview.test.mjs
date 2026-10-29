@@ -259,22 +259,33 @@ test('preview backend binding requires the exact project hostname and HTTPS',()=
  assert.equal(validWk100CapturePreviewProjectBinding(`https://${ref}.supabase.co`, 'abcdefghijklmnopqrst'),false);
 });
 test('private candidate receipt adapter reads canonical private bucket and returns allowlisted aggregates only',async()=>{
- const x=f(), downloaded=[];
- for(let i=0;i<2;i++)x.data.wk_chart_capture_attempts_v1[i].raw_object_key=
-   `v1/${week}/source_${keys[i]}/20261019T000000Z-1/${hash}.json`;
- const storage={from(bucket){assert.equal(bucket,'wk-chart-raw-evidence-v1');return {download:async(key)=>{
-   downloaded.push(key);return {data:new Blob([bytes]),error:null};}};}};
- const manifest={schema_version:'wk100-private-capture-preview-v1',week_start_eat:week,
-   dataset_mode:'authorized_candidate',selected_attempt_ids:x.options.selected_attempt_ids,
-   constitution:x.options.constitution,method};
- const result=await runWk100PrivateCapturePreview({db:x.options.db,storage,manifest});
- assert.equal(result.status,'private_preview');assert.equal(result.can_publish,false);
- assert.equal(result.operator_count,2);assert.equal(result.recording_count,2);
- assert.equal(downloaded.length,2);
- const serialized=JSON.stringify(result);
- for(const secret of ['provider_a','source_a','operator_0','native_0_0',hash,
-   'behavior_weights','rank_input_sha256','private_audit','recording_id','contributions'])
-   assert.equal(serialized.includes(secret),false,secret);
+  const {x,archive}=authorizedReplayFixture(),downloaded=[],canonicalKeys=[];
+  for(let i=0;i<2;i++){
+    const attempt=x.data.wk_chart_capture_attempts_v1[i];
+    const raw=archive.get(attempt.raw_object_key);
+    assert.ok(raw instanceof Uint8Array);
+    archive.delete(attempt.raw_object_key);
+    attempt.raw_object_key=`v1/${week}/${x.data.wk_chart_capture_contracts_v1[i].source_key}/20261019T000000Z-1/${attempt.payload_sha256}.json`;
+    canonicalKeys.push(attempt.raw_object_key);
+    archive.set(attempt.raw_object_key,raw);
+  }
+  const storage={from(bucket){assert.equal(bucket,'wk-chart-raw-evidence-v1');return {download:async(key)=>{
+    downloaded.push(key);
+    const raw=archive.get(key);
+    return {data:raw?new Blob([raw]):null,error:raw?null:new Error('missing evidence')};
+  }};}};
+  const manifest={schema_version:'wk100-private-capture-preview-v1',week_start_eat:week,
+    dataset_mode:'authorized_candidate',selected_attempt_ids:x.options.selected_attempt_ids,
+    constitution:x.options.constitution,method};
+  const result=await runWk100PrivateCapturePreview({db:x.options.db,storage,manifest});
+  assert.equal(result.status,'private_preview');assert.equal(result.can_publish,false);
+  assert.equal(result.operator_count,2);assert.equal(result.recording_count,2);
+  assert.deepEqual(downloaded,canonicalKeys);
+  const serialized=JSON.stringify(result);
+  for(const secret of ['provider_0','apple_ke','operator_0','native_0_0',
+    ...x.data.wk_chart_capture_attempts_v1.map(a=>a.payload_sha256),
+    'behavior_weights','rank_input_sha256','private_audit','recording_id','contributions'])
+    assert.equal(serialized.includes(secret),false,secret);
 });
 test('private adapter rejects noncanonical raw paths and oversized objects before scoring',async()=>{
  const make=()=>{
