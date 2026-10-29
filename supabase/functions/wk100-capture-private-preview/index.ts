@@ -30,9 +30,19 @@ Deno.serve(async(req:Request)=>{
   try{
     const declared=Number(req.headers.get('content-length')??0);
     if(!Number.isFinite(declared)||declared>96)return reply(req,413,{error:'request_too_large'});
-    const body=await req.text();
-    if(body.length>96||!body.length)return reply(req,400,{error:'request_invalid'});
-    const payload=JSON.parse(body);
+    const reader=req.body?.getReader();
+    if(!reader)return reply(req,400,{error:'request_invalid'});
+    const chunks:Uint8Array[]=[];let total=0;
+    try{
+      while(true){const part=await reader.read();if(part.done)break;
+        total+=part.value.byteLength;
+        if(total>96){await reader.cancel();return reply(req,413,{error:'request_too_large'});}
+        chunks.push(part.value);}
+    }finally{try{reader.releaseLock();}catch{/* cancelled */}}
+    if(!total)return reply(req,400,{error:'request_invalid'});
+    const bytes=new Uint8Array(total);let offset=0;
+    for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+    const payload=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
     if(!payload||Array.isArray(payload)||typeof payload!=='object'||
       Object.keys(payload).length!==1||payload.action!=='read')
       return reply(req,400,{error:'request_invalid'});
