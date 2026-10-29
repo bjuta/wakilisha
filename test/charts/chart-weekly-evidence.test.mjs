@@ -162,6 +162,20 @@ test('Shazam preserves literal interior quotes inside quoted public CSV fields',
   assert.ok(r.rows.every(x=>x.provider_track_id===null));
 });
 
+test('Shazam 200-row public CSV with an interior quote on physical line 116 retains all ranks',()=>{
+  const rows=Array.from({length:200},(_,i)=>i===112
+    ?`113,"The "Real" Artist","Song "Love" Edit"`
+    :`${i+1},Artist ${i+1},Song ${i+1}`);
+  const csv=`Shazam Top 200 Kenya\n2026-W42\nRank,Artist,Title\n${rows.join('\n')}\n`;
+  const r=parseShazamKenya(csv);
+  assert.equal(r.rows.length,200);
+  assert.equal(r.rows[112].rank,113);
+  assert.equal(r.rows[112].artist,'The "Real" Artist');
+  assert.equal(r.rows[112].title,'Song "Love" Edit');
+  assert.equal(r.chart_depth,200);
+  assert.equal(r.native_period,'unknown');
+});
+
 test('Shazam retains strict columns, field boundaries and rank integrity',()=>{
   assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,"Artist"tail,Song\n'),
     /shazam_unterminated_csv_quote/);
