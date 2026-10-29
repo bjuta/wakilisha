@@ -62,3 +62,6 @@ verify_jwt = true
 
 [functions.wk100-private-admin-preview]
 verify_jwt = true
+
+[functions.wk100-capture-private-preview]
+verify_jwt = true
