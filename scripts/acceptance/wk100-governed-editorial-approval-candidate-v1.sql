@@ -626,17 +626,82 @@ before insert on public.wk_chart_editions_v2 for each row
 execute function platform_private.wk100_block_direct_published_insert_v1();
 
 
--- WK100 publication is globally disabled until a separate verified
--- one-transaction promotion authority exists. This preserves existing
--- historical eligibility requirements for every OTHER programme.
+-- A transient promotion authority is bound to a single Postgres transaction.
+-- It also leaves an immutable public-release audit receipt after commit.
+create table platform_private.wk100_governed_publications_v1 (
+  id uuid primary key default gen_random_uuid(),
+  approved_review_id uuid not null unique references
+    platform_private.wk100_governed_editorial_approvals_v1(id),
+  edition_id text not null unique,
+  proposal_sha256 text not null check(proposal_sha256 ~ '^[a-f0-9]{64}$'),
+  published_by uuid not null,
+  authorized_tx bigint not null,
+  published_at timestamptz not null default clock_timestamp()
+);
+alter table platform_private.wk100_governed_publications_v1 enable row level security;
+revoke all on platform_private.wk100_governed_publications_v1
+  from public,anon,authenticated,service_role;
+create trigger wk100_publications_immutable_rows
+before update or delete on platform_private.wk100_governed_publications_v1
+for each row execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+create trigger wk100_publications_immutable_truncate
+before truncate on platform_private.wk100_governed_publications_v1
+for each statement execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+
+-- Preserve Chart V2's existing eligibility behavior for every other programme.
+-- WK100 has different rank-evidence authority, so publication is admitted ONLY
+-- when this same SQL transaction created the immutable verified grant above.
+-- An arbitrary GUC or a user-supplied proposal field cannot bypass this check.
+create or replace function public.wk_chart_editions_publish_integrity_guard()
+returns trigger language plpgsql security definer
+set search_path to 'public'
+as $$
+begin
+  if new.status='published' and old.status is distinct from new.status then
+    if new.program_id='top100' then
+      if not exists (
+        select 1 from platform_private.wk100_governed_publications_v1 g
+        join platform_private.wk100_governed_staged_editions_v1 s
+          on s.approval_id=g.approved_review_id
+         and s.edition_id=g.edition_id
+        where g.edition_id=new.id
+          and s.proposal_sha256=g.proposal_sha256
+          and g.authorized_tx=txid_current()
+          and g.published_by=auth.uid()
+      ) then
+        raise exception using errcode='42501',
+          message='WK100 requires same-transaction reviewed publication grant';
+      end if;
+    else
+      perform public.chart_assert_publishable_edition(new.id);
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+-- Additional independent WK100-only guard, also blocks unpublishing or
+-- republishing an Edition without a fresh, impossible-to-forge transaction.
 create function platform_private.wk100_block_ungoverned_promotion_v1()
 returns trigger language plpgsql set search_path=pg_catalog
 as $$
 begin
+  if old.program_id='top100' and old.status='published'
+     and new.status is distinct from old.status then
+    raise exception using errcode='42501',
+      message='WK100 published Edition cannot be silently demoted';
+  end if;
   if new.program_id='top100' and new.status='published'
      and old.status is distinct from 'published' then
-    raise exception using errcode='42501',
-      message='WK100 requires the separately approved governed promotion';
+    if not exists (
+      select 1 from platform_private.wk100_governed_publications_v1 g
+      where g.edition_id=new.id
+        and g.authorized_tx=txid_current()
+        and g.published_by=auth.uid()
+    ) then
+      raise exception using errcode='42501',
+        message='WK100 ungoverned publication forbidden';
+    end if;
   end if;
   return new;
 end;
