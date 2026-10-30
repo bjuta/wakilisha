@@ -750,8 +750,28 @@ begin
       raise exception using errcode='42501',
         message='WK100 approved Edition snapshot may not be rewritten';
     end if;
+    if new.status is distinct from old.status
+       or new.published_at is distinct from old.published_at
+       or new.published_by is distinct from old.published_by
+       or new.updated_at is distinct from old.updated_at then
+      if old.status is distinct from 'draft' or new.status is distinct from 'published'
+         or new.published_by is distinct from auth.uid()::text
+         or new.published_at is null or
+         not exists (
+           select 1 from platform_private.wk100_governed_publications_v1 g
+           where g.edition_id=old.id
+             and g.published_by=auth.uid()
+             and g.authorized_tx=txid_current()
+         ) then
+        raise exception using errcode='42501',
+          message='WK100 publication metadata may only change in the governed transaction';
+      end if;
+    end if;
   end if;
-  return case when tg_op='DELETE' then old else new end;
+  if tg_op='DELETE' then
+    return old;
+  end if;
+  return new;
 end;
 $$;
 revoke execute on function platform_private.wk100_block_staged_content_mutation_v1()
