@@ -629,7 +629,7 @@ begin
   if tg_table_name='wk_chart_entries_v2' then
     select e.program_id,e.period_start into v_program,v_week
     from public.wk_chart_editions_v2 e
-    where e.id=coalesce(old.edition_id,new.edition_id);
+    where e.id=old.edition_id;
     if v_program='top100' and exists (
       select 1 from platform_private.wk100_governed_staged_editions_v1 s
       where s.program_id='top100' and s.week_start_eat=v_week
@@ -643,8 +643,11 @@ begin
        select 1 from platform_private.wk100_governed_staged_editions_v1 s
        where s.edition_id=old.id
      ) then
-    if tg_op='DELETE' or
-       (to_jsonb(new)-'updated_at'-'status'-'published_at'-'published_by')
+    if tg_op='DELETE' then
+      raise exception using errcode='42501',
+        message='WK100 approved Edition cannot be deleted';
+    end if;
+    if (to_jsonb(new)-'updated_at'-'status'-'published_at'-'published_by')
          is distinct from
        (to_jsonb(old)-'updated_at'-'status'-'published_at'-'published_by')
     then
@@ -663,6 +666,29 @@ execute function platform_private.wk100_block_staged_content_mutation_v1();
 create trigger wk100_stage_edition_update_delete_guard
 before update or delete on public.wk_chart_editions_v2 for each row
 execute function platform_private.wk100_block_staged_content_mutation_v1();
+
+-- A completed staged Edition must also reject late INSERTs; otherwise a
+-- separate writer could append rank 101 without modifying approved rows.
+create function platform_private.wk100_block_extra_staged_entry_v1()
+returns trigger language plpgsql set search_path=pg_catalog
+as $$
+begin
+  if exists(
+    select 1 from platform_private.wk100_governed_staged_editions_v1 s
+    where s.edition_id=new.edition_id
+  ) then
+    raise exception using errcode='42501',
+      message='WK100 staged Edition cannot receive additional entries';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function platform_private.wk100_block_extra_staged_entry_v1()
+from public,anon,authenticated,service_role;
+create trigger wk100_block_extra_staged_entry
+before insert on public.wk_chart_entries_v2
+for each row
+execute function platform_private.wk100_block_extra_staged_entry_v1();
 
 -- Stage exactly 100 snapshot rows in one transaction. Never publishes.
 create function public.wk100_stage_governed_weekly_edition_v1(
