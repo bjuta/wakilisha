@@ -591,6 +591,7 @@ create table platform_private.wk100_governed_staged_editions_v1 (
   edition_id text not null unique,
   proposal_sha256 text not null check (proposal_sha256 ~ '^[a-f0-9]{64}$'),
   staged_by uuid not null,
+  authorized_tx bigint not null,
   staged_at timestamptz not null default now(),
   unique (program_id,week_start_eat)
 );
@@ -612,9 +613,19 @@ create function platform_private.wk100_block_direct_published_insert_v1()
 returns trigger language plpgsql set search_path=pg_catalog
 as $$
 begin
-  if new.program_id='top100' and new.status='published' then
-    raise exception using errcode='42501',
-      message='WK100 direct published Edition INSERT prohibited';
+  if new.program_id='top100' then
+    if new.status='published' then
+      raise exception using errcode='42501',
+        message='WK100 direct published Edition INSERT prohibited';
+    end if;
+    if not exists(
+      select 1 from platform_private.wk100_governed_staged_editions_v1 s
+      where s.edition_id=new.id and s.program_id='top100'
+        and s.authorized_tx=txid_current() and s.staged_by=auth.uid()
+    ) then
+      raise exception using errcode='42501',
+        message='WK100 requires same-transaction approved Edition staging';
+    end if;
   end if;
   return new;
 end;
@@ -789,12 +800,17 @@ create function platform_private.wk100_block_extra_staged_entry_v1()
 returns trigger language plpgsql set search_path=pg_catalog
 as $$
 begin
-  if exists(
-    select 1 from platform_private.wk100_governed_staged_editions_v1 s
-    where s.edition_id=new.edition_id
-  ) then
-    raise exception using errcode='42501',
-      message='WK100 staged Edition cannot receive additional entries';
+  if new.edition_id ~ '^wk100-ke-[0-9]{8}$'
+     or exists(select 1 from public.wk_chart_editions_v2 e
+       where e.id=new.edition_id and e.program_id='top100') then
+    if not exists(
+      select 1 from platform_private.wk100_governed_staged_editions_v1 s
+      where s.edition_id=new.edition_id and s.program_id='top100'
+        and s.authorized_tx=txid_current() and s.staged_by=auth.uid()
+    ) then
+      raise exception using errcode='42501',
+        message='WK100 cannot insert entries outside the staged transaction';
+    end if;
   end if;
   return new;
 end;
@@ -863,6 +879,11 @@ begin
      or jsonb_array_length(v_approval.proposal_snapshot->'observed_entries')<>100 then
     raise exception 'WK100 approved Edition does not have 100 entries';
   end if;
+  -- Insert the immutable receipt FIRST, to authorize ONLY this transaction's
+  -- Edition and Entry INSERT triggers. A failed later statement rolls all back.
+  insert into platform_private.wk100_governed_staged_editions_v1
+    (week_start_eat,approval_id,edition_id,proposal_sha256,staged_by,authorized_tx)
+  values(p_week,v_approval.id,v_id,p_proposal_sha256,v_actor,txid_current());
   insert into public.wk_chart_editions_v2
     (id,program_id,edition_slug,edition_label,edition_date,
      period_start,period_end,entry_count,chart_size,status,
@@ -939,9 +960,6 @@ begin
        where x->>'canonical_track_id' is null) then
     raise exception 'WK100 pending Registry investigation roster incomplete';
   end if;
-  insert into platform_private.wk100_governed_staged_editions_v1
-    (week_start_eat,approval_id,edition_id,proposal_sha256,staged_by)
-    values(p_week,v_approval.id,v_id,p_proposal_sha256,v_actor);
   return v_id;
 end;
 $$;
