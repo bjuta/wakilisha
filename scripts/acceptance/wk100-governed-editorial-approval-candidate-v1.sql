@@ -363,4 +363,50 @@ grant execute on function
   public.wk100_register_governed_editorial_approval_v1(jsonb)
 to authenticated;
 
+
+-- Immutable one-week STAGING ledger, not public approval and not publication.
+-- One approved snapshot may stage at most one draft Edition per EAT week.
+create table platform_private.wk100_governed_staged_editions_v1 (
+  id uuid primary key default gen_random_uuid(),
+  program_id text not null default 'top100' check (program_id='top100'),
+  week_start_eat date not null,
+  approval_id uuid not null references
+    platform_private.wk100_governed_editorial_approvals_v1(id),
+  edition_id text not null unique,
+  proposal_sha256 text not null check (proposal_sha256 ~ '^[a-f0-9]{64}$'),
+  staged_by uuid not null,
+  staged_at timestamptz not null default now(),
+  unique (program_id,week_start_eat)
+);
+alter table platform_private.wk100_governed_staged_editions_v1 enable row level security;
+revoke all on platform_private.wk100_governed_staged_editions_v1
+  from public,anon,authenticated,service_role;
+create trigger wk100_staged_edition_rows_immutable
+before update or delete on platform_private.wk100_governed_staged_editions_v1
+for each row execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+create trigger wk100_staged_edition_truncate_immutable
+before truncate on platform_private.wk100_governed_staged_editions_v1
+for each statement execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+
+-- Legacy Chart V2's status publication guard is UPDATE-only. Restrict a
+-- previously unguarded published INSERT for the WK100 programme alone.
+-- Publication UPDATE remains subject to the existing legacy guard and is NOT
+-- enabled by this candidate.
+create function platform_private.wk100_block_direct_published_insert_v1()
+returns trigger language plpgsql set search_path=pg_catalog
+as $$
+begin
+  if new.program_id='top100' and new.status='published' then
+    raise exception using errcode='42501',
+      message='WK100 direct published Edition INSERT prohibited';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function platform_private.wk100_block_direct_published_insert_v1()
+  from public,anon,authenticated,service_role;
+create trigger wk100_block_direct_published_insert
+before insert on public.wk_chart_editions_v2 for each row
+execute function platform_private.wk100_block_direct_published_insert_v1();
+
 commit;
