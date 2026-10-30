@@ -10,6 +10,16 @@ begin;
 set local lock_timeout='10s';
 set local statement_timeout='120s';
 
+-- SAFETY INTERLOCK: this tracked design candidate is NOT a deployable migration.
+-- An accepted CLI-minted migration may remove this interlock only after review,
+-- exact-schema SQL acceptance and explicit Preview authority.
+do $$
+begin
+  raise exception using errcode='P0001',
+    message='WK100_CANDIDATE_EXECUTION_PROHIBITED: not an accepted migration';
+end;
+$$;
+
 create table platform_private.wk100_governed_editorial_approvals_v1 (
   id uuid primary key default gen_random_uuid(),
   program_id text not null default 'top100' check (program_id='top100'),
