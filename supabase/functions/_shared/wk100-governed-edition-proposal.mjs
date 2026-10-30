@@ -6,6 +6,7 @@
  * This is not a publication RPC, approval signature, or a scheduled job.
  */
 import {canonicalJSON, digestSHA256, trackingWeek} from './chart-weekly-evidence.mjs';
+import {buildWk100PrivatePreview} from './wk100-private-preview-core.mjs';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHA=/^[0-9a-f]{64}$/;
@@ -126,6 +127,39 @@ export async function prepareWk100GovernedEditionProposal({
   for(const source of manifest)need(sourceRanks.get(source.source_key)===source.expected_depth,
     'source_rank_coverage_invalid');
   need(attemptOwners.size===result.selected_attempt_ids.length,'selected_attempt_coverage_invalid');
+  // Reconstruct the EXACT sealed private input from each captured rank and
+  // the frozen source constitution. A copied privateAudit alone cannot assert
+  // its own scores or ranking order. Re-hash then replay the existing kernel.
+  const reconstructed={
+    schema_version:'wk100-private-preview-v1',
+    week_start_eat:result.week_start_eat,
+    dataset_mode:'authorized_candidate',
+    method:clone(audit.method_configuration),
+    sources:manifest.map(source=>({
+      source_key:source.source_key,operator_key:source.operator_key,
+      behavior:source.behavior,market:source.market,
+      expected_depth:source.expected_depth,native_period:clone(source.native_period),
+      authority_ref:source.authority_ref,admission:source.admission,
+      raw_sha256:source.raw_sha256,
+      entries:provenance.filter(row=>row.source_key===source.source_key)
+        .sort((a,b)=>a.source_rank-b.source_rank)
+        .map(row=>({recording_id:row.recording_id??row.provisional_ref,rank:row.source_rank})),
+    })).sort((a,b)=>a.source_key.localeCompare(b.source_key)),
+  };
+  let replay;
+  try {
+    const computed=await digestSHA256(canonicalJSON(reconstructed));
+    need(computed===result.rank_input_sha256,'independent_input_replay_mismatch');
+    replay=buildWk100PrivatePreview(reconstructed,computed).privateAudit;
+  } catch (error) {
+    if(error?.message?.startsWith('wk100_edition_proposal_'))throw error;
+    fail('private_ranking_replay_invalid');
+  }
+  need(canonicalJSON(replay.top100)===canonicalJSON(audit.top100)&&
+    canonicalJSON(replay.failures)===canonicalJSON(audit.failures)&&
+    replay.coverage_status===audit.coverage_status&&
+    replay.provisional_recording_count===audit.provisional_recording_count,
+    'private_ranking_replay_mismatch');
 
   need(Array.isArray(audit.top100)&&audit.top100.length===100&&
     Array.isArray(review.labels)&&review.labels.length===100,
