@@ -68,7 +68,7 @@ export function makeWk100CapturePreviewSummary(result){
 }
 
 /** Service-only DB client and private Storage bucket are never instantiated here. */
-export async function runWk100PrivateCapturePreview({db,storage,manifest}){
+export async function readWk100PrivateCaptureEvidence({db,storage,manifest}){
   if(!db||typeof db.from!=='function'||!storage||typeof storage.from!=='function')fail('backend_missing');
   if(!object(manifest)||manifest.schema_version!=='wk100-private-capture-preview-v1'||
     manifest.dataset_mode!=='authorized_candidate')fail('manifest_not_authorized');
@@ -86,5 +86,10 @@ export async function runWk100PrivateCapturePreview({db,storage,manifest}){
   const result=await readWk100PrivateRankingEvidence({db,readRawBytes,
     week_start_eat:manifest.week_start_eat,selected_attempt_ids:manifest.selected_attempt_ids,
     constitution:manifest.constitution,method:manifest.method,dataset_mode:'authorized_candidate'});
-  return makeWk100CapturePreviewSummary(result);
+  return result;
+}
+
+/** Browser-safe existing preview path: never returns private evidence. */
+export async function runWk100PrivateCapturePreview(args){
+  return makeWk100CapturePreviewSummary(await readWk100PrivateCaptureEvidence(args));
 }
