@@ -495,6 +495,27 @@ before insert on public.wk_chart_editions_v2 for each row
 execute function platform_private.wk100_block_direct_published_insert_v1();
 
 
+-- WK100 publication is globally disabled until a separate verified
+-- one-transaction promotion authority exists. This preserves existing
+-- historical eligibility requirements for every OTHER programme.
+create function platform_private.wk100_block_ungoverned_promotion_v1()
+returns trigger language plpgsql set search_path=pg_catalog
+as $$
+begin
+  if new.program_id='top100' and new.status='published'
+     and old.status is distinct from 'published' then
+    raise exception using errcode='42501',
+      message='WK100 requires the separately approved governed promotion';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function platform_private.wk100_block_ungoverned_promotion_v1()
+  from public,anon,authenticated,service_role;
+create trigger wk100_block_ungoverned_promotion
+before update of status on public.wk_chart_editions_v2
+for each row execute function platform_private.wk100_block_ungoverned_promotion_v1();
+
 -- Stage exactly 100 snapshot rows in one transaction. Never publishes.
 create function public.wk100_stage_governed_weekly_edition_v1(
   p_week date, p_proposal_sha256 text
