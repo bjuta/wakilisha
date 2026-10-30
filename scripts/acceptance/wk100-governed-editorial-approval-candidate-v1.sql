@@ -580,6 +580,32 @@ before truncate on platform_private.wk100_pending_identity_investigations_v1
 for each statement
 execute function platform_private.wk100_block_editorial_approval_mutation_v1();
 
+-- Chart V2 has permissive PUBLIC SELECT policies, so a staged WK100 draft
+-- is otherwise publicly readable before the authorized release. Apply a
+-- restrictive SELECT gate solely to top100; legacy programmes are unchanged.
+create policy wk100_hide_nonpublished_editions_v1
+  on public.wk_chart_editions_v2 as restrictive for select to public
+  using (
+    program_id is distinct from 'top100'
+    or status='published'
+    or public.current_user_has_capability('view_charts_admin')
+    or public.current_user_is_administrator()
+  );
+create policy wk100_hide_nonpublished_entries_v1
+  on public.wk_chart_entries_v2 as restrictive for select to public
+  using (
+    exists (
+      select 1 from public.wk_chart_editions_v2 e
+      where e.id=edition_id
+        and (
+          e.program_id is distinct from 'top100'
+          or e.status='published'
+          or public.current_user_has_capability('view_charts_admin')
+          or public.current_user_is_administrator()
+        )
+    )
+  );
+
 -- Immutable one-week STAGING ledger, not public approval and not publication.
 -- One approved snapshot may stage at most one draft Edition per EAT week.
 create table platform_private.wk100_governed_staged_editions_v1 (
