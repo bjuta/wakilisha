@@ -110,7 +110,7 @@ test('altering score contribution cannot turn another observation into source co
 });
 test('no truncated Top100, phantom independent provider, duplicate position or incomplete source ranks',async()=>{
  const a=await fixture();a.reader_result.private_audit.top100.pop();
- await assert.rejects(prepare(a),/top100_missing/);
+ await assert.rejects(prepare(a),/private_ranking_replay_mismatch/);
  const b=await fixture();b.reader_result.private_audit.source_manifest[1].operator_key='operator_1';
  await assert.rejects(prepare(b),/source_provenance_invalid/);
  const c=await fixture();c.review.labels[1].position=1;
