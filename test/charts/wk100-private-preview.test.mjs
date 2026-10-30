@@ -7,10 +7,11 @@ import { join,resolve } from 'node:path';
 import { buildWk100PrivatePreview,previewInputDigest } from '../../scripts/charts/wk100-private-preview.mjs';
 import {buildWk100CaptureRankingInput as project} from '../../supabase/functions/_shared/wk100-capture-ranking-bridge.mjs';
 import {createHash} from 'node:crypto';
-import {readWk100SealedCaptureManifest,validWk100CapturePreviewProjectBinding,makeWk100CapturePreviewSummary,runWk100PrivateCapturePreview} from '../../supabase/functions/_shared/wk100-capture-private-server.mjs';
+import {readWk100SealedCaptureManifest,validWk100CapturePreviewProjectBinding,makeWk100CapturePreviewSummary,runWk100PrivateCapturePreview,readWk100PrivateCaptureEvidence} from '../../supabase/functions/_shared/wk100-capture-private-server.mjs';
 import {readWk100PrivateRankingEvidence as run} from '../../supabase/functions/_shared/wk100-capture-ranking-reader.mjs';
 import {canonicalJSON,digestSHA256} from '../../supabase/functions/_shared/chart-weekly-evidence.mjs';
 import {prepareWk100GovernedEditionProposal as prepare} from '../../supabase/functions/_shared/wk100-governed-edition-proposal.mjs';
+import {verifyAndAttestWk100GovernedEdition} from '../../supabase/functions/_shared/wk100-governed-edition-attestation-server.mjs';
 
 const uuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`;
 const p={starts_at:'2026-10-18T21:00:00Z',ends_at:'2026-10-25T21:00:00Z',evidence_ref:'period_week_2026_43'};
@@ -454,6 +455,137 @@ test('candidate replay rejects unsupported parser and unmatched native week key'
  await assert.rejects(run(b.x.options),/wk100_reader_native_replay_unavailable/);
 });
 
+// Keep attestation fixture inside existing native-replay scope.
+test('governed attestation refuses unsealed or insufficient private evidence without RPC',async()=>{
+ const {x,archive}=authorizedReplayFixture();
+ const manifest={schema_version:'wk100-private-capture-preview-v1',
+   week_start_eat:week,dataset_mode:'authorized_candidate',
+   selected_attempt_ids:x.options.selected_attempt_ids,
+   constitution:x.options.constitution,method};
+ const raw=JSON.stringify(manifest);
+ const sha=createHash('sha256').update(raw).digest('hex');
+ let rpcCalls=0;
+ const db={...x.options.db,rpc:async()=>{rpcCalls++;return {data:uuid(8000),error:null};}};
+ const storage={from(){return {download:async key=>{
+   const bytes=archive.get(key);
+   return {data:bytes?new Blob([bytes]):null,error:bytes?null:new Error('unavailable')};
+ }};}};
+ const options={db,storage,sealed_manifest_text:raw,sealed_manifest_sha256:sha,
+   edition_date_eat:'2026-10-26',cutoff_at_utc:'2026-10-25T21:00:00Z',
+   deadline_at_utc:'2026-10-26T21:00:00Z',
+   review:{editor_ref:'wk100_editor_01',reviewed_at_utc:'2026-10-26T09:00:00Z',
+     input_sha256:'f'.repeat(64),labels:[],dispositions:[]}};
+ await assert.rejects(verifyAndAttestWk100GovernedEdition({...options,
+   sealed_manifest_sha256:'a'.repeat(64)}),/manifest_digest_mismatch/);
+ assert.equal(rpcCalls,0);
+ await assert.rejects(verifyAndAttestWk100GovernedEdition(options),
+   /wk100_capture_preview_raw_key_invalid|wk100_edition_proposal_/);
+ assert.equal(rpcCalls,0);
+ await assert.rejects(verifyAndAttestWk100GovernedEdition({...options,db:x.options.db}),
+   /restricted_backend_required/);
+ assert.equal(rpcCalls,0);
+});
+
+test('governed attestation positively replays 100 native recordings before service RPC',async()=>{
+  // Complete native Apple/YouTube bytes, never a synthetic scoring shortcut.
+  const {x,archive}=authorizedReplayFixture();
+  const total=100,sourceKeys=['apple_ke','youtube_ke'];
+  const attempts=x.data.wk_chart_capture_attempts_v1;
+  const identities=Array.from({length:total},(_,i)=>uuid(4000+i));
+  x.data.registry_tracks=identities.map(id=>({id,status:'active'}));
+  x.data.wk_chart_capture_rows_v1=[];
+  x.data.registry_track_provider_links=[];
+  for(let j=0;j<2;j++){
+    const attempt=attempts[j],contract=x.data.wk_chart_capture_contracts_v1[j];
+    contract.expected_depth=total;attempt.observed_depth=total;attempt.record_count=total;
+    for(let i=0;i<total;i++){
+      const nativeId='native_'+j+'_'+i;
+      x.data.wk_chart_capture_rows_v1.push({
+        id:uuid(5000+j*total+i),attempt_id:attempt.id,source_rank:i+1,
+        provider_track_id:nativeId,title_observed:'Song '+i,
+        artist_observed:'Artist',source_native_count:j?250-i:null,
+      });
+      x.data.registry_track_provider_links.push({
+        provider_key:contract.provider_key,provider_track_id:nativeId,
+        track_id:identities[i],match_status:'matched',
+      });
+    }
+    const raw=j===0
+      ?{feed:{country:'KE',results:Array.from({length:total},(_,i)=>({
+        id:'native_0_'+i,name:'Song '+i,artistName:'Artist',
+      }))}}
+      :{period:'weekly:20261019:20261025:ke',
+        trackViews:Array.from({length:total},(_,i)=>({
+          chartEntryMetadata:{currentPosition:i+1},
+          encryptedVideoId:'native_1_'+i,viewCount:250-i,
+          name:'Song '+i,artists:[{name:'Artist'}],
+        }))};
+    const bytes=new TextEncoder().encode(JSON.stringify(raw));
+    const hash=createHash('sha256').update(bytes).digest('hex');
+    archive.delete(attempt.raw_object_key);attempt.payload_sha256=hash;
+    attempt.raw_object_key='v1/'+week+'/'+sourceKeys[j]+'/20261019T000000Z-1/'+hash+'.json';
+    archive.set(attempt.raw_object_key,bytes);
+  }
+  const manifest={
+    schema_version:'wk100-private-capture-preview-v1',week_start_eat:week,
+    dataset_mode:'authorized_candidate',selected_attempt_ids:x.options.selected_attempt_ids,
+    constitution:x.options.constitution,method,
+  };
+  const sealed_manifest_text=JSON.stringify(manifest);
+  const sealed_manifest_sha256=createHash('sha256').update(sealed_manifest_text).digest('hex');
+  const storage={from(bucket){
+    assert.equal(bucket,'wk-chart-raw-evidence-v1');
+    return {download:async key=>{
+      const bytes=archive.get(key);
+      return {data:bytes?new Blob([bytes]):null,
+        error:bytes?null:new Error('unapproved private object')};
+    }};
+  }};
+  let rpcCalls=0,positiveProposal;
+  const db={...x.options.db,rpc:async(name,args)=>{
+    rpcCalls++;
+    assert.equal(name,'wk100_attest_private_ranking_replay_v1');
+    assert.deepEqual(Object.keys(args),['p_proposal']);
+    positiveProposal=args.p_proposal;
+    assert.equal(positiveProposal.can_publish,false);
+    assert.equal(positiveProposal.can_write_registry,false);
+    assert.equal(positiveProposal.observed_entries.length,total);
+    assert.equal(positiveProposal.pending_identity_rows,0);
+    return {data:uuid(9000),error:null};
+  }};
+  const verified=await readWk100PrivateCaptureEvidence({db,storage,manifest});
+  assert.equal(verified.status,'private_preview');
+  assert.equal(verified.verified_receipts,2);
+  assert.equal(verified.resolved_rows,200);
+  assert.deepEqual(verified.private_audit.failures,[]);
+  assert.equal(verified.private_audit.top100.length,total);
+  const labels=verified.private_audit.top100.map(row=>{
+    const selected=row.contributions[0];
+    const observation=verified.provenance.find(entry=>
+      entry.source_key===selected.source_key&&entry.source_rank===selected.source_rank);
+    assert.ok(observation);
+    return {position:row.position,source_key:observation.source_key,
+      capture_row_id:observation.capture_row_id};
+  });
+  const opts={db,storage,sealed_manifest_text,sealed_manifest_sha256,
+    edition_date_eat:'2026-10-26',
+    cutoff_at_utc:'2026-10-25T21:00:00Z',
+    deadline_at_utc:'2026-10-26T21:00:00Z',
+    review:{editor_ref:'wk100_editor_01',reviewed_at_utc:'2026-10-26T09:00:00Z',
+      input_sha256:verified.rank_input_sha256,labels,dispositions:[]}};
+  const result=await verifyAndAttestWk100GovernedEdition(opts);
+  assert.equal(result.attestation_id,uuid(9000));
+  assert.equal(result.proposal,positiveProposal);
+  assert.equal(rpcCalls,1);
+  assert.equal(result.proposal.observed_entries.every((entry,i)=>
+    entry.rank===i+1&&entry.original_title==='Song '+i),true);
+  // Complete manifest does not authorize a changed immutable native row.
+  x.data.wk_chart_capture_rows_v1[0].title_observed='Rewritten after capture';
+  await assert.rejects(verifyAndAttestWk100GovernedEdition(opts),
+    /wk100_reader_native_row_mismatch/);
+  assert.equal(rpcCalls,1);
+});
+
 }
 
 // WK100 #1329: governed publication proposal is a nonpublishing evidence contract.
@@ -665,4 +797,32 @@ test('EAT deadline, editorial exception review and nonpublishing authority',asyn
   const c=await proposalFixture();c.constitution_sha256='unknown';
   await assert.rejects(prepare(c),/constitution_authority_missing/);
  }
+});
+
+test('WK100 SQL draft remains inert and binds source admissions, editorial roles, week lock, and Registry handoff',async()=>{
+ const sql=await readFile('scripts/acceptance/wk100-governed-editorial-approval-candidate-v1.sql','utf8');
+ const interlock=sql.indexOf('WK100_CANDIDATE_EXECUTION_PROHIBITED');
+ const firstDDL=sql.indexOf('create table platform_private.');
+ assert.ok(interlock>0&&firstDDL>interlock);
+ assert.equal((sql.match(/^begin;$/gm)||[]).length,1);
+ assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
+ assert.match(sql,/20261030095808_wk100_governed_publisher_v1\.sql/);
+ assert.match(sql,/wk100_governed_source_admissions_v1/);
+ assert.match(sql,/current_user_has_capability\('manage_ingest'\)/);
+ assert.match(sql,/current_user_has_capability\('manage_charts'\)/);
+ assert.match(sql,/current_user_has_capability\('publish_charts'\)/);
+ assert.match(sql,/clock_timestamp\(\)>v_deadline/);
+ assert.match(sql,/wk100_private_replay_attestations_v1/);
+ assert.match(sql,/wk100_unique_program_edition_date_v1/);
+ assert.match(sql,/wk100_block_ungoverned_promotion/);
+ assert.match(sql,/wk100_pending_identity_investigations_v1/);
+ assert.match(sql,/wk100_stage_entry_update_delete_guard/);
+ assert.match(sql,/wk100_block_extra_staged_entry/);
+ assert.match(sql,/wk100_governed_publications_v1/);
+ assert.match(sql,/wk100_publish_governed_weekly_edition_v1/);
+ assert.match(sql,/wk100_governed_identity_links_v1/);
+ assert.match(sql,/authorized_tx=txid_current\(\)/);
+ assert.match(sql,/wk100_governed_source_admissions_v1/);
+ assert.match(sql,/100,100,'draft'/);
+ assert.doesNotMatch(sql,/100,100,'published'/);
 });

@@ -1,6 +1,24 @@
 # WAKILISHA 100 — governed Edition boundary v1 (#1329)
 
-**Status, 30 October 2026:** private, nonpublishing proposal contract implemented on `feat/wk100-governed-weekly-edition-1329`. **NOT** a deployed weekly Edition writer or a Production approval mechanism. Parent programme: [#1264](https://github.com/bjuta/wakilisha/issues/1264).
+**Current engineering state, 30 October 2026:** source-only governed publisher candidate on `feat/wk100-governed-publisher-1329`; **not** deployed, merged, or authorized for a real WAKILISHA 100 Edition. Parent programme: [#1264](https://github.com/bjuta/wakilisha/issues/1264).
+
+## Authoritative release decision (supersedes historical implementation checkpoints below)
+
+| Gate | Evidence / authority | Decision |
+| --- | --- | --- |
+| Native source proposal | 82/82 full Node tests on accepted source baseline | PASS for that baseline |
+| Positive private-byte attestation helper | 100 Apple + 100 YouTube native observations, independently SHA-verified and ranked, exercised against exact source modules in isolated JS with Web API polyfill; new test added to consolidated suite | PASS for isolated component; full native suite containing new test **not rerun** |
+| SQL schema and role boundaries | Non-executable candidate applied only in paid, disposable Preview; seven private tables, restrictive RLS, service-only attestation RPC and Chart V2 guards | PASS in Preview; **not a deployable migration** |
+| Publication behavior | Synthetic 100-row approve → stage → publish, anonymous draft visibility, immutable revisions, idempotent retries, verified Registry lineage; initial-transaction rollback and concurrently dispatched first publications | PASS within synthetic Preview |
+| Production WK100 runtime | Read-only Supabase function inventory: **no WK100 Edge Function deployed**; SQL candidate absent in Production | **NOT ACTIVATED** |
+| Live collection/source qualification | No actual WK100 source contracts, raw capture receipts, independently qualified live source/method or server-sealed selection | **NOT AUTHORIZED** |
+| EAT publication cadence and operational ownership | Explicit signed editorial clock, deadline and accountable go/no-go approval not in accepted runtime record | **DECISION REQUIRED** |
+| Final Production migration and release | CLI-minted version identity only; executable migration deliberately **not** in `supabase/migrations`; source SQL contains unconditional execution interlock | **BLOCKED**, no merge or deployment of publisher authority |
+
+The 29 October [Independent Research and Source Qualification](wakilisha-100-independent-research-source-qualification-v1.md) is controlling: **researcher-directed public-fact observation and use of WAKILISHA's tools are not automatically conditional on negotiated provider licences**. Record exact research-method provenance and concrete restrictions. A separately scheduled unattended collector requires its own source-specific review and runtime admission. Neither `RESEARCH_QUALIFIED` nor a synthetic source-admission row grants the authority to publish an Edition.
+
+**Next controlled action:** technical review of this **nondeployable** source candidate. Do not activate or deploy an Edge route, promote the interlocked SQL to a migration, configure collection, claim live source admission, or issue a public Edition until the separately authorized runtime/operational gates are satisfied. Historical sections below describe the evolution of the contract; the table above is authoritative wherever their earlier "not implemented" or "pending native acceptance" labels conflict.
+
 
 ## What exists, independently verified in Production (read-only)
 
@@ -24,7 +42,7 @@ Two different keys are deliberate: `edition_slot_key=wk100:KE:<EAT-week>` identi
 
 The result is deep-frozen, content-addressed and **always** `can_publish:false` / `can_write_registry:false`. An `editor_ref` is contextual evidence, **not an authenticated signature**. `constitution_sha256` is an external source-decision digest, **not permission**. The scoring quality flags are recorded and require one explicit reason per exception; the proposal is *never* an automatic quality override or publishing grant.
 
-## Required governed writer (not yet implemented)
+## Original governed-writer requirements (implemented in guarded candidate; retained design contract)
 
 The current legacy `chart-ingest-api` commit path inserts edition and entry records as separate network operations; it is not the accepted atomic WK100 publication pathway. The next implementation must use a single PostgreSQL transaction behind an authenticated, restricted role/capability boundary:
 
@@ -42,3 +60,137 @@ The current legacy `chart-ingest-api` commit path inserts edition and entry reco
 - **Then:** PR with native Node and SQL acceptance; no GitHub Actions dependency because minutes are exhausted; approved SQL promotion to Production only once verified. No collector cron, source enrollment, provider polling, automatic public publication or Edge activation as a side effect.
 
 **Controlling principle:** evidence freeze / public Edition cutoff and Registry investigation are different clocks. The first is a quality and publication decision; the second is ongoing cultural-identity stewardship.
+
+
+## Publisher preflight — observed database authority, 30 October 2026
+
+This is a read-only analysis of live Production schema. **No migration has been deployed by this slice.**
+
+1. Existing captured source contracts have `wk_chart_capture_contracts_v1_admission_state_check`: `admission_state = 'candidate'` only. A proposal's `admission:'approved'` is a separate *methodology/research decision*, not a database contract status. Do **not** rewrite the historical source contract check or claim an approved production feed because a private proposal can be constructed.
+2. The `wk_chart_capture_attempts_v1` schema enforces a Kenya Monday EAT week, successful/failed transport distinction, SHA-256, exactly persisted observed row count, provider-period truth, and a unique `(contract_id,scheduled_at,attempt_number)` slot. A publisher must bind exact selected attempt IDs and immutable row evidence and cannot mint new observations from a ranked proposal.
+3. The existing `wk_chart_weekly_freezes_v1` is permanently restricted to `freeze_state='blocked'` and `can_publish=false`; updates/deletions have an immutable trigger. It is valuable historical evidence and **must not** be repurposed into a publication grant or softened.
+4. V2 `wk_chart_editions_v2` has a primary unique `id`, but no enforced uniqueness on the desired `(program_id, EAT-week)` slot. Its current program/date index is nonunique. The future publisher requires a transactional immutable weekly slot ledger/unique key; hashing proposal content alone does not prevent conflicting same-week publications.
+5. The legacy `wk_chart_editions_publish_integrity_guard_bu` runs **before UPDATE OF status**, not INSERT. It calls the legacy resolved artist-origin eligibility assertion on becoming published. A WK100 pathway must never sneak around that guard by inserting `status='published'` directly, nor remove artist checks from all chart programmes. Proposed integration: create the V2 Edition in an explicitly nonpublished state, write/verify all entries in the same database transaction, then perform a guarded status transition with a narrowly scoped, independently verified WK100 publication authority and preserved legacy behavior for other programmes.
+6. The existing Chart Entry insert/update/delete lineage triggers already capture canonical identity projection changes. They are append-only history, but a verified canonical link later must preserve **original observed** artist/title/rank and not infer missing artist origin, ISRC or cross-source equivalence.
+7. The existing `public.current_user_has_capability(text)` is a candidate authenticated-user gate to inspect before designing the RPC. **Do not trust the client-supplied editor_ref**. Ensure the publisher function is schema-private, has explicit `EXECUTE` revocations, validates `auth.uid()` and an authenticated live capability, and is not callable by a generic service-role token or arbitrary signed-in user. A SECURITY DEFINER alone is not an authorization scheme.
+8. At review, Production has **zero** WK100 capture contracts, receipts and freezes. No genuine Week-1 score or publishable source admission exists. This is an engineering implementation track, not authorization to generate a public chart.
+
+### Immediate implementation decision
+
+The transactional publisher needs a narrowly scoped *new governed approval/slot mechanism*, not an amendment to the protected frozen historical receipt table or a change to all chart programmes. Its database acceptance must specifically prove a direct published INSERT is denied for WK100, that only authenticated reviewed proposal promotion is allowed, that conflicting same-week proposals fail atomically, and that existing legacy `toprnb` publication validation is unchanged.
+
+The accepted proposal module remains nonpublishing even after an SQL writer is authored. The bridge between private audited proposal and SQL must reject any client-made claims: recompute source/attempt evidence server-side under controlled privileges, compare content digest and approved review authority, and never accept a manufactured `can_publish:true` field.
+
+
+## CLI migration identity and database candidate checkpoint (30 October 2026)
+
+The product owner ran the established `supabase migration new wk100_governed_publisher_v1` command successfully. **Supabase CLI generated `20261030095808_wk100_governed_publisher_v1.sql`.** It was generated inside a disposable directory and deleted by that script's cleanup; there is no executable SQL file to recover from the temporary directory. The timestamp and base name are now authoritative for this slice. The final SQL must be installed at `supabase/migrations/20261030095808_wk100_governed_publisher_v1.sql` **only after a full isolated database acceptance**.
+
+The current source branch `feat/wk100-governed-publisher-1329` contains an intentionally **nondeployable** draft in `scripts/acceptance/wk100-governed-editorial-approval-candidate-v1.sql` with an unconditional `WK100_CANDIDATE_EXECUTION_PROHIBITED` interlock before DDL. The draft now includes three separate identity/authority boundaries: server-only private ranking replay attestation, independently authorized human editorial approval, and separately authorized atomic 100-entry **draft-only** Edition staging. All three have private immutable receipts and deny direct table access. The staging writer serializes an approved week, checks the approved snapshot and original observation rows, rejects duplicate identities/ranks, inserts 100 Entries transactionally, and never marks an Edition published. A targeted partial unique index prevents two Top100 Editions for one edition_date even if a different V2 writer races the staging RPC.
+
+Scoped WK100 Edition INSERT and status-transition triggers deliberately reject any ungoverned move to `published`; legacy guards for other programmes remain active. **A real WK100 publication promotion RPC and async MIZIZI linkage are NOT implemented.** The private attestation RPC is only a service-role trust boundary: the database cannot itself establish that raw Storage bytes were read and scored. A restricted server path must actually replay those bytes, the rank kernel and the content digest before attesting; otherwise a caller holding the service key could vouch for a false proposal.
+
+Release remains blocked: this staged draft has not been run through a PostgreSQL parser or an actual isolated DB, has no denied-role/concurrent-retry or SQL rollback acceptance, and is not in `supabase/migrations`. No Production SQL, Edge activation, paid Preview or GitHub Actions run occurred. Before accepting a migration: complete independent attestation caller, verify the approved proposal idempotency and all 100 staged Entries through a clean Preview, implement the governed publication transition and the Registry follow-up ledger, and confirm public chart readers on provisional identities. A paid Preview requires explicit new-cost approval; #1326's historical Preview consent is not reused.
+
+
+### Separate trusted source attestation is now modeled
+
+The branch adds `supabase/functions/_shared/wk100-governed-edition-attestation-server.mjs`, a private server-side integration helper. It reads a **SHA-sealed manifest**, downloads and replays exact private raw observations through the existing reader, derives the constitution/method SHA-256 from that manifest, runs the immutable governed Top 100 proposal builder, and only then invokes the service-role-only `wk100_attest_private_ranking_replay_v1` RPC. The existing browser-safe preview response remains allowlisted and unchanged. The helper's output contains private evidence and must **never** be returned to a browser.
+
+The draft SQL now requires the service attestation, a separately authenticated `manage_charts` editorial approval, and a separately authorized `publish_charts` draft staging action. The private approval, attestation and stage ledgers are immutable and RLS-protected. One partial unique index prevents competing `top100` Editions by date even outside the staging writer. The stage writes all 100 entries as **draft** in one transaction. WK100 published INSERT and status UPDATE are both blocked until a separately accepted governed promotion authority is implemented.
+
+**Still not accepted:** This helper is not an activated or deployed Edge Function. Neither its server-side environment/role boundary nor the new SQL functions have been runtime-tested. The current one-case native regression is unexecuted. No public publication can be performed. Native Node test, the full isolated PostgreSQL Preview (including real publisher/denied-role/concurrency checks), and the public promotion/correction workflow remain mandatory.
+
+
+### Publisher hardening checkpoint — source admission, deadline, frozen rank and MIZIZI handoff
+
+The gated SQL candidate now requires a **separate institutional source-admission decision per EAT week and capture contract**. The existing capture contract's `admission_state='candidate'` is not sufficient authority to publish. Admission needs a logged source/method authority SHA, a live editor with both `manage_charts` and `manage_ingest` capabilities, and an immutable private receipt. The editorial approval RPC must find each selected contract in that separately admitted roster.
+
+The editor's claimed review timestamp is not the clock of record: the approval RPC checks `clock_timestamp()` against the exact approved UTC cutoff and deadline. This deliberately fails closed for late approval; a missed deadline needs an explicit incident/recovery policy, not a hidden backdate.
+
+After atomic draft staging, UPDATE/DELETE on staged Chart Entry original observations, late INSERTs, and material Edition edits are rejected. A future **separate audited identity-linkage RPC** must preserve observed artist/title/rank/source evidence rather than directly editing staged content. No public WK100 status transition is currently permitted.
+
+For each unresolved provisional recording, staging creates an immutable, RLS-protected **MIZIZI investigation handoff** in the same transaction and verifies its row count equals the provisional entries. This is a review queue only: it does not create a Track, infer ISRC or artist origin, or silently merge two observed recordings. Later canonical linkage/reconciliation is still pending.
+
+The existing WK100 consolidated test suite now contains a **static-only fail-closed SQL candidate contract check**. Changed JavaScript files parse, and that source-level check passed in isolated evaluation. No PostgreSQL schema, trigger, RPC, concurrency, RLS role or migration execution acceptance has been performed. No GitHub Actions minutes used; issue #1329 remains open and Production unchanged.
+
+### Governed promotion design checkpoint — 30 October 2026
+
+The inert SQL candidate now includes a proposed restricted publication RPC, a private immutable publication receipt bound to `txid_current()`, and a WK100-specific branch of the existing Chart V2 status integrity function. For **all non-WK100 programmes**, the existing `chart_assert_publishable_edition(new.id)` call is retained. The WK100 path requires both its own status trigger and the existing Chart V2 trigger to find the current transaction's approval-linked publication receipt. The published Edition's rank/artist/title/score are checked against the approved 100-row snapshot first; exact retries are intended to be idempotent. A separate provisional-to-canonical Registry link ledger checks currently verified provider mappings (including conflicting inactive historical mappings), but never rewrites original published entries.
+
+A separate design pass closed direct-write races in the draft workflow: the staged Edition receipt is inserted before any Chart V2 Edition/Entry, and the WK100 insert guards require its actor/transaction. After release, publisher and timestamp fields are restricted to the same authorized transition. A server-signed private replay attestation, explicit source admission bound to the constitution hash, a current-database-time approval deadline, and zero unresolved scorer-quality dispositions are required. The EAT publication schedule has **not** been separately ratified, so a real-publication deadline is not authorized by this draft.
+
+A permanent, **read-only** postflight query now exists at `scripts/acceptance/wk100-governed-publisher-postflight-v1.sql`. It is safe to run before deployment; executed against current Production it returned `pass=false`, seven missing private tables, zero applicable role or WK100 trigger gates, and the original legacy guard present. That is the expected not-deployed baseline, **not** a failed deployment. It is not evidence that the SQL candidate parses or executes.
+
+**Release remains blocked:** The 20261030095808 CLI-minted migration identity is recorded, but the candidate still contains an unconditional execution interlock and is outside `supabase/migrations`. The SQL has not undergone a real Postgres parser, isolated full-migration replay, transaction/role/rollback/concurrency acceptance, or native Node suite. The new source and publication authorizations are *proposed engineering controls*, not admitted sources or an editorial policy decision. No SQL Production changes or GitHub Actions run occurred.
+
+
+### Final acceptance scope correction: distinguish schema replay from historical data replay
+
+On 30 October 2026, the product owner completed native Node acceptance against exact source commit `1241d2883bbe9558739cdd7c033b92d8ae0c3069`: **82/82 passed, zero failed**. Previous statements in this file that native Node acceptance remains pending are superseded by that result. Native acceptance is not SQL runtime acceptance.
+
+Three attempts to initialize a disposable local Supabase stack failed **before WK100 candidate SQL ran**. The first was a harness assertion using incorrect whitespace against the historical Storage migration; the second tried to alter `storage.buckets` without owning that system table; the third replayed a Production-data-specific historical retirement migration into an empty local database.
+
+**Decisive root cause of the third failure:** `supabase/migrations/20261030062819_retire_18_kenya_rnb_editions.sql`, exact Git blob `b3c2b412ea8bb594d22f61858fb40c5c4a6553f5`, requires 18 historical Kenya R&B published Editions, 1,800 entries, 58 artist decisions, 10 playback runs and 1,000 items, 18 ingest runs, 7,560 source raw rows, and 7,398 candidates. An unseeded local database cannot satisfy its intentionally strict Production retirement authority. Do **not** modify this canonical migration, forge its historical records, or mistake its refusal for a WK100 database failure.
+
+For **WK100 schema-only isolated rehearsal**, take the exact canonical migrations through `20261020072800_wk_chart_capture_runtime_v1.sql`. Exclude **only** `20261030062819_retire_18_kenya_rnb_editions.sql` from the disposable archive after checking its Git blob, and label the test evidence `WK100_SCHEMA_TEST_ONLY`. Apply the established disposable Storage compatibility technique; never alter canonical Storage migration history or change Production. This scoped rehearsal does not claim to reproduce the full historical Production data state. Separately require the SQL candidate's actual PostgreSQL parse/atomic apply, negative-role behavior, transaction-bound publication proof, rollback, draft invisibility, identity-link immutability, cross-week and conflicting-review rejection, and postflight pass before PR or migration promotion. Preserve the early `WK100_CANDIDATE_EXECUTION_PROHIBITED` interlock in the tracked source; remove it only in a disposable acceptance copy.
+
+**Verified live Production readback:** `top100` Editions = 0, WK100 source contracts = 0, capture attempts = 0; published Kenya `toprnb` Editions = 0. There is no existing Supabase development branch beyond the default `main`. A paid Preview cannot be created without its cost authorization; Production cannot be used for unaccepted mutating fixtures. Accordingly, the branch remains nondeployable and issue #1329 remains open. The initial SQL runtime gate cannot truthfully be marked passed until it is executed on a permissible isolated PostgreSQL instance.
+
+
+### Real Supabase isolated Preview acceptance — 30 October 2026
+
+The owner's approved branch-compute rate was USD 0.01344 per hour, plus applicable usage. The first Preview was mistakenly deleted while it was **still provisioning**, not because migrations had failed. A second Preview was created under the same express cost authorization and its actual migration ledger was followed from 42 to **234 migrations**, through `20261020072800_wk_chart_capture_runtime_v1.sql`. The R&B historical-retirement migration at version 235 cannot run in a no-data Preview, but the WK100 schema prerequisites were all present at version 234. This is **schema-only acceptance**, not a full historical Production-data replay.
+
+The **first actual WK100 SQL migration attempt** correctly failed under the repository's RLS event-trigger guard: a new restrictive `TO PUBLIC` draft-read policy invoked a privileged capability helper. This was an engineering defect, not an infrastructure problem. The candidate was corrected by splitting the two draft-visibility policies per table into `TO anon` and `TO authenticated`; privileged helper calls exist **only** in authenticated-role policies. Corrected source commit: `db5cb9c513f599b2c1099cb2b2af960d139c8ea4`.
+
+The isolated second candidate apply returned `{"success":true}`; the tracked candidate still contains the non-executable interlock, removed **only** from the ephemeral acceptance input. The existing read-only `wk100-governed-publisher-postflight-v1.sql` returned `pass=true`: 7/7 private tables RLS protected, all expected execute grants, original legacy chart guard retained, WK100 transaction-bound publication protections, and one-week uniqueness. Read-only policy follow-up: two restrictive `anon` policies, two restrictive `authenticated` policies, **zero** privileged helper references in `anon` policies. Targeted negative database tests rejected direct published/draft Top100 Edition inserts, unauthenticated review and unauthenticated publication; no durable WK100 Editions or publication grants were created.
+
+Supabase security advisor reported no ERROR-level lints. The seven new private tables are reported under the INFO `rls_enabled_no_policy` finding (intentional deny-all direct table access). Authenticated SECURITY DEFINER RPCs are reported as WARN and need continued capability/identity authorization acceptance; the lint is not silently dismissed as a passed end-to-end authorization test. Reference: https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy .
+
+**Remaining release blockers:** successful approved-editor and publisher happy-path fixtures with 100 real-sealed source observations, concurrent same-week collision/rollback, actual anonymous draft-visibility assertion with staged rows, and verified Registry correction after publication. No actual WK100 source contracts are admitted in Production, and no live Edition can be authorized. These negative/schema checks do not authorize merge or Production deployment. Native WK100 Node tests were 82/82 on `1241d288`; the subsequent SQL policy change has only been tested by actual isolated PostgreSQL, not a new native run.
+
+
+### Complete isolated synthetic publisher-behavior acceptance — 30 October 2026
+
+A separately authorized, temporary, no-Production-data Preview (\`wmoubjewphcfueooleyv\`) was allowed to provision through the **234-migration** WK100 schema boundary (\`20261020072800\`). The previously PostgreSQL-accepted source candidate (with \`TO anon\` / \`TO authenticated\` restrictive draft policies and its tracked execution interlock removed **only** from the ephemeral acceptance input) applied successfully.
+
+The isolated test inserted synthetic source contracts/attempts (two independent providers, 100 ranked rows each), a synthetic user with \`super_admin\` capabilities, admitted source rows and a synthetic replay-attestation row. **These attestation/admission records were inserted directly in the disposable Preview by the database test harness; the real restricted server-byte-attestation positive path was not exercised. This fixture does not certify real source rights or data authenticity.**
+
+The live candidate RPCs were then exercised against the 100-row proposal:
+
+- \`wk100_register_governed_editorial_approval_v1\` accepted the bound exact source observation identities and SHA snapshot within its EAT approval window.
+- \`wk100_stage_governed_weekly_edition_v1\` generated exactly **100 draft Chart V2 Entries** with **100 provisional identity handoffs**.
+- An anonymous database role could see **zero** staged draft Editions and Entries.
+- \`wk100_publish_governed_weekly_edition_v1\` promoted the 100-entry Edition with **one immutable publication grant**. Exact replay returned the same Edition; **two concurrent calls against the already-published Edition** both succeeded and left one grant. This is *post-publication concurrent retry*, **not** a proven first-publication collision or rollback race.
+- Six independent negative mutations were rejected: Entry UPDATE, Entry DELETE, extra Entry INSERT, Edition demotion, publisher metadata tamper, and Edition DELETE.
+- An anonymous database role could read the published Edition and exactly **100** Entries.
+- The first attempt at verified Registry linkage revealed an actual runtime SQL type defect: the new \`UNION\` combined \`registry_track_provider_links.track_id\` (**uuid**) and \`provider_entity_links.registry_entity_id\` (**text**). Corrected the canonical candidate to cast the legacy track ID to \`uuid\` under the existing match-status/type guards; source commit \`2138fb4cc2dc85747e24cd9af6abbfe30a71298e\`. Replaced the function in the Preview using a narrowly scoped migration. The corrected Registry-linking RPC created **one immutable matched Track link**, replay returned its original ID, the published Entry remained provisional and unchanged, mismatching linkage authority was rejected, and an UPDATE to the identity-link ledger was denied.
+- Conflicting same-week proposal hash was rejected.
+- Final independently re-read state: **one published Edition, 100 Entries, one publication receipt, one Registry link**; the SQL postflight reported **\`pass=true\`** with seven controlled private tables, all expected role grants and publication guards.
+
+**Cost containment and isolation:** the temporary Preview branch (ID \`566574c7-70c0-4cba-b96e-d3d95e28beef\`) was deleted successfully after testing, and \`list_branches\` independently confirmed **only the default Production branch remains**. The synthetic user, source rows, Registry entity, edition, and all test receipts were destroyed with that Preview; no Production database mutation.
+
+**Release interpretation:** the 82/82 accepted native suite plus the synthetic database happy/negative paths are substantive acceptance. Nonetheless, the first-publish concurrency collision under two separate DB connections, transaction rollback during *initial* publication, fully authenticated **positive** private raw-byte attestation/service-only RPC, actual human source-rights admission and institutional weekly EAT publication policy remain unproven. The tracked candidate is still non-executable and absent from \`supabase/migrations\`. These outstanding authorities are separate from synthetic database correctness, and cannot be silently represented as accepted Production release. No migration should be merged or deployed until the explicit WAKILISHA release owner completes those gates.
+
+
+### Isolated first-publication rollback and competing first-call acceptance — 30 October 2026
+
+A dedicated, paid, disposable Supabase Preview with project ref `atafyuhtlbvvdgbpqrxz` reached the **234-migration** WK100 schema-only baseline. The same tracked, non-executable candidate was applied successfully with its safety interlock removed solely from the Preview acceptance input; no canonical migration was deployed.
+
+A synthetic 100-entry Edition was staged through the real immutable WK100 source admission, approval and staging SQL functions. Synthetic source contracts/100 rows per source and a synthetic role-bearing actor were inserted **directly** in the isolated fixture; this deliberately does not prove the service's genuine private raw-byte attestation path.
+
+**Initial publish rollback:** Within one explicit PostgreSQL transaction the authorized publication RPC executed, followed by `ROLLBACK`. Independent readback returned `status=draft`, `entries=100`, `publication_grants=0`. This proves the initial status transition and grant are transactionally atomic under rollback in the synthetic fixture.
+
+**Competing first publication:** Two separate Supabase SQL connector calls were dispatched concurrently via `Promise.allSettled`, each using its own explicit `BEGIN` / authorized JWT claims / `wk100_publish_governed_weekly_edition_v1` / `COMMIT`. Both independently returned the **same** `wk100-ke-20261019` identity. Subsequent fresh-database readback returned exactly one `published` Edition, exactly `100` Entries, one immutable publication grant, and one approved week. Connector timing does not expose precise lock contention; the accepted assertion is **simultaneously dispatched first-publication requests with one durable result**, not a claim about measured lock wait time.
+
+The server-side private raw-byte attestation positive path, independently approved source data rights, and institutional EAT release-time authority remain **unproven**. The governed proposal service helper has no active Edge route. Do not treat the synthetic manually injected private attestation as a real source authorization. The tracked SQL remains interlocked and outside `supabase/migrations`. This is not yet Production deployment acceptance.
+
+
+### Positive private-byte replay and service RPC acceptance — 30 October 2026
+
+An additional **positive** test was appended to the existing native WK100 consolidated suite, in the original reader fixture scope (source commit `52df15f4052897a4cf1fc5a0d893327e77df03b7`). The case seals a manifest for two independently ranked 100-row native feeds, constructs actual Apple/YouTube-format bytes, binds every immutable capture row to its SHA-256 object and matching active Registry recording, privately replays the provider-native parser, independently reconstructs the Top 100, checks rank/label/score and verifies exactly one call to `wk100_attest_private_ranking_replay_v1`. Changing the original row title after archival fails before that RPC. The positive case **was executed in an isolated JavaScript runtime against the exact 10 GitHub source modules** and passed. Its temporary runtime supplied an independently validated SHA-256/Web API polyfill, not the native full Node test runner. The preexisting **82/82 native Node PASS remains the last full-suite result**; the newly added positive test itself is separately accepted by this isolated execution, not a newly verified 83/83 native run.
+
+A further cost-approved disposable Supabase Preview at project ref `bccgdzvvrevjihnurxgd` replayed the actual canonical schema through **migration 234**. The same guarded candidate was applied with its safety interlock removed solely from Preview SQL input. The true PostgreSQL `wk100_attest_private_ranking_replay_v1` created **one immutable receipt** for a synthetic 100-row proposal under the `service_role` JWT claim, returned the same ID on retry, and rejected the same proposal under an `authenticated` JWT claim with SQLSTATE 42501. This database fixture does not itself contain verified raw bytes: the positive byte-verifier call and positive role-only database RPC were exercised **separately**, using a stub adapter at their seam. Neither the production service secret nor an activated Edge attestation endpoint was used.
+
+**Release interpretation:** The positive technical source-native replay/attestation helper and service-only RPC authorization are validated separately; the deployed complete request boundary, institutional source rights, and human publication authority remain release gates. WAKILISHA has **no authorized actual source admission** in Production. No synthetic test has authority to create it. The tracked SQL remains execution-interlocked outside migrations; no merge/Production write is authorized by these tests.
