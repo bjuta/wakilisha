@@ -97,6 +97,7 @@ export async function prepareWk100GovernedEditionProposal({
     provenance.length===manifest.reduce((n,s)=>n+s.expected_depth,0),
     'provenance_depth_mismatch');
   const bySourceRank=new Map(),usedCapture=new Set(),sourceRanks=new Map();
+  const attemptBySource=new Map(),attemptOwners=new Map();
   for(const row of provenance) {
     const source=sourceByKey.get(row?.source_key);
     need(source&&row.operator_key===source.operator_key&&
@@ -113,11 +114,18 @@ export async function prepareWk100GovernedEditionProposal({
       PROVISIONAL.test(row.provisional_ref)&&
       row.provisional_ref===`wk100:obs:v1:${source.raw_sha256}:${row.capture_row_id.toLowerCase()}`),
       'provenance_identity_invalid');
+    const priorAttempt=attemptBySource.get(row.source_key);
+    need(!priorAttempt||priorAttempt===row.attempt_id,'source_attempt_mismatch');
+    const priorSource=attemptOwners.get(row.attempt_id);
+    need(!priorSource||priorSource===row.source_key,'attempt_reused_between_sources');
+    attemptBySource.set(row.source_key,row.attempt_id);
+    attemptOwners.set(row.attempt_id,row.source_key);
     bySourceRank.set(k,row);usedCapture.add(row.capture_row_id);
     sourceRanks.set(row.source_key,(sourceRanks.get(row.source_key)||0)+1);
   }
   for(const source of manifest)need(sourceRanks.get(source.source_key)===source.expected_depth,
     'source_rank_coverage_invalid');
+  need(attemptOwners.size===result.selected_attempt_ids.length,'selected_attempt_coverage_invalid');
 
   need(Array.isArray(audit.top100)&&audit.top100.length===100&&
     Array.isArray(review.labels)&&review.labels.length===100,
@@ -208,6 +216,9 @@ export async function prepareWk100GovernedEditionProposal({
   const proposal_sha256=await digestSHA256(canonicalJSON(candidate));
   return freezeDeep({
     ...candidate,proposal_sha256,
+    // The future database publisher MUST hold one immutable Edition slot per
+    // market/week; a changed review digest is not a second publication.
+    edition_slot_key:`wk100:KE:${week.week_start_eat}`,
     idempotency_key:`wk100:${week.week_start_eat}:${proposal_sha256}`,
     state:'candidate_for_separate_governed_review',
     can_publish:false,can_write_registry:false,
