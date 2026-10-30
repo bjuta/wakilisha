@@ -165,7 +165,11 @@ begin
     if coalesce(v_source->>'source_key','')=any(v_seen_sources)
        or coalesce(v_source->>'operator_key','')=any(v_seen_operators)
        or nullif(btrim(coalesce(v_source->>'operator_key','')),'') is null
-       or (v_source->>'raw_sha256') !~ '^[a-f0-9]{64}
+       or (v_source->>'raw_sha256') !~ '^[a-f0-9]{64}$' then
+      raise exception 'WK100 source/operator duplication or invalid hash.';
+    end if;
+    v_seen_sources:=array_append(v_seen_sources,v_source->>'source_key');
+    v_seen_operators:=array_append(v_seen_operators,v_source->>'operator_key');
 
     select a.id,a.record_count,a.payload_sha256,
            a.native_period_start,a.native_period_end,
@@ -255,175 +259,7 @@ begin
     else
       if v_item->>'provisional_ref' is not null
          or (v_item->>'canonical_track_id') !~
-            '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}
-
-  -- Atomic immutable one-per-week approval, unlike proposal digest uniqueness.
-  insert into platform_private.wk100_governed_editorial_approvals_v1
-    (week_start_eat,edition_slot_key,proposal_sha256,
-     proposal_snapshot_sha256,constitution_sha256,rank_input_sha256,
-     proposal_snapshot,approved_by)
-  values(v_week,p_proposal->>'edition_slot_key',v_proposal_sha,
-         v_snapshot_sha,p_proposal->>'constitution_sha256',
-         p_proposal->>'rank_input_sha256',p_proposal,v_actor)
-  on conflict (program_id,week_start_eat) do nothing
-  returning id into v_id;
-
-  if v_id is null then
-    select * into strict v_existing
-    from platform_private.wk100_governed_editorial_approvals_v1
-    where program_id='top100' and week_start_eat=v_week;
-    if v_existing.proposal_snapshot_sha256<>v_snapshot_sha
-       or v_existing.proposal_sha256<>v_proposal_sha then
-      raise exception using errcode='23505',
-        message='WK100 week already has a different immutable reviewed proposal.';
-    end if;
-    v_id:=v_existing.id;
-  end if;
-  return v_id;
-end;
-$$;
-
-revoke execute on function
-  public.wk100_register_governed_editorial_approval_v1(jsonb)
-from public,anon,authenticated,service_role;
--- Intentionally callable by signed-in users; the function verifies live
--- auth.uid() and manage_charts against the existing role authority.
-grant execute on function
-  public.wk100_register_governed_editorial_approval_v1(jsonb)
-to authenticated;
-
-commit;
- then
-      raise exception 'WK100 source/operator duplication or invalid hash.';
-    end if;
-    v_seen_sources:=array_append(v_seen_sources,v_source->>'source_key');
-    v_seen_operators:=array_append(v_seen_operators,v_source->>'operator_key');
-
-    select a.id,a.record_count,a.payload_sha256,
-           a.native_period_start,a.native_period_end,
-           a.native_period_evidence_ref,
-           c.expected_depth,c.provider_key,c.source_key
-      into strict v_contract
-    from public.wk_chart_capture_attempts_v1 a
-    join public.wk_chart_capture_contracts_v1 c on c.id=a.contract_id
-    where c.source_key=v_source->>'source_key'
-      and c.market='KE'
-      and a.week_start_eat=v_week
-      and a.status='succeeded'
-      and a.native_period_authority='provider_defined'
-      and a.payload_sha256=v_source->>'raw_sha256'
-      and a.id::text in (
-        select jsonb_array_elements_text(p_proposal->'selected_attempt_ids')
-      );
-    if not found or v_contract.id=any(v_seen_attempts)
-       or v_contract.record_count<>v_contract.expected_depth
-       or to_char(v_contract.native_period_start at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"')
-          <>v_source#>>'{native_period,starts_at}'
-       or to_char(v_contract.native_period_end at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"')
-          <>v_source#>>'{native_period,ends_at}'
-       or v_contract.native_period_evidence_ref
-          <>v_source#>>'{native_period,evidence_ref}' then
-      raise exception 'WK100 source receipt authority or period mismatches the database.';
-    end if;
-    v_seen_attempts:=array_append(v_seen_attempts,v_contract.id);
-
-    select count(*) into v_count
-      from public.wk_chart_capture_rows_v1 r
-      where r.attempt_id=v_contract.id;
-    if v_count<>v_contract.record_count then
-      raise exception 'WK100 selected capture source rows are incomplete.';
-    end if;
-  end loop;
-
-  if cardinality(v_seen_attempts)<>jsonb_array_length(p_proposal->'selected_attempt_ids') then
-    raise exception 'WK100 selected attempt set does not match the source panel.';
-  end if;
-
-  if jsonb_typeof(p_proposal->'observed_entries')<>'array'
-     or jsonb_array_length(p_proposal->'observed_entries')<>100 then
-    raise exception 'WK100 editorial review must contain exactly 100 ranked observations.';
-  end if;
-  for v_item in select value from jsonb_array_elements(p_proposal->'observed_entries') loop
-    v_rank:=(v_item->>'rank')::integer;
-    if v_rank<>v_expected
-       or nullif(btrim(v_item->>'original_title'),'') is null
-       or nullif(btrim(v_item->>'original_artist'),'') is null
-       or (v_item->>'score')::numeric<=0 then
-      raise exception 'WK100 ranks, observed text or positive scores are incomplete.';
-    end if;
-    v_expected:=v_expected+1;
-
-    -- An original title/artist is never invented at the editorial layer.
-    v_attempt:=(v_item#>>'{source_observation,attempt_id}')::uuid;
-    if not v_attempt=any(v_seen_attempts)
-       or (v_item#>>'{source_observation,capture_row_id}')::uuid=any(v_seen_rows) then
-      raise exception 'WK100 ranked observation contains a foreign/duplicate source row.';
-    end if;
-    v_seen_rows:=array_append(v_seen_rows,(v_item#>>'{source_observation,capture_row_id}')::uuid);
-    select count(*) into v_count
-    from public.wk_chart_capture_rows_v1 r
-    join public.wk_chart_capture_attempts_v1 a on a.id=r.attempt_id
-    join public.wk_chart_capture_contracts_v1 c on c.id=a.contract_id
-    where r.id=(v_item#>>'{source_observation,capture_row_id}')::uuid
-      and r.attempt_id=v_attempt
-      and r.source_rank=(v_item#>>'{source_observation,source_rank}')::integer
-      and c.source_key=v_item#>>'{source_observation,source_key}'
-      and a.payload_sha256=v_item#>>'{source_observation,raw_sha256}'
-      and r.title_observed=v_item->>'original_title'
-      and r.artist_observed=v_item->>'original_artist';
-    if v_count<>1 then
-      raise exception 'WK100 original observed title, artist, rank or evidence ID cannot be verified.';
-    end if;
-    if (v_item->>'canonical_track_id') is null then
-      if coalesce(v_item->>'provisional_ref','') !~ '^wk100:obs:v1:[a-f0-9]{64}:[0-9a-f-]{36}$'
-        or v_item->>'provisional_ref'<>
-           'wk100:obs:v1:'||
-           (v_item#>>'{source_observation,raw_sha256}')||':'||
-           lower(v_item#>>'{source_observation,capture_row_id}') then
-        raise exception 'WK100 provisional observation must be source-anchored.';
-      end if;
-    elsif v_item->>'provisional_ref' is not null then
-      raise exception 'WK100 canonical and provisional identity may not coexist.';
-    end if;
-  end loop;
-
-  -- Atomic immutable one-per-week approval, unlike proposal digest uniqueness.
-  insert into platform_private.wk100_governed_editorial_approvals_v1
-    (week_start_eat,edition_slot_key,proposal_sha256,
-     proposal_snapshot_sha256,constitution_sha256,rank_input_sha256,
-     proposal_snapshot,approved_by)
-  values(v_week,p_proposal->>'edition_slot_key',v_proposal_sha,
-         v_snapshot_sha,p_proposal->>'constitution_sha256',
-         p_proposal->>'rank_input_sha256',p_proposal,v_actor)
-  on conflict (program_id,week_start_eat) do nothing
-  returning id into v_id;
-
-  if v_id is null then
-    select * into strict v_existing
-    from platform_private.wk100_governed_editorial_approvals_v1
-    where program_id='top100' and week_start_eat=v_week;
-    if v_existing.proposal_snapshot_sha256<>v_snapshot_sha
-       or v_existing.proposal_sha256<>v_proposal_sha then
-      raise exception using errcode='23505',
-        message='WK100 week already has a different immutable reviewed proposal.';
-    end if;
-    v_id:=v_existing.id;
-  end if;
-  return v_id;
-end;
-$$;
-
-revoke execute on function
-  public.wk100_register_governed_editorial_approval_v1(jsonb)
-from public,anon,authenticated,service_role;
--- Intentionally callable by signed-in users; the function verifies live
--- auth.uid() and manage_charts against the existing role authority.
-grant execute on function
-  public.wk100_register_governed_editorial_approval_v1(jsonb)
-to authenticated;
-
-commit;
- then
+            '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
         raise exception 'WK100 canonical and provisional identity may not coexist.';
       end if;
       select count(*) into v_count
@@ -446,8 +282,7 @@ commit;
        or jsonb_array_length(v_item->'corroboration_refs')=0 then
       raise exception 'WK100 ranked entry lacks source contribution evidence.';
     end if;
-    for v_ref in
-      select value from jsonb_array_elements(v_item->'corroboration_refs')
+    for v_ref in select value from jsonb_array_elements(v_item->'corroboration_refs')
     loop
       select count(*) into v_count
       from public.wk_chart_capture_rows_v1 r
@@ -478,136 +313,6 @@ commit;
         raise exception 'WK100 source contribution identity lacks verified capture evidence.';
       end if;
     end loop;
-  end loop;
-
-  -- Atomic immutable one-per-week approval, unlike proposal digest uniqueness.
-  insert into platform_private.wk100_governed_editorial_approvals_v1
-    (week_start_eat,edition_slot_key,proposal_sha256,
-     proposal_snapshot_sha256,constitution_sha256,rank_input_sha256,
-     proposal_snapshot,approved_by)
-  values(v_week,p_proposal->>'edition_slot_key',v_proposal_sha,
-         v_snapshot_sha,p_proposal->>'constitution_sha256',
-         p_proposal->>'rank_input_sha256',p_proposal,v_actor)
-  on conflict (program_id,week_start_eat) do nothing
-  returning id into v_id;
-
-  if v_id is null then
-    select * into strict v_existing
-    from platform_private.wk100_governed_editorial_approvals_v1
-    where program_id='top100' and week_start_eat=v_week;
-    if v_existing.proposal_snapshot_sha256<>v_snapshot_sha
-       or v_existing.proposal_sha256<>v_proposal_sha then
-      raise exception using errcode='23505',
-        message='WK100 week already has a different immutable reviewed proposal.';
-    end if;
-    v_id:=v_existing.id;
-  end if;
-  return v_id;
-end;
-$$;
-
-revoke execute on function
-  public.wk100_register_governed_editorial_approval_v1(jsonb)
-from public,anon,authenticated,service_role;
--- Intentionally callable by signed-in users; the function verifies live
--- auth.uid() and manage_charts against the existing role authority.
-grant execute on function
-  public.wk100_register_governed_editorial_approval_v1(jsonb)
-to authenticated;
-
-commit;
- then
-      raise exception 'WK100 source/operator duplication or invalid hash.';
-    end if;
-    v_seen_sources:=array_append(v_seen_sources,v_source->>'source_key');
-    v_seen_operators:=array_append(v_seen_operators,v_source->>'operator_key');
-
-    select a.id,a.record_count,a.payload_sha256,
-           a.native_period_start,a.native_period_end,
-           a.native_period_evidence_ref,
-           c.expected_depth,c.provider_key,c.source_key
-      into strict v_contract
-    from public.wk_chart_capture_attempts_v1 a
-    join public.wk_chart_capture_contracts_v1 c on c.id=a.contract_id
-    where c.source_key=v_source->>'source_key'
-      and c.market='KE'
-      and a.week_start_eat=v_week
-      and a.status='succeeded'
-      and a.native_period_authority='provider_defined'
-      and a.payload_sha256=v_source->>'raw_sha256'
-      and a.id::text in (
-        select jsonb_array_elements_text(p_proposal->'selected_attempt_ids')
-      );
-    if not found or v_contract.id=any(v_seen_attempts)
-       or v_contract.record_count<>v_contract.expected_depth
-       or to_char(v_contract.native_period_start at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"')
-          <>v_source#>>'{native_period,starts_at}'
-       or to_char(v_contract.native_period_end at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"')
-          <>v_source#>>'{native_period,ends_at}'
-       or v_contract.native_period_evidence_ref
-          <>v_source#>>'{native_period,evidence_ref}' then
-      raise exception 'WK100 source receipt authority or period mismatches the database.';
-    end if;
-    v_seen_attempts:=array_append(v_seen_attempts,v_contract.id);
-
-    select count(*) into v_count
-      from public.wk_chart_capture_rows_v1 r
-      where r.attempt_id=v_contract.id;
-    if v_count<>v_contract.record_count then
-      raise exception 'WK100 selected capture source rows are incomplete.';
-    end if;
-  end loop;
-
-  if cardinality(v_seen_attempts)<>jsonb_array_length(p_proposal->'selected_attempt_ids') then
-    raise exception 'WK100 selected attempt set does not match the source panel.';
-  end if;
-
-  if jsonb_typeof(p_proposal->'observed_entries')<>'array'
-     or jsonb_array_length(p_proposal->'observed_entries')<>100 then
-    raise exception 'WK100 editorial review must contain exactly 100 ranked observations.';
-  end if;
-  for v_item in select value from jsonb_array_elements(p_proposal->'observed_entries') loop
-    v_rank:=(v_item->>'rank')::integer;
-    if v_rank<>v_expected
-       or nullif(btrim(v_item->>'original_title'),'') is null
-       or nullif(btrim(v_item->>'original_artist'),'') is null
-       or (v_item->>'score')::numeric<=0 then
-      raise exception 'WK100 ranks, observed text or positive scores are incomplete.';
-    end if;
-    v_expected:=v_expected+1;
-
-    -- An original title/artist is never invented at the editorial layer.
-    v_attempt:=(v_item#>>'{source_observation,attempt_id}')::uuid;
-    if not v_attempt=any(v_seen_attempts)
-       or (v_item#>>'{source_observation,capture_row_id}')::uuid=any(v_seen_rows) then
-      raise exception 'WK100 ranked observation contains a foreign/duplicate source row.';
-    end if;
-    v_seen_rows:=array_append(v_seen_rows,(v_item#>>'{source_observation,capture_row_id}')::uuid);
-    select count(*) into v_count
-    from public.wk_chart_capture_rows_v1 r
-    join public.wk_chart_capture_attempts_v1 a on a.id=r.attempt_id
-    join public.wk_chart_capture_contracts_v1 c on c.id=a.contract_id
-    where r.id=(v_item#>>'{source_observation,capture_row_id}')::uuid
-      and r.attempt_id=v_attempt
-      and r.source_rank=(v_item#>>'{source_observation,source_rank}')::integer
-      and c.source_key=v_item#>>'{source_observation,source_key}'
-      and a.payload_sha256=v_item#>>'{source_observation,raw_sha256}'
-      and r.title_observed=v_item->>'original_title'
-      and r.artist_observed=v_item->>'original_artist';
-    if v_count<>1 then
-      raise exception 'WK100 original observed title, artist, rank or evidence ID cannot be verified.';
-    end if;
-    if (v_item->>'canonical_track_id') is null then
-      if coalesce(v_item->>'provisional_ref','') !~ '^wk100:obs:v1:[a-f0-9]{64}:[0-9a-f-]{36}$'
-        or v_item->>'provisional_ref'<>
-           'wk100:obs:v1:'||
-           (v_item#>>'{source_observation,raw_sha256}')||':'||
-           lower(v_item#>>'{source_observation,capture_row_id}') then
-        raise exception 'WK100 provisional observation must be source-anchored.';
-      end if;
-    elsif v_item->>'provisional_ref' is not null then
-      raise exception 'WK100 canonical and provisional identity may not coexist.';
-    end if;
   end loop;
 
   -- Atomic immutable one-per-week approval, unlike proposal digest uniqueness.
