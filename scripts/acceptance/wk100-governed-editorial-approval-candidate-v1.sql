@@ -1059,4 +1059,128 @@ grant execute on function
 to authenticated;
 
 
+
+-- Immutable post-publication identity linkage, separated from the frozen
+-- observed rank/text. Resolution requires Registry's own verified provider
+-- mapping; this function NEVER writes a Track or rewrites Chart V2 Entries.
+create table platform_private.wk100_governed_identity_links_v1 (
+  id uuid primary key default gen_random_uuid(),
+  edition_id text not null,
+  rank integer not null check(rank between 1 and 100),
+  provisional_ref text not null,
+  canonical_track_id uuid not null references public.registry_tracks(id),
+  authority_sha256 text not null check(authority_sha256 ~ '^[a-f0-9]{64}$'),
+  linked_by uuid not null,
+  linked_at timestamptz not null default clock_timestamp(),
+  unique(edition_id,rank),
+  unique(provisional_ref)
+);
+alter table platform_private.wk100_governed_identity_links_v1 enable row level security;
+revoke all on platform_private.wk100_governed_identity_links_v1
+from public,anon,authenticated,service_role;
+create trigger wk100_identity_links_immutable_rows
+before update or delete on platform_private.wk100_governed_identity_links_v1
+for each row execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+create trigger wk100_identity_links_immutable_truncate
+before truncate on platform_private.wk100_governed_identity_links_v1
+for each statement execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+
+create function public.wk100_link_governed_recording_identity_v1(
+  p_edition_id text,p_rank integer,p_track_id uuid,p_authority_sha256 text
+) returns uuid language plpgsql security definer set search_path=pg_catalog
+as $$
+declare
+  v_actor uuid:=auth.uid();
+  v_pending platform_private.wk100_pending_identity_investigations_v1%rowtype;
+  v_existing platform_private.wk100_governed_identity_links_v1%rowtype;
+  v_approved_count integer;
+  v_distinct_count integer;
+  v_only_track uuid;
+  v_link_id uuid;
+begin
+  if v_actor is null or
+     not public.current_user_has_capability('manage_registry') or
+     not public.current_user_has_capability('manage_charts') then
+    raise exception using errcode='42501',
+      message='WK100 identity correction requires chart and Registry stewardship';
+  end if;
+  if p_edition_id is null or p_rank not between 1 and 100 or
+     p_track_id is null or coalesce(p_authority_sha256,'') !~ '^[a-f0-9]{64}$' then
+    raise exception 'WK100 identity linkage requires exact evidence and recording';
+  end if;
+  select * into strict v_pending from
+    platform_private.wk100_pending_identity_investigations_v1
+    where edition_id=p_edition_id and rank=p_rank for update;
+  if not exists(
+    select 1 from platform_private.wk100_governed_publications_v1 p
+    join public.wk_chart_editions_v2 e on e.id=p.edition_id
+    join public.wk_chart_entries_v2 x on x.edition_id=e.id
+    where p.edition_id=p_edition_id and e.program_id='top100'
+      and e.status='published' and x.rank=p_rank
+      and x.canonical_track_id is null
+      and x.track_title=v_pending.original_title
+      and x.artist_name=v_pending.original_artist
+  ) then
+    raise exception 'WK100 original published provisional recording not found';
+  end if;
+
+  -- Respect BOTH accepted link systems used by the existing private reader.
+  -- Any conflicting provider->Track assertion keeps identity unresolved.
+  select count(*),count(distinct track_id),min(track_id)
+    into v_approved_count,v_distinct_count,v_only_track
+  from (
+    select l.track_id
+    from public.wk_chart_capture_rows_v1 r
+    join public.wk_chart_capture_attempts_v1 a on a.id=r.attempt_id
+    join public.wk_chart_capture_contracts_v1 c on c.id=a.contract_id
+    join public.registry_track_provider_links l
+      on l.provider_key=c.provider_key and l.provider_track_id=r.provider_track_id
+      and l.match_status='matched'
+    join public.registry_tracks t on t.id=l.track_id and t.status='active'
+    where r.id=v_pending.capture_row_id and a.id=v_pending.attempt_id
+    union
+    select legacy.registry_entity_id
+    from public.wk_chart_capture_rows_v1 r
+    join public.wk_chart_capture_attempts_v1 a on a.id=r.attempt_id
+    join public.wk_chart_capture_contracts_v1 c on c.id=a.contract_id
+    join public.provider_entity_links legacy
+      on legacy.provider=c.provider_key
+      and legacy.provider_entity_id=r.provider_track_id
+      and legacy.registry_entity_type='track'
+      and legacy.match_status='confirmed'
+    join public.registry_tracks t
+      on t.id=legacy.registry_entity_id and t.status='active'
+    where r.id=v_pending.capture_row_id and a.id=v_pending.attempt_id
+  ) verified;
+  if v_approved_count=0 or v_distinct_count<>1 or
+     v_only_track is distinct from p_track_id then
+    raise exception using errcode='42501',
+      message='WK100 recording has no unique current verified Registry identity';
+  end if;
+  insert into platform_private.wk100_governed_identity_links_v1
+    (edition_id,rank,provisional_ref,canonical_track_id,authority_sha256,linked_by)
+  values(p_edition_id,p_rank,v_pending.provisional_ref,p_track_id,p_authority_sha256,v_actor)
+  on conflict(edition_id,rank) do nothing returning id into v_link_id;
+  if v_link_id is null then
+    select * into strict v_existing
+    from platform_private.wk100_governed_identity_links_v1
+    where edition_id=p_edition_id and rank=p_rank;
+    if v_existing.provisional_ref<>v_pending.provisional_ref or
+       v_existing.canonical_track_id<>p_track_id or
+       v_existing.authority_sha256<>p_authority_sha256 then
+      raise exception using errcode='23505',
+        message='WK100 canonical link conflicts with immutable history';
+    end if;
+    v_link_id:=v_existing.id;
+  end if;
+  return v_link_id;
+end;
+$$;
+revoke execute on function
+  public.wk100_link_governed_recording_identity_v1(text,integer,uuid,text)
+from public,anon,authenticated,service_role;
+grant execute on function
+  public.wk100_link_governed_recording_identity_v1(text,integer,uuid,text)
+to authenticated;
+
 commit;
