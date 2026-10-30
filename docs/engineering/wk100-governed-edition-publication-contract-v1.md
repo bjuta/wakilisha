@@ -1,0 +1,44 @@
+# WAKILISHA 100 — governed Edition boundary v1 (#1329)
+
+**Status, 30 October 2026:** private, nonpublishing proposal contract implemented on `feat/wk100-governed-weekly-edition-1329`. **NOT** a deployed weekly Edition writer or a Production approval mechanism. Parent programme: [#1264](https://github.com/bjuta/wakilisha/issues/1264).
+
+## What exists, independently verified in Production (read-only)
+
+- The established Kenya `top100` Chart V2 Programme already exists with `chart_size=100`. It does not need a duplicate Programme.
+- `public.wk_chart_entries_v2.canonical_track_id` is nullable; Chart Entries preserve `track_title`, `artist_name`, `rank`, `source_payload` and `methodology_version`. Do not write a provisional observation reference into `canonical_track_id`.
+- `public.wk_chart_weekly_freezes_v1` deliberately has `freeze_state='blocked'` and `can_publish=false` constraints, plus a unique receipt/constitution/method/digest identity. It is historical **nonpublishing** evidence, not a permission to publish a Top 100.
+- `public.chart_get_edition_integrity_report(text)` currently assesses resolved Registry artist origins and marks `unresolved_artist_origins` / `country_ineligible_entries` as blockers; `public.wk_chart_editions_publish_integrity_guard()` calls the assertion on status transition to published. This is legacy programme integrity. It cannot be globally removed or treated as WAKILISHA 100's evidence sufficiency policy.
+- As of this review, WK100 capture contracts = **0**, successful capture receipts = **0**, weekly freezes = **0**. There is **no** prospective evidence allowing an authentic public WK100 edition today. Do not seed synthetic rows into Production or claim an Edition exists.
+
+## Committed source-only contract
+
+`supabase/functions/_shared/wk100-governed-edition-proposal.mjs` exports `prepareWk100GovernedEditionProposal`.
+
+It accepts the **restricted** source reader output from `readWk100PrivateRankingEvidence`, explicit constitutional SHA-256, week/Edition date, explicit UTC cutoff + deadline, and an editorial review selecting exactly one **actual observed title/artist source row** for each Top 100 rank. A review entry may choose the display observation but **cannot reassign a rank**, invent a listening count or convert an unresolved source row into a Registry Track.
+
+The planner verifies the selected source manifests (market KE, approved candidate evidence, unique operators, native-period evidence), every selected capture attempt and per-source contiguous rank, selected rows, and the absence of source-attempt reuse. It reconstructs the exact private ranking input from the captured provenance, checks its cryptographic input digest and **independently reruns the existing scoring kernel**. It refuses a changed rank, score, source contribution, identity join, source digest, display observation, selection set, editorial digest, or cutoff. This logic does not claim to perform a fresh external provider read; that remains the private reader's raw-byte and parser contract.
+
+The proposal records original title and artist from the explicit selected capture row, unchanged rank, frozen score, exact source/digest/attempt reference and all claimed corroboration sources. Each non-UUID `wk100:obs:v1:<raw_sha256>:<capture_row_uuid>` remains a provisional observation with `canonical_track_id:null`, not a canonical identity. Registry/MIZIZI resolution may follow later, under established authority, without rewriting that original published observation snapshot.
+
+Two different keys are deliberate: `edition_slot_key=wk100:KE:<EAT-week>` identifies the **one allowed weekly Edition**, whereas `idempotency_key=wk100:<EAT-week>:<proposal-digest>` identifies the immutable exact review proposal. Changed review content cannot authorize a second Edition for the same week; the future DB writer MUST enforce that weekly uniqueness transactionally.
+
+The result is deep-frozen, content-addressed and **always** `can_publish:false` / `can_write_registry:false`. An `editor_ref` is contextual evidence, **not an authenticated signature**. `constitution_sha256` is an external source-decision digest, **not permission**. The scoring quality flags are recorded and require one explicit reason per exception; the proposal is *never* an automatic quality override or publishing grant.
+
+## Required governed writer (not yet implemented)
+
+The current legacy `chart-ingest-api` commit path inserts edition and entry records as separate network operations; it is not the accepted atomic WK100 publication pathway. The next implementation must use a single PostgreSQL transaction behind an authenticated, restricted role/capability boundary:
+
+1. Lock one `(program='top100', market='KE', week_start_eat)` Edition slot and compare approved constitution, cutoff, immutable source rows/digests, ranked result and editorial evidence. Refuse multiple different proposal digests for one week, source drift and post-cutoff recalc. Protect concurrent and retry operations.
+2. Use an auditable immutable WK100 decision/freeze authority rather than reinterpreting `wk_chart_weekly_freezes_v1`'s permanently blocked contract. Reuse existing review and audit primitives where they provide **correct** exact approval and idempotency semantics. Any new schema or RPC must be minimal, migration-controlled and RLS-protected.
+3. Insert the V2 Edition, **all 100** Chart Entries, frozen source metadata and publication ledger atomically. Explicitly validate rank continuity, unique candidates, preserved original display labels, source provenance and positive scores. Unresolved Registry identity is allowed; insufficient ranking evidence remains a separate hard blocker. Do not weaken unrelated `toprnb` or other legacy programme integrity rules.
+4. Publish on the founder-approved EAT cadence; the missing explicit clock time must be set as an **authoritative publication policy** rather than guessed in code. Absence of required evidence creates a visible incident; missing ISRC, artwork, credits or Registry Track completion does not automatically postpone otherwise sufficiently evidenced publication.
+5. Write pending identity investigations to accepted Registry/MIZIZI mechanisms **idempotently**. A later verified Track link must use controlled mutation/projection and append provenance/correction lineage; preserve exact original rank, display text, source period and methodology. No invented artist origin or ISRC.
+6. Verify readers, links, chart tiles, search and mobile/desktop without assuming `track_slug` or `canonical_track_id` exists. Publish a true revision only through explicit authenticated correction authority, never by silent re-score.
+
+## Release gates
+
+- **Now:** pure ranked-evidence proposal and consolidated Node tests. Test source rows include missing ISRC, unresolved source identity, duplicate-source traps, incomplete metadata, tampered replay digest, reordered review and missed deadline. Production untouched.
+- **Next:** CLI-minted **one scoped forward migration**, if required, after exact read-only schema/RPC audit; controlled isolated Supabase Preview with approved cost, synthetic transaction/rollback, denied-role checks, concurrent duplicate week and permanent read-only postflight verifier.
+- **Then:** PR with native Node and SQL acceptance; no GitHub Actions dependency because minutes are exhausted; approved SQL promotion to Production only once verified. No collector cron, source enrollment, provider polling, automatic public publication or Edge activation as a side effect.
+
+**Controlling principle:** evidence freeze / public Edition cutoff and Registry investigation are different clocks. The first is a quality and publication decision; the second is ongoing cultural-identity stewardship.
