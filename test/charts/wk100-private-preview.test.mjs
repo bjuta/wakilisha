@@ -697,3 +697,26 @@ test('governed attestation refuses unsealed or insufficient private evidence wit
    /restricted_backend_required/);
  assert.equal(rpcCalls,0);
 });
+
+test('WK100 SQL draft remains inert and binds source admissions, editorial roles, week lock, and Registry handoff',async()=>{
+ const sql=await readFile('scripts/acceptance/wk100-governed-editorial-approval-candidate-v1.sql','utf8');
+ const interlock=sql.indexOf('WK100_CANDIDATE_EXECUTION_PROHIBITED');
+ const firstDDL=sql.indexOf('create table platform_private.');
+ assert.ok(interlock>0&&firstDDL>interlock);
+ assert.equal((sql.match(/^begin;$/gm)||[]).length,1);
+ assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
+ assert.match(sql,/20261030095808_wk100_governed_publisher_v1\.sql/);
+ assert.match(sql,/wk100_governed_source_admissions_v1/);
+ assert.match(sql,/current_user_has_capability\('manage_ingest'\)/);
+ assert.match(sql,/current_user_has_capability\('manage_charts'\)/);
+ assert.match(sql,/current_user_has_capability\('publish_charts'\)/);
+ assert.match(sql,/clock_timestamp\(\)>v_deadline/);
+ assert.match(sql,/wk100_private_replay_attestations_v1/);
+ assert.match(sql,/wk100_unique_program_edition_date_v1/);
+ assert.match(sql,/wk100_block_ungoverned_promotion/);
+ assert.match(sql,/wk100_pending_identity_investigations_v1/);
+ assert.match(sql,/wk100_stage_entry_update_delete_guard/);
+ assert.match(sql,/wk100_block_extra_staged_entry/);
+ assert.match(sql,/100,100,'draft'/);
+ assert.doesNotMatch(sql,/100,100,'published'/);
+});
