@@ -729,7 +729,7 @@ begin
     if v_program='top100' and exists (
       select 1 from platform_private.wk100_governed_staged_editions_v1 s
       where s.program_id='top100' and s.week_start_eat=v_week
-        and s.edition_id=coalesce(old.edition_id,new.edition_id)
+        and s.edition_id=old.edition_id
     ) then
       raise exception using errcode='42501',
         message='WK100 staged original observations are immutable';
@@ -1095,7 +1095,7 @@ declare
   v_existing platform_private.wk100_governed_identity_links_v1%rowtype;
   v_approved_count integer;
   v_distinct_count integer;
-  v_only_track uuid;
+  v_tracks uuid[];
   v_link_id uuid;
 begin
   if v_actor is null or
@@ -1126,8 +1126,8 @@ begin
 
   -- Respect BOTH accepted link systems used by the existing private reader.
   -- Any conflicting provider->Track assertion keeps identity unresolved.
-  select count(*),count(distinct track_id),min(track_id)
-    into v_approved_count,v_distinct_count,v_only_track
+  select count(*),count(distinct track_id),array_agg(distinct track_id)
+    into v_approved_count,v_distinct_count,v_tracks
   from (
     select l.track_id
     from public.wk_chart_capture_rows_v1 r
@@ -1136,7 +1136,6 @@ begin
     join public.registry_track_provider_links l
       on l.provider_key=c.provider_key and l.provider_track_id=r.provider_track_id
       and l.match_status='matched'
-    join public.registry_tracks t on t.id=l.track_id and t.status='active'
     where r.id=v_pending.capture_row_id and a.id=v_pending.attempt_id
     union
     select legacy.registry_entity_id
@@ -1148,12 +1147,12 @@ begin
       and legacy.provider_entity_id=r.provider_track_id
       and legacy.registry_entity_type='track'
       and legacy.match_status='confirmed'
-    join public.registry_tracks t
-      on t.id=legacy.registry_entity_id and t.status='active'
     where r.id=v_pending.capture_row_id and a.id=v_pending.attempt_id
   ) verified;
   if v_approved_count=0 or v_distinct_count<>1 or
-     v_only_track is distinct from p_track_id then
+     v_tracks[1] is distinct from p_track_id or
+     not exists(select 1 from public.registry_tracks t
+       where t.id=p_track_id and t.status='active') then
     raise exception using errcode='42501',
       message='WK100 recording has no unique current verified Registry identity';
   end if;
