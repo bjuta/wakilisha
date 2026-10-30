@@ -42,3 +42,23 @@ The current legacy `chart-ingest-api` commit path inserts edition and entry reco
 - **Then:** PR with native Node and SQL acceptance; no GitHub Actions dependency because minutes are exhausted; approved SQL promotion to Production only once verified. No collector cron, source enrollment, provider polling, automatic public publication or Edge activation as a side effect.
 
 **Controlling principle:** evidence freeze / public Edition cutoff and Registry investigation are different clocks. The first is a quality and publication decision; the second is ongoing cultural-identity stewardship.
+
+
+## Publisher preflight — observed database authority, 30 October 2026
+
+This is a read-only analysis of live Production schema. **No migration has been deployed by this slice.**
+
+1. Existing captured source contracts have `wk_chart_capture_contracts_v1_admission_state_check`: `admission_state = 'candidate'` only. A proposal's `admission:'approved'` is a separate *methodology/research decision*, not a database contract status. Do **not** rewrite the historical source contract check or claim an approved production feed because a private proposal can be constructed.
+2. The `wk_chart_capture_attempts_v1` schema enforces a Kenya Monday EAT week, successful/failed transport distinction, SHA-256, exactly persisted observed row count, provider-period truth, and a unique `(contract_id,scheduled_at,attempt_number)` slot. A publisher must bind exact selected attempt IDs and immutable row evidence and cannot mint new observations from a ranked proposal.
+3. The existing `wk_chart_weekly_freezes_v1` is permanently restricted to `freeze_state='blocked'` and `can_publish=false`; updates/deletions have an immutable trigger. It is valuable historical evidence and **must not** be repurposed into a publication grant or softened.
+4. V2 `wk_chart_editions_v2` has a primary unique `id`, but no enforced uniqueness on the desired `(program_id, EAT-week)` slot. Its current program/date index is nonunique. The future publisher requires a transactional immutable weekly slot ledger/unique key; hashing proposal content alone does not prevent conflicting same-week publications.
+5. The legacy `wk_chart_editions_publish_integrity_guard_bu` runs **before UPDATE OF status**, not INSERT. It calls the legacy resolved artist-origin eligibility assertion on becoming published. A WK100 pathway must never sneak around that guard by inserting `status='published'` directly, nor remove artist checks from all chart programmes. Proposed integration: create the V2 Edition in an explicitly nonpublished state, write/verify all entries in the same database transaction, then perform a guarded status transition with a narrowly scoped, independently verified WK100 publication authority and preserved legacy behavior for other programmes.
+6. The existing Chart Entry insert/update/delete lineage triggers already capture canonical identity projection changes. They are append-only history, but a verified canonical link later must preserve **original observed** artist/title/rank and not infer missing artist origin, ISRC or cross-source equivalence.
+7. The existing `public.current_user_has_capability(text)` is a candidate authenticated-user gate to inspect before designing the RPC. **Do not trust the client-supplied editor_ref**. Ensure the publisher function is schema-private, has explicit `EXECUTE` revocations, validates `auth.uid()` and an authenticated live capability, and is not callable by a generic service-role token or arbitrary signed-in user. A SECURITY DEFINER alone is not an authorization scheme.
+8. At review, Production has **zero** WK100 capture contracts, receipts and freezes. No genuine Week-1 score or publishable source admission exists. This is an engineering implementation track, not authorization to generate a public chart.
+
+### Immediate implementation decision
+
+The transactional publisher needs a narrowly scoped *new governed approval/slot mechanism*, not an amendment to the protected frozen historical receipt table or a change to all chart programmes. Its database acceptance must specifically prove a direct published INSERT is denied for WK100, that only authenticated reviewed proposal promotion is allowed, that conflicting same-week proposals fail atomically, and that existing legacy `toprnb` publication validation is unchanged.
+
+The accepted proposal module remains nonpublishing even after an SQL writer is authored. The bridge between private audited proposal and SQL must reject any client-made claims: recompute source/attempt evidence server-side under controlled privileges, compare content digest and approved review authority, and never accept a manufactured `can_publish:true` field.
