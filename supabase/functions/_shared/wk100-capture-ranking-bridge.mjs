@@ -3,9 +3,10 @@
  * ranking preview's source-native input shape. This is a pure projection:
  * no provider requests, Registry writes, scoring weights, or edition changes.
  *
- * The caller supplies a fixed source/operator constitution and resolved
- * recording UUIDs. Neither a matching assertion nor a collection receipt
- * acquires canonical identity authority merely by passing through this bridge.
+ * The caller supplies a fixed source/operator constitution and optional
+ * verified Registry Track UUIDs. Unresolved rows get source-evidence-anchored,
+ * non-UUID observation references; no inferred cross-source equivalence.
+ * A receipt never acquires canonical identity authority through this bridge.
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHA = /^[a-f0-9]{64}$/;
@@ -28,6 +29,7 @@ const utcTime = x => new Date(x).toISOString().replace('.000Z','Z');
  * @param {Array<{contract: object, attempt: object, rows: object[], operator_key: string, authority_ref: string}>} options.sources
  * @param {Array<{capture_row_id:string, recording_id:string}>} options.resolutions
  * @returns {{input:object, provenance:object[], can_publish:false}}
+ * Provisional refs are NOT Registry UUIDs and must never be put in canonical_track_id.
  */
 export function buildWk100CaptureRankingInput({
   week_start_eat, dataset_mode, method, sources, resolutions,
@@ -91,13 +93,21 @@ export function buildWk100CaptureRankingInput({
         'rank_invalid');
       requireValue(!usedRows.has(row.id), 'capture_row_reused');
       ranks.add(row.source_rank); usedRows.add(row.id);
-      const recording_id = mapped.get(row.id);
-      requireValue(recording_id, 'recording_unresolved');
+      // An unlinked observation is its own recording *candidate*, never an
+      // implicit vote for another source's similarly titled recording.
+      const canonical_id = mapped.get(row.id) ?? null;
+      const recording_id = canonical_id ??
+        `wk100:obs:v1:${attempt.payload_sha256}:${row.id.toLowerCase()}`;
       requireValue(!recordings.has(recording_id), 'recording_duplicate_within_source');
       recordings.add(recording_id);
       entries.push({recording_id, rank: row.source_rank});
       provenance.push({source_key:contract.source_key,operator_key,attempt_id:attempt.id,
-        capture_row_id:row.id,recording_id,source_rank:row.source_rank});
+        capture_row_id:row.id,recording_id:canonical_id,
+        provisional_ref:canonical_id ? null : recording_id,
+        identity_state:canonical_id ? 'canonical' : 'provisional',
+        title_observed:typeof row.title_observed==='string' ? row.title_observed : null,
+        artist_observed:typeof row.artist_observed==='string' ? row.artist_observed : null,
+        source_rank:row.source_rank});
     }
     entries.sort((a,b)=>a.rank-b.rank);
     requireValue(entries.every((row,i)=>row.rank === i+1), 'rank_not_contiguous');
@@ -110,7 +120,7 @@ export function buildWk100CaptureRankingInput({
       raw_sha256:attempt.payload_sha256, entries,
     });
   }
-  requireValue(mapped.size === usedRows.size, 'orphan_resolution');
+  for (const id of mapped.keys()) requireValue(usedRows.has(id), 'orphan_resolution');
   previewSources.sort((a,b)=>a.source_key.localeCompare(b.source_key));
   provenance.sort((a,b)=>a.source_key.localeCompare(b.source_key) || a.source_rank-b.source_rank);
   return Object.freeze({

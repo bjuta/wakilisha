@@ -1,10 +1,11 @@
 /**
- * WK100: read-only capture -> Registry identity -> existing private rank kernel.
+ * WK100: read-only capture -> optional Registry identity -> private rank kernel.
  *
  * Caller MUST supply a service-role-only database reader and a private Storage
  * object reader behind an existing authenticated server boundary. This module
- * never fetches providers, mutates the Registry, scores unresolved rows or
- * writes a Chart Edition. All selected receipts are explicit (no latest-wins).
+ * never fetches providers, mutates the Registry or writes a Chart Edition.
+ * Unresolved identities are distinct source-anchored scoring candidates, not
+ * cross-source matches. All receipts are explicit (no latest-wins).
  */
 import {buildWk100CaptureRankingInput} from './wk100-capture-ranking-bridge.mjs';
 import {buildWk100PrivatePreview} from './wk100-private-preview-core.mjs';
@@ -79,8 +80,9 @@ function verifyNativeRows(bytes,contract,attempt,rows) {
 
 /**
  * Only exact, existing matched provider links count as a resolved recording.
- * A missing, conflicting, inactive or non-UUID Registry identity is REVIEW,
- * never inferred from title/artist similarity. Accepted provider/Track links
+ * A missing, conflicting, inactive or non-UUID Registry identity is queued
+ * for independent enrichment, never inferred from title/artist similarity.
+ * Accepted provider/Track links
  * from both existing authorities must agree if both have evidence.
  */
 export async function readWk100PrivateRankingEvidence({
@@ -184,11 +186,6 @@ export async function readWk100PrivateRankingEvidence({
   }
   reviews.sort((a,b)=>a.source_key.localeCompare(b.source_key)||
     a.capture_row_id.localeCompare(b.capture_row_id));
-  if(reviews.length) return {status:'review_required',week_start_eat,
-    selected_attempt_ids:[...selected_attempt_ids].sort(),
-    verified_receipts:selected.length,resolved_rows:resolutions.length,
-    review_rows:reviews,can_publish:false};
-
   const projected=buildWk100CaptureRankingInput({week_start_eat,dataset_mode,method,
     sources:selected.map(s=>({contract:s.contract,attempt:s.attempt,rows:s.rows,
       operator_key:s.authority.operator_key,authority_ref:s.authority.authority_ref})),
@@ -198,6 +195,7 @@ export async function readWk100PrivateRankingEvidence({
   return {status:'private_preview',week_start_eat,
     selected_attempt_ids:[...selected_attempt_ids].sort(),
     verified_receipts:selected.length, resolved_rows:resolutions.length,
+    pending_identity_rows:reviews.length,review_rows:reviews,
     rank_input_sha256:inputSha256,provenance:projected.provenance,private_audit:preview.privateAudit,
     public_methodology_summary:preview.publicSummary,can_publish:false};
 }
