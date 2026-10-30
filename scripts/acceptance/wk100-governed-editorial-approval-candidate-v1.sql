@@ -384,7 +384,7 @@ begin
       where admitted.week_start_eat=v_week
         and att.id=v_contract.id
         and admitted.approved_at<=v_deadline
-        and admitted.authority_sha256 ~ '^[a-f0-9]{64}$'
+        and admitted.authority_sha256=p_proposal->>'constitution_sha256'
     ) then
       raise exception using errcode='42501',
         message='WK100 source not separately admitted for this chart week';
@@ -1006,6 +1006,12 @@ begin
     return v_stage.edition_id;
   end if;
 
+  if jsonb_typeof(v_review.proposal_snapshot#>'{editor_review,dispositions}')
+       is distinct from 'array'
+     or jsonb_array_length(v_review.proposal_snapshot#>'{editor_review,dispositions}')<>0 then
+    raise exception using errcode='42501',
+      message='WK100 published Edition requires the configured ranking quality floors to pass';
+  end if;
   v_cutoff:=(v_review.proposal_snapshot->>'cutoff_at_utc')::timestamptz;
   v_deadline:=(v_review.proposal_snapshot->>'deadline_at_utc')::timestamptz;
   if clock_timestamp()<v_cutoff or clock_timestamp()>v_deadline then
