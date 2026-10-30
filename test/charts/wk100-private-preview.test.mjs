@@ -9,6 +9,8 @@ import {buildWk100CaptureRankingInput as project} from '../../supabase/functions
 import {createHash} from 'node:crypto';
 import {readWk100SealedCaptureManifest,validWk100CapturePreviewProjectBinding,makeWk100CapturePreviewSummary,runWk100PrivateCapturePreview} from '../../supabase/functions/_shared/wk100-capture-private-server.mjs';
 import {readWk100PrivateRankingEvidence as run} from '../../supabase/functions/_shared/wk100-capture-ranking-reader.mjs';
+import {canonicalJSON,digestSHA256} from '../../supabase/functions/_shared/chart-weekly-evidence.mjs';
+import {prepareWk100GovernedEditionProposal as prepare} from '../../supabase/functions/_shared/wk100-governed-edition-proposal.mjs';
 
 const uuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`;
 const p={starts_at:'2026-10-18T21:00:00Z',ends_at:'2026-10-25T21:00:00Z',evidence_ref:'period_week_2026_43'};
@@ -453,3 +455,214 @@ test('candidate replay rejects unsupported parser and unmatched native week key'
 });
 
 }
+
+// WK100 #1329: governed publication proposal is a nonpublishing evidence contract.
+const proposalUuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`;
+const copy=x=>structuredClone(x);
+const proposalMethod={
+ version:'preview-proxy-v1',
+ behavior_weights:{consumption:.5,video_consumption:.5},
+ operator_slots:{consumption:1,video_consumption:1},
+ minimum_operators:2,minimum_behaviors:2,minimum_corrob_tracks:1,
+ maximum_operator_share:1,
+};
+function proposalSource(n,behavior) {
+ const id=proposalUuid(10+n),attempt=proposalUuid(20+n);
+ return {
+  contract:{id,source_key:`source_${n}`,market:'KE',behavior,native_metric:'rank',expected_depth:100},
+  attempt:{id:attempt,contract_id:id,week_start_eat:'2026-10-19',
+   status:'succeeded',payload_sha256:n.toString(16).repeat(64),
+   observed_depth:100,record_count:100,native_period_authority:'provider_defined',
+   native_period_start:'2026-10-18T21:00:00Z',native_period_end:'2026-10-25T21:00:00Z',
+   native_period_evidence_ref:'period_ke_week'},
+  operator_key:`operator_${n}`,authority_ref:`authority_${n}`,
+  rows:Array.from({length:100},(_,i)=>({
+   id:proposalUuid(1000+n*100+i),attempt_id:attempt,source_rank:i+1,
+   title_observed:`Observed Track ${i+1}`,artist_observed:`Artist ${i+1}`,
+  })),
+ };
+}
+async function proposalFixture(methodOverrides={}) {
+ const sources=[proposalSource(1,'consumption'),proposalSource(2,'video_consumption')];
+ // The two final observations are not yet verified as the same recording.
+ const resolutions=sources.flatMap(s=>s.rows.slice(0,99).map((row,i)=>({
+  capture_row_id:row.id,recording_id:proposalUuid(2000+i),
+ })));
+ const projected=project({
+  week_start_eat:'2026-10-19',dataset_mode:'authorized_candidate',
+  method:{...proposalMethod,...methodOverrides},sources,resolutions,
+ });
+ const sha=await digestSHA256(canonicalJSON(projected.input));
+ const {privateAudit}=buildWk100PrivatePreview(projected.input,sha);
+ const reader_result={
+  status:'private_preview',week_start_eat:'2026-10-19',can_publish:false,
+  verified_receipts:2,selected_attempt_ids:sources.map(s=>s.attempt.id),
+  rank_input_sha256:sha,provenance:projected.provenance,private_audit:privateAudit,
+ };
+ const labels=privateAudit.top100.map(entry=>{
+  const observation=entry.contributions[0];
+  const row=projected.provenance.find(p=>p.source_key===observation.source_key&&
+   p.source_rank===observation.source_rank);
+  return {position:entry.position,source_key:row.source_key,capture_row_id:row.capture_row_id};
+ });
+ return {
+  reader_result,constitution_sha256:'f'.repeat(64),
+  edition_date_eat:'2026-10-26',
+  cutoff_at_utc:'2026-10-25T21:00:00Z',
+  deadline_at_utc:'2026-10-26T21:00:00Z',
+  review:{editor_ref:'editor_research_01',reviewed_at_utc:'2026-10-26T09:00:00Z',
+   input_sha256:sha,labels,dispositions:[]},
+ };
+}
+test('Immutable mixed-recording snapshot, weekly-slot idempotency and deterministic replay',async()=>{
+ {
+  // mixed resolved/provisional Top 100 becomes sealed NONPUBLISHING proposal
+
+  const f=await proposalFixture(),p=await prepare(f);
+  assert.equal(p.schema_version,'wk100-governed-edition-proposal-v1');
+  assert.equal(p.observed_entries.length,100);
+  assert.equal(p.pending_identity_rows,1);
+  assert.equal(p.observed_entries.filter(x=>x.canonical_track_id!==null).length,99);
+  assert.equal(p.observed_entries.filter(x=>x.provisional_ref!==null).length,1);
+  assert.equal(p.observed_entries[0].original_title,'Observed Track 1');
+  assert.equal(p.observed_entries[0].original_artist,'Artist 1');
+  assert.equal(p.can_publish,false);assert.equal(p.can_write_registry,false);
+  assert.equal(p.state,'candidate_for_separate_governed_review');
+  assert.match(p.proposal_sha256,/^[a-f0-9]{64}$/);
+  assert.equal(p.idempotency_key,`wk100:2026-10-19:${p.proposal_sha256}`);
+  assert.equal(p.edition_slot_key,'wk100:KE:2026-10-19');
+  assert.equal(Object.isFrozen(p.observed_entries[0].source_observation),true);
+  assert.throws(()=>{p.observed_entries[0].original_title='Tampered';},TypeError);
+ }
+ {
+  // same frozen receipt and decisions replay to identical immutable proposal
+
+  const f=await proposalFixture(),a=await prepare(f);
+  const b=await prepare(copy(f));
+  assert.deepEqual(a,b);
+  assert.deepEqual(b.observed_entries.map(x=>x.rank),Array.from({length:100},(_,i)=>i+1));
+ }
+ {
+  // review changes cannot create a second edition slot for the same EAT week
+
+  const f=await proposalFixture(),a=await prepare(f);
+  const g=copy(f);g.review.reviewed_at_utc='2026-10-26T10:00:00Z';
+  const b=await prepare(g);
+  assert.equal(a.edition_slot_key,b.edition_slot_key);
+  assert.notEqual(a.proposal_sha256,b.proposal_sha256);
+  assert.equal(b.can_publish,false);
+ }
+});
+
+test('Cryptographic receipt binding and independent scoring replay',async()=>{
+ {
+  // raw ranking receipt digest and review digest must both bind
+
+  const f=await proposalFixture();
+  f.reader_result.private_audit.input_sha256='a'.repeat(64);
+  await assert.rejects(prepare(f),/input_digest_mismatch/);
+  const g=await proposalFixture();g.review.input_sha256='b'.repeat(64);
+  await assert.rejects(prepare(g),/review_input_digest_mismatch/);
+ }
+ {
+  // fake provider-evidence association is rejected even with matched title
+
+  const f=await proposalFixture();
+  f.reader_result.provenance[0].provisional_ref='wk100:obs:v1:'+'a'.repeat(64)+':'+proposalUuid(1001);
+  await assert.rejects(prepare(f),/provenance_identity_invalid/);
+ }
+ {
+  // altering score contribution cannot turn another observation into source corroboration
+
+  const f=await proposalFixture();f.reader_result.private_audit.top100[0].contributions[0].source_rank=98;
+  await assert.rejects(prepare(f),/private_ranking_replay_mismatch/);
+ }
+ {
+  // a forged top rank or scored magnitude cannot pass independent ranking replay
+
+  const a=await proposalFixture();a.reader_result.private_audit.top100[0].score=1000;
+  await assert.rejects(prepare(a),/private_ranking_replay_mismatch/);
+  const b=await proposalFixture();[b.reader_result.private_audit.top100[0],b.reader_result.private_audit.top100[1]]=
+   [b.reader_result.private_audit.top100[1],b.reader_result.private_audit.top100[0]];
+  await assert.rejects(prepare(b),/private_ranking_replay_mismatch/);
+ }
+ {
+  // altered source-rank identity association fails original input SHA replay
+
+  const a=await proposalFixture();
+  const row=a.reader_result.provenance.find(x=>x.source_key==='source_1'&&x.source_rank===1);
+  row.recording_id=proposalUuid(900000);
+  await assert.rejects(prepare(a),/independent_input_replay_mismatch/);
+ }
+});
+
+test('Observed display evidence, source attempts and exact ranked coverage',async()=>{
+ {
+  // wrong observed label or missing original text fails closed
+
+  const f=await proposalFixture();
+  f.review.labels[0].capture_row_id=proposalUuid(999999);
+  await assert.rejects(prepare(f),/observed_label_unverifiable/);
+  const g=await proposalFixture();g.reader_result.provenance.find(x=>x.source_rank===1).artist_observed='';
+  await assert.rejects(prepare(g),/observed_label_unverifiable/);
+ }
+ {
+  // no truncated Top100, phantom independent provider, duplicate position or incomplete source ranks
+
+  const a=await proposalFixture();a.reader_result.private_audit.top100.pop();
+  await assert.rejects(prepare(a),/private_ranking_replay_mismatch/);
+  const b=await proposalFixture();b.reader_result.private_audit.source_manifest[1].operator_key='operator_1';
+  await assert.rejects(prepare(b),/source_provenance_invalid/);
+  const c=await proposalFixture();c.review.labels[1].position=1;
+  await assert.rejects(prepare(c),/label_selection_invalid/);
+  const d=await proposalFixture();d.reader_result.provenance.pop();
+  await assert.rejects(prepare(d),/provenance_depth_mismatch/);
+ }
+ {
+  // source rows cannot switch attempts or reuse an attempt as independent provider evidence
+
+  const a=await proposalFixture(),row=a.reader_result.provenance[0];
+  row.attempt_id=a.reader_result.selected_attempt_ids[1];
+  await assert.rejects(prepare(a),/source_attempt_mismatch|attempt_reused_between_sources/);
+  const b=await proposalFixture();
+  b.reader_result.provenance.filter(x=>x.source_key==='source_2').forEach(x=>{
+   x.attempt_id=b.reader_result.selected_attempt_ids[0];
+  });
+  await assert.rejects(prepare(b),/attempt_reused_between_sources/);
+ }
+});
+
+test('EAT deadline, editorial exception review and nonpublishing authority',async()=>{
+ {
+  // deadline is explicit in EAT week, and review must be between cutoff and deadline
+
+  const a=await proposalFixture();a.cutoff_at_utc='2026-10-25T20:59:59Z';
+  await assert.rejects(prepare(a),/deadline_outside_weekly_window/);
+  const b=await proposalFixture();b.review.reviewed_at_utc='2026-10-26T21:00:01Z';
+  await assert.rejects(prepare(b),/review_timing_invalid/);
+  const c=await proposalFixture();c.deadline_at_utc='2026-11-03T00:00:00Z';
+  await assert.rejects(prepare(c),/deadline_outside_weekly_window/);
+ }
+ {
+  // preview quality warnings need exact documented editorial dispositions, not invented evidence
+
+  const f=await proposalFixture({minimum_corrob_tracks:100});
+  assert.deepEqual(f.reader_result.private_audit.failures,['insufficient_cross_operator_corroboration']);
+  await assert.rejects(prepare(f),/review_dispositions_missing/);
+  f.review.dispositions=[{code:'insufficient_cross_operator_corroboration',
+   rationale:'Unverified cross-source equivalence is not counted as corroboration.'}];
+  const p=await prepare(f);
+  assert.equal(p.can_publish,false);
+  assert.deepEqual(p.editor_review.dispositions,f.review.dispositions);
+ }
+ {
+  // private preview never authenticates itself as a publishing permission
+
+  const a=await proposalFixture();a.reader_result.can_publish=true;
+  await assert.rejects(prepare(a),/reader_result_invalid/);
+  const b=await proposalFixture();b.reader_result.private_audit.dataset_mode='synthetic';
+  await assert.rejects(prepare(b),/audit_not_publishing_authority/);
+  const c=await proposalFixture();c.constitution_sha256='unknown';
+  await assert.rejects(prepare(c),/constitution_authority_missing/);
+ }
+});
