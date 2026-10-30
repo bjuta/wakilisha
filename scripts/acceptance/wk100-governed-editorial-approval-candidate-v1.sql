@@ -245,7 +245,9 @@ begin
   if v_cutoff<v_end or v_deadline<v_cutoff
      or v_deadline>v_end+interval '7 days'
      or v_review<v_cutoff or v_review>v_deadline
-     or p_proposal#>>'{editor_review,editor_ref}' is null then
+     or p_proposal#>>'{editor_review,editor_ref}' is null
+     or clock_timestamp()>v_deadline
+     or clock_timestamp()<v_cutoff then
     raise exception 'WK100 EAT cutoff or editorial review is invalid.';
   end if;
 
@@ -523,6 +525,54 @@ create trigger wk100_block_ungoverned_promotion
 before update of status on public.wk_chart_editions_v2
 for each row execute function platform_private.wk100_block_ungoverned_promotion_v1();
 
+-- Preserve the ORIGINAL WK100 source-native snapshot once a staged ledger
+-- exists. Registry/MIZIZI may attach verified metadata through a future
+-- separate, audited correction workflow; it must not rewrite ranks or labels.
+create function platform_private.wk100_block_staged_content_mutation_v1()
+returns trigger language plpgsql set search_path=pg_catalog
+as $$
+declare
+  v_program text;
+  v_week date;
+begin
+  if tg_table_name='wk_chart_entries_v2' then
+    select e.program_id,e.period_start into v_program,v_week
+    from public.wk_chart_editions_v2 e
+    where e.id=coalesce(old.edition_id,new.edition_id);
+    if v_program='top100' and exists (
+      select 1 from platform_private.wk100_governed_staged_editions_v1 s
+      where s.program_id='top100' and s.week_start_eat=v_week
+        and s.edition_id=coalesce(old.edition_id,new.edition_id)
+    ) then
+      raise exception using errcode='42501',
+        message='WK100 staged original observations are immutable';
+    end if;
+  elsif tg_table_name='wk_chart_editions_v2' and
+     old.program_id='top100' and exists (
+       select 1 from platform_private.wk100_governed_staged_editions_v1 s
+       where s.edition_id=old.id
+     ) then
+    if tg_op='DELETE' or
+       (to_jsonb(new)-'updated_at'-'status'-'published_at'-'published_by')
+         is distinct from
+       (to_jsonb(old)-'updated_at'-'status'-'published_at'-'published_by')
+    then
+      raise exception using errcode='42501',
+        message='WK100 approved Edition snapshot may not be rewritten';
+    end if;
+  end if;
+  return case when tg_op='DELETE' then old else new end;
+end;
+$$;
+revoke execute on function platform_private.wk100_block_staged_content_mutation_v1()
+  from public,anon,authenticated,service_role;
+create trigger wk100_stage_entry_update_delete_guard
+before update or delete on public.wk_chart_entries_v2 for each row
+execute function platform_private.wk100_block_staged_content_mutation_v1();
+create trigger wk100_stage_edition_update_delete_guard
+before update or delete on public.wk_chart_editions_v2 for each row
+execute function platform_private.wk100_block_staged_content_mutation_v1();
+
 -- Stage exactly 100 snapshot rows in one transaction. Never publishes.
 create function public.wk100_stage_governed_weekly_edition_v1(
   p_week date, p_proposal_sha256 text
@@ -547,6 +597,7 @@ begin
     raise exception 'WK100 exact week and approved digest required';
   end if;
   -- One approved source snapshot is the serialization point for retries.
+  -- The clock gate belongs at editorial approval, not at idempotent retries.
   select * into strict v_approval from
     platform_private.wk100_governed_editorial_approvals_v1
     where program_id='top100' and week_start_eat=p_week
