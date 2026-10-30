@@ -1,6 +1,9 @@
 -- WAKILISHA 100 #1329. STAGED SQL CANDIDATE — NOT A SUPABASE MIGRATION.
 -- Do not execute against Production or rename into supabase/migrations by hand.
--- First use the accepted Supabase CLI to mint the migration filename.
+-- CLI-MINTED VERSION AUTHORITY: 20261030095808_wk100_governed_publisher_v1.sql
+-- The CLI minted its filename in a disposable worktree on 2026-10-30.
+-- No file survived the disposable worktree; only the version/name was retained.
+-- Do not promote this design candidate into that migration until DB acceptance.
 -- Gate: replay on a clean isolated Preview, denied-role checks, exact receipts,
 -- one-week conflict, immutable history, and a complete controlled publisher.
 --
