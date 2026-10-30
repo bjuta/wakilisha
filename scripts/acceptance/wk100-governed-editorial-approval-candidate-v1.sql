@@ -77,6 +77,79 @@ on platform_private.wk100_governed_editorial_approvals_v1
 for each statement
 execute function platform_private.wk100_block_editorial_approval_mutation_v1();
 
+-- Trusted server-side private-reader replay evidence. A human Editor cannot
+-- self-attest scoring. The trusted server must check raw bytes and recompute
+-- the independent ranking BEFORE calling the service-role-only RPC below.
+create table platform_private.wk100_private_replay_attestations_v1 (
+  id uuid primary key default gen_random_uuid(),
+  week_start_eat date not null,
+  proposal_snapshot_sha256 text not null unique
+    check (proposal_snapshot_sha256 ~ '^[a-f0-9]{64}$'),
+  proposal_sha256 text not null check (proposal_sha256 ~ '^[a-f0-9]{64}$'),
+  rank_input_sha256 text not null check (rank_input_sha256 ~ '^[a-f0-9]{64}$'),
+  constitution_sha256 text not null check (constitution_sha256 ~ '^[a-f0-9]{64}$'),
+  attested_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now()+interval '48 hours'),
+  unique(week_start_eat,proposal_snapshot_sha256)
+);
+alter table platform_private.wk100_private_replay_attestations_v1 enable row level security;
+revoke all on platform_private.wk100_private_replay_attestations_v1
+  from public,anon,authenticated,service_role;
+create trigger wk100_private_replay_immutable_rows
+before update or delete on platform_private.wk100_private_replay_attestations_v1
+for each row execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+create trigger wk100_private_replay_immutable_truncate
+before truncate on platform_private.wk100_private_replay_attestations_v1
+for each statement execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+
+-- Service-only transport boundary: this RPC itself does not replay sources.
+-- Only an existing restricted server path after full native byte/digest/rank
+-- verification may invoke it; never expose service credentials to browsers.
+create function public.wk100_attest_private_ranking_replay_v1(p_proposal jsonb)
+returns uuid language plpgsql security definer set search_path=pg_catalog
+as $$
+declare
+  v_hash text;
+  v_week date;
+  v_id uuid;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception using errcode='42501',message='WK100 private replay attestation is server-only';
+  end if;
+  if p_proposal is null or jsonb_typeof(p_proposal)<>'object'
+     or p_proposal->>'schema_version'<>'wk100-governed-edition-proposal-v1'
+     or p_proposal->>'can_publish' is distinct from 'false'
+     or p_proposal->>'can_write_registry' is distinct from 'false'
+     or coalesce(p_proposal->>'proposal_sha256','') !~ '^[a-f0-9]{64}$'
+     or coalesce(p_proposal->>'rank_input_sha256','') !~ '^[a-f0-9]{64}$'
+     or coalesce(p_proposal->>'constitution_sha256','') !~ '^[a-f0-9]{64}$'
+     or jsonb_typeof(p_proposal->'observed_entries') is distinct from 'array'
+     or jsonb_array_length(p_proposal->'observed_entries')<>100 then
+    raise exception 'WK100 private replay attestation requires complete nonpublishing proposal';
+  end if;
+  v_week:=(p_proposal->>'week_start_eat')::date;
+  v_hash:=encode(extensions.digest(p_proposal::text,'sha256'),'hex');
+  insert into platform_private.wk100_private_replay_attestations_v1
+    (week_start_eat,proposal_snapshot_sha256,proposal_sha256,
+     rank_input_sha256,constitution_sha256)
+  values(v_week,v_hash,p_proposal->>'proposal_sha256',
+         p_proposal->>'rank_input_sha256',p_proposal->>'constitution_sha256')
+  on conflict (proposal_snapshot_sha256) do nothing returning id into v_id;
+  if v_id is null then
+    select id into strict v_id
+    from platform_private.wk100_private_replay_attestations_v1
+    where proposal_snapshot_sha256=v_hash
+      and week_start_eat=v_week
+      and proposal_sha256=p_proposal->>'proposal_sha256';
+  end if;
+  return v_id;
+end;
+$$;
+revoke execute on function public.wk100_attest_private_ranking_replay_v1(jsonb)
+  from public,anon,authenticated,service_role;
+grant execute on function public.wk100_attest_private_ranking_replay_v1(jsonb)
+  to service_role;
+
 -- A real signed-in Chart Editor must approve exactly one frozen, previously
 -- private-verified proposal. This approval is NOT a capability to publish.
 -- Raw bytes must also have passed the pre-existing private reader checks.
@@ -151,6 +224,18 @@ begin
   -- A database-local snapshot digest protects the exact approved JSONB.
   -- It is deliberately distinct from the Node canonicalJSON SHA256.
   v_snapshot_sha:=encode(extensions.digest(p_proposal::text,'sha256'),'hex');
+  if not exists (
+    select 1 from platform_private.wk100_private_replay_attestations_v1 a
+    where a.week_start_eat=v_week
+      and a.proposal_snapshot_sha256=v_snapshot_sha
+      and a.proposal_sha256=v_proposal_sha
+      and a.rank_input_sha256=p_proposal->>'rank_input_sha256'
+      and a.constitution_sha256=p_proposal->>'constitution_sha256'
+      and a.expires_at>now()
+  ) then
+    raise exception using errcode='42501',
+      message='WK100 trusted private source and ranking replay attestation missing';
+  end if;
 
   v_start:=v_week::timestamp at time zone 'Africa/Nairobi';
   v_end:=(v_week+7)::timestamp at time zone 'Africa/Nairobi';
