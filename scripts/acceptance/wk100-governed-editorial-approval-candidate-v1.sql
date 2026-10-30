@@ -449,6 +449,13 @@ grant execute on function
 to authenticated;
 
 
+-- The review-slot lock alone does not stop an unrelated V2 writer racing
+-- against the same WK100 week. Enforce one global Top100 Edition per date.
+-- Other programmes preserve their current indexing/eligibility behavior.
+create unique index wk100_unique_program_edition_date_v1
+  on public.wk_chart_editions_v2(program_id,edition_date)
+  where program_id='top100' and edition_date is not null;
+
 -- Immutable one-week STAGING ledger, not public approval and not publication.
 -- One approved snapshot may stage at most one draft Edition per EAT week.
 create table platform_private.wk100_governed_staged_editions_v1 (
