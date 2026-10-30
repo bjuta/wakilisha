@@ -1219,7 +1219,7 @@ begin
       and l.match_status='matched'
     where r.id=v_pending.capture_row_id and a.id=v_pending.attempt_id
     union
-    select legacy.registry_entity_id
+    select legacy.registry_entity_id::uuid as track_id
     from public.wk_chart_capture_rows_v1 r
     join public.wk_chart_capture_attempts_v1 a on a.id=r.attempt_id
     join public.wk_chart_capture_contracts_v1 c on c.id=a.contract_id
