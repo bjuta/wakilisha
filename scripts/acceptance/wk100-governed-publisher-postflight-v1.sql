@@ -64,7 +64,13 @@ with expected(rel) as (
     (select pg_get_functiondef('public.wk_chart_editions_publish_integrity_guard()'::regprocedure))
       like '%chart_assert_publishable_edition(new.id)%' as legacy_unchanged,
     (select pg_get_functiondef('public.wk_chart_editions_publish_integrity_guard()'::regprocedure))
-      like '%authorized_tx=txid_current()%' as wk100_promotion_proof
+      like '%authorized_tx=txid_current()%' as wk100_promotion_proof,
+    (select pg_get_functiondef('platform_private.wk100_block_direct_published_insert_v1()'::regprocedure))
+      like '%s.authorized_tx=txid_current()%' as same_tx_edition_insert,
+    (select pg_get_functiondef('platform_private.wk100_block_extra_staged_entry_v1()'::regprocedure))
+      like '%s.authorized_tx=txid_current()%' as same_tx_entry_insert,
+    (select pg_get_functiondef('public.wk100_publish_governed_weekly_edition_v1(date,text)'::regprocedure))
+      like '%configured ranking quality floors%' as scoring_quality_gate
 )
 select
   (select count(*) from private_tables) as private_table_count,
@@ -82,6 +88,7 @@ select
         (stage_auth),(publish_auth),(registry_auth),(publisher_definer)) flags(v)) is true
     and (select bool_and(v) from guards,
       lateral (values(edition_guards),(entry_guards),(week_unique),
-        (legacy_unchanged),(wk100_promotion_proof)) flags(v)) is true
+        (legacy_unchanged),(wk100_promotion_proof),
+        (same_tx_edition_insert),(same_tx_entry_insert),(scoring_quality_gate)) flags(v)) is true
   ) as pass
 from permissions,guards;
