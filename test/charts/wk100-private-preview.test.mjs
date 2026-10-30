@@ -488,7 +488,7 @@ async function proposalFixture(methodOverrides={}) {
  const resolutions=sources.flatMap(s=>s.rows.slice(0,99).map((row,i)=>({
   capture_row_id:row.id,recording_id:proposalUuid(2000+i),
  })));
- const projected=buildWk100CaptureRankingInput({
+ const projected=project({
   week_start_eat:'2026-10-19',dataset_mode:'authorized_candidate',
   method:{...proposalMethod,...methodOverrides},sources,resolutions,
  });
