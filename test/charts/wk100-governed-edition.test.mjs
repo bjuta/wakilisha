@@ -30,7 +30,7 @@ function source(n,behavior) {
   })),
  };
 }
-async function fixture() {
+async function fixture(methodOverrides={}) {
  const sources=[source(1,'consumption'),source(2,'video_consumption')];
  // The two final observations are not yet verified as the same recording.
  const resolutions=sources.flatMap(s=>s.rows.slice(0,99).map((row,i)=>({
@@ -38,7 +38,7 @@ async function fixture() {
  })));
  const projected=buildWk100CaptureRankingInput({
   week_start_eat:'2026-10-19',dataset_mode:'authorized_candidate',
-  method,sources,resolutions,
+  method:{...method,...methodOverrides},sources,resolutions,
  });
  const sha=await digestSHA256(canonicalJSON(projected.input));
  const {privateAudit}=buildWk100PrivatePreview(projected.input,sha);
@@ -106,7 +106,7 @@ test('wrong observed label or missing original text fails closed',async()=>{
 });
 test('altering score contribution cannot turn another observation into source corroboration',async()=>{
  const f=await fixture();f.reader_result.private_audit.top100[0].contributions[0].source_rank=98;
- await assert.rejects(prepare(f),/ranking_contribution_unverifiable|observed_label_unverifiable/);
+ await assert.rejects(prepare(f),/private_ranking_replay_mismatch/);
 });
 test('no truncated Top100, phantom independent provider, duplicate position or incomplete source ranks',async()=>{
  const a=await fixture();a.reader_result.private_audit.top100.pop();
@@ -127,7 +127,8 @@ test('deadline is explicit in EAT week, and review must be between cutoff and de
  await assert.rejects(prepare(c),/deadline_outside_weekly_window/);
 });
 test('preview quality warnings need exact documented editorial dispositions, not invented evidence',async()=>{
- const f=await fixture();f.reader_result.private_audit.failures=['insufficient_cross_operator_corroboration'];
+ const f=await fixture({minimum_corrob_tracks:100});
+ assert.deepEqual(f.reader_result.private_audit.failures,['insufficient_cross_operator_corroboration']);
  await assert.rejects(prepare(f),/review_dispositions_missing/);
  f.review.dispositions=[{code:'insufficient_cross_operator_corroboration',
   rationale:'Unverified cross-source equivalence is not counted as corroboration.'}];
@@ -161,4 +162,18 @@ test('review changes cannot create a second edition slot for the same EAT week',
  assert.equal(a.edition_slot_key,b.edition_slot_key);
  assert.notEqual(a.proposal_sha256,b.proposal_sha256);
  assert.equal(b.can_publish,false);
+});
+
+test('a forged top rank or scored magnitude cannot pass independent ranking replay',async()=>{
+ const a=await fixture();a.reader_result.private_audit.top100[0].score=1000;
+ await assert.rejects(prepare(a),/private_ranking_replay_mismatch/);
+ const b=await fixture();[b.reader_result.private_audit.top100[0],b.reader_result.private_audit.top100[1]]=
+  [b.reader_result.private_audit.top100[1],b.reader_result.private_audit.top100[0]];
+ await assert.rejects(prepare(b),/private_ranking_replay_mismatch/);
+});
+test('altered source-rank identity association fails original input SHA replay',async()=>{
+ const a=await fixture();
+ const row=a.reader_result.provenance.find(x=>x.source_key==='source_1'&&x.source_rank===1);
+ row.recording_id=uuid(900000);
+ await assert.rejects(prepare(a),/independent_input_replay_mismatch/);
 });
