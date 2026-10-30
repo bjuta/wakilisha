@@ -549,6 +549,37 @@ create unique index wk100_unique_program_edition_date_v1
   on public.wk_chart_editions_v2(program_id,edition_date)
   where program_id='top100' and edition_date is not null;
 
+-- Private, append-only review Handoff to the EXISTING Registry/MIZIZI
+-- stewardship workflows. This is NOT a duplicate Track writer and never
+-- modifies a canonical Registry entity.
+create table platform_private.wk100_pending_identity_investigations_v1 (
+  id uuid primary key default gen_random_uuid(),
+  edition_id text not null,
+  rank integer not null check(rank between 1 and 100),
+  provisional_ref text not null unique
+    check(provisional_ref ~ '^wk100:obs:v1:[a-f0-9]{64}:[0-9a-f-]{36}$'),
+  capture_row_id uuid not null,
+  attempt_id uuid not null,
+  source_key text not null,
+  original_title text not null,
+  original_artist text not null,
+  submitted_at timestamptz not null default now(),
+  unique(edition_id,rank),
+  unique(edition_id,capture_row_id)
+);
+alter table platform_private.wk100_pending_identity_investigations_v1
+  enable row level security;
+revoke all on platform_private.wk100_pending_identity_investigations_v1
+  from public,anon,authenticated,service_role;
+create trigger wk100_pending_identity_immutable_rows
+before update or delete on platform_private.wk100_pending_identity_investigations_v1
+for each row
+execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+create trigger wk100_pending_identity_immutable_truncate
+before truncate on platform_private.wk100_pending_identity_investigations_v1
+for each statement
+execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+
 -- Immutable one-week STAGING ledger, not public approval and not publication.
 -- One approved snapshot may stage at most one draft Edition per EAT week.
 create table platform_private.wk100_governed_staged_editions_v1 (
@@ -800,10 +831,28 @@ begin
          'identity_pending',(v_entry->>'canonical_track_id') is null),
        v_approval.proposal_snapshot->>'methodology_version',
        v_approval.proposal_snapshot->>'methodology_version');
+    if v_entry->>'canonical_track_id' is null then
+      insert into platform_private.wk100_pending_identity_investigations_v1
+        (edition_id,rank,provisional_ref,capture_row_id,attempt_id,
+         source_key,original_title,original_artist)
+      values
+        (v_id,v_rank,v_entry->>'provisional_ref',
+         (v_entry#>>'{source_observation,capture_row_id}')::uuid,
+         (v_entry#>>'{source_observation,attempt_id}')::uuid,
+         v_entry#>>'{source_observation,source_key}',
+         v_entry->>'original_title',v_entry->>'original_artist');
+    end if;
   end loop;
   if v_rank<>100 or (select count(*) from public.wk_chart_entries_v2
                      where edition_id=v_id)<>100 then
     raise exception 'WK100 atomic stage missing entries';
+  end if;
+  if (select count(*) from platform_private.wk100_pending_identity_investigations_v1
+      where edition_id=v_id) <>
+     (select count(*) from jsonb_array_elements(
+        v_approval.proposal_snapshot->'observed_entries') x
+       where x->>'canonical_track_id' is null) then
+    raise exception 'WK100 pending Registry investigation roster incomplete';
   end if;
   insert into platform_private.wk100_governed_staged_editions_v1
     (week_start_eat,approval_id,edition_id,proposal_sha256,staged_by)
