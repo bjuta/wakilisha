@@ -135,9 +135,36 @@ test('row/source reorder has stable output and provenance',()=>{
  const a=fixture(),b=structuredClone(a);b.sources.reverse();b.sources.forEach(s=>s.rows.reverse());b.resolutions.reverse();
  assert.deepEqual(project(b),project(a));
 });
-test('fail closed on unresolved and forged recording identities',()=>{
- const a=fixture();a.resolutions.pop();assert.throws(()=>project(a),/wk100_bridge_recording_unresolved/);
+test('provisional evidence survives incomplete Registry linkage without impersonating a Track',()=>{
+ const a=fixture();a.resolutions.pop();const projected=project(a);
+ assert.equal(projected.provenance.filter(x=>x.identity_state==='provisional').length,1);
+ assert.equal(projected.provenance.filter(x=>x.identity_state==='canonical').length,3);
+ const provisional=projected.provenance.find(x=>x.identity_state==='provisional');
+ assert.equal(provisional.recording_id,null);
+ assert.match(provisional.provisional_ref,/^wk100:obs:v1:[a-f0-9]{64}:[0-9a-f-]{36}$/);
+ assert.equal(buildWk100PrivatePreview(projected.input).privateAudit.provisional_recording_count,1);
+ assert.equal(projected.can_publish,false);
  const b=fixture();b.resolutions[0].recording_id='not-uuid';assert.throws(()=>project(b),/wk100_bridge_resolution_invalid/);
+});
+test('same observed title never fabricates cross-source corroboration, and provisional digests are sealed',()=>{
+ const a=fixture();a.resolutions=[];
+ for(const s of a.sources)for(const row of s.rows){row.title_observed='Shared title';row.artist_observed='Shared artist';}
+ const ranked=project(a),again=structuredClone(a);again.sources.reverse();again.sources.forEach(x=>x.rows.reverse());
+ assert.deepEqual(project(again),ranked);
+ const audit=buildWk100PrivatePreview(ranked.input).privateAudit;
+ assert.equal(audit.provisional_recording_count,4);
+ assert.equal(audit.corroborated_top100,0);
+ assert.ok(audit.failures.includes('insufficient_cross_operator_corroboration'));
+ assert.ok(audit.top100.every(x=>x.operator_count===1));
+ const forged=structuredClone(ranked.input);
+ forged.sources[1].entries[0].recording_id=forged.sources[0].entries[0].recording_id;
+ assert.throws(()=>buildWk100PrivatePreview(forged),/wk100_preview_provisional_evidence_mismatch/);
+ const badDigest=structuredClone(ranked.input);badDigest.sources[0].raw_sha256='b'.repeat(64);
+ assert.throws(()=>buildWk100PrivatePreview(badDigest),/wk100_preview_provisional_evidence_mismatch/);
+ const reused=structuredClone(ranked.input);
+ reused.sources[1].raw_sha256=reused.sources[0].raw_sha256;
+ reused.sources[1].entries[0].recording_id=reused.sources[0].entries[0].recording_id;
+ assert.throws(()=>buildWk100PrivatePreview(reused),/wk100_preview_provisional_reference_reused/);
 });
 test('reject duplicated operator, same recording twice in a source and reused capture row',()=>{
  const a=fixture();a.sources[1].operator_key='operator_1';assert.throws(()=>project(a),/source_or_operator_duplicate/);
@@ -194,17 +221,24 @@ test('exact immutable receipts resolve through existing provider links without w
  assert.match(result.rank_input_sha256,/^[a-f0-9]{64}$/);
  assert.ok(calls.every(x=>!x.startsWith('chart_ingest_')));
 });
-test('unknown provider Track produces explicit review without scoring',async()=>{
+test('unknown provider Track is ranked provisionally and queued for identity review',async()=>{
  const x=f();x.data.registry_track_provider_links.shift();const r=await run(x.options);
- assert.equal(r.status,'review_required');assert.equal(r.resolved_rows,3);assert.equal(r.review_rows[0].reason,'unresolved');
+ assert.equal(r.status,'private_preview');assert.equal(r.resolved_rows,3);
+ assert.equal(r.pending_identity_rows,1);assert.equal(r.review_rows[0].reason,'unresolved');
+ assert.equal(r.private_audit.provisional_recording_count,1);
+ assert.equal(r.can_publish,false);
 });
-test('conflicting legacy provider Track prevents scoring',async()=>{
+test('conflicting Registry links do not acquire false corroboration or block preview scoring',async()=>{
  const x=f();x.data.provider_entity_links.push({provider:'provider_a',provider_entity_id:'native_0_0',registry_entity_id:uuid(102),registry_entity_type:'track',match_status:'confirmed'});
- const r=await run(x.options);assert.equal(r.status,'review_required');assert.equal(r.review_rows[0].reason,'conflicting_identity');
+ const r=await run(x.options);assert.equal(r.status,'private_preview');
+ assert.equal(r.pending_identity_rows,1);assert.equal(r.review_rows[0].reason,'conflicting_identity');
+ assert.equal(r.private_audit.provisional_recording_count,1);
 });
-test('non-active Registry Track produces review',async()=>{
+test('inactive Registry Track becomes provisional while the other entries rank',async()=>{
  const x=f();x.data.registry_tracks[0].status='archived';const r=await run(x.options);
- assert.equal(r.status,'review_required');assert.equal(r.review_rows.length,2);assert.equal(r.review_rows[0].reason,'inactive_identity');
+ assert.equal(r.status,'private_preview');assert.equal(r.pending_identity_rows,2);
+ assert.equal(r.review_rows.length,2);assert.equal(r.review_rows[0].reason,'inactive_identity');
+ assert.equal(r.private_audit.provisional_recording_count,2);
 });
 test('raw digest mismatch stops before scoring',async()=>{
  const x=f();x.options.readRawBytes=async()=>new TextEncoder().encode('different');
@@ -301,6 +335,17 @@ test('private adapter rejects noncanonical raw paths and oversized objects befor
  const b=make();const large={from(){return {download:async()=>({data:{size:5_000_000,arrayBuffer:async()=>new ArrayBuffer(0)},error:null})};}};
  await assert.rejects(runWk100PrivateCapturePreview({db:b.x.options.db,storage:large,manifest:b.manifest}),
    /wk100_capture_preview_raw_size_invalid/);
+});
+test('private candidate aggregate exposes unresolved count but never identity provenance',()=>{
+ const r=makeWk100CapturePreviewSummary({status:'private_preview',week_start_eat:week,
+   verified_receipts:2,resolved_rows:1,pending_identity_rows:3,
+   review_rows:[{capture_row_id:uuid(700),provider_track_id:'secret_native',reason:'unresolved'}],
+   private_audit:{can_publish:false,dataset_mode:'authorized_candidate',operator_count:2,
+     behavior_count:2,recording_count:4,corroborated_top100:0,
+     coverage_status:'below_proposed_quality_floor'},can_publish:false});
+ assert.equal(r.pending_identity_rows,3);assert.equal(r.can_publish,false);
+ assert.equal(JSON.stringify(r).includes('secret_native'),false);
+ assert.equal(JSON.stringify(r).includes('review_rows'),false);
 });
 test('candidate review-only summary never serializes provider-native track IDs or row provenance',()=>{
  const result=makeWk100CapturePreviewSummary({status:'review_required',week_start_eat:week,
