@@ -717,6 +717,11 @@ test('WK100 SQL draft remains inert and binds source admissions, editorial roles
  assert.match(sql,/wk100_pending_identity_investigations_v1/);
  assert.match(sql,/wk100_stage_entry_update_delete_guard/);
  assert.match(sql,/wk100_block_extra_staged_entry/);
+ assert.match(sql,/wk100_governed_publications_v1/);
+ assert.match(sql,/wk100_publish_governed_weekly_edition_v1/);
+ assert.match(sql,/wk100_governed_identity_links_v1/);
+ assert.match(sql,/authorized_tx=txid_current\(\)/);
+ assert.match(sql,/wk100_governed_source_admissions_v1/);
  assert.match(sql,/100,100,'draft'/);
  assert.doesNotMatch(sql,/100,100,'published'/);
 });
