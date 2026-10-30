@@ -930,4 +930,133 @@ revoke execute on function public.wk100_stage_governed_weekly_edition_v1(date,te
 grant execute on function public.wk100_stage_governed_weekly_edition_v1(date,text)
   to authenticated;
 
+
+-- Final reviewed PUBLICATION transition. Dedicated privileges + immutable
+-- approval + staged entries + transaction-bound grant must ALL agree.
+-- Does not invent metadata or change any historical rank/source text.
+create function public.wk100_publish_governed_weekly_edition_v1(
+  p_week date,p_proposal_sha256 text
+) returns text language plpgsql security definer set search_path=pg_catalog
+as $$
+declare
+  v_actor uuid:=auth.uid();
+  v_review platform_private.wk100_governed_editorial_approvals_v1%rowtype;
+  v_stage platform_private.wk100_governed_staged_editions_v1%rowtype;
+  v_prior platform_private.wk100_governed_publications_v1%rowtype;
+  v_item jsonb;
+  v_rank integer:=0;
+  v_matching integer;
+  v_cutoff timestamptz;
+  v_deadline timestamptz;
+begin
+  if v_actor is null or not public.current_user_has_capability('publish_charts') then
+    raise exception using errcode='42501',
+      message='WK100 publication requires active human Chart Publisher';
+  end if;
+  if p_week is null or coalesce(p_proposal_sha256,'') !~ '^[a-f0-9]{64}$' then
+    raise exception 'WK100 publication requires approved exact week/digest';
+  end if;
+  select * into strict v_review from
+    platform_private.wk100_governed_editorial_approvals_v1
+    where program_id='top100' and week_start_eat=p_week for update;
+  select * into strict v_stage from
+    platform_private.wk100_governed_staged_editions_v1
+    where program_id='top100' and week_start_eat=p_week for update;
+  if v_review.id is distinct from v_stage.approval_id
+    or v_review.proposal_sha256 is distinct from p_proposal_sha256
+    or v_stage.proposal_sha256 is distinct from p_proposal_sha256
+    or encode(extensions.digest(v_review.proposal_snapshot::text,'sha256'),'hex')
+      is distinct from v_review.proposal_snapshot_sha256 then
+    raise exception 'WK100 approval, staging and published evidence diverged';
+  end if;
+
+  -- Exact retries are safe; no new publication receipt can be minted.
+  select * into v_prior from platform_private.wk100_governed_publications_v1
+    where edition_id=v_stage.edition_id;
+  if found then
+    if v_prior.approved_review_id is distinct from v_review.id
+      or v_prior.proposal_sha256 is distinct from p_proposal_sha256
+      or not exists(select 1 from public.wk_chart_editions_v2 e
+        where e.id=v_stage.edition_id and e.program_id='top100'
+          and e.status='published'
+          and (select count(*) from public.wk_chart_entries_v2 x
+            where x.edition_id=e.id)=100) then
+      raise exception 'WK100 publication replay conflicts with frozen release';
+    end if;
+    return v_stage.edition_id;
+  end if;
+
+  v_cutoff:=(v_review.proposal_snapshot->>'cutoff_at_utc')::timestamptz;
+  v_deadline:=(v_review.proposal_snapshot->>'deadline_at_utc')::timestamptz;
+  if clock_timestamp()<v_cutoff or clock_timestamp()>v_deadline then
+    raise exception using errcode='42501',
+      message='WK100 unapproved publication time window; visible incident required';
+  end if;
+  if not exists(select 1 from public.wk_chart_editions_v2 e
+    where e.id=v_stage.edition_id and e.program_id='top100'
+      and e.status='draft' and e.edition_date=p_week+7
+      and e.period_start=p_week and e.period_end=p_week+6
+      and e.entry_count=100 and e.chart_size=100
+      and e.rule_set_snapshot->>'proposal_sha256'=p_proposal_sha256) then
+    raise exception 'WK100 staging Edition is incomplete or altered';
+  end if;
+  if (select count(*) from public.wk_chart_entries_v2 x
+       where x.edition_id=v_stage.edition_id)<>100 then
+    raise exception 'WK100 stage has missing or excess rows';
+  end if;
+  for v_item in
+    select value from jsonb_array_elements(v_review.proposal_snapshot->'observed_entries')
+  loop
+    v_rank:=v_rank+1;
+    if v_rank>100 or (v_item->>'rank')::integer<>v_rank then
+      raise exception 'WK100 publisher rank sequence changed';
+    end if;
+    select count(*) into v_matching
+    from public.wk_chart_entries_v2 e
+    where e.edition_id=v_stage.edition_id
+      and e.rank=v_rank
+      and e.track_title=v_item->>'original_title'
+      and e.artist_name=v_item->>'original_artist'
+      and e.canonical_track_id is not distinct from v_item->>'canonical_track_id'
+      and e.total_score=(v_item->>'score')::numeric
+      and e.source_payload->>'proposal_sha256'=p_proposal_sha256;
+    if v_matching<>1 then
+      raise exception 'WK100 frozen entry mismatch before publication at rank %',v_rank;
+    end if;
+  end loop;
+  if v_rank<>100 then
+    raise exception 'WK100 cannot publish fewer than 100 authenticated ranks';
+  end if;
+  if (select count(*) from platform_private.wk100_pending_identity_investigations_v1
+      where edition_id=v_stage.edition_id) <>
+     (select count(*) from jsonb_array_elements(
+       v_review.proposal_snapshot->'observed_entries') x
+       where x->>'canonical_track_id' is null) then
+    raise exception 'WK100 source identity review handoff differs from frozen edition';
+  end if;
+
+  -- Only this transaction can satisfy BOTH Chart V2 publication guards.
+  -- A rollback retracts both the grant and Edition status update.
+  insert into platform_private.wk100_governed_publications_v1
+    (approved_review_id,edition_id,proposal_sha256,published_by,authorized_tx)
+  values(v_review.id,v_stage.edition_id,p_proposal_sha256,v_actor,txid_current());
+  update public.wk_chart_editions_v2
+    set status='published',
+        published_at=clock_timestamp(),
+        published_by=v_actor::text
+    where id=v_stage.edition_id and program_id='top100' and status='draft';
+  if not found then
+    raise exception 'WK100 reviewed publication status transition failed';
+  end if;
+  return v_stage.edition_id;
+end;
+$$;
+revoke execute on function
+  public.wk100_publish_governed_weekly_edition_v1(date,text)
+from public,anon,authenticated,service_role;
+grant execute on function
+  public.wk100_publish_governed_weekly_edition_v1(date,text)
+to authenticated;
+
+
 commit;
