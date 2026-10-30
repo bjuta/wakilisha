@@ -62,6 +62,7 @@ export function makeWk100CapturePreviewSummary(result){
   return {status:'private_preview',week_start_eat:result.week_start_eat,
     verified_receipts:result.verified_receipts,operator_count:audit.operator_count,
     behavior_count:audit.behavior_count,recording_count:audit.recording_count,
+    pending_identity_rows:result.pending_identity_rows??0,
     corroborated_top100:audit.corroborated_top100,coverage_status:audit.coverage_status,
     can_publish:false};
 }
