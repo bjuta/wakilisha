@@ -11,6 +11,7 @@ import {readWk100SealedCaptureManifest,validWk100CapturePreviewProjectBinding,ma
 import {readWk100PrivateRankingEvidence as run} from '../../supabase/functions/_shared/wk100-capture-ranking-reader.mjs';
 import {canonicalJSON,digestSHA256} from '../../supabase/functions/_shared/chart-weekly-evidence.mjs';
 import {prepareWk100GovernedEditionProposal as prepare} from '../../supabase/functions/_shared/wk100-governed-edition-proposal.mjs';
+import {verifyAndAttestWk100GovernedEdition} from '../../supabase/functions/_shared/wk100-governed-edition-attestation-server.mjs';
 
 const uuid=n=>`00000000-0000-4000-8000-${n.toString(16).padStart(12,'0')}`;
 const p={starts_at:'2026-10-18T21:00:00Z',ends_at:'2026-10-25T21:00:00Z',evidence_ref:'period_week_2026_43'};
@@ -665,4 +666,34 @@ test('EAT deadline, editorial exception review and nonpublishing authority',asyn
   const c=await proposalFixture();c.constitution_sha256='unknown';
   await assert.rejects(prepare(c),/constitution_authority_missing/);
  }
+});
+
+test('governed attestation refuses unsealed or insufficient private evidence without RPC',async()=>{
+ const {x,archive}=authorizedReplayFixture();
+ const manifest={schema_version:'wk100-private-capture-preview-v1',
+   week_start_eat:week,dataset_mode:'authorized_candidate',
+   selected_attempt_ids:x.options.selected_attempt_ids,
+   constitution:x.options.constitution,method};
+ const raw=JSON.stringify(manifest);
+ const sha=createHash('sha256').update(raw).digest('hex');
+ let rpcCalls=0;
+ const db={...x.options.db,rpc:async()=>{rpcCalls++;return {data:uuid(8000),error:null};}};
+ const storage={from(){return {download:async key=>{
+   const bytes=archive.get(key);
+   return {data:bytes?new Blob([bytes]):null,error:bytes?null:new Error('unavailable')};
+ }};}};
+ const options={db,storage,sealed_manifest_text:raw,sealed_manifest_sha256:sha,
+   edition_date_eat:'2026-10-26',cutoff_at_utc:'2026-10-25T21:00:00Z',
+   deadline_at_utc:'2026-10-26T21:00:00Z',
+   review:{editor_ref:'wk100_editor_01',reviewed_at_utc:'2026-10-26T09:00:00Z',
+     input_sha256:'f'.repeat(64),labels:[],dispositions:[]}};
+ await assert.rejects(verifyAndAttestWk100GovernedEdition({...options,
+   sealed_manifest_sha256:'a'.repeat(64)}),/manifest_digest_mismatch/);
+ assert.equal(rpcCalls,0);
+ await assert.rejects(verifyAndAttestWk100GovernedEdition(options),
+   /wk100_capture_preview_raw_key_invalid|wk100_edition_proposal_/);
+ assert.equal(rpcCalls,0);
+ await assert.rejects(verifyAndAttestWk100GovernedEdition({...options,db:x.options.db}),
+   /restricted_backend_required/);
+ assert.equal(rpcCalls,0);
 });
