@@ -77,6 +77,84 @@ on platform_private.wk100_governed_editorial_approvals_v1
 for each statement
 execute function platform_private.wk100_block_editorial_approval_mutation_v1();
 
+-- A sealed source receipt is not approval to use that provider for a Kenya
+-- chart. The separate source/legal-methodology decision has its own human
+-- authority and must be recorded BEFORE any reviewed week is accepted.
+create table platform_private.wk100_governed_source_admissions_v1 (
+  id uuid primary key default gen_random_uuid(),
+  week_start_eat date not null
+    check (extract(isodow from week_start_eat)=1),
+  contract_id uuid not null references public.wk_chart_capture_contracts_v1(id),
+  authority_sha256 text not null
+    check (authority_sha256 ~ '^[a-f0-9]{64}$'),
+  approved_by uuid not null,
+  approved_at timestamptz not null default now(),
+  unique(week_start_eat,contract_id)
+);
+alter table platform_private.wk100_governed_source_admissions_v1
+  enable row level security;
+revoke all on platform_private.wk100_governed_source_admissions_v1
+  from public,anon,authenticated,service_role;
+create trigger wk100_source_admission_immutable_rows
+before update or delete
+on platform_private.wk100_governed_source_admissions_v1
+for each row
+execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+create trigger wk100_source_admission_immutable_truncate
+before truncate on platform_private.wk100_governed_source_admissions_v1
+for each statement
+execute function platform_private.wk100_block_editorial_approval_mutation_v1();
+
+create function public.wk100_admit_governed_source_v1(
+  p_week_start_eat date,p_contract_id uuid,p_authority_sha256 text
+) returns uuid language plpgsql security definer set search_path=pg_catalog
+as $$
+declare
+  v_actor uuid:=auth.uid();
+  v_id uuid;
+  v_existing platform_private.wk100_governed_source_admissions_v1%rowtype;
+begin
+  if v_actor is null or
+     not public.current_user_has_capability('manage_charts') or
+     not public.current_user_has_capability('manage_ingest') then
+    raise exception using errcode='42501',
+      message='WK100 source authority requires both chart and ingest stewardship';
+  end if;
+  if p_week_start_eat is null or
+     extract(isodow from p_week_start_eat)<>1 or
+     p_authority_sha256 !~ '^[a-f0-9]{64}$' or
+     not exists(
+       select 1 from public.wk_chart_capture_contracts_v1 c
+       where c.id=p_contract_id and c.market='KE'
+         and c.admission_state='candidate'
+         and c.native_metric in ('rank','rank_and_count')
+     ) then
+    raise exception 'WK100 source admission requires exact existing KE source, method and authority evidence';
+  end if;
+  insert into platform_private.wk100_governed_source_admissions_v1
+   (week_start_eat,contract_id,authority_sha256,approved_by)
+  values(p_week_start_eat,p_contract_id,p_authority_sha256,v_actor)
+  on conflict(week_start_eat,contract_id) do nothing returning id into v_id;
+  if v_id is null then
+    select * into strict v_existing
+    from platform_private.wk100_governed_source_admissions_v1
+    where week_start_eat=p_week_start_eat and contract_id=p_contract_id;
+    if v_existing.authority_sha256<>p_authority_sha256 then
+      raise exception using errcode='23505',
+        message='WK100 source admission has conflicting immutable authority';
+    end if;
+    v_id:=v_existing.id;
+  end if;
+  return v_id;
+end;
+$$;
+revoke execute on function
+  public.wk100_admit_governed_source_v1(date,uuid,text)
+from public,anon,authenticated,service_role;
+grant execute on function
+  public.wk100_admit_governed_source_v1(date,uuid,text)
+to authenticated;
+
 -- Trusted server-side private-reader replay evidence. A human Editor cannot
 -- self-attest scoring. The trusted server must check raw bytes and recompute
 -- the independent ranking BEFORE calling the service-role-only RPC below.
@@ -297,6 +375,19 @@ begin
        or v_contract.native_period_evidence_ref is distinct from
          v_source#>>'{native_period,evidence_ref}' then
       raise exception 'WK100 source receipt authority or period mismatches the database.';
+    end if;
+    if not exists (
+      select 1
+      from platform_private.wk100_governed_source_admissions_v1 admitted
+      join public.wk_chart_capture_attempts_v1 att
+        on att.contract_id=admitted.contract_id
+      where admitted.week_start_eat=v_week
+        and att.id=v_contract.id
+        and admitted.approved_at<=v_deadline
+        and admitted.authority_sha256 ~ '^[a-f0-9]{64}$'
+    ) then
+      raise exception using errcode='42501',
+        message='WK100 source not separately admitted for this chart week';
     end if;
     v_seen_attempts:=array_append(v_seen_attempts,v_contract.id);
     v_seen_providers:=array_append(v_seen_providers,v_contract.provider_key);
