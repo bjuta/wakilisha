@@ -583,26 +583,37 @@ execute function platform_private.wk100_block_editorial_approval_mutation_v1();
 -- Chart V2 has permissive PUBLIC SELECT policies, so a staged WK100 draft
 -- is otherwise publicly readable before the authorized release. Apply a
 -- restrictive SELECT gate solely to top100; legacy programmes are unchanged.
-create policy wk100_hide_nonpublished_editions_v1
-  on public.wk_chart_editions_v2 as restrictive for select to public
+-- Role-separated restrictive policies satisfy the existing global RLS
+-- privileged-helper authority event trigger. No privileged helper on anon.
+create policy wk100_hide_nonpublished_editions_anon_v1
+  on public.wk_chart_editions_v2 as restrictive for select to anon
+  using (program_id is distinct from 'top100' or status='published');
+create policy wk100_hide_nonpublished_editions_auth_v1
+  on public.wk_chart_editions_v2 as restrictive for select to authenticated
   using (
-    program_id is distinct from 'top100'
-    or status='published'
+    program_id is distinct from 'top100' or status='published'
     or public.current_user_has_capability('view_charts_admin')
     or public.current_user_is_administrator()
   );
-create policy wk100_hide_nonpublished_entries_v1
-  on public.wk_chart_entries_v2 as restrictive for select to public
+create policy wk100_hide_nonpublished_entries_anon_v1
+  on public.wk_chart_entries_v2 as restrictive for select to anon
   using (
     exists (
       select 1 from public.wk_chart_editions_v2 e
-      where e.id=edition_id
-        and (
-          e.program_id is distinct from 'top100'
-          or e.status='published'
-          or public.current_user_has_capability('view_charts_admin')
-          or public.current_user_is_administrator()
-        )
+      where e.id=edition_id and
+        (e.program_id is distinct from 'top100' or e.status='published')
+    )
+  );
+create policy wk100_hide_nonpublished_entries_auth_v1
+  on public.wk_chart_entries_v2 as restrictive for select to authenticated
+  using (
+    exists (
+      select 1 from public.wk_chart_editions_v2 e
+      where e.id=edition_id and (
+        e.program_id is distinct from 'top100' or e.status='published'
+        or public.current_user_has_capability('view_charts_admin')
+        or public.current_user_is_administrator()
+      )
     )
   );
 
