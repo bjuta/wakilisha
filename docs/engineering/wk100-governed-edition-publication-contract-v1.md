@@ -82,3 +82,16 @@ The branch adds `supabase/functions/_shared/wk100-governed-edition-attestation-s
 The draft SQL now requires the service attestation, a separately authenticated `manage_charts` editorial approval, and a separately authorized `publish_charts` draft staging action. The private approval, attestation and stage ledgers are immutable and RLS-protected. One partial unique index prevents competing `top100` Editions by date even outside the staging writer. The stage writes all 100 entries as **draft** in one transaction. WK100 published INSERT and status UPDATE are both blocked until a separately accepted governed promotion authority is implemented.
 
 **Still not accepted:** This helper is not an activated or deployed Edge Function. Neither its server-side environment/role boundary nor the new SQL functions have been runtime-tested. The current one-case native regression is unexecuted. No public publication can be performed. Native Node test, the full isolated PostgreSQL Preview (including real publisher/denied-role/concurrency checks), and the public promotion/correction workflow remain mandatory.
+
+
+### Publisher hardening checkpoint — source admission, deadline, frozen rank and MIZIZI handoff
+
+The gated SQL candidate now requires a **separate institutional source-admission decision per EAT week and capture contract**. The existing capture contract's `admission_state='candidate'` is not sufficient authority to publish. Admission needs a logged source/method authority SHA, a live editor with both `manage_charts` and `manage_ingest` capabilities, and an immutable private receipt. The editorial approval RPC must find each selected contract in that separately admitted roster.
+
+The editor's claimed review timestamp is not the clock of record: the approval RPC checks `clock_timestamp()` against the exact approved UTC cutoff and deadline. This deliberately fails closed for late approval; a missed deadline needs an explicit incident/recovery policy, not a hidden backdate.
+
+After atomic draft staging, UPDATE/DELETE on staged Chart Entry original observations, late INSERTs, and material Edition edits are rejected. A future **separate audited identity-linkage RPC** must preserve observed artist/title/rank/source evidence rather than directly editing staged content. No public WK100 status transition is currently permitted.
+
+For each unresolved provisional recording, staging creates an immutable, RLS-protected **MIZIZI investigation handoff** in the same transaction and verifies its row count equals the provisional entries. This is a review queue only: it does not create a Track, infer ISRC or artist origin, or silently merge two observed recordings. Later canonical linkage/reconciliation is still pending.
+
+The existing WK100 consolidated test suite now contains a **static-only fail-closed SQL candidate contract check**. Changed JavaScript files parse, and that source-level check passed in isolated evaluation. No PostgreSQL schema, trigger, RPC, concurrency, RLS role or migration execution acceptance has been performed. No GitHub Actions minutes used; issue #1329 remains open and Production unchanged.
