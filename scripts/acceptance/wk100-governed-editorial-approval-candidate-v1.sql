@@ -169,7 +169,7 @@ begin
            a.native_period_start,a.native_period_end,
            a.native_period_evidence_ref,
            c.expected_depth,c.provider_key,c.source_key
-      into v_contract
+      into strict v_contract
     from public.wk_chart_capture_attempts_v1 a
     join public.wk_chart_capture_contracts_v1 c on c.id=a.contract_id
     where c.source_key=v_source->>'source_key'
