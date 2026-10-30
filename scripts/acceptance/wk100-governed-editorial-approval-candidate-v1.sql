@@ -409,4 +409,130 @@ create trigger wk100_block_direct_published_insert
 before insert on public.wk_chart_editions_v2 for each row
 execute function platform_private.wk100_block_direct_published_insert_v1();
 
+
+-- Stage exactly 100 snapshot rows in one transaction. Never publishes.
+create function public.wk100_stage_governed_weekly_edition_v1(
+  p_week date, p_proposal_sha256 text
+) returns text
+language plpgsql security definer set search_path=pg_catalog
+as $$
+declare
+  v_actor uuid:=auth.uid();
+  v_approval platform_private.wk100_governed_editorial_approvals_v1%rowtype;
+  v_prior platform_private.wk100_governed_staged_editions_v1%rowtype;
+  v_entry jsonb;
+  v_id text;
+  v_rank integer:=0;
+  v_match_count integer;
+  v_identity text;
+  v_seen text[]:='{}'::text[];
+begin
+  if v_actor is null or not public.current_user_has_capability('publish_charts') then
+    raise exception using errcode='42501',message='WK100 publisher capability required';
+  end if;
+  if p_week is null or coalesce(p_proposal_sha256,'') !~ '^[a-f0-9]{64}$' then
+    raise exception 'WK100 exact week and approved digest required';
+  end if;
+  -- One approved source snapshot is the serialization point for retries.
+  select * into strict v_approval from
+    platform_private.wk100_governed_editorial_approvals_v1
+    where program_id='top100' and week_start_eat=p_week
+    for update;
+  if v_approval.proposal_sha256 is distinct from p_proposal_sha256
+    or v_approval.proposal_snapshot_sha256 is distinct from
+       encode(extensions.digest(v_approval.proposal_snapshot::text,'sha256'),'hex') then
+    raise exception 'WK100 approval snapshot/digest does not match';
+  end if;
+  select * into v_prior from platform_private.wk100_governed_staged_editions_v1
+   where program_id='top100' and week_start_eat=p_week;
+  if found then
+    if v_prior.approval_id<>v_approval.id or
+       v_prior.proposal_sha256<>p_proposal_sha256 or
+       not exists(select 1 from public.wk_chart_editions_v2 e
+         where e.id=v_prior.edition_id and e.program_id='top100'
+           and e.status='draft' and e.edition_date=p_week+7
+           and (select count(*) from public.wk_chart_entries_v2 x
+                where x.edition_id=e.id)=100) then
+      raise exception 'WK100 staged week has conflicting or incomplete Edition';
+    end if;
+    return v_prior.edition_id;
+  end if;
+  v_id:='wk100-ke-'||to_char(p_week,'YYYYMMDD');
+  if exists(select 1 from public.wk_chart_editions_v2 e
+    where e.id=v_id or (e.program_id='top100' and e.edition_date=p_week+7)) then
+    raise exception 'WK100 overlapping Edition slot already exists';
+  end if;
+  if jsonb_typeof(v_approval.proposal_snapshot->'observed_entries')<>'array'
+     or jsonb_array_length(v_approval.proposal_snapshot->'observed_entries')<>100 then
+    raise exception 'WK100 approved Edition does not have 100 entries';
+  end if;
+  insert into public.wk_chart_editions_v2
+    (id,program_id,edition_slug,edition_label,edition_date,
+     period_start,period_end,entry_count,chart_size,status,
+     methodology_version,source_policy_version,rule_set_snapshot)
+  values
+    (v_id,'top100',(p_week+7)::text,'WAKILISHA 100 — '||p_week::text,
+     p_week+7,p_week,p_week+6,100,100,'draft',
+     v_approval.proposal_snapshot->>'methodology_version',
+     'wk100-governed-v1',
+     jsonb_build_object('proposal_sha256',p_proposal_sha256,
+       'wk100_evidence_version','wk100-governed-edition-proposal-v1'));
+  for v_entry in select value from jsonb_array_elements(
+      v_approval.proposal_snapshot->'observed_entries') loop
+    v_rank:=v_rank+1;
+    v_identity:=coalesce(v_entry->>'canonical_track_id',v_entry->>'provisional_ref');
+    if (v_entry->>'rank')::integer<>v_rank or
+      v_identity is null or v_identity=any(v_seen) or
+      coalesce((v_entry->>'score')::numeric,0)<=0 then
+      raise exception 'WK100 duplicate identity, rank drift or invalid score';
+    end if;
+    v_seen:=array_append(v_seen,v_identity);
+    -- Re-read the original observation before staging; do not import
+    -- title/artist labels which no longer match the immutable capture row.
+    select count(*) into v_match_count
+    from public.wk_chart_capture_rows_v1 r
+    join public.wk_chart_capture_attempts_v1 a on a.id=r.attempt_id
+    join public.wk_chart_capture_contracts_v1 c on c.id=a.contract_id
+    where r.id=(v_entry#>>'{source_observation,capture_row_id}')::uuid
+      and a.id=(v_entry#>>'{source_observation,attempt_id}')::uuid
+      and a.week_start_eat=p_week and a.status='succeeded'
+      and a.payload_sha256=v_entry#>>'{source_observation,raw_sha256}'
+      and c.source_key=v_entry#>>'{source_observation,source_key}'
+      and r.source_rank=(v_entry#>>'{source_observation,source_rank}')::integer
+      and r.title_observed=v_entry->>'original_title'
+      and r.artist_observed=v_entry->>'original_artist';
+    if v_match_count<>1 then
+      raise exception 'WK100 source observation no longer matches reviewed evidence';
+    end if;
+    insert into public.wk_chart_entries_v2
+      (id,edition_id,rank,track_title,artist_name,canonical_track_id,
+       total_score,source_score,source_count,source_payload,
+       methodology_version,scoring_policy_version)
+    values
+      (v_id||'-'||lpad(v_rank::text,3,'0'),v_id,v_rank,
+       v_entry->>'original_title',v_entry->>'original_artist',
+       v_entry->>'canonical_track_id',
+       (v_entry->>'score')::numeric,(v_entry->>'score')::numeric,
+       jsonb_array_length(v_entry->'corroboration_refs'),
+       jsonb_build_object('wk100_source_review','governed-v1',
+         'proposal_sha256',p_proposal_sha256,
+         'identity_pending',(v_entry->>'canonical_track_id') is null),
+       v_approval.proposal_snapshot->>'methodology_version',
+       v_approval.proposal_snapshot->>'methodology_version');
+  end loop;
+  if v_rank<>100 or (select count(*) from public.wk_chart_entries_v2
+                     where edition_id=v_id)<>100 then
+    raise exception 'WK100 atomic stage missing entries';
+  end if;
+  insert into platform_private.wk100_governed_staged_editions_v1
+    (week_start_eat,approval_id,edition_id,proposal_sha256,staged_by)
+    values(p_week,v_approval.id,v_id,p_proposal_sha256,v_actor);
+  return v_id;
+end;
+$$;
+revoke execute on function public.wk100_stage_governed_weekly_edition_v1(date,text)
+  from public,anon,authenticated,service_role;
+grant execute on function public.wk100_stage_governed_weekly_edition_v1(date,text)
+  to authenticated;
+
 commit;
