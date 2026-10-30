@@ -1,6 +1,24 @@
 # WAKILISHA 100 — governed Edition boundary v1 (#1329)
 
-**Status, 30 October 2026:** private, nonpublishing proposal contract implemented on `feat/wk100-governed-weekly-edition-1329`. **NOT** a deployed weekly Edition writer or a Production approval mechanism. Parent programme: [#1264](https://github.com/bjuta/wakilisha/issues/1264).
+**Current engineering state, 30 October 2026:** source-only governed publisher candidate on `feat/wk100-governed-publisher-1329`; **not** deployed, merged, or authorized for a real WAKILISHA 100 Edition. Parent programme: [#1264](https://github.com/bjuta/wakilisha/issues/1264).
+
+## Authoritative release decision (supersedes historical implementation checkpoints below)
+
+| Gate | Evidence / authority | Decision |
+| --- | --- | --- |
+| Native source proposal | 82/82 full Node tests on accepted source baseline | PASS for that baseline |
+| Positive private-byte attestation helper | 100 Apple + 100 YouTube native observations, independently SHA-verified and ranked, exercised against exact source modules in isolated JS with Web API polyfill; new test added to consolidated suite | PASS for isolated component; full native suite containing new test **not rerun** |
+| SQL schema and role boundaries | Non-executable candidate applied only in paid, disposable Preview; seven private tables, restrictive RLS, service-only attestation RPC and Chart V2 guards | PASS in Preview; **not a deployable migration** |
+| Publication behavior | Synthetic 100-row approve → stage → publish, anonymous draft visibility, immutable revisions, idempotent retries, verified Registry lineage; initial-transaction rollback and concurrently dispatched first publications | PASS within synthetic Preview |
+| Production WK100 runtime | Read-only Supabase function inventory: **no WK100 Edge Function deployed**; SQL candidate absent in Production | **NOT ACTIVATED** |
+| Live collection/source qualification | No actual WK100 source contracts, raw capture receipts, independently qualified live source/method or server-sealed selection | **NOT AUTHORIZED** |
+| EAT publication cadence and operational ownership | Explicit signed editorial clock, deadline and accountable go/no-go approval not in accepted runtime record | **DECISION REQUIRED** |
+| Final Production migration and release | CLI-minted version identity only; executable migration deliberately **not** in `supabase/migrations`; source SQL contains unconditional execution interlock | **BLOCKED**, no merge or deployment of publisher authority |
+
+The 29 October [Independent Research and Source Qualification](wakilisha-100-independent-research-source-qualification-v1.md) is controlling: **researcher-directed public-fact observation and use of WAKILISHA's tools are not automatically conditional on negotiated provider licences**. Record exact research-method provenance and concrete restrictions. A separately scheduled unattended collector requires its own source-specific review and runtime admission. Neither `RESEARCH_QUALIFIED` nor a synthetic source-admission row grants the authority to publish an Edition.
+
+**Next controlled action:** technical review of this **nondeployable** source candidate. Do not activate or deploy an Edge route, promote the interlocked SQL to a migration, configure collection, claim live source admission, or issue a public Edition until the separately authorized runtime/operational gates are satisfied. Historical sections below describe the evolution of the contract; the table above is authoritative wherever their earlier "not implemented" or "pending native acceptance" labels conflict.
+
 
 ## What exists, independently verified in Production (read-only)
 
@@ -24,7 +42,7 @@ Two different keys are deliberate: `edition_slot_key=wk100:KE:<EAT-week>` identi
 
 The result is deep-frozen, content-addressed and **always** `can_publish:false` / `can_write_registry:false`. An `editor_ref` is contextual evidence, **not an authenticated signature**. `constitution_sha256` is an external source-decision digest, **not permission**. The scoring quality flags are recorded and require one explicit reason per exception; the proposal is *never* an automatic quality override or publishing grant.
 
-## Required governed writer (not yet implemented)
+## Original governed-writer requirements (implemented in guarded candidate; retained design contract)
 
 The current legacy `chart-ingest-api` commit path inserts edition and entry records as separate network operations; it is not the accepted atomic WK100 publication pathway. The next implementation must use a single PostgreSQL transaction behind an authenticated, restricted role/capability boundary:
 
