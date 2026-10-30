@@ -21,6 +21,7 @@ const instant=value=>typeof value==='string'&&UTC.test(value)&&
   new Date(value).toISOString().replace('.000Z','Z')===value;
 const unique=values=>new Set(values).size===values.length;
 const clone=value=>structuredClone(value);
+const freezeDeep=value=>{if(value&&typeof value==='object'){Object.freeze(value);for(const child of Object.values(value))freezeDeep(child);}return value;};
 const validateRecord=(value,keys,code)=>{
   need(object(value)&&Object.keys(value).length===keys.length&&
     keys.every(field=>Object.hasOwn(value,field)),code);
@@ -38,8 +39,10 @@ const validateRecord=(value,keys,code)=>{
  * for each immutable rank. A later Registry link must never rewrite this label.
  */
 export async function prepareWk100GovernedEditionProposal({
-  reader_result, edition_date_eat, cutoff_at_utc, deadline_at_utc, review,
+  reader_result, edition_date_eat, cutoff_at_utc, deadline_at_utc,
+  constitution_sha256, review,
 }) {
+  need(SHA.test(constitution_sha256),'constitution_authority_missing');
   const result=reader_result;
   need(object(result)&&result.status==='private_preview'&&
     result.can_publish===false,'reader_result_invalid');
@@ -186,7 +189,8 @@ export async function prepareWk100GovernedEditionProposal({
     week_start_eat:week.week_start_eat,edition_date_eat,
     evidence_week:{starts_at:week.starts_at,ends_at:week.ends_at},
     cutoff_at_utc,deadline_at_utc,
-    constitution_version:audit.method_version,
+    constitution_sha256,
+    methodology_version:audit.method_version,
     rank_input_sha256:result.rank_input_sha256,
     selected_attempt_ids:[...result.selected_attempt_ids].sort(),
     source_receipts:manifest.map(s=>({
@@ -202,7 +206,7 @@ export async function prepareWk100GovernedEditionProposal({
     observed_entries:items,
   };
   const proposal_sha256=await digestSHA256(canonicalJSON(candidate));
-  return Object.freeze({
+  return freezeDeep({
     ...candidate,proposal_sha256,
     idempotency_key:`wk100:${week.week_start_eat}:${proposal_sha256}`,
     state:'candidate_for_separate_governed_review',
