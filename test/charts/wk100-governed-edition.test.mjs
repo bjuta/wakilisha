@@ -75,6 +75,7 @@ test('mixed resolved/provisional Top 100 becomes sealed NONPUBLISHING proposal',
  assert.equal(p.state,'candidate_for_separate_governed_review');
  assert.match(p.proposal_sha256,/^[a-f0-9]{64}$/);
  assert.equal(p.idempotency_key,`wk100:2026-10-19:${p.proposal_sha256}`);
+ assert.equal(p.edition_slot_key,'wk100:KE:2026-10-19');
  assert.equal(Object.isFrozen(p.observed_entries[0].source_observation),true);
  assert.throws(()=>{p.observed_entries[0].original_title='Tampered';},TypeError);
 });
@@ -141,4 +142,23 @@ test('private preview never authenticates itself as a publishing permission',asy
  await assert.rejects(prepare(b),/audit_not_publishing_authority/);
  const c=await fixture();c.constitution_sha256='unknown';
  await assert.rejects(prepare(c),/constitution_authority_missing/);
+});
+
+test('source rows cannot switch attempts or reuse an attempt as independent provider evidence',async()=>{
+ const a=await fixture(),row=a.reader_result.provenance[0];
+ row.attempt_id=a.reader_result.selected_attempt_ids[1];
+ await assert.rejects(prepare(a),/source_attempt_mismatch|attempt_reused_between_sources/);
+ const b=await fixture();
+ b.reader_result.provenance.filter(x=>x.source_key==='source_2').forEach(x=>{
+  x.attempt_id=b.reader_result.selected_attempt_ids[0];
+ });
+ await assert.rejects(prepare(b),/attempt_reused_between_sources/);
+});
+test('review changes cannot create a second edition slot for the same EAT week',async()=>{
+ const f=await fixture(),a=await prepare(f);
+ const g=copy(f);g.review.reviewed_at_utc='2026-10-26T10:00:00Z';
+ const b=await prepare(g);
+ assert.equal(a.edition_slot_key,b.edition_slot_key);
+ assert.notEqual(a.proposal_sha256,b.proposal_sha256);
+ assert.equal(b.can_publish,false);
 });
