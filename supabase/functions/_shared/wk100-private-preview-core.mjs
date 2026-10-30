@@ -1,5 +1,6 @@
 const BEHAVIORS = new Set(['consumption', 'video_consumption', 'discovery', 'broadcast_exposure']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PROVISIONAL = /^wk100:obs:v1:([a-f0-9]{64}):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const ID = /^[a-z][a-z0-9_:-]{2,79}$/;
 const SHA = /^[0-9a-f]{64}$/;
 const UTC = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/;
@@ -42,7 +43,7 @@ function validate(input) {
   check(Number.isInteger(method.minimum_corrob_tracks)&&method.minimum_corrob_tracks>=1&&method.minimum_corrob_tracks<=1000,'corroboration_floor');
   check(typeof method.maximum_operator_share==='number'&&method.maximum_operator_share>0&&method.maximum_operator_share<=1,'concentration_floor');
   check(Array.isArray(input.sources)&&input.sources.length>=2&&input.sources.length<=8,'source_count');
-  const sourceIds=new Set(), operatorIds=new Set(), behaviors=new Set();
+  const sourceIds=new Set(), operatorIds=new Set(), behaviors=new Set(), provisionalRefs=new Set();
   for(const source of input.sources){
     exactFields(source,['source_key','operator_key','behavior','market','expected_depth','native_period','authority_ref','admission','raw_sha256','entries'],'source');
     check(typeof source.source_key==='string'&&ID.test(source.source_key)&&!sourceIds.has(source.source_key),'source_key');
@@ -64,7 +65,14 @@ function validate(input) {
     const seen=new Set();
     for(let i=0;i<source.entries.length;i++){
       const row=source.entries[i];exactFields(row,['recording_id','rank'],'row');
-      check(typeof row.recording_id==='string'&&UUID.test(row.recording_id),'registry_identity_required');
+      const provisional=typeof row.recording_id==='string' ?
+        row.recording_id.match(PROVISIONAL) : null;
+      check(UUID.test(row.recording_id)||provisional,'recording_reference_invalid');
+      if(provisional){
+        check(provisional[1]===source.raw_sha256,'provisional_evidence_mismatch');
+        check(!provisionalRefs.has(row.recording_id),'provisional_reference_reused');
+        provisionalRefs.add(row.recording_id);
+      }
       check(row.rank===i+1,'rank_contiguous');
       check(!seen.has(row.recording_id),'recording_duplicate');seen.add(row.recording_id);
     }
@@ -123,6 +131,7 @@ export function buildWk100PrivatePreview(input, inputSha256=null) {
     input_sha256:inputSha256,source_raw_digests_independently_verified:false,
     identities_externally_attested:false,source_authority_externally_verified:false,
     operator_count:info.operators.length,behavior_count:info.behaviors.length,recording_count:rows.length,
+    provisional_recording_count:rows.filter(r=>r.recording_id.startsWith('wk100:obs:v1:')).length,
     corroborated_top100:corroborated,coverage_status:failures.length?'below_proposed_quality_floor':'provisional_quality_floor_met',
     failures,top100:top,sensitivity,
     can_publish:false,can_write_registry:false,can_promote_to_edition:false};
