@@ -83,4 +83,5 @@ select
     and (select bool_and(v) from guards,
       lateral (values(edition_guards),(entry_guards),(week_unique),
         (legacy_unchanged),(wk100_promotion_proof)) flags(v)) is true
-  ) as pass;
+  ) as pass
+from permissions,guards;
