@@ -65,11 +65,11 @@ with expected(rel) as (
       like '%chart_assert_publishable_edition(new.id)%' as legacy_unchanged,
     (select pg_get_functiondef('public.wk_chart_editions_publish_integrity_guard()'::regprocedure))
       like '%authorized_tx=txid_current()%' as wk100_promotion_proof,
-    (select pg_get_functiondef('platform_private.wk100_block_direct_published_insert_v1()'::regprocedure))
+    (select pg_get_functiondef(to_regprocedure('platform_private.wk100_block_direct_published_insert_v1()')))
       like '%s.authorized_tx=txid_current()%' as same_tx_edition_insert,
-    (select pg_get_functiondef('platform_private.wk100_block_extra_staged_entry_v1()'::regprocedure))
+    (select pg_get_functiondef(to_regprocedure('platform_private.wk100_block_extra_staged_entry_v1()')))
       like '%s.authorized_tx=txid_current()%' as same_tx_entry_insert,
-    (select pg_get_functiondef('public.wk100_publish_governed_weekly_edition_v1(date,text)'::regprocedure))
+    (select pg_get_functiondef(to_regprocedure('public.wk100_publish_governed_weekly_edition_v1(date,text)')))
       like '%configured ranking quality floors%' as scoring_quality_gate
 )
 select
