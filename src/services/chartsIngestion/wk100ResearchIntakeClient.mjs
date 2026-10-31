@@ -63,10 +63,24 @@ export async function submitWk100ResearchEvidence({originalCsv,receiptFile,weekS
   try{response=await invoke("wk100-research-intake",{body:form});}
   catch{fail("server_unavailable");}
   if(response?.error||response?.data?.error){
-    const code=response?.data?.error;
     const known=new Set(["authentication_required","not_authorized","capability_unavailable",
       "intake_not_enabled","backend_unavailable","research_payload_invalid",
       "research_source_invalid","research_receipt_not_verified"]);
+    let code=response?.data?.error;
+    // supabase-js places non-2xx JSON responses in FunctionsHttpError.context,
+    // not necessarily in data. Admit only known public error codes, never details.
+    const context=response?.error?.context;
+    if(!known.has(code)&&context instanceof Response){
+      try{
+        if(context.headers.get("content-type")?.toLowerCase().includes("application/json")){
+          const text=await context.clone().text();
+          if(text.length<=512){
+            const parsed=JSON.parse(text);
+            if(object(parsed)&&typeof parsed.error==="string")code=parsed.error;
+          }
+        }
+      }catch{} // Body unavailable or invalid: retain the generic safe fallback.
+    }
     fail(known.has(code)?code:"server_unavailable");
   }
   const data=response?.data;
