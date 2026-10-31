@@ -76,13 +76,18 @@ export function createWk100ResearchIntakeHandler({createClient,executeWk100Resea
   });
   // Read live Auth user, not user_metadata, and revalidate current database role
   // before any private bytes are read or any reservation/Storage write occurs.
-  const auth=await serviceDb.auth.getUser(token);
-  if(auth.error||!auth.data?.user?.id)return reply(req,401,{error:'authentication_required'});
-  const [chart,ingest]=await Promise.all([
-    callerDb.rpc('current_user_has_capability',{required_capability:'manage_charts'}),
-    callerDb.rpc('current_user_has_capability',{required_capability:'manage_ingest'}),
-  ]);
-  if(chart.error||ingest.error)return reply(req,503,{error:'capability_unavailable'});
+  let auth;
+  try{auth=await serviceDb.auth.getUser(token);}
+  catch{return reply(req,503,{error:'backend_unavailable'});}
+  if(auth?.error||!auth?.data?.user?.id)return reply(req,401,{error:'authentication_required'});
+  let chart,ingest;
+  try{
+    [chart,ingest]=await Promise.all([
+      callerDb.rpc('current_user_has_capability',{required_capability:'manage_charts'}),
+      callerDb.rpc('current_user_has_capability',{required_capability:'manage_ingest'}),
+    ]);
+  }catch{return reply(req,503,{error:'capability_unavailable'});}
+  if(chart?.error||ingest?.error)return reply(req,503,{error:'capability_unavailable'});
   if(chart.data!==true||ingest.data!==true)return reply(req,403,{error:'not_authorized'});
   const contentType=req.headers.get('content-type')??'';
   if(!/^multipart\/form-data;\s*boundary=[A-Za-z0-9'()+_,.\/:=?-]{1,150}(?:;.*)?$/i.test(contentType))
