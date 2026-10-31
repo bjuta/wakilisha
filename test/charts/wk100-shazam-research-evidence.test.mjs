@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {storeWk100ResearchOriginalBytes} from '../../supabase/functions/_shared/wk100-research-private-object-store.mjs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {mkdtemp,rm,readFile,stat,symlink,chmod} from 'node:fs/promises';
@@ -216,4 +217,96 @@ test('WK100 Admin projection leaks no research labels, operator, original SHA, o
  assert.equal(projected.can_publish,false);
  assert.equal(projected.native_period_authority,'unknown');
  assert.throws(()=>projectWk100ResearchImportStatus({...verified,can_publish:true}),/unverified_projection/);
+});
+
+// WK100 research bytes are stored only by a restricted server caller;
+// no successful Storage ACK alone becomes a database research receipt.
+function researchStorageFake({initial=null,writeError=null,readError=null}={}){
+  const objects=new Map(initial?[[initial.key,new Uint8Array(initial.bytes)]]:[]);
+  const actions=[];
+  return {actions,objects,storage:{from(name){
+    actions.push(['bucket',name]);
+    return {
+      async upload(path,body,options){
+        actions.push(['upload',path,options]);
+        if(writeError)return {data:null,error:writeError};
+        if(objects.has(path))return {data:null,error:{code:'AssetAlreadyExists',statusCode:409}};
+        objects.set(path,new Uint8Array(body));
+        return {data:{path},error:null};
+      },
+      async download(path){
+        actions.push(['download',path]);
+        if(readError)return {data:null,error:readError};
+        const bytes=objects.get(path);
+        if(!bytes)return {data:null,error:{statusCode:404}};
+        return {data:new Blob([bytes],{type:'text/csv'}),error:null};
+      },
+    };
+  }}};
+}
+const researchStoreInput=()=>({originalBytes:csv,
+  receipt:prepareShazamResearchEvidence(args).receipt,
+  researchWeekStartEat:'2026-10-26'});
+
+test('WK100 private research object is create-only and exactly read back, not an admitted receipt',async()=>{
+  const fake=researchStorageFake();
+  const result=await storeWk100ResearchOriginalBytes({...researchStoreInput(),storage:fake.storage});
+  assert.equal(fake.actions[0][1],'wk-chart-raw-evidence-v1');
+  assert.equal(fake.actions[1][2].upsert,false);
+  assert.equal(fake.actions[1][2].contentType,'text/csv');
+  assert.equal(result.object_key,`research/v1/shazam_ke/${hash(csv).slice(0,2)}/${hash(csv)}.csv`);
+  assert.equal(result.reused_existing_object,false);
+  assert.equal(result.status,'private_bytes_verified_no_db_receipt');
+  assert.equal(result.source_admitted,false);
+  assert.equal(result.can_score,false);
+  assert.equal(result.can_publish,false);
+  assert.equal(result.private_verification.private_rows.length,2);
+  assert.equal(result.sanitized_status.status,'research_only');
+  assert.equal('private_rows' in result.sanitized_status,false);
+});
+test('WK100 same raw CSV reuses exact Storage object, never upserts',async()=>{
+  const fake=researchStorageFake();
+  const first=await storeWk100ResearchOriginalBytes({...researchStoreInput(),storage:fake.storage});
+  const again=await storeWk100ResearchOriginalBytes({...researchStoreInput(),storage:fake.storage});
+  assert.equal(again.reused_existing_object,true);
+  assert.equal(again.object_key,first.object_key);
+  assert.equal(fake.objects.size,1);
+  assert.ok(fake.actions.filter(x=>x[0]==='upload').every(x=>x[2].upsert===false));
+});
+test('WK100 changed original bytes fail before any private Storage interaction',async()=>{
+  const fake=researchStorageFake();
+  const edited=enc('Rank,Artist,Title\n1,Artist One,Track Six\n2,Artist Two,Track Two\n');
+  await assert.rejects(storeWk100ResearchOriginalBytes({...researchStoreInput(),
+    originalBytes:edited,storage:fake.storage}),/wk100_research_import_original_bytes_mismatch/);
+  assert.equal(fake.actions.length,0);
+});
+test('WK100 private object hash collision or tampered readback fails closed',async()=>{
+  const fake=researchStorageFake();
+  const input=researchStoreInput();
+  const key=`research/v1/shazam_ke/${hash(csv).slice(0,2)}/${hash(csv)}.csv`;
+  fake.objects.set(key,enc('different source evidence'));
+  await assert.rejects(storeWk100ResearchOriginalBytes({...input,storage:fake.storage}),
+    /private_readback_mismatch/);
+  assert.deepEqual(fake.objects.get(key),enc('different source evidence'));
+});
+test('WK100 unrelated upload error is never mistaken for an idempotent collision',async()=>{
+  const fake=researchStorageFake({writeError:{statusCode:503,code:'StorageUnavailable'}});
+  await assert.rejects(storeWk100ResearchOriginalBytes({...researchStoreInput(),
+    storage:fake.storage}),/upload_unavailable/);
+  assert.equal(fake.actions.some(x=>x[0]==='download'),false);
+});
+test('WK100 missing readback never counts as a verified research object',async()=>{
+  const fake=researchStorageFake({readError:{statusCode:503}});
+  await assert.rejects(storeWk100ResearchOriginalBytes({...researchStoreInput(),
+    storage:fake.storage}),/private_readback_unavailable/);
+});
+test('WK100 needs restricted private Storage client and does not invent admission',async()=>{
+  await assert.rejects(storeWk100ResearchOriginalBytes({...researchStoreInput(),
+    storage:null}),/restricted_storage_required/);
+  const fake=researchStorageFake();
+  const x=await storeWk100ResearchOriginalBytes({...researchStoreInput(),storage:fake.storage});
+  const fields=JSON.stringify(x.sanitized_status);
+  assert.equal(fields.includes(args.operator_ref),false);
+  assert.equal(fields.includes(hash(csv)),false);
+  assert.equal(fields.includes('Track One'),false);
 });
