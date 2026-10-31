@@ -496,6 +496,22 @@ test('WK100 Admin errors or rejected receipts never report verified evidence',as
   await assert.rejects(submitWk100ResearchEvidence({
     ...files,invoke:async()=>{throw Error('SECRET SERVICE DETAIL');},
   }),/server_unavailable/);
+  // Supabase FunctionsHttpError moves non-2xx JSON into error.context rather than data.
+  await assert.rejects(submitWk100ResearchEvidence({
+    ...files,invoke:async()=>({
+      data:null,error:{context:new Response(JSON.stringify({
+        error:'intake_not_enabled',detail:'SECRET PRIVATE DIAGNOSTICS',
+      }),{status:503,headers:{'content-type':'application/json'}})},
+    }),
+  }),/wk100_research_ui_intake_not_enabled/);
+  // Never promote unknown server details to visible Admin copy.
+  await assert.rejects(submitWk100ResearchEvidence({
+    ...files,invoke:async()=>({
+      data:null,error:{context:new Response(JSON.stringify({
+        error:'SECRET PRIVATE DIAGNOSTICS',
+      }),{status:409,headers:{'content-type':'application/json'}})},
+    }),
+  }),/wk100_research_ui_server_unavailable/);
 });
 test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic publish',async()=>{
   const config=await readFile(new URL('../../supabase/config.toml',import.meta.url),'utf8');
