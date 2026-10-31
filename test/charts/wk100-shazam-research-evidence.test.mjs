@@ -6,6 +6,7 @@ import {mkdtemp,rm,readFile,stat,symlink,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {prepareShazamResearchEvidence,archiveShazamResearchEvidence,prepareShazamRegistryReview} from '../../scripts/charts/wk100-shazam-research-evidence.mjs';
+import {executeWk100ResearchIntake} from '../../supabase/functions/_shared/wk100-research-intake-orchestrator.mjs';
 import {verifyWk100ShazamResearchImport,projectWk100ResearchImportStatus} from '../../supabase/functions/_shared/wk100-research-receipt-bridge.mjs';
 const enc=x=>new TextEncoder().encode(x);
 const hash=x=>createHash('sha256').update(x).digest('hex');
@@ -309,4 +310,99 @@ test('WK100 needs restricted private Storage client and does not invent admissio
   assert.equal(fields.includes(args.operator_ref),false);
   assert.equal(fields.includes(hash(csv)),false);
   assert.equal(fields.includes('Track One'),false);
+});
+
+// WAKILISHA 100: authenticated research intake -> immutable reservation ->
+// private byte-confirmed object -> service-only finalized research receipt.
+const intakeId='00000000-0000-4000-8000-000000000321';
+const intakeActor='00000000-0000-4000-8000-000000000654';
+const intakeKey=`research/v1/shazam_ke/${hash(csv).slice(0,2)}/${hash(csv)}.csv`;
+function intakeFake({reserveError=null,reservedKey=intakeKey,finalizeError=null,finalizeId=intakeId,storageFake=null}={}){
+  const order=[];
+  const blob=storageFake??researchStorageFake();
+  return {order,blob,callerDb:{async rpc(name,params){
+    order.push(['reserve',name,params]);
+    return reserveError?{data:null,error:reserveError}:{data:{reservation_id:intakeId,object_key:reservedKey},error:null};
+  }},serviceDb:{async rpc(name,params){
+    order.push(['finalize',name,params]);
+    return finalizeError?{data:null,error:finalizeError}:{data:{reservation_id:finalizeId,status:'verified'},error:null};
+  }}};
+}
+const runIntake=(f,more={})=>executeWk100ResearchIntake({
+  ...researchStoreInput(),authenticatedUserId:intakeActor,
+  callerDb:f.callerDb,serviceDb:f.serviceDb,restrictedStorage:f.blob.storage,...more,
+});
+test('WK100 authenticated server intake reserves, verifies original bytes and finalizes private evidence only',async()=>{
+  const f=intakeFake();const result=await runIntake(f);
+  assert.deepEqual(f.order.map(x=>x[0]),['reserve','finalize']);
+  assert.equal(f.order[0][1],'wk100_reserve_research_observation_v1');
+  assert.equal(f.order[0][2].p_observed_at,args.observed_at);
+  assert.equal(f.order[0][2].p_operator_ref,args.operator_ref);
+  assert.equal(f.order[1][1],'wk100_finalize_research_observation_v1');
+  assert.deepEqual(f.order[1][2].p_rows.map(r=>r.source_rank),[1,2]);
+  assert.ok(f.blob.actions.some(x=>x[0]==='download'));
+  assert.equal(result.reservation_id,intakeId);
+  assert.equal(result.persisted,true);
+  assert.equal(result.original_bytes_privately_verified,true);
+  assert.equal(result.status,'research_only');
+  assert.equal(result.can_score,false);assert.equal(result.can_publish,false);
+  for(const privateText of [args.operator_ref,hash(csv),'Track One','Artist One',intakeKey])
+    assert.equal(JSON.stringify(result).includes(privateText),false);
+});
+test('WK100 malformed actor and edited original CSV never reserve or store',async()=>{
+  const f=intakeFake();await assert.rejects(runIntake(f,{authenticatedUserId:'forged'}),/restricted_boundary_required/);
+  const edited=enc('Rank,Artist,Title\n1,Artist One,Track Six\n2,Artist Two,Track Two\n');
+  await assert.rejects(runIntake(f,{originalBytes:edited}),/original_bytes_mismatch/);
+  assert.equal(f.order.length,0);assert.equal(f.blob.actions.length,0);
+});
+test('WK100 SQL reservation denied or unavailable fails before private Storage calls',async()=>{
+  const f=intakeFake({reserveError:{code:'42501'}});
+  await assert.rejects(runIntake(f),/reservation_unavailable/);
+  assert.equal(f.blob.actions.length,0);
+  assert.deepEqual(f.order.map(x=>x[0]),['reserve']);
+});
+test('WK100 failed Storage readback does not claim a durable finalized receipt',async()=>{
+  const f=intakeFake({storageFake:researchStorageFake({readError:{statusCode:503}})});
+  await assert.rejects(runIntake(f),/private_readback_unavailable/);
+  assert.deepEqual(f.order.map(x=>x[0]),['reserve']);
+});
+test('WK100 reserved object key mismatch prevents any durable finalize RPC',async()=>{
+  const f=intakeFake({reservedKey:'research/v1/shazam_ke/ff/'+hash(csv)+'.csv'});
+  await assert.rejects(runIntake(f),/reservation_storage_mismatch/);
+  assert.deepEqual(f.order.map(x=>x[0]),['reserve']);
+});
+test('WK100 finalize failure or mismatched UUID cannot acknowledge a persisted receipt',async()=>{
+  const a=intakeFake({finalizeError:{code:'42501'}});
+  await assert.rejects(runIntake(a),/durable_receipt_unavailable/);
+  const b=intakeFake({finalizeId:intakeActor});
+  await assert.rejects(runIntake(b),/durable_receipt_unavailable/);
+});
+test('WK100 original CSV duplicate safely reuses object while each observation has DB verification',async()=>{
+  const f=intakeFake();await runIntake(f);await runIntake(f);
+  assert.equal(f.blob.objects.size,1);
+  assert.equal(f.order.filter(x=>x[0]==='reserve').length,2);
+  assert.equal(f.order.filter(x=>x[0]==='finalize').length,2);
+  assert.ok(f.blob.actions.filter(x=>x[0]==='upload').every(x=>x[2].upsert===false));
+});
+test('WK100 additive SQL ledger and restricted Edge route retain independent authority',async()=>{
+  const {readdir}=await import('node:fs/promises');
+  const dir=new URL('../../supabase/migrations/',import.meta.url);
+  const files=(await readdir(dir)).filter(x=>x.endsWith('_wk100_research_observation_ledger_v1.sql'));
+  assert.equal(files.length,1);
+  const sql=await readFile(new URL(files[0],dir),'utf8');
+  for(const word of [
+    'wk100_reserve_research_observation_v1','wk100_finalize_research_observation_v1',
+    "auth.role() IS DISTINCT FROM 'service_role'",'current_user_has_capability',
+    'source_native_period_authority','source_admitted=false','can_score=false',
+    'can_publish=false','FOR UPDATE','REVOKE ALL','BEFORE TRUNCATE',
+    'ON CONFLICT(week_start_eat,source_key,observation_time_utc,raw_sha256,reserved_by)',
+  ])assert.ok(sql.includes(word),`missing SQL ledger invariant ${word}`);
+  assert.equal(sql.includes('CREATE POLICY'),false);
+  const edge=await readFile(new URL('../../supabase/functions/wk100-research-intake/index.ts',import.meta.url),'utf8');
+  for(const word of [
+    'WK100_RESEARCH_INTAKE_ENABLED', 'WK100_RESEARCH_INTAKE_PROJECT_REF',
+    'auth.getUser(token)',"required_capability:'manage_charts'",
+    "required_capability:'manage_ingest'",'boundedBody(req)',
+    'executeWk100ResearchIntake','serviceDb.storage',
+  ])assert.ok(edge.includes(word),`missing Edge boundary ${word}`);
 });

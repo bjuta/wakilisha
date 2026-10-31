@@ -1,0 +1,22 @@
+# WAKILISHA 100 — Authenticated Researcher Observation Intake v1
+
+**Scope:** PR #1333, programme #1264. **Status:** source-only candidate. No Production migration, Storage mutation, Edge deploy, frontend activation, publisher or Chart Edition acceptance.
+
+## Source versus collection
+
+A researcher obtains the original Shazam Kenya Top 200 CSV via WAKILISHA's independent factual research workflow. This does **not** create an unattended collector schedule, fetched-at time, HTTP status, provider Track ID, actual play count, verified provider-native measurement interval, or canonical Registry Track. Those fields must never be invented. The actual 29 October 2026 source bytes remain in the owner's private archive; no repo fixture reproduces them.
+
+## Authenticated private workflow
+
+1. The dedicated `wk100-research-intake` server route is **disabled unless** `WK100_RESEARCH_INTAKE_ENABLED=true`; `WK100_RESEARCH_INTAKE_PROJECT_REF` must match the bound `SUPABASE_URL` exactly. For Preview, verify custom environment presence and secret parity before deployment. Existing JWT verification must remain active on the function as well as the route's `auth.getUser(token)` check.
+2. Require live `manage_charts` **and** `manage_ingest` capabilities with the signed-in caller's JWT. No browser receives the service-role key, private CSV, research operator reference or ranked original labels. Accept a bounded `multipart/form-data` POST containing `original_csv`, `receipt_json`, `research_week_start_eat`. The original byte cap is **4,194,304 bytes**; request cap includes multipart overhead. Reject invalid source/receipt before Storage.
+3. Verify the private offline research receipt against the exact bytes, SHA-256, native row ranks and explicit `unknown` measurement period. Reserve the research observation via authenticated `wk100_reserve_research_observation_v1`; the private, row-level append-only ledger records a truthful `observation_time_utc`, EAT editorial week, SHA, operator identity and provenance. Its `reserved` state is **not** a verified source receipt.
+4. Upload original bytes to the existing private `wk-chart-raw-evidence-v1` bucket with `upsert:false`. Existing exact SHA objects may be reused after byte-for-byte private download/readback. A collision with different bytes is a hard stop, never an overwrite. The object alone is not a source admission.
+5. On verified readback, the restricted server calls service-role-only `wk100_finalize_research_observation_v1` once. This finalizes a single transaction containing the exact gapless native source rows and immutable verification marker; the service RPC independently rejects unexpected identity/stream fields, conflicts and malformed ranks. Only a committed finalization receives a sanitized browser ACK, and the ACK is still `research_only`, `can_score:false`, `can_publish:false`.
+6. If Storage succeeds but DB finalization fails, retain the private object and reservation. A retry of the **same observation** reuses it; never manufacture a second scheduled capture, delete evidence blindly, or claim `persisted:true` from Storage alone. The reservation and rows cannot be mutated or truncated.
+
+## Source-only acceptance and deployment holds
+
+The in-repository tests use fake Storage/RPC clients and contract inspection. They prove deterministic validation and error handling, **not** PostgreSQL transaction semantics, real RLS/JWT, hosted Storage, Edge bundling, CORS, browser multipart compatibility or production source provenance. Before protected merge: run an isolated PostgreSQL migration replay from exact accepted main, prove 42501 unauthenticated/ordinary/revoked denial, service-only finalize, immutable row and truncate guards, rollback of partially invalid row arrays, conflicting retries, separate timestamps with same raw body, week locks, and live read-only evidence review. Then prove the actual browser path in a clean, migration-equivalent Preview with recorded fixtures and non-destructive cleanup.
+
+No new source admission/publisher adapter is claimed. The existing governed publisher's collector-bound source FKs and independent ranking/edit approvals remain unchanged. Publication is held until a **separate reviewed forward adapter** and full Admin weekly orchestration have been verified. SQL is forward-only; no destructive rollback against Production. The current captured Shazam ranks are discovery observations, never streams.
