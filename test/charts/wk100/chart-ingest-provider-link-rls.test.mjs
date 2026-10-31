@@ -25,7 +25,7 @@ test('alias normalization respects compact provider object identity only',()=>as
 
 test('exact RLS policy preserves public matched read and gates expanded Admin read with existing capability only',()=>{
  const sql=readFileSync(new URL('../../../supabase/migrations/20261030180827_chart_full_filter_decision_execution_v1.sql',import.meta.url),'utf8');
- const frag=sql.split('CREATE POLICY wk100_registry_track_provider_links_admin_review_read_v1')[1]??'';
+ const frag=sql.split('CREATE POLICY wk100_registry_track_provider_links_admin_review_read_v1')[1]?.split(';',1)[0]??'';
  assert.match(frag,/ON public\.registry_track_provider_links\s+FOR SELECT TO authenticated/);
  assert.match(frag,/current_user_has_capability\('view_registry'\)/);
  assert.match(frag,/current_user_is_administrator\(\)/);

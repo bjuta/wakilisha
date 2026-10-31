@@ -269,7 +269,7 @@ CREATE TABLE platform_private.wk100_admin_weekly_drafts_v1 (
   week_start_eat date PRIMARY KEY CHECK (extract(isodow from week_start_eat)=1),
   revision bigint NOT NULL CHECK (revision >= 1),
   config_json jsonb NOT NULL CHECK (jsonb_typeof(config_json)='object'),
-  config_sha256 text NOT NULL CHECK (config_sha256 ~ '^[a-f0-9]{64}),
+  config_sha256 text NOT NULL CHECK (config_sha256 ~ '^[a-f0-9]{64}$'),
   updated_by uuid NOT NULL,
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
@@ -279,7 +279,7 @@ REVOKE ALL ON platform_private.wk100_admin_weekly_drafts_v1 FROM PUBLIC, anon, a
 CREATE TABLE platform_private.wk100_admin_draft_revisions_v1 (
   week_start_eat date NOT NULL,
   revision bigint NOT NULL CHECK (revision >= 1),
-  config_sha256 text NOT NULL CHECK (config_sha256 ~ '^[a-f0-9]{64}),
+  config_sha256 text NOT NULL CHECK (config_sha256 ~ '^[a-f0-9]{64}$'),
   config_json jsonb NOT NULL CHECK (jsonb_typeof(config_json)='object'),
   saved_by uuid NOT NULL,
   saved_at timestamptz NOT NULL DEFAULT clock_timestamp(),
