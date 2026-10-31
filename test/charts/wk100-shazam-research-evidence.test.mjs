@@ -405,7 +405,7 @@ test('WK100 additive SQL ledger and restricted Edge route retain independent aut
     'missing Edge production handler import');
   assert.ok(edge.includes('Deno.serve(createWk100ResearchIntakeHandler('),
     'missing Edge production handler wiring');
-  assert.ok(edge.includes('readEnv:name=>Deno.env.get(name)'),
+  assert.ok(edge.includes('readEnv:(name: string)=>Deno.env.get(name)'),
     'missing Edge production environment wiring');
   for(const word of [
     'WK100_RESEARCH_INTAKE_ENABLED', 'WK100_RESEARCH_INTAKE_PROJECT_REF',
@@ -693,7 +693,7 @@ test('WK100 Edge Deno entrypoint uses the tested handler without an auth bypass'
   const index=await readFile(new URL('../../supabase/functions/wk100-research-intake/index.ts',import.meta.url),'utf8');
   const config=await readFile(new URL('../../supabase/config.toml',import.meta.url),'utf8');
   assert.match(index,/Deno\.serve\(createWk100ResearchIntakeHandler\(/);
-  assert.match(index,/readEnv:name=>Deno\.env\.get\(name\)/);
+  assert.match(index,/readEnv:\(name: string\)=>Deno\.env\.get\(name\)/);
   assert.match(config,/\[functions\.wk100-research-intake\]\s*\nverify_jwt = true/);
   assert.doesNotMatch(index,/no-verify-jwt|localhost|testing_override/i);
 });
