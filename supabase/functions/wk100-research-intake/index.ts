@@ -5,5 +5,5 @@ import {createWk100ResearchIntakeHandler} from '../_shared/wk100-research-intake
 // The same authenticated project-bound handler runs in tests and Production.
 Deno.serve(createWk100ResearchIntakeHandler({
   createClient,executeWk100ResearchIntake,
-  readEnv:name=>Deno.env.get(name),
+  readEnv:(name: string)=>Deno.env.get(name),
 }));
