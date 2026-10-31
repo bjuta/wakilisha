@@ -523,6 +523,7 @@ function wk100EdgeHarness(overrides={}){
   const service={
     auth:{getUser:async()=>{
       calls.auth++;
+      if(overrides.authThrows)throw Error('secret auth service transport detail');
       return overrides.auth??{error:null,data:{user:{id:u(70)}}};
     }},
     storage:{from:()=>{throw Error('must not read storage before authorization');}},
@@ -531,6 +532,7 @@ function wk100EdgeHarness(overrides={}){
   const caller={
     rpc:async(name,params)=>{
       calls.capability.push({name,params});
+      if(overrides.capabilityThrows)throw Error('secret capability transport detail');
       if(overrides.capabilityError)return {error:{message:'permission check failed'},data:null};
       const ok=name==='current_user_has_capability'&&
         (params?.required_capability==='manage_charts'?
@@ -628,6 +630,12 @@ test('WK100 Edge invalid Auth session is rejected before capability and Storage'
   assert.equal(calls.auth,1);
   assert.equal(calls.capability.length,0);
   assert.equal(calls.intake,0);
+  const failing=wk100EdgeHarness({authThrows:true});
+  const unavailable=await failing.handle(wk100EdgeRequest());
+  assert.equal(unavailable.status,503);
+  assert.equal((await unavailable.json()).error,'backend_unavailable');
+  assert.equal(failing.calls.capability.length,0);
+  assert.equal(failing.calls.intake,0);
 });
 test('WK100 Edge requires BOTH live chart and ingest capabilities',async()=>{
   for(const options of [{allowCharts:false},{allowIngest:false}]){
@@ -646,6 +654,13 @@ test('WK100 Edge capability service errors fail closed before upload',async()=>{
   assert.equal(result.status,503);
   assert.equal((await result.json()).error,'capability_unavailable');
   assert.equal(calls.intake,0);
+  const rejected=wk100EdgeHarness({capabilityThrows:true});
+  const unavailable=await rejected.handle(wk100EdgeRequest());
+  assert.equal(unavailable.status,503);
+  const body=await unavailable.json();
+  assert.equal(body.error,'capability_unavailable');
+  assert.doesNotMatch(JSON.stringify(body),/secret capability transport detail/);
+  assert.equal(rejected.calls.intake,0);
 });
 test('WK100 Edge requires bounded multipart and strictly three fields',async()=>{
   const {handle,calls}=wk100EdgeHarness();
