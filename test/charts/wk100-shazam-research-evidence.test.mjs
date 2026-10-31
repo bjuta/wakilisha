@@ -498,3 +498,194 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
   assert.match(panel,/disabled=\{!ready\}/);
   assert.doesNotMatch(panel,/commitIngestRun|runDryRun|publishEdition|localStorage/);
 });
+
+import {createWk100ResearchIntakeHandler} from '../../supabase/functions/_shared/wk100-research-intake-handler.mjs';
+
+const WK100_EDGE_REF='pgzizndxdyhqmtyywjmt';
+function wk100EdgeHarness(overrides={}){
+  const calls={client:[],auth:0,capability:[],intake:0};
+  const env={
+    WK100_RESEARCH_INTAKE_ENABLED:'true',
+    SUPABASE_URL:'https://'+WK100_EDGE_REF+'.supabase.co',
+    WK100_RESEARCH_INTAKE_PROJECT_REF:WK100_EDGE_REF,
+    SUPABASE_ANON_KEY:'local-mock-anon',
+    SUPABASE_SERVICE_ROLE_KEY:'local-mock-service',
+    ...overrides.env,
+  };
+  const service={
+    auth:{getUser:async()=>{
+      calls.auth++;
+      return overrides.auth??{error:null,data:{user:{id:u(70)}}};
+    }},
+    storage:{from:()=>{throw Error('must not read storage before authorization');}},
+    rpc:async()=>{throw Error('must not call service RPC before orchestrator');},
+  };
+  const caller={
+    rpc:async(name,params)=>{
+      calls.capability.push({name,params});
+      if(overrides.capabilityError)return {error:{message:'permission check failed'},data:null};
+      const ok=name==='current_user_has_capability'&&
+        (params?.required_capability==='manage_charts'?
+          overrides.allowCharts!==false:overrides.allowIngest!==false);
+      return {data:ok,error:null};
+    },
+  };
+  const ack={
+    schema_version:'wk100-admin-research-intake-ack-v1',
+    reservation_id:u(71),persisted:true,original_bytes_privately_verified:true,
+    source:'Shazam Kenya',research_week_start_eat:'2026-10-26',
+    observed_depth:2,source_native_metric:'discovery_rank',
+    native_period_authority:'unknown',status:'research_only',
+    source_admitted:false,can_score:false,can_publish:false,
+  };
+  const handle=createWk100ResearchIntakeHandler({
+    readEnv:key=>env[key],
+    createClient:(url,key,options)=>{
+      calls.client.push({url,key,options});
+      return key===env.SUPABASE_SERVICE_ROLE_KEY?service:caller;
+    },
+    executeWk100ResearchIntake:async details=>{
+      calls.intake++;
+      if(overrides.intakeError)throw overrides.intakeError;
+      assert.equal(details.authenticatedUserId,u(70));
+      assert.equal(details.callerDb,caller);
+      assert.equal(details.serviceDb,service);
+      assert.equal(details.restrictedStorage,service.storage);
+      assert.equal(details.researchWeekStartEat,'2026-10-26');
+      assert.equal(details.receipt.raw_sha256,hash(csv));
+      assert.deepEqual(details.originalBytes,csv);
+      return overrides.intakeAck??ack;
+    },
+  });
+  return {handle,calls,env,ack};
+}
+function wk100EdgeRequest({
+  method='POST',origin='http://localhost:5173',authorization='Bearer local-user-jwt',
+  body,contentType,
+}={}){
+  const headers={origin,authorization};
+  if(contentType)headers['content-type']=contentType;
+  return new Request('https://functions.example.test/functions/v1/wk100-research-intake',{
+    method,headers,...(body===undefined?{}:{body}),
+  });
+}
+
+test('WK100 Edge factory rejects missing server dependencies before requests',()=>{
+  assert.throws(()=>createWk100ResearchIntakeHandler({}),/handler_dependency_invalid/);
+});
+test('WK100 Edge rejects disallowed origin even for preflight; allowed preflight is narrow',async()=>{
+  const {handle,calls}=wk100EdgeHarness();
+  const hostile=await handle(wk100EdgeRequest({method:'OPTIONS',origin:'https://hostile.example'}));
+  assert.equal(hostile.status,403);
+  assert.equal((await hostile.json()).error,'origin_not_allowed');
+  const allowed=await handle(wk100EdgeRequest({method:'OPTIONS'}));
+  assert.equal(allowed.status,204);
+  assert.equal(allowed.headers.get('access-control-allow-origin'),'http://localhost:5173');
+  assert.equal(allowed.headers.get('access-control-allow-methods'),'POST,OPTIONS');
+  assert.doesNotMatch(allowed.headers.get('access-control-allow-headers'),/service.role|cookie/i);
+  assert.equal(calls.client.length,0);
+});
+test('WK100 Edge wrong method and missing bearer cannot create privileged clients',async()=>{
+  const {handle,calls}=wk100EdgeHarness();
+  const get=await handle(wk100EdgeRequest({method:'GET'}));
+  assert.equal(get.status,405);
+  const anonymous=await handle(wk100EdgeRequest({authorization:''}));
+  assert.equal(anonymous.status,401);
+  assert.equal((await anonymous.json()).error,'authentication_required');
+  assert.equal(calls.client.length,0);
+});
+test('WK100 Edge feature flag is closed before any backend client exists',async()=>{
+  const {handle,calls}=wk100EdgeHarness({env:{WK100_RESEARCH_INTAKE_ENABLED:'false'}});
+  const result=await handle(wk100EdgeRequest());
+  assert.equal(result.status,503);
+  assert.equal((await result.json()).error,'intake_not_enabled');
+  assert.equal(calls.client.length,0);
+});
+test('WK100 Edge requires exact project-bound HTTPS origin, never localhost',async()=>{
+  for(const url of ['http://'+WK100_EDGE_REF+'.supabase.co',
+    'https://localhost:54321','https://'+WK100_EDGE_REF+'.supabase.co.evil.example',
+    'https://'+WK100_EDGE_REF+'.supabase.co/path',
+    'https://user@'+WK100_EDGE_REF+'.supabase.co/']){
+    const {handle,calls}=wk100EdgeHarness({env:{SUPABASE_URL:url}});
+    const result=await handle(wk100EdgeRequest());
+    assert.equal(result.status,503,url);
+    assert.equal((await result.json()).error,'backend_unavailable');
+    assert.equal(calls.client.length,0);
+  }
+});
+test('WK100 Edge invalid Auth session is rejected before capability and Storage',async()=>{
+  const {handle,calls}=wk100EdgeHarness({auth:{error:{message:'invalid'},data:{user:null}}});
+  const result=await handle(wk100EdgeRequest());
+  assert.equal(result.status,401);
+  assert.equal(calls.auth,1);
+  assert.equal(calls.capability.length,0);
+  assert.equal(calls.intake,0);
+});
+test('WK100 Edge requires BOTH live chart and ingest capabilities',async()=>{
+  for(const options of [{allowCharts:false},{allowIngest:false}]){
+    const {handle,calls}=wk100EdgeHarness(options);
+    const result=await handle(wk100EdgeRequest());
+    assert.equal(result.status,403);
+    assert.equal((await result.json()).error,'not_authorized');
+    assert.deepEqual(calls.capability.map(c=>c.params.required_capability).sort(),
+      ['manage_charts','manage_ingest']);
+    assert.equal(calls.intake,0);
+  }
+});
+test('WK100 Edge capability service errors fail closed before upload',async()=>{
+  const {handle,calls}=wk100EdgeHarness({capabilityError:true});
+  const result=await handle(wk100EdgeRequest());
+  assert.equal(result.status,503);
+  assert.equal((await result.json()).error,'capability_unavailable');
+  assert.equal(calls.intake,0);
+});
+test('WK100 Edge requires bounded multipart and strictly three fields',async()=>{
+  const {handle,calls}=wk100EdgeHarness();
+  const missingMultipart=await handle(wk100EdgeRequest({body:'plain text',contentType:'text/plain'}));
+  assert.equal(missingMultipart.status,415);
+  const form=new FormData();
+  form.append('original_csv',new File([csv],'source.csv',{type:'text/csv'}));
+  form.append('receipt_json',JSON.stringify(prepareShazamResearchEvidence(args).receipt));
+  form.append('research_week_start_eat','2026-10-26');
+  form.append('unexpected','no');
+  const extra=await handle(wk100EdgeRequest({body:form}));
+  assert.equal(extra.status,400);
+  assert.equal((await extra.json()).error,'research_payload_invalid');
+  assert.equal(calls.intake,0);
+});
+test('WK100 Edge valid browser multipart reaches only the authorized intake orchestrator',async()=>{
+  const {handle,calls,ack}=wk100EdgeHarness();
+  const {form}=await prepareWk100ResearchForm(browserResearchFiles());
+  const result=await handle(wk100EdgeRequest({body:form}));
+  assert.equal(result.status,200);
+  assert.deepEqual(await result.json(),ack);
+  assert.equal(result.headers.get('cache-control'),'no-store');
+  assert.equal(result.headers.get('access-control-allow-origin'),'http://localhost:5173');
+  assert.equal(calls.auth,1);
+  assert.equal(calls.intake,1);
+  assert.deepEqual(calls.client.map(c=>c.key),['local-mock-service','local-mock-anon']);
+  assert.ok(calls.client.every(c=>c.url==='https://'+WK100_EDGE_REF+'.supabase.co'));
+});
+test('WK100 Edge invalid original and durable receipt errors never leak server details',async()=>{
+  const {form}=await prepareWk100ResearchForm(browserResearchFiles());
+  for(const [error,status,code] of [
+    [Error('wk100_research_import_invalid'),422,'research_source_invalid'],
+    [Error('secret private storage diagnostics'),409,'research_receipt_not_verified'],
+  ]){
+    const {handle,calls}=wk100EdgeHarness({intakeError:error});
+    const result=await handle(wk100EdgeRequest({body:form}));
+    assert.equal(result.status,status);
+    const body=await result.json();
+    assert.equal(body.error,code);
+    assert.equal(JSON.stringify(body).includes('secret'),false);
+    assert.equal(calls.intake,1);
+  }
+});
+test('WK100 Edge Deno entrypoint uses the tested handler without an auth bypass',async()=>{
+  const index=await readFile(new URL('../../supabase/functions/wk100-research-intake/index.ts',import.meta.url),'utf8');
+  const config=await readFile(new URL('../../supabase/config.toml',import.meta.url),'utf8');
+  assert.match(index,/Deno\.serve\(createWk100ResearchIntakeHandler\(/);
+  assert.match(index,/readEnv:name=>Deno\.env\.get\(name\)/);
+  assert.match(config,/\[functions\.wk100-research-intake\]\s*\nverify_jwt = true/);
+  assert.doesNotMatch(index,/no-verify-jwt|localhost|testing_override/i);
+});
