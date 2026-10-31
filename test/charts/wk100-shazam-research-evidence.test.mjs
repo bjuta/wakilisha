@@ -398,6 +398,17 @@ test('WK100 additive SQL ledger and restricted Edge route retain independent aut
     'ON CONFLICT(week_start_eat,source_key,observation_time_utc,raw_sha256,reserved_by)',
   ])assert.ok(sql.includes(word),`missing SQL ledger invariant ${word}`);
   assert.equal(sql.includes('CREATE POLICY'),false);
+  // The installed publisher is NOT compatible with unknown-period research rows.
+  // A researcher-directed Shazam CSV must not masquerade as scheduled capture.
+  const publisher=await readFile(
+    new URL('../../supabase/migrations/20261030095808_wk100_governed_publisher_v1.sql',import.meta.url),'utf8');
+  assert.ok(sql.includes("CHECK (source_native_period_authority='unknown')"));
+  assert.ok(sql.includes("CHECK (acquisition_mode='researcher_directed_public_csv')"));
+  assert.ok(sql.includes("source_admitted=false")&&sql.includes("can_score=false"));
+  assert.ok(publisher.includes("a.native_period_authority='provider_defined'"));
+  assert.ok(publisher.includes("join public.wk_chart_capture_attempts_v1"));
+  assert.ok(publisher.includes("platform_private.wk100_governed_source_admissions_v1"));
+  assert.ok(publisher.includes("jsonb_array_length(p_proposal->'source_receipts') not between 2 and 8"));
   const edge=await readFile(new URL('../../supabase/functions/wk100-research-intake/index.ts',import.meta.url),'utf8');
   const handler=await readFile(new URL('../../supabase/functions/_shared/wk100-research-intake-handler.mjs',import.meta.url),'utf8');
   // The Deno entrypoint wires the real handler; security checks live in that handler.
