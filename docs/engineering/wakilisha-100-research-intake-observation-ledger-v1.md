@@ -55,6 +55,23 @@ Owner executed **two live, unauthenticated, bodyless `OPTIONS` requests** agains
 
 **Scope and hold:** `wk100-research-intake` itself is still **not deployed**. No data-bearing POST or real signed JWT, capability revocation, Supabase Storage private write/download, Admin browser, Supabase gateway bundling of this new function, hosted data-less migration replay, or publisher flow has been proven by these two requests. The intended WK100 `verify_jwt=true` and `WK100_RESEARCH_INTAKE_ENABLED` disabled state are **unchanged**. Gate classification: **existing protected gateway CORS preflight PASS; WK100-specific hosted integration OPEN**.
 
+## Isolated local Supabase CLI gateway probe: response-layer correction (1 November 2026)
+
+Owner ran checksum-pinned `wk100_pr1333_local_supabase_gateway_packaging_20261101.sh` (SHA256 `3d7cc7775c18482905c02b87b488ab2127519139b036fb75d213d481f4524017`) with local Supabase CLI **2.107.0** and Docker. All seven accepted source/config blob pins passed, and the separate migration-free fixture was created at `~/PrivateResearch/WK100/EdgeGatewayOnly-20261101.Dyhy4FAL`, isolated project ID `wk100edgegatedyhy4fal`, with feature flag disabled. Local stack startup passed.
+
+The runner prematurely emitted `ACTUAL_SUPABASE_LOCAL_EDGE_BUNDLE_AND_SERVE=PASS` when a status-only `OPTIONS` probe returned 200/204. That assertion **did not prove the WK100 entrypoint had been bundled or invoked**. The script then stopped at `Missing exact allowed origin`. On read-only inspection of the **already saved** `preflight-headers.txt`, the owner observed:
+
+```http
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: authorization,apikey,content-type,x-client-info
+Access-Control-Allow-Methods: GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT
+```
+
+This is a **generic upstream/gateway OPTIONS response**, not the unchanged WK100 handler response. The WK100 handler would return **204**, the exact `https://wakilisha.africa` origin and only `POST,OPTIONS`. No WK100 application defect, JWT bypass, runtime package success or route-specific CORS failure can be concluded from this intercepted preflight alone. The runner's premature packaging marker is **RETRACTED**, and its exact-origin assertion was invalid for this gateway interception. The later invalid-JWT and feature-disabled local-anon POST probes were **not executed**; no outcome is claimed. Do not rerun the fixture, rewrite the Edge handler, loosen `verify_jwt`, or recreate a paid Preview based on this receipt.
+
+**Correct gate state:** isolated scratch stack startup PASS; *local Supabase Edge bundling/handler invocation/JWT denial* **UNPROVEN**, not failed product behavior. The existing **hosted** JWT-protected `chart-ingest-api` preflight acceptance from the prior section remains independently valid. Existing Deno import/typecheck plus no-permission fail-closed handler smoke, 159/159 focused source tests, and 238/238 isolated PostgreSQL acceptance remain valid. No Production SQL, Edge, Storage or browser writes; no hosted Preview or merge. The failed fixture script included a project-specific cleanup trap; a completed Docker stop readback was not supplied, so do not invent one.
+
 ## Source-only acceptance and deployment holds
 
 The in-repository tests use fake Storage/RPC clients and contract inspection. They prove deterministic validation and error handling, **not** PostgreSQL transaction semantics, real RLS/JWT, hosted Storage, Edge bundling, CORS, browser multipart compatibility or production source provenance. Before protected merge: run an isolated PostgreSQL migration replay from exact accepted main, prove 42501 unauthenticated/ordinary/revoked denial, service-only finalize, immutable row and truncate guards, rollback of partially invalid row arrays, conflicting retries, separate timestamps with same raw body, week locks, and live read-only evidence review. Then prove the actual browser path in a clean, migration-equivalent Preview with recorded fixtures and non-destructive cleanup.
