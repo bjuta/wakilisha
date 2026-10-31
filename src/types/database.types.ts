@@ -21427,6 +21427,15 @@ export type Database = {
         Args: { p_enrichment_item_id: string }
         Returns: Json
       }
+      chart_apply_full_filter_decisions_v1: {
+        Args: {
+          p_decisions: Json
+          p_expected_run_updated_at: string
+          p_policy: Json
+          p_run_id: string
+        }
+        Returns: Json
+      }
       chart_assert_committable_run: {
         Args: { p_run_id: string }
         Returns: Json

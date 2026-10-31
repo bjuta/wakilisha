@@ -7,7 +7,6 @@ import {
   retryIngestRun,
   sendGapsToReview,
   commitIngestRun,
-  validateCommitReadiness,
   sourceFetch,
   normalizeRun,
   runEligibility,
@@ -15,12 +14,13 @@ import {
   runShortlist,
   getChartPlaybackReadiness,
   getOriginReviewQueue,
+  getFullFilterPreview,
   setArtistOriginForRun,
   createOriginArtistShell,
   getOriginCountryOptions,
   resetAfterOriginResolution,
 } from "@/services/chartsIngestion/client";
-import type { OriginReviewQueueRow, OriginCountryOption } from "@/services/chartsIngestion/client";
+import type { OriginReviewQueueRow, OriginCountryOption, FullFilterPreview } from "@/services/chartsIngestion/client";
 import { validateRunReadinessAsync } from "@/services/chartsIngestion/productionAdapter";
 import { SkeletonBlock } from "@/components/skeletons/Skeletons";
 import type { CommitIngestRunResponse, CommitValidationResult } from "@/services/chartsIngestion/commitTypes";
@@ -279,7 +279,7 @@ function OriginCountryPicker({
   busy: boolean;
   onApply: (row: OriginReviewQueueRow, originIso2: string) => void;
 }) {
-  const initial = (row.currentOriginIso2 || row.targetIso2 || "KE").toUpperCase();
+  const initial = (row.currentOriginIso2 || "").toUpperCase();
   const [query, setQuery] = useState("");
   const [selectedIso2, setSelectedIso2] = useState(initial);
 
@@ -332,6 +332,7 @@ function OriginCountryPicker({
           onChange={(value) => setSelectedIso2(value)}
           triggerClassName="h-8 min-w-0 flex-1 rounded-md border border-wk-border bg-wk-surface px-2 text-[11px] font-semibold text-wk-text outline-none focus:border-wk-brand"
         >
+          <option value="" disabled>Select verified origin</option>
           {filtered.map((option) => (
             <option key={option.originIso2} value={option.originIso2}>
               {option.originIso2} — {countryDisplayName(option.originIso2)}
@@ -377,7 +378,7 @@ function OriginResolutionQueuePanel({
   const unresolved = rows.filter((row) => row.issueType === "unresolved_artist");
   const mismatched = rows.filter((row) => row.issueType === "country_mismatch");
 
-  if (!loading && rows.length === 0) {
+  if (!loading && rows.length === 0 && !error) {
     return (
       <WkSurface className="p-5">
         <div className="flex items-center gap-2">
@@ -545,6 +546,9 @@ export default function AdminChartsIngestRunDetail() {
   const [originCountryOptions, setOriginCountryOptions] = useState<OriginCountryOption[]>([]);
   const [originError, setOriginError] = useState<string | null>(null);
   const [originResetLoading, setOriginResetLoading] = useState(false);
+  const [fullFilterReview, setFullFilterReview] = useState<FullFilterPreview | null>(null);
+  const [fullFilterError, setFullFilterError] = useState<string | null>(null);
+  const [fullFilterLoading, setFullFilterLoading] = useState(false);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -618,15 +622,13 @@ export default function AdminChartsIngestRunDetail() {
           });
         }
       } catch {
-        if (!cancelled) {
-          // Fall back to client-side validation if the edge function is unreachable
-          try {
-            const localResult = await validateCommitReadiness(run);
-            if (!cancelled) setCommitValidation(localResult);
-          } catch {
-            if (!cancelled) setCommitValidation(null);
-          }
-        }
+        // The server integrity gate is authoritative. A client-only estimate
+        // must never turn a failed server check into a green commit button.
+        if (!cancelled) setCommitValidation({
+          canCommit: false,
+          errors: [{ code: "server_integrity_unavailable", message: "Server commit validation is unavailable. Retry; do not use local readiness as approval.", retryable: true }],
+          warnings: [],
+        });
       }
     }
     load();
@@ -681,11 +683,13 @@ export default function AdminChartsIngestRunDetail() {
   async function loadOriginQueue() {
     if (!runId) return;
     setOriginQueueLoading(true);
+    setOriginError(null);
     try {
       const rows = await getOriginReviewQueue(runId);
       setOriginQueue(rows);
     } catch {
       setOriginQueue([]);
+      setOriginError("Origin review could not be loaded. Retry before advancing this run.");
     } finally {
       setOriginQueueLoading(false);
     }
@@ -696,6 +700,20 @@ export default function AdminChartsIngestRunDetail() {
     loadOriginQueue();
     loadOriginCountryOptions();
   }, [runId, run?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!runId || !run) return;
+    let cancelled = false;
+    setFullFilterLoading(true);
+    setFullFilterError(null);
+    setFullFilterReview(null);
+    getFullFilterPreview(runId).then((result) => {
+      if (!cancelled) setFullFilterReview(result);
+    }).catch((error) => {
+      if (!cancelled) setFullFilterError(error instanceof Error ? error.message : "Full filter review unavailable");
+    }).finally(() => { if (!cancelled) setFullFilterLoading(false); });
+    return () => { cancelled = true; };
+  }, [runId, run?.updatedAt]);
 
   async function handleApplyOrigin(row: OriginReviewQueueRow, originIso2: string) {
     if (row.canonicalArtistId) {
@@ -1051,6 +1069,35 @@ export default function AdminChartsIngestRunDetail() {
           run={run}
         />
       )}
+
+      {/* Comprehensive eligibility preview uses this SAME ingest-run page. Never grants stage advancement. */}
+      <WkSurface className="p-5">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="text-[14px] font-bold text-wk-text">Full Eligibility &amp; Metadata Review</h2>
+          <span className="text-[11px] font-bold text-wk-warning">Preview only · scoring held</span>
+        </div>
+        {fullFilterLoading ? <p className="text-[12px] text-wk-text-muted">Checking all configured filters…</p> :
+          fullFilterError ? <p role="alert" className="text-[12px] text-wk-danger">Review unavailable: {fullFilterError}. No clean review state has been established.</p> :
+          fullFilterReview ? <>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 mb-3">
+              {(["ELIGIBLE", "EXCLUDED", "REVIEW_REQUIRED", "CONFLICTED"] as const).map((kind) => (
+                <div key={kind} className="rounded-md bg-wk-surface-raised p-2">
+                  <div className="text-[15px] font-bold text-wk-text">{fullFilterReview.counts[kind] ?? 0}</div>
+                  <div className="text-[10px] text-wk-text-muted">{kind.replace(/_/g," ")}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-wk-warning mb-2">Not cleared for scoring. Holds: {fullFilterReview.holdReasons.length ? fullFilterReview.holdReasons.join(", ") : "release acceptance not yet verified"}.</p>
+            {fullFilterReview.reviewRows.slice(0,20).map((row) => (
+              <div key={row.candidateId} className="border-t border-wk-border py-2 text-[11px]">
+                <span className="font-mono text-wk-text-soft">{row.candidateId.slice(0,12)}…</span>
+                <span className="ml-2 font-semibold text-wk-warning">{row.outcome.replace(/_/g," ")}</span>
+                <p className="mt-1 text-wk-text-muted">{row.reasonCodes.join(", ") || "Metadata requires verification"}</p>
+              </div>
+            ))}
+            {fullFilterReview.reviewRows.length > 20 && <p className="text-[11px] text-wk-text-muted">Showing 20 of {fullFilterReview.reviewRows.length} review rows.</p>}
+          </> : <p className="text-[12px] text-wk-warning">No verified full-filter result available. Stage advancement is not authorized.</p>}
+      </WkSurface>
 
       <OriginResolutionQueuePanel
         rows={originQueue}
