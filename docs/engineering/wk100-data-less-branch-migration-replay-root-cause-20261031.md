@@ -26,6 +26,20 @@ This is a **proven deterministic incompatibility**, consistent with the branch s
 4. **Resolve branch replay as a distinct release gate:** obtain an accepted, provenance-preserving baseline/migration strategy for data-less Preview that does not silently alter or skip applied Production history. Prove it from clean original main in a local disposable environment first; only then create one new paid Preview if final hosted parity is still required.
 5. **Only after both gates:** secret-presence parity, JWT/capability, private Storage, real browser-shaped multipart and admin CAS, then independently governed weekly ranking/edit approval, and protected CI. Never claim research-only Shazam discovery counts are stream or scheduled collector evidence.
 
+## Recovered local historical replay receipts (31 October, Mac read-only inspection)
+
+The owner's checksum-pinned `wk100_historical_replay_evidence_readonly_nested_fix_20261031.sh` found **all 12 original nested receipts uniquely** in the private `Phase2CleanHistoryReplay-20261030.7Vao7nGg` archive, without opening Docker or a database. The earlier 'missing' error was caused by a mistaken top-level-only lookup, not missing evidence.
+
+- `stop-reason.txt`: `STOP: Could not identify exactly one isolated DB container for local assigned port`. This is a **container-identification stop**, not a PostgreSQL SQLSTATE or proof that either migration failed.
+- `migration-235-up.log`: reports `Applying migration 20261030062819_retire_18_kenya_rnb_editions.sql` followed by `Local database is up to date.`
+- `migration-236-up.log`: reports `Applying migration 20261030180827_chart_full_filter_decision_execution_v1.sql` followed by `Local database is up to date.`
+- `final-ledger.txt` and `final-expected.txt` have **identical SHA-256** `b252fd937fc32695d580eefe3a8f2ea1153a28df8759a99aa303689261816b86` and both include `20261030062819` and `20261030180827`. This supports the **historical retirement plus Phase 2** replay path, not current publisher parity.
+- `retirement-receipt.txt`: `1|18|1800|2904`; `retired-editions.txt`: `0`; `provider-link-policy.txt`, `transaction-invoker.txt`, and `local-connect.txt`: each `1`; `structural-fingerprint.txt`: `14|450|2418899d6ff56a1e4a049d0cc1d4ad2e8d3e8ab533948860dcb3846efee10ac3`.
+- **Neither** the publisher `20261030095808` **nor** the researcher ledger `20261031194228` appears in the accepted local replay's final ledger, and the local DB container that replay used could not be uniquely identified. Do not reuse its old `Local database is up to date` text to attest these untested migrations.
+- The running `supabase_db_wakilisha-supabase-deploy` is a **different, shared 225-migration development baseline** (PostgreSQL 17.6) and lacks publisher/Phase 2/research tables. Never apply WK100 acceptance migrations to its `postgres`, `_supabase`, or `storage_vectors` databases.
+
+**Next safe action:** locate the preserved, exact **historical isolated replay runner / container and ledger contracts**. In a newly dedicated, disposable local database, reproduce the independently accepted historical state without altering the shared Docker DB. Then apply the already-installed-in-Production publisher SQL `20261030095808` as the precondition, followed by pending `20261030180827` and `20261031194228`; test security and rollback against the actual fresh database. The old replay's original order had retirement → Phase 2; do not silently mistake it for publisher → Phase 2 → research. A partial local result cannot close clean data-less hosted Preview replay parity.
+
 ## Immediate authority holds
 
 - PR #1333 source HEAD `f97de34178e20b14ef6d130ed78818a831a73609`: 140/140 focused source tests and application build previously accepted; pending SQL remains unapplied.
