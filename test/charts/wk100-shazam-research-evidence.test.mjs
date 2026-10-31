@@ -5,6 +5,7 @@ import {mkdtemp,rm,readFile,stat,symlink,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {prepareShazamResearchEvidence,archiveShazamResearchEvidence,prepareShazamRegistryReview} from '../../scripts/charts/wk100-shazam-research-evidence.mjs';
+import {verifyWk100ShazamResearchImport,projectWk100ResearchImportStatus} from '../../supabase/functions/_shared/wk100-research-receipt-bridge.mjs';
 const enc=x=>new TextEncoder().encode(x);
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const csv=enc('Rank,Artist,Title\n1,Artist One,Track One\n2,Artist Two,Track Two\n');
@@ -128,4 +129,91 @@ test('duplicate active ISRC and archived Registry candidates fail closed',()=>{
 test('identical filename at source rank does not infer a source-native provider ID',()=>{
  const x=valid();x.evidence.entries[0].provider_track_id='fake_shazam_id';
  assert.throws(()=>prepareShazamRegistryReview(x),/evidence_raw_mismatch/);
+});
+
+test('WK100 server import bridges genuine researcher CSV receipt to private nonpublishing rows',async()=>{
+ const evidence=prepareShazamResearchEvidence(args);
+ const verified=await verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt:evidence.receipt,researchWeekStartEat:'2026-10-26'});
+ assert.equal(verified.raw_sha256,hash(csv));
+ assert.equal(verified.private_rows.length,2);
+ assert.equal(verified.private_rows[0].row_ref,`${hash(csv)}:1`);
+ assert.equal(verified.private_rows[0].title_observed,'Track One');
+ assert.equal(verified.private_rows[0].artist_observed,'Artist One');
+ assert.equal(verified.private_rows[0].canonical_track_id,null);
+ assert.equal(verified.private_rows[0].provider_track_id,null);
+ assert.equal(verified.private_rows[0].source_native_count,null);
+ assert.equal(verified.source_native_metric,'rank');
+ assert.equal(verified.native_period_authority,'unknown');
+ assert.equal(verified.source_origin_independently_attested,false);
+ assert.equal(verified.source_admitted,false);
+ assert.equal(verified.can_score,false);
+ assert.equal(verified.can_publish,false);
+});
+test('WK100 import rejects changed raw bytes even when a CSV still parses',async()=>{
+ const receipt=prepareShazamResearchEvidence(args).receipt;
+ const changed=enc('Rank,Artist,Title\n1,Artist One,Track One\n2,Artist Two,Track Six\n');
+ assert.equal(changed.byteLength,csv.byteLength);
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:changed,receipt,researchWeekStartEat:'2026-10-26'}),/original_bytes_mismatch/);
+});
+test('WK100 research receipt never impersonates HTTP collection, native period, streams, or admitted provider',async()=>{
+ const original=prepareShazamResearchEvidence(args).receipt;
+ for(const change of [
+   {http_status:200},
+   {source_key:'youtube_ke'},
+   {acquisition_mode:'unattended_collector'},
+   {source_url:'https://evil.example/kenya'},
+   {can_publish:true},
+   {identity_state:'canonical'},
+   {source_native_period:{authority:'provider_defined',starts_at:'2026-10-26T00:00:00Z',ends_at:'2026-11-02T00:00:00Z'}},
+ ]){
+   await assert.rejects(verifyWk100ShazamResearchImport({
+     originalBytes:csv,receipt:{...original,...change},researchWeekStartEat:'2026-10-26'}),
+     /receipt_invalid/);
+ }
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt:{...original,observed_depth:200},researchWeekStartEat:'2026-10-26'}),
+   /native_observation_mismatch/);
+});
+test('WK100 import requires exact EAT Monday editorial week without inventing source measurement time',async()=>{
+ const receipt=prepareShazamResearchEvidence(args).receipt;
+ for(const week of ['2026-10-25','2026-10-27','2026-13-04','2026-02-30','26-10-26']){
+   await assert.rejects(verifyWk100ShazamResearchImport({
+     originalBytes:csv,receipt,researchWeekStartEat:week}),/week_invalid/);
+ }
+ assert.equal((await verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt,researchWeekStartEat:'2026-10-26'})).observation_time_utc,
+   args.observed_at);
+});
+test('WK100 import refuses invalid original-byte encoding and native CSV rows',async()=>{
+ const invalid=new Uint8Array([0xff,0xfe,0x00]);
+ const receipt={...prepareShazamResearchEvidence(args).receipt,
+   raw_sha256:hash(invalid),byte_length:invalid.length};
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:invalid,receipt,researchWeekStartEat:'2026-10-26'}),/source_native_parse_failed/);
+});
+test('WK100 import preserves original CSV byte-size cap and exact receipt shape',async()=>{
+ const receipt=prepareShazamResearchEvidence(args).receipt;
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:new Uint8Array(4_194_305),receipt,researchWeekStartEat:'2026-10-26'}),/byte_size_invalid/);
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt:{...receipt,operator_ref:undefined},researchWeekStartEat:'2026-10-26'}),/receipt_invalid/);
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt:{...receipt,observed_at:'2026-02-30T18:00:00Z'},
+   researchWeekStartEat:'2026-10-26'}),/receipt_invalid/);
+});
+test('WK100 Admin projection leaks no research labels, operator, original SHA, or private bytes',async()=>{
+ const receipt=prepareShazamResearchEvidence(args).receipt;
+ const verified=await verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt,researchWeekStartEat:'2026-10-26'});
+ const projected=projectWk100ResearchImportStatus(verified);
+ const exposed=JSON.stringify(projected);
+ for(const confidential of ['Track One','Artist One',args.operator_ref,hash(csv),'private_rows'])
+   assert.equal(exposed.includes(confidential),false);
+ assert.equal(projected.status,'research_only');
+ assert.equal(projected.can_score,false);
+ assert.equal(projected.can_publish,false);
+ assert.equal(projected.native_period_authority,'unknown');
+ assert.throws(()=>projectWk100ResearchImportStatus({...verified,can_publish:true}),/unverified_projection/);
 });
