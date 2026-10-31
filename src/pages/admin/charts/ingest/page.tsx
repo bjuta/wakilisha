@@ -25,6 +25,7 @@ import type {
 } from "@/services/chartsIngestion/ingestStudioTypes";
 import type { Wk100AdminDraftConfig } from "@/services/chartsIngestion/client";
 import { useWk100DraftAutosave } from "./hooks/useWk100DraftAutosave";
+import { Wk100ResearchEvidencePanel } from "./components/Wk100ResearchEvidencePanel";
 import { wk100CurrentWeekStartEat, isWk100WeekStartEat } from "./wk100EatWeek.mjs";
 import type { ChartFamily } from "@/services/chartsIngestion/types";
 import { getEligibilityProfiles } from "@/services/chartsEligibility/eligibilityStore";
@@ -560,6 +561,8 @@ export default function AdminChartsIngest() {
           </button>
         </div>}
       </section>}
+      {isWk100 && <Wk100ResearchEvidencePanel key={editionDate}
+        weekStartEat={editionDate} draftSaved={wk100Save.state==="saved" && wk100Config!==null} />}
       <Stepper step={step} onStepChange={(nextStep) => { if (nextStep === "configure") handleReset(); if (nextStep === "rules") handleContinueToRules(); }} />
       <IngestKpiStrip kpis={kpis} />
       <IngestStatusStack formError={formError} successMessage={successMessage} editionExistsWarning={editionExistsWarning} />

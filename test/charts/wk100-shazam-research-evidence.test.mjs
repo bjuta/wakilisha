@@ -406,3 +406,95 @@ test('WK100 additive SQL ledger and restricted Edge route retain independent aut
     'executeWk100ResearchIntake','serviceDb.storage',
   ])assert.ok(edge.includes(word),`missing Edge boundary ${word}`);
 });
+
+import {prepareWk100ResearchForm,submitWk100ResearchEvidence} from '../../src/services/chartsIngestion/wk100ResearchIntakeClient.mjs';
+
+function browserResearchFiles({
+  bytes=csv,receipt=prepareShazamResearchEvidence(args).receipt,
+}={}){
+  return {
+    originalCsv:new File([bytes],'private-source.csv',{type:'text/csv'}),
+    receiptFile:new File([JSON.stringify(receipt)],'research-receipt.json',{type:'application/json'}),
+    weekStartEat:'2026-10-26',
+  };
+}
+test('WK100 Admin transport includes exact original bytes and receipt without private local filename',async()=>{
+  const {form,observedDepth}=await prepareWk100ResearchForm(browserResearchFiles());
+  assert.equal(observedDepth,2);
+  assert.deepEqual([...form.keys()].sort(),['original_csv','receipt_json','research_week_start_eat']);
+  assert.equal(form.get('original_csv').name,'original.csv');
+  assert.deepEqual(new Uint8Array(await form.get('original_csv').arrayBuffer()),csv);
+  assert.equal(form.get('research_week_start_eat'),'2026-10-26');
+});
+test('WK100 Admin rejects changed CSV before any Edge request',async()=>{
+  let called=0;
+  await assert.rejects(submitWk100ResearchEvidence({
+    ...browserResearchFiles({bytes:enc('tampered source rank')}),
+    invoke:async()=>{called++;return {data:null,error:null};},
+  }),/receipt_invalid|original_bytes_mismatch/);
+  assert.equal(called,0);
+});
+test('WK100 Admin never fabricates a researcher, collector or native period',async()=>{
+  const original=prepareShazamResearchEvidence(args).receipt;
+  const mutate=[
+    r=>{r.observed_at='2026-10-29';},
+    r=>{r.acquisition_mode='scheduled_collector';},
+    r=>{r.can_publish=true;},
+    r=>{r.operator_ref='';},
+    r=>{r.source_native_period={authority:'provider',starts_at:null,ends_at:null};},
+  ];
+  for(const change of mutate){
+    const receipt=structuredClone(original);change(receipt);
+    await assert.rejects(prepareWk100ResearchForm(browserResearchFiles({receipt})),/receipt_invalid/);
+  }
+});
+test('WK100 Admin invalid week and missing file inputs stop before transport',async()=>{
+  const files=browserResearchFiles();
+  await assert.rejects(prepareWk100ResearchForm({...files,weekStartEat:'2026-10-27'}),/week_invalid/);
+  await assert.rejects(prepareWk100ResearchForm({...files,receiptFile:null}),/receipt_invalid/);
+  await assert.rejects(prepareWk100ResearchForm({...files,originalCsv:null}),/csv_invalid/);
+});
+test('WK100 Admin projects only verified nonpublishing ACK with no rank labels',async()=>{
+  const ack={schema_version:'wk100-admin-research-intake-ack-v1',reservation_id:u(88),
+    persisted:true,original_bytes_privately_verified:true,
+    source:'Shazam Kenya',research_week_start_eat:'2026-10-26',
+    observed_depth:2,source_native_metric:'discovery_rank',
+    native_period_authority:'unknown',status:'research_only',
+    source_admitted:false,can_score:false,can_publish:false,
+    private_rows:[{title_observed:'PRIVATE LABEL'}],operator_ref:'PRIVATE RESEARCHER'};
+  const files=browserResearchFiles();
+  const projected=await submitWk100ResearchEvidence({
+    ...files,invoke:async(name,options)=>{
+      assert.equal(name,'wk100-research-intake');
+      assert.equal(options.body.get('research_week_start_eat'),'2026-10-26');
+      return {data:ack,error:null};
+    },
+  });
+  assert.deepEqual(Object.keys(projected).sort(),['canPublish','canScore','observedDepth','status','verified','weekStartEat']);
+  assert.equal(JSON.stringify(projected).includes('PRIVATE'),false);
+  for(const changed of [
+    {...ack,persisted:false},{...ack,can_publish:true},
+    {...ack,observed_depth:3},{...ack,status:'published'},
+    {...ack,research_week_start_eat:'2026-11-02'},
+  ])await assert.rejects(submitWk100ResearchEvidence({
+    ...files,invoke:async()=>({data:changed,error:null}),
+  }),/unverified_ack/);
+});
+test('WK100 Admin errors or rejected receipts never report verified evidence',async()=>{
+  const files=browserResearchFiles();
+  await assert.rejects(submitWk100ResearchEvidence({
+    ...files,invoke:async()=>({data:{error:'research_receipt_not_verified'},error:null}),
+  }),/research_receipt_not_verified/);
+  await assert.rejects(submitWk100ResearchEvidence({
+    ...files,invoke:async()=>{throw Error('SECRET SERVICE DETAIL');},
+  }),/server_unavailable/);
+});
+test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic publish',async()=>{
+  const config=await readFile(new URL('../../supabase/config.toml',import.meta.url),'utf8');
+  const page=await readFile(new URL('../../src/pages/admin/charts/ingest/page.tsx',import.meta.url),'utf8');
+  const panel=await readFile(new URL('../../src/pages/admin/charts/ingest/components/Wk100ResearchEvidencePanel.tsx',import.meta.url),'utf8');
+  assert.match(config,/\[functions\.wk100-research-intake\]\s*\nverify_jwt = true/);
+  assert.match(page,/Wk100ResearchEvidencePanel/);
+  assert.match(panel,/disabled=\{!ready\}/);
+  assert.doesNotMatch(panel,/commitIngestRun|runDryRun|publishEdition|localStorage/);
+});
