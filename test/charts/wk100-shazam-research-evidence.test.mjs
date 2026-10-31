@@ -399,12 +399,20 @@ test('WK100 additive SQL ledger and restricted Edge route retain independent aut
   ])assert.ok(sql.includes(word),`missing SQL ledger invariant ${word}`);
   assert.equal(sql.includes('CREATE POLICY'),false);
   const edge=await readFile(new URL('../../supabase/functions/wk100-research-intake/index.ts',import.meta.url),'utf8');
+  const handler=await readFile(new URL('../../supabase/functions/_shared/wk100-research-intake-handler.mjs',import.meta.url),'utf8');
+  // The Deno entrypoint wires the real handler; security checks live in that handler.
+  assert.ok(edge.includes("from '../_shared/wk100-research-intake-handler.mjs'"),
+    'missing Edge production handler import');
+  assert.ok(edge.includes('Deno.serve(createWk100ResearchIntakeHandler('),
+    'missing Edge production handler wiring');
+  assert.ok(edge.includes('readEnv:name=>Deno.env.get(name)'),
+    'missing Edge production environment wiring');
   for(const word of [
     'WK100_RESEARCH_INTAKE_ENABLED', 'WK100_RESEARCH_INTAKE_PROJECT_REF',
     'auth.getUser(token)',"required_capability:'manage_charts'",
     "required_capability:'manage_ingest'",'boundedBody(req)',
     'executeWk100ResearchIntake','serviceDb.storage',
-  ])assert.ok(edge.includes(word),`missing Edge boundary ${word}`);
+  ])assert.ok(handler.includes(word),`missing Edge handler security invariant ${word}`);
 });
 
 import {prepareWk100ResearchForm,submitWk100ResearchEvidence} from '../../src/services/chartsIngestion/wk100ResearchIntakeClient.mjs';
