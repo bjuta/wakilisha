@@ -1,0 +1,141 @@
+name: RNB18 One-Time Hosted Preview Schema Acceptance Commit
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/rnb18-one-time-preview-seal-commit.yml'
+permissions:
+  contents: write
+  actions: read
+  checks: read
+concurrency:
+  group: rnb18-one-time-preview-seal-1336
+  cancel-in-progress: false
+jobs:
+  seal-evidence:
+    if: ${{ github.event.pull_request.number == 1336 && github.event.pull_request.head.repo.full_name == 'bjuta/wakilisha' && github.event.pull_request.head.ref == 'fix/wk100-rnb18-stage2-retirement-replay-20261102' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PREVIEW_REF: uummbxewahdozsjkubez
+      PREVIEW_BRANCH_ID: c00bfe1e-fcc8-4a10-86b3-c2af1d249776
+      EXPECTED_TYPES_SHA: eed74587624364062f6d4cee1d2b0a16d530aa86865d2493476994061e8a9cf6
+      EXPECTED_BASE_MAIN: 4ecf39a6b295d2012f37e918771b9aad692e0d72
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Verify exact branch and active migration chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          test "$GITHUB_HEAD_REF" = fix/wk100-rnb18-stage2-retirement-replay-20261102
+          test "$(git merge-base HEAD origin/main)" = "$EXPECTED_BASE_MAIN"
+          test ! -e docs/engineering/replay-proofs/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql.json
+          test -f supabase/migrations/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql
+          test ! -e supabase/migrations/20261030062819_retire_18_kenya_rnb_editions.sql
+          test -f docs/engineering/replay-baseline/retired-active-migrations/20261030062819_retire_18_kenya_rnb_editions.sql
+          test "$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')" = 236
+          echo WK_RNB18_EXACT_STAGE2_REPLAY_SOURCE=PASS
+      - name: Retrieve exact successful canonical CLI artifact from GitHub Actions
+        uses: actions/download-artifact@v4
+        with:
+          name: rnb18-stage2-preview-types-7cb43ca436806c697bc5e6ccc57eb5810a22e7da
+          run-id: 41356641433
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/rnb18-seal
+      - name: Require real Supabase Preview check success on this exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const url='https://api.github.com/repos/bjuta/wakilisha/commits/'+process.env.HEAD_SHA+'/check-runs?per_page=100';
+          let found;
+          for(let i=0;i<20;i++){
+            const response=await fetch(url,{headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'}});
+            if(!response.ok)throw Error('STOP_GITHUB_CHECK_API_'+response.status);
+            const data=await response.json();
+            const checks=(data.check_runs||[]).filter(c=>c.name==='Supabase Preview'&&c.app?.slug==='supabase');
+            found=checks.find(c=>c.conclusion==='success');
+            if(found)break;
+            if(checks.some(c=>['failure','cancelled'].includes(c.conclusion)))throw Error('STOP_PREVIEW_FAILED');
+            await new Promise(r=>setTimeout(r,15000));
+          }
+          if(!found)throw Error('STOP_PREVIEW_SUCCESS_NOT_VERIFIED');
+          fs.appendFileSync(process.env.GITHUB_ENV,'PROVIDER_CHECK_ID='+found.id+'\n');
+          console.log('WK_RNB18_CURRENT_HEAD_NATIVE_SUPABASE_PREVIEW_SUCCESS=PASS');
+          NODE
+      - name: Bind exact SHA-pinned public and editorial artifact to hosted replay receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIR="$RUNNER_TEMP/rnb18-seal"
+          test "$(sha256sum "$DIR/src/types/database.types.ts" | awk '{print $1}')" = "$EXPECTED_TYPES_SHA"
+          mkdir -p docs/engineering/replay-proofs
+          cp "$DIR/src/types/database.types.ts" src/types/database.types.ts
+          cp "$DIR/docs/engineering/live-schema-baseline.json" docs/engineering/live-schema-baseline.json
+          cp "$DIR/docs/engineering/replay-proofs/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql.json" docs/engineering/replay-proofs/
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const file='docs/engineering/replay-proofs/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql.json';
+          const proof=JSON.parse(fs.readFileSync(file,'utf8'));
+          const baseline=JSON.parse(fs.readFileSync('docs/engineering/live-schema-baseline.json','utf8'));
+          const types=fs.readFileSync('src/types/database.types.ts','utf8');
+          const typesHash=crypto.createHash('sha256').update(types).digest('hex');
+          const sqlHash=crypto.createHash('sha256').update(fs.readFileSync(proof.migration_file)).digest('hex');
+          if(proof.baseline_replay!=='pending'||proof.candidate_apply!=='pass'||proof.verifier!=='pass'||
+             proof.preview_project_ref!==process.env.PREVIEW_REF||
+             proof.preview_branch_id!==process.env.PREVIEW_BRANCH_ID||
+             proof.schema_migration_count!==236||proof.schema_migration_head!=='20261101210335'||
+             proof.base_main_sha!==process.env.EXPECTED_BASE_MAIN||
+             proof.schema_types_sha256!==typesHash||typesHash!==process.env.EXPECTED_TYPES_SHA||
+             proof.migration_sha256!==sqlHash||
+             baseline.typesSha256!==typesHash||baseline.migrationCount!==236||
+             baseline.schema!=='public,editorial'||baseline.schemaSeal?.mode!=='preview'||
+             baseline.schemaSeal?.sourceProjectRef!==process.env.PREVIEW_REF||
+             baseline.schemaSeal?.previewBranchId!==process.env.PREVIEW_BRANCH_ID||
+             baseline.latestMigration!=='20261101210335_rnb18_stage1_archive_replay_authority_v1.sql'||
+             !types.includes('  editorial: {')||!types.includes('  public: {'))throw Error('STOP_PREVIEW_PROOF_SOURCE_DRIFT');
+          proof.baseline_replay='pass';
+          proof.hosted_replay_evidence={
+            provider:'Supabase Preview',
+            provider_check_id:process.env.PROVIDER_CHECK_ID,
+            provider_check_head_sha:process.env.HEAD_SHA,
+            verified_preview_project_ref:process.env.PREVIEW_REF,
+            verified_preview_branch_id:process.env.PREVIEW_BRANCH_ID,
+            verified_migration_count:236,
+            verified_head:'20261101210335',
+            archived_rows:0,
+            receipts:0,
+            independent_postflight:'WK_RNB18_HOSTED_PREVIEW_VERIFIER_PASS',
+            evidence_note:'Native Supabase GitHub check SUCCESS, direct hosted Preview migration ledger and empty archive readback, and independently executed read-only RNB18 verifier; see draft PR #1336.'
+          };
+          fs.writeFileSync(file,JSON.stringify(proof,null,2)+'\n');
+          console.log('WK_RNB18_HOSTED_REPLAY_AND_TYPE_SEAL_ATTESTED=PASS');
+          NODE
+      - name: Require protected migration and schema validators unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/control-plane/verify-migration-replay-contract.mjs
+          node scripts/control-plane/verify-repository-schema-snapshot.mjs
+          echo WK_RNB18_PROTECTED_GATES_WITH_AUTHENTIC_PROOF=PASS
+      - name: Commit only verified artifact bytes to Stage 2 draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- src/types/database.types.ts docs/engineering/live-schema-baseline.json docs/engineering/replay-proofs/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql.json
+          EXPECTED="$(printf '%s\n' docs/engineering/live-schema-baseline.json docs/engineering/replay-proofs/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql.json src/types/database.types.ts)"
+          test "$(git diff --cached --name-only | LC_ALL=C sort)" = "$EXPECTED"
+          test -z "$(git diff --name-only)"
+          git config user.name "WAKILISHA CI"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs(rnb18): seal genuine hosted 236-migration Preview and canonical public/editorial types"
+          git push origin HEAD:refs/heads/fix/wk100-rnb18-stage2-retirement-replay-20261102
+          echo WK_RNB18_HOSTED_PREVIEW_TYPES_AND_PROOF_COMMITTED=PASS
