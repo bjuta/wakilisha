@@ -428,6 +428,7 @@ test('WK100 additive SQL ledger and restricted Edge route retain independent aut
 
 import {prepareWk100ResearchForm,submitWk100ResearchEvidence} from '../../src/services/chartsIngestion/wk100ResearchIntakeClient.mjs';
 import {getWk100ArchivedResearchPortfolio,verifyWk100ArchivedOriginal} from '../../src/services/chartsIngestion/wk100ResearchPortfolio.mjs';
+import {parseWk100ResearchNativeHtml,verifyWk100OctoberHtmlOriginal} from '../../supabase/functions/_shared/wk100-research-native-html-bridge.mjs';
 
 function browserResearchFiles({
   bytes=csv,receipt=prepareShazamResearchEvidence(args).receipt,
@@ -547,6 +548,54 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
     weekStartEat:'2026-10-26',sourceKey:'apple_ke_public_playlist',
     originalBytes:enc('not-the-original-private-bytes'),
   }),/wk100_archived_original_mismatch/);
+  // These are synthetic PARSER contracts, not substitutes for October originals.
+  const mdundo=Array.from({length:100},(_,i)=>
+    '<div class="md-playlist-song-item" data-playlist-url="/top-charts/ke" '+
+    'data-index="'+(i+1)+'" data-id="m'+(i+1)+'" '+
+    'data-title="Song '+(i+1)+'" data-artist="Artist '+(i+1)+'"></div>').join('');
+  const md=parseWk100ResearchNativeHtml({sourceKey:'mdundo_ke',html:mdundo});
+  assert.equal(md.private_rows.length,100);
+  assert.equal(md.private_rows[0].provider_track_id,'m1');
+  assert.equal(md.private_rows[99].source_rank,100);
+  assert.equal(md.native_period_authority,'unknown');
+  assert.throws(()=>parseWk100ResearchNativeHtml({sourceKey:'mdundo_ke',
+    html:mdundo.replace('data-index="100"','data-index="101"')}),
+    /wk100_native_html_unverified/);
+  const urls=Array.from({length:100},(_,i)=>
+    'https://music.apple.com/ke/song/synthetic-'+(i+1)+'/'+(100000+i));
+  const meta='<meta property="music:song_count" content="100">'+
+    urls.map((url,i)=>'<meta property="music:song" content="'+url+'">'+
+      '<meta property="music:song:track" content="'+(i+1)+'">').join('');
+  const playlist={ '@type':'MusicPlaylist',numTracks:100,
+    track:urls.map((url,i)=>({'@type':'MusicRecording',url,
+      name:'Song '+(i+1),duration:'PT3M12S'}))};
+  const apple=meta+'<script type="application/ld+json" id="schema:music-playlist">'+
+    JSON.stringify(playlist)+'</script>';
+  const ap=parseWk100ResearchNativeHtml({
+    sourceKey:'apple_ke_public_playlist',html:apple,
+  });
+  assert.equal(ap.private_rows.length,100);
+  assert.equal(ap.private_rows[0].provider_track_id,'100000');
+  assert.equal(ap.private_rows[99].source_rank,100);
+  assert.equal(ap.source_cadence,'daily_updated_playlist');
+  const altered={...playlist,track:[...playlist.track]};
+  altered.track[0]={...altered.track[0],url:urls[1]};
+  assert.throws(()=>parseWk100ResearchNativeHtml({
+    sourceKey:'apple_ke_public_playlist',
+    html:meta+'<script id="schema:music-playlist" type="application/ld+json">'+
+      JSON.stringify(altered)+'</script>',
+  }),/wk100_native_html_unverified/);
+  assert.throws(()=>parseWk100ResearchNativeHtml({
+    sourceKey:'audiomack_ke',html:apple,
+  }),/wk100_native_html_unverified/);
+  await assert.rejects(verifyWk100OctoberHtmlOriginal({
+    weekStartEat:'2026-10-26',sourceKey:'mdundo_ke',
+    originalBytes:enc(mdundo),
+  }),/wk100_native_html_unverified/);
+  await assert.rejects(verifyWk100OctoberHtmlOriginal({
+    weekStartEat:'2026-11-02',sourceKey:'apple_ke_public_playlist',
+    originalBytes:enc(apple),
+  }),/wk100_native_html_unverified/);
 });
 
 import {createWk100ResearchIntakeHandler} from '../../supabase/functions/_shared/wk100-research-intake-handler.mjs';
