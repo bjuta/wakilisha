@@ -45,11 +45,15 @@ snapshot() {
         WHERE status='active');"
 }
 BEFORE="$(snapshot)" || { echo 'STOP_LOCAL_PRE_SNAPSHOT_FAILED'; exit 22; }
-MIGRATION_FILES="$(git -C "$ROOT" ls-files -- 'supabase/migrations/*.sql' | LC_ALL=C sort)"
+# CI deliberately stages only the first 234 immutable application migrations.
+# The five later SQL files were verified byte-for-byte and held separately by
+# prepare-disposable-ci-234-baseline.sh before local Supabase startup.
+MIGRATION_FILES="$(find "$ROOT/supabase/migrations" -maxdepth 1 -type f -name '*.sql' -print | LC_ALL=C sort)"
 EXPECTED_MIGRATION_COUNT="$(printf '%s\n' "$MIGRATION_FILES" | grep -c .)"
 LATEST_MIGRATION="$(printf '%s\n' "$MIGRATION_FILES" | tail -n 1)"
 EXPECTED_MIGRATION_HEAD="$(printf '%s\n' "$LATEST_MIGRATION" | sed -E 's@.*/([0-9]{14})_.*@\1@')"
-[ "$EXPECTED_MIGRATION_COUNT" -ge 231 ] &&
+[ "$EXPECTED_MIGRATION_COUNT" -eq 234 ] &&
+[ "$EXPECTED_MIGRATION_HEAD" = '20261020072800' ] &&
 [[ "$EXPECTED_MIGRATION_HEAD" =~ ^[0-9]{14}$ ]] &&
 [ "$BEFORE" = "$EXPECTED_MIGRATION_COUNT|$EXPECTED_MIGRATION_HEAD|1|0|0|0|0|0|0|0|0|0|0|0|0|0" ] &&
 [ "$(docker exec -i "$CONTAINER" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c   "select count(*) from supabase_migrations.schema_migrations where version='20261015091718' and name='mizizi_registry_review_reader_rls_v1';")" = "1" ] || {
