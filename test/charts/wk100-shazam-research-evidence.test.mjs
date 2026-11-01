@@ -581,6 +581,19 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
   assert.equal(ap.private_rows[0].provider_track_id,'100000');
   assert.equal(ap.private_rows[99].source_rank,100);
   assert.equal(ap.source_cadence,'daily_updated_playlist');
+  // The sealed Apple public HTML has one typed JSON-LD playlist without
+  // a script id. Exact 100-song rank and URL corroboration remains mandatory.
+  const jsonLdScriptWithoutId=apple.slice(meta.length).replace(
+    ' id="schema:music-playlist"','');
+  const idlessApple=meta+jsonLdScriptWithoutId;
+  const idlessResult=parseWk100ResearchNativeHtml({
+    sourceKey:'apple_ke_public_playlist',html:idlessApple,
+  });
+  assert.deepEqual(idlessResult.private_rows,ap.private_rows);
+  assert.throws(()=>parseWk100ResearchNativeHtml({
+    sourceKey:'apple_ke_public_playlist',
+    html:meta+jsonLdScriptWithoutId+jsonLdScriptWithoutId,
+  }),/wk100_native_html_unverified/);
   const altered={...playlist,track:[...playlist.track]};
   altered.track[0]={...altered.track[0],url:urls[1]};
   assert.throws(()=>parseWk100ResearchNativeHtml({
