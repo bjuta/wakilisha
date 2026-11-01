@@ -429,6 +429,9 @@ test('WK100 additive SQL ledger and restricted Edge route retain independent aut
 import {prepareWk100ResearchForm,submitWk100ResearchEvidence} from '../../src/services/chartsIngestion/wk100ResearchIntakeClient.mjs';
 import {getWk100ArchivedResearchPortfolio,verifyWk100ArchivedOriginal} from '../../src/services/chartsIngestion/wk100ResearchPortfolio.mjs';
 import {parseWk100ResearchNativeHtml,verifyWk100OctoberHtmlOriginal} from '../../supabase/functions/_shared/wk100-research-native-html-bridge.mjs';
+import {prepareWk100HtmlResearchForm} from '../../src/services/chartsIngestion/wk100HtmlResearchIntakeClient.mjs';
+import {createWk100HtmlResearchIntakeHandler} from '../../supabase/functions/_shared/wk100-research-html-intake-handler.mjs';
+import {executeWk100HtmlResearchIntake} from '../../supabase/functions/_shared/wk100-research-html-intake-orchestrator.mjs';
 
 function browserResearchFiles({
   bytes=csv,receipt=prepareShazamResearchEvidence(args).receipt,
@@ -596,6 +599,59 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
     weekStartEat:'2026-11-02',sourceKey:'apple_ke_public_playlist',
     originalBytes:enc(apple),
   }),/wk100_native_html_unverified/);
+  await assert.rejects(prepareWk100HtmlResearchForm({
+    weekStartEat:'2026-10-26',sourceKey:'audiomack_ke',
+    originalHtml:new File([apple],'original.html'),
+  }),/wk100_html_ui_source_not_supported/);
+  await assert.rejects(prepareWk100HtmlResearchForm({
+    weekStartEat:'2026-10-26',sourceKey:'apple_ke_public_playlist',
+    originalHtml:new File([apple],'original.html'),
+  }),/wk100_html_ui_original_bytes_mismatch/);
+  const sql=await readFile(new URL(
+    '../../scripts/acceptance/wk100-html-research-ledger-forward-candidate-v1.sql',
+    import.meta.url),'utf8');
+  const config=await readFile(new URL('../../supabase/config.toml',import.meta.url),'utf8');
+  assert.match(config,/\[functions\.wk100-research-html-intake\]\s*\nverify_jwt = true/);
+  assert.match(sql,/CREATE TABLE platform_private\.wk100_html_research_reservations_v1/);
+  assert.match(sql,/ENABLE ROW LEVEL SECURITY/g);
+  assert.match(sql,/current_user_has_capability\('manage_charts'\)/);
+  assert.match(sql,/current_user_has_capability\('manage_ingest'\)/);
+  assert.match(sql,/auth\.role\(\) IS DISTINCT FROM 'service_role'/);
+  assert.match(sql,/BEFORE UPDATE OR DELETE/);
+  assert.match(sql,/BEFORE TRUNCATE/);
+  assert.match(sql,/source_admitted=false/);
+  assert.match(sql,/can_score=false/);
+  assert.match(sql,/can_publish=false/);
+  assert.doesNotMatch(sql,/GRANT EXECUTE[^;]* TO anon/);
+  // Signed-in runtime boundaries must reject unauthorized requests before bytes.
+  const guard=createWk100HtmlResearchIntakeHandler({
+    createClient:()=>{throw Error('backend must not be used');},
+    executeWk100HtmlResearchIntake:()=>{throw Error('intake must not run');},
+    readEnv:()=>null,
+  });
+  const route='https://example.invalid/functions/v1/wk100-research-html-intake';
+  const noAuth=await guard(new Request(route,{method:'POST',headers:{
+    origin:'https://wakilisha.africa',
+  }}));
+  assert.equal(noAuth.status,401);
+  const disabled=await guard(new Request(route,{method:'POST',headers:{
+    origin:'https://wakilisha.africa',authorization:'Bearer test',
+  }}));
+  assert.equal(disabled.status,503);
+  assert.equal((await disabled.json()).error,'intake_not_enabled');
+  const badOrigin=await guard(new Request(route,{method:'POST',headers:{
+    origin:'https://malicious.invalid',authorization:'Bearer test',
+  }}));
+  assert.equal(badOrigin.status,403);
+  let touch=0;
+  await assert.rejects(executeWk100HtmlResearchIntake({
+    originalBytes:enc(mdundo),sourceKey:'mdundo_ke',
+    researchWeekStartEat:'2026-10-26',authenticatedUserId:u(70),
+    callerDb:{rpc:async()=>{touch++;throw Error('db touched');}},
+    serviceDb:{rpc:async()=>{touch++;throw Error('service touched');}},
+    restrictedStorage:{from:()=>{touch++;throw Error('storage touched');}},
+  }),/wk100_native_html_unverified/);
+  assert.equal(touch,0);
 });
 
 import {createWk100ResearchIntakeHandler} from '../../supabase/functions/_shared/wk100-research-intake-handler.mjs';
