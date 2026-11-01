@@ -427,6 +427,7 @@ test('WK100 additive SQL ledger and restricted Edge route retain independent aut
 });
 
 import {prepareWk100ResearchForm,submitWk100ResearchEvidence} from '../../src/services/chartsIngestion/wk100ResearchIntakeClient.mjs';
+import {getWk100ArchivedResearchPortfolio,verifyWk100ArchivedOriginal} from '../../src/services/chartsIngestion/wk100ResearchPortfolio.mjs';
 
 function browserResearchFiles({
   bytes=csv,receipt=prepareShazamResearchEvidence(args).receipt,
@@ -532,6 +533,20 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
   assert.match(page,/Wk100ResearchEvidencePanel/);
   assert.match(panel,/disabled=\{!ready\}/);
   assert.doesNotMatch(panel,/commitIngestRun|runDryRun|publishEdition|localStorage/);
+  assert.match(panel,/getWk100ArchivedResearchPortfolio/);
+  const archived=getWk100ArchivedResearchPortfolio('2026-10-26');
+  assert.equal(archived.length,4);
+  assert.deepEqual(archived.map(x=>x.sourceKey),
+    ['shazam_ke','mdundo_ke','apple_ke_public_playlist','audiomack_ke']);
+  assert.deepEqual(archived.map(x=>x.rankDepth),[200,100,100,null]);
+  assert.equal(archived.filter(x=>x.rankStructure==='verified').length,3);
+  assert.ok(archived.every(x=>x.rawSha256.length===64&&x.byteLength>0&&
+    x.nativePeriod!=='provider_defined'));
+  assert.equal(getWk100ArchivedResearchPortfolio('2026-11-02').length,0);
+  await assert.rejects(verifyWk100ArchivedOriginal({
+    weekStartEat:'2026-10-26',sourceKey:'apple_ke_public_playlist',
+    originalBytes:enc('not-the-original-private-bytes'),
+  }),/wk100_archived_original_mismatch/);
 });
 
 import {createWk100ResearchIntakeHandler} from '../../supabase/functions/_shared/wk100-research-intake-handler.mjs';
