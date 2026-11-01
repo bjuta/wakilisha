@@ -56,4 +56,4 @@ jobs:
           echo "WK_RNB18_CLI_21070_OFFLINE_MINT=PASS"
       - name: Execute genuine fresh PostgreSQL 17 acceptance
         shell: bash
-        run: bash scripts/acceptance/run-rnb18-stage1-fresh-postgres.sh
+        run: bash -x scripts/acceptance/run-rnb18-stage1-fresh-postgres.sh
