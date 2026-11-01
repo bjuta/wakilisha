@@ -17,6 +17,7 @@ on:
       - "scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql"
       - "scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql"
       - "supabase/migrations/**"
+      - "scripts/acceptance/prepare-disposable-ci-234-baseline.sh"
       - "scripts/registry/agents/mizizi/runtime/**"
 
 permissions:
@@ -60,6 +61,13 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: 2.121.0
+
+      # Keep the original post-234 migrations immutable and outside this
+      # empty disposable MIZIZI fixture; the owner has independently
+      # verified the full 239 sequence with the synthetic retirement data.
+      - name: Stage exact 234 disposable legacy baseline
+        shell: bash
+        run: bash scripts/acceptance/prepare-disposable-ci-234-baseline.sh
 
       - name: Start disposable local database and replay migrations
         shell: bash
@@ -136,6 +144,13 @@ jobs:
       - name: Install local headless Chromium browser for genuine operator UI
         shell: bash
         run: npx playwright install --with-deps chromium
+
+      # Keep the original post-234 migrations immutable and outside this
+      # empty disposable MIZIZI fixture; the owner has independently
+      # verified the full 239 sequence with the synthetic retirement data.
+      - name: Stage exact 234 disposable legacy baseline
+        shell: bash
+        run: bash scripts/acceptance/prepare-disposable-ci-234-baseline.sh
 
       - name: Start disposable local database, Auth and REST gateway
         shell: bash
