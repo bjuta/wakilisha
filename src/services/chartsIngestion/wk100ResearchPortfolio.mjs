@@ -29,7 +29,7 @@ const RECEIPTS = Object.freeze([
   }),
   Object.freeze({
     sourceKey:'apple_ke_public_playlist',displayName:'Apple Music Kenya',
-    observedAtUtc:'2026-10-30T15:07:59Z',
+    observedAtUtc:'2026-10-30T15:07:59.769Z',
     rawSha256:'35b372511a91df88ffd942b4b04373d7bb46216ae4636d37c20a2f3afaba5d7b',
     byteLength:712638,rankDepth:100,rankStructure:'verified',
     observationType:'Daily playlist ranks',nativePeriod:'daily_snapshot_not_week',
