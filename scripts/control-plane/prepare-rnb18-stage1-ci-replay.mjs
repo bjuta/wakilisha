@@ -40,8 +40,16 @@ for(const p of pairedPaths) {
 // The old historical SQL is removed ONLY inside this disposable CI worktree.
 // All 236 remaining files were just byte-checked against the hosted source.
 fs.unlinkSync(oldPath);
+// MIZIZI's existing acceptance counts the Git INDEX with git ls-files,
+// not the working directory. Stage the same deletion only in this throwaway
+// CI checkout so its exact-ledger guard sees the identical paired 236 files.
+// This change is never committed or pushed and is not Production history repair.
+exec("git",["rm","--cached","--quiet","--",oldPath]);
 const remaining=fs.readdirSync("supabase/migrations").filter(x=>x.endsWith(".sql"));
-if(remaining.length!==236||fs.existsSync(oldPath))stop("ephemeral staged source not isolated");
+const tracked=exec("git",["ls-files","--","supabase/migrations/*.sql"])
+  .split(/\r?\n/).filter(Boolean);
+if(remaining.length!==236||tracked.length!==236||fs.existsSync(oldPath))
+  stop("ephemeral working directory and Git index must both contain the exact 236 migrations");
 console.log("WK_RNB18_EXACT_237_STAGE1_SOURCE_ASSERTED=PASS");
 console.log("WK_RNB18_BYTE_IDENTICAL_236_PAIRED_DISPOSABLE_REPLAY=PASS");
 console.log("WK_RNB18_NO_HISTORICAL_EDITION_FIXTURES_OR_REMOTE_TARGET=PASS");
