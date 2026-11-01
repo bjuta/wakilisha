@@ -19,11 +19,23 @@ echo RNB18_DISPOSABLE_NO_REMOTE_TARGET=PASS
 docker pull postgres:17.6-alpine >/dev/null
 docker run --rm -d --network none --name "$DB" \
  -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17.6-alpine >/dev/null
+# Postgres Docker entrypoint temporarily opens a bootstrap server and restarts.
+# Waiting for PID 1 to become the final postgres process avoids false readiness.
+READY=0
 for i in $(seq 1 60); do
-  if docker exec "$DB" pg_isready -q -U postgres -d postgres; then break; fi
+  if docker exec "$DB" sh -c 'test "$(cat /proc/1/comm)" = postgres' 2>/dev/null &&
+     docker exec "$DB" psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d postgres -c 'SELECT 1' 2>/dev/null | grep -qx '1'; then
+    READY=1
+    break
+  fi
   sleep 1
 done
-docker exec "$DB" pg_isready -q -U postgres -d postgres
+if [ "$READY" -ne 1 ]; then
+  echo "RNB18_DISPOSABLE_POSTGRES_FINAL_SERVER_NOT_READY"
+  docker logs --tail 60 "$DB" || true
+  exit 1
+fi
+echo RNB18_DOCKER_FINAL_POSTGRES_READY=PASS
 
 # Minimal exact chart-ingest status baseline, no archived charts, no historical fixtures.
 docker exec -i "$DB" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres <<'SQL'
