@@ -1,5 +1,6 @@
 import {useState, type FormEvent} from "react";
 import {supabase} from "@/lib/supabase";
+import {WkUploadField} from "@/components/design-system/primitives/UploadField";
 import {getWk100ArchivedResearchPortfolio} from "@/services/chartsIngestion/wk100ResearchPortfolio.mjs";
 import {submitWk100HtmlResearchEvidence} from "@/services/chartsIngestion/wk100HtmlResearchIntakeClient.mjs";
 import {
@@ -117,26 +118,28 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
           <p className="mt-1 text-xs text-wk-text-muted">
             {originalCsv?"Original CSV selected":"No CSV selected"}
           </p>
-          <label htmlFor="wk100-research-csv"
-            className="wk-button wk-button-secondary wk-button-sm mt-3 inline-flex cursor-pointer">
-            Select original CSV
-          </label>
-          <input id="wk100-research-csv" className="sr-only" type="file"
-            accept=".csv,text/csv" disabled={busy}
-            onChange={event=>changeCsv(event.currentTarget.files?.[0]??null)}/>
+          <WkUploadField
+            id="wk100-research-csv"
+            className="mt-3"
+            label="Select original CSV"
+            ariaLabel="Select original CSV"
+            accept=".csv,text/csv"
+            disabled={busy}
+            onSelect={files=>changeCsv(files?.[0]??null)}/>
         </div>
         <div className="rounded-lg border border-wk-border bg-wk-surface-raised p-3">
           <p className="text-sm font-semibold text-wk-text">Research receipt</p>
           <p className="mt-1 text-xs text-wk-text-muted">
             {receiptFile?"Research receipt selected":"No receipt selected"}
           </p>
-          <label htmlFor="wk100-research-receipt"
-            className="wk-button wk-button-secondary wk-button-sm mt-3 inline-flex cursor-pointer">
-            Select receipt JSON
-          </label>
-          <input id="wk100-research-receipt" className="sr-only" type="file"
-            accept=".json,application/json" disabled={busy}
-            onChange={event=>changeReceipt(event.currentTarget.files?.[0]??null)}/>
+          <WkUploadField
+            id="wk100-research-receipt"
+            className="mt-3"
+            label="Select receipt JSON"
+            ariaLabel="Select receipt JSON"
+            accept=".json,application/json"
+            disabled={busy}
+            onSelect={files=>changeReceipt(files?.[0]??null)}/>
         </div>
       </div>
       {!draftSaved&&<p className="text-xs text-wk-text-muted">
@@ -191,13 +194,13 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
               "wk-button wk-button-secondary wk-button-sm"}>{label}</button>)}
         </div>
         <form onSubmit={uploadHtml} className="mt-3 flex flex-wrap items-center gap-3">
-          <label htmlFor="wk100-research-original-html"
-            className="wk-button wk-button-secondary wk-button-sm cursor-pointer">
-            Select preserved HTML
-          </label>
-          <input id="wk100-research-original-html" type="file" className="sr-only"
-            accept=".html,text/html" disabled={htmlBusy||busy}
-            onChange={e=>{setHtmlFile(e.currentTarget.files?.[0]??null);
+          <WkUploadField
+            id="wk100-research-original-html"
+            label="Select preserved HTML"
+            ariaLabel="Select preserved HTML"
+            accept=".html,text/html"
+            disabled={htmlBusy||busy}
+            onSelect={files=>{setHtmlFile(files?.[0]??null);
               setHtmlError(null);setHtmlSaved(null);}}/>
           <span className="text-xs text-wk-text-muted">
             {htmlFile?"Original HTML selected":"No HTML selected"}
