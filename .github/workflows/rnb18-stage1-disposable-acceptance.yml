@@ -32,9 +32,6 @@ jobs:
           test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
           test -z "$(printenv SUPABASE_PROJECT_REF || true)"
           bash -n scripts/acceptance/run-rnb18-stage1-fresh-postgres.sh
-      - name: Execute genuine fresh PostgreSQL 17 acceptance
-        shell: bash
-        run: bash scripts/acceptance/run-rnb18-stage1-fresh-postgres.sh
       - name: Install accepted CLI solely to mint an offline migration filename
         uses: supabase/setup-cli@v1
         with:
@@ -57,3 +54,6 @@ jobs:
           echo "WK_RNB18_CLI_MINTED_PATH=$MINTED"
           echo "WK_RNB18_CLI_MINTED_VERSION=$(basename "$MINTED")"
           echo "WK_RNB18_CLI_21070_OFFLINE_MINT=PASS"
+      - name: Execute genuine fresh PostgreSQL 17 acceptance
+        shell: bash
+        run: bash scripts/acceptance/run-rnb18-stage1-fresh-postgres.sh
