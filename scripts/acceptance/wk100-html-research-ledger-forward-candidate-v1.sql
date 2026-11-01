@@ -224,7 +224,47 @@ BEGIN
          v_url IS NULL OR
          v_url !~ '^https://music[.]apple[.]com/ke/song/([^/?#]+/)?[0-9]+$' OR
          substring(v_url from '/([0-9]+)$')<>v_id OR
-         v_duration IS NULL OR v_duration !~ '^PT([0-9]+H)?([0-9]+M)?([0-9]+([.][0-9]+)?S)?$')) OR
+         v_duration IS NULL OR v_duration='PT' OR
+         v_duration !~ '^PT([0-9]+H)?([0-9]+M)?([0-9]+([.][0-9]+)?S)?
+       v_r IS DISTINCT FROM jsonb_build_object(
+         'source_rank',v_rank,'row_ref',v_res.raw_sha256||':'||v_rank,
+         'provider_track_id',v_id,'title_observed',v_title,
+         'artist_observed',v_artist,'provider_url',v_url,
+         'duration_native',v_duration,'canonical_track_id',NULL,
+         'source_native_count',NULL) THEN
+      RAISE EXCEPTION 'WK100 HTML unverified row authority' USING ERRCODE='22023';
+    END IF;
+  END LOOP;
+  v_rows_sha:=encode(extensions.digest(p_rows::text,'sha256'),'hex');
+  SELECT * INTO v_existing FROM platform_private.wk100_html_research_verified_v1
+    WHERE reservation_id=v_res.id;
+  IF FOUND THEN
+    IF v_existing.rows_sha256<>v_rows_sha OR
+       v_existing.verified_byte_sha256<>p_sha256 THEN
+      RAISE EXCEPTION 'WK100 HTML receipt immutable conflict' USING ERRCODE='23505';
+    END IF;
+    RETURN jsonb_build_object('reservation_id',v_res.id,'status','verified','reused',true);
+  END IF;
+  INSERT INTO platform_private.wk100_html_research_rows_v1 (
+    reservation_id,source_rank,row_ref,provider_track_id,
+    title_observed,artist_observed,provider_url,duration_native
+  ) SELECT v_res.id,(r.value->>'source_rank')::integer,r.value->>'row_ref',
+    r.value->>'provider_track_id',r.value->>'title_observed',
+    r.value->>'artist_observed',r.value->>'provider_url',
+    r.value->>'duration_native'
+  FROM jsonb_array_elements(p_rows) AS r(value);
+  INSERT INTO platform_private.wk100_html_research_verified_v1 (
+    reservation_id,rows_sha256,verified_byte_sha256
+  ) VALUES(v_res.id,v_rows_sha,p_sha256);
+  RETURN jsonb_build_object('reservation_id',v_res.id,'status','verified','reused',false);
+END;
+$final$;
+REVOKE ALL ON FUNCTION public.wk100_finalize_html_research_observation_v1(uuid,text,jsonb)
+  FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.wk100_finalize_html_research_observation_v1(uuid,text,jsonb)
+  TO service_role;
+COMMIT;
+)) OR
        v_r IS DISTINCT FROM jsonb_build_object(
          'source_rank',v_rank,'row_ref',v_res.raw_sha256||':'||v_rank,
          'provider_track_id',v_id,'title_observed',v_title,
