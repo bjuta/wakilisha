@@ -18,16 +18,38 @@ db_sql() {
   docker exec -i "$CONTAINER" psql -X -q -A -t -v ON_ERROR_STOP=1 \
     -U supabase_admin -d postgres -c "$1"
 }
+# Require the COMPLETE active migration-version set to equal the actual
+# disposable PostgreSQL ledger; a fixed Oct 20 count/head is no longer valid
+# after later accepted migrations and governed historical retirements.
+EXPECTED_VERSIONS="$(
+  find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print |
+  sed -nE 's@.*/([0-9]{14})_[^/]+\.sql$@\1@p' |
+  LC_ALL=C sort
+)"
+ACTIVE_FILE_COUNT="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d '[:space:]')"
+EXPECTED_COUNT="$(printf '%s\n' "$EXPECTED_VERSIONS" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
+UNIQUE_COUNT="$(printf '%s\n' "$EXPECTED_VERSIONS" | sed '/^$/d' | LC_ALL=C sort -u | wc -l | tr -d '[:space:]')"
+[ "$ACTIVE_FILE_COUNT" = "$EXPECTED_COUNT" ] &&
+[ "$UNIQUE_COUNT" = "$EXPECTED_COUNT" ] &&
+[ "$EXPECTED_COUNT" -gt 0 ] || {
+  echo 'STOP: malformed or duplicate active migration version'; exit 21;
+}
+ACTUAL_VERSIONS="$(db_sql 'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;')"
+[ "$ACTUAL_VERSIONS" = "$EXPECTED_VERSIONS" ] || {
+  echo 'STOP: disposable migration ledger differs from the exact active source set'; exit 21;
+}
+EXPECTED_HEAD="$(printf '%s\n' "$EXPECTED_VERSIONS" | tail -n 1)"
 BASE="$(db_sql "SELECT (SELECT count(*) FROM supabase_migrations.schema_migrations)::text||'|'||
   (SELECT max(version) FROM supabase_migrations.schema_migrations)||'|'||
   (SELECT count(*) FROM public.wk_chart_capture_contracts_v1)||'|'||
   (SELECT count(*) FROM private.wk_chart_runtime_reservations_v1)||'|'||
   (SELECT count(*) FROM public.wk_chart_capture_attempts_v1)||'|'||
   (SELECT count(*) FROM storage.objects WHERE bucket_id='wk-chart-raw-evidence-v1');")"
-[ "$BASE" = '234|20261020072800|0|0|0|0' ] || {
-  echo 'STOP: wrong disposable schema or existing candidate fixtures'; exit 21;
+[ "$BASE" = "$EXPECTED_COUNT|$EXPECTED_HEAD|0|0|0|0" ] || {
+  echo 'STOP: disposable schema differs or candidate fixtures already exist'; exit 21;
 }
-echo 'WK100_DISPOSABLE_EXACT_234_EMPTY_BASELINE=PASS'
+echo 'WK100_DISPOSABLE_EXACT_ACTIVE_MIGRATION_LEDGER=PASS'
+echo 'WK100_DISPOSABLE_ZERO_EXISTING_FIXTURES=PASS'
 
 # Committed fixture is allowed ONLY in this already-proven disposable database.
 # Preview and Production are never linked or addressed by this script.
