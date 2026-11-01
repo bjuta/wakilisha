@@ -1,5 +1,6 @@
 import {useState, type FormEvent} from "react";
 import {supabase} from "@/lib/supabase";
+import {getWk100ArchivedResearchPortfolio} from "@/services/chartsIngestion/wk100ResearchPortfolio.mjs";
 import {
   submitWk100ResearchEvidence, type Wk100ResearchIntakeAck,
 } from "@/services/chartsIngestion/wk100ResearchIntakeClient.mjs";
@@ -36,6 +37,7 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState<string|null>(null);
   const [ack,setAck]=useState<Wk100ResearchIntakeAck|null>(null);
+  const archivedResearch=getWk100ArchivedResearchPortfolio(weekStartEat);
   const ready=draftSaved&&originalCsv!==null&&receiptFile!==null&&!busy;
   function changeCsv(file:File|null){
     if(busy)return;
@@ -121,6 +123,32 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
       {" "}{ack.observedDepth} discovery ranks recorded. Research only; not admitted for
       chart scoring or publication.
     </p>}
+    {archivedResearch.length>0&&<div className="mt-5 border-t border-wk-border pt-4"
+      aria-label="Previously captured source research">
+      <h3 className="text-sm font-semibold text-wk-text">Research already captured for this week</h3>
+      <p className="mt-1 text-xs text-wk-text-muted">
+        These are October 29–30 operator-archive audit references, not live Supabase
+        receipts. We will reuse the original files rather than request fresh downloads.
+        No source is admitted to scoring or publication.
+      </p>
+      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+        {archivedResearch.map(source=><li key={source.sourceKey}
+          className="rounded-lg border border-wk-border bg-wk-surface-raised p-3">
+          <p className="text-sm font-semibold text-wk-text">{source.displayName}</p>
+          <p className="mt-1 text-xs text-wk-text-soft">
+            {source.rankStructure==="verified"
+              ?`${source.rankDepth} source-native ranks audited`
+              :"Original preserved; ranked recording structure unresolved"}
+          </p>
+          <p className="mt-1 text-xs text-wk-text-muted">{source.note}</p>
+        </li>)}
+      </ul>
+      <p className="mt-3 text-xs text-wk-text-muted">
+        The existing secure upload above accepts Shazam CSV only. Mdundo and Apple
+        HTML require their own reviewed server intake; Audiomack requires native
+        recording-rank evidence. No provider-native measurement week is inferred.
+      </p>
+    </div>}
     <p className="mt-3 text-xs text-wk-text-muted">
       Original ranks and researcher details stay off this page and out of browser storage.
       Keep both files for reconciliation if the server cannot confirm the receipt.
