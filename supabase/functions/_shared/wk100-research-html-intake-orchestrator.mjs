@@ -19,6 +19,7 @@ function identicalBytes(a,b){
 }
 function retryableDuplicate(err){
   return err?.code==='AssetAlreadyExists'||err?.code==='ResourceAlreadyExists'||
+    err?.error==='Duplicate'||err?.code==='Duplicate'||
     err?.status===409||err?.statusCode===409;
 }
 function rowsForLedger(verified){
