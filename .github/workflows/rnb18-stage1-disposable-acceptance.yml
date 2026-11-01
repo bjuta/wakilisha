@@ -7,6 +7,7 @@ on:
       - '.github/workflows/rnb18-stage1-disposable-acceptance.yml'
       - 'scripts/acceptance/rnb18-stage1-replay-repair-v4-CANDIDATE.sql'
       - 'scripts/acceptance/run-rnb18-stage1-fresh-postgres.sh'
+      - 'supabase/migrations/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql'
 
 permissions:
   contents: read
@@ -32,28 +33,18 @@ jobs:
           test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
           test -z "$(printenv SUPABASE_PROJECT_REF || true)"
           bash -n scripts/acceptance/run-rnb18-stage1-fresh-postgres.sh
-      - name: Install accepted CLI solely to mint an offline migration filename
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.107.0
-      - name: Mint exact forward migration path without applying SQL
+      - name: Verify exact one-time CLI-minted forward path and candidate body
         shell: bash
         run: |
           set -euo pipefail
-          test "$(supabase --version)" = "2.107.0"
-          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
-          test -z "$(printenv SUPABASE_PROJECT_REF || true)"
+          CANONICAL=supabase/migrations/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql
+          SOURCE=scripts/acceptance/rnb18-stage1-replay-repair-v4-CANDIDATE.sql
+          test -f "$CANONICAL"
+          test -f "$SOURCE"
+          test "$(find supabase/migrations -maxdepth 1 -type f -name '*_rnb18_stage1_archive_replay_authority_v1.sql' | wc -l | tr -d ' ')" = "1"
+          diff -u <(sed -n '/^BEGIN;$/,$p' "$SOURCE") <(sed -n '/^BEGIN;$/,$p' "$CANONICAL")
           test ! -e supabase/.temp/project-ref
-          test -z "$(find supabase/migrations -maxdepth 1 -type f -name '*_rnb18_stage1_archive_replay_authority_v1.sql' -print)"
-          supabase migration new rnb18_stage1_archive_replay_authority_v1
-          MINTED="$(find supabase/migrations -maxdepth 1 -type f -name '*_rnb18_stage1_archive_replay_authority_v1.sql' -print)"
-          test -n "$MINTED"
-          test "$(printf '%s\n' "$MINTED" | wc -l | tr -d ' ')" = "1"
-          test -f "$MINTED"
-          test ! -s "$MINTED"
-          echo "WK_RNB18_CLI_MINTED_PATH=$MINTED"
-          echo "WK_RNB18_CLI_MINTED_VERSION=$(basename "$MINTED")"
-          echo "WK_RNB18_CLI_21070_OFFLINE_MINT=PASS"
+          echo WK_RNB18_CANONICAL_CLI_MINT_AND_IDENTICAL_SQL=PASS
       - name: Execute genuine fresh PostgreSQL 17 acceptance
         shell: bash
         run: bash -x scripts/acceptance/run-rnb18-stage1-fresh-postgres.sh
