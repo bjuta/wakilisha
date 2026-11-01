@@ -610,7 +610,6 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
   const sql=await readFile(new URL(
     '../../scripts/acceptance/wk100-html-research-ledger-forward-candidate-v1.sql',
     import.meta.url),'utf8');
-  const config=await readFile(new URL('../../supabase/config.toml',import.meta.url),'utf8');
   assert.match(config,/\[functions\.wk100-research-html-intake\]\s*\nverify_jwt = true/);
   assert.match(sql,/CREATE TABLE platform_private\.wk100_html_research_reservations_v1/);
   assert.match(sql,/ENABLE ROW LEVEL SECURITY/g);
