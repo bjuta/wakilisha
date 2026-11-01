@@ -217,7 +217,7 @@ BEGIN
        (v_r->'canonical_track_id')<>'null'::jsonb OR
        (v_r->'source_native_count')<>'null'::jsonb OR
        (v_res.source_key='mdundo_ke' AND (
-         length(v_artist) NOT BETWEEN 1 AND 500 OR
+         v_artist IS NULL OR length(v_artist) NOT BETWEEN 1 AND 500 OR
          v_url IS NOT NULL OR v_duration IS NOT NULL)) OR
        (v_res.source_key='apple_ke_public_playlist' AND (
          v_artist IS NOT NULL OR v_id !~ '^[0-9]+$' OR
