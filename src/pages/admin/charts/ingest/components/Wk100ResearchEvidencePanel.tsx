@@ -1,6 +1,7 @@
 import {useState, type FormEvent} from "react";
 import {supabase} from "@/lib/supabase";
 import {getWk100ArchivedResearchPortfolio} from "@/services/chartsIngestion/wk100ResearchPortfolio.mjs";
+import {submitWk100HtmlResearchEvidence} from "@/services/chartsIngestion/wk100HtmlResearchIntakeClient.mjs";
 import {
   submitWk100ResearchEvidence, type Wk100ResearchIntakeAck,
 } from "@/services/chartsIngestion/wk100ResearchIntakeClient.mjs";
@@ -37,6 +38,11 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState<string|null>(null);
   const [ack,setAck]=useState<Wk100ResearchIntakeAck|null>(null);
+  const [htmlSource,setHtmlSource]=useState<"mdundo_ke"|"apple_ke_public_playlist">("mdundo_ke");
+  const [htmlFile,setHtmlFile]=useState<File|null>(null);
+  const [htmlBusy,setHtmlBusy]=useState(false);
+  const [htmlError,setHtmlError]=useState<string|null>(null);
+  const [htmlSaved,setHtmlSaved]=useState<string|null>(null);
   const archivedResearch=getWk100ArchivedResearchPortfolio(weekStartEat);
   const ready=draftSaved&&originalCsv!==null&&receiptFile!==null&&!busy;
   function changeCsv(file:File|null){
@@ -59,6 +65,30 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
       setAck(result);
     }catch(cause){setError(messageFor(cause));}
     finally{setBusy(false);}
+  }
+  async function uploadHtml(event:FormEvent<HTMLFormElement>){
+    event.preventDefault();
+    if(!draftSaved||!htmlFile||htmlBusy||busy||archivedResearch.length===0)return;
+    setHtmlBusy(true);setHtmlError(null);setHtmlSaved(null);
+    try{
+      const saved=await submitWk100HtmlResearchEvidence({
+        sourceKey:htmlSource,originalHtml:htmlFile,weekStartEat,
+        invoke:(name,options)=>supabase.functions.invoke(name,options),
+      });
+      setHtmlSaved(saved.sourceKey);
+    }catch(cause){
+      const code=cause instanceof Error&&cause.message.startsWith("wk100_html_ui_")
+        ?cause.message.slice("wk100_html_ui_".length):"server_unavailable";
+      const extra:Record<string,string>={
+        source_not_supported:"Only the two previously audited October HTML sources are eligible here.",
+        original_bytes_mismatch:"The selected HTML does not match the archived original. Keep the original unchanged.",
+      };
+      setHtmlError(extra[code]??errors[code]??errors.server_unavailable);
+    }finally{setHtmlBusy(false);}
+  }
+  function chooseHtmlSource(next:"mdundo_ke"|"apple_ke_public_playlist"){
+    if(htmlBusy)return;
+    setHtmlSource(next);setHtmlFile(null);setHtmlError(null);setHtmlSaved(null);
   }
   return <section aria-labelledby="wk100-research-heading"
     className="rounded-xl border border-wk-border bg-wk-surface p-4">
@@ -143,10 +173,56 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
           <p className="mt-1 text-xs text-wk-text-muted">{source.note}</p>
         </li>)}
       </ul>
+      <div className="mt-4 rounded-lg border border-wk-border bg-wk-surface-raised p-3">
+        <h4 className="text-sm font-semibold text-wk-text">Verify preserved Apple or Mdundo HTML</h4>
+        <p className="mt-1 text-xs text-wk-text-muted">
+          Select only the unchanged October original already saved privately. The service
+          verifies its exact bytes, native ranks and private receipt. Audiomack remains
+          research-only and is not eligible for this upload.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2" aria-label="Original research provider">
+          {([
+            ["mdundo_ke","Mdundo Kenya"],
+            ["apple_ke_public_playlist","Apple Music Kenya"],
+          ] as const).map(([key,label])=><button key={key} type="button"
+            disabled={htmlBusy||busy} aria-pressed={htmlSource===key}
+            onClick={()=>chooseHtmlSource(key)}
+            className={htmlSource===key?"wk-button wk-button-primary wk-button-sm":
+              "wk-button wk-button-secondary wk-button-sm"}>{label}</button>)}
+        </div>
+        <form onSubmit={uploadHtml} className="mt-3 flex flex-wrap items-center gap-3">
+          <label htmlFor="wk100-research-original-html"
+            className="wk-button wk-button-secondary wk-button-sm cursor-pointer">
+            Select preserved HTML
+          </label>
+          <input id="wk100-research-original-html" type="file" className="sr-only"
+            accept=".html,text/html" disabled={htmlBusy||busy}
+            onChange={e=>{setHtmlFile(e.currentTarget.files?.[0]??null);
+              setHtmlError(null);setHtmlSaved(null);}}/>
+          <span className="text-xs text-wk-text-muted">
+            {htmlFile?"Original HTML selected":"No HTML selected"}
+          </span>
+          <button type="submit"
+            disabled={!draftSaved||!htmlFile||htmlBusy||busy}
+            className="wk-button wk-button-primary wk-button-sm disabled:cursor-not-allowed disabled:opacity-50">
+            {htmlBusy?"Verifying private HTML…":"Verify and save HTML"}
+          </button>
+        </form>
+        {htmlError&&<p role="alert" className="mt-3 text-sm text-wk-danger">{htmlError}</p>}
+        {htmlSaved&&<p role="status" aria-live="polite"
+          className="mt-3 text-sm text-wk-text">
+          {htmlSaved==="mdundo_ke"?"Mdundo Kenya":"Apple Music Kenya"} original
+          verified and private receipt finalized. Research only; not admitted for
+          scoring or publication.
+        </p>}
+        {!draftSaved&&<p className="mt-2 text-xs text-wk-text-muted">
+          Save the complete weekly Admin configuration before uploading.
+        </p>}
+      </div>
       <p className="mt-3 text-xs text-wk-text-muted">
-        The existing secure upload above accepts Shazam CSV only. Mdundo and Apple
-        HTML require their own reviewed server intake; Audiomack requires native
-        recording-rank evidence. No provider-native measurement week is inferred.
+        Shazam CSV uses its separate protected intake above. Apple and Mdundo
+        retain separate native methods; Audiomack requires verified ranked recording
+        semantics. None of these observations establishes a common source-native week.
       </p>
     </div>}
     <p className="mt-3 text-xs text-wk-text-muted">
