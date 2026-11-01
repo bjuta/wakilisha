@@ -57,3 +57,46 @@ The owner's checksum-pinned `wk100_historical_replay_evidence_readonly_nested_fi
 - PR #1333 source HEAD `f97de34178e20b14ef6d130ed78818a831a73609`: 140/140 focused source tests and application build previously accepted; pending SQL remains unapplied.
 - No Production SQL, Edge, Storage, frontend Finish Update, merge, paid Preview, or WK100 Edition publication is authorized by this report.
 - Project Deployment Workflow: on first unexplained failure switch to diagnosis; no repeat paid preview and no synthetic schema equivalence.
+
+
+## PG239 managed Storage dependency and failed local replay (1 November 2026)
+
+**Classification: an assistant-authored acceptance-environment failure, not evidence of a product SQL defect.** These tests must not be retried until managed Supabase Storage is verified independently of application migrations.
+
+### Exactly observed failed local attempt
+
+- The first fresh local project `wk100pg239tuczr84f` was created at `~/PrivateResearch/WK100/Pg239IsolatedReplay-20261101.tUCzr84f` from **234** byte-matched historical application SQL files. Supabase CLI **2.107.0** rejected the generated `[db.shadow]` configuration before PostgreSQL startup. That unsupported local configuration key was the runner's defect.
+- After replacing it with the documented `[db] shadow_port`, the second attempt **did** start the isolated PostgreSQL database, initialize its base schema and roles, and execute a prefix of historical application migrations. It stopped at `20261019203244_wk_chart_private_raw_evidence_v1.sql` with **SQLSTATE 42703**, `storage.buckets.versioning_status` missing. Saved original log `local-start-234-after-shadow-fix.log` contains the exact statement and error. It does **not** attest a completed 234, 238 or 239 database ledger.
+- The runner's hard-coded `supabase start -x` excluded **`storage-api`**, although historical migration 233 relies on Storage-managed schema changes. Its Postgres-image-only preflight was not a sufficient dependency or version check. Merely removing the exclusion is **not** an accepted fix, because Supabase applies application migrations during `start`, and the required Storage-managed migration ordering and image versions have not been tested on this new local project. The exact failed Stack's Storage image/version was not captured, so do not invent it.
+- The newer HTML migration is an **already CLI-minted private file**, `20261101074119_wk100_html_research_ledger_v1.sql` at `~/PrivateResearch/WK100/HtmlForwardMint-20261101.66BTV65c`, SHA-256 `4e9086bd3a550cf9d814f1ae82ebe8c9092c412d4391c2b3e1e24663cb09924c`. It was **not executed**. All prior 238 app SQL files were compared byte-for-byte against this private mint. Do not mint a replacement or change existing historical files.
+- Both assistant-authored PG239 startup/resume scripts are **withdrawn as executable acceptance instructions**. The failed isolated project's database or volume might contain a partial migration history; keep it for forensics. Do not reset, remove or reuse it as an accepted baseline.
+
+### Read-only production and upstream authority verified on 1 November
+
+The accepted Production Supabase project `pgzizndxdyhqmtyywjmt` was checked through **SELECT-only catalog/managed-migration metadata queries**, with no user records, secrets, Storage bytes or DDL read or changed:
+
+| Required managed Storage authority | Live Production result |
+| --- | --- |
+| `storage.buckets.versioning_status` | Present, `text`, NOT NULL |
+| `storage.buckets.lifecycle_configuration` | Present, `jsonb`, nullable |
+| `storage.buckets.file_size_limit` | Present, `bigint` |
+| `storage.buckets.allowed_mime_types` | Present, `ARRAY` |
+| `storage.migrations` | Present; 74 entries, maximum `id=73` |
+| Storage migration `62` | `object-versioning-core` |
+| Storage migration `68` | `bucket-lifecycle-configuration` |
+| Storage migration `73` | `revoke-grants-to-unused-operations` |
+
+Production's Storage-managed migration ledger is **not** WAKILISHA's `supabase_migrations.schema_migrations` application ledger. Never manually alter either ledger.
+
+Source `supabase/migrations/20261019203244_wk_chart_private_raw_evidence_v1.sql` (Git blob `7e2e185e2855df25580fd622609d4c6c81ba53a5`) explicitly uses **both** managed `storage.buckets` columns and verifies bucket policies/RLS. The contract cannot be bypassed by a fake `ALTER TABLE storage.buckets` or a compatibility shim. The upstream [Supabase Docker 0.8.3 release from 2026-10-16](https://github.com/supabase/supabase/blob/master/docker/CHANGELOG.md) identifies `supabase/storage-api:v1.81.0` and its one-way Storage migrations, including object versioning. This is version-capable upstream evidence; it does **not** prove which Storage image was cached or which migrations ran in the failed local project.
+
+### Accepted next environment contract, before any application SQL
+
+1. **Inventory dependencies independently, not through another speculative full startup.** Establish a dedicated, never-linked project and an explicit, internally compatible Supabase CLI, Postgres and Storage image/version set; verify the exact image digests and local availability. Do not upgrade the shared developer stack globally. Official documentation: [CLI start and exclusions](https://supabase.com/docs/reference/cli/global-flags), [Supabase Docker release](https://github.com/supabase/supabase/blob/master/docker/CHANGELOG.md).
+2. **First bootstrap the managed platform schema with zero WAKILISHA application migrations staged.** Its Storage initialization must be verified against the dedicated database: `storage.migrations` includes the vendor-authorized versions `62` and `68`, and `storage.buckets` has `versioning_status` and `lifecycle_configuration` with expected types. Confirm Storage policy and schema constraints still match the historical 233 preflight. **Do not add compatibility SQL to `storage`.** If this cannot be demonstrated with supported version-matched components, stop without replay.
+3. **Only then stage the unchanged 234 historical application migrations.** Execute them on that same dedicated database, verify their exact `supabase_migrations.schema_migrations` versions, and compare schema/Storage-policy evidence with accepted Production authority. Do not take the old 238 test receipt as proof of this new instance.
+4. Introduce only the existing sealed **synthetic** pre-retirement fixture on the dedicated 234 baseline. Execute the original 235 retirement, 236 governed publisher, 237 Phase 2 full filter, 238 Shazam research ledger and private CLI-minted 239 HTML ledger **in that order**, verifying each ledger boundary and source blob. Never copy historical Production user rows or fabricate live provider source receipts.
+5. With 239 executed, prove the actual SQL semantics: ordinary/revoked caller denial `42501`, authenticated dual capability checks, service-only finalization, duplicate and conflicting retry handling `23505`, native 100 contiguous rows, append-only UPDATE/DELETE/TRUNCATE denials, failed finalize transaction rollback, week freeze, and **zero retained test rows after rollback**. Capture exact PostgreSQL SQLSTATE and durable read-only receipts.
+6. Only after local DB acceptance, advance to **separate** real signed-JWT/Supabase gateway, private Storage create-only upload/download plus unauthorized read denial, Admin browser and hosted parity gates. A local Storage schema or a passing HTML parser does not prove the hosted end-to-end feature.
+
+**Operational hold:** never apply or rewrite historical Production migrations 233–238, manually repair app or managed Storage migration ledgers, touch the shared 225-migration Docker DB or leftover Edge-only volumes, deploy a paid Preview, expose source HTML, deploy Edge/frontend, perform Production Finish Update, merge draft PR #1333 or publish WK100 on these receipts. Preserve the tested code authority `39853ebf5790c17a992e3367749a758f4b842301` and all prior acceptance evidence separately from this documentation correction.
