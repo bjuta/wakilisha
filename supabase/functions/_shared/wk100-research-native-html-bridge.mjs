@@ -62,7 +62,7 @@ function parseApple(html){
   if(new Set(links.map(x=>x.id)).size!==100||
      rankTags.some((x,i)=>x.content!==String(i+1)))fail();
   const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)]
-    .filter(x=>{const a=attrs(x[1]);return a.type==='application/ld+json'&&a.id==='schema:music-playlist';});
+    .filter(x=>{const a=attrs(x[1]);return a.type==='application/ld+json';});
   if(scripts.length!==1||scripts[0][2].length>400000)fail();
   let playlist;
   try{playlist=JSON.parse(scripts[0][2]);}catch{fail();}
