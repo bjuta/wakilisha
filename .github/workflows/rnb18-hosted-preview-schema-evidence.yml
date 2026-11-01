@@ -50,7 +50,8 @@ jobs:
           test -f docs/engineering/replay-baseline/retired-active-migrations/20261030062819_retire_18_kenya_rnb_editions.sql
           test "$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')" = 236
           test "$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | sort | tail -1 | sed 's#^.*/##')" = "$(basename "$MIGRATION")"
-          git fetch origin refs/heads/main:refs/remotes/origin/main
+          git show-ref --verify --quiet refs/remotes/origin/main
+          git merge-base HEAD refs/remotes/origin/main >/dev/null
           echo WK_RNB18_EXACT_STAGE2_236_FILE_SOURCE=PASS
 
       - name: Set up canonical pinned Supabase CLI 2.107.0
