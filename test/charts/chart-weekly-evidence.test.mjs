@@ -345,6 +345,40 @@ test('candidate HTTP evidence retains exact bytes but refuses redirect, MIME, ov
   assert.equal(captured.payload_sha256,await sha256Hex(wkCapBytes));
   assert.equal(captured.byte_length,wkCapBytes.length);
   assert.equal('can_publish' in captured,false);
+  // Apple API auth is a server-only, exact-host exception. No bearer may be
+  // sent to a public chart provider or to a lookalike destination.
+  const chartEndpoint='https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played&limit=100';
+  const token='eyJhbGciOiJFUzI1NiJ9.appleChartFixture.signature';
+  const appleInput={
+    sourceKey:'apple_ke',endpoint:chartEndpoint,
+    accessDecision:{source_key:'apple_ke',exact_endpoint:chartEndpoint,
+      authorization_ref:'wk-source-access-v1/fixture',purpose:'candidate_raw_evidence'},
+    providerAuthorization:{kind:'apple_developer_bearer',token},
+    verifyAccess:async()=>true,
+    now:()=>new Date('2026-10-19T09:02:00Z'),
+  };
+  const nativeBytes=new TextEncoder().encode('{"results":{"songs":[]}}');
+  const native=await fetchCandidateBytes({...appleInput,fetchImpl:async(url,options)=>{
+    assert.equal(url,chartEndpoint);
+    assert.equal(options.redirect,'manual');
+    assert.equal(options.headers.authorization,'Bearer '+token);
+    return new Response(nativeBytes,{status:200,headers:{'content-type':'application/json'}});
+  }});
+  assert.deepEqual(native.bytes,nativeBytes);
+  assert.equal('providerAuthorization' in native,false);
+  let unauthorizedRequests=0;
+  const countRequest=async()=>{unauthorizedRequests++;return new Response(nativeBytes);};
+  await wkCapReject(()=>fetchCandidateBytes(wkCapInput({
+    providerAuthorization:{kind:'apple_developer_bearer',token},fetchImpl:countRequest,
+  })),'provider_authorization_invalid');
+  await wkCapReject(()=>fetchCandidateBytes({...appleInput,
+    endpoint:chartEndpoint.replace('api.music.apple.com','api.music.apple.com.evil.example'),
+    fetchImpl:countRequest,
+  }),'provider_authorization_invalid');
+  await wkCapReject(()=>fetchCandidateBytes({...appleInput,
+    providerAuthorization:{kind:'apple_developer_bearer',token:'bad\\nheader'},fetchImpl:countRequest,
+  }),'provider_authorization_invalid');
+  assert.equal(unauthorizedRequests,0);
   const fixtureResponse=(body,status,type,extra={})=>async()=>new Response(body,{status,headers:{'content-type':type,...extra}});
   await wkCapReject(()=>fetchCandidateBytes(wkCapInput({fetchImpl:fixtureResponse(null,302,'text/html',{location:'https://wrong.tld'})})), 'redirect_forbidden');
   await wkCapReject(()=>fetchCandidateBytes(wkCapInput({fetchImpl:fixtureResponse('oops',503,'text/html')})), 'upstream_http_unaccepted');
