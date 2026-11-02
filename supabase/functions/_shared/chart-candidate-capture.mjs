@@ -61,9 +61,25 @@ export async function sha256Hex(value) {
  * No redirects, arbitrary hosts, credentials, or unbounded response bodies.
  */
 export async function fetchCandidateBytes({ sourceKey, endpoint, accessDecision,
-  verifyAccess, fetchImpl = fetch, timeoutMs = 12_000, now = () => new Date() }) {
+  verifyAccess, providerAuthorization, fetchImpl = fetch, timeoutMs = 12_000,
+  now = () => new Date() }) {
   assert(SOURCE.test(sourceKey), 'source_key_invalid');
   const url = approvedHttpsEndpoint(endpoint);
+  // Tokens only travel to Apple's exact native chart API; never allow a
+  // manifest entry to redirect credentials to another HTTPS host or route.
+  let providerHeaders = null;
+  if(providerAuthorization !== undefined) {
+    exactKeys(providerAuthorization, ['kind','token'], 'provider_authorization_invalid');
+    assert(sourceKey === 'apple_ke' && url.hostname === 'api.music.apple.com' &&
+      url.pathname === '/v1/catalog/ke/charts' &&
+      url.searchParams.get('types') === 'songs' &&
+      url.searchParams.get('chart') === 'most-played' &&
+      providerAuthorization.kind === 'apple_developer_bearer' &&
+      typeof providerAuthorization.token === 'string' &&
+      /^[a-zA-Z0-9_.-]{20,8192}$/.test(providerAuthorization.token),
+      'provider_authorization_invalid');
+    providerHeaders = { authorization: 'Bearer ' + providerAuthorization.token };
+  }
   exactKeys(accessDecision, ['source_key', 'exact_endpoint', 'authorization_ref', 'purpose'], 'source_access_invalid');
   assert(accessDecision.source_key === sourceKey && accessDecision.exact_endpoint === endpoint
     && accessDecision.purpose === 'candidate_raw_evidence'
@@ -90,7 +106,8 @@ export async function fetchCandidateBytes({ sourceKey, endpoint, accessDecision,
         response = await fetchImpl(endpoint, {
           method: 'GET', redirect: 'manual', credentials: 'omit',
           cache: 'no-store', signal: controller.signal,
-          headers: { accept: 'application/json, text/html, text/csv, application/octet-stream' },
+          headers: { accept: 'application/json, text/html, text/csv, application/octet-stream',
+            ...(providerHeaders || {}) },
         });
       } catch { reject('transport_failed'); }
       assert(response && typeof response.status === 'number', 'transport_failed');
