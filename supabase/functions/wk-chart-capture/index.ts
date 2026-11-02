@@ -93,6 +93,23 @@ Deno.serve(async (req:Request) => {
   const now=new Date();
   const entry=approvedEntry(manifest,key,version,now);
   if(!entry) return json(403,{error:'source_access_not_authorized'});
+  // Only Apple's native catalog charts endpoint may receive the explicitly
+  // configured developer token. Never accept request-body headers or secrets.
+  let providerAuthorization: {kind:string;token:string} | undefined;
+  if(key==='apple_ke') {
+    let nativeApple=false;
+    try {const endpoint=new URL(entry.endpoint);
+      nativeApple=endpoint.protocol==='https:' &&
+        endpoint.hostname==='api.music.apple.com' &&
+        endpoint.pathname==='/v1/catalog/ke/charts';
+    } catch { /* transport rejects malformed endpoints separately */ }
+    if(nativeApple) {
+      const token=Deno.env.get('WK100_APPLE_MUSIC_DEVELOPER_TOKEN')??'';
+      if(!/^[a-zA-Z0-9_.-]{20,8192}$/.test(token))
+        return json(503,{error:'source_credential_not_configured',can_publish:false});
+      providerAuthorization={kind:'apple_developer_bearer',token};
+    }
+  }
   const db=createClient(url,bearer,{auth:{persistSession:false,autoRefreshToken:false}});
   const found=await db.from('wk_chart_capture_contracts_v1').select('*')
     .eq('source_key',key).eq('contract_version',version).maybeSingle();
@@ -142,7 +159,8 @@ Deno.serve(async (req:Request) => {
       weekStartEat:String(payload.week_start_eat),scheduledAt:String(payload.scheduled_at),
       attemptNumber:Number(payload.attempt_number),
       access:{source_key:key,endpoint:entry.endpoint,authorization_ref:entry.authorization_ref,
-        native_period_key:entry.native_period_key},verifyAccess,db:backend,storage,
+        native_period_key:entry.native_period_key,providerAuthorization},
+      verifyAccess,db:backend,storage,
       clock:()=>new Date(),enabled:true,timeoutMs:12000});
     // Never serialize upstream content or credential values into the response.
     return json(200,{status:result.status,receipt_id:result.receipt_id??null,

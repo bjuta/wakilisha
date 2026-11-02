@@ -187,21 +187,67 @@ export function parseShazamKenya(raw) {
     provider_period_label:text(sheet?.[1]?.[0],300)});
 }
 
-/** Apple official Kenya public chart feed, not Apple playlist API. */
-export function parseAppleKenya(raw) {
+/**
+ * Apple Kenya native charts. Two distinct public chart schemas are supported:
+ * the historical country-bearing RSS feed and the MusicKit catalog charts API.
+ * The API payload has no trustworthy storefront field; its territory must be
+ * bound to the exact independently approved request endpoint by the caller.
+ * Neither schema asserts a seven-day native measurement period or play count.
+ */
+export function parseAppleKenya(raw,access={}) {
   const o=record(raw);
   const feed=record(o?.feed);
-  const results=arr(feed?.results);
-  if (!feed || !results.length || results.length>MAX_ROWS) fail('apple_invalid_feed');
-  if (text(feed.country)?.toUpperCase() !== 'KE') fail('apple_territory_unverified');
-  const rows=results.map((value,i)=>{
-    const v=record(value);
+  if (feed) {
+    const results=arr(feed.results);
+    if (!results.length || results.length>MAX_ROWS) fail('apple_invalid_feed');
+    if (text(feed.country)?.toUpperCase() !== 'KE') fail('apple_territory_unverified');
+    const rows=results.map((value,i)=>{
+      const v=record(value),id=text(v?.id,180);
+      if (!id || !ID_RE.test(id)) fail('apple_invalid_track_id');
+      return track(i+1,id,text(v.name),text(v.artistName),{artist_provider_id:text(v.artistId,180)});
+    });
+    return normalizeRows('apple_ke',rows,results.length,{behavior:'consumption',metric:'rank',
+      provider_updated_at:text(feed.updated,120),chart_surface:'apple_rss_most_played'});
+  }
+
+  // An empty or unrelated response is not an Apple chart at all.
+  // Preserve the established fail-closed invalid-feed contract first.
+  if (!record(o?.results) || !Array.isArray(o.results.songs)) fail('apple_invalid_feed');
+
+  // The Apple Music API response is only valid when the approved source
+  // manifest binds its exact Kenya /charts request. A client-supplied JSON
+  // "country" property or an Apple US endpoint cannot supply that authority.
+  let endpoint;
+  try { endpoint=new URL(access?.endpoint); } catch { fail('apple_chart_endpoint_unverified'); }
+  if(endpoint.protocol!=='https:' || endpoint.hostname!=='api.music.apple.com' ||
+    endpoint.port || endpoint.username || endpoint.password || endpoint.hash ||
+    endpoint.pathname!=='/v1/catalog/ke/charts' ||
+    endpoint.searchParams.get('types')!=='songs' ||
+    endpoint.searchParams.get('chart')!=='most-played' ||
+    [...endpoint.searchParams.keys()].some(k=>!['types','chart','limit'].includes(k)) ||
+    new Set(endpoint.searchParams.keys()).size!==[...endpoint.searchParams.keys()].length) {
+    fail('apple_chart_endpoint_unverified');
+  }
+  const limit=endpoint.searchParams.get('limit');
+  if(limit!==null && (!/^\d{1,3}$/.test(limit) || Number(limit)<1 || Number(limit)>200))
+    fail('apple_chart_endpoint_unverified');
+  const charts=arr(record(o?.results)?.songs);
+  if(charts.length!==1 || charts[0]?.chart!=='most-played')
+    fail('apple_invalid_chart_response');
+  const items=arr(charts[0]?.data);
+  if(!items.length || items.length>MAX_ROWS || (limit!==null && items.length>Number(limit)))
+    fail('apple_invalid_chart_response');
+  const rows=items.map((item,i)=>{
+    const v=record(item),attributes=record(v?.attributes);
     const id=text(v?.id,180);
-    if (!id || !ID_RE.test(id)) fail('apple_invalid_track_id');
-    return track(i+1,id,text(v.name),text(v.artistName),{artist_provider_id:text(v.artistId,180)});
+    if(v?.type!=='songs' || !id || !ID_RE.test(id) ||
+      !text(attributes?.name) || !text(attributes?.artistName))
+      fail('apple_invalid_chart_item');
+    return track(i+1,id,text(attributes.name),text(attributes.artistName));
   });
-  return normalizeRows('apple_ke',rows,results.length,{behavior:'consumption',metric:'rank',
-    provider_updated_at:text(feed.updated,120)});
+  return normalizeRows('apple_ke',rows,items.length,{
+    behavior:'consumption',metric:'rank',chart_surface:'apple_music_api_most_played',
+  });
 }
 
 function findTrackViews(payload, matches, depth=0) {

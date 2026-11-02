@@ -197,6 +197,40 @@ test('Apple public most-played is not inferred to be a seven-day consumption tot
   assert.equal(r.metric,'rank');assert.equal(r.native_period,'unknown');
   assert.equal(r.provider_updated_at,'2026-10-19T00:00:00Z');
   assert.throws(()=>parseAppleKenya({...payload,feed:{...payload.feed,country:'US'}}),/territory_unverified/);
+
+  // Native Music API chart response has no trustworthy market in its JSON
+  // payload. The independently approved exact Kenya endpoint is required.
+  const api={results:{songs:[{chart:'most-played',data:[
+    {id:'131',type:'songs',attributes:{name:'Song A',artistName:'Artist A'}},
+    {id:'132',type:'songs',attributes:{name:'Song B',artistName:'Artist B'}},
+  ]}]}};
+  const endpoint='https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played&limit=100';
+  const native=parseAppleKenya(api,{endpoint});
+  assert.equal(native.chart_surface,'apple_music_api_most_played');
+  assert.equal(native.metric,'rank');
+  assert.equal(native.native_period,'unknown');
+  assert.equal(native.candidate_only,true);
+  assert.equal(native.eligible_for_scoring,false);
+  assert.deepEqual(native.rows.map(row=>[row.rank,row.provider_track_id]),[[1,'131'],[2,'132']]);
+  assert.equal(native.rows[0].view_count,undefined);
+  assert.throws(()=>parseAppleKenya(api),/apple_chart_endpoint_unverified/);
+  for(const invalid of [
+    endpoint.replace('/ke/','/us/'),
+    endpoint.replace('api.music.apple.com','api.music.apple.com.evil.example'),
+    endpoint.replace('https:','http:'),
+    endpoint.replace('types=songs','types=playlists'),
+    endpoint.replace('chart=most-played','chart=top'),
+    endpoint+'&genre=1',
+    endpoint.replace('limit=100','limit=201'),
+    endpoint+'&types=playlists',
+  ]) assert.throws(()=>parseAppleKenya(api,{endpoint:invalid}),/apple_chart_endpoint_unverified/);
+  assert.throws(()=>parseAppleKenya({results:{songs:[{chart:'top',data:api.results.songs[0].data}]}},{endpoint}),/apple_invalid_chart_response/);
+  assert.throws(()=>parseAppleKenya({results:{songs:[{chart:'most-played',data:[
+    {...api.results.songs[0].data[0]}, {...api.results.songs[0].data[0]},
+  ]}]}},{endpoint}),/apple_ke_duplicate_provider_id/);
+  assert.throws(()=>parseAppleKenya({results:{songs:[{chart:'most-played',data:[
+    {id:'131',type:'playlists',attributes:{name:'Song',artistName:'Artist'}},
+  ]}]}},{endpoint}),/apple_invalid_chart_item/);
 });
 
 test('YouTube provider weekly observation retains views, exact target period and separate behavior',()=>{
@@ -311,6 +345,40 @@ test('candidate HTTP evidence retains exact bytes but refuses redirect, MIME, ov
   assert.equal(captured.payload_sha256,await sha256Hex(wkCapBytes));
   assert.equal(captured.byte_length,wkCapBytes.length);
   assert.equal('can_publish' in captured,false);
+  // Apple API auth is a server-only, exact-host exception. No bearer may be
+  // sent to a public chart provider or to a lookalike destination.
+  const chartEndpoint='https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played&limit=100';
+  const token='eyJhbGciOiJFUzI1NiJ9.appleChartFixture.signature';
+  const appleInput={
+    sourceKey:'apple_ke',endpoint:chartEndpoint,
+    accessDecision:{source_key:'apple_ke',exact_endpoint:chartEndpoint,
+      authorization_ref:'wk-source-access-v1/fixture',purpose:'candidate_raw_evidence'},
+    providerAuthorization:{kind:'apple_developer_bearer',token},
+    verifyAccess:async()=>true,
+    now:()=>new Date('2026-10-19T09:02:00Z'),
+  };
+  const nativeBytes=new TextEncoder().encode('{"results":{"songs":[]}}');
+  const native=await fetchCandidateBytes({...appleInput,fetchImpl:async(url,options)=>{
+    assert.equal(url,chartEndpoint);
+    assert.equal(options.redirect,'manual');
+    assert.equal(options.headers.authorization,'Bearer '+token);
+    return new Response(nativeBytes,{status:200,headers:{'content-type':'application/json'}});
+  }});
+  assert.deepEqual(native.bytes,nativeBytes);
+  assert.equal('providerAuthorization' in native,false);
+  let unauthorizedRequests=0;
+  const countRequest=async()=>{unauthorizedRequests++;return new Response(nativeBytes);};
+  await wkCapReject(()=>fetchCandidateBytes(wkCapInput({
+    providerAuthorization:{kind:'apple_developer_bearer',token},fetchImpl:countRequest,
+  })),'provider_authorization_invalid');
+  await wkCapReject(()=>fetchCandidateBytes({...appleInput,
+    endpoint:chartEndpoint.replace('api.music.apple.com','api.music.apple.com.evil.example'),
+    fetchImpl:countRequest,
+  }),'provider_authorization_invalid');
+  await wkCapReject(()=>fetchCandidateBytes({...appleInput,
+    providerAuthorization:{kind:'apple_developer_bearer',token:'bad\\nheader'},fetchImpl:countRequest,
+  }),'provider_authorization_invalid');
+  assert.equal(unauthorizedRequests,0);
   const fixtureResponse=(body,status,type,extra={})=>async()=>new Response(body,{status,headers:{'content-type':type,...extra}});
   await wkCapReject(()=>fetchCandidateBytes(wkCapInput({fetchImpl:fixtureResponse(null,302,'text/html',{location:'https://wrong.tld'})})), 'redirect_forbidden');
   await wkCapReject(()=>fetchCandidateBytes(wkCapInput({fetchImpl:fixtureResponse('oops',503,'text/html')})), 'upstream_http_unaccepted');
