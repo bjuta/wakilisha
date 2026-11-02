@@ -220,7 +220,8 @@ export function parseAppleKenya(raw,access={}) {
     endpoint.pathname!=='/v1/catalog/ke/charts' ||
     endpoint.searchParams.get('types')!=='songs' ||
     endpoint.searchParams.get('chart')!=='most-played' ||
-    [...endpoint.searchParams.keys()].some(k=>!['types','chart','limit'].includes(k))) {
+    [...endpoint.searchParams.keys()].some(k=>!['types','chart','limit'].includes(k)) ||
+    new Set(endpoint.searchParams.keys()).size!==[...endpoint.searchParams.keys()].length) {
     fail('apple_chart_endpoint_unverified');
   }
   const limit=endpoint.searchParams.get('limit');
