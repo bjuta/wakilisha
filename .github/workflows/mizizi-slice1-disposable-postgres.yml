@@ -16,8 +16,8 @@ on:
       - "scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql"
       - "scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql"
       - "scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql"
-      - "scripts/control-plane/verify-rnb18-stage1-replay-authority.sql"
       - "supabase/migrations/**"
+      - "scripts/control-plane/verify-rnb18-stage1-replay-authority.sql"
       - "scripts/registry/agents/mizizi/runtime/**"
 
 permissions:
@@ -37,6 +37,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Prove there is no linked or credentialed Supabase target
         shell: bash
@@ -83,12 +84,13 @@ jobs:
       - name: Verify RNB18 empty historical archive and immutable authority (read only)
         shell: bash
         run: |
+          set -euo pipefail
           DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
           test -n "$DB"
           test "$(printf '%s\n' "$DB" | wc -l | tr -d ' ')" = "1"
           docker exec -i "$DB" psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
             < scripts/control-plane/verify-rnb18-stage1-replay-authority.sql
-          echo WK_RNB18_STAGE1_NATIVE_FULL_REPLAY_POSTFLIGHT=PASS
+          echo WK_RNB18_STAGE2_CLEAN_REPLAY_READ_ONLY_POSTFLIGHT=PASS
 
       - name: Execute worker, source-negative and 32 Track corpus SQL acceptance
         shell: bash
@@ -116,6 +118,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Prove no remote Supabase target can be used
         shell: bash

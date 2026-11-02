@@ -15,6 +15,12 @@ import {
   validateHistoricalCleanReplayProof,
 } from "../../scripts/control-plane/verify-historical-migration-clean-replay.mjs";
 import {
+  validateRnb18StagedFields,
+  RNB18_STAGED_MODE,
+  RNB18_STAGE1,
+  RNB18_BASE,
+} from "../../scripts/control-plane/verify-rnb18-staged-retirement.mjs";
+import {
   validatePendingSchemaState,
   validateRepositorySchemaSnapshot,
 } from "../../scripts/control-plane/verify-repository-schema-snapshot.mjs";
@@ -521,6 +527,62 @@ describe(
         ).toEqual([]);
       },
     );
+
+    it("restricts RNB18 staged replay to its exact 237-to-236 version identity", () => {
+      const proof = {
+        proof_mode:RNB18_STAGED_MODE,
+        migration_file:"supabase/migrations/"+RNB18_STAGE1,
+        migration_sha256:"705c19ddd540705942900ce0ca47da1a6b65fb548a30e553a7eac05dd73bdb9c",
+        base_main_sha:RNB18_BASE,
+        stage1_migration_count:237,
+        stage1_migration_head:"20261101210335",
+        original_historical_migration_file:"supabase/migrations/20261030062819_retire_18_kenya_rnb_editions.sql",
+        original_historical_git_blob_sha:"b3c2b412ea8bb594d22f61858fb40c5c4a6553f5",
+        paired_replay_commit_sha:"905455ba985b25814a6ad45b9b92229510a2abe4",
+        paired_replay_proof_blob_sha:"95a897fa628cf5ca702fcbcc03ddf4bceb9f04c3",
+        paired_replay_migration_count:236,
+        paired_replay_migration_head:"20261101210335",
+        paired_preview_project_ref:"uummbxewahdozsjkubez",
+        paired_preview_branch_id:"c00bfe1e-fcc8-4a10-86b3-c2af1d249776",
+        schema_types_sha256:"eed74587624364062f6d4cee1d2b0a16d530aa86865d2493476994061e8a9cf6",
+        verifier_file:"scripts/control-plane/verify-rnb18-stage1-replay-authority.sql",
+        stage1_clean_replay:"not_claimed",
+        paired_stage2_hosted_replay:"pass",
+        verified_at:"2026-11-01T22:21:19.798Z"
+      };
+      const args={proof,migrationFile:proof.migration_file,
+        migrationSha256:proof.migration_sha256,baseMainSha:RNB18_BASE};
+      expect(validateRnb18StagedFields(args)).toEqual([]);
+      expect(validateRnb18StagedFields({...args,proof:{...proof,baseline_replay:"pass"}}))
+        .toContain("Stage 1 must not claim a 237-file clean replay");
+      expect(validateRnb18StagedFields({...args,proof:{...proof,paired_replay_migration_count:237}}))
+        .toContain("paired_replay_migration_count must equal the sealed RNB18 stage authority");
+      expect(validateRnb18StagedFields({...args,proof:{...proof,original_historical_git_blob_sha:"0".repeat(40)}}))
+        .toContain("original_historical_git_blob_sha must equal the sealed RNB18 stage authority");
+    });
+    it("rejects changed RNB18 staged schema seal or unrelated migration use", () => {
+      const base = {
+        projectRef:"pgzizndxdyhqmtyywjmt",schema:"public,editorial",
+        generatedAt:"2026-11-01T22:21:19Z",
+        typesSha256:"eed74587624364062f6d4cee1d2b0a16d530aa86865d2493476994061e8a9cf6",
+        authoritativeMigrationDirectory:"supabase/migrations",
+        migrationCount:237,latestMigration:RNB18_STAGE1,
+        schemaSeal:{
+          mode:RNB18_STAGED_MODE,sourceProjectRef:"uummbxewahdozsjkubez",
+          migrationHead:"20261101210335",baseMainSha:RNB18_BASE,
+          previewBranchId:"c00bfe1e-fcc8-4a10-86b3-c2af1d249776",
+          pairedReplayCommitSha:"905455ba985b25814a6ad45b9b92229510a2abe4",
+          pairedReplayMigrationCount:236,retiredHistoricalVersion:"20261030062819"
+        }
+      };
+      const args={baseline:base,actualTypesSha256:base.typesSha256,
+        expectedProjectRef:base.projectRef,migrationCount:237,latestMigration:RNB18_STAGE1};
+      expect(validateRepositorySchemaSnapshot(args)).toEqual([]);
+      const error="RNB18 two-stage seal must disclose the exact 236-file paired Preview for the 237-file stage";
+      expect(validateRepositorySchemaSnapshot({...args,latestMigration:"20261101210336_unrelated.sql"})).toContain(error);
+      expect(validateRepositorySchemaSnapshot({...args,baseline:{...base,schemaSeal:{...base.schemaSeal,pairedReplayMigrationCount:237}}})).toContain(error);
+      expect(validatePendingSchemaState({pendingCount:1,sealMode:RNB18_STAGED_MODE})).toEqual([]);
+    });
 
   },
 );
