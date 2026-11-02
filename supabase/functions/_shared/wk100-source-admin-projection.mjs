@@ -31,6 +31,11 @@ export function projectWk100SourceHealth(contracts, attempts, weekStartEat) {
       nativePeriodEnd:success?.native_period_end||null,
       receiptSha256: typeof success?.payload_sha256==='string' && /^[a-f0-9]{64}$/.test(success.payload_sha256) ? success.payload_sha256:null,
       failureCode:latest?.failure_code?key(latest.failure_code):null,
+      recentAttempts:history.slice(0,12).map(a=>({
+        id:key(a.id),status:key(a.status),attemptedAt:a.created_at||null,
+        fetchedAt:a.fetched_at||null,failureCode:a.failure_code?key(a.failure_code):null,
+        observedDepth:integer(a.observed_depth),
+      })),
       canScore:false,canPublish:false,
     };
   });
