@@ -71,3 +71,7 @@ verify_jwt = true
 # Source-native, separately gated researcher-directed HTML; off until accepted.
 [functions.wk100-research-html-intake]
 verify_jwt = true
+
+# Candidate-only authenticated Admin proposals, no capture or admission.
+[functions.wk100-source-admin-proposals]
+verify_jwt = true
