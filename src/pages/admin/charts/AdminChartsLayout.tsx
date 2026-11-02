@@ -37,7 +37,7 @@ const PRIVATE_WK100_ITEM: NavItem = { path: "/admin/charts/wk100-preview", label
 function ChartsLayoutInner() {
   const user = useAdminUser();
   const showPrivatePreview = user.role === "super_admin" || user.role === "administrator";
-  const visibleMoreItems = showPrivatePreview ? [...MORE_ITEMS, PRIVATE_WK100_ITEM] : MORE_ITEMS;
+  const visibleMoreItems = showPrivatePreview ? [...MORE_ITEMS, WK100_OPERATIONS_ITEM, PRIVATE_WK100_ITEM] : [...MORE_ITEMS, WK100_OPERATIONS_ITEM];
   const visibleItems = [...PRIMARY_TABS, ...visibleMoreItems];
   const { theme, toggle } = useTheme();
   const location = useLocation();
