@@ -1,0 +1,77 @@
+name: WK100 Preview Disabled-Flag Runtime Proof (One Time)
+on:
+  pull_request:
+    types: [synchronize]
+permissions:
+  contents: read
+jobs:
+  disabled-flags:
+    if: >-
+      github.event.pull_request.number == 1333 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'feat/wk100-phase2-frozen-filter-integration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      WK_PREVIEW_REF: vabruwtjzyxerxdsjtwz
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: supabase/setup-cli@v1
+        with:
+          version: '2.107.0'
+          github-token: ${{ github.token }}
+      - name: Verify both research handlers disabled with legacy anon JWT
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          trap 'rm -f /tmp/wk100-keys.json /tmp/wk100-anon-only /tmp/wk100-response /tmp/wk100-cli-err' EXIT
+          test "$(git rev-parse HEAD)" = "$PR_HEAD_SHA"
+          test "$WK_PREVIEW_REF" = vabruwtjzyxerxdsjtwz
+          test "$WK_PREVIEW_REF" != pgzizndxdyhqmtyywjmt
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          if ! supabase projects api-keys --project-ref "$WK_PREVIEW_REF" --output json > /tmp/wk100-keys.json 2>/tmp/wk100-cli-err; then
+            echo STOP_PREVIEW_API_KEY_LOOKUP
+            exit 1
+          fi
+          node --input-type=module <<'NODE' > /tmp/wk100-anon-only
+          import fs from 'node:fs';
+          const value=JSON.parse(fs.readFileSync('/tmp/wk100-keys.json','utf8'));
+          const keys=Array.isArray(value)?value:value?.keys;
+          if(!Array.isArray(keys))throw Error('STOP_UNEXPECTED_API_KEY_FORMAT');
+          const matches=keys.filter(k=>k?.name==='anon'&&k?.disabled!==true&&k?.type==='legacy');
+          if(matches.length!==1||typeof matches[0].api_key!=='string'||
+             matches[0].api_key.split('.').length!==3)throw Error('STOP_ANON_JWT_UNAVAILABLE');
+          process.stdout.write(matches[0].api_key);
+          NODE
+          test -s /tmp/wk100-anon-only
+          echo WK100_ANON_PROJECT_JWT_AVAILABLE=PASS
+          for fn in wk100-research-intake wk100-research-html-intake; do
+            status="$(curl --silent --show-error --max-time 25 -X POST \
+              "https://$WK_PREVIEW_REF.supabase.co/functions/v1/$fn" \
+              -H 'Origin: https://wakilisha.africa' \
+              -H 'Content-Type: application/json' \
+              -H "apikey: $(cat /tmp/wk100-anon-only)" \
+              -H "Authorization: Bearer $(cat /tmp/wk100-anon-only)" \
+              --data '{}' -o /tmp/wk100-response -w '%{http_code}')"
+            if [ "$status" != 503 ]; then
+              echo "STOP_PREVIEW_DISABLED_ROUTE_UNPROVEN:$fn:HTTP_$status"
+              exit 1
+            fi
+            node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          let body;
+          try{body=JSON.parse(fs.readFileSync('/tmp/wk100-response','utf8'))}
+          catch{throw Error('STOP_UNRECOGNIZED_DISABLED_BODY')}
+          if(body?.error!=='intake_not_enabled'||Object.keys(body).length!==1)
+            throw Error('STOP_NOT_APPLICATION_DISABLED_RESPONSE');
+          NODE
+            echo "WK100_PREVIEW_RUNTIME_DISABLED=PASS:$fn"
+          done
+          echo WK100_PREVIEW_NO_AUTH_USER_NO_UPLOAD_AND_NO_STORAGE_WRITES=PASS
