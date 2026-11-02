@@ -12,6 +12,7 @@ import { WkSelect } from '@/components/design-system/primitives/Select';
 import { WkStateBadge } from '@/components/design-system/primitives/StateBadge';
 import { WkDataTable, type WkDataColumn } from '@/components/design-system/primitives/DataTable';
 import { WkDetailList } from '@/components/design-system/primitives/DetailList';
+import { WkTabs } from '@/components/design-system/primitives/Tabs';
 import { wk100CurrentWeekStartEat, isWk100WeekStartEat } from '../ingest/wk100EatWeek.mjs';
 import { WkOperationsHero, WkNextAction, WkReadinessList } from '@/components/design-system/primitives/OperationsWorkspace';
 import { WkAuditTimeline } from '@/components/design-system/primitives/AuditTimeline';
@@ -79,6 +80,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [providerFilter,setProviderFilter]=useState('all');
   const [metricFilter,setMetricFilter]=useState('all');
   const [detail,setDetail]=useState<Source|null>(null);
+  const [detailTab,setDetailTab]=useState<'configuration'|'qualification'|'history'>('configuration');
   const [add,setAdd]=useState(false);
   const load=useCallback(async()=>{
     const seq=++readSequence.current;
@@ -220,21 +222,60 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             onClick={()=>setDetail(report.sources.find(s=>['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState))??null)}>Inspect incident</button>}/>}
       </div>}
     </>}
-    {detail&&<WkInspector open={true} onClose={()=>setDetail(null)} title={detail.surface} eyebrow="Source inspection" summary={<p className="text-sm text-wk-text-muted">{detail.provider} · {detail.market} · {detail.version}</p>}><WkDetailList items={[
-        {label:'Provider',value:detail.provider},
-        {label:'Market',value:detail.market},
-        {label:'Metric',value:detail.metric},
-        {label:'Behavior',value:detail.behavior},
-        {label:'Version',value:detail.version},
-        {label:'Capture state',value:detail.captureState},
-        {label:'Attempts',value:detail.attemptCount},
-        {label:'Last attempt',value:when(detail.lastAttemptAt)},
-        {label:'Last success',value:when(detail.lastSuccessfulAt)},
-        {label:'Native period',value:detail.nativePeriodAuthority==='provider_defined'
-          ?when(detail.nativePeriodStart)+' to '+when(detail.nativePeriodEnd):'Unverified'},
-        {label:'Evidence SHA-256',value:detail.receiptSha256||'No verified receipt'},
-        {label:'Failure reason',value:detail.failureCode||'None recorded'},
-      ]} /><p className="mt-5 rounded-xl bg-wk-surface-raised p-4 text-sm text-wk-text-muted">Source editing, qualification and retries are held until governed service operations are available. This panel never starts a collection.</p></WkInspector>}
+    {detail&&<WkInspector open={true} onClose={()=>setDetail(null)} title={detail.surface}
+      eyebrow="Source candidate · Kenya"
+      summary={<div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-wk-text-muted">{detail.provider} · {detail.market} · {detail.version}</span>
+        <WkStateBadge>Candidate</WkStateBadge>
+        <WkStateBadge tone={detail.failureCode?'danger':detail.receiptSha256?'info':'neutral'}>{detail.captureState.replaceAll('_',' ')}</WkStateBadge>
+      </div>}>
+      <WkTabs ariaLabel="Source information" value={detailTab} onChange={setDetailTab}
+        items={[{id:'configuration',label:'Configuration'},{id:'qualification',label:'Qualification'},{id:'history',label:'History'}]}>
+        {detailTab==='configuration'&&<div className="space-y-4">
+          <WkDetailList items={[
+            {label:'Provider',value:detail.provider},
+            {label:'Source identity',value:detail.sourceKey},
+            {label:'Territory',value:detail.market},
+            {label:'Native metric',value:detail.metric},
+            {label:'Behavior class',value:detail.behavior},
+            {label:'Expected depth',value:detail.expectedDepth},
+            {label:'Cadence',value:detail.cadence},
+            {label:'Version',value:detail.version},
+            {label:'Native measurement period',value:detail.nativePeriodAuthority==='provider_defined'
+              ?when(detail.nativePeriodStart)+' to '+when(detail.nativePeriodEnd):'Unknown'},
+          ]}/>
+          <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4">
+            <p className="text-xs font-bold text-wk-text">Infrastructure-managed source method</p>
+            <p className="mt-2 text-xs leading-relaxed text-wk-text-muted">Approved endpoints, parser identity, and credentials are not editable in this inspection view. No secrets are transmitted to the browser.</p>
+          </div>
+        </div>}
+        {detailTab==='qualification'&&<div className="space-y-3">
+          <WkReadinessList items={[
+            {id:'market',label:'Market and surface',status:detail.market==='KE'?'pending':'blocked',description:'A Kenya label does not independently establish source qualification'},
+            {id:'method',label:'Independent source method',status:'blocked',description:'No accepted WK100 source admission has been established for this candidate'},
+            {id:'native',label:'Native measurement period',status:detail.nativePeriodAuthority==='provider_defined'?'pending':'blocked',description:'Period evidence must be evaluated against the approved week'},
+            {id:'score',label:'Scoring authority',status:'blocked',description:'Candidate capture contracts do not grant scoring authority'},
+          ]}/>
+        </div>}
+        {detailTab==='history'&&<div className="space-y-4">
+          <WkDetailList items={[
+            {label:'Most recent attempt',value:when(detail.lastAttemptAt)},
+            {label:'Last successful capture',value:when(detail.lastSuccessfulAt)},
+            {label:'Observed depth',value:detail.observedDepth},
+            {label:'Verified digest',value:detail.receiptSha256||'No private evidence receipt'},
+            {label:'Safe failure code',value:detail.failureCode||'None recorded'},
+          ]}/>
+          <WkAuditTimeline ariaLabel="Source capture attempts" emptyLabel="No attempts have been recorded for this week."
+            events={detail.recentAttempts.map((a,i)=>({
+              id:a.id||String(i),label:a.status.replaceAll('_',' '),occurredAt:a.attemptedAt,
+              description:a.failureCode?'Reason: '+a.failureCode:'Observed rows: '+a.observedDepth,
+            }))}/>
+        </div>}
+      </WkTabs>
+      <p className="mt-5 rounded-xl bg-wk-surface-raised p-4 text-xs leading-relaxed text-wk-text-muted">
+        Source settings, qualification, retries, and coverage exceptions require separately accepted governed commands. This inspection view does not modify the capture ledger.
+      </p>
+    </WkInspector>}
     {add&&<AddSource close={()=>setAdd(false)}/>}
   </div>;
 }
