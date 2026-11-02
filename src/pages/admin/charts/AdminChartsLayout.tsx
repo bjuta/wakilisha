@@ -30,7 +30,7 @@ const MORE_ITEMS: NavItem[] = [
   { path: "/admin/charts/ingest-health", label: "API Health", icon: "HeartPulse", requiredCapability: "view_charts_admin" },
 ];
 
-const WK100_OPERATIONS_ITEM: NavItem = { path: "/admin/charts/wk100-operations", label: "WAKILISHA 100 Operations", icon: "BarChart3", requiredCapability: "view_charts_admin" };
+const WK100_OPERATIONS_ITEM: NavItem = { path: "/admin/charts/wk100-operations", label: "WAKILISHA 100 Operations", icon: "BarChart3", requiredCapability: "manage_ingest" };
 
 const PRIVATE_WK100_ITEM: NavItem = { path: "/admin/charts/wk100-preview", label: "WAKILISHA 100", icon: "ShieldCheck", requiredCapability: "manage_charts" };
 
