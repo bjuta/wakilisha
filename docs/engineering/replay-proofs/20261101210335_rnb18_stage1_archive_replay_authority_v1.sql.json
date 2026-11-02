@@ -1,0 +1,21 @@
+{
+  "proof_mode": "rnb18_two_stage_retirement",
+  "migration_file": "supabase/migrations/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql",
+  "migration_sha256": "705c19ddd540705942900ce0ca47da1a6b65fb548a30e553a7eac05dd73bdb9c",
+  "base_main_sha": "4ecf39a6b295d2012f37e918771b9aad692e0d72",
+  "stage1_migration_count": 237,
+  "stage1_migration_head": "20261101210335",
+  "original_historical_migration_file": "supabase/migrations/20261030062819_retire_18_kenya_rnb_editions.sql",
+  "original_historical_git_blob_sha": "b3c2b412ea8bb594d22f61858fb40c5c4a6553f5",
+  "paired_replay_commit_sha": "905455ba985b25814a6ad45b9b92229510a2abe4",
+  "paired_replay_proof_blob_sha": "95a897fa628cf5ca702fcbcc03ddf4bceb9f04c3",
+  "paired_replay_migration_count": 236,
+  "paired_replay_migration_head": "20261101210335",
+  "paired_preview_project_ref": "uummbxewahdozsjkubez",
+  "paired_preview_branch_id": "c00bfe1e-fcc8-4a10-86b3-c2af1d249776",
+  "schema_types_sha256": "eed74587624364062f6d4cee1d2b0a16d530aa86865d2493476994061e8a9cf6",
+  "verifier_file": "scripts/control-plane/verify-rnb18-stage1-replay-authority.sql",
+  "stage1_clean_replay": "not_claimed",
+  "paired_stage2_hosted_replay": "pass",
+  "verified_at": "2026-11-01T22:21:19.798Z"
+}
