@@ -49,7 +49,7 @@ Deno.serve(async req=>{
   // service-role boundary. No raw object keys, endpoints or credentials.
   const [contracts,attempts]=await Promise.all([
     admin.from('wk_chart_capture_contracts_v1')
-      .select('id,source_key,provider_key,source_surface,market,behavior,native_metric,expected_depth,cadence_kind,contract_version,admission_state')
+      .select('id,source_key,provider_key,source_surface,market,behavior,native_metric,expected_depth,cadence_kind,interval_hours,eat_hour,eat_minute,weekday_eat,minimum_healthy_checkpoints,adapter_version,contract_version,admission_state')
       .order('created_at',{ascending:false}).limit(100),
     admin.from('wk_chart_capture_attempts_v1')
       .select('id,contract_id,week_start_eat,created_at,fetched_at,status,observed_depth,native_period_authority,native_period_start,native_period_end,payload_sha256,failure_code')
