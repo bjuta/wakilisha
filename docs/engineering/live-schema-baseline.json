@@ -4,16 +4,13 @@
   "generatedAt": "2026-11-01T22:21:19Z",
   "typesSha256": "eed74587624364062f6d4cee1d2b0a16d530aa86865d2493476994061e8a9cf6",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 237,
+  "migrationCount": 236,
   "latestMigration": "20261101210335_rnb18_stage1_archive_replay_authority_v1.sql",
   "schemaSeal": {
-    "mode": "rnb18_two_stage_retirement",
+    "mode": "preview",
     "sourceProjectRef": "uummbxewahdozsjkubez",
     "migrationHead": "20261101210335",
     "baseMainSha": "4ecf39a6b295d2012f37e918771b9aad692e0d72",
-    "previewBranchId": "c00bfe1e-fcc8-4a10-86b3-c2af1d249776",
-    "pairedReplayCommitSha": "905455ba985b25814a6ad45b9b92229510a2abe4",
-    "pairedReplayMigrationCount": 236,
-    "retiredHistoricalVersion": "20261030062819"
+    "previewBranchId": "c00bfe1e-fcc8-4a10-86b3-c2af1d249776"
   }
 }

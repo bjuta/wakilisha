@@ -8,7 +8,6 @@ on:
       - 'scripts/acceptance/run-wk100-two-session-disposable-ci.sh'
       - 'scripts/acceptance/wk100-genuine-auth-storage-disposable-ci.mjs'
       - 'supabase/migrations/**'
-      - 'scripts/control-plane/prepare-rnb18-stage1-ci-replay.mjs'
 
 permissions:
   contents: read
@@ -58,13 +57,6 @@ jobs:
       - name: Install locked JS dependencies
         shell: bash
         run: npm ci --ignore-scripts --no-audit --no-fund
-
-      - name: Prove exact paired RNB18 staged replay before disposable Supabase startup
-        if: ${{ github.event.pull_request.number == 1335 }}
-        shell: bash
-        env:
-          WK_RNB18_PR_NUMBER: "1335"
-        run: node scripts/control-plane/prepare-rnb18-stage1-ci-replay.mjs
 
       - name: Start UNLINKED local database Auth Storage and REST
         shell: bash

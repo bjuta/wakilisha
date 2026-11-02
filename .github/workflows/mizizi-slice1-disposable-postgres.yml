@@ -17,7 +17,7 @@ on:
       - "scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql"
       - "scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql"
       - "supabase/migrations/**"
-      - "scripts/control-plane/prepare-rnb18-stage1-ci-replay.mjs"
+      - "scripts/control-plane/verify-rnb18-stage1-replay-authority.sql"
       - "scripts/registry/agents/mizizi/runtime/**"
 
 permissions:
@@ -63,13 +63,6 @@ jobs:
         with:
           version: 2.121.0
 
-      - name: Prove exact paired RNB18 staged replay before disposable Supabase startup
-        if: ${{ github.event.pull_request.number == 1335 }}
-        shell: bash
-        env:
-          WK_RNB18_PR_NUMBER: "1335"
-        run: node scripts/control-plane/prepare-rnb18-stage1-ci-replay.mjs
-
       - name: Start disposable local database and replay migrations
         shell: bash
         run: |
@@ -87,6 +80,17 @@ jobs:
             < scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql
           docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
             < scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql
+
+      - name: Verify RNB18 empty historical archive and immutable authority (read only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          test "$(printf '%s\n' "$DB" | wc -l | tr -d ' ')" = "1"
+          docker exec -i "$DB" psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-rnb18-stage1-replay-authority.sql
+          echo WK_RNB18_STAGE2_CLEAN_REPLAY_READ_ONLY_POSTFLIGHT=PASS
 
       - name: Execute worker, source-negative and 32 Track corpus SQL acceptance
         shell: bash
@@ -146,13 +150,6 @@ jobs:
       - name: Install local headless Chromium browser for genuine operator UI
         shell: bash
         run: npx playwright install --with-deps chromium
-
-      - name: Prove exact paired RNB18 staged replay before disposable Supabase startup
-        if: ${{ github.event.pull_request.number == 1335 }}
-        shell: bash
-        env:
-          WK_RNB18_PR_NUMBER: "1335"
-        run: node scripts/control-plane/prepare-rnb18-stage1-ci-replay.mjs
 
       - name: Start disposable local database, Auth and REST gateway
         shell: bash
