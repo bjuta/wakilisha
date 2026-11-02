@@ -161,11 +161,11 @@ jobs:
             docs/engineering/replay-proofs/20261102084046_wk100_full_filter_execution_forward_v1.sql.json \
             docs/engineering/replay-proofs/20261102084049_wk100_research_observation_forward_v1.sql.json \
             docs/engineering/replay-proofs/20261102084052_wk100_html_research_forward_v1.sql.json; do
-            printf '%s\\n' "$staged" | grep -Fxq "$required" || { echo "STOP_REQUIRED_SEAL_FILE_MISSING=$required"; exit 1; }
+            printf '%s\n' "$staged" | grep -Fxq "$required" || { echo "STOP_REQUIRED_SEAL_FILE_MISSING=$required"; exit 1; }
           done
-          case "$(printf '%s\\n' "$staged" | grep -c .)" in 4|5) ;; *) echo STOP_UNEXPECTED_STAGED_FILE_COUNT; exit 1;; esac
-          if [ "$(printf '%s\\n' "$staged" | grep -c .)" -eq 5 ]; then
-            printf '%s\\n' "$staged" | grep -Fxq src/types/database.types.ts || exit 1
+          case "$(printf '%s\n' "$staged" | grep -c .)" in 4|5) ;; *) echo STOP_UNEXPECTED_STAGED_FILE_COUNT; exit 1;; esac
+          if [ "$(printf '%s\n' "$staged" | grep -c .)" -eq 5 ]; then
+            printf '%s\n' "$staged" | grep -Fxq src/types/database.types.ts || exit 1
           fi
           git diff --cached --check
           git config user.name 'wakilisha-evidence-bot'
