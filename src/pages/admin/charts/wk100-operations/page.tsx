@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { AdminChartsPageHeader } from '../components/AdminChartsPageHeader';
 import { WkSurface } from '@/components/design-system/primitives/Surface';
@@ -12,7 +12,9 @@ import { WkSelect } from '@/components/design-system/primitives/Select';
 import { WkStateBadge } from '@/components/design-system/primitives/StateBadge';
 import { WkDataTable, type WkDataColumn } from '@/components/design-system/primitives/DataTable';
 import { WkDetailList } from '@/components/design-system/primitives/DetailList';
-import { wk100CurrentWeekStartEat } from '../ingest/wk100EatWeek.mjs';
+import { wk100CurrentWeekStartEat, isWk100WeekStartEat } from '../ingest/wk100EatWeek.mjs';
+import { WkOperationsHero, WkNextAction, WkReadinessList } from '@/components/design-system/primitives/OperationsWorkspace';
+import { WkAuditTimeline } from '@/components/design-system/primitives/AuditTimeline';
 
 type Source = {
   id:string;sourceKey:string;provider:string;surface:string;market:string;
@@ -62,7 +64,11 @@ function AddSource({close}:{close:()=>void}) {
 }
 export default function Wk100OperationsPage({view}:{view:View}) {
   const navigate=useNavigate();
-  const [week,setWeek]=useState(()=>wk100CurrentWeekStartEat());
+  const [searchParams,setSearchParams]=useSearchParams();
+  const requestedWeek=searchParams.get('week');
+  const week=requestedWeek&&isWk100WeekStartEat(requestedWeek)?requestedWeek:wk100CurrentWeekStartEat();
+  const setWeek=(next:(week:string)=>string)=>setSearchParams(p=>{const q=new URLSearchParams(p);q.set('week',next(week));return q;});
+  const readSequence=useRef(0);
   const [report,setReport]=useState<Report|null>(null);
   const [phase,setPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
   const [search,setSearch]=useState('');
@@ -70,13 +76,15 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [detail,setDetail]=useState<Source|null>(null);
   const [add,setAdd]=useState(false);
   const load=useCallback(async()=>{
+    const seq=++readSequence.current;
     setPhase('loading');setReport(null);setDetail(null);
     try {
       const {data,error}=await supabase.functions.invoke('wk100-source-admin-read',{body:{action:'read_source_health',weekStartEat:week}});
       if(error||!data||data.schemaVersion!=='wk100-admin-source-health-v1'||data.weekStartEat!==week||
         !Array.isArray(data.sources)||data.canScore!==false||data.canPublish!==false)throw Error();
+      if(seq!==readSequence.current)return;
       setReport(data as Report);setPhase('ready');
-    } catch {setPhase('unavailable');}
+    } catch {if(seq===readSequence.current)setPhase('unavailable');}
   },[week]);
   useEffect(()=>{void load()},[load]);
   const sources=useMemo(()=>(report?.sources??[]).filter(s=>
@@ -84,7 +92,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       ['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState):s.captureState==='not_collected'))&&
     (s.surface+' '+s.provider+' '+s.sourceKey).toLowerCase().includes(search.trim().toLowerCase())
   ),[report,search,status]);
-  const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path);
+  const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
     <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
       <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>void load()} disabled={phase==='loading'}>Refresh status</button>
