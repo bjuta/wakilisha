@@ -23,6 +23,10 @@ import type {
   ResourceGuardStatus,
   BackendCommitResponse,
 } from "@/services/chartsIngestion/ingestStudioTypes";
+import type { Wk100AdminDraftConfig } from "@/services/chartsIngestion/client";
+import { useWk100DraftAutosave } from "./hooks/useWk100DraftAutosave";
+import { Wk100ResearchEvidencePanel } from "./components/Wk100ResearchEvidencePanel";
+import { wk100CurrentWeekStartEat, isWk100WeekStartEat } from "./wk100EatWeek.mjs";
 import type { ChartFamily } from "@/services/chartsIngestion/types";
 import { getEligibilityProfiles } from "@/services/chartsEligibility/eligibilityStore";
 import type { ChartEligibilityProfile } from "@/services/chartsEligibility/eligibilityTypes";
@@ -95,6 +99,8 @@ function toMarketScopeSnapshot(scope: StoredChartMarketScope | null) {
     primaryMarketSlug: scope.primaryMarketSlug,
     includedMarkets: scope.includedMarkets,
     aggregationMode: scope.aggregationMode,
+    artistOriginCountries: scope.artistOriginCountries ?? [],
+    artistOriginUnknownMode: scope.artistOriginUnknownMode ?? "exclude",
     visibility: scope.visibility,
     description: scope.description,
   };
@@ -131,6 +137,7 @@ export default function AdminChartsIngest() {
     d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
     return d.toISOString().split("T")[0];
   });
+  const [wk100WeekInitialized, setWk100WeekInitialized] = useState(false);
   const [chartSize, setChartSize] = useState(40);
   const [market, setMarket] = useState("KE");
   const [chartKind, setChartKind] = useState<"tracks" | "releases">("tracks");
@@ -196,20 +203,20 @@ export default function AdminChartsIngest() {
     setKpis(kpiData);
     setActivity(recentActivity);
     setRuns(ingestRuns);
-    setFamilies(chartFamilies);
+    setFamilies(chartFamilies.map(family=>family.id==="top100"
+      ? {...family,label:"WAKILISHA 100"} : family));
     setMarketScopes(scopes);
     setEligibilityProfiles(profiles);
 
-    if (!scopes.some((scope) => scope.id === selectedMarketScopeId)) {
-      setSelectedMarketScopeId(scopes[0]?.id ?? "scope_kenya");
-    }
-
-    if (!profiles.some((profile) => profile.id === selectedEligibilityProfileId)) {
-      setSelectedEligibilityProfileId(profiles[0]?.id ?? "elig_all_artists");
-    }
+    setSelectedMarketScopeId(current =>
+      scopes.some(scope => scope.id === current) ? current : scopes[0]?.id ?? "scope_kenya"
+    );
+    setSelectedEligibilityProfileId(current =>
+      profiles.some(profile => profile.id === current) ? current : profiles[0]?.id ?? "elig_all_artists"
+    );
 
     setLoading(false);
-  }, [selectedEligibilityProfileId, selectedMarketScopeId]);
+  }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { setDetectedProviders(detectProvidersFromUrls(sourceUrls.split("\n").filter((url) => url.trim()))); }, [sourceUrls]);
@@ -226,6 +233,52 @@ export default function AdminChartsIngest() {
   const selectedEligibilityProfile = useMemo(() => eligibilityProfiles.find((profile) => profile.id === selectedEligibilityProfileId || profile.slug === selectedEligibilityProfileId) ?? null, [eligibilityProfiles, selectedEligibilityProfileId]);
   const selectedMarketScope = useMemo(() => marketScopes.find((scope) => scope.id === selectedMarketScopeId || scope.slug === selectedMarketScopeId) ?? null, [marketScopes, selectedMarketScopeId]);
   const marketScopeSnapshot = useMemo(() => toMarketScopeSnapshot(selectedMarketScope), [selectedMarketScope]);
+  const isWk100=existingSeriesId==="top100";
+  // Entering WK100 defaults to the EAT week, without changing other chart families.
+  useEffect(() => {
+    if (isWk100 && !wk100WeekInitialized) {
+      setEditionDate(wk100CurrentWeekStartEat());
+      setWk100WeekInitialized(true);
+    }
+  }, [isWk100, wk100WeekInitialized]);
+  const wk100Config=useMemo<Wk100AdminDraftConfig|null>(()=>
+    isWk100 && wk100WeekInitialized && isWk100WeekStartEat(editionDate) && selectedEligibilityProfile && marketScopeSnapshot &&
+    chartSize===100 && market==="KE" && chartKind==="tracks" ? ({
+      schemaVersion:"wk100-admin-edition-config/v1",programId:"top100",
+      weekStartEat:editionDate,chartTitle,chartSlug,chartSize:100,market:"KE",
+      chartKind:"tracks",coverStyle,
+      sourceUrls:sourceUrls.split("\n").map(s=>s.trim()).filter(Boolean),
+      saveAsRecurring,eligibilityProfileId:selectedEligibilityProfileId,
+      marketScopeId:selectedMarketScopeId,
+      eligibilityProfileSnapshot:selectedEligibilityProfile,marketScopeSnapshot,
+    }) : null,
+    [isWk100,wk100WeekInitialized,selectedEligibilityProfile,marketScopeSnapshot,chartSize,
+     market,chartKind,editionDate,chartTitle,chartSlug,coverStyle,sourceUrls,
+     saveAsRecurring,selectedEligibilityProfileId,selectedMarketScopeId]
+  );
+  const hydrateWk100=useCallback((draft:Wk100AdminDraftConfig)=>{
+    setChartTitle(draft.chartTitle);setChartSlug(draft.chartSlug);
+    setChartSize(draft.chartSize);setMarket(draft.market);
+    setChartKind(draft.chartKind);setCoverStyle(draft.coverStyle);
+    setSourceUrls(draft.sourceUrls.join("\n"));
+    setSaveAsRecurring(draft.saveAsRecurring);
+    setSelectedEligibilityProfileId(draft.eligibilityProfileId);
+    setSelectedMarketScopeId(draft.marketScopeId);
+    const profile=draft.eligibilityProfileSnapshot as ChartEligibilityProfile;
+    const scope=draft.marketScopeSnapshot as StoredChartMarketScope;
+    if(profile?.id)setEligibilityProfiles(old=>[
+      ...old.filter(x=>x.id!==profile.id),profile,
+    ]);
+    if(scope?.id)setMarketScopes(old=>[
+      ...old.filter(x=>x.id!==scope.id),
+      {...scope,createdAt:scope.createdAt??"",updatedAt:scope.updatedAt??""},
+    ]);
+  },[]);
+  const wk100Save=useWk100DraftAutosave({
+    enabled:isWk100 && wk100WeekInitialized && isWk100WeekStartEat(editionDate),weekStartEat:editionDate,
+    config:wk100Config,onHydrate:hydrateWk100,
+  });
+
   const publicUrlPreview = useMemo(() => (chartSlug && editionDate ? `/charts/${chartSlug}/${editionDate}` : null), [chartSlug, editionDate]);
   const filteredRows = useMemo(() => !dryRunResult ? [] : rowFilter === "all" ? dryRunResult.rows : dryRunResult.rows.filter((row) => row.matchStatus === rowFilter), [dryRunResult, rowFilter]);
   const activeRun = runs.find((run) => run.status === "running");
@@ -369,7 +422,7 @@ export default function AdminChartsIngest() {
   function handleQuickTemplate(template: QuickTemplateKey) {
     const templates: Record<QuickTemplateKey, { title: string; slug: string; size: number; market: string; marketScopeId: string; seriesId: string; eligibilityProfileId: string }> = {
       top40: { title: "WAKILISHA Top 40", slug: "wakilisha-top-40", size: 40, market: "KE", marketScopeId: "scope_kenya", seriesId: "kenya", eligibilityProfileId: "elig_all_artists" },
-      kenyan: { title: "WAKILISHA Top 100 — Kenyan Artists", slug: "top-songs-kenya-artists-only", size: 100, market: "KE", marketScopeId: "scope_kenya", seriesId: "kenya", eligibilityProfileId: "elig_kenyan_artists_only" },
+      kenyan: { title: "WAKILISHA Kenyan Artists", slug: "top-songs-kenya-artists-only", size: 100, market: "KE", marketScopeId: "scope_kenya", seriesId: "kenya", eligibilityProfileId: "elig_kenyan_artists_only" },
       groups: { title: "WAKILISHA Groups & Collectives", slug: "groups-collectives-kenya", size: 40, market: "KE", marketScopeId: "scope_kenya", seriesId: "kenya", eligibilityProfileId: "elig_groups_collectives_only" },
       eastAfrica: { title: "WAKILISHA East African Artists", slug: "east-african-artists", size: 100, market: "KE", marketScopeId: "scope_east_africa_ke_ug_tz", seriesId: "kenya", eligibilityProfileId: "elig_east_africa_selected_markets" },
     };
@@ -387,12 +440,24 @@ export default function AdminChartsIngest() {
   }
 
   function handleContinueToRules() {
+    if(isWk100 && (!wk100WeekInitialized || !isWk100WeekStartEat(editionDate))){
+      setFormError("Choose a Monday to set the WAKILISHA 100 week in East Africa Time.");
+      return;
+    }
+    if(isWk100 && !wk100Save.canContinue){
+      setFormError("Save WAKILISHA 100 settings to the server before continuing.");
+      return;
+    }
     const error = validateProgramStep();
     if (error) { setFormError(error); return; }
     setFormError(null); setSuccessMessage(null); setStep("rules");
   }
 
   async function handleDryRun() {
+    if(isWk100){
+      setFormError("WAKILISHA 100 requires its governed research-to-publication path. Generic Ingest cannot publish this programme.");
+      return;
+    }
     const error = validateForm();
     if (error) { setFormError(error); return; }
     setFormError(null); setDryRunLoading(true); setDryRunResult(null); setSuccessMessage(null); setExpandedRowId(null);
@@ -437,6 +502,10 @@ export default function AdminChartsIngest() {
   }
 
   async function handleCommit() {
+    if(isWk100){
+      setFormError("WAKILISHA 100 uses signed editorial approval and the governed weekly publisher, not generic Ingest commit.");
+      return;
+    }
     if (!dryRunResult) return;
     setCommitLoading(true); setFormError(null); setCommitResult(null);
     try {
@@ -462,7 +531,39 @@ export default function AdminChartsIngest() {
   return (
     <div className="space-y-6">
       <IngestPageHeader mode={mode} onOpenRuns={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-runs`)} onOpenHealth={() => navigate(`${ADMIN_CHARTS_BASE}/ingest-health`)} />
-      <Stepper step={step} onStepChange={(nextStep) => { if (nextStep === "configure") handleReset(); if (nextStep === "rules") setStep("rules"); }} />
+      {isWk100 && <section aria-live="polite" className="rounded-xl border border-wk-border bg-wk-surface p-4">
+        <h2 className="text-base font-bold text-wk-text">WAKILISHA 100 · Weekly Edition</h2>
+        <p className="mt-1 text-xs text-wk-text-muted">
+          Full filter selection is saved against this EAT week, with a verified server revision.
+        </p>
+        <p className="mt-2 text-sm text-wk-text" role="status">
+          {wk100Save.state==="saved"
+            ? `Saved · revision ${wk100Save.revision}`
+            : wk100Save.state==="loading"?"Loading server draft…"
+            : wk100Save.state==="saving"?"Saving draft…"
+            : wk100Save.state==="conflict"?"Another Admin changed this week"
+            : wk100Save.state==="error"?"Save failed. Your changes are retained"
+            : "Not yet saved"}
+        </p>
+        {wk100WeekInitialized && !isWk100WeekStartEat(editionDate) && <p className="text-xs text-wk-danger" role="alert">
+          Choose a Monday for this WAKILISHA 100 week. Dates use East Africa Time.
+        </p>}
+        {wk100WeekInitialized && isWk100WeekStartEat(editionDate) && !wk100Config && <p className="text-xs text-wk-danger" role="alert">
+          Select a valid eligibility profile and market scope; WAKILISHA 100 requires 100 tracks in Kenya.
+        </p>}
+        {wk100Save.message && <p className="mt-2 text-xs text-wk-danger" role="alert">{wk100Save.message}</p>}
+        {(wk100Save.state==="error"||wk100Save.state==="conflict") && <div className="mt-2 flex flex-wrap gap-2">
+          {wk100Save.state==="error" && <button className="wk-button wk-button-secondary wk-button-sm"
+            type="button" onClick={wk100Save.retry}>Retry save</button>}
+          <button className="wk-button wk-button-secondary wk-button-sm"
+            type="button" onClick={wk100Save.discardAndReload}>
+            Discard local edits and reload saved draft
+          </button>
+        </div>}
+      </section>}
+      {isWk100 && <Wk100ResearchEvidencePanel key={editionDate}
+        weekStartEat={editionDate} draftSaved={wk100Save.state==="saved" && wk100Config!==null} />}
+      <Stepper step={step} onStepChange={(nextStep) => { if (nextStep === "configure") handleReset(); if (nextStep === "rules") handleContinueToRules(); }} />
       <IngestKpiStrip kpis={kpis} />
       <IngestStatusStack formError={formError} successMessage={successMessage} editionExistsWarning={editionExistsWarning} />
 

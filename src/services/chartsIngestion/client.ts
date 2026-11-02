@@ -161,6 +161,11 @@ export function getIngestStudioEndpointGroups(): Record<string, EndpointDefiniti
 // Production pipeline (new 21-stage ingest run system)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// WAKILISHA 100 — server-acknowledged EAT-week draft revision API.
+export const getWk100AdminDraft = ingestStudioAdapter.getWk100AdminDraft;
+export const saveWk100AdminDraft = ingestStudioAdapter.saveWk100AdminDraft;
+export type { Wk100AdminDraftConfig, Wk100AdminDraft } from "./productionAdapter";
+
 export const runDryRun: typeof ingestStudioAdapter.runDryRun = (request) => {
   const payload = request as Parameters<typeof ingestStudioAdapter.runDryRun>[0] & Record<string, unknown>;
   const profileId = typeof payload.eligibilityProfileId === "string" ? payload.eligibilityProfileId : "";
@@ -196,6 +201,7 @@ export const runShortlist = ingestStudioAdapter.runShortlist;
 export const resetPipeline = ingestStudioAdapter.resetPipeline;
 export const runFullPipeline = ingestStudioAdapter.runFullPipeline;
 export const getOriginReviewQueue = ingestStudioAdapter.getOriginReviewQueue;
+export const getFullFilterPreview = ingestStudioAdapter.getFullFilterPreview;
 export const setArtistOriginForRun = ingestStudioAdapter.setArtistOriginForRun;
 export const createOriginArtistShell = ingestStudioAdapter.createOriginArtistShell;
 export const getOriginCountryOptions = ingestStudioAdapter.getOriginCountryOptions;
@@ -204,7 +210,7 @@ export const getChartBackfillPresets = ingestStudioAdapter.getChartBackfillPrese
 export const saveChartBackfillPreset = ingestStudioAdapter.saveChartBackfillPreset;
 export const getWeeklyBackfillPlan = ingestStudioAdapter.getWeeklyBackfillPlan;
 export type { ChartBackfillPreset, ChartBackfillPresetConfig, WeeklyBackfillPlanRow } from "./productionAdapter";
-export type { OriginReviewQueueRow, OriginCountryOption } from "./productionAdapter";
+export type { OriginReviewQueueRow, OriginCountryOption, FullFilterPreview } from "./productionAdapter";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Legacy ingest studio (9-phase UI) — now backed by real DB tables

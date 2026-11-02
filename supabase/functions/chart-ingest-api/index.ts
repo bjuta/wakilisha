@@ -1,6 +1,10 @@
 // ── SHARED BLOCK (Phase A) ──
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { parseChartArtistCredits, type ChartArtistCredit } from "./artistCredit.ts";
+import { previewFullIngestFilters, ChartIngestPreviewHold } from "../_shared/chart-ingest-full-filter-preview.mjs";
+import { executeFullFilterStage, FullFilterStageHold } from "../_shared/chart-ingest-full-filter-stage.mjs";
+import { createIngestPolicySnapshot, ChartIngestPolicyError, assertIngestEvaluatorReady } from "../_shared/chart-ingest-policy-snapshot.mjs";
+import { canonicalJSON, digestSHA256 } from "../_shared/chart-weekly-evidence.mjs";
 import {
   compactProviderIdentityPart as compactIdentityPart,
   normalizeIsrc,
@@ -47,7 +51,7 @@ function safeError(req: Request, action: string, err: unknown): Response { const
 
 const ACTION_CAPABILITIES: Record<string, string> = {
   list_runs:"view_charts_admin",get_run:"view_charts_admin",get_stages:"view_charts_admin",get_sources:"view_charts_admin",get_candidates:"view_charts_admin",get_normalized:"view_charts_admin",get_kpis:"view_charts_admin",get_activity:"view_charts_admin",get_resource_guard:"view_charts_admin",get_review_issues:"view_charts_admin",get_matches_for_run:"view_charts_admin",validate_commit:"view_charts_admin",preflight:"view_charts_admin",csv_list:"view_charts_admin",get_origin_review_queue:"view_charts_admin",get_origin_country_options:"view_charts_admin",get_family_ingest_presets:"view_charts_admin",get_weekly_backfill_plan:"view_charts_admin",
-  create_dry_run:"manage_ingest",source_fetch:"manage_ingest",normalize_run:"manage_ingest",run_canonical_match:"manage_ingest",run_entity_resolution:"manage_ingest",run_eligibility:"manage_ingest",run_carry_forward:"manage_ingest",run_scoring:"manage_ingest",run_shortlist:"manage_ingest",run_airplay_detection:"manage_ingest",run_full_pipeline:"manage_ingest",send_gaps_to_review:"manage_ingest",apply_row_decision:"manage_ingest",cancel_run:"manage_ingest",retry_run:"manage_ingest",reset_pipeline:"manage_ingest",csv_upload:"manage_ingest",csv_normalize:"manage_ingest",set_artist_origin_for_run:"manage_registry",create_origin_artist_shell:"manage_registry",reset_after_origin_resolution:"manage_ingest",save_family_ingest_preset:"manage_ingest",commit_run:"publish_charts",fix_chart_artist_slugs:"publish_charts",reingest_edition:"publish_charts"};
+  wk100_get_admin_draft:"manage_ingest",wk100_save_admin_draft:"manage_ingest",preview_full_filters:"manage_ingest",create_dry_run:"manage_ingest",source_fetch:"manage_ingest",normalize_run:"manage_ingest",run_canonical_match:"manage_ingest",run_entity_resolution:"manage_ingest",run_eligibility:"manage_ingest",run_carry_forward:"manage_ingest",run_scoring:"manage_ingest",run_shortlist:"manage_ingest",run_airplay_detection:"manage_ingest",run_full_pipeline:"manage_ingest",send_gaps_to_review:"manage_ingest",apply_row_decision:"manage_ingest",cancel_run:"manage_ingest",retry_run:"manage_ingest",reset_pipeline:"manage_ingest",csv_upload:"manage_ingest",csv_normalize:"manage_ingest",set_artist_origin_for_run:"manage_registry",create_origin_artist_shell:"manage_registry",reset_after_origin_resolution:"manage_ingest",save_family_ingest_preset:"manage_ingest",commit_run:"publish_charts",fix_chart_artist_slugs:"publish_charts",reingest_edition:"publish_charts"};
 
 Deno.serve(async (req) => {
   const cors = corsRestricted(req);
@@ -60,6 +64,8 @@ Deno.serve(async (req) => {
   const requiredCapability=ACTION_CAPABILITIES[action];
   if(requiredCapability){const can=await requireCap(db,requiredCapability);if(!can)return json(req,{error:"forbidden"},403);}
   try {
+    if (action === "wk100_get_admin_draft") return handleWk100GetAdminDraft(req, db, params);
+    if (action === "wk100_save_admin_draft") return handleWk100SaveAdminDraft(req, db, params, auth);
     if (action === "create_dry_run") return handleCreateDryRun(req, db, params, auth);
     if (action === "list_runs") return handleListRuns(req, db, params);
     if (action === "get_run") return handleGetRun(req, db, params);
@@ -72,7 +78,7 @@ Deno.serve(async (req) => {
     if (action === "run_canonical_match") return handleRunCanonicalMatch(req, db, params, auth);
     if (action === "run_entity_resolution") return handleRunEntityResolution(req, db, params, auth);
     if (action === "source_fetch") return handleSourceFetch(req, db, params, auth);
-    if (action === "run_eligibility") return handleRunEligibilityWithReleaseWindow(req, db, params, auth);
+    if (action === "run_eligibility") return handleFullFilterEligibilityDispatch(req, db, params, auth);
     if (action === "run_carry_forward") return handleRunCarryForward(req, db, params, auth);
     if (action === "run_scoring") return handleRunScoring(req, db, params, auth);
     if (action === "run_shortlist") return handleRunShortlist(req, db, params, auth);
@@ -90,6 +96,7 @@ Deno.serve(async (req) => {
     if (action === "get_review_issues") return handleGetReviewIssues(req, db, params);
     if (action === "get_matches_for_run") return handleGetMatchesForRun(req, db, params);
     if (action === "get_origin_review_queue") return handleGetOriginReviewQueue(req, db, params);
+    if (action === "preview_full_filters") return handleFullFilterPreview(req, db, params);
     if (action === "get_origin_country_options") return handleGetOriginCountryOptions(req, db, params);
     if (action === "get_family_ingest_presets") return handleGetFamilyIngestPresets(req, db);
     if (action === "save_family_ingest_preset") return handleSaveFamilyIngestPreset(req, db, params, auth);
@@ -814,7 +821,106 @@ async function handleReingestEdition(
   }, stats.errors === 0 ? 200 : 409);
 }
 
-async function handleCreateDryRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const rq = params.request as Record<string, unknown>; if (!rq) return json(req, { error: "request_required" }, 400); const runId = crypto.randomUUID(); const ed = rq.editionDate as string; const sUrls = (rq.sourceUrls as string[]) || []; const { error: rErr } = await db.from("chart_ingest_runs").insert({ id: runId, program_id: (rq.existingSeriesId as string) || "unknown", series_slug: (rq.existingSeriesId as string) || null, market_slug: (rq.market as string) || "KE", chart_kind: (rq.chartKind as string) || "tracks", edition_date: ed, period_start: ed, period_end: ed, chart_size: (rq.chartSize as number) || 20, status: "queued", rule_snapshot_json: { chartTitle: rq.chartTitle, chartSlug: rq.chartSlug, coverStyle: rq.coverStyle || "default", saveAsRecurringSeries: rq.saveAsRecurringSeries || false, methodologyVersion: rq.methodologyVersion || "1.0.0" }, market_scope_snapshot_json: (rq.marketScopeSnapshot as object) || {}, eligibility_profile_id: (rq.eligibilityProfileId as string) || null, market_scope_id: (rq.marketScopeId as string) || null, scoring_policy_version: "1.0.1", source_policy_version: "1.0.0", eligibility_policy_version: "1.0.0", methodology_version: (rq.methodologyVersion as string) || "1.0.0", created_by: user.id, created_by_email: user.email || null }); if (rErr) return json(req, { error: "run_create_failed", detail: rErr.message }, 500); if (sUrls.length > 0) { const srs = sUrls.map((url, i) => ({ run_id: runId, provider: detectProvider(url), source_type: url.endsWith(".csv") ? "csv" : "playlist", source_url: url, storefront_or_market: (rq.market as string) || "KE", enabled: true, priority: i, fetch_status: "pending" })); await db.from("chart_ingest_run_sources").insert(srs); } const sgs = ALL_STAGES.map(s => ({ run_id: runId, stage: s, status: "idle", metrics_json: {} })); await db.from("chart_ingest_stage_events").insert(sgs); await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "run_created", new_status: "queued", payload_json: { sourceCount: sUrls.length } }); return json(req, { runId, status: "queued" }); }
+
+// WAKILISHA 100 weekly draft. No scoring, publication or service-role client.
+// The signed-in caller must hold manage_ingest. SQL grants are additionally
+// constrained by the existing authenticated capability and per-week CAS lock.
+const WK100_DRAFT_SCHEMA = "wk100-admin-edition-config/v1";
+const WK100_DRAFT_KEYS = new Set([
+  "schemaVersion","programId","weekStartEat","chartTitle","chartSlug",
+  "chartSize","market","chartKind","coverStyle","sourceUrls",
+  "saveAsRecurring","eligibilityProfileId","marketScopeId",
+  "eligibilityProfileSnapshot","marketScopeSnapshot",
+]);
+
+function validWk100Week(week: unknown): week is string {
+  if (typeof week !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(week)) return false;
+  const date = new Date(week + "T00:00:00Z");
+  return !Number.isNaN(date.getTime()) &&
+    date.toISOString().slice(0,10) === week && date.getUTCDay() === 1;
+}
+
+async function handleWk100GetAdminDraft(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string,unknown>,
+) {
+  const week = params.weekStartEat;
+  if (!validWk100Week(week)) return json(req,{error:"invalid_eat_week"},400);
+  const {data,error}=await db.rpc("wk100_get_admin_draft_v1",{p_week:week});
+  if (error) return json(req,{error:error.code==="42501"?"forbidden":"draft_read_unavailable"},error.code==="42501"?403:503);
+  return json(req,{ok:true,weekStartEat:week,draft:data??null});
+}
+
+async function handleWk100SaveAdminDraft(
+  req: Request,
+  db: ReturnType<typeof createClient>,
+  params: Record<string,unknown>,
+  user: {id:string; email?:string},
+) {
+  const week=params.weekStartEat,revision=params.expectedRevision;
+  const draft=params.config;
+  if (!validWk100Week(week) || !Number.isInteger(revision) ||
+      Number(revision)<0 || Number(revision)>2147483647 ||
+      !draft || Array.isArray(draft) || typeof draft!=="object") {
+    return json(req,{error:"invalid_draft_request"},400);
+  }
+  const config=draft as Record<string,unknown>;
+  if (Object.keys(config).some(k=>!WK100_DRAFT_KEYS.has(k)) ||
+      config.schemaVersion!==WK100_DRAFT_SCHEMA ||
+      config.programId!=="top100" || config.weekStartEat!==week ||
+      config.chartSize!==100 || config.market!=="KE" ||
+      config.chartKind!=="tracks" ||
+      typeof config.chartTitle!=="string" || config.chartTitle.length>150 ||
+      typeof config.chartSlug!=="string" || config.chartSlug.length>150 ||
+      !Array.isArray(config.sourceUrls) || config.sourceUrls.length>20 ||
+      !config.sourceUrls.every(u=>typeof u==="string" && u.length<=2048) ||
+      typeof config.eligibilityProfileId!=="string" ||
+      typeof config.marketScopeId!=="string" ||
+      !config.eligibilityProfileSnapshot ||
+      !config.marketScopeSnapshot) {
+    return json(req,{error:"invalid_wk100_configuration"},400);
+  }
+  // This is validation, not permission to score: the frozen policy evaluator
+  // remains held until real source-native receipts and editorial authority.
+  try {
+    await createIngestPolicySnapshot({
+      eligibilityProfileId:config.eligibilityProfileId,
+      marketScopeId:config.marketScopeId,
+      eligibilityProfileSnapshot:config.eligibilityProfileSnapshot,
+      marketScopeSnapshot:config.marketScopeSnapshot,
+    },user.id,new Date().toISOString());
+  } catch {
+    return json(req,{error:"invalid_wk100_filters"},400);
+  }
+  // A draft fingerprint must be stable across identical retries and users;
+  // the frozen policy's actor/time-bound SHA is not an idempotency key.
+  const policyDraftDigest=await digestSHA256(canonicalJSON({
+    profileId:config.eligibilityProfileId,marketScopeId:config.marketScopeId,
+    eligibilityProfileSnapshot:config.eligibilityProfileSnapshot,
+    marketScopeSnapshot:config.marketScopeSnapshot,
+  }));
+  const sealed={...config,ingestPolicySha256:policyDraftDigest};
+  if(JSON.stringify(sealed).length>100000)return json(req,{error:"configuration_too_large"},413);
+  const {data,error}=await db.rpc("wk100_save_admin_draft_v1",{
+    p_week:week,p_expected_revision:revision,p_config:sealed,
+  });
+  if(error){
+    if(error.code==="40001")return json(req,{error:"draft_revision_conflict",retryable:false},409);
+    if(error.code==="42501")return json(req,{error:"draft_locked_or_unauthorized"},403);
+    if(error.code==="22023")return json(req,{error:"draft_invalid"},400);
+    return json(req,{error:"draft_persistence_unavailable"},503);
+  }
+  if(!data||data.persisted!==true||!Number.isInteger(data.revision)||
+     data.revision!==Number(revision)+1 ||
+     !/^[a-f0-9]{64}$/.test(String(data.configSha256||"")))
+    return json(req,{error:"draft_receipt_invalid"},503);
+  return json(req,{ok:true,weekStartEat:week,revision:data.revision,
+    updatedAt:data.updatedAt,configSha256:data.configSha256,persisted:true});
+}
+
+
+async function handleCreateDryRun(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>, user: { id: string; email?: string }) { const rq = params.request as Record<string, unknown>; if (!rq) return json(req, { error: "request_required" }, 400); let frozenPolicy; try { frozenPolicy = await createIngestPolicySnapshot(rq, user.id, new Date().toISOString()); } catch (error) { if (error instanceof ChartIngestPolicyError) return json(req, { error: "invalid_eligibility_policy_snapshot", code: error.code }, 400); throw error; } const runId = crypto.randomUUID(); const ed = rq.editionDate as string; const sUrls = (rq.sourceUrls as string[]) || []; const { error: rErr } = await db.from("chart_ingest_runs").insert({ id: runId, program_id: (rq.existingSeriesId as string) || "unknown", series_slug: (rq.existingSeriesId as string) || null, market_slug: (rq.market as string) || "KE", chart_kind: (rq.chartKind as string) || "tracks", edition_date: ed, period_start: ed, period_end: ed, chart_size: (rq.chartSize as number) || 20, status: "queued", rule_snapshot_json: { chartTitle: rq.chartTitle, chartSlug: rq.chartSlug, coverStyle: rq.coverStyle || "default", saveAsRecurringSeries: rq.saveAsRecurringSeries || false, methodologyVersion: rq.methodologyVersion || "1.0.0", eligibilityProfileId: frozenPolicy.profileId, releaseWindowStart: frozenPolicy.releaseWindowStart, releaseWindowEnd: frozenPolicy.releaseWindowEnd, ingestPolicy: frozenPolicy }, market_scope_snapshot_json: frozenPolicy.marketScopeSnapshot, eligibility_profile_id: (rq.eligibilityProfileId as string) || null, market_scope_id: (rq.marketScopeId as string) || null, scoring_policy_version: "1.0.1", source_policy_version: "1.0.0", eligibility_policy_version: "1.0.0", methodology_version: (rq.methodologyVersion as string) || "1.0.0", created_by: user.id, created_by_email: user.email || null }); if (rErr) return json(req, { error: "run_create_failed", detail: rErr.message }, 500); if (sUrls.length > 0) { const srs = sUrls.map((url, i) => ({ run_id: runId, provider: detectProvider(url), source_type: url.endsWith(".csv") ? "csv" : "playlist", source_url: url, storefront_or_market: (rq.market as string) || "KE", enabled: true, priority: i, fetch_status: "pending" })); await db.from("chart_ingest_run_sources").insert(srs); } const sgs = ALL_STAGES.map(s => ({ run_id: runId, stage: s, status: "idle", metrics_json: {} })); await db.from("chart_ingest_stage_events").insert(sgs); await db.from("chart_ingest_audit_events").insert({ run_id: runId, actor: user.id, actor_email: user.email || null, action: "run_created", new_status: "queued", payload_json: { sourceCount: sUrls.length } }); return json(req, { runId, status: "queued" }); }
 
 async function handleListRuns(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) { const limit = Math.min((params.limit as number) || 100, 200); const { data: runs, error } = await db.from("chart_ingest_runs").select("*").order("created_at", { ascending: false }).limit(limit); if (error) return json(req, { error: error.message }, 500); const rl = runs || []; if (rl.length > 0) { const rids = rl.map((r: { id: string }) => r.id); const [sr, sg] = await Promise.all([db.from("chart_ingest_run_sources").select("*").in("run_id", rids).order("priority"), db.from("chart_ingest_stage_events").select("*").in("run_id", rids).order("created_at")]); const sbm = new Map<string, unknown[]>(); for (const s of (sr.data || [])) { const rid = s.run_id as string; if (!sbm.has(rid)) sbm.set(rid, []); sbm.get(rid)!.push(s); } const stm = new Map<string, unknown[]>(); for (const s of (sg.data || [])) { const rid = s.run_id as string; if (!stm.has(rid)) stm.set(rid, []); stm.get(rid)!.push(s); } return json(req, { runs: rl.map((r: { id: string }) => ({ ...r, chart_ingest_run_sources: sbm.get(r.id) || [], chart_ingest_stage_events: stm.get(r.id) || [] })) }); } return json(req, { runs: [] }); }
 
@@ -888,6 +994,62 @@ async function handleValidateCommit(req: Request, db: ReturnType<typeof createCl
     warnings: [],
     integrityReport: integrity,
   });
+}
+
+
+async function enforceChartIngestFullFilterGate(req: Request, run: Record<string, unknown>): Promise<Response | null> {
+  const rule = run.rule_snapshot_json as Record<string, unknown> | null;
+  if (!rule || !Object.hasOwn(rule, "ingestPolicy")) return null;
+  const result = await assertIngestEvaluatorReady(rule.ingestPolicy);
+  if (result.ok) return null;
+  return json(req, { error: "ingest_full_filter_gate_blocked", code: result.code }, 409);
+}
+
+async function handleFullFilterPreview(req: Request, db: ReturnType<typeof createClient>, params: Record<string, unknown>) {
+  const runId = params.runId;
+  if (typeof runId !== "string") return json(req, { error: "runId_required" }, 400);
+  try {
+    const projection = await previewFullIngestFilters(db, runId);
+    return json(req, projection);
+  } catch (err) {
+    if (err instanceof ChartIngestPreviewHold) return json(req, { error: "full_filter_preview_blocked", code: err.code }, 409);
+    return json(req, { error: "full_filter_preview_unavailable" }, 503);
+  }
+}
+
+// New frozen-policy execution: caller-JWT, complete predicates, atomic *review-only*
+// dispositions. Historic unfrozen runs preserve their existing behavior.
+// No downstream hold can be lifted by this handler.
+async function handleFullFilterEligibilityDispatch(
+  req: Request, db: ReturnType<typeof createClient>,
+  params: Record<string, unknown>, user: { id: string; email?: string },
+): Promise<Response> {
+  const runId = params.runId;
+  if (typeof runId !== "string" || !runId) return json(req, { error: "runId_required" }, 400);
+  const { data: run, error } = await db.from("chart_ingest_runs")
+    .select("id,rule_snapshot_json").eq("id", runId).maybeSingle();
+  if (error) return json(req, { error: "run_lookup_failed" }, 503);
+  if (!run) return json(req, { error: "run_not_found" }, 404);
+  const frozen = (run.rule_snapshot_json as Record<string, unknown> | null)?.ingestPolicy;
+  if (frozen !== undefined && frozen !== null) {
+    // The invoker RPC writes under legacy manage_charts RLS; full Registry
+    // evidence also needs view_registry. Never fabricate absent RLS rows.
+    // Manage_ingest is independently enforced by ACTION_CAPABILITIES.
+    for (const capability of ["manage_charts", "view_charts_admin", "view_registry"]) {
+      if (!(await requireCap(db, capability))) {
+        return json(req, { error: "full_filter_capability_required", capability }, 403);
+      }
+    }
+    try {
+      const receipt = await executeFullFilterStage(db, runId);
+      return json(req, { ok: true, ...receipt });
+    } catch (err) {
+      if (err instanceof FullFilterStageHold)
+        return json(req, { error: "full_filter_eligibility_held", code: err.code }, 409);
+      return json(req, { error: "full_filter_eligibility_failed" }, 503);
+    }
+  }
+  return handleRunEligibilityWithReleaseWindow(req, db, params, user);
 }
 
 // NORMALIZE
@@ -2342,12 +2504,14 @@ async function handleRunEligibility(
 
   const { data: run, error: runError } = await db
     .from("chart_ingest_runs")
-    .select("id,status,market_scope_snapshot_json")
+    .select("id,status,market_scope_snapshot_json,rule_snapshot_json")
     .eq("id", runId)
     .maybeSingle();
 
   if (runError) return json(req, { error: "run_lookup_failed", detail: runError.message }, 500);
   if (!run) return json(req, { error: "run_not_found" }, 404);
+  const frozenPolicyGate = await enforceChartIngestFullFilterGate(req, run);
+  if (frozenPolicyGate) return frozenPolicyGate;
 
   await db
     .from("chart_ingest_stage_events")
@@ -2698,6 +2862,8 @@ async function handleRunScoring(
 
   if (runError) return json(req, { error: "run_lookup_failed", detail: runError.message }, 500);
   if (!run) return json(req, { error: "run_not_found" }, 404);
+  const frozenPolicyGate = await enforceChartIngestFullFilterGate(req, run);
+  if (frozenPolicyGate) return frozenPolicyGate;
 
   await db
     .from("chart_ingest_stage_events")
@@ -3219,12 +3385,14 @@ async function handleRunShortlist(
 
   const { data: run, error: runError } = await db
     .from("chart_ingest_runs")
-    .select("id,status,edition_date,chart_size")
+    .select("id,status,edition_date,chart_size,rule_snapshot_json")
     .eq("id", runId)
     .maybeSingle();
 
   if (runError) return json(req, { error: "run_lookup_failed", detail: runError.message }, 500);
   if (!run) return json(req, { error: "run_not_found" }, 404);
+  const frozenPolicyGate = await enforceChartIngestFullFilterGate(req, run);
+  if (frozenPolicyGate) return frozenPolicyGate;
 
   await db
     .from("chart_ingest_stage_events")
@@ -3507,6 +3675,28 @@ async function handleRunFullPipeline(
 ) {
   const { runId } = params as { runId: string };
   if (!runId) return json(req, { error: "runId_required" }, 400);
+  // This route otherwise calls the LEGACY eligibility function directly after
+  // already mutating sources, candidates, matches, resolution and carry-forward.
+  // Frozen-policy V1 remains review-only; reject BEFORE the first write.
+  const { data: pipelineRun, error: pipelineLookupError } = await db
+    .from("chart_ingest_runs")
+    .select("id,status,rule_snapshot_json")
+    .eq("id", runId).maybeSingle();
+  if (pipelineLookupError) return json(req, { error: "pipeline_run_lookup_failed" }, 503);
+  if (!pipelineRun) return json(req, { error: "run_not_found" }, 404);
+  const prohibitedPipelineStates = [
+    "retired", "committed", "published", "cancelled", "commit_pending",
+    "ready_to_commit", "committing", "publishing",
+  ];
+  if (prohibitedPipelineStates.includes(String(pipelineRun.status || "")))
+    return json(req, { error: "terminal_ingest_run_protected" }, 409);
+  const rule = pipelineRun.rule_snapshot_json as Record<string, unknown> | null;
+  if (rule && Object.hasOwn(rule, "ingestPolicy"))
+    return json(req, {
+      error: "frozen_full_pipeline_held",
+      code: "governed_eligibility_review_required",
+      canScore: false, canCommit: false, canPublish: false,
+    }, 409);
 
   const startedAt = Date.now();
   const pipelineStages: Array<{ stage: string; result: string }> = [];
@@ -3743,6 +3933,8 @@ async function handleCommitRun(
 
   if (runError) return json(req, { error: "run_lookup_failed", detail: runError.message }, 500);
   if (!run) return json(req, { error: "run_not_found" }, 404);
+  const frozenPolicyGate = await enforceChartIngestFullFilterGate(req, run);
+  if (frozenPolicyGate) return frozenPolicyGate;
 
   const now = new Date().toISOString();
   const editionDate = String(run.edition_date || now.split("T")[0]);

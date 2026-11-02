@@ -50,7 +50,7 @@ interface DbRunSource {
   id: string;
   run_id: string;
   provider: string;
-  source_url: string;
+  source_url: string | null;
   enabled: boolean;
   fetch_status: string;
 }
@@ -240,7 +240,11 @@ function mapDbRunToUi(dbRun: DbRun): IngestRun {
   );
   const detectedProviders = Array.from(providerSet) as ProviderName[];
 
-  const sourceUrls = sources.map((s) => s.source_url);
+  // Manual/CSV sources can have no external URL. Preserve the source record,
+  // but never pass null into the string-only UI sourceLinks contract.
+  const sourceUrls = sources
+    .map((source) => source.source_url)
+    .filter((url): url is string => typeof url === "string" && url.trim().length > 0);
 
   // Summary from DB counts (will be populated once pipeline runs)
   const total = counts?.total ?? 0;
@@ -376,6 +380,51 @@ export async function runDryRun(
     commercialReadiness: null,
     rowIntelligence: {},
   };
+}
+
+/** WAKILISHA 100: live Admin draft only. Does not publish or score. */
+export type Wk100AdminDraftConfig = {
+  schemaVersion: "wk100-admin-edition-config/v1";
+  programId: "top100";
+  weekStartEat: string;
+  chartTitle: string;
+  chartSlug: string;
+  chartSize: 100;
+  market: "KE";
+  chartKind: "tracks";
+  coverStyle: string;
+  sourceUrls: string[];
+  saveAsRecurring: boolean;
+  eligibilityProfileId: string;
+  marketScopeId: string;
+  eligibilityProfileSnapshot: unknown;
+  marketScopeSnapshot: unknown;
+};
+export type Wk100AdminDraft = {
+  weekStartEat: string;
+  revision: number;
+  config: Wk100AdminDraftConfig & {ingestPolicySha256?:string};
+  configSha256: string;
+  updatedAt: string;
+};
+
+export async function getWk100AdminDraft(weekStartEat: string): Promise<Wk100AdminDraft|null> {
+  const result=await invokeApi<{ok:true;draft:Wk100AdminDraft|null}>(
+    "wk100_get_admin_draft",{weekStartEat});
+  if(result.ok!==true)throw new Error("draft_read_invalid");
+  return result.draft;
+}
+
+export async function saveWk100AdminDraft(
+  weekStartEat:string, expectedRevision:number, config:Wk100AdminDraftConfig,
+):Promise<{revision:number;configSha256:string;updatedAt:string}> {
+  const result=await invokeApi<{
+    ok:true;revision:number;configSha256:string;updatedAt:string;persisted:true;
+  }>("wk100_save_admin_draft",{weekStartEat,expectedRevision,config});
+  if(result.ok!==true||result.persisted!==true||
+     result.revision!==expectedRevision+1||!result.configSha256)
+    throw new Error("draft_save_receipt_invalid");
+  return {revision:result.revision,configSha256:result.configSha256,updatedAt:result.updatedAt};
 }
 
 /** Commit a run to a V2 chart edition. */
@@ -1039,4 +1088,25 @@ export async function getWeeklyBackfillPlan(input: {
     latestRunUpdatedAt: row.latest_run_updated_at,
     recommendedAction: row.recommended_action,
   }));
+}
+
+/** Read-only comprehensive filter review for the existing Ingest Run page.
+ * No scoring, commit, or Registry mutation authority is ever returned. */
+export type FullFilterPreview = {
+  runId: string;
+  contract: string;
+  frozenPolicyVerified: boolean;
+  candidateCount: number;
+  counts: Record<"ELIGIBLE" | "EXCLUDED" | "REVIEW_REQUIRED" | "CONFLICTED", number>;
+  reviewRowCount: number;
+  holdReasons: string[];
+  reviewRows: Array<{ candidateId: string; outcome: string; reasonCodes: string[]; sourceObservationCount: number }>;
+  excludedRows: Array<{ candidateId: string; outcome: string; reasonCodes: string[]; sourceObservationCount: number }>;
+  canAdvanceToScoring: false;
+  canCommit: false;
+  mayScore: false;
+  mayPublish: false;
+};
+export async function getFullFilterPreview(runId: string): Promise<FullFilterPreview> {
+  return invokeApi<FullFilterPreview>("preview_full_filters", { runId });
 }

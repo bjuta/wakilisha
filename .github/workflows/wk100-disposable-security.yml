@@ -79,6 +79,9 @@ jobs:
         run: |
           set -euo pipefail
           supabase stop --no-backup
-          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          # Inspect stopped containers too, not only running DB containers.
+          test -z "$(docker ps -a --filter 'name=^supabase_' --format '{{.Names}}')"
+          # Verify actual Supabase-named volumes; labels alone may be incomplete.
+          test -z "$(docker volume ls --filter 'name=supabase_' --format '{{.Name}}')"
           test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
           echo WK100_CI_LOCAL_AUTH_STORAGE_CONTRACT_AND_LEASE_VOLUME_DESTROYED=PASS

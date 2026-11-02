@@ -65,3 +65,9 @@ verify_jwt = true
 
 [functions.wk100-capture-private-preview]
 verify_jwt = true
+
+[functions.wk100-research-intake]
+verify_jwt = true
+# Source-native, separately gated researcher-directed HTML; off until accepted.
+[functions.wk100-research-html-intake]
+verify_jwt = true

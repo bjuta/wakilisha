@@ -1,10 +1,13 @@
 import {test} from 'node:test';
+import {storeWk100ResearchOriginalBytes} from '../../supabase/functions/_shared/wk100-research-private-object-store.mjs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {mkdtemp,rm,readFile,stat,symlink,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {prepareShazamResearchEvidence,archiveShazamResearchEvidence,prepareShazamRegistryReview} from '../../scripts/charts/wk100-shazam-research-evidence.mjs';
+import {executeWk100ResearchIntake} from '../../supabase/functions/_shared/wk100-research-intake-orchestrator.mjs';
+import {verifyWk100ShazamResearchImport,projectWk100ResearchImportStatus} from '../../supabase/functions/_shared/wk100-research-receipt-bridge.mjs';
 const enc=x=>new TextEncoder().encode(x);
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const csv=enc('Rank,Artist,Title\n1,Artist One,Track One\n2,Artist Two,Track Two\n');
@@ -128,4 +131,743 @@ test('duplicate active ISRC and archived Registry candidates fail closed',()=>{
 test('identical filename at source rank does not infer a source-native provider ID',()=>{
  const x=valid();x.evidence.entries[0].provider_track_id='fake_shazam_id';
  assert.throws(()=>prepareShazamRegistryReview(x),/evidence_raw_mismatch/);
+});
+
+test('WK100 server import bridges genuine researcher CSV receipt to private nonpublishing rows',async()=>{
+ const evidence=prepareShazamResearchEvidence(args);
+ const verified=await verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt:evidence.receipt,researchWeekStartEat:'2026-10-26'});
+ assert.equal(verified.raw_sha256,hash(csv));
+ assert.equal(verified.private_rows.length,2);
+ assert.equal(verified.private_rows[0].row_ref,`${hash(csv)}:1`);
+ assert.equal(verified.private_rows[0].title_observed,'Track One');
+ assert.equal(verified.private_rows[0].artist_observed,'Artist One');
+ assert.equal(verified.private_rows[0].canonical_track_id,null);
+ assert.equal(verified.private_rows[0].provider_track_id,null);
+ assert.equal(verified.private_rows[0].source_native_count,null);
+ assert.equal(verified.source_native_metric,'rank');
+ assert.equal(verified.native_period_authority,'unknown');
+ assert.equal(verified.source_origin_independently_attested,false);
+ assert.equal(verified.source_admitted,false);
+ assert.equal(verified.can_score,false);
+ assert.equal(verified.can_publish,false);
+});
+test('WK100 import rejects changed raw bytes even when a CSV still parses',async()=>{
+ const receipt=prepareShazamResearchEvidence(args).receipt;
+ const changed=enc('Rank,Artist,Title\n1,Artist One,Track One\n2,Artist Two,Track Six\n');
+ assert.equal(changed.byteLength,csv.byteLength);
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:changed,receipt,researchWeekStartEat:'2026-10-26'}),/original_bytes_mismatch/);
+});
+test('WK100 research receipt never impersonates HTTP collection, native period, streams, or admitted provider',async()=>{
+ const original=prepareShazamResearchEvidence(args).receipt;
+ for(const change of [
+   {http_status:200},
+   {source_key:'youtube_ke'},
+   {acquisition_mode:'unattended_collector'},
+   {source_url:'https://evil.example/kenya'},
+   {can_publish:true},
+   {identity_state:'canonical'},
+   {source_native_period:{authority:'provider_defined',starts_at:'2026-10-26T00:00:00Z',ends_at:'2026-11-02T00:00:00Z'}},
+ ]){
+   await assert.rejects(verifyWk100ShazamResearchImport({
+     originalBytes:csv,receipt:{...original,...change},researchWeekStartEat:'2026-10-26'}),
+     /receipt_invalid/);
+ }
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt:{...original,observed_depth:200},researchWeekStartEat:'2026-10-26'}),
+   /native_observation_mismatch/);
+});
+test('WK100 import requires exact EAT Monday editorial week without inventing source measurement time',async()=>{
+ const receipt=prepareShazamResearchEvidence(args).receipt;
+ for(const week of ['2026-10-25','2026-10-27','2026-13-04','2026-02-30','26-10-26']){
+   await assert.rejects(verifyWk100ShazamResearchImport({
+     originalBytes:csv,receipt,researchWeekStartEat:week}),/week_invalid/);
+ }
+ assert.equal((await verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt,researchWeekStartEat:'2026-10-26'})).observation_time_utc,
+   args.observed_at);
+});
+test('WK100 import refuses invalid original-byte encoding and native CSV rows',async()=>{
+ const invalid=new Uint8Array([0xff,0xfe,0x00]);
+ const receipt={...prepareShazamResearchEvidence(args).receipt,
+   raw_sha256:hash(invalid),byte_length:invalid.length};
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:invalid,receipt,researchWeekStartEat:'2026-10-26'}),/source_native_parse_failed/);
+});
+test('WK100 import preserves original CSV byte-size cap and exact receipt shape',async()=>{
+ const receipt=prepareShazamResearchEvidence(args).receipt;
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:new Uint8Array(4_194_305),receipt,researchWeekStartEat:'2026-10-26'}),/byte_size_invalid/);
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt:{...receipt,operator_ref:undefined},researchWeekStartEat:'2026-10-26'}),/receipt_invalid/);
+ await assert.rejects(verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt:{...receipt,observed_at:'2026-02-30T18:00:00Z'},
+   researchWeekStartEat:'2026-10-26'}),/receipt_invalid/);
+});
+test('WK100 Admin projection leaks no research labels, operator, original SHA, or private bytes',async()=>{
+ const receipt=prepareShazamResearchEvidence(args).receipt;
+ const verified=await verifyWk100ShazamResearchImport({
+   originalBytes:csv,receipt,researchWeekStartEat:'2026-10-26'});
+ const projected=projectWk100ResearchImportStatus(verified);
+ const exposed=JSON.stringify(projected);
+ for(const confidential of ['Track One','Artist One',args.operator_ref,hash(csv),'private_rows'])
+   assert.equal(exposed.includes(confidential),false);
+ assert.equal(projected.status,'research_only');
+ assert.equal(projected.can_score,false);
+ assert.equal(projected.can_publish,false);
+ assert.equal(projected.native_period_authority,'unknown');
+ assert.throws(()=>projectWk100ResearchImportStatus({...verified,can_publish:true}),/unverified_projection/);
+});
+
+// WK100 research bytes are stored only by a restricted server caller;
+// no successful Storage ACK alone becomes a database research receipt.
+function researchStorageFake({initial=null,writeError=null,readError=null}={}){
+  const objects=new Map(initial?[[initial.key,new Uint8Array(initial.bytes)]]:[]);
+  const actions=[];
+  return {actions,objects,storage:{from(name){
+    actions.push(['bucket',name]);
+    return {
+      async upload(path,body,options){
+        actions.push(['upload',path,options]);
+        if(writeError)return {data:null,error:writeError};
+        if(objects.has(path))return {data:null,error:{code:'AssetAlreadyExists',statusCode:409}};
+        objects.set(path,new Uint8Array(body));
+        return {data:{path},error:null};
+      },
+      async download(path){
+        actions.push(['download',path]);
+        if(readError)return {data:null,error:readError};
+        const bytes=objects.get(path);
+        if(!bytes)return {data:null,error:{statusCode:404}};
+        return {data:new Blob([bytes],{type:'text/csv'}),error:null};
+      },
+    };
+  }}};
+}
+const researchStoreInput=()=>({originalBytes:csv,
+  receipt:prepareShazamResearchEvidence(args).receipt,
+  researchWeekStartEat:'2026-10-26'});
+
+test('WK100 private research object is create-only and exactly read back, not an admitted receipt',async()=>{
+  const fake=researchStorageFake();
+  const result=await storeWk100ResearchOriginalBytes({...researchStoreInput(),storage:fake.storage});
+  assert.equal(fake.actions[0][1],'wk-chart-raw-evidence-v1');
+  assert.equal(fake.actions[1][2].upsert,false);
+  assert.equal(fake.actions[1][2].contentType,'text/csv');
+  assert.equal(result.object_key,`research/v1/shazam_ke/${hash(csv).slice(0,2)}/${hash(csv)}.csv`);
+  assert.equal(result.reused_existing_object,false);
+  assert.equal(result.status,'private_bytes_verified_no_db_receipt');
+  assert.equal(result.source_admitted,false);
+  assert.equal(result.can_score,false);
+  assert.equal(result.can_publish,false);
+  assert.equal(result.private_verification.private_rows.length,2);
+  assert.equal(result.sanitized_status.status,'research_only');
+  assert.equal('private_rows' in result.sanitized_status,false);
+});
+test('WK100 same raw CSV reuses exact Storage object, never upserts',async()=>{
+  const fake=researchStorageFake();
+  const first=await storeWk100ResearchOriginalBytes({...researchStoreInput(),storage:fake.storage});
+  const again=await storeWk100ResearchOriginalBytes({...researchStoreInput(),storage:fake.storage});
+  assert.equal(again.reused_existing_object,true);
+  assert.equal(again.object_key,first.object_key);
+  assert.equal(fake.objects.size,1);
+  assert.ok(fake.actions.filter(x=>x[0]==='upload').every(x=>x[2].upsert===false));
+});
+test('WK100 changed original bytes fail before any private Storage interaction',async()=>{
+  const fake=researchStorageFake();
+  const edited=enc('Rank,Artist,Title\n1,Artist One,Track Six\n2,Artist Two,Track Two\n');
+  await assert.rejects(storeWk100ResearchOriginalBytes({...researchStoreInput(),
+    originalBytes:edited,storage:fake.storage}),/wk100_research_import_original_bytes_mismatch/);
+  assert.equal(fake.actions.length,0);
+});
+test('WK100 private object hash collision or tampered readback fails closed',async()=>{
+  const fake=researchStorageFake();
+  const input=researchStoreInput();
+  const key=`research/v1/shazam_ke/${hash(csv).slice(0,2)}/${hash(csv)}.csv`;
+  fake.objects.set(key,enc('different source evidence'));
+  await assert.rejects(storeWk100ResearchOriginalBytes({...input,storage:fake.storage}),
+    /private_readback_mismatch/);
+  assert.deepEqual(fake.objects.get(key),enc('different source evidence'));
+});
+test('WK100 unrelated upload error is never mistaken for an idempotent collision',async()=>{
+  const fake=researchStorageFake({writeError:{statusCode:503,code:'StorageUnavailable'}});
+  await assert.rejects(storeWk100ResearchOriginalBytes({...researchStoreInput(),
+    storage:fake.storage}),/upload_unavailable/);
+  assert.equal(fake.actions.some(x=>x[0]==='download'),false);
+});
+test('WK100 missing readback never counts as a verified research object',async()=>{
+  const fake=researchStorageFake({readError:{statusCode:503}});
+  await assert.rejects(storeWk100ResearchOriginalBytes({...researchStoreInput(),
+    storage:fake.storage}),/private_readback_unavailable/);
+});
+test('WK100 needs restricted private Storage client and does not invent admission',async()=>{
+  await assert.rejects(storeWk100ResearchOriginalBytes({...researchStoreInput(),
+    storage:null}),/restricted_storage_required/);
+  const fake=researchStorageFake();
+  const x=await storeWk100ResearchOriginalBytes({...researchStoreInput(),storage:fake.storage});
+  const fields=JSON.stringify(x.sanitized_status);
+  assert.equal(fields.includes(args.operator_ref),false);
+  assert.equal(fields.includes(hash(csv)),false);
+  assert.equal(fields.includes('Track One'),false);
+});
+
+// WAKILISHA 100: authenticated research intake -> immutable reservation ->
+// private byte-confirmed object -> service-only finalized research receipt.
+const intakeId='00000000-0000-4000-8000-000000000321';
+const intakeActor='00000000-0000-4000-8000-000000000654';
+const intakeKey=`research/v1/shazam_ke/${hash(csv).slice(0,2)}/${hash(csv)}.csv`;
+function intakeFake({reserveError=null,reservedKey=intakeKey,finalizeError=null,finalizeId=intakeId,storageFake=null}={}){
+  const order=[];
+  const blob=storageFake??researchStorageFake();
+  return {order,blob,callerDb:{async rpc(name,params){
+    order.push(['reserve',name,params]);
+    return reserveError?{data:null,error:reserveError}:{data:{reservation_id:intakeId,object_key:reservedKey},error:null};
+  }},serviceDb:{async rpc(name,params){
+    order.push(['finalize',name,params]);
+    return finalizeError?{data:null,error:finalizeError}:{data:{reservation_id:finalizeId,status:'verified'},error:null};
+  }}};
+}
+const runIntake=(f,more={})=>executeWk100ResearchIntake({
+  ...researchStoreInput(),authenticatedUserId:intakeActor,
+  callerDb:f.callerDb,serviceDb:f.serviceDb,restrictedStorage:f.blob.storage,...more,
+});
+test('WK100 authenticated server intake reserves, verifies original bytes and finalizes private evidence only',async()=>{
+  const f=intakeFake();const result=await runIntake(f);
+  assert.deepEqual(f.order.map(x=>x[0]),['reserve','finalize']);
+  assert.equal(f.order[0][1],'wk100_reserve_research_observation_v1');
+  assert.equal(f.order[0][2].p_observed_at,args.observed_at);
+  assert.equal(f.order[0][2].p_operator_ref,args.operator_ref);
+  assert.equal(f.order[1][1],'wk100_finalize_research_observation_v1');
+  assert.deepEqual(f.order[1][2].p_rows.map(r=>r.source_rank),[1,2]);
+  assert.ok(f.blob.actions.some(x=>x[0]==='download'));
+  assert.equal(result.reservation_id,intakeId);
+  assert.equal(result.persisted,true);
+  assert.equal(result.original_bytes_privately_verified,true);
+  assert.equal(result.status,'research_only');
+  assert.equal(result.can_score,false);assert.equal(result.can_publish,false);
+  for(const privateText of [args.operator_ref,hash(csv),'Track One','Artist One',intakeKey])
+    assert.equal(JSON.stringify(result).includes(privateText),false);
+});
+test('WK100 malformed actor and edited original CSV never reserve or store',async()=>{
+  const f=intakeFake();await assert.rejects(runIntake(f,{authenticatedUserId:'forged'}),/restricted_boundary_required/);
+  const edited=enc('Rank,Artist,Title\n1,Artist One,Track Six\n2,Artist Two,Track Two\n');
+  await assert.rejects(runIntake(f,{originalBytes:edited}),/original_bytes_mismatch/);
+  assert.equal(f.order.length,0);assert.equal(f.blob.actions.length,0);
+});
+test('WK100 SQL reservation denied or unavailable fails before private Storage calls',async()=>{
+  const f=intakeFake({reserveError:{code:'42501'}});
+  await assert.rejects(runIntake(f),/reservation_unavailable/);
+  assert.equal(f.blob.actions.length,0);
+  assert.deepEqual(f.order.map(x=>x[0]),['reserve']);
+});
+test('WK100 failed Storage readback does not claim a durable finalized receipt',async()=>{
+  const f=intakeFake({storageFake:researchStorageFake({readError:{statusCode:503}})});
+  await assert.rejects(runIntake(f),/private_readback_unavailable/);
+  assert.deepEqual(f.order.map(x=>x[0]),['reserve']);
+});
+test('WK100 reserved object key mismatch prevents any durable finalize RPC',async()=>{
+  const f=intakeFake({reservedKey:'research/v1/shazam_ke/ff/'+hash(csv)+'.csv'});
+  await assert.rejects(runIntake(f),/reservation_storage_mismatch/);
+  assert.deepEqual(f.order.map(x=>x[0]),['reserve']);
+});
+test('WK100 finalize failure or mismatched UUID cannot acknowledge a persisted receipt',async()=>{
+  const a=intakeFake({finalizeError:{code:'42501'}});
+  await assert.rejects(runIntake(a),/durable_receipt_unavailable/);
+  const b=intakeFake({finalizeId:intakeActor});
+  await assert.rejects(runIntake(b),/durable_receipt_unavailable/);
+});
+test('WK100 original CSV duplicate safely reuses object while each observation has DB verification',async()=>{
+  const f=intakeFake();await runIntake(f);await runIntake(f);
+  assert.equal(f.blob.objects.size,1);
+  assert.equal(f.order.filter(x=>x[0]==='reserve').length,2);
+  assert.equal(f.order.filter(x=>x[0]==='finalize').length,2);
+  assert.ok(f.blob.actions.filter(x=>x[0]==='upload').every(x=>x[2].upsert===false));
+});
+test('WK100 additive SQL ledger and restricted Edge route retain independent authority',async()=>{
+  const {readdir}=await import('node:fs/promises');
+  const dir=new URL('../../supabase/migrations/',import.meta.url);
+  const files=(await readdir(dir)).filter(x=>x.endsWith('_wk100_research_observation_ledger_v1.sql'));
+  assert.equal(files.length,1);
+  const sql=await readFile(new URL(files[0],dir),'utf8');
+  for(const word of [
+    'wk100_reserve_research_observation_v1','wk100_finalize_research_observation_v1',
+    "auth.role() IS DISTINCT FROM 'service_role'",'current_user_has_capability',
+    'source_native_period_authority','source_admitted=false','can_score=false',
+    'can_publish=false','FOR UPDATE','REVOKE ALL','BEFORE TRUNCATE',
+    'ON CONFLICT(week_start_eat,source_key,observation_time_utc,raw_sha256,reserved_by)',
+  ])assert.ok(sql.includes(word),`missing SQL ledger invariant ${word}`);
+  assert.equal(sql.includes('CREATE POLICY'),false);
+  // The installed publisher is NOT compatible with unknown-period research rows.
+  // A researcher-directed Shazam CSV must not masquerade as scheduled capture.
+  const publisher=await readFile(
+    new URL('../../supabase/migrations/20261030095808_wk100_governed_publisher_v1.sql',import.meta.url),'utf8');
+  assert.ok(sql.includes("CHECK (source_native_period_authority='unknown')"));
+  assert.ok(sql.includes("CHECK (acquisition_mode='researcher_directed_public_csv')"));
+  assert.ok(sql.includes("source_admitted=false")&&sql.includes("can_score=false"));
+  assert.ok(publisher.includes("a.native_period_authority='provider_defined'"));
+  assert.ok(publisher.includes("join public.wk_chart_capture_attempts_v1"));
+  assert.ok(publisher.includes("platform_private.wk100_governed_source_admissions_v1"));
+  assert.ok(publisher.includes("jsonb_array_length(p_proposal->'source_receipts') not between 2 and 8"));
+  const edge=await readFile(new URL('../../supabase/functions/wk100-research-intake/index.ts',import.meta.url),'utf8');
+  const handler=await readFile(new URL('../../supabase/functions/_shared/wk100-research-intake-handler.mjs',import.meta.url),'utf8');
+  // The Deno entrypoint wires the real handler; security checks live in that handler.
+  assert.ok(edge.includes("from '../_shared/wk100-research-intake-handler.mjs'"),
+    'missing Edge production handler import');
+  assert.ok(edge.includes('Deno.serve(createWk100ResearchIntakeHandler('),
+    'missing Edge production handler wiring');
+  assert.ok(edge.includes('readEnv:(name: string)=>Deno.env.get(name)'),
+    'missing Edge production environment wiring');
+  for(const word of [
+    'WK100_RESEARCH_INTAKE_ENABLED', 'WK100_RESEARCH_INTAKE_PROJECT_REF',
+    'auth.getUser(token)',"required_capability:'manage_charts'",
+    "required_capability:'manage_ingest'",'boundedBody(req)',
+    'executeWk100ResearchIntake','serviceDb.storage',
+  ])assert.ok(handler.includes(word),`missing Edge handler security invariant ${word}`);
+});
+
+import {prepareWk100ResearchForm,submitWk100ResearchEvidence} from '../../src/services/chartsIngestion/wk100ResearchIntakeClient.mjs';
+import {getWk100ArchivedResearchPortfolio,verifyWk100ArchivedOriginal} from '../../src/services/chartsIngestion/wk100ResearchPortfolio.mjs';
+import {parseWk100ResearchNativeHtml,verifyWk100OctoberHtmlOriginal} from '../../supabase/functions/_shared/wk100-research-native-html-bridge.mjs';
+import {prepareWk100HtmlResearchForm} from '../../src/services/chartsIngestion/wk100HtmlResearchIntakeClient.mjs';
+import {createWk100HtmlResearchIntakeHandler} from '../../supabase/functions/_shared/wk100-research-html-intake-handler.mjs';
+import {executeWk100HtmlResearchIntake} from '../../supabase/functions/_shared/wk100-research-html-intake-orchestrator.mjs';
+
+function browserResearchFiles({
+  bytes=csv,receipt=prepareShazamResearchEvidence(args).receipt,
+}={}){
+  return {
+    originalCsv:new File([bytes],'private-source.csv',{type:'text/csv'}),
+    receiptFile:new File([JSON.stringify(receipt)],'research-receipt.json',{type:'application/json'}),
+    weekStartEat:'2026-10-26',
+  };
+}
+test('WK100 Admin transport includes exact original bytes and receipt without private local filename',async()=>{
+  const {form,observedDepth}=await prepareWk100ResearchForm(browserResearchFiles());
+  assert.equal(observedDepth,2);
+  assert.deepEqual([...form.keys()].sort(),['original_csv','receipt_json','research_week_start_eat']);
+  assert.equal(form.get('original_csv').name,'original.csv');
+  assert.deepEqual(new Uint8Array(await form.get('original_csv').arrayBuffer()),csv);
+  assert.equal(form.get('research_week_start_eat'),'2026-10-26');
+});
+test('WK100 Admin rejects changed CSV before any Edge request',async()=>{
+  let called=0;
+  await assert.rejects(submitWk100ResearchEvidence({
+    ...browserResearchFiles({bytes:enc('tampered source rank')}),
+    invoke:async()=>{called++;return {data:null,error:null};},
+  }),/receipt_invalid|original_bytes_mismatch/);
+  assert.equal(called,0);
+});
+test('WK100 Admin never fabricates a researcher, collector or native period',async()=>{
+  const original=prepareShazamResearchEvidence(args).receipt;
+  const mutate=[
+    r=>{r.observed_at='2026-10-29';},
+    r=>{r.acquisition_mode='scheduled_collector';},
+    r=>{r.can_publish=true;},
+    r=>{r.operator_ref='';},
+    r=>{r.source_native_period={authority:'provider',starts_at:null,ends_at:null};},
+  ];
+  for(const change of mutate){
+    const receipt=structuredClone(original);change(receipt);
+    await assert.rejects(prepareWk100ResearchForm(browserResearchFiles({receipt})),/receipt_invalid/);
+  }
+});
+test('WK100 Admin invalid week and missing file inputs stop before transport',async()=>{
+  const files=browserResearchFiles();
+  await assert.rejects(prepareWk100ResearchForm({...files,weekStartEat:'2026-10-27'}),/week_invalid/);
+  await assert.rejects(prepareWk100ResearchForm({...files,receiptFile:null}),/receipt_invalid/);
+  await assert.rejects(prepareWk100ResearchForm({...files,originalCsv:null}),/csv_invalid/);
+});
+test('WK100 Admin projects only verified nonpublishing ACK with no rank labels',async()=>{
+  const ack={schema_version:'wk100-admin-research-intake-ack-v1',reservation_id:u(88),
+    persisted:true,original_bytes_privately_verified:true,
+    source:'Shazam Kenya',research_week_start_eat:'2026-10-26',
+    observed_depth:2,source_native_metric:'discovery_rank',
+    native_period_authority:'unknown',status:'research_only',
+    source_admitted:false,can_score:false,can_publish:false,
+    private_rows:[{title_observed:'PRIVATE LABEL'}],operator_ref:'PRIVATE RESEARCHER'};
+  const files=browserResearchFiles();
+  const projected=await submitWk100ResearchEvidence({
+    ...files,invoke:async(name,options)=>{
+      assert.equal(name,'wk100-research-intake');
+      assert.equal(options.body.get('research_week_start_eat'),'2026-10-26');
+      return {data:ack,error:null};
+    },
+  });
+  assert.deepEqual(Object.keys(projected).sort(),['canPublish','canScore','observedDepth','status','verified','weekStartEat']);
+  assert.equal(JSON.stringify(projected).includes('PRIVATE'),false);
+  for(const changed of [
+    {...ack,persisted:false},{...ack,can_publish:true},
+    {...ack,observed_depth:3},{...ack,status:'published'},
+    {...ack,research_week_start_eat:'2026-11-02'},
+  ])await assert.rejects(submitWk100ResearchEvidence({
+    ...files,invoke:async()=>({data:changed,error:null}),
+  }),/unverified_ack/);
+});
+test('WK100 Admin errors or rejected receipts never report verified evidence',async()=>{
+  const files=browserResearchFiles();
+  await assert.rejects(submitWk100ResearchEvidence({
+    ...files,invoke:async()=>({data:{error:'research_receipt_not_verified'},error:null}),
+  }),/research_receipt_not_verified/);
+  await assert.rejects(submitWk100ResearchEvidence({
+    ...files,invoke:async()=>{throw Error('SECRET SERVICE DETAIL');},
+  }),/server_unavailable/);
+  // Supabase FunctionsHttpError moves non-2xx JSON into error.context rather than data.
+  await assert.rejects(submitWk100ResearchEvidence({
+    ...files,invoke:async()=>({
+      data:null,error:{context:new Response(JSON.stringify({
+        error:'intake_not_enabled',detail:'SECRET PRIVATE DIAGNOSTICS',
+      }),{status:503,headers:{'content-type':'application/json'}})},
+    }),
+  }),/wk100_research_ui_intake_not_enabled/);
+  // Never promote unknown server details to visible Admin copy.
+  await assert.rejects(submitWk100ResearchEvidence({
+    ...files,invoke:async()=>({
+      data:null,error:{context:new Response(JSON.stringify({
+        error:'SECRET PRIVATE DIAGNOSTICS',
+      }),{status:409,headers:{'content-type':'application/json'}})},
+    }),
+  }),/wk100_research_ui_server_unavailable/);
+});
+test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic publish',async()=>{
+  const config=await readFile(new URL('../../supabase/config.toml',import.meta.url),'utf8');
+  const page=await readFile(new URL('../../src/pages/admin/charts/ingest/page.tsx',import.meta.url),'utf8');
+  const panel=await readFile(new URL('../../src/pages/admin/charts/ingest/components/Wk100ResearchEvidencePanel.tsx',import.meta.url),'utf8');
+  assert.match(config,/\[functions\.wk100-research-intake\]\s*\nverify_jwt = true/);
+  assert.match(page,/Wk100ResearchEvidencePanel/);
+  assert.match(panel,/disabled=\{!ready\}/);
+  assert.doesNotMatch(panel,/commitIngestRun|runDryRun|publishEdition|localStorage/);
+  assert.match(panel,/getWk100ArchivedResearchPortfolio/);
+  const archived=getWk100ArchivedResearchPortfolio('2026-10-26');
+  assert.equal(archived.length,4);
+  assert.deepEqual(archived.map(x=>x.sourceKey),
+    ['shazam_ke','mdundo_ke','apple_ke_public_playlist','audiomack_ke']);
+  assert.deepEqual(archived.map(x=>x.rankDepth),[200,100,100,null]);
+  assert.equal(archived.filter(x=>x.rankStructure==='verified').length,3);
+  assert.ok(archived.every(x=>x.rawSha256.length===64&&x.byteLength>0&&
+    x.nativePeriod!=='provider_defined'));
+  assert.equal(getWk100ArchivedResearchPortfolio('2026-11-02').length,0);
+  await assert.rejects(verifyWk100ArchivedOriginal({
+    weekStartEat:'2026-10-26',sourceKey:'apple_ke_public_playlist',
+    originalBytes:enc('not-the-original-private-bytes'),
+  }),/wk100_archived_original_mismatch/);
+  // These are synthetic PARSER contracts, not substitutes for October originals.
+  const mdundo=Array.from({length:100},(_,i)=>
+    '<div class="md-playlist-song-item" data-playlist-url="/top-charts/ke" '+
+    'data-index="'+(i+1)+'" data-id="m'+(i+1)+'" '+
+    'data-title="Song '+(i+1)+'" data-artist="Artist '+(i+1)+'"></div>').join('');
+  const md=parseWk100ResearchNativeHtml({sourceKey:'mdundo_ke',html:mdundo});
+  assert.equal(md.private_rows.length,100);
+  assert.equal(md.private_rows[0].provider_track_id,'m1');
+  assert.equal(md.private_rows[99].source_rank,100);
+  assert.equal(md.native_period_authority,'unknown');
+  assert.throws(()=>parseWk100ResearchNativeHtml({sourceKey:'mdundo_ke',
+    html:mdundo.replace('data-index="100"','data-index="101"')}),
+    /wk100_native_html_unverified/);
+  const urls=Array.from({length:100},(_,i)=>
+    'https://music.apple.com/ke/song/synthetic-'+(i+1)+'/'+(100000+i));
+  const meta='<meta property="music:song_count" content="100">'+
+    urls.map((url,i)=>'<meta property="music:song" content="'+url+'">'+
+      '<meta property="music:song:track" content="'+(i+1)+'">').join('');
+  const playlist={ '@type':'MusicPlaylist',numTracks:100,
+    track:urls.map((url,i)=>({'@type':'MusicRecording',url,
+      name:'Song '+(i+1),duration:'PT3M12S'}))};
+  const apple=meta+'<script type="application/ld+json" id="schema:music-playlist">'+
+    JSON.stringify(playlist)+'</script>';
+  const ap=parseWk100ResearchNativeHtml({
+    sourceKey:'apple_ke_public_playlist',html:apple,
+  });
+  assert.equal(ap.private_rows.length,100);
+  assert.equal(ap.private_rows[0].provider_track_id,'100000');
+  assert.equal(ap.private_rows[99].source_rank,100);
+  assert.equal(ap.source_cadence,'daily_updated_playlist');
+  // The sealed Apple public HTML has one typed JSON-LD playlist without
+  // a script id. Exact 100-song rank and URL corroboration remains mandatory.
+  const jsonLdScriptWithoutId=apple.slice(meta.length).replace(
+    ' id="schema:music-playlist"','');
+  const idlessApple=meta+jsonLdScriptWithoutId;
+  const idlessResult=parseWk100ResearchNativeHtml({
+    sourceKey:'apple_ke_public_playlist',html:idlessApple,
+  });
+  assert.deepEqual(idlessResult.private_rows,ap.private_rows);
+  assert.throws(()=>parseWk100ResearchNativeHtml({
+    sourceKey:'apple_ke_public_playlist',
+    html:meta+jsonLdScriptWithoutId+jsonLdScriptWithoutId,
+  }),/wk100_native_html_unverified/);
+  const altered={...playlist,track:[...playlist.track]};
+  altered.track[0]={...altered.track[0],url:urls[1]};
+  assert.throws(()=>parseWk100ResearchNativeHtml({
+    sourceKey:'apple_ke_public_playlist',
+    html:meta+'<script id="schema:music-playlist" type="application/ld+json">'+
+      JSON.stringify(altered)+'</script>',
+  }),/wk100_native_html_unverified/);
+  assert.throws(()=>parseWk100ResearchNativeHtml({
+    sourceKey:'audiomack_ke',html:apple,
+  }),/wk100_native_html_unverified/);
+  await assert.rejects(verifyWk100OctoberHtmlOriginal({
+    weekStartEat:'2026-10-26',sourceKey:'mdundo_ke',
+    originalBytes:enc(mdundo),
+  }),/wk100_native_html_unverified/);
+  await assert.rejects(verifyWk100OctoberHtmlOriginal({
+    weekStartEat:'2026-11-02',sourceKey:'apple_ke_public_playlist',
+    originalBytes:enc(apple),
+  }),/wk100_native_html_unverified/);
+  await assert.rejects(prepareWk100HtmlResearchForm({
+    weekStartEat:'2026-10-26',sourceKey:'audiomack_ke',
+    originalHtml:new File([apple],'original.html'),
+  }),/wk100_html_ui_source_not_supported/);
+  await assert.rejects(prepareWk100HtmlResearchForm({
+    weekStartEat:'2026-10-26',sourceKey:'apple_ke_public_playlist',
+    originalHtml:new File([apple],'original.html'),
+  }),/wk100_html_ui_original_bytes_mismatch/);
+  const sql=await readFile(new URL(
+    '../../scripts/acceptance/wk100-html-research-ledger-forward-candidate-v1.sql',
+    import.meta.url),'utf8');
+  assert.match(config,/\[functions\.wk100-research-html-intake\]\s*\nverify_jwt = true/);
+  assert.match(sql,/CREATE TABLE platform_private\.wk100_html_research_reservations_v1/);
+  assert.match(sql,/ENABLE ROW LEVEL SECURITY/g);
+  assert.match(sql,/current_user_has_capability\('manage_charts'\)/);
+  assert.match(sql,/current_user_has_capability\('manage_ingest'\)/);
+  assert.match(sql,/auth\.role\(\) IS DISTINCT FROM 'service_role'/);
+  assert.match(sql,/BEFORE UPDATE OR DELETE/);
+  assert.match(sql,/BEFORE TRUNCATE/);
+  assert.match(sql,/source_admitted=false/);
+  assert.match(sql,/can_score=false/);
+  assert.match(sql,/can_publish=false/);
+  assert.doesNotMatch(sql,/GRANT EXECUTE[^;]* TO anon/);
+  // Signed-in runtime boundaries must reject unauthorized requests before bytes.
+  const guard=createWk100HtmlResearchIntakeHandler({
+    createClient:()=>{throw Error('backend must not be used');},
+    executeWk100HtmlResearchIntake:()=>{throw Error('intake must not run');},
+    readEnv:()=>null,
+  });
+  const route='https://example.invalid/functions/v1/wk100-research-html-intake';
+  const noAuth=await guard(new Request(route,{method:'POST',headers:{
+    origin:'https://wakilisha.africa',
+  }}));
+  assert.equal(noAuth.status,401);
+  const disabled=await guard(new Request(route,{method:'POST',headers:{
+    origin:'https://wakilisha.africa',authorization:'Bearer test',
+  }}));
+  assert.equal(disabled.status,503);
+  assert.equal((await disabled.json()).error,'intake_not_enabled');
+  const badOrigin=await guard(new Request(route,{method:'POST',headers:{
+    origin:'https://malicious.invalid',authorization:'Bearer test',
+  }}));
+  assert.equal(badOrigin.status,403);
+  let touch=0;
+  await assert.rejects(executeWk100HtmlResearchIntake({
+    originalBytes:enc(mdundo),sourceKey:'mdundo_ke',
+    researchWeekStartEat:'2026-10-26',authenticatedUserId:u(70),
+    callerDb:{rpc:async()=>{touch++;throw Error('db touched');}},
+    serviceDb:{rpc:async()=>{touch++;throw Error('service touched');}},
+    restrictedStorage:{from:()=>{touch++;throw Error('storage touched');}},
+  }),/wk100_native_html_unverified/);
+  assert.equal(touch,0);
+});
+
+import {createWk100ResearchIntakeHandler} from '../../supabase/functions/_shared/wk100-research-intake-handler.mjs';
+
+const WK100_EDGE_REF='pgzizndxdyhqmtyywjmt';
+function wk100EdgeHarness(overrides={}){
+  const calls={client:[],auth:0,capability:[],intake:0};
+  const env={
+    WK100_RESEARCH_INTAKE_ENABLED:'true',
+    SUPABASE_URL:'https://'+WK100_EDGE_REF+'.supabase.co',
+    WK100_RESEARCH_INTAKE_PROJECT_REF:WK100_EDGE_REF,
+    SUPABASE_ANON_KEY:'local-mock-anon',
+    SUPABASE_SERVICE_ROLE_KEY:'local-mock-service',
+    ...overrides.env,
+  };
+  const service={
+    auth:{getUser:async()=>{
+      calls.auth++;
+      if(overrides.authThrows)throw Error('secret auth service transport detail');
+      return overrides.auth??{error:null,data:{user:{id:u(70)}}};
+    }},
+    storage:{from:()=>{throw Error('must not read storage before authorization');}},
+    rpc:async()=>{throw Error('must not call service RPC before orchestrator');},
+  };
+  const caller={
+    rpc:async(name,params)=>{
+      calls.capability.push({name,params});
+      if(overrides.capabilityThrows)throw Error('secret capability transport detail');
+      if(overrides.capabilityError)return {error:{message:'permission check failed'},data:null};
+      const ok=name==='current_user_has_capability'&&
+        (params?.required_capability==='manage_charts'?
+          overrides.allowCharts!==false:overrides.allowIngest!==false);
+      return {data:ok,error:null};
+    },
+  };
+  const ack={
+    schema_version:'wk100-admin-research-intake-ack-v1',
+    reservation_id:u(71),persisted:true,original_bytes_privately_verified:true,
+    source:'Shazam Kenya',research_week_start_eat:'2026-10-26',
+    observed_depth:2,source_native_metric:'discovery_rank',
+    native_period_authority:'unknown',status:'research_only',
+    source_admitted:false,can_score:false,can_publish:false,
+  };
+  const handle=createWk100ResearchIntakeHandler({
+    readEnv:key=>env[key],
+    createClient:(url,key,options)=>{
+      calls.client.push({url,key,options});
+      return key===env.SUPABASE_SERVICE_ROLE_KEY?service:caller;
+    },
+    executeWk100ResearchIntake:async details=>{
+      calls.intake++;
+      if(overrides.intakeError)throw overrides.intakeError;
+      assert.equal(details.authenticatedUserId,u(70));
+      assert.equal(details.callerDb,caller);
+      assert.equal(details.serviceDb,service);
+      assert.equal(details.restrictedStorage,service.storage);
+      assert.equal(details.researchWeekStartEat,'2026-10-26');
+      assert.equal(details.receipt.raw_sha256,hash(csv));
+      assert.deepEqual(details.originalBytes,csv);
+      return overrides.intakeAck??ack;
+    },
+  });
+  return {handle,calls,env,ack};
+}
+function wk100EdgeRequest({
+  method='POST',origin='http://localhost:5173',authorization='Bearer local-user-jwt',
+  body,contentType,
+}={}){
+  const headers={origin,authorization};
+  if(contentType)headers['content-type']=contentType;
+  return new Request('https://functions.example.test/functions/v1/wk100-research-intake',{
+    method,headers,...(body===undefined?{}:{body}),
+  });
+}
+
+test('WK100 Edge factory rejects missing server dependencies before requests',()=>{
+  assert.throws(()=>createWk100ResearchIntakeHandler({}),/handler_dependency_invalid/);
+});
+test('WK100 Edge rejects disallowed origin even for preflight; allowed preflight is narrow',async()=>{
+  const {handle,calls}=wk100EdgeHarness();
+  const hostile=await handle(wk100EdgeRequest({method:'OPTIONS',origin:'https://hostile.example'}));
+  assert.equal(hostile.status,403);
+  assert.equal((await hostile.json()).error,'origin_not_allowed');
+  const allowed=await handle(wk100EdgeRequest({method:'OPTIONS'}));
+  assert.equal(allowed.status,204);
+  assert.equal(allowed.headers.get('access-control-allow-origin'),'http://localhost:5173');
+  assert.equal(allowed.headers.get('access-control-allow-methods'),'POST,OPTIONS');
+  assert.doesNotMatch(allowed.headers.get('access-control-allow-headers'),/service.role|cookie/i);
+  assert.equal(calls.client.length,0);
+});
+test('WK100 Edge wrong method and missing bearer cannot create privileged clients',async()=>{
+  const {handle,calls}=wk100EdgeHarness();
+  const get=await handle(wk100EdgeRequest({method:'GET'}));
+  assert.equal(get.status,405);
+  const anonymous=await handle(wk100EdgeRequest({authorization:''}));
+  assert.equal(anonymous.status,401);
+  assert.equal((await anonymous.json()).error,'authentication_required');
+  assert.equal(calls.client.length,0);
+});
+test('WK100 Edge feature flag is closed before any backend client exists',async()=>{
+  const {handle,calls}=wk100EdgeHarness({env:{WK100_RESEARCH_INTAKE_ENABLED:'false'}});
+  const result=await handle(wk100EdgeRequest());
+  assert.equal(result.status,503);
+  assert.equal((await result.json()).error,'intake_not_enabled');
+  assert.equal(calls.client.length,0);
+});
+test('WK100 Edge requires exact project-bound HTTPS origin, never localhost',async()=>{
+  for(const url of ['http://'+WK100_EDGE_REF+'.supabase.co',
+    'https://localhost:54321','https://'+WK100_EDGE_REF+'.supabase.co.evil.example',
+    'https://'+WK100_EDGE_REF+'.supabase.co/path',
+    'https://user@'+WK100_EDGE_REF+'.supabase.co/']){
+    const {handle,calls}=wk100EdgeHarness({env:{SUPABASE_URL:url}});
+    const result=await handle(wk100EdgeRequest());
+    assert.equal(result.status,503,url);
+    assert.equal((await result.json()).error,'backend_unavailable');
+    assert.equal(calls.client.length,0);
+  }
+});
+test('WK100 Edge invalid Auth session is rejected before capability and Storage',async()=>{
+  const {handle,calls}=wk100EdgeHarness({auth:{error:{message:'invalid'},data:{user:null}}});
+  const result=await handle(wk100EdgeRequest());
+  assert.equal(result.status,401);
+  assert.equal(calls.auth,1);
+  assert.equal(calls.capability.length,0);
+  assert.equal(calls.intake,0);
+  const failing=wk100EdgeHarness({authThrows:true});
+  const unavailable=await failing.handle(wk100EdgeRequest());
+  assert.equal(unavailable.status,503);
+  assert.equal((await unavailable.json()).error,'backend_unavailable');
+  assert.equal(failing.calls.capability.length,0);
+  assert.equal(failing.calls.intake,0);
+});
+test('WK100 Edge requires BOTH live chart and ingest capabilities',async()=>{
+  for(const options of [{allowCharts:false},{allowIngest:false}]){
+    const {handle,calls}=wk100EdgeHarness(options);
+    const result=await handle(wk100EdgeRequest());
+    assert.equal(result.status,403);
+    assert.equal((await result.json()).error,'not_authorized');
+    assert.deepEqual(calls.capability.map(c=>c.params.required_capability).sort(),
+      ['manage_charts','manage_ingest']);
+    assert.equal(calls.intake,0);
+  }
+});
+test('WK100 Edge capability service errors fail closed before upload',async()=>{
+  const {handle,calls}=wk100EdgeHarness({capabilityError:true});
+  const result=await handle(wk100EdgeRequest());
+  assert.equal(result.status,503);
+  assert.equal((await result.json()).error,'capability_unavailable');
+  assert.equal(calls.intake,0);
+  const rejected=wk100EdgeHarness({capabilityThrows:true});
+  const unavailable=await rejected.handle(wk100EdgeRequest());
+  assert.equal(unavailable.status,503);
+  const body=await unavailable.json();
+  assert.equal(body.error,'capability_unavailable');
+  assert.doesNotMatch(JSON.stringify(body),/secret capability transport detail/);
+  assert.equal(rejected.calls.intake,0);
+});
+test('WK100 Edge requires bounded multipart and strictly three fields',async()=>{
+  const {handle,calls}=wk100EdgeHarness();
+  const missingMultipart=await handle(wk100EdgeRequest({body:'plain text',contentType:'text/plain'}));
+  assert.equal(missingMultipart.status,415);
+  const form=new FormData();
+  form.append('original_csv',new File([csv],'source.csv',{type:'text/csv'}));
+  form.append('receipt_json',JSON.stringify(prepareShazamResearchEvidence(args).receipt));
+  form.append('research_week_start_eat','2026-10-26');
+  form.append('unexpected','no');
+  const extra=await handle(wk100EdgeRequest({body:form}));
+  assert.equal(extra.status,400);
+  assert.equal((await extra.json()).error,'research_payload_invalid');
+  assert.equal(calls.intake,0);
+});
+test('WK100 Edge valid browser multipart reaches only the authorized intake orchestrator',async()=>{
+  const {handle,calls,ack}=wk100EdgeHarness();
+  const {form}=await prepareWk100ResearchForm(browserResearchFiles());
+  const result=await handle(wk100EdgeRequest({body:form}));
+  assert.equal(result.status,200);
+  assert.deepEqual(await result.json(),ack);
+  assert.equal(result.headers.get('cache-control'),'no-store');
+  assert.equal(result.headers.get('access-control-allow-origin'),'http://localhost:5173');
+  assert.equal(calls.auth,1);
+  assert.equal(calls.intake,1);
+  assert.deepEqual(calls.client.map(c=>c.key),['local-mock-service','local-mock-anon']);
+  assert.ok(calls.client.every(c=>c.url==='https://'+WK100_EDGE_REF+'.supabase.co'));
+});
+test('WK100 Edge invalid original and durable receipt errors never leak server details',async()=>{
+  const {form}=await prepareWk100ResearchForm(browserResearchFiles());
+  for(const [error,status,code] of [
+    [Error('wk100_research_import_invalid'),422,'research_source_invalid'],
+    [Error('secret private storage diagnostics'),409,'research_receipt_not_verified'],
+  ]){
+    const {handle,calls}=wk100EdgeHarness({intakeError:error});
+    const result=await handle(wk100EdgeRequest({body:form}));
+    assert.equal(result.status,status);
+    const body=await result.json();
+    assert.equal(body.error,code);
+    assert.equal(JSON.stringify(body).includes('secret'),false);
+    assert.equal(calls.intake,1);
+  }
+});
+test('WK100 Edge Deno entrypoint uses the tested handler without an auth bypass',async()=>{
+  const index=await readFile(new URL('../../supabase/functions/wk100-research-intake/index.ts',import.meta.url),'utf8');
+  const config=await readFile(new URL('../../supabase/config.toml',import.meta.url),'utf8');
+  assert.match(index,/Deno\.serve\(createWk100ResearchIntakeHandler\(/);
+  assert.match(index,/readEnv:\(name: string\)=>Deno\.env\.get\(name\)/);
+  assert.match(config,/\[functions\.wk100-research-intake\]\s*\nverify_jwt = true/);
+  assert.doesNotMatch(index,/no-verify-jwt|localhost|testing_override/i);
 });
