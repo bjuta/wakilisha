@@ -16,7 +16,8 @@ const PARSERS = Object.freeze({
   audiomack_ke: bytes => parseAudiomackKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
   boomplay_ke: bytes => parseBoomplayKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
   shazam_ke: bytes => parseShazamKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
-  apple_ke: bytes => parseAppleKenya(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))),
+  apple_ke: (bytes, access) => parseAppleKenya(
+    JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)), access),
   youtube_ke: (bytes, access) => parseYouTubeKenyaWeekly(
     JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)), access.native_period_key),
 });
