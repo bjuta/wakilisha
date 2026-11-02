@@ -44,7 +44,7 @@ jobs:
             recorded_sha="$(node -p 'require("./'"$proof"'").migration_sha256')"
             if [ "$original_sha" != "$recorded_sha" ]; then echo "STOP_SOURCE_PROOF_SHA_MISMATCH_FOR=$old" >&2; exit 1; fi
             echo "SOURCE_SHA_PIN=PASS $old"
-            supabase migration new "$slug"
+            supabase migration new "$slug" </dev/null
             newfile="$(find supabase/migrations -maxdepth 1 -type f -name "*_${slug}.sql" -print)"
             test -f "$newfile"
             version="$(basename "$newfile" | cut -d_ -f1)"
