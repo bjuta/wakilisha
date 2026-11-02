@@ -222,6 +222,7 @@ test('Apple public most-played is not inferred to be a seven-day consumption tot
     endpoint.replace('chart=most-played','chart=top'),
     endpoint+'&genre=1',
     endpoint.replace('limit=100','limit=201'),
+    endpoint+'&types=playlists',
   ]) assert.throws(()=>parseAppleKenya(api,{endpoint:invalid}),/apple_chart_endpoint_unverified/);
   assert.throws(()=>parseAppleKenya({results:{songs:[{chart:'top',data:api.results.songs[0].data}]}},{endpoint}),/apple_invalid_chart_response/);
   assert.throws(()=>parseAppleKenya({results:{songs:[{chart:'most-played',data:[
