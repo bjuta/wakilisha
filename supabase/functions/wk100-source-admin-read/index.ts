@@ -42,7 +42,7 @@ Deno.serve(async req=>{
     auth:{persistSession:false,autoRefreshToken:false}});
   const identity=await admin.auth.getUser(token);
   if(identity.error||!identity.data.user?.id)return reply(req,401,{error:'authentication_required'});
-  const allowed=await caller.rpc('current_user_has_capability',{required_capability:'view_charts_admin'});
+  const allowed=await caller.rpc('current_user_has_capability',{required_capability:'manage_ingest'});
   if(allowed.error)return reply(req,503,{error:'capability_unavailable'});
   if(allowed.data!==true)return reply(req,403,{error:'not_authorized'});
   // Only explicitly selected read-only columns are allowed across this
