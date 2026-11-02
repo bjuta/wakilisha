@@ -2,6 +2,22 @@
 
 **Scope:** PR #1333, programme #1264. **Latest authority (1 November 2026):** HTML research source and isolated local PostgreSQL 239/239, deep SQL, signed Auth and private Storage acceptance PASS. This is NOT a hosted Edge/browser or Production acceptance. Historical source-only and failed-gate notes below remain evidence of earlier checkpoints; read the local closure section for current status. No Production migration, hosted Storage mutation, Edge deploy, frontend activation, publisher or Chart Edition acceptance.
 
+## Current Hosted Authority and No-Fixture Release Boundary (2 November 2026)
+
+**Primary status:** Draft PR #1333 remains open and unmerged. The existing data-less Supabase Preview `vabruwtjzyxerxdsjtwz` has an independently proven clean, forward-only 239/239 migration replay through `20261102084052`, official `public,editorial` types, three current replay proofs, and completed protected Critical, WK100, and MIZIZI CI on the prior exact code/evidence head. The current PR head must still pass its own required checks after any documentation changes. Production remains outside this acceptance.
+
+**Independent read-only recheck on 2 November 2026:** the permanent `verify-wk100-hosted-pg239-research-security.sql` returns `WK100_HOSTED_PG239_READONLY_SECURITY=PASS`. The same Preview has zero Auth users, zero role assignments, zero Storage objects, zero CSV/HTML reservations, zero CSV/HTML source rows, and zero CSV/HTML verified receipts. The `wk-chart-raw-evidence-v1` bucket remains private. This is a state observation, not a claim about authenticated browser upload acceptance.
+
+**Preview configuration:** an independently executed, values-redacted Supabase CLI audit proved the names `WK100_RESEARCH_INTAKE_ENABLED`, `WK100_HTML_RESEARCH_INTAKE_ENABLED`, and `WK100_RESEARCH_INTAKE_PROJECT_REF` are present on this Preview. The owner entered `false`, `false`, and `vabruwtjzyxerxdsjtwz`. The CLI listing did not attest hidden values. Earlier live protected ingress tests proved exact-origin unauthenticated OPTIONS and invalid bearer denial (HTTP 401) for both WK100 Edge routes. They did not exercise a signed-in Admin user or prove the effective values after the save.
+
+**Fixture-free release decision:** do not create a test Admin, role grant, private research source row, Storage object, or artificial provider observation in this accepted Preview. Do not copy Production identities or genuine source material into public CI. The existing SQL, Auth, Storage, Edge-handler, and real-browser contract suites retain their actual, separately recorded scopes. Their successes do **not** silently become a hosted write test.
+
+A future live authorized upload/retry/revocation acceptance may run only within a separately approved, isolated disposable environment after all of these are independently proven: runtime dependencies and intended secret values; actual browser-class access; fixture IDs recorded on creation; no publication or cross-project capabilities; reliable automated whole-environment teardown on success **and** failure; and independent deletion readback. An unproven teardown is a stop condition. The founder is not a manual cleanup mechanism. No new test infrastructure or paid branch is authorized by this document.
+
+**Release classification:** the genuine hosted signed-in Admin write/retry/denial gate is **NOT PROVEN**, not failed. Keep PR #1333 draft/unmerged and both WK100 intake flags disabled. There is no authority to promote Production SQL, deploy Production Edge Functions, complete a frontend Finish Update, admit research sources, score, or publish WAKILISHA 100. No new fixture, SQL migration, CI test, or Edge change is required to record this decision.
+
+---
+
 ## Source versus collection
 
 A researcher obtains the original Shazam Kenya Top 200 CSV via WAKILISHA's independent factual research workflow. This does **not** create an unattended collector schedule, fetched-at time, HTTP status, provider Track ID, actual play count, verified provider-native measurement interval, or canonical Registry Track. Those fields must never be invented. The actual 29 October 2026 source bytes remain in the owner's private archive; no repo fixture reproduces them.
