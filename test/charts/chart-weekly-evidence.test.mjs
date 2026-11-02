@@ -197,6 +197,39 @@ test('Apple public most-played is not inferred to be a seven-day consumption tot
   assert.equal(r.metric,'rank');assert.equal(r.native_period,'unknown');
   assert.equal(r.provider_updated_at,'2026-10-19T00:00:00Z');
   assert.throws(()=>parseAppleKenya({...payload,feed:{...payload.feed,country:'US'}}),/territory_unverified/);
+
+  // Native Music API chart response has no trustworthy market in its JSON
+  // payload. The independently approved exact Kenya endpoint is required.
+  const api={results:{songs:[{chart:'most-played',data:[
+    {id:'131',type:'songs',attributes:{name:'Song A',artistName:'Artist A'}},
+    {id:'132',type:'songs',attributes:{name:'Song B',artistName:'Artist B'}},
+  ]}]}};
+  const endpoint='https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played&limit=100';
+  const native=parseAppleKenya(api,{endpoint});
+  assert.equal(native.chart_surface,'apple_music_api_most_played');
+  assert.equal(native.metric,'rank');
+  assert.equal(native.native_period,'unknown');
+  assert.equal(native.candidate_only,true);
+  assert.equal(native.eligible_for_scoring,false);
+  assert.deepEqual(native.rows.map(row=>[row.rank,row.provider_track_id]),[[1,'131'],[2,'132']]);
+  assert.equal(native.rows[0].view_count,undefined);
+  assert.throws(()=>parseAppleKenya(api),/apple_chart_endpoint_unverified/);
+  for(const invalid of [
+    endpoint.replace('/ke/','/us/'),
+    endpoint.replace('api.music.apple.com','api.music.apple.com.evil.example'),
+    endpoint.replace('https:','http:'),
+    endpoint.replace('types=songs','types=playlists'),
+    endpoint.replace('chart=most-played','chart=top'),
+    endpoint+'&genre=1',
+    endpoint.replace('limit=100','limit=201'),
+  ]) assert.throws(()=>parseAppleKenya(api,{endpoint:invalid}),/apple_chart_endpoint_unverified/);
+  assert.throws(()=>parseAppleKenya({results:{songs:[{chart:'top',data:api.results.songs[0].data}]}},{endpoint}),/apple_invalid_chart_response/);
+  assert.throws(()=>parseAppleKenya({results:{songs:[{chart:'most-played',data:[
+    {...api.results.songs[0].data[0]}, {...api.results.songs[0].data[0]},
+  ]}]}},{endpoint}),/apple_ke_duplicate_provider_id/);
+  assert.throws(()=>parseAppleKenya({results:{songs:[{chart:'most-played',data:[
+    {id:'131',type:'playlists',attributes:{name:'Song',artistName:'Artist'}},
+  ]}]}},{endpoint}),/apple_invalid_chart_item/);
 });
 
 test('YouTube provider weekly observation retains views, exact target period and separate behavior',()=>{
