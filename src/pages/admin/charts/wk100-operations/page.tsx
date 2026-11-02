@@ -157,8 +157,47 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             ] satisfies WkDataColumn<Source>[]} />
         </Card>
       </>}
-      {view==='collection'&&<Card title="Collection Status"><p className="mb-4 text-xs text-wk-text-muted">A successful source download is not automatic admission to scoring. Provider-native periods remain separately verifiable.</p>{report.sources.length===0?<p className="rounded-xl bg-wk-surface-raised p-5 text-sm text-wk-text-muted">No collection contracts or attempts exist for the selected week. Scheduled collection and retry controls will become available only through a governed service.</p>:<div className="space-y-2">{report.sources.map(s=><button key={s.id} type="button" onClick={()=>setDetail(s)} className="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-wk-border p-4 text-left hover:bg-wk-surface-raised"><span><strong className="block text-sm text-wk-text">{s.surface}</strong><span className="text-xs text-wk-text-muted">{s.observedDepth}/{s.expectedDepth} observed · {s.nativePeriodAuthority==='provider_defined'?'Provider-defined period':'Native period unknown'}</span></span><span className="text-xs text-wk-text-muted">{s.captureState.replaceAll('_',' ')}</span></button>)}</div>}</Card>}
-
+      {view==='collection'&&<div className="space-y-5">
+        <WkOperationsHero eyebrow={'Collection · EAT week '+week} title="Collection"
+          description="Source-specific reporting periods, captured evidence and attempt integrity are tracked separately. A successful download does not grant scoring qualification."
+          aside={<WkStateBadge tone={report.failedSources?'danger':'neutral'}>{report.failedSources?report.failedSources+' source failures':'No admitted collection'}</WkStateBadge>}
+          action={<div className="flex flex-wrap gap-2">
+            <button type="button" disabled title="Coverage exceptions need an accepted policy workflow" className="wk-button wk-button-secondary wk-button-sm">Request Coverage Exception</button>
+            <button type="button" disabled title="Source retry requires a governed capture command" className="wk-button wk-button-secondary wk-button-sm">Request Retry</button>
+          </div>}/>
+        <WkSurface className="rounded-2xl p-4 sm:p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <div><p className="text-[11px] font-bold uppercase tracking-[.1em] text-wk-text-muted">Qualified coverage</p>
+              <p className="mt-2 text-xl font-bold text-wk-text">{report.qualifiedSources} qualified sources</p>
+              <p className="mt-1 text-sm text-wk-text-muted">{report.successfulSources} capture receipts across {report.sourceCount} candidate contracts. These do not establish admitted coverage.</p>
+            </div><WkStateBadge tone="warning">Not ready for ranking</WkStateBadge>
+          </div>
+          <div aria-label="Qualified coverage progress" role="progressbar" aria-valuenow={0} aria-valuemin={0} aria-valuemax={100}
+            className="mt-4 h-2 overflow-hidden rounded-full bg-wk-surface-raised"><div className="h-full w-0 bg-wk-brand"/></div>
+        </WkSurface>
+        <Card title="Source collection">
+          <WkDataTable<Source> rows={report.sources} getKey={s=>s.id} ariaLabel="Weekly source collection"
+            empty="No source capture contracts or attempts exist for this week. Collection scheduling has not been enabled."
+            columns={[
+              {key:'source',label:'Source · reporting period',render:s=><><button type="button" className="font-semibold text-wk-text hover:underline" onClick={()=>setDetail(s)}>{s.surface}</button><p className="mt-1 text-xs text-wk-text-muted">{s.nativePeriodAuthority==='provider_defined'?'Provider-defined period':'Native period unknown'}</p></>},
+              {key:'depth',label:'Rows observed',render:s=><span className="font-semibold tabular-nums text-wk-text">{s.observedDepth} <span className="font-normal text-wk-text-muted">of {s.expectedDepth}</span></span>},
+              {key:'attempt',label:'Latest attempt',render:s=><span className="text-wk-text-muted">{when(s.lastAttemptAt)}</span>},
+              {key:'receipt',label:'Validation · receipt',render:s=><span className="text-wk-text-muted">{s.receiptSha256?'SHA-256 verified':'No verified receipt'}</span>},
+              {key:'status',label:'Status',render:s=><WkStateBadge tone={['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState)?'danger':s.receiptSha256?'info':'neutral'}>{s.captureState.replaceAll('_',' ')}</WkStateBadge>},
+            ] satisfies WkDataColumn<Source>[]} />
+        </Card>
+        <Card title="Collection activity">
+          <WkAuditTimeline ariaLabel="Collection attempt history" emptyLabel="No collection attempts recorded." events={report.sources.flatMap(s=>s.recentAttempts.map((a,i)=>({
+            id:s.id+':'+(a.id||i),label:s.surface+' · '+a.status.replaceAll('_',' '),
+            occurredAt:a.attemptedAt,
+            description:a.failureCode?'Safe reason: '+a.failureCode:'Rows observed: '+a.observedDepth,
+          }))).sort((a,b)=>String(b.occurredAt||'').localeCompare(String(a.occurredAt||''))).slice(0,30)}/>
+        </Card>
+        {report.failedSources>0&&<WkNextAction eyebrow="Collection incident" title="A source returned an unusable observation"
+          description="Inspect the latest safe failure code and capture history. The system must not reuse another week's evidence or redistribute source weights automatically."
+          blocked action={<button type="button" className="wk-button wk-button-secondary wk-button-sm"
+            onClick={()=>setDetail(report.sources.find(s=>['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState))??null)}>Inspect incident</button>}/>}
+      </div>}
     </>}
     {detail&&<WkInspector open={true} onClose={()=>setDetail(null)} title={detail.surface} eyebrow="Source inspection" summary={<p className="text-sm text-wk-text-muted">{detail.provider} · {detail.market} · {detail.version}</p>}><WkDetailList items={[
         {label:'Provider',value:detail.provider},
