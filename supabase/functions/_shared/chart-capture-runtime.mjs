@@ -125,7 +125,8 @@ export async function runCandidateCapture({
   if (reservation.state==='reserved') {
     try {
       capture=await fetchCandidateBytes({sourceKey:contract.source_key,
-        endpoint:access.endpoint,accessDecision,verifyAccess,fetchImpl,timeoutMs,now:clock});
+        endpoint:access.endpoint,accessDecision,verifyAccess,
+        providerAuthorization:access.providerAuthorization,fetchImpl,timeoutMs,now:clock});
     } catch(e) {
       if (e instanceof CandidateCaptureError &&
         ['transport_failed','transport_timeout','upstream_http_unaccepted',
