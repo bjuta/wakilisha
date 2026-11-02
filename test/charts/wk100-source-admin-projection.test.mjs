@@ -23,6 +23,10 @@ test('WK100 source read never upgrades capture success into scoring qualificatio
   assert.equal(model.sources[0].admissionState,'candidate');
   assert.equal(model.sources[0].canScore,false);
   assert.equal('raw_object_key' in model.sources[0],false);
+  assert.equal(model.sources[0].recentAttempts.length,1);
+  assert.equal(model.sources[0].recentAttempts[0].status,'succeeded');
+  assert.equal('raw_object_key' in model.sources[0].recentAttempts[0],false);
+  assert.equal(model.sources[0].canPublish,false);
 });
 test('invalid week, malformed lists and overlarge input fail closed',()=>{
   assert.equal(validEatWeek('2026-11-03'),false);
