@@ -18,6 +18,57 @@ These are **four acceptance phases inside one existing delivery issue**, not fou
 
 **No surprise flagship:** collection, scoring, CI, merge, deployment, staging, and green health checks never authorize public release. A first public WAKILISHA 100 Edition needs a separate, explicit founder launch instruction. Later Editions still need an authorized, auditable Admin decision for their exact frozen EAT week. Do not implement automatic public publication.
 
+## Workbook Design-to-Engineering Authority
+
+**Binding interpretation, 2 November 2026:** the founder's final `Charts Ingest Workbook.html.zip` is the detailed **Admin UI and UX specification**, and this four-phase plan is the **engineering, integration, and acceptance programme for that same product**. They are not parallel workstreams or alternative designs. The existing WAKILISHA architecture provides the implementation substrate and its actual data, permission, Registry, and publication authority. The final workbook fingerprints, exclusions, and page mapping are recorded in [#1338](https://github.com/bjuta/wakilisha/issues/1338#issuecomment-6583961265). This section makes their relationship binding across all four phases.
+
+### Authority and fidelity
+
+1. **Workbook specifies what the operator sees and does.** Preserve its component geometry, shapes, spatial hierarchy, proportions, spacing, border treatments, density, tables, navigation, controls, drawers, dialogs, state transitions, and interaction semantics. Do not reduce it to loose visual inspiration or replace distinctive layouts with convenient generic cards. Study the **actual final ZIP and its HTML/CSS/JS interactions**, not a reconstructed screenshot or an obsolete earlier workbook. If the exact source artifact is unavailable, record the fidelity check as *unproven*, not passed.
+2. **Four-phase plan specifies how to make those interactions real.** Every action requires genuine server authority, correct source/Registry/methodology lineage, durable state, safe permissions, and appropriate failure and recovery behavior. Simulated prototype success never counts as operational acceptance. A pixel-matched screen with an inert, invented, or unsafe backend is incomplete; a green backend that abandons the approved interface is equally incomplete.
+3. **WAKILISHA supplies the native implementation.** Translate the workbook into our React/TypeScript application, existing Admin shell, shared font family, semantic token system, and parent light/dark themes. Do **not** ship, import, embed, refer to from application code, or depend on the workbook HTML, support scripts, runtime, assets, fonts, or prototype component library. This is a faithful **port**, not an iframe, copy/paste runtime, or wholesale redesign. WAKILISHA is not dark-first.
+4. **Componentize once for the wider product.** Before each screen, audit existing WAKILISHA primitives and extend them where appropriate. Promote repeatable workbook structures and behaviors to small reusable WAKILISHA primitives, then compose pages from those primitives. Preserve domain distinctions: shared data table/inspector/decision patterns can be reused while source admission, recording identity, eligibility, and publication stay governed by their own authorities. Avoid duplicate libraries, premature universal abstractions, and separate handcrafted copies on every page.
+5. **Source truth outranks example values.** Workbook example providers, names, Edition IDs, ranks, methodology weights, actors, timestamps, badges, and publication-ready flags are illustrative until independently verified by the real system. Never render mock values as live facts or invent backend endpoints and capability contracts to make the design appear functional. If a designed action lacks an accepted implementation, show a truthful unavailable/blocked state with the missing contract identified.
+
+### Workbook screen ownership across engineering phases
+
+| Engineering delivery | Workbook surfaces to faithfully translate | Operational ownership and exit evidence |
+| --- | --- | --- |
+| **Phase 1: Collect** | W1 Weekly Overview; W2 Source Registry; W2A Add Source; W3 Collection and Incidents; shared W0 interaction foundations | Qualified source research and governed configuration, automated original-byte collection, accurate provider-native periods and metrics, source health, safe incidents/retries, two prospective EAT week slots. The UI cannot fabricate admission, metrics, or collection. |
+| **Phase 2: Identify and Qualify** | W4 chart-facing Recording Review; W5 Eligibility Workbench; W5C Correction Editor; W6 Re-evaluation | Existing Registry/MIZIZI reconciliation, real applicable full-filter matrix, all-candidate review and evidence-backed corrections, concurrency-safe impact preview, deterministic re-evaluation without re-fetching original source evidence. |
+| **Phase 3: Rank and Publish** | W7 Methodology; W8 Ranking; W8S Score Explanation; W8B Incomplete Ranking; W9 Readiness Inspection; W9B Stale Evidence; W10 Stage/Publish; W10C Confirmation; W10O Outcomes; W11 Edition History | Reviewed versioned methodology, reproducible private Top 100, genuine source/identity/policy lineage, server-authorized readiness, staging and explicit week-specific publication, correction/withdrawal. Reconcile existing backend editorial sign-off semantics with the founder's rejected fictional handoff chain without weakening real authorization. |
+| **Phase 4: Acceptance and Handoff** | W12 Operational Audit and Recovery, plus all prior pages and interactions | Complete responsive/theme/keyboard/security acceptance; two end-to-end weekly cycles, isolation/cleanup proof, controlled deployment, private/public separation, real Admin runbook, founder acceptance. This phase verifies polish and capability implemented throughout earlier phases; it does not postpone mobile or dark-mode implementation until the end. |
+
+**Navigation remains a five-stage Admin experience:** **Collect -> Identify -> Qualify -> Rank -> Publish**. The four numbered engineering phases are delivery gates, not replacement navigation tabs. The shared week, evidence revision, blocked status, safe next action, and return path must remain coherent between pages.
+
+### Founder exclusions and governing safety
+
+- **Exclude W1S entirely.** Retain the principal W1 Weekly Overview. Do not create a replacement weekly-review screen.
+- **Reject workbook-invented role-holder approval chains.** No fictional preparer/Reviewer B/publisher relay or arbitrary sign-off. W9 is actionable evidence and readiness inspection. Actual capability checks, audited decisions, server-side constraints, integrity verification, stale-revision rejection, and deliberate publication remain mandatory. Phase 3 must consciously reconcile the pre-existing publisher's independent editorial approval contract with the founder's simpler Admin flow; merely hiding buttons is not an implementation.
+- **Reject the workbook's MIZIZI product design.** Preserve appropriate W4 chart-side candidate inspection and return flows, but use existing governed MIZIZI and canonical Registry paths for identity and origin. A suggested match or metadata assertion never becomes a silent canonical write.
+- **No surprise flagship.** No collection, CI, private ranking, stage, merge, deployment, or passing screenshot ever authorizes the inaugural public Edition. First launch requires separate explicit founder instruction, and subsequent weeks require a valid exact-Edition publish action.
+- **Correct evidence, not history.** Preserve immutable original provider evidence, original native metrics/periods, source identity and audit trails. Run-level corrections, canonical Registry revisions, and methodology/policy changes are distinct.
+
+### Definition of a finished workbook port, per screen and phase
+
+A page is not accepted until all of these have evidence:
+
+1. **Design:** comparison against the exact final workbook of its layout, shapes, density, interactions and significant normal, loading, empty, partial, blocked, denied, conflict, and failure states. Note each authorized departure and why.
+2. **Native reuse:** inspect the shared library, reuse or add fit-for-purpose WAKILISHA primitives, with no shipped prototype references/dependencies and no duplicate component implementation.
+3. **Theme and responsive:** existing font/tokens; proper light and dark modes; approximately 1440, 1024, 768, and 390 px behaviors; mobile interaction, keyboard focus, and accessible dialogs.
+4. **Authority:** identify real data sources, actor capability checks, command/server validation, safe error result, persistence, audit write, freshness/revision handling, downstream invalidation, and recovery path for every consequential action. No pretend action is enabled.
+5. **Verification:** focused existing contracts, appropriate genuine-browser or isolated-runtime tests, source/evidence checks where relevant, CI consolidation review, and the phase's published exit gates. Synthetic UI tests prove interaction behavior only, not live source collection or Production acceptance.
+
+**Acceptance is conjunctive:** workbook fidelity **and** native reusable WAKILISHA implementation **and** genuine governed product behavior **and** phase-specific operational proof. Neither a screenshot nor green CI alone satisfies all four.
+
+### Current implementation baseline and immediate next sequence
+
+- [PR #1340](https://github.com/bjuta/wakilisha/pull/1340) extended the existing candidate collector with bound Apple catalog chart parsing and transport guards; it did **not** admit or activate a source.
+- [PR #1341](https://github.com/bjuta/wakilisha/pull/1341) merged the Phase 1 native W1/W2/W2A/W3 interface foundation and shared operations primitives. Its source-health backend is read-only and not deployed to Production. Its Add Source review does **not** persist a source. Its isolated browser tests do **not** establish pixel-perfect all-state acceptance or genuine collection.
+- **Continue Phase 1 inside #1338, not a new phase issue:** inspect existing immutable candidate-capture schema and publisher/Registry authority; implement approved durable Admin source enrollment/configuration as a *separately governed* authority rather than editing historical receipts; connect it to the existing bounded service collector; add approved scheduling/health/retry contracts; qualify actual Kenya provider methods and native periods; and demonstrate two genuine EAT weeks with exact original-byte lineage. Keep Production and publication activation held until their separate gates are satisfied.
+
+No section here creates publication permission, source-method admission, deployment authorization, or an exemption from any earlier gate.
+
 ## 2. Audited Starting Point (not release authority)
 
 On 2 November 2026, current merged `main` and independent read-only Production checks established:
