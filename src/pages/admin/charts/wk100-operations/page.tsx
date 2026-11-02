@@ -20,6 +20,8 @@ import { WkAuditTimeline } from '@/components/design-system/primitives/AuditTime
 type Source = {
   id:string;sourceKey:string;provider:string;surface:string;market:string;
   metric:string;behavior:string;expectedDepth:number;cadence:string;version:string;
+  intervalHours:number|null;eatHour:number|null;eatMinute:number|null;
+  weekdayEat:number|null;minimumHealthyCheckpoints:number;adapterVersion:string;
   admissionState:string;captureState:string;attemptCount:number;lastAttemptAt:string|null;
   lastSuccessfulAt:string|null;observedDepth:number;nativePeriodAuthority:string;
   nativePeriodStart:string|null;nativePeriodEnd:string|null;receiptSha256:string|null;
@@ -43,6 +45,17 @@ const catalogue=[
 function nextWeek(v:string,n:number) {
   const d=new Date(v+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n*7);
   return d.toISOString().slice(0,10);
+}
+// An immutable candidate contract describes intended timing, not an active scheduler.
+function candidateCadence(s:Source) {
+  if(s.eatHour===null||s.eatMinute===null)return 'Timing not recorded';
+  const time=String(s.eatHour).padStart(2,'0')+':'+String(s.eatMinute).padStart(2,'0')+' EAT';
+  if(s.cadence==='daily')return 'Daily at '+time;
+  if(s.cadence==='interval_hours'&&s.intervalHours!==null)
+    return 'Every '+s.intervalHours+' hours, starting '+time;
+  if(s.cadence==='weekly'&&s.weekdayEat!==null)
+    return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][s.weekdayEat]+' at '+time;
+  return 'Timing definition unavailable';
 }
 function when(v:string|null) {
   if(!v)return 'Not recorded';
@@ -173,6 +186,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                 <p className="mt-1 text-xs text-wk-text-muted">{s.provider} · {s.sourceKey}</p>
               </>},
               {key:'metric',label:'Metric · period · depth',render:s=><span className="text-wk-text-soft">{s.metric} · {s.nativePeriodAuthority==='provider_defined'?'Defined':'Unverified'} · {s.expectedDepth}</span>},
+              {key:'cadence',label:'Candidate Timing',render:s=><span className="text-wk-text-soft">{candidateCadence(s)}</span>},
               {key:'qualification',label:'Qualification',render:()=> <WkStateBadge>Candidate</WkStateBadge>},
               {key:'health',label:'Health',render:s=><WkStateBadge tone={['transport_failed','parse_failed','missed','target_period_unavailable'].includes(s.captureState)?'danger':s.receiptSha256?'success':'neutral'}>{['transport_failed','parse_failed','missed','target_period_unavailable'].includes(s.captureState)?'Failing':s.receiptSha256?'Captured':'Unknown'}</WkStateBadge>},
               {key:'last',label:'Last success',render:s=><span className="text-wk-text-muted">{when(s.lastSuccessfulAt)}</span>},
@@ -239,14 +253,16 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             {label:'Native metric',value:detail.metric},
             {label:'Behavior class',value:detail.behavior},
             {label:'Expected depth',value:detail.expectedDepth},
-            {label:'Cadence',value:detail.cadence},
-            {label:'Version',value:detail.version},
+            {label:'Candidate cadence definition',value:candidateCadence(detail)},
+            {label:'Minimum healthy checkpoints',value:detail.minimumHealthyCheckpoints},
+            {label:'Adapter revision',value:detail.adapterVersion||'Not recorded'},
+            {label:'Source contract version',value:detail.version},
             {label:'Native measurement period',value:detail.nativePeriodAuthority==='provider_defined'
               ?when(detail.nativePeriodStart)+' to '+when(detail.nativePeriodEnd):'Unknown'},
           ]}/>
           <div className="rounded-xl border border-wk-border bg-wk-surface-raised p-4">
             <p className="text-xs font-bold text-wk-text">Infrastructure-managed source method</p>
-            <p className="mt-2 text-xs leading-relaxed text-wk-text-muted">Approved endpoints, parser identity, and credentials are not editable in this inspection view. No secrets are transmitted to the browser.</p>
+            <p className="mt-2 text-xs leading-relaxed text-wk-text-muted">The timing shown is a candidate contract definition, not proof that collection is scheduled. Approved endpoints, parser identity, and credentials are not editable here. No secrets are transmitted to the browser.</p>
           </div>
         </div>}
         {detailTab==='qualification'&&<div className="space-y-3">
