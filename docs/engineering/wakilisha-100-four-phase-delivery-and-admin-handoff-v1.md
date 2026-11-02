@@ -4,7 +4,7 @@
 **Date:** 2 November 2026 (EAT).  
 **Delivery issue:** [#1338](https://github.com/bjuta/wakilisha/issues/1338).  
 **Source and editorial authority:** [#1264](https://github.com/bjuta/wakilisha/issues/1264).  
-**Accepted code baseline:** [PR #1333](https://github.com/bjuta/wakilisha/pull/1333), merged as \`561a323503a21184a36c8e5453c0024d329b8abc\`.
+**Accepted code baseline:** [PR #1333](https://github.com/bjuta/wakilisha/pull/1333), merged as `561a323503a21184a36c8e5453c0024d329b8abc`.
 
 ## 1. Product Contract
 
@@ -20,17 +20,17 @@ These are **four acceptance phases inside one existing delivery issue**, not fou
 
 ## 2. Audited Starting Point (not release authority)
 
-On 2 November 2026, current merged \`main\` and independent read-only Production checks established:
+On 2 November 2026, current merged `main` and independent read-only Production checks established:
 
-- Production \`pgzizndxdyhqmtyywjmt\` held **236 migrations**. The three forward WK100 migrations \`20261102084046\`, \`20261102084049\`, \`20261102084052\` had not been applied. Recheck exact live state before any deployment.
+- Production `pgzizndxdyhqmtyywjmt` held **236 migrations**. The three forward WK100 migrations `20261102084046`, `20261102084049`, `20261102084052` had not been applied. Recheck exact live state before any deployment.
 - Legacy ingest had **21 runs, 10,216 raw observations**, and predominantly Spotify/Apple playlist sources. These are historical, **not** a current qualified WK100 observation period.
 - Existing Registry Artists and Tracks and the MIZIZI chart broker provide real reuse value. They are not permission to mint canonical identities from uncertain provider rows.
-- \`chart-ingest-api\`, \`chart-provider-fetch\`, and \`wk-chart-capture\` have been deployed; WK100 capture contracts, capture attempts, captured rank rows, and weekly freezes were **zero**.
+- `chart-ingest-api`, `chart-provider-fetch`, and `wk-chart-capture` have been deployed; WK100 capture contracts, capture attempts, captured rank rows, and weekly freezes were **zero**.
 - The guarded WK100 publisher SQL exists in Production, including source admission, replay attestation, independent editorial approval, staging, publication and identity-link controls. The associated private ledgers were **all empty**. Deployed SQL does not prove a working Admin publication path.
 - WK100 had **zero Editions and zero published entries**.
 - WK100 generic dry-run and publish actions are intentionally blocked in the old Ingest UI. The frozen full-filter stage is review-only and does not authorize scoring. The current preview displays only 20 flagged rows.
 - Eligibility profile, market scope and methodology definitions have browser-local persistence in the legacy path. A shared, reviewed server-side version must become authoritative for WK100.
-- The existing \`origin_iso2\` queue and reset of downstream eligibility/scoring stages are the pattern to generalize, not rebuild.
+- The existing `origin_iso2` queue and reset of downstream eligibility/scoring stages are the pattern to generalize, not rebuild.
 - Critical merged-main checks were green at this accepted SHA. That is not end-to-end source, operator, or Production acceptance.
 
 **Never promote historical documentation or a passing isolated test to current Production authority.**
@@ -39,16 +39,16 @@ On 2 November 2026, current merged \`main\` and independent read-only Production
 
 | Boundary | Reuse | Do not create or bypass |
 | --- | --- | --- |
-| Original source collection | \`wk-chart-capture\`, private Storage, capture receipts, EAT kernel and existing parsers | A second collector or source evidence ledger |
+| Original source collection | `wk-chart-capture`, private Storage, capture receipts, EAT kernel and existing parsers | A second collector or source evidence ledger |
 | Provider enrichment | Existing Apple/Spotify discovery and metadata logic where current access is verified | Assumed public playlist availability or obsolete API guarantees |
 | Recording identity | Legacy candidate normalization, MIZIZI-governed Registry Artist, Track, credit and origin operations | Automatic recording merge from similar title/lead Artist |
 | Eligibility | Frozen policy snapshot, full-filter evaluator and review-only stage | Another partial filter engine, or invented claims of 104 executed rules |
 | Corrections | Artist-origin review/reset, audit events, governed Registry broker | Destructive provider-evidence edits or silent published-Edition reset |
 | Ranking | WK100 private evidence and replay kernel | Generic playlist occurrence counts treated as comparable weekly streams |
-| Publication | Installed WK100 governed admission, attestation, approval, staging and publish RPCs | Direct V2 writes, service-key exposure, or generic \`publishImmediately:true\` |
+| Publication | Installed WK100 governed admission, attestation, approval, staging and publish RPCs | Direct V2 writes, service-key exposure, or generic `publishImmediately:true` |
 | Admin experience | Existing Charts Ingest, Review, No Match, Artist Resolution and Editions surfaces | Fragmented developer-dependent steps for a normal week |
 
-The binding cultural model is **assertion -> evidence -> review / reconciliation -> canonical fact**. Editorial decisions are not Registry facts, and a Kenya chart appearance does not imply an Artist's \`origin_iso2\`.
+The binding cultural model is **assertion -> evidence -> review / reconciliation -> canonical fact**. Editorial decisions are not Registry facts, and a Kenya chart appearance does not imply an Artist's `origin_iso2`.
 
 ## Phase 1. Multi-Source Collection and Automated Research
 
@@ -58,7 +58,7 @@ The binding cultural model is **assertion -> evidence -> review / reconciliation
 
 1. Implement one durable **Admin-managed Source Registry**, covering provider, exact Kenya surface and ID, operator identity, method, permitted access evidence, metric class, native period, rank depth, parser revision, credential reference, EAT cadence, refresh budget, and qualification/health status.
 2. Investigate and qualify **YouTube, Spotify, Boomplay, Apple Music, Mdundo, and Shazam**, plus representative optional services including Audiomack and genuine airplay where demonstrably useful. Each named core provider must have an independently verified usable method or a documented unqualified state. Provider count does not equal chart credibility.
-3. Extend \`wk-chart-capture\` and current native parsers/adapters. Prefer provider API, offered export fetched on the server, or separately qualified public-page observation method. A playlist listing is not a stream count; a YouTube playlist is not the weekly YouTube chart metric; Shazam recognition/discovery is not audio streaming. Reverify actual Spotify endpoint/access behavior. Public-fact research does **not** automatically require a negotiated partnership, but unattended collection must respect the verified source-specific method and concrete restrictions.
+3. Extend `wk-chart-capture` and current native parsers/adapters. Prefer provider API, offered export fetched on the server, or separately qualified public-page observation method. A playlist listing is not a stream count; a YouTube playlist is not the weekly YouTube chart metric; Shazam recognition/discovery is not audio streaming. Reverify actual Spotify endpoint/access behavior. Public-fact research does **not** automatically require a negotiated partnership, but unattended collection must respect the verified source-specific method and concrete restrictions.
 4. Record original private bytes, SHA-256, provider response, observed timestamp, native reporting period, territory, rank/count meaning, provenance and attempt identity. Do not manufacture a native week from the capture time.
 5. Schedule collection, detect corrupt/schema-drifted payloads, quarantine bad sources, expose source health, and support bounded idempotent retry. The ordinary Admin never downloads and uploads CSVs. Manual original-byte upload is an exceptional, validated recovery route.
 
@@ -80,8 +80,8 @@ The binding cultural model is **assertion -> evidence -> review / reconciliation
 
 1. Converge existing Ingest, No Match, Artist Resolution, Review Queue and MIZIZI workflows into one searchable **Filter Review and Correction Workbench**. Use verified ISRC/provider links and governed canonical recording identity. Similar titles are match candidates, not authority to merge originals, remixes, acoustic, live, re-recorded or remastered versions.
 2. Inventory the **approximately 104 founder-referenced filters** against real profiles and executable predicates. The count is an estimate, not a verified exact contract. Map every applicable filter to field, evidence, disposition, correction or policy authority, dependencies, and regression acceptance.
-3. Evaluate each predicate as \`ELIGIBLE\`, \`EXCLUDED\`, \`REVIEW_REQUIRED\`, or \`CONFLICTED\` with reason codes. No incomplete rule silently passes. Replace the review-only downstream hold **only after** independent source period, Registry completeness, authorization and full-filter enforcement pass.
-4. Support Admin corrections to factual metadata including Artist attribution, primary/featured credits, version/remix flags, release dates/types, genres, languages, explicit metadata, ISRC/provider IDs, and \`origin_iso2\`. Keep factual correction separate from an audited exclusion and from a proposed **week-wide policy revision**.
+3. Evaluate each predicate as `ELIGIBLE`, `EXCLUDED`, `REVIEW_REQUIRED`, or `CONFLICTED` with reason codes. No incomplete rule silently passes. Replace the review-only downstream hold **only after** independent source period, Registry completeness, authorization and full-filter enforcement pass.
+4. Support Admin corrections to factual metadata including Artist attribution, primary/featured credits, version/remix flags, release dates/types, genres, languages, explicit metadata, ISRC/provider IDs, and `origin_iso2`. Keep factual correction separate from an audited exclusion and from a proposed **week-wide policy revision**.
 5. Preserve original provider values, evidence, proposer, reviewer, reason, old/new value, policy digest and timestamp. MIZIZI may suggest evidence; it must not self-approve or overwrite canonical Registry values. Use governed Artist/Track/credit/origin authority, retaining accepted facts for subsequent weeks.
 6. Implement **Apply Corrections and Re-evaluate**, with version/digest conflict checks and before/after impact preview. Invalidate affected filter, score, shortlist, review and approval states. Recompute from existing original observations **without refetching or uploading**. Preserve manual exclusions and audit history. Committed/published Editions use a separately governed revision, not a destructive reset.
 7. Give the Admin a complete searchable/paginated queue, batch review with justified shared values, and explainable stale/conflicting edit rejection.
@@ -89,7 +89,7 @@ The binding cultural model is **assertion -> evidence -> review / reconciliation
 **Phase 2 exit, all required:**
 
 - [ ] All applicable filters have explicit executed outcomes, evidence and correct/review/exclude/policy-revision dispositions. No arbitrary first-20 review limit.
-- [ ] Realistic cases for false remix labels, Artist misattribution, credits, missing/conflicted \`origin_iso2\`, recording versions, release/explicit fields, language/genre, provider collisions and unknown evidence produce correct outcomes.
+- [ ] Realistic cases for false remix labels, Artist misattribution, credits, missing/conflicted `origin_iso2`, recording versions, release/explicit fields, language/genre, provider collisions and unknown evidence produce correct outcomes.
 - [ ] Single and batch correction/re-evaluation are deterministic, idempotent, audit-preserving, and never duplicate source evidence or canonical Registry entities.
 - [ ] Denied roles, stale versions, simultaneous Admin corrections, and interrupted updates fail safely.
 - [ ] Independent scoring/publication blocks remain in effect until proven cleared.
@@ -145,7 +145,7 @@ The binding cultural model is **assertion -> evidence -> review / reconciliation
 ## 4. Cardinal Cross-Phase Rules
 
 1. **One owner per authority:** extend existing capture, Registry, filter, ranking, and publisher systems. No competing implementation.
-2. **Truthful measurements:** playlist appearance is not stream count; Shazam discovery is not streaming; provider-native periods cannot be invented; Kenya observation does not establish Artist \`origin_iso2\`.
+2. **Truthful measurements:** playlist appearance is not stream count; Shazam discovery is not streaming; provider-native periods cannot be invented; Kenya observation does not establish Artist `origin_iso2`.
 3. **Evidence survives correction:** never rewrite provider originals; separate facts, policy choices, editorial exceptions, canonical identity and published revision.
 4. **Security survives convenience:** use caller-scoped JWT/role authority, RLS and private source/score provenance; MIZIZI suggestions are not autonomous canonical writes.
 5. **No fixtures left behind:** use isolated local integration stack and independent automated whole-lifecycle teardown; no manual founder cleanup.
