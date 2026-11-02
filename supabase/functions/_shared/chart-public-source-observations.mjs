@@ -210,6 +210,10 @@ export function parseAppleKenya(raw,access={}) {
       provider_updated_at:text(feed.updated,120),chart_surface:'apple_rss_most_played'});
   }
 
+  // An empty or unrelated response is not an Apple chart at all.
+  // Preserve the established fail-closed invalid-feed contract first.
+  if (!record(o?.results) || !Array.isArray(o.results.songs)) fail('apple_invalid_feed');
+
   // The Apple Music API response is only valid when the approved source
   // manifest binds its exact Kenya /charts request. A client-supplied JSON
   // "country" property or an Apple US endpoint cannot supply that authority.
