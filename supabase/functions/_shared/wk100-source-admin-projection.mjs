@@ -1,5 +1,6 @@
 const key = v => typeof v === 'string' ? v.slice(0,180) : '';
 const integer = v => Number.isInteger(v) && v >= 0 ? v : 0;
+const bounded = (v,max) => Number.isInteger(v) && v >= 0 && v <= max ? v : null;
 export function validEatWeek(value) {
   if(typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(value+'T12:00:00Z');
@@ -21,6 +22,10 @@ export function projectWk100SourceHealth(contracts, attempts, weekStartEat) {
       surface:key(c.source_surface),market:key(c.market),
       metric:key(c.native_metric),behavior:key(c.behavior),expectedDepth:integer(c.expected_depth),
       cadence:key(c.cadence_kind),version:key(c.contract_version),
+      intervalHours:bounded(c.interval_hours,24),eatHour:bounded(c.eat_hour,23),
+      eatMinute:bounded(c.eat_minute,59),weekdayEat:bounded(c.weekday_eat,6),
+      minimumHealthyCheckpoints:integer(c.minimum_healthy_checkpoints),
+      adapterVersion:key(c.adapter_version),
       admissionState:'candidate', // This legacy capture contract cannot be 'qualified'.
       captureState: latest ? key(latest.status) : 'not_collected',
       attemptCount:history.length,lastAttemptAt:latest?.created_at||null,
