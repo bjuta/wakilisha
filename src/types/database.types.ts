@@ -28234,6 +28234,39 @@ export type Database = {
       wk_slugify: { Args: { value: string }; Returns: string }
       wk_slugify_text: { Args: { p_value: string }; Returns: string }
       wk_stable_uuid: { Args: { value: string }; Returns: string }
+      wk100_admit_governed_source_v1: {
+        Args: {
+          p_authority_sha256: string
+          p_contract_id: string
+          p_week_start_eat: string
+        }
+        Returns: string
+      }
+      wk100_attest_private_ranking_replay_v1: {
+        Args: { p_proposal: Json }
+        Returns: string
+      }
+      wk100_link_governed_recording_identity_v1: {
+        Args: {
+          p_authority_sha256: string
+          p_edition_id: string
+          p_rank: number
+          p_track_id: string
+        }
+        Returns: string
+      }
+      wk100_publish_governed_weekly_edition_v1: {
+        Args: { p_proposal_sha256: string; p_week: string }
+        Returns: string
+      }
+      wk100_register_governed_editorial_approval_v1: {
+        Args: { p_proposal: Json }
+        Returns: string
+      }
+      wk100_stage_governed_weekly_edition_v1: {
+        Args: { p_proposal_sha256: string; p_week: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

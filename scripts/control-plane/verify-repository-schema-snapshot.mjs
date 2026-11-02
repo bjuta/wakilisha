@@ -2,6 +2,15 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  RNB18_STAGED_MODE,
+  RNB18_STAGE1,
+  RNB18_BASE,
+  RNB18_PAIRED_COMMIT,
+  RNB18_PREVIEW_REF,
+  RNB18_PREVIEW_BRANCH,
+  RNB18_TYPES_SHA256,
+} from "./verify-rnb18-staged-retirement.mjs";
 
 const TYPE_FILE =
   "src/types/database.types.ts";
@@ -141,6 +150,7 @@ export function validateRepositorySchemaSnapshot({
     ![
       "production",
       "preview",
+      RNB18_STAGED_MODE,
     ].includes(seal.mode)
   ) {
     errors.push(
@@ -213,6 +223,19 @@ export function validateRepositorySchemaSnapshot({
     }
   }
 
+  if (seal.mode === RNB18_STAGED_MODE) {
+    if (expectedProjectRef !== "pgzizndxdyhqmtyywjmt" ||
+        migrationCount !== 237 || latestMigration !== RNB18_STAGE1 ||
+        seal.migrationHead !== "20261101210335" ||
+        seal.sourceProjectRef !== RNB18_PREVIEW_REF ||
+        seal.previewBranchId !== RNB18_PREVIEW_BRANCH ||
+        seal.baseMainSha !== RNB18_BASE ||
+        seal.pairedReplayCommitSha !== RNB18_PAIRED_COMMIT ||
+        seal.pairedReplayMigrationCount !== 236 ||
+        seal.retiredHistoricalVersion !== "20261030062819" ||
+        baseline.typesSha256 !== RNB18_TYPES_SHA256)
+      errors.push("RNB18 two-stage seal must disclose the exact 236-file paired Preview for the 237-file stage");
+  }
   return errors;
 }
 
@@ -236,7 +259,8 @@ export function validatePendingSchemaState({
 
   if (
     pendingCount > 0 &&
-    sealMode !== "preview"
+    sealMode !== "preview" &&
+    sealMode !== RNB18_STAGED_MODE
   ) {
     errors.push(
       "pending repository migrations require a preview-sealed schema snapshot",

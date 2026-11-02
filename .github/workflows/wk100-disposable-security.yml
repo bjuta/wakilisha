@@ -6,7 +6,6 @@ on:
     paths:
       - '.github/workflows/wk100-disposable-security.yml'
       - 'scripts/acceptance/run-wk100-two-session-disposable-ci.sh'
-      - 'scripts/acceptance/prepare-disposable-ci-234-baseline.sh'
       - 'scripts/acceptance/wk100-genuine-auth-storage-disposable-ci.mjs'
       - 'supabase/migrations/**'
 
@@ -27,6 +26,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Prove no linked or credentialed remote target
         shell: bash
@@ -57,14 +57,6 @@ jobs:
       - name: Install locked JS dependencies
         shell: bash
         run: npm ci --ignore-scripts --no-audit --no-fund
-
-      # This workflow's security contracts explicitly require 234 and zero
-      # historical editions. Migration 235 has a deliberate Production-only
-      # 18-edition retirement preflight; it must not be run on this empty
-      # disposable fixture. All five later SQL blobs are verified and held.
-      - name: Stage exact 234 disposable baseline without rewriting history
-        shell: bash
-        run: bash scripts/acceptance/prepare-disposable-ci-234-baseline.sh
 
       - name: Start UNLINKED local database Auth Storage and REST
         shell: bash

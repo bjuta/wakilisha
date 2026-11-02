@@ -64,7 +64,7 @@ node "$SNAPSHOT_VERIFIER" \
 if [ "$PENDING_COUNT" -gt 0 ]; then
   node "$REPLAY_VERIFIER"
 
-  echo "PASS: committed public,editorial schema snapshot is preview-sealed for ${PENDING_COUNT} pending repository migration(s)."
+  echo "PASS: committed public,editorial schema snapshot is sealed under its explicit declared mode for ${PENDING_COUNT} pending migration(s)."
   echo "PASS: production type equality is deferred until canonical merged-main promotion applies those migrations."
   exit 0
 fi

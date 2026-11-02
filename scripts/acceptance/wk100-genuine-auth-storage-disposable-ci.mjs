@@ -6,7 +6,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 const check=(condition,code)=>{if(!condition) throw new Error(code);};
 const UUID=/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 function env(){
@@ -43,10 +43,24 @@ async function main(){
     '--format','{{.Names}}'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
   check(c.length===1,'STOP_LOCAL_POSTGRES_CONTAINER_CARDINALITY');
   const db=c[0];
-  check(query("SELECT (SELECT count(*) FROM supabase_migrations.schema_migrations)::text||'|'||"+
-    "(SELECT count(*) FROM auth.users)::text||'|'||"+
+  // Verify the complete migration ledger, not a stale 234-version Oct 20 head.
+  const activeFiles=readdirSync('supabase/migrations')
+    .filter(name=>name.endsWith('.sql')).sort();
+  const expectedVersions=activeFiles.map(name=>
+    name.match(/^([0-9]{14})_[A-Za-z0-9_-]+\.sql$/)?.[1]??null);
+  check(expectedVersions.length>0&&expectedVersions.every(Boolean)&&
+    new Set(expectedVersions).size===expectedVersions.length,
+    'STOP_LOCAL_ACTIVE_MIGRATION_SOURCE_INVALID');
+  const appliedVersions=query(
+    'SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;',db)
+    .split(/\r?\n/).filter(Boolean);
+  check(appliedVersions.length===expectedVersions.length&&
+    appliedVersions.every((version,index)=>version===expectedVersions[index]),
+    'STOP_LOCAL_ACTIVE_MIGRATION_LEDGER_DRIFT');
+  check(query("SELECT (SELECT count(*) FROM auth.users)::text||'|'||"+
     "(SELECT count(*) FROM storage.objects WHERE bucket_id='wk-chart-raw-evidence-v1')::text;",db)
-    ==='234|0|0','STOP_LOCAL_234_AUTH_AND_STORAGE_NOT_EMPTY');
+    ==='0|0','STOP_LOCAL_AUTH_AND_STORAGE_NOT_EMPTY');
+  console.log('WK100_GENUINE_AUTH_EXACT_ACTIVE_LEDGER_AND_ZERO_DATA=PASS');
   const admin=client(url,v.SERVICE_ROLE_KEY),anon=client(url,v.ANON_KEY);
   const identity=randomUUID(); const email=`wk100-ci-${identity}@example.test`;
   const password=randomBytes(30).toString('base64url');

@@ -11,6 +11,11 @@ import {
   validateHistoricalCleanReplayProof,
   validateHistoricalCleanReplayRepositoryState,
 } from "./verify-historical-migration-clean-replay.mjs";
+import {
+  isRnb18StagedProof,
+  validateRnb18StagedFields,
+  validateRnb18StagedRepositoryState,
+} from "./verify-rnb18-staged-retirement.mjs";
 
 const BASE_REF =
   process.env.CONTROL_PLANE_BASE_REF ??
@@ -671,7 +676,12 @@ function main() {
             baseMainSha:
               mergeBase,
           })
-        : validateReplayProof({
+        : isRnb18StagedProof(proof) ? validateRnb18StagedFields({
+            proof,
+            migrationFile: entry.path,
+            migrationSha256: sha256File(entry.path),
+            baseMainSha: mergeBase,
+          }) : validateReplayProof({
             proof,
             migrationFile:
               entry.path,
@@ -773,6 +783,17 @@ function main() {
               ),
           );
 
+        const stagedMode = changedActive.some((entry) =>
+          isRnb18StagedProof(proofs.get(entry.path)));
+        if (stagedMode) {
+          const stagedProof = proofs.get("supabase/migrations/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql");
+          for (const error of validateRnb18StagedRepositoryState({
+            proof: stagedProof, changedActive, mergeBase, baseline,
+            migrations, latestMigration, actualTypesSha256,
+          })) failures.push("RNB18 two-stage retirement: " + error);
+        }
+        if (historicalMode && stagedMode) failures.push("Cannot combine historical clean replay and RNB18 staged modes");
+
         if (historicalMode) {
           for (
             const error of
@@ -793,7 +814,7 @@ function main() {
         }
 
         if (
-          !historicalMode &&
+          !historicalMode && !stagedMode &&
           baseline
             .schemaSeal?.mode !==
           "preview"
@@ -804,7 +825,7 @@ function main() {
         }
 
         if (
-          !historicalMode &&
+          !historicalMode && !stagedMode &&
           baseline
             .schemaSeal
             ?.baseMainSha !==
@@ -815,7 +836,7 @@ function main() {
           );
         }
 
-        if (!historicalMode) {
+        if (!historicalMode && !stagedMode) {
         const latestChanged =
           changedActive.at(-1);
         const latestProof =
