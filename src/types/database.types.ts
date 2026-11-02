@@ -28246,6 +28246,15 @@ export type Database = {
         Args: { p_proposal: Json }
         Returns: string
       }
+      wk100_finalize_html_research_observation_v1: {
+        Args: { p_reservation_id: string; p_rows: Json; p_sha256: string }
+        Returns: Json
+      }
+      wk100_finalize_research_observation_v1: {
+        Args: { p_reservation_id: string; p_rows: Json; p_sha256: string }
+        Returns: Json
+      }
+      wk100_get_admin_draft_v1: { Args: { p_week: string }; Returns: Json }
       wk100_link_governed_recording_identity_v1: {
         Args: {
           p_authority_sha256: string
@@ -28262,6 +28271,34 @@ export type Database = {
       wk100_register_governed_editorial_approval_v1: {
         Args: { p_proposal: Json }
         Returns: string
+      }
+      wk100_reserve_html_research_observation_v1: {
+        Args: {
+          p_acquisition_mode: string
+          p_byte_length: number
+          p_observed_at: string
+          p_raw_sha256: string
+          p_source_key: string
+          p_source_url: string
+          p_week: string
+        }
+        Returns: Json
+      }
+      wk100_reserve_research_observation_v1: {
+        Args: {
+          p_byte_length: number
+          p_depth: number
+          p_observed_at: string
+          p_operator_ref: string
+          p_raw_sha256: string
+          p_source_url: string
+          p_week: string
+        }
+        Returns: Json
+      }
+      wk100_save_admin_draft_v1: {
+        Args: { p_config: Json; p_expected_revision: number; p_week: string }
+        Returns: Json
       }
       wk100_stage_governed_weekly_edition_v1: {
         Args: { p_proposal_sha256: string; p_week: string }

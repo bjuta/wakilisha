@@ -1,0 +1,25 @@
+{
+  "migration_file": "supabase/migrations/20261101074119_wk100_html_research_ledger_v1.sql",
+  "migration_sha256": "4e9086bd3a550cf9d814f1ae82ebe8c9092c412d4391c2b3e1e24663cb09924c",
+  "base_main_sha": "534b302628097bc64b8f946dce6cf261ed366a57",
+  "preview_project_ref": "qzndtjjlbmdzcjdbqdak",
+  "preview_branch_id": "817baaa7-a198-40d8-a4cd-d83e5f61a0c0",
+  "preview_migration_head": "20261101074119",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/control-plane/verify-wk100-hosted-pg239-research-security.sql",
+  "schema_types_sha256": "c9e27d705a5c7b8dec1ea8b095c699400ecb51ed4a468f5a8236ec0c51f80d1c",
+  "schema_migration_count": 239,
+  "schema_migration_head": "20261101210335",
+  "verified_at": "2026-11-02T08:29:45.764Z",
+  "hosted_replay_evidence": {
+    "source": "Native Supabase Preview success for exact PR head and independent read-only hosted 239/239 and security postflights.",
+    "check_url": "https://github.com/bjuta/wakilisha/commit/cd274cfda13b5f0df1796e75ee19ef17eb9a7096/checks",
+    "branch_data_mode": "with_data=false",
+    "verified_migration_count": 239,
+    "verified_latest_version": "20261101210335",
+    "interpretation": "The preview_migration_head field identifies each candidate, not a separate stopped Preview. All 239 files applied in one fresh hosted replay.",
+    "production_mutation": false
+  }
+}
