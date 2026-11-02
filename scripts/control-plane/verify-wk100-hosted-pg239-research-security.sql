@@ -1,5 +1,5 @@
--- WK100 PG239: hosted data-less research-ledger security postflight.
--- Read only. Execute against the PR #1333 Preview, not against Production.
+-- WK100 PG239: forward-only hosted research-ledger security postflight.
+-- Read only. Execute only on a fresh Preview after the forward-only migration replay. Do NOT treat prior PG239 evidence as acceptance of reordered files.
 -- Does not prove Edge gateway, signed JWT, Storage, or Admin browser behavior.
 WITH expected_tables(name) AS (
   VALUES
@@ -44,16 +44,16 @@ WITH expected_tables(name) AS (
 ), ledger AS (
   SELECT count(*) AS total, count(DISTINCT version) AS distinct_count,
     max(version) AS head,
-    count(*) FILTER (WHERE version='20261030180827') AS filters_version,
-    count(*) FILTER (WHERE version='20261031194228') AS csv_version,
-    count(*) FILTER (WHERE version='20261101074119') AS html_version,
+    count(*) FILTER (WHERE version='20261102084046') AS filters_version,
+    count(*) FILTER (WHERE version='20261102084049') AS csv_version,
+    count(*) FILTER (WHERE version='20261102084052') AS html_version,
     count(*) FILTER (WHERE version='20261101210335') AS rnb18_forward,
     count(*) FILTER (WHERE version='20261030062819') AS retired_old
   FROM supabase_migrations.schema_migrations
 )
 SELECT
   CASE WHEN
-    (SELECT total=239 AND distinct_count=239 AND head='20261101210335'
+    (SELECT total=239 AND distinct_count=239 AND head='20261102084052'
       AND filters_version=1 AND csv_version=1 AND html_version=1
       AND rnb18_forward=1 AND retired_old=0 FROM ledger)
     AND (SELECT count(*)=6 AND bool_and(relrowsecurity
