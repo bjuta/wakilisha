@@ -13,18 +13,21 @@ interface WkAuditTimelineProps {
   events: WkAuditTimelineEvent[];
   emptyLabel?: string;
   ariaLabel?: string;
+  locale?: string;
+  timeZone?: string;
 }
 
-function formatWhen(value: string | null | undefined) {
+function formatWhen(value: string | null | undefined, locale = 'en-US', timeZone?: string) {
   if (!value) return "Time unavailable";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("en-US", {
+  return date.toLocaleString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   });
 }
 
@@ -32,6 +35,8 @@ export function WkAuditTimeline({
   events,
   emptyLabel = "No recorded activity yet.",
   ariaLabel = "Activity history",
+  locale = 'en-US',
+  timeZone,
 }: WkAuditTimelineProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -63,7 +68,7 @@ export function WkAuditTimeline({
                     {event.label}
                   </span>
                   <span className="text-[9px] font-bold text-wk-text-faint">
-                    {formatWhen(event.occurredAt)}
+                    {formatWhen(event.occurredAt, locale, timeZone)}
                   </span>
                 </div>
 
