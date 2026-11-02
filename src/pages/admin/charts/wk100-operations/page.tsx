@@ -8,6 +8,7 @@ import { WkWorkflowRail } from '@/components/design-system/primitives/WorkflowRa
 import { WkInspector } from '@/components/design-system/primitives/Inspector';
 import { Sheet } from '@/components/design-system/primitives/Sheet';
 import { WkSearchField } from '@/components/design-system/primitives/Field';
+import { WkSelect } from '@/components/design-system/primitives/Select';
 import { WkStateBadge } from '@/components/design-system/primitives/StateBadge';
 import { WkDataTable, type WkDataColumn } from '@/components/design-system/primitives/DataTable';
 import { WkDetailList } from '@/components/design-system/primitives/DetailList';
@@ -107,7 +108,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       {view==='sources'&&<>
         <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-wk-text-muted">Only registered capture contracts appear as live sources.</p><button className="wk-button wk-button-secondary wk-button-sm" type="button" onClick={()=>setAdd(true)}>Propose Source</button></div>
         <Card title="Registered Sources">
-          <div className="mb-4 flex flex-wrap gap-2"><WkSearchField ariaLabel="Search sources" placeholder="Search source" value={search} onChange={setSearch} className="min-w-40 flex-1"/><select aria-label="Collection state" value={status} onChange={e=>setStatus(e.target.value)} className="rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-sm text-wk-text"><option value="all">All states</option><option value="collected">Collected</option><option value="failed">Failed</option><option value="not_collected">Not collected</option></select></div>
+          <div className="mb-4 flex flex-wrap gap-2"><WkSearchField ariaLabel="Search sources" placeholder="Search source" value={search} onChange={setSearch} className="min-w-40 flex-1"/><WkSelect ariaLabel="Collection state" value={status} onChange={setStatus}
+            options={[{value:'all',label:'All states'},{value:'collected',label:'Collected'},{value:'failed',label:'Failed'},{value:'not_collected',label:'Not collected'}]}
+            className="min-w-40" /></div>
           <WkDataTable<Source> rows={sources} getKey={s=>s.id} ariaLabel="Registered capture sources"
             empty={report.sourceCount===0?'No source capture contracts exist yet. Select Propose Source to review qualification requirements.':'No sources match the selected filters.'}
             columns={[
