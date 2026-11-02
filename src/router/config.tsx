@@ -41,6 +41,7 @@ import {
   AdminChartsReviewQueue,
   AdminChartsScoringRuns,
   Wk100PrivateAdminPreview,
+  Wk100OperationsPage,
   AdminChartsSnapshots,
   AdminCommunityPage,
   AdminArtistClaimsPage,
