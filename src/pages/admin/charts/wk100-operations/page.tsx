@@ -23,6 +23,7 @@ type Source = {
   lastSuccessfulAt:string|null;observedDepth:number;nativePeriodAuthority:string;
   nativePeriodStart:string|null;nativePeriodEnd:string|null;receiptSha256:string|null;
   failureCode:string|null;canScore:false;canPublish:false;
+  recentAttempts:{id:string;status:string;attemptedAt:string|null;fetchedAt:string|null;failureCode:string|null;observedDepth:number}[];
 };
 type Report = {schemaVersion:string;weekStartEat:string;sourceCount:number;
   successfulSources:number;failedSources:number;qualifiedSources:number;
@@ -110,10 +111,34 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     {phase==='loading'&&<Card title="Reading capture status"><p role="status" className="text-sm text-wk-text-muted">Checking the restricted source ledger…</p></Card>}
     {phase==='unavailable'&&<Card title="Source status unavailable"><p role="alert" className="text-sm text-wk-text-muted">The protected source service did not return a verified response. No source is assumed to be qualified or collected. Backend deployment and authorized access are needed before this view can show live status.</p></Card>}
     {phase==='ready'&&report&&<>
-      <WkMetricStrip>{[['Registered candidates',report.sourceCount],['Qualified sources',report.qualifiedSources],['Verified captures',report.successfulSources],['Collection failures',report.failedSources]].map(([name,value])=><WkMetricCard key={name} label={name} value={value}/>)}</WkMetricStrip>
-      {view==='overview'&&<div className="grid gap-3 lg:grid-cols-2">
-        <Card title="Weekly Research"><p className="text-sm text-wk-text-muted">{report.sourceCount===0?'No source capture contracts have been enrolled.':report.successfulSources+' of '+report.sourceCount+' candidates have a verified private capture this week.'}</p><button type="button" onClick={()=>go('/collection')} className="wk-button wk-button-secondary wk-button-sm mt-3">Review Collection</button></Card>
-        <Card title="Next Action"><p className="text-sm text-wk-text-muted">Qualify source methods and establish the approved collection roster. Ranking and publication remain held.</p><button type="button" onClick={()=>go('/sources')} className="wk-button wk-button-secondary wk-button-sm mt-3">Review Sources</button></Card>
+      {view==='overview'&&<div className="space-y-5">
+        <WkOperationsHero eyebrow={'WAKILISHA 100 · Kenya · week '+week}
+          title={'Week of '+new Intl.DateTimeFormat('en-KE',{day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Nairobi'}).format(new Date(week+'T12:00:00Z'))}
+          description={report.sourceCount===0?'No enrolled capture sources yet. This week has no verified evidence set and cannot proceed to private ranking.':'Source research is provisional. Captures do not become scoring evidence until separately qualified.'}
+          aside={<WkStateBadge tone="warning">Private · Not ready</WkStateBadge>}/>
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)]">
+          <WkNextAction title={report.sourceCount===0?'Establish the qualified source roster':'Review captured source evidence'}
+            blocked={report.sourceCount===0}
+            description={report.sourceCount===0?'No source capture contracts have been enrolled. Begin with method qualification and an approved Source Registry.':'Inspect source-specific captures, reporting periods, and validation outcomes before advancing this week.'}
+            action={<button type="button" className="wk-button wk-button-primary wk-button-sm" onClick={()=>go(report.sourceCount===0?'/sources':'/collection')}>{report.sourceCount===0?'Review Sources':'Review Collection'}</button>}
+            secondary={<button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>go('/collection')}>Why collection is held</button>}/>
+          <Card title="Readiness">
+            <WkReadinessList items={[
+              {id:'sources',label:'Qualified source constitution',status:'blocked',description:report.qualifiedSources+' qualified sources for this week'},
+              {id:'receipts',label:'Verified weekly captures',status:report.successfulSources?'pending':'blocked',description:report.successfulSources+' verifiable original evidence receipts'},
+              {id:'period',label:'Native measurement periods',status:'pending',description:'A successful capture alone does not prove an eligible source period'},
+              {id:'ranking',label:'Private ranking and publication',status:'blocked',description:'The scoring and publisher remain separately controlled'},
+            ]}/>
+          </Card>
+        </div>
+        <section aria-label="This week" className="space-y-2">
+          <h2 className="text-xs font-bold uppercase tracking-[.12em] text-wk-text-muted">This week</h2>
+          <WkMetricStrip>{[['Registered candidates',report.sourceCount],['Qualified sources',report.qualifiedSources],['Verified captures',report.successfulSources],['Collection failures',report.failedSources]].map(([name,value])=><WkMetricCard key={name} label={name} value={value}/>)}</WkMetricStrip>
+        </section>
+        <Card title="Collection activity"><WkAuditTimeline ariaLabel="Verified capture activity" emptyLabel="No source attempts recorded for this week." events={report.sources.flatMap(s=>s.recentAttempts.map((a,i)=>({
+          id:s.id+':'+(a.id||i),label:s.surface+' · '+a.status.replaceAll('_',' '),
+          occurredAt:a.attemptedAt,description:a.failureCode?('Reason: '+a.failureCode):('Observed rows: '+a.observedDepth),
+        }))).sort((a,b)=>String(b.occurredAt||'').localeCompare(String(a.occurredAt||''))).slice(0,12)}/></Card>
       </div>}
       {view==='sources'&&<>
         <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-wk-text-muted">Only registered capture contracts appear as live sources.</p><button className="wk-button wk-button-secondary wk-button-sm" type="button" onClick={()=>setAdd(true)}>Propose Source</button></div>
@@ -133,7 +158,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         </Card>
       </>}
       {view==='collection'&&<Card title="Collection Status"><p className="mb-4 text-xs text-wk-text-muted">A successful source download is not automatic admission to scoring. Provider-native periods remain separately verifiable.</p>{report.sources.length===0?<p className="rounded-xl bg-wk-surface-raised p-5 text-sm text-wk-text-muted">No collection contracts or attempts exist for the selected week. Scheduled collection and retry controls will become available only through a governed service.</p>:<div className="space-y-2">{report.sources.map(s=><button key={s.id} type="button" onClick={()=>setDetail(s)} className="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-wk-border p-4 text-left hover:bg-wk-surface-raised"><span><strong className="block text-sm text-wk-text">{s.surface}</strong><span className="text-xs text-wk-text-muted">{s.observedDepth}/{s.expectedDepth} observed · {s.nativePeriodAuthority==='provider_defined'?'Provider-defined period':'Native period unknown'}</span></span><span className="text-xs text-wk-text-muted">{s.captureState.replaceAll('_',' ')}</span></button>)}</div>}</Card>}
-      {view==='overview'&&<Card title="Publication Readiness"><p className="text-sm text-wk-text-muted">Private evidence collection, full eligibility evaluation, actual ranking and publication authority have not been accepted as a complete weekly workflow. No publication operation is available here.</p></Card>}
+
     </>}
     {detail&&<WkInspector open={true} onClose={()=>setDetail(null)} title={detail.surface} eyebrow="Source inspection" summary={<p className="text-sm text-wk-text-muted">{detail.provider} · {detail.market} · {detail.version}</p>}><WkDetailList items={[
         {label:'Provider',value:detail.provider},
