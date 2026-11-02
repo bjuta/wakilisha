@@ -141,7 +141,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           <h2 className="text-xs font-bold uppercase tracking-[.12em] text-wk-text-muted">This week</h2>
           <WkMetricStrip>{[['Registered candidates',report.sourceCount],['Qualified sources',report.qualifiedSources],['Verified captures',report.successfulSources],['Collection failures',report.failedSources]].map(([name,value])=><WkMetricCard key={name} label={name} value={value}/>)}</WkMetricStrip>
         </section>
-        <Card title="Collection activity"><WkAuditTimeline ariaLabel="Verified capture activity" emptyLabel="No source attempts recorded for this week." events={report.sources.flatMap(s=>s.recentAttempts.map((a,i)=>({
+        <Card title="Collection activity"><WkAuditTimeline locale="en-KE" timeZone="Africa/Nairobi" ariaLabel="Verified capture activity" emptyLabel="No source attempts recorded for this week." events={report.sources.flatMap(s=>s.recentAttempts.map((a,i)=>({
           id:s.id+':'+(a.id||i),label:s.surface+' · '+a.status.replaceAll('_',' '),
           occurredAt:a.attemptedAt,description:a.failureCode?('Reason: '+a.failureCode):('Observed rows: '+a.observedDepth),
         }))).sort((a,b)=>String(b.occurredAt||'').localeCompare(String(a.occurredAt||''))).slice(0,12)}/></Card>
@@ -210,7 +210,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             ] satisfies WkDataColumn<Source>[]} />
         </Card>
         <Card title="Collection activity">
-          <WkAuditTimeline ariaLabel="Collection attempt history" emptyLabel="No collection attempts recorded." events={report.sources.flatMap(s=>s.recentAttempts.map((a,i)=>({
+          <WkAuditTimeline locale="en-KE" timeZone="Africa/Nairobi" ariaLabel="Collection attempt history" emptyLabel="No collection attempts recorded." events={report.sources.flatMap(s=>s.recentAttempts.map((a,i)=>({
             id:s.id+':'+(a.id||i),label:s.surface+' · '+a.status.replaceAll('_',' '),
             occurredAt:a.attemptedAt,
             description:a.failureCode?'Safe reason: '+a.failureCode:'Rows observed: '+a.observedDepth,
@@ -265,7 +265,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             {label:'Verified digest',value:detail.receiptSha256||'No private evidence receipt'},
             {label:'Safe failure code',value:detail.failureCode||'None recorded'},
           ]}/>
-          <WkAuditTimeline ariaLabel="Source capture attempts" emptyLabel="No attempts have been recorded for this week."
+          <WkAuditTimeline locale="en-KE" timeZone="Africa/Nairobi" ariaLabel="Source capture attempts" emptyLabel="No attempts have been recorded for this week."
             events={detail.recentAttempts.map((a,i)=>({
               id:a.id||String(i),label:a.status.replaceAll('_',' '),occurredAt:a.attemptedAt,
               description:a.failureCode?'Reason: '+a.failureCode:'Observed rows: '+a.observedDepth,
