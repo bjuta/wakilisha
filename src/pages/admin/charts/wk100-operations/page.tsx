@@ -122,7 +122,21 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       {view==='collection'&&<Card title="Collection Status"><p className="mb-4 text-xs text-wk-text-muted">A successful source download is not automatic admission to scoring. Provider-native periods remain separately verifiable.</p>{report.sources.length===0?<p className="rounded-xl bg-wk-surface-raised p-5 text-sm text-wk-text-muted">No collection contracts or attempts exist for the selected week. Scheduled collection and retry controls will become available only through a governed service.</p>:<div className="space-y-2">{report.sources.map(s=><button key={s.id} type="button" onClick={()=>setDetail(s)} className="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-wk-border p-4 text-left hover:bg-wk-surface-raised"><span><strong className="block text-sm text-wk-text">{s.surface}</strong><span className="text-xs text-wk-text-muted">{s.observedDepth}/{s.expectedDepth} observed · {s.nativePeriodAuthority==='provider_defined'?'Provider-defined period':'Native period unknown'}</span></span><span className="text-xs text-wk-text-muted">{s.captureState.replaceAll('_',' ')}</span></button>)}</div>}</Card>}
       {view==='overview'&&<Card title="Publication Readiness"><p className="text-sm text-wk-text-muted">Private evidence collection, full eligibility evaluation, actual ranking and publication authority have not been accepted as a complete weekly workflow. No publication operation is available here.</p></Card>}
     </>}
-    {detail&&<WkInspector open={true} onClose={()=>setDetail(null)} title={detail.surface} eyebrow="Source inspection" summary={<p className="text-sm text-wk-text-muted">{detail.provider} · {detail.market} · {detail.version}</p>}><WkDetailList items={['Provider',detail.provider],['Market',detail.market],['Metric',detail.metric],['Behavior',detail.behavior],['Version',detail.version],['Capture state',detail.captureState],['Attempts',String(detail.attemptCount)],['Last attempt',when(detail.lastAttemptAt)],['Last success',when(detail.lastSuccessfulAt)],['Native period',detail.nativePeriodAuthority==='provider_defined'?when(detail.nativePeriodStart)+' to '+when(detail.nativePeriodEnd):'Unverified'],['Evidence SHA-256',detail.receiptSha256||'No verified receipt'],['Failure reason',detail.failureCode||'None recorded'].map(([label,value])=>({label,value}))}/><p className="mt-5 rounded-xl bg-wk-surface-raised p-4 text-sm text-wk-text-muted">Source editing, qualification and retries are held until governed service operations are available. This panel never starts a collection.</p></WkInspector>}
+    {detail&&<WkInspector open={true} onClose={()=>setDetail(null)} title={detail.surface} eyebrow="Source inspection" summary={<p className="text-sm text-wk-text-muted">{detail.provider} · {detail.market} · {detail.version}</p>}><WkDetailList items={[
+        {label:'Provider',value:detail.provider},
+        {label:'Market',value:detail.market},
+        {label:'Metric',value:detail.metric},
+        {label:'Behavior',value:detail.behavior},
+        {label:'Version',value:detail.version},
+        {label:'Capture state',value:detail.captureState},
+        {label:'Attempts',value:detail.attemptCount},
+        {label:'Last attempt',value:when(detail.lastAttemptAt)},
+        {label:'Last success',value:when(detail.lastSuccessfulAt)},
+        {label:'Native period',value:detail.nativePeriodAuthority==='provider_defined'
+          ?when(detail.nativePeriodStart)+' to '+when(detail.nativePeriodEnd):'Unverified'},
+        {label:'Evidence SHA-256',value:detail.receiptSha256||'No verified receipt'},
+        {label:'Failure reason',value:detail.failureCode||'None recorded'},
+      ]} /><p className="mt-5 rounded-xl bg-wk-surface-raised p-4 text-sm text-wk-text-muted">Source editing, qualification and retries are held until governed service operations are available. This panel never starts a collection.</p></WkInspector>}
     {add&&<AddSource close={()=>setAdd(false)}/>}
   </div>;
 }
