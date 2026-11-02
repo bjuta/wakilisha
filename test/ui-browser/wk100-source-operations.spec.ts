@@ -14,8 +14,10 @@ const cors={
 async function json(route:Route,body:unknown,status=200) {
   await route.fulfill({status,contentType:'application/json',headers:cors,body:JSON.stringify(body)});
 }
-async function install(page:Page,{invalid=false,deny=false}:{invalid?:boolean;deny?:boolean}={}) {
+async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[]}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[]}={}) {
   const reads:unknown[]=[];
+  const writes:unknown[]=[];
+  const proposalRecords:Record<string,unknown>[]=[...existingProposals] as Record<string,unknown>[];
   const unexpected:string[]=[];
   await page.route('**/*',async route=>{
     const req=route.request(),url=new URL(req.url());
@@ -46,6 +48,37 @@ async function install(page:Page,{invalid=false,deny=false}:{invalid?:boolean;de
         .map(capability_key=>({capability_key})));return;
     }
     if(url.pathname==='/rest/v1/user_access_scopes') {await json(route,[]);return;}
+    if(url.pathname==='/functions/v1/wk100-source-admin-proposals') {
+      if(req.method()!=='POST'){await json(route,{error:'method_not_allowed'},405);return;}
+      let body:Record<string,unknown>;
+      try{body=JSON.parse(req.postData()||'null');}catch{body={};}
+      if(body.action==='list_source_proposals'){
+        await json(route,{schemaVersion:'wk100-source-proposals-v1',proposals:proposalRecords,
+          canCollect:false,canScore:false,canPublish:false});return;
+      }
+      if(body.action==='submit_source_proposal'){
+        if(failProposal){await json(route,{error:'proposal_write_unavailable'},503);return;}
+        const proposal=body.proposal;
+        if(!proposal||typeof proposal!=='object'||Array.isArray(proposal)){
+          await json(route,{error:'proposal_invalid'},400);return;
+        }
+        const candidate=proposal as Record<string,unknown>;
+        const last=proposalRecords.filter(p=>p.sourceKey===candidate.sourceKey).at(-1);
+        const nextRevision=Number(body.expectedRevision)+1;
+        if(Number(last?.revision??0)!==Number(body.expectedRevision)){
+          await json(route,{error:'proposal_revision_conflict'},409);return;
+        }
+        const saved={...candidate,
+          id:'22222222-2222-4222-8222-222222222222',revision:nextRevision,
+          createdAt:'2026-11-02T19:00:00Z',state:'proposed',
+          canCollect:false,canScore:false,canPublish:false,
+        };
+        proposalRecords.push(saved);
+        writes.push(body);
+        await json(route,{schemaVersion:'wk100-source-proposal-written-v1',saved});return;
+      }
+      await json(route,{error:'unexpected_proposal_action'},400);return;
+    }
     if(url.pathname==='/functions/v1/wk100-source-admin-read') {
       if(req.method()!=='POST'){await json(route,{error:'read_only_post_required'},405);return;}
       let body:unknown;
@@ -71,7 +104,7 @@ async function install(page:Page,{invalid=false,deny=false}:{invalid?:boolean;de
         app_metadata:{},user_metadata:{},identities:[],created_at:'2026-10-21T00:00:00Z'},
     }));
   },{ref:PROJECT_REF,id:USER_ID});
-  return {reads,unexpected};
+  return {reads,unexpected,writes};
 }
 
 test('source overview stays truthful, carries EAT week through navigation and uses no publisher',async({page})=>{
@@ -89,20 +122,91 @@ test('source overview stays truthful, carries EAT week through navigation and us
   expect(ctx.unexpected).toEqual([]);
 });
 
-test('Add Source is a three-step review, not an ungoverned source write',async({page})=>{
+test('Add Source sends only a proposed candidate through the isolated governed endpoint',async({page})=>{
   const ctx=await install(page);
   await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',{waitUntil:'domcontentloaded'});
   await expect(page.getByText('No source capture contracts are registered.')).toBeVisible({timeout:20_000});
+  await expect(page.getByText('No source proposals have been saved.')).toBeVisible();
   await page.getByRole('button',{name:'Add Source'}).click();
-  await expect(page.getByRole('heading',{name:'Which provider?'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Choose a Kenya provider'})).toBeVisible();
   await page.getByRole('button',{name:/YouTube Kenya/}).click();
   await page.getByRole('button',{name:'Continue'}).click();
-  await expect(page.getByRole('heading',{name:'Verify the approved surface'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Configure the proposed source method'})).toBeVisible();
+  await page.getByRole('textbox',{name:'Stable source ID (provider-scoped)'}).fill('youtube_ke_top_songs_weekly');
+  await page.getByRole('textbox',{name:'Source surface'}).fill('YouTube Kenya official weekly chart');
+  await page.getByRole('textbox',{name:/Internal evidence reference/}).fill('wk100-youtube-method-2026');
   await page.getByRole('button',{name:'Continue'}).click();
-  await expect(page.getByRole('heading',{name:'Review source qualification'})).toBeVisible();
-  await expect(page.getByText('Source creation is not yet enabled.')).toBeVisible();
-  await page.getByRole('button',{name:'Close review'}).click();
-  for(const body of ctx.reads)expect(body).toEqual({action:'read_source_health',weekStartEat:'2026-11-02'});
+  await expect(page.getByRole('heading',{name:'Review before saving'})).toBeVisible();
+  await page.getByRole('button',{name:'Save proposal'}).click();
+  await expect(page.getByRole('heading',{name:'Add Source'})).toHaveCount(0);
+  expect(ctx.writes).toHaveLength(1);
+  const submitted=ctx.writes[0] as {action:string;proposal:Record<string,unknown>;expectedRevision:number};
+  expect(submitted.action).toBe('submit_source_proposal');
+  expect(submitted.expectedRevision).toBe(0);
+  expect(submitted.proposal.providerKey).toBe('youtube_ke');
+  expect(submitted.proposal.sourceKey).toBe('youtube_ke_top_songs_weekly');
+  expect(submitted.proposal.evidenceReference).toBe('wk100-youtube-method-2026');
+  expect(submitted.proposal).not.toHaveProperty('endpoint');
+  expect(submitted.proposal).not.toHaveProperty('canPublish');
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('a provider can own multiple independent source proposals without overriding one another',async({page})=>{
+  const existing=[{
+    id:'11111111-1111-4111-8111-111111111111',providerKey:'youtube_ke',
+    sourceKey:'youtube_ke_top_songs_weekly',revision:1,
+    surface:'YouTube Kenya official weekly chart',methodClass:'provider_api',
+    behavior:'video_consumption',metric:'rank',expectedDepth:100,
+    cadence:'weekly',intervalHours:null,eatHour:12,eatMinute:0,weekdayEat:0,
+    minimumHealthyCheckpoints:1,evidenceReference:'source-method-evidence',reason:null,
+    createdAt:'2026-11-02T00:00:00Z',state:'proposed',
+    canCollect:false,canScore:false,canPublish:false,
+  }];
+  const ctx=await install(page,{existingProposals:existing});
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',{waitUntil:'domcontentloaded'});
+  await expect(page.getByText('youtube_ke_top_songs_weekly')).toBeVisible({timeout:20_000});
+  await page.getByRole('button',{name:'Add Source'}).click();
+  await expect(page.getByRole('button',{name:/YouTube Kenya/})).toBeEnabled();
+  await expect(page.getByText('1 existing proposed sources')).toBeVisible();
+  await page.getByRole('button',{name:/YouTube Kenya/}).click();
+  await page.getByRole('button',{name:'Continue'}).click();
+  const id=page.getByRole('textbox',{name:'Stable source ID (provider-scoped)'});
+  await id.fill('youtube_ke_top_songs_weekly');
+  await expect(page.getByText('This source ID already exists.')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Continue'})).toBeDisabled();
+  await id.fill('youtube_ke_daily_playlist');
+  await page.getByRole('textbox',{name:'Source surface'}).fill('YouTube Kenya editorial playlist');
+  await page.getByRole('textbox',{name:/Internal evidence reference/}).fill('youtube-playlist-evidence');
+  await page.getByRole('button',{name:'Continue'}).click();
+  await page.getByRole('button',{name:'Save proposal'}).click();
+  // Wait for the asynchronous Edge call AND the confirmed UI readback.
+  // A Playwright click alone does not await an async React event handler.
+  await expect(page.getByRole('heading',{name:'Add Source'})).toHaveCount(0);
+  await expect(page.getByText('youtube_ke_daily_playlist')).toBeVisible();
+  await expect(page.getByText('youtube_ke_top_songs_weekly')).toBeVisible();
+  expect(ctx.writes).toHaveLength(1);
+  const written=ctx.writes[0] as {proposal:{providerKey:string;sourceKey:string};expectedRevision:number};
+  expect(written.proposal.providerKey).toBe('youtube_ke');
+  expect(written.proposal.sourceKey).toBe('youtube_ke_daily_playlist');
+  expect(written.expectedRevision).toBe(0);
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('failed source proposal command does not claim persistence',async({page})=>{
+  const ctx=await install(page,{failProposal:true});
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',{waitUntil:'domcontentloaded'});
+  await expect(page.getByText('No source proposals have been saved.')).toBeVisible({timeout:20_000});
+  await page.getByRole('button',{name:'Add Source'}).click();
+  await page.getByRole('button',{name:/YouTube Kenya/}).click();
+  await page.getByRole('button',{name:'Continue'}).click();
+  await page.getByRole('textbox',{name:'Stable source ID (provider-scoped)'}).fill('youtube_ke_top_songs_weekly');
+  await page.getByRole('textbox',{name:'Source surface'}).fill('YouTube Kenya official weekly chart');
+  await page.getByRole('textbox',{name:/Internal evidence reference/}).fill('wk100-youtube-method-2026');
+  await page.getByRole('button',{name:'Continue'}).click();
+  await page.getByRole('button',{name:'Save proposal'}).click();
+  await expect(page.getByRole('alert')).toContainText('not confirmed by the protected server');
+  await expect(page.getByRole('heading',{name:'Add Source'})).toBeVisible();
+  expect(ctx.writes).toHaveLength(0);
   expect(ctx.unexpected).toEqual([]);
 });
 

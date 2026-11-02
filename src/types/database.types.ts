@@ -28264,6 +28264,7 @@ export type Database = {
         }
         Returns: string
       }
+      wk100_list_source_proposals_v1: { Args: never; Returns: Json }
       wk100_publish_governed_weekly_edition_v1: {
         Args: { p_proposal_sha256: string; p_week: string }
         Returns: string
@@ -28303,6 +28304,10 @@ export type Database = {
       wk100_stage_governed_weekly_edition_v1: {
         Args: { p_proposal_sha256: string; p_week: string }
         Returns: string
+      }
+      wk100_submit_source_proposal_v1: {
+        Args: { p_expected_revision: number; p_payload: Json }
+        Returns: Json
       }
     }
     Enums: {

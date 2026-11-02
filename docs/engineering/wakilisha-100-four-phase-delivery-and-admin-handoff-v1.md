@@ -193,6 +193,35 @@ The binding cultural model is **assertion -> evidence -> review / reconciliation
 - [ ] An authorized Admin runs the next week completely through Admin, with no developer actions.
 - [ ] Founder accepts the working operational walkthrough and runbook, with deployment and handoff receipts in #1338.
 
+### Phase 1 candidate checkpoint — versioned Admin source proposals (2 November 2026)
+
+The Phase 1 branch proposes a **source configuration proposal** foundation, not source
+qualification, method admission, collection, or a completed Source Registry.
+`supabase/migrations/20261102191805_wk100_source_proposals_v1.sql` was minted by the
+accepted CLI and is a separate append-only, capability-gated proposal ledger.
+Each provider may have multiple separately identified source surfaces, each with
+an independent audit/revision counter and fail-closed optimistic concurrency.
+The original immutable capture contracts, capture scheduler, and Edition publisher
+are unchanged. Proposal saves never set `canCollect`, `canScore`, or `canPublish`.
+
+**Local candidate evidence:** eight domain contracts, six Chromium source-workspace
+tests, native Vite build, and real isolated PostgreSQL 17 append/role/immutability,
+per-source concurrency, same-provider identity, rollback, and revocation checks
+passed. These are not hosted-production or provider-source qualification proofs.
+The existing WK100 disposable CI harness is extended in place to prove full
+migration-chain replay, read-only SQL authority, genuine signed-in GoTrue JWT,
+multiple-source revision semantics, revocation with the same JWT, and complete
+fixture/volume destruction. No separate CI workflow, duplicate migration, or new
+test suite is introduced. These CI proofs are **pending until recorded on the
+exact PR head**; this paragraph is not a claim that CI has run.
+
+**Remaining gates:** native Edge deployed to a migration-equivalent, secret-inventoried
+isolated target and tested with an actual authorized browser/client, source-method
+qualification and credentials governance, scheduler integration with accepted
+capture receipts, two real EAT weeks, and separate founder authorization for any
+Production promotion or public flagship publication. This branch must not be
+interpreted as Phase 1 exit or permission to activate collection.
+
 ## 4. Cardinal Cross-Phase Rules
 
 1. **One owner per authority:** extend existing capture, Registry, filter, ranking, and publisher systems. No competing implementation.

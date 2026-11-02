@@ -6,7 +6,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 const check=(condition,code)=>{if(!condition) throw new Error(code);};
 const UUID=/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 function env(){
@@ -61,6 +61,16 @@ async function main(){
     "(SELECT count(*) FROM storage.objects WHERE bucket_id='wk-chart-raw-evidence-v1')::text;",db)
     ==='0|0','STOP_LOCAL_AUTH_AND_STORAGE_NOT_EMPTY');
   console.log('WK100_GENUINE_AUTH_EXACT_ACTIVE_LEDGER_AND_ZERO_DATA=PASS');
+  // Use the already-authoritative read-only SQL verifier against the *entire*
+  // current migration replay, not a synthetic isolated-schema approximation.
+  const sourceVerifier=readFileSync('scripts/acceptance/wk100-source-proposals-v1-readonly.sql','utf8');
+  check(sourceVerifier.includes('WK100_SOURCE_PROPOSAL_READONLY_AUTHORITY_PASS') &&
+    sourceVerifier.includes('begin read only;') && sourceVerifier.includes('rollback;'),
+    'STOP_PROPOSAL_SQL_VERIFIER_NOT_READ_ONLY');
+  query(sourceVerifier,db);
+  check(query('SELECT count(*) FROM platform_private.wk100_source_proposals_v1;',db)==='0',
+    'STOP_PROPOSAL_FIXTURE_NOT_EMPTY');
+  console.log('WK100_GENUINE_SOURCE_PROPOSAL_FULL_CHAIN_SQL_VERIFIER=PASS');
   const admin=client(url,v.SERVICE_ROLE_KEY),anon=client(url,v.ANON_KEY);
   const identity=randomUUID(); const email=`wk100-ci-${identity}@example.test`;
   const password=randomBytes(30).toString('base64url');
@@ -79,6 +89,75 @@ async function main(){
     !verified.error&&verified.data.user?.id===created.data.user.id,
     'STOP_GOTRUE_AUTHENTICATED_IDENTITY_NOT_PROVEN');
   console.log('WK100_GENUINE_LOCAL_GOTRUE_SIGNED_IN_USER=PASS');
+  // Both RPCs run through PostgREST using the same genuine GoTrue-signed JWT.
+  // They must fail before an active manage_ingest assignment, and again after
+  // live revocation without obtaining a new JWT or refreshing its claims.
+  const proposalA={
+    providerKey:'youtube_ke',sourceKey:'youtube_ke_top_songs_weekly',
+    surface:'YouTube Kenya Top Songs weekly chart',methodClass:'provider_api',
+    behavior:'video_consumption',metric:'rank',expectedDepth:100,
+    cadence:'weekly',intervalHours:null,eatHour:9,eatMinute:0,weekdayEat:0,
+    minimumHealthyCheckpoints:1,evidenceReference:'local_disposable_signed_jwt_a',
+    reason:'Disposable nonpublishing CI acceptance',
+  };
+  const proposalB={...proposalA,sourceKey:'youtube_ke_daily_playlist',
+    surface:'YouTube Kenya daily playlist',methodClass:'reviewed_page_adapter',
+    behavior:'ugc_curation',cadence:'daily',weekdayEat:null,
+    minimumHealthyCheckpoints:7,evidenceReference:'local_disposable_signed_jwt_b'};
+  const rpcWrite=(payload,revision)=>signed.rpc('wk100_submit_source_proposal_v1',{
+    p_payload:payload,p_expected_revision:revision});
+  const deniedAnon=await anon.rpc('wk100_list_source_proposals_v1');
+  check(!!deniedAnon.error,'STOP_ANON_SOURCE_PROPOSALS_READABLE');
+  const deniedRead=await signed.rpc('wk100_list_source_proposals_v1');
+  const deniedWrite=await rpcWrite(proposalA,0);
+  check(!!deniedRead.error&&!!deniedWrite.error,
+    'STOP_UNPRIVILEGED_SIGNED_JWT_ACCESS_TO_SOURCE_PROPOSALS');
+  console.log('WK100_SOURCE_PROPOSAL_ANON_AND_UNPRIVILEGED_SIGNED_JWT_DENIED=PASS');
+  query("INSERT INTO public.user_role_assignments(user_id,role_key,status,expires_at,notes) "+
+    "VALUES ('"+created.data.user.id+"'::uuid,'administrator','active',"+
+    "clock_timestamp()+interval '20 minutes','Disposable local WK100 proposal operator fixture');",db);
+  const active=await signed.rpc('current_user_has_capability',{
+    required_capability:'manage_ingest'});
+  check(!active.error&&active.data===true,
+    'STOP_GENUINE_SIGNED_JWT_MANAGE_INGEST_NOT_ACTIVE');
+  const one=await rpcWrite(proposalA,0),two=await rpcWrite(proposalB,0);
+  check(!one.error&&!two.error&&one.data?.revision===1&&two.data?.revision===1&&
+    one.data?.sourceKey===proposalA.sourceKey&&two.data?.sourceKey===proposalB.sourceKey&&
+    one.data?.providerKey==='youtube_ke'&&two.data?.providerKey==='youtube_ke'&&
+    one.data?.canCollect===false&&two.data?.canScore===false&&two.data?.canPublish===false,
+    'STOP_REAL_JWT_TWO_SOURCES_NOT_INDEPENDENT');
+  const proposedSourceList=await signed.rpc('wk100_list_source_proposals_v1');
+  check(!proposedSourceList.error&&Array.isArray(proposedSourceList.data)&&proposedSourceList.data.length===2&&
+    proposedSourceList.data.every(x=>x.state==='proposed'&&x.providerKey==='youtube_ke'&&
+      x.canCollect===false&&x.canScore===false&&x.canPublish===false)&&
+    proposedSourceList.data.some(x=>x.sourceKey===proposalA.sourceKey&&x.revision===1)&&
+    proposedSourceList.data.some(x=>x.sourceKey===proposalB.sourceKey&&x.revision===1),
+    'STOP_REAL_JWT_SOURCE_LIST_WRONG');
+  const stale=await rpcWrite(proposalA,0);
+  const forged=await rpcWrite({...proposalA,state:'admitted'},1);
+  check(!!stale.error&&!!forged.error,
+    'STOP_REAL_JWT_CONFLICT_OR_FORGED_AUTHORITY_ALLOWED');
+  const revised=await rpcWrite({...proposalA,reason:'Revised disposable proposal'},1);
+  check(!revised.error&&revised.data?.revision===2&&
+    revised.data?.sourceKey===proposalA.sourceKey&&revised.data?.canCollect===false,
+    'STOP_REAL_JWT_INDEPENDENT_REVISION_NOT_APPLIED');
+  check(query("SELECT count(*)::text||'|'||count(DISTINCT source_key)::text "+
+    "FROM platform_private.wk100_source_proposals_v1;",db)==='3|2',
+    'STOP_SIGNED_JWT_SOURCE_AUDIT_CARDINALITY');
+  console.log('WK100_GENUINE_SOURCE_PROPOSAL_TWO_SOURCES_CAS_AUDIT=PASS');
+  query("UPDATE public.user_role_assignments SET status='revoked',"+
+    "updated_at=clock_timestamp() WHERE user_id='"+created.data.user.id+
+    "'::uuid AND role_key='administrator';",db);
+  const revokedRole=await signed.rpc('current_user_has_capability',{
+    required_capability:'manage_ingest'});
+  const revokedRead=await signed.rpc('wk100_list_source_proposals_v1');
+  const revokedWrite=await rpcWrite(proposalB,1);
+  check(!revokedRole.error&&revokedRole.data===false&&
+    !!revokedRead.error&&!!revokedWrite.error,
+    'STOP_SAME_SIGNED_JWT_REVOKED_ROLE_STILL_MANAGES_PROPOSALS');
+  check(query("SELECT count(*) FROM platform_private.wk100_source_proposals_v1;",db)==='3',
+    'STOP_REVOCATION_CHANGED_AUDIT');
+  console.log('WK100_GENUINE_SOURCE_PROPOSAL_SIGNED_JWT_AND_REVOCATION=PASS');
   const bucket='wk-chart-raw-evidence-v1';
   const key=`acceptance/wk100-auth-disposable/${identity}.bin`;
   const raw=Buffer.from(`WK100 isolated private sentinel ${identity}`,'utf8');

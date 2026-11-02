@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions/_shared/wk100-source-admin-projection.mjs';
+import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
 
 test('WK100 source read model preserves empty real Production state',()=>{
   const model=projectWk100SourceHealth([],[],'2026-11-02');
@@ -43,4 +44,81 @@ test('invalid week, malformed lists and overlarge input fail closed',()=>{
   assert.throws(()=>projectWk100SourceHealth([],[],'2026-11-03'),/week_invalid/);
   assert.throws(()=>projectWk100SourceHealth(null,[],'2026-11-02'),/unavailable/);
   assert.throws(()=>projectWk100SourceHealth(Array(101).fill({}),[],'2026-11-02'),/unavailable/);
+});
+
+// Reuse the existing WK100 source domain contract suite. No new CI file.
+const wk100CandidateProposal=()=>({
+  providerKey:'apple_ke',sourceKey:'apple_ke_weekly_songs',surface:'Apple Music Kenya most played',
+  methodClass:'provider_api',behavior:'consumption',metric:'rank',
+  expectedDepth:100,cadence:'weekly',intervalHours:null,
+  eatHour:12,eatMinute:0,weekdayEat:0,minimumHealthyCheckpoints:1,
+  evidenceReference:'wk100-apple-kenya-method-v1',reason:null,
+});
+test('source proposals remain unadmitted and cannot collect, score or publish',()=>{
+  const model=validateWk100SourceProposal(wk100CandidateProposal());
+  assert.equal(model.state,'proposed');
+  assert.equal(model.market,'KE');
+  assert.equal(model.canCollect,false);
+  assert.equal(model.canScore,false);
+  assert.equal(model.canPublish,false);
+  assert.equal(Object.isFrozen(model),true);
+});
+test('source proposal rejects forged authority and arbitrary provider egress',()=>{
+  for(const extra of [
+    {admissionState:'qualified'},{enabled:true},{endpoint:'https://evil.example/'},
+    {authorization_ref:'fabricated'},{canPublish:true},{actorUserId:'forged'},
+    {adapterSha256:'a'.repeat(64)},
+  ])assert.throws(()=>validateWk100SourceProposal({...wk100CandidateProposal(),...extra}),
+    /proposal_fields_invalid/);
+  for(const bad of [
+    {sourceKey:'arbitrary_host'},
+    {providerKey:'unsupported'},
+    {providerKey:'youtube_ke'},
+    {sourceKey:'apple_ke'},
+    {behavior:'video_consumption',metric:'event_count'},
+    {evidenceReference:'https://host/path?token=secret'},
+    {expectedDepth:501},{cadence:'weekly',weekdayEat:7},
+    {cadence:'weekly',intervalHours:3},
+  ])assert.throws(()=>validateWk100SourceProposal({...wk100CandidateProposal(),...bad}));
+});
+test('candidate cadence validation stays bounded by existing EAT kernel vocabulary',()=>{
+  const daily={...wk100CandidateProposal(),cadence:'daily',weekdayEat:null,
+    minimumHealthyCheckpoints:7};
+  const hourly={...daily,cadence:'interval_hours',intervalHours:3,
+    minimumHealthyCheckpoints:56};
+  assert.equal(validateWk100SourceProposal(daily).cadence,'daily');
+  assert.equal(validateWk100SourceProposal(hourly).intervalHours,3);
+  for(const candidate of [{...hourly,minimumHealthyCheckpoints:57},
+    {...hourly,intervalHours:2},{...daily,minimumHealthyCheckpoints:8}])
+    assert.throws(()=>validateWk100SourceProposal(candidate),/cadence_invalid/);
+});
+// Error and negative-revision tests stay in the single existing source contract suite.
+test('source proposal cannot smuggle internal authority into persisted payload',()=>{
+  const input=wk100CandidateProposal();
+  for(const field of ['revision','actor','state','canCollect','approved','scheduledAt',
+    'credential','authorization_ref','nativePeriodAuthority']){
+    assert.throws(()=>validateWk100SourceProposal({...input,[field]:'forged'}),
+      /proposal_fields_invalid/);
+  }
+  assert.throws(()=>validateWk100SourceProposal({...input,reason:'line\nbreak'}),/reason_invalid/);
+});
+
+test('multiple independent source IDs under one provider retain separate revisions',()=>{
+  const first=wk100CandidateProposal();
+  const second={...first,sourceKey:'apple_ke_top_albums'};
+  assert.equal(validateWk100SourceProposal(first).sourceKey,'apple_ke_weekly_songs');
+  assert.equal(validateWk100SourceProposal(second).providerKey,'apple_ke');
+  assert.equal(validateWk100SourceProposal(second).sourceKey,'apple_ke_top_albums');
+  for(const invalid of [
+    {...first,sourceKey:'apple_ke'},
+    {...first,sourceKey:'youtube_ke_weekly_songs'},
+    {...first,providerKey:'youtube_ke'},
+    {...first,sourceKey:'apple_ke_bad-name'},
+    {...first,sourceKey:'apple_ke_'},
+    {...first,sourceKey:'apple_ke_'+ 'x'.repeat(60)},
+    {...first,providerKey:'bad_provider'},
+    {...first,sourceKey:'apple_ke_weekly_songs',endpoint:'https://invalid.example'},
+  ])assert.throws(()=>validateWk100SourceProposal(invalid));
+  assert.equal(validateWk100SourceProposal(first).canCollect,false);
+  assert.equal(validateWk100SourceProposal(second).canPublish,false);
 });

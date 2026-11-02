@@ -1,0 +1,30 @@
+{
+  "migration_file": "supabase/migrations/20261102191805_wk100_source_proposals_v1.sql",
+  "migration_sha256": "0010738febaaf08b2970b8825799f54641e15d855be2eea2177440665fc293ef",
+  "base_main_sha": "36b374bddce6c92e280c5d77969f372556fb7a2c",
+  "preview_project_ref": "dfttuaynurylphxyiafg",
+  "preview_branch_id": "0761dd55-233c-46a1-9a40-a83c781a53b9",
+  "preview_migration_head": "20261102191805",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/acceptance/wk100-source-proposals-v1-readonly.sql",
+  "schema_types_sha256": "9b21d1d91bc7f13bcc8c5c5e965c5310f66ae8193ea60c94875e91a836eb98c5",
+  "schema_migration_count": 240,
+  "schema_migration_head": "20261102191805",
+  "verified_at": "2026-11-02T20:15:42.610Z",
+  "hosted_replay_evidence": {
+    "source": "Native Supabase Preview check SUCCESS on exact PR #1344 head; independently verified via read-only SQL on existing data-less Preview",
+    "check_url": "https://github.com/bjuta/wakilisha/commit/5de9d46094e8ee914f116e50dca68230f806cb70/checks",
+    "preview_project_ref": "dfttuaynurylphxyiafg",
+    "preview_branch_id": "0761dd55-233c-46a1-9a40-a83c781a53b9",
+    "preview_branch_name": "feat/wk100-phase1-source-proposal-contract",
+    "with_data": false,
+    "verified_migration_count": 240,
+    "verified_latest_version": "20261102191805",
+    "verified_empty_proposal_and_capture_ledgers": true,
+    "independent_verifier": "WK100_SOURCE_PROPOSAL_READONLY_AUTHORITY_PASS",
+    "disposable_full_chain_and_genuine_jwt_run": "https://github.com/bjuta/wakilisha/actions/runs/41515326676",
+    "production_mutation": false
+  }
+}

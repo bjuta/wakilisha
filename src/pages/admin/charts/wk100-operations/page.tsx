@@ -16,6 +16,7 @@ import { WkTabs } from '@/components/design-system/primitives/Tabs';
 import { wk100CurrentWeekStartEat, isWk100WeekStartEat } from '../ingest/wk100EatWeek.mjs';
 import { WkOperationsHero, WkNextAction, WkReadinessList } from '@/components/design-system/primitives/OperationsWorkspace';
 import { WkAuditTimeline } from '@/components/design-system/primitives/AuditTimeline';
+import { SourceProposalForm, type Wk100ProposalRecord } from './SourceProposalForm';
 
 type Source = {
   id:string;sourceKey:string;provider:string;surface:string;market:string;
@@ -33,15 +34,6 @@ type Report = {schemaVersion:string;weekStartEat:string;sourceCount:number;
   canScore:false;canPublish:false;sources:Source[]};
 type View = 'overview'|'sources'|'collection';
 
-const catalogue=[
-  ['YouTube Kenya','Native chart method qualification required'],
-  ['Spotify Kenya','Approved chart method qualification required'],
-  ['Boomplay Kenya','Source access and metric verification required'],
-  ['Apple Music Kenya','Native API admission and evidence period required'],
-  ['Mdundo Kenya','Source access and period verification required'],
-  ['Shazam Kenya','Offered chart evidence and period verification required'],
-  ['Audiomack Kenya','Source qualification required'],
-] as const;
 function nextWeek(v:string,n:number) {
   const d=new Date(v+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n*7);
   return d.toISOString().slice(0,10);
@@ -67,18 +59,6 @@ function when(v:string|null) {
 function Card({title,children}:{title:string;children:ReactNode}) {
   return <WkSurface className="rounded-xl p-4 sm:p-5"><h2 className="text-base font-bold text-wk-text">{title}</h2><div className="mt-3">{children}</div></WkSurface>;
 }
-function AddSource({close}:{close:()=>void}) {
-  const [selected,setSelected]=useState('');
-  const [step,setStep]=useState(1);
-  const item=catalogue.find(x=>x[0]===selected);
-  return <Modal open={true} onClose={close} title="Add Source" maxWidth="3xl" footer={<div className="flex justify-between"><button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>step===1?close():setStep(s=>s-1)}>{step===1?'Cancel':'Back'}</button>{step<3?<button type="button" disabled={!selected} className="wk-button wk-button-primary wk-button-sm" onClick={()=>setStep(s=>s+1)}>Continue</button>:<button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={close}>Close review</button>}</div>}>
-      <p className="text-[11px] font-semibold uppercase tracking-[.1em] text-wk-text-muted">Creates a candidate, not a qualified source</p>
-      <h3 className="mt-4 text-2xl font-bold text-wk-text">{step===1?'Which provider?':step===2?'Verify the approved surface':'Review source qualification'}</h3>
-      <ol aria-label="Add Source steps" className="mt-3 flex flex-wrap gap-2 text-xs text-wk-text-muted"><li className={step===1?'font-bold text-wk-text':''}>1 Provider and method</li><li aria-hidden="true">→</li><li className={step===2?'font-bold text-wk-text':''}>2 Approved surface</li><li aria-hidden="true">→</li><li className={step===3?'font-bold text-wk-text':''}>3 Review</li></ol>
-      {step===1?<div className="mt-5 grid gap-2 sm:grid-cols-2">{catalogue.map(([name,desc])=><button key={name} type="button" aria-pressed={selected===name} onClick={()=>setSelected(name)} className={'min-h-[96px] w-full rounded-2xl border p-4 text-left '+(selected===name?'border-wk-brand bg-wk-brand-soft':'border-wk-border hover:bg-wk-surface-raised')}><strong className="block text-sm text-wk-text">{name}</strong><span className="text-xs text-wk-text-muted">{desc}</span></button>)}</div>:
-      <div className="mt-4 rounded-xl bg-wk-surface-raised p-4"><h3 className="font-semibold text-wk-text">{item?.[0]}</h3><p className="mt-2 text-sm text-wk-text-muted">{item?.[1]}</p><p className="mt-3 text-sm text-wk-text-muted">{step===2?'A qualified source requires verified market, method, native metric and access authority.':'Source creation is not yet enabled. This review does not create a contract or start collection.'}</p></div>}
-    </Modal>;
-}
 export default function Wk100OperationsPage({view}:{view:View}) {
   const navigate=useNavigate();
   const [searchParams,setSearchParams]=useSearchParams();
@@ -95,6 +75,24 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [detail,setDetail]=useState<Source|null>(null);
   const [detailTab,setDetailTab]=useState<'configuration'|'qualification'|'history'>('configuration');
   const [add,setAdd]=useState(false);
+  const [editing,setEditing]=useState<Wk100ProposalRecord|null>(null);
+  const [proposals,setProposals]=useState<Wk100ProposalRecord[]>([]);
+  const [proposalPhase,setProposalPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
+  const loadProposals=useCallback(async()=>{
+    setProposalPhase('loading');
+    try{
+      const {data,error}=await supabase.functions.invoke('wk100-source-admin-proposals',{
+        body:{action:'list_source_proposals'},
+      });
+      if(error||!data||data.schemaVersion!=='wk100-source-proposals-v1'||
+        !Array.isArray(data.proposals)||data.proposals.length>500||
+        data.canCollect!==false||data.canScore!==false||data.canPublish!==false||
+        data.proposals.some((p:Wk100ProposalRecord)=>p.state!=='proposed'||
+          p.canCollect!==false||p.canScore!==false||p.canPublish!==false))throw Error();
+      setProposals(data.proposals as Wk100ProposalRecord[]);setProposalPhase('ready');
+    }catch{setProposals([]);setProposalPhase('unavailable');}
+  },[]);
+  useEffect(()=>{if(view==='sources')void loadProposals()},[loadProposals,view]);
   const load=useCallback(async()=>{
     const seq=++readSequence.current;
     setPhase('loading');setReport(null);setDetail(null);
@@ -117,7 +115,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
     <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
-      <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>void load()} disabled={phase==='loading'}>Refresh status</button>
+      <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();if(view==='sources')void loadProposals()}} disabled={phase==='loading'}>Refresh status</button>
     </AdminChartsPageHeader>
     <WkSurface className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3">
       <div className="flex items-center gap-2"><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Previous week" onClick={()=>setWeek(v=>nextWeek(v,-1))}>‹</button><div className="min-w-40 text-center"><p className="text-xs text-wk-text-muted">Edition week · Monday EAT</p><p className="text-sm font-bold text-wk-text">{week}</p></div><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Next week" onClick={()=>setWeek(v=>nextWeek(v,1))}>›</button></div>
@@ -163,7 +161,28 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         <WkOperationsHero eyebrow="Programme · Kenya source constitution" title="Sources"
           description="Manage known collection surfaces without conflating technical access, qualification, capture health, and scoring admission."
           aside={<WkStateBadge tone="warning">{report.qualifiedSources} qualified</WkStateBadge>}
-          action={<button className="wk-button wk-button-primary wk-button-sm" type="button" onClick={()=>setAdd(true)}>Add Source</button>}/>
+          action={<button className="wk-button wk-button-primary wk-button-sm" type="button" onClick={()=>{setEditing(null);setAdd(true)}}>Add Source</button>}/>
+        <Card title="Source proposals">
+          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
+            These are append-only Admin configuration proposals, not admitted sources.
+            They cannot start capture, appear in a weekly scoring constitution or publish a chart.
+          </p>
+          {proposalPhase==='loading'&&<p role="status" className="text-sm text-wk-text-muted">Reading protected proposals…</p>}
+          {proposalPhase==='unavailable'&&<p role="alert" className="text-sm text-wk-text-muted">
+            The protected proposal service is unavailable. No saved configuration is assumed.
+            Source proposals cannot be submitted until the versioned database and Edge authority are deployed.
+          </p>}
+          {proposalPhase==='ready'&&<WkDataTable<Wk100ProposalRecord>
+            rows={proposals} getKey={p=>p.id} ariaLabel="Source proposals"
+            empty="No source proposals have been saved."
+            columns={[
+              {key:'surface',label:'Provider and surface',render:p=><span className="font-semibold text-wk-text">{p.surface}<span className="mt-1 block text-xs font-normal text-wk-text-muted">{p.providerKey} · {p.sourceKey}</span></span>},
+              {key:'method',label:'Method',render:p=><span className="text-wk-text-soft">{p.methodClass.replaceAll('_',' ')}</span>},
+              {key:'revision',label:'Revision',render:p=><span className="text-wk-text-soft">{p.revision}</span>},
+              {key:'status',label:'Authority',render:()=> <WkStateBadge>Proposed only</WkStateBadge>},
+              {key:'action',label:'Update proposal',render:p=><button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{setEditing(p);setAdd(true)}}>Revise</button>},
+            ] satisfies WkDataColumn<Wk100ProposalRecord>[]} />}
+        </Card>
         <Card title="Source Registry">
           <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_repeat(3,minmax(130px,160px))]">
             <WkSearchField ariaLabel="Search provider or source" placeholder="Provider or source" value={search} onChange={setSearch}/>
@@ -292,6 +311,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         Source settings, qualification, retries, and coverage exceptions require separately accepted governed commands. This inspection view does not modify the capture ledger.
       </p>
     </WkInspector>}
-    {add&&<AddSource close={()=>setAdd(false)}/>}
+    {add&&<SourceProposalForm initial={editing} existing={proposals}
+      close={()=>{setAdd(false);setEditing(null)}} onSaved={()=>void loadProposals()}/>}
+
   </div>;
 }
