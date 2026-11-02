@@ -6,7 +6,7 @@ import { WkSurface } from '@/components/design-system/primitives/Surface';
 import { WkMetricCard, WkMetricStrip } from '@/components/design-system/primitives/Metric';
 import { WkWorkflowRail } from '@/components/design-system/primitives/WorkflowRail';
 import { WkInspector } from '@/components/design-system/primitives/Inspector';
-import { Sheet } from '@/components/design-system/primitives/Sheet';
+import { Modal } from '@/components/design-system/primitives/Modal';
 import { WkSearchField } from '@/components/design-system/primitives/Field';
 import { WkSelect } from '@/components/design-system/primitives/Select';
 import { WkStateBadge } from '@/components/design-system/primitives/StateBadge';
@@ -56,11 +56,13 @@ function AddSource({close}:{close:()=>void}) {
   const [selected,setSelected]=useState('');
   const [step,setStep]=useState(1);
   const item=catalogue.find(x=>x[0]===selected);
-  return <Sheet open={true} onClose={close} title="Propose Source" side="right" maxWidth="lg" footer={<div className="flex justify-between"><button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>step===1?close():setStep(s=>s-1)}>{step===1?'Cancel':'Back'}</button>{step<3?<button type="button" disabled={!selected} className="wk-button wk-button-primary wk-button-sm" onClick={()=>setStep(s=>s+1)}>Continue</button>:<button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={close}>Close review</button>}</div>}>
-      <p className="text-xs font-bold uppercase text-wk-brand">Source candidate · {step} of 3</p>
-      {step===1?<div className="mt-4 space-y-2">{catalogue.map(([name,desc])=><button key={name} type="button" aria-pressed={selected===name} onClick={()=>setSelected(name)} className={'w-full rounded-lg border p-3 text-left '+(selected===name?'border-wk-brand bg-wk-brand-soft':'border-wk-border hover:bg-wk-surface-raised')}><strong className="block text-sm text-wk-text">{name}</strong><span className="text-xs text-wk-text-muted">{desc}</span></button>)}</div>:
+  return <Modal open={true} onClose={close} title="Add Source" maxWidth="3xl" footer={<div className="flex justify-between"><button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>step===1?close():setStep(s=>s-1)}>{step===1?'Cancel':'Back'}</button>{step<3?<button type="button" disabled={!selected} className="wk-button wk-button-primary wk-button-sm" onClick={()=>setStep(s=>s+1)}>Continue</button>:<button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={close}>Close review</button>}</div>}>
+      <p className="text-[11px] font-semibold uppercase tracking-[.1em] text-wk-text-muted">Creates a candidate, not a qualified source</p>
+      <h3 className="mt-4 text-2xl font-bold text-wk-text">{step===1?'Which provider?':step===2?'Verify the approved surface':'Review source qualification'}</h3>
+      <ol aria-label="Add Source steps" className="mt-3 flex flex-wrap gap-2 text-xs text-wk-text-muted"><li className={step===1?'font-bold text-wk-text':''}>1 Provider and method</li><li aria-hidden="true">→</li><li className={step===2?'font-bold text-wk-text':''}>2 Approved surface</li><li aria-hidden="true">→</li><li className={step===3?'font-bold text-wk-text':''}>3 Review</li></ol>
+      {step===1?<div className="mt-5 grid gap-2 sm:grid-cols-2">{catalogue.map(([name,desc])=><button key={name} type="button" aria-pressed={selected===name} onClick={()=>setSelected(name)} className={'min-h-[96px] w-full rounded-2xl border p-4 text-left '+(selected===name?'border-wk-brand bg-wk-brand-soft':'border-wk-border hover:bg-wk-surface-raised')}><strong className="block text-sm text-wk-text">{name}</strong><span className="text-xs text-wk-text-muted">{desc}</span></button>)}</div>:
       <div className="mt-4 rounded-xl bg-wk-surface-raised p-4"><h3 className="font-semibold text-wk-text">{item?.[0]}</h3><p className="mt-2 text-sm text-wk-text-muted">{item?.[1]}</p><p className="mt-3 text-sm text-wk-text-muted">{step===2?'A qualified source requires verified market, method, native metric and access authority.':'Source creation is not yet enabled. This review does not create a contract or start collection.'}</p></div>}
-    </Sheet>;
+    </Modal>;
 }
 export default function Wk100OperationsPage({view}:{view:View}) {
   const navigate=useNavigate();
