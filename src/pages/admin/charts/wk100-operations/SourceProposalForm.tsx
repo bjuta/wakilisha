@@ -34,6 +34,22 @@ const methodOptions=[
   {value:'reviewed_page_adapter',label:'Reviewed page adapter'},
   {value:'research_only',label:'Research only'},
 ];
+// Research pointers are not a method allowlist or collector approval.
+ // Unreviewed methods may still be proposed for independent assessment.
+const methodResearchNotes:Record<string,Partial<Record<string,string>>>={
+  youtube_ke:{provider_api:'No approved YouTube Kenya weekly Charts API route is verified. The observed internal chart endpoint is not an admitted method.'},
+  spotify_ke:{provider_api:'No approved Spotify Kenya national-chart API method has been verified for unattended capture.'},
+  boomplay_ke:{reviewed_page_adapter:'A Kenya playlist alone does not prove an official chart or a permitted unattended page adapter.'},
+  apple_ke:{provider_api:'Apple documents a Kenya Catalog Charts API. The source period, server credentials and collection approval remain unverified.'},
+  mdundo_ke:{reviewed_page_adapter:'A public Kenya ranked page is available for research. Automated collection is not approved.'},
+  shazam_ke:{offered_export:'The Kenya Top 200 offers a CSV for researcher-directed observation. An unattended export method is not approved.'},
+  audiomack_ke:{reviewed_page_adapter:'A public Kenya ranking has been researched. The unattended page method is not approved.'},
+};
+function methodGuidance(provider:string,method:string){
+  if(method==='research_only')return 'Public chart facts can be recorded for research. This does not authorize unattended collection.';
+  return methodResearchNotes[provider]?.[method]??
+    'No qualified access evidence has been recorded for this provider and method. Independent review is required.';
+}
 const behaviorOptions=[
   {value:'consumption',label:'Consumption'},
   {value:'video_consumption',label:'Video consumption'},
@@ -151,7 +167,8 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
       <div className="grid gap-2 sm:grid-cols-2">
       {providers.map(provider=><button key={provider.value} type="button"
         aria-pressed={draft.providerKey===provider.value}
-        onClick={()=>setDraft(d=>({...d,providerKey:provider.value,sourceKey:provider.value+'_'}))}
+        onClick={()=>{setDraft(d=>({...d,providerKey:provider.value,
+          sourceKey:provider.value+'_',methodClass:'research_only'}));setError('')}}
         className={'min-h-20 rounded-2xl border p-4 text-left font-semibold '+
           (draft.providerKey===provider.value?'border-wk-brand bg-wk-brand-soft text-wk-text':
             'border-wk-border text-wk-text-soft hover:bg-wk-surface-raised')}>{provider.label}
@@ -159,12 +176,23 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
       </button>)}
       </div>
       {draft.providerKey&&<div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
-        <Choose label="Proposed access method" value={draft.methodClass}
-          onChange={v=>change('methodClass',v)} options={methodOptions}/>
+        <p className="mb-2 text-xs font-semibold text-wk-text">Choose a proposed access method</p>
+        <div role="group" aria-label="Proposed source access methods" className="grid gap-2 sm:grid-cols-2">
+          {methodOptions.map(method=><button key={method.value} type="button"
+            aria-pressed={draft.methodClass===method.value}
+            onClick={()=>change('methodClass',method.value)}
+            className={'min-h-14 rounded-xl border p-3 text-left text-xs font-semibold '+
+              (draft.methodClass===method.value?'border-wk-brand bg-wk-brand-soft text-wk-text':
+                'border-wk-border text-wk-text-soft hover:bg-wk-surface-raised')}>
+            {method.label}
+          </button>)}
+        </div>
+        <p role="status" className="mt-3 text-xs leading-relaxed text-wk-text-muted">
+          {methodGuidance(draft.providerKey,draft.methodClass)}
+        </p>
         <p className="mt-2 text-xs text-wk-text-muted">
-          No method is pre-approved by this selector. This proposed access route
-          does not prove the provider offers it. Recorded method review, evidence
-          digests and a separately approved constitution govern collection.
+          No collector method is approved by this form. The method review, source constitution
+          and runtime admission remain separate.
         </p>
       </div>}
     </div>}
@@ -177,7 +205,15 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
       </div>
       <div className="sm:col-span-2"><ProposalField label="Source surface" value={draft.surface}
         onChange={v=>change('surface',v)} limit={180}/></div>
-      <Choose label="Access method class" value={draft.methodClass} onChange={v=>change('methodClass',v)} options={methodOptions}/>
+      <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-wk-border p-3">
+        <p className="text-xs text-wk-text-soft">
+          Proposed method: <strong className="text-wk-text">
+            {methodOptions.find(m=>m.value===draft.methodClass)?.label??'Unspecified'}
+          </strong>. No approved collection surface has been selected.
+        </p>
+        <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+          onClick={()=>setStep(1)}>Change Method</button>
+      </div>
       <Choose label="Observation behavior" value={draft.behavior} onChange={v=>change('behavior',v)} options={behaviorOptions}/>
       <Choose label="Provider-native measurement" value={draft.metric} onChange={v=>change('metric',v)} options={metricOptions}/>
       <Choose label="Expected depth" value={String(draft.expectedDepth)}

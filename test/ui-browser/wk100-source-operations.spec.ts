@@ -373,6 +373,36 @@ test('W1 counts only reviewed current candidate contracts, never qualifies them 
   expect(ctx.unexpected).toEqual([]);
 });
 
+
+test('W1 directs the Admin to current source review before enrollment',async({page})=>{
+  const sourceKey='shazam_ke_top_200';
+  const proposal={
+    id:'11111111-1111-4111-8111-111111111111',
+    providerKey:'shazam_ke',sourceKey,revision:2,
+    surface:'Shazam Kenya Top 200',methodClass:'offered_export',
+    behavior:'discovery',metric:'rank',expectedDepth:200,cadence:'daily',
+    intervalHours:null,eatHour:9,eatMinute:0,weekdayEat:null,
+    minimumHealthyCheckpoints:1,evidenceReference:'historical-csv-research',
+    reason:null,createdAt:'2026-11-03T09:00:00Z',state:'proposed',
+    canCollect:false,canScore:false,canPublish:false,
+  };
+  const ctx=await install(page,{existingProposals:[proposal]});
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('heading',{name:'Review proposed source methods'}))
+    .toBeVisible({timeout:20_000});
+  await expect(page.getByText('No enrolled capture sources yet.',{exact:false})).toBeVisible();
+  await expect(page.getByText('0 current reviewed candidate contracts.',{exact:false})).toBeVisible();
+  await page.getByRole('button',{name:'Review Methods'}).click();
+  await expect(page).toHaveURL(/wk100-operations\/sources\?week=2026-11-02/);
+  const registry=page.getByRole('table',{name:'Source registry'});
+  await expect(registry.getByRole('button',{name:'Shazam Kenya Top 200'})).toBeVisible();
+  await expect(registry.getByText('Not enrolled',{exact:true})).toBeVisible();
+  expect(ctx.contractWrites).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
 test('W2 filters current reviewed candidates without inventing scoring constitution admission',async({page})=>{
   const apple='apple_ke_catalog_most_played',youtube='youtube_ke_top_songs_weekly';
   const source=(id:string,key:string,provider:string,surface:string)=>({
@@ -449,8 +479,15 @@ test('Add Source sends only a proposed candidate through the isolated governed e
   await page.getByRole('button',{name:'Add Source'}).click();
   await expect(page.getByRole('heading',{name:'Choose a Kenya provider'})).toBeVisible();
   await page.getByRole('dialog',{name:'Add Source'}).getByRole('button',{name:/^YouTube Kenya/}).click();
+  const methodGroup=page.getByRole('group',{name:'Proposed source access methods'});
+  await expect(methodGroup.getByRole('button',{name:'Research only'})).toHaveAttribute('aria-pressed','true');
+  await methodGroup.getByRole('button',{name:'Provider API'}).click();
+  await expect(page.getByText('No approved YouTube Kenya weekly Charts API route is verified.',{exact:false})).toBeVisible();
+  await expect(page.getByText('No collector method is approved by this form.',{exact:false})).toBeVisible();
   await page.getByRole('button',{name:'Continue'}).click();
   await expect(page.getByRole('heading',{name:'Configure the proposed source method'})).toBeVisible();
+  await expect(page.getByText('Proposed method:')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Change Method'})).toBeVisible();
   await page.getByRole('textbox',{name:'Stable source ID (provider-scoped)'}).fill('youtube_ke_top_songs_weekly');
   await page.getByRole('textbox',{name:'Source surface'}).fill('YouTube Kenya official weekly chart');
   await page.getByRole('textbox',{name:/Internal evidence reference/}).fill('wk100-youtube-method-2026');
@@ -474,6 +511,7 @@ test('Add Source sends only a proposed candidate through the isolated governed e
   expect(submitted.expectedRevision).toBe(0);
   expect(submitted.proposal.providerKey).toBe('youtube_ke');
   expect(submitted.proposal.sourceKey).toBe('youtube_ke_top_songs_weekly');
+  expect(submitted.proposal.methodClass).toBe('provider_api');
   expect(submitted.proposal.evidenceReference).toBe('wk100-youtube-method-2026');
   expect(submitted.proposal).not.toHaveProperty('endpoint');
   expect(submitted.proposal).not.toHaveProperty('canPublish');

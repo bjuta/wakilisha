@@ -326,9 +326,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   // Exactly one next action follows real server-owned proposal, review and
   // receipt state. A candidate contract never makes an Edition ready.
   const nextAction=(()=>{
-    if(!report||report.sourceCount===0)return {
-      title:'Establish the source roster',
-      description:'No source capture contracts are enrolled. Start with a proposed Kenya source and independent method review.',
+    if(!report)return {
+      title:'Check source status',
+      description:'The source ledger is unavailable. No source readiness is assumed.',
       target:'/sources',button:'Review Sources',
     };
     if(proposalPhase!=='ready'||methodPhase!=='ready')return {
@@ -336,6 +336,27 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       description:'The protected proposal or method decision is unavailable. No collector method is assumed approved.',
       target:'/sources',button:'Review Sources',
     };
+    if(proposals.length===0&&report.sourceCount===0)return {
+      title:'Establish the source roster',
+      description:'No source proposals are recorded. Document a Kenya source and its research method before review.',
+      target:'/sources',button:'Add Source',
+    };
+    if(report.sourceCount===0){
+      const awaiting=proposals.some(p=>{
+        const decision=methodDecisions.find(d=>d.sourceKey===p.sourceKey);
+        return !decision||decision.proposalRevision!==p.revision||
+          decision.decisionState!=='collector_admitted';
+      });
+      return awaiting?{
+        title:'Review proposed source methods',
+        description:'Proposals exist, but no capture contract is enrolled. Review each current method before candidate enrollment.',
+        target:'/sources',button:'Review Methods',
+      }:{
+        title:'Review candidate contract enrollment',
+        description:'Method decisions are recorded. Review exact source contracts before any separately approved collection.',
+        target:'/sources',button:'Review Sources',
+      };
+    }
     if(reviewedCandidateContracts===0)return {
       title:'Review current source methods',
       description:'Candidate contracts exist, but no matching current proposal and reviewed method can be confirmed.',
