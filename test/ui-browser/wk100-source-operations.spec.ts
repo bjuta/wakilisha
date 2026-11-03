@@ -352,6 +352,27 @@ test('source overview stays truthful, carries EAT week through navigation and us
   expect(ctx.unexpected).toEqual([]);
 });
 
+test('W1 founder-workbook hierarchy is two-column on desktop and stacked on mobile',async({page})=>{
+  const ctx=await install(page);
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  const layout=page.locator('[data-wk-weekly-layout]');
+  const primary=page.locator('[data-wk-weekly-primary]');
+  const summary=page.locator('[data-wk-weekly-summary]');
+  await expect(layout).toBeVisible({timeout:20_000});
+  await expect(primary.getByRole('heading',{name:'Readiness'})).toBeVisible();
+  await expect(summary.getByRole('heading',{name:'This week'})).toBeVisible();
+  await expect(summary.getByRole('heading',{name:'Collection activity'})).toBeVisible();
+  await expect(summary.getByText('Registered candidates')).toBeVisible();
+  const desktopLeft=await primary.boundingBox(),desktopRight=await summary.boundingBox();
+  expect(desktopLeft&&desktopRight&&desktopRight.x>desktopLeft.x+desktopLeft.width-5).toBe(true);
+  await page.setViewportSize({width:390,height:844});
+  const mobileLeft=await primary.boundingBox(),mobileRight=await summary.boundingBox();
+  expect(mobileLeft&&mobileRight&&mobileRight.y>=mobileLeft.y+mobileLeft.height-5).toBe(true);
+  expect(ctx.unexpected).toEqual([]);
+});
+
 test('W1 counts only reviewed current candidate contracts, never qualifies them or unlocks readiness',async({page})=>{
   const key='apple_ke_catalog_most_played';
   const source={id:'33333333-3333-4333-8333-333333333333',

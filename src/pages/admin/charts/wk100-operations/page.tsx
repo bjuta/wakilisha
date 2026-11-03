@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { AdminChartsPageHeader } from '../components/AdminChartsPageHeader';
 import { WkSurface } from '@/components/design-system/primitives/Surface';
-import { WkMetricCard, WkMetricStrip } from '@/components/design-system/primitives/Metric';
 import { WkWorkflowRail } from '@/components/design-system/primitives/WorkflowRail';
 import { WkInspector } from '@/components/design-system/primitives/Inspector';
 import { Modal } from '@/components/design-system/primitives/Modal';
@@ -430,7 +429,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           title={'Week of '+new Intl.DateTimeFormat('en-KE',{day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Nairobi'}).format(new Date(week+'T12:00:00Z'))}
           description={report.sourceCount===0?'No enrolled capture sources yet. This week has no verified evidence set and cannot proceed to private ranking.':'Source research is provisional. Captures do not become scoring evidence until separately qualified.'}
           aside={<WkStateBadge tone="warning">Private · Not ready</WkStateBadge>}/>
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)]">
+        <div data-wk-weekly-layout className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)]">
+          <div data-wk-weekly-primary className="min-w-0 space-y-5">
           <WkNextAction title={nextAction.title}
             blocked
             description={nextAction.description}
@@ -451,15 +451,26 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               {id:'edition',label:'Edition staging and explicit publication',status:'blocked',description:'No public flagship has been authorized'},
             ]}/>
           </Card>
+          </div>
+          <aside data-wk-weekly-summary aria-label="Weekly evidence summary" className="min-w-0 space-y-5">
+            <Card title="This week">
+              <WkDetailList items={[
+                {label:'Registered candidates',value:report.sourceCount},
+                {label:'Reviewed candidate contracts',value:reviewedCandidateContracts},
+                {label:'Verified captures',value:report.successfulSources},
+                {label:'Collection failures',value:report.failedSources},
+              ]}/>
+            </Card>
+            <Card title="Collection activity"><WkAuditTimeline locale="en-KE" timeZone="Africa/Nairobi"
+              ariaLabel="Verified capture activity" emptyLabel="No source attempts recorded for this week."
+              events={report.sources.flatMap(s=>s.recentAttempts.map((a,i)=>({
+                id:s.id+':'+(a.id||i),label:s.surface+' · '+a.status.replaceAll('_',' '),
+                occurredAt:a.attemptedAt,description:a.failureCode?
+                  'Reason: '+a.failureCode:'Observed rows: '+a.observedDepth,
+              }))).sort((a,b)=>String(b.occurredAt||'').localeCompare(String(a.occurredAt||''))).slice(0,12)}/>
+            </Card>
+          </aside>
         </div>
-        <section aria-label="This week" className="space-y-2">
-          <h2 className="text-xs font-bold uppercase tracking-[.12em] text-wk-text-muted">This week</h2>
-          <WkMetricStrip>{[['Registered candidates',report.sourceCount],['Reviewed candidate contracts',reviewedCandidateContracts],['Verified captures',report.successfulSources],['Collection failures',report.failedSources]].map(([name,value])=><WkMetricCard key={name} label={name} value={value}/>)}</WkMetricStrip>
-        </section>
-        <Card title="Collection activity"><WkAuditTimeline locale="en-KE" timeZone="Africa/Nairobi" ariaLabel="Verified capture activity" emptyLabel="No source attempts recorded for this week." events={report.sources.flatMap(s=>s.recentAttempts.map((a,i)=>({
-          id:s.id+':'+(a.id||i),label:s.surface+' · '+a.status.replaceAll('_',' '),
-          occurredAt:a.attemptedAt,description:a.failureCode?('Reason: '+a.failureCode):('Observed rows: '+a.observedDepth),
-        }))).sort((a,b)=>String(b.occurredAt||'').localeCompare(String(a.occurredAt||''))).slice(0,12)}/></Card>
       </div>}
       {view==='sources'&&<div className="space-y-5">
         <WkOperationsHero eyebrow="Programme · Kenya source constitution" title="Sources"
