@@ -343,7 +343,7 @@ test('W1 counts only reviewed current candidate contracts, never qualifies them 
   const overview=page.getByRole('heading',{name:'Readiness'}).locator('..');
   await expect(overview.getByText('1 current reviewed candidate contracts.',{exact:false}))
     .toBeVisible({timeout:20_000});
-  await expect(page.getByText('Reviewed candidate contracts')).toBeVisible();
+  await expect(page.getByText('Reviewed candidate contracts',{exact:true})).toBeVisible();
   await expect(page.getByText('Qualified sources')).toHaveCount(0);
   await expect(page.getByText('Research only · Publication locked')).toBeVisible();
   expect(ctx.methodWrites).toEqual([]);
