@@ -745,12 +745,22 @@ test('W3 checks the stored original through the Admin readback command without e
       fetchedAt:'2026-11-02T06:03:00Z',failureCode:null,observedDepth:100,
     }],
   }]});
+  await page.setViewportSize({width:1440,height:900});
   await page.goto('/admin/charts/wk100-operations/collection?week=2026-11-02',
     {waitUntil:'domcontentloaded'});
   const table=page.getByRole('table',{name:'Weekly source collection'});
   await table.getByRole('button',{name:'Inspect original receipt'}).click();
-  const inspector=page.getByRole('dialog',{name:'Apple Kenya native chart'});
+  const inspector=page.getByRole('region',{name:'Source incident inspector'});
+  await expect(inspector.getByRole('heading',{name:'Apple Kenya native chart'})).toBeVisible();
+  const workbench=page.locator('[data-wk-w3-layout]');
+  await expect(workbench).toBeVisible();
+  await expect(inspector).toHaveAttribute('data-wk-incident-inline','');
   await expect(inspector.getByText('Private Original Readback')).toBeVisible({timeout:20_000});
+  await expect.poll(async()=>workbench.evaluate(root=>{
+    const main=root.querySelector('[data-wk-w3-master]')?.getBoundingClientRect();
+    const side=root.querySelector('[data-wk-incident-inline]')?.getBoundingClientRect();
+    return !!main&&!!side&&side.left>=main.right-5&&side.top<=main.bottom;
+  }),{timeout:10_000}).toBe(true);
   await inspector.getByRole('button',{name:'Verify original · Attempt 1'}).click();
   await expect(inspector.getByText('Original verified in private Storage.',{exact:false}))
     .toBeVisible();
@@ -758,6 +768,33 @@ test('W3 checks the stored original through the Admin readback command without e
     weekStartEat:'2026-11-02',contractId,receiptId}]);
   expect(ctx.unexpected).toEqual([]);
   expect(ctx.writes).toEqual([]);
+});
+
+test('W3 mobile collection keeps the accessible right-hand incident Sheet',async({page})=>{
+  const ctx=await install(page,{existingSources:[{
+    id:'33333333-3333-4333-8333-333333333333',
+    sourceKey:'shazam_ke_top_200',provider:'shazam_ke',surface:'Shazam Kenya Top 200',
+    market:'KE',metric:'rank',behavior:'discovery',expectedDepth:200,
+    cadence:'daily',intervalHours:null,eatHour:8,eatMinute:0,weekdayEat:null,
+    minimumHealthyCheckpoints:7,adapterVersion:'shazam-test',version:'v1',
+    admissionState:'candidate',captureState:'not_collected',attemptCount:0,
+    lastAttemptAt:null,lastScheduledAt:null,lastAttemptNumber:null,
+    lastSuccessfulAt:null,observedDepth:0,nativePeriodAuthority:'unknown',
+    nativePeriodStart:null,nativePeriodEnd:null,receiptSha256:null,
+    failureCode:null,recentAttempts:[],canScore:false,canPublish:false,
+  }]});
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/admin/charts/wk100-operations/collection?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  await page.getByRole('table',{name:'Weekly source collection'})
+    .getByRole('button',{name:'Shazam Kenya Top 200'}).click();
+  const sheet=page.getByRole('dialog',{name:'Shazam Kenya Top 200'});
+  await expect(sheet).toBeVisible();
+  await expect(page.locator('[data-wk-incident-inline]')).toHaveCount(0);
+  await expect(sheet.getByRole('tab',{name:'History'})).toBeVisible();
+  await sheet.getByRole('button',{name:'Close'}).click();
+  await expect(sheet).toHaveCount(0);
+  expect(ctx.unexpected).toEqual([]);
 });
 
 test('W3 week-bound retry request and coverage review use one signed-in audit command without publishing',async({page})=>{
@@ -779,13 +816,15 @@ test('W3 week-bound retry request and coverage review use one signed-in audit co
     failureCode:'transport_failed',recentAttempts:[],canScore:false,canPublish:false,
   };
   const ctx=await install(page,{existingSources:[source]});
+  await page.setViewportSize({width:1440,height:900});
   await page.goto('/admin/charts/wk100-operations/collection?week='+week,
     {waitUntil:'domcontentloaded'});
   const table=page.getByRole('table',{name:'Weekly source collection'});
   await expect(page.getByRole('group',{name:'Candidate collection coverage breakdown'}))
     .toBeVisible({timeout:20_000});
   await table.getByRole('button',{name:'Apple Music Kenya'}).click();
-  const inspector=page.getByRole('dialog',{name:'Apple Music Kenya'});
+  const inspector=page.getByRole('region',{name:'Source incident inspector'});
+  await expect(inspector.getByRole('heading',{name:'Apple Music Kenya'})).toBeVisible();
   await inspector.getByRole('tab',{name:'History'}).click();
   await expect(inspector.getByText('Incident impact and recovery')).toBeVisible();
   await expect(inspector.getByText('No accepted original receipt for this source')).toBeVisible();

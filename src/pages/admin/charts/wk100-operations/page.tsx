@@ -116,6 +116,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [constitutionFilter,setConstitutionFilter]=useState('all');
   const [selectedSourceKey,setSelectedSourceKey]=useState<string|null>(null);
   const [detail,setDetail]=useState<Source|null>(null);
+  const [desktopIncident,setDesktopIncident]=useState(false);
+  useEffect(()=>{
+    const match=window.matchMedia('(min-width: 1280px)');
+    const sync=()=>setDesktopIncident(match.matches);
+    sync();
+    match.addEventListener('change',sync);
+    return ()=>match.removeEventListener('change',sync);
+  },[]);
   const [detailTab,setDetailTab]=useState<'configuration'|'qualification'|'history'>('configuration');
   const [add,setAdd]=useState(false);
   const [editing,setEditing]=useState<Wk100ProposalRecord|null>(null);
@@ -701,7 +709,11 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         </Card>
 
       </div>}
-      {view==='collection'&&<div className="space-y-5">
+      {view==='collection'&&<div data-wk-w3-layout
+        className={detail&&desktopIncident?
+          'grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,480px)]':
+          'grid grid-cols-1 gap-5'}>
+        <div data-wk-w3-master className="min-w-0 space-y-5">
         <WkOperationsHero eyebrow={'Collection · EAT week '+week} title="Collection"
           description="Source-specific reporting periods, captured evidence and attempt integrity are tracked separately. A successful download does not grant scoring qualification."
           aside={<WkStateBadge tone={report.failedSources?'danger':'neutral'}>{report.failedSources?report.failedSources+' source failures':'No admitted collection'}</WkStateBadge>}
@@ -822,40 +834,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           description="Inspect the latest safe failure code and capture history. The system must not reuse another week's evidence or redistribute source weights automatically."
           blocked action={<button type="button" className="wk-button wk-button-secondary wk-button-sm"
             onClick={()=>setDetail(report.sources.find(s=>['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState))??null)}>Inspect incident</button>}/>}
-      </div>}
-    </>}
-    {view==='sources'&&
-        <Card title="Research Already Captured">
-          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
-            Researcher-held originals from 29–30 October 2026. These observations remain useful
-            without a source proposal. The private files are not hosted capture receipts,
-            verified measurement weeks, or permission to publish.
-          </p>
-          <WkDataTable rows={getWk100ArchivedResearchPortfolio(WK100_ARCHIVED_EAT_WEEK)}
-            getKey={r=>r.sourceKey} ariaLabel="Archived Kenya research observations"
-            empty="No preserved research observations." columns={[
-              {key:'source',label:'Platform',render:r=><span className="font-semibold text-wk-text">{r.displayName}</span>},
-              {key:'observed',label:'Observed',render:r=><span className="text-wk-text-soft">{when(r.observedAtUtc)}</span>},
-              {key:'evidence',label:'Research Evidence',render:r=>
-                <div>
-                  <span className="text-wk-text-soft">{r.rankStructure==='verified'
-                    ?r.rankDepth+' observed '+r.observationType.toLowerCase()
-                    :'Original retained; ranks unverified'}</span>
-                  <p className="text-xs text-wk-text-muted">{r.note}</p>
-                </div>},
-            ]} />
-          <p className="mt-3 text-xs text-wk-text-muted">
-            In Ingest Studio, select WAKILISHA 100 and the EAT week of 26 October 2026
-            to review the preserved originals. Opening the studio does not save
-            a draft, upload evidence, or change this week's collection status.
-          </p>
-          <button type="button" className="wk-button wk-button-secondary wk-button-sm mt-3"
-            onClick={()=>navigate('/admin/charts/ingest')}>
-            Open Ingest Studio
-          </button>
-        </Card>
-    }
-    {detail&&view==='collection'&&<WkInspector open={true} onClose={()=>setDetail(null)} title={detail.surface}
+        </div>
+        {detail&&<WkInspector open={true} inline={desktopIncident} onClose={()=>setDetail(null)} title={detail.surface}
       eyebrow="Source candidate · Kenya"
       summary={<div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-wk-text-muted">{detail.provider} · {detail.market} · {detail.version}</span>
@@ -971,6 +951,39 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         Source settings, qualification, retries, and coverage exceptions require separately accepted governed commands. This inspection view does not modify the capture ledger.
       </p>
     </WkInspector>}
+      </div>}
+    </>}
+    {view==='sources'&&
+        <Card title="Research Already Captured">
+          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
+            Researcher-held originals from 29–30 October 2026. These observations remain useful
+            without a source proposal. The private files are not hosted capture receipts,
+            verified measurement weeks, or permission to publish.
+          </p>
+          <WkDataTable rows={getWk100ArchivedResearchPortfolio(WK100_ARCHIVED_EAT_WEEK)}
+            getKey={r=>r.sourceKey} ariaLabel="Archived Kenya research observations"
+            empty="No preserved research observations." columns={[
+              {key:'source',label:'Platform',render:r=><span className="font-semibold text-wk-text">{r.displayName}</span>},
+              {key:'observed',label:'Observed',render:r=><span className="text-wk-text-soft">{when(r.observedAtUtc)}</span>},
+              {key:'evidence',label:'Research Evidence',render:r=>
+                <div>
+                  <span className="text-wk-text-soft">{r.rankStructure==='verified'
+                    ?r.rankDepth+' observed '+r.observationType.toLowerCase()
+                    :'Original retained; ranks unverified'}</span>
+                  <p className="text-xs text-wk-text-muted">{r.note}</p>
+                </div>},
+            ]} />
+          <p className="mt-3 text-xs text-wk-text-muted">
+            In Ingest Studio, select WAKILISHA 100 and the EAT week of 26 October 2026
+            to review the preserved originals. Opening the studio does not save
+            a draft, upload evidence, or change this week's collection status.
+          </p>
+          <button type="button" className="wk-button wk-button-secondary wk-button-sm mt-3"
+            onClick={()=>navigate('/admin/charts/ingest')}>
+            Open Ingest Studio
+          </button>
+        </Card>
+    }
     {recoveryTarget&&<SourceRecoveryDialog
       key={recoveryTarget.source.id+':'+recoveryTarget.kind+':'+week+':'+recoveryTarget.revision}
       kind={recoveryTarget.kind} source={recoveryTarget.source}
