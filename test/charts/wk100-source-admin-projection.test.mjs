@@ -290,3 +290,17 @@ test('WK100 method retire is final and gated by super-admin, with no role-assign
   assert.match(sql,/role_key='super_admin'/);
   assert.match(sql,/wk100_method_restricted_decision_requires_super_admin/);
 });
+
+test('WK100 capture authorization is service-only and bound to latest proposal and exact method',async()=>{
+  const sql=await readFile('scripts/acceptance/wk100-phase1-source-method-candidate.sql','utf8');
+  assert.match(sql,/create function public\.wk100_service_admitted_methods_v1\(\)/);
+  assert.match(sql,/create function public\.wk100_service_capture_method_allowed_v1\(/);
+  assert.match(sql,/auth\.role\(\) is distinct from 'service_role'/);
+  assert.match(sql,/p\.revision=d\.proposal_revision/);
+  assert.match(sql,/c\.adapter_version=d\.parser_class/);
+  assert.match(sql,/c\.native_metric=p\.native_metric/);
+  assert.match(sql,/d\.decision_state='collector_admitted'/);
+  assert.match(sql,/d\.authorization_expires_at>now\(\)/);
+  assert.match(sql,/item\.v->>'endpoint_sha256'=p_endpoint_sha256/);
+  assert.match(sql,/grant execute on function public\.wk100_service_admitted_methods_v1/);
+});

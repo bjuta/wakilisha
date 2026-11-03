@@ -203,6 +203,93 @@ revoke all on function public.wk100_review_source_method_v1(jsonb,integer),
 grant execute on function public.wk100_review_source_method_v1(jsonb,integer),
   public.wk100_list_source_method_decisions_v1() to authenticated;
 
+-- Explicit service-role projection. It never returns credentials or HTTP URLs.
+-- A source is eligible only when its latest decision matches the latest proposal
+-- and an immutable candidate contract matches the exact reviewed method.
+create function public.wk100_service_admitted_methods_v1()
+returns jsonb language plpgsql stable security definer set search_path=pg_catalog as $service$
+declare v_out jsonb;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'wk100_service_only';
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'source_key',d.source_key,'provider_key',d.provider_key,
+    'proposal_revision',d.proposal_revision,
+    'decision_revision',d.decision_revision,'contract_version',c.contract_version,
+    'parser_class',d.parser_class,'method_class',d.method_class,
+    'native_period_state',d.native_period_authority,
+    'native_period_evidence_ref',d.native_period_evidence_ref,
+    'endpoint_sha256',d.endpoint_sha256,
+    'evidence_sha256',d.access_evidence_sha256,
+    'authorization_ref',d.authorization_ref,
+    'authorization_expires_at',d.authorization_expires_at,
+    'constitution_version',d.constitution_version
+  ) order by d.source_key,c.contract_version),'[]'::jsonb)
+  into v_out
+  from (
+    select distinct on(source_key) *
+    from platform_private.wk100_source_method_decisions_v1
+    order by source_key,decision_revision desc
+  ) d
+  join (
+    select distinct on(source_key) *
+    from platform_private.wk100_source_proposals_v1
+    order by source_key,revision desc
+  ) p on p.source_key=d.source_key and p.provider_key=d.provider_key
+    and p.revision=d.proposal_revision
+  join public.wk_chart_capture_contracts_v1 c on c.source_key=d.source_key
+    and c.provider_key=d.provider_key
+    and c.admission_state='candidate' and c.market='KE'
+    and c.source_surface=p.surface
+    and c.behavior=p.behavior and c.native_metric=p.native_metric
+    and c.expected_depth=p.expected_depth
+    and c.cadence_kind=p.cadence_kind
+    and c.interval_hours is not distinct from p.interval_hours
+    and c.eat_hour=p.eat_hour and c.eat_minute=p.eat_minute
+    and c.weekday_eat is not distinct from p.weekday_eat
+    and c.minimum_healthy_checkpoints=p.minimum_healthy_checkpoints
+    and c.adapter_version=d.parser_class
+  where d.decision_state='collector_admitted'
+    and d.method_class=p.method_class and p.method_class<>'research_only'
+    and d.native_period_authority='provider_defined'
+    and d.authorization_expires_at>now();
+  return v_out;
+end; $service$;
+
+-- Rechecked by the capture worker before reservation and before every GET.
+-- The SHA is computed from the sealed endpoint, never supplied by a browser.
+create function public.wk100_service_capture_method_allowed_v1(
+  p_source_key text,p_contract_version text,p_endpoint_sha256 text,
+  p_authorization_ref text,p_parser_class text
+) returns boolean language plpgsql stable security definer
+set search_path=pg_catalog as $check$
+declare v_allowed boolean;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'wk100_service_only';
+  end if;
+  if p_source_key is null or p_contract_version is null
+    or p_endpoint_sha256 is null or p_authorization_ref is null
+    or p_parser_class is null then return false; end if;
+  select exists(
+    select 1
+    from jsonb_array_elements(public.wk100_service_admitted_methods_v1()) as item(v)
+    where item.v->>'source_key'=p_source_key
+      and item.v->>'contract_version'=p_contract_version
+      and item.v->>'endpoint_sha256'=p_endpoint_sha256
+      and item.v->>'authorization_ref'=p_authorization_ref
+      and item.v->>'parser_class'=p_parser_class
+  ) into v_allowed;
+  return v_allowed;
+end; $check$;
+revoke all on function public.wk100_service_admitted_methods_v1(),
+  public.wk100_service_capture_method_allowed_v1(text,text,text,text,text)
+  from public,anon,authenticated,service_role;
+grant execute on function public.wk100_service_admitted_methods_v1(),
+  public.wk100_service_capture_method_allowed_v1(text,text,text,text,text)
+  to service_role;
+
 do $postflight$
 begin
   if exists(select 1 from platform_private.wk100_source_method_decisions_v1)
@@ -210,6 +297,11 @@ begin
     or has_table_privilege('service_role','platform_private.wk100_source_method_decisions_v1','INSERT')
     or has_function_privilege('anon','public.wk100_review_source_method_v1(jsonb,integer)','EXECUTE')
     or not has_function_privilege('authenticated','public.wk100_review_source_method_v1(jsonb,integer)','EXECUTE')
+    or has_function_privilege('anon','public.wk100_service_admitted_methods_v1()','EXECUTE')
+    or has_function_privilege('authenticated','public.wk100_service_admitted_methods_v1()','EXECUTE')
+    or not has_function_privilege('service_role','public.wk100_service_admitted_methods_v1()','EXECUTE')
+    or has_function_privilege('authenticated',
+       'public.wk100_service_capture_method_allowed_v1(text,text,text,text,text)','EXECUTE')
   then raise exception 'WK100 source method postflight failed'; end if;
   raise notice 'WK100_SOURCE_METHOD_EMPTY_IMMUTABLE_NOT_ACTIVATED_PASS';
 end; $postflight$;
