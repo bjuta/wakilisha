@@ -177,10 +177,10 @@ test('all six core providers show truthful readiness and no invented source admi
     'Apple Music Kenya','Mdundo Kenya','Shazam Kenya']){
     await expect(table.getByText(provider,{exact:true})).toBeVisible();
   }
-  await expect(table.getByRole('button',{name:'Add Source'})).toHaveCount(6);
+  await expect(table.getByRole('button',{name:/^Add .+ Source$/})).toHaveCount(6);
   await expect(table.getByText('No proposal')).toHaveCount(6);
   await expect(table.getByText('Candidate enrolled')).toHaveCount(0);
-  await table.getByRole('button',{name:'Add Source'}).first().click();
+  await table.getByRole('button',{name:'Add YouTube Kenya Source'}).click();
   await expect(page.getByRole('heading',{name:'Choose a Kenya provider'})).toBeVisible();
   expect(ctx.writes).toEqual([]);
   expect(ctx.methodWrites).toEqual([]);
@@ -214,7 +214,7 @@ test('a stale reviewed method does not appear as an enrolled, current platform s
   const youtube=roster.getByRole('row').filter({hasText:'YouTube Kenya'});
   await expect(youtube.getByText('Method review needed')).toBeVisible({timeout:20_000});
   await expect(youtube.getByText('Candidate enrolled')).toHaveCount(0);
-  await youtube.getByRole('button',{name:'Review Method'}).click();
+  await youtube.getByRole('button',{name:'Review YouTube Kenya Method'}).click();
   const review=page.getByRole('dialog',{name:'Review Source Method'});
   await expect(review.getByRole('heading',{name:'Review Source Method'})).toBeVisible();
   await expect(review.getByText('YouTube Kenya weekly songs')).toBeVisible();
