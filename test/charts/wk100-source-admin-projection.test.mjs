@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions/_shared/wk100-source-admin-projection.mjs';
 import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
 import { resolveCaptureParser, parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
+import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 
 test('WK100 source read model preserves empty real Production state',()=>{
   const model=projectWk100SourceHealth([],[],'2026-11-02');
@@ -144,4 +145,67 @@ test('WK100 provider-scoped source parser requires independently sealed native c
     period:access.native_period_key,playlistItems:[{videoId:'one'}]})),youtube,access));
   const apple={provider_key:'apple_ke',source_key:'apple_ke_catalog_most_played'};
   assert.equal(resolveCaptureParser(apple,{parser_class:'apple_kenya_chart_v1'})?.providerKey,'apple_ke');
+});
+
+const wk100PlanFixture=week=>({
+  weekStartEat:week,nowUtc:week+'T06:05:00Z',executionEnabled:true,
+  sourceContracts:[{
+    id:'11111111-1111-4111-8111-111111111111',
+    source_key:'youtube_ke_top_songs_weekly',provider_key:'youtube_ke',
+    contract_version:'v1',market:'KE',behavior:'video_consumption',
+    native_metric:'rank_and_count',expected_depth:100,adapter_version:'youtube-weekly-v1',
+    cadence_kind:'weekly',interval_hours:null,eat_hour:9,eat_minute:0,
+    weekday_eat:0,minimum_healthy_checkpoints:1,
+  }],
+  approvedDecisions:[{
+    source_key:'youtube_ke_top_songs_weekly',provider_key:'youtube_ke',
+    contract_version:'v1',state:'collector_admitted',enabled:true,
+    native_period_state:'provider_defined',native_period_evidence_ref:'provider_week',
+    parser_class:'youtube_kenya_weekly_top_songs_v1',
+    evidence_sha256:'a'.repeat(64),endpoint_sha256:'b'.repeat(64),
+    constitution_version:'wk100-test-v1',authorization_ref:'test_approved_access',
+    authorization_expires_at:'2027-01-01T00:00:00Z',
+  }],
+  attempts:[],
+});
+test('WK100 two prospective EAT weeks remain independent synthetic dispatch slots',()=>{
+  const first=planWk100SourceDispatch(wk100PlanFixture('2026-11-02'));
+  const second=planWk100SourceDispatch(wk100PlanFixture('2026-11-09'));
+  assert.equal(first.jobs.length,1);
+  assert.equal(second.jobs.length,1);
+  assert.equal(first.jobs[0].scheduled_at,'2026-11-02T06:00:00Z');
+  assert.equal(second.jobs[0].scheduled_at,'2026-11-09T06:00:00Z');
+  assert.notEqual(first.jobs[0].scheduled_at,second.jobs[0].scheduled_at);
+  assert.equal(first.canScore,false);assert.equal(second.canPublish,false);
+});
+test('WK100 dispatch requires explicit enable, admitted authority and native period',()=>{
+  const f=wk100PlanFixture('2026-11-02');
+  assert.equal(planWk100SourceDispatch({...f,executionEnabled:false}).jobs.length,0);
+  for(const decision of [
+    {...f.approvedDecisions[0],state:'proposed'},
+    {...f.approvedDecisions[0],enabled:false},
+    {...f.approvedDecisions[0],native_period_state:'unknown'},
+    {...f.approvedDecisions[0],authorization_expires_at:'2026-11-01T00:00:00Z'},
+    {...f.approvedDecisions[0],evidence_sha256:null},
+    {...f.approvedDecisions[0],parser_class:'apple_kenya_chart_v1'},
+  ]) {
+    const r=planWk100SourceDispatch({...f,approvedDecisions:[decision]});
+    assert.equal(r.jobs.length,0);assert.ok(r.blocked.length);
+  }
+});
+test('WK100 committed, quarantined, unsafe or exhausted retries never duplicate a source observation',()=>{
+  const f=wk100PlanFixture('2026-11-02');
+  const receipt={contract_id:f.sourceContracts[0].id,scheduled_at:'2026-11-02T06:00:00Z',attempt_number:1};
+  for(const status of ['succeeded','partial_depth','parse_failed','target_period_unavailable','reserved']) {
+    const p=planWk100SourceDispatch({...f,attempts:[{...receipt,status}]});
+    assert.equal(p.jobs.length,0);
+  }
+  const retry=planWk100SourceDispatch({...f,attempts:[{...receipt,status:'transport_failed'}]});
+  assert.equal(retry.jobs.length,1);assert.equal(retry.jobs[0].attempt_number,2);
+  const exhausted=planWk100SourceDispatch({...f,attempts:Array.from({length:8},(_,i)=>({
+    ...receipt,attempt_number:i+1,status:'transport_failed',
+  }))});
+  assert.equal(exhausted.jobs.length,0);
+  const late=planWk100SourceDispatch({...f,nowUtc:'2026-11-02T06:21:00Z'});
+  assert.equal(late.jobs.length,0);
 });
