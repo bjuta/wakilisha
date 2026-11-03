@@ -2,6 +2,8 @@ import {test} from 'node:test';
 import {storeWk100ResearchOriginalBytes} from '../../supabase/functions/_shared/wk100-research-private-object-store.mjs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {webcrypto} from 'node:crypto';
+import {prepareWk100LocalShazamResearch} from '../../src/services/chartsIngestion/wk100LocalShazamResearch.mjs';
 import {mkdtemp,rm,readFile,stat,symlink,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -529,6 +531,63 @@ test('WK100 Admin errors or rejected receipts never report verified evidence',as
     }),
   }),/wk100_research_ui_server_unavailable/);
 });
+test('new researcher-downloaded Shazam CSV becomes an offline, nonpublishing original-byte receipt',async()=>{
+  const original=enc('"Wednesday, 28 October 2026 [performance over the past 7 days]"\\n'+
+    'Rank,Artist,Title\\n1,Artist One,Song One\\n2,Artist Two,Song Two\\n');
+  const receipt=await prepareWk100LocalShazamResearch({
+    originalBytes:original,checkedAtUtc:'2026-11-03T12:34:56.789Z',
+    subtle:webcrypto.subtle,
+  });
+  assert.equal(receipt.source_key,'shazam_ke');
+  assert.equal(receipt.market,'KE');
+  assert.equal(receipt.original_sha256,hash(original));
+  assert.equal(receipt.original_byte_length,original.byteLength);
+  assert.equal(receipt.observed_rank_count,2);
+  assert.equal(receipt.complete_chart,false); // Never call a two-row CSV a Top 200.
+  assert.equal(receipt.provider_snapshot_date,'2026-10-28');
+  assert.equal(receipt.provider_rolling_window_days,7);
+  assert.equal(receipt.checked_at_utc,'2026-11-03T12:34:56.789Z');
+  assert.equal(receipt.source_retrieved_at_utc,null);
+  assert.equal(receipt.source_fetch_verified,false);
+  assert.equal(receipt.native_period_start,null);
+  assert.equal(receipt.native_period_end,null);
+  assert.equal(receipt.native_period_authority,'unknown');
+  assert.equal(receipt.original_bytes_in_receipt,false);
+  assert.equal(receipt.hosted_receipt_verified,false);
+  assert.equal(receipt.source_admitted,false);
+  assert.equal(receipt.can_score,false);
+  assert.equal(receipt.can_publish,false);
+  assert.doesNotMatch(JSON.stringify(receipt),/Artist One|Song One|operator_email|private_filename/);
+  assert.doesNotThrow(()=>JSON.parse(JSON.stringify(receipt)+'\\n'));
+  const modified=enc('"Wednesday, 28 October 2026 [performance over the past 7 days]"\\n'+
+    'Rank,Artist,Title\\n1,Artist One,Song ONe\\n2,Artist Two,Song Two\\n');
+  assert.equal(modified.byteLength,original.byteLength);
+  const changed=await prepareWk100LocalShazamResearch({
+    originalBytes:modified,checkedAtUtc:'2026-11-03T12:34:56.789Z',
+    subtle:webcrypto.subtle,
+  });
+  assert.notEqual(changed.original_sha256,receipt.original_sha256);
+  assert.equal(changed.source_fetch_verified,false);
+});
+test('offline Shazam research rejects malformed charts and false source-time precision',async()=>{
+  const base={checkedAtUtc:'2026-11-03T12:34:56.789Z',subtle:webcrypto.subtle};
+  await assert.rejects(prepareWk100LocalShazamResearch({
+    ...base,originalBytes:new Uint8Array(),
+  }),/wk100_local_shazam_research_invalid/);
+  await assert.rejects(prepareWk100LocalShazamResearch({
+    ...base,originalBytes:enc('Rank,Artist,Title\\n1,A,B\\n3,C,D\\n'),
+  }),/wk100_local_shazam_research_invalid/);
+  await assert.rejects(prepareWk100LocalShazamResearch({
+    ...base,originalBytes:enc('not a chart csv'),
+  }),/wk100_local_shazam_research_invalid/);
+  await assert.rejects(prepareWk100LocalShazamResearch({
+    ...base,checkedAtUtc:'2026-11-03',originalBytes:enc('Rank,Artist,Title\\n1,A,B\\n'),
+  }),/wk100_local_shazam_research_invalid/);
+  await assert.rejects(prepareWk100LocalShazamResearch({
+    ...base,originalBytes:new Uint8Array(4*1024*1024+1),
+  }),/wk100_local_shazam_research_invalid/);
+});
+
 test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic publish',async()=>{
   const config=await readFile(new URL('../../supabase/config.toml',import.meta.url),'utf8');
   const page=await readFile(new URL('../../src/pages/admin/charts/ingest/page.tsx',import.meta.url),'utf8');
@@ -539,6 +598,15 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
   assert.doesNotMatch(panel,/commitIngestRun|runDryRun|publishEdition|localStorage/);
   assert.match(panel,/getWk100ArchivedResearchPortfolio/);
   assert.match(panel,/verifyWk100ArchivedOriginal/);
+  assert.match(panel,/prepareWk100LocalShazamResearch/);
+  assert.match(panel,/aria-label="New local Shazam research"/);
+  assert.match(panel,/source_retrieved_at_utc/);
+  const localNew=panel.slice(panel.indexOf('aria-label="New local Shazam research"'),
+    panel.indexOf('<form className="mt-4 space-y-3" onSubmit={upload}>'));
+  assert.ok(localNew.length>800);
+  assert.doesNotMatch(localNew,/supabase|\.invoke\(|submitWk100|saveWk100|publishEdition/);
+  assert.match(localNew,/Open Shazam Kenya Top 200/);
+  assert.match(localNew,/Save Local Research Receipt/);
   assert.match(panel,/localOriginal\.size!==source\.byteLength/);
   assert.match(panel,/disabled=\{!localOriginal\|\|localChecking\}/);
   const localSection=panel.slice(panel.indexOf('aria-label="Local archived original verification"'),
