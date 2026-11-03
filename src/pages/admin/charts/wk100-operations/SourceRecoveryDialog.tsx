@@ -86,10 +86,10 @@ export function SourceRecoveryDialog({kind,source,week,revision,close,onSaved}:{
           'A retry stays inside the original collection window. The existing scheduler and capture lease decide whether an attempt can run. Recording a request does not mean collection succeeded.':
           'Coverage decisions document missing evidence. They cannot substitute earlier data, adjust source weights, or unlock ranking or publication.'}
       </p>
-      <TextField aria-label="Reason" className="block">
+      <TextField aria-label="Reason" className="block" value={reason} onChange={v=>{setReason(v);setError('')}}>
         <span className="mb-1 block text-xs font-semibold text-wk-text-muted">Reason</span>
         <TextArea className="wk-input min-h-28 w-full rounded-xl border-wk-border bg-wk-surface text-[16px] text-wk-text"
-          maxLength={500} value={reason} onChange={v=>{setReason(v);setError('')}}/>
+          maxLength={500}/>
       </TextField>
       {error&&<p role="alert" className="rounded-xl border border-wk-danger p-3 text-sm text-wk-danger">{error}</p>}
     </div>
