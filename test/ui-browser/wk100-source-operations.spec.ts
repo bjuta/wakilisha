@@ -14,8 +14,9 @@ const cors={
 async function json(route:Route,body:unknown,status=200) {
   await route.fulfill({status,contentType:'application/json',headers:cors,body:JSON.stringify(body)});
 }
-async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[]}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[]}={}) {
+async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[],existingEditionDraft=null}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[];existingEditionDraft?:Record<string,unknown>|null}={}) {
   const reads:unknown[]=[];
+  const editionReads:unknown[]=[];
   const writes:unknown[]=[];
   const methodWrites:unknown[]=[];
   const contractWrites:unknown[]=[];
@@ -51,6 +52,14 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         .map(capability_key=>({capability_key})));return;
     }
     if(url.pathname==='/rest/v1/user_access_scopes') {await json(route,[]);return;}
+    if(url.pathname==='/rest/v1/rpc/wk100_get_admin_draft_v1') {
+      if(req.method()!=='POST'){await json(route,{error:'method_not_allowed'},405);return;}
+      let payload:Record<string,unknown>;
+      try{payload=JSON.parse(req.postData()||'null');}catch{payload={};}
+      editionReads.push(payload);
+      await json(route,existingEditionDraft?.weekStartEat===payload.p_week?existingEditionDraft:null);
+      return;
+    }
     if(url.pathname==='/functions/v1/wk100-source-admin-proposals') {
       if(req.method()!=='POST'){await json(route,{error:'method_not_allowed'},405);return;}
       let body:Record<string,unknown>;
@@ -164,7 +173,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         app_metadata:{},user_metadata:{},identities:[],created_at:'2026-10-21T00:00:00Z'},
     }));
   },{ref:PROJECT_REF,id:USER_ID});
-  return {reads,unexpected,writes,methodWrites,contractWrites};
+  return {reads,editionReads,unexpected,writes,methodWrites,contractWrites};
 }
 
 test('all six core providers show truthful readiness and no invented source admission',async({page})=>{
@@ -280,6 +289,26 @@ test('source overview stays truthful, carries EAT week through navigation and us
   await expect(page.getByText('No source capture contracts are registered.')).toBeVisible();
   expect(ctx.reads.length).toBeGreaterThanOrEqual(2);
   for(const body of ctx.reads)expect(body).toEqual({action:'read_source_health',weekStartEat:'2026-10-26'});
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('W1 reads actual week-bound Edition configuration revision without inferring collection readiness',async({page})=>{
+  const draft={weekStartEat:'2026-10-26',revision:7,configSha256:'f'.repeat(64),
+    updatedAt:'2026-11-01T07:00:00Z'};
+  const ctx=await install(page,{existingEditionDraft:draft});
+  await page.goto('/admin/charts/wk100-operations?week=2026-10-26',{waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('status').filter({hasText:'Edition configuration · Revision 7'}))
+    .toBeVisible({timeout:20_000});
+  await expect(page.getByText('No enrolled capture sources yet.')).toBeVisible();
+  await page.getByRole('button',{name:'Next week'}).click();
+  await expect(page).toHaveURL(/week=2026-11-02/);
+  await expect(page.getByRole('status').filter({hasText:'No saved Edition configuration'}))
+    .toBeVisible();
+  expect(ctx.editionReads).toContainEqual({p_week:'2026-10-26'});
+  expect(ctx.editionReads).toContainEqual({p_week:'2026-11-02'});
+  expect(ctx.writes).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.contractWrites).toEqual([]);
   expect(ctx.unexpected).toEqual([]);
 });
 

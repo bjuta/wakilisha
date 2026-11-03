@@ -83,6 +83,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const readSequence=useRef(0);
   const [report,setReport]=useState<Report|null>(null);
   const [phase,setPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
+  const editionReadSequence=useRef(0);
+  const [editionPhase,setEditionPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
+  const [editionConfig,setEditionConfig]=useState<{revision:number;updatedAt:string}|null>(null);
   const [search,setSearch]=useState('');
   const [status,setStatus]=useState('all');
   const [providerFilter,setProviderFilter]=useState('all');
@@ -141,6 +144,34 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     } catch {if(seq===readSequence.current)setPhase('unavailable');}
   },[week]);
   useEffect(()=>{void load()},[load]);
+  // Existing governed weekly draft authority is the only source for a saved
+  // Edition configuration revision. It is not a collection ledger revision,
+  // evidence admission, or permission to publish.
+  const loadEdition=useCallback(async()=>{
+    const seq=++editionReadSequence.current;
+    setEditionPhase('loading');setEditionConfig(null);
+    try{
+      const {data,error}=await supabase.rpc('wk100_get_admin_draft_v1',{p_week:week});
+      if(error)throw Error('edition_read_failed');
+      let revision:{revision:number;updatedAt:string}|null=null;
+      if(data!==null){
+        if(!data||typeof data!=='object'||Array.isArray(data)||
+          data.weekStartEat!==week||
+          !Number.isSafeInteger(data.revision)||data.revision<1||
+          typeof data.updatedAt!=='string'||!Number.isFinite(Date.parse(data.updatedAt))||
+          typeof data.configSha256!=='string'||!/^[a-f0-9]{64}$/.test(data.configSha256))
+          throw Error('edition_read_invalid');
+        revision={revision:data.revision as number,updatedAt:data.updatedAt as string};
+      }
+      if(seq!==editionReadSequence.current)return;
+      setEditionConfig(revision);setEditionPhase('ready');
+    }catch{
+      if(seq===editionReadSequence.current){
+        setEditionConfig(null);setEditionPhase('unavailable');
+      }
+    }
+  },[week]);
+  useEffect(()=>{void loadEdition()},[loadEdition]);
   const providerReadiness=useMemo<ProviderReadiness[]>(()=>CORE_PROVIDERS.map(provider=>{
     const candidates=proposals.filter(p=>p.providerKey===provider.key);
     const paired=candidates.map(proposal=>({
@@ -175,11 +206,19 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
     <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
-      <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();if(view==='sources'){void loadProposals();void loadMethods()}}} disabled={phase==='loading'}>Refresh status</button>
+      <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();void loadEdition();if(view==='sources'){void loadProposals();void loadMethods()}}} disabled={phase==='loading'}>Refresh status</button>
     </AdminChartsPageHeader>
     <WkSurface className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3">
       <div className="flex items-center gap-2"><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Previous week" onClick={()=>setWeek(v=>nextWeek(v,-1))}>‹</button><div className="min-w-40 text-center"><p className="text-xs text-wk-text-muted">Edition week · Monday EAT</p><p className="text-sm font-bold text-wk-text">{week}</p></div><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Next week" onClick={()=>setWeek(v=>nextWeek(v,1))}>›</button></div>
-      <span className="rounded-full border border-wk-border px-3 py-1 text-xs font-semibold text-wk-text-soft">Research only · Publication locked</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span role="status" className="rounded-full border border-wk-border px-3 py-1 text-xs font-semibold text-wk-text-soft">
+          {editionPhase==='loading'?'Checking Edition configuration…':
+            editionPhase==='unavailable'?'Edition configuration unavailable':
+            editionConfig?'Edition configuration · Revision '+editionConfig.revision:
+            'No saved Edition configuration'}
+        </span>
+        <span className="rounded-full border border-wk-border px-3 py-1 text-xs font-semibold text-wk-text-soft">Research only · Publication locked</span>
+      </div>
     </WkSurface>
     <WkWorkflowRail ariaLabel="Chart operations stages" steps={['Collect','Identify','Qualify','Rank','Publish'].map((label,i)=>({id:label.toLowerCase(),label,description:i===0?'Current phase':'Not operational',state:i===0?'current' as const:'blocked' as const}))}/>
     <nav className="flex flex-wrap gap-2" aria-label="Collection workspace">
