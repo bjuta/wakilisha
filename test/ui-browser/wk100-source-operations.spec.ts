@@ -177,18 +177,18 @@ test('all six core providers show truthful readiness and no invented source admi
     'Apple Music Kenya','Mdundo Kenya','Shazam Kenya']){
     await expect(table.getByText(provider,{exact:true})).toBeVisible();
   }
-  // Previously verified researcher-held originals are not empty collector
-  // state. They remain historical private research, not current hosted receipts.
-  await expect(table.getByRole('row').filter({hasText:'Shazam Kenya'})
-    .getByText('200 archived discovery ranks')).toBeVisible();
-  await expect(table.getByRole('row').filter({hasText:'Mdundo Kenya'})
-    .getByText('100 archived platform chart ranks')).toBeVisible();
-  await expect(table.getByRole('row').filter({hasText:'Apple Music Kenya'})
-    .getByText('100 archived daily playlist ranks')).toBeVisible();
-  await expect(table.getByRole('row').filter({hasText:'YouTube Kenya'})
-    .getByText('No ranked receipt in this archive')).toBeVisible();
-  await expect(table.getByRole('row').filter({hasText:'Apple Music Kenya'})
-    .getByText('30 Oct 2026 · public playlist, not Catalog API')).toBeVisible();
+  // The genuine 29–30 October original-byte archive is independent of
+  // candidate collection. Research remains visible with zero proposals.
+  const archive=page.getByRole('table',{name:'Archived Kenya research observations'});
+  await expect(archive).toBeVisible();
+  await expect(archive.getByRole('row').filter({hasText:'Shazam Kenya'})
+    .getByText('200 observed discovery ranks')).toBeVisible();
+  await expect(archive.getByRole('row').filter({hasText:'Mdundo Kenya'})
+    .getByText('100 observed platform chart ranks')).toBeVisible();
+  await expect(archive.getByRole('row').filter({hasText:'Apple Music Kenya'})
+    .getByText('100 observed daily playlist ranks')).toBeVisible();
+  await expect(archive.getByRole('row').filter({hasText:'Audiomack Kenya'})
+    .getByText('Original retained; ranks unverified')).toBeVisible();
   await expect(page.getByRole('button',{name:'Open Research Evidence'})).toBeVisible();
     await expect(table.getByRole('button',{name:/^Add .+ Source$/})).toHaveCount(6);
   await expect(table.getByText('No proposal')).toHaveCount(6);
