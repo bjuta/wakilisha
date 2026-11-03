@@ -75,3 +75,7 @@ verify_jwt = true
 # Candidate-only authenticated Admin proposals, no capture or admission.
 [functions.wk100-source-admin-proposals]
 verify_jwt = true
+
+# Admin method review only. No collection, scoring, or publishing.
+[functions.wk100-source-admin-methods]
+verify_jwt = true

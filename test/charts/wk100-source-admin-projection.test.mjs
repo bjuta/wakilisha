@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions/_shared/wk100-source-admin-projection.mjs';
 import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
@@ -246,4 +247,18 @@ test('WK100 source-method review cannot convert research-only or a mismatched pr
     nativePeriodEvidenceRef:null,endpointSha256:null,accessEvidenceSha256:null,
     authorizationRef:null,authorizationExpiresAt:null},{now});
   assert.equal(hold.canCollect,false);
+});
+
+test('WK100 review endpoint verifies caller JWT, both capabilities and SQL confirmation without service role',async()=>{
+  const edge=await readFile('supabase/functions/wk100-source-admin-methods/index.ts','utf8');
+  const config=await readFile('supabase/config.toml','utf8');
+  assert.match(config,/\[functions\.wk100-source-admin-methods\]\s*verify_jwt = true/);
+  assert.match(edge,/caller\.auth\.getUser\(bearer\.slice\(7\)\)/);
+  assert.match(edge,/required_capability:'manage_ingest'/);
+  assert.match(edge,/required_capability:'manage_charts'/);
+  assert.match(edge,/wk100_review_source_method_v1/);
+  assert.match(edge,/wk100_list_source_method_decisions_v1/);
+  assert.match(edge,/data\.proposalRevision===decision\.proposalRevision/);
+  assert.match(edge,/data\.decisionRevision===\(body\.expectedDecisionRevision as number\)\+1/);
+  assert.doesNotMatch(edge,/SUPABASE_SERVICE_ROLE_KEY|service_role|\.insert\(|\.upsert\(|\bfetch\(/);
 });
