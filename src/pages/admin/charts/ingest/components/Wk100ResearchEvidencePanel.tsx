@@ -77,7 +77,7 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
   }
   function downloadNewResearchReceipt(){
     if(!newResearchReceipt)return;
-    const blob=new Blob([JSON.stringify(newResearchReceipt,null,2)+"\\n"],
+    const blob=new Blob([JSON.stringify(newResearchReceipt,null,2)+"\n"],
       {type:'application/json'});
     const url=URL.createObjectURL(blob);
     const anchor=document.createElement('a');
