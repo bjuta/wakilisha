@@ -6,6 +6,62 @@
 **Source and editorial authority:** [#1264](https://github.com/bjuta/wakilisha/issues/1264).  
 **Accepted code baseline:** [PR #1333](https://github.com/bjuta/wakilisha/pull/1333), merged as `561a323503a21184a36c8e5453c0024d329b8abc`.
 
+## Final Delivery Execution Lock — 3 November 2026 (Founder-directed)
+
+**Status: binding sequence, scope-control and stop-condition amendment to [delivery issue #1338](https://github.com/bjuta/wakilisha/issues/1338).** This does not override security, source truth, Registry, publisher, deployment authorization, or the technical phase exit requirements below. It does override loose progress language that treats an isolated green check or research helper as a finished workbook screen.
+
+### One product and one finish line
+
+The deliverable is **the exact founder-approved Charts Ingest Workbook ported natively into WAKILISHA Headquarters**, not an alternate research console or several independent products. The final workbook HTML has SHA-256 **91ded11f49ef0531f02b69d3c2ee73126eaa4af5625e34ae97527446c043ed96**. The workbook specifies visible layout and interactions; this four-phase programme specifies integrated engineering and acceptance. Reuse WAKILISHA's existing Admin shell, tokens/themes, primitives, capture, MIZIZI/Registry, filters, private ranking, publisher and audit. Do not embed the prototype runtime.
+
+**The finish line:** an authorized Admin can operate one credible Kenyan weekly WAKILISHA 100 Edition from automatic source evidence through identity, complete eligibility, private ranking, explicit Edition handling and recovery, **without routine developer commands, SQL, GitHub or manual provider downloads**. The founder accepts the integrated product walkthrough and runbook. The first public Edition still requires a separate explicit founder launch instruction.
+
+**Four engineering phases, one issue, one product.** The five Admin navigation stages remain **Collect → Identify → Qualify → Rank → Publish**. Founder exclusions remain: **no W1S**, no fictional role-holder approval relay, and no workbook mock MIZIZI implementation.
+
+### Fixed delivery order and phase exit
+
+| Phase and workbook scope | Required implementation, not an optional wish list | Objective closure |
+| --- | --- | --- |
+| **1. Collect — W0, W1, W2, W2A, W3 (current)** | Complete W2 source roster/master-detail with constitution, qualification versus health, metrics, EAT cadence and inspector; W2A **provider and supported method → approved surface → review**; W3 source coverage, original receipt drilldown, failure diagnosis, bounded retry and governed coverage exception; W1 real Edition/week/revision, seven readiness gates and one evidence-derived next action; connect to existing automatic collection | Faithful workbook UI with real authorized Admin commands; all six core sources assessed and founder-approved credible source constitution; at least one genuine service-collected, method-qualified original-byte sample with SHA-256/private readback and honest metric/period; failure/retry/quarantine/pause/nonpublication; two **logical** EAT weeks with real application orchestration plus independent **actual-clock** disposable PostgreSQL/GoTrue/Storage proof; **no 14-day wait** |
+| **2. Identify & Qualify — W4, W5, W5C, W6** | Converge governed MIZIZI/Registry recording identity; inventory and execute every applicable rule from the approximately 104 founder-referenced filters; complete queue, correction editor, batch actions, impact preview and conflict-safe re-evaluation without refetching | Every applicable rule has executable evidence and a clear disposition; no arbitrary first-20 limit; realistic identity/remix/credits/origin conflicts, stale writes and denied roles fail safely without mutating original evidence or duplicating Registry facts |
+| **3. Rank & Publish — W7, W8, W8S, W8B, W9, W9B, W10, W10C, W10O, W11** | Server-versioned methodology; deterministic private Top 100 and explanation; incomplete/stale/evidence-readiness states; private staging and deliberate Edition publication/revision/withdrawal through **the existing** governed publisher | Same frozen inputs reproduce the same explainable complete private ranking; unresolved/insufficient evidence blocks staging; real role, digest, stale revision, editorial integrity and rollback/withdrawal contracts accepted in isolation; **no actual first public Edition as a test** |
+| **4. Acceptance & Handoff — W12 plus every prior page** | Complete desktop/mobile/light/dark/keyboard/role fidelity; accelerated two-cycle whole-workflow rehearsal, independent runtime/fixture cleanup and genuine separately verified provider evidence; controlled deployment only after founder approval; Admin runbook and normal weekly operation walkthrough | Exact merged-main and deployment checks, safe rollback and no unauthorized public Edition; authorized Admin operates a normal week without engineering; founder accepts runbook, working product and handoff; **implementation stops** |
+
+**Phase 1 workbook implementation order: W2 → W2A → W3 → W1**, with W0 native primitives improved only as each screen requires. Each screen gets responsive/light/dark acceptance as it is finished, not deferred to Phase 4. W1S remains excluded.
+
+**Research-first remains binding.** Public researcher-directed chart observation and first-party offered exports continue without speculative source partnerships or invented permission gates. Reuse the accepted October original-byte research. The local original/CSV tools are valuable **exception and recovery features**, not the ordinary weekly workflow, not an alternate UI programme, and not proof of unattended capture. Exact native measurement periods and metrics must never be invented.
+
+### Ten anti-sprawl rules
+
+1. **One authority and tracker:** final workbook, this document, delivery issue **#1338**. No new parallel delivery issue, new product, or fifth phase.
+2. **One phase actively delivered at a time:** no speculative future-phase work while the present workbook screens remain incomplete, except a demonstrated surgical security/integration prerequisite.
+3. **One active implementation PR at a time:** **draft PR #1345** is frozen to discretionary feature growth. Audit and consolidate it first; preserve proven substrate, remove redundant work if necessary, and verify actual workbook alignment. It may close as a correctly scoped foundation **without claiming Phase 1 complete**. No unapproved merge, rollout, or extra branch to manufacture progress. Begin the next workbook-screen implementation only after its disposition.
+4. **No new infrastructure by default:** reuse existing capture, private Storage/receipts, source registry authority, MIZIZI/Registry, filter evaluator, publisher and shared Admin primitives. A new scheduler, uploader, database ledger, service or permanent test workflow needs a specific proven requirement that existing mechanisms cannot meet.
+5. **Three-question scope test before coding:** Which **exact workbook interaction** (or demonstrated safety defect) does it finish? Which existing **WAKILISHA authority** does it use? Which **bounded acceptance evidence** will prove it? If any answer is missing, defer the idea; do not quietly code it.
+6. **No artificial gates or rework:** do not reinstate a two-calendar-week soak, speculative platform partnerships as prerequisites to factual public research, repeated acquisition of accepted October originals, or founder-operated SQL/CLI for ordinary weekly work. Apply concrete access restrictions to concrete methods.
+7. **No CI sprawl:** extend or consolidate established suites; use genuine browser and isolated SQL/GoTrue/Storage checks as appropriate. Diagnose failures at the correct layer before changing code. A skipped hosted Preview check is never green.
+8. **No fake workbook affordances:** actions not backed by accepted audited, capability-checked, revision-safe server commands remain visibly unavailable with exact reasons. Disabled W3 retry/coverage-exception buttons are **unfinished**, not accepted UX.
+9. **No silent release:** merging, source collection, CI, private ranking, staging and Preview do not approve Production deployment, source/cron activation, scoring or the inaugural public flagship. Follow separate founder deployment and public launch controls.
+10. **No “done” from code alone:** a PR, migrated SQL, isolated test or local research note is not a finished screen. Workbook fidelity, real authorized behaviour and independent acceptance must all be proven.
+
+### One proof package per screen, one closure record per phase
+
+A screen is accepted only with (a) **direct fidelity comparison** against this exact workbook's hierarchy, geometry, density, table, drawer/dialog and interactions; (b) native shared-component reuse; (c) approximately **1440/1024/768/390 px**, light/dark, keyboard and accessible states; (d) actual permission/data/metric/evidence/revision truth including empty, loading, denied, conflict and failed states; and (e) focused existing-suite and real browser acceptance. Note any authorized design departure. Example workbook data must never become live facts. Pixel fidelity remains **unproven** without an actual rendered comparison.
+
+At each phase boundary, put **one consolidated acceptance record in #1338**: exact commit; workbook screens and interactions actually finished; source/SQL/Edge/client prerequisites; tests including real-browser and independent database/Storage; whether Preview and Production are deployed; fail-closed/nonpublication proofs; precise outstanding blockers and next action. Do not promote a former-head green CI result to a newer commit.
+
+**Founder progress report format:** current phase → workbook screens genuinely completed → acceptance proven → precise blocker → next implementation action. No commit counts presented as product progress.
+
+### Immediate next action and project stop
+
+**Do not build another local evidence widget.** First audit and disposition **PR #1345** as a reviewable foundation; then finish **W2 Source Registry** in the workbook's master/detail structure using the already protected source authority. Continue W2A, W3, W1, then the fixed remaining phases. Use the [3 November workbook gap audit](https://github.com/bjuta/wakilisha/issues/1338#issuecomment-6606118492): W0/W1/W2A partial; W2/W3 major. Green current code CI is **not** workbook-fidelity acceptance.
+
+Founder intervention is reserved for genuine product decisions: source constitution and necessary methods, methodology, authorized Production deployment, first public launch and final acceptance. Implementation decisions are engineering responsibility.
+
+**Final stop condition:** all four phase gates, exact-workbook integrated acceptance, separately authorized Production deployment, a normal Admin weekly walkthrough, and founder-accepted runbook/handoff receipt in **#1338**. Close the engineering job then. Routine weekly Editions become normal operations, not a fifth phase.
+
+---
+
 ## 1. Product Contract
 
 Deliver **one** Admin-operated, multi-source weekly WAKILISHA 100 chart of music consumption and discovery in Kenya. The complete path is:
