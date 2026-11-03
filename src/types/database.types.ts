@@ -28274,11 +28274,28 @@ export type Database = {
         }
         Returns: string
       }
+      wk100_list_collection_actions_v1: {
+        Args: { p_week: string }
+        Returns: Json
+      }
       wk100_list_source_method_decisions_v1: { Args: never; Returns: Json }
       wk100_list_source_proposals_v1: { Args: never; Returns: Json }
       wk100_publish_governed_weekly_edition_v1: {
         Args: { p_proposal_sha256: string; p_week: string }
         Returns: string
+      }
+      wk100_record_collection_action_v1: {
+        Args: {
+          p_action: string
+          p_contract_id: string
+          p_expected_attempt_number: number
+          p_expected_revision: number
+          p_operation_id: string
+          p_reason: string
+          p_scheduled_at: string
+          p_week: string
+        }
+        Returns: Json
       }
       wk100_register_governed_editorial_approval_v1: {
         Args: { p_proposal: Json }
@@ -28326,6 +28343,10 @@ export type Database = {
           p_source_key: string
         }
         Returns: boolean
+      }
+      wk100_service_retry_requests_v1: {
+        Args: { p_week: string }
+        Returns: Json
       }
       wk100_stage_governed_weekly_edition_v1: {
         Args: { p_proposal_sha256: string; p_week: string }
