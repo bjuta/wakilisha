@@ -216,7 +216,8 @@ begin
   select coalesce(jsonb_agg(jsonb_build_object(
     'source_key',d.source_key,'provider_key',d.provider_key,
     'proposal_revision',d.proposal_revision,
-    'decision_revision',d.decision_revision,'contract_version',c.contract_version,
+    'decision_revision',d.decision_revision,'decision_state',d.decision_state,
+    'contract_version',c.contract_version,
     'parser_class',d.parser_class,'method_class',d.method_class,
     'native_period_state',d.native_period_authority,
     'native_period_evidence_ref',d.native_period_evidence_ref,
