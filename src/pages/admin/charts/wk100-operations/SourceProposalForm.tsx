@@ -139,11 +139,16 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
       {step===1?'Choose a Kenya provider':step===2?'Configure the proposed source method':'Review before saving'}
     </h3>
     <ol aria-label="Source proposal steps" className="mt-3 flex flex-wrap gap-2 text-xs text-wk-text-muted">
-      <li className={step===1?'font-bold text-wk-text':''}>1 Provider</li>
-      <li aria-hidden>→</li><li className={step===2?'font-bold text-wk-text':''}>2 Method and schedule</li>
+      <li className={step===1?'font-bold text-wk-text':''}>1 Provider and method</li>
+      <li aria-hidden>→</li><li className={step===2?'font-bold text-wk-text':''}>2 Proposed surface and timing</li>
       <li aria-hidden>→</li><li className={step===3?'font-bold text-wk-text':''}>3 Review</li>
     </ol>
-    {step===1&&<div className="mt-5 grid gap-2 sm:grid-cols-2">
+    {step===1&&<div className="mt-5 space-y-3">
+      <p className="text-xs leading-relaxed text-wk-text-muted">
+        Choose a Kenya provider and proposed source method. Public research remains
+        independent; selecting a method does not grant unattended collection.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
       {providers.map(provider=><button key={provider.value} type="button"
         aria-pressed={draft.providerKey===provider.value}
         onClick={()=>setDraft(d=>({...d,providerKey:provider.value,sourceKey:provider.value+'_'}))}
@@ -152,6 +157,15 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
             'border-wk-border text-wk-text-soft hover:bg-wk-surface-raised')}>{provider.label}
         <span className="mt-1 block text-xs font-normal">{existing.filter(p=>p.providerKey===provider.value).length} existing proposed sources</span>
       </button>)}
+      </div>
+      {draft.providerKey&&<div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
+        <Choose label="Proposed access method" value={draft.methodClass}
+          onChange={v=>change('methodClass',v)} options={methodOptions}/>
+        <p className="mt-2 text-xs text-wk-text-muted">
+          Method availability is not an approval claim. The separately audited
+          source-method decision controls unattended collection.
+        </p>
+      </div>}
     </div>}
     {step===2&&<div className="mt-5 grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2">

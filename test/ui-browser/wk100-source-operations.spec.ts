@@ -173,6 +173,9 @@ test('all six core providers show truthful readiness and no invented source admi
     {waitUntil:'domcontentloaded'});
   const table=page.getByRole('table',{name:'Six core provider readiness'});
   await expect(table).toBeVisible({timeout:20_000});
+  await expect(page.getByRole('region',{name:'Selected source inspector'})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Selected source inspector'}).getByText('Select a source'))
+    .toBeVisible();
   for(const provider of ['YouTube Kenya','Spotify Kenya','Boomplay Kenya',
     'Apple Music Kenya','Mdundo Kenya','Shazam Kenya']){
     await expect(table.getByText(provider,{exact:true})).toBeVisible();
@@ -264,6 +267,12 @@ test('source overview stays truthful, carries EAT week through navigation and us
   await page.goto('/admin/charts/wk100-operations?week=2026-10-26',{waitUntil:'domcontentloaded'});
   await expect(page.getByRole('heading',{name:'Weekly Overview'})).toBeVisible({timeout:20_000});
   await expect(page.getByText('No enrolled capture sources yet.')).toBeVisible();
+  for(const gate of ['Qualified source constitution','Original source evidence',
+    'Provider-native measurement periods','Canonical recording identities',
+    'Complete eligibility and corrections','Frozen methodology and private Top 100',
+    'Edition staging and explicit publication']){
+    await expect(page.getByText(gate,{exact:true})).toBeVisible();
+  }
   await expect(page.getByText('Publication locked')).toBeVisible();
   await page.getByRole('button',{name:'Sources',exact:true}).click();
   await expect(page).toHaveURL(/wk100-operations\/sources\?week=2026-10-26/);
@@ -368,6 +377,8 @@ test('mobile source navigation and parent theme toggle remain usable',async({pag
   await page.goto('/admin/charts/wk100-operations/collection?week=2026-11-02',{waitUntil:'domcontentloaded'});
   await expect(page.getByRole('heading',{name:'Collection & Incidents'})).toBeVisible({timeout:20_000});
   await expect(page.getByText('No source capture contracts or attempts exist for this week.')).toBeVisible();
+  await expect(page.getByRole('progressbar',{name:'Candidate receipt coverage'}))
+    .toHaveAttribute('aria-valuenow','0');
   const menu=page.getByRole('button',{name:'Open Charts navigation'});
   await menu.click();
   await expect(menu).toHaveAttribute('aria-expanded','true');
