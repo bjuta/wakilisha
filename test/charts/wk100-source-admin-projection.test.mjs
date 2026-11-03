@@ -5,7 +5,7 @@ import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions
 import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
 import { resolveCaptureParser, parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
 import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
-import { fetchCandidateBytes } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
+import { fetchCandidateBytes, sha256Hex } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
 import { bindWk100DispatchAuthority, wk100EatWeekFromUtc } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
 import { validateWk100SourceMethodDecision } from '../../supabase/functions/_shared/wk100-source-method-decision-v1.mjs';
 
@@ -351,13 +351,18 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
   assert.equal(wk100EatWeekFromUtc(new Date('2026-11-02T00:00:00Z')),'2026-11-02');
   assert.equal(wk100EatWeekFromUtc(new Date('2026-11-08T22:00:00Z')),'2026-11-09');
   const endpoint='https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played';
+  const reviewedEndpointSha=await sha256Hex(new TextEncoder().encode(endpoint));
+  const modifiedEndpoint='https://unknown.invalid/raw';
+  // Use the real digest: a constant hash stub would falsely approve a
+  // tampered sealed-manifest endpoint and mask the security assertion.
+  assert.notEqual(await sha256Hex(new TextEncoder().encode(modifiedEndpoint)),reviewedEndpointSha);
   const contract={source_key:'apple_ke_catalog_most_played',provider_key:'apple_ke',
     contract_version:'v1',adapter_version:'apple_kenya_chart_v1',admission_state:'candidate',market:'KE'};
   const row={source_key:contract.source_key,provider_key:contract.provider_key,
     contract_version:'v1',decision_state:'collector_admitted',
     parser_class:contract.adapter_version,native_period_state:'provider_defined',
     native_period_evidence_ref:'reviewed_period',
-    endpoint_sha256:'a'.repeat(64),evidence_sha256:'b'.repeat(64),
+    endpoint_sha256:reviewedEndpointSha,evidence_sha256:'b'.repeat(64),
     authorization_ref:'reviewed_access_v1',authorization_expires_at:'2027-01-01T00:00:00Z',
     constitution_version:'approved-v1'};
   const entry={source_key:contract.source_key,contract_version:'v1',
@@ -366,7 +371,7 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
     native_period_key:'provider_week',authorization_ref:'reviewed_access_v1',
     authorization_expires_at:row.authorization_expires_at};
   const args={methodRows:[row],manifest:{sources:[entry]},sourceContracts:[contract],
-    sha256Hex:async()=>row.endpoint_sha256,
+    sha256Hex,
     nowUtc:new Date('2026-11-03T08:00:00Z'),constitutionVersion:'approved-v1'};
   const allowed=await bindWk100DispatchAuthority(args);
   assert.equal(allowed.length,1);assert.equal(allowed[0].enabled,true);
@@ -376,7 +381,7 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
     {methodRows:[{...row,proposal_revision:2,constitution_version:'old-v1'}]},
     {methodRows:[{...row,authorization_ref:'different_access'}]},
     {manifest:{sources:[{...entry,enabled:false}]}},
-    {manifest:{sources:[{...entry,endpoint:'https://unknown.invalid/raw'}]}},
+    {manifest:{sources:[{...entry,endpoint:modifiedEndpoint}]}},
     {sourceContracts:[{...contract,adapter_version:'wrong'}]},
     {sha256Hex:async()=>('f'.repeat(64))},
     {nowUtc:new Date('2027-02-01T00:00:00Z')},
