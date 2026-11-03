@@ -379,7 +379,14 @@ test('W2 filters current reviewed candidates without inventing scoring constitut
     source('22222222-2222-4222-8222-222222222222',apple,'apple_ke','Apple candidate'),
     source('33333333-3333-4333-8333-333333333333',youtube,'youtube_ke','YouTube candidate'),
   ],existingProposals:[{
+    id:'11111111-1111-4111-8111-111111111111',
     providerKey:'apple_ke',sourceKey:apple,revision:1,
+    surface:'Apple candidate',methodClass:'provider_api',
+    behavior:'consumption',metric:'rank',expectedDepth:100,
+    cadence:'weekly',intervalHours:null,eatHour:9,eatMinute:0,
+    weekdayEat:0,minimumHealthyCheckpoints:1,
+    evidenceReference:'synthetic-reviewed-method',reason:null,
+    createdAt:'2026-11-02T06:00:00Z',
     state:'proposed',canCollect:false,canScore:false,canPublish:false,
   }],existingMethods:[{
     providerKey:'apple_ke',sourceKey:apple,proposalRevision:1,
