@@ -19,6 +19,7 @@ import { WkOperationsHero, WkNextAction, WkReadinessList } from '@/components/de
 import { WkAuditTimeline } from '@/components/design-system/primitives/AuditTimeline';
 import { SourceProposalForm, type Wk100ProposalRecord } from './SourceProposalForm';
 import { SourceMethodReviewForm, type Wk100MethodDecision } from './SourceMethodReviewForm';
+import { SourceRecoveryDialog, type Wk100RecoveryKind } from './SourceRecoveryDialog';
 
 type Source = {
   id:string;sourceKey:string;provider:string;surface:string;market:string;
@@ -36,6 +37,12 @@ type Report = {schemaVersion:string;weekStartEat:string;sourceCount:number;
   successfulSources:number;failedSources:number;qualifiedSources:number;
   canScore:false;canPublish:false;sources:Source[]};
 type View = 'overview'|'sources'|'collection';
+type RecoveryAction = {
+  actionId:string;sourceKey:string;contractId:string;weekStartEat:string;
+  actionKind:'retry_requested'|'coverage_requested'|'coverage_accepted'|'coverage_rejected';
+  revision:number;scheduledAt:string|null;attemptNumber:number|null;
+  reason:string;createdAt:string;canCollect:false;canScore:false;canPublish:false;
+};
 const CORE_PROVIDERS=[
   {key:'youtube_ke',label:'YouTube Kenya'},
   {key:'spotify_ke',label:'Spotify Kenya'},
@@ -101,6 +108,30 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [incidentPause,setIncidentPause]=useState(false);
   const [methodDecisions,setMethodDecisions]=useState<Wk100MethodDecision[]>([]);
   const [methodPhase,setMethodPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
+  const recoverySequence=useRef(0);
+  const [recoveryPhase,setRecoveryPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
+  const [recoveryActions,setRecoveryActions]=useState<RecoveryAction[]>([]);
+  const [recoveryTarget,setRecoveryTarget]=useState<{kind:Wk100RecoveryKind;source:Source;revision:number}|null>(null);
+  const loadRecovery=useCallback(async()=>{
+    const seq=++recoverySequence.current;
+    setRecoveryPhase('loading');setRecoveryActions([]);
+    try{
+      const {data,error}=await supabase.rpc('wk100_list_collection_actions_v1',{p_week:week});
+      if(error||!Array.isArray(data)||data.length>1000||
+        data.some((a:RecoveryAction)=>!a||a.weekStartEat!==week||
+          !['retry_requested','coverage_requested','coverage_accepted','coverage_rejected'].includes(a.actionKind)||
+          typeof a.actionId!=='string'||typeof a.contractId!=='string'||
+          !Number.isInteger(a.revision)||a.canCollect!==false||a.canScore!==false||a.canPublish!==false))
+        throw Error('recovery_read_invalid');
+      if(seq!==recoverySequence.current)return;
+      setRecoveryActions(data as RecoveryAction[]);setRecoveryPhase('ready');
+    }catch{if(seq===recoverySequence.current){setRecoveryActions([]);setRecoveryPhase('unavailable');}}
+  },[week]);
+  useEffect(()=>{
+    if(view==='collection')void loadRecovery();
+    return ()=>{recoverySequence.current+=1;};
+  },[loadRecovery,view]);
+  useEffect(()=>{setRecoveryTarget(null)},[week]);
   const loadMethods=useCallback(async()=>{
     setMethodPhase('loading');
     try {
@@ -207,7 +238,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
     <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
-      <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();void loadEdition();if(view==='sources'){void loadProposals();void loadMethods()}}} disabled={phase==='loading'}>Refresh status</button>
+      <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();void loadEdition();if(view==='collection')void loadRecovery();if(view==='sources'){void loadProposals();void loadMethods()}}} disabled={phase==='loading'}>Refresh status</button>
     </AdminChartsPageHeader>
     <WkSurface className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3">
       <div className="flex items-center gap-2"><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Previous week" onClick={()=>setWeek(v=>nextWeek(v,-1))}>‹</button><div className="min-w-40 text-center"><p className="text-xs text-wk-text-muted">Edition week · Monday EAT</p><p className="text-sm font-bold text-wk-text">{week}</p></div><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Next week" onClick={()=>setWeek(v=>nextWeek(v,1))}>›</button></div>
@@ -456,10 +487,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         <WkOperationsHero eyebrow={'Collection · EAT week '+week} title="Collection"
           description="Source-specific reporting periods, captured evidence and attempt integrity are tracked separately. A successful download does not grant scoring qualification."
           aside={<WkStateBadge tone={report.failedSources?'danger':'neutral'}>{report.failedSources?report.failedSources+' source failures':'No admitted collection'}</WkStateBadge>}
-          action={<div className="flex flex-wrap gap-2">
-            <button type="button" disabled title="Coverage exceptions need an accepted policy workflow" className="wk-button wk-button-secondary wk-button-sm">Request Coverage Exception</button>
-            <button type="button" disabled title="Source retry requires a governed capture command" className="wk-button wk-button-secondary wk-button-sm">Request Retry</button>
-          </div>}/>
+          action={<span className="text-xs text-wk-text-muted">Choose a source below for recovery options</span>}/>
         <WkSurface className="rounded-2xl p-4 sm:p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <div><p className="text-[11px] font-bold uppercase tracking-[.1em] text-wk-text-muted">Qualified coverage</p>
@@ -480,10 +508,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           </div>
         </WkSurface>
         <p className="text-xs leading-relaxed text-wk-text-muted">
-           Retry and coverage exceptions are disabled pending accepted, audited,
-           idempotent week-bound server commands. No earlier-week evidence substitution
-           or automatic source reweighting is allowed.
-         </p>
+          Retry requests remain subject to the original 20-minute collection slot, method admission,
+          the existing scheduler, and durable lease. Coverage decisions document missingness and
+          never restore missing evidence or change source weights.
+        </p>
+        {recoveryPhase==='loading'&&<p role="status" className="text-xs text-wk-text-muted">Reading recovery history…</p>}
+        {recoveryPhase==='unavailable'&&<p role="alert" className="text-sm text-wk-text-muted">
+          The protected recovery service is unavailable. No retry or coverage decision can be recorded.
+        </p>
          <Card title="Source collection">
           <WkDataTable<Source> rows={report.sources} getKey={s=>s.id} ariaLabel="Weekly source collection"
             empty="No source capture contracts or attempts exist for this week. Collection scheduling has not been enabled."
@@ -496,6 +528,32 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                    onClick={()=>{setDetail(s);setDetailTab('history')}}>Inspect original receipt</button>:
                  <span className="text-wk-text-muted">No verified receipt</span>},
               {key:'status',label:'Status',render:s=><WkStateBadge tone={['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState)?'danger':s.receiptSha256?'info':'neutral'}>{s.captureState.replaceAll('_',' ')}</WkStateBadge>},
+              {key:'recovery',label:'Recovery',render:s=>{
+                if(recoveryPhase!=='ready')
+                  return <span className="text-xs text-wk-text-muted">Recovery unavailable</span>;
+                const coverage=recoveryActions.filter(a=>a.contractId===s.id&&
+                  a.actionKind!=='retry_requested')
+                  .sort((a,b)=>b.revision-a.revision)[0];
+                const withinWindow=!!s.lastScheduledAt &&
+                  Date.now()>=Date.parse(s.lastScheduledAt) &&
+                  Date.now()-Date.parse(s.lastScheduledAt)<=20*60_000;
+                const retryable=['transport_failed','missed'].includes(s.captureState) &&
+                  !!s.lastAttemptNumber && s.lastAttemptNumber<8 && withinWindow;
+                return <div className="flex flex-wrap gap-2">
+                  {retryable&&<button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                    onClick={()=>setRecoveryTarget({kind:'request_retry',source:s,revision:0})}>Request Retry</button>}
+                  {['transport_failed','missed'].includes(s.captureState)&&!retryable&&
+                    <span className="text-xs text-wk-text-muted">Retry window closed or exhausted</span>}
+                  {coverage?.actionKind==='coverage_requested'?<>
+                    <WkStateBadge tone="warning">Coverage review pending</WkStateBadge>
+                    <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                      onClick={()=>setRecoveryTarget({kind:'accept_exception',source:s,revision:coverage.revision})}>Accept Missingness</button>
+                    <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                      onClick={()=>setRecoveryTarget({kind:'reject_exception',source:s,revision:coverage.revision})}>Reject Request</button>
+                  </>:!s.receiptSha256&&<button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                    onClick={()=>setRecoveryTarget({kind:'request_exception',source:s,revision:coverage?.revision??0})}>Request Coverage Review</button>}
+                </div>;
+              }},
               {key:'control',label:'Incident Control',render:s=>{
                 const decision=methodDecisions.find(d=>d.sourceKey===s.sourceKey);
                 const proposal=proposals.find(p=>p.sourceKey===s.sourceKey);
@@ -512,6 +570,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                 </button>;
               }},
             ] satisfies WkDataColumn<Source>[]} />
+        </Card>
+        <Card title="Recovery decision history">
+          <WkAuditTimeline locale="en-KE" timeZone="Africa/Nairobi"
+            ariaLabel="Collection recovery decisions" emptyLabel="No recovery requests or decisions recorded."
+            events={recoveryActions.map(a=>({
+              id:a.actionId,label:a.sourceKey+' · '+a.actionKind.replaceAll('_',' '),
+              occurredAt:a.createdAt,description:a.reason,
+            })).sort((a,b)=>String(b.occurredAt||'').localeCompare(String(a.occurredAt||''))).slice(0,30)}/>
         </Card>
         <Card title="Collection activity">
           <WkAuditTimeline locale="en-KE" timeZone="Africa/Nairobi" ariaLabel="Collection attempt history" emptyLabel="No collection attempts recorded." events={report.sources.flatMap(s=>s.recentAttempts.map((a,i)=>({
@@ -584,6 +650,12 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         Source settings, qualification, retries, and coverage exceptions require separately accepted governed commands. This inspection view does not modify the capture ledger.
       </p>
     </WkInspector>}
+    {recoveryTarget&&<SourceRecoveryDialog
+      key={recoveryTarget.source.id+':'+recoveryTarget.kind+':'+week+':'+recoveryTarget.revision}
+      kind={recoveryTarget.kind} source={recoveryTarget.source}
+      week={week} revision={recoveryTarget.revision}
+      close={()=>setRecoveryTarget(null)}
+      onSaved={()=>{void loadRecovery();void load()}}/>}
     {add&&<SourceProposalForm initial={editing} existing={proposals}
       close={()=>{setAdd(false);setEditing(null)}} onSaved={()=>void loadProposals()}/>}
     {reviewing&&<SourceMethodReviewForm proposal={reviewing}
