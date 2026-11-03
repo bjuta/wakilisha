@@ -532,3 +532,24 @@ test('WK100 native adapter digest is a required contract/manifest match at sched
   assert.match(worker,/source_adapter_digest_mismatch/);
   assert.match(worker,/!\/\^\[a-f0-9\]\{64\}\$\/\.test\(source\.adapter_sha256\)/);
 });
+
+test('WK100 restricted source health and proposal endpoints require the verified Admin JWT and both capabilities',async()=>{
+  const config=await readFile('supabase/config.toml','utf8');
+  for(const slug of ['wk100-source-admin-read','wk100-source-admin-proposals','wk100-source-admin-methods']) {
+    assert.match(config,new RegExp('\\[functions\\.'+slug+'\\]\\s*verify_jwt = true'));
+  }
+  const health=await readFile('supabase/functions/wk100-source-admin-read/index.ts','utf8');
+  const proposal=await readFile('supabase/functions/wk100-source-admin-proposals/index.ts','utf8');
+  assert.match(health,/admin\.auth\.getUser\(token\)/);
+  assert.match(proposal,/caller\.auth\.getUser\(bearer\.slice\(7\)\)/);
+  for(const file of [health,proposal]){
+    assert.match(file,/required_capability:'manage_ingest'/);
+    assert.match(file,/required_capability:'manage_charts'/);
+    assert.match(file,/data!==true\)return reply\(req,403,\{error:'not_authorized'\}\)/);
+    assert.doesNotMatch(file,/WK100_CAPTURE_ENABLED|WK100_SOURCE_SCHEDULER_ENABLED/);
+  }
+  assert.match(health,/\.limit\(1000\)/);
+  assert.match(health,/source_health_page_limit/);
+  assert.doesNotMatch(health,/\.select\('\*'\)/);
+  assert.doesNotMatch(health,/raw_object_key|service_role:\s*serviceKey/);
+});

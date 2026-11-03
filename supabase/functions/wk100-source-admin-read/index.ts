@@ -45,6 +45,9 @@ Deno.serve(async req=>{
   const allowed=await caller.rpc('current_user_has_capability',{required_capability:'manage_ingest'});
   if(allowed.error)return reply(req,503,{error:'capability_unavailable'});
   if(allowed.data!==true)return reply(req,403,{error:'not_authorized'});
+  const charts=await caller.rpc('current_user_has_capability',{required_capability:'manage_charts'});
+  if(charts.error)return reply(req,503,{error:'capability_unavailable'});
+  if(charts.data!==true)return reply(req,403,{error:'not_authorized'});
   // Only explicitly selected read-only columns are allowed across this
   // service-role boundary. No raw object keys, endpoints or credentials.
   const [contracts,attempts]=await Promise.all([

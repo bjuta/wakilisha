@@ -57,6 +57,9 @@ Deno.serve(async(req:Request)=>{
   const permission=await caller.rpc('current_user_has_capability',{required_capability:'manage_ingest'});
   if(permission.error)return reply(req,503,{error:'capability_unavailable'});
   if(permission.data!==true)return reply(req,403,{error:'not_authorized'});
+  const chartsPermission=await caller.rpc('current_user_has_capability',{required_capability:'manage_charts'});
+  if(chartsPermission.error)return reply(req,503,{error:'capability_unavailable'});
+  if(chartsPermission.data!==true)return reply(req,403,{error:'not_authorized'});
   if(list){
     const {data,error}=await caller.rpc('wk100_list_source_proposals_v1');
     if(error||!Array.isArray(data)||data.length>500)
