@@ -18,6 +18,15 @@ function exactUtc(s){
   return typeof s==='string'&&UTC.test(s)&&!Number.isNaN(Date.parse(s))&&
     new Date(s).toISOString().replace('.000Z','Z')===s;
 }
+// PostgREST serializes PostgreSQL timestamptz as +00:00 (sometimes with
+// microseconds). A byte-for-byte comparison to planner slots ending in Z
+// would miss an existing attempt and could dispatch an unauthorized retry.
+const SQL_INSTANT=/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|[+-]\d\d:\d\d)$/;
+function sqlInstant(value){
+  if(typeof value!=='string'||!SQL_INSTANT.test(value))return null;
+  const ms=Date.parse(value);
+  return Number.isFinite(ms)?ms:null;
+}
 function asKernelContract(c){
   return {
     source_key:c.source_key,behavior:c.behavior,metric:c.native_metric,
@@ -84,10 +93,17 @@ export function planWk100SourceDispatch({
     let slots;
     try{slots=checkpointsForSource(weekStartEat,asKernelContract(c))}
     catch{blocked.push({sourceKey:c.source_key,code:'source_slot_contract_invalid'});continue;}
+    // If the SQL attempt timestamps for this contract are malformed, do
+    // not silently overlook them and invent another attempt for this source.
+    if(attempts.some(a=>a?.contract_id===c.id&&sqlInstant(a.scheduled_at)===null)){
+      blocked.push({sourceKey:c.source_key,code:'attempt_history_invalid'});
+      continue;
+    }
     for(const slot of slots){
       const delta=now-Date.parse(slot.scheduled_at);
       if(delta<0||delta>20*60_000)continue; // no catch-up/backfill
-      const same=attempts.filter(a=>a?.contract_id===c.id&&a?.scheduled_at===slot.scheduled_at);
+      const same=attempts.filter(a=>a?.contract_id===c.id&&
+        sqlInstant(a.scheduled_at)===Date.parse(slot.scheduled_at));
       if(same.some(a=>['succeeded','partial_depth'].includes(a.status))){
         blocked.push({sourceKey:c.source_key,scheduledAt:slot.scheduled_at,code:'slot_already_observed'});
         continue;
@@ -117,4 +133,55 @@ export function planWk100SourceDispatch({
   jobs.sort((a,b)=>a.scheduled_at.localeCompare(b.scheduled_at)||a.source_key.localeCompare(b.source_key));
   return Object.freeze({schemaVersion:'wk100-source-dispatch-plan-v1',weekStartEat,
     jobs:Object.freeze(jobs),blocked:Object.freeze(blocked),...never});
+}
+
+/**
+ * Enforce the founder-governed W3 retry request at the service dispatcher.
+ * First attempts remain automatic when separately admitted; attempt 2..8
+ * needs an exact, durable, actor-audited SQL request for the same contract,
+ * source, EAT week and slot. An irrelevant request cannot grant a dispatch.
+ * This does not override method admission, leases, TTL or native-period gates.
+ */
+export function selectWk100AuditedDispatch({jobs,sourceContracts,retryRequests}){
+  if(!Array.isArray(jobs)||!Array.isArray(sourceContracts)||
+    !Array.isArray(retryRequests)||jobs.length>5000||
+    sourceContracts.length>100||retryRequests.length>500)
+    failure('wk100_retry_dispatch_invalid');
+  const ids=new Map();
+  for(const c of sourceContracts){
+    if(!c||typeof c.id!=='string'||!c.id||
+      typeof c.source_key!=='string'||typeof c.contract_version!=='string')
+      failure('wk100_retry_dispatch_invalid');
+    const key=c.source_key+'/'+c.contract_version;
+    if(ids.has(key))failure('wk100_retry_dispatch_invalid');
+    ids.set(key,c.id);
+  }
+  const requested=new Set();
+  for(const r of retryRequests){
+    const when=sqlInstant(r?.scheduled_at);
+    if(!r||typeof r.contract_id!=='string'||!r.contract_id||
+      typeof r.source_key!=='string'||!validEatWeek(r.week_start_eat)||
+      when===null||!Number.isInteger(r.attempt_number)||
+      r.attempt_number<2||r.attempt_number>8)
+      failure('wk100_retry_dispatch_invalid');
+    requested.add(JSON.stringify([r.contract_id,r.source_key,
+      r.week_start_eat,when,r.attempt_number]));
+  }
+  const selected=jobs.filter(job=>{
+    if(job.attempt_number===1)return true;
+    const id=ids.get(job.source_key+'/'+job.contract_version);
+    if(!id||job.attempt_number<2||job.attempt_number>8)return false;
+    const when=sqlInstant(job.scheduled_at);
+    return when!==null&&requested.has(JSON.stringify([
+      id,job.source_key,job.week_start_eat,when,job.attempt_number]));
+  });
+  // Honor explicit retry requests before unattended first attempts when
+  // the current trigger can execute only four slots.
+  selected.sort((a,b)=>
+    Number(b.attempt_number>1)-Number(a.attempt_number>1)||
+    a.scheduled_at.localeCompare(b.scheduled_at)||
+    a.source_key.localeCompare(b.source_key));
+  return Object.freeze({
+    jobs:Object.freeze(selected),withheldRetryCount:jobs.length-selected.length,
+  });
 }
