@@ -8,6 +8,7 @@ import { runCandidateCapture } from '../_shared/chart-capture-runtime.mjs';
 import { isWk100CaptureConstitutionCurrent } from '../_shared/wk100-source-scheduler-authority.mjs';
 import { sha256Hex } from '../_shared/chart-candidate-capture.mjs';
 import { isGatewayVerifiedServiceRole, runtimeProjectApiUrl } from '../_shared/chart-capture-gateway-role.mjs';
+import { isWk100AppleCatalogChart, resolveWk100AppleProviderAuthorization } from '../_shared/wk100-apple-service-credential.mjs';
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), {
   status, headers: {'content-type':'application/json','cache-control':'no-store'},
@@ -124,23 +125,22 @@ Deno.serve(async (req:Request) => {
   };
   if(!await methodAllowed())
     return json(403,{error:'source_method_not_admitted',can_publish:false});
-  // Only Apple's native catalog charts endpoint may receive the explicitly
-  // configured developer token. Never accept request-body headers or secrets.
+  // No Apple credential is read unless this exact source is currently
+  // admitted AND the manifest routes to Apple's official Kenya chart API.
+  // The existing platform signing key can only be reused after a separate
+  // WK100-specific opt-in. Preview reads its own bound database, never Production.
+  // A minted developer token stays in memory and is sent only to the approved
+  // Apple endpoint by the existing no-redirect candidate transport.
   let providerAuthorization: {kind:string;token:string} | undefined;
-  if(key==='apple_ke' || (key.startsWith('apple_ke_') &&
-      entry.parser_class==='apple_kenya_chart_v1')) {
-    let nativeApple=false;
-    try {const endpoint=new URL(entry.endpoint);
-      nativeApple=endpoint.protocol==='https:' &&
-        endpoint.hostname==='api.music.apple.com' &&
-        endpoint.pathname==='/v1/catalog/ke/charts';
-    } catch { /* transport rejects malformed endpoints separately */ }
-    if(nativeApple) {
-      const token=Deno.env.get('WK100_APPLE_MUSIC_DEVELOPER_TOKEN')??'';
-      if(!/^[a-zA-Z0-9_.-]{20,8192}$/.test(token))
-        return json(503,{error:'source_credential_not_configured',can_publish:false});
-      providerAuthorization={kind:'apple_developer_bearer',token};
-    }
+  if(isWk100AppleCatalogChart(key,entry.endpoint)){
+    const credentials=await resolveWk100AppleProviderAuthorization({
+      sourceKey:key,endpoint:entry.endpoint,db,
+      directToken:Deno.env.get('WK100_APPLE_MUSIC_DEVELOPER_TOKEN')??'',
+      reuseExisting:Deno.env.get('WK100_APPLE_USE_EXISTING_PLATFORM_CREDENTIALS')==='true',
+    });
+    if(!credentials)
+      return json(503,{error:'source_credential_not_configured',can_publish:false});
+    providerAuthorization=credentials;
   }
   const found=await db.from('wk_chart_capture_contracts_v1').select('*')
     .eq('source_key',key).eq('contract_version',version).maybeSingle();
