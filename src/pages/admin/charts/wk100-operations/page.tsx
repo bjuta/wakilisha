@@ -265,6 +265,35 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     (constitutionFilter==='all'||(report?.qualifiedSources??0)>0&&s.admissionState==='qualified')&&
     (s.surface+' '+s.provider+' '+s.sourceKey).toLowerCase().includes(search.trim().toLowerCase())
   ),[report,search,status,providerFilter,metricFilter,reviewFilter,constitutionFilter,reviewedSourceIds]);
+  // Exactly one next action follows real server-owned proposal, review and
+  // receipt state. A candidate contract never makes an Edition ready.
+  const nextAction=(()=>{
+    if(!report||report.sourceCount===0)return {
+      title:'Establish the source roster',
+      description:'No source capture contracts are enrolled. Start with a proposed Kenya source and independent method review.',
+      target:'/sources',button:'Review Sources',
+    };
+    if(proposalPhase!=='ready'||methodPhase!=='ready')return {
+      title:'Check source review authority',
+      description:'The protected proposal or method decision is unavailable. No collector method is assumed approved.',
+      target:'/sources',button:'Review Sources',
+    };
+    if(reviewedCandidateContracts===0)return {
+      title:'Review current source methods',
+      description:'Candidate contracts exist, but no matching current proposal and reviewed method can be confirmed.',
+      target:'/sources',button:'Review Methods',
+    };
+    if(report.successfulSources===0)return {
+      title:'Verify a source capture',
+      description:'A reviewed candidate exists, but this EAT week has no verified capture receipt. Collection still needs separate approval.',
+      target:'/collection',button:'Review Collection',
+    };
+    return {
+      title:'Inspect captured source evidence',
+      description:'Review original receipts and native periods. Captures still need independent qualification before ranking.',
+      target:'/collection',button:'Review Evidence',
+    };
+  })();
   const verifyOriginal=async(source:Source,attemptId:string)=>{
     const seq=++originalSequence.current;
     setOriginalReadback({contractId:source.id,attemptId,phase:'loading'});
@@ -354,10 +383,11 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           description={report.sourceCount===0?'No enrolled capture sources yet. This week has no verified evidence set and cannot proceed to private ranking.':'Source research is provisional. Captures do not become scoring evidence until separately qualified.'}
           aside={<WkStateBadge tone="warning">Private · Not ready</WkStateBadge>}/>
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)]">
-          <WkNextAction title={report.sourceCount===0?'Establish the qualified source roster':'Review captured source evidence'}
-            blocked={report.sourceCount===0}
-            description={report.sourceCount===0?'No source capture contracts have been enrolled. Begin with method qualification and an approved Source Registry.':'Inspect source-specific captures, reporting periods, and validation outcomes before advancing this week.'}
-            action={<button type="button" className="wk-button wk-button-primary wk-button-sm" onClick={()=>go(report.sourceCount===0?'/sources':'/collection')}>{report.sourceCount===0?'Review Sources':'Review Collection'}</button>}
+          <WkNextAction title={nextAction.title}
+            blocked
+            description={nextAction.description}
+            action={<button type="button" className="wk-button wk-button-primary wk-button-sm"
+              onClick={()=>go(nextAction.target)}>{nextAction.button}</button>}
             secondary={<button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>go('/collection')}>Why collection is held</button>}/>
           <Card title="Readiness">
             <WkReadinessList items={[
