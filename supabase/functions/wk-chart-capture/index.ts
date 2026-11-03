@@ -5,6 +5,7 @@
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { runCandidateCapture } from '../_shared/chart-capture-runtime.mjs';
+import { isWk100CaptureConstitutionCurrent } from '../_shared/wk100-source-scheduler-authority.mjs';
 import { sha256Hex } from '../_shared/chart-candidate-capture.mjs';
 import { isGatewayVerifiedServiceRole, runtimeProjectApiUrl } from '../_shared/chart-capture-gateway-role.mjs';
 
@@ -98,14 +99,26 @@ Deno.serve(async (req:Request) => {
   // The same check repeats before transport to honour pause/retire actions.
   const db=createClient(url,bearer,{auth:{persistSession:false,autoRefreshToken:false}});
   const endpointSha256=await sha256Hex(new TextEncoder().encode(entry.endpoint));
+  const constitutionVersion=Deno.env.get('WK100_SOURCE_CONSTITUTION_VERSION')??'';
   const methodAllowed=async():Promise<boolean>=>{
-    const {data,error}=await db.rpc('wk100_service_capture_method_allowed_v1',{
-      p_source_key:key,p_contract_version:version,
-      p_endpoint_sha256:endpointSha256,
-      p_authorization_ref:entry.authorization_ref,
-      p_parser_class:entry.parser_class,
-    });
-    return !error && data===true;
+    if(!/^[a-zA-Z0-9._-]{2,100}$/.test(constitutionVersion))return false;
+    // Both probes execute using the gateway-verified service credential,
+    // not browser input, and each check is repeated before actual transport.
+    const [authority,current]=await Promise.all([
+      db.rpc('wk100_service_capture_method_allowed_v1',{
+        p_source_key:key,p_contract_version:version,
+        p_endpoint_sha256:endpointSha256,
+        p_authorization_ref:entry.authorization_ref,
+        p_parser_class:entry.parser_class,
+      }),
+      db.rpc('wk100_service_admitted_methods_v1'),
+    ]);
+    return !authority.error&&authority.data===true&&!current.error&&
+      isWk100CaptureConstitutionCurrent({
+        rows:current.data,sourceKey:key,contractVersion:version,
+        endpointSha256,authorizationRef:entry.authorization_ref,
+        parserClass:entry.parser_class,constitutionVersion,nowUtc:new Date(),
+      });
   };
   if(!await methodAllowed())
     return json(403,{error:'source_method_not_admitted',can_publish:false});

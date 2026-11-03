@@ -6,7 +6,7 @@ import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk
 import { resolveCaptureParser, parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
 import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 import { fetchCandidateBytes, sha256Hex } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
-import { bindWk100DispatchAuthority, wk100EatWeekFromUtc } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
+import { bindWk100DispatchAuthority, wk100EatWeekFromUtc, isWk100CaptureConstitutionCurrent } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
 import { validateWk100SourceMethodDecision } from '../../supabase/functions/_shared/wk100-source-method-decision-v1.mjs';
 
 test('WK100 source read model preserves empty real Production state',()=>{
@@ -405,4 +405,47 @@ test('WK100 scheduler only dispatches signed service calls through existing capt
   assert.match(edge,/\/functions\/v1\/wk-chart-capture/);
   assert.match(edge,/redirect:'error'/);
   assert.doesNotMatch(edge,/wk_chart_runtime_reserve_v1|\.insert\(|\.upsert\(|SUPABASE_SERVICE_ROLE_KEY/);
+});
+
+test('WK100 direct capture calls require current founder constitution, not merely service_role',()=>{
+  const row={
+    source_key:'apple_ke_catalog_most_played',contract_version:'v1',
+    decision_state:'collector_admitted',constitution_version:'accepted-constitution-v1',
+    endpoint_sha256:'a'.repeat(64),authorization_ref:'reviewed_access_v1',
+    parser_class:'apple_kenya_chart_v1',native_period_state:'provider_defined',
+    native_period_evidence_ref:'native-period-2026',
+    authorization_expires_at:'2027-01-01T00:00:00Z',
+  };
+  const req={
+    rows:[row],sourceKey:row.source_key,contractVersion:row.contract_version,
+    endpointSha256:row.endpoint_sha256,
+    authorizationRef:row.authorization_ref,parserClass:row.parser_class,
+    constitutionVersion:'accepted-constitution-v1',
+    nowUtc:new Date('2026-11-03T08:00:00Z'),
+  };
+  assert.equal(isWk100CaptureConstitutionCurrent(req),true);
+  for(const change of [
+    {constitutionVersion:'unapproved'},
+    {rows:[{...row,decision_state:'paused'}]},
+    {rows:[{...row,decision_state:'retired'}]},
+    {rows:[{...row,constitution_version:'superseded-constitution'}]},
+    {rows:[{...row,authorization_expires_at:'2026-11-02T00:00:00Z'}]},
+    {rows:[{...row,endpoint_sha256:'f'.repeat(64)}]},
+    {rows:[{...row,native_period_state:'unknown'}]},
+    {rows:[]},{rows:[row,row]},
+    {parserClass:'youtube_kenya_weekly_top_songs_v1'},
+  ])assert.equal(isWk100CaptureConstitutionCurrent({...req,...change}),false);
+  const worker=await readFile('supabase/functions/wk-chart-capture/index.ts','utf8');
+  assert.match(worker,/WK100_SOURCE_CONSTITUTION_VERSION/);
+  assert.match(worker,/isWk100CaptureConstitutionCurrent/);
+  assert.match(worker,/wk100_service_admitted_methods_v1/);
+  assert.match(worker,/await methodAllowed\(\)/);
+});
+test('WK100 scheduler only passes admitted contract versions to the dispatch planner',async()=>{
+  const edge=await readFile('supabase/functions/wk100-source-scheduler/index.ts','utf8');
+  assert.match(edge,/const admittedContracts=new Set\(approved\.map/);
+  assert.match(edge,/sourceContracts:currentContracts,approvedDecisions:approved/);
+  assert.doesNotMatch(edge,/sourceContracts:contractsResult\.data,approvedDecisions:approved/);
+  const authority=await readFile('supabase/functions/_shared/wk100-source-scheduler-authority.mjs','utf8');
+  assert.match(authority,/scheduler_multiple_admitted_contract_versions/);
 });

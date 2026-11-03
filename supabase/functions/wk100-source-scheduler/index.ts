@@ -75,9 +75,15 @@ Deno.serve(async(req:Request)=>{
       sha256Hex,nowUtc:now,constitutionVersion,
     });
     const nowUtc=now.toISOString().replace(/\.\d{3}Z$/,'Z');
+    // Unapproved historical contract versions cannot veto an otherwise
+    // admitted current source. The binder already rejects competing
+    // admitted versions of one source as an ambiguity.
+    const admittedContracts=new Set(approved.map(d=>d.source_key+'/'+d.contract_version));
+    const currentContracts=contractsResult.data.filter(c=>
+      admittedContracts.has(c.source_key+'/'+c.contract_version));
     const plan=planWk100SourceDispatch({
       weekStartEat:week,nowUtc,
-      sourceContracts:contractsResult.data,approvedDecisions:approved,
+      sourceContracts:currentContracts,approvedDecisions:approved,
       attempts,executionEnabled:true,
     });
     // A single trigger dispatches at most four source slots. A subsequent

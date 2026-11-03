@@ -80,5 +80,52 @@ export async function bindWk100DispatchAuthority({
       constitution_version:row.constitution_version,
     }));
   }
+  // One provider may register many independently named sources, but there
+  // must never be competing admitted contract versions for the SAME source.
+  // Refuse ambiguous manifests rather than choosing newest-wins.
+  const admittedSourceIds=new Set();
+  for(const d of decisions){
+    if(admittedSourceIds.has(d.source_key))
+      fail('scheduler_multiple_admitted_contract_versions');
+    admittedSourceIds.add(d.source_key);
+  }
   return Object.freeze(decisions);
+}
+
+/**
+ * Defense in depth for direct service-role calls to wk-chart-capture.
+ * Scheduler dispatch does not grant standalone worker authority. The worker
+ * must independently check the current service-only database projection
+ * against the founder-approved constitution before reservation and before GET.
+ *
+ * Callers pass only server-held evidence; a browser cannot supply the rows.
+ */
+export function isWk100CaptureConstitutionCurrent({
+  rows,sourceKey,contractVersion,endpointSha256,authorizationRef,
+  parserClass,constitutionVersion,nowUtc,
+}){
+  if(!Array.isArray(rows)||rows.length>100||
+    typeof sourceKey!=='string'||!IDENT.test(sourceKey)||
+    typeof contractVersion!=='string'||contractVersion.length<2||
+    typeof endpointSha256!=='string'||!SHA.test(endpointSha256)||
+    typeof authorizationRef!=='string'||authorizationRef.length<3||
+    typeof parserClass!=='string'||parserClass.length<3||
+    typeof constitutionVersion!=='string'||
+    !/^[a-zA-Z0-9._-]{2,100}$/.test(constitutionVersion)||
+    !(nowUtc instanceof Date)||!Number.isFinite(nowUtc.valueOf()))
+    return false;
+  const hits=rows.filter(r=>r && typeof r==='object' &&
+    r.source_key===sourceKey &&
+    r.contract_version===contractVersion &&
+    r.decision_state==='collector_admitted' &&
+    r.constitution_version===constitutionVersion &&
+    r.endpoint_sha256===endpointSha256 &&
+    r.authorization_ref===authorizationRef &&
+    r.parser_class===parserClass &&
+    r.native_period_state==='provider_defined' &&
+    typeof r.native_period_evidence_ref==='string' &&
+    r.native_period_evidence_ref.length>=3 &&
+    Number.isFinite(Date.parse(r.authorization_expires_at)) &&
+    Date.parse(r.authorization_expires_at)>nowUtc.valueOf());
+  return hits.length===1;
 }

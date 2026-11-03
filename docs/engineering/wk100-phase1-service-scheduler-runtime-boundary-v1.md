@@ -19,7 +19,7 @@
 | `WK100_CAPTURE_PROJECT_REF` | Both Edge functions | Check exact project-ref metadata. The project API URL is derived from the verified signed JWT, not a request body or untrusted URL. |
 | `WK100_SOURCE_SCHEDULER_ENABLED` | Scheduler Edge function | Explicit true only following release authorization. Default absent or false. |
 | `WK100_CAPTURE_ENABLED` | Both Edge functions | Explicit true only following release authorization. Separate runtime secret inventory per function. |
-| `WK100_SOURCE_CONSTITUTION_VERSION` | Scheduler Edge function | Exact founder-approved source-constitution version and unchanged decision evidence. |
+| `WK100_SOURCE_CONSTITUTION_VERSION` | Scheduler and Capture Edge functions | Same exact founder-approved constitution version on BOTH functions. Direct service-role capture calls must fail closed if it is absent, expired, or no longer current. |
 | `WK100_CAPTURE_SOURCE_MANIFEST` and `WK100_CAPTURE_SOURCE_MANIFEST_SHA256` | Both Edge functions | Confirm byte-identical manifest and SHA seal, exact reviewed endpoint, credential identifier, parser class, native period key and expiry. Do not log manifest contents. |
 | `WK100_APPLE_MUSIC_DEVELOPER_TOKEN` | Capture Edge function only, when Apple route admitted | Check presence and provider route permissions, not value. Credentials can travel only to Apple's `api.music.apple.com/v1/catalog/ke/charts` with `types=songs&chart=most-played`. |
 | `wk-chart-raw-evidence-v1` private Storage and capture SQL RPCs | Exact Supabase project | Full migration replay, bucket ACL, SHA-256 byte readback, create-only object name, three-minute lease and live role revocation proof. |
@@ -45,3 +45,13 @@ For Preview, compare the presence of every required custom Edge secret with Prod
 5. Complete W1/W2/W2A/W3 Admin recovery, incident control and immutable review history. Keep scoring, MIZIZI identity mutation and publisher authority separate throughout.
 
 Until every conjunctive exit gate is proven, Phase 1 remains **open**. A green PR or merged candidate code is not itself an unattended-source or Production launch authorization.
+
+
+## Additional direct-worker and multi-version protections
+
+The capture worker enforces the exact current constitution version independently
+of scheduler dispatch, on initial admission and again just before source
+transport. A service-role token by itself cannot bypass constitution approval.
+For each source ID, only one admitted contract version may be dispatched.
+Historical candidate contract versions do not block a newer admitted contract;
+competing admitted versions fail closed until an explicit operator resolution.
