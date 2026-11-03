@@ -227,7 +227,7 @@ test('all six core providers show truthful readiness and no invented source admi
   const table=page.getByRole('table',{name:'Six core provider readiness'});
   await expect(table).toBeVisible({timeout:20_000});
   // The operator's source master/detail must precede secondary October research.
-  const registryBeforeArchive=await page.locator('main').evaluate(root=>{
+  const registryBeforeArchive=await page.locator('main').first().evaluate(root=>{
     const headings=Array.from(root.querySelectorAll('h2'));
     const registry=headings.find(h=>h.textContent?.trim()==='Source Registry');
     const archive=headings.find(h=>h.textContent?.trim()==='Research Already Captured');
