@@ -162,8 +162,9 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
         <Choose label="Proposed access method" value={draft.methodClass}
           onChange={v=>change('methodClass',v)} options={methodOptions}/>
         <p className="mt-2 text-xs text-wk-text-muted">
-          Method availability is not an approval claim. The separately audited
-          source-method decision controls unattended collection.
+          No method is pre-approved by this selector. This proposed access route
+          does not prove the provider offers it. Recorded method review, evidence
+          digests and a separately approved constitution govern collection.
         </p>
       </div>}
     </div>}

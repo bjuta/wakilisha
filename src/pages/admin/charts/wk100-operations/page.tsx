@@ -98,6 +98,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [status,setStatus]=useState('all');
   const [providerFilter,setProviderFilter]=useState('all');
   const [metricFilter,setMetricFilter]=useState('all');
+  const [reviewFilter,setReviewFilter]=useState('all');
+  const [constitutionFilter,setConstitutionFilter]=useState('all');
   const [detail,setDetail]=useState<Source|null>(null);
   const [detailTab,setDetailTab]=useState<'configuration'|'qualification'|'history'>('configuration');
   const [add,setAdd]=useState(false);
@@ -232,25 +234,31 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   // constitution. Count only the current matching method/proposal revision
   // with a matching actual capture contract in the selected source projection.
   // Never show a positive count while either protected review read is stale.
-  const reviewedCandidateContracts=useMemo(()=>{
-    if(proposalPhase!=='ready'||methodPhase!=='ready'||phase!=='ready'||!report)return 0;
-    return report.sources.filter(source=>{
+  // Only matching current proposal/method/contract revisions count as
+  // reviewed candidate contracts. This is not qualification or collection.
+  const reviewedSourceIds=useMemo(()=>{
+    const ids=new Set<string>();
+    if(proposalPhase!=='ready'||methodPhase!=='ready'||phase!=='ready'||!report)return ids;
+    for(const source of report.sources){
       const proposal=proposals.find(p=>p.sourceKey===source.sourceKey&&
         p.providerKey===source.provider);
       const method=methodDecisions.find(m=>m.sourceKey===source.sourceKey&&
-        m.providerKey===source.provider&&
-        m.proposalRevision===proposal?.revision);
-      return !!proposal&&method?.decisionState==='collector_admitted'&&
-        method.captureContractVersion===source.version;
-    }).length;
+        m.providerKey===source.provider&&m.proposalRevision===proposal?.revision);
+      if(proposal&&method?.decisionState==='collector_admitted'&&
+        method.captureContractVersion===source.version)ids.add(source.id);
+    }
+    return ids;
   },[report,phase,proposals,proposalPhase,methodDecisions,methodPhase]);
+  const reviewedCandidateContracts=reviewedSourceIds.size;
   const sources=useMemo(()=>(report?.sources??[]).filter(s=>
     (status==='all'||(status==='collected'?!!s.receiptSha256:status==='failed'?
       ['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState):s.captureState==='not_collected'))&&
     (providerFilter==='all'||s.provider===providerFilter)&&
     (metricFilter==='all'||s.metric===metricFilter)&&
+    (reviewFilter==='all'||(reviewFilter==='reviewed'?reviewedSourceIds.has(s.id):!reviewedSourceIds.has(s.id)))&&
+    (constitutionFilter==='all'||(report?.qualifiedSources??0)>0&&s.admissionState==='qualified')&&
     (s.surface+' '+s.provider+' '+s.sourceKey).toLowerCase().includes(search.trim().toLowerCase())
-  ),[report,search,status,providerFilter,metricFilter]);
+  ),[report,search,status,providerFilter,metricFilter,reviewFilter,constitutionFilter,reviewedSourceIds]);
   const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
     <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
@@ -268,7 +276,13 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         <span className="rounded-full border border-wk-border px-3 py-1 text-xs font-semibold text-wk-text-soft">Research only · Publication locked</span>
       </div>
     </WkSurface>
-    <WkWorkflowRail ariaLabel="Chart operations stages" steps={['Collect','Identify','Qualify','Rank','Publish'].map((label,i)=>({id:label.toLowerCase(),label,description:i===0?'Current phase':'Not operational',state:i===0?'current' as const:'blocked' as const}))}/>
+    <WkWorkflowRail ariaLabel="Chart operations stages"
+      steps={['Collect','Identify','Qualify','Rank','Publish'].map((label,i)=>({
+        id:label.toLowerCase(),label,
+        description:i===0?'Current: source and evidence review':'Locked until preceding phase acceptance',
+        state:i===0?'current' as const:'blocked' as const,
+      }))}
+      onSelect={step=>{if(step.id==='collect')go('')}}/>
     <nav className="flex flex-wrap gap-2" aria-label="Collection workspace">
       {[['Overview',''],['Sources','/sources'],['Collection','/collection']].map(([name,path])=><button key={name} type="button" onClick={()=>go(path)} aria-current={(view==='overview'&&path==='')||(view==='sources'&&path==='/sources')||(view==='collection'&&path==='/collection')?'page':undefined} className={'rounded-full border px-4 py-2 text-xs font-semibold '+((view==='overview'&&path==='')||(view==='sources'&&path==='/sources')||(view==='collection'&&path==='/collection')?'border-wk-brand bg-wk-brand-soft text-wk-text':'border-wk-border text-wk-text-muted hover:bg-wk-surface-raised')}>{name}</button>)}
     </nav>
@@ -347,7 +361,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           aside={<WkStateBadge tone="warning">{report.qualifiedSources} qualified</WkStateBadge>}
           action={<button className="wk-button wk-button-primary wk-button-sm" type="button" onClick={()=>{setEditing(null);setAdd(true)}}>Add Source</button>}/>
         <Card title="Source Registry">
-          <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_repeat(3,minmax(130px,160px))]">
+          <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(190px,1fr)_repeat(5,minmax(105px,155px))]">
             <WkSearchField ariaLabel="Search provider or source" placeholder="Provider or source" value={search} onChange={setSearch}/>
             <WkSelect ariaLabel="Filter provider" value={providerFilter} onChange={setProviderFilter}
               options={[{value:'all',label:'All providers'},...Array.from(new Set((report?.sources??[]).map(s=>s.provider))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
@@ -355,10 +369,17 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               options={[{value:'all',label:'All health states'},{value:'collected',label:'Captured'},{value:'failed',label:'Failing'},{value:'not_collected',label:'Unknown'}]}/>
             <WkSelect ariaLabel="Filter metric" value={metricFilter} onChange={setMetricFilter}
               options={[{value:'all',label:'All metrics'},...Array.from(new Set((report?.sources??[]).map(s=>s.metric))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
+            <WkSelect ariaLabel="Filter method review" value={reviewFilter} onChange={setReviewFilter}
+              options={[{value:'all',label:'All method states'},
+                {value:'reviewed',label:'Current reviewed candidates'},
+                {value:'pending',label:'Method review pending'}]}/>
+            <WkSelect ariaLabel="Filter constitution" value={constitutionFilter} onChange={setConstitutionFilter}
+              options={[{value:'all',label:'Constitution · All'},
+                {value:'in',label:'Constitution · In'}]}/>
           </div>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-wk-text-muted">
-            <span>Registered candidates · {report.sourceCount} · No sources admitted to the scoring constitution</span>
-            <span>All changes require verified source-method authority</span>
+            <span>Registered candidates · {report.sourceCount} · Reviewed candidate contracts · {reviewedCandidateContracts}</span>
+            <span>Candidate-only service · scoring constitution not granted</span>
           </div>
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,480px)]">
           <WkDataTable<Source> rows={sources} getKey={s=>s.id} ariaLabel="Source registry"
@@ -370,10 +391,12 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               </>},
               {key:'metric',label:'Metric · period · depth',render:s=><span className="text-wk-text-soft">{s.metric} · {s.nativePeriodAuthority==='provider_defined'?'Defined':'Unverified'} · {s.expectedDepth}</span>},
               {key:'cadence',label:'Candidate Timing',render:s=><span className="text-wk-text-soft">{candidateCadence(s)}</span>},
-              {key:'qualification',label:'Qualification',render:()=> <WkStateBadge>Candidate</WkStateBadge>},
+              {key:'qualification',label:'Qualification',render:s=>reviewedSourceIds.has(s.id)?
+                <WkStateBadge tone="info">Reviewed candidate</WkStateBadge>:
+                <WkStateBadge>Candidate · review pending</WkStateBadge>},
               {key:'health',label:'Health',render:s=><WkStateBadge tone={['transport_failed','parse_failed','missed','target_period_unavailable'].includes(s.captureState)?'danger':s.receiptSha256?'success':'neutral'}>{['transport_failed','parse_failed','missed','target_period_unavailable'].includes(s.captureState)?'Failing':s.receiptSha256?'Captured':'Unknown'}</WkStateBadge>},
               {key:'last',label:'Last success',render:s=><span className="text-wk-text-muted">{when(s.lastSuccessfulAt)}</span>},
-              {key:'constitution',label:'Constitution',render:()=> <span className="text-xs text-wk-text-muted">Not admitted</span>},
+              {key:'constitution',label:'Constitution',render:()=> <span className="text-xs text-wk-text-muted">Out · no scoring authority</span>},
             ] satisfies WkDataColumn<Source>[]} />
           <aside role="region" aria-label="Selected source inspector"
             className="min-w-0 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
@@ -396,10 +419,10 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                     when(detail.nativePeriodStart)+' to '+when(detail.nativePeriodEnd):'Unknown'},
                 ]}/>}
                 {detailTab==='qualification'&&<WkReadinessList items={[
-                  {id:'method',label:'Current reviewed method',status:methodDecisions.some(d=>
-                    d.sourceKey===detail.sourceKey&&d.decisionState==='collector_admitted'&&
-                    proposals.some(p=>p.sourceKey===d.sourceKey&&p.revision===d.proposalRevision))?'pending':'blocked',
-                    description:'Method admission is not weekly scoring authority'},
+                  {id:'method',label:'Current reviewed method',status:reviewedSourceIds.has(detail.id)?'pending':'blocked',
+                    description:reviewedSourceIds.has(detail.id)?
+                      'Current proposal, reviewed method and candidate contract match; collection remains separately gated':
+                      'No matching current proposal, reviewed method and candidate contract'},
                   {id:'period',label:'Provider-native reporting period',status:detail.nativePeriodAuthority==='provider_defined'?'pending':'blocked',
                     description:'Native period evidence needs independent verification'},
                   {id:'score',label:'Ranking and publishing',status:'blocked',description:'Candidate contracts cannot publish'},

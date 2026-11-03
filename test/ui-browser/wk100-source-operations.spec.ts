@@ -351,6 +351,47 @@ test('W1 counts only reviewed current candidate contracts, never qualifies them 
   expect(ctx.unexpected).toEqual([]);
 });
 
+test('W2 filters current reviewed candidates without inventing scoring constitution admission',async({page})=>{
+  const apple='apple_ke_catalog_most_played',youtube='youtube_ke_top_songs_weekly';
+  const source=(id:string,key:string,provider:string,surface:string)=>({
+    id,sourceKey:key,provider,surface,market:'KE',version:'v1',
+    metric:'rank',behavior:'consumption',expectedDepth:100,
+    cadence:'weekly',eatHour:9,eatMinute:0,weekdayEat:0,
+    intervalHours:null,minimumHealthyCheckpoints:1,adapterVersion:'fixture-v1',
+    admissionState:'candidate',captureState:'not_collected',
+    attemptCount:0,recentAttempts:[],receiptSha256:null,
+    nativePeriodAuthority:'unknown',canScore:false,canPublish:false,
+  });
+  const ctx=await install(page,{existingSources:[
+    source('22222222-2222-4222-8222-222222222222',apple,'apple_ke','Apple candidate'),
+    source('33333333-3333-4333-8333-333333333333',youtube,'youtube_ke','YouTube candidate'),
+  ],existingProposals:[{
+    providerKey:'apple_ke',sourceKey:apple,revision:1,
+    state:'proposed',canCollect:false,canScore:false,canPublish:false,
+  }],existingMethods:[{
+    providerKey:'apple_ke',sourceKey:apple,proposalRevision:1,
+    decisionRevision:2,decisionState:'collector_admitted',
+    captureContractVersion:'v1',canScore:false,canPublish:false,
+  }]});
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  const table=page.getByRole('table',{name:'Source registry'});
+  await expect(table.getByRole('button',{name:'Apple candidate'})).toBeVisible({timeout:20_000});
+  await expect(table.getByRole('button',{name:'YouTube candidate'})).toBeVisible();
+  await page.getByRole('button',{name:'Filter method review'}).click();
+  await page.getByRole('option',{name:'Current reviewed candidates'}).click();
+  await expect(table.getByRole('button',{name:'Apple candidate'})).toBeVisible();
+  await expect(table.getByRole('button',{name:'YouTube candidate'})).toHaveCount(0);
+  await expect(table.getByText('Reviewed candidate',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Filter constitution'}).click();
+  await page.getByRole('option',{name:'Constitution · In'}).click();
+  await expect(table.getByRole('button',{name:'Apple candidate'})).toHaveCount(0);
+  await expect(table.getByText('No sources match these filters.')).toBeVisible();
+  expect(ctx.contractWrites).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
 test('W1 reads actual week-bound Edition configuration revision without inferring collection readiness',async({page})=>{
   const draft={weekStartEat:'2026-10-26',revision:7,configSha256:'f'.repeat(64),
     updatedAt:'2026-11-01T07:00:00Z'};
