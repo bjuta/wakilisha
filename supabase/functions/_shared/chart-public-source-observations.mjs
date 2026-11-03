@@ -216,6 +216,47 @@ export function parseShazamKenya(raw) {
 }
 
 /**
+ * Spotify offered Top 200 export: parser/schema preflight only.
+ *
+ * Contemporary public examples document these nine columns, but WAKILISHA
+ * has NOT yet received an authenticated current Kenya export. This parser
+ * deliberately does NOT attest origin, territorial authority, collection
+ * permission, native time bounds, or eligibility for the WK100 collector.
+ * Do not route its output into runCandidateCapture, source admission or scoring
+ * before an actual reviewed KE original and accepted source-method contract.
+ */
+export function parseSpotifyChartCsvCandidate(raw) {
+  const sheet=csvRows(assertString(raw,'spotify').replace(/^\ufeff/,''));
+  const header=['rank','uri','artist_names','track_name','source',
+    'peak_rank','previous_rank','weeks_on_chart','streams'];
+  if(!sheet[0] || sheet[0].length!==header.length ||
+    sheet[0].some((v,i)=>v.trim().toLowerCase()!==header[i]))
+    fail('spotify_export_schema_unverified');
+  const data=sheet.slice(1).filter(c=>c.some(v=>v.trim()));
+  if(data.length<1 || data.length>200) fail('spotify_export_depth_invalid');
+  const rows=data.map(c=>{
+    const uri=c[1]?.trim();
+    if(c.length!==header.length ||
+      !/^spotify:track:[A-Za-z0-9]{22}$/.test(uri??'') ||
+      !text(c[2]) || !text(c[3]))
+      fail('spotify_export_row_invalid');
+    const rank=positiveInt(c[0]?.trim());
+    const streams=nonnegativeCount(c[8]?.trim());
+    if(rank===null || streams===null) fail('spotify_export_row_invalid');
+    return track(rank,uri.slice('spotify:track:'.length),
+      text(c[3]),text(c[2]),{chart_eligible_stream_count:streams});
+  });
+  // Source body has no independent Kenya/weekly-period attestation.
+  // Spotify's chart-eligible streams are NOT YouTube view_count.
+  return normalizeRows('spotify_chart_csv_candidate',rows,rows.length,{
+    market:'unverified',behavior:'consumption',
+    metric:'rank_plus_spotify_chart_eligible_streams',
+    chart_surface:'spotify_offered_csv_candidate',native_period:'unknown',
+    source_admitted:false,can_collect:false,can_score:false,can_publish:false,
+  });
+}
+
+/**
  * Apple Kenya native charts. Two distinct public chart schemas are supported:
  * the historical country-bearing RSS feed and the MusicKit catalog charts API.
  * The API payload has no trustworthy storefront field; its territory must be
