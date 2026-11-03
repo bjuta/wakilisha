@@ -62,7 +62,7 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
       /^[a-f0-9]{64}$/.test(draft.accessEvidenceSha256)&&
       draft.authorizationRef.trim().length>=3&&
       draft.authorizationExpiresAt.trim().length>=20));
-  const canEnroll=previous?.decisionState==='collector_admitted' &&
+  const canEnroll=initialDecisionState!=='paused' && previous?.decisionState==='collector_admitted' &&
     previous.proposalRevision===proposal.revision &&
     !previous.captureContractVersion;
   const enrollmentValid=canEnroll&&
@@ -141,16 +141,18 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
     finally{setSaving(false);}
   };
   return <Modal open={true} onClose={close} dismissable={!saving&&!enrolling} maxWidth="3xl"
-    title="Review Source Method"
+    title={initialDecisionState==='paused'?'Pause Source Method':'Review Source Method'}
     footer={<div className="flex items-center justify-end gap-3">
       <button type="button" disabled={saving||enrolling} className="wk-button wk-button-secondary wk-button-sm" onClick={close}>Cancel</button>
       <button type="button" disabled={!valid||saving||enrolling} className="wk-button wk-button-primary wk-button-sm" onClick={()=>void submit()}>
-        {saving?'Saving…':'Save method decision'}
+        {saving?'Saving…':initialDecisionState==='paused'?'Confirm Pause':'Save method decision'}
       </button>
     </div>}>
     <div className="space-y-4">
       <p className="text-sm text-wk-text-muted">
-        Review the specific source and its evidence. A method decision does not start collection or authorize ranking.
+        {initialDecisionState==='paused'
+          ?'Pause the reviewed source method. The collector checks this authority again before transport. Original receipts remain unchanged.'
+          :'Review the specific source and its evidence. A method decision does not start collection or authorize ranking.'}
       </p>
       <WkDetailList items={[
         {label:'Provider and source',value:proposal.providerKey+' · '+proposal.sourceKey},
@@ -162,14 +164,16 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
       ]}/>
       <div className="space-y-1">
         <p className="text-xs font-semibold text-wk-text-muted">Decision</p>
-        <WkSelect ariaLabel="Method decision" value={draft.decisionState}
-          onChange={value=>setDraft(d=>({...d,decisionState:value as State}))}
-          options={[
-            {value:'held',label:'Hold for evidence'},
-            {value:'collector_admitted',label:'Admit reviewed method'},
-            {value:'paused',label:'Pause reviewed method'},
-            {value:'retired',label:'Retire source method'},
-          ]}/>
+        {initialDecisionState==='paused'
+          ?<p className="rounded-xl border border-wk-border px-3 py-2 text-sm text-wk-text">Pause reviewed method</p>
+          :<WkSelect ariaLabel="Method decision" value={draft.decisionState}
+            onChange={value=>setDraft(d=>({...d,decisionState:value as State}))}
+            options={[
+              {value:'held',label:'Hold for evidence'},
+              {value:'collector_admitted',label:'Admit reviewed method'},
+              {value:'paused',label:'Pause reviewed method'},
+              {value:'retired',label:'Retire source method'},
+            ]}/>}
       </div>
       <ReviewField label="Constitution version" limit={100}
         value={draft.constitutionVersion} onChange={v=>change('constitutionVersion',v)}/>
@@ -195,7 +199,7 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
           The server independently verifies this review and the reviewer’s authority.
         </p>
       </div>}
-      {previous?.decisionState==='collector_admitted'&&
+      {initialDecisionState!=='paused'&&previous?.decisionState==='collector_admitted'&&
         previous.proposalRevision===proposal.revision&&
         <div className="space-y-4 rounded-xl border border-wk-border p-4">
           <p className="text-xs font-semibold text-wk-text">Capture contract enrollment</p>
