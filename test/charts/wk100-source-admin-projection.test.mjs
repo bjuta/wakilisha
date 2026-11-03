@@ -515,6 +515,14 @@ test('WK100 direct capture calls require current founder constitution, not merel
   assert.match(worker,/isWk100CaptureConstitutionCurrent/);
   assert.match(worker,/wk100_service_admitted_methods_v1/);
   assert.match(worker,/await methodAllowed\(\)/);
+  // Service-role requests can reach the worker without passing through the
+  // scheduler, so a direct retry must prove the same immutable SQL action.
+  assert.match(worker,/if\(Number\(payload\.attempt_number\)>1\)/);
+  assert.match(worker,/wk100_service_retry_requests_v1/);
+  assert.match(worker,/selectWk100AuditedDispatch\(/);
+  assert.match(worker,/retry_request_not_authorized/);
+  assert.ok(worker.indexOf("if(Number(payload.attempt_number)>1)") <
+    worker.indexOf("const credentials=await resolveWk100AppleProviderAuthorization"));
 });
 test('WK100 scheduler only passes admitted contract versions to the dispatch planner',async()=>{
   const edge=await readFile('supabase/functions/wk100-source-scheduler/index.ts','utf8');
