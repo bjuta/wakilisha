@@ -305,6 +305,13 @@ test('a stale reviewed method does not appear as an enrolled, current platform s
   const youtube=roster.getByRole('row').filter({hasText:'YouTube Kenya'});
   await expect(youtube.getByText('Method review needed')).toBeVisible({timeout:20_000});
   await expect(youtube.getByText('Candidate enrolled')).toHaveCount(0);
+  const sourceMaster=page.getByRole('table',{name:'Source registry'});
+  await expect(sourceMaster.getByRole('button',{name:'YouTube Kenya weekly songs'})).toBeVisible();
+  await expect(sourceMaster.getByText('Review outdated',{exact:true})).toBeVisible();
+  await sourceMaster.getByRole('button',{name:'YouTube Kenya weekly songs'}).click();
+  const inspector=page.getByRole('region',{name:'Selected source inspector'});
+  await expect(inspector.getByText('Source proposal · no capture contract enrolled')).toBeVisible();
+  await expect(inspector.getByText('Not enrolled',{exact:true})).toBeVisible();
   await youtube.getByRole('button',{name:'Review YouTube Kenya Method'}).click();
   const review=page.getByRole('dialog',{name:'Review Source Method'});
   await expect(review.getByRole('heading',{name:'Review Source Method'})).toBeVisible();
@@ -330,7 +337,7 @@ test('source overview stays truthful, carries EAT week through navigation and us
   await page.getByRole('button',{name:'Sources',exact:true}).click();
   await expect(page).toHaveURL(/wk100-operations\/sources\?week=2026-10-26/);
   await expect(page.getByRole('heading',{name:'Source Registry'}).first()).toBeVisible();
-  await expect(page.getByText('No source capture contracts are registered.')).toBeVisible();
+  await expect(page.getByText('No sources proposed or enrolled yet.')).toBeVisible();
   expect(ctx.reads.length).toBeGreaterThanOrEqual(2);
   for(const body of ctx.reads)expect(body).toEqual({action:'read_source_health',weekStartEat:'2026-10-26'});
   expect(ctx.unexpected).toEqual([]);
@@ -437,7 +444,7 @@ test('W1 reads actual week-bound Edition configuration revision without inferrin
 test('Add Source sends only a proposed candidate through the isolated governed endpoint',async({page})=>{
   const ctx=await install(page);
   await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',{waitUntil:'domcontentloaded'});
-  await expect(page.getByText('No source capture contracts are registered.')).toBeVisible({timeout:20_000});
+  await expect(page.getByText('No sources proposed or enrolled yet.')).toBeVisible({timeout:20_000});
   await expect(page.getByText('No source proposals have been saved.')).toBeVisible();
   await page.getByRole('button',{name:'Add Source'}).click();
   await expect(page.getByRole('heading',{name:'Choose a Kenya provider'})).toBeVisible();
@@ -451,6 +458,16 @@ test('Add Source sends only a proposed candidate through the isolated governed e
   await expect(page.getByRole('heading',{name:'Review before saving'})).toBeVisible();
   await page.getByRole('button',{name:'Save proposal'}).click();
   await expect(page.getByRole('heading',{name:'Add Source'})).toHaveCount(0);
+  const sourceMaster=page.getByRole('table',{name:'Source registry'});
+  await expect(sourceMaster.getByRole('button',{name:'YouTube Kenya official weekly chart'})).toBeVisible();
+  await expect(sourceMaster.getByText('Method review needed',{exact:true})).toBeVisible();
+  await expect(sourceMaster.getByText('Not enrolled',{exact:true})).toBeVisible();
+  await sourceMaster.getByRole('button',{name:'YouTube Kenya official weekly chart'}).click();
+  const inspector=page.getByRole('region',{name:'Selected source inspector'});
+  await expect(inspector.getByText('Source proposal · no capture contract enrolled')).toBeVisible();
+  await expect(inspector.getByText('Not enrolled',{exact:true})).toBeVisible();
+  await expect(inspector.getByRole('button',{name:'Revise Proposal'})).toBeVisible();
+  await expect(inspector.getByRole('button',{name:'Review Method'})).toBeVisible();
   expect(ctx.writes).toHaveLength(1);
   const submitted=ctx.writes[0] as {action:string;proposal:Record<string,unknown>;expectedRevision:number};
   expect(submitted.action).toBe('submit_source_proposal');
@@ -476,7 +493,7 @@ test('a provider can own multiple independent source proposals without overridin
   }];
   const ctx=await install(page,{existingProposals:existing});
   await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',{waitUntil:'domcontentloaded'});
-  await expect(page.getByText('youtube_ke_top_songs_weekly')).toBeVisible({timeout:20_000});
+  await expect(page.getByRole('table',{name:'Source registry'}).getByText('youtube_ke_top_songs_weekly')).toBeVisible({timeout:20_000});
   await page.getByRole('button',{name:'Add Source'}).click();
   await expect(page.getByRole('dialog',{name:'Add Source'}).getByRole('button',{name:/^YouTube Kenya/})).toBeEnabled();
   await expect(page.getByText('1 existing proposed sources')).toBeVisible();
@@ -494,8 +511,10 @@ test('a provider can own multiple independent source proposals without overridin
   // Wait for the asynchronous Edge call AND the confirmed UI readback.
   // A Playwright click alone does not await an async React event handler.
   await expect(page.getByRole('heading',{name:'Add Source'})).toHaveCount(0);
-  await expect(page.getByText('youtube_ke_daily_playlist')).toBeVisible();
-  await expect(page.getByText('youtube_ke_top_songs_weekly')).toBeVisible();
+  const sourceMaster=page.getByRole('table',{name:'Source registry'});
+  await expect(sourceMaster.getByText('youtube_ke_daily_playlist')).toBeVisible();
+  await expect(sourceMaster.getByText('youtube_ke_top_songs_weekly')).toBeVisible();
+  await expect(sourceMaster.getByRole('row')).toHaveCount(3);
   expect(ctx.writes).toHaveLength(1);
   const written=ctx.writes[0] as {proposal:{providerKey:string;sourceKey:string};expectedRevision:number};
   expect(written.proposal.providerKey).toBe('youtube_ke');

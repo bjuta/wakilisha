@@ -55,6 +55,21 @@ type ProviderReadiness={
   key:string;label:string;proposalCount:number;decisionCount:number;
   state:string;next:string;focus:Wk100ProposalRecord|null;
 };
+type RegistrySource={
+  id:string;sourceKey:string;provider:string;surface:string;
+  contract:Source|null;proposal:Wk100ProposalRecord|null;method:Wk100MethodDecision|null;
+};
+function registryReviewLabel(row:RegistrySource,reviewAvailable:boolean,reviewedContract:boolean){
+  if(!reviewAvailable)return 'Review unavailable';
+  if(reviewedContract)return 'Reviewed candidate';
+  if(!row.proposal)return 'Proposal missing';
+  if(!row.method)return 'Method review needed';
+  if(row.method.proposalRevision!==row.proposal.revision)return 'Review outdated';
+  if(row.method.decisionState==='held')return 'Evidence held';
+  if(row.method.decisionState==='paused')return 'Paused';
+  if(row.method.decisionState==='retired')return 'Retired';
+  return row.contract?'Contract review mismatch':'Method admitted · not enrolled';
+}
 
 
 function nextWeek(v:string,n:number) {
@@ -62,7 +77,7 @@ function nextWeek(v:string,n:number) {
   return d.toISOString().slice(0,10);
 }
 // An immutable candidate contract describes intended timing, not an active scheduler.
-function candidateCadence(s:Source) {
+function candidateCadence(s:Pick<Source,'eatHour'|'eatMinute'|'cadence'|'intervalHours'|'weekdayEat'>) {
   if(s.eatHour===null||s.eatMinute===null)return 'Timing not recorded';
   const time=String(s.eatHour).padStart(2,'0')+':'+String(s.eatMinute).padStart(2,'0')+' EAT';
   if(s.cadence==='daily')return 'Daily at '+time;
@@ -100,6 +115,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [metricFilter,setMetricFilter]=useState('all');
   const [reviewFilter,setReviewFilter]=useState('all');
   const [constitutionFilter,setConstitutionFilter]=useState('all');
+  const [selectedSourceKey,setSelectedSourceKey]=useState<string|null>(null);
   const [detail,setDetail]=useState<Source|null>(null);
   const [detailTab,setDetailTab]=useState<'configuration'|'qualification'|'history'>('configuration');
   const [add,setAdd]=useState(false);
@@ -256,15 +272,57 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     return ids;
   },[report,phase,proposals,proposalPhase,methodDecisions,methodPhase]);
   const reviewedCandidateContracts=reviewedSourceIds.size;
-  const sources=useMemo(()=>(report?.sources??[]).filter(s=>
-    (status==='all'||(status==='collected'?!!s.receiptSha256:status==='failed'?
-      ['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState):s.captureState==='not_collected'))&&
-    (providerFilter==='all'||s.provider===providerFilter)&&
-    (metricFilter==='all'||s.metric===metricFilter)&&
-    (reviewFilter==='all'||(reviewFilter==='reviewed'?reviewedSourceIds.has(s.id):!reviewedSourceIds.has(s.id)))&&
-    (constitutionFilter==='all'||(report?.qualifiedSources??0)>0&&s.admissionState==='qualified')&&
-    (s.surface+' '+s.provider+' '+s.sourceKey).toLowerCase().includes(search.trim().toLowerCase())
-  ),[report,search,status,providerFilter,metricFilter,reviewFilter,constitutionFilter,reviewedSourceIds]);
+  // The source-master must include pre-enrollment proposals. A proposal is
+  // neither an enrolled capture contract nor a current-week evidence receipt.
+  const registryRows=useMemo<RegistrySource[]>(()=>{
+    const currentProposals=new Map<string,Wk100ProposalRecord>();
+    if(proposalPhase==='ready')for(const proposal of proposals){
+      const previous=currentProposals.get(proposal.sourceKey);
+      if(!previous||proposal.revision>previous.revision)
+        currentProposals.set(proposal.sourceKey,proposal);
+    }
+    const rows:RegistrySource[]=[];
+    const enrolledKeys=new Set<string>();
+    for(const contract of report?.sources??[]){
+      enrolledKeys.add(contract.sourceKey);
+      rows.push({
+        id:'contract:'+contract.id,sourceKey:contract.sourceKey,
+        provider:contract.provider,surface:contract.surface,contract,
+        proposal:currentProposals.get(contract.sourceKey)??null,
+        method:methodPhase==='ready'
+          ?methodDecisions.find(m=>m.sourceKey===contract.sourceKey)??null:null,
+      });
+    }
+    for(const proposal of currentProposals.values()){
+      if(enrolledKeys.has(proposal.sourceKey))continue;
+      rows.push({
+        id:'proposal:'+proposal.sourceKey,sourceKey:proposal.sourceKey,
+        provider:proposal.providerKey,surface:proposal.surface,contract:null,proposal,
+        method:methodPhase==='ready'
+          ?methodDecisions.find(m=>m.sourceKey===proposal.sourceKey)??null:null,
+      });
+    }
+    return rows.sort((a,b)=>a.provider.localeCompare(b.provider)||
+      a.surface.localeCompare(b.surface));
+  },[report,proposalPhase,proposals,methodPhase,methodDecisions]);
+  const sources=useMemo(()=>registryRows.filter(row=>{
+    const contract=row.contract;
+    const metric=contract?.metric??row.proposal?.metric??'';
+    const health=contract?.captureState??'not_collected';
+    const reviewed=!!contract&&reviewedSourceIds.has(contract.id);
+    return (status==='all'||(status==='collected'?!!contract?.receiptSha256:
+      status==='failed'?['transport_failed','parse_failed','target_period_unavailable','missed'].includes(health):
+      health==='not_collected'))&&
+      (providerFilter==='all'||row.provider===providerFilter)&&
+      (metricFilter==='all'||metric===metricFilter)&&
+      (reviewFilter==='all'||(reviewFilter==='reviewed'?reviewed:!reviewed))&&
+      (constitutionFilter==='all'||(report?.qualifiedSources??0)>0&&
+        contract?.admissionState==='qualified')&&
+      (row.surface+' '+row.provider+' '+row.sourceKey).toLowerCase().includes(search.trim().toLowerCase());
+  }),[registryRows,status,providerFilter,metricFilter,reviewFilter,constitutionFilter,report,search,reviewedSourceIds]);
+  const selectedRegistrySource=registryRows.find(row=>row.sourceKey===selectedSourceKey)??null;
+  const selectedCurrentMethod=selectedRegistrySource?.proposal&&selectedRegistrySource.method?.proposalRevision===
+    selectedRegistrySource.proposal.revision?selectedRegistrySource.method:null;
   // Exactly one next action follows real server-owned proposal, review and
   // receipt state. A candidate contract never makes an Edition ready.
   const nextAction=(()=>{
@@ -422,11 +480,11 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(190px,1fr)_repeat(5,minmax(105px,155px))]">
             <WkSearchField ariaLabel="Search provider or source" placeholder="Provider or source" value={search} onChange={setSearch}/>
             <WkSelect ariaLabel="Filter provider" value={providerFilter} onChange={setProviderFilter}
-              options={[{value:'all',label:'All providers'},...Array.from(new Set((report?.sources??[]).map(s=>s.provider))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
+              options={[{value:'all',label:'All providers'},...Array.from(new Set(registryRows.map(s=>s.provider))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
             <WkSelect ariaLabel="Filter health" value={status} onChange={setStatus}
               options={[{value:'all',label:'All health states'},{value:'collected',label:'Captured'},{value:'failed',label:'Failing'},{value:'not_collected',label:'Unknown'}]}/>
             <WkSelect ariaLabel="Filter metric" value={metricFilter} onChange={setMetricFilter}
-              options={[{value:'all',label:'All metrics'},...Array.from(new Set((report?.sources??[]).map(s=>s.metric))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
+              options={[{value:'all',label:'All metrics'},...Array.from(new Set(registryRows.map(s=>s.contract?.metric??s.proposal?.metric??''))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
             <WkSelect ariaLabel="Filter method review" value={reviewFilter} onChange={setReviewFilter}
               options={[{value:'all',label:'All method states'},
                 {value:'reviewed',label:'Current reviewed candidates'},
@@ -436,66 +494,120 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                 {value:'in',label:'Constitution · In'}]}/>
           </div>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-wk-text-muted">
-            <span>Registered candidates · {report.sourceCount} · Reviewed candidate contracts · {reviewedCandidateContracts}</span>
+            <span>Known sources · {registryRows.length} · Enrolled capture contracts · {report.sourceCount} · Reviewed candidate contracts · {reviewedCandidateContracts}</span>
             <span>Candidate-only service · scoring constitution not granted</span>
           </div>
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,480px)]">
-          <WkDataTable<Source> rows={sources} getKey={s=>s.id} ariaLabel="Source registry"
-            empty={report.sourceCount===0?'No source capture contracts are registered. Add Source explains the supported qualification steps.':'No sources match these filters.'}
+          <WkDataTable<RegistrySource> rows={sources} getKey={row=>row.id} ariaLabel="Source registry"
+            empty={proposalPhase==='loading'&&report.sourceCount===0?
+              'Reading proposed sources…':
+              proposalPhase==='unavailable'&&report.sourceCount===0?
+              'Proposed source authority unavailable. The source roster cannot be confirmed.':
+              registryRows.length===0?'No sources proposed or enrolled yet.':
+              'No sources match these filters.'}
             columns={[
-              {key:'source',label:'Source · operator',render:s=><>
-                <button type="button" className="font-semibold text-wk-text underline-offset-2 hover:underline" onClick={()=>{setDetail(s);setDetailTab('configuration')}}>{s.surface}</button>
-                <p className="mt-1 text-xs text-wk-text-muted">{s.provider} · {s.sourceKey}</p>
+              {key:'source',label:'Source · operator',render:row=><>
+                <button type="button" className="font-semibold text-wk-text underline-offset-2 hover:underline"
+                  onClick={()=>{setSelectedSourceKey(row.sourceKey);setDetailTab('configuration')}}>{row.surface}</button>
+                <p className="mt-1 text-xs text-wk-text-muted">{row.provider} · {row.sourceKey}</p>
               </>},
-              {key:'metric',label:'Metric · period · depth',render:s=><span className="text-wk-text-soft">{s.metric} · {s.nativePeriodAuthority==='provider_defined'?'Defined':'Unverified'} · {s.expectedDepth}</span>},
-              {key:'cadence',label:'Candidate Timing',render:s=><span className="text-wk-text-soft">{candidateCadence(s)}</span>},
-              {key:'qualification',label:'Qualification',render:s=>reviewedSourceIds.has(s.id)?
-                <WkStateBadge tone="info">Reviewed candidate</WkStateBadge>:
-                <WkStateBadge>Candidate · review pending</WkStateBadge>},
-              {key:'health',label:'Health',render:s=><WkStateBadge tone={['transport_failed','parse_failed','missed','target_period_unavailable'].includes(s.captureState)?'danger':s.receiptSha256?'success':'neutral'}>{['transport_failed','parse_failed','missed','target_period_unavailable'].includes(s.captureState)?'Failing':s.receiptSha256?'Captured':'Unknown'}</WkStateBadge>},
-              {key:'last',label:'Last success',render:s=><span className="text-wk-text-muted">{when(s.lastSuccessfulAt)}</span>},
-              {key:'constitution',label:'Constitution',render:()=> <span className="text-xs text-wk-text-muted">Out · no scoring authority</span>},
-            ] satisfies WkDataColumn<Source>[]} />
+              {key:'metric',label:'Metric · period · depth',render:row=>
+                <span className="text-wk-text-soft">
+                  {row.contract?.metric??row.proposal?.metric??'Unknown'} ·
+                  {row.contract?.nativePeriodAuthority==='provider_defined'?' Defined':' Unverified'} ·
+                  {' '+(row.contract?.expectedDepth??row.proposal?.expectedDepth??'Unknown')}
+                </span>},
+              {key:'cadence',label:'Candidate Timing',render:row=>
+                <span className="text-wk-text-soft">{row.contract||row.proposal?
+                  candidateCadence((row.contract??row.proposal)!):'Timing unavailable'}</span>},
+              {key:'qualification',label:'Qualification',render:row=>
+                <WkStateBadge tone={row.contract&&reviewedSourceIds.has(row.contract.id)?'info':
+                  row.method?.decisionState==='paused'||row.method?.decisionState==='held'?'warning':'neutral'}>
+                  {registryReviewLabel(row,proposalPhase==='ready'&&methodPhase==='ready',
+                    !!row.contract&&reviewedSourceIds.has(row.contract.id))}
+                </WkStateBadge>},
+              {key:'health',label:'Health',render:row=>row.contract?
+                <WkStateBadge tone={['transport_failed','parse_failed','missed','target_period_unavailable'].includes(row.contract.captureState)?'danger':
+                  row.contract.receiptSha256?'success':'neutral'}>
+                  {['transport_failed','parse_failed','missed','target_period_unavailable'].includes(row.contract.captureState)?
+                    'Failing':row.contract.receiptSha256?'Captured':'Not collected'}
+                </WkStateBadge>:
+                <WkStateBadge>Not enrolled</WkStateBadge>},
+              {key:'last',label:'Last success',render:row=>
+                <span className="text-wk-text-muted">{when(row.contract?.lastSuccessfulAt??null)}</span>},
+              {key:'constitution',label:'Constitution',render:()=>
+                <span className="text-xs text-wk-text-muted">Out · no scoring authority</span>},
+            ] satisfies WkDataColumn<RegistrySource>[]} />
           <aside role="region" aria-label="Selected source inspector"
             className="min-w-0 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
             <div className="flex items-start justify-between gap-3">
-              <h3 className="text-sm font-bold text-wk-text">{detail?.surface??'Select a source'}</h3>
-              {detail&&<button type="button" className="wk-button wk-button-secondary wk-button-sm"
-                onClick={()=>setDetail(null)}>Clear selection</button>}
+              <h3 className="text-sm font-bold text-wk-text">{selectedRegistrySource?.surface??'Select a source'}</h3>
+              {selectedRegistrySource&&<button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                onClick={()=>setSelectedSourceKey(null)}>Clear selection</button>}
             </div>
-            {detail?<div className="mt-4">
+            {selectedRegistrySource?<div className="mt-4 space-y-4">
+              <p className="text-xs text-wk-text-muted">
+                {selectedRegistrySource.contract?'Capture contract enrolled · Collection remains separately gated':
+                  'Source proposal · no capture contract enrolled'}
+              </p>
               <WkTabs ariaLabel="Selected source detail" value={detailTab} onChange={setDetailTab}
                 items={[{id:'configuration',label:'Configuration'},{id:'qualification',label:'Qualification'},{id:'history',label:'Change History'}]}>
                 {detailTab==='configuration'&&<WkDetailList items={[
-                  {label:'Provider and market',value:detail.provider+' · '+detail.market},
-                  {label:'Source ID',value:detail.sourceKey},
-                  {label:'Native metric and behaviour',value:detail.metric+' · '+detail.behavior},
-                  {label:'Candidate EAT cadence',value:candidateCadence(detail)},
-                  {label:'Expected depth',value:detail.expectedDepth},
-                  {label:'Capture version',value:detail.version},
-                  {label:'Native period',value:detail.nativePeriodAuthority==='provider_defined'?
-                    when(detail.nativePeriodStart)+' to '+when(detail.nativePeriodEnd):'Unknown'},
+                  {label:'Provider and market',value:selectedRegistrySource.provider+' · KE'},
+                  {label:'Source ID',value:selectedRegistrySource.sourceKey},
+                  {label:'Proposed method',value:selectedRegistrySource.proposal?.methodClass??'Not recorded'},
+                  {label:'Native metric and behaviour',value:
+                    (selectedRegistrySource.contract?.metric??selectedRegistrySource.proposal?.metric??'Unknown')+' · '+
+                    (selectedRegistrySource.contract?.behavior??selectedRegistrySource.proposal?.behavior??'Unknown')},
+                  {label:'Candidate EAT cadence',value:
+                    selectedRegistrySource.contract||selectedRegistrySource.proposal?
+                    candidateCadence((selectedRegistrySource.contract??selectedRegistrySource.proposal)!):'Unknown'},
+                  {label:'Expected depth',value:
+                    selectedRegistrySource.contract?.expectedDepth??selectedRegistrySource.proposal?.expectedDepth??'Unknown'},
+                  {label:'Capture contract',value:selectedRegistrySource.contract?.version??'Not enrolled'},
+                  {label:'Native period',value:selectedRegistrySource.contract?.nativePeriodAuthority==='provider_defined'?
+                    when(selectedRegistrySource.contract.nativePeriodStart)+' to '+
+                    when(selectedRegistrySource.contract.nativePeriodEnd):'Unverified'},
                 ]}/>}
                 {detailTab==='qualification'&&<WkReadinessList items={[
-                  {id:'method',label:'Current reviewed method',status:reviewedSourceIds.has(detail.id)?'pending':'blocked',
-                    description:reviewedSourceIds.has(detail.id)?
-                      'Current proposal, reviewed method and candidate contract match; collection remains separately gated':
-                      'No matching current proposal, reviewed method and candidate contract'},
-                  {id:'period',label:'Provider-native reporting period',status:detail.nativePeriodAuthority==='provider_defined'?'pending':'blocked',
-                    description:'Native period evidence needs independent verification'},
-                  {id:'score',label:'Ranking and publishing',status:'blocked',description:'Candidate contracts cannot publish'},
+                  {id:'proposal',label:'Current source proposal',
+                    status:selectedRegistrySource.proposal?'pending':'blocked',
+                    description:selectedRegistrySource.proposal?
+                      'Revision '+selectedRegistrySource.proposal.revision+' is proposed, not admitted':
+                      'No current proposal could be confirmed'},
+                  {id:'method',label:'Reviewed source method',
+                    status:selectedCurrentMethod?.decisionState==='collector_admitted'?'pending':'blocked',
+                    description:selectedCurrentMethod?
+                      selectedCurrentMethod.decisionState.replaceAll('_',' ')+' · Collection not enabled':
+                      'A matching current method decision is not confirmed'},
+                  {id:'contract',label:'Enrolled capture contract',
+                    status:selectedRegistrySource.contract?'pending':'blocked',
+                    description:selectedRegistrySource.contract?
+                      'Candidate contract recorded, not a qualified source':'No capture contract enrolled'},
+                  {id:'score',label:'Ranking and publishing',
+                    status:'blocked',description:'No candidate can grant scoring authority'},
                 ]}/>}
                 {detailTab==='history'&&<WkDetailList items={[
-                  {label:'Last attempt',value:when(detail.lastAttemptAt)},
-                  {label:'Last successful collection',value:when(detail.lastSuccessfulAt)},
-                  {label:'Failure code',value:detail.failureCode??'None'},
-                  {label:'SHA-256 original receipt',value:detail.receiptSha256??'Not recorded'},
-                  {label:'Attempt count',value:detail.attemptCount},
+                  {label:'Latest proposal revision',value:selectedRegistrySource.proposal?.revision??'Not recorded'},
+                  {label:'Proposal saved',value:when(selectedRegistrySource.proposal?.createdAt??null)},
+                  {label:'Method review',value:selectedRegistrySource.method?
+                    selectedRegistrySource.method.decisionState.replaceAll('_',' ')+
+                    ' · revision '+selectedRegistrySource.method.decisionRevision:'Not recorded'},
+                  {label:'Method matches proposal',value:selectedCurrentMethod?'Yes':'Not confirmed'},
+                  {label:'Last capture attempt',value:when(selectedRegistrySource.contract?.lastAttemptAt??null)},
+                  {label:'Original receipt SHA-256',value:selectedRegistrySource.contract?.receiptSha256??'Not recorded'},
+                  {label:'Capture attempt count',value:selectedRegistrySource.contract?.attemptCount??0},
                 ]}/>}
               </WkTabs>
+              {selectedRegistrySource.proposal&&proposalPhase==='ready'&&<div className="flex flex-wrap gap-2">
+                <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                  onClick={()=>{setEditing(selectedRegistrySource.proposal);setAdd(true)}}>Revise Proposal</button>
+                {methodPhase==='ready'&&<button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                  onClick={()=>{setIncidentPause(false);setReviewing(selectedRegistrySource.proposal)}}>Review Method</button>}
+              </div>}
             </div>:<p className="mt-3 text-xs text-wk-text-muted">
-              Select a source to inspect its configuration, qualification and evidence.
-              This inspector is read-only and cannot grant scoring authority.
+              Select a source to inspect its proposal, method decision, capture contract, and evidence.
+              Proposed sources remain visible before enrollment. This inspector does not grant scoring authority.
             </p>}
           </aside>
           </div>
