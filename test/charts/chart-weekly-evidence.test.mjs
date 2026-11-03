@@ -442,6 +442,7 @@ test('candidate archive stops on digest, missing ledger, corrupt readback and in
 
 // Integrated WK100 candidate-only collector contract. Existing chart suite owner.
 import { runCandidateCapture,validateCaptureSlot } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
+import { isWk100AppleCatalogChart,resolveWk100AppleProviderAuthorization } from '../../supabase/functions/_shared/wk100-apple-service-credential.mjs';
 import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 const wkRuntimeSlot='2026-10-19T09:00:00Z';
 const wkRuntimeWeek='2026-10-19';
@@ -476,6 +477,79 @@ function wkRuntimeHarness(extra={}) {
     ...extra};
   return {events,objects,db,storage,args};
 }
+
+test('WK100 Apple signing is exact-route, opt-in, project-local and never creates collection authority',async()=>{
+  const {webcrypto}=await import('node:crypto');
+  const pair=await webcrypto.subtle.generateKey(
+    {name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+  const pkcs8=await webcrypto.subtle.exportKey('pkcs8',pair.privateKey);
+  const pem='-----BEGIN PRIVATE KEY-----\n'+Buffer.from(pkcs8).toString('base64')+
+    '\n-----END PRIVATE KEY-----';
+  const secrets={
+    apple_music_private_key:pem,
+    apple_music_team_id:'ABCDEFGHIJ',
+    apple_music_key_id:'0123456789',
+  };
+  const calls=[];
+  const db={
+    from(table){
+      assert.equal(table,'admin_settings_secrets');
+      return {
+        select(name){
+          assert.equal(name,'setting_value');
+          return this;
+        },
+        eq(key,value){
+          assert.equal(key,'setting_key');
+          calls.push(value);
+          this.secretKey=value;
+          return this;
+        },
+        async maybeSingle(){return {data:{setting_value:secrets[this.secretKey]},error:null};},
+      };
+    },
+  };
+  const endpoint='https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played&limit=100';
+  const base={sourceKey:'apple_ke_kenya_most_played',endpoint,db,
+    now:new Date('2026-11-03T11:00:00Z'),subtle:webcrypto.subtle};
+  assert.equal(isWk100AppleCatalogChart(base.sourceKey,endpoint),true);
+  for(const bad of [
+    'http://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played',
+    'https://api.music.apple.com.evil.test/v1/catalog/ke/charts?types=songs&chart=most-played',
+    'https://api.music.apple.com/v1/catalog/us/charts?types=songs&chart=most-played',
+    'https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played&chart=most-played',
+    'https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played&redirect=evil',
+  ])assert.equal(isWk100AppleCatalogChart(base.sourceKey,bad),false);
+  assert.equal(await resolveWk100AppleProviderAuthorization(base),null);
+  assert.deepEqual(calls,[]); // no key read unless WK100-specific opt-in
+  assert.equal(await resolveWk100AppleProviderAuthorization({
+    ...base,sourceKey:'spotify_ke_playlist',reuseExisting:true}),null);
+  assert.deepEqual(calls,[]);
+  const credentials=await resolveWk100AppleProviderAuthorization({
+    ...base,reuseExisting:true});
+  assert.equal(credentials.kind,'apple_developer_bearer');
+  assert.match(credentials.token,/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+  assert.deepEqual(calls.sort(),Object.keys(secrets).sort());
+  const [h,p,signature]=credentials.token.split('.');
+  const header=JSON.parse(Buffer.from(h,'base64url').toString('utf8'));
+  const payload=JSON.parse(Buffer.from(p,'base64url').toString('utf8'));
+  assert.deepEqual(header,{alg:'ES256',kid:'0123456789'});
+  assert.equal(payload.iss,'ABCDEFGHIJ');
+  assert.equal(payload.iat,1793703600);
+  assert.equal(payload.exp-payload.iat,3600);
+  assert.equal(await webcrypto.subtle.verify(
+    {name:'ECDSA',hash:'SHA-256'},pair.publicKey,
+    Buffer.from(signature,'base64url'),new TextEncoder().encode(h+'.'+p)),true);
+  // An expired/incorrect signing key cannot accidentally create a token.
+  secrets.apple_music_private_key='uploaded:server';
+  assert.equal(await resolveWk100AppleProviderAuthorization({
+    ...base,reuseExisting:true}),null);
+  assert.equal(await resolveWk100AppleProviderAuthorization({
+    ...base,directToken:'invalid',reuseExisting:true}),null);
+  const direct=await resolveWk100AppleProviderAuthorization({
+    ...base,directToken:'token-'+ 'a'.repeat(40)});
+  assert.equal(direct.token,'token-'+ 'a'.repeat(40));
+});
 
 test('WK100 integrated collector authorizes source before durable slot claim, stores and commits without publishing',async()=>{
   const f=wkRuntimeHarness();const r=await runCandidateCapture(f.args);
