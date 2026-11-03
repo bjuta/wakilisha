@@ -46,7 +46,6 @@ const CORE_PROVIDERS=[
 type ProviderReadiness={
   key:string;label:string;proposalCount:number;decisionCount:number;
   state:string;next:string;focus:Wk100ProposalRecord|null;
-  researchLabel:string;researchDetail:string;
 };
 
 
@@ -163,24 +162,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     else if(paused){state='Paused';next='Review the paused method before any restart';}
     else if(enrolled){state='Candidate enrolled';next='Runtime approval and live collection remain separate';}
     else if(current.length){state='Retired';next='Review a new source method before use';}
-    // Research evidence is not source admission. Keep the dated private
-    // operator archive visible even when the current collector has no proposal.
-    const archives=getWk100ArchivedResearchPortfolio(WK100_ARCHIVED_EAT_WEEK);
-    const archived=archives.find(a=>a.sourceKey===provider.key||
-      (provider.key==='apple_ke'&&a.sourceKey==='apple_ke_public_playlist'));
-    const researchLabel=archived?.rankStructure==='verified'
-      ?archived.rankDepth+' archived '+archived.observationType.toLowerCase()
-      :'No ranked receipt in this archive';
-    const researchDetail=archived
-      ?(archived.sourceKey==='apple_ke_public_playlist'
-        ?'30 Oct 2026 · public playlist, not Catalog API'
-        :archived.sourceKey==='shazam_ke'
-        ?'29 Oct 2026 · discovery, not streams'
-        :'30 Oct 2026 · platform ranks, not streams')
-      :'Other past research may exist';
     return {key:provider.key,label:provider.label,proposalCount:candidates.length,
-      decisionCount:current.length,state,next,focus:focus?.proposal??null,
-      researchLabel,researchDetail};
+      decisionCount:current.length,state,next,focus:focus?.proposal??null};
   }),[proposals,methodDecisions]);
   const sources=useMemo(()=>(report?.sources??[]).filter(s=>
     (status==='all'||(status==='collected'?!!s.receiptSha256:status==='failed'?
@@ -239,16 +222,36 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           description="Manage known collection surfaces without conflating technical access, qualification, capture health, and scoring admission."
           aside={<WkStateBadge tone="warning">{report.qualifiedSources} qualified</WkStateBadge>}
           action={<button className="wk-button wk-button-primary wk-button-sm" type="button" onClick={()=>{setEditing(null);setAdd(true)}}>Add Source</button>}/>
-        <Card title="Core Provider Readiness">
+        <Card title="Research Already Captured">
           <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
-            Research and collection are separate. October research evidence remains useful even
-            when a provider has no source proposal. The archived original files stay private
-            with the researcher; they are not hosted capture receipts or weekly stream counts.
+            Researcher-held originals from 29–30 October 2026. These observations remain useful
+            without a source proposal. The private files are not hosted capture receipts,
+            verified measurement weeks, or permission to publish.
           </p>
-          <button type="button" className="wk-button wk-button-secondary wk-button-sm mb-3"
+          <WkDataTable rows={getWk100ArchivedResearchPortfolio(WK100_ARCHIVED_EAT_WEEK)}
+            getKey={r=>r.sourceKey} ariaLabel="Archived Kenya research observations"
+            empty="No preserved research observations." columns={[
+              {key:'source',label:'Platform',render:r=><span className="font-semibold text-wk-text">{r.displayName}</span>},
+              {key:'observed',label:'Observed',render:r=><span className="text-wk-text-soft">{when(r.observedAtUtc)}</span>},
+              {key:'evidence',label:'Research Evidence',render:r=>
+                <div>
+                  <span className="text-wk-text-soft">{r.rankStructure==='verified'
+                    ?r.rankDepth+' observed '+r.observationType.toLowerCase()
+                    :'Original retained; ranks unverified'}</span>
+                  <p className="text-xs text-wk-text-muted">{r.note}</p>
+                </div>},
+            ]} />
+          <button type="button" className="wk-button wk-button-secondary wk-button-sm mt-3"
             onClick={()=>navigate('/admin/charts/ingest')}>
             Open Research Evidence
           </button>
+        </Card>
+        <Card title="Core Provider Readiness">
+          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
+            Six Kenya platforms are in scope for future collection. The following
+            source proposals and method decisions are separate from factual research.
+            Candidate enrollment does not activate collection or publishing.
+          </p>
           {(proposalPhase==='loading'||methodPhase==='loading')&&
             <p role="status" className="text-sm text-wk-text-muted">Reading source method authority…</p>}
           {(proposalPhase==='unavailable'||methodPhase==='unavailable')&&
@@ -261,11 +264,6 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               columns={[
                 {key:'provider',label:'Platform',render:p=>
                   <span className="font-semibold text-wk-text">{p.label}</span>},
-                {key:'research',label:'Research Archive',render:p=>
-                  <div>
-                    <span className="text-wk-text-soft">{p.researchLabel}</span>
-                    <p className="text-xs text-wk-text-muted">{p.researchDetail}</p>
-                  </div>},
                 {key:'records',label:'Saved Records',render:p=>
                   <span className="text-wk-text-soft">{p.proposalCount} proposed · {p.decisionCount} current reviews</span>},
                 {key:'state',label:'Current Position',render:p=>
