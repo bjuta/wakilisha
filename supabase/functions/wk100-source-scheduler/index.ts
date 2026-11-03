@@ -7,7 +7,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { sha256Hex } from '../_shared/chart-candidate-capture.mjs';
 import { isGatewayVerifiedServiceRole, runtimeProjectApiUrl } from '../_shared/chart-capture-gateway-role.mjs';
 import { wk100EatWeekFromUtc, bindWk100DispatchAuthority } from '../_shared/wk100-source-scheduler-authority.mjs';
-import { planWk100SourceDispatch } from '../_shared/wk100-source-dispatch-plan.mjs';
+import { planWk100SourceDispatch, selectWk100AuditedDispatch } from '../_shared/wk100-source-dispatch-plan.mjs';
 
 const JSON_HEADERS={'content-type':'application/json','cache-control':'no-store'};
 const reply=(status:number,body:Record<string,unknown>)=>
@@ -86,21 +86,16 @@ Deno.serve(async(req:Request)=>{
       sourceContracts:currentContracts,approvedDecisions:approved,
       attempts,executionEnabled:true,
     });
-    // The queue is only a priority hint. Its records cannot authorize an
-    // otherwise ineligible slot, provider, source or extra attempt.
+    // Retry intent is a mandatory authority gate, not just a priority
+    // hint. The SQL read is service-only, and the exact source, contract,
+    // week, scheduled instant and attempt must match before dispatch.
     const queued=await db.rpc('wk100_service_retry_requests_v1',{p_week:week});
-    if(queued.error||!Array.isArray(queued.data)||queued.data.length>500||
-      queued.data.some((r:Record<string,unknown>)=>
-        !r||typeof r.source_key!=='string'||
-        typeof r.scheduled_at!=='string'||!Number.isInteger(r.attempt_number)))
+    if(queued.error||!Array.isArray(queued.data)||queued.data.length>500)
       return reply(503,{error:'retry_requests_unavailable',canPublish:false});
-    const requested=new Set(queued.data.map((r:Record<string,unknown>)=>
-      r.source_key+'/'+r.scheduled_at+'/'+r.attempt_number));
-    const jobs=[...plan.jobs].sort((a,b)=>
-      Number(requested.has(b.source_key+'/'+b.scheduled_at+'/'+b.attempt_number))-
-      Number(requested.has(a.source_key+'/'+a.scheduled_at+'/'+a.attempt_number)) ||
-      a.scheduled_at.localeCompare(b.scheduled_at) ||
-      a.source_key.localeCompare(b.source_key));
+    const authorized=selectWk100AuditedDispatch({
+      jobs:plan.jobs,sourceContracts:currentContracts,retryRequests:queued.data,
+    });
+    const jobs=authorized.jobs;
     // A single trigger dispatches at most four source slots. A subsequent
     // five-minute tick can address the rest without exhausting Edge runtime.
     // The capture service owns SQL reservation, leases and private receipts.
@@ -123,7 +118,8 @@ Deno.serve(async(req:Request)=>{
     }
     return reply(200,{schemaVersion:'wk100-source-scheduler-v1',
       status:'evaluated',weekStartEat:week,
-      eligible:plan.jobs.length,dispatched,rejected,
+      eligible:jobs.length,dispatched,rejected,
+      withheldRetries:authorized.withheldRetryCount,
       blocked:plan.blocked.length,canScore:false,canPublish:false});
   }catch{return reply(503,{error:'scheduler_evaluation_failed',canPublish:false});}
 });
