@@ -1,16 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-02T20:15:42Z",
-  "typesSha256": "9b21d1d91bc7f13bcc8c5c5e965c5310f66ae8193ea60c94875e91a836eb98c5",
+  "generatedAt": "2026-11-03T10:20:51Z",
+  "typesSha256": "61651a44fa65d557aebd1e1e53bfd5fb77f68117f5506d8e57e82ef8d20a0909",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 240,
-  "latestMigration": "20261102191805_wk100_source_proposals_v1.sql",
+  "migrationCount": 241,
+  "latestMigration": "20261103072906_wk100_phase1_governed_source_method_capture_contract_v1.sql",
   "schemaSeal": {
     "mode": "preview",
-    "sourceProjectRef": "dfttuaynurylphxyiafg",
-    "migrationHead": "20261102191805",
-    "baseMainSha": "36b374bddce6c92e280c5d77969f372556fb7a2c",
-    "previewBranchId": "0761dd55-233c-46a1-9a40-a83c781a53b9"
+    "sourceProjectRef": "yoixjzeuqsinavtvbepp",
+    "migrationHead": "20261103072906",
+    "baseMainSha": "24ec5400327a70a9d5610d350a4ca487f28c1e13",
+    "previewBranchId": "c39178eb-74a4-46c8-891e-d783875fdd71"
   }
 }

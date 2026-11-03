@@ -1,0 +1,16 @@
+{
+  "migration_file": "supabase/migrations/20261103072906_wk100_phase1_governed_source_method_capture_contract_v1.sql",
+  "migration_sha256": "c0c1ef6f7d3a2cf432895284a24185b61d4a2a6701cab49cd90b38bf427c8bde",
+  "base_main_sha": "24ec5400327a70a9d5610d350a4ca487f28c1e13",
+  "preview_project_ref": "yoixjzeuqsinavtvbepp",
+  "preview_branch_id": "c39178eb-74a4-46c8-891e-d783875fdd71",
+  "preview_migration_head": "20261103072906",
+  "baseline_replay": "pending",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "scripts/acceptance/wk100-source-proposals-v1-readonly.sql",
+  "schema_types_sha256": "61651a44fa65d557aebd1e1e53bfd5fb77f68117f5506d8e57e82ef8d20a0909",
+  "schema_migration_count": 241,
+  "schema_migration_head": "20261103072906",
+  "verified_at": "2026-11-03T10:20:51.832Z"
+}
