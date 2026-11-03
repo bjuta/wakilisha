@@ -4,6 +4,7 @@ import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions
 import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
 import { resolveCaptureParser, parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
 import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
+import { validateWk100SourceMethodDecision } from '../../supabase/functions/_shared/wk100-source-method-decision-v1.mjs';
 
 test('WK100 source read model preserves empty real Production state',()=>{
   const model=projectWk100SourceHealth([],[],'2026-11-02');
@@ -220,4 +221,29 @@ test('WK100 committed, quarantined, unsafe or exhausted retries never duplicate 
   assert.equal(exhausted.jobs.length,0);
   const late=planWk100SourceDispatch({...f,nowUtc:'2026-11-02T06:21:00Z'});
   assert.equal(late.jobs.length,0);
+});
+
+test('WK100 source-method review cannot convert research-only or a mismatched provider into admission',()=>{
+  const p={sourceKey:'youtube_ke_top_songs_weekly',providerKey:'youtube_ke',proposalRevision:1,
+    decisionState:'collector_admitted',parserClass:'youtube_kenya_weekly_top_songs_v1',
+    methodClass:'provider_api',nativePeriodAuthority:'provider_defined',
+    nativePeriodEvidenceRef:'reviewed_week_20261102',endpointSha256:'a'.repeat(64),
+    accessEvidenceSha256:'b'.repeat(64),authorizationRef:'reviewed_access_v1',
+    authorizationExpiresAt:'2027-01-01T00:00:00Z',
+    constitutionVersion:'wk100-test-v1',reason:'Reviewed original source method'};
+  const now=new Date('2026-11-03T00:00:00Z');
+  const accepted=validateWk100SourceMethodDecision(p,{now});
+  assert.equal(accepted.canCollect,false);
+  assert.equal(accepted.canScore,false);assert.equal(accepted.canPublish,false);
+  for(const patch of [
+    {methodClass:'research_only'},{parserClass:'apple_kenya_chart_v1'},
+    {providerKey:'spotify_ke',sourceKey:'spotify_ke_chart'},
+    {nativePeriodAuthority:'unknown'},{authorizationExpiresAt:'2026-11-02T00:00:00Z'},
+    {endpointSha256:null},{extra:true},
+  ])assert.throws(()=>validateWk100SourceMethodDecision({...p,...patch},{now}));
+  const hold=validateWk100SourceMethodDecision({...p,decisionState:'held',
+    parserClass:null,methodClass:'research_only',nativePeriodAuthority:null,
+    nativePeriodEvidenceRef:null,endpointSha256:null,accessEvidenceSha256:null,
+    authorizationRef:null,authorizationExpiresAt:null},{now});
+  assert.equal(hold.canCollect,false);
 });

@@ -137,6 +137,7 @@ begin
       raise exception 'wk100_method_admission_requires_super_admin';
     end if;
     if v_expected_parser is null or v_parser<>v_expected_parser
+      or v_p.method_class='research_only'
       or p_payload->>'methodClass'<>v_p.method_class
       or p_payload->>'nativePeriodAuthority'<>'provider_defined'
       or coalesce(length(p_payload->>'nativePeriodEvidenceRef'),0)<3
