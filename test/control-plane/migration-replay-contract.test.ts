@@ -85,6 +85,26 @@ describe(
     );
 
     it(
+      "does not classify reviewed source-method documentation as a production replay lock",
+      () => {
+        expect(
+          analyzeMigrationText(`
+            comment on table platform_private.wk100_source_method_decisions_v1 is
+              'Immutable independently reviewed source-method decisions. A decision is not a collector manifest.';
+          `),
+        ).toEqual([]);
+
+        expect(
+          analyzeMigrationText(`
+            raise exception 'STOP: reviewed Production manifest revision mismatched';
+          `),
+        ).toContain(
+          "reviewed production boundary",
+        );
+      },
+    );
+
+    it(
       "would have blocked the August 19 Organization backfill trap",
       () => {
         expect(
