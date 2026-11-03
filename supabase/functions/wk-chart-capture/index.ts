@@ -5,6 +5,7 @@
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { runCandidateCapture } from '../_shared/chart-capture-runtime.mjs';
+import { selectWk100AuditedDispatch } from '../_shared/wk100-source-dispatch-plan.mjs';
 import { isWk100CaptureConstitutionCurrent } from '../_shared/wk100-source-scheduler-authority.mjs';
 import { sha256Hex } from '../_shared/chart-candidate-capture.mjs';
 import { isGatewayVerifiedServiceRole, runtimeProjectApiUrl } from '../_shared/chart-capture-gateway-role.mjs';
@@ -125,6 +126,37 @@ Deno.serve(async (req:Request) => {
   };
   if(!await methodAllowed())
     return json(403,{error:'source_method_not_admitted',can_publish:false});
+  const found=await db.from('wk_chart_capture_contracts_v1').select('*')
+    .eq('source_key',key).eq('contract_version',version).maybeSingle();
+  if(found.error || !found.data) return json(409,{error:'source_contract_absent'});
+  if(found.data.admission_state!=='candidate') return json(409,{error:'not_candidate_contract'});
+  if(!/^[a-f0-9]{64}$/.test(found.data.adapter_sha256??'') ||
+     found.data.adapter_sha256!==entry.adapter_sha256 ||
+     found.data.adapter_version!==entry.parser_class)
+    return json(409,{error:'source_adapter_digest_mismatch',can_publish:false});
+  // This endpoint is independently callable by a service credential. It
+  // must not trust the scheduler as the only guard for attempt 2..8.
+  // Query the service-only immutable action ledger before credentials,
+  // reservation or provider egress. A direct call cannot forge approval.
+  if(Number(payload.attempt_number)>1){
+    const queued=await db.rpc('wk100_service_retry_requests_v1',{
+      p_week:payload.week_start_eat,
+    });
+    if(queued.error||!Array.isArray(queued.data)||queued.data.length>500)
+      return json(503,{error:'retry_request_authority_unavailable',can_publish:false});
+    let allowed=false;
+    try{
+      const dispatch=selectWk100AuditedDispatch({
+        jobs:[{source_key:key,contract_version:version,
+          week_start_eat:payload.week_start_eat,
+          scheduled_at:payload.scheduled_at,attempt_number:payload.attempt_number}],
+        sourceContracts:[found.data],retryRequests:queued.data,
+      });
+      allowed=dispatch.jobs.length===1;
+    }catch{return json(503,{error:'retry_request_authority_unavailable',can_publish:false});}
+    if(!allowed)
+      return json(403,{error:'retry_request_not_authorized',can_publish:false});
+  }
   // No Apple credential is read unless this exact source is currently
   // admitted AND the manifest routes to Apple's official Kenya chart API.
   // The existing platform signing key can only be reused after a separate
@@ -142,14 +174,6 @@ Deno.serve(async (req:Request) => {
       return json(503,{error:'source_credential_not_configured',can_publish:false});
     providerAuthorization=credentials;
   }
-  const found=await db.from('wk_chart_capture_contracts_v1').select('*')
-    .eq('source_key',key).eq('contract_version',version).maybeSingle();
-  if(found.error || !found.data) return json(409,{error:'source_contract_absent'});
-  if(found.data.admission_state!=='candidate') return json(409,{error:'not_candidate_contract'});
-  if(!/^[a-f0-9]{64}$/.test(found.data.adapter_sha256??'') ||
-     found.data.adapter_sha256!==entry.adapter_sha256 ||
-     found.data.adapter_version!==entry.parser_class)
-    return json(409,{error:'source_adapter_digest_mismatch',can_publish:false});
   const rpc=async (name:string,args:Record<string,unknown>)=>{
     const {data,error}=await db.rpc(name,args);
     if(error) throw new Error(`database_${name}_rejected`);
