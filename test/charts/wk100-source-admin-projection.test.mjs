@@ -409,6 +409,8 @@ test('WK100 scheduler only dispatches signed service calls through existing capt
   assert.match(edge,/wk100_service_admitted_methods_v1/);
   assert.match(edge,/bindWk100DispatchAuthority\(/);
   assert.match(edge,/planWk100SourceDispatch\(/);
+  assert.match(edge,/wk100_service_retry_requests_v1/);
+  assert.match(edge,/requested\.has/);
   assert.match(edge,/\/functions\/v1\/wk-chart-capture/);
   assert.match(edge,/redirect:'error'/);
   assert.doesNotMatch(edge,/wk_chart_runtime_reserve_v1|\.insert\(|\.upsert\(|SUPABASE_SERVICE_ROLE_KEY/);

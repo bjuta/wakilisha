@@ -86,11 +86,26 @@ Deno.serve(async(req:Request)=>{
       sourceContracts:currentContracts,approvedDecisions:approved,
       attempts,executionEnabled:true,
     });
+    // The queue is only a priority hint. Its records cannot authorize an
+    // otherwise ineligible slot, provider, source or extra attempt.
+    const queued=await db.rpc('wk100_service_retry_requests_v1',{p_week:week});
+    if(queued.error||!Array.isArray(queued.data)||queued.data.length>500||
+      queued.data.some((r:Record<string,unknown>)=>
+        !r||typeof r.source_key!=='string'||
+        typeof r.scheduled_at!=='string'||!Number.isInteger(r.attempt_number)))
+      return reply(503,{error:'retry_requests_unavailable',canPublish:false});
+    const requested=new Set(queued.data.map((r:Record<string,unknown>)=>
+      r.source_key+'/'+r.scheduled_at+'/'+r.attempt_number));
+    const jobs=[...plan.jobs].sort((a,b)=>
+      Number(requested.has(b.source_key+'/'+b.scheduled_at+'/'+b.attempt_number))-
+      Number(requested.has(a.source_key+'/'+a.scheduled_at+'/'+a.attempt_number)) ||
+      a.scheduled_at.localeCompare(b.scheduled_at) ||
+      a.source_key.localeCompare(b.source_key));
     // A single trigger dispatches at most four source slots. A subsequent
     // five-minute tick can address the rest without exhausting Edge runtime.
     // The capture service owns SQL reservation, leases and private receipts.
     let dispatched=0,rejected=0;
-    for(const job of plan.jobs.slice(0,4)){
+    for(const job of jobs.slice(0,4)){
       const controller=new AbortController();
       const timeout=setTimeout(()=>controller.abort(),20000);
       try{

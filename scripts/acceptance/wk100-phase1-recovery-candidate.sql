@@ -254,4 +254,37 @@ revoke all on function public.wk100_list_collection_actions_v1(date)
   from public,anon,authenticated,service_role;
 grant execute on function public.wk100_list_collection_actions_v1(date)
   to authenticated;
+
+-- The signed service scheduler reads pending manual retries without obtaining
+-- any client authority or exposing secrets. Existing worker leases still own
+-- reservation and no row here can force capture or bypass slot eligibility.
+create function public.wk100_service_retry_requests_v1(p_week date)
+returns jsonb language plpgsql security definer set search_path=pg_catalog as $requests$
+declare v_items jsonb;
+begin
+  if auth.role() is distinct from 'service_role'
+  then raise exception 'wk100_recovery_service_only' using errcode='42501'; end if;
+  if p_week is null or extract(isodow from p_week)<>1
+  then raise exception 'wk100_recovery_invalid_week' using errcode='22023'; end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'source_key',source_key,'contract_id',contract_id,'week_start_eat',week_start_eat,
+    'scheduled_at',scheduled_at,'attempt_number',attempt_number)
+    order by scheduled_at,source_key),'[]'::jsonb)
+  into v_items
+  from platform_private.wk100_collection_actions_v1 a
+  where a.week_start_eat=p_week and a.action_kind='retry_requested'
+    and a.scheduled_at between now()-interval '20 minutes' and now()
+    and not exists(
+      select 1 from public.wk_chart_capture_attempts_v1 receipt
+      where receipt.contract_id=a.contract_id and receipt.scheduled_at=a.scheduled_at
+        and receipt.attempt_number>=a.attempt_number
+    );
+  if jsonb_array_length(v_items)>500
+  then raise exception 'wk100_recovery_page_limit'; end if;
+  return v_items;
+end; $requests$;
+revoke all on function public.wk100_service_retry_requests_v1(date)
+  from public,anon,authenticated,service_role;
+grant execute on function public.wk100_service_retry_requests_v1(date)
+  to service_role;
 commit;
