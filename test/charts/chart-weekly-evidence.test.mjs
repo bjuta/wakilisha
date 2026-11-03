@@ -461,6 +461,71 @@ test('WK100 integrated collector authorizes source before durable slot claim, st
   assert.match(r.raw_object_key,/^v1\/2026-10-19\/mdundo_ke\/20261019T090000Z-1\/[a-f0-9]{64}\.html$/);
 });
 
+// Accelerated gate: two logical EAT weeks in the existing isolated collector
+// harness, NOT two purported live provider observations or a real-time soak.
+test('WK100 two consecutive EAT weeks keep distinct raw bytes, slots and idempotent receipts without elapsed calendar delay',async()=>{
+  const f=wkRuntimeHarness();
+  const receipts=new Map();
+  let networkCalls=0;
+  f.db.reserve=async({p_contract_id,p_week_start_eat,p_scheduled_at,p_attempt_number})=>{
+    assert.equal(p_contract_id,wkRuntimeContract.id);
+    const id=[p_week_start_eat,p_scheduled_at,p_attempt_number].join('/');
+    const committed=receipts.get(id);
+    return committed
+      ?{state:'committed',receipt_id:committed.receipt_id}
+      :{state:'reserved',reservation_id:id,lease_id:'fixture-exclusive-lease'};
+  };
+  f.db.commit=async p=>{
+    assert.equal(p.p_outcome,'succeeded');
+    assert.equal(p.p_rows.length,1);
+    // Neither an injected week nor an HTML page can invent native-period evidence.
+    assert.equal(p.p_native_period_start,null);
+    assert.equal(p.p_native_period_end,null);
+    assert.equal(p.p_native_period_evidence_ref,null);
+    const receipt_id='synthetic-only-receipt-'+(receipts.size+1);
+    assert.equal(receipts.has(p.p_reservation_id),false);
+    receipts.set(p.p_reservation_id,{receipt_id,rows:p.p_rows});
+    return {status:p.p_outcome,receipt_id};
+  };
+  const weeks=[
+    {week:'2026-10-19',slot:'2026-10-19T09:00:00Z',song:'123'},
+    {week:'2026-10-26',slot:'2026-10-26T09:00:00Z',song:'456'},
+  ];
+  for(const {week,slot,song} of weeks){
+    const observedAt=new Date(Date.parse(slot)+2*60_000);
+    f.args.weekStartEat=week;
+    f.args.scheduledAt=slot;
+    f.args.clock=()=>new Date(observedAt);
+    f.args.fetchImpl=async()=>{
+      networkCalls+=1;
+      return new Response(
+        '<div class="md-playlist-song-item" data-index="1" data-id="'+song+
+        '" data-playlist-url="/top-charts/ke" data-title="Fixture song" data-artist="Fixture"></div>',
+        {status:200,headers:{'content-type':'text/html'}},
+      );
+    };
+    const result=await runCandidateCapture(f.args);
+    assert.equal(result.status,'succeeded');
+    assert.equal(result.can_publish,false);
+    assert.equal(result.raw_object_key.startsWith('v1/'+week+'/mdundo_ke/'),true);
+    const duplicate=await runCandidateCapture(f.args);
+    assert.equal(duplicate.status,'already_committed');
+    assert.equal(duplicate.can_publish,false);
+  }
+  assert.equal(networkCalls,2); // a replay never creates another provider GET
+  assert.equal(receipts.size,2);
+  assert.equal(f.objects.size,2);
+  const originalKeys=[...f.objects.keys()];
+  assert.equal(new Set(originalKeys).size,2);
+  assert.notDeepEqual(f.objects.get(originalKeys[0]),f.objects.get(originalKeys[1]));
+  assert.deepEqual([...receipts.values()].map(r=>r.rows[0].provider_track_id),['123','456']);
+  await assert.rejects(()=>runCandidateCapture({
+    ...f.args,weekStartEat:'2026-10-19',scheduledAt:'2026-10-26T09:00:00Z',
+  }),/slot_unexpected/);
+  assert.equal(networkCalls,2);
+  assert.equal(receipts.size,2);
+});
+
 test('WK100 integrated collector rejects inactive, unapproved and mistimed sources before any claim',async()=>{
   const f=wkRuntimeHarness();
   await assert.rejects(()=>runCandidateCapture({...f.args,enabled:false}),/capture_not_enabled/);
