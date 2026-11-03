@@ -18,10 +18,18 @@ function env(){
   }
   return values;
 }
-function query(sql,container){
+function query(sql,container,diagnoseCandidate=false){
   const p=spawnSync('docker',['exec','-i',container,'psql','-X','-q','-A','-t',
     '-v','ON_ERROR_STOP=1','-U','supabase_admin','-d','postgres'],{
     input:sql,encoding:'utf8',timeout:45000,maxBuffer:256*1024});
+  if((p.error||p.status!==0)&&diagnoseCandidate){
+    // Candidate contains no provider bytes or credentials. Show only PostgreSQL
+    // error classification to locate a failed SQL boundary, not the SQL body.
+    const lines=String(p.stderr||'').split(/\r?\n/).filter(line=>
+      /ERROR:|HINT:|DETAIL:|CONTEXT:|LINE [0-9]+:/.test(line));
+    console.error('WK100_W3_CANDIDATE_SQL_DIAGNOSTIC='+
+      lines.slice(0,5).join(' | ').slice(0,700).replace(/[\x00-\x1f]/g,' '));
+  }
   check(!p.error && p.status===0,'STOP_DISPOSABLE_LOCAL_SQL_FAILED');
   return p.stdout.trim();
 }
@@ -78,7 +86,7 @@ async function main(){
     w3Candidate.includes('wk100_service_retry_requests_v1') &&
     w3Candidate.trimEnd().endsWith('commit;'),
     'STOP_WK100_W3_CANDIDATE_NOT_SEALED');
-  query(w3Candidate,db);
+  query(w3Candidate,db,true);
   check(query("SELECT (SELECT count(*) FROM platform_private.wk100_collection_actions_v1)::text||'|'||"+
     "(SELECT has_function_privilege('anon','public.wk100_record_collection_action_v1(text,date,uuid,timestamptz,smallint,integer,uuid,text)','EXECUTE'))::text||'|'||"+
     "(SELECT has_function_privilege('service_role','public.wk100_service_retry_requests_v1(date)','EXECUTE'))::text;",db)==='0|false|true',
