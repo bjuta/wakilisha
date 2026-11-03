@@ -93,7 +93,7 @@ begin
      or not public.current_user_has_capability('manage_ingest')
      or not public.current_user_has_capability('manage_charts')
   then raise exception 'wk100_recovery_not_authorized' using errcode='42501'; end if;
-  if p_action not in ('request_retry','request_exception','accept_exception','reject_exception')
+  if p_action is null or p_action not in ('request_retry','request_exception','accept_exception','reject_exception')
      or p_week is null or extract(isodow from p_week)<>1
      or p_contract_id is null or p_operation_id is null
      or p_reason is null or p_reason<>btrim(p_reason)
@@ -137,7 +137,8 @@ begin
   end if;
 
   if p_action='request_retry' then
-    if p_scheduled_at is null or p_expected_attempt_number not between 1 and 7
+    if p_scheduled_at is null or p_expected_attempt_number is null
+       or p_expected_attempt_number not between 1 and 7
        or p_expected_revision is not null
        or p_scheduled_at>now() or p_scheduled_at<now()-interval '20 minutes'
        or p_scheduled_at < (p_week::timestamp at time zone 'Africa/Nairobi')
@@ -197,8 +198,13 @@ begin
       then raise exception 'wk100_coverage_not_missing' using errcode='40001'; end if;
       v_kind:='coverage_requested';
     else
-      if v_latest_action.action_kind is distinct from 'coverage_requested' or
-         not exists(
+      if v_latest_action.action_kind is distinct from 'coverage_requested'
+         or exists(
+           select 1 from public.wk_chart_capture_attempts_v1
+           where contract_id=p_contract_id and week_start_eat=p_week
+             and status in ('succeeded','partial_depth')
+         )
+         or not exists(
           select 1 from public.user_role_assignments
           where user_id=v_actor and role_key='super_admin'
             and status='active' and (expires_at is null or expires_at>now())
