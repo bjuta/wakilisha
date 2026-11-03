@@ -39,7 +39,8 @@ export function resolveCaptureParser(contract,access={}) {
   if(!Object.hasOwn(PARSERS,provider))return null;
   if(key===provider)return Object.freeze({providerKey:provider,legacy:true});
   if(key.length>64 || !new RegExp('^'+provider+'_[a-z][a-z0-9_]{1,45}$').test(key) ||
-     access.parser_class!==PARSER_CLASS[provider])return null;
+     access.parser_class!==PARSER_CLASS[provider] ||
+     contract.adapter_version!==PARSER_CLASS[provider])return null;
   return Object.freeze({providerKey:provider,legacy:false});
 }
 const exactUtc = x => typeof x === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(x)

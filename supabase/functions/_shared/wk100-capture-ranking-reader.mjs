@@ -60,6 +60,7 @@ function verifyNativeRows(bytes,contract,attempt,rows) {
   try {
     replayed=parseCaptureNativeRows(bytes,contract,{
       native_period_key:attempt.native_period_evidence_ref,
+      parser_class:contract.adapter_version,
     });
   } catch {
     fail('native_replay_unavailable');

@@ -127,11 +127,13 @@ test('multiple independent source IDs under one provider retain separate revisio
 
 test('WK100 provider-scoped source parser requires independently sealed native class',()=>{
   const youtube={provider_key:'youtube_ke',source_key:'youtube_ke_top_songs_weekly',
-    market:'KE',behavior:'video_consumption',native_metric:'rank_and_count',expected_depth:100};
+    market:'KE',behavior:'video_consumption',native_metric:'rank_and_count',expected_depth:100,
+    adapter_version:'youtube_kenya_weekly_top_songs_v1'};
   const access={parser_class:'youtube_kenya_weekly_top_songs_v1',native_period_key:'weekly:20261102:20261108:ke'};
   assert.equal(resolveCaptureParser(youtube,access)?.providerKey,'youtube_ke');
   assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke_second_weekly'},access)?.legacy,false);
   assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke'},{}).legacy,true);
+  assert.equal(resolveCaptureParser({...youtube,adapter_version:'unrelated-parser'},access),null);
   for(const [contract,manifest] of [
     [youtube,{}],[youtube,{parser_class:'apple_kenya_chart_v1'}],
     [{...youtube,provider_key:'apple_ke'},access],
@@ -143,7 +145,7 @@ test('WK100 provider-scoped source parser requires independently sealed native c
   // A YouTube playlist listing has no native weekly Top Songs trackViews.
   assert.throws(()=>parseCaptureNativeRows(new TextEncoder().encode(JSON.stringify({
     period:access.native_period_key,playlistItems:[{videoId:'one'}]})),youtube,access));
-  const apple={provider_key:'apple_ke',source_key:'apple_ke_catalog_most_played'};
+  const apple={provider_key:'apple_ke',source_key:'apple_ke_catalog_most_played',adapter_version:'apple_kenya_chart_v1'};
   assert.equal(resolveCaptureParser(apple,{parser_class:'apple_kenya_chart_v1'})?.providerKey,'apple_ke');
 });
 
@@ -153,7 +155,8 @@ const wk100PlanFixture=week=>({
     id:'11111111-1111-4111-8111-111111111111',
     source_key:'youtube_ke_top_songs_weekly',provider_key:'youtube_ke',
     contract_version:'v1',market:'KE',behavior:'video_consumption',
-    native_metric:'rank_and_count',expected_depth:100,adapter_version:'youtube-weekly-v1',
+    native_metric:'rank_and_count',expected_depth:100,
+    adapter_version:'youtube_kenya_weekly_top_songs_v1',
     cadence_kind:'weekly',interval_hours:null,eat_hour:9,eat_minute:0,
     weekday_eat:0,minimum_healthy_checkpoints:1,
   }],
