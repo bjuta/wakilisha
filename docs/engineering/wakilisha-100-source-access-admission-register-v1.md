@@ -26,6 +26,17 @@ This register's historic `BLOCKED`, `HOLD`, `SUPPLEMENTARY HOLD` and `ADMITTED` 
 
 **Operational distinction:** Conduct and record current public-source research without waiting for the WK100 unattended Edge collector. The collector's source-specific runtime controls protect deployed autonomous network execution and immutable receipts; they are **not research permission gates**. Neither historical research observations nor public page extracts may be mislabeled as raw-byte WK100 service receipts or scored as weekly stream counts. Treat an unknown period as **unknown**, not as a reason to discard useful observed ranks.
 
+**Existing genuine WAKILISHA research archive (do not reacquire or discard):** the separately accepted [research portfolio](../../src/services/chartsIngestion/wk100ResearchPortfolio.mjs) already records original-byte evidence from 29–30 October 2026. The originals remain in the operator's private archive, not public Git or a WK100 hosted capture ledger.
+
+| Research observation | Verified original-byte evidence | Native claim retained |
+| --- | --- | --- |
+| Shazam Kenya, 29 October 2026 | **8,210 bytes**, SHA-256 `771209bf966548f4594dab542bca1b9ffb3ec571f7441f5f41d2791c1e58ef17`, **200** gapless discovery ranks | Recognitions/discovery order; no provider recording IDs or verified UTC measurement bounds |
+| Mdundo Kenya, 30 October 2026 | **1,564,780 bytes**, SHA-256 `885fd7140b014bb98a7efea525148ac5e98629ee66351fbb217bc6f3b3eb45f1`, **100** ordered native ranks | Platform positions and a weekly-update description; no verified exact week or stream count |
+| Apple Music Kenya public playlist, 30 October 2026 | **712,638 bytes**, SHA-256 `35b372511a91df88ffd942b4b04373d7bb46216ae4636d37c20a2f3afaba5d7b`, **100** ranks | Daily playlist snapshot, **not** the Catalog Charts API or national weekly streaming chart |
+| Audiomack Kenya, October research archive | **646,920 bytes**, SHA-256 `0884e9777bee45c38c1008dae544cfe62b1febd74fcf82ad156a3f2d808392a4` | HTML original retained; ranked recording structure remains unqualified |
+
+These are **actual historical researcher-directed original-byte observations**, not synthetic fixtures, and they prove WAKILISHA has been researching real source material. Neither a current-week re-fetch nor a new collector method approval is needed to use these facts as dated private research evidence. To attest a hosted research receipt, use the **already implemented Ingest Studio private research intake** with the unchanged private original and receipt, not a new uploader or an invented payload. Do not turn these 2026-10-26 editorial-week archives into observations for November 2026.
+
 **Practical next acquisition:** use the existing researcher-directed observation path on Shazam's offered Kenya CSV or Mdundo's public Kenya chart. Record the exact URL, observed time, provider-stated metric, displayed rank and source label, original bytes/SHA-256 when an export is actually saved, and any cached/undated source uncertainty. Reuse the existing parser and private research archive. Do not create a second system or silently grant publisher authority.
 
 ## Evidence precedence and status vocabulary
