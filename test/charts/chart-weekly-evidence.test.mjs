@@ -585,6 +585,68 @@ test('WK100 integrated collector resumes bound original bytes, never silently po
   await assert.rejects(()=>runCandidateCapture(f.args),/reconciliation_digest_mismatch/);
 });
 
+test('WK100 preserves wrong YouTube native week as quarantined receipt, distinct from malformed counts',async()=>{
+  const target='weekly:20261016:20261022:ke';
+  const contract={...wkRuntimeContract,source_key:'youtube_ke',provider_key:'youtube_ke',
+    behavior:'video_consumption',native_metric:'rank_and_count',
+    cadence_kind:'weekly',weekday_eat:3,expected_depth:1};
+  const periodFixture=(periodKey,viewCount)=>new TextEncoder().encode(JSON.stringify({
+    metadata:{periodKey},charts:{trackViews:[{
+      encryptedVideoId:'fixture-video',name:'Fixture track',
+      artists:[{name:'Fixture artist'}],viewCount,
+      chartEntryMetadata:{currentPosition:1},
+    }]},
+  }));
+  const make=bytes=>{
+    const f=wkRuntimeHarness({
+      contract,weekStartEat:'2026-10-19',scheduledAt:'2026-10-22T09:00:00Z',
+      clock:()=>new Date('2026-10-22T09:02:00Z'),
+      access:{source_key:'youtube_ke',endpoint:'https://example.org/chart/ke',
+        authorization_ref:'WK100-ACCESS-TEST-1',native_period_key:target},
+      fetchImpl:async()=>new Response(bytes,{status:200,
+        headers:{'content-type':'application/json'}}),
+    });
+    const commits=[];
+    f.db.commit=async p=>{
+      commits.push(p);
+      assert.deepEqual(p.p_rows,[]);
+      assert.equal(p.p_native_period_start,null);
+      assert.equal(p.p_native_period_end,null);
+      assert.equal(p.p_native_period_evidence_ref,null);
+      return {status:p.p_outcome,receipt_id:'synthetic-only-receipt'};
+    };
+    return {...f,commits};
+  };
+  const wrong=make(periodFixture('weekly:20261009:20261015:ke','12400'));
+  const missing=await runCandidateCapture(wrong.args);
+  assert.equal(missing.status,'target_period_unavailable');
+  assert.equal(missing.can_publish,false);
+  assert.equal(wrong.commits[0].p_outcome,'target_period_unavailable');
+  assert.equal(wrong.commits[0].p_failure_code,'source_target_period_unavailable');
+  assert.equal(wrong.objects.size,1); // exact original bytes remain archived privately
+  const malformed=make(periodFixture(target,'not-a-count'));
+  const parsed=await runCandidateCapture(malformed.args);
+  assert.equal(parsed.status,'parse_failed');
+  assert.equal(parsed.can_publish,false);
+  assert.equal(malformed.commits[0].p_failure_code,'source_parse_failed');
+  assert.equal(malformed.objects.size,1);
+  const method={source_key:'youtube_ke',provider_key:'youtube_ke',contract_version:'fixture-v1',
+    state:'collector_admitted',enabled:true,native_period_state:'provider_defined',
+    native_period_evidence_ref:'synthetic_only_not_provider_evidence',
+    authorization_ref:'WK100-ACCESS-TEST-1',constitution_version:'ci-only-v1',
+    evidence_sha256:'f'.repeat(64),endpoint_sha256:'e'.repeat(64),
+    authorization_expires_at:'2026-11-30T00:00:00Z'};
+  const plan=planWk100SourceDispatch({
+    weekStartEat:'2026-10-19',nowUtc:'2026-10-22T09:02:00Z',
+    sourceContracts:[contract],approvedDecisions:[method],
+    attempts:[{contract_id:contract.id,scheduled_at:'2026-10-22T09:00:00Z',
+      attempt_number:1,status:'target_period_unavailable'}],executionEnabled:true,
+  });
+  assert.equal(plan.jobs.length,0);
+  assert.equal(plan.blocked[0]?.code,'source_quarantined');
+  assert.equal(plan.canPublish,false);
+});
+
 test('WK100 integrated collector persists a transport failure and never commits truncated raw rows',async()=>{
   const f=wkRuntimeHarness({fetchImpl:async()=>new Response('blocked',{status:503,headers:{'content-type':'text/html'}})});
   const result=await runCandidateCapture(f.args);
