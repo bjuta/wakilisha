@@ -384,3 +384,20 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
   await assert.rejects(bindWk100DispatchAuthority({...args,manifest:{sources:[entry,entry]}}));
   await assert.rejects(bindWk100DispatchAuthority({...args,methodRows:[row,row]}));
 });
+
+test('WK100 scheduler only dispatches signed service calls through existing capture worker',async()=>{
+  const edge=await readFile('supabase/functions/wk100-source-scheduler/index.ts','utf8');
+  const config=await readFile('supabase/config.toml','utf8');
+  assert.match(config,/\[functions\.wk100-source-scheduler\]\s*verify_jwt = true/);
+  assert.match(edge,/isGatewayVerifiedServiceRole\(bearer,req\.headers\.get\('apikey'\)\)/);
+  assert.match(edge,/WK100_SOURCE_SCHEDULER_ENABLED/);
+  assert.match(edge,/WK100_CAPTURE_ENABLED/);
+  assert.match(edge,/WK100_SOURCE_CONSTITUTION_VERSION/);
+  assert.match(edge,/runtimeProjectApiUrl\(bearer/);
+  assert.match(edge,/wk100_service_admitted_methods_v1/);
+  assert.match(edge,/bindWk100DispatchAuthority\(/);
+  assert.match(edge,/planWk100SourceDispatch\(/);
+  assert.match(edge,/\/functions\/v1\/wk-chart-capture/);
+  assert.match(edge,/redirect:'error'/);
+  assert.doesNotMatch(edge,/wk_chart_runtime_reserve_v1|\.insert\(|\.upsert\(|SUPABASE_SERVICE_ROLE_KEY/);
+});

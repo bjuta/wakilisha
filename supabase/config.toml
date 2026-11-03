@@ -79,3 +79,7 @@ verify_jwt = true
 # Admin method review only. No collection, scoring, or publishing.
 [functions.wk100-source-admin-methods]
 verify_jwt = true
+
+# Service-only timed collector dispatch. OFF without explicit secret gates.
+[functions.wk100-source-scheduler]
+verify_jwt = true
