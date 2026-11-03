@@ -408,7 +408,7 @@ test('W2 filters current reviewed candidates without inventing scoring constitut
   await page.getByRole('button',{name:'Filter constitution'}).click();
   await page.getByRole('option',{name:'Constitution · In'}).click();
   await expect(table.getByRole('button',{name:'Apple candidate'})).toHaveCount(0);
-  await expect(table.getByText('No sources match these filters.')).toBeVisible();
+  await expect(page.getByRole('status').filter({hasText:'No sources match these filters.'})).toBeVisible();
   expect(ctx.contractWrites).toEqual([]);
   expect(ctx.methodWrites).toEqual([]);
   expect(ctx.unexpected).toEqual([]);
