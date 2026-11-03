@@ -17,6 +17,7 @@ import { wk100CurrentWeekStartEat, isWk100WeekStartEat } from '../ingest/wk100Ea
 import { WkOperationsHero, WkNextAction, WkReadinessList } from '@/components/design-system/primitives/OperationsWorkspace';
 import { WkAuditTimeline } from '@/components/design-system/primitives/AuditTimeline';
 import { SourceProposalForm, type Wk100ProposalRecord } from './SourceProposalForm';
+import { SourceMethodReviewForm, type Wk100MethodDecision } from './SourceMethodReviewForm';
 
 type Source = {
   id:string;sourceKey:string;provider:string;surface:string;market:string;
@@ -78,6 +79,24 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [editing,setEditing]=useState<Wk100ProposalRecord|null>(null);
   const [proposals,setProposals]=useState<Wk100ProposalRecord[]>([]);
   const [proposalPhase,setProposalPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
+  const [reviewing,setReviewing]=useState<Wk100ProposalRecord|null>(null);
+  const [methodDecisions,setMethodDecisions]=useState<Wk100MethodDecision[]>([]);
+  const [methodPhase,setMethodPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
+  const loadMethods=useCallback(async()=>{
+    setMethodPhase('loading');
+    try {
+      const {data,error}=await supabase.functions.invoke('wk100-source-admin-methods',{
+        body:{action:'list_method_decisions'},
+      });
+      if(error||!data||data.schemaVersion!=='wk100-source-method-decisions-v1'||
+        !Array.isArray(data.decisions)||data.decisions.length>500||
+        data.canCollect!==false||data.canScore!==false||data.canPublish!==false||
+        data.decisions.some((d:Wk100MethodDecision)=>d.canScore!==false||
+          d.canPublish!==false||typeof d.sourceKey!=='string'||
+          !['held','collector_admitted','paused','retired'].includes(d.decisionState)))throw Error();
+      setMethodDecisions(data.decisions as Wk100MethodDecision[]);setMethodPhase('ready');
+    }catch{setMethodDecisions([]);setMethodPhase('unavailable');}
+  },[]);
   const loadProposals=useCallback(async()=>{
     setProposalPhase('loading');
     try{
@@ -92,7 +111,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       setProposals(data.proposals as Wk100ProposalRecord[]);setProposalPhase('ready');
     }catch{setProposals([]);setProposalPhase('unavailable');}
   },[]);
-  useEffect(()=>{if(view==='sources')void loadProposals()},[loadProposals,view]);
+  useEffect(()=>{if(view==='sources'){void loadProposals();void loadMethods()}},[loadProposals,loadMethods,view]);
   const load=useCallback(async()=>{
     const seq=++readSequence.current;
     setPhase('loading');setReport(null);setDetail(null);
@@ -115,7 +134,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
     <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
-      <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();if(view==='sources')void loadProposals()}} disabled={phase==='loading'}>Refresh status</button>
+      <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();if(view==='sources'){void loadProposals();void loadMethods()}}} disabled={phase==='loading'}>Refresh status</button>
     </AdminChartsPageHeader>
     <WkSurface className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3">
       <div className="flex items-center gap-2"><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Previous week" onClick={()=>setWeek(v=>nextWeek(v,-1))}>‹</button><div className="min-w-40 text-center"><p className="text-xs text-wk-text-muted">Edition week · Monday EAT</p><p className="text-sm font-bold text-wk-text">{week}</p></div><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Next week" onClick={()=>setWeek(v=>nextWeek(v,1))}>›</button></div>
@@ -180,8 +199,34 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               {key:'method',label:'Method',render:p=><span className="text-wk-text-soft">{p.methodClass.replaceAll('_',' ')}</span>},
               {key:'revision',label:'Revision',render:p=><span className="text-wk-text-soft">{p.revision}</span>},
               {key:'status',label:'Authority',render:()=> <WkStateBadge>Proposed only</WkStateBadge>},
-              {key:'action',label:'Update proposal',render:p=><button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{setEditing(p);setAdd(true)}}>Revise</button>},
+              {key:'action',label:'Actions',render:p=><div className="flex flex-wrap gap-2">
+                <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{setEditing(p);setAdd(true)}}>Revise</button>
+                <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>setReviewing(p)}>Review Method</button>
+              </div>},
             ] satisfies WkDataColumn<Wk100ProposalRecord>[]} />}
+        </Card>
+        <Card title="Source Method Reviews">
+          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
+            Independent method decisions are audited separately from source proposals. Admitting a method
+            does not enable automated collection, qualify scoring evidence or publish a chart.
+          </p>
+          {methodPhase==='loading'&&<p role="status" className="text-sm text-wk-text-muted">Reading method decisions…</p>}
+          {methodPhase==='unavailable'&&<p role="alert" className="text-sm text-wk-text-muted">
+            The protected method review service is unavailable. No source method is assumed approved.
+          </p>}
+          {methodPhase==='ready'&&<WkDataTable<Wk100MethodDecision>
+            rows={methodDecisions} getKey={d=>d.sourceKey} ariaLabel="Source method decisions"
+            empty="No reviewed source methods yet."
+            columns={[
+              {key:'source',label:'Source',render:d=><span className="font-semibold text-wk-text">
+                {d.sourceKey}<span className="mt-1 block text-xs font-normal text-wk-text-muted">{d.providerKey}</span>
+              </span>},
+              {key:'decision',label:'Method review',render:d=><WkStateBadge tone={d.decisionState==='collector_admitted'?'info':d.decisionState==='retired'?'danger':'neutral'}>
+                {d.decisionState==='collector_admitted'?'Method admitted':d.decisionState.replaceAll('_',' ')}
+              </WkStateBadge>},
+              {key:'revision',label:'Revision',render:d=><span className="text-wk-text-soft">{d.decisionRevision}</span>},
+              {key:'collection',label:'Collection',render:()=> <WkStateBadge>Off</WkStateBadge>},
+            ] satisfies WkDataColumn<Wk100MethodDecision>[]} />}
         </Card>
         <Card title="Source Registry">
           <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_repeat(3,minmax(130px,160px))]">
@@ -313,6 +358,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     </WkInspector>}
     {add&&<SourceProposalForm initial={editing} existing={proposals}
       close={()=>{setAdd(false);setEditing(null)}} onSaved={()=>void loadProposals()}/>}
+    {reviewing&&<SourceMethodReviewForm proposal={reviewing}
+      previous={methodDecisions.find(d=>d.sourceKey===reviewing.sourceKey)??null}
+      close={()=>setReviewing(null)} onSaved={()=>void loadMethods()}/>}
 
   </div>;
 }

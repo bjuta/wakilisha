@@ -1,0 +1,159 @@
+import { useState } from 'react';
+import { Input, TextArea, TextField } from 'react-aria-components';
+import { supabase } from '@/lib/supabase';
+import { Modal } from '@/components/design-system/primitives/Modal';
+import { WkSelect } from '@/components/design-system/primitives/Select';
+import { WkDetailList } from '@/components/design-system/primitives/DetailList';
+import type { Wk100ProposalRecord } from './SourceProposalForm';
+
+export type Wk100MethodDecision={
+  sourceKey:string;providerKey:string;proposalRevision:number;decisionRevision:number;
+  decisionState:'held'|'collector_admitted'|'paused'|'retired';constitutionVersion:string;
+  createdAt:string;hasMethodEvidence:boolean;nativePeriodAuthority:string|null;
+  canScore:false;canPublish:false;
+};
+type State=Wk100MethodDecision['decisionState'];
+type Field='constitutionVersion'|'reason'|'nativePeriodEvidenceRef'|'endpointSha256'|
+  'accessEvidenceSha256'|'authorizationRef'|'authorizationExpiresAt';
+type Draft={decisionState:State;constitutionVersion:string;reason:string;
+  nativePeriodEvidenceRef:string;endpointSha256:string;
+  accessEvidenceSha256:string;authorizationRef:string;authorizationExpiresAt:string};
+const PARSERS:Record<string,string>={
+  youtube_ke:'youtube_kenya_weekly_top_songs_v1',apple_ke:'apple_kenya_chart_v1',
+  boomplay_ke:'boomplay_kenya_chart_v1',mdundo_ke:'mdundo_kenya_chart_v1',
+  shazam_ke:'shazam_kenya_discovery_v1',audiomack_ke:'audiomack_kenya_chart_v1',
+};
+function ReviewField({label,value,onChange,limit,area=false}:{
+  label:string;value:string;onChange:(v:string)=>void;limit:number;area?:boolean;
+}){
+  return <TextField aria-label={label} value={value} onChange={onChange} className="block min-w-0">
+    <span className="mb-1 block text-xs font-semibold text-wk-text-muted">{label}</span>
+    {area?<TextArea maxLength={limit} className="wk-input min-h-24 w-full rounded-xl border-wk-border bg-wk-surface text-[16px] text-wk-text"/>:
+      <Input maxLength={limit} className="wk-input w-full rounded-xl border-wk-border bg-wk-surface text-[16px] text-wk-text"/>}
+  </TextField>;
+}
+export function SourceMethodReviewForm({proposal,previous,close,onSaved}:{
+  proposal:Wk100ProposalRecord;previous:Wk100MethodDecision|null;
+  close:()=>void;onSaved:()=>void;
+}){
+  const [draft,setDraft]=useState<Draft>({
+    decisionState:'held',constitutionVersion:'',reason:'',
+    nativePeriodEvidenceRef:'',endpointSha256:'',
+    accessEvidenceSha256:'',authorizationRef:'',authorizationExpiresAt:'',
+  });
+  const [saving,setSaving]=useState(false);
+  const [error,setError]=useState('');
+  const change=(key:Field,value:string)=>{
+    setDraft(d=>({...d,[key]:value}));setError('');
+  };
+  const admitted=draft.decisionState==='collector_admitted';
+  const parser=PARSERS[proposal.providerKey]??null;
+  const allowedAdmission=!!parser&&proposal.methodClass!=='research_only';
+  const valid=draft.constitutionVersion.trim().length>=2&&
+    draft.reason.trim().length>=6&&
+    (!admitted||(allowedAdmission&&
+      draft.nativePeriodEvidenceRef.trim().length>=3&&
+      /^[a-f0-9]{64}$/.test(draft.endpointSha256)&&
+      /^[a-f0-9]{64}$/.test(draft.accessEvidenceSha256)&&
+      draft.authorizationRef.trim().length>=3&&
+      draft.authorizationExpiresAt.trim().length>=20));
+  const submit=async()=>{
+    if(saving||!valid)return;
+    setSaving(true);setError('');
+    try{
+      const decision={
+        sourceKey:proposal.sourceKey,providerKey:proposal.providerKey,
+        proposalRevision:proposal.revision,decisionState:draft.decisionState,
+        parserClass:admitted?parser:null,
+        methodClass:proposal.methodClass,
+        nativePeriodAuthority:admitted?'provider_defined':null,
+        nativePeriodEvidenceRef:admitted?draft.nativePeriodEvidenceRef.trim():null,
+        endpointSha256:admitted?draft.endpointSha256:null,
+        accessEvidenceSha256:admitted?draft.accessEvidenceSha256:null,
+        authorizationRef:admitted?draft.authorizationRef.trim():null,
+        authorizationExpiresAt:admitted?draft.authorizationExpiresAt.trim():null,
+        constitutionVersion:draft.constitutionVersion.trim(),
+        reason:draft.reason.trim(),
+      };
+      const expectedDecisionRevision=previous?.decisionRevision??0;
+      const {data,error:callError}=await supabase.functions.invoke('wk100-source-admin-methods',{
+        body:{action:'review_source_method',decision,expectedDecisionRevision},
+      });
+      if(callError||!data||data.schemaVersion!=='wk100-source-method-written-v1'||
+        data.canCollect!==false||data.canScore!==false||data.canPublish!==false||
+        !data.saved||data.saved.sourceKey!==proposal.sourceKey||
+        data.saved.providerKey!==proposal.providerKey||
+        data.saved.proposalRevision!==proposal.revision||
+        data.saved.decisionRevision!==expectedDecisionRevision+1||
+        data.saved.decisionState!==draft.decisionState||
+        data.saved.canScore!==false||data.saved.canPublish!==false)
+        throw new Error(data?.error==='method_revision_conflict'
+          ?'This method review changed. Refresh the Source Registry before saving.'
+          :'The protected server did not confirm this decision. Nothing is assumed saved.');
+      onSaved();close();
+    }catch(e){setError(e instanceof Error?e.message:'The method decision could not be saved.');}
+    finally{setSaving(false);}
+  };
+  return <Modal open={true} onClose={close} dismissable={!saving} maxWidth="3xl"
+    title="Review Source Method"
+    footer={<div className="flex items-center justify-end gap-3">
+      <button type="button" disabled={saving} className="wk-button wk-button-secondary wk-button-sm" onClick={close}>Cancel</button>
+      <button type="button" disabled={!valid||saving} className="wk-button wk-button-primary wk-button-sm" onClick={()=>void submit()}>
+        {saving?'Saving…':'Save method decision'}
+      </button>
+    </div>}>
+    <div className="space-y-4">
+      <p className="text-sm text-wk-text-muted">
+        Review the specific source and its evidence. A method decision does not start collection or authorize ranking.
+      </p>
+      <WkDetailList items={[
+        {label:'Provider and source',value:proposal.providerKey+' · '+proposal.sourceKey},
+        {label:'Source surface',value:proposal.surface},
+        {label:'Proposal revision',value:proposal.revision},
+        {label:'Previous decision',value:previous?previous.decisionState.replaceAll('_',' ')+' · revision '+previous.decisionRevision:'No decision recorded'},
+        {label:'Method class',value:proposal.methodClass.replaceAll('_',' ')},
+        {label:'Native parser class',value:parser??'Not implemented'},
+      ]}/>
+      <div className="space-y-1">
+        <p className="text-xs font-semibold text-wk-text-muted">Decision</p>
+        <WkSelect ariaLabel="Method decision" value={draft.decisionState}
+          onChange={value=>setDraft(d=>({...d,decisionState:value as State}))}
+          options={[
+            {value:'held',label:'Hold for evidence'},
+            {value:'collector_admitted',label:'Admit reviewed method'},
+            {value:'paused',label:'Pause reviewed method'},
+            {value:'retired',label:'Retire source method'},
+          ]}/>
+      </div>
+      <ReviewField label="Constitution version" limit={100}
+        value={draft.constitutionVersion} onChange={v=>change('constitutionVersion',v)}/>
+      <ReviewField label="Decision reason" limit={500} area
+        value={draft.reason} onChange={v=>change('reason',v)}/>
+      {admitted&&<div className="space-y-4 rounded-xl border border-wk-border p-4">
+        <p className="text-xs font-semibold text-wk-text">Independent source-method evidence</p>
+        {!allowedAdmission&&<p role="alert" className="text-sm text-wk-danger">
+          This provider method cannot be admitted for unattended collection. Record a hold instead.
+        </p>}
+        <ReviewField label="Provider-defined period evidence reference" limit={240}
+          value={draft.nativePeriodEvidenceRef} onChange={v=>change('nativePeriodEvidenceRef',v)}/>
+        <ReviewField label="Reviewed endpoint SHA-256 (hex only)" limit={64}
+          value={draft.endpointSha256} onChange={v=>change('endpointSha256',v)}/>
+        <ReviewField label="Access evidence SHA-256 (hex only)" limit={64}
+          value={draft.accessEvidenceSha256} onChange={v=>change('accessEvidenceSha256',v)}/>
+        <ReviewField label="Approved credential reference (not a secret)" limit={120}
+          value={draft.authorizationRef} onChange={v=>change('authorizationRef',v)}/>
+        <ReviewField label="Permission expiry UTC (YYYY-MM-DDTHH:MM:SSZ)" limit={45}
+          value={draft.authorizationExpiresAt} onChange={v=>change('authorizationExpiresAt',v)}/>
+        <p className="text-xs text-wk-text-muted">
+          Enter evidence identifiers only. Never paste an access token, password or provider URL.
+          The server independently verifies this review and the reviewer’s authority.
+        </p>
+      </div>}
+      <p className="rounded-xl bg-wk-surface-raised p-3 text-xs text-wk-text-muted">
+        All decisions append a permanent audit revision. Collection stays off until the independent
+        source-access and scheduler gates are accepted. This review cannot publish a chart.
+      </p>
+      {error&&<p role="alert" className="rounded-xl border border-wk-danger p-3 text-sm text-wk-danger">{error}</p>}
+    </div>
+  </Modal>;
+}
