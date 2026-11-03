@@ -62,6 +62,48 @@ Founder intervention is reserved for genuine product decisions: source constitut
 
 ---
 
+## Phase 1 Connected-House Closure Execution Contract | 3 November 2026 EAT
+
+**Status: founder-directed, binding execution correction. Phase 1 is not accepted by this document.** This section supersedes the earlier overly narrow interpretation that Phase 1 may leave workbook-required server commands disabled because their plumbing was not present. It does not supersede safety gates, the four-phase structure, the original workbook, existing Registry/MIZIZI authority, or independent launch authorization.
+
+### Governing construction rule
+
+Build complete, connected **vertical product slices**. When an interaction on W0, W1, W2, W2A, or W3 exposes a missing essential SQL, Edge, source adapter, authenticated command, audit, revision, recovery, or Admin projection, engineer that dependency **within Phase 1** and verify the whole path. Do not classify necessary load-bearing infrastructure as optional scope and do not call a disabled button a completed interaction. Keep external source facts and founder choices distinct from engineering deficiencies: code can make an integration operational but cannot fabricate provider permission, period semantics, sample data or authorization.
+
+The anti-sprawl filter remains: the feature must complete a current workbook interaction, reuse an existing WAKILISHA authority where one exists, and have a concrete acceptance test. Do not add parallel research apps, a second collector, a second publisher, unrelated future-phase processing, speculative partnership gates, or duplicate CI suites.
+
+### Phase 1 work packages | one implementation scope, not separate delivery programmes
+
+| Work package | Required connected implementation | Done only when |
+| --- | --- | --- |
+| **A. W2 Source Registry and W2A Add Source** | Workbook-faithful dense roster, statuses, filters, 480 px inspector, provider plus method first step, approved surface and schedule, review, current proposal and method revisions; real role-gated source proposal, qualification, reviewed method, exact enrollment, pause/review/history and configuration authority. Existing immutable contracts, manifest and constitution are authoritative. | Signed-in authorized Admin can take a genuinely qualified Kenya source through reviewed configuration and read it back; stale, unqualified and unauthorized requests fail; history and inspector reflect the same durable state. |
+| **B. W3 Collection and Incidents** | Genuine scheduler and existing `wk-chart-capture` worker, original-byte private receipts, source period/metric integrity, source health, incident inspector, idempotent **week/slot-bound, actor-audited retry request and dispatch**, bounded budgets, quarantine and recovery; **durable coverage-exception request/decision** with reason, role, revision and history. No earlier-week substitution, automatic reweighting, fictitious observation, or readiness override. | Admin can inspect and recover a legitimately retryable failure; duplicate/stale/revoked attempts are denied; nonrecoverable failures and exception decisions persist and are visibly truthful. |
+| **C. W1 and W0 Edition state** | Minimal server-owned weekly EAT Edition identity, monotonically checked revision and source/readiness projection; seven gates, five-stage rail, exactly one supported next action, revision-aware navigation, loading/empty/blocked/conflict views and activity timeline. Future Identify/Qualify/Rank/Publish surfaces remain accurately unavailable until implemented. | Same Edition and revision are authoritative across refresh, week change, source review, retry and exception; stale mutations reject and the UI cannot manufacture later-phase readiness. |
+| **D. Genuine source and collection qualification** | Evidence-backed six-provider assessment for YouTube, Spotify, Boomplay, Apple Music, Mdundo and Shazam; select a viable qualified source, verify accepted endpoint/method/parser/credential/native period/constitution, trigger genuine service-side acquisition, read exact original bytes privately, prove digest and immutable receipt. Prefer existing Apple service route to investigate first; do not presume it is qualified. | All six have honest written assessments, founder approves the concrete constitution choice, and at least one real qualified provider supplies a fresh collector-created private original with verified readback. |
+
+Work packages may share implementation code. Complete them within the **existing Phase 1 branch/PR #1345** and delivery issue **#1338**. Recommended screen order is W2 -> W2A -> W3 -> W1/W0, but implement each package's backend dependencies alongside the UI. Prior three-commit workbook work is the foundation, not accepted Phase 1 completion.
+
+### Exact acceptance gate | conjunctive, not averaged
+
+1. **Source and security:** prove real admin admission, method/contract binding, explicit constitution, least-privilege JWT and revocation, versioned edits, pause, denied access, no secret exposure and original provider-native semantics.
+2. **Collection and recovery:** at least one real source acquired by the governed collector with actual original bytes, private Storage readback and SHA-256 identity; prove the real scheduler, exact-week slot leases, retries, malformed responses, quarantine, missingness, coverage exceptions, audit and nonpublication.
+3. **Two logical EAT weeks:** run two consecutive injected-clock EAT weeks through actual application dispatch/collector boundaries in an isolated disposable environment, in addition to separate unmodified current-clock real GoTrue/PostgreSQL/Storage acceptance. Logical-week fixtures never substitute for real qualified-provider evidence. No fourteen-calendar-day wait.
+4. **Workbook fidelity:** compare W0/W1/W2/W2A/W3 with the exact approved HTML source, including geometry, density, focus, dialog/inspector behavior and 1440/1024/768/390 px light/dark states. The exact workbook cannot be treated as mere inspiration. Future-stage controls must be truthful.
+5. **Release integrity:** complete current migration replay and generated filename verification, SQL acceptance, target runtime/secret/ingress parity, real signed-in browser acceptance, focused existing tests and CI consolidation. Track every fixture and independently verify cleanup and rollback.
+6. **Final decision:** record each proof in #1338 against the **exact head**, then and only then mark Phase 1 accepted, merge eligible changes through established controls and proceed to Phase 2. No first public WK100 Edition or production collector activation is authorized by this gate.
+
+A green unit test, UI screenshot, historical October research file, candidate proposal, disabled command, or passing fixture week cannot individually satisfy this gate.
+
+### Minimum-commit release discipline
+
+Target **one consolidated additional implementation commit**, only if the change is fully tested before writing it, with a correction commit permitted for proven problems. This is a *target, not a reason to rush or combine unsafe unreviewed mutations*. Keep documentation and implementation in the same existing PR. No automatic new branch, issue, collector, external service or CI workflow. If an independent external source genuinely cannot be qualified, record specific evidence and evaluate the next viable source; do not disguise it as an unresolved engineering to-do.
+
+### Status and stop boundaries at this directive
+
+At the initial planning head `d2b783a6f0a175da41726b9d17ea921113f6c946`, PR #1345 is draft/unmerged. The W3 manual retry and coverage-exception commands, true W1 server Edition revision projection, founder-selected qualified constitution and fresh private service-collected original have **not** passed acceptance. This document is an engineering instruction and does not claim these are implemented. Do not apply Production SQL, enable unattended collection, score, publish or merge based solely on this section.
+
+---
+
 ## 1. Product Contract
 
 Deliver **one** Admin-operated, multi-source weekly WAKILISHA 100 chart of music consumption and discovery in Kenya. The complete path is:
