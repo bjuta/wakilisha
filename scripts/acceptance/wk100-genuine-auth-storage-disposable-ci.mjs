@@ -79,19 +79,28 @@ async function main(){
   check(query('SELECT count(*) FROM platform_private.wk100_source_proposals_v1;',db)==='0',
     'STOP_PROPOSAL_FIXTURE_NOT_EMPTY');
   console.log('WK100_GENUINE_SOURCE_PROPOSAL_FULL_CHAIN_SQL_VERIFIER=PASS');
-  // This candidate is tested only AFTER the exact active migration ledger
-  // has been proven. It is not part of migration history or Production.
+  // W3 is now an ACTIVE source-controlled migration, not supplemental
+  // candidate DDL. The already-completed clean Supabase migration replay
+  // must have applied it exactly once before any GoTrue/Storage fixtures.
+  // The founder minted this exact version using Supabase CLI 2.107.0 and
+  // independently verified the candidate SHA-256 on 2026-11-03.
+  const w3Path='supabase/migrations/20261103160634_wk100_phase1_w3_collection_recovery_v1.sql';
+  const w3Version='20261103160634';
   const w3Candidate=readFileSync('scripts/acceptance/wk100-phase1-recovery-candidate.sql','utf8');
-  check(w3Candidate.includes('wk100_record_collection_action_v1') &&
-    w3Candidate.includes('wk100_service_retry_requests_v1') &&
-    w3Candidate.trimEnd().endsWith('commit;'),
-    'STOP_WK100_W3_CANDIDATE_NOT_SEALED');
-  query(w3Candidate,db,true);
+  const w3Active=readFileSync(w3Path,'utf8');
+  check(w3Candidate===w3Active &&
+    sha(Buffer.from(w3Active,'utf8'))==='38f27592803baa1097ac38010b018da70778f901af0e5fa876c14323bd1cb2d0' &&
+    w3Active.includes('wk100_record_collection_action_v1') &&
+    w3Active.includes('wk100_service_retry_requests_v1') &&
+    w3Active.trimEnd().endsWith('commit;') &&
+    expectedVersions.at(-1)===w3Version &&
+    appliedVersions.at(-1)===w3Version,
+    'STOP_WK100_W3_ACTIVE_MIGRATION_FILENAME_OR_BYTES_NOT_SEALED');
   check(query("SELECT (SELECT count(*) FROM platform_private.wk100_collection_actions_v1)::text||'|'||"+
     "(SELECT has_function_privilege('anon','public.wk100_record_collection_action_v1(text,date,uuid,timestamptz,smallint,integer,uuid,text)','EXECUTE'))::text||'|'||"+
     "(SELECT has_function_privilege('service_role','public.wk100_service_retry_requests_v1(date)','EXECUTE'))::text;",db)==='0|false|true',
     'STOP_WK100_W3_CANDIDATE_ACL_OR_EMPTY_LEDGER');
-  console.log('WK100_W3_DISPOSABLE_PG17_RECOVERY_SCHEMA_AND_ACL=PASS');
+  console.log('WK100_W3_ACTIVE_PG17_FULL_REPLAY_AND_ACL=PASS');
   const admin=client(url,v.SERVICE_ROLE_KEY),anon=client(url,v.ANON_KEY);
   const identity=randomUUID(); const email=`wk100-ci-${identity}@example.test`;
   const password=randomBytes(30).toString('base64url');
