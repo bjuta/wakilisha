@@ -179,7 +179,7 @@ const SHAZAM_MONTHS=['January','February','March','April','May','June',
  */
 function shazamSnapshotDate(label) {
   if(typeof label!=='string')return null;
-  const match=label.match(/^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday), (\\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December) (\\d{4}) \\[performance over the past 7 days\\]$/);
+  const match=label.match(/^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday), (\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December) (\d{4}) \[performance over the past 7 days\]$/);
   if(!match)return null;
   const day=Number(match[2]),month=SHAZAM_MONTHS.indexOf(match[3]),year=Number(match[4]);
   const date=new Date(Date.UTC(year,month,day));
