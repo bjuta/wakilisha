@@ -183,7 +183,7 @@ test('all six core providers show truthful readiness and no invented source admi
   const table=page.getByRole('table',{name:'Six core provider readiness'});
   await expect(table).toBeVisible({timeout:20_000});
   await expect(page.getByRole('region',{name:'Selected source inspector'})).toBeVisible();
-  await expect(page.getByRole('region',{name:'Selected source inspector'}).getByText('Select a source'))
+  await expect(page.getByRole('region',{name:'Selected source inspector'}).getByRole('heading',{name:'Select a source',exact:true}))
     .toBeVisible();
   for(const provider of ['YouTube Kenya','Spotify Kenya','Boomplay Kenya',
     'Apple Music Kenya','Mdundo Kenya','Shazam Kenya']){
