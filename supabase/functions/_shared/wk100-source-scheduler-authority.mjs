@@ -52,6 +52,8 @@ export async function bindWk100DispatchAuthority({
       entry.method!=='GET'||entry.purpose!=='candidate_raw_evidence'||
       contract.provider_key!==row.provider_key||
       contract.adapter_version!==row.parser_class||
+      !SHA.test(contract.adapter_sha256)||!SHA.test(entry.adapter_sha256)||
+      contract.adapter_sha256!==entry.adapter_sha256||
       contract.admission_state!=='candidate'||contract.market!=='KE'||
       row.native_period_state!=='provider_defined'||!SHA.test(row.evidence_sha256)||
       !SHA.test(row.endpoint_sha256)||typeof entry.endpoint!=='string'||

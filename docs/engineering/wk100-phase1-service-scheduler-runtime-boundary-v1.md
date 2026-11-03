@@ -58,6 +58,16 @@ Historical candidate contract versions do not block a newer admitted contract;
 competing admitted versions fail closed until an explicit operator resolution.
 
 
+## Immutable adapter-digest binding
+
+The separately enrolled capture contract's `adapter_sha256` must equal
+the SHA-256 pinned in the byte-sealed source manifest. Both scheduler planning
+and direct worker capture reject missing, malformed, or divergent digests.
+The parser *class* and `adapter_version` must also match. Reviewers must
+derive the accepted digest from the actual adapter artifact, not from a
+browser-supplied claim. This check does not itself establish external provider
+permission or collection readiness.
+
 ## Contract-enrollment authority (candidate; not a completed release)
 
 The method-review Edge endpoint supports the separate

@@ -357,7 +357,8 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
   // tampered sealed-manifest endpoint and mask the security assertion.
   assert.notEqual(await sha256Hex(new TextEncoder().encode(modifiedEndpoint)),reviewedEndpointSha);
   const contract={source_key:'apple_ke_catalog_most_played',provider_key:'apple_ke',
-    contract_version:'v1',adapter_version:'apple_kenya_chart_v1',admission_state:'candidate',market:'KE'};
+    contract_version:'v1',adapter_version:'apple_kenya_chart_v1',
+    adapter_sha256:'c'.repeat(64),admission_state:'candidate',market:'KE'};
   const row={source_key:contract.source_key,provider_key:contract.provider_key,
     contract_version:'v1',decision_state:'collector_admitted',
     parser_class:contract.adapter_version,native_period_state:'provider_defined',
@@ -367,7 +368,7 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
     constitution_version:'approved-v1'};
   const entry={source_key:contract.source_key,contract_version:'v1',
     enabled:true,market:'KE',method:'GET',purpose:'candidate_raw_evidence',
-    endpoint,parser_class:contract.adapter_version,
+    endpoint,parser_class:contract.adapter_version,adapter_sha256:contract.adapter_sha256,
     native_period_key:'provider_week',authorization_ref:'reviewed_access_v1',
     authorization_expires_at:row.authorization_expires_at};
   const args={methodRows:[row],manifest:{sources:[entry]},sourceContracts:[contract],
@@ -383,6 +384,8 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
     {manifest:{sources:[{...entry,enabled:false}]}},
     {manifest:{sources:[{...entry,endpoint:modifiedEndpoint}]}},
     {sourceContracts:[{...contract,adapter_version:'wrong'}]},
+    {sourceContracts:[{...contract,adapter_sha256:'d'.repeat(64)}]},
+    {manifest:{sources:[{...entry,adapter_sha256:'e'.repeat(64)}]}},
     {sha256Hex:async()=>('f'.repeat(64))},
     {nowUtc:new Date('2027-02-01T00:00:00Z')},
   ])assert.equal((await bindWk100DispatchAuthority({...args,...override})).length,0);
@@ -508,4 +511,15 @@ test('WK100 enrollment UI cannot infer collection authority from a candidate con
   assert.match(ui,/data\.enrollment\.canPublish!==false/);
   assert.match(ui,/Collection Off/);
   assert.doesNotMatch(ui,/service_role|SUPABASE_SERVICE_ROLE_KEY/);
+});
+
+test('WK100 native adapter digest is a required contract/manifest match at scheduler and worker',async()=>{
+  const scheduler=await readFile('supabase/functions/_shared/wk100-source-scheduler-authority.mjs','utf8');
+  const worker=await readFile('supabase/functions/wk-chart-capture/index.ts','utf8');
+  assert.match(scheduler,/contract\.adapter_sha256!==entry\.adapter_sha256/);
+  assert.match(scheduler,/SHA\.test\(contract\.adapter_sha256\)/);
+  assert.match(worker,/found\.data\.adapter_sha256!==entry\.adapter_sha256/);
+  assert.match(worker,/found\.data\.adapter_version!==entry\.parser_class/);
+  assert.match(worker,/source_adapter_digest_mismatch/);
+  assert.match(worker,/!\/\^\[a-f0-9\]\{64\}\$\/\.test\(source\.adapter_sha256\)/);
 });

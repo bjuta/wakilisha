@@ -39,6 +39,8 @@ function approvedEntry(manifest:Record<string,unknown>,sourceKey:string,version:
   if(source.enabled!==true || source.market!=='KE' ||
     source.method!=='GET' || source.purpose!=='candidate_raw_evidence' ||
     typeof source.endpoint!=='string' || typeof source.authorization_ref!=='string' ||
+    typeof source.adapter_sha256!=='string' ||
+    !/^[a-f0-9]{64}$/.test(source.adapter_sha256) ||
     typeof source.authorization_expires_at!=='string' ||
     !Number.isFinite(Date.parse(source.authorization_expires_at)) ||
     Date.parse(source.authorization_expires_at)<=now.valueOf()) return null;
@@ -144,6 +146,10 @@ Deno.serve(async (req:Request) => {
     .eq('source_key',key).eq('contract_version',version).maybeSingle();
   if(found.error || !found.data) return json(409,{error:'source_contract_absent'});
   if(found.data.admission_state!=='candidate') return json(409,{error:'not_candidate_contract'});
+  if(!/^[a-f0-9]{64}$/.test(found.data.adapter_sha256??'') ||
+     found.data.adapter_sha256!==entry.adapter_sha256 ||
+     found.data.adapter_version!==entry.parser_class)
+    return json(409,{error:'source_adapter_digest_mismatch',can_publish:false});
   const rpc=async (name:string,args:Record<string,unknown>)=>{
     const {data,error}=await db.rpc(name,args);
     if(error) throw new Error(`database_${name}_rejected`);
