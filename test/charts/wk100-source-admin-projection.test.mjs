@@ -449,3 +449,21 @@ test('WK100 scheduler only passes admitted contract versions to the dispatch pla
   const authority=await readFile('supabase/functions/_shared/wk100-source-scheduler-authority.mjs','utf8');
   assert.match(authority,/scheduler_multiple_admitted_contract_versions/);
 });
+
+test('WK100 governed capture-contract enrollment has a single auditable super-admin authority',async()=>{
+  const sql=await readFile('scripts/acceptance/wk100-phase1-source-method-candidate.sql','utf8');
+  assert.match(sql,/revoke insert on public\.wk_chart_capture_contracts_v1 from service_role/);
+  assert.match(sql,/create function public\.wk100_enroll_source_capture_contract_v1\(/);
+  assert.match(sql,/wk100_contract_enrollment_not_authorized/);
+  assert.match(sql,/v_actor uuid:=auth\.uid\(\)/);
+  assert.match(sql,/role_key='super_admin'/);
+  assert.match(sql,/pg_advisory_xact_lock\(11400,pg_catalog\.hashtext\(p_source_key\)\)/);
+  assert.match(sql,/v_decision\.decision_state<>'collector_admitted'/);
+  assert.match(sql,/v_decision\.proposal_revision<>v_proposal\.revision/);
+  assert.match(sql,/wk100_contract_already_enrolled/);
+  assert.match(sql,/create table platform_private\.wk100_capture_contract_enrollments_v1/);
+  assert.match(sql,/wk100_contract_enrollment_update_delete_guard/);
+  assert.match(sql,/wk100_contract_enrollment_truncate_guard/);
+  assert.match(sql,/grant execute on function public\.wk100_enroll_source_capture_contract_v1/);
+  assert.match(sql,/'state','candidate','canCollect',false,'canScore',false,'canPublish',false/);
+});

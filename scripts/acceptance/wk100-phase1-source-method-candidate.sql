@@ -291,11 +291,156 @@ grant execute on function public.wk100_service_admitted_methods_v1(),
   public.wk100_service_capture_method_allowed_v1(text,text,text,text,text)
   to service_role;
 
+-- Capture-contract enrollment is a separate, audited transition.
+-- Do not leave direct service-role INSERT as a bypass around the Method review.
+-- Historical receipts are untouched; new capture contracts enter only through
+-- the following signed-in, super-admin-only, exact-revision RPC.
+revoke insert on public.wk_chart_capture_contracts_v1 from service_role;
+
+create table platform_private.wk100_capture_contract_enrollments_v1 (
+  contract_id uuid primary key references public.wk_chart_capture_contracts_v1(id)
+    on update restrict on delete restrict,
+  source_key text not null,
+  contract_version text not null,
+  proposal_revision integer not null,
+  decision_revision integer not null,
+  adapter_sha256 text not null check(adapter_sha256 ~ '^[a-f0-9]{64}$'),
+  actor_user_id uuid not null,
+  created_at timestamptz not null default clock_timestamp(),
+  unique (source_key,contract_version)
+);
+comment on table platform_private.wk100_capture_contract_enrollments_v1 is
+  'Immutable operator provenance for an independently governed candidate-only capture contract. No activation, scoring or publishing authority.';
+alter table platform_private.wk100_capture_contract_enrollments_v1 enable row level security;
+revoke all on platform_private.wk100_capture_contract_enrollments_v1
+  from public,anon,authenticated,service_role;
+create trigger wk100_contract_enrollment_update_delete_guard
+  before update or delete on platform_private.wk100_capture_contract_enrollments_v1
+  for each row execute function platform_private.wk100_method_decision_immutable_v1();
+create trigger wk100_contract_enrollment_truncate_guard
+  before truncate on platform_private.wk100_capture_contract_enrollments_v1
+  for each statement execute function platform_private.wk100_method_decision_immutable_v1();
+
+create function public.wk100_enroll_source_capture_contract_v1(
+  p_source_key text,p_contract_version text,p_adapter_sha256 text,
+  p_expected_proposal_revision integer,p_expected_decision_revision integer)
+returns jsonb language plpgsql security definer set search_path=pg_catalog as $enroll$
+declare
+  v_actor uuid:=auth.uid();
+  v_proposal platform_private.wk100_source_proposals_v1%rowtype;
+  v_decision platform_private.wk100_source_method_decisions_v1%rowtype;
+  v_contract_id uuid;
+  v_expected_parser text;
+begin
+  if v_actor is null
+    or not public.current_user_has_capability('manage_ingest')
+    or not public.current_user_has_capability('manage_charts')
+    or not exists(
+      select 1 from public.user_role_assignments ura
+      where ura.user_id=v_actor and ura.role_key='super_admin'
+        and ura.status='active'
+        and (ura.expires_at is null or ura.expires_at>now())
+    ) then raise exception 'wk100_contract_enrollment_not_authorized'; end if;
+
+  if p_source_key is null or
+    p_source_key !~ '^[a-z][a-z0-9_]{2,63}$'
+    or p_contract_version is null
+    or p_contract_version !~ '^[a-zA-Z0-9][a-zA-Z0-9._-]{1,63}$'
+    or p_adapter_sha256 is null or p_adapter_sha256 !~ '^[a-f0-9]{64}$'
+    or p_expected_proposal_revision is null
+    or p_expected_proposal_revision not between 1 and 100000
+    or p_expected_decision_revision is null
+    or p_expected_decision_revision not between 1 and 100000
+  then raise exception 'wk100_contract_enrollment_invalid'; end if;
+
+  -- Exactly the same transaction lock as proposal and method review. A
+  -- competing revision cannot slip between proof and insertion.
+  perform pg_catalog.pg_advisory_xact_lock(11400,pg_catalog.hashtext(p_source_key));
+
+  select * into v_proposal
+  from platform_private.wk100_source_proposals_v1
+  where source_key=p_source_key order by revision desc limit 1;
+  if not found or v_proposal.revision<>p_expected_proposal_revision
+    or v_proposal.method_class='research_only'
+  then raise exception 'wk100_contract_proposal_stale_or_unqualified'; end if;
+
+  select * into v_decision
+  from platform_private.wk100_source_method_decisions_v1
+  where source_key=p_source_key order by decision_revision desc limit 1;
+  if not found or v_decision.decision_revision<>p_expected_decision_revision
+    or v_decision.proposal_revision<>v_proposal.revision
+    or v_decision.provider_key<>v_proposal.provider_key
+    or v_decision.method_class<>v_proposal.method_class
+    or v_decision.decision_state<>'collector_admitted'
+    or v_decision.native_period_authority<>'provider_defined'
+    or v_decision.authorization_expires_at<=now()
+    or v_decision.endpoint_sha256 is null
+    or v_decision.access_evidence_sha256 is null
+    or v_decision.authorization_ref is null
+  then raise exception 'wk100_contract_method_not_current'; end if;
+
+  v_expected_parser:=case v_proposal.provider_key
+    when 'youtube_ke' then 'youtube_kenya_weekly_top_songs_v1'
+    when 'apple_ke' then 'apple_kenya_chart_v1'
+    when 'boomplay_ke' then 'boomplay_kenya_chart_v1'
+    when 'mdundo_ke' then 'mdundo_kenya_chart_v1'
+    when 'shazam_ke' then 'shazam_kenya_discovery_v1'
+    when 'audiomack_ke' then 'audiomack_kenya_chart_v1'
+    else null end;
+  if v_expected_parser is null or v_decision.parser_class<>v_expected_parser
+    or (v_proposal.provider_key='youtube_ke' and
+       (v_proposal.behavior<>'video_consumption'
+        or v_proposal.native_metric<>'rank_and_count'
+        or v_proposal.cadence_kind<>'weekly'))
+  then raise exception 'wk100_contract_parser_unqualified'; end if;
+
+  -- Phase 1 allows one immutable capture contract per source. Later
+  -- replacements require an explicit version/retirement migration, never
+  -- a silent parallel contract or a newest-wins scheduler selection.
+  if exists(select 1 from public.wk_chart_capture_contracts_v1
+    where source_key=p_source_key)
+  then raise exception 'wk100_contract_already_enrolled'; end if;
+
+  insert into public.wk_chart_capture_contracts_v1(
+    source_key,contract_version,provider_key,source_surface,market,behavior,
+    native_metric,expected_depth,cadence_kind,interval_hours,eat_hour,
+    eat_minute,weekday_eat,minimum_healthy_checkpoints,adapter_version,
+    adapter_sha256,admission_state
+  ) values(
+    v_proposal.source_key,p_contract_version,v_proposal.provider_key,
+    v_proposal.surface,'KE',v_proposal.behavior,v_proposal.native_metric,
+    v_proposal.expected_depth,v_proposal.cadence_kind,v_proposal.interval_hours,
+    v_proposal.eat_hour,v_proposal.eat_minute,v_proposal.weekday_eat,
+    v_proposal.minimum_healthy_checkpoints,v_decision.parser_class,
+    p_adapter_sha256,'candidate'
+  ) returning id into v_contract_id;
+  insert into platform_private.wk100_capture_contract_enrollments_v1(
+    contract_id,source_key,contract_version,proposal_revision,
+    decision_revision,adapter_sha256,actor_user_id
+  ) values(v_contract_id,p_source_key,p_contract_version,
+    v_proposal.revision,v_decision.decision_revision,p_adapter_sha256,v_actor);
+
+  return jsonb_build_object('contractId',v_contract_id,
+    'sourceKey',p_source_key,'contractVersion',p_contract_version,
+    'proposalRevision',v_proposal.revision,
+    'decisionRevision',v_decision.decision_revision,
+    'state','candidate','canCollect',false,'canScore',false,'canPublish',false);
+end; $enroll$;
+revoke all on function public.wk100_enroll_source_capture_contract_v1(
+  text,text,text,integer,integer) from public,anon,authenticated,service_role;
+grant execute on function public.wk100_enroll_source_capture_contract_v1(
+  text,text,text,integer,integer) to authenticated;
+
 do $postflight$
 begin
   if exists(select 1 from platform_private.wk100_source_method_decisions_v1)
     or has_table_privilege('authenticated','platform_private.wk100_source_method_decisions_v1','SELECT')
     or has_table_privilege('service_role','platform_private.wk100_source_method_decisions_v1','INSERT')
+    or has_table_privilege('service_role','public.wk_chart_capture_contracts_v1','INSERT')
+    or has_table_privilege('authenticated','platform_private.wk100_capture_contract_enrollments_v1','SELECT')
+    or has_function_privilege('anon','public.wk100_enroll_source_capture_contract_v1(text,text,text,integer,integer)','EXECUTE')
+    or not has_function_privilege('authenticated','public.wk100_enroll_source_capture_contract_v1(text,text,text,integer,integer)','EXECUTE')
+    or exists(select 1 from platform_private.wk100_capture_contract_enrollments_v1)
     or has_function_privilege('anon','public.wk100_review_source_method_v1(jsonb,integer)','EXECUTE')
     or not has_function_privilege('authenticated','public.wk100_review_source_method_v1(jsonb,integer)','EXECUTE')
     or has_function_privilege('anon','public.wk100_service_admitted_methods_v1()','EXECUTE')
