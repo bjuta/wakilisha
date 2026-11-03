@@ -419,6 +419,7 @@ test('candidate archive stops on digest, missing ledger, corrupt readback and in
 
 // Integrated WK100 candidate-only collector contract. Existing chart suite owner.
 import { runCandidateCapture,validateCaptureSlot } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
+import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 const wkRuntimeSlot='2026-10-19T09:00:00Z';
 const wkRuntimeWeek='2026-10-19';
 const wkRuntimeBytes=new TextEncoder().encode('<div class="md-playlist-song-item" data-index="1" data-id="123" data-playlist-url="/top-charts/ke" data-title="Song" data-artist="Singer"></div>');
@@ -491,7 +492,40 @@ test('WK100 two consecutive EAT weeks keep distinct raw bytes, slots and idempot
     {week:'2026-10-19',slot:'2026-10-19T09:00:00Z',song:'123'},
     {week:'2026-10-26',slot:'2026-10-26T09:00:00Z',song:'456'},
   ];
+  // The real dispatch planner, not an invented timer implementation, is run
+  // for both adjacent logical EAT weeks. Decisions and provider bytes below
+  // are synthetic authority fixtures and never qualify a live Kenya source.
+  const planContract={...wkRuntimeContract,provider_key:'mdundo_ke'};
+  const syntheticMethod={
+    source_key:'mdundo_ke',provider_key:'mdundo_ke',contract_version:'fixture-v1',
+    state:'collector_admitted',enabled:true,native_period_state:'provider_defined',
+    native_period_evidence_ref:'synthetic_period_marker_not_a_provider_fact',
+    authorization_ref:'WK100-ACCESS-TEST-1',constitution_version:'ci-only-v1',
+    evidence_sha256:'f'.repeat(64),endpoint_sha256:'e'.repeat(64),
+    authorization_expires_at:'2026-11-30T00:00:00Z',
+  };
   for(const {week,slot,song} of weeks){
+    const nowUtc=new Date(Date.parse(slot)+2*60_000).toISOString().replace('.000Z','Z');
+    const schedule={weekStartEat:week,nowUtc,sourceContracts:[planContract],
+      approvedDecisions:[syntheticMethod],attempts:[],executionEnabled:true};
+    const plan=planWk100SourceDispatch(schedule);
+    assert.equal(plan.canPublish,false);
+    assert.equal(plan.canScore,false);
+    assert.deepEqual(plan.jobs,[{
+      source_key:'mdundo_ke',contract_version:'fixture-v1',
+      week_start_eat:week,scheduled_at:slot,attempt_number:1,
+    }]);
+    const alreadyObserved=planWk100SourceDispatch({
+      ...schedule,attempts:[{
+        contract_id:planContract.id,scheduled_at:slot,
+        attempt_number:1,status:'succeeded',
+      }],
+    });
+    assert.equal(alreadyObserved.jobs.length,0);
+    assert.equal(alreadyObserved.blocked[0]?.code,'slot_already_observed');
+    const disabled=planWk100SourceDispatch({...schedule,executionEnabled:false});
+    assert.equal(disabled.jobs.length,0);
+    assert.equal(disabled.blocked[0]?.code,'scheduler_disabled');
     const observedAt=new Date(Date.parse(slot)+2*60_000);
     f.args.weekStartEat=week;
     f.args.scheduledAt=slot;
