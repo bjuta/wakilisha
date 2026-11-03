@@ -80,6 +80,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [proposals,setProposals]=useState<Wk100ProposalRecord[]>([]);
   const [proposalPhase,setProposalPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
   const [reviewing,setReviewing]=useState<Wk100ProposalRecord|null>(null);
+  const [incidentPause,setIncidentPause]=useState(false);
   const [methodDecisions,setMethodDecisions]=useState<Wk100MethodDecision[]>([]);
   const [methodPhase,setMethodPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
   const loadMethods=useCallback(async()=>{
@@ -111,7 +112,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       setProposals(data.proposals as Wk100ProposalRecord[]);setProposalPhase('ready');
     }catch{setProposals([]);setProposalPhase('unavailable');}
   },[]);
-  useEffect(()=>{if(view==='sources'){void loadProposals();void loadMethods()}},[loadProposals,loadMethods,view]);
+  useEffect(()=>{
+    if(view==='sources'||view==='collection'){void loadProposals();void loadMethods()}
+  },[loadProposals,loadMethods,view]);
   const load=useCallback(async()=>{
     const seq=++readSequence.current;
     setPhase('loading');setReport(null);setDetail(null);
@@ -201,7 +204,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               {key:'status',label:'Authority',render:()=> <WkStateBadge>Proposed only</WkStateBadge>},
               {key:'action',label:'Actions',render:p=><div className="flex flex-wrap gap-2">
                 <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{setEditing(p);setAdd(true)}}>Revise</button>
-                <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>setReviewing(p)}>Review Method</button>
+                <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{setIncidentPause(false);setReviewing(p)}}>Review Method</button>
               </div>},
             ] satisfies WkDataColumn<Wk100ProposalRecord>[]} />}
         </Card>
@@ -285,6 +288,21 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               {key:'attempt',label:'Latest attempt',render:s=><span className="text-wk-text-muted">{when(s.lastAttemptAt)}</span>},
               {key:'receipt',label:'Validation · receipt',render:s=><span className="text-wk-text-muted">{s.receiptSha256?'SHA-256 verified':'No verified receipt'}</span>},
               {key:'status',label:'Status',render:s=><WkStateBadge tone={['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState)?'danger':s.receiptSha256?'info':'neutral'}>{s.captureState.replaceAll('_',' ')}</WkStateBadge>},
+              {key:'control',label:'Incident Control',render:s=>{
+                const decision=methodDecisions.find(d=>d.sourceKey===s.sourceKey);
+                const proposal=proposals.find(p=>p.sourceKey===s.sourceKey);
+                if(methodPhase!=='ready'||proposalPhase!=='ready')
+                  return <span className="text-xs text-wk-text-muted">Controls unavailable</span>;
+                if(decision?.decisionState==='paused')
+                  return <WkStateBadge tone="warning">Paused</WkStateBadge>;
+                if(decision?.decisionState!=='collector_admitted'||!proposal||
+                   proposal.revision!==decision.proposalRevision)
+                  return <span className="text-xs text-wk-text-muted">No current admitted method</span>;
+                return <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                  onClick={()=>{setIncidentPause(true);setReviewing(proposal)}}>
+                  Pause Collection
+                </button>;
+              }},
             ] satisfies WkDataColumn<Source>[]} />
         </Card>
         <Card title="Collection activity">
@@ -360,7 +378,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       close={()=>{setAdd(false);setEditing(null)}} onSaved={()=>void loadProposals()}/>}
     {reviewing&&<SourceMethodReviewForm proposal={reviewing}
       previous={methodDecisions.find(d=>d.sourceKey===reviewing.sourceKey)??null}
-      close={()=>setReviewing(null)} onSaved={()=>void loadMethods()}/>}
+      initialDecisionState={incidentPause?'paused':'held'}
+      close={()=>{setReviewing(null);setIncidentPause(false)}}
+      onSaved={()=>{void loadMethods();void load()}}/>}
 
   </div>;
 }
