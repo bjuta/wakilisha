@@ -149,8 +149,8 @@ test('Shazam quoted comma is parsed and evidence remains discovery, not streamin
 });
 
 test('Shazam preserves the dated seven-day CSV label without inventing exact UTC bounds',()=>{
-  const raw='"Wednesday, 28 October 2026 [performance over the past 7 days]"\\n\\n'+
-    'Rank,Artist,Title\\n1,\"Kenya Artist\",\"Kenya Song\"\\n';
+  const raw='"Wednesday, 28 October 2026 [performance over the past 7 days]"\n\n'+
+    'Rank,Artist,Title\n1,\"Kenya Artist\",\"Kenya Song\"\n';
   const parsed=parseShazamKenya(raw);
   assert.equal(parsed.provider_period_label,
     'Wednesday, 28 October 2026 [performance over the past 7 days]');
@@ -159,13 +159,13 @@ test('Shazam preserves the dated seven-day CSV label without inventing exact UTC
   assert.equal(parsed.native_period,'unknown');
   assert.equal(parsed.eligible_for_scoring,false);
   assert.equal(parsed.rows[0].title,'Kenya Song');
-  const noLabel=parseShazamKenya('Rank,Artist,Title\\n1,A,B\\n');
+  const noLabel=parseShazamKenya('Rank,Artist,Title\n1,A,B\n');
   assert.equal(noLabel.provider_period_label,null);
   assert.equal(noLabel.provider_snapshot_date,null);
   assert.equal(noLabel.provider_rolling_window_days,null);
   const inconsistent=parseShazamKenya(
-    '"Thursday, 28 October 2026 [performance over the past 7 days]"\\n'+
-    'Rank,Artist,Title\\n1,A,B\\n');
+    '"Thursday, 28 October 2026 [performance over the past 7 days]"\n'+
+    'Rank,Artist,Title\n1,A,B\n');
   assert.equal(inconsistent.provider_snapshot_date,null);
   assert.equal(inconsistent.provider_rolling_window_days,null);
   assert.equal(inconsistent.native_period,'unknown');
