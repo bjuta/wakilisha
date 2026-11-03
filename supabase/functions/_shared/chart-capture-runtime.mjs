@@ -21,6 +21,27 @@ const PARSERS = Object.freeze({
   youtube_ke: (bytes, access) => parseYouTubeKenyaWeekly(
     JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)), access.native_period_key),
 });
+
+/** A source ID is distinct from its provider parser; IDs never grant fetch authority.
+ * Provider-scoped sources need a manifest-bound parser class, while historical
+ * provider-only contracts remain replayable without a class. */
+const PARSER_CLASS=Object.freeze({
+  mdundo_ke:'mdundo_kenya_chart_v1',
+  audiomack_ke:'audiomack_kenya_chart_v1',
+  boomplay_ke:'boomplay_kenya_chart_v1',
+  shazam_ke:'shazam_kenya_discovery_v1',
+  apple_ke:'apple_kenya_chart_v1',
+  youtube_ke:'youtube_kenya_weekly_top_songs_v1',
+});
+export function resolveCaptureParser(contract,access={}) {
+  if(!contract || typeof contract.source_key!=='string' || typeof contract.provider_key!=='string')return null;
+  const key=contract.source_key,provider=contract.provider_key;
+  if(!Object.hasOwn(PARSERS,provider))return null;
+  if(key===provider)return Object.freeze({providerKey:provider,legacy:true});
+  if(key.length>64 || !new RegExp('^'+provider+'_[a-z][a-z0-9_]{1,45}$').test(key) ||
+     access.parser_class!==PARSER_CLASS[provider])return null;
+  return Object.freeze({providerKey:provider,legacy:false});
+}
 const exactUtc = x => typeof x === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(x)
   && !Number.isNaN(Date.parse(x)) && new Date(x).toISOString().replace('.000Z','Z') === x;
 const fail = c => { throw new CandidateCaptureError(c); };
@@ -33,8 +54,8 @@ function sourceContractForKernel(c) {
       eat_hour:c.eat_hour,eat_minute:c.eat_minute,weekday_eat:c.weekday_eat??undefined},
     minimum_healthy_checkpoints:c.minimum_healthy_checkpoints};
 }
-export function validateCaptureSlot({contract,weekStartEat,scheduledAt,attemptNumber,clock=new Date()}) {
-  requireValue(contract && PARSERS[contract.source_key], 'source_unimplemented');
+export function validateCaptureSlot({contract,weekStartEat,scheduledAt,attemptNumber,access={},clock=new Date()}) {
+  requireValue(resolveCaptureParser(contract,access),'source_unimplemented');
   requireValue(contract.admission_state==='candidate' && contract.market==='KE', 'source_unadmitted');
   requireValue(exactUtc(scheduledAt),'slot_invalid');
   requireValue(Number.isInteger(attemptNumber)&&attemptNumber>=1&&attemptNumber<=8,'attempt_number_invalid');
@@ -44,10 +65,10 @@ export function validateCaptureSlot({contract,weekStartEat,scheduledAt,attemptNu
   const elapsed=clock.valueOf()-Date.parse(scheduledAt);
   requireValue(elapsed>=0 && elapsed<=20*60*1000,'slot_outside_capture_window');
 }
-function normalizeNativeRows(parsed,contract) {
+function normalizeNativeRows(parsed,contract,providerKey) {
   requireValue(parsed && parsed.candidate_only===true && parsed.eligible_for_scoring===false,
     'parser_cannot_admit_source');
-  requireValue(parsed.source_key===contract.source_key && parsed.market==='KE' &&
+  requireValue(parsed.source_key===providerKey && parsed.market==='KE' &&
     parsed.metric===contract.native_metric && parsed.behavior===contract.behavior,
     'parser_contract_mismatch');
   requireValue(Array.isArray(parsed.rows) && parsed.rows.length>=1 &&
@@ -69,8 +90,9 @@ function normalizeNativeRows(parsed,contract) {
 export function parseCaptureNativeRows(bytes,contract,access={}) {
   requireValue(bytes instanceof Uint8Array&&bytes.byteLength>=1&&
     bytes.byteLength<=4_194_304,'raw_bytes_invalid');
-  requireValue(contract&&PARSERS[contract.source_key],'source_unimplemented');
-  return normalizeNativeRows(PARSERS[contract.source_key](bytes,access),contract);
+  const adapter=resolveCaptureParser(contract,access);
+  requireValue(adapter,'source_unimplemented');
+  return normalizeNativeRows(PARSERS[adapter.providerKey](bytes,access),contract,adapter.providerKey);
 }
 
 function dependency(db, names) {
@@ -96,7 +118,7 @@ export async function runCandidateCapture({
     typeof verifyAccess==='function' &&
     typeof access.endpoint==='string' && typeof access.authorization_ref==='string',
     'access_not_configured');
-  validateCaptureSlot({contract,weekStartEat,scheduledAt,attemptNumber,clock:clock()});
+  validateCaptureSlot({contract,weekStartEat,scheduledAt,attemptNumber,access,clock:clock()});
   const accessDecision={source_key:contract.source_key,exact_endpoint:access.endpoint,
     authorization_ref:access.authorization_ref,purpose:'candidate_raw_evidence'};
   // Do not reserve an unauthorized endpoint. Bound authority check also stops

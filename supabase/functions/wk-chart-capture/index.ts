@@ -159,7 +159,7 @@ Deno.serve(async (req:Request) => {
       weekStartEat:String(payload.week_start_eat),scheduledAt:String(payload.scheduled_at),
       attemptNumber:Number(payload.attempt_number),
       access:{source_key:key,endpoint:entry.endpoint,authorization_ref:entry.authorization_ref,
-        native_period_key:entry.native_period_key,providerAuthorization},
+        native_period_key:entry.native_period_key,parser_class:entry.parser_class,providerAuthorization},
       verifyAccess,db:backend,storage,
       clock:()=>new Date(),enabled:true,timeoutMs:12000});
     // Never serialize upstream content or credential values into the response.

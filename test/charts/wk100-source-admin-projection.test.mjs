@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions/_shared/wk100-source-admin-projection.mjs';
 import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
+import { resolveCaptureParser, parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
 
 test('WK100 source read model preserves empty real Production state',()=>{
   const model=projectWk100SourceHealth([],[],'2026-11-02');
@@ -121,4 +122,26 @@ test('multiple independent source IDs under one provider retain separate revisio
   ])assert.throws(()=>validateWk100SourceProposal(invalid));
   assert.equal(validateWk100SourceProposal(first).canCollect,false);
   assert.equal(validateWk100SourceProposal(second).canPublish,false);
+});
+
+test('WK100 provider-scoped source parser requires independently sealed native class',()=>{
+  const youtube={provider_key:'youtube_ke',source_key:'youtube_ke_top_songs_weekly',
+    market:'KE',behavior:'video_consumption',native_metric:'rank_and_count',expected_depth:100};
+  const access={parser_class:'youtube_kenya_weekly_top_songs_v1',native_period_key:'weekly:20261102:20261108:ke'};
+  assert.equal(resolveCaptureParser(youtube,access)?.providerKey,'youtube_ke');
+  assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke_second_weekly'},access)?.legacy,false);
+  assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke'},{}).legacy,true);
+  for(const [contract,manifest] of [
+    [youtube,{}],[youtube,{parser_class:'apple_kenya_chart_v1'}],
+    [{...youtube,provider_key:'apple_ke'},access],
+    [{...youtube,source_key:'spotify_ke_playlist'},access],
+    [{...youtube,source_key:'youtube_ke_bad-name'},access],
+  ]) assert.equal(resolveCaptureParser(contract,manifest),null);
+  assert.throws(()=>parseCaptureNativeRows(new TextEncoder().encode('{}'),youtube,{}),
+    e=>e?.code==='source_unimplemented');
+  // A YouTube playlist listing has no native weekly Top Songs trackViews.
+  assert.throws(()=>parseCaptureNativeRows(new TextEncoder().encode(JSON.stringify({
+    period:access.native_period_key,playlistItems:[{videoId:'one'}]})),youtube,access));
+  const apple={provider_key:'apple_ke',source_key:'apple_ke_catalog_most_played'};
+  assert.equal(resolveCaptureParser(apple,{parser_class:'apple_kenya_chart_v1'})?.providerKey,'apple_ke');
 });
