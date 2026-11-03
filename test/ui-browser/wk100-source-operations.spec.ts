@@ -246,7 +246,7 @@ test('Add Source sends only a proposed candidate through the isolated governed e
   await expect(page.getByText('No source proposals have been saved.')).toBeVisible();
   await page.getByRole('button',{name:'Add Source'}).click();
   await expect(page.getByRole('heading',{name:'Choose a Kenya provider'})).toBeVisible();
-  await page.getByRole('button',{name:/YouTube Kenya/}).click();
+  await page.getByRole('dialog',{name:'Add Source'}).getByRole('button',{name:/^YouTube Kenya/}).click();
   await page.getByRole('button',{name:'Continue'}).click();
   await expect(page.getByRole('heading',{name:'Configure the proposed source method'})).toBeVisible();
   await page.getByRole('textbox',{name:'Stable source ID (provider-scoped)'}).fill('youtube_ke_top_songs_weekly');
@@ -283,9 +283,9 @@ test('a provider can own multiple independent source proposals without overridin
   await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',{waitUntil:'domcontentloaded'});
   await expect(page.getByText('youtube_ke_top_songs_weekly')).toBeVisible({timeout:20_000});
   await page.getByRole('button',{name:'Add Source'}).click();
-  await expect(page.getByRole('button',{name:/YouTube Kenya/})).toBeEnabled();
+  await expect(page.getByRole('dialog',{name:'Add Source'}).getByRole('button',{name:/^YouTube Kenya/})).toBeEnabled();
   await expect(page.getByText('1 existing proposed sources')).toBeVisible();
-  await page.getByRole('button',{name:/YouTube Kenya/}).click();
+  await page.getByRole('dialog',{name:'Add Source'}).getByRole('button',{name:/^YouTube Kenya/}).click();
   await page.getByRole('button',{name:'Continue'}).click();
   const id=page.getByRole('textbox',{name:'Stable source ID (provider-scoped)'});
   await id.fill('youtube_ke_top_songs_weekly');
@@ -314,7 +314,7 @@ test('failed source proposal command does not claim persistence',async({page})=>
   await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',{waitUntil:'domcontentloaded'});
   await expect(page.getByText('No source proposals have been saved.')).toBeVisible({timeout:20_000});
   await page.getByRole('button',{name:'Add Source'}).click();
-  await page.getByRole('button',{name:/YouTube Kenya/}).click();
+  await page.getByRole('dialog',{name:'Add Source'}).getByRole('button',{name:/^YouTube Kenya/}).click();
   await page.getByRole('button',{name:'Continue'}).click();
   await page.getByRole('textbox',{name:'Stable source ID (provider-scoped)'}).fill('youtube_ke_top_songs_weekly');
   await page.getByRole('textbox',{name:'Source surface'}).fill('YouTube Kenya official weekly chart');
