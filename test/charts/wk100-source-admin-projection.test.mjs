@@ -551,7 +551,10 @@ test('WK100 restricted source health and proposal endpoints require the verified
   assert.match(health,/\.limit\(1000\)/);
   assert.match(health,/source_health_page_limit/);
   assert.doesNotMatch(health,/\.select\('\*'\)/);
-  assert.doesNotMatch(health,/raw_object_key|service_role:\s*serviceKey/);
+  // The readback path requires a private object key internally.
+  // The service must never return that key or a service-role credential.
+  assert.match(health,/const hash=record\.payload_sha256,key=record\.raw_object_key/);
+  assert.doesNotMatch(health,/raw_object_key:record\.raw_object_key|service_role:\s*serviceKey/);
 });
 
 test('WK100 private original readback binds exact signed-in receipt and hashes server-owned Storage bytes',async()=>{
