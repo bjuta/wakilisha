@@ -120,7 +120,7 @@ export function analyzeMigrationText(
     ],
     [
       "reviewed production boundary",
-      /\breviewed\b[\s\S]{0,120}\b(?:(?:manifest|cardinality|revision|count)\b|boundary\b[\s\S]{0,80}\b(?:changed|drift(?:ed)?|mismatch|exact(?:ly)?|expected|lock(?:ed)?|revision|count|cardinality|manifest)\b)/i,
+      /\breviewed\b[\s\S]{0,120}\bboundary\b[\s\S]{0,80}\b(?:changed|drift(?:ed)?|mismatch|exact(?:ly)?|expected|lock(?:ed)?|revision|count|cardinality|manifest)\b|\breviewed\s+production\b[\s\S]{0,120}\b(?:manifest|cardinality|revision|count)\b/i,
     ],
     [
       "manifest digest lock",
