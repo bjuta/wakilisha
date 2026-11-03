@@ -410,7 +410,7 @@ test('WK100 scheduler only dispatches signed service calls through existing capt
   assert.doesNotMatch(edge,/wk_chart_runtime_reserve_v1|\.insert\(|\.upsert\(|SUPABASE_SERVICE_ROLE_KEY/);
 });
 
-test('WK100 direct capture calls require current founder constitution, not merely service_role',()=>{
+test('WK100 direct capture calls require current founder constitution, not merely service_role',async()=>{
   const row={
     source_key:'apple_ke_catalog_most_played',contract_version:'v1',
     decision_state:'collector_admitted',constitution_version:'accepted-constitution-v1',
