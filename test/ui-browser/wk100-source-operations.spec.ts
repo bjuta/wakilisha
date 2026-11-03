@@ -368,8 +368,14 @@ test('W1 founder-workbook hierarchy is two-column on desktop and stacked on mobi
   const desktopLeft=await primary.boundingBox(),desktopRight=await summary.boundingBox();
   expect(desktopLeft&&desktopRight&&desktopRight.x>desktopLeft.x+desktopLeft.width-5).toBe(true);
   await page.setViewportSize({width:390,height:844});
-  const mobileLeft=await primary.boundingBox(),mobileRight=await summary.boundingBox();
-  expect(mobileLeft&&mobileRight&&mobileRight.y>=mobileLeft.y+mobileLeft.height-5).toBe(true);
+  // Read both rectangles in one layout pass and poll after responsive reflow.
+  // The assertion retains the actual no-overlap/stacking contract.
+  await expect.poll(async()=>layout.evaluate(root=>{
+    const a=root.querySelector('[data-wk-weekly-primary]')?.getBoundingClientRect();
+    const b=root.querySelector('[data-wk-weekly-summary]')?.getBoundingClientRect();
+    const cols=getComputedStyle(root).gridTemplateColumns.trim().split(/\s+/);
+    return !!a&&!!b&&cols.length===1&&b.top>=a.bottom-5;
+  }),{timeout:10_000}).toBe(true);
   expect(ctx.unexpected).toEqual([]);
 });
 

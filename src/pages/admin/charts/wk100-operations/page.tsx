@@ -429,7 +429,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           title={'Week of '+new Intl.DateTimeFormat('en-KE',{day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Nairobi'}).format(new Date(week+'T12:00:00Z'))}
           description={report.sourceCount===0?'No enrolled capture sources yet. This week has no verified evidence set and cannot proceed to private ranking.':'Source research is provisional. Captures do not become scoring evidence until separately qualified.'}
           aside={<WkStateBadge tone="warning">Private · Not ready</WkStateBadge>}/>
-        <div data-wk-weekly-layout className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)]">
+        <div data-wk-weekly-layout className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)]">
           <div data-wk-weekly-primary className="min-w-0 space-y-5">
           <WkNextAction title={nextAction.title}
             blocked
