@@ -100,6 +100,13 @@ begin
      or length(p_reason) not between 8 and 500
      or p_reason ~ '[[:cntrl:]<>]'
   then raise exception 'wk100_recovery_invalid' using errcode='22023'; end if;
+  -- Resolve the validated action once, before conflict comparisons.
+  v_kind:=case p_action
+    when 'request_retry' then 'retry_requested'
+    when 'request_exception' then 'coverage_requested'
+    when 'accept_exception' then 'coverage_accepted'
+    when 'reject_exception' then 'coverage_rejected'
+  end;
   select * into v_contract from public.wk_chart_capture_contracts_v1
     where id=p_contract_id;
   if not found or v_contract.admission_state<>'candidate'
@@ -116,11 +123,7 @@ begin
        or v_previous_operation.contract_id<>p_contract_id
        or v_previous_operation.week_start_eat<>p_week
        or v_previous_operation.reason<>p_reason
-       or v_previous_operation.action_kind<>case p_action
-         when 'request_retry' then 'retry_requested'
-         when 'request_exception' then 'coverage_requested'
-         when 'accept_exception' then 'coverage_accepted'
-         when 'reject_exception' then 'coverage_rejected' end
+       or v_previous_operation.action_kind<>v_kind
        or v_previous_operation.scheduled_at is distinct from p_scheduled_at
        or (p_action='request_retry' and
            v_previous_operation.attempt_number is distinct from
