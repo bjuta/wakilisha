@@ -71,6 +71,19 @@ async function main(){
   check(query('SELECT count(*) FROM platform_private.wk100_source_proposals_v1;',db)==='0',
     'STOP_PROPOSAL_FIXTURE_NOT_EMPTY');
   console.log('WK100_GENUINE_SOURCE_PROPOSAL_FULL_CHAIN_SQL_VERIFIER=PASS');
+  // This candidate is tested only AFTER the exact active migration ledger
+  // has been proven. It is not part of migration history or Production.
+  const w3Candidate=readFileSync('scripts/acceptance/wk100-phase1-recovery-candidate.sql','utf8');
+  check(w3Candidate.includes('wk100_record_collection_action_v1') &&
+    w3Candidate.includes('wk100_service_retry_requests_v1') &&
+    w3Candidate.trimEnd().endsWith('commit;'),
+    'STOP_WK100_W3_CANDIDATE_NOT_SEALED');
+  query(w3Candidate,db);
+  check(query("SELECT (SELECT count(*) FROM platform_private.wk100_collection_actions_v1)::text||'|'||"+
+    "(SELECT has_function_privilege('anon','public.wk100_record_collection_action_v1(text,date,uuid,timestamptz,smallint,integer,uuid,text)','EXECUTE'))::text||'|'||"+
+    "(SELECT has_function_privilege('service_role','public.wk100_service_retry_requests_v1(date)','EXECUTE'))::text;",db)==='0|false|true',
+    'STOP_WK100_W3_CANDIDATE_ACL_OR_EMPTY_LEDGER');
+  console.log('WK100_W3_DISPOSABLE_PG17_RECOVERY_SCHEMA_AND_ACL=PASS');
   const admin=client(url,v.SERVICE_ROLE_KEY),anon=client(url,v.ANON_KEY);
   const identity=randomUUID(); const email=`wk100-ci-${identity}@example.test`;
   const password=randomBytes(30).toString('base64url');
@@ -110,7 +123,10 @@ async function main(){
   check(!!deniedAnon.error,'STOP_ANON_SOURCE_PROPOSALS_READABLE');
   const deniedRead=await signed.rpc('wk100_list_source_proposals_v1');
   const deniedWrite=await rpcWrite(proposalA,0);
-  check(!!deniedRead.error&&!!deniedWrite.error,
+  const deniedW3Read=await signed.rpc('wk100_list_collection_actions_v1',{p_week:'2026-11-02'});
+  const anonymousW3Read=await anon.rpc('wk100_list_collection_actions_v1',{p_week:'2026-11-02'});
+  check(!!deniedRead.error&&!!deniedWrite.error&&
+    !!deniedW3Read.error&&!!anonymousW3Read.error,
     'STOP_UNPRIVILEGED_SIGNED_JWT_ACCESS_TO_SOURCE_PROPOSALS');
   console.log('WK100_SOURCE_PROPOSAL_ANON_AND_UNPRIVILEGED_SIGNED_JWT_DENIED=PASS');
   query("INSERT INTO public.user_role_assignments(user_id,role_key,status,expires_at,notes) "+
@@ -250,6 +266,53 @@ async function main(){
     admittedService.data[0].contract_version==='ci-v1',
     'STOP_REAL_SERVICE_ADMISSION_PROJECTION_INVALID');
   console.log('WK100_GOTRUE_SUPERADMIN_ADMISSION_AND_IMMUTABLE_ENROLLMENT=PASS');
+  const localEat=new Date(Date.now()+3*3600_000);
+  localEat.setUTCDate(localEat.getUTCDate()-((localEat.getUTCDay()+6)%7));
+  const currentWeek=localEat.toISOString().slice(0,10);
+  const w3Read=await signed.rpc('wk100_list_collection_actions_v1',{p_week:currentWeek});
+  check(!w3Read.error&&Array.isArray(w3Read.data)&&w3Read.data.length===0,
+    'STOP_W3_SUPERADMIN_EMPTY_ACTIONS_UNAVAILABLE');
+  const attemptOperation=randomUUID();
+  const baseW3={p_week:currentWeek,p_contract_id:enrolled.data.contractId,
+    p_scheduled_at:null,p_expected_attempt_number:null,
+    p_operation_id:attemptOperation,p_reason:'Document missing collection without evidence substitution'};
+  const forgedRetry=await signed.rpc('wk100_record_collection_action_v1',{
+    ...baseW3,p_action:'request_retry',
+    p_scheduled_at:new Date().toISOString(),p_expected_attempt_number:1,
+    p_expected_revision:null});
+  check(!!forgedRetry.error,'STOP_W3_RETRY_WITHOUT_FAILED_ATTEMPT_ACCEPTED');
+  const coverageArgs={...baseW3,p_action:'request_exception',p_expected_revision:0};
+  const requestedCoverage=await signed.rpc('wk100_record_collection_action_v1',coverageArgs);
+  check(!requestedCoverage.error&&requestedCoverage.data?.recorded===true&&
+    requestedCoverage.data?.actionKind==='coverage_requested'&&
+    requestedCoverage.data?.revision===1&&
+    requestedCoverage.data?.canCollect===false&&
+    requestedCoverage.data?.canScore===false&&
+    requestedCoverage.data?.canPublish===false,
+    'STOP_W3_COVERAGE_REQUEST_NOT_GOVERNED');
+  const duplicateCoverage=await signed.rpc('wk100_record_collection_action_v1',coverageArgs);
+  check(!duplicateCoverage.error&&duplicateCoverage.data?.actionId===requestedCoverage.data.actionId,
+    'STOP_W3_COVERAGE_OPERATION_IDEMPOTENCE_MISSING');
+  const staleCoverage=await signed.rpc('wk100_record_collection_action_v1',{
+    ...coverageArgs,p_operation_id:randomUUID()});
+  check(!!staleCoverage.error,'STOP_W3_DUPLICATE_PENDING_EXCEPTION_ACCEPTED');
+  const decidedCoverage=await signed.rpc('wk100_record_collection_action_v1',{
+    ...coverageArgs,p_action:'accept_exception',p_operation_id:randomUUID(),
+    p_expected_revision:1,p_reason:'Missingness accepted as documentation only'});
+  check(!decidedCoverage.error&&decidedCoverage.data?.revision===2&&
+    decidedCoverage.data?.actionKind==='coverage_accepted'&&
+    decidedCoverage.data?.canScore===false&&decidedCoverage.data?.canPublish===false,
+    'STOP_W3_SUPERADMIN_COVERAGE_DECISION_NOT_GOVERNED');
+  const w3Readback=await signed.rpc('wk100_list_collection_actions_v1',{p_week:currentWeek});
+  const pendingServiceRetries=await admin.rpc('wk100_service_retry_requests_v1',{p_week:currentWeek});
+  const deniedUserServiceRetries=await signed.rpc('wk100_service_retry_requests_v1',{p_week:currentWeek});
+  check(!w3Readback.error&&w3Readback.data?.length===2&&
+    w3Readback.data.every(a=>a.canScore===false&&a.canPublish===false)&&
+    !pendingServiceRetries.error&&Array.isArray(pendingServiceRetries.data)&&
+    pendingServiceRetries.data.length===0&&!!deniedUserServiceRetries.error&&
+    query("SELECT count(*) FROM platform_private.wk100_collection_actions_v1;",db)==='2',
+    'STOP_W3_DURABLE_ACTIONS_OR_SERVICE_PRIVACY');
+  console.log('WK100_W3_GOTRUE_REQUEST_REPLAY_DECISION_AND_NO_CAPTURE=PASS');
 
   const pause=await signed.rpc('wk100_review_source_method_v1',{
     p_payload:{...appleMethod,decisionState:'paused',
@@ -265,10 +328,12 @@ async function main(){
     "updated_at=clock_timestamp() WHERE user_id='"+created.data.user.id+
     "'::uuid AND role_key='super_admin';",db);
   const revokedMethods=await signed.rpc('wk100_list_source_method_decisions_v1');
+  const revokedRecovery=await signed.rpc('wk100_list_collection_actions_v1',{p_week:currentWeek});
   const revokedEnroll=await signed.rpc('wk100_enroll_source_capture_contract_v1',enrollArgs);
   const revokedMethodWrite=await signed.rpc('wk100_review_source_method_v1',{
     p_payload:methodHold,p_expected_decision_revision:1});
-  check(!!revokedMethods.error&&!!revokedEnroll.error&&!!revokedMethodWrite.error,
+  check(!!revokedMethods.error&&!!revokedEnroll.error&&!!revokedMethodWrite.error&&
+    !!revokedRecovery.error,
     'STOP_REAL_GOTRUE_REVOKED_SUPERADMIN_STILL_AUTHORIZED');
   check(query("SELECT (SELECT count(*) FROM platform_private.wk100_source_method_decisions_v1)::text||'|'||"+
     "(SELECT count(*) FROM platform_private.wk100_capture_contract_enrollments_v1)::text||'|'||"+
