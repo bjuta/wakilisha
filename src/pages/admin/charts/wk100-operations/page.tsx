@@ -256,6 +256,79 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           description="Manage known collection surfaces without conflating technical access, qualification, capture health, and scoring admission."
           aside={<WkStateBadge tone="warning">{report.qualifiedSources} qualified</WkStateBadge>}
           action={<button className="wk-button wk-button-primary wk-button-sm" type="button" onClick={()=>{setEditing(null);setAdd(true)}}>Add Source</button>}/>
+        <Card title="Source Registry">
+          <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_repeat(3,minmax(130px,160px))]">
+            <WkSearchField ariaLabel="Search provider or source" placeholder="Provider or source" value={search} onChange={setSearch}/>
+            <WkSelect ariaLabel="Filter provider" value={providerFilter} onChange={setProviderFilter}
+              options={[{value:'all',label:'All providers'},...Array.from(new Set((report?.sources??[]).map(s=>s.provider))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
+            <WkSelect ariaLabel="Filter health" value={status} onChange={setStatus}
+              options={[{value:'all',label:'All health states'},{value:'collected',label:'Captured'},{value:'failed',label:'Failing'},{value:'not_collected',label:'Unknown'}]}/>
+            <WkSelect ariaLabel="Filter metric" value={metricFilter} onChange={setMetricFilter}
+              options={[{value:'all',label:'All metrics'},...Array.from(new Set((report?.sources??[]).map(s=>s.metric))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
+          </div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-wk-text-muted">
+            <span>Registered candidates · {report.sourceCount} · No sources admitted to the scoring constitution</span>
+            <span>All changes require verified source-method authority</span>
+          </div>
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,480px)]">
+          <WkDataTable<Source> rows={sources} getKey={s=>s.id} ariaLabel="Source registry"
+            empty={report.sourceCount===0?'No source capture contracts are registered. Add Source explains the supported qualification steps.':'No sources match these filters.'}
+            columns={[
+              {key:'source',label:'Source · operator',render:s=><>
+                <button type="button" className="font-semibold text-wk-text underline-offset-2 hover:underline" onClick={()=>{setDetail(s);setDetailTab('configuration')}}>{s.surface}</button>
+                <p className="mt-1 text-xs text-wk-text-muted">{s.provider} · {s.sourceKey}</p>
+              </>},
+              {key:'metric',label:'Metric · period · depth',render:s=><span className="text-wk-text-soft">{s.metric} · {s.nativePeriodAuthority==='provider_defined'?'Defined':'Unverified'} · {s.expectedDepth}</span>},
+              {key:'cadence',label:'Candidate Timing',render:s=><span className="text-wk-text-soft">{candidateCadence(s)}</span>},
+              {key:'qualification',label:'Qualification',render:()=> <WkStateBadge>Candidate</WkStateBadge>},
+              {key:'health',label:'Health',render:s=><WkStateBadge tone={['transport_failed','parse_failed','missed','target_period_unavailable'].includes(s.captureState)?'danger':s.receiptSha256?'success':'neutral'}>{['transport_failed','parse_failed','missed','target_period_unavailable'].includes(s.captureState)?'Failing':s.receiptSha256?'Captured':'Unknown'}</WkStateBadge>},
+              {key:'last',label:'Last success',render:s=><span className="text-wk-text-muted">{when(s.lastSuccessfulAt)}</span>},
+              {key:'constitution',label:'Constitution',render:()=> <span className="text-xs text-wk-text-muted">Not admitted</span>},
+            ] satisfies WkDataColumn<Source>[]} />
+          <aside role="region" aria-label="Selected source inspector"
+            className="min-w-0 rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-sm font-bold text-wk-text">{detail?.surface??'Select a source'}</h3>
+              {detail&&<button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                onClick={()=>setDetail(null)}>Clear selection</button>}
+            </div>
+            {detail?<div className="mt-4">
+              <WkTabs ariaLabel="Selected source detail" value={detailTab} onChange={setDetailTab}
+                items={[{id:'configuration',label:'Configuration'},{id:'qualification',label:'Qualification'},{id:'history',label:'Change History'}]}>
+                {detailTab==='configuration'&&<WkDetailList items={[
+                  {label:'Provider and market',value:detail.provider+' · '+detail.market},
+                  {label:'Source ID',value:detail.sourceKey},
+                  {label:'Native metric and behaviour',value:detail.metric+' · '+detail.behavior},
+                  {label:'Candidate EAT cadence',value:candidateCadence(detail)},
+                  {label:'Expected depth',value:detail.expectedDepth},
+                  {label:'Capture version',value:detail.version},
+                  {label:'Native period',value:detail.nativePeriodAuthority==='provider_defined'?
+                    when(detail.nativePeriodStart)+' to '+when(detail.nativePeriodEnd):'Unknown'},
+                ]}/>}
+                {detailTab==='qualification'&&<WkReadinessList items={[
+                  {id:'method',label:'Current reviewed method',status:methodDecisions.some(d=>
+                    d.sourceKey===detail.sourceKey&&d.decisionState==='collector_admitted'&&
+                    proposals.some(p=>p.sourceKey===d.sourceKey&&p.revision===d.proposalRevision))?'pending':'blocked',
+                    description:'Method admission is not weekly scoring authority'},
+                  {id:'period',label:'Provider-native reporting period',status:detail.nativePeriodAuthority==='provider_defined'?'pending':'blocked',
+                    description:'Native period evidence needs independent verification'},
+                  {id:'score',label:'Ranking and publishing',status:'blocked',description:'Candidate contracts cannot publish'},
+                ]}/>}
+                {detailTab==='history'&&<WkDetailList items={[
+                  {label:'Last attempt',value:when(detail.lastAttemptAt)},
+                  {label:'Last successful collection',value:when(detail.lastSuccessfulAt)},
+                  {label:'Failure code',value:detail.failureCode??'None'},
+                  {label:'SHA-256 original receipt',value:detail.receiptSha256??'Not recorded'},
+                  {label:'Attempt count',value:detail.attemptCount},
+                ]}/>}
+              </WkTabs>
+            </div>:<p className="mt-3 text-xs text-wk-text-muted">
+              Select a source to inspect its configuration, qualification and evidence.
+              This inspector is read-only and cannot grant scoring authority.
+            </p>}
+          </aside>
+          </div>
+        </Card>
         <Card title="Core Provider Readiness">
           <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
             Six Kenya platforms are in scope for future collection. The following
@@ -337,35 +410,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               {key:'collection',label:'Collection',render:()=> <WkStateBadge>Off</WkStateBadge>},
             ] satisfies WkDataColumn<Wk100MethodDecision>[]} />}
         </Card>
-        <Card title="Source Registry">
-          <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_repeat(3,minmax(130px,160px))]">
-            <WkSearchField ariaLabel="Search provider or source" placeholder="Provider or source" value={search} onChange={setSearch}/>
-            <WkSelect ariaLabel="Filter provider" value={providerFilter} onChange={setProviderFilter}
-              options={[{value:'all',label:'All providers'},...Array.from(new Set((report?.sources??[]).map(s=>s.provider))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
-            <WkSelect ariaLabel="Filter health" value={status} onChange={setStatus}
-              options={[{value:'all',label:'All health states'},{value:'collected',label:'Captured'},{value:'failed',label:'Failing'},{value:'not_collected',label:'Unknown'}]}/>
-            <WkSelect ariaLabel="Filter metric" value={metricFilter} onChange={setMetricFilter}
-              options={[{value:'all',label:'All metrics'},...Array.from(new Set((report?.sources??[]).map(s=>s.metric))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
-          </div>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-wk-text-muted">
-            <span>Registered candidates · {report.sourceCount} · No sources admitted to the scoring constitution</span>
-            <span>All changes require verified source-method authority</span>
-          </div>
-          <WkDataTable<Source> rows={sources} getKey={s=>s.id} ariaLabel="Source registry"
-            empty={report.sourceCount===0?'No source capture contracts are registered. Add Source explains the supported qualification steps.':'No sources match these filters.'}
-            columns={[
-              {key:'source',label:'Source · operator',render:s=><>
-                <button type="button" className="font-semibold text-wk-text underline-offset-2 hover:underline" onClick={()=>setDetail(s)}>{s.surface}</button>
-                <p className="mt-1 text-xs text-wk-text-muted">{s.provider} · {s.sourceKey}</p>
-              </>},
-              {key:'metric',label:'Metric · period · depth',render:s=><span className="text-wk-text-soft">{s.metric} · {s.nativePeriodAuthority==='provider_defined'?'Defined':'Unverified'} · {s.expectedDepth}</span>},
-              {key:'cadence',label:'Candidate Timing',render:s=><span className="text-wk-text-soft">{candidateCadence(s)}</span>},
-              {key:'qualification',label:'Qualification',render:()=> <WkStateBadge>Candidate</WkStateBadge>},
-              {key:'health',label:'Health',render:s=><WkStateBadge tone={['transport_failed','parse_failed','missed','target_period_unavailable'].includes(s.captureState)?'danger':s.receiptSha256?'success':'neutral'}>{['transport_failed','parse_failed','missed','target_period_unavailable'].includes(s.captureState)?'Failing':s.receiptSha256?'Captured':'Unknown'}</WkStateBadge>},
-              {key:'last',label:'Last success',render:s=><span className="text-wk-text-muted">{when(s.lastSuccessfulAt)}</span>},
-              {key:'constitution',label:'Constitution',render:()=> <span className="text-xs text-wk-text-muted">Not admitted</span>},
-            ] satisfies WkDataColumn<Source>[]} />
-        </Card>
+
       </div>}
       {view==='collection'&&<div className="space-y-5">
         <WkOperationsHero eyebrow={'Collection · EAT week '+week} title="Collection"
@@ -441,7 +486,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             onClick={()=>setDetail(report.sources.find(s=>['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState))??null)}>Inspect incident</button>}/>}
       </div>}
     </>}
-    {detail&&<WkInspector open={true} onClose={()=>setDetail(null)} title={detail.surface}
+    {detail&&view==='collection'&&<WkInspector open={true} onClose={()=>setDetail(null)} title={detail.surface}
       eyebrow="Source candidate · Kenya"
       summary={<div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-wk-text-muted">{detail.provider} · {detail.market} · {detail.version}</span>
