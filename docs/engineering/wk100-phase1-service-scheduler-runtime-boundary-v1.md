@@ -6,10 +6,11 @@
 
 1. W2A appends a *candidate* source proposal. An ordinary proposal does not start a job.
 2. A signed-in reviewer records a separately audited method decision. A reviewed `collector_admitted` decision requires an active super-admin and exact proposal revision, approved native parser, real source-method evidence identifiers, endpoint SHA-256, credential reference and bounded expiry. Retirement is terminal. Source proposals and reviews share a per-source transaction lock.
-3. A service-only database function returns a method only when its *latest decision* and the *latest proposal* agree and a matching immutable candidate capture contract exists. It exposes metadata, never a provider URL or credential. A separate service-only Boolean function checks the exact source, contract version, endpoint SHA, credential reference and parser class at the moment of capture.
-4. A sealed server manifest independently pins the concrete HTTPS endpoint and allowed source method, and an explicit constitution-version runtime setting matches the reviewed decision. Missing or conflicting authority excludes the source.
-5. The proposed `wk100-source-scheduler` Edge function computes current EAT slots from the already accepted kernel. It reads attempt history, plans bounded nonpublishing jobs and invokes the existing `wk-chart-capture` worker. The worker independently rechecks the service-only method decision before reserve and before network transport. Existing PostgreSQL leases and immutable raw-Storage receipts remain authoritative.
-6. No code in this path admits evidence for scoring, edits MIZIZI facts, or publishes a chart. All returned `canScore` and `canPublish` flags remain false.
+3. A signed-in super-admin independently enrolls an exact immutable **candidate capture contract**, using current proposal and method decision revisions plus a reviewed adapter-code SHA-256. The enrollment RPC shares the per-source advisory transaction lock, records immutable operator provenance, allows only one initial capture contract per source, and returns `canCollect=false`. Direct `service_role` table insertion is revoked. No operator can make a collector-ready source by writing a contract directly.
+4. A service-only database function returns a method only when its *latest decision* and the *latest proposal* agree and the independently enrolled contract matches exactly. It exposes metadata, never a provider URL or credential. A separate service-only Boolean function checks source, contract version, endpoint SHA, credential reference and parser class at capture time.
+5. A sealed server manifest independently pins the concrete HTTPS endpoint and allowed method. Both the scheduler **and direct capture worker** require the exact currently approved constitution version; a service-role token alone cannot bypass it.
+6. The proposed `wk100-source-scheduler` Edge function computes current EAT slots from the accepted kernel. It reads attempt history, plans bounded nonpublishing jobs only for current admitted contract versions, and invokes the existing `wk-chart-capture` worker. The worker independently rechecks current method admission before reservation and before network transport. Existing PostgreSQL leases and immutable raw-Storage receipts remain authoritative.
+7. No code in this path admits evidence for scoring, edits MIZIZI facts, or publishes a chart. All returned `canScore` and `canPublish` flags remain false.
 
 ## Runtime dependencies requiring independent preflight
 
@@ -55,3 +56,26 @@ transport. A service-role token by itself cannot bypass constitution approval.
 For each source ID, only one admitted contract version may be dispatched.
 Historical candidate contract versions do not block a newer admitted contract;
 competing admitted versions fail closed until an explicit operator resolution.
+
+
+## Contract-enrollment authority (candidate; not a completed release)
+
+The method-review Edge endpoint supports the separate
+`enroll_capture_contract` action. The client supplies only source key,
+contract version, reviewed adapter SHA-256, and exact expected proposal/method
+revision numbers. The server forwards the caller's GoTrue JWT; it never uses
+a service-role token for Admin requests. Only PostgreSQL may create the
+contract and append `platform_private.wk100_capture_contract_enrollments_v1`
+with actual actor provenance. The native Admin confirms all returned
+identities and nonpublishing flags; an unconfirmed response remains a failure.
+
+The baseline `service_role` grant on `wk_chart_capture_contracts_v1`
+is deliberately narrowed to SELECT. No public or authenticated direct INSERT
+grant is introduced. The sealed source manifest and founder constitution remain
+independent. Contract enrollment is a prerequisite, never the final authority.
+
+**Acceptance still pending for this addition:** isolated PG17 real-role test
+must exercise direct service-role INSERT denial, denied editor enrollment,
+accepted super-admin enrollment, stale proposal/decision denial, duplicate
+contract denial, immutable enrollment audit and no durable fixture after
+rollback; real GoTrue/hosted Edge tests and clean CLI replay must follow.
