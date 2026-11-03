@@ -262,3 +262,15 @@ test('WK100 review endpoint verifies caller JWT, both capabilities and SQL confi
   assert.match(edge,/data\.decisionRevision===\(body\.expectedDecisionRevision as number\)\+1/);
   assert.doesNotMatch(edge,/SUPABASE_SERVICE_ROLE_KEY|service_role|\.insert\(|\.upsert\(|\bfetch\(/);
 });
+
+test('WK100 draft admission forbids research-only and YouTube playlist masquerading as Weekly Top Songs',async()=>{
+  const sql=await readFile('scripts/acceptance/wk100-phase1-source-method-candidate.sql','utf8');
+  assert.match(sql,/v_p\.method_class='research_only'/);
+  assert.match(sql,/v_p\.provider_key='youtube_ke'/);
+  assert.match(sql,/v_p\.behavior<>'video_consumption'/);
+  assert.match(sql,/v_p\.native_metric<>'rank_and_count'/);
+  assert.match(sql,/v_p\.cadence_kind<>'weekly'/);
+  assert.match(sql,/wk100_method_admission_requires_super_admin/);
+  assert.match(sql,/wk100_method_review_conflict/);
+  assert.match(sql,/wk100_method_decision_immutable/);
+});

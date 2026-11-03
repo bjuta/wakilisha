@@ -138,6 +138,12 @@ begin
     end if;
     if v_expected_parser is null or v_parser<>v_expected_parser
       or v_p.method_class='research_only'
+      -- YouTube Weekly Top Songs is *not* playlist entries or ordinal-only.
+      -- Rank and native view counts, weekly period, and video consumption
+      -- are mandatory before the provider's Top Songs adapter can be reviewed.
+      or (v_p.provider_key='youtube_ke' and
+        (v_p.behavior<>'video_consumption' or
+         v_p.native_metric<>'rank_and_count' or v_p.cadence_kind<>'weekly'))
       or p_payload->>'methodClass'<>v_p.method_class
       or p_payload->>'nativePeriodAuthority'<>'provider_defined'
       or coalesce(length(p_payload->>'nativePeriodEvidenceRef'),0)<3
