@@ -709,11 +709,11 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         </Card>
 
       </div>}
-      {view==='collection'&&<div data-wk-w3-layout
+      {view==='collection'&&<div data-wk-w3-layout=""
         className={detail&&desktopIncident?
           'grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,480px)]':
           'grid grid-cols-1 gap-5'}>
-        <div data-wk-w3-master className="min-w-0 space-y-5">
+        <div data-wk-w3-master="" className="min-w-0 space-y-5">
         <WkOperationsHero eyebrow={'Collection · EAT week '+week} title="Collection"
           description="Source-specific reporting periods, captured evidence and attempt integrity are tracked separately. A successful download does not grant scoring qualification."
           aside={<WkStateBadge tone={report.failedSources?'danger':'neutral'}>{report.failedSources?report.failedSources+' source failures':'No admitted collection'}</WkStateBadge>}

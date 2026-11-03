@@ -71,7 +71,7 @@ export function WkInspector({
   };
   if (inline) return (
     <aside role="region" aria-label="Source incident inspector"
-      data-wk-incident-inline
+      data-wk-incident-inline=""
       className="min-w-0 w-full rounded-2xl border border-wk-border bg-wk-surface shadow-sm
         xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:overflow-y-auto">
       <div className="flex items-center justify-between gap-3 border-b border-wk-border px-4 py-3">
