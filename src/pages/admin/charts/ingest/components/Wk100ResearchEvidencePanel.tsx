@@ -1,7 +1,10 @@
-import {useState, type FormEvent} from "react";
+import {useRef, useState, type FormEvent} from "react";
 import {supabase} from "@/lib/supabase";
 import {WkUploadField} from "@/components/design-system/primitives/UploadField";
-import {getWk100ArchivedResearchPortfolio} from "@/services/chartsIngestion/wk100ResearchPortfolio.mjs";
+import {
+  getWk100ArchivedResearchPortfolio,
+  verifyWk100ArchivedOriginal,
+} from "@/services/chartsIngestion/wk100ResearchPortfolio.mjs";
 import {submitWk100HtmlResearchEvidence} from "@/services/chartsIngestion/wk100HtmlResearchIntakeClient.mjs";
 import {
   submitWk100ResearchEvidence, type Wk100ResearchIntakeAck,
@@ -45,7 +48,55 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
   const [htmlError,setHtmlError]=useState<string|null>(null);
   const [htmlSaved,setHtmlSaved]=useState<string|null>(null);
   const archivedResearch=getWk100ArchivedResearchPortfolio(weekStartEat);
+  const [localSourceKey,setLocalSourceKey]=useState("shazam_ke");
+  const [localOriginal,setLocalOriginal]=useState<File|null>(null);
+  const [localChecking,setLocalChecking]=useState(false);
+  const [localResult,setLocalResult]=useState<{matched:boolean;message:string}|null>(null);
+  const localEpoch=useRef(0);
   const ready=draftSaved&&originalCsv!==null&&receiptFile!==null&&!busy;
+  function selectLocalSource(sourceKey:string){
+    localEpoch.current+=1;
+    setLocalSourceKey(sourceKey);
+    setLocalOriginal(null);
+    setLocalResult(null);
+    setLocalChecking(false);
+  }
+  function selectLocalOriginal(file:File|null){
+    localEpoch.current+=1;
+    setLocalOriginal(file);
+    setLocalResult(null);
+    setLocalChecking(false);
+  }
+  async function verifyLocalOriginal(){
+    if(!localOriginal||localChecking)return;
+    const source=archivedResearch.find(s=>s.sourceKey===localSourceKey);
+    const token=++localEpoch.current;
+    setLocalChecking(true);setLocalResult(null);
+    try{
+      // A local browser read, not an upload. Reject wrong sizes before copying
+      // into memory. Do not retain contents, file names or raw bytes in state.
+      if(!source||localOriginal.size!==source.byteLength)
+        throw new Error("wk100_archived_original_mismatch");
+      const bytes=new Uint8Array(await localOriginal.arrayBuffer());
+      const receipt=await verifyWk100ArchivedOriginal({
+        weekStartEat,sourceKey:localSourceKey,originalBytes:bytes,
+      });
+      if(token===localEpoch.current){
+        setLocalResult({
+          matched:true,
+          message:receipt.privateOriginalMatchesArchivedReceipt
+            ?"Local SHA-256 matches the original October research receipt. No file was uploaded, no hosted receipt was created, and this does not establish a scoring period."
+            :"The original could not be verified.",
+        });
+      }
+    }catch{
+      if(token===localEpoch.current)setLocalResult({
+        matched:false,message:"This file does not match the archived original. Select the unchanged October file; nothing was uploaded.",
+      });
+    }finally{
+      if(token===localEpoch.current)setLocalChecking(false);
+    }
+  }
   function changeCsv(file:File|null){
     if(busy)return;
     setOriginalCsv(file);setAck(null);setError(null);
@@ -176,6 +227,43 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
           <p className="mt-1 text-xs text-wk-text-muted">{source.note}</p>
         </li>)}
       </ul>
+      <div className="mt-4 rounded-lg border border-wk-border bg-wk-surface-raised p-3"
+        aria-label="Local archived original verification">
+        <h4 className="text-sm font-semibold text-wk-text">Verify a preserved original locally</h4>
+        <p className="mt-1 text-xs text-wk-text-muted">
+          Compare any unchanged October CSV or HTML file against the previously audited
+          SHA-256 receipt. The browser reads the selected file only on this device.
+          No network upload, database write, saved Admin draft or collector permission is needed.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2" aria-label="Select archived research source">
+          {archivedResearch.map(source=><button key={source.sourceKey} type="button"
+            aria-pressed={localSourceKey===source.sourceKey} disabled={localChecking}
+            onClick={()=>selectLocalSource(source.sourceKey)}
+            className={localSourceKey===source.sourceKey
+              ?"wk-button wk-button-primary wk-button-sm"
+              :"wk-button wk-button-secondary wk-button-sm"}>
+            {source.displayName}
+          </button>)}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <WkUploadField id="wk100-archived-local-original"
+            label="Choose original for local verification"
+            ariaLabel="Choose original for local verification"
+            accept={localSourceKey==="shazam_ke"?".csv,text/csv":".html,text/html"}
+            disabled={localChecking}
+            onSelect={files=>selectLocalOriginal(files?.[0]??null)}/>
+          <button type="button" onClick={()=>{void verifyLocalOriginal()}}
+            disabled={!localOriginal||localChecking}
+            className="wk-button wk-button-secondary wk-button-sm disabled:cursor-not-allowed disabled:opacity-50">
+            {localChecking?"Checking local SHA-256…":"Verify original on this device"}
+          </button>
+        </div>
+        {localResult&&<p role={localResult.matched?"status":"alert"} aria-live="polite"
+          className={localResult.matched
+            ?"mt-3 text-xs text-wk-text":"mt-3 text-xs text-wk-danger"}>
+          {localResult.message}
+        </p>}
+      </div>
       <div className="mt-4 rounded-lg border border-wk-border bg-wk-surface-raised p-3">
         <h4 className="text-sm font-semibold text-wk-text">Verify preserved Apple or Mdundo HTML</h4>
         <p className="mt-1 text-xs text-wk-text-muted">
