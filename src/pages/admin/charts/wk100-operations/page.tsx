@@ -29,7 +29,8 @@ type Source = {
   lastSuccessfulAt:string|null;observedDepth:number;nativePeriodAuthority:string;
   nativePeriodStart:string|null;nativePeriodEnd:string|null;receiptSha256:string|null;
   failureCode:string|null;canScore:false;canPublish:false;
-  recentAttempts:{id:string;status:string;attemptedAt:string|null;fetchedAt:string|null;failureCode:string|null;observedDepth:number}[];
+  lastScheduledAt:string|null;lastAttemptNumber:number|null;
+  recentAttempts:{id:string;status:string;attemptedAt:string|null;scheduledAt:string|null;attemptNumber:number|null;fetchedAt:string|null;failureCode:string|null;observedDepth:number}[];
 };
 type Report = {schemaVersion:string;weekStartEat:string;sourceCount:number;
   successfulSources:number;failedSources:number;qualifiedSources:number;
@@ -565,6 +566,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         {detailTab==='history'&&<div className="space-y-4">
           <WkDetailList items={[
             {label:'Most recent attempt',value:when(detail.lastAttemptAt)},
+             {label:'Most recent slot',value:when(detail.lastScheduledAt)},
+             {label:'Latest attempt number',value:detail.lastAttemptNumber??'Not recorded'},
             {label:'Last successful capture',value:when(detail.lastSuccessfulAt)},
             {label:'Observed depth',value:detail.observedDepth},
             {label:'Verified digest',value:detail.receiptSha256||'No private evidence receipt'},

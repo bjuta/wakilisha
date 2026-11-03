@@ -24,7 +24,7 @@ test('WK100 source read never upgrades capture success into scoring qualificatio
       eat_hour:9,eat_minute:30,weekday_eat:2,interval_hours:null,
       minimum_healthy_checkpoints:1,adapter_version:'apple-v1',adapter_sha256:'b'.repeat(64),
       contract_version:'v1'}],
-    [{contract_id:id,week_start_eat:'2026-11-02',status:'succeeded',created_at:'2026-11-02T09:00:00Z',
+    [{contract_id:id,week_start_eat:'2026-11-02',status:'succeeded',scheduled_at:'2026-11-02T08:55:00Z',attempt_number:1,created_at:'2026-11-02T09:00:00Z',
       fetched_at:'2026-11-02T09:00:00Z',observed_depth:100,
       payload_sha256:'a'.repeat(64),native_period_authority:'unknown',raw_object_key:'private/secret'}],
     '2026-11-02');
@@ -41,6 +41,10 @@ test('WK100 source read never upgrades capture success into scoring qualificatio
   assert.equal('raw_object_key' in model.sources[0],false);
   assert.equal(model.sources[0].recentAttempts.length,1);
   assert.equal(model.sources[0].recentAttempts[0].status,'succeeded');
+  assert.equal(model.sources[0].lastScheduledAt,'2026-11-02T08:55:00Z');
+  assert.equal(model.sources[0].lastAttemptNumber,1);
+  assert.equal(model.sources[0].recentAttempts[0].scheduledAt,'2026-11-02T08:55:00Z');
+  assert.equal(model.sources[0].recentAttempts[0].attemptNumber,1);
   assert.equal('raw_object_key' in model.sources[0].recentAttempts[0],false);
   assert.equal(model.sources[0].canPublish,false);
 });
