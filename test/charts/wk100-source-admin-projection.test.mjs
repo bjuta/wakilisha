@@ -496,3 +496,16 @@ test('WK100 method list exposes only nonsecret capture contract version, not cre
     .split('end; \$list\$;')[0];
   assert.doesNotMatch(section,/authorization_ref|endpoint_sha256|access_evidence_sha256/);
 });
+
+test('WK100 enrollment UI cannot infer collection authority from a candidate contract',async()=>{
+  const ui=await readFile('src/pages/admin/charts/wk100-operations/SourceMethodReviewForm.tsx','utf8');
+  assert.match(ui,/previous\?\.decisionState==='collector_admitted'/);
+  assert.match(ui,/previous\.proposalRevision===proposal\.revision/);
+  assert.match(ui,/previous\.captureContractVersion/);
+  assert.match(ui,/action:'enroll_capture_contract'/);
+  assert.match(ui,/data\.enrollment\.decisionRevision!==previous\.decisionRevision/);
+  assert.match(ui,/data\.enrollment\.canCollect!==false/);
+  assert.match(ui,/data\.enrollment\.canPublish!==false/);
+  assert.match(ui,/Collection Off/);
+  assert.doesNotMatch(ui,/service_role|SUPABASE_SERVICE_ROLE_KEY/);
+});

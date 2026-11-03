@@ -10,6 +10,7 @@ export type Wk100MethodDecision={
   sourceKey:string;providerKey:string;proposalRevision:number;decisionRevision:number;
   decisionState:'held'|'collector_admitted'|'paused'|'retired';constitutionVersion:string;
   createdAt:string;hasMethodEvidence:boolean;nativePeriodAuthority:string|null;
+  captureContractVersion?:string|null;
   canScore:false;canPublish:false;
 };
 type State=Wk100MethodDecision['decisionState'];
@@ -42,6 +43,9 @@ export function SourceMethodReviewForm({proposal,previous,close,onSaved}:{
     accessEvidenceSha256:'',authorizationRef:'',authorizationExpiresAt:'',
   });
   const [saving,setSaving]=useState(false);
+  const [enrolling,setEnrolling]=useState(false);
+  const [contractVersion,setContractVersion]=useState('');
+  const [adapterSha256,setAdapterSha256]=useState('');
   const [error,setError]=useState('');
   const change=(key:Field,value:string)=>{
     setDraft(d=>({...d,[key]:value}));setError('');
@@ -57,8 +61,49 @@ export function SourceMethodReviewForm({proposal,previous,close,onSaved}:{
       /^[a-f0-9]{64}$/.test(draft.accessEvidenceSha256)&&
       draft.authorizationRef.trim().length>=3&&
       draft.authorizationExpiresAt.trim().length>=20));
+  const canEnroll=previous?.decisionState==='collector_admitted' &&
+    previous.proposalRevision===proposal.revision &&
+    !previous.captureContractVersion;
+  const enrollmentValid=canEnroll&&
+    /^[a-zA-Z0-9][a-zA-Z0-9._-]{1,63}$/.test(contractVersion)&&
+    /^[a-f0-9]{64}$/.test(adapterSha256);
+  const enrollContract=async()=>{
+    if(!enrollmentValid||saving||enrolling||!previous)return;
+    setEnrolling(true);setError('');
+    try{
+      const enrollment={
+        sourceKey:proposal.sourceKey,contractVersion,
+        adapterSha256,
+        expectedProposalRevision:proposal.revision,
+        expectedDecisionRevision:previous.decisionRevision,
+      };
+      const {data,error:callError}=await supabase.functions.invoke(
+        'wk100-source-admin-methods',{
+          body:{action:'enroll_capture_contract',enrollment},
+        });
+      if(callError||!data||
+        data.schemaVersion!=='wk100-capture-contract-enrolled-v1'||
+        data.canCollect!==false||data.canScore!==false||
+        data.canPublish!==false||!data.enrollment||
+        data.enrollment.sourceKey!==proposal.sourceKey||
+        data.enrollment.contractVersion!==contractVersion||
+        data.enrollment.proposalRevision!==proposal.revision||
+        data.enrollment.decisionRevision!==previous.decisionRevision||
+        data.enrollment.state!=='candidate'||
+        data.enrollment.canCollect!==false||
+        data.enrollment.canScore!==false||
+        data.enrollment.canPublish!==false||
+        typeof data.enrollment.contractId!=='string')
+        throw new Error(data?.error==='contract_enrollment_conflict'
+          ?'The source method or contract changed. Refresh before enrolling.'
+          :'The protected server did not confirm enrollment. Nothing is assumed saved.');
+      onSaved();close();
+    }catch(e){
+      setError(e instanceof Error?e.message:'The capture contract could not be enrolled.');
+    }finally{setEnrolling(false);}
+  };
   const submit=async()=>{
-    if(saving||!valid)return;
+    if(saving||enrolling||!valid)return;
     setSaving(true);setError('');
     try{
       const decision={
@@ -94,11 +139,11 @@ export function SourceMethodReviewForm({proposal,previous,close,onSaved}:{
     }catch(e){setError(e instanceof Error?e.message:'The method decision could not be saved.');}
     finally{setSaving(false);}
   };
-  return <Modal open={true} onClose={close} dismissable={!saving} maxWidth="3xl"
+  return <Modal open={true} onClose={close} dismissable={!saving&&!enrolling} maxWidth="3xl"
     title="Review Source Method"
     footer={<div className="flex items-center justify-end gap-3">
-      <button type="button" disabled={saving} className="wk-button wk-button-secondary wk-button-sm" onClick={close}>Cancel</button>
-      <button type="button" disabled={!valid||saving} className="wk-button wk-button-primary wk-button-sm" onClick={()=>void submit()}>
+      <button type="button" disabled={saving||enrolling} className="wk-button wk-button-secondary wk-button-sm" onClick={close}>Cancel</button>
+      <button type="button" disabled={!valid||saving||enrolling} className="wk-button wk-button-primary wk-button-sm" onClick={()=>void submit()}>
         {saving?'Saving…':'Save method decision'}
       </button>
     </div>}>
@@ -149,6 +194,31 @@ export function SourceMethodReviewForm({proposal,previous,close,onSaved}:{
           The server independently verifies this review and the reviewer’s authority.
         </p>
       </div>}
+      {previous?.decisionState==='collector_admitted'&&
+        previous.proposalRevision===proposal.revision&&
+        <div className="space-y-4 rounded-xl border border-wk-border p-4">
+          <p className="text-xs font-semibold text-wk-text">Capture contract enrollment</p>
+          <p className="text-xs leading-relaxed text-wk-text-muted">
+            Restricted to super-admins with current chart and ingest management permission.
+            Enrollment records an immutable candidate contract and operator provenance.
+            It does not start collection, score evidence, or publish a chart.
+          </p>
+          {previous.captureContractVersion?
+            <p role="status" className="text-sm text-wk-text">
+              Contract {previous.captureContractVersion} enrolled · Collection Off
+            </p>:
+            <>
+              <ReviewField label="Capture contract version" limit={64}
+                value={contractVersion} onChange={v=>{setContractVersion(v);setError('')}}/>
+              <ReviewField label="Verified adapter SHA-256" limit={64}
+                value={adapterSha256} onChange={v=>{setAdapterSha256(v);setError('')}}/>
+              <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                disabled={!enrollmentValid||saving||enrolling}
+                onClick={()=>void enrollContract()}>
+                {enrolling?'Enrolling…':'Enroll candidate capture contract'}
+              </button>
+            </>}
+        </div>}
       <p className="rounded-xl bg-wk-surface-raised p-3 text-xs text-wk-text-muted">
         All decisions append a permanent audit revision. Collection stays off until the independent
         source-access and scheduler gates are accepted. This review cannot publish a chart.
