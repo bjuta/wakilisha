@@ -274,3 +274,11 @@ test('WK100 draft admission forbids research-only and YouTube playlist masquerad
   assert.match(sql,/wk100_method_review_conflict/);
   assert.match(sql,/wk100_method_decision_immutable/);
 });
+
+test('WK100 source method review shares proposal revision lock and respects permanent retirement',async()=>{
+  const sql=await readFile('scripts/acceptance/wk100-phase1-source-method-candidate.sql','utf8');
+  assert.match(sql,/pg_advisory_xact_lock\(11400,pg_catalog\.hashtext\(v_key\)\)/);
+  assert.doesNotMatch(sql,/pg_advisory_xact_lock\(11500,/);
+  assert.match(sql,/where source_key=v_key and decision_state='retired'/);
+  assert.match(sql,/wk100_method_source_retired/);
+});

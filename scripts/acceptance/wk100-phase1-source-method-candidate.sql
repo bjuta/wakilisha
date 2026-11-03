@@ -71,7 +71,6 @@ declare
   v_actor uuid:=auth.uid();
   v_p platform_private.wk100_source_proposals_v1%rowtype;
   v_decision platform_private.wk100_source_method_decisions_v1%rowtype;
-  v_prior_state text;
   v_latest integer;
   v_state text;
   v_key text;
@@ -104,7 +103,9 @@ begin
     ('held','collector_admitted','paused','retired')
     or length(p_payload->>'reason') not between 6 and 500
   then raise exception 'wk100_method_review_invalid'; end if;
-  perform pg_catalog.pg_advisory_xact_lock(11500,pg_catalog.hashtext(v_key));
+  -- Proposal writes use 11400 for the SAME source key. Share that lock,
+  -- otherwise a concurrent proposal revision can invalidate this admission.
+  perform pg_catalog.pg_advisory_xact_lock(11400,pg_catalog.hashtext(v_key));
   select * into v_p from platform_private.wk100_source_proposals_v1
     where source_key=v_key order by revision desc limit 1;
   if not found or v_p.provider_key<>p_payload->>'providerKey' or
@@ -114,10 +115,12 @@ begin
     from platform_private.wk100_source_method_decisions_v1 where source_key=v_key;
   if v_latest<>p_expected_decision_revision then
     raise exception 'wk100_method_review_conflict'; end if;
-  select decision_state into v_prior_state from platform_private.wk100_source_method_decisions_v1
-    where source_key=v_key order by decision_revision desc limit 1;
-  if v_prior_state='retired' and v_state='collector_admitted' then
-    raise exception 'wk100_method_source_retired'; end if;
+  -- Retirement is final even if another subsequent hold/pause was recorded.
+  -- Re-admission requires a separately designed and approved reactivation contract.
+  if v_state='collector_admitted' and exists (
+    select 1 from platform_private.wk100_source_method_decisions_v1
+      where source_key=v_key and decision_state='retired'
+  ) then raise exception 'wk100_method_source_retired'; end if;
   v_expected_parser:=case v_p.provider_key
     when 'youtube_ke' then 'youtube_kenya_weekly_top_songs_v1'
     when 'apple_ke' then 'apple_kenya_chart_v1'
