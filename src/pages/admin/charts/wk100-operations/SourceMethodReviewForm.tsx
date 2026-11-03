@@ -33,12 +33,13 @@ function ReviewField({label,value,onChange,limit,area=false}:{
       <Input maxLength={limit} className="wk-input w-full rounded-xl border-wk-border bg-wk-surface text-[16px] text-wk-text"/>}
   </TextField>;
 }
-export function SourceMethodReviewForm({proposal,previous,close,onSaved}:{
+export function SourceMethodReviewForm({proposal,previous,initialDecisionState='held',close,onSaved}:{
   proposal:Wk100ProposalRecord;previous:Wk100MethodDecision|null;
+  initialDecisionState?:State;
   close:()=>void;onSaved:()=>void;
 }){
   const [draft,setDraft]=useState<Draft>({
-    decisionState:'held',constitutionVersion:'',reason:'',
+    decisionState:initialDecisionState,constitutionVersion:previous?.constitutionVersion??'',reason:'',
     nativePeriodEvidenceRef:'',endpointSha256:'',
     accessEvidenceSha256:'',authorizationRef:'',authorizationExpiresAt:'',
   });
