@@ -192,6 +192,11 @@ begin
     'decisionRevision',d.decision_revision,'decisionState',d.decision_state,
     'constitutionVersion',d.constitution_version,'createdAt',d.created_at,
     'hasMethodEvidence',d.access_evidence_sha256 is not null,
+    'captureContractVersion',(
+      select c.contract_version from public.wk_chart_capture_contracts_v1 c
+        where c.source_key=d.source_key
+        order by c.created_at desc limit 1
+    ),
     'nativePeriodAuthority',d.native_period_authority,
     'canScore',false,'canPublish',false) order by d.source_key),'[]'::jsonb) into v_out
   from (select distinct on(source_key) * from platform_private.wk100_source_method_decisions_v1

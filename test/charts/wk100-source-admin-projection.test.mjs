@@ -487,3 +487,12 @@ test('WK100 enrollment intent is bounded and server uses exact JWT actor and SQL
   assert.match(edge,/result\.canCollect!==false/);
   assert.doesNotMatch(edge,/SUPABASE_SERVICE_ROLE_KEY|\.insert\(|\.upsert\(/);
 });
+
+test('WK100 method list exposes only nonsecret capture contract version, not credential or URL',async()=>{
+  const sql=await readFile('scripts/acceptance/wk100-phase1-source-method-candidate.sql','utf8');
+  assert.match(sql,/'captureContractVersion',\(\s*select c\.contract_version/);
+  assert.match(sql,/where c\.source_key=d\.source_key/);
+  const section=sql.split('create function public.wk100_list_source_method_decisions_v1()')[1]
+    .split('end; \$list\$;')[0];
+  assert.doesNotMatch(section,/authorization_ref|endpoint_sha256|access_evidence_sha256/);
+});
