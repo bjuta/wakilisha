@@ -251,7 +251,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                       onClick={()=>{
                         if(p.focus){setIncidentPause(false);setReviewing(p.focus)}
                         else {setEditing(null);setAdd(true)}
-                      }}>{p.focus?'Review Method':'Add Source'}</button>
+                      }}>{p.focus?'Review '+p.label+' Method':'Add '+p.label+' Source'}</button>
                   </div>},
               ] satisfies WkDataColumn<ProviderReadiness>[]} />}
         </Card>
