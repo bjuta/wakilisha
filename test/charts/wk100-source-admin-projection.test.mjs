@@ -5,6 +5,7 @@ import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions
 import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
 import { resolveCaptureParser, parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
 import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
+import { fetchCandidateBytes } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
 import { validateWk100SourceMethodDecision } from '../../supabase/functions/_shared/wk100-source-method-decision-v1.mjs';
 
 test('WK100 source read model preserves empty real Production state',()=>{
@@ -314,4 +315,33 @@ test('WK100 capture endpoint rechecks current method admission before a provider
   assert.match(edge,/sha256Hex\(new TextEncoder\(\)\.encode\(entry\.endpoint\)\)/);
   assert.match(edge,/key\.startsWith\('apple_ke_'\)/);
   assert.doesNotMatch(edge,/body\.providerAuthorization|body\.endpoint/);
+});
+
+test('WK100 scoped Apple source sends provider token only to the exact native catalog charts route',async()=>{
+  const endpoint='https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played';
+  const token='local-test-apple-developer-token-not-a-secret';
+  const createRequest=sourceKey=>({
+    sourceKey,endpoint,
+    accessDecision:{source_key:sourceKey,exact_endpoint:endpoint,
+      authorization_ref:'reviewed_access_v1',purpose:'candidate_raw_evidence'},
+    verifyAccess:async()=>true,
+    providerAuthorization:{kind:'apple_developer_bearer',token},
+    timeoutMs:1000,now:()=>new Date('2026-11-03T08:00:00Z'),
+  });
+  let called=0;
+  const capture=await fetchCandidateBytes({...createRequest('apple_ke_catalog_most_played'),
+    fetchImpl:async (_url,init)=>{
+      called+=1;
+      assert.equal(init.headers.authorization,'Bearer '+token);
+      return new Response('{"native":"example"}',
+        {status:200,headers:{'content-type':'application/json'}});
+    }});
+  assert.equal(called,1);
+  assert.equal(capture.source_key,'apple_ke_catalog_most_played');
+  assert.equal(capture.byte_length>0,true);
+  await assert.rejects(
+    fetchCandidateBytes({...createRequest('youtube_ke_top_songs_weekly'),
+      fetchImpl:async()=>{throw Error('must_not_call');}}),
+    e=>e?.code==='provider_authorization_invalid');
+  assert.equal(called,1);
 });

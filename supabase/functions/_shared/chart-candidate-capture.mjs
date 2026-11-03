@@ -70,7 +70,8 @@ export async function fetchCandidateBytes({ sourceKey, endpoint, accessDecision,
   let providerHeaders = null;
   if(providerAuthorization !== undefined) {
     exactKeys(providerAuthorization, ['kind','token'], 'provider_authorization_invalid');
-    assert(sourceKey === 'apple_ke' && url.hostname === 'api.music.apple.com' &&
+    assert((sourceKey === 'apple_ke' || /^apple_ke_[a-z][a-z0-9_]{1,45}$/.test(sourceKey)) &&
+      url.hostname === 'api.music.apple.com' &&
       url.pathname === '/v1/catalog/ke/charts' &&
       url.searchParams.get('types') === 'songs' &&
       url.searchParams.get('chart') === 'most-played' &&
