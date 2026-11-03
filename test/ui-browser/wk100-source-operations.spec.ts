@@ -589,6 +589,14 @@ test('W3 week-bound retry request and coverage review use one signed-in audit co
   await page.goto('/admin/charts/wk100-operations/collection?week='+week,
     {waitUntil:'domcontentloaded'});
   const table=page.getByRole('table',{name:'Weekly source collection'});
+  await expect(page.getByRole('group',{name:'Candidate collection coverage breakdown'}))
+    .toBeVisible({timeout:20_000});
+  await table.getByRole('button',{name:'Apple Music Kenya'}).click();
+  const inspector=page.getByRole('dialog',{name:'Apple Music Kenya'});
+  await inspector.getByRole('tab',{name:'History'}).click();
+  await expect(inspector.getByText('Incident impact and recovery')).toBeVisible();
+  await expect(inspector.getByText('No accepted original receipt for this source')).toBeVisible();
+  await inspector.getByRole('button',{name:'Close'}).click();
   await expect(table.getByRole('button',{name:'Request Retry'})).toBeVisible({timeout:20_000});
   await table.getByRole('button',{name:'Request Retry'}).click();
   const retry=page.getByRole('dialog',{name:'Request Source Retry'});

@@ -514,9 +514,23 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               <p className="mt-1 text-sm text-wk-text-muted">{report.successfulSources} capture receipts across {report.sourceCount} candidate contracts. These do not establish admitted coverage.</p>
             </div><WkStateBadge tone="warning">Not ready for ranking</WkStateBadge>
           </div>
+          <div role="group" aria-label="Candidate collection coverage breakdown"
+            className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {([
+              ['Receipt recorded',report.successfulSources],
+              ['No verified original',Math.max(0,report.sourceCount-report.successfulSources)],
+              ['Latest attempt failed',report.failedSources],
+              ['Not yet attempted',report.sources.filter(s=>s.attemptCount===0).length],
+            ] as const).map(([label,count])=>
+              <div key={label} className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
+                <p className="text-[11px] text-wk-text-muted">{label}</p>
+                <p className="mt-1 text-lg font-bold tabular-nums text-wk-text">{count}</p>
+              </div>)}
+          </div>
           <p className="mt-3 text-xs text-wk-text-muted">
-            Candidate capture receipts: {report.successfulSources} of {report.sourceCount}.
-            These do not establish qualified-source coverage.
+            Candidate receipt coverage: {report.successfulSources} of {report.sourceCount}.
+            A source may have an earlier receipt and a later failure, so the categories can overlap.
+            None of these records independently qualifies a source or unlocks ranking.
           </p>
           <div aria-label="Candidate receipt coverage" role="progressbar"
             aria-valuenow={report.sourceCount?Math.round(100*Math.min(report.successfulSources,report.sourceCount)/report.sourceCount):0}
@@ -655,14 +669,45 @@ export default function Wk100OperationsPage({view}:{view:View}) {
              {label:'Latest attempt number',value:detail.lastAttemptNumber??'Not recorded'},
             {label:'Last successful capture',value:when(detail.lastSuccessfulAt)},
             {label:'Observed depth',value:detail.observedDepth},
-            {label:'Verified digest',value:detail.receiptSha256||'No private evidence receipt'},
+            {label:'Original receipt SHA-256',value:detail.receiptSha256||'No verified receipt'},
+            {label:'Recorded attempts',value:detail.attemptCount},
+            {label:'Attempts remaining',value:Math.max(0,8-(detail.lastAttemptNumber??0))+
+              ' at most, only inside the original 20-minute slot'},
             {label:'Safe failure code',value:detail.failureCode||'None recorded'},
           ]}/>
+          <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
+            <h3 className="text-sm font-bold text-wk-text">Incident impact and recovery</h3>
+            <p className="mt-2 text-xs leading-relaxed text-wk-text-muted">
+              Earlier-week evidence cannot fill this gap. Coverage decisions record missingness,
+              never replacement evidence or new source weights. Ranking and publication remain blocked.
+            </p>
+            <WkDetailList items={[
+              {label:'Current source outcome',value:detail.captureState.replaceAll('_',' ')},
+              {label:'Original evidence for this week',value:detail.receiptSha256?
+                'Candidate receipt recorded, pending independent qualification':
+                'No accepted original receipt for this source'},
+              {label:'Latest coverage decision',value:recoveryPhase!=='ready'?'Unavailable':
+                recoveryActions.filter(a=>a.contractId===detail.id&&a.actionKind!=='retry_requested')
+                  .sort((a,b)=>b.revision-a.revision)[0]?.actionKind.replaceAll('_',' ')??'Not requested'},
+              {label:'Edition and ranking impact',value:'Blocked pending accepted source and evidence authority'},
+            ]}/>
+          </div>
+          {detail.attemptCount>detail.recentAttempts.length&&
+            <p className="text-xs text-wk-text-muted">
+              Showing {detail.recentAttempts.length} of {detail.attemptCount} recorded attempts.
+            </p>}
           <WkAuditTimeline locale="en-KE" timeZone="Africa/Nairobi" ariaLabel="Source capture attempts" emptyLabel="No attempts have been recorded for this week."
             events={detail.recentAttempts.map((a,i)=>({
-              id:a.id||String(i),label:a.status.replaceAll('_',' '),occurredAt:a.attemptedAt,
-              description:a.failureCode?'Reason: '+a.failureCode:'Observed rows: '+a.observedDepth,
+              id:a.id||String(i),
+              label:'Attempt '+(a.attemptNumber??'?')+' · '+a.status.replaceAll('_',' '),
+              occurredAt:a.attemptedAt,
+              description:'Slot '+when(a.scheduledAt)+' · '+
+                (a.failureCode?'Safe reason: '+a.failureCode:'Observed rows: '+a.observedDepth),
             }))}/>
+          <p className="text-xs leading-relaxed text-wk-text-muted">
+            This inspector exposes only nonsecret receipt metadata and the SHA-256 digest.
+            Original bytes remain private in Storage and are not retrieved by this view.
+          </p>
         </div>}
       </WkTabs>
       <p className="mt-5 rounded-xl bg-wk-surface-raised p-4 text-xs leading-relaxed text-wk-text-muted">
