@@ -158,6 +158,124 @@ async function main(){
   check(query("SELECT count(*) FROM platform_private.wk100_source_proposals_v1;",db)==='3',
     'STOP_REVOCATION_CHANGED_AUDIT');
   console.log('WK100_GENUINE_SOURCE_PROPOSAL_SIGNED_JWT_AND_REVOCATION=PASS');
+  // Exercise real GoTrue identity against the existing method-review and
+  // capture-enrollment RPCs. All source/method evidence below is synthetic,
+  // local-only and NEVER qualifies a real provider for collection.
+  const methodReadDenied=await signed.rpc('wk100_list_source_method_decisions_v1');
+  const methodWriteDenied=await signed.rpc('wk100_review_source_method_v1',{
+    p_payload:{},p_expected_decision_revision:0});
+  check(!!methodReadDenied.error&&!!methodWriteDenied.error,
+    'STOP_REVOKED_REAL_JWT_METHOD_ACCESS');
+  query("INSERT INTO public.user_role_assignments(user_id,role_key,status,expires_at,notes) "+
+    "VALUES ('"+created.data.user.id+"'::uuid,'super_admin','active',"+
+    "clock_timestamp()+interval '20 minutes','Disposable WK100 method and enrollment authority');",db);
+  const superIngest=await signed.rpc('current_user_has_capability',{required_capability:'manage_ingest'});
+  const superCharts=await signed.rpc('current_user_has_capability',{required_capability:'manage_charts'});
+  check(!superIngest.error&&superIngest.data===true&&
+    !superCharts.error&&superCharts.data===true,
+    'STOP_GOTRUE_SUPERADMIN_CAPABILITY_MISSING');
+  const listedMethods=await signed.rpc('wk100_list_source_method_decisions_v1');
+  check(!listedMethods.error&&Array.isArray(listedMethods.data)&&listedMethods.data.length===0,
+    'STOP_METHOD_EMPTY_LEDGER_NOT_REPORTED');
+  const methodHold={
+    sourceKey:proposalA.sourceKey,providerKey:'youtube_ke',proposalRevision:2,
+    decisionState:'held',parserClass:null,methodClass:'provider_api',
+    nativePeriodAuthority:null,nativePeriodEvidenceRef:null,endpointSha256:null,
+    accessEvidenceSha256:null,authorizationRef:null,authorizationExpiresAt:null,
+    constitutionVersion:'wk100-ci-method-v1',
+    reason:'Disposable local method hold without source admission',
+  };
+  const hold=await signed.rpc('wk100_review_source_method_v1',{
+    p_payload:methodHold,p_expected_decision_revision:0});
+  check(!hold.error&&hold.data?.decisionRevision===1&&
+    hold.data?.decisionState==='held'&&hold.data?.canPublish===false,
+    'STOP_REAL_GOTRUE_METHOD_HOLD_NOT_RECORDED');
+  const staleHold=await signed.rpc('wk100_review_source_method_v1',{
+    p_payload:methodHold,p_expected_decision_revision:0});
+  check(!!staleHold.error,'STOP_METHOD_REVIEW_STALE_REVISION_ACCEPTED');
+  const heldEnroll=await signed.rpc('wk100_enroll_source_capture_contract_v1',{
+    p_source_key:proposalA.sourceKey,p_contract_version:'ci-v1',
+    p_adapter_sha256:'a'.repeat(64),p_expected_proposal_revision:2,
+    p_expected_decision_revision:1});
+  check(!!heldEnroll.error,'STOP_METHOD_HOLD_BYPASSED_FOR_ENROLLMENT');
+  console.log('WK100_GOTRUE_METHOD_HOLD_STALE_CAS_AND_ENROLLMENT_DENIAL=PASS');
+
+  // The Apple source is a synthetic SQL authority fixture, not a qualified
+  // Apple access method, native reporting period or collection constitution.
+  const proposalC={...proposalA,providerKey:'apple_ke',
+    sourceKey:'apple_ke_disposable_catalog',surface:'Disposable Apple Kenya chart method',
+    behavior:'consumption',metric:'rank',methodClass:'provider_api',
+    cadence:'daily',weekdayEat:null,minimumHealthyCheckpoints:7,
+    evidenceReference:'ci_only_not_provider_evidence',
+    reason:'Local super-admin enrollment authority acceptance'};
+  const appleProposal=await rpcWrite(proposalC,0);
+  check(!appleProposal.error&&appleProposal.data?.revision===1&&
+    appleProposal.data?.canCollect===false,
+    'STOP_REAL_JWT_DISPOSABLE_APPLE_PROPOSAL_FAILED');
+  const reviewedEndpoint='https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played';
+  const expires=new Date(Date.now()+14*86400_000).toISOString().replace(/\.\d{3}Z$/,'Z');
+  const appleMethod={
+    ...methodHold,sourceKey:proposalC.sourceKey,providerKey:'apple_ke',
+    proposalRevision:1,decisionState:'collector_admitted',
+    parserClass:'apple_kenya_chart_v1',methodClass:'provider_api',
+    nativePeriodAuthority:'provider_defined',
+    nativePeriodEvidenceRef:'synthetic_ci_period_not_provider_fact',
+    endpointSha256:sha(Buffer.from(reviewedEndpoint)),
+    accessEvidenceSha256:sha(Buffer.from('ci_disposable_access_review')),
+    authorizationRef:'ci_only_no_external_access',
+    authorizationExpiresAt:expires,
+    reason:'Synthetic local admission for authorization test only',
+  };
+  const admitted=await signed.rpc('wk100_review_source_method_v1',{
+    p_payload:appleMethod,p_expected_decision_revision:0});
+  check(!admitted.error&&admitted.data?.decisionRevision===1&&
+    admitted.data?.decisionState==='collector_admitted'&&
+    admitted.data?.canScore===false&&admitted.data?.canPublish===false,
+    'STOP_REAL_GOTRUE_SUPERADMIN_METHOD_DECISION');
+  const adapterSha=sha(Buffer.from('wk100-disposable-adapter-no-provider-transport'));
+  const enrollArgs={p_source_key:proposalC.sourceKey,p_contract_version:'ci-v1',
+    p_adapter_sha256:adapterSha,p_expected_proposal_revision:1,
+    p_expected_decision_revision:1};
+  const enrolled=await signed.rpc('wk100_enroll_source_capture_contract_v1',enrollArgs);
+  check(!enrolled.error&&UUID.test(enrolled.data?.contractId??'')&&
+    enrolled.data?.state==='candidate'&&enrolled.data?.canCollect===false&&
+    enrolled.data?.canScore===false&&enrolled.data?.canPublish===false,
+    'STOP_REAL_GOTRUE_SUPERADMIN_CONTRACT_ENROLLMENT');
+  const duplicateEnroll=await signed.rpc('wk100_enroll_source_capture_contract_v1',enrollArgs);
+  check(!!duplicateEnroll.error,'STOP_DUPLICATE_CAPTURE_ENROLLMENT_ACCEPTED');
+  const admittedService=await admin.rpc('wk100_service_admitted_methods_v1');
+  check(!admittedService.error&&Array.isArray(admittedService.data)&&
+    admittedService.data.length===1&&
+    admittedService.data[0].source_key===proposalC.sourceKey&&
+    admittedService.data[0].contract_version==='ci-v1',
+    'STOP_REAL_SERVICE_ADMISSION_PROJECTION_INVALID');
+  console.log('WK100_GOTRUE_SUPERADMIN_ADMISSION_AND_IMMUTABLE_ENROLLMENT=PASS');
+
+  const pause=await signed.rpc('wk100_review_source_method_v1',{
+    p_payload:{...appleMethod,decisionState:'paused',
+      reason:'Disable the synthetic source immediately after enrollment'},
+    p_expected_decision_revision:1});
+  const pausedService=await admin.rpc('wk100_service_admitted_methods_v1');
+  check(!pause.error&&pause.data?.decisionRevision===2&&
+    pause.data?.decisionState==='paused'&&
+    !pausedService.error&&Array.isArray(pausedService.data)&&
+    pausedService.data.length===0,
+    'STOP_METHOD_PAUSE_DID_NOT_REVOKE_SERVICE_ADMISSION');
+  query("UPDATE public.user_role_assignments SET status='revoked',"+
+    "updated_at=clock_timestamp() WHERE user_id='"+created.data.user.id+
+    "'::uuid AND role_key='super_admin';",db);
+  const revokedMethods=await signed.rpc('wk100_list_source_method_decisions_v1');
+  const revokedEnroll=await signed.rpc('wk100_enroll_source_capture_contract_v1',enrollArgs);
+  const revokedMethodWrite=await signed.rpc('wk100_review_source_method_v1',{
+    p_payload:methodHold,p_expected_decision_revision:1});
+  check(!!revokedMethods.error&&!!revokedEnroll.error&&!!revokedMethodWrite.error,
+    'STOP_REAL_GOTRUE_REVOKED_SUPERADMIN_STILL_AUTHORIZED');
+  check(query("SELECT (SELECT count(*) FROM platform_private.wk100_source_method_decisions_v1)::text||'|'||"+
+    "(SELECT count(*) FROM platform_private.wk100_capture_contract_enrollments_v1)::text||'|'||"+
+    "(SELECT count(*) FROM public.wk_chart_capture_attempts_v1)::text;",db)==='3|1|0',
+    'STOP_REAL_GOTRUE_METHOD_AUDIT_OR_UNINTENDED_CAPTURE');
+  console.log('WK100_GOTRUE_METHOD_PAUSE_AND_LIVE_ROLE_REVOCATION=PASS');
+
   const bucket='wk-chart-raw-evidence-v1';
   const key=`acceptance/wk100-auth-disposable/${identity}.bin`;
   const raw=Buffer.from(`WK100 isolated private sentinel ${identity}`,'utf8');
