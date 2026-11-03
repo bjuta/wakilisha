@@ -169,6 +169,26 @@ function csvRows(csv) {
   return out;
 }
 
+const SHAZAM_WEEKDAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const SHAZAM_MONTHS=['January','February','March','April','May','June',
+  'July','August','September','October','November','December'];
+/**
+ * A Shazam CSV may put its dated rolling-window label on the first row,
+ * followed by a blank row and the Rank header. Treat the date as a
+ * provider-labelled SNAPSHOT DATE, never an exact UTC period boundary.
+ */
+function shazamSnapshotDate(label) {
+  if(typeof label!=='string')return null;
+  const match=label.match(/^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday), (\\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December) (\\d{4}) \\[performance over the past 7 days\\]$/);
+  if(!match)return null;
+  const day=Number(match[2]),month=SHAZAM_MONTHS.indexOf(match[3]),year=Number(match[4]);
+  const date=new Date(Date.UTC(year,month,day));
+  if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month||
+    date.getUTCDate()!==day||SHAZAM_WEEKDAYS[date.getUTCDay()]!==match[1])
+    return null;
+  return date.toISOString().slice(0,10);
+}
+
 /** Shazam CSV: identifications/discovery, NEVER equivalent to streams. */
 export function parseShazamKenya(raw) {
   const csv=assertString(raw,'shazam').replace(/^\ufeff/,'');
@@ -183,8 +203,16 @@ export function parseShazamKenya(raw) {
     rows.push(track(rank,null,text(cols[2]),text(cols[1])));
   }
   if (!rows.length) fail('shazam_missing_chart_rows');
+  // The preamble is not guaranteed to have a fixed row index. The last
+  // nonempty single-cell line before the header is the recorded label.
+  const labels=sheet.slice(0,h).filter(cols=>cols.length===1)
+    .map(cols=>text(cols[0],300)).filter(Boolean);
+  const label=labels.at(-1)??null;
+  const snapshotDate=shazamSnapshotDate(label);
   return normalizeRows('shazam_ke',rows,rows.length,{behavior:'discovery',metric:'rank',
-    provider_period_label:text(sheet?.[1]?.[0],300)});
+    provider_period_label:label,
+    provider_snapshot_date:snapshotDate,
+    provider_rolling_window_days:snapshotDate?7:null});
 }
 
 /**
