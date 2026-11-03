@@ -14,11 +14,12 @@ const cors={
 async function json(route:Route,body:unknown,status=200) {
   await route.fulfill({status,contentType:'application/json',headers:cors,body:JSON.stringify(body)});
 }
-async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[]}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[]}={}) {
+async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[],existingMethods=[]}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[]}={}) {
   const reads:unknown[]=[];
   const writes:unknown[]=[];
   const methodWrites:unknown[]=[];
-  const methodRecords:Record<string,unknown>[]=[];
+  const contractWrites:unknown[]=[];
+  const methodRecords:Record<string,unknown>[]=[...existingMethods] as Record<string,unknown>[];
   const proposalRecords:Record<string,unknown>[]=[...existingProposals] as Record<string,unknown>[];
   const unexpected:string[]=[];
   await page.route('**/*',async route=>{
@@ -113,6 +114,28 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         await json(route,{schemaVersion:'wk100-source-method-written-v1',
           saved,canCollect:false,canScore:false,canPublish:false});return;
       }
+      if(body.action==='enroll_capture_contract'){
+        const intent=body.enrollment as Record<string,unknown>|null;
+        const current=methodRecords.find(m=>m.sourceKey===intent?.sourceKey);
+        if(!intent||!current||current.decisionState!=='collector_admitted'||
+          current.proposalRevision!==intent.expectedProposalRevision||
+          current.decisionRevision!==intent.expectedDecisionRevision||
+          current.captureContractVersion){
+          await json(route,{error:'contract_enrollment_conflict'},409);return;
+        }
+        const enrolled={
+          contractId:'33333333-3333-4333-8333-333333333333',
+          sourceKey:intent.sourceKey,
+          contractVersion:intent.contractVersion,
+          proposalRevision:intent.expectedProposalRevision,
+          decisionRevision:intent.expectedDecisionRevision,
+          state:'candidate',canCollect:false,canScore:false,canPublish:false,
+        };
+        current.captureContractVersion=intent.contractVersion;
+        contractWrites.push(body);
+        await json(route,{schemaVersion:'wk100-capture-contract-enrolled-v1',
+          enrollment:enrolled,canCollect:false,canScore:false,canPublish:false});return;
+      }
       await json(route,{error:'unexpected_method_action'},400);return;
     }
     if(url.pathname==='/functions/v1/wk100-source-admin-read') {
@@ -140,7 +163,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         app_metadata:{},user_metadata:{},identities:[],created_at:'2026-10-21T00:00:00Z'},
     }));
   },{ref:PROJECT_REF,id:USER_ID});
-  return {reads,unexpected,writes,methodWrites};
+  return {reads,unexpected,writes,methodWrites,contractWrites};
 }
 
 test('source overview stays truthful, carries EAT week through navigation and uses no publisher',async({page})=>{
@@ -303,5 +326,51 @@ test('Admin method hold is independently persisted and never claims collection o
   expect(saved.decision.authorizationRef).toBeNull();
   expect(saved.decision).not.toHaveProperty('canCollect');
   expect(saved.decision).not.toHaveProperty('canPublish');
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('Admin can enroll only an admitted current method as an inert candidate contract',async({page})=>{
+  const sourceKey='apple_ke_catalog_most_played';
+  const proposals=[{
+    id:'11111111-1111-4111-8111-111111111111',
+    providerKey:'apple_ke',sourceKey,revision:1,
+    surface:'Apple Music Kenya native most played',
+    methodClass:'provider_api',behavior:'consumption',metric:'rank',
+    expectedDepth:100,cadence:'weekly',intervalHours:null,
+    eatHour:9,eatMinute:0,weekdayEat:0,minimumHealthyCheckpoints:1,
+    evidenceReference:'wk100-apple-method-research-2026',reason:null,
+    createdAt:'2026-11-02T00:00:00Z',
+    state:'proposed',canCollect:false,canScore:false,canPublish:false,
+  }];
+  const methods=[{
+    sourceKey,providerKey:'apple_ke',proposalRevision:1,
+    decisionRevision:2,decisionState:'collector_admitted',
+    constitutionVersion:'research-acceptance-v1',createdAt:'2026-11-03T06:00:00Z',
+    nativePeriodAuthority:'provider_defined',
+    hasMethodEvidence:true,captureContractVersion:null,
+    canScore:false,canPublish:false,
+  }];
+  const ctx=await install(page,{existingProposals:proposals,existingMethods:methods});
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  await expect(page.getByText(sourceKey).first()).toBeVisible({timeout:20_000});
+  await page.getByRole('button',{name:'Review Method'}).click();
+  await expect(page.getByText('Capture contract enrollment')).toBeVisible();
+  await page.getByRole('textbox',{name:'Capture contract version'}).fill('apple-ke-v1');
+  await page.getByRole('textbox',{name:'Verified adapter SHA-256'}).fill('a'.repeat(64));
+  await page.getByRole('button',{name:'Enroll candidate capture contract'}).click();
+  await expect(page.getByRole('heading',{name:'Review Source Method'})).toHaveCount(0);
+  expect(ctx.contractWrites).toHaveLength(1);
+  const sent=ctx.contractWrites[0] as {
+    action:string;enrollment:Record<string,unknown>;
+  };
+  expect(sent.action).toBe('enroll_capture_contract');
+  expect(sent.enrollment).toEqual({
+    sourceKey,contractVersion:'apple-ke-v1',adapterSha256:'a'.repeat(64),
+    expectedProposalRevision:1,expectedDecisionRevision:2,
+  });
+  await page.getByRole('button',{name:'Review Method'}).click();
+  await expect(page.getByText('Contract apple-ke-v1 enrolled · Collection Off')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Enroll candidate capture contract'})).toHaveCount(0);
   expect(ctx.unexpected).toEqual([]);
 });
