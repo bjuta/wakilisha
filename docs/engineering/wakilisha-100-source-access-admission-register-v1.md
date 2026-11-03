@@ -56,6 +56,26 @@ These are **actual historical researcher-directed original-byte observations**, 
 
 **Release guard:** On this date, direct Preview inspection still records **0** proposals, **0** method decisions, **0** enrollments, **0** capture contracts, **0** attempts, **0** captured rows and **0** private collector originals. The current `wk-chart-capture` code does not resolve Apple credentials before service-role, enabled-switch, project, manifest, constitution and independently admitted method checks. Missing evidence must stay missing rather than be represented as authorization. PR #1345 remains draft; no source, cron, Production or publication change follows from this research note.
 
+### Shazam Kenya CSV supplied and structurally verified | 3 November 2026
+
+**New primary research material received after the first-party research matrix above:** the operator supplied `Shazam Top 200 Kenya Chart 03-11-2026.csv` for offline inspection. This is **not** a fresh WAKILISHA-initiated provider GET or a hosted receipt. The original file bytes were read directly without normalization or re-encoding; independent SHA-256 commands agreed. **Never commit the CSV original or a row-level content dump to public Git.**
+
+| Property | Evidence from the unchanged uploaded CSV and local checks |
+| --- | --- |
+| Raw original byte length | **8,183 bytes** |
+| Exact original SHA-256 | `5bd148baa5aed3091cfac07b71f0d77a46f83450f22fbef167dff6607bb1ffc3` |
+| UTF-8 format | Valid UTF-8 with BOM, followed by a blank row, one date preamble and `Rank,Artist,Title` header |
+| Source-provided label | `Tuesday, 3 November 2026 [performance over the past 7 days]` |
+| Snapshot date | **2026-11-03**, matching the supplied Tuesday label |
+| Rank and metadata integrity | **200/200** contiguous ranks, no duplicate rank, no missing artist/title, no duplicate normalized artist/title pair |
+| Interpretation | Shazam discovery/identification **rank only**; no source-native recognition counts, verified recording IDs, or UTC window bounds in the CSV |
+| Verification | Read-only local parse and independent SHA readback passed, consistent with the checked-in `parseShazamKenya` and `prepareWk100LocalShazamResearch` contracts |
+| Explicit limitations | Exact provider download time, direct provider-origin signature, precise rolling-window start/end and hosted original receipt **not verified** |
+
+**Local receipt contract:** `wk100-local-public-research-receipt/v1` was generated separately for the operator, with `source_fetch_verified=false`, `source_retrieved_at_utc=null`, `provider_snapshot_date=2026-11-03`, `provider_rolling_window_days=7`, `native_period_authority=unknown`, `hosted_receipt_verified=false`, `source_admitted=false`, `can_score=false` and `can_publish=false`. The local receipt is not the authenticated Admin research-intake receipt schema and is not a substitute for a signed-in hosted byte-storage ACK. Original bytes were not uploaded by this GitHub update.
+
+**Decision:** Shazam's November 3 research-original *file verification* is now proven. The remaining operations are private original retention through the existing authorized research intake where appropriate, independent provider-origin/access and period review for the exact unattended method, and eventual genuine service-collected evidence under a separately approved collector constitution. Neither this file nor its SHA authorizes collection, Registry identity adoption, scoring or publication.
+
 ## Evidence precedence and status vocabulary
 
 Sources of truth: [September 14 technical durability closure](charts-public-source-accessibility-soak-final.md), [WAKILISHA 100 Source Observation Contracts](https://docs.google.com/spreadsheets/d/1fcPlSrOA-OCGfYoY2TQWLNlCyMOiA0orZX3zV7zcyh0/edit), [current integrated runtime authority](wakilisha-100-integrated-capture-runtime-v1.md), and provider's own terms. The live research spreadsheet documents candidate endpoints, native metric classes, source depth and unknowns; it is **not** an access grant. Terms below are research pointers, not legal advice or final contractual interpretation. Provider terms or arrangements may change.
