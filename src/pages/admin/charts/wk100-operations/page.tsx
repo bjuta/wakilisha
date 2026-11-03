@@ -187,6 +187,37 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     </nav>
     {phase==='loading'&&<Card title="Reading capture status"><p role="status" className="text-sm text-wk-text-muted">Checking the restricted source ledger…</p></Card>}
     {phase==='unavailable'&&<Card title="Source status unavailable"><p role="alert" className="text-sm text-wk-text-muted">The protected source service did not return a verified response. No source is assumed to be qualified or collected. Backend deployment and authorized access are needed before this view can show live status.</p></Card>}
+    {view==='sources'&&
+        <Card title="Research Already Captured">
+          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
+            Researcher-held originals from 29–30 October 2026. These observations remain useful
+            without a source proposal. The private files are not hosted capture receipts,
+            verified measurement weeks, or permission to publish.
+          </p>
+          <WkDataTable rows={getWk100ArchivedResearchPortfolio(WK100_ARCHIVED_EAT_WEEK)}
+            getKey={r=>r.sourceKey} ariaLabel="Archived Kenya research observations"
+            empty="No preserved research observations." columns={[
+              {key:'source',label:'Platform',render:r=><span className="font-semibold text-wk-text">{r.displayName}</span>},
+              {key:'observed',label:'Observed',render:r=><span className="text-wk-text-soft">{when(r.observedAtUtc)}</span>},
+              {key:'evidence',label:'Research Evidence',render:r=>
+                <div>
+                  <span className="text-wk-text-soft">{r.rankStructure==='verified'
+                    ?r.rankDepth+' observed '+r.observationType.toLowerCase()
+                    :'Original retained; ranks unverified'}</span>
+                  <p className="text-xs text-wk-text-muted">{r.note}</p>
+                </div>},
+            ]} />
+          <p className="mt-3 text-xs text-wk-text-muted">
+            In Ingest Studio, select WAKILISHA 100 and the EAT week of 26 October 2026
+            to review the preserved originals. Opening the studio does not save
+            a draft, upload evidence, or change this week's collection status.
+          </p>
+          <button type="button" className="wk-button wk-button-secondary wk-button-sm mt-3"
+            onClick={()=>navigate('/admin/charts/ingest')}>
+            Open Ingest Studio
+          </button>
+        </Card>
+    }
     {phase==='ready'&&report&&<>
       {view==='overview'&&<div className="space-y-5">
         <WkOperationsHero eyebrow={'WAKILISHA 100 · Kenya · week '+week}
@@ -222,30 +253,6 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           description="Manage known collection surfaces without conflating technical access, qualification, capture health, and scoring admission."
           aside={<WkStateBadge tone="warning">{report.qualifiedSources} qualified</WkStateBadge>}
           action={<button className="wk-button wk-button-primary wk-button-sm" type="button" onClick={()=>{setEditing(null);setAdd(true)}}>Add Source</button>}/>
-        <Card title="Research Already Captured">
-          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
-            Researcher-held originals from 29–30 October 2026. These observations remain useful
-            without a source proposal. The private files are not hosted capture receipts,
-            verified measurement weeks, or permission to publish.
-          </p>
-          <WkDataTable rows={getWk100ArchivedResearchPortfolio(WK100_ARCHIVED_EAT_WEEK)}
-            getKey={r=>r.sourceKey} ariaLabel="Archived Kenya research observations"
-            empty="No preserved research observations." columns={[
-              {key:'source',label:'Platform',render:r=><span className="font-semibold text-wk-text">{r.displayName}</span>},
-              {key:'observed',label:'Observed',render:r=><span className="text-wk-text-soft">{when(r.observedAtUtc)}</span>},
-              {key:'evidence',label:'Research Evidence',render:r=>
-                <div>
-                  <span className="text-wk-text-soft">{r.rankStructure==='verified'
-                    ?r.rankDepth+' observed '+r.observationType.toLowerCase()
-                    :'Original retained; ranks unverified'}</span>
-                  <p className="text-xs text-wk-text-muted">{r.note}</p>
-                </div>},
-            ]} />
-          <button type="button" className="wk-button wk-button-secondary wk-button-sm mt-3"
-            onClick={()=>navigate('/admin/charts/ingest')}>
-            Open Research Evidence
-          </button>
-        </Card>
         <Card title="Core Provider Readiness">
           <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
             Six Kenya platforms are in scope for future collection. The following
