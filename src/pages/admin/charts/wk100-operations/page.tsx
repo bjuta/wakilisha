@@ -34,6 +34,19 @@ type Report = {schemaVersion:string;weekStartEat:string;sourceCount:number;
   successfulSources:number;failedSources:number;qualifiedSources:number;
   canScore:false;canPublish:false;sources:Source[]};
 type View = 'overview'|'sources'|'collection';
+const CORE_PROVIDERS=[
+  {key:'youtube_ke',label:'YouTube Kenya'},
+  {key:'spotify_ke',label:'Spotify Kenya'},
+  {key:'boomplay_ke',label:'Boomplay Kenya'},
+  {key:'apple_ke',label:'Apple Music Kenya'},
+  {key:'mdundo_ke',label:'Mdundo Kenya'},
+  {key:'shazam_ke',label:'Shazam Kenya'},
+] as const;
+type ProviderReadiness={
+  key:string;label:string;proposalCount:number;decisionCount:number;
+  state:string;next:string;focus:Wk100ProposalRecord|null;
+};
+
 
 function nextWeek(v:string,n:number) {
   const d=new Date(v+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n*7);
@@ -127,6 +140,30 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     } catch {if(seq===readSequence.current)setPhase('unavailable');}
   },[week]);
   useEffect(()=>{void load()},[load]);
+  const providerReadiness=useMemo<ProviderReadiness[]>(()=>CORE_PROVIDERS.map(provider=>{
+    const candidates=proposals.filter(p=>p.providerKey===provider.key);
+    const paired=candidates.map(proposal=>({
+      proposal,decision:methodDecisions.find(d=>d.sourceKey===proposal.sourceKey)??null,
+    }));
+    const current=paired.filter(x=>x.decision?.proposalRevision===x.proposal.revision);
+    const missing=paired.find(x=>!x.decision||x.decision.proposalRevision!==x.proposal.revision);
+    const held=current.find(x=>x.decision?.decisionState==='held');
+    const pendingContract=current.find(x=>x.decision?.decisionState==='collector_admitted'&&
+      !x.decision.captureContractVersion);
+    const paused=current.find(x=>x.decision?.decisionState==='paused');
+    const enrolled=current.find(x=>x.decision?.decisionState==='collector_admitted'&&
+      !!x.decision.captureContractVersion);
+    const focus=missing??held??pendingContract??paused??enrolled??current[0];
+    let state='No proposal',next='Document a Kenya chart source and its access method';
+    if(missing){state='Method review needed';next='Review the current source revision';}
+    else if(held){state='Evidence held';next='Resolve the recorded evidence hold';}
+    else if(pendingContract){state='Method admitted';next='Review candidate contract enrollment';}
+    else if(paused){state='Paused';next='Review the paused method before any restart';}
+    else if(enrolled){state='Candidate enrolled';next='Runtime approval and live collection remain separate';}
+    else if(current.length){state='Retired';next='Review a new source method before use';}
+    return {key:provider.key,label:provider.label,proposalCount:candidates.length,
+      decisionCount:current.length,state,next,focus:focus?.proposal??null};
+  }),[proposals,methodDecisions]);
   const sources=useMemo(()=>(report?.sources??[]).filter(s=>
     (status==='all'||(status==='collected'?!!s.receiptSha256:status==='failed'?
       ['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState):s.captureState==='not_collected'))&&
@@ -184,6 +221,40 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           description="Manage known collection surfaces without conflating technical access, qualification, capture health, and scoring admission."
           aside={<WkStateBadge tone="warning">{report.qualifiedSources} qualified</WkStateBadge>}
           action={<button className="wk-button wk-button-primary wk-button-sm" type="button" onClick={()=>{setEditing(null);setAdd(true)}}>Add Source</button>}/>
+        <Card title="Core Provider Readiness">
+          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
+            Six Kenya platforms are in scope. This list reflects saved source proposals and
+            method decisions, not provider permission or approval to collect.
+            Candidate enrollment never enables collection or publishing.
+          </p>
+          {(proposalPhase==='loading'||methodPhase==='loading')&&
+            <p role="status" className="text-sm text-wk-text-muted">Reading source method authority…</p>}
+          {(proposalPhase==='unavailable'||methodPhase==='unavailable')&&
+            <p role="alert" className="text-sm text-wk-text-muted">
+              The protected source authority is unavailable. Provider readiness cannot be confirmed.
+            </p>}
+          {proposalPhase==='ready'&&methodPhase==='ready'&&
+            <WkDataTable<ProviderReadiness> rows={providerReadiness} getKey={p=>p.key}
+              ariaLabel="Six core provider readiness" empty="No core providers configured."
+              columns={[
+                {key:'provider',label:'Platform',render:p=>
+                  <span className="font-semibold text-wk-text">{p.label}</span>},
+                {key:'records',label:'Saved Records',render:p=>
+                  <span className="text-wk-text-soft">{p.proposalCount} proposed · {p.decisionCount} current reviews</span>},
+                {key:'state',label:'Current Position',render:p=>
+                  <WkStateBadge tone={p.state==='Paused'||p.state==='Evidence held'?'warning':
+                    p.state==='Candidate enrolled'?'info':'neutral'}>{p.state}</WkStateBadge>},
+                {key:'next',label:'Next Action',render:p=>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-xs text-wk-text-muted">{p.next}</span>
+                    <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                      onClick={()=>{
+                        if(p.focus){setIncidentPause(false);setReviewing(p.focus)}
+                        else {setEditing(null);setAdd(true)}
+                      }}>{p.focus?'Review Method':'Add Source'}</button>
+                  </div>},
+              ] satisfies WkDataColumn<ProviderReadiness>[]} />}
+        </Card>
         <Card title="Source proposals">
           <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
             These are append-only Admin configuration proposals, not admitted sources.
