@@ -80,10 +80,11 @@ Deno.serve(async(req:Request)=>{
       sourceContracts:contractsResult.data,approvedDecisions:approved,
       attempts,executionEnabled:true,
     });
-    // A single trigger may dispatch at most eight source slots. The capture
-    // service owns the exact SQL reservation, leases and private byte receipts.
+    // A single trigger dispatches at most four source slots. A subsequent
+    // five-minute tick can address the rest without exhausting Edge runtime.
+    // The capture service owns SQL reservation, leases and private receipts.
     let dispatched=0,rejected=0;
-    for(const job of plan.jobs.slice(0,8)){
+    for(const job of plan.jobs.slice(0,4)){
       const controller=new AbortController();
       const timeout=setTimeout(()=>controller.abort(),20000);
       try{
