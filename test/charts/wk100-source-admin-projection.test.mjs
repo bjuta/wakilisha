@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions/_shared/wk100-source-admin-projection.mjs';
 import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
 import { resolveCaptureParser, parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
-import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
+import { planWk100SourceDispatch, selectWk100AuditedDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 import { fetchCandidateBytes, sha256Hex } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
 import { bindWk100DispatchAuthority, wk100EatWeekFromUtc, isWk100CaptureConstitutionCurrent } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
 import { validateWk100SourceMethodDecision, validateWk100ContractEnrollmentIntent } from '../../supabase/functions/_shared/wk100-source-method-decision-v1.mjs';
@@ -230,6 +230,71 @@ test('WK100 committed, quarantined, unsafe or exhausted retries never duplicate 
   assert.equal(late.jobs.length,0);
 });
 
+test('WK100 scheduler never dispatches a retry without exact audited contract, week, slot and attempt',()=>{
+  const f=wk100PlanFixture('2026-11-02');
+  const contract=f.sourceContracts[0];
+  const slot='2026-11-02T06:00:00Z';
+  const first=planWk100SourceDispatch(f);
+  assert.equal(selectWk100AuditedDispatch({
+    jobs:first.jobs,sourceContracts:f.sourceContracts,retryRequests:[],
+  }).jobs.length,1); // normal first attempt remains eligible
+  const failed={contract_id:contract.id,scheduled_at:'2026-11-02T06:00:00+00:00',
+    attempt_number:1,status:'transport_failed'};
+  const retry=planWk100SourceDispatch({...f,attempts:[failed]});
+  assert.equal(retry.jobs[0].attempt_number,2); // UTC offset matches real SQL
+  const absent=selectWk100AuditedDispatch({
+    jobs:retry.jobs,sourceContracts:f.sourceContracts,retryRequests:[],
+  });
+  assert.equal(absent.jobs.length,0);
+  assert.equal(absent.withheldRetryCount,1);
+  const requested={contract_id:contract.id,source_key:contract.source_key,
+    week_start_eat:f.weekStartEat,scheduled_at:'2026-11-02T06:00:00+00:00',
+    attempt_number:2};
+  const options=[
+    {...requested,contract_id:'other-contract'},
+    {...requested,source_key:'apple_ke_other'},
+    {...requested,week_start_eat:'2026-11-09'},
+    {...requested,scheduled_at:'2026-11-02T06:01:00+00:00'},
+    {...requested,attempt_number:3},
+  ];
+  for(const bad of options){
+    const denied=selectWk100AuditedDispatch({
+      jobs:retry.jobs,sourceContracts:f.sourceContracts,retryRequests:[bad],
+    });
+    assert.equal(denied.jobs.length,0);
+  }
+  const approved=selectWk100AuditedDispatch({
+    jobs:retry.jobs,sourceContracts:f.sourceContracts,retryRequests:[requested],
+  });
+  assert.equal(approved.jobs.length,1);
+  assert.equal(approved.jobs[0].scheduled_at,slot);
+  assert.equal(approved.jobs[0].attempt_number,2);
+  assert.equal(approved.withheldRetryCount,0);
+  assert.throws(()=>selectWk100AuditedDispatch({
+    jobs:retry.jobs,sourceContracts:f.sourceContracts,
+    retryRequests:[{...requested,scheduled_at:'not-a-date'}],
+  }),/wk100_retry_dispatch_invalid/);
+});
+test('WK100 SQL timezone forms cannot make a completed slot look absent',()=>{
+  const f=wk100PlanFixture('2026-11-02');
+  const contract=f.sourceContracts[0];
+  for(const sqlTime of ['2026-11-02T06:00:00+00:00',
+    '2026-11-02T09:00:00+03:00','2026-11-02T06:00:00.000000Z']){
+    const observed=planWk100SourceDispatch({...f,attempts:[{
+      contract_id:contract.id,scheduled_at:sqlTime,
+      attempt_number:1,status:'succeeded',
+    }]});
+    assert.equal(observed.jobs.length,0);
+    assert.equal(observed.blocked[0].code,'slot_already_observed');
+  }
+  const corrupt=planWk100SourceDispatch({...f,attempts:[{
+    contract_id:contract.id,scheduled_at:'not-a-date',
+    attempt_number:1,status:'transport_failed',
+  }]});
+  assert.equal(corrupt.jobs.length,0);
+  assert.equal(corrupt.blocked[0].code,'attempt_history_invalid');
+});
+
 test('WK100 source-method review cannot convert research-only or a mismatched provider into admission',()=>{
   const p={sourceKey:'youtube_ke_top_songs_weekly',providerKey:'youtube_ke',proposalRevision:1,
     decisionState:'collector_admitted',parserClass:'youtube_kenya_weekly_top_songs_v1',
@@ -410,7 +475,8 @@ test('WK100 scheduler only dispatches signed service calls through existing capt
   assert.match(edge,/bindWk100DispatchAuthority\(/);
   assert.match(edge,/planWk100SourceDispatch\(/);
   assert.match(edge,/wk100_service_retry_requests_v1/);
-  assert.match(edge,/requested\.has/);
+  assert.match(edge,/selectWk100AuditedDispatch\(/);
+  assert.match(edge,/withheldRetries/);
   assert.match(edge,/\/functions\/v1\/wk-chart-capture/);
   assert.match(edge,/redirect:'error'/);
   assert.doesNotMatch(edge,/wk_chart_runtime_reserve_v1|\.insert\(|\.upsert\(|SUPABASE_SERVICE_ROLE_KEY/);
