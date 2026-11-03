@@ -14,7 +14,7 @@ const cors={
 async function json(route:Route,body:unknown,status=200) {
   await route.fulfill({status,contentType:'application/json',headers:cors,body:JSON.stringify(body)});
 }
-async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[],existingMethods=[]}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[]}={}) {
+async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[]}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[]}={}) {
   const reads:unknown[]=[];
   const writes:unknown[]=[];
   const methodWrites:unknown[]=[];
@@ -147,8 +147,9 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         ?String(body.weekStartEat):'';
       await json(route,{
         schemaVersion:'wk100-admin-source-health-v1',weekStartEat:week,
-        sourceCount:0,successfulSources:0,failedSources:0,qualifiedSources:0,
-        canScore:false,canPublish:invalid,sources:[],
+        sourceCount:existingSources.length,successfulSources:0,
+        failedSources:existingSources.filter(s=>s.captureState==='transport_failed').length,
+        qualifiedSources:0,canScore:false,canPublish:invalid,sources:existingSources,
       });return;
     }
     // Any unrecognized Supabase call is denied, not forwarded.
@@ -372,5 +373,68 @@ test('Admin can enroll only an admitted current method as an inert candidate con
   await page.getByRole('button',{name:'Review Method'}).click();
   await expect(page.getByText('Contract apple-ke-v1 enrolled · Collection Off')).toBeVisible();
   await expect(page.getByRole('button',{name:'Enroll candidate capture contract'})).toHaveCount(0);
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('W3 incident pause uses the existing protected method command and cannot re-admit a source',async({page})=>{
+  const sourceKey='apple_ke_catalog_most_played';
+  const proposals=[{
+    id:'11111111-1111-4111-8111-111111111111',
+    providerKey:'apple_ke',sourceKey,revision:1,
+    surface:'Apple Kenya chart method',
+    methodClass:'provider_api',behavior:'consumption',metric:'rank',
+    expectedDepth:100,cadence:'daily',intervalHours:null,eatHour:12,
+    eatMinute:0,weekdayEat:null,minimumHealthyCheckpoints:7,
+    evidenceReference:'synthetic_browser_evidence',reason:null,
+    createdAt:'2026-11-02T00:00:00Z',state:'proposed',
+    canCollect:false,canScore:false,canPublish:false,
+  }];
+  const methods=[{
+    sourceKey,providerKey:'apple_ke',proposalRevision:1,
+    decisionRevision:1,decisionState:'collector_admitted',
+    constitutionVersion:'wk100-synthetic-v1',createdAt:'2026-11-03T06:00:00Z',
+    nativePeriodAuthority:'provider_defined',hasMethodEvidence:true,
+    captureContractVersion:'ci-v1',canScore:false,canPublish:false,
+  }];
+  const sources=[{
+    id:'22222222-2222-4222-8222-222222222222',sourceKey,
+    provider:'apple_ke',surface:'Apple Kenya chart method',
+    market:'KE',metric:'rank',behavior:'consumption',expectedDepth:100,
+    cadence:'daily',version:'ci-v1',intervalHours:null,eatHour:12,eatMinute:0,
+    weekdayEat:null,minimumHealthyCheckpoints:7,adapterVersion:'apple_kenya_chart_v1',
+    admissionState:'candidate',captureState:'transport_failed',attemptCount:1,
+    lastAttemptAt:'2026-11-03T06:00:00Z',lastSuccessfulAt:null,observedDepth:0,
+    nativePeriodAuthority:'unknown',nativePeriodStart:null,nativePeriodEnd:null,
+    receiptSha256:null,failureCode:'transport_failed',canScore:false,canPublish:false,
+    recentAttempts:[],
+  }];
+  const ctx=await install(page,{existingProposals:proposals,
+    existingMethods:methods,existingSources:sources});
+  await page.goto('/admin/charts/wk100-operations/collection?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  const table=page.getByRole('table',{name:'Weekly source collection'});
+  await expect(table.getByRole('button',{name:'Pause Collection'})).toBeVisible({timeout:20_000});
+  await table.getByRole('button',{name:'Pause Collection'}).click();
+  await expect(page.getByRole('heading',{name:'Pause Source Method'})).toBeVisible();
+  await expect(page.getByText('Pause reviewed method')).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'Constitution version'})).toHaveValue('wk100-synthetic-v1');
+  await expect(page.getByRole('button',{name:'Enroll candidate capture contract'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Confirm Pause'})).toBeDisabled();
+  await page.getByRole('textbox',{name:'Decision reason'}).fill('Stop collection following a transport incident');
+  await page.getByRole('button',{name:'Confirm Pause'}).click();
+  await expect(page.getByRole('heading',{name:'Pause Source Method'})).toHaveCount(0);
+  await expect(table.getByText('Paused')).toBeVisible();
+  await expect(table.getByRole('button',{name:'Pause Collection'})).toHaveCount(0);
+  expect(ctx.methodWrites).toHaveLength(1);
+  const review=ctx.methodWrites[0] as {
+    action:string;decision:Record<string,unknown>;expectedDecisionRevision:number;
+  };
+  expect(review.action).toBe('review_source_method');
+  expect(review.expectedDecisionRevision).toBe(1);
+  expect(review.decision.decisionState).toBe('paused');
+  expect(review.decision.constitutionVersion).toBe('wk100-synthetic-v1');
+  expect(review.decision.endpointSha256).toBeNull();
+  expect(review.decision.authorizationRef).toBeNull();
+  expect(ctx.contractWrites).toHaveLength(0);
   expect(ctx.unexpected).toEqual([]);
 });
