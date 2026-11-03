@@ -114,6 +114,7 @@ test('the kernel has no policy for converting native rank to stream counts',()=>
 import {
   parseMdundoKenya, parseAudiomackKenya, parseBoomplayKenya,
   parseShazamKenya, parseAppleKenya, parseYouTubeKenyaWeekly,
+  parseSpotifyChartCsvCandidate,
 } from '../../supabase/functions/_shared/chart-public-source-observations.mjs';
 
 test('Mdundo parses explicit Kenya playlist ranks, and rejects unexplained rank gaps',()=>{
@@ -138,6 +139,51 @@ test('Boomplay page repeats do not become extra ranked observations; scope stays
   const r=parseBoomplayKenya(html);
   assert.equal(r.rows.length,2);assert.equal(r.rows[1].provider_track_id,'44');
   assert.equal(r.officiality,'unverified');assert.equal(r.native_period,'unknown');
+});
+
+test('Spotify exported chart CSV preflight preserves ranked native counts without inventing Kenya or weekly period',()=>{
+  const id1='A'.repeat(22),id2='B'.repeat(22);
+  const header='rank,uri,artist_names,track_name,source,peak_rank,previous_rank,weeks_on_chart,streams';
+  const first=`1,spotify:track:${id1},"Alpha, Guest","Song, Mix",Label,1,0,2,2433`;
+  const second=`2,spotify:track:${id2},Beta,Second,Label,2,1,1,2000`;
+  const csv=[header,first,second,''].join('\\n');
+  const got=parseSpotifyChartCsvCandidate(csv);
+  assert.equal(got.source_key,'spotify_chart_csv_candidate');
+  assert.equal(got.market,'unverified');
+  assert.equal(got.behavior,'consumption');
+  assert.equal(got.metric,'rank_plus_spotify_chart_eligible_streams');
+  assert.equal(got.native_period,'unknown');
+  assert.equal(got.source_admitted,false);
+  assert.equal(got.eligible_for_scoring,false);
+  assert.equal(got.can_collect,false);assert.equal(got.can_score,false);assert.equal(got.can_publish,false);
+  assert.deepEqual(got.rows.map(r=>r.provider_track_id),[id1,id2]);
+  assert.deepEqual(got.rows.map(r=>r.chart_eligible_stream_count),[2433,2000]);
+  assert.equal(got.rows[0].artist,'Alpha, Guest');
+  assert.equal(got.rows[0].title,'Song, Mix');
+  assert.equal(got.rows[0].view_count,undefined);
+});
+
+test('Spotify candidate preflight rejects forged or ambiguous CSV shapes rather than granting collector authority',()=>{
+  const id1='A'.repeat(22),id2='B'.repeat(22);
+  const header='rank,uri,artist_names,track_name,source,peak_rank,previous_rank,weeks_on_chart,streams';
+  const r1=`1,spotify:track:${id1},Artist,Track,Label,1,1,1,1200`;
+  const r2=`2,spotify:track:${id2},Artist Two,Track Two,Label,2,1,1,1000`;
+  const csv=[header,r1,r2].join('\\n');
+  assert.throws(()=>parseSpotifyChartCsvCandidate(csv.replace('streams','youtube_views')),
+    /spotify_export_schema_unverified/);
+  assert.throws(()=>parseSpotifyChartCsvCandidate(csv.replace(id1,'not-an-id')),
+    /spotify_export_row_invalid/);
+  assert.throws(()=>parseSpotifyChartCsvCandidate(csv.replace(',1200',',-1')),
+    /spotify_export_row_invalid/);
+  assert.throws(()=>parseSpotifyChartCsvCandidate(csv.replace(r2,`3,${r2.slice(2)}`)),
+    /spotify_chart_csv_candidate_duplicate_or_invalid_rank|spotify_chart_csv_candidate_noncontiguous_rank/);
+  assert.throws(()=>parseSpotifyChartCsvCandidate(csv.replace(id2,id1)),
+    /spotify_chart_csv_candidate_duplicate_provider_id/);
+  assert.throws(()=>parseSpotifyChartCsvCandidate(csv+',unexpected,column'),
+    /spotify_export_row_invalid/);
+  const tooDeep=Array.from({length:201},(_,i)=>`${i+1},spotify:track:${id1},A,T,L,1,1,1,1`).join('\\n');
+  assert.throws(()=>parseSpotifyChartCsvCandidate(header+'\\n'+tooDeep),
+    /spotify_export_depth_invalid/);
 });
 
 test('Shazam quoted comma is parsed and evidence remains discovery, not streaming',()=>{
