@@ -226,6 +226,15 @@ test('all six core providers show truthful readiness and no invented source admi
     {waitUntil:'domcontentloaded'});
   const table=page.getByRole('table',{name:'Six core provider readiness'});
   await expect(table).toBeVisible({timeout:20_000});
+  // The operator's source master/detail must precede secondary October research.
+  const registryBeforeArchive=await page.locator('main').evaluate(root=>{
+    const headings=Array.from(root.querySelectorAll('h2'));
+    const registry=headings.find(h=>h.textContent?.trim()==='Source Registry');
+    const archive=headings.find(h=>h.textContent?.trim()==='Research Already Captured');
+    return !!registry&&!!archive&&
+      Boolean(registry.compareDocumentPosition(archive)&Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+  expect(registryBeforeArchive).toBe(true);
   await expect(page.getByRole('region',{name:'Selected source inspector'})).toBeVisible();
   await expect(page.getByRole('region',{name:'Selected source inspector'}).getByRole('heading',{name:'Select a source',exact:true}))
     .toBeVisible();
@@ -503,6 +512,8 @@ test('Add Source sends only a proposed candidate through the isolated governed e
   const inspector=page.getByRole('region',{name:'Selected source inspector'});
   await expect(inspector.getByText('Source proposal · no capture contract enrolled')).toBeVisible();
   await expect(inspector.getByText('Not enrolled',{exact:true})).toBeVisible();
+  await expect(inspector.getByText('Source evidence reference')).toBeVisible();
+  await expect(inspector.getByText('wk100-youtube-method-2026')).toBeVisible();
   await expect(inspector.getByRole('button',{name:'Revise Proposal'})).toBeVisible();
   await expect(inspector.getByRole('button',{name:'Review Method'})).toBeVisible();
   expect(ctx.writes).toHaveLength(1);

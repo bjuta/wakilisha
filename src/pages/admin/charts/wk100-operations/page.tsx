@@ -424,37 +424,6 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     </nav>
     {phase==='loading'&&<Card title="Reading capture status"><p role="status" className="text-sm text-wk-text-muted">Checking the restricted source ledger…</p></Card>}
     {phase==='unavailable'&&<Card title="Source status unavailable"><p role="alert" className="text-sm text-wk-text-muted">The protected source service did not return a verified response. No source is assumed to be qualified or collected. Backend deployment and authorized access are needed before this view can show live status.</p></Card>}
-    {view==='sources'&&
-        <Card title="Research Already Captured">
-          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
-            Researcher-held originals from 29–30 October 2026. These observations remain useful
-            without a source proposal. The private files are not hosted capture receipts,
-            verified measurement weeks, or permission to publish.
-          </p>
-          <WkDataTable rows={getWk100ArchivedResearchPortfolio(WK100_ARCHIVED_EAT_WEEK)}
-            getKey={r=>r.sourceKey} ariaLabel="Archived Kenya research observations"
-            empty="No preserved research observations." columns={[
-              {key:'source',label:'Platform',render:r=><span className="font-semibold text-wk-text">{r.displayName}</span>},
-              {key:'observed',label:'Observed',render:r=><span className="text-wk-text-soft">{when(r.observedAtUtc)}</span>},
-              {key:'evidence',label:'Research Evidence',render:r=>
-                <div>
-                  <span className="text-wk-text-soft">{r.rankStructure==='verified'
-                    ?r.rankDepth+' observed '+r.observationType.toLowerCase()
-                    :'Original retained; ranks unverified'}</span>
-                  <p className="text-xs text-wk-text-muted">{r.note}</p>
-                </div>},
-            ]} />
-          <p className="mt-3 text-xs text-wk-text-muted">
-            In Ingest Studio, select WAKILISHA 100 and the EAT week of 26 October 2026
-            to review the preserved originals. Opening the studio does not save
-            a draft, upload evidence, or change this week's collection status.
-          </p>
-          <button type="button" className="wk-button wk-button-secondary wk-button-sm mt-3"
-            onClick={()=>navigate('/admin/charts/ingest')}>
-            Open Ingest Studio
-          </button>
-        </Card>
-    }
     {phase==='ready'&&report&&<>
       {view==='overview'&&<div className="space-y-5">
         <WkOperationsHero eyebrow={'WAKILISHA 100 · Kenya · week '+week}
@@ -577,6 +546,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                   {label:'Provider and market',value:selectedRegistrySource.provider+' · KE'},
                   {label:'Source ID',value:selectedRegistrySource.sourceKey},
                   {label:'Proposed method',value:selectedRegistrySource.proposal?.methodClass??'Not recorded'},
+                  {label:'Source evidence reference',value:selectedRegistrySource.proposal?.evidenceReference??'Not recorded'},
+                  {label:'Method constitution version',value:selectedCurrentMethod?.constitutionVersion??'Not recorded'},
                   {label:'Native metric and behaviour',value:
                     (selectedRegistrySource.contract?.metric??selectedRegistrySource.proposal?.metric??'Unknown')+' · '+
                     (selectedRegistrySource.contract?.behavior??selectedRegistrySource.proposal?.behavior??'Unknown')},
@@ -614,6 +585,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                   {label:'Method review',value:selectedRegistrySource.method?
                     selectedRegistrySource.method.decisionState.replaceAll('_',' ')+
                     ' · revision '+selectedRegistrySource.method.decisionRevision:'Not recorded'},
+                  {label:'Method decision recorded',value:when(selectedRegistrySource.method?.createdAt??null)},
+                  {label:'Independent method evidence',value:selectedCurrentMethod?.hasMethodEvidence?
+                    'Recorded, not collection approval':'Not verified'},
                   {label:'Method matches proposal',value:selectedCurrentMethod?'Yes':'Not confirmed'},
                   {label:'Last capture attempt',value:when(selectedRegistrySource.contract?.lastAttemptAt??null)},
                   {label:'Original receipt SHA-256',value:selectedRegistrySource.contract?.receiptSha256??'Not recorded'},
@@ -839,6 +813,37 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             onClick={()=>setDetail(report.sources.find(s=>['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState))??null)}>Inspect incident</button>}/>}
       </div>}
     </>}
+    {view==='sources'&&
+        <Card title="Research Already Captured">
+          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
+            Researcher-held originals from 29–30 October 2026. These observations remain useful
+            without a source proposal. The private files are not hosted capture receipts,
+            verified measurement weeks, or permission to publish.
+          </p>
+          <WkDataTable rows={getWk100ArchivedResearchPortfolio(WK100_ARCHIVED_EAT_WEEK)}
+            getKey={r=>r.sourceKey} ariaLabel="Archived Kenya research observations"
+            empty="No preserved research observations." columns={[
+              {key:'source',label:'Platform',render:r=><span className="font-semibold text-wk-text">{r.displayName}</span>},
+              {key:'observed',label:'Observed',render:r=><span className="text-wk-text-soft">{when(r.observedAtUtc)}</span>},
+              {key:'evidence',label:'Research Evidence',render:r=>
+                <div>
+                  <span className="text-wk-text-soft">{r.rankStructure==='verified'
+                    ?r.rankDepth+' observed '+r.observationType.toLowerCase()
+                    :'Original retained; ranks unverified'}</span>
+                  <p className="text-xs text-wk-text-muted">{r.note}</p>
+                </div>},
+            ]} />
+          <p className="mt-3 text-xs text-wk-text-muted">
+            In Ingest Studio, select WAKILISHA 100 and the EAT week of 26 October 2026
+            to review the preserved originals. Opening the studio does not save
+            a draft, upload evidence, or change this week's collection status.
+          </p>
+          <button type="button" className="wk-button wk-button-secondary wk-button-sm mt-3"
+            onClick={()=>navigate('/admin/charts/ingest')}>
+            Open Ingest Studio
+          </button>
+        </Card>
+    }
     {detail&&view==='collection'&&<WkInspector open={true} onClose={()=>setDetail(null)} title={detail.surface}
       eyebrow="Source candidate · Kenya"
       summary={<div className="flex flex-wrap items-center gap-2">
