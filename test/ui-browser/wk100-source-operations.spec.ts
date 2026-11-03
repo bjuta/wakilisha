@@ -17,6 +17,8 @@ async function json(route:Route,body:unknown,status=200) {
 async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[]}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[]}={}) {
   const reads:unknown[]=[];
   const writes:unknown[]=[];
+  const methodWrites:unknown[]=[];
+  const methodRecords:Record<string,unknown>[]=[];
   const proposalRecords:Record<string,unknown>[]=[...existingProposals] as Record<string,unknown>[];
   const unexpected:string[]=[];
   await page.route('**/*',async route=>{
@@ -79,6 +81,40 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
       }
       await json(route,{error:'unexpected_proposal_action'},400);return;
     }
+    if(url.pathname==='/functions/v1/wk100-source-admin-methods') {
+      if(req.method()!=='POST'){await json(route,{error:'method_not_allowed'},405);return;}
+      let body:Record<string,unknown>;
+      try{body=JSON.parse(req.postData()||'null');}catch{body={};}
+      if(body.action==='list_method_decisions'){
+        await json(route,{schemaVersion:'wk100-source-method-decisions-v1',
+          decisions:methodRecords,canCollect:false,canScore:false,canPublish:false});return;
+      }
+      if(body.action==='review_source_method'){
+        const next=Number(body.expectedDecisionRevision)+1;
+        const decision=body.decision as Record<string,unknown>;
+        if(!decision||typeof decision!=='object'||Number(body.expectedDecisionRevision)<0){
+          await json(route,{error:'method_review_invalid'},400);return;
+        }
+        const prior=methodRecords.find(p=>p.sourceKey===decision.sourceKey);
+        if(Number(prior?.decisionRevision??0)!==Number(body.expectedDecisionRevision)){
+          await json(route,{error:'method_revision_conflict'},409);return;
+        }
+        const saved={sourceKey:decision.sourceKey,providerKey:decision.providerKey,
+          proposalRevision:decision.proposalRevision,decisionRevision:next,
+          decisionState:decision.decisionState,
+          constitutionVersion:decision.constitutionVersion,
+          createdAt:'2026-11-03T06:00:00Z',
+          nativePeriodAuthority:decision.nativePeriodAuthority,
+          hasMethodEvidence:!!decision.accessEvidenceSha256,
+          canScore:false,canPublish:false};
+        methodRecords.splice(0,methodRecords.length,
+          ...methodRecords.filter(p=>p.sourceKey!==decision.sourceKey),saved);
+        methodWrites.push(body);
+        await json(route,{schemaVersion:'wk100-source-method-written-v1',
+          saved,canCollect:false,canScore:false,canPublish:false});return;
+      }
+      await json(route,{error:'unexpected_method_action'},400);return;
+    }
     if(url.pathname==='/functions/v1/wk100-source-admin-read') {
       if(req.method()!=='POST'){await json(route,{error:'read_only_post_required'},405);return;}
       let body:unknown;
@@ -104,7 +140,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         app_metadata:{},user_metadata:{},identities:[],created_at:'2026-10-21T00:00:00Z'},
     }));
   },{ref:PROJECT_REF,id:USER_ID});
-  return {reads,unexpected,writes};
+  return {reads,unexpected,writes,methodWrites};
 }
 
 test('source overview stays truthful, carries EAT week through navigation and uses no publisher',async({page})=>{
@@ -230,5 +266,42 @@ test('a falsely publishable source projection is rejected without showing claims
   await expect(page.getByRole('heading',{name:'Source status unavailable'})).toBeVisible({timeout:20_000});
   await expect(page.getByRole('heading',{name:'Week of 2 November 2026'})).toHaveCount(0);
   expect(ctx.reads.length).toBeGreaterThanOrEqual(1);
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('Admin method hold is independently persisted and never claims collection or publishing',async({page})=>{
+  const proposals=[{
+    id:'11111111-1111-4111-8111-111111111111',
+    providerKey:'youtube_ke',sourceKey:'youtube_ke_top_songs_weekly',
+    revision:1,surface:'YouTube Kenya official weekly chart',
+    methodClass:'provider_api',behavior:'video_consumption',
+    metric:'rank_and_count',expectedDepth:100,cadence:'weekly',
+    intervalHours:null,eatHour:12,eatMinute:0,weekdayEat:0,
+    minimumHealthyCheckpoints:1,evidenceReference:'wk100-method-research-2026',
+    reason:null,createdAt:'2026-11-02T00:00:00Z',
+    state:'proposed',canCollect:false,canScore:false,canPublish:false,
+  }];
+  const ctx=await install(page,{existingProposals:proposals});
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',{waitUntil:'domcontentloaded'});
+  await expect(page.getByText('youtube_ke_top_songs_weekly').first()).toBeVisible({timeout:20_000});
+  await expect(page.getByText('No reviewed source methods yet.')).toBeVisible();
+  await page.getByRole('button',{name:'Review Method'}).click();
+  await expect(page.getByRole('heading',{name:'Review Source Method'})).toBeVisible();
+  await page.getByRole('textbox',{name:'Constitution version'}).fill('wk100-research-constitution-v1');
+  await page.getByRole('textbox',{name:'Decision reason'}).fill('Provider-native period remains unverified');
+  await page.getByRole('button',{name:'Save method decision'}).click();
+  await expect(page.getByRole('heading',{name:'Review Source Method'})).toHaveCount(0);
+  await expect(page.getByRole('table',{name:'Source method decisions'}).getByText('held')).toBeVisible();
+  expect(ctx.methodWrites).toHaveLength(1);
+  const saved=ctx.methodWrites[0] as {action:string;decision:Record<string,unknown>;
+    expectedDecisionRevision:number};
+  expect(saved.action).toBe('review_source_method');
+  expect(saved.expectedDecisionRevision).toBe(0);
+  expect(saved.decision.sourceKey).toBe('youtube_ke_top_songs_weekly');
+  expect(saved.decision.decisionState).toBe('held');
+  expect(saved.decision.endpointSha256).toBeNull();
+  expect(saved.decision.authorizationRef).toBeNull();
+  expect(saved.decision).not.toHaveProperty('canCollect');
+  expect(saved.decision).not.toHaveProperty('canPublish');
   expect(ctx.unexpected).toEqual([]);
 });
