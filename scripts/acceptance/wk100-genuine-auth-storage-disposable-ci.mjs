@@ -226,10 +226,16 @@ async function main(){
 
   // The Apple source is a synthetic SQL authority fixture, not a qualified
   // Apple access method, native reporting period or collection constitution.
+  // Keep the SQL fixture's real EAT slot inside the collector's enforced
+  // 20-minute window; never relax source cadence or reservation rules.
+  const captureSlotUtc=new Date();
+  captureSlotUtc.setUTCSeconds(0,0);
+  const captureSlotEat=new Date(captureSlotUtc.getTime()+3*3600_000);
   const proposalC={...proposalA,providerKey:'apple_ke',
     sourceKey:'apple_ke_disposable_catalog',surface:'Disposable Apple Kenya chart method',
     behavior:'consumption',metric:'rank',methodClass:'provider_api',
     cadence:'daily',weekdayEat:null,minimumHealthyCheckpoints:7,
+    eatHour:captureSlotEat.getUTCHours(),eatMinute:captureSlotEat.getUTCMinutes(),
     evidenceReference:'ci_only_not_provider_evidence',
     reason:'Local super-admin enrollment authority acceptance'};
   const appleProposal=await rpcWrite(proposalC,0);
@@ -274,7 +280,7 @@ async function main(){
     admittedService.data[0].contract_version==='ci-v1',
     'STOP_REAL_SERVICE_ADMISSION_PROJECTION_INVALID');
   console.log('WK100_GOTRUE_SUPERADMIN_ADMISSION_AND_IMMUTABLE_ENROLLMENT=PASS');
-  const localEat=new Date(Date.now()+3*3600_000);
+  const localEat=new Date(captureSlotEat);
   localEat.setUTCDate(localEat.getUTCDate()-((localEat.getUTCDay()+6)%7));
   const currentWeek=localEat.toISOString().slice(0,10);
   const w3Read=await signed.rpc('wk100_list_collection_actions_v1',{p_week:currentWeek});
@@ -289,6 +295,51 @@ async function main(){
     p_scheduled_at:new Date().toISOString(),p_expected_attempt_number:1,
     p_expected_revision:null});
   check(!!forgedRetry.error,'STOP_W3_RETRY_WITHOUT_FAILED_ATTEMPT_ACCEPTED');
+  // A legitimate W3 retry requires an actual service-owned failure receipt.
+  // The existing reservation + fail RPCs, not direct table insertion, create
+  // that receipt; this exercises exactly the worker's Postgres lease boundary.
+  const slotIso=captureSlotUtc.toISOString().replace('.000Z','Z');
+  const reserve=await admin.rpc('wk_chart_runtime_reserve_v1',{
+    p_contract_id:enrolled.data.contractId,p_week_start_eat:currentWeek,
+    p_scheduled_at:slotIso,p_attempt_number:1,
+  });
+  check(!reserve.error&&UUID.test(reserve.data?.reservation_id??'')&&
+    UUID.test(reserve.data?.lease_id??''),
+    'STOP_W3_REAL_SERVICE_RESERVATION_FAILED');
+  const failed=await admin.rpc('wk_chart_runtime_fail_v1',{
+    p_reservation_id:reserve.data.reservation_id,
+    p_lease_id:reserve.data.lease_id,p_outcome:'transport_failed',
+    p_upstream_reference:'disposable_local_transport_failure',
+    p_failure_code:'ci_transport_unavailable',
+  });
+  check(!failed.error&&failed.data?.status==='transport_failed'&&
+    UUID.test(failed.data?.receipt_id??'')&&failed.data?.can_publish===false,
+    'STOP_W3_REAL_SERVICE_TRANSPORT_FAILURE_MISSING');
+  const retryArgs={...baseW3,p_action:'request_retry',
+    p_operation_id:randomUUID(),p_scheduled_at:slotIso,
+    p_expected_attempt_number:1,p_expected_revision:null,
+    p_reason:'Retry preserved isolated transport-failure receipt'};
+  const requestedRetry=await signed.rpc('wk100_record_collection_action_v1',retryArgs);
+  check(!requestedRetry.error&&requestedRetry.data?.recorded===true&&
+    requestedRetry.data?.actionKind==='retry_requested'&&
+    requestedRetry.data?.attemptNumber===2&&
+    requestedRetry.data?.canCollect===false&&requestedRetry.data?.canPublish===false,
+    'STOP_W3_VALID_FAILED_SLOT_RETRY_NOT_RECORDED');
+  const idempotentRetry=await signed.rpc('wk100_record_collection_action_v1',retryArgs);
+  check(!idempotentRetry.error&&
+    idempotentRetry.data?.actionId===requestedRetry.data.actionId,
+    'STOP_W3_VALID_RETRY_OPERATION_REPLAY_NOT_IDEMPOTENT');
+  const secondRetry=await signed.rpc('wk100_record_collection_action_v1',{
+    ...retryArgs,p_operation_id:randomUUID()});
+  check(!!secondRetry.error,'STOP_W3_DUPLICATE_SLOT_RETRY_ALLOWED');
+  const queuedRetry=await admin.rpc('wk100_service_retry_requests_v1',{p_week:currentWeek});
+  check(!queuedRetry.error&&Array.isArray(queuedRetry.data)&&
+    queuedRetry.data.length===1&&
+    queuedRetry.data[0].source_key===proposalC.sourceKey&&
+    queuedRetry.data[0].attempt_number===2&&
+    Date.parse(queuedRetry.data[0].scheduled_at)===Date.parse(slotIso),
+    'STOP_W3_SERVICE_RETRY_QUEUE_LOST_VALID_SLOT');
+  console.log('WK100_W3_REAL_LEASE_FAILURE_GOVERNED_RETRY_AND_QUEUE=PASS');
   const coverageArgs={...baseW3,p_action:'request_exception',p_expected_revision:0};
   const requestedCoverage=await signed.rpc('wk100_record_collection_action_v1',coverageArgs);
   check(!requestedCoverage.error&&requestedCoverage.data?.recorded===true&&
@@ -314,11 +365,11 @@ async function main(){
   const w3Readback=await signed.rpc('wk100_list_collection_actions_v1',{p_week:currentWeek});
   const pendingServiceRetries=await admin.rpc('wk100_service_retry_requests_v1',{p_week:currentWeek});
   const deniedUserServiceRetries=await signed.rpc('wk100_service_retry_requests_v1',{p_week:currentWeek});
-  check(!w3Readback.error&&w3Readback.data?.length===2&&
+  check(!w3Readback.error&&w3Readback.data?.length===3&&
     w3Readback.data.every(a=>a.canScore===false&&a.canPublish===false)&&
     !pendingServiceRetries.error&&Array.isArray(pendingServiceRetries.data)&&
-    pendingServiceRetries.data.length===0&&!!deniedUserServiceRetries.error&&
-    query("SELECT count(*) FROM platform_private.wk100_collection_actions_v1;",db)==='2',
+    pendingServiceRetries.data.length===1&&!!deniedUserServiceRetries.error&&
+    query("SELECT count(*) FROM platform_private.wk100_collection_actions_v1;",db)==='3',
     'STOP_W3_DURABLE_ACTIONS_OR_SERVICE_PRIVACY');
   console.log('WK100_W3_GOTRUE_REQUEST_REPLAY_DECISION_AND_NO_CAPTURE=PASS');
 
@@ -345,7 +396,7 @@ async function main(){
     'STOP_REAL_GOTRUE_REVOKED_SUPERADMIN_STILL_AUTHORIZED');
   check(query("SELECT (SELECT count(*) FROM platform_private.wk100_source_method_decisions_v1)::text||'|'||"+
     "(SELECT count(*) FROM platform_private.wk100_capture_contract_enrollments_v1)::text||'|'||"+
-    "(SELECT count(*) FROM public.wk_chart_capture_attempts_v1)::text;",db)==='3|1|0',
+    "(SELECT count(*) FROM public.wk_chart_capture_attempts_v1)::text;",db)==='3|1|1',
     'STOP_REAL_GOTRUE_METHOD_AUDIT_OR_UNINTENDED_CAPTURE');
   console.log('WK100_GOTRUE_METHOD_PAUSE_AND_LIVE_ROLE_REVOCATION=PASS');
 
