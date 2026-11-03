@@ -93,10 +93,27 @@ Deno.serve(async (req:Request) => {
   const now=new Date();
   const entry=approvedEntry(manifest,key,version,now);
   if(!entry) return json(403,{error:'source_access_not_authorized'});
+  // Bind collection to the *current* service-only method authority. A source
+  // manifest permits a route, but it never admits or re-admits a source.
+  // The same check repeats before transport to honour pause/retire actions.
+  const db=createClient(url,bearer,{auth:{persistSession:false,autoRefreshToken:false}});
+  const endpointSha256=await sha256Hex(new TextEncoder().encode(entry.endpoint));
+  const methodAllowed=async():Promise<boolean>=>{
+    const {data,error}=await db.rpc('wk100_service_capture_method_allowed_v1',{
+      p_source_key:key,p_contract_version:version,
+      p_endpoint_sha256:endpointSha256,
+      p_authorization_ref:entry.authorization_ref,
+      p_parser_class:entry.parser_class,
+    });
+    return !error && data===true;
+  };
+  if(!await methodAllowed())
+    return json(403,{error:'source_method_not_admitted',can_publish:false});
   // Only Apple's native catalog charts endpoint may receive the explicitly
   // configured developer token. Never accept request-body headers or secrets.
   let providerAuthorization: {kind:string;token:string} | undefined;
-  if(key==='apple_ke') {
+  if(key==='apple_ke' || (key.startsWith('apple_ke_') &&
+      entry.parser_class==='apple_kenya_chart_v1')) {
     let nativeApple=false;
     try {const endpoint=new URL(entry.endpoint);
       nativeApple=endpoint.protocol==='https:' &&
@@ -110,7 +127,6 @@ Deno.serve(async (req:Request) => {
       providerAuthorization={kind:'apple_developer_bearer',token};
     }
   }
-  const db=createClient(url,bearer,{auth:{persistSession:false,autoRefreshToken:false}});
   const found=await db.from('wk_chart_capture_contracts_v1').select('*')
     .eq('source_key',key).eq('contract_version',version).maybeSingle();
   if(found.error || !found.data) return json(409,{error:'source_contract_absent'});
@@ -152,7 +168,8 @@ Deno.serve(async (req:Request) => {
     const current=approvedEntry(manifest,key,version,new Date());
     return !!current && current.source_key===decision.source_key &&
       current.endpoint===decision.exact_endpoint &&
-      current.authorization_ref===decision.authorization_ref;
+      current.authorization_ref===decision.authorization_ref &&
+      await methodAllowed();
   };
   try {
     const result=await runCandidateCapture({contract:found.data,

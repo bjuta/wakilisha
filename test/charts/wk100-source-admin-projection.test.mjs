@@ -304,3 +304,14 @@ test('WK100 capture authorization is service-only and bound to latest proposal a
   assert.match(sql,/item\.v->>'endpoint_sha256'=p_endpoint_sha256/);
   assert.match(sql,/grant execute on function public\.wk100_service_admitted_methods_v1/);
 });
+
+test('WK100 capture endpoint rechecks current method admission before a provider GET',async()=>{
+  const edge=await readFile('supabase/functions/wk-chart-capture/index.ts','utf8');
+  assert.match(edge,/wk100_service_capture_method_allowed_v1/);
+  assert.match(edge,/if\(!await methodAllowed\(\)\)/);
+  assert.match(edge,/current\.authorization_ref===decision\.authorization_ref &&\s*await methodAllowed\(\)/);
+  assert.match(edge,/p_endpoint_sha256:endpointSha256/);
+  assert.match(edge,/sha256Hex\(new TextEncoder\(\)\.encode\(entry\.endpoint\)\)/);
+  assert.match(edge,/key\.startsWith\('apple_ke_'\)/);
+  assert.doesNotMatch(edge,/body\.providerAuthorization|body\.endpoint/);
+});
