@@ -1,6 +1,6 @@
 /** WK100 Admin source method review. An admitted decision is NOT collector activation. */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
-import { validateWk100SourceMethodDecision } from '../_shared/wk100-source-method-decision-v1.mjs';
+import { validateWk100SourceMethodDecision, validateWk100ContractEnrollmentIntent } from '../_shared/wk100-source-method-decision-v1.mjs';
 
 const ORIGINS=new Set([
   'https://wakilisha.africa','https://www.wakilisha.africa',
@@ -48,7 +48,14 @@ Deno.serve(async(req:Request)=>{
   const list=body.action==='list_method_decisions'&&exact(body,['action']);
   const review=body.action==='review_source_method'&&
     exact(body,['action','decision','expectedDecisionRevision']);
-  if(!list&&!review)return reply(req,400,{error:'request_invalid'});
+  const enroll=body.action==='enroll_capture_contract'&&
+    exact(body,['action','enrollment']);
+  if(!list&&!review&&!enroll)return reply(req,400,{error:'request_invalid'});
+  let enrollment:Record<string,unknown>|null=null;
+  if(enroll){
+    try{enrollment=validateWk100ContractEnrollmentIntent(body.enrollment);}
+    catch{return reply(req,400,{error:'contract_enrollment_invalid'});}
+  }
   let decision:Record<string,unknown>|null=null;
   if(review){
     try {
@@ -82,6 +89,38 @@ Deno.serve(async(req:Request)=>{
   const charts=await caller.rpc('current_user_has_capability',{required_capability:'manage_charts'});
   if(charts.error)return reply(req,503,{error:'capability_unavailable'});
   if(charts.data!==true)return reply(req,403,{error:'not_authorized'});
+  if(enrollment){
+    if(!enrollment)return reply(req,400,{error:'contract_enrollment_invalid'});
+    const {data,error}=await caller.rpc('wk100_enroll_source_capture_contract_v1',{
+      p_source_key:enrollment.sourceKey,
+      p_contract_version:enrollment.contractVersion,
+      p_adapter_sha256:enrollment.adapterSha256,
+      p_expected_proposal_revision:enrollment.expectedProposalRevision,
+      p_expected_decision_revision:enrollment.expectedDecisionRevision,
+    });
+    if(error){
+      const message=String(error.message??'');
+      if(message.includes('wk100_contract_enrollment_not_authorized'))
+        return reply(req,403,{error:'not_authorized'});
+      if(message.includes('wk100_contract_already_enrolled')||
+         message.includes('wk100_contract_proposal_stale_or_unqualified')||
+         message.includes('wk100_contract_method_not_current'))
+        return reply(req,409,{error:'contract_enrollment_conflict'});
+      return reply(req,503,{error:'contract_enrollment_unavailable'});
+    }
+    const result=data as Record<string,unknown>|null;
+    if(!result||result.sourceKey!==enrollment.sourceKey||
+      result.contractVersion!==enrollment.contractVersion||
+      result.proposalRevision!==enrollment.expectedProposalRevision||
+      result.decisionRevision!==enrollment.expectedDecisionRevision||
+      result.state!=='candidate'||
+      result.canCollect!==false||result.canScore!==false||
+      result.canPublish!==false||
+      typeof result.contractId!=='string')
+      return reply(req,503,{error:'contract_enrollment_confirmation_invalid'});
+    return reply(req,200,{schemaVersion:'wk100-capture-contract-enrolled-v1',
+      enrollment:result,canCollect:false,canScore:false,canPublish:false});
+  }
   if(!decision)return reply(req,400,{error:'method_review_invalid'});
   const {data,error}=await caller.rpc('wk100_review_source_method_v1',{
     p_payload:decision,p_expected_decision_revision:body.expectedDecisionRevision,

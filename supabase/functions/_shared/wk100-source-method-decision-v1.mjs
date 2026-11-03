@@ -78,3 +78,23 @@ export function validateWk100SourceMethodDecision(payload,{now=new Date()}={}){
   }
   return Object.freeze({...p,canCollect:false,canScore:false,canPublish:false});
 }
+
+/** This is a request shape, NOT a collection grant. SQL independently
+ * confirms current role, current decision, proposal and immutable contract. */
+export function validateWk100ContractEnrollmentIntent(payload){
+  const keys=['sourceKey','contractVersion','adapterSha256',
+    'expectedProposalRevision','expectedDecisionRevision'];
+  if(!payload||typeof payload!=='object'||Array.isArray(payload)||
+    Object.keys(payload).length!==keys.length||
+    !keys.every(k=>Object.hasOwn(payload,k))||
+    typeof payload.sourceKey!=='string'||!SOURCE.test(payload.sourceKey)||
+    typeof payload.contractVersion!=='string'||
+    !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,63}$/.test(payload.contractVersion)||
+    typeof payload.adapterSha256!=='string'||!HEX.test(payload.adapterSha256)||
+    !Number.isInteger(payload.expectedProposalRevision)||
+    payload.expectedProposalRevision<1||payload.expectedProposalRevision>100000||
+    !Number.isInteger(payload.expectedDecisionRevision)||
+    payload.expectedDecisionRevision<1||payload.expectedDecisionRevision>100000)
+    fail('contract_enrollment_invalid');
+  return Object.freeze({...payload});
+}

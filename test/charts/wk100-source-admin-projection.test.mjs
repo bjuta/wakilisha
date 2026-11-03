@@ -7,7 +7,7 @@ import { resolveCaptureParser, parseCaptureNativeRows } from '../../supabase/fun
 import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 import { fetchCandidateBytes, sha256Hex } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
 import { bindWk100DispatchAuthority, wk100EatWeekFromUtc, isWk100CaptureConstitutionCurrent } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
-import { validateWk100SourceMethodDecision } from '../../supabase/functions/_shared/wk100-source-method-decision-v1.mjs';
+import { validateWk100SourceMethodDecision, validateWk100ContractEnrollmentIntent } from '../../supabase/functions/_shared/wk100-source-method-decision-v1.mjs';
 
 test('WK100 source read model preserves empty real Production state',()=>{
   const model=projectWk100SourceHealth([],[],'2026-11-02');
@@ -466,4 +466,24 @@ test('WK100 governed capture-contract enrollment has a single auditable super-ad
   assert.match(sql,/wk100_contract_enrollment_truncate_guard/);
   assert.match(sql,/grant execute on function public\.wk100_enroll_source_capture_contract_v1/);
   assert.match(sql,/'state','candidate','canCollect',false,'canScore',false,'canPublish',false/);
+});
+
+test('WK100 enrollment intent is bounded and server uses exact JWT actor and SQL confirmation',async()=>{
+  const p={sourceKey:'apple_ke_catalog_most_played',
+    contractVersion:'apple-native-v1',adapterSha256:'a'.repeat(64),
+    expectedProposalRevision:1,expectedDecisionRevision:1};
+  assert.deepEqual({...validateWk100ContractEnrollmentIntent(p)},p);
+  for(const patch of [
+    {adapterSha256:'a'}, {contractVersion:'../escape'},
+    {sourceKey:'apple_ke_bad-name'}, {expectedProposalRevision:0},
+    {expectedDecisionRevision:1.5},{canPublish:true}
+  ])assert.throws(()=>validateWk100ContractEnrollmentIntent({...p,...patch}));
+  const edge=await readFile('supabase/functions/wk100-source-admin-methods/index.ts','utf8');
+  assert.match(edge,/body\.action==='enroll_capture_contract'/);
+  assert.match(edge,/validateWk100ContractEnrollmentIntent\(body\.enrollment\)/);
+  assert.match(edge,/wk100_enroll_source_capture_contract_v1/);
+  assert.match(edge,/result\.proposalRevision!==enrollment\.expectedProposalRevision/);
+  assert.match(edge,/result\.decisionRevision!==enrollment\.expectedDecisionRevision/);
+  assert.match(edge,/result\.canCollect!==false/);
+  assert.doesNotMatch(edge,/SUPABASE_SERVICE_ROLE_KEY|\.insert\(|\.upsert\(/);
 });
