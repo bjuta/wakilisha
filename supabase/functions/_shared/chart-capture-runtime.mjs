@@ -34,9 +34,12 @@ const PARSER_CLASS=Object.freeze({
   youtube_ke:'youtube_kenya_weekly_top_songs_v1',
 });
 export function resolveCaptureParser(contract,access={}) {
-  if(!contract || typeof contract.source_key!=='string' || typeof contract.provider_key!=='string')return null;
-  const key=contract.source_key,provider=contract.provider_key;
-  if(!Object.hasOwn(PARSERS,provider))return null;
+  if(!contract || typeof contract.source_key!=='string')return null;
+  const key=contract.source_key;
+  // Historical provider-only candidate receipts may predate provider_key.
+  // Never use this fallback for a scoped source ID or mismatched provider.
+  const provider=contract.provider_key??(Object.hasOwn(PARSERS,key)?key:null);
+  if(typeof provider!=='string'||!Object.hasOwn(PARSERS,provider))return null;
   if(key===provider)return Object.freeze({providerKey:provider,legacy:true});
   if(key.length>64 || !new RegExp('^'+provider+'_[a-z][a-z0-9_]{1,45}$').test(key) ||
      access.parser_class!==PARSER_CLASS[provider] ||

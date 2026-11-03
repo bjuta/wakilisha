@@ -133,6 +133,8 @@ test('WK100 provider-scoped source parser requires independently sealed native c
   assert.equal(resolveCaptureParser(youtube,access)?.providerKey,'youtube_ke');
   assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke_second_weekly'},access)?.legacy,false);
   assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke'},{}).legacy,true);
+  assert.equal(resolveCaptureParser({source_key:'mdundo_ke'},{}).legacy,true);
+  assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke',provider_key:'apple_ke'},{}),null);
   assert.equal(resolveCaptureParser({...youtube,adapter_version:'unrelated-parser'},access),null);
   for(const [contract,manifest] of [
     [youtube,{}],[youtube,{parser_class:'apple_kenya_chart_v1'}],
