@@ -215,9 +215,10 @@ test('a stale reviewed method does not appear as an enrolled, current platform s
   await expect(youtube.getByText('Method review needed')).toBeVisible({timeout:20_000});
   await expect(youtube.getByText('Candidate enrolled')).toHaveCount(0);
   await youtube.getByRole('button',{name:'Review Method'}).click();
-  await expect(page.getByRole('heading',{name:'Review Source Method'})).toBeVisible();
-  await expect(page.getByText('YouTube Kenya weekly songs')).toBeVisible();
-  await expect(page.getByText('collector admitted · revision 3')).toBeVisible();
+  const review=page.getByRole('dialog',{name:'Review Source Method'});
+  await expect(review.getByRole('heading',{name:'Review Source Method'})).toBeVisible();
+  await expect(review.getByText('YouTube Kenya weekly songs')).toBeVisible();
+  await expect(review.getByText('collector admitted · revision 3')).toBeVisible();
   expect(ctx.methodWrites).toEqual([]);
   expect(ctx.contractWrites).toEqual([]);
   expect(ctx.unexpected).toEqual([]);
