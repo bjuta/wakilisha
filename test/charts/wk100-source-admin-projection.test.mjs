@@ -553,3 +553,20 @@ test('WK100 restricted source health and proposal endpoints require the verified
   assert.doesNotMatch(health,/\.select\('\*'\)/);
   assert.doesNotMatch(health,/raw_object_key|service_role:\s*serviceKey/);
 });
+
+test('WK100 private original readback binds exact signed-in receipt and hashes server-owned Storage bytes',async()=>{
+  const code=await readFile('supabase/functions/wk100-source-admin-read/index.ts','utf8');
+  const config=await readFile('supabase/config.toml','utf8');
+  assert.match(config,/\[functions\.wk100-source-admin-read\]\s*verify_jwt\s*=\s*true/);
+  assert.match(code,/data\.action==='verify_private_original'/);
+  assert.match(code,/required_capability:'manage_ingest'/);
+  assert.match(code,/required_capability:'manage_charts'/);
+  assert.match(code,/\.eq\('id',receiptId\)\.eq\('contract_id',contractId\)\.eq\('week_start_eat',week\)/);
+  assert.match(code,/\.from\('wk-chart-raw-evidence-v1'\)\.download\(key\)/);
+  assert.match(code,/crypto\.subtle\.digest\('SHA-256',bytes\)/);
+  assert.match(code,/if\(calculated!==hash\)return reply\(req,503/);
+  assert.match(code,/originalVerified:true/);
+  assert.match(code,/canScore:false,canPublish:false/);
+  assert.doesNotMatch(code,/signedUrl|createSignedUrl/);
+});
+

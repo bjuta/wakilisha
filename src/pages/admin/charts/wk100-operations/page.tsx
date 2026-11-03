@@ -114,6 +114,12 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [recoveryPhase,setRecoveryPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
   const [recoveryActions,setRecoveryActions]=useState<RecoveryAction[]>([]);
   const [recoveryTarget,setRecoveryTarget]=useState<{kind:Wk100RecoveryKind;source:Source;revision:number}|null>(null);
+  const originalSequence=useRef(0);
+  const [originalReadback,setOriginalReadback]=useState<{
+    contractId:string;attemptId:string;phase:'loading'|'verified'|'unavailable';
+    digest?:string;byteLength?:number;
+  }|null>(null);
+  useEffect(()=>{originalSequence.current+=1;setOriginalReadback(null)},[week,detail?.id]);
   const loadRecovery=useCallback(async()=>{
     const seq=++recoverySequence.current;
     setRecoveryPhase('loading');setRecoveryActions([]);
@@ -259,6 +265,28 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     (constitutionFilter==='all'||(report?.qualifiedSources??0)>0&&s.admissionState==='qualified')&&
     (s.surface+' '+s.provider+' '+s.sourceKey).toLowerCase().includes(search.trim().toLowerCase())
   ),[report,search,status,providerFilter,metricFilter,reviewFilter,constitutionFilter,reviewedSourceIds]);
+  const verifyOriginal=async(source:Source,attemptId:string)=>{
+    const seq=++originalSequence.current;
+    setOriginalReadback({contractId:source.id,attemptId,phase:'loading'});
+    try{
+      const {data,error}=await supabase.functions.invoke('wk100-source-admin-read',{
+        body:{action:'verify_private_original',weekStartEat:week,
+          contractId:source.id,receiptId:attemptId},
+      });
+      if(error||!data||data.schemaVersion!=='wk100-admin-original-readback-v1'||
+        data.weekStartEat!==week||data.contractId!==source.id||
+        data.receiptId!==attemptId||data.originalVerified!==true||
+        typeof data.payloadSha256!=='string'||!/^[a-f0-9]{64}$/.test(data.payloadSha256)||
+        !Number.isInteger(data.byteLength)||data.byteLength<1||data.byteLength>4194304||
+        data.canScore!==false||data.canPublish!==false)throw Error();
+      if(seq!==originalSequence.current)return;
+      setOriginalReadback({contractId:source.id,attemptId,phase:'verified',
+        digest:data.payloadSha256,byteLength:data.byteLength});
+    }catch{
+      if(seq===originalSequence.current)
+        setOriginalReadback({contractId:source.id,attemptId,phase:'unavailable'});
+    }
+  };
   const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
     <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
@@ -727,10 +755,37 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               description:'Slot '+when(a.scheduledAt)+' · '+
                 (a.failureCode?'Safe reason: '+a.failureCode:'Observed rows: '+a.observedDepth),
             }))}/>
-          <p className="text-xs leading-relaxed text-wk-text-muted">
-            This inspector exposes only nonsecret receipt metadata and the SHA-256 digest.
-            Original bytes remain private in Storage and are not retrieved by this view.
-          </p>
+          <section aria-label="Private original readback" className="space-y-3">
+            <h3 className="text-sm font-bold text-wk-text">Private Original Readback</h3>
+            <p className="text-xs leading-relaxed text-wk-text-muted">
+              Verify the exact stored bytes against the recorded SHA-256.
+              The server performs the readback. No original file or private path leaves Storage.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {detail.recentAttempts.filter(a=>
+                ['succeeded','partial_depth','parse_failed','target_period_unavailable'].includes(a.status)
+                &&!!a.id).map(a=><button key={a.id} type="button"
+                  disabled={originalReadback?.phase==='loading'}
+                  className="wk-button wk-button-secondary wk-button-sm"
+                  onClick={()=>void verifyOriginal(detail,a.id)}>
+                  Verify original · Attempt {a.attemptNumber??'?'}
+                </button>)}
+            </div>
+            {!detail.recentAttempts.some(a=>
+              ['succeeded','partial_depth','parse_failed','target_period_unavailable'].includes(a.status)
+              &&!!a.id)&&<p className="text-xs text-wk-text-muted">
+              No retained original appears in the current attempt window.
+            </p>}
+            {originalReadback?.contractId===detail.id&&
+              <div role={originalReadback.phase==='unavailable'?'alert':'status'}
+                className="rounded-xl border border-wk-border bg-wk-surface-raised p-3 text-xs text-wk-text-soft">
+                {originalReadback.phase==='loading'?'Checking the private original…':
+                  originalReadback.phase==='verified'?
+                    'Original verified in private Storage. SHA-256: '+originalReadback.digest+
+                    '. Bytes: '+originalReadback.byteLength+'. This is not scoring admission.':
+                    'The server could not verify the original. No evidence is assumed valid.'}
+              </div>}
+          </section>
         </div>}
       </WkTabs>
       <p className="mt-5 rounded-xl bg-wk-surface-raised p-4 text-xs leading-relaxed text-wk-text-muted">

@@ -16,6 +16,7 @@ async function json(route:Route,body:unknown,status=200) {
 }
 async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[],existingEditionDraft=null}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[];existingEditionDraft?:Record<string,unknown>|null}={}) {
   const reads:unknown[]=[];
+  const originalReads:unknown[]=[];
   const editionReads:unknown[]=[];
   const writes:unknown[]=[];
   const methodWrites:unknown[]=[];
@@ -182,6 +183,18 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
       if(req.method()!=='POST'){await json(route,{error:'read_only_post_required'},405);return;}
       let body:unknown;
       try {body=JSON.parse(req.postData()||'null');}catch{body=null;}
+      if(body&&typeof body==='object'&&'action' in body&&
+        body.action==='verify_private_original'){
+        originalReads.push(body);
+        const request=body as {weekStartEat:string;contractId:string;receiptId:string};
+        await json(route,{
+          schemaVersion:'wk100-admin-original-readback-v1',
+          weekStartEat:request.weekStartEat,contractId:request.contractId,
+          receiptId:request.receiptId,originalVerified:true,
+          payloadSha256:'f'.repeat(64),byteLength:247,status:'succeeded',
+          nativePeriodAuthority:'unknown',canScore:false,canPublish:false,
+        });return;
+      }
       reads.push(body);
       const week=body&&typeof body==='object'&&'weekStartEat' in body
         ?String(body.weekStartEat):'';
@@ -204,7 +217,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         app_metadata:{},user_metadata:{},identities:[],created_at:'2026-10-21T00:00:00Z'},
     }));
   },{ref:PROJECT_REF,id:USER_ID});
-  return {reads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites};
+  return {reads,originalReads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites};
 }
 
 test('all six core providers show truthful readiness and no invented source admission',async({page})=>{
@@ -606,6 +619,41 @@ test('Admin can enroll only an admitted current method as an inert candidate con
   await expect(page.getByText('Contract apple-ke-v1 enrolled · Collection Off')).toBeVisible();
   await expect(page.getByRole('button',{name:'Enroll candidate capture contract'})).toHaveCount(0);
   expect(ctx.unexpected).toEqual([]);
+});
+
+test('W3 checks the stored original through the Admin readback command without exposing a private object path',async({page})=>{
+  const contractId='33333333-3333-4333-8333-333333333333';
+  const receiptId='44444444-4444-4444-8444-444444444444';
+  const ctx=await install(page,{existingSources:[{
+    id:contractId,sourceKey:'apple_ke_catalog_most_played',provider:'apple_ke',
+    surface:'Apple Kenya native chart',market:'KE',metric:'rank',behavior:'consumption',
+    expectedDepth:100,cadence:'weekly',version:'v1',intervalHours:null,
+    eatHour:9,eatMinute:0,weekdayEat:0,minimumHealthyCheckpoints:1,
+    adapterVersion:'apple_kenya_chart_v1',admissionState:'candidate',
+    captureState:'succeeded',attemptCount:1,lastAttemptAt:'2026-11-02T06:03:00Z',
+    lastScheduledAt:'2026-11-02T06:00:00Z',lastAttemptNumber:1,
+    lastSuccessfulAt:'2026-11-02T06:03:00Z',observedDepth:100,
+    nativePeriodAuthority:'unknown',nativePeriodStart:null,nativePeriodEnd:null,
+    receiptSha256:'f'.repeat(64),failureCode:null,canScore:false,canPublish:false,
+    recentAttempts:[{
+      id:receiptId,status:'succeeded',attemptNumber:1,
+      scheduledAt:'2026-11-02T06:00:00Z',attemptedAt:'2026-11-02T06:03:00Z',
+      fetchedAt:'2026-11-02T06:03:00Z',failureCode:null,observedDepth:100,
+    }],
+  }]});
+  await page.goto('/admin/charts/wk100-operations/collection?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  const table=page.getByRole('table',{name:'Weekly source collection'});
+  await table.getByRole('button',{name:'Inspect original receipt'}).click();
+  const inspector=page.getByRole('dialog',{name:'Apple Kenya native chart'});
+  await expect(inspector.getByText('Private Original Readback')).toBeVisible({timeout:20_000});
+  await inspector.getByRole('button',{name:'Verify original · Attempt 1'}).click();
+  await expect(inspector.getByText('Original verified in private Storage.',{exact:false}))
+    .toBeVisible();
+  expect(ctx.originalReads).toEqual([{action:'verify_private_original',
+    weekStartEat:'2026-11-02',contractId,receiptId}]);
+  expect(ctx.unexpected).toEqual([]);
+  expect(ctx.writes).toEqual([]);
 });
 
 test('W3 week-bound retry request and coverage review use one signed-in audit command without publishing',async({page})=>{
