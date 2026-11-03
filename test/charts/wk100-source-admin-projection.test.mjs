@@ -497,7 +497,10 @@ test('WK100 method list exposes only nonsecret capture contract version, not cre
   assert.match(sql,/where c\.source_key=d\.source_key/);
   const section=sql.split('create function public.wk100_list_source_method_decisions_v1()')[1]
     .split('end; \$list\$;')[0];
-  assert.doesNotMatch(section,/authorization_ref|endpoint_sha256|access_evidence_sha256/);
+  // The private digest is read to derive a BOOLEAN, not serialized as a field.
+  // Assert the returned JSON projection's key names, not internal SQL columns.
+  assert.match(section,/'hasMethodEvidence',d.access_evidence_sha256 is not null/);
+  assert.doesNotMatch(section,/'(?:authorizationRef|endpointSha256|accessEvidenceSha256|authorization_ref|endpoint_sha256|access_evidence_sha256)'\s*,/);
 });
 
 test('WK100 enrollment UI cannot infer collection authority from a candidate contract',async()=>{
