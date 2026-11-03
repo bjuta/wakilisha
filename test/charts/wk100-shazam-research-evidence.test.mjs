@@ -538,6 +538,14 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
   assert.match(panel,/disabled=\{!ready\}/);
   assert.doesNotMatch(panel,/commitIngestRun|runDryRun|publishEdition|localStorage/);
   assert.match(panel,/getWk100ArchivedResearchPortfolio/);
+  assert.match(panel,/verifyWk100ArchivedOriginal/);
+  assert.match(panel,/localOriginal\.size!==source\.byteLength/);
+  assert.match(panel,/disabled=\{!localOriginal\|\|localChecking\}/);
+  const localSection=panel.slice(panel.indexOf('aria-label="Local archived original verification"'),
+    panel.indexOf('Verify preserved Apple or Mdundo HTML'));
+  assert.ok(localSection.length>500);
+  assert.doesNotMatch(localSection,/supabase|\.invoke\(|submitWk100|saveWk100|publishEdition/);
+  assert.match(localSection,/No network upload, database write/);
   const archived=getWk100ArchivedResearchPortfolio('2026-10-26');
   assert.equal(archived.length,4);
   assert.deepEqual(archived.map(x=>x.sourceKey),
@@ -550,6 +558,12 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
   await assert.rejects(verifyWk100ArchivedOriginal({
     weekStartEat:'2026-10-26',sourceKey:'apple_ke_public_playlist',
     originalBytes:enc('not-the-original-private-bytes'),
+  }),/wk100_archived_original_mismatch/);
+  // Equal-size fabricated bytes still fail their cryptographic receipt.
+  // Neither a file length alone nor a guessed filename establishes provenance.
+  await assert.rejects(verifyWk100ArchivedOriginal({
+    weekStartEat:'2026-10-26',sourceKey:'shazam_ke',
+    originalBytes:new Uint8Array(archived[0].byteLength),
   }),/wk100_archived_original_mismatch/);
   // These are synthetic PARSER contracts, not substitutes for October originals.
   const mdundo=Array.from({length:100},(_,i)=>
