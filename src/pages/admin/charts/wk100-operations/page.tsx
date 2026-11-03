@@ -232,10 +232,13 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             secondary={<button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>go('/collection')}>Why collection is held</button>}/>
           <Card title="Readiness">
             <WkReadinessList items={[
-              {id:'sources',label:'Qualified source constitution',status:'blocked',description:report.qualifiedSources+' qualified sources for this week'},
-              {id:'receipts',label:'Verified weekly captures',status:report.successfulSources?'pending':'blocked',description:report.successfulSources+' verifiable original evidence receipts'},
-              {id:'period',label:'Native measurement periods',status:'pending',description:'A successful capture alone does not prove an eligible source period'},
-              {id:'ranking',label:'Private ranking and publication',status:'blocked',description:'The scoring and publisher remain separately controlled'},
+              {id:'sources',label:'Qualified source constitution',status:report.qualifiedSources>0?'pending':'blocked',description:report.qualifiedSources+' qualified sources for this EAT week'},
+              {id:'receipts',label:'Original source evidence',status:report.successfulSources>0?'pending':'blocked',description:report.successfulSources+' verifiable capture receipts'},
+              {id:'period',label:'Provider-native measurement periods',status:report.sources.some(x=>x.receiptSha256&&x.nativePeriodAuthority==='provider_defined')?'pending':'blocked',description:'Capture time is not native-period authority'},
+              {id:'identity',label:'Canonical recording identities',status:'blocked',description:'Registry and MIZIZI reconciliation is Phase 2'},
+              {id:'eligibility',label:'Complete eligibility and corrections',status:'blocked',description:'All applicable filter checks are Phase 2'},
+              {id:'ranking',label:'Frozen methodology and private Top 100',status:'blocked',description:'A private ranking is not inferred from captures'},
+              {id:'edition',label:'Edition staging and explicit publication',status:'blocked',description:'No public flagship has been authorized'},
             ]}/>
           </Card>
         </div>
@@ -379,17 +382,34 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               <p className="mt-1 text-sm text-wk-text-muted">{report.successfulSources} capture receipts across {report.sourceCount} candidate contracts. These do not establish admitted coverage.</p>
             </div><WkStateBadge tone="warning">Not ready for ranking</WkStateBadge>
           </div>
-          <div aria-label="Qualified coverage progress" role="progressbar" aria-valuenow={0} aria-valuemin={0} aria-valuemax={100}
-            className="mt-4 h-2 overflow-hidden rounded-full bg-wk-surface-raised"><div className="h-full w-0 bg-wk-brand"/></div>
+          <p className="mt-3 text-xs text-wk-text-muted">
+            Candidate capture receipts: {report.successfulSources} of {report.sourceCount}.
+            These do not establish qualified-source coverage.
+          </p>
+          <div aria-label="Candidate receipt coverage" role="progressbar"
+            aria-valuenow={report.sourceCount?Math.round(100*Math.min(report.successfulSources,report.sourceCount)/report.sourceCount):0}
+            aria-valuemin={0} aria-valuemax={100}
+            className="mt-4 h-2 overflow-hidden rounded-full bg-wk-surface-raised">
+            <div className="h-full bg-wk-brand"
+              style={{width:(report.sourceCount?100*Math.min(report.successfulSources,report.sourceCount)/report.sourceCount:0)+'%'}}/>
+          </div>
         </WkSurface>
-        <Card title="Source collection">
+        <p className="text-xs leading-relaxed text-wk-text-muted">
+           Retry and coverage exceptions are disabled pending accepted, audited,
+           idempotent week-bound server commands. No earlier-week evidence substitution
+           or automatic source reweighting is allowed.
+         </p>
+         <Card title="Source collection">
           <WkDataTable<Source> rows={report.sources} getKey={s=>s.id} ariaLabel="Weekly source collection"
             empty="No source capture contracts or attempts exist for this week. Collection scheduling has not been enabled."
             columns={[
               {key:'source',label:'Source · reporting period',render:s=><><button type="button" className="font-semibold text-wk-text hover:underline" onClick={()=>setDetail(s)}>{s.surface}</button><p className="mt-1 text-xs text-wk-text-muted">{s.nativePeriodAuthority==='provider_defined'?'Provider-defined period':'Native period unknown'}</p></>},
               {key:'depth',label:'Rows observed',render:s=><span className="font-semibold tabular-nums text-wk-text">{s.observedDepth} <span className="font-normal text-wk-text-muted">of {s.expectedDepth}</span></span>},
               {key:'attempt',label:'Latest attempt',render:s=><span className="text-wk-text-muted">{when(s.lastAttemptAt)}</span>},
-              {key:'receipt',label:'Validation · receipt',render:s=><span className="text-wk-text-muted">{s.receiptSha256?'SHA-256 verified':'No verified receipt'}</span>},
+               {key:'receipt',label:'Validation · receipt',render:s=>s.receiptSha256?
+                 <button type="button" className="text-left font-semibold text-wk-text hover:underline"
+                   onClick={()=>{setDetail(s);setDetailTab('history')}}>Inspect original receipt</button>:
+                 <span className="text-wk-text-muted">No verified receipt</span>},
               {key:'status',label:'Status',render:s=><WkStateBadge tone={['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState)?'danger':s.receiptSha256?'info':'neutral'}>{s.captureState.replaceAll('_',' ')}</WkStateBadge>},
               {key:'control',label:'Incident Control',render:s=>{
                 const decision=methodDecisions.find(d=>d.sourceKey===s.sourceKey);
