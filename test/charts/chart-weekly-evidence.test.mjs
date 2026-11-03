@@ -146,7 +146,7 @@ test('Spotify exported chart CSV preflight preserves ranked native counts withou
   const header='rank,uri,artist_names,track_name,source,peak_rank,previous_rank,weeks_on_chart,streams';
   const first=`1,spotify:track:${id1},"Alpha, Guest","Song, Mix",Label,1,0,2,2433`;
   const second=`2,spotify:track:${id2},Beta,Second,Label,2,1,1,2000`;
-  const csv=[header,first,second,''].join('\\n');
+  const csv=[header,first,second,''].join('\n');
   const got=parseSpotifyChartCsvCandidate(csv);
   assert.equal(got.source_key,'spotify_chart_csv_candidate');
   assert.equal(got.market,'unverified');
@@ -168,7 +168,7 @@ test('Spotify candidate preflight rejects forged or ambiguous CSV shapes rather 
   const header='rank,uri,artist_names,track_name,source,peak_rank,previous_rank,weeks_on_chart,streams';
   const r1=`1,spotify:track:${id1},Artist,Track,Label,1,1,1,1200`;
   const r2=`2,spotify:track:${id2},Artist Two,Track Two,Label,2,1,1,1000`;
-  const csv=[header,r1,r2].join('\\n');
+  const csv=[header,r1,r2].join('\n');
   assert.throws(()=>parseSpotifyChartCsvCandidate(csv.replace('streams','youtube_views')),
     /spotify_export_schema_unverified/);
   assert.throws(()=>parseSpotifyChartCsvCandidate(csv.replace(id1,'not-an-id')),
@@ -181,8 +181,8 @@ test('Spotify candidate preflight rejects forged or ambiguous CSV shapes rather 
     /spotify_chart_csv_candidate_duplicate_provider_id/);
   assert.throws(()=>parseSpotifyChartCsvCandidate(csv+',unexpected,column'),
     /spotify_export_row_invalid/);
-  const tooDeep=Array.from({length:201},(_,i)=>`${i+1},spotify:track:${id1},A,T,L,1,1,1,1`).join('\\n');
-  assert.throws(()=>parseSpotifyChartCsvCandidate(header+'\\n'+tooDeep),
+  const tooDeep=Array.from({length:201},(_,i)=>`${i+1},spotify:track:${id1},A,T,L,1,1,1,1`).join('\n');
+  assert.throws(()=>parseSpotifyChartCsvCandidate(header+'\n'+tooDeep),
     /spotify_export_depth_invalid/);
 });
 
