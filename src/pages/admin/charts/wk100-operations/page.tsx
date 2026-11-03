@@ -515,7 +515,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         {recoveryPhase==='loading'&&<p role="status" className="text-xs text-wk-text-muted">Reading recovery history…</p>}
         {recoveryPhase==='unavailable'&&<p role="alert" className="text-sm text-wk-text-muted">
           The protected recovery service is unavailable. No retry or coverage decision can be recorded.
-        </p>
+        </p>}
          <Card title="Source collection">
           <WkDataTable<Source> rows={report.sources} getKey={s=>s.id} ariaLabel="Weekly source collection"
             empty="No source capture contracts or attempts exist for this week. Collection scheduling has not been enabled."
