@@ -167,6 +167,62 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
   return {reads,unexpected,writes,methodWrites,contractWrites};
 }
 
+test('all six core providers show truthful readiness and no invented source admission',async({page})=>{
+  const ctx=await install(page);
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  const table=page.getByRole('table',{name:'Six core provider readiness'});
+  await expect(table).toBeVisible({timeout:20_000});
+  for(const provider of ['YouTube Kenya','Spotify Kenya','Boomplay Kenya',
+    'Apple Music Kenya','Mdundo Kenya','Shazam Kenya']){
+    await expect(table.getByText(provider,{exact:true})).toBeVisible();
+  }
+  await expect(table.getByRole('button',{name:'Add Source'})).toHaveCount(6);
+  await expect(table.getByText('No proposal')).toHaveCount(6);
+  await expect(table.getByText('Candidate enrolled')).toHaveCount(0);
+  await table.getByRole('button',{name:'Add Source'}).first().click();
+  await expect(page.getByRole('heading',{name:'Choose a Kenya provider'})).toBeVisible();
+  expect(ctx.writes).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.contractWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('a stale reviewed method does not appear as an enrolled, current platform source',async({page})=>{
+  const sourceKey='youtube_ke_weekly_top_songs';
+  const proposal={
+    id:'11111111-1111-4111-8111-111111111111',
+    providerKey:'youtube_ke',sourceKey,revision:2,
+    surface:'YouTube Kenya weekly songs',methodClass:'provider_api',
+    behavior:'video_consumption',metric:'rank_and_count',expectedDepth:100,
+    cadence:'weekly',intervalHours:null,eatHour:12,eatMinute:0,weekdayEat:3,
+    minimumHealthyCheckpoints:1,evidenceReference:'synthetic-review-revision',
+    reason:null,createdAt:'2026-11-03T09:00:00Z',state:'proposed',
+    canCollect:false,canScore:false,canPublish:false,
+  };
+  const oldDecision={
+    sourceKey,providerKey:'youtube_ke',proposalRevision:1,decisionRevision:3,
+    decisionState:'collector_admitted',constitutionVersion:'ci-only-v1',
+    createdAt:'2026-11-01T09:00:00Z',hasMethodEvidence:true,
+    nativePeriodAuthority:'provider_defined',captureContractVersion:'old-fixture-v1',
+    canScore:false,canPublish:false,
+  };
+  const ctx=await install(page,{existingProposals:[proposal],existingMethods:[oldDecision]});
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  const roster=page.getByRole('table',{name:'Six core provider readiness'});
+  const youtube=roster.getByRole('row').filter({hasText:'YouTube Kenya'});
+  await expect(youtube.getByText('Method review needed')).toBeVisible({timeout:20_000});
+  await expect(youtube.getByText('Candidate enrolled')).toHaveCount(0);
+  await youtube.getByRole('button',{name:'Review Method'}).click();
+  await expect(page.getByRole('heading',{name:'Review Source Method'})).toBeVisible();
+  await expect(page.getByText('YouTube Kenya weekly songs')).toBeVisible();
+  await expect(page.getByText('collector admitted · revision 3')).toBeVisible();
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.contractWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
 test('source overview stays truthful, carries EAT week through navigation and uses no publisher',async({page})=>{
   const ctx=await install(page);
   await page.goto('/admin/charts/wk100-operations?week=2026-10-26',{waitUntil:'domcontentloaded'});
