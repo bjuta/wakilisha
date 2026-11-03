@@ -117,7 +117,7 @@ begin
     raise exception 'wk100_method_review_conflict'; end if;
   -- Retirement is final even if another subsequent hold/pause was recorded.
   -- Re-admission requires a separately designed and approved reactivation contract.
-  if v_state='collector_admitted' and exists (
+  if exists (
     select 1 from platform_private.wk100_source_method_decisions_v1
       where source_key=v_key and decision_state='retired'
   ) then raise exception 'wk100_method_source_retired'; end if;
@@ -130,15 +130,16 @@ begin
     when 'audiomack_ke' then 'audiomack_kenya_chart_v1'
     else null end;
   v_parser:=p_payload->>'parserClass';
+  -- Terminal retirement and method admission both require super-admin review.
+  -- Editors can hold or pause unsafe sources, but cannot retire them forever.
+  if v_state in ('collector_admitted','retired') and not exists(
+    select 1 from public.user_role_assignments ura
+      where ura.user_id=v_actor and ura.role_key='super_admin' and
+        ura.status='active' and (ura.expires_at is null or ura.expires_at>now())
+  ) then
+    raise exception 'wk100_method_restricted_decision_requires_super_admin';
+  end if;
   if v_state='collector_admitted' then
-    -- A privileged editor may record holds, but only an active super_admin
-    -- can explicitly admit a source method; the founder still approves the
-    -- whole multi-source constitution separately before Phase 1 exit.
-    if not exists(select 1 from public.user_role_assignments ura
-       where ura.user_id=v_actor and ura.role_key='super_admin' and
-         ura.status='active' and (ura.expires_at is null or ura.expires_at>now())) then
-      raise exception 'wk100_method_admission_requires_super_admin';
-    end if;
     if v_expected_parser is null or v_parser<>v_expected_parser
       or v_p.method_class='research_only'
       -- YouTube Weekly Top Songs is *not* playlist entries or ordinal-only.

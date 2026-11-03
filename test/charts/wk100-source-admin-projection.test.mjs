@@ -270,7 +270,7 @@ test('WK100 draft admission forbids research-only and YouTube playlist masquerad
   assert.match(sql,/v_p\.behavior<>'video_consumption'/);
   assert.match(sql,/v_p\.native_metric<>'rank_and_count'/);
   assert.match(sql,/v_p\.cadence_kind<>'weekly'/);
-  assert.match(sql,/wk100_method_admission_requires_super_admin/);
+  assert.match(sql,/wk100_method_restricted_decision_requires_super_admin/);
   assert.match(sql,/wk100_method_review_conflict/);
   assert.match(sql,/wk100_method_decision_immutable/);
 });
@@ -281,4 +281,12 @@ test('WK100 source method review shares proposal revision lock and respects perm
   assert.doesNotMatch(sql,/pg_advisory_xact_lock\(11500,/);
   assert.match(sql,/where source_key=v_key and decision_state='retired'/);
   assert.match(sql,/wk100_method_source_retired/);
+});
+
+test('WK100 method retire is final and gated by super-admin, with no role-assignment drift',async()=>{
+  const sql=await readFile('scripts/acceptance/wk100-phase1-source-method-candidate.sql','utf8');
+  assert.match(sql,/if exists \(\s*select 1 from platform_private\.wk100_source_method_decisions_v1[\s\S]*where source_key=v_key and decision_state='retired'/);
+  assert.match(sql,/v_state in \('collector_admitted','retired'\) and not exists/);
+  assert.match(sql,/role_key='super_admin'/);
+  assert.match(sql,/wk100_method_restricted_decision_requires_super_admin/);
 });
