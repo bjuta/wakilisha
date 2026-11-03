@@ -20,6 +20,8 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
   const writes:unknown[]=[];
   const methodWrites:unknown[]=[];
   const contractWrites:unknown[]=[];
+  const recoveryWrites:Record<string,unknown>[]=[];
+  const recoveryRecords:Record<string,unknown>[]=[];
   const methodRecords:Record<string,unknown>[]=[...existingMethods] as Record<string,unknown>[];
   const proposalRecords:Record<string,unknown>[]=[...existingProposals] as Record<string,unknown>[];
   const unexpected:string[]=[];
@@ -52,6 +54,35 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         .map(capability_key=>({capability_key})));return;
     }
     if(url.pathname==='/rest/v1/user_access_scopes') {await json(route,[]);return;}
+    if(url.pathname==='/rest/v1/rpc/wk100_list_collection_actions_v1') {
+      let body:Record<string,unknown>;
+      try{body=JSON.parse(req.postData()||'null');}catch{body={};}
+      await json(route,recoveryRecords.filter(a=>a.weekStartEat===body.p_week));return;
+    }
+    if(url.pathname==='/rest/v1/rpc/wk100_record_collection_action_v1') {
+      let body:Record<string,unknown>;
+      try{body=JSON.parse(req.postData()||'null');}catch{body={};}
+      const kinds:Record<string,string>={request_retry:'retry_requested',
+        request_exception:'coverage_requested',
+        accept_exception:'coverage_accepted',reject_exception:'coverage_rejected'};
+      if(typeof body.p_action!=='string'||!kinds[body.p_action]||
+         typeof body.p_reason!=='string'||body.p_reason.length<8||
+         typeof body.p_operation_id!=='string'){
+        await json(route,{code:'22023',message:'invalid'},400);return;
+      }
+      const saved={
+        actionId:String(body.p_operation_id),actionKind:kinds[body.p_action],
+        contractId:body.p_contract_id,weekStartEat:body.p_week,
+        revision:body.p_action==='request_retry'?0:Number(body.p_expected_revision)+1,
+        attemptNumber:body.p_action==='request_retry'?Number(body.p_expected_attempt_number)+1:null,
+        recorded:true,canCollect:false,canScore:false,canPublish:false,
+      };
+      const event={...saved,sourceKey:'apple_ke_catalog_most_played',
+        scheduledAt:body.p_scheduled_at,reason:body.p_reason,createdAt:new Date().toISOString()};
+      recoveryRecords.push(event);
+      recoveryWrites.push(body);
+      await json(route,saved);return;
+    }
     if(url.pathname==='/rest/v1/rpc/wk100_get_admin_draft_v1') {
       if(req.method()!=='POST'){await json(route,{error:'method_not_allowed'},405);return;}
       let payload:Record<string,unknown>;
@@ -173,7 +204,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         app_metadata:{},user_metadata:{},identities:[],created_at:'2026-10-21T00:00:00Z'},
     }));
   },{ref:PROJECT_REF,id:USER_ID});
-  return {reads,editionReads,unexpected,writes,methodWrites,contractWrites};
+  return {reads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites};
 }
 
 test('all six core providers show truthful readiness and no invented source admission',async({page})=>{
@@ -505,6 +536,56 @@ test('Admin can enroll only an admitted current method as an inert candidate con
   await page.getByRole('button',{name:'Review Method'}).click();
   await expect(page.getByText('Contract apple-ke-v1 enrolled · Collection Off')).toBeVisible();
   await expect(page.getByRole('button',{name:'Enroll candidate capture contract'})).toHaveCount(0);
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('W3 week-bound retry request and coverage review use one signed-in audit command without publishing',async({page})=>{
+  const now=new Date(),eat=new Date(now.valueOf()+3*60*60*1000);
+  eat.setUTCDate(eat.getUTCDate()-((eat.getUTCDay()+6)%7));
+  const week=eat.toISOString().slice(0,10);
+  const slot=new Date(now.valueOf()-5*60*1000).toISOString();
+  const source={
+    id:'33333333-3333-4333-8333-333333333333',
+    sourceKey:'apple_ke_catalog_most_played',provider:'apple_ke',
+    surface:'Apple Music Kenya',market:'KE',metric:'rank',behavior:'consumption',
+    expectedDepth:100,cadence:'weekly',version:'v1',intervalHours:null,
+    eatHour:9,eatMinute:0,weekdayEat:0,minimumHealthyCheckpoints:1,
+    adapterVersion:'apple_kenya_chart_v1',admissionState:'candidate',
+    captureState:'transport_failed',attemptCount:1,lastAttemptAt:slot,
+    lastScheduledAt:slot,lastAttemptNumber:1,lastSuccessfulAt:null,
+    observedDepth:0,nativePeriodAuthority:'unknown',
+    nativePeriodStart:null,nativePeriodEnd:null,receiptSha256:null,
+    failureCode:'transport_failed',recentAttempts:[],canScore:false,canPublish:false,
+  };
+  const ctx=await install(page,{existingSources:[source]});
+  await page.goto('/admin/charts/wk100-operations/collection?week='+week,
+    {waitUntil:'domcontentloaded'});
+  const table=page.getByRole('table',{name:'Weekly source collection'});
+  await expect(table.getByRole('button',{name:'Request Retry'})).toBeVisible({timeout:20_000});
+  await table.getByRole('button',{name:'Request Retry'}).click();
+  const retry=page.getByRole('dialog',{name:'Request Source Retry'});
+  await expect(retry).toBeVisible();
+  await retry.getByRole('textbox',{name:'Reason'}).fill('Retry after a confirmed transport error');
+  await retry.getByRole('button',{name:'Confirm Action'}).click();
+  await expect(retry).toHaveCount(0);
+  await expect(page.getByText('retry requested')).toBeVisible();
+  expect(ctx.recoveryWrites).toHaveLength(1);
+  expect(ctx.recoveryWrites[0].p_action).toBe('request_retry');
+  expect(ctx.recoveryWrites[0].p_week).toBe(week);
+  expect(ctx.recoveryWrites[0].p_expected_attempt_number).toBe(1);
+  expect(ctx.recoveryWrites[0].p_scheduled_at).toBe(slot);
+  await table.getByRole('button',{name:'Request Coverage Review'}).click();
+  const coverage=page.getByRole('dialog',{name:'Request Coverage Review'});
+  await coverage.getByRole('textbox',{name:'Reason'}).fill('Source missing after transport failure');
+  await coverage.getByRole('button',{name:'Confirm Action'}).click();
+  await expect(coverage).toHaveCount(0);
+  expect(ctx.recoveryWrites).toHaveLength(2);
+  expect(ctx.recoveryWrites[1].p_action).toBe('request_exception');
+  expect(ctx.recoveryWrites[1].p_expected_revision).toBe(0);
+  expect(ctx.recoveryWrites[1].p_scheduled_at).toBeNull();
+  expect(ctx.writes).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.contractWrites).toEqual([]);
   expect(ctx.unexpected).toEqual([]);
 });
 
