@@ -14,6 +14,7 @@ import { WkDataTable, type WkDataColumn } from '@/components/design-system/primi
 import { WkDetailList } from '@/components/design-system/primitives/DetailList';
 import { WkTabs } from '@/components/design-system/primitives/Tabs';
 import { wk100CurrentWeekStartEat, isWk100WeekStartEat } from '../ingest/wk100EatWeek.mjs';
+import { WK100_ARCHIVED_EAT_WEEK, getWk100ArchivedResearchPortfolio } from '@/services/chartsIngestion/wk100ResearchPortfolio.mjs';
 import { WkOperationsHero, WkNextAction, WkReadinessList } from '@/components/design-system/primitives/OperationsWorkspace';
 import { WkAuditTimeline } from '@/components/design-system/primitives/AuditTimeline';
 import { SourceProposalForm, type Wk100ProposalRecord } from './SourceProposalForm';
@@ -45,6 +46,7 @@ const CORE_PROVIDERS=[
 type ProviderReadiness={
   key:string;label:string;proposalCount:number;decisionCount:number;
   state:string;next:string;focus:Wk100ProposalRecord|null;
+  researchLabel:string;researchDetail:string;
 };
 
 
@@ -161,8 +163,24 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     else if(paused){state='Paused';next='Review the paused method before any restart';}
     else if(enrolled){state='Candidate enrolled';next='Runtime approval and live collection remain separate';}
     else if(current.length){state='Retired';next='Review a new source method before use';}
+    // Research evidence is not source admission. Keep the dated private
+    // operator archive visible even when the current collector has no proposal.
+    const archives=getWk100ArchivedResearchPortfolio(WK100_ARCHIVED_EAT_WEEK);
+    const archived=archives.find(a=>a.sourceKey===provider.key||
+      (provider.key==='apple_ke'&&a.sourceKey==='apple_ke_public_playlist'));
+    const researchLabel=archived?.rankStructure==='verified'
+      ?archived.rankDepth+' archived '+archived.observationType.toLowerCase()
+      :'No ranked receipt in this archive';
+    const researchDetail=archived
+      ?(archived.sourceKey==='apple_ke_public_playlist'
+        ?'30 Oct 2026 · public playlist, not Catalog API'
+        :archived.sourceKey==='shazam_ke'
+        ?'29 Oct 2026 · discovery, not streams'
+        :'30 Oct 2026 · platform ranks, not streams')
+      :'Other past research may exist';
     return {key:provider.key,label:provider.label,proposalCount:candidates.length,
-      decisionCount:current.length,state,next,focus:focus?.proposal??null};
+      decisionCount:current.length,state,next,focus:focus?.proposal??null,
+      researchLabel,researchDetail};
   }),[proposals,methodDecisions]);
   const sources=useMemo(()=>(report?.sources??[]).filter(s=>
     (status==='all'||(status==='collected'?!!s.receiptSha256:status==='failed'?
@@ -223,10 +241,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           action={<button className="wk-button wk-button-primary wk-button-sm" type="button" onClick={()=>{setEditing(null);setAdd(true)}}>Add Source</button>}/>
         <Card title="Core Provider Readiness">
           <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
-            Six Kenya platforms are in scope. This list reflects saved source proposals and
-            method decisions, not provider permission or approval to collect.
-            Candidate enrollment never enables collection or publishing.
+            Research and collection are separate. October research evidence remains useful even
+            when a provider has no source proposal. The archived original files stay private
+            with the researcher; they are not hosted capture receipts or weekly stream counts.
           </p>
+          <button type="button" className="wk-button wk-button-secondary wk-button-sm mb-3"
+            onClick={()=>navigate('/admin/charts/ingest')}>
+            Open Research Evidence
+          </button>
           {(proposalPhase==='loading'||methodPhase==='loading')&&
             <p role="status" className="text-sm text-wk-text-muted">Reading source method authority…</p>}
           {(proposalPhase==='unavailable'||methodPhase==='unavailable')&&
@@ -239,6 +261,11 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               columns={[
                 {key:'provider',label:'Platform',render:p=>
                   <span className="font-semibold text-wk-text">{p.label}</span>},
+                {key:'research',label:'Research Archive',render:p=>
+                  <div>
+                    <span className="text-wk-text-soft">{p.researchLabel}</span>
+                    <p className="text-xs text-wk-text-muted">{p.researchDetail}</p>
+                  </div>},
                 {key:'records',label:'Saved Records',render:p=>
                   <span className="text-wk-text-soft">{p.proposalCount} proposed · {p.decisionCount} current reviews</span>},
                 {key:'state',label:'Current Position',render:p=>
