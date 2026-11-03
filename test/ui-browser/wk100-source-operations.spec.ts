@@ -189,12 +189,34 @@ test('all six core providers show truthful readiness and no invented source admi
     .getByText('100 observed daily playlist ranks')).toBeVisible();
   await expect(archive.getByRole('row').filter({hasText:'Audiomack Kenya'})
     .getByText('Original retained; ranks unverified')).toBeVisible();
-  await expect(page.getByRole('button',{name:'Open Research Evidence'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Open Ingest Studio'})).toBeVisible();
     await expect(table.getByRole('button',{name:/^Add .+ Source$/})).toHaveCount(6);
   await expect(table.getByText('No proposal')).toHaveCount(6);
   await expect(table.getByText('Candidate enrolled')).toHaveCount(0);
   await table.getByRole('button',{name:'Add YouTube Kenya Source'}).click();
   await expect(page.getByRole('heading',{name:'Choose a Kenya provider'})).toBeVisible();
+  expect(ctx.writes).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.contractWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('historical research remains visible when collector health denies its own authority',async({page})=>{
+  const ctx=await install(page,{invalid:true});
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('heading',{name:'Source status unavailable'}))
+    .toBeVisible({timeout:20_000});
+  const archive=page.getByRole('table',{name:'Archived Kenya research observations'});
+  await expect(archive).toBeVisible();
+  await expect(archive.getByRole('row').filter({hasText:'Shazam Kenya'})
+    .getByText('200 observed discovery ranks')).toBeVisible();
+  await expect(archive.getByRole('row').filter({hasText:'Mdundo Kenya'})
+    .getByText('100 observed platform chart ranks')).toBeVisible();
+  await expect(archive.getByRole('row').filter({hasText:'Audiomack Kenya'})
+    .getByText('Original retained; ranks unverified')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Open Ingest Studio'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Sources',exact:true})).toHaveCount(0);
   expect(ctx.writes).toEqual([]);
   expect(ctx.methodWrites).toEqual([]);
   expect(ctx.contractWrites).toEqual([]);
