@@ -78,3 +78,40 @@ Before any call, the runtime requires the separate independently SHA-256-sealed 
 **Source activation is still zero.** The existing `wk-chart-capture` is service-role-only, explicit and disabled by default; its independently SHA-sealed manifest, runtime project binding and separately admitted source contract still govern *every* retrieval. A parser test is not a successful provider GET, an API access grant, signed-in Admin UI, native week verification or multi-source scoring authorization. No provider-specific secrets, raw captures, scheduled jobs, or Production SQL are introduced by this checkpoint.
 
 **Next implementation dependency:** qualify and configure the exact Apple source method and developer-token lifecycle (including rotation), then implement the durable Admin-visible source roster, approved scheduling, and live per-source adapter acceptance within existing capture authority. Prove real authorized source evidence and two consecutive EAT observation slots. Other provider credentials must not be generalized into arbitrary bearer egress. Do not add a second collector or producer role.
+
+
+## Phase 1 current public-source verification (3 November 2026 EAT)
+
+**Scope of this checkpoint:** a fresh review of published public documentation and reachable
+provider-facing chart pages. It is **not** a collector fetch, complete source-dossier
+review, original-byte research archive, legal conclusion, method admission, or
+provider approval. Older October and 2 November assessments above remain
+historical evidence and must not be silently upgraded. Source qualification
+uses the [independent-research and separately governed collector distinction](wakilisha-100-independent-research-source-qualification-v1.md).
+
+| Named core platform | Current independently observed public fact | Measurement and unresolved autonomous-source requirement | Collector status |
+| --- | --- | --- | --- |
+| **YouTube** | [YouTube's own Charts Help](https://support.google.com/youtube/answer/9014376) defines **Weekly Top Songs**, confirms Kenya availability, and describes song-level views combining official recordings, lyrics and user-made videos. | Weekly song views are not audio streams. An independently authorized, reproducible exact-week Kenya machine-readable acquisition route and verified raw response have not been shown. An internal `youtubei` endpoint or playlist API is not approved by the public Help article. | **UNQUALIFIED** |
+| **Spotify** | [Spotify's own Charts Help](https://support.spotify.com/bh-en/artists/article/understanding-spotify-charts/) confirms official charts use filtered, chart-eligible stream counts and directs readers to `charts.spotify.com`. | We have not independently verified a Kenya weekly export/API permitted for WAKILISHA's particular application, country, metric, and durable scheduled use. User-curated playlists are not national streaming charts. Existing Development Mode restrictions still need current project-specific examination. | **UNQUALIFIED** |
+| **Boomplay** | Public third-party displays, such as [Soundcharts' Kenya Boomplay page](https://soundcharts.com/en/charts/boomplay/kenya), demonstrate a marketed Kenya chart surface, but that page's observed July 2026 period does not establish current official first-party coverage. | Official operator, present-day first-party Kenya endpoint, chart definition, native interval, and independently reviewed unattended method remain unverified. Do not substitute a third-party presentation as original Boomplay bytes. | **UNQUALIFIED** |
+| **Apple Music** | The [official Catalog Charts API](https://developer.apple.com/documentation/applemusicapi/charts) documents a chart endpoint supporting the `ke` storefront, `types=songs`, and `chart=most-played`. The existing parser accepts this exact independently configured route. | A valid developer credential is needed for hosted execution. Chart order is not a supplied play-count or proof of exact weekly measurement boundaries. The Preview has no configured `WK100_APPLE_MUSIC_DEVELOPER_TOKEN`, and no qualified provider-native period evidence is recorded. | **UNQUALIFIED** |
+| **Mdundo** | Mdundo's own [Weekly Top 100 in Kenya](https://mdundo.com/best/ke/64) displays ranked tracks; its [Kenya chart surface](https://play.mdundo.com/top-charts/ke) is publicly presented. | The heading alone does not prove start/end boundaries or whether an official machine-readable export may be retained and fetched unattended. Existing source-specific terms and method checks above remain relevant. Native values are ordinal ranks, not measured streams. | **UNQUALIFIED** |
+| **Shazam** | The first-party [Kenya Top 200](https://www.shazam.com/charts/top-200/kenya) explicitly offers **Download CSV** and describes a Kenya chart. | The CSV describes music recognition/discovery rankings, not plays. The exact native reporting window, offered-export retrieval behavior, retention, source identity and reliable unattended execution have not yet been independently qualified. The researcher-directed export is a different authority from unattended Edge collection. | **UNQUALIFIED** |
+
+**Decision:** Six named core platforms have concrete research pointers and explicit
+unresolved method questions. **Zero** have a founder-approved unattended capture
+method or a sealed runtime source constitution. The research check above
+must **not** be copied into `wk100_review_source_method_v1` as an admitted
+decision, and no token, raw provider body, invented native week, or
+source manifest belongs in GitHub. Follow the existing Admin proposal,
+independent method review, immutable candidate enrollment, and
+server-held manifest workflow only after the actual source-specific
+evidence has been reviewed.
+
+**Engineering progress after this review:** The existing disposable
+GoTrue/Storage runner now includes signed-in method review, candidate
+enrollment, current-method pause and role revocation checks; the existing
+W3 Collection workspace adds an audited **Pause Collection** path through
+the same protected method endpoint. Both changes remain **unaccepted**
+until their consolidated Node, isolated GoTrue, app build and real Chromium
+acceptance passes. Pausing does not edit captured bytes or publish.
