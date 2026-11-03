@@ -1,6 +1,7 @@
 import {useRef, useState, type FormEvent} from "react";
 import {supabase} from "@/lib/supabase";
 import {WkUploadField} from "@/components/design-system/primitives/UploadField";
+import {prepareWk100LocalShazamResearch} from "@/services/chartsIngestion/wk100LocalShazamResearch.mjs";
 import {
   getWk100ArchivedResearchPortfolio,
   verifyWk100ArchivedOriginal,
@@ -48,6 +49,44 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
   const [htmlError,setHtmlError]=useState<string|null>(null);
   const [htmlSaved,setHtmlSaved]=useState<string|null>(null);
   const archivedResearch=getWk100ArchivedResearchPortfolio(weekStartEat);
+  const [newResearchCsv,setNewResearchCsv]=useState<File|null>(null);
+  const [newResearchChecking,setNewResearchChecking]=useState(false);
+  const [newResearchReceipt,setNewResearchReceipt]=useState<Awaited<ReturnType<typeof prepareWk100LocalShazamResearch>>|null>(null);
+  const [newResearchError,setNewResearchError]=useState<string|null>(null);
+  const newResearchEpoch=useRef(0);
+  async function inspectNewResearch(){
+    if(!newResearchCsv||newResearchChecking)return;
+    const version=++newResearchEpoch.current;
+    setNewResearchChecking(true);
+    setNewResearchReceipt(null);
+    setNewResearchError(null);
+    try {
+      if(newResearchCsv.size<1||newResearchCsv.size>4*1024*1024)
+        throw new Error('invalid_local_csv_size');
+      const bytes=new Uint8Array(await newResearchCsv.arrayBuffer());
+      const receipt=await prepareWk100LocalShazamResearch({
+        originalBytes:bytes,checkedAtUtc:new Date().toISOString(),
+      });
+      if(version===newResearchEpoch.current)setNewResearchReceipt(receipt);
+    }catch{
+      if(version===newResearchEpoch.current)
+        setNewResearchError("The file does not contain a valid Kenya chart CSV. Nothing was saved or uploaded.");
+    }finally{
+      if(version===newResearchEpoch.current)setNewResearchChecking(false);
+    }
+  }
+  function downloadNewResearchReceipt(){
+    if(!newResearchReceipt)return;
+    const blob=new Blob([JSON.stringify(newResearchReceipt,null,2)+"\\n"],
+      {type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const anchor=document.createElement('a');
+    anchor.href=url;
+    anchor.download='wk100-shazam-kenya-local-research-'+
+      newResearchReceipt.checked_at_utc.slice(0,10)+'.json';
+    anchor.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
   const [localSourceKey,setLocalSourceKey]=useState("shazam_ke");
   const [localOriginal,setLocalOriginal]=useState<File|null>(null);
   const [localChecking,setLocalChecking]=useState(false);
@@ -162,6 +201,59 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
       Week of {weekStartEat} (East Africa Time). The source’s native measurement period remains
       unknown. This observation does not authorize scoring, ranking or publication.
     </p>
+    <div className="mt-4 rounded-lg border border-wk-border bg-wk-surface-raised p-3"
+      aria-label="New local Shazam research">
+      <h3 className="text-sm font-semibold text-wk-text">Inspect a New Shazam Chart</h3>
+      <p className="mt-1 text-xs text-wk-text-muted">
+        Download the offered CSV from the Kenya Top 200 chart, then select it here.
+        We check its ranks and original SHA-256 on this device. We do not upload
+        the file, infer a reporting week, or add it to a published chart.
+      </p>
+      <a href="https://www.shazam.com/charts/top-200/kenya"
+        target="_blank" rel="noopener noreferrer"
+        className="mt-3 inline-flex text-sm font-semibold text-wk-text underline">
+        Open Shazam Kenya Top 200
+      </a>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <WkUploadField id="wk100-new-shazam-local"
+          label="Select downloaded Kenya chart CSV"
+          ariaLabel="Select downloaded Kenya chart CSV"
+          accept=".csv,text/csv"
+          disabled={newResearchChecking}
+          onSelect={files=>{
+            newResearchEpoch.current+=1;
+            setNewResearchCsv(files?.[0]??null);
+            setNewResearchReceipt(null);
+            setNewResearchError(null);
+            setNewResearchChecking(false);
+          }}/>
+        <button type="button" onClick={()=>{void inspectNewResearch()}}
+          disabled={!newResearchCsv||newResearchChecking}
+          className="wk-button wk-button-secondary wk-button-sm disabled:cursor-not-allowed disabled:opacity-50">
+          {newResearchChecking?"Checking local chart…":"Inspect Local Chart"}
+        </button>
+      </div>
+      {newResearchError&&<p role="alert" className="mt-3 text-xs text-wk-danger">
+        {newResearchError}
+      </p>}
+      {newResearchReceipt&&<div role="status" className="mt-3 space-y-2 text-xs text-wk-text">
+        <p>
+          {newResearchReceipt.observed_rank_count} valid discovery ranks.
+          {newResearchReceipt.complete_chart
+            ?" All 200 positions are present."
+            :" The file has fewer than 200 positions."}
+        </p>
+        <p className="break-all">Original SHA-256: {newResearchReceipt.original_sha256}</p>
+        <p>
+          File checked {newResearchReceipt.checked_at_utc}.
+          This does not establish when the provider served it or its exact measurement period.
+        </p>
+        <button type="button" onClick={downloadNewResearchReceipt}
+          className="wk-button wk-button-secondary wk-button-sm">
+          Save Local Research Receipt
+        </button>
+      </div>}
+    </div>
     <form className="mt-4 space-y-3" onSubmit={upload}>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-wk-border bg-wk-surface-raised p-3">
