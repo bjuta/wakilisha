@@ -162,7 +162,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     }catch{setProposals([]);setProposalPhase('unavailable');}
   },[]);
   useEffect(()=>{
-    if(view==='sources'||view==='collection'){void loadProposals();void loadMethods()}
+    void loadProposals();void loadMethods();
   },[loadProposals,loadMethods,view]);
   const load=useCallback(async()=>{
     const seq=++readSequence.current;
@@ -228,6 +228,22 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     return {key:provider.key,label:provider.label,proposalCount:candidates.length,
       decisionCount:current.length,state,next,focus:focus?.proposal??null};
   }),[proposals,methodDecisions]);
+  // An enrolled candidate is NOT a qualified source or an accepted source
+  // constitution. Count only the current matching method/proposal revision
+  // with a matching actual capture contract in the selected source projection.
+  // Never show a positive count while either protected review read is stale.
+  const reviewedCandidateContracts=useMemo(()=>{
+    if(proposalPhase!=='ready'||methodPhase!=='ready'||phase!=='ready'||!report)return 0;
+    return report.sources.filter(source=>{
+      const proposal=proposals.find(p=>p.sourceKey===source.sourceKey&&
+        p.providerKey===source.provider);
+      const method=methodDecisions.find(m=>m.sourceKey===source.sourceKey&&
+        m.providerKey===source.provider&&
+        m.proposalRevision===proposal?.revision);
+      return !!proposal&&method?.decisionState==='collector_admitted'&&
+        method.captureContractVersion===source.version;
+    }).length;
+  },[report,phase,proposals,proposalPhase,methodDecisions,methodPhase]);
   const sources=useMemo(()=>(report?.sources??[]).filter(s=>
     (status==='all'||(status==='collected'?!!s.receiptSha256:status==='failed'?
       ['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState):s.captureState==='not_collected'))&&
@@ -238,7 +254,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
     <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
-      <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();void loadEdition();if(view==='collection')void loadRecovery();if(view==='sources'){void loadProposals();void loadMethods()}}} disabled={phase==='loading'}>Refresh status</button>
+      <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();void loadEdition();void loadProposals();void loadMethods();if(view==='collection')void loadRecovery()}} disabled={phase==='loading'}>Refresh status</button>
     </AdminChartsPageHeader>
     <WkSurface className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3">
       <div className="flex items-center gap-2"><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Previous week" onClick={()=>setWeek(v=>nextWeek(v,-1))}>‹</button><div className="min-w-40 text-center"><p className="text-xs text-wk-text-muted">Edition week · Monday EAT</p><p className="text-sm font-bold text-wk-text">{week}</p></div><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Next week" onClick={()=>setWeek(v=>nextWeek(v,1))}>›</button></div>
@@ -303,7 +319,10 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             secondary={<button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>go('/collection')}>Why collection is held</button>}/>
           <Card title="Readiness">
             <WkReadinessList items={[
-              {id:'sources',label:'Qualified source constitution',status:report.qualifiedSources>0?'pending':'blocked',description:report.qualifiedSources+' qualified sources for this EAT week'},
+              {id:'sources',label:'Qualified source constitution',status:'blocked',
+                description:proposalPhase!=='ready'||methodPhase!=='ready'
+                  ?'Source review authority unavailable. Qualification cannot be inferred.'
+                  :reviewedCandidateContracts+' current reviewed candidate contracts. A reviewed contract is not an approved live source constitution.'},
               {id:'receipts',label:'Original source evidence',status:report.successfulSources>0?'pending':'blocked',description:report.successfulSources+' verifiable capture receipts'},
               {id:'period',label:'Provider-native measurement periods',status:report.sources.some(x=>x.receiptSha256&&x.nativePeriodAuthority==='provider_defined')?'pending':'blocked',description:'Capture time is not native-period authority'},
               {id:'identity',label:'Canonical recording identities',status:'blocked',description:'Registry and MIZIZI reconciliation is Phase 2'},
@@ -315,7 +334,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         </div>
         <section aria-label="This week" className="space-y-2">
           <h2 className="text-xs font-bold uppercase tracking-[.12em] text-wk-text-muted">This week</h2>
-          <WkMetricStrip>{[['Registered candidates',report.sourceCount],['Qualified sources',report.qualifiedSources],['Verified captures',report.successfulSources],['Collection failures',report.failedSources]].map(([name,value])=><WkMetricCard key={name} label={name} value={value}/>)}</WkMetricStrip>
+          <WkMetricStrip>{[['Registered candidates',report.sourceCount],['Reviewed candidate contracts',reviewedCandidateContracts],['Verified captures',report.successfulSources],['Collection failures',report.failedSources]].map(([name,value])=><WkMetricCard key={name} label={name} value={value}/>)}</WkMetricStrip>
         </section>
         <Card title="Collection activity"><WkAuditTimeline locale="en-KE" timeZone="Africa/Nairobi" ariaLabel="Verified capture activity" emptyLabel="No source attempts recorded for this week." events={report.sources.flatMap(s=>s.recentAttempts.map((a,i)=>({
           id:s.id+':'+(a.id||i),label:s.surface+' · '+a.status.replaceAll('_',' '),

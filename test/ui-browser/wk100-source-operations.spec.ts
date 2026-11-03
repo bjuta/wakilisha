@@ -323,6 +323,34 @@ test('source overview stays truthful, carries EAT week through navigation and us
   expect(ctx.unexpected).toEqual([]);
 });
 
+test('W1 counts only reviewed current candidate contracts, never qualifies them or unlocks readiness',async({page})=>{
+  const key='apple_ke_catalog_most_played';
+  const source={id:'33333333-3333-4333-8333-333333333333',
+    sourceKey:key,provider:'apple_ke',surface:'Apple Music Kenya native most played',
+    version:'apple-ke-v1',admissionState:'candidate',captureState:'not_collected',
+    recentAttempts:[],receiptSha256:null,canScore:false,canPublish:false};
+  const proposal={providerKey:'apple_ke',sourceKey:key,revision:2,
+    surface:'Apple Music Kenya native most played',state:'proposed',
+    canCollect:false,canScore:false,canPublish:false};
+  const method={providerKey:'apple_ke',sourceKey:key,proposalRevision:2,
+    decisionRevision:2,decisionState:'collector_admitted',
+    captureContractVersion:'apple-ke-v1',canScore:false,canPublish:false};
+  const ctx=await install(page,{
+    existingSources:[source],existingProposals:[proposal],existingMethods:[method],
+  });
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  const overview=page.getByRole('heading',{name:'Readiness'}).locator('..');
+  await expect(overview.getByText('1 current reviewed candidate contracts.',{exact:false}))
+    .toBeVisible({timeout:20_000});
+  await expect(page.getByText('Reviewed candidate contracts')).toBeVisible();
+  await expect(page.getByText('Qualified sources')).toHaveCount(0);
+  await expect(page.getByText('Research only · Publication locked')).toBeVisible();
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.contractWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
 test('W1 reads actual week-bound Edition configuration revision without inferring collection readiness',async({page})=>{
   const draft={weekStartEat:'2026-10-26',revision:7,configSha256:'f'.repeat(64),
     updatedAt:'2026-11-01T07:00:00Z'};
