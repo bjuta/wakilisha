@@ -203,8 +203,16 @@ export async function runCandidateCapture({
   try {
     rows=parseCaptureNativeRows(capture.bytes,contract,access);
     outcome=rows.length===contract.expected_depth?'succeeded':'partial_depth';
-  } catch {
-    outcome='parse_failed';failureCode='source_parse_failed';
+  } catch (error) {
+    // A real provider response for a *different* weekly chart is not a
+    // malformed source body. Preserve its original private bytes and exact
+    // receipt, but quarantine the due slot as target_period_unavailable.
+    // Never infer provider-native start/end timestamps from an EAT slot.
+    const wrongWeek=error instanceof Error &&
+      error.message==='youtube_target_period_unavailable' &&
+      resolveCaptureParser(contract,access)?.providerKey==='youtube_ke';
+    outcome=wrongWeek?'target_period_unavailable':'parse_failed';
+    failureCode=wrongWeek?'source_target_period_unavailable':'source_parse_failed';
   }
   const receipt=await db.commit({p_reservation_id:resId,p_lease_id:lease,
     p_outcome:outcome,p_rows:rows,p_upstream_reference:access.authorization_ref,
