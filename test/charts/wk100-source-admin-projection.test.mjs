@@ -134,6 +134,13 @@ test('WK100 provider-scoped source parser requires independently sealed native c
   assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke_second_weekly'},access)?.legacy,false);
   assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke'},{}).legacy,true);
   assert.equal(resolveCaptureParser({source_key:'mdundo_ke'},{}).legacy,true);
+  // Existing immutable Apple/YouTube replay fixtures carry older provider
+  // identifiers; the source key was already the accepted parser authority.
+  assert.equal(resolveCaptureParser({...youtube,source_key:'apple_ke',
+    provider_key:'provider_0',adapter_version:'fixture-v1'},{}).providerKey,'apple_ke');
+  assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke',
+    provider_key:'provider_1',adapter_version:'fixture-v1'},{}).providerKey,'youtube_ke');
+  // A known but conflicting provider parser must still fail closed.
   assert.equal(resolveCaptureParser({...youtube,source_key:'youtube_ke',provider_key:'apple_ke'},{}),null);
   assert.equal(resolveCaptureParser({...youtube,adapter_version:'unrelated-parser'},access),null);
   for(const [contract,manifest] of [
