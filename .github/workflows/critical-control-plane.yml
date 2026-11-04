@@ -200,6 +200,7 @@ jobs:
         run: |
           node --test test/charts/wk100-offline-intake-authority.test.mjs
           node --test test/charts/wk100-shazam-research-evidence.test.mjs
+          node --test test/charts/wk100-source-admin-projection.test.mjs
 
       - name: Verify WK100 server-only Admin preview and confidentiality
         run: |
