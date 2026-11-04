@@ -48,14 +48,23 @@ async function freePorts(count){
 const criticalSecurityStep={name:'Run critical security and lifecycle tests against disposable local services',run:'npm run test:critical'};
 lanes['critical-security']=[...lanes.wk100.slice(0,2),criticalSecurityStep];
 lanes.wk100.splice(2,0,criticalSecurityStep);
+lanes['public-runtime']=plans['public-runtime-watch'].jobs['public-runtime'].steps.filter(s=>s.run&&s.name.startsWith('Probe '));
 const dbLanes=['mizizi-sql','mizizi-auth','wk100','critical-security'];
 const lane=process.argv[2];
 if(lane==='audit'){console.log('LOCAL_WORKFLOW_AUDIT=PASS; eight retired workflows; no runner allocation');process.exit(0);}
-if(!lanes[lane])stop('Choose: audit, core, browser, source-preflight, mizizi-sql, mizizi-auth, wk100, critical-security. Release remains BLOCKED until all scopes and remote/provenance/protection gates pass.');
+if(!lanes[lane])stop('Choose: audit, core, browser, source-preflight, mizizi-sql, mizizi-auth, wk100, critical-security, public-runtime. Release remains BLOCKED until all scopes and remote/provenance/protection gates pass.');
 if(process.argv.includes('--plan')){console.log(JSON.stringify({lane,steps:lanes[lane],blockedReleaseGates:['live security and schema drift','three production control-plane preflights','public runtime watch','trusted local replay provenance','enforced merge protection'],productionMutation:false},null,2));process.exit(0);}
 if(process.platform!=='darwin'||process.versions.node.split('.')[0]!=='22')stop('Run on macOS with pinned Node 22');
 // Ambient credentials and repository .env files never enter the execution clone.
 const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:os.tmpdir(),LANG:'en_US.UTF-8',CI:'true',CONTROL_PLANE_BASE_REF:'origin/main'};
+if(lane==='public-runtime'){
+ const c=JSON.parse(fs.readFileSync(process.env.WK_LOCAL_PUBLIC_CONFIG??'', 'utf8'));
+ if(c.url!=='https://pgzizndxdyhqmtyywjmt.supabase.co')stop('Public runtime project mismatch');
+ let publicKey=c.key?.startsWith('sb_publishable_');
+ try{publicKey ||= JSON.parse(Buffer.from(c.key.split('.')[1],'base64url')).role==='anon';}catch{}
+ if(!publicKey)stop('Public runtime accepts only an anonymous/publishable key');
+ Object.assign(env,{VITE_PUBLIC_SUPABASE_URL:c.url,VITE_PUBLIC_SUPABASE_ANON_KEY:c.key});
+}
 const dirty=capture('git',['status','--porcelain']);
 if(dirty)stop('Commit reviewed changes before running acceptance; dirty trees are not evidence');
 const disk=fs.statfsSync(root);
@@ -115,8 +124,10 @@ try {
   report.disposable={...ownership,config_sha256:sha(fs.readFileSync(config)),existing_containers:originalContainers.length,existing_volumes:originalVolumes.length,docker_context:env.DOCKER_CONTEXT};save();
   database=true;
  }
- if(lane==='browser'||lane==='mizizi-auth')command('Browser installation','./node_modules/.bin/playwright install '+(lane==='browser'?'chromium webkit':'chromium'));
+ if(['browser','mizizi-auth','public-runtime'].includes(lane))command('Browser installation','./node_modules/.bin/playwright install '+(lane==='browser'?'chromium webkit':'chromium'));
+ const failedCore=[];
  for(const s of lanes[lane]){
+  if(lane==='core'){try{command(s.name,s.run,s.env??{});}catch{failedCore.push(s.name);}continue;}
   if(['critical-security','wk100'].includes(lane)&&s.run==='npm run test:critical'){
    const values={};
    for(const line of capture('supabase',['status','-o','env'],{cwd:dir,env}).split('\n')){const m=line.match(/^([A-Z_]+)="?(.*?)"?$/);if(m)values[m[1]]=m[2];}
@@ -126,6 +137,7 @@ try {
    command(s.name,s.run,{VITE_PUBLIC_SUPABASE_URL:values.API_URL,VITE_PUBLIC_SUPABASE_ANON_KEY:values.ANON_KEY});
   }else command(s.name,s.run,s.env??{});
  }
+ if(failedCore.length)stop('Core gates failed: '+failedCore.join(', '));
  // Copy before later browser invocations clear test-results (each invocation is preserved).
  report.result='pass';
 } catch(e){report.result='fail';report.reason=e.message;console.error(e.message);process.exitCode=1;}
