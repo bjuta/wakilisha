@@ -4,6 +4,61 @@
 
 **Classification:** dated source-method triage and runtime decision register. **No source is currently admitted to the unattended WK100 collector, scoring or publication.** This does not prohibit WAKILISHA's separately reviewed, human-led factual research. This document does not activate `WK100_CAPTURE_ENABLED`, add a source manifest or contract, create a scheduler, request chart endpoints, confer provider rights, or replace source-specific legal review.
 
+## Observed-as-of authority — founder method decision, 4 November 2026
+
+**Scientific rule:** collection/observation time and provider measurement time are different
+facts. For an exact provider original with no independently attested start/end
+reporting interval, WAKILISHA may preserve a ranked list as **observed-as-of**
+its *actual* research observation or service `fetched_at` timestamp, assigned
+to the corresponding EAT operational Edition week. That assignment is an
+**Edition evidence cutoff**, never a declaration that the provider's audience
+activity occurred that day/week. Record provider-declared chart date/week end
+*as well*, whenever available; do not overwrite it with an observed-at time.
+Do not infer a missing date by subtracting seven days, and do not convert
+rankings, discoveries, editorial positions or YouTube views into streams.
+
+**Three distinct concepts:**
+
+- `provider_defined`: provider-native measurement/reporting authority actually supported
+  by source evidence (including clearly characterized chart dates; undisclosed
+  UTC start/end boundaries remain null).
+- `observed_as_of`: explicitly reviewed missing-native-period disposition,
+  whose review reference follows `observed_as_of/<review-id>`; this is NOT
+  a provider-defined week. The original immutable service capture's actual
+  server `fetched_at` (or separately labelled researcher-observed time)
+  records the timestamp. Source-native start/end remain null.
+- `unknown`: the default when neither provider-period authority nor a
+  qualifying, authorized, timestamped source observation exists. This must
+  never qualify an unattended collection method by itself.
+
+**Operational safeguards:** Every admitted observed-as-of source still needs an
+approved exact endpoint/method, governed access evidence and expiry, a sealed
+adapter/manifest/constitution, authorized reviewer and immutable decision, strict
+native-rank or native-metric parser, genuine original-byte private SHA readback,
+source freshness checks and truthful Admin projections. The method selection
+alone cannot supply a valid source observation. Repeated identical originals,
+cached/stale material or a known prior-week chart cannot silently count as a
+fresh independent weekly vote. Where a provider's published report date conflicts
+with observation week, preserve both, flag the mismatch and require coverage
+review rather than backdating the provider. Phase 3 governs how any allowed
+as-of evidence affects scoring and source-family caps, not Phase 1.
+
+**Current implementation boundary:** This additive Phase 1 forward contract
+permits `observed_as_of` for an independently qualified ranked-source method;
+it does not qualify Audiomack's unverified title metadata order. YouTube's
+current weekly `trackViews` parser demands a bound provider period and its
+undocumented web-client POST is not an approved unattended GET; Spotify's
+official weekly chart export is also period-specific. Those two existing
+method classes therefore remain **outside observed-as-of collector admission**
+until their own source-specific method/adapter review proves a suitable path.
+The four required Spotify editorials remain separate, lower-weight
+**research** signals within one provider family, never weekly stream counts.
+
+This is a product/data-science policy and its controlled implementation
+candidate, **not** an authorization to deploy SQL, switch on
+`WK100_CAPTURE_ENABLED`, grant provider access, merge PR #1345, score,
+publish or open Phase 2. All four exit gates of #1338 remain in force.
+
 ## Current operating interpretation (29 October 2026)
 
 The WAKILISHA founder has specified the operative research model: independently observe and report publicly available chart facts, use WAKILISHA-built research tools, preserve WAKILISHA's private evidence archive and calculate an original proprietary commercial chart. The governing [Independent Research and Source Qualification v1](wakilisha-100-independent-research-source-qualification-v1.md) supersedes **any blanket implication here** that every factual observation or original chart requires a negotiated provider agreement. It does **not** supersede a demonstrated restriction on an actual collection route.

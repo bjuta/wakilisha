@@ -55,14 +55,21 @@ export async function bindWk100DispatchAuthority({
       !SHA.test(contract.adapter_sha256)||!SHA.test(entry.adapter_sha256)||
       contract.adapter_sha256!==entry.adapter_sha256||
       contract.admission_state!=='candidate'||contract.market!=='KE'||
-      row.native_period_state!=='provider_defined'||!SHA.test(row.evidence_sha256)||
+      !['provider_defined','observed_as_of'].includes(row.native_period_state)||
+      (row.native_period_state==='observed_as_of'&&
+        (!/^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(row.native_period_evidence_ref??'')||
+         ['youtube_ke','spotify_ke'].includes(row.provider_key)))||
+      !SHA.test(row.evidence_sha256)||
       !SHA.test(row.endpoint_sha256)||typeof entry.endpoint!=='string'||
       entry.endpoint.length>1200||
       entry.parser_class!==row.parser_class||
       entry.authorization_ref!==row.authorization_ref||
-      typeof entry.native_period_key!=='string'||
-      entry.native_period_key.length<3||entry.native_period_key.length>240||
-      /[?&=#<>]/.test(entry.native_period_key))
+      (row.native_period_state==='provider_defined' &&
+        (typeof entry.native_period_key!=='string'||
+         entry.native_period_key.length<3||entry.native_period_key.length>240||
+         /[?&=#<>]/.test(entry.native_period_key)))||
+      // The as-of evidence class MUST NOT fabricate a provider period key.
+      (row.native_period_state==='observed_as_of' && entry.native_period_key!=null))
       continue;
     const expires=Date.parse(row.authorization_expires_at);
     if(!Number.isFinite(expires)||expires<=nowUtc.valueOf()||
@@ -124,7 +131,10 @@ export function isWk100CaptureConstitutionCurrent({
     r.endpoint_sha256===endpointSha256 &&
     r.authorization_ref===authorizationRef &&
     r.parser_class===parserClass &&
-    r.native_period_state==='provider_defined' &&
+    ['provider_defined','observed_as_of'].includes(r.native_period_state) &&
+    (r.native_period_state!=='observed_as_of'||
+      (/^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(r.native_period_evidence_ref??'')&&
+       !/^(youtube_ke|spotify_ke)(?:_|$)/.test(r.source_key))) &&
     typeof r.native_period_evidence_ref==='string' &&
     r.native_period_evidence_ref.length>=3 &&
     Number.isFinite(Date.parse(r.authorization_expires_at)) &&

@@ -445,6 +445,19 @@ test('WK100 source-method review cannot convert research-only or a mismatched pr
   const accepted=validateWk100SourceMethodDecision(p,{now});
   assert.equal(accepted.canCollect,false);
   assert.equal(accepted.canScore,false);assert.equal(accepted.canPublish,false);
+  // As-of is a reviewed observation strategy, not invented source-native dates.
+  const asOf={...p,providerKey:'apple_ke',sourceKey:'apple_ke_public_top100',
+    parserClass:'apple_kenya_chart_v1',methodClass:'reviewed_page_adapter',
+    nativePeriodAuthority:'observed_as_of',
+    nativePeriodEvidenceRef:'observed_as_of/approved_public_source_method_v1'};
+  assert.equal(validateWk100SourceMethodDecision(asOf,{now}).nativePeriodAuthority,'observed_as_of');
+  for(const patch of [
+    {nativePeriodEvidenceRef:'unverified_provider_week'},
+    {nativePeriodAuthority:'unknown'},
+    {providerKey:'youtube_ke',sourceKey:'youtube_ke_weekly',parserClass:'youtube_kenya_weekly_top_songs_v1'},
+    {providerKey:'spotify_ke',sourceKey:'spotify_ke_chart',parserClass:'spotify_kenya_offered_chart_csv_v1'},
+  ])assert.throws(()=>validateWk100SourceMethodDecision({...asOf,...patch},{now}),
+    /method_admission_unqualified/);
   for(const patch of [
     {methodClass:'research_only'},{parserClass:'apple_kenya_chart_v1'},
     {providerKey:'spotify_ke',sourceKey:'spotify_ke_chart'},
@@ -602,6 +615,19 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
     nowUtc:new Date('2026-11-03T08:00:00Z'),constitutionVersion:'approved-v1'};
   const allowed=await bindWk100DispatchAuthority(args);
   assert.equal(allowed.length,1);assert.equal(allowed[0].enabled,true);
+  const observedRow={...row,native_period_state:'observed_as_of',
+    native_period_evidence_ref:'observed_as_of/approved_chart_method_v1'};
+  const observedEntry={...entry,native_period_key:null};
+  const asOf=await bindWk100DispatchAuthority({...args,methodRows:[observedRow],
+    manifest:{sources:[observedEntry]}});
+  assert.equal(asOf.length,1);
+  for(const altered of [
+    {...observedEntry,native_period_key:'fabricated_week'},
+  ])assert.equal((await bindWk100DispatchAuthority({...args,
+    methodRows:[observedRow],manifest:{sources:[altered]}})).length,0);
+  assert.equal((await bindWk100DispatchAuthority({...args,
+    methodRows:[{...observedRow,native_period_evidence_ref:'fake_period'}],
+    manifest:{sources:[observedEntry]}})).length,0);
   for(const override of [
     {constitutionVersion:'not-approved'},
     {methodRows:[{...row,decision_state:'paused'}]},
@@ -656,6 +682,11 @@ test('WK100 direct capture calls require current founder constitution, not merel
     nowUtc:new Date('2026-11-03T08:00:00Z'),
   };
   assert.equal(isWk100CaptureConstitutionCurrent(req),true);
+  const observed={...row,native_period_state:'observed_as_of',
+    native_period_evidence_ref:'observed_as_of/method_review_v1'};
+  assert.equal(isWk100CaptureConstitutionCurrent({...req,rows:[observed]}),true);
+  assert.equal(isWk100CaptureConstitutionCurrent({...req,
+    rows:[{...observed,native_period_evidence_ref:'fabricated_week'}]}),false);
   for(const change of [
     {constitutionVersion:'unapproved'},
     {rows:[{...row,decision_state:'paused'}]},

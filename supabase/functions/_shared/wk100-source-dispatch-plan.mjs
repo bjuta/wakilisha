@@ -41,8 +41,13 @@ function isQualified(d,c,now) {
   if(!d||d.source_key!==c.source_key||d.contract_version!==c.contract_version||
     d.provider_key!==c.provider_key)return 'source_decision_mismatch';
   if(d.state!=='collector_admitted'||d.enabled!==true)return 'source_not_admitted';
-  if(d.native_period_state!=='provider_defined'||typeof d.native_period_evidence_ref!=='string'||
-    d.native_period_evidence_ref.length<3)return 'native_period_unverified';
+  if(!['provider_defined','observed_as_of'].includes(d.native_period_state)||
+    typeof d.native_period_evidence_ref!=='string'||
+    d.native_period_evidence_ref.length<3||
+    (d.native_period_state==='observed_as_of'&&
+      (!/^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(d.native_period_evidence_ref)||
+       ['youtube_ke','spotify_ke'].includes(d.provider_key))))
+    return 'native_period_unverified';
   if(typeof d.authorization_ref!=='string'||d.authorization_ref.length<3||
     !SHA.test(d.evidence_sha256)||!SHA.test(d.endpoint_sha256)||
     typeof d.constitution_version!=='string'||d.constitution_version.length<2)

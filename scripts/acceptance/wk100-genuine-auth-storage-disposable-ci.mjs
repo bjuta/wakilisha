@@ -63,7 +63,7 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
     {provider:'apple_ke',source:'apple_ke_public_top100',parser:'apple_kenya_chart_v1',
      endpoint:'https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172',
      methodClass:'reviewed_page_adapter',behavior:'consumption',metric:'rank',depth:100,
-     cadence:'daily',expected:'succeeded'},
+     cadence:'daily',periodAuthority:'observed_as_of',expected:'succeeded'},
     {provider:'shazam_ke',source:'shazam_ke_public_top200',parser:'shazam_kenya_discovery_v1',
      endpoint:'https://www.shazam.com/services/charts/csv/top-200/kenya/',
      methodClass:'offered_export',behavior:'discovery',metric:'rank',depth:200,expected:'succeeded'},
@@ -96,8 +96,10 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
         decisionState:'collector_admitted',parserClass:spec.parser,methodClass:spec.methodClass,
         // Local synthetic period authority intentionally cannot qualify an
         // actual source-native date or commercial collection authorization.
-        nativePeriodAuthority:'provider_defined',
-        nativePeriodEvidenceRef:'ci_synthetic_period_not_provider_week_proof',
+        nativePeriodAuthority:spec.periodAuthority??'provider_defined',
+        nativePeriodEvidenceRef:spec.periodAuthority==='observed_as_of'
+          ?'observed_as_of/ci_approved_public_method_v1'
+          :'ci_synthetic_period_not_provider_week_proof',
         endpointSha256:endpointSha,
         accessEvidenceSha256:sha(Buffer.from('ci_only_synthetic_method_'+spec.provider)),
         authorizationRef,authorizationExpiresAt:
@@ -136,6 +138,13 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
           });
       };
       check(await allowed(),'STOP_WK100_LIVE_METHOD_SERVICE_CONSTITUTION_NOT_BOUND');
+      // The method has its own honest period-authority class even though
+      // the immutable raw receipt retains UNKNOWN source-native boundaries.
+      const inspectedMethod=await admin.rpc('wk100_service_admitted_methods_v1');
+      check(!inspectedMethod.error&&Array.isArray(inspectedMethod.data)&&
+        inspectedMethod.data.some(m=>m.source_key===spec.source&&
+          m.native_period_state===(spec.periodAuthority??'provider_defined')),
+        'STOP_WK100_LIVE_OBSERVED_METHOD_AUTHORITY_READBACK');
       const storage={
         async readPrivate(key){
           const res=await bucket.download(key);
@@ -154,6 +163,7 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
         if(error||!data)throw Error('service_rpc_'+name+'_failed');
         return data;
       };
+      const captureStartMs=Date.now();
       const capture=await runCandidateCapture({
         contract:contract.data,weekStartEat:week,scheduledAt,attemptNumber:1,
         access:{source_key:spec.source,endpoint:spec.endpoint,
@@ -172,7 +182,7 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
       check(outcomeValid&&UUID.test(capture.receipt_id??'')&&
         capture.can_publish===false,'STOP_WK100_LIVE_PRIVATE_COLLECTOR_STATUS_INVALID');
       const receipt=await admin.from('wk_chart_capture_attempts_v1')
-        .select('id,status,observed_depth,payload_sha256,raw_object_key,native_period_authority')
+        .select('id,status,observed_depth,payload_sha256,raw_object_key,native_period_authority,fetched_at')
         .eq('id',capture.receipt_id).single();
       const depth=receipt.data?.observed_depth;
       const nativeDepthValid=spec.provider==='mdundo_ke'?
@@ -182,7 +192,10 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
       check(!receipt.error&&receipt.data?.status===capture.status&&
         receipt.data.raw_object_key===capture.raw_object_key&&
         receipt.data.payload_sha256===capture.payload_sha256&&
-        receipt.data.native_period_authority==='unknown'&&nativeDepthValid,
+        receipt.data.native_period_authority==='unknown'&&nativeDepthValid&&
+        Number.isFinite(Date.parse(receipt.data.fetched_at))&&
+        Date.parse(receipt.data.fetched_at)>=captureStartMs-2000&&
+        Date.parse(receipt.data.fetched_at)<=Date.now()+2000,
         'STOP_WK100_LIVE_PRIVATE_SQL_RECEIPT_READBACK_INVALID');
       const raw=await storage.readPrivate(capture.raw_object_key);
       check(sha(Buffer.from(raw))===capture.payload_sha256,

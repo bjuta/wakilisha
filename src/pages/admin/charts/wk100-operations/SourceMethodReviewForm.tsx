@@ -14,6 +14,7 @@ export type Wk100MethodDecision={
   canScore:false;canPublish:false;
 };
 type State=Wk100MethodDecision['decisionState'];
+type PeriodAuthority='provider_defined'|'observed_as_of';
 type Field='constitutionVersion'|'reason'|'nativePeriodEvidenceRef'|'endpointSha256'|
   'accessEvidenceSha256'|'authorizationRef'|'authorizationExpiresAt';
 type Draft={decisionState:State;constitutionVersion:string;reason:string;
@@ -44,6 +45,8 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
     nativePeriodEvidenceRef:'',endpointSha256:'',
     accessEvidenceSha256:'',authorizationRef:'',authorizationExpiresAt:'',
   });
+  const [periodAuthority,setPeriodAuthority]=useState<PeriodAuthority>(
+    previous?.nativePeriodAuthority==='observed_as_of'?'observed_as_of':'provider_defined');
   const [saving,setSaving]=useState(false);
   const [enrolling,setEnrolling]=useState(false);
   const [contractVersion,setContractVersion]=useState('');
@@ -59,6 +62,9 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
       proposal.behavior==='consumption'&&proposal.metric==='rank_and_count'&&
       proposal.cadence==='weekly'));
   const valid=draft.constitutionVersion.trim().length>=2&&
+    (!admitted||periodAuthority==='provider_defined'||
+      (!['youtube_ke','spotify_ke'].includes(proposal.providerKey)&&
+       /^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(draft.nativePeriodEvidenceRef.trim())))&&
     draft.reason.trim().length>=6&&
     (!admitted||(allowedAdmission&&
       draft.nativePeriodEvidenceRef.trim().length>=3&&
@@ -116,7 +122,7 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
         proposalRevision:proposal.revision,decisionState:draft.decisionState,
         parserClass:admitted?parser:null,
         methodClass:proposal.methodClass,
-        nativePeriodAuthority:admitted?'provider_defined':null,
+        nativePeriodAuthority:admitted?periodAuthority:null,
         nativePeriodEvidenceRef:admitted?draft.nativePeriodEvidenceRef.trim():null,
         endpointSha256:admitted?draft.endpointSha256:null,
         accessEvidenceSha256:admitted?draft.accessEvidenceSha256:null,
@@ -188,7 +194,23 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
         {!allowedAdmission&&<p role="alert" className="text-sm text-wk-danger">
           This provider method cannot be admitted for unattended collection. Record a hold instead.
         </p>}
-        <ReviewField label="Provider-defined period evidence reference" limit={240}
+        <WkSelect ariaLabel="Period authority" value={periodAuthority}
+          onChange={value=>{setPeriodAuthority(value as PeriodAuthority);setError('');}}
+          options={[
+            {value:'provider_defined',label:'Provider-declared reporting period or chart date'},
+            ...(!['youtube_ke','spotify_ke'].includes(proposal.providerKey)?[
+              {value:'observed_as_of',label:'WAKILISHA observed-as-of (native period unknown)'},
+            ]:[]),
+          ]}/>
+        <p className="text-xs leading-relaxed text-wk-text-muted">
+          Observed-as-of means the source rank was visible when our collector captured
+          the original bytes. It does not mean the activity happened that day.
+          A provider chart date remains source evidence even when full reporting bounds are unknown.
+          YouTube's period-bound adapter and Spotify's weekly chart export still require separate native-period qualification.
+        </p>
+        <ReviewField label={periodAuthority==='observed_as_of'
+          ?'Missing-period review reference (observed_as_of/review-id)'
+          :'Provider-native period evidence reference'} limit={240}
           value={draft.nativePeriodEvidenceRef} onChange={v=>change('nativePeriodEvidenceRef',v)}/>
         <ReviewField label="Reviewed endpoint SHA-256 (hex only)" limit={64}
           value={draft.endpointSha256} onChange={v=>change('endpointSha256',v)}/>
