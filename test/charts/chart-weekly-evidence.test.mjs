@@ -311,6 +311,24 @@ test('YouTube provider weekly observation retains views, exact target period and
   assert.equal(r.metric,'rank_and_count');assert.equal(r.behavior,'video_consumption');
   assert.equal(r.rows[0].view_count,12400);assert.equal(r.source_period_key,target);
   assert.throws(()=>parseYouTubeKenyaWeekly(payload,'weekly:20261009:20261015:ke'),/target_period_unavailable/);
+  const otherWeek='weekly:20261009:20261015:ke';
+  const mismatched={metadata:{periodKey:target},
+    charts:{periodKey:otherWeek,trackViews:[{
+      encryptedVideoId:'wrong-week',name:'Other week',
+      viewCount:999999,chartEntryMetadata:{currentPosition:1},
+    }]}};
+  assert.throws(()=>parseYouTubeKenyaWeekly(mismatched,target),/target_period_unavailable/);
+  const both={charts:[
+    {periodKey:otherWeek,trackViews:Array.from({length:3},(_,i)=>({
+      encryptedVideoId:'old-'+i,viewCount:1000,chartEntryMetadata:{currentPosition:i+1},
+    }))},
+    {periodKey:target,trackViews:payload.charts.trackViews},
+  ]};
+  assert.equal(parseYouTubeKenyaWeekly(both,target).rows[0].provider_track_id,'xyz');
+  assert.throws(()=>parseYouTubeKenyaWeekly({
+    periodKey:target,charts:{trackViews:payload.charts.trackViews,
+      competing:{periodKey:target,trackViews:payload.charts.trackViews}},
+  },target),/ambiguous_weekly_track_views/);
 });
 
 test('YouTube rejects absent counts, duplicated ranks and invented provider periods',()=>{
