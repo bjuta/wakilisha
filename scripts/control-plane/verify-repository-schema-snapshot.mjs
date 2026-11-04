@@ -160,11 +160,12 @@ export function validateRepositorySchemaSnapshot({
   }
 
   if (
-    typeof seal.sourceProjectRef !==
+    seal.mode !== "disposable_ci" &&
+    (typeof seal.sourceProjectRef !==
       "string" ||
     !/^[a-z0-9]{20}$/.test(
       seal.sourceProjectRef,
-    )
+    ))
   ) {
     errors.push(
       "schemaSeal.sourceProjectRef must be a 20-character Supabase project ref",
