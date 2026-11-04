@@ -150,11 +150,12 @@ export function validateRepositorySchemaSnapshot({
     ![
       "production",
       "preview",
+      "disposable_ci",
       RNB18_STAGED_MODE,
     ].includes(seal.mode)
   ) {
     errors.push(
-      "schemaSeal.mode must be production or preview",
+      "schemaSeal.mode must be production, preview, or approved disposable_ci",
     );
   }
 
@@ -223,6 +224,23 @@ export function validateRepositorySchemaSnapshot({
     }
   }
 
+  if (seal.mode === "disposable_ci") {
+    // An unlinked local replay has NO hosted Preview project identity.
+    // The exact replay commit and workflow run are separately bound by
+    // verify-migration-replay-contract.mjs to the committed migration bytes.
+    if (seal.sourceProjectRef !== "unlinked-local-ci" ||
+        typeof seal.baseMainSha !== "string" ||
+        !/^[0-9a-f]{40}$/.test(seal.baseMainSha) ||
+        typeof seal.replayCandidateHeadSha !== "string" ||
+        !/^[0-9a-f]{40}$/.test(seal.replayCandidateHeadSha) ||
+        !Number.isInteger(seal.workflowRunId) || seal.workflowRunId < 1) {
+      errors.push("disposable_ci schema seal needs unlinked-local-ci and exact replay commit/run authority");
+    }
+    if (seal.previewBranchId != null) {
+      errors.push("disposable_ci schema seal cannot claim a hosted Preview branch");
+    }
+  }
+
   if (seal.mode === RNB18_STAGED_MODE) {
     if (expectedProjectRef !== "pgzizndxdyhqmtyywjmt" ||
         migrationCount !== 237 || latestMigration !== RNB18_STAGE1 ||
@@ -260,6 +278,7 @@ export function validatePendingSchemaState({
   if (
     pendingCount > 0 &&
     sealMode !== "preview" &&
+    sealMode !== "disposable_ci" &&
     sealMode !== RNB18_STAGED_MODE
   ) {
     errors.push(
