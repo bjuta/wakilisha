@@ -349,7 +349,7 @@ export function parseAppleKenya(raw,access={}) {
 // Bind trackViews to its nearest explicit provider period. The previous
 // document-wide period search could accept a matching label in unrelated
 // metadata and then choose a different week's (larger) chart list.
-const YOUTUBE_PERIOD=/^weekly:\\d{8}:\\d{8}:ke$/;
+const YOUTUBE_PERIOD=/^weekly:\d{8}:\d{8}:ke$/;
 function youtubeDeclaredPeriod(o) {
   const meta=record(o.metadata);
   const candidates=[o.periodKey,o.period,o.period_key,
