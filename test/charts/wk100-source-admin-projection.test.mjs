@@ -408,7 +408,11 @@ test('WK100 capture endpoint rechecks current method admission before a provider
   assert.match(edge,/current\.authorization_ref===decision\.authorization_ref &&\s*await methodAllowed\(\)/);
   assert.match(edge,/p_endpoint_sha256:endpointSha256/);
   assert.match(edge,/sha256Hex\(new TextEncoder\(\)\.encode\(entry\.endpoint\)\)/);
-  assert.match(edge,/key\.startsWith\('apple_ke_'\)/);
+  // Apple scoped validation moved to its shared exact-route authority helper.
+  assert.match(edge,/isWk100AppleCatalogChart\(key,entry\.endpoint\)/);
+  const apple=await readFile('supabase/functions/_shared/wk100-apple-service-credential.mjs','utf8');
+  assert.match(apple,/\^apple_ke\(\?:_\[a-z\]/);
+  assert.match(apple,/validAppleEndpoint\(endpoint\)/);
   assert.doesNotMatch(edge,/body\.providerAuthorization|body\.endpoint/);
 });
 
