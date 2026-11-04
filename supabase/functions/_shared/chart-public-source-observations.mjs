@@ -348,6 +348,73 @@ export function parseAppleKenya(raw,access={}) {
   });
 }
 
+/**
+ * Apple Music's FREE, public Kenya Top 100 page, not the developer-token API.
+ * Its HTML is independently provider URL-bound and cross-checks 100 ordered
+ * music:song / music:song:track meta tags against a MusicPlaylist JSON-LD.
+ * The chart is updated daily; no weekly play counts or period boundaries
+ * are inferred from a webpage retrieval time.
+ */
+export const WK100_APPLE_KE_PUBLIC_CHART_URL =
+  'https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172';
+function applePublicSongUrl(ref) {
+  if(typeof ref!=='string'||ref.length>1024||ref.includes('&'))
+    fail('apple_public_song_url_invalid');
+  let url;
+  try{url=new URL(ref);}catch{fail('apple_public_song_url_invalid');}
+  if(url.protocol!=='https:'||url.hostname!=='music.apple.com'||
+    url.port||url.username||url.password||url.search||url.hash||
+    !/^\/ke\/song\/(?:[^/?#]+\/)?[0-9]+$/.test(url.pathname)||
+    url.href!==ref)fail('apple_public_song_url_invalid');
+  return {url:ref,id:url.pathname.split('/').at(-1)};
+}
+export function parseAppleKenyaPublicHtml(raw,access={}) {
+  if(access?.endpoint!==WK100_APPLE_KE_PUBLIC_CHART_URL)
+    fail('apple_public_chart_endpoint_unverified');
+  const html=assertString(raw,'apple_public');
+  const metadata=[...html.matchAll(/<meta\b[^>]*>/gi)].map(x=>attrs(x[0]));
+  const count=metadata.filter(x=>x.property==='music:song_count');
+  const songs=metadata.filter(x=>x.property==='music:song');
+  const ranks=metadata.filter(x=>x.property==='music:song:track');
+  if(count.length!==1||count[0].content!=='100'||
+    songs.length!==100||ranks.length!==100)
+    fail('apple_public_chart_structure_unverified');
+  const links=songs.map(x=>applePublicSongUrl(x.content));
+  if(new Set(links.map(x=>x.id)).size!==100||
+    ranks.some((x,i)=>x.content!==String(i+1)))
+    fail('apple_public_chart_rank_mismatch');
+  const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)]
+    .filter(x=>attrs(x[1]).type==='application/ld+json');
+  if(scripts.length!==1||scripts[0][2].length>400000)
+    fail('apple_public_chart_jsonld_unverified');
+  let playlist;
+  try{playlist=JSON.parse(scripts[0][2]);}
+  catch{fail('apple_public_chart_jsonld_unverified');}
+  if(!record(playlist)||playlist['@type']!=='MusicPlaylist'||
+    playlist.numTracks!==100||!Array.isArray(playlist.track)||
+    playlist.track.length!==100)
+    fail('apple_public_chart_jsonld_unverified');
+  const rows=playlist.track.map((item,i)=>{
+    const entry=record(item);
+    if(!entry||entry['@type']!=='MusicRecording'||!text(entry.name)||
+      typeof entry.duration!=='string'||
+      !/^PT(?=.*[0-9])(?:[0-9]+H)?(?:[0-9]+M)?(?:[0-9]+(?:\.[0-9]+)?S)?$/.test(entry.duration))
+      fail('apple_public_chart_track_invalid');
+    const ref=applePublicSongUrl(entry.url);
+    if(ref.url!==links[i].url||ref.id!==links[i].id)
+      fail('apple_public_chart_track_mismatch');
+    return track(i+1,ref.id,entry.name,null,{
+      provider_url:ref.url,duration_native:entry.duration,
+    });
+  });
+  return normalizeRows('apple_ke',rows,100,{
+    behavior:'consumption',metric:'rank',
+    chart_surface:'apple_public_daily_top_100',
+    source_cadence:'daily_updated_playlist',
+    native_period:'unknown',
+  });
+}
+
 // Bind trackViews to its nearest explicit provider period. The previous
 // document-wide period search could accept a matching label in unrelated
 // metadata and then choose a different week's (larger) chart list.
