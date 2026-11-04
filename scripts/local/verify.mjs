@@ -45,9 +45,13 @@ async function freePorts(count){
  try{for(let i=0;i<count;i++){const server=net.createServer();await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});probes.push(server);ports.push(server.address().port);}return ports;}
  finally{await Promise.all(probes.map(s=>new Promise(r=>s.close(r))));}
 }
+const criticalSecurityStep={name:'Run critical security and lifecycle tests against disposable local services',run:'npm run test:critical'};
+lanes['critical-security']=[...lanes.wk100.slice(0,2),criticalSecurityStep];
+lanes.wk100.splice(2,0,criticalSecurityStep);
+const dbLanes=['mizizi-sql','mizizi-auth','wk100','critical-security'];
 const lane=process.argv[2];
 if(lane==='audit'){console.log('LOCAL_WORKFLOW_AUDIT=PASS; eight retired workflows; no runner allocation');process.exit(0);}
-if(!lanes[lane])stop('Choose: audit, core, browser, source-preflight, mizizi-sql, mizizi-auth, wk100. Release remains BLOCKED until all scopes and remote/provenance/protection gates pass.');
+if(!lanes[lane])stop('Choose: audit, core, browser, source-preflight, mizizi-sql, mizizi-auth, wk100, critical-security. Release remains BLOCKED until all scopes and remote/provenance/protection gates pass.');
 if(process.argv.includes('--plan')){console.log(JSON.stringify({lane,steps:lanes[lane],blockedReleaseGates:['live security and schema drift','three production control-plane preflights','public runtime watch','trusted local replay provenance','enforced merge protection'],productionMutation:false},null,2));process.exit(0);}
 if(process.platform!=='darwin'||process.versions.node.split('.')[0]!=='22')stop('Run on macOS with pinned Node 22');
 // Ambient credentials and repository .env files never enter the execution clone.
@@ -67,7 +71,7 @@ save();
 let database=false,locked=false;let originalContainers=[],originalVolumes=[];const lock=path.join(fs.realpathSync(os.tmpdir()),'wakilisha-local-disposable.lock');
 function command(name,script,extra={}) {
  if(script.includes('${{'))stop('Untranslated Actions expression: '+name);
- if(['mizizi-sql','mizizi-auth','wk100'].includes(lane))script=script.replaceAll("--filter 'name=^supabase_db_'",'--filter "$(node scripts/local/disposable-context.mjs --db-filter)"');
+ if(dbLanes.includes(lane))script=script.replaceAll("--filter 'name=^supabase_db_'",'--filter "$(node scripts/local/disposable-context.mjs --db-filter)"');
  const started=Date.now();
  const index=report.steps.length;
  const logPath=path.join(reportDir,`${index}.log`);
@@ -90,7 +94,7 @@ try {
  capture('git',['update-ref','refs/remotes/origin/main',base],{cwd:dir});
  // Dependencies are installed in the scratch tree; no user checkout is modified.
  command('locked dependencies','npm ci --ignore-scripts --no-audit --no-fund');
- const dbLane=['mizizi-sql','mizizi-auth','wk100'].includes(lane);
+ const dbLane=dbLanes.includes(lane);
  if(dbLane){
   fs.mkdirSync(lock);locked=true;
   env.DOCKER_CONTEXT=capture('docker',['context','show']);
@@ -112,7 +116,16 @@ try {
   database=true;
  }
  if(lane==='browser'||lane==='mizizi-auth')command('Browser installation','./node_modules/.bin/playwright install '+(lane==='browser'?'chromium webkit':'chromium'));
- for(const s of lanes[lane])command(s.name,s.run,s.env??{});
+ for(const s of lanes[lane]){
+  if(['critical-security','wk100'].includes(lane)&&s.run==='npm run test:critical'){
+   const values={};
+   for(const line of capture('supabase',['status','-o','env'],{cwd:dir,env}).split('\n')){const m=line.match(/^([A-Z_]+)="?(.*?)"?$/);if(m)values[m[1]]=m[2];}
+   if(values.API_URL!==`http://127.0.0.1:${report.disposable.apiPort}`||!values.ANON_KEY)stop('Disposable public endpoint/key not proven');
+   const role=JSON.parse(Buffer.from(values.ANON_KEY.split('.')[1],'base64url')).role;
+   if(role!=='anon')stop('Critical security requires a genuine local anonymous key');
+   command(s.name,s.run,{VITE_PUBLIC_SUPABASE_URL:values.API_URL,VITE_PUBLIC_SUPABASE_ANON_KEY:values.ANON_KEY});
+  }else command(s.name,s.run,s.env??{});
+ }
  // Copy before later browser invocations clear test-results (each invocation is preserved).
  report.result='pass';
 } catch(e){report.result='fail';report.reason=e.message;console.error(e.message);process.exitCode=1;}
