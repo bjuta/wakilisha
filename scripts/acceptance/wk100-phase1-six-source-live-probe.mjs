@@ -22,7 +22,8 @@ const SOURCES=Object.freeze([
     kind:'csv',reason:'First-party Kenya Top 200 CSV candidate; native discovery rank, never streams.'},
   {id:'mdundo_ke',url:'https://play.mdundo.com/top-charts/ke',
     kind:'html',reason:'First-party Kenya ranked songs, described as weekly updated; exact native bounds unverified.'},
-  {id:'youtube_ke',reason:'Mandatory official Kenya weekly Top Songs song-view source; exact first-party service route remains unverified.'},
+  {id:'youtube_ke',url:'https://charts.youtube.com/charts/TopSongs/ke',
+    kind:'public_chart_html',reason:'First-party public Kenya Top Songs landing page; exact weekly original response, views and provider period remain unverified.'},
   {id:'audiomack_ke',url:'https://audiomack.com/geo-charts/playlist/kenya',
     kind:'html',reason:'Provider-owned Weekly 100 Kenya geo chart. Preserve native ranks, not invented streams.'},
 ]);
