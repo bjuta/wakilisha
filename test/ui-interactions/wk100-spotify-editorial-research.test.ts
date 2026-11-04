@@ -7,7 +7,8 @@ import {
 } from '../../src/services/chartsIngestion/wk100SpotifyEditorialSources';
 
 const observedAt='2026-11-04T10:00:00.000Z';
-const input=(source=WK100_SPOTIFY_EDITORIAL_SOURCES[0])=>({
+const input=(source:typeof WK100_SPOTIFY_EDITORIAL_SOURCES[number]=
+  WK100_SPOTIFY_EDITORIAL_SOURCES[0])=>({
   sourceKey:source.sourceKey,playlistUrl:spotifyEditorialSourceUrl(source.playlistId),
   curatorBylineObserved:'Spotify' as const,
   researcherObservedAtUtc:observedAt,
