@@ -9,7 +9,8 @@ import {createHash,randomUUID} from 'node:crypto';
 import {mkdir,writeFile,readFile,chmod} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {homedir} from 'node:os';
-import {parseMdundoKenya,parseShazamKenya,parseAudiomackKenya} from
+import {parseMdundoKenya,parseShazamKenya,parseAudiomackKenya,
+  parseAppleKenyaPublicHtml} from
   '../../supabase/functions/_shared/chart-public-source-observations.mjs';
 
 const MAX=4_194_304;
@@ -121,7 +122,7 @@ async function main(){
       if(prior.length!==bytes.length||sha(prior)!==evidence.payload_sha256||
           !prior.equals(bytes))throw Error('immutable_original_conflict');
       const observation={...base,...evidence,original_file:filename,status:'ORIGINAL_SAVED_RESEARCH_ONLY'};
-      if(source.kind==='public_chart_html'){
+      if(source.kind==='public_chart_html'&&source.id!=='apple_ke'){
         // A public playlist/landing HTML is not a proven observation list,
         // reporting period, provider stream count, or governed collector receipt.
         observation.status=supplementary?
@@ -132,7 +133,8 @@ async function main(){
       }
       try{
         const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
-        const parsed=source.id==='mdundo_ke'?parseMdundoKenya(text):
+        const parsed=source.id==='apple_ke'?parseAppleKenyaPublicHtml(text,{endpoint:source.url}):
+          source.id==='mdundo_ke'?parseMdundoKenya(text):
           source.id==='audiomack_ke'?parseAudiomackKenya(text):parseShazamKenya(text);
         observation.status='ORIGINAL_PARSED_RESEARCH_ONLY';
         observation.observed_depth=parsed.observed_depth;
@@ -161,6 +163,7 @@ async function main(){
       signal_class:r.signal_class,status:r.status,
       http_status:r.http_status??null,observed_depth:r.observed_depth??null,
       sha256:r.payload_sha256??null,content_type:r.content_type??null,
-      byte_length:r.byte_length??null}))},null,2));
+      byte_length:r.byte_length??null,
+      parse_failure:r.parse_failure??null}))},null,2));
 }
 await main();
