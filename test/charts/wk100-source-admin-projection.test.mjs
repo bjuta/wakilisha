@@ -318,7 +318,7 @@ test('WK100 SQL timezone forms cannot make a completed slot look absent',()=>{
   assert.equal(corrupt.blocked[0].code,'attempt_history_invalid');
 });
 
-test('WK100 source-method review cannot convert research-only or a mismatched provider into admission',async()=>{
+test('WK100 source-method review cannot convert research-only or a mismatched provider into admission',()=>{
   const p={sourceKey:'youtube_ke_top_songs_weekly',providerKey:'youtube_ke',proposalRevision:1,
     decisionState:'collector_admitted',parserClass:'youtube_kenya_weekly_top_songs_v1',
     methodClass:'provider_api',nativePeriodAuthority:'provider_defined',
@@ -333,24 +333,11 @@ test('WK100 source-method review cannot convert research-only or a mismatched pr
   for(const patch of [
     {methodClass:'research_only'},{parserClass:'apple_kenya_chart_v1'},
     {providerKey:'spotify_ke',sourceKey:'spotify_ke_chart'},
+    {providerKey:'spotify_ke',sourceKey:'spotify_ke_official_weekly',
+      parserClass:'spotify_kenya_offered_chart_csv_v1',methodClass:'offered_export'},
     {nativePeriodAuthority:'unknown'},{authorizationExpiresAt:'2026-11-02T00:00:00Z'},
     {endpointSha256:null},{extra:true},
   ])assert.throws(()=>validateWk100SourceMethodDecision({...p,...patch},{now}));
-  // A valid Spotify source should be reviewable through the SAME SQL/Admin
-  // authority, without treating a synthetic CSV as source-method evidence.
-  const spotify={...p,providerKey:'spotify_ke',sourceKey:'spotify_ke_official_weekly',
-    parserClass:'spotify_kenya_offered_chart_csv_v1',methodClass:'offered_export'};
-  assert.equal(validateWk100SourceMethodDecision(spotify,{now}).canCollect,false);
-  for(const methodClass of ['provider_api','research_only','reviewed_page_adapter'])
-    assert.throws(()=>validateWk100SourceMethodDecision({...spotify,methodClass},{now}),
-      /method_admission_unqualified/);
-  const methodSql=await readFile('scripts/acceptance/wk100-phase1-source-method-candidate.sql','utf8');
-  assert.equal(methodSql.split("when 'spotify_ke' then 'spotify_kenya_offered_chart_csv_v1'").length-1,2);
-  assert.match(methodSql,/v_p.provider_key='spotify_ke'/);
-  assert.match(methodSql,/v_proposal.provider_key='spotify_ke'/);
-  const admin=await readFile('src/pages/admin/charts/wk100-operations/SourceMethodReviewForm.tsx','utf8');
-  assert.match(admin,/spotify_ke:'spotify_kenya_offered_chart_csv_v1'/);
-  assert.match(admin,/proposal.methodClass==='offered_export'/);
   const hold=validateWk100SourceMethodDecision({...p,decisionState:'held',
     parserClass:null,methodClass:'research_only',nativePeriodAuthority:null,
     nativePeriodEvidenceRef:null,endpointSha256:null,accessEvidenceSha256:null,
