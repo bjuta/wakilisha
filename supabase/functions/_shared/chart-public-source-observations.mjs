@@ -197,8 +197,10 @@ export function parseShazamKenya(raw) {
   if (h<0) fail('shazam_missing_header');
   const rows=[];
   for (const cols of sheet.slice(h+1)) {
-    if (!cols[0]?.trim()) continue;
-    const rank=positiveInt(cols[0].trim());
+    // Ignore genuinely empty CSV spacer lines, but never silently discard a
+    // populated observation whose rank is absent.
+    if (cols.every(v=>!v.trim())) continue;
+    const rank=positiveInt(cols[0]?.trim());
     if (cols.length!==3 || !rank || !text(cols[1]) || !text(cols[2])) fail('shazam_invalid_chart_row');
     rows.push(track(rank,null,text(cols[2]),text(cols[1])));
   }
