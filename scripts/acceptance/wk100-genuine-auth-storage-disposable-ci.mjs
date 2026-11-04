@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { localDisposableContext } from '../local/disposable-context.mjs';
+import { localDisposableContext, disposableDatabaseFilter, disposableApiPort } from '../local/disposable-context.mjs';
 /**
  * Real GoTrue-issued authenticated JWT vs PRIVATE WK100 Storage in a disposable
  * local Supabase stack. No hosted Preview/Production credentials or endpoints.
@@ -239,9 +239,9 @@ async function main(){
   const v=env(); const url=v.API_URL||v.SUPABASE_URL;
   const parsed=new URL(url||'http://invalid.invalid');
   check(parsed.protocol==='http:'&&parsed.hostname==='127.0.0.1'&&
-    parsed.port==='54321'&&parsed.pathname==='/'&&
+    parsed.port===disposableApiPort()&&parsed.pathname==='/'&&
     v.ANON_KEY&&v.SERVICE_ROLE_KEY,'STOP_NOT_LOCAL_AUTH_AND_STORAGE');
-  const c=execFileSync('docker',['ps','--filter','name=^supabase_db_',
+  const c=execFileSync('docker',['ps','--filter',disposableDatabaseFilter(),
     '--format','{{.Names}}'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
   check(c.length===1,'STOP_LOCAL_POSTGRES_CONTAINER_CARDINALITY');
   const db=c[0];

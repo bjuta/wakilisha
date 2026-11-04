@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { localDisposableContext } from '../local/disposable-context.mjs';
+import { localDisposableContext, disposableDatabaseFilter, disposableApiPort } from '../local/disposable-context.mjs';
 // Actual GoTrue JWT + PostgREST RPC proof in fresh unlinked LOCAL CI only.
 // Temporary role and second workspace membership are synthetic local fixtures.
 // Surrounding workflow MUST destroy the local Docker volumes on every outcome.
@@ -48,9 +48,9 @@ async function main(){
  const api=values.API_URL||values.SUPABASE_URL;
  const loc=new URL(api||"https://invalid.invalid");
  assert(loc.protocol==="http:"&&loc.hostname==="127.0.0.1"&&
-  loc.port==="54321"&&loc.pathname==="/"&&
+  loc.port===disposableApiPort()&&loc.pathname==="/"&&
   values.ANON_KEY&&values.SERVICE_ROLE_KEY,"STOP_AUTH_LOCAL_KEYS_OR_URL_NOT_PROVEN");
- const names=execFileSync("docker",["ps","--filter","name=^supabase_db_",
+ const names=execFileSync("docker",["ps","--filter",disposableDatabaseFilter(),
   "--format","{{.Names}}"],{encoding:"utf8"}).trim().split("\n").filter(Boolean);
  assert(names.length===1,"STOP_AUTH_LOCAL_DB_CONTAINER_COUNT");
  const db=names[0];

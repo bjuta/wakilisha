@@ -10,7 +10,7 @@ set -euo pipefail
 [ ! -e supabase/.temp/project-ref ] || {
   echo 'STOP: remote Supabase authority or link present'; exit 20;
 }
-CONTAINER="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+CONTAINER="$(docker ps --filter "$(node scripts/local/disposable-context.mjs --db-filter)" --format '{{.Names}}')"
 [ -n "$CONTAINER" ] && [ "$(printf '%s\n' "$CONTAINER" | wc -l | tr -d ' ')" = 1 ] || {
   echo 'STOP: expected one disposable database container'; exit 20;
 }

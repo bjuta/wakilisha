@@ -15,7 +15,7 @@ SQL=scripts/acceptance/mizizi-slice1-worker-parallel-setup-ci.sql
 [ "$(git hash-object "$SQL")" = "$(git rev-parse HEAD:$SQL)" ] || {
   echo 'STOP_PARALLEL_SQL_NOT_EXACT_GIT_BLOB'; exit 20;
 }
-CONTAINER="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+CONTAINER="$(docker ps --filter "$(node scripts/local/disposable-context.mjs --db-filter)" --format '{{.Names}}')"
 [ -n "$CONTAINER" ] && [ "$(printf '%s\n' "$CONTAINER" | wc -l)" -eq 1 ] || {
   echo 'STOP_PARALLEL_LOCAL_CONTAINER_CARDINALITY'; exit 21;
 }

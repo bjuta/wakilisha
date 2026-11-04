@@ -1,3 +1,4 @@
+import { localDisposableContext, disposableApiPort } from '../local/disposable-context.mjs';
 /**
  * Full browser acceptance against the same real local GoTrue and PostgREST
  * instance verified by the sibling operator RPC test. No fake session state,
@@ -66,9 +67,8 @@ async function mobileOverflow(page){
 export async function verifyLocalHeadquartersBrowsersV1({
  api,anonKey,first,second,caseId,
 }){
- assert(process.env.GITHUB_ACTIONS==="true"&&
-  process.env.GITHUB_EVENT_NAME==="pull_request"&&
-  api==="http://127.0.0.1:54321"&&anonKey&&
+ assert((localDisposableContext() || (process.env.GITHUB_ACTIONS==="true"&&process.env.GITHUB_EVENT_NAME==="pull_request"))&&
+  api===`http://127.0.0.1:${disposableApiPort()}`&&anonKey&&
   first?.email&&first?.password&&second?.email&&second?.password&&caseId,
   "STOP_BROWSER_DISPOSABLE_AUTH_CONTEXT_UNVERIFIED");
  process.env.VITE_PUBLIC_SUPABASE_URL=api;
@@ -171,9 +171,8 @@ export async function verifyLocalHeadquartersBrowsersV1({
 export async function verifyStaleBrowserTransitionV1({
  api,anonKey,first,second,caseId,onAdvance,
 }){
- assert(process.env.GITHUB_ACTIONS==="true"&&
-  process.env.GITHUB_EVENT_NAME==="pull_request"&&
-  api==="http://127.0.0.1:54321"&&anonKey&&
+ assert((localDisposableContext() || (process.env.GITHUB_ACTIONS==="true"&&process.env.GITHUB_EVENT_NAME==="pull_request"))&&
+  api===`http://127.0.0.1:${disposableApiPort()}`&&anonKey&&
   first?.email&&first?.password&&second?.email&&second?.password&&
   /^[0-9a-f-]{36}$/.test(caseId||"")&&typeof onAdvance==="function",
   "STOP_O25_UNLINKED_LOCAL_AUTH_AND_CALLBACK_REQUIRED");

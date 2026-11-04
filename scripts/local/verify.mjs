@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import net from 'node:net';
 import {spawnSync} from 'node:child_process';
 const root=fs.realpathSync(new URL('../..',import.meta.url).pathname);
 process.chdir(root);
@@ -39,6 +40,11 @@ const lanes={
  'mizizi-auth':plans['mizizi-slice1-disposable-postgres'].jobs['disposable-operator-jwt'].steps.filter(s=>s.run&&!/Destroy|Install/.test(s.name)),
  wk100:plans['wk100-disposable-security'].jobs['disposable-wk100-security'].steps.filter(s=>s.run&&!/Destroy|Install/.test(s.name)).map(s=>({...s,run:s.run.replace('test "$GITHUB_EVENT_NAME" = pull_request','node scripts/local/disposable-context.mjs'),env:s.env?{WK100_LIVE_SOURCE_ACCEPTANCE:'true'}:undefined})),
 };
+async function freePorts(count){
+ const probes=[];const ports=[];
+ try{for(let i=0;i<count;i++){const server=net.createServer();await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});probes.push(server);ports.push(server.address().port);}return ports;}
+ finally{await Promise.all(probes.map(s=>new Promise(r=>s.close(r))));}
+}
 const lane=process.argv[2];
 if(lane==='audit'){console.log('LOCAL_WORKFLOW_AUDIT=PASS; eight retired workflows; no runner allocation');process.exit(0);}
 if(!lanes[lane])stop('Choose: audit, core, browser, source-preflight, mizizi-sql, mizizi-auth, wk100. Release remains BLOCKED until all scopes and remote/provenance/protection gates pass.');
@@ -57,16 +63,24 @@ fs.chmodSync(dir,0o700);
 const reportDir=path.join(root,'artifacts','local',path.basename(dir));fs.mkdirSync(reportDir,{recursive:true,mode:0o700});
 const report={kind:'mac-local-verification-v1',lane,head,base,platform:os.platform(),arch:os.arch(),node:process.version,plan_sha256:sha(fs.readFileSync('ops/local/workflow-plan.json')),started:new Date().toISOString(),result:'running',releaseAcceptance:'blocked',steps:[],scratch:dir};
 const save=()=>fs.writeFileSync(path.join(reportDir,'report.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});
-let database=false,locked=false;const lock=path.join(fs.realpathSync(os.tmpdir()),'wakilisha-local-disposable.lock');
+save();
+let database=false,locked=false;let originalContainers=[],originalVolumes=[];const lock=path.join(fs.realpathSync(os.tmpdir()),'wakilisha-local-disposable.lock');
 function command(name,script,extra={}) {
  if(script.includes('${{'))stop('Untranslated Actions expression: '+name);
+ if(['mizizi-sql','mizizi-auth','wk100'].includes(lane))script=script.replaceAll("--filter 'name=^supabase_db_'",'--filter "$(node scripts/local/disposable-context.mjs --db-filter)"');
  const started=Date.now();
- const r=spawnSync('/bin/bash',['-euo','pipefail','-c',script],{cwd:dir,env:{...env,...extra},encoding:'utf8',timeout:30*60*1000,maxBuffer:32*1024*1024});
- const log=String(r.stdout??'')+String(r.stderr??'');
  const index=report.steps.length;
+ const logPath=path.join(reportDir,`${index}.log`);
+ report.currentStep=name;save();
+ const fd=fs.openSync(logPath,'w',0o600);
+ let r;
+ try{r=spawnSync('/bin/bash',['-euo','pipefail','-c',script],{cwd:dir,env:{...env,...extra},stdio:['ignore',fd,fd],timeout:30*60*1000});}
+ finally{fs.closeSync(fd);}
+ const log=fs.readFileSync(logPath,'utf8').replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,'[REDACTED_LOCAL_JWT]');
  const captures=path.join(dir,'test-results');
  if(fs.existsSync(captures))fs.cpSync(captures,path.join(reportDir,`captures-${index}`),{recursive:true});
  fs.writeFileSync(path.join(reportDir,`${index}.log`),log,{mode:0o600});
+ delete report.currentStep;
  report.steps.push({name,exit:r.status,signal:r.signal,error:r.error?.code,elapsed_ms:Date.now()-started,log_sha256:sha(log)});save();
  console.log(`${r.status===0?'PASS':'FAIL'} ${name}`);
  if(r.status!==0)stop(`${name} failed; private evidence: ${reportDir}`);
@@ -79,13 +93,22 @@ try {
  const dbLane=['mizizi-sql','mizizi-auth','wk100'].includes(lane);
  if(dbLane){
   fs.mkdirSync(lock);locked=true;
-  const existing=capture('docker',['ps','-a','--filter','name=^supabase_','--format','{{.Names}}'],{env});
-  const volumes=capture('docker',['volume','ls','--filter','name=supabase_','--format','{{.Name}}'],{env});
-  if(existing||volumes)stop('Existing Supabase resources: refusing to start, target or destroy them');
+  env.DOCKER_CONTEXT=capture('docker',['context','show']);
+  const endpoint=capture('docker',['context','inspect',env.DOCKER_CONTEXT,'--format','{{.Endpoints.docker.Host}}']);
+  if(!endpoint.startsWith('unix://'))stop('Disposable tests require a local Unix Docker endpoint');
+  originalContainers=capture('docker',['ps','-a','--format','{{.ID}} {{.Names}}'],{env}).split('\n').filter(Boolean);
+  originalVolumes=capture('docker',['volume','ls','--format','{{.Name}}'],{env}).split('\n').filter(Boolean);
   if(capture('supabase',['--version'],{env})!=='2.121.0')stop('Disposable Supabase CLI must be 2.121.0');
-  // The stack project ID is unique, and legacy broad discovery is safe only after the empty-host check.
-  const config=path.join(dir,'supabase/config.toml');fs.writeFileSync(config,`project_id = "${path.basename(dir)}"\n`+fs.readFileSync(config,'utf8'));
+  const projectId=path.basename(dir);
+  if(originalContainers.some(x=>x.endsWith('_'+projectId))||originalVolumes.some(x=>x.endsWith('_'+projectId)))stop('Disposable project name already exists');
+  const [apiPort,dbPort,shadowPort,studioPort,mailPort]=await freePorts(5);
+  const config=path.join(dir,'supabase/config.toml');
+  const prefix=`project_id = "${projectId}"\n[api]\nport = ${apiPort}\n[db]\nport = ${dbPort}\nshadow_port = ${shadowPort}\n[studio]\nport = ${studioPort}\n[inbucket]\nport = ${mailPort}\n`;
+  fs.writeFileSync(config,prefix+fs.readFileSync(config,'utf8'));
+  const ownership={projectId,apiPort,dbPort,shadowPort,studioPort,mailPort};
+  fs.writeFileSync(path.join(dir,'.local-disposable.json'),JSON.stringify(ownership),{mode:0o600});
   Object.assign(env,{WK_LOCAL_DISPOSABLE:'1',WK_LOCAL_DISPOSABLE_DIR:dir});
+  report.disposable={...ownership,config_sha256:sha(fs.readFileSync(config)),existing_containers:originalContainers.length,existing_volumes:originalVolumes.length,docker_context:env.DOCKER_CONTEXT};save();
   database=true;
  }
  if(lane==='browser'||lane==='mizizi-auth')command('Browser installation','./node_modules/.bin/playwright install '+(lane==='browser'?'chromium webkit':'chromium'));
@@ -96,12 +119,16 @@ try {
 finally {
  if(database){
   try{
-   command('Destroy only this newly owned disposable stack','supabase stop --no-backup');
+   command('Destroy only this newly owned disposable stack',`supabase stop --no-backup --project-id ${path.basename(dir)}`);
    const owned=capture('docker',['ps','-a','--filter',`label=com.supabase.cli.project=${path.basename(dir)}`,'--format','{{.Names}}'],{env});
    const volumes=capture('docker',['volume','ls','--filter',`label=com.supabase.cli.project=${path.basename(dir)}`,'--format','{{.Name}}'],{env});
    const allNames=capture('docker',['ps','-a','--format','{{.Names}}'],{env}).split('\n');
    const allVolumes=capture('docker',['volume','ls','--format','{{.Name}}'],{env}).split('\n');
    const suffix='_'+path.basename(dir);
+   const remainingContainers=capture('docker',['ps','-a','--format','{{.ID}} {{.Names}}'],{env}).split('\n');
+   const remainingVolumes=capture('docker',['volume','ls','--format','{{.Name}}'],{env}).split('\n');
+   report.unrelated_resources_preserved=originalContainers.every(x=>remainingContainers.includes(x))&&originalVolumes.every(x=>remainingVolumes.includes(x));
+   if(!report.unrelated_resources_preserved)stop('Unrelated resource inventory changed during acceptance');
    if(owned||volumes||allNames.some(n=>n.startsWith('supabase_')&&n.endsWith(suffix))||allVolumes.some(n=>n.startsWith('supabase_')&&n.endsWith(suffix)))stop('Owned resources remain');report.cleanup='pass';
   }catch(e){report.cleanup='fail';report.result='fail';report.reason=e.message;process.exitCode=1;}
  }

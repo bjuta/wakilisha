@@ -17,7 +17,7 @@ CORPUS="$ROOT/scripts/acceptance/mizizi-slice1-32-source-corpus-disposable-ci.sq
 [ "$(git hash-object "$CORPUS")" = "$(git rev-parse HEAD:scripts/acceptance/mizizi-slice1-32-source-corpus-disposable-ci.sql)" ] || {
   echo 'STOP_SOURCE_CORPUS_NOT_EXACT_GIT_BLOB'; exit 20;
 }
-DB_NAMES="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+DB_NAMES="$(docker ps --filter "$(node scripts/local/disposable-context.mjs --db-filter)" --format '{{.Names}}')"
 [ "$(printf '%s\n' "$DB_NAMES" | grep -c .)" -eq 1 ] || { echo 'STOP_DISPOSABLE_DB_CONTAINER_CARDINALITY'; exit 21; }
 CONTAINER="$DB_NAMES"
 [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER")" = true ] || {
