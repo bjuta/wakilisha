@@ -22,7 +22,8 @@ type Draft={decisionState:State;constitutionVersion:string;reason:string;
 const PARSERS:Record<string,string>={
   youtube_ke:'youtube_kenya_weekly_top_songs_v1',apple_ke:'apple_kenya_chart_v1',
   boomplay_ke:'boomplay_kenya_chart_v1',mdundo_ke:'mdundo_kenya_chart_v1',
-  shazam_ke:'shazam_kenya_discovery_v1',audiomack_ke:'audiomack_kenya_chart_v1',
+  shazam_ke:'shazam_kenya_discovery_v1',spotify_ke:'spotify_kenya_offered_chart_csv_v1',
+  audiomack_ke:'audiomack_kenya_chart_v1',
 };
 function ReviewField({label,value,onChange,limit,area=false}:{
   label:string;value:string;onChange:(v:string)=>void;limit:number;area?:boolean;
@@ -53,7 +54,10 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
   };
   const admitted=draft.decisionState==='collector_admitted';
   const parser=PARSERS[proposal.providerKey]??null;
-  const allowedAdmission=!!parser&&proposal.methodClass!=='research_only';
+  const allowedAdmission=!!parser&&proposal.methodClass!=='research_only'&&
+    (proposal.providerKey!=='spotify_ke'||(proposal.methodClass==='offered_export'&&
+      proposal.behavior==='consumption'&&proposal.metric==='rank_and_count'&&
+      proposal.cadence==='weekly'));
   const valid=draft.constitutionVersion.trim().length>=2&&
     draft.reason.trim().length>=6&&
     (!admitted||(allowedAdmission&&
