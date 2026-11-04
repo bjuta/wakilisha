@@ -188,12 +188,10 @@ test('WK100 Audiomack public title metadata is candidate-only with no invented s
   assert.equal(parsed.rows.length,100);
   assert.equal(parsed.rows[0].title,'Synthetic Title 1');
   assert.equal(parsed.rows[0].provider_track_id,null);
-  const candidate=parseCaptureNativeRows(new TextEncoder().encode(html),contract,access);
-  assert.equal(candidate.length,100);
-  assert.equal(candidate[99].rank,100);
-  assert.equal(candidate[99].provider_track_id,null);
-  assert.equal(candidate[99].artist,null);
-  assert.equal(Object.hasOwn(candidate[0],'view_count'),false);
+  // Research can read this first-party metadata, but no authoritative
+  // display-order proof exists. Collector row commitment must fail closed.
+  assert.throws(()=>parseCaptureNativeRows(new TextEncoder().encode(html),contract,access),
+    /source_rank_unverified/);
   for(const bad of [
     html.replace('Weekly 100: Kenya','Top 100: Worldwide'),
     html.replace('Synthetic Title 100',''),
