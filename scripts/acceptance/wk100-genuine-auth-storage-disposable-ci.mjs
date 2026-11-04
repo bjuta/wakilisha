@@ -7,6 +7,8 @@ import { createClient } from '@supabase/supabase-js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { runCandidateCapture } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
+import { isWk100CaptureConstitutionCurrent, wk100EatWeekFromUtc } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
 const check=(condition,code)=>{if(!condition) throw new Error(code);};
 const UUID=/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 function env(){
@@ -36,6 +38,174 @@ function query(sql,container,diagnoseCandidate=false){
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const client=(url,key)=>createClient(url,key,{auth:{autoRefreshToken:false,
   persistSession:false,detectSessionInUrl:false}});
+/**
+ * Real first-party Shazam/Mdundo GET bytes through the ACTUAL WK100 candidate
+ * runtime, genuine local signed-in super-admin RPC, PostgreSQL lease/receipt
+ * and private Storage readback. ONLY in an unlinked disposable CI database.
+ *
+ * Authority is deliberately SYNTHETIC and exists exclusively in this
+ * disposable database. These are real network/service execution tests, NOT
+ * a founder-approved source admission or permanent production receipt.
+ */
+async function runActualProviderDisposableCapture({signed,admin,db,userId}){
+  const constitutionVersion='wk100-ci-live-provider-v1';
+  const slot=new Date();slot.setUTCSeconds(0,0);
+  const eat=new Date(slot.getTime()+3*3600_000);
+  const weeklyDay=(eat.getUTCDay()+6)%7;
+  const week=wk100EatWeekFromUtc(slot);
+  const scheduledAt=slot.toISOString().replace('.000Z','Z');
+  query("UPDATE public.user_role_assignments SET status='active',"+
+    "updated_at=clock_timestamp(),expires_at=clock_timestamp()+interval '20 minutes'"+
+    " WHERE user_id='"+userId+"'::uuid AND role_key='super_admin';",db);
+  const canAdmin=await signed.rpc('current_user_has_capability',{required_capability:'manage_ingest'});
+  check(!canAdmin.error&&canAdmin.data===true,'STOP_WK100_LIVE_LOCAL_METHOD_ADMIN_UNAVAILABLE');
+  const sources=[
+    {provider:'shazam_ke',source:'shazam_ke_public_top200',parser:'shazam_kenya_discovery_v1',
+     endpoint:'https://www.shazam.com/services/charts/csv/top-200/kenya/',
+     methodClass:'offered_export',behavior:'discovery',metric:'rank',depth:200,expected:'succeeded'},
+    {provider:'mdundo_ke',source:'mdundo_ke_public_top_songs',parser:'mdundo_kenya_chart_v1',
+     endpoint:'https://play.mdundo.com/top-charts/ke',
+     methodClass:'reviewed_page_adapter',behavior:'consumption',metric:'rank',depth:100,
+     expected:'partial_depth'},
+  ];
+  const bucket=admin.storage.from('wk-chart-raw-evidence-v1');
+  const objects=[];
+  try{
+    for(const spec of sources){
+      const proposal={
+        providerKey:spec.provider,sourceKey:spec.source,
+        surface:spec.provider+' public Kenya source, isolated real-byte CI',
+        methodClass:spec.methodClass,behavior:spec.behavior,metric:spec.metric,
+        expectedDepth:spec.depth,cadence:'weekly',intervalHours:null,
+        eatHour:eat.getUTCHours(),eatMinute:eat.getUTCMinutes(),
+        weekdayEat:weeklyDay,minimumHealthyCheckpoints:1,
+        evidenceReference:'ci_real_public_bytes_synthetic_method_authority',
+        reason:'Disposable independent public transport without Production admission',
+      };
+      const p=await signed.rpc('wk100_submit_source_proposal_v1',{
+        p_payload:proposal,p_expected_revision:0});
+      check(!p.error&&p.data?.revision===1,'STOP_WK100_LIVE_SOURCE_PROPOSAL_FAILED');
+      const endpointSha=sha(Buffer.from(spec.endpoint));
+      const authorizationRef='ci_only_synthetic_public_access_'+spec.provider;
+      const method={
+        sourceKey:spec.source,providerKey:spec.provider,proposalRevision:1,
+        decisionState:'collector_admitted',parserClass:spec.parser,methodClass:spec.methodClass,
+        // Local synthetic period authority intentionally cannot qualify an
+        // actual source-native date or commercial collection authorization.
+        nativePeriodAuthority:'provider_defined',
+        nativePeriodEvidenceRef:'ci_synthetic_period_not_provider_week_proof',
+        endpointSha256:endpointSha,
+        accessEvidenceSha256:sha(Buffer.from('ci_only_synthetic_method_'+spec.provider)),
+        authorizationRef,authorizationExpiresAt:
+          new Date(Date.now()+2*86400_000).toISOString().replace(/\.\d{3}Z$/,'Z'),
+        constitutionVersion,reason:'CI synthetic admission for real first-party service flow only',
+      };
+      const review=await signed.rpc('wk100_review_source_method_v1',{
+        p_payload:method,p_expected_decision_revision:0});
+      check(!review.error&&review.data?.decisionState==='collector_admitted',
+        'STOP_WK100_LIVE_LOCAL_METHOD_REVIEW_FAILED');
+      const version='ci-real-source-v1',adapterSha=sha(Buffer.from('ci_only_'+spec.parser));
+      const enrolled=await signed.rpc('wk100_enroll_source_capture_contract_v1',{
+        p_source_key:spec.source,p_contract_version:version,
+        p_adapter_sha256:adapterSha,p_expected_proposal_revision:1,
+        p_expected_decision_revision:1});
+      check(!enrolled.error&&UUID.test(enrolled.data?.contractId??''),
+        'STOP_WK100_LIVE_LOCAL_ENROLLMENT_FAILED');
+      const contract=await admin.from('wk_chart_capture_contracts_v1').select('*')
+        .eq('source_key',spec.source).eq('contract_version',version).single();
+      check(!contract.error&&contract.data?.id===enrolled.data.contractId,
+        'STOP_WK100_LIVE_LOCAL_CONTRACT_READBACK_FAILED');
+      const allowed=async()=>{
+        const [q,listed]=await Promise.all([
+          admin.rpc('wk100_service_capture_method_allowed_v1',{
+            p_source_key:spec.source,p_contract_version:version,
+            p_endpoint_sha256:endpointSha,p_authorization_ref:authorizationRef,
+            p_parser_class:spec.parser,
+          }),
+          admin.rpc('wk100_service_admitted_methods_v1'),
+        ]);
+        return !q.error&&q.data===true&&!listed.error&&
+          isWk100CaptureConstitutionCurrent({
+            rows:listed.data,sourceKey:spec.source,contractVersion:version,
+            endpointSha256:endpointSha,authorizationRef,
+            parserClass:spec.parser,constitutionVersion,nowUtc:new Date(),
+          });
+      };
+      check(await allowed(),'STOP_WK100_LIVE_METHOD_SERVICE_CONSTITUTION_NOT_BOUND');
+      const storage={
+        async readPrivate(key){
+          const res=await bucket.download(key);
+          if(res.error||!res.data)throw Error('readback_unavailable');
+          return new Uint8Array(await res.data.arrayBuffer());
+        },
+        async putCreateOnly(key,bytes,options){
+          const res=await bucket.upload(key,Buffer.from(bytes),{
+            contentType:options.contentType,upsert:false,cacheControl:'0'});
+          if(res.error)throw Error('private_upload_failed');
+          objects.push(key);
+        },
+      };
+      const rpc=async(name,args)=>{
+        const {data,error}=await admin.rpc(name,args);
+        if(error||!data)throw Error('service_rpc_'+name+'_failed');
+        return data;
+      };
+      const capture=await runCandidateCapture({
+        contract:contract.data,weekStartEat:week,scheduledAt,attemptNumber:1,
+        access:{source_key:spec.source,endpoint:spec.endpoint,
+          authorization_ref:authorizationRef,parser_class:spec.parser},
+        verifyAccess:allowed,clock:()=>new Date(),enabled:true,timeoutMs:15000,
+        db:{
+          reserve:args=>rpc('wk_chart_runtime_reserve_v1',args),
+          advance:args=>rpc('wk_chart_runtime_advance_v1',args),
+          commit:args=>rpc('wk_chart_runtime_commit_v1',args),
+          fail:args=>rpc('wk_chart_runtime_fail_v1',args),
+        },storage,
+      });
+      check(capture.status===spec.expected&&UUID.test(capture.receipt_id??'')&&
+        capture.can_publish===false,'STOP_WK100_LIVE_PRIVATE_COLLECTOR_STATUS_INVALID');
+      const receipt=await admin.from('wk_chart_capture_attempts_v1')
+        .select('id,status,observed_depth,payload_sha256,raw_object_key,native_period_authority')
+        .eq('id',capture.receipt_id).single();
+      check(!receipt.error&&receipt.data?.status===spec.expected&&
+        receipt.data.raw_object_key===capture.raw_object_key&&
+        receipt.data.payload_sha256===capture.payload_sha256&&
+        receipt.data.native_period_authority==='unknown'&&
+        receipt.data.observed_depth===(spec.provider==='mdundo_ke'?99:200),
+        'STOP_WK100_LIVE_PRIVATE_SQL_RECEIPT_READBACK_INVALID');
+      const raw=await storage.readPrivate(capture.raw_object_key);
+      check(sha(Buffer.from(raw))===capture.payload_sha256,
+        'STOP_WK100_LIVE_PRIVATE_ORIGINAL_SHA_READBACK_INVALID');
+      const rows=await admin.from('wk_chart_capture_rows_v1')
+        .select('source_rank').eq('attempt_id',capture.receipt_id).order('source_rank');
+      check(!rows.error&&rows.data?.length===receipt.data.observed_depth&&
+        rows.data[0]?.source_rank===1&&
+        rows.data.at(-1)?.source_rank===receipt.data.observed_depth,
+        'STOP_WK100_LIVE_NATIVE_SQL_RANKS_INVALID');
+      console.log('WK100_REAL_FIRST_PARTY_'+spec.provider.toUpperCase()+
+        '_LOCAL_SERVICE_SQL_PRIVATE_RECEIPT_SHA_READBACK=PASS'+
+        ' status='+capture.status+' rows='+receipt.data.observed_depth+
+        ' sha256='+capture.payload_sha256);
+    }
+    const all=await admin.from('wk_chart_capture_attempts_v1')
+      .select('id,contract_id').order('created_at');
+    check(!all.error&&all.data?.length===3,
+      'STOP_WK100_LIVE_TWO_PROVIDER_SERVICE_RECEIPTS_MISSING');
+    console.log('WK100_TWO_REAL_PROVIDER_BYTES_SYNTHETIC_LOCAL_ADMISSION_ONLY=PASS');
+  }finally{
+    if(objects.length){
+      const gone=await bucket.remove(objects);
+      check(!gone.error,'STOP_WK100_LIVE_PRIVATE_SOURCE_CLEANUP_FAILED');
+    }
+    query("UPDATE public.user_role_assignments SET status='revoked',"+
+      "updated_at=clock_timestamp() WHERE user_id='"+userId+
+      "'::uuid AND role_key='super_admin';",db);
+  }
+  check(query("SELECT count(*) FROM storage.objects WHERE bucket_id='wk-chart-raw-evidence-v1';",db)==='0',
+    'STOP_WK100_LIVE_DISPOSABLE_PRIVATE_OBJECTS_REMAIN');
+  console.log('WK100_LIVE_FIRST_PARTY_DISPOSABLE_STORAGE_CLEANUP=PASS');
+}
+
 async function main(){
   check(process.env.GITHUB_ACTIONS==='true'&&
    process.env.GITHUB_EVENT_NAME==='pull_request'&&
@@ -445,6 +615,8 @@ async function main(){
     'STOP_LOCAL_SYNTHETIC_AUTH_FIXTURE_IDENTITY_DRIFT');
   console.log('WK100_SYNTHETIC_STORAGE_OBJECT_REMOVED=PASS');
   console.log('WK100_SYNTHETIC_AUTH_USER_LOCAL_VOLUME_DESTRUCTION_REQUIRED=PASS');
+  if(process.env.WK100_LIVE_SOURCE_ACCEPTANCE==='true')
+    await runActualProviderDisposableCapture({signed,admin,db,userId:created.data.user.id});
   console.log('WK100_NO_HOSTED_SUPABASE_PROVIDER_OR_PRODUCTION_ACCESS=PASS');
 }
 main().catch(e=>{console.error(String(e?.message||'STOP_UNKNOWN').replace(/[^a-zA-Z0-9_ .:-]/g,'_').slice(0,140));process.exitCode=1;});
