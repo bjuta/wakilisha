@@ -39,7 +39,7 @@ const sha=b=>createHash('sha256').update(b).digest('hex');
 const client=(url,key)=>createClient(url,key,{auth:{autoRefreshToken:false,
   persistSession:false,detectSessionInUrl:false}});
 /**
- * Real first-party Shazam/Mdundo GET bytes through the ACTUAL WK100 candidate
+ * Real first-party Apple/Shazam/Mdundo GET bytes through the ACTUAL WK100 candidate
  * runtime, genuine local signed-in super-admin RPC, PostgreSQL lease/receipt
  * and private Storage readback. ONLY in an unlinked disposable CI database.
  *
@@ -60,6 +60,10 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
   const canAdmin=await signed.rpc('current_user_has_capability',{required_capability:'manage_ingest'});
   check(!canAdmin.error&&canAdmin.data===true,'STOP_WK100_LIVE_LOCAL_METHOD_ADMIN_UNAVAILABLE');
   const sources=[
+    {provider:'apple_ke',source:'apple_ke_public_top100',parser:'apple_kenya_chart_v1',
+     endpoint:'https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172',
+     methodClass:'reviewed_page_adapter',behavior:'consumption',metric:'rank',depth:100,
+     cadence:'daily',expected:'succeeded'},
     {provider:'shazam_ke',source:'shazam_ke_public_top200',parser:'shazam_kenya_discovery_v1',
      endpoint:'https://www.shazam.com/services/charts/csv/top-200/kenya/',
      methodClass:'offered_export',behavior:'discovery',metric:'rank',depth:200,expected:'succeeded'},
@@ -76,9 +80,9 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
         providerKey:spec.provider,sourceKey:spec.source,
         surface:spec.provider+' public Kenya source, isolated real-byte CI',
         methodClass:spec.methodClass,behavior:spec.behavior,metric:spec.metric,
-        expectedDepth:spec.depth,cadence:'weekly',intervalHours:null,
+        expectedDepth:spec.depth,cadence:spec.cadence??'weekly',intervalHours:null,
         eatHour:eat.getUTCHours(),eatMinute:eat.getUTCMinutes(),
-        weekdayEat:weeklyDay,minimumHealthyCheckpoints:1,
+        weekdayEat:spec.cadence==='daily'?null:weeklyDay,minimumHealthyCheckpoints:1,
         evidenceReference:'ci_real_public_bytes_synthetic_method_authority',
         reason:'Disposable independent public transport without Production admission',
       };
@@ -174,7 +178,7 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
       const nativeDepthValid=spec.provider==='mdundo_ke'?
         Number.isInteger(depth)&&depth>=1&&depth<=100&&
           (capture.status==='succeeded'?depth===100:depth<100):
-        depth===200;
+        depth===spec.depth;
       check(!receipt.error&&receipt.data?.status===capture.status&&
         receipt.data.raw_object_key===capture.raw_object_key&&
         receipt.data.payload_sha256===capture.payload_sha256&&
@@ -196,9 +200,9 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
     }
     const all=await admin.from('wk_chart_capture_attempts_v1')
       .select('id,contract_id').order('created_at');
-    check(!all.error&&all.data?.length===3,
-      'STOP_WK100_LIVE_TWO_PROVIDER_SERVICE_RECEIPTS_MISSING');
-    console.log('WK100_TWO_REAL_PROVIDER_BYTES_SYNTHETIC_LOCAL_ADMISSION_ONLY=PASS');
+    check(!all.error&&all.data?.length===sources.length+1,
+      'STOP_WK100_LIVE_THREE_PROVIDER_SERVICE_RECEIPTS_MISSING');
+    console.log('WK100_THREE_REAL_PROVIDER_BYTES_SYNTHETIC_LOCAL_ADMISSION_ONLY=PASS');
   }finally{
     if(objects.length){
       const gone=await bucket.remove(objects);
