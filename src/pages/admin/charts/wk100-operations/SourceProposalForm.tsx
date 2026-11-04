@@ -19,13 +19,13 @@ type Draft={
   eatHour:number;eatMinute:number;weekdayEat:number|null;
   minimumHealthyCheckpoints:number;evidenceReference:string;reason:string|null;
 };
+// New core proposals follow the founder-selected priority roster.
+ // Older research/history records remain available in the protected registry.
 const providers=[
-  {value:'youtube_ke',label:'YouTube Kenya'},
-  {value:'spotify_ke',label:'Spotify Kenya'},
-  {value:'boomplay_ke',label:'Boomplay Kenya'},
   {value:'apple_ke',label:'Apple Music Kenya'},
-  {value:'mdundo_ke',label:'Mdundo Kenya'},
   {value:'shazam_ke',label:'Shazam Kenya'},
+  {value:'mdundo_ke',label:'Mdundo Kenya'},
+  {value:'youtube_ke',label:'YouTube Kenya'},
   {value:'audiomack_ke',label:'Audiomack Kenya'},
 ];
 const methodOptions=[
