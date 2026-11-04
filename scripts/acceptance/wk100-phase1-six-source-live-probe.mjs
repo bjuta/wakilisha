@@ -129,7 +129,15 @@ function inspectCandidateJson(sourceKey,bytes){
   if(sourceKey!=='youtube_ke_weekly_browse_candidate')
     return {status:'UNEXPECTED_CANDIDATE_JSON'};
   let nodes=0,lists=0,maxDepth=0,validCountRows=0,periodLabels=0;
-  const periods=new Set();
+  const periods=new Set(),periodMetadata=[];
+  const periodMetaKey=/^(perspectiveMetadata|entityId|chartPeriod|periodLabel|startDate|endDate|dateRange|chartKey|chartId|periodKey|period_key|period)$/i;
+  // Only shallow, bounded provider metadata values; no artist, song,
+  // user, or internal arbitrary-content dump into CI logs.
+  const metaValue=(v)=>{
+    if(typeof v==='string' && v.length<=128 &&
+      /^[A-Za-z0-9 _:/.,-]+$/.test(v))return v;
+    return null;
+  };
   function walk(value,depth=0){
     nodes++;
     if(nodes>120_000||depth>35)throw Error('candidate_json_traversal_limit');
@@ -152,6 +160,16 @@ function inspectCandidateJson(sourceKey,bytes){
       }
     }
     for(const [key,child] of Object.entries(value)){
+      if(periodMetaKey.test(key)&&periodMetadata.length<20){
+        if(key==='perspectiveMetadata'&&child&&typeof child==='object'&&!Array.isArray(child)){
+          const fields=Object.entries(child).filter(([k])=>periodMetaKey.test(k))
+            .map(([k,v])=>({key:k,value:metaValue(v)})).filter(x=>x.value);
+          periodMetadata.push({key,fields:fields.slice(0,8)});
+        }else{
+          const v=metaValue(child);
+          if(v)periodMetadata.push({key,value:v});
+        }
+      }
       if(['periodKey','period_key','period'].includes(key)&&
         typeof child==='string'&&/^weekly:[0-9]{8}:[0-9]{8}:ke$/.test(child)){
         periodLabels++;periods.add(child);
@@ -166,6 +184,7 @@ function inspectCandidateJson(sourceKey,bytes){
     track_view_lists:lists,max_candidate_depth:maxDepth,
     rows_with_rank_and_view_count:validCountRows,
     exact_period_label_count:periodLabels,distinct_period_labels:periods.size,
+    bounded_provider_period_metadata:periodMetadata,
     native_period_authority:'unverified'};
 }
 
@@ -176,7 +195,12 @@ function inspectCandidateJson(sourceKey,bytes){
  */
 function audiomackPublicMetaDiagnostics(html){
   const tags=[...html.matchAll(/<meta\b[^>]*>/gi)].map(x=>x[0]);
-  const refs=[];
+  const refs=[],rankMeta=[];
+  for(const tag of tags){
+    if(!/\bproperty\s*=\s*(["'])music:song:track\1/i.test(tag))continue;
+    const m=tag.match(/\bcontent\s*=\s*(["'])(.*?)\1/i);
+    rankMeta.push(m?.[2]??'');
+  }
   for(const tag of tags){
     if(!/\bproperty\s*=\s*(["'])music:song\1/i.test(tag))continue;
     const m=tag.match(/\bcontent\s*=\s*(["'])(.*?)\1/i);
@@ -192,7 +216,21 @@ function audiomackPublicMetaDiagnostics(html){
   };
   const kinds={};
   for(const ref of refs)kinds[category(ref)]=(kinds[category(ref)]??0)+1;
+  const sequentialRanks=rankMeta.length===100&&rankMeta.every((v,i)=>v===String(i+1));
+  const structured=html.match(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+  let schemaType=null,structuredDepth=null;
+  try{
+    const obj=structured?JSON.parse(structured[1]):null;
+    schemaType=obj?.['@type']??null;
+    structuredDepth=Array.isArray(obj?.track)?obj.track.length:
+      Array.isArray(obj?.itemListElement)?obj.itemListElement.length:null;
+  }catch{}
   return {music_song_meta_count:refs.length,ref_classes:kinds,
+    music_song_track_meta_count:rankMeta.length,
+    song_track_rank_prefix:rankMeta.slice(0,4).filter(x=>/^[0-9]{1,3}$/.test(x)),
+    song_track_ranks_exactly_sequential:sequentialRanks,
+    jsonld_schema_type:typeof schemaType==='string'?schemaType.slice(0,48):null,
+    jsonld_ordered_entry_depth:structuredDepth,
     first_three_public_meta_refs:refs.slice(0,3).map(x=>
       x.replace(/[\u0000-\u001f\u007f]/g,'').slice(0,140)),
     track_count_token:html.match(/"track_count"\s*:\s*(\d+)/)?.[1]??null,
