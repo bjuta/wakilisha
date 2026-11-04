@@ -346,30 +346,45 @@ export function parseAppleKenya(raw,access={}) {
   });
 }
 
-function findTrackViews(payload, matches, depth=0) {
-  if (depth>30) fail('youtube_payload_too_deep');
-  if (Array.isArray(payload)) {for (const x of payload) findTrackViews(x,matches,depth+1);return;}
-  const o=record(payload);
-  if (!o) return;
-  for (const [key,x] of Object.entries(o)) {
-    if (key==='trackViews' && Array.isArray(x)) matches.push(x);
-    if (key!=='trackViews') findTrackViews(x,matches,depth+1);
-  }
+// Bind trackViews to its nearest explicit provider period. The previous
+// document-wide period search could accept a matching label in unrelated
+// metadata and then choose a different week's (larger) chart list.
+const YOUTUBE_PERIOD=/^weekly:\\d{8}:\\d{8}:ke$/;
+function youtubeDeclaredPeriod(o) {
+  const meta=record(o.metadata);
+  const candidates=[o.periodKey,o.period,o.period_key,
+    meta?.periodKey,meta?.period,meta?.period_key]
+    .filter(x=>typeof x==='string' && YOUTUBE_PERIOD.test(x));
+  if(new Set(candidates).size>1)fail('youtube_ambiguous_native_period');
+  return candidates[0]??null;
 }
-function includesValue(payload, target, depth=0) {
-  if(depth>30)return false;
-  if(typeof payload==='string')return payload===target;
-  if(Array.isArray(payload))return payload.some(v=>includesValue(v,target,depth+1));
+function findPeriodBoundTrackViews(payload,target,matches,period=null,depth=0) {
+  if(depth>30)fail('youtube_payload_too_deep');
+  if(Array.isArray(payload)){
+    for(const x of payload)findPeriodBoundTrackViews(x,target,matches,period,depth+1);
+    return;
+  }
   const o=record(payload);
-  return o?Object.values(o).some(v=>includesValue(v,target,depth+1)):false;
+  if(!o)return;
+  const effectivePeriod=youtubeDeclaredPeriod(o)??period;
+  if(Array.isArray(o.trackViews) && effectivePeriod===target)
+    matches.push(o.trackViews);
+  for(const [key,child] of Object.entries(o)){
+    if(key==='trackViews'||key==='metadata')continue;
+    findPeriodBoundTrackViews(child,target,matches,effectivePeriod,depth+1);
+  }
 }
 /** YouTube weekly Kenya tracks: rank AND native view count, not audio plays. */
 export function parseYouTubeKenyaWeekly(raw, targetPeriodKey) {
-  if(typeof targetPeriodKey!=='string'||!/^weekly:\d{8}:\d{8}:ke$/.test(targetPeriodKey)) fail('youtube_invalid_target_period');
-  if(!record(raw) || !includesValue(raw,targetPeriodKey)) fail('youtube_target_period_unavailable');
+  if(typeof targetPeriodKey!=='string'||!YOUTUBE_PERIOD.test(targetPeriodKey)) fail('youtube_invalid_target_period');
+  if(!record(raw))fail('youtube_target_period_unavailable');
   const lists=[];
-  findTrackViews(raw,lists);
-  const top=lists.sort((a,b)=>b.length-a.length)[0];
+  findPeriodBoundTrackViews(raw,targetPeriodKey,lists);
+  // Multiple candidate charts for the same week need an explicit reviewed
+  // selector; never arbitrarily choose the largest provider list.
+  if(lists.length>1)fail('youtube_ambiguous_weekly_track_views');
+  const top=lists[0];
+  if(!top)fail('youtube_target_period_unavailable');
   if(!top?.length || top.length>MAX_ROWS) fail('youtube_missing_track_views');
   const rows=top.map((x)=>{
     const v=record(x),meta=record(v?.chartEntryMetadata);
