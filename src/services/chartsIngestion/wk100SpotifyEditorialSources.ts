@@ -104,7 +104,7 @@ export function validateWk100SpotifyEditorialNote(input:unknown){
     rejectNote();
   const placements=note.placements;
   if(!Array.isArray(placements)||placements.length===0||placements.length>200)
-    rejectNote();
+    throw Error('wk100_spotify_editorial_note_invalid');
   const ranks=new Set<number>(),ids=new Set<string>();
   const rows=placements.map((row:unknown)=>{
     if(!noteShape(row,PLACEMENT_KEYS))rejectNote();
