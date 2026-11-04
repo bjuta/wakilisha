@@ -48,6 +48,8 @@ if(process.platform!=='darwin'||process.versions.node.split('.')[0]!=='22')stop(
 const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:os.tmpdir(),LANG:'en_US.UTF-8',CI:'true',CONTROL_PLANE_BASE_REF:'origin/main'};
 const dirty=capture('git',['status','--porcelain']);
 if(dirty)stop('Commit reviewed changes before running acceptance; dirty trees are not evidence');
+const disk=fs.statfsSync(root);
+if(disk.bavail*disk.bsize<3*1024**3)stop('At least 3 GiB free disk space is required before cloning/installing; no automatic deletion');
 const head=capture('git',['rev-parse','HEAD']);
 const base=capture('git',['rev-parse','refs/remotes/origin/main']);
 const dir=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'wakilisha-local-'));
@@ -86,7 +88,7 @@ try {
   Object.assign(env,{WK_LOCAL_DISPOSABLE:'1',WK_LOCAL_DISPOSABLE_DIR:dir});
   database=true;
  }
- if(lane==='browser'||lane==='mizizi-auth')command('Chromium installation','./node_modules/.bin/playwright install chromium');
+ if(lane==='browser'||lane==='mizizi-auth')command('Browser installation','./node_modules/.bin/playwright install '+(lane==='browser'?'chromium webkit':'chromium'));
  for(const s of lanes[lane])command(s.name,s.run,s.env??{});
  // Copy before later browser invocations clear test-results (each invocation is preserved).
  report.result='pass';
