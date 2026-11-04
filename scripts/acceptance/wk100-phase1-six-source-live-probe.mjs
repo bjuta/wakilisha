@@ -318,6 +318,8 @@ async function main(){
         observation.native_metric=parsed.metric;
         observation.native_period=parsed.native_period;
         observation.provider_period_label=parsed.provider_period_label??null;
+        observation.provider_snapshot_date=parsed.provider_snapshot_date??null;
+        observation.provider_rolling_window_days=parsed.provider_rolling_window_days??null;
         // Replay the ACTUAL first-party bytes through the EXISTING collector's
         // exact native row parser. This proves decoder compatibility only;
         // there is NO service admission, SQL reservation, durable raw receipt,
@@ -379,6 +381,10 @@ async function main(){
       sha256:r.payload_sha256??null,content_type:r.content_type??null,
       byte_length:r.byte_length??null,
       parse_failure:r.parse_failure??null,
+      native_metric:r.native_metric??null,native_period:r.native_period??null,
+      provider_period_label:r.provider_period_label??null,
+      provider_snapshot_date:r.provider_snapshot_date??null,
+      provider_rolling_window_days:r.provider_rolling_window_days??null,
       collector_parser_row_replay:r.collector_parser_row_replay??null,
       collector_parser_replay_status:r.collector_parser_replay_status??null,
       collector_parser_reject_class:r.collector_parser_reject_class??null,
