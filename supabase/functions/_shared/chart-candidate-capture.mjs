@@ -7,6 +7,8 @@
  * Storage and durable attempt-ledger interfaces are injected; this module
  * does not manufacture privileges or connect to Production on its own.
  */
+import { isWk100AppleCatalogChart } from './wk100-apple-service-credential.mjs';
+
 const MAX_BYTES = 4_194_304;
 const MIME_TYPES = new Set(['text/html', 'text/csv', 'application/json', 'application/octet-stream']);
 const SOURCE = /^[a-z][a-z0-9_]{2,63}$/;
@@ -70,11 +72,7 @@ export async function fetchCandidateBytes({ sourceKey, endpoint, accessDecision,
   let providerHeaders = null;
   if(providerAuthorization !== undefined) {
     exactKeys(providerAuthorization, ['kind','token'], 'provider_authorization_invalid');
-    assert((sourceKey === 'apple_ke' || /^apple_ke_[a-z][a-z0-9_]{1,45}$/.test(sourceKey)) &&
-      url.hostname === 'api.music.apple.com' &&
-      url.pathname === '/v1/catalog/ke/charts' &&
-      url.searchParams.get('types') === 'songs' &&
-      url.searchParams.get('chart') === 'most-played' &&
+    assert(isWk100AppleCatalogChart(sourceKey,endpoint) &&
       providerAuthorization.kind === 'apple_developer_bearer' &&
       typeof providerAuthorization.token === 'string' &&
       /^[a-zA-Z0-9_.-]{20,8192}$/.test(providerAuthorization.token),
