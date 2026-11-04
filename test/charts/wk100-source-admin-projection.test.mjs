@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions/_shared/wk100-source-admin-projection.mjs';
 import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
 import { resolveCaptureParser, parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
-import { parseAppleKenyaPublicHtml, WK100_APPLE_KE_PUBLIC_CHART_URL } from '../../supabase/functions/_shared/chart-public-source-observations.mjs';
+import { parseAppleKenyaPublicHtml, WK100_APPLE_KE_PUBLIC_CHART_URL,
+  parseAudiomackKenya, WK100_AUDIOMACK_KE_PUBLIC_CHART_URL } from '../../supabase/functions/_shared/chart-public-source-observations.mjs';
 import { planWk100SourceDispatch, selectWk100AuditedDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 import { fetchCandidateBytes, sha256Hex } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
 import { bindWk100DispatchAuthority, wk100EatWeekFromUtc, isWk100CaptureConstitutionCurrent } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
@@ -165,6 +166,45 @@ test('WK100 five-core public-source preflight has YouTube and no paid or dropped
     'https://charts.youtube.com/youtubei/v1/browse?alt=json');
   assert.equal(report.routeCandidates[1].url,
     'https://api.audiomack.com/v1/playlist/geo-charts/kenya');
+});
+
+test('WK100 Audiomack public title metadata is candidate-only with no invented song ID or period',()=>{
+  const tags=Array.from({length:100},(_,i)=>
+    '<meta property="music:song" content="Synthetic Title '+(i+1)+'">').join('');
+  const html='<title>Weekly 100: Kenya - Audiomack</title>'+tags;
+  const access={endpoint:WK100_AUDIOMACK_KE_PUBLIC_CHART_URL,
+    parser_class:'audiomack_kenya_chart_v1'};
+  const contract={source_key:'audiomack_ke_public_weekly',provider_key:'audiomack_ke',
+    adapter_version:'audiomack_kenya_chart_v1',expected_depth:100,
+    native_metric:'rank',behavior:'consumption'};
+  const parsed=parseAudiomackKenya(html,access);
+  assert.equal(parsed.chart_surface,'audiomack_public_kenya_weekly_100_title_metadata');
+  assert.equal(parsed.rank_authority,'metadata_order_requires_independent_verification');
+  assert.equal(parsed.artist_authority,'unverified');
+  assert.equal(parsed.provider_track_identity_authority,'unverified');
+  assert.equal(parsed.native_period,'unknown');
+  assert.equal(parsed.candidate_only,true);
+  assert.equal(parsed.eligible_for_scoring,false);
+  assert.equal(parsed.rows.length,100);
+  assert.equal(parsed.rows[0].title,'Synthetic Title 1');
+  assert.equal(parsed.rows[0].provider_track_id,null);
+  const candidate=parseCaptureNativeRows(new TextEncoder().encode(html),contract,access);
+  assert.equal(candidate.length,100);
+  assert.equal(candidate[99].rank,100);
+  assert.equal(candidate[99].provider_track_id,null);
+  assert.equal(candidate[99].artist,null);
+  assert.equal(Object.hasOwn(candidate[0],'view_count'),false);
+  for(const bad of [
+    html.replace('Weekly 100: Kenya','Top 100: Worldwide'),
+    html.replace('Synthetic Title 100',''),
+    html.replace('<meta property="music:song" content="Synthetic Title 100">',''),
+    html+'<meta property="music:song" content="Synthetic Title 101">',
+    html.replace('Synthetic Title 1','https://audiomack.com/some/song'),
+  ])assert.throws(()=>parseAudiomackKenya(bad,access),/audiomack_/);
+  for(const endpoint of [
+    null,'https://audiomack.com/geo-charts/playlist/nigeria',
+    'https://untrusted.example/geo-charts/playlist/kenya',
+  ])assert.throws(()=>parseAudiomackKenya(html,{endpoint}),/audiomack_public_titles_unqualified/);
 });
 
 test('WK100 public Apple Kenya Top 100 is collector-parsable without API credentials',()=>{
