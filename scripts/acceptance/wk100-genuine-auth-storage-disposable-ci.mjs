@@ -93,8 +93,11 @@ async function main(){
     w3Active.includes('wk100_record_collection_action_v1') &&
     w3Active.includes('wk100_service_retry_requests_v1') &&
     w3Active.trimEnd().endsWith('commit;') &&
-    expectedVersions.at(-1)===w3Version &&
-    appliedVersions.at(-1)===w3Version,
+    // The full active/apply ledger was matched exactly above. W3 must be
+    // byte-for-byte present in that ledger, but newer forward migrations
+    // must not falsely invalidate its approved authority.
+    expectedVersions.includes(w3Version) &&
+    appliedVersions.includes(w3Version),
     'STOP_WK100_W3_ACTIVE_MIGRATION_FILENAME_OR_BYTES_NOT_SEALED');
   check(query("SELECT (SELECT count(*) FROM platform_private.wk100_collection_actions_v1)::text||'|'||"+
     "(SELECT has_function_privilege('anon','public.wk100_record_collection_action_v1(text,date,uuid,timestamptz,smallint,integer,uuid,text)','EXECUTE'))::text||'|'||"+
