@@ -3,6 +3,7 @@
  * The Production Deno entrypoint supplies real clients and environment values.
  * Local tests cannot bypass project binding or authentication checks.
  */
+import {coerceWk100ShazamResearchIntakeReceipt} from './wk100-research-receipt-bridge.mjs';
 // Server-only upload. NEVER mount a Storage policy exposing raw evidence to browsers.
 // The private schema is accessible only via narrowly scoped, audited RPCs.
 const ORIGINS=new Set([
@@ -111,8 +112,14 @@ export function createWk100ResearchIntakeHandler({createClient,executeWk100Resea
     receipt=JSON.parse(receiptText);week=weekText;
   }catch{return reply(req,400,{error:'research_payload_invalid'});}
   try{
-    const data=await executeWk100ResearchIntake({
+    // Bind a locally verified receipt to the authenticated actor and the
+    // existing private research-intake contract. No provider-fetch claim.
+    const canonicalReceipt=await coerceWk100ShazamResearchIntakeReceipt({
       originalBytes,receipt,researchWeekStartEat:week,
+      authenticatedUserId:auth.data.user.id,
+    });
+    const data=await executeWk100ResearchIntake({
+      originalBytes,receipt:canonicalReceipt,researchWeekStartEat:week,
       authenticatedUserId:auth.data.user.id,
       callerDb,serviceDb,restrictedStorage:serviceDb.storage,
     });
