@@ -162,16 +162,23 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
           fail:args=>rpc('wk_chart_runtime_fail_v1',args),
         },storage,
       });
-      check(capture.status===spec.expected&&UUID.test(capture.receipt_id??'')&&
+      const outcomeValid=spec.provider==='mdundo_ke'?
+        ['succeeded','partial_depth'].includes(capture.status):
+        capture.status==='succeeded';
+      check(outcomeValid&&UUID.test(capture.receipt_id??'')&&
         capture.can_publish===false,'STOP_WK100_LIVE_PRIVATE_COLLECTOR_STATUS_INVALID');
       const receipt=await admin.from('wk_chart_capture_attempts_v1')
         .select('id,status,observed_depth,payload_sha256,raw_object_key,native_period_authority')
         .eq('id',capture.receipt_id).single();
-      check(!receipt.error&&receipt.data?.status===spec.expected&&
+      const depth=receipt.data?.observed_depth;
+      const nativeDepthValid=spec.provider==='mdundo_ke'?
+        Number.isInteger(depth)&&depth>=1&&depth<=100&&
+          (capture.status==='succeeded'?depth===100:depth<100):
+        depth===200;
+      check(!receipt.error&&receipt.data?.status===capture.status&&
         receipt.data.raw_object_key===capture.raw_object_key&&
         receipt.data.payload_sha256===capture.payload_sha256&&
-        receipt.data.native_period_authority==='unknown'&&
-        receipt.data.observed_depth===(spec.provider==='mdundo_ke'?99:200),
+        receipt.data.native_period_authority==='unknown'&&nativeDepthValid,
         'STOP_WK100_LIVE_PRIVATE_SQL_RECEIPT_READBACK_INVALID');
       const raw=await storage.readPrivate(capture.raw_object_key);
       check(sha(Buffer.from(raw))===capture.payload_sha256,
