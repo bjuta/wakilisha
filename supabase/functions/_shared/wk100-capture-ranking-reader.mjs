@@ -74,7 +74,12 @@ function verifyNativeRows(bytes,contract,attempt,rows) {
       stored.provider_track_id===native.provider_track_id&&
       stored.title_observed===native.title&&
       stored.artist_observed===native.artist&&
-      stored.source_native_count===(Object.hasOwn(native,'view_count')?native.view_count:null),
+      // Spotify chart-eligible streams stay source-native; YouTube views
+      // retain their legacy parser field. SQL persists either in the single
+      // generic source_native_count column, never as comparable play totals.
+      stored.source_native_count===(Object.hasOwn(native,'source_native_count')
+        ?native.source_native_count
+        :(Object.hasOwn(native,'view_count')?native.view_count:null)),
       'native_row_mismatch');
   }
 }
