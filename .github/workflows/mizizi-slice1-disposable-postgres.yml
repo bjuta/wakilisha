@@ -113,6 +113,7 @@ jobs:
 
   disposable-operator-jwt:
     name: disposable-operator-jwt
+    if: ${{ github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

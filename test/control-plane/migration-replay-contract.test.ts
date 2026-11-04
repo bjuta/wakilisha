@@ -521,6 +521,15 @@ describe(
         expect(mizizi).toContain(
           "if: ${{ github.event.pull_request.draft == false }}",
         );
+        expect(wk100.split(
+          "if: ${{ github.event.pull_request.draft == false }}",
+        )).toHaveLength(2);
+        expect(mizizi.split(
+          "if: ${{ github.event.pull_request.draft == false }}",
+        )).toHaveLength(3);
+        expect(mizizi).toContain(
+          "  disposable-operator-jwt:\n    name: disposable-operator-jwt\n    if: ${{ github.event.pull_request.draft == false }}",
+        );
       },
     );
 
