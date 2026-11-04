@@ -1,0 +1,230 @@
+{
+  "scope": "all tracked text files; workflow paths and Actions-run provenance URLs",
+  "references": [
+    {
+      "file": "docs/engineering/archive/chart-research-retirement-20261007/README.md",
+      "lines": [
+        143
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/migration-authority.md",
+      "lines": [
+        26
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/mizizi-enterprise-product-and-release-authority-20261015.md",
+      "lines": [
+        71,
+        84,
+        89,
+        177,
+        212
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/mizizi-headquarters-code-change-register-v1-20261010.md",
+      "lines": [
+        238
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/mizizi-slice1-original-40-scenario-acceptance-ledger-20261014.json",
+      "lines": [
+        16,
+        17,
+        18,
+        19,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        563,
+        564,
+        607,
+        608
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/mizizi-worker-transport-preview-acceptance-20261013.md",
+      "lines": [
+        113
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/music-identity-rights-slice4-ern432-authoritative-conformance-v1-closure-20260923.md",
+      "lines": [
+        116
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/replay-proofs/20261013184040_mizizi_headquarters_stale_conflict_http_v1.sql.json",
+      "lines": [
+        16
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/replay-proofs/20261014094213_mizizi_db05_hold_supersedes_prior_registry_grants_v1.sql.json",
+      "lines": [
+        16
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/replay-proofs/20261014134759_mizizi_db02_observation_completion_authority_v1.sql.json",
+      "lines": [
+        16
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/replay-proofs/20261014182214_mizizi_db02_prior_observation_replay_fence_v1.sql.json",
+      "lines": [
+        16
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/replay-proofs/20261015091718_mizizi_registry_review_reader_rls_v1.sql.json",
+      "lines": [
+        16
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/replay-proofs/20261102191805_wk100_source_proposals_v1.sql.json",
+      "lines": [
+        27
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/replay-proofs/20261103072906_wk100_phase1_governed_source_method_capture_contract_v1.sql.json",
+      "lines": [
+        19
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/replay-proofs/20261103160634_wk100_phase1_w3_collection_recovery_v1.sql.json",
+      "lines": [
+        19
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/replay-proofs/20261104084956_wk100_spotify_offered_export_method_admission.sql.json",
+      "lines": [
+        12
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/replay-proofs/20261104161304_wk100_phase1_observed_as_of_period_authority_v1.sql.json",
+      "lines": [
+        12
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/rnb18-stage1-forward-replay-repair-acceptance-20261101.md",
+      "lines": [
+        13,
+        19
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/rnb18-stage2-history-only-retirement-20261102.md",
+      "lines": [
+        5,
+        28,
+        32,
+        33
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/engineering/wakilisha-mizizi-four-phase-closure-20261018.md",
+      "lines": [
+        80
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "docs/registry/MIZIZI_CULTURAL_DATA_STEWARD.md",
+      "lines": [
+        573
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "ops/local/workflows/mizizi-release-production-control-plane.yml",
+      "lines": [
+        6
+      ],
+      "category": "legacy-reference"
+    },
+    {
+      "file": "ops/local/workflows/mizizi-slice1-disposable-postgres.yml",
+      "lines": [
+        8
+      ],
+      "category": "legacy-reference"
+    },
+    {
+      "file": "ops/local/workflows/mizizi-track-production-control-plane.yml",
+      "lines": [
+        6
+      ],
+      "category": "legacy-reference"
+    },
+    {
+      "file": "ops/local/workflows/mizizi-url-identity-production-control-plane.yml",
+      "lines": [
+        6
+      ],
+      "category": "legacy-reference"
+    },
+    {
+      "file": "ops/local/workflows/wk100-disposable-security.yml",
+      "lines": [
+        8
+      ],
+      "category": "legacy-reference"
+    },
+    {
+      "file": "scripts/control-plane/verify-disposable-ci-replay-proof.mjs",
+      "lines": [
+        43
+      ],
+      "category": "review-required-reference"
+    },
+    {
+      "file": "scripts/local/verify.mjs",
+      "lines": [
+        23,
+        28
+      ],
+      "category": "review-required-reference"
+    }
+  ]
+}
