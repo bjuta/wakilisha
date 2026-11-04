@@ -9,7 +9,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {mkdir,writeFile,readFile,chmod} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {homedir} from 'node:os';
-import {parseMdundoKenya,parseShazamKenya,parseAppleKenya} from
+import {parseMdundoKenya,parseShazamKenya} from
   '../../supabase/functions/_shared/chart-public-source-observations.mjs';
 
 const MAX=4_194_304;
@@ -17,8 +17,8 @@ const SOURCES=Object.freeze([
   {id:'youtube_ke',reason:'Official weekly Kenya song-view methodology; exact first-party weekly bytes route not established.'},
   {id:'spotify_ke',reason:'First-party editorial playlists do not provide Kenya chart-eligible weekly stream counts; offered export unverified.'},
   {id:'boomplay_ke',reason:'First-party Kenya ranked chart route and native schema not independently established.'},
-  {id:'apple_ke',url:'https://api.music.apple.com/v1/catalog/ke/charts?types=songs&chart=most-played',
-    kind:'api',reason:'Official Kenya chart API; requires read-only developer bearer token.'},
+  {id:'apple_ke',url:'https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172',
+    kind:'public_chart_html',reason:'Public first-party daily Top 100 Kenya chart; no token or paid provider access needed. Daily displayed rank, not weekly streams.'},
   {id:'mdundo_ke',url:'https://play.mdundo.com/top-charts/ke',
     kind:'html',reason:'First-party weekly-described Kenya chart; exact native period bounds not proved.'},
   {id:'shazam_ke',url:'https://www.shazam.com/services/charts/csv/top-200/kenya/',
@@ -82,18 +82,16 @@ async function main(){
       method_reason:source.reason,checked_at:new Date().toISOString(),
       can_collect:false,can_score:false,can_publish:false,collector_receipt:false};
     if(!source.url){records.push({...base,status:'EXACT_SOURCE_ROUTE_UNVERIFIED'});continue;}
-    const token=source.kind==='api'?process.env.WK100_APPLE_READONLY_DEVELOPER_TOKEN:null;
-    if(source.kind==='api'&&!token){records.push({...base,status:'API_CREDENTIAL_NOT_AVAILABLE'});continue;}
     try{
-      const result=await getBounded(source.url,token);
+      const result=await getBounded(source.url,null);
       const {bytes,...evidence}=result;
       if(!bytes){records.push({...base,...evidence});continue;}
-      const allowed=source.kind==='html'?evidence.content_type==='text/html':
-        source.kind==='csv'?['text/csv','application/octet-stream'].includes(evidence.content_type):
-        evidence.content_type==='application/json';
+      const allowed=(source.kind==='html'||source.kind==='public_chart_html')?
+        evidence.content_type==='text/html':
+        source.kind==='csv'&&['text/csv','application/octet-stream'].includes(evidence.content_type);
       if(!allowed){records.push({...base,...evidence,status:'CONTENT_TYPE_UNQUALIFIED'});continue;}
       const filename=source.id+'-'+evidence.payload_sha256.slice(0,16)+'.'+
-        (source.kind==='html'?'html':source.kind==='csv'?'csv':'json');
+        (source.kind==='csv'?'csv':'html');
       try{await writeFile(join(dir,filename),bytes,{flag:'wx',mode:0o600});}
       catch(e){
         if(e?.code!=='EEXIST')throw e;
@@ -102,10 +100,16 @@ async function main(){
           throw Error('immutable_original_conflict');
       }
       const observation={...base,...evidence,original_file:filename,status:'ORIGINAL_SAVED_RESEARCH_ONLY'};
+      if(source.kind==='public_chart_html'){
+        // Preserve the first-party original; unlike the API adapter there is
+        // no reviewed public HTML rank decoder. Never invent a parse result.
+        observation.status='ORIGINAL_CAPTURED_PUBLIC_CHART_DECODER_PENDING';
+        records.push(observation);
+        continue;
+      }
       try{
         const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
-        const parsed=source.kind==='html'?parseMdundoKenya(text):
-          source.kind==='csv'?parseShazamKenya(text):parseAppleKenya(JSON.parse(text),{});
+        const parsed=source.kind==='html'?parseMdundoKenya(text):parseShazamKenya(text);
         observation.status='ORIGINAL_PARSED_RESEARCH_ONLY';
         observation.observed_depth=parsed.observed_depth;
         observation.native_metric=parsed.metric;
