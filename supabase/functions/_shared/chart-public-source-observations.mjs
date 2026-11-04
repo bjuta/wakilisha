@@ -97,26 +97,62 @@ export function parseMdundoKenya(raw) {
   return normalizeRows('mdundo_ke',rows,rows.length,{behavior:'consumption',metric:'rank'});
 }
 
-/** Audiomack Kenya chart: order of music:song meta elements is observed rank. */
-export function parseAudiomackKenya(raw) {
+/**
+ * First-party Audiomack Kenya public Weekly 100 playlist. The page's current
+ * native music:song content is a TITLE (not a URL); historical pages exposed
+ * absolute song URLs instead. Neither representation attests streaming totals
+ * or exact weekly start/end boundaries.
+ */
+export const WK100_AUDIOMACK_KE_PUBLIC_CHART_URL =
+  'https://audiomack.com/geo-charts/playlist/kenya';
+export function parseAudiomackKenya(raw,access={}) {
   const html=assertString(raw,'audiomack');
   const count=html.match(/"track_count"\s*:\s*(\d+)/i);
   const declared=count ? positiveInt(count[1]) : null;
-  const rows=[];
+  const refs=[];
   for (const hit of html.matchAll(/<meta\b[^>]*>/gi)) {
     const a=attrs(hit[0]);
-    if (a.property !== 'music:song') continue;
+    if(a.property!=='music:song')continue;
     const ref=text(a.content,1024);
-    if (!ref) fail('audiomack_song_url_missing');
-    let u;
-    try { u=new URL(ref); } catch { fail('audiomack_invalid_url'); }
-    if (u.protocol !== 'https:' || !['audiomack.com','www.audiomack.com'].includes(u.hostname)) fail('audiomack_untrusted_song_origin');
-    const id=u.pathname.replace(/^\/+|\/+$/g,'');
-    if (!id || !ID_RE.test(id)) fail('audiomack_invalid_song_path');
-    rows.push(track(rows.length+1,id,null,null,{provider_url:u.origin+u.pathname}));
+    if(!ref)fail('audiomack_song_metadata_missing');
+    refs.push(ref);
   }
-  if (!rows.length) fail('audiomack_missing_chart_rows');
-  return normalizeRows('audiomack_ke',rows,declared || rows.length,{behavior:'consumption',metric:'rank'});
+  if(!refs.length)fail('audiomack_missing_chart_rows');
+  const allAbsolute=refs.every(ref=>/^https:\/\//i.test(ref));
+  if(allAbsolute){
+    const rows=[];
+    for(const ref of refs){
+      let u;
+      try{u=new URL(ref);}catch{fail('audiomack_invalid_url');}
+      if(u.protocol!=='https:' || !['audiomack.com','www.audiomack.com'].includes(u.hostname) ||
+        u.port||u.username||u.password||u.search||u.hash)
+        fail('audiomack_untrusted_song_origin');
+      const id=u.pathname.replace(/^\/+|\/+$/g,'');
+      if(!id || !ID_RE.test(id))fail('audiomack_invalid_song_path');
+      rows.push(track(rows.length+1,id,null,null,{provider_url:u.origin+u.pathname}));
+    }
+    return normalizeRows('audiomack_ke',rows,declared||rows.length,{
+      behavior:'consumption',metric:'rank',
+      chart_surface:'audiomack_public_music_song_urls',
+    });
+  }
+  // Today's first-party HTML contains exactly 100 music:song TITLE meta tags.
+  // Accept only that source-bound public-chart shape. They are not stable song
+  // IDs, and metadata order still needs independent ranked-display verification.
+  if(access?.endpoint!==WK100_AUDIOMACK_KE_PUBLIC_CHART_URL ||
+    refs.length!==100||(declared!==null&&declared!==100)||
+    !/<title\b[^>]*>[^<]*Weekly 100:\s*Kenya\b/i.test(html)||
+    refs.some(x=>/^[a-z][a-z0-9.+-]*:|^\/|[<>]|[\u0000-\u001f\u007f]/i.test(x)))
+    fail('audiomack_public_titles_unqualified');
+  const rows=refs.map((title,i)=>track(i+1,null,title));
+  return normalizeRows('audiomack_ke',rows,100,{
+    behavior:'consumption',metric:'rank',
+    chart_surface:'audiomack_public_kenya_weekly_100_title_metadata',
+    native_period:'unknown',
+    rank_authority:'metadata_order_requires_independent_verification',
+    provider_track_identity_authority:'unverified',
+    artist_authority:'unverified',
+  });
 }
 
 /** Boomplay public chart: rank-preserving ordered /songs/ anchors. */
