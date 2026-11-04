@@ -1,18 +1,18 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-03T16:31:56Z",
+  "generatedAt": "2026-11-04T16:30:40Z",
   "typesSha256": "8fbb66dd8863675fb283be5715ee49e4a6a13bc5e5dfb56b6339298eb4fa532d",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 243,
-  "latestMigration": "20261104084956_wk100_spotify_offered_export_method_admission.sql",
+  "migrationCount": 244,
+  "latestMigration": "20261104161304_wk100_phase1_observed_as_of_period_authority_v1.sql",
   "schemaSeal": {
     "mode": "disposable_ci",
     "sourceProjectRef": "unlinked-local-ci",
-    "migrationHead": "20261104084956",
+    "migrationHead": "20261104161304",
     "baseMainSha": "24ec5400327a70a9d5610d350a4ca487f28c1e13",
-    "replayCandidateHeadSha": "012ae175aae5d74e93d0e4d18f424d7f2e6cdbdc",
-    "workflowRunId": 41803260567
+    "replayCandidateHeadSha": "b83cf8c0e8da35c64bb60301f945b3c8702bf7e0",
+    "workflowRunId": 41866304907
   },
-  "reverifiedAt": "2026-11-04T08:58:08Z"
+  "reverifiedAt": "2026-11-04T16:30:40Z"
 }
