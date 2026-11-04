@@ -1,5 +1,3 @@
-import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -26,7 +24,6 @@ function git(args,{allowFailure=false}={}) {
   if(r.status!==0 && !allowFailure)throw Error("WK100 local proof Git check failed: "+args[0]);
   return {status:r.status,stdout:r.stdout??""};
 }
-function sha(value){return crypto.createHash("sha256").update(value).digest("hex");}
 export function isDisposableCiReplayProof(proof){
   return proof?.proof_mode===DISPOSABLE_CI_REPLAY_PROOF_MODE;
 }
