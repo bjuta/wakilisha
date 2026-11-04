@@ -14,6 +14,7 @@ import { WkDetailList } from '@/components/design-system/primitives/DetailList';
 import { WkTabs } from '@/components/design-system/primitives/Tabs';
 import { wk100CurrentWeekStartEat, isWk100WeekStartEat } from '../ingest/wk100EatWeek.mjs';
 import { WK100_ARCHIVED_EAT_WEEK, getWk100ArchivedResearchPortfolio } from '@/services/chartsIngestion/wk100ResearchPortfolio.mjs';
+import { WK100_SPOTIFY_EDITORIAL_SOURCES, spotifyEditorialSourceUrl } from '@/services/chartsIngestion/wk100SpotifyEditorialSources';
 import { WkOperationsHero, WkNextAction, WkReadinessList } from '@/components/design-system/primitives/OperationsWorkspace';
 import { WkAuditTimeline } from '@/components/design-system/primitives/AuditTimeline';
 import { SourceProposalForm, type Wk100ProposalRecord } from './SourceProposalForm';
@@ -660,6 +661,31 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                       }}>{p.focus?'Review '+p.label+' Method':'Add '+p.label+' Source'}</button>
                   </div>},
               ] satisfies WkDataColumn<ProviderReadiness>[]} />}
+        </Card>
+        <Card title="Spotify Editorial — Supplementary Signals">
+          <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
+            Four founder-selected Spotify editorial playlists are required supplementary research
+            inputs for the WAKILISHA 100 methodology. Their verified inclusion and displayed
+            order may inform a lower-weight editorial signal, capped together as ONE provider
+            family. They do not report Kenya stream totals and do not count toward the five
+            primary platforms or the two-independent-provider collector receipt minimum.
+          </p>
+          <ul aria-label="Required Spotify editorial sources" className="grid gap-2 sm:grid-cols-2">
+            {WK100_SPOTIFY_EDITORIAL_SOURCES.map(source=>
+              <li key={source.sourceKey} className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
+                <a className="font-semibold text-wk-text underline underline-offset-2"
+                   href={spotifyEditorialSourceUrl(source.playlistId)}
+                   target="_blank" rel="noopener noreferrer">{source.label}</a>
+                <p className="mt-1 text-xs text-wk-text-muted">{source.role}</p>
+                <p className="mt-2 text-xs text-wk-text-soft">
+                  Editorial placement · source-method review required · no collector receipt
+                </p>
+              </li>)}
+          </ul>
+          <p className="mt-3 text-xs text-wk-text-muted">
+            Numeric weighting and anti-double-counting are approved in Phase 3. This source
+            register does not admit unattended Spotify collection or authorize scoring.
+          </p>
         </Card>
         <Card title="Source proposals">
           <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
