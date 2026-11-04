@@ -9,20 +9,22 @@ import {createHash,randomUUID} from 'node:crypto';
 import {mkdir,writeFile,readFile,chmod} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {homedir} from 'node:os';
-import {parseMdundoKenya,parseShazamKenya} from
+import {parseMdundoKenya,parseShazamKenya,parseAudiomackKenya} from
   '../../supabase/functions/_shared/chart-public-source-observations.mjs';
 
 const MAX=4_194_304;
 const SOURCES=Object.freeze([
-  {id:'youtube_ke',reason:'Official weekly Kenya song-view methodology; exact first-party weekly bytes route not established.'},
-  {id:'spotify_ke',reason:'First-party editorial playlists do not provide Kenya chart-eligible weekly stream counts; offered export unverified.'},
-  {id:'boomplay_ke',reason:'First-party Kenya ranked chart route and native schema not independently established.'},
+  // Exact founder-selected five-core priority order (issue #1338).
+  // Research preflight only; these are NOT admitted collector sources.
   {id:'apple_ke',url:'https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172',
-    kind:'public_chart_html',reason:'Public first-party daily Top 100 Kenya chart; no token or paid provider access needed. Daily displayed rank, not weekly streams.'},
-  {id:'mdundo_ke',url:'https://play.mdundo.com/top-charts/ke',
-    kind:'html',reason:'First-party weekly-described Kenya chart; exact native period bounds not proved.'},
+    kind:'public_chart_html',reason:'First-party public daily Kenya Top 100; unknown exact weekly stream totals.'},
   {id:'shazam_ke',url:'https://www.shazam.com/services/charts/csv/top-200/kenya/',
-    kind:'csv',reason:'Offered Top 200 Kenya CSV candidate; native discovery ranks, not streams.'},
+    kind:'csv',reason:'First-party Kenya Top 200 CSV candidate; native discovery rank, never streams.'},
+  {id:'mdundo_ke',url:'https://play.mdundo.com/top-charts/ke',
+    kind:'html',reason:'First-party Kenya ranked songs, described as weekly updated; exact native bounds unverified.'},
+  {id:'youtube_ke',reason:'Mandatory official Kenya weekly Top Songs song-view source; exact first-party service route remains unverified.'},
+  {id:'audiomack_ke',url:'https://audiomack.com/geo-charts/playlist/kenya',
+    kind:'html',reason:'Provider-owned Weekly 100 Kenya geo chart. Preserve native ranks, not invented streams.'},
 ]);
 function sha(bytes){return createHash('sha256').update(bytes).digest('hex');}
 async function getBounded(url,token){
@@ -73,7 +75,7 @@ async function main(){
     return;
   }
   const dir=resolve(process.env.WK100_PROBE_PRIVATE_DIR||
-    join(homedir(),'Downloads','wk100-private-six-source-preflight'));
+    join(homedir(),'Downloads','wk100-private-five-core-preflight'));
   await mkdir(dir,{recursive:true,mode:0o700});
   await chmod(dir,0o700);
   const records=[];
@@ -109,7 +111,8 @@ async function main(){
       }
       try{
         const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
-        const parsed=source.kind==='html'?parseMdundoKenya(text):parseShazamKenya(text);
+        const parsed=source.id==='mdundo_ke'?parseMdundoKenya(text):
+          source.id==='audiomack_ke'?parseAudiomackKenya(text):parseShazamKenya(text);
         observation.status='ORIGINAL_PARSED_RESEARCH_ONLY';
         observation.observed_depth=parsed.observed_depth;
         observation.native_metric=parsed.metric;
@@ -123,7 +126,7 @@ async function main(){
     }catch(e){records.push({...base,status:'TRANSPORT_CLIENT_CLASS_UNQUALIFIED',
       error_class:e?.name==='AbortError'?'timeout':'network_or_transport'});}
   }
-  const report={schema:'wk100-six-provider-source-method-preflight-v1',
+  const report={schema:'wk100-five-core-source-method-preflight-v1',
     client:'node_server_fetch',run_at:new Date().toISOString(),
     collector_receipts:0,operational_providers:0,all_four_gates_open:true,
     records};
