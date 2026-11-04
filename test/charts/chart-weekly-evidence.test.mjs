@@ -349,6 +349,9 @@ test('all source parsers fail closed on empty inputs and never assign a country-
   assert.throws(()=>parseYouTubeKenyaWeekly({},'weekly:20261016:20261022:ke'),/target_period_unavailable/);
   const r=parseShazamKenya('Rank,Artist,Title\n1,A,B\n');
   assert.equal('plays' in r,false);assert.equal('estimated_listeners' in r,false);
+  assert.throws(()=>parseShazamKenya('Rank,Artist,Title\n1,A,B\n,Hidden,Missing Rank\n'),
+    /shazam_invalid_chart_row/);
+  assert.equal(parseShazamKenya('Rank,Artist,Title\n1,A,B\n\n').rows.length,1);
 });
 
 
