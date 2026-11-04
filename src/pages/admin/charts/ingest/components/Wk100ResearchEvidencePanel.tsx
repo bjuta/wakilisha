@@ -189,7 +189,7 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
           Private Research Evidence
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-wk-text-soft">
-          Select the original Shazam Kenya chart CSV and its existing researcher receipt.
+          Select the Shazam Kenya CSV and its matching research receipt, including one saved above.
           We verify and retain the original bytes in restricted private storage.
         </p>
       </div>
@@ -278,8 +278,8 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
           <WkUploadField
             id="wk100-research-receipt"
             className="mt-3"
-            label="Select receipt JSON"
-            ariaLabel="Select receipt JSON"
+            label="Select matching receipt JSON"
+            ariaLabel="Select matching receipt JSON"
             accept=".json,application/json"
             disabled={busy}
             onSelect={files=>changeReceipt(files?.[0]??null)}/>
