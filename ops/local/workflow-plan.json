@@ -1,0 +1,817 @@
+{
+  "critical-control-plane": {
+    "sha256": "ab6e3c31a7012c8df6907aa282c20c1a4c120fe201b5303af695384051154ab6",
+    "name": "Critical Control Plane",
+    "jobs": {
+      "critical-core": {
+        "name": "critical-core",
+        "if": "${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 25,
+        "concurrency": {
+          "group": "mizizi-production-jit-control-plane",
+          "queue": "max"
+        },
+        "env": {
+          "SUPABASE_PROJECT_REF": "pgzizndxdyhqmtyywjmt",
+          "SUPABASE_ACCESS_TOKEN": "${{ secrets.SUPABASE_ACCESS_TOKEN }}",
+          "CONTROL_PLANE_BASE_REF": "origin/main"
+        },
+        "steps": [
+          {
+            "name": "Check out repository",
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "name": "Use Node.js",
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22",
+              "cache": "npm",
+              "cache-dependency-path": "package-lock.json"
+            }
+          },
+          {
+            "name": "Install dependencies",
+            "run": "npm ci --prefer-offline --no-audit --no-fund"
+          },
+          {
+            "name": "Reject undeclared runtime identifiers",
+            "run": "npm run audit:runtime-identifiers"
+          },
+          {
+            "name": "Enforce authoritative ERN 4.3.2 XSD fixture conformance",
+            "run": "MISSING_PACKAGES=\"\"\ncommand -v xmllint >/dev/null 2>&1 || MISSING_PACKAGES=\"$MISSING_PACKAGES libxml2-utils\"\ncommand -v unzip >/dev/null 2>&1 || MISSING_PACKAGES=\"$MISSING_PACKAGES unzip\"\nif [ -n \"$MISSING_PACKAGES\" ]; then\n  sudo apt-get update\n  sudo apt-get install -y $MISSING_PACKAGES\nfi\nbash scripts/music-standards/verify-ern432-authoritative-conformance.sh\n"
+          },
+          {
+            "name": "Validate canonical Production frontend runner",
+            "run": "scripts/deploy/production-frontend.sh --self-test"
+          },
+          {
+            "name": "Enforce WAKILISHA browser-chrome debt ledger",
+            "run": "npm run audit:ui-chrome\nnpx vitest run test/control-plane/wakilisha-ui-chrome.test.ts\n"
+          },
+          {
+            "name": "Enforce WAKILISHA viewport integrity",
+            "run": "npm run audit:viewport-integrity"
+          },
+          {
+            "name": "Enforce Admin overlay primitive convergence",
+            "run": "npm run audit:admin-overlays"
+          },
+          {
+            "name": "Run WAKILISHA DOM interaction contracts",
+            "run": "npm run test:ui-dom"
+          },
+          {
+            "name": "Enforce migration replay contract",
+            "run": "node scripts/control-plane/verify-migration-replay-contract.mjs"
+          },
+          {
+            "name": "Test migration replay contract",
+            "run": "npx vitest run test/control-plane/migration-replay-contract.test.ts"
+          },
+          {
+            "name": "Enforce MIZIZI worker transport contracts",
+            "run": "npx vitest run \\\n  test/registry/mizizi-headquarters-shared-job-adapter.test.ts \\\n  test/registry/mizizi-research-worker-cycle.test.ts\n"
+          },
+          {
+            "name": "Enforce MIZIZI review-to-case/research and operator Data API contracts",
+            "run": "npx vitest run \\\n  test/registry/mizizi-headquarters-review-case-research-flow.test.ts \\\n  test/registry/mizizi-trusted-headquarters-review-dispatch.test.ts \\\n  test/registry/mizizi-exact-case-research-job.test.ts \\\n  test/registry/mizizi-durable-cases-operator.test.ts\n"
+          },
+          {
+            "name": "Enforce primitive compounding contract",
+            "run": "node scripts/control-plane/verify-primitive-compounding.mjs\nnpx vitest run test/control-plane/primitive-compounding.test.ts\n"
+          },
+          {
+            "name": "Enforce Phase 7A kernel closure contract",
+            "run": "npx vitest run test/control-plane/phase-7a-kernel-closure.test.ts"
+          },
+          {
+            "name": "Enforce Phase 7A K5A Video editorial boundary",
+            "run": "npx vitest run test/video/phase-7a-k5a-video-editorial-command-read-boundary.test.ts"
+          },
+          {
+            "name": "Enforce Phase 7A K5B Video Editor composition",
+            "run": "npx vitest run test/video/phase-7a-k5b-video-editor-composition.test.ts"
+          },
+          {
+            "name": "Enforce Phase 7A K5C Video version Trust convergence",
+            "run": "npx vitest run test/video/phase-7a-k5c-video-version-trust-convergence.test.ts"
+          },
+          {
+            "name": "Enforce Phase 7A K5D Video correction provenance convergence",
+            "run": "npx vitest run test/video/phase-7a-k5d-video-correction-provenance-convergence.test.ts"
+          },
+          {
+            "name": "Enforce Phase 7B V1 public Video read and delivery",
+            "run": "npx vitest run test/video/phase-7b-v1-public-video-read-delivery.test.ts"
+          },
+          {
+            "name": "Enforce Phase 7B V2 public Video experience convergence",
+            "run": "npx vitest run test/video/phase-7b-v2-public-video-experience-convergence.test.ts"
+          },
+          {
+            "name": "Enforce Phase 7B V3 Video provider source convergence",
+            "run": "npx vitest run test/video/phase-7b-v3-video-provider-source-convergence.test.ts"
+          },
+          {
+            "name": "Enforce Phase 7B V4A adaptive Video Media foundation",
+            "run": "python3 -m py_compile ops/media-processor/worker.py\nnpx vitest run \\\n  test/media/phase-4b-m2-processing-contract.test.ts \\\n  test/audio/phase-6a-m2-audio-master-delivery.test.ts \\\n  test/video/phase-7b-v4a-adaptive-video-media.test.ts\n"
+          },
+          {
+            "name": "Enforce Phase 7B V4B public adaptive Video playback",
+            "run": "npx vitest run \\\n  test/video/phase-7b-v1-public-video-read-delivery.test.ts \\\n  test/video/phase-7b-v2-public-video-experience-convergence.test.ts \\\n  test/video/phase-7b-v4a-adaptive-video-media.test.ts \\\n  test/video/phase-7b-v4b-public-adaptive-video-playback.test.ts\n"
+          },
+          {
+            "name": "Enforce Phase 7B V4C governed Video quality selection",
+            "run": "npx vitest run \\\n  test/video/phase-7b-v4a-adaptive-video-media.test.ts \\\n  test/video/phase-7b-v4b-public-adaptive-video-playback.test.ts \\\n  test/video/phase-7b-v4c-governed-video-quality-selection.test.ts\n"
+          },
+          {
+            "name": "Enforce shared Media presentation and Chapter 25 playback contracts",
+            "run": "npx vitest run \\\n  test/media/media-presentation-surface.test.ts \\\n  test/player/mobile-provider-playback-contract.test.ts \\\n  test/player/canonical-media-runtime-commit1.test.ts \\\n  test/player/workbook-ch25-crossfade-policy.test.ts\n"
+          },
+          {
+            "name": "Require Supabase control-plane access",
+            "run": "if [ -z \"$SUPABASE_ACCESS_TOKEN\" ]; then\n  echo \"SUPABASE_ACCESS_TOKEN repository secret is required.\"\n  exit 1\nfi\n"
+          },
+          {
+            "name": "Set up Supabase CLI",
+            "uses": "supabase/setup-cli@v1",
+            "with": {
+              "version": "2.107.0",
+              "github-token": "${{ github.token }}"
+            }
+          },
+          {
+            "name": "Resolve public RLS test credentials",
+            "run": "supabase projects api-keys \\\n  --project-ref \"$SUPABASE_PROJECT_REF\" \\\n  -o json \\\n  > /tmp/supabase-api-keys.json\n\nANON_KEY=\"$(\n  node \\\n    scripts/control-plane/resolve-supabase-anon-key.mjs \\\n    /tmp/supabase-api-keys.json\n)\"\n\nif [ -z \"$ANON_KEY\" ]; then\n  echo \"Could not resolve the public Supabase API key.\"\n  exit 1\nfi\n\necho \"::add-mask::$ANON_KEY\"\necho \"VITE_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_REF}.supabase.co\" >> \"$GITHUB_ENV\"\necho \"VITE_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY\" >> \"$GITHUB_ENV\"\n"
+          },
+          {
+            "name": "Run critical security and lifecycle tests",
+            "run": "npm run test:critical"
+          },
+          {
+            "name": "Verify WK100 local confidential preview fail-closed contract",
+            "run": "node --test test/charts/wk100-private-preview.test.mjs"
+          },
+          {
+            "name": "Verify WK100 offline authority-bound intake",
+            "run": "node --test test/charts/wk100-offline-intake-authority.test.mjs\nnode --test test/charts/wk100-shazam-research-evidence.test.mjs\nnode --test test/charts/wk100-source-admin-projection.test.mjs\n"
+          },
+          {
+            "name": "Verify WK100 server-only Admin preview and confidentiality",
+            "run": "node --test test/charts/wk100-private-admin-preview.test.mjs\nnpx vitest run test/charts/wk100-admin-role-expiry.test.ts\n"
+          },
+          {
+            "name": "Enforce Post draft and authored Thread authority",
+            "run": "npx vitest run test/community/post-drafts-authored-threads-m8c3.test.ts test/community/post-thread-presentation-m8c3.test.ts test/community/post-thread-detail-m8c3.test.ts test/community/post-drafts-thread-composer-m8c3.test.ts test/community/post-thread-affordance-m8c3.test.ts"
+          },
+          {
+            "name": "Enforce canonical Post mention product UI",
+            "run": "npx vitest run test/community/post-mentions-product-ui-m8c4.test.ts"
+          },
+          {
+            "name": "Enforce public Post delete product UI",
+            "run": "npx vitest run test/community/post-delete-product-ui.test.ts"
+          },
+          {
+            "name": "Enforce dedicated Notifications product UI",
+            "run": "npx vitest run test/community/notifications-page-m8c4.test.ts"
+          },
+          {
+            "name": "Enforce public configuration and anonymous authority boundaries",
+            "run": "npx vitest run test/public-read-authority-boundary.test.ts test/security/configured-supabase-csp.test.ts test/security/configured-public-content-edge-origin.test.ts"
+          },
+          {
+            "name": "Detect live schema and migration-history drift",
+            "run": "npm run schema:verify"
+          },
+          {
+            "name": "Build application",
+            "run": "npm run performance:audit && npm run build:app"
+          }
+        ]
+      },
+      "critical-browser": {
+        "name": "critical-browser",
+        "if": "${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 10,
+        "container": {
+          "image": "mcr.microsoft.com/playwright:v1.63.0-noble"
+        },
+        "steps": [
+          {
+            "name": "Check out repository",
+            "uses": "actions/checkout@v4"
+          },
+          {
+            "name": "Use Node.js",
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22",
+              "cache": "npm",
+              "cache-dependency-path": "package-lock.json"
+            }
+          },
+          {
+            "name": "Install dependencies",
+            "run": "npm ci --prefer-offline --no-audit --no-fund"
+          },
+          {
+            "name": "WK100 five primary plus four editorial public source preflight",
+            "if": "${{ github.event_name == 'pull_request' && github.event.pull_request.number == 1345 }}",
+            "shell": "bash",
+            "run": "set -euo pipefail\nprivate_dir=\"$(mktemp -d \"${RUNNER_TEMP:-/tmp}/wk100-public-source.XXXXXXXX\")\"\ntrap 'rm -rf -- \"$private_dir\"' EXIT\nWK100_PROBE_PRIVATE_DIR=\"$private_dir\" \\\n  node scripts/acceptance/wk100-phase1-six-source-live-probe.mjs --fetch\n"
+          },
+          {
+            "name": "Run WAKILISHA real-browser interaction acceptance",
+            "run": "npm run test:ui-browser"
+          },
+          {
+            "name": "Preserve actual public-route visual evidence",
+            "if": "always()",
+            "uses": "actions/upload-artifact@v4",
+            "with": {
+              "name": "workbook-v4-public-route-browser-captures",
+              "path": "test-results/**/workbook-v4-*.png",
+              "if-no-files-found": "error",
+              "retention-days": 7
+            }
+          },
+          {
+            "name": "Exercise shared authoring editor in isolated real Chromium",
+            "env": {
+              "WK_EDITORIAL_FIXTURE": "1",
+              "VITE_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
+              "VITE_PUBLIC_SUPABASE_ANON_KEY": "wk-test-synthetic-no-credentials"
+            },
+            "run": "npm run test:ui-browser -- test/ui-browser/editorial-rating-workflow.spec.ts"
+          },
+          {
+            "name": "Preserve isolated authoring screenshots",
+            "if": "always()",
+            "uses": "actions/upload-artifact@v4",
+            "with": {
+              "name": "workbook-v4-editorial-browser-captures",
+              "path": "test-results/**/workbook-v4-editor-rating-*.png",
+              "if-no-files-found": "ignore",
+              "retention-days": 7
+            }
+          }
+        ]
+      },
+      "critical": {
+        "name": "critical",
+        "if": "${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}",
+        "needs": [
+          "critical-core",
+          "critical-browser"
+        ],
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 2,
+        "steps": [
+          {
+            "name": "Require all critical control planes",
+            "env": {
+              "CORE_RESULT": "${{ needs.critical-core.result }}",
+              "BROWSER_RESULT": "${{ needs.critical-browser.result }}"
+            },
+            "run": "echo \"critical-core=$CORE_RESULT\"\necho \"critical-browser=$BROWSER_RESULT\"\ntest \"$CORE_RESULT\" = \"success\"\ntest \"$BROWSER_RESULT\" = \"success\"\n"
+          }
+        ]
+      }
+    }
+  },
+  "mizizi-release-production-control-plane": {
+    "sha256": "259e66ef9a22503b8c2c1d3873de5bf4b86799c40c5a8c6559dd132dae42ca94",
+    "name": "MIZIZI Release Production Control Plane",
+    "jobs": {
+      "control-plane": {
+        "name": "control-plane",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 30,
+        "env": {
+          "SUPABASE_PROJECT_REF": "pgzizndxdyhqmtyywjmt",
+          "SUPABASE_ACCESS_TOKEN": "${{ secrets.SUPABASE_ACCESS_TOKEN }}",
+          "MIZIZI_CONTROL_PLANE_MODE": "${{ github.event_name == 'push' && 'apply' || 'preflight' }}",
+          "MIZIZI_EXPECTED_MAIN_SHA": "${{ github.event_name == 'push' && github.sha || '' }}",
+          "MIZIZI_TRIGGER_FILE": "${{ github.event_name == 'push' && '.github/mizizi-release-production-apply.json' || '' }}",
+          "MIZIZI_ARTIFACT_DIR": "artifacts/mizizi-release-production-control-plane"
+        },
+        "steps": [
+          {
+            "name": "Check out repository",
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "name": "Use Node.js",
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install dependencies",
+            "run": "npm ci"
+          },
+          {
+            "name": "Run MIZIZI Release production control plane",
+            "run": "node scripts/control-plane/mizizi-release-production-control-plane.mjs"
+          },
+          {
+            "name": "Upload MIZIZI Release control-plane evidence",
+            "if": "always()",
+            "uses": "actions/upload-artifact@v4",
+            "with": {
+              "name": "mizizi-release-production-control-plane-${{ github.run_id }}",
+              "path": "artifacts/mizizi-release-production-control-plane",
+              "if-no-files-found": "ignore",
+              "retention-days": 30
+            }
+          }
+        ]
+      }
+    }
+  },
+  "mizizi-slice1-disposable-postgres": {
+    "sha256": "f8a1b512c9033c49b2ad7f2e2f0bbcd2e6d19a68d019bed28d5254d4405ada60",
+    "name": "MIZIZI Slice 1 Disposable PostgreSQL Proof",
+    "jobs": {
+      "disposable-worker-sql": {
+        "name": "disposable-worker-sql",
+        "if": "${{ github.event.pull_request.draft == false }}",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 25,
+        "steps": [
+          {
+            "name": "Check out exact pull request head",
+            "uses": "actions/checkout@v4",
+            "with": {
+              "persist-credentials": false,
+              "fetch-depth": 0
+            }
+          },
+          {
+            "name": "Prove there is no linked or credentialed Supabase target",
+            "shell": "bash",
+            "run": "test ! -e supabase/.temp/project-ref\ntest -z \"$(printenv SUPABASE_PROJECT_REF || true)\"\ntest -z \"$(printenv SUPABASE_ACCESS_TOKEN || true)\"\ntest -f supabase/config.toml\necho \"WK_CI_NO_REMOTE_TARGET=PASS\"\n"
+          },
+          {
+            "name": "Check acceptance runner syntax",
+            "shell": "bash",
+            "run": "bash -n scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh\nbash -n scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh\n"
+          },
+          {
+            "name": "Install pinned Supabase CLI for local-only Docker",
+            "uses": "supabase/setup-cli@v1",
+            "with": {
+              "version": "2.121.0"
+            }
+          },
+          {
+            "name": "Start disposable local database and replay migrations",
+            "shell": "bash",
+            "run": "supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor\necho \"WK_CI_LOCAL_MIGRATION_REPLAY_FINISHED=PASS\"\n"
+          },
+          {
+            "name": "Verify exact HTTP 409 operator RPC and sealed ACLs",
+            "shell": "bash",
+            "run": "DB=\"$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')\"\ntest -n \"$DB\"\ndocker exec -i \"$DB\" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \\\n  < scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql\ndocker exec -i \"$DB\" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \\\n  < scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql\ndocker exec -i \"$DB\" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \\\n  < scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql\n"
+          },
+          {
+            "name": "Verify RNB18 empty historical archive and immutable authority (read only)",
+            "shell": "bash",
+            "run": "set -euo pipefail\nDB=\"$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')\"\ntest -n \"$DB\"\ntest \"$(printf '%s\\n' \"$DB\" | wc -l | tr -d ' ')\" = \"1\"\ndocker exec -i \"$DB\" psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \\\n  < scripts/control-plane/verify-rnb18-stage1-replay-authority.sql\necho WK_RNB18_STAGE2_CLEAN_REPLAY_READ_ONLY_POSTFLIGHT=PASS\n"
+          },
+          {
+            "name": "Execute worker, source-negative and 32 Track corpus SQL acceptance",
+            "shell": "bash",
+            "run": "bash scripts/acceptance/run-mizizi-slice1-worker-disposable-ci.sh"
+          },
+          {
+            "name": "Execute actual concurrent W31 claim on independent database sessions",
+            "shell": "bash",
+            "run": "bash scripts/acceptance/run-mizizi-slice1-worker-parallel-ci.sh"
+          },
+          {
+            "name": "Destroy disposable PostgreSQL containers and all local data volumes",
+            "if": "always()",
+            "shell": "bash",
+            "run": "supabase stop --no-backup\ntest -z \"$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')\"\ntest -z \"$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')\"\necho \"WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS\"\n"
+          }
+        ]
+      },
+      "disposable-operator-jwt": {
+        "name": "disposable-operator-jwt",
+        "if": "${{ github.event.pull_request.draft == false }}",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 25,
+        "steps": [
+          {
+            "name": "Check out exact pull request head",
+            "uses": "actions/checkout@v4",
+            "with": {
+              "persist-credentials": false,
+              "fetch-depth": 0
+            }
+          },
+          {
+            "name": "Prove no remote Supabase target can be used",
+            "shell": "bash",
+            "run": "test ! -e supabase/.temp/project-ref\ntest -z \"$(printenv SUPABASE_PROJECT_REF || true)\"\ntest -z \"$(printenv SUPABASE_ACCESS_TOKEN || true)\"\ntest -f supabase/config.toml\nnode --check scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs\nnode --check scripts/acceptance/mizizi-slice1-real-browser-ci.mjs\nnode --check scripts/acceptance/mizizi-slice1-h38-real-grant-ci.mjs\necho \"WK_CI_AUTH_NO_REMOTE_TARGET=PASS\"\n"
+          },
+          {
+            "name": "Install pinned local Supabase CLI",
+            "uses": "supabase/setup-cli@v1",
+            "with": {
+              "version": "2.121.0"
+            }
+          },
+          {
+            "name": "Install Node dependencies for genuine HTTP Supabase Auth client",
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22",
+              "cache": "npm"
+            }
+          },
+          {
+            "name": "Install exact package-lock dependencies",
+            "shell": "bash",
+            "run": "npm ci --ignore-scripts --no-audit --no-fund"
+          },
+          {
+            "name": "Install local headless Chromium browser for genuine operator UI",
+            "shell": "bash",
+            "run": "npx playwright install --with-deps chromium"
+          },
+          {
+            "name": "Start disposable local database, Auth and REST gateway",
+            "shell": "bash",
+            "run": "supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor\necho \"WK_CI_LOCAL_GOTRUE_REST_MIGRATION_REPLAY=PASS\"\n"
+          },
+          {
+            "name": "Verify exact HTTP 409 operator RPC and sealed ACLs",
+            "shell": "bash",
+            "run": "DB=\"$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')\"\ntest -n \"$DB\"\ndocker exec -i \"$DB\" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \\\n  < scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql\ndocker exec -i \"$DB\" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \\\n  < scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql\ndocker exec -i \"$DB\" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \\\n  < scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql\n"
+          },
+          {
+            "name": "Exercise genuine JWT operator bootstrap, case and competing hold RPCs",
+            "shell": "bash",
+            "run": "node scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs"
+          },
+          {
+            "name": "Destroy all disposable local Auth and database volumes",
+            "if": "always()",
+            "shell": "bash",
+            "run": "supabase stop --no-backup\ntest -z \"$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')\"\ntest -z \"$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')\"\necho \"WK_CI_LOCAL_AUTH_USERS_MEMBERSHIPS_AND_VOLUMES_DESTROYED=PASS\"\n"
+          }
+        ]
+      }
+    }
+  },
+  "mizizi-track-production-control-plane": {
+    "sha256": "4e34e4992252f215837a2892ae754dd9e1e888579fc5a549fe5031df2a3d40b0",
+    "name": "MIZIZI Track Production Control Plane",
+    "jobs": {
+      "control-plane": {
+        "name": "control-plane",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 45,
+        "env": {
+          "SUPABASE_PROJECT_REF": "pgzizndxdyhqmtyywjmt",
+          "SUPABASE_REGION": "eu-west-2",
+          "SUPABASE_ACCESS_TOKEN": "${{ secrets.SUPABASE_ACCESS_TOKEN }}",
+          "MIZIZI_CONTROL_PLANE_MODE": "preflight",
+          "MIZIZI_EXPECTED_MAIN_SHA": "",
+          "MIZIZI_TRIGGER_FILE": "",
+          "MIZIZI_ARTIFACT_DIR": "artifacts/mizizi-track-production-control-plane"
+        },
+        "steps": [
+          {
+            "name": "Check out repository",
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "name": "Use Node.js",
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install dependencies",
+            "run": "npm ci"
+          },
+          {
+            "name": "Resolve reviewed Production intent",
+            "if": "github.event_name == 'push'",
+            "shell": "bash",
+            "run": "set -euo pipefail\n\nCHANGED=\"$(git diff --name-only \"${{ github.event.before }}\" \"${{ github.sha }}\")\"\nAPPLY_FILE=\".github/mizizi-track-production-apply.json\"\nREVIEW_FILE=\".github/mizizi-track-production-review.json\"\n\nTOTAL=\"$(printf '%s\\n' \"$CHANGED\" | sed '/^$/d' | wc -l | tr -d ' ')\"\nAPPLY_COUNT=\"$(printf '%s\\n' \"$CHANGED\" | grep -Fxc \"$APPLY_FILE\" || true)\"\nREVIEW_COUNT=\"$(printf '%s\\n' \"$CHANGED\" | grep -Fxc \"$REVIEW_FILE\" || true)\"\n\nif [ \"$TOTAL\" = \"1\" ] && [ \"$APPLY_COUNT\" = \"1\" ] && [ \"$REVIEW_COUNT\" = \"0\" ]; then\n  echo \"MIZIZI_CONTROL_PLANE_MODE=apply\" >> \"$GITHUB_ENV\"\n  echo \"MIZIZI_TRIGGER_FILE=$APPLY_FILE\" >> \"$GITHUB_ENV\"\nelif [ \"$TOTAL\" = \"1\" ] && [ \"$APPLY_COUNT\" = \"0\" ] && [ \"$REVIEW_COUNT\" = \"1\" ]; then\n  echo \"MIZIZI_CONTROL_PLANE_MODE=review\" >> \"$GITHUB_ENV\"\n  echo \"MIZIZI_TRIGGER_FILE=$REVIEW_FILE\" >> \"$GITHUB_ENV\"\nelse\n  echo \"STOP: Production intent push must change exactly one reviewed MIZIZI Track trigger file.\"\n  printf '%s\\n' \"$CHANGED\"\n  exit 1\nfi\n\necho \"MIZIZI_EXPECTED_MAIN_SHA=$GITHUB_SHA\" >> \"$GITHUB_ENV\"\n"
+          },
+          {
+            "name": "Run MIZIZI production control plane",
+            "run": "node scripts/control-plane/mizizi-track-production-control-plane.mjs"
+          },
+          {
+            "name": "Upload MIZIZI control-plane evidence",
+            "if": "always()",
+            "uses": "actions/upload-artifact@v4",
+            "with": {
+              "name": "mizizi-track-production-control-plane-${{ github.run_id }}",
+              "path": "artifacts/mizizi-track-production-control-plane",
+              "if-no-files-found": "ignore",
+              "retention-days": 30
+            }
+          }
+        ]
+      }
+    }
+  },
+  "mizizi-url-identity-production-control-plane": {
+    "sha256": "83714db5dcfe9f2a7674a1bb8d70c2ba74cce1b97dda4e7b53d5eaf5fe69baea",
+    "name": "MIZIZI URL Identity Production Control Plane",
+    "jobs": {
+      "control-plane": {
+        "name": "control-plane",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 60,
+        "env": {
+          "SUPABASE_PROJECT_REF": "pgzizndxdyhqmtyywjmt",
+          "SUPABASE_ACCESS_TOKEN": "${{ secrets.SUPABASE_ACCESS_TOKEN }}",
+          "MIZIZI_CONTROL_PLANE_MODE": "preflight",
+          "MIZIZI_EXPECTED_MAIN_SHA": "",
+          "MIZIZI_TRIGGER_FILE": "",
+          "PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY": "",
+          "MIZIZI_ARTIFACT_DIR": "artifacts/mizizi-url-identity-production-control-plane"
+        },
+        "steps": [
+          {
+            "name": "Check out repository",
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "name": "Use Node.js",
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install dependencies",
+            "run": "npm ci"
+          },
+          {
+            "name": "Resolve reviewed Production intent",
+            "if": "github.event_name == 'push'",
+            "shell": "bash",
+            "run": "set -euo pipefail\n\nCHANGED=\"$(git diff --name-only \"${{ github.event.before }}\" \"${{ github.sha }}\")\"\nLEGACY_FILE=\".github/mizizi-url-identity-production-apply.json\"\nSINGLE_FILE=\".github/public-music-identity-release-single-alignment-apply.json\"\nTRACK_ZERO_FILE=\".github/public-music-identity-track-slug-zero-apply.json\"\nTRACK_PRIMARY_FILE=\".github/public-music-identity-track-slug-primary-followup-apply.json\"\nBATCH_A_FILE=\".github/public-music-identity-batch-a-safe-slug-apply.json\"\n\nTOTAL=\"$(printf '%s\\n' \"$CHANGED\" | sed '/^$/d' | wc -l | tr -d ' ')\"\nLEGACY_COUNT=\"$(printf '%s\\n' \"$CHANGED\" | grep -Fxc \"$LEGACY_FILE\" || true)\"\nSINGLE_COUNT=\"$(printf '%s\\n' \"$CHANGED\" | grep -Fxc \"$SINGLE_FILE\" || true)\"\nTRACK_ZERO_COUNT=\"$(printf '%s\\n' \"$CHANGED\" | grep -Fxc \"$TRACK_ZERO_FILE\" || true)\"\nTRACK_PRIMARY_COUNT=\"$(printf '%s\\n' \"$CHANGED\" | grep -Fxc \"$TRACK_PRIMARY_FILE\" || true)\"\nBATCH_A_COUNT=\"$(printf '%s\\n' \"$CHANGED\" | grep -Fxc \"$BATCH_A_FILE\" || true)\"\n\nif [ \"$TOTAL\" = \"1\" ] && [ \"$LEGACY_COUNT\" = \"1\" ] && [ \"$SINGLE_COUNT\" = \"0\" ] && [ \"$TRACK_ZERO_COUNT\" = \"0\" ] && [ \"$TRACK_PRIMARY_COUNT\" = \"0\" ] && [ \"$BATCH_A_COUNT\" = \"0\" ]; then\n  echo \"MIZIZI_CONTROL_PLANE_MODE=apply\" >> \"$GITHUB_ENV\"\n  echo \"MIZIZI_TRIGGER_FILE=$LEGACY_FILE\" >> \"$GITHUB_ENV\"\nelif [ \"$TOTAL\" = \"1\" ] && [ \"$LEGACY_COUNT\" = \"0\" ] && [ \"$SINGLE_COUNT\" = \"1\" ] && [ \"$TRACK_ZERO_COUNT\" = \"0\" ] && [ \"$TRACK_PRIMARY_COUNT\" = \"0\" ] && [ \"$BATCH_A_COUNT\" = \"0\" ]; then\n  echo \"MIZIZI_CONTROL_PLANE_MODE=apply\" >> \"$GITHUB_ENV\"\n  echo \"MIZIZI_TRIGGER_FILE=$SINGLE_FILE\" >> \"$GITHUB_ENV\"\nelif [ \"$TOTAL\" = \"1\" ] && [ \"$LEGACY_COUNT\" = \"0\" ] && [ \"$SINGLE_COUNT\" = \"0\" ] && [ \"$TRACK_ZERO_COUNT\" = \"1\" ] && [ \"$TRACK_PRIMARY_COUNT\" = \"0\" ] && [ \"$BATCH_A_COUNT\" = \"0\" ]; then\n  echo \"MIZIZI_CONTROL_PLANE_MODE=apply\" >> \"$GITHUB_ENV\"\n  echo \"MIZIZI_TRIGGER_FILE=$TRACK_ZERO_FILE\" >> \"$GITHUB_ENV\"\nelif [ \"$TOTAL\" = \"1\" ] && [ \"$LEGACY_COUNT\" = \"0\" ] && [ \"$SINGLE_COUNT\" = \"0\" ] && [ \"$TRACK_ZERO_COUNT\" = \"0\" ] && [ \"$TRACK_PRIMARY_COUNT\" = \"1\" ] && [ \"$BATCH_A_COUNT\" = \"0\" ]; then\n  echo \"MIZIZI_CONTROL_PLANE_MODE=apply\" >> \"$GITHUB_ENV\"\n  echo \"MIZIZI_TRIGGER_FILE=$TRACK_PRIMARY_FILE\" >> \"$GITHUB_ENV\"\nelif [ \"$TOTAL\" = \"1\" ] && [ \"$LEGACY_COUNT\" = \"0\" ] && [ \"$SINGLE_COUNT\" = \"0\" ] && [ \"$TRACK_ZERO_COUNT\" = \"0\" ] && [ \"$TRACK_PRIMARY_COUNT\" = \"0\" ] && [ \"$BATCH_A_COUNT\" = \"1\" ]; then\n  echo \"PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY=true\" >> \"$GITHUB_ENV\"\n  echo \"MIZIZI_TRIGGER_FILE=$BATCH_A_FILE\" >> \"$GITHUB_ENV\"\nelse\n  echo \"STOP: Production intent push must change exactly one reviewed URL-identity trigger file.\"\n  printf '%s\\n' \"$CHANGED\"\n  exit 1\nfi\n\necho \"MIZIZI_EXPECTED_MAIN_SHA=$GITHUB_SHA\" >> \"$GITHUB_ENV\"\n"
+          },
+          {
+            "name": "Resolve manual Production operation",
+            "if": "github.event_name == 'workflow_dispatch'",
+            "shell": "bash",
+            "run": "set -euo pipefail\n\nif [ \"${{ inputs.operation }}\" = \"public_music_identity_batch_a_safe_slug\" ]; then\n  test \"$GITHUB_REF\" = \"refs/heads/main\" || {\n    echo \"STOP: Batch A mutation may run only from protected main.\"\n    exit 1\n  }\n  echo \"MIZIZI_EXPECTED_MAIN_SHA=$GITHUB_SHA\" >> \"$GITHUB_ENV\"\n  echo \"MIZIZI_TRIGGER_FILE=.github/public-music-identity-batch-a-safe-slug-apply.json\" >> \"$GITHUB_ENV\"\nfi\n"
+          },
+          {
+            "name": "Run current MIZIZI URL-identity control plane",
+            "if": "github.event_name != 'workflow_dispatch' || inputs.operation == 'preflight' || inputs.operation == 'public_music_identity_batch_a_safe_slug'",
+            "run": "node scripts/control-plane/mizizi-url-identity-production-control-plane.mjs"
+          },
+          {
+            "name": "Run Public Music Identity Batch A safe-slug executor",
+            "if": "(github.event_name == 'workflow_dispatch' && inputs.operation == 'public_music_identity_batch_a_safe_slug') || env.PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY == 'true'",
+            "run": "node scripts/control-plane/public-music-identity-batch-a-production-control-plane.mjs"
+          },
+          {
+            "name": "Snapshot full active Track slug corpus after Batch A",
+            "if": "(github.event_name == 'workflow_dispatch' && inputs.operation == 'public_music_identity_batch_a_safe_slug') || env.PUBLIC_MUSIC_IDENTITY_BATCH_A_APPLY == 'true'",
+            "env": {
+              "PUBLIC_MUSIC_IDENTITY_ZERO_MODE": "report",
+              "PUBLIC_MUSIC_IDENTITY_ZERO_ARTIFACT_DIR": "artifacts/public-music-identity-track-actual-zero"
+            },
+            "run": "node scripts/control-plane/public-music-identity-track-actual-zero-audit.mjs"
+          },
+          {
+            "name": "Upload URL-identity control-plane evidence",
+            "if": "always()",
+            "uses": "actions/upload-artifact@v4",
+            "with": {
+              "name": "mizizi-url-identity-production-control-plane-${{ github.run_id }}",
+              "path": "artifacts/mizizi-url-identity-production-control-plane\nartifacts/public-music-identity-batch-a\nartifacts/public-music-identity-track-actual-zero\n",
+              "if-no-files-found": "ignore",
+              "retention-days": 30
+            }
+          }
+        ]
+      }
+    }
+  },
+  "public-runtime-watch": {
+    "sha256": "1ade88ab6050cdb080c5850adf388e1c9079b23294995ad3da1b8eb1aa875f79",
+    "name": "Public Runtime Watch",
+    "jobs": {
+      "public-runtime": {
+        "name": "public-runtime",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 10,
+        "env": {
+          "SUPABASE_PROJECT_REF": "pgzizndxdyhqmtyywjmt",
+          "SUPABASE_ACCESS_TOKEN": "${{ secrets.SUPABASE_ACCESS_TOKEN }}"
+        },
+        "steps": [
+          {
+            "name": "Check out repository",
+            "uses": "actions/checkout@v4"
+          },
+          {
+            "name": "Use Node.js",
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install dependencies",
+            "run": "npm ci"
+          },
+          {
+            "name": "Install Chromium for live browser runtime probes",
+            "run": "npx playwright install --with-deps chromium"
+          },
+          {
+            "name": "Require Supabase control-plane access",
+            "run": "if [ -z \"$SUPABASE_ACCESS_TOKEN\" ]; then\n  echo \"SUPABASE_ACCESS_TOKEN repository secret is required.\"\n  exit 1\nfi\n"
+          },
+          {
+            "name": "Resolve anonymous production credentials",
+            "run": "npx --yes supabase@2.107.0 projects api-keys \\\n  --project-ref \"$SUPABASE_PROJECT_REF\" \\\n  -o json \\\n  > /tmp/supabase-api-keys.json\n\nANON_KEY=\"$(\n  node \\\n    scripts/control-plane/resolve-supabase-anon-key.mjs \\\n    /tmp/supabase-api-keys.json\n)\"\n\nif [ -z \"$ANON_KEY\" ]; then\n  echo \"Could not resolve the public Supabase API key.\"\n  exit 1\nfi\n\necho \"::add-mask::$ANON_KEY\"\necho \"VITE_PUBLIC_SUPABASE_URL=https://${SUPABASE_PROJECT_REF}.supabase.co\" >> \"$GITHUB_ENV\"\necho \"VITE_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY\" >> \"$GITHUB_ENV\"\n"
+          },
+          {
+            "name": "Probe signed-out public data and Edge runtime",
+            "run": "npx vitest run test/security/public-anon-content.test.ts test/security/public-edge-runtime.test.ts"
+          },
+          {
+            "name": "Probe live public browser runtime",
+            "run": "node scripts/test/public-production-runtime-watch.mjs"
+          }
+        ]
+      }
+    }
+  },
+  "repository-migration-production-promotion": {
+    "sha256": "bde91d96c4fbdd6a68266cf7f026f774b59a225e50b9768f022b705fd4f90c82",
+    "name": "Repository Migration Production Promotion",
+    "jobs": {
+      "promote": {
+        "name": "exact-main-native-promotion",
+        "if": "github.ref == 'refs/heads/main'",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 30,
+        "env": {
+          "PROD_REF": "pgzizndxdyhqmtyywjmt",
+          "EXPECTED_MAIN_SHA": "${{ inputs.expected_main_sha }}",
+          "EXPECTED_PENDING": "${{ inputs.expected_pending }}",
+          "SUPABASE_PROJECT_REF": "pgzizndxdyhqmtyywjmt",
+          "SUPABASE_ACCESS_TOKEN": "${{ secrets.SUPABASE_ACCESS_TOKEN }}"
+        },
+        "steps": [
+          {
+            "name": "Check out protected main",
+            "uses": "actions/checkout@v4",
+            "with": {
+              "ref": "main",
+              "fetch-depth": 0
+            }
+          },
+          {
+            "name": "Use Node.js",
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22",
+              "cache": "npm",
+              "cache-dependency-path": "package-lock.json"
+            }
+          },
+          {
+            "name": "Install repository dependencies",
+            "run": "npm ci --prefer-offline --no-audit --no-fund"
+          },
+          {
+            "name": "Set up pinned Supabase CLI",
+            "uses": "supabase/setup-cli@v1",
+            "with": {
+              "version": "2.107.0",
+              "github-token": "${{ github.token }}"
+            }
+          },
+          {
+            "name": "Require exact protected main authority",
+            "run": "set -euo pipefail\n\ncase \"$EXPECTED_MAIN_SHA\" in\n  [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;\n  *)\n    echo \"STOP: expected_main_sha must be a full lowercase commit SHA.\"\n    exit 1\n    ;;\nesac\n\ngit fetch origin refs/heads/main:refs/remotes/origin/main\ngit switch -C main refs/remotes/origin/main\n\ntest \"$(git branch --show-current)\" = \"main\"\ntest \"$(git rev-parse HEAD)\" = \"$EXPECTED_MAIN_SHA\"\ntest \"$(git rev-parse HEAD)\" = \"$(git rev-parse refs/remotes/origin/main)\"\ntest \"$GITHUB_SHA\" = \"$EXPECTED_MAIN_SHA\"\ntest -z \"$(git status --porcelain)\"\n\necho \"REPOSITORY_MIGRATION_EXACT_MAIN=PASS\"\n"
+          },
+          {
+            "name": "Link exact Production project",
+            "run": "set -euo pipefail\n\nsupabase link --project-ref \"$PROD_REF\"\n\ntest -f supabase/.temp/project-ref\ntest \"$(cat supabase/.temp/project-ref)\" = \"$PROD_REF\"\n\necho \"REPOSITORY_MIGRATION_EXACT_PRODUCTION=PASS\"\n"
+          },
+          {
+            "name": "Require exact reviewed pending set",
+            "run": "set -euo pipefail\n\nEXPECTED=\"$(\n  printf '%s\\n' \"$EXPECTED_PENDING\" |\n    tr ',' '\\n' |\n    sed 's/^[[:space:]]*//;s/[[:space:]]*$//' |\n    sed '/^$/d' |\n    sort -u\n)\"\n\ntest -n \"$EXPECTED\"\n\nwhile IFS= read -r name; do\n  case \"$name\" in\n    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_*.sql) ;;\n    *)\n      echo \"STOP: non-canonical expected migration filename: $name\"\n      exit 1\n      ;;\n  esac\n  test -f \"supabase/migrations/$name\"\ndone <<EOF\n$EXPECTED\nEOF\n\nDRY=\"$(\n  supabase db push --dry-run --linked 2>&1\n)\"\nprintf '%s\\n' \"$DRY\"\n\nACTUAL=\"$(\n  {\n    printf '%s\\n' \"$DRY\" |\n      grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\\.sql' || true\n  } |\n    sort -u\n)\"\n\nif [ \"$ACTUAL\" != \"$EXPECTED\" ]; then\n  printf 'STOP: pending migration set changed.\\nEXPECTED:\\n%s\\nACTUAL:\\n%s\\n'               \"$EXPECTED\" \"$ACTUAL\"\n  exit 1\nfi\n\necho \"REPOSITORY_MIGRATION_EXACT_PENDING_SET=PASS\"\n"
+          },
+          {
+            "name": "Run canonical repository migration promotion",
+            "run": "set -euo pipefail\nbash scripts/control-plane/promote-repository-migrations.sh\n"
+          },
+          {
+            "name": "Record zero-pending completion",
+            "run": "set -euo pipefail\n\nPOST=\"$(\n  supabase db push --dry-run --linked 2>&1\n)\"\nprintf '%s\\n' \"$POST\"\n\nPOST_PENDING=\"$(\n  {\n    printf '%s\\n' \"$POST\" |\n      grep -Eo '[0-9]{14}_[A-Za-z0-9_-]+\\.sql' || true\n  } |\n    sort -u\n)\"\n\ntest -z \"$POST_PENDING\"\n\necho \"REPOSITORY_MIGRATION_PRODUCTION_PROMOTION=PASS\"\n"
+          }
+        ]
+      }
+    }
+  },
+  "wk100-disposable-security": {
+    "sha256": "e26c6fedc6f6e2824e3d244c64daa0b15d3201e336d8cb10b9589d5571183ee4",
+    "name": "WK100 Disposable SQL Concurrency and Signed-in Storage ACL",
+    "jobs": {
+      "disposable-wk100-security": {
+        "name": "disposable-two-session-and-signed-in-acl",
+        "if": "${{ github.event.pull_request.draft == false }}",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 30,
+        "steps": [
+          {
+            "name": "Check out exact pull request head",
+            "uses": "actions/checkout@v4",
+            "with": {
+              "persist-credentials": false,
+              "fetch-depth": 0
+            }
+          },
+          {
+            "name": "Prove no linked or credentialed remote target",
+            "shell": "bash",
+            "run": "set -euo pipefail\ntest \"$GITHUB_EVENT_NAME\" = pull_request\ntest -z \"$(printenv SUPABASE_PROJECT_REF || true)\"\ntest -z \"$(printenv SUPABASE_ACCESS_TOKEN || true)\"\ntest ! -e supabase/.temp/project-ref\ntest -f supabase/migrations/20261020072800_wk_chart_capture_runtime_v1.sql\nbash -n scripts/acceptance/run-wk100-two-session-disposable-ci.sh\nnode --check scripts/acceptance/wk100-genuine-auth-storage-disposable-ci.mjs\necho WK100_CI_DISPOSABLE_NO_REMOTE_TARGET=PASS\n"
+          },
+          {
+            "name": "Install compatible disposable Supabase CLI",
+            "uses": "supabase/setup-cli@v1",
+            "with": {
+              "version": "2.121.0"
+            }
+          },
+          {
+            "name": "Use Node.js",
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22",
+              "cache": "npm"
+            }
+          },
+          {
+            "name": "Install locked JS dependencies",
+            "shell": "bash",
+            "run": "npm ci --ignore-scripts --no-audit --no-fund"
+          },
+          {
+            "name": "Start UNLINKED local database Auth Storage and REST",
+            "shell": "bash",
+            "run": "set -euo pipefail\nsupabase start -x realtime,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor\necho WK100_CI_LOCAL_FULL_MIGRATION_REPLAY=PASS\n"
+          },
+          {
+            "name": "Prove two independent WK100 PostgreSQL sessions compete for one lease",
+            "shell": "bash",
+            "run": "bash scripts/acceptance/run-wk100-two-session-disposable-ci.sh"
+          },
+          {
+            "name": "Prove real signed-in JWT cannot read or list private WK100 raw object",
+            "shell": "bash",
+            "env": {
+              "WK100_LIVE_SOURCE_ACCEPTANCE": "${{ github.event.pull_request.number == 1345 && 'true' || 'false' }}"
+            },
+            "run": "node scripts/acceptance/wk100-genuine-auth-storage-disposable-ci.mjs"
+          },
+          {
+            "name": "Destroy disposable database Auth Storage containers and volumes",
+            "if": "always()",
+            "shell": "bash",
+            "run": "set -euo pipefail\nsupabase stop --no-backup\n# Inspect stopped containers too, not only running DB containers.\ntest -z \"$(docker ps -a --filter 'name=^supabase_' --format '{{.Names}}')\"\n# Verify actual Supabase-named volumes; labels alone may be incomplete.\ntest -z \"$(docker volume ls --filter 'name=supabase_' --format '{{.Name}}')\"\ntest -z \"$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')\"\necho WK100_CI_LOCAL_AUTH_STORAGE_CONTRACT_AND_LEASE_VOLUME_DESTROYED=PASS\n"
+          }
+        ]
+      }
+    }
+  }
+}

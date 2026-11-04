@@ -3,7 +3,7 @@ set -euo pipefail
 # Local Github PR runner ONLY. Setup intentionally COMMITS fixtures so two
 # independent Postgres sessions can see and race on the exact same queued job.
 # The subsequent CI step must destroy the disposable local Docker volumes.
-[ "$GITHUB_ACTIONS" = true ] && [ "$GITHUB_EVENT_NAME" = pull_request ] || {
+(node scripts/local/disposable-context.mjs || { [ "${GITHUB_ACTIONS:-}" = true ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ]; }) || {
   echo 'STOP_NOT_DISPOSABLE_PR_RUNNER'; exit 20;
 }
 [ -z "$(printenv SUPABASE_ACCESS_TOKEN || true)" ] &&

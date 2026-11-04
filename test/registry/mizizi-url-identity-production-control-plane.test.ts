@@ -62,19 +62,19 @@ describe("MIZIZI current URL-identity production control plane", () => {
 
   it("keeps the current programme on the shared Stage C JIT boundary", () => {
     const workflow = readFileSync(
-      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "ops/local/workflows/mizizi-url-identity-production-control-plane.yml",
       "utf8",
     );
     const criticalWorkflow = readFileSync(
-      ".github/workflows/critical-control-plane.yml",
+      "ops/local/workflows/critical-control-plane.yml",
       "utf8",
     );
     const trackWorkflow = readFileSync(
-      ".github/workflows/mizizi-track-production-control-plane.yml",
+      "ops/local/workflows/mizizi-track-production-control-plane.yml",
       "utf8",
     );
     const releaseWorkflow = readFileSync(
-      ".github/workflows/mizizi-release-production-control-plane.yml",
+      "ops/local/workflows/mizizi-release-production-control-plane.yml",
       "utf8",
     );
     const trackControlPlane = readFileSync(
@@ -250,7 +250,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
 
   it("executes reviewed Public Music Identity Batch A only through the existing exact MIZIZI broker", () => {
     const workflow = readFileSync(
-      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "ops/local/workflows/mizizi-url-identity-production-control-plane.yml",
       "utf8",
     );
     const batch = readFileSync(
@@ -499,7 +499,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
 
   it("seals exact Release slug partial-stop resume integrity", () => {
     const workflow = readFileSync(
-      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "ops/local/workflows/mizizi-url-identity-production-control-plane.yml",
       "utf8",
     );
     const migration = readFileSync(
@@ -654,7 +654,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
 
   it("governs one-track Release public identity without Track mutation or redirects", () => {
     const workflow = readFileSync(
-      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "ops/local/workflows/mizizi-url-identity-production-control-plane.yml",
       "utf8",
     );
     const controlPlane = readFileSync(
@@ -908,7 +908,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
 
   it("converges stale Community Track slug blockers through V2 without redirects", () => {
     const workflow = readFileSync(
-      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "ops/local/workflows/mizizi-url-identity-production-control-plane.yml",
       "utf8",
     );
     const controlPlane = readFileSync(
@@ -1085,7 +1085,7 @@ describe("MIZIZI current URL-identity production control plane", () => {
 
   it("integrates #1087 into the shared JIT control plane without duplicating Track mutation authority", () => {
     const workflow = readFileSync(
-      ".github/workflows/mizizi-url-identity-production-control-plane.yml",
+      "ops/local/workflows/mizizi-url-identity-production-control-plane.yml",
       "utf8",
     );
     const controlPlane = readFileSync(

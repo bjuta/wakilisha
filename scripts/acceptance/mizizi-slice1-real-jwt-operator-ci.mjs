@@ -1,3 +1,4 @@
+import { localDisposableContext } from '../local/disposable-context.mjs';
 #!/usr/bin/env node
 // Actual GoTrue JWT + PostgREST RPC proof in fresh unlinked LOCAL CI only.
 // Temporary role and second workspace membership are synthetic local fixtures.
@@ -40,7 +41,7 @@ const client=(url,key)=>createClient(url,key,{
  auth:{autoRefreshToken:false,persistSession:false,detectSessionInUrl:false}
 });
 async function main(){
- assert(process.env.GITHUB_ACTIONS==="true"&&process.env.GITHUB_EVENT_NAME==="pull_request"&&
+ assert((localDisposableContext() || (process.env.GITHUB_ACTIONS==="true" && process.env.GITHUB_EVENT_NAME==="pull_request")) &&
   !process.env.SUPABASE_ACCESS_TOKEN&&!process.env.SUPABASE_PROJECT_REF&&
   !existsSync("supabase/.temp/project-ref"),"STOP_AUTH_NOT_UNLINKED_LOCAL_PR");
  const values=environment();

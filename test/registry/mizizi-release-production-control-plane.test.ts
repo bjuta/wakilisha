@@ -4,11 +4,11 @@ import { readFileSync } from "node:fs";
 describe("MIZIZI Release production control plane", () => {
   it("keeps historical Release taxonomy apply behind reviewed GitHub authority", () => {
     const workflow = readFileSync(
-      ".github/workflows/mizizi-release-production-control-plane.yml",
+      "ops/local/workflows/mizizi-release-production-control-plane.yml",
       "utf8",
     );
     const trackWorkflow = readFileSync(
-      ".github/workflows/mizizi-track-production-control-plane.yml",
+      "ops/local/workflows/mizizi-track-production-control-plane.yml",
       "utf8",
     );
     const controlPlane = readFileSync(

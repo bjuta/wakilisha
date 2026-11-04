@@ -49,7 +49,7 @@ const notificationSettings = readFileSync(
   "utf8",
 );
 const workflow = readFileSync(
-  ".github/workflows/critical-control-plane.yml",
+  "ops/local/workflows/critical-control-plane.yml",
   "utf8",
 );
 const postActions = readFileSync(

@@ -38,3 +38,6 @@ supabase/.temp/
 test-results/
 playwright-report/
 blob-report/
+
+# Private Mac verification evidence
+artifacts/local/

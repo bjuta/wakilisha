@@ -5,7 +5,7 @@ import {
 } from "node:child_process";
 
 const requiredFiles = [
-  ".github/workflows/critical-control-plane.yml",
+  "ops/local/workflows/critical-control-plane.yml",
   "archive/legacy-migrations/README.md",
   "docs/engineering/live-schema-baseline.json",
   "docs/engineering/migration-authority.md",
@@ -1033,7 +1033,7 @@ if (
 }
 
 const workflow = fs.readFileSync(
-  ".github/workflows/critical-control-plane.yml",
+  "ops/local/workflows/critical-control-plane.yml",
   "utf8",
 );
 

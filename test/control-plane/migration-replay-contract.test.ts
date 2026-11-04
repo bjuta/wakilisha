@@ -1,5 +1,5 @@
 import {
-  readFileSync,
+  readFileSync, readdirSync,
 } from "node:fs";
 import {
   describe,
@@ -60,8 +60,8 @@ describe(
       ));
       const args={baseline,actualTypesSha256:baseline.typesSha256,
         expectedProjectRef:"pgzizndxdyhqmtyywjmt",
-        migrationCount:243,
-        latestMigration:"20261104084956_wk100_spotify_offered_export_method_admission.sql"};
+        migrationCount:readdirSync("supabase/migrations").filter(name=>name.endsWith(".sql")).length,
+        latestMigration:readdirSync("supabase/migrations").filter(name=>name.endsWith(".sql")).sort().at(-1)!};
       expect(validateRepositorySchemaSnapshot(args)).toEqual([]);
       expect(validateRepositorySchemaSnapshot({
         ...args,baseline:{...baseline,schemaSeal:{...baseline.schemaSeal,workflowRunId:null}},
@@ -481,15 +481,15 @@ describe(
       "keeps heavyweight CI off draft PR runners and requires ready-to-review validation",
       () => {
         const critical = readFileSync(
-          ".github/workflows/critical-control-plane.yml",
+          "ops/local/workflows/critical-control-plane.yml",
           "utf8",
         );
         const wk100 = readFileSync(
-          ".github/workflows/wk100-disposable-security.yml",
+          "ops/local/workflows/wk100-disposable-security.yml",
           "utf8",
         );
         const mizizi = readFileSync(
-          ".github/workflows/mizizi-slice1-disposable-postgres.yml",
+          "ops/local/workflows/mizizi-slice1-disposable-postgres.yml",
           "utf8",
         );
 
@@ -538,7 +538,7 @@ describe(
       () => {
         const workflow =
           readFileSync(
-            ".github/workflows/repository-migration-production-promotion.yml",
+            "ops/local/workflows/repository-migration-production-promotion.yml",
             "utf8",
           );
 

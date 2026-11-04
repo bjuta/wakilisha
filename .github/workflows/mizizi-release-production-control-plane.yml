@@ -1,24 +1,7 @@
+# Retired execution: see ops/local and docs/engineering/local-mac-acceptance.md.
 name: MIZIZI Release Production Control Plane
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/mizizi-release-production-control-plane.yml"
-      - "scripts/control-plane/mizizi-release-production-control-plane.mjs"
-      - "scripts/registry/agents/mizizi/run.ts"
-      - "scripts/registry/agents/mizizi/core.ts"
-      - "supabase/functions/_shared/release-taxonomy.ts"
-      - "test/registry/mizizi-release-production-control-plane.test.ts"
-      - "test/registry/mizizi-cultural-data-steward.test.ts"
-      - "test/release-taxonomy-public-identity.test.ts"
-      - "docs/registry/MIZIZI_CULTURAL_DATA_STEWARD.md"
-      - "docs/registry/mizizi-v1-1-release-taxonomy-audit.md"
-      - ".github/mizizi-release-production-apply.json"
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/mizizi-release-production-apply.json"
   workflow_dispatch:
 
 permissions:
@@ -30,6 +13,7 @@ concurrency:
 
 jobs:
   control-plane:
+    if: ${{ false }}
     name: control-plane
     runs-on: ubuntu-latest
     timeout-minutes: 30

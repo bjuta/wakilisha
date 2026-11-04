@@ -1044,7 +1044,7 @@ describe("DDEX ERN 4.3.2 read-only adapter", () => {
       "utf8",
     );
     const workflow = fs.readFileSync(
-      path.join(root, ".github/workflows/critical-control-plane.yml"),
+      path.join(root, "ops/local/workflows/critical-control-plane.yml"),
       "utf8",
     );
 

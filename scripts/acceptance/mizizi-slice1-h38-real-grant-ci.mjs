@@ -1,3 +1,4 @@
+import { localDisposableContext } from '../local/disposable-context.mjs';
 /**
  * H38: prove a real, pre-existing and caller-bound reviewed Registry grant is
  * denied AFTER a genuine signed-in operator activates Hold Writes.
@@ -14,8 +15,7 @@ function resultOk(response,label){
  return response.data;
 }
 export async function verifyH38ExactGrantedWriterV1({sql,db,operator}){
- check(process.env.GITHUB_ACTIONS==="true"&&
-  process.env.GITHUB_EVENT_NAME==="pull_request"&&
+ check((localDisposableContext() || (process.env.GITHUB_ACTIONS==="true" && process.env.GITHUB_EVENT_NAME==="pull_request")) &&
   typeof sql==="function"&&typeof db==="string"&&
   UUID.test(operator?.id||"")&&
   typeof operator.user?.rpc==="function",

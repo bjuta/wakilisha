@@ -23,7 +23,7 @@ const messagesLegalPanel = read(
 );
 const observer = read("src/lib/viewport/viewportIntegrity.ts");
 const config = read("playwright.config.ts");
-const workflow = read(".github/workflows/critical-control-plane.yml");
+const workflow = read("ops/local/workflows/critical-control-plane.yml");
 
 const viewportMatch = index.match(
   /<meta\s+name="viewport"\s+content="([^"]+)"\s*\/?>/,

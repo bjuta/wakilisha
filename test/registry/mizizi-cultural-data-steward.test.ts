@@ -1149,7 +1149,7 @@ describe("MIZIZI Cultural Data Steward", () => {
       "utf8",
     );
     const trackWorkflow = readFileSync(
-      ".github/workflows/mizizi-track-production-control-plane.yml",
+      "ops/local/workflows/mizizi-track-production-control-plane.yml",
       "utf8",
     );
     const trackControlPlane = readFileSync(
@@ -2205,7 +2205,7 @@ describe("MIZIZI Cultural Data Steward", () => {
   it("routes production Track apply through the governed control plane", () => {
     const workflow =
       readFileSync(
-        ".github/workflows/mizizi-track-production-control-plane.yml",
+        "ops/local/workflows/mizizi-track-production-control-plane.yml",
         "utf8",
       );
     const controlPlane =

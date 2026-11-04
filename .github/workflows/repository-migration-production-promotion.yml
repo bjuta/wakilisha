@@ -1,16 +1,8 @@
+# Retired execution: see ops/local and docs/engineering/local-mac-acceptance.md.
 name: Repository Migration Production Promotion
 
 on:
   workflow_dispatch:
-    inputs:
-      expected_main_sha:
-        description: Exact protected main commit approved for Production promotion
-        required: true
-        type: string
-      expected_pending:
-        description: Comma-separated canonical migration filenames expected to be pending
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -21,8 +13,8 @@ concurrency:
 
 jobs:
   promote:
+    if: ${{ false }}
     name: exact-main-native-promotion
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

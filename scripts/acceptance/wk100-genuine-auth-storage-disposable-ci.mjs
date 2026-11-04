@@ -1,3 +1,4 @@
+import { localDisposableContext } from '../local/disposable-context.mjs';
 #!/usr/bin/env node
 /**
  * Real GoTrue-issued authenticated JWT vs PRIVATE WK100 Storage in a disposable
@@ -231,8 +232,7 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
 }
 
 async function main(){
-  check(process.env.GITHUB_ACTIONS==='true'&&
-   process.env.GITHUB_EVENT_NAME==='pull_request'&&
+  check((localDisposableContext() || (process.env.GITHUB_ACTIONS==="true" && process.env.GITHUB_EVENT_NAME==="pull_request")) &&
    !process.env.SUPABASE_PROJECT_REF&&!process.env.SUPABASE_ACCESS_TOKEN&&
    !existsSync('supabase/.temp/project-ref'),
    'STOP_NOT_UNLINKED_DISPOSABLE_PR_RUNNER');

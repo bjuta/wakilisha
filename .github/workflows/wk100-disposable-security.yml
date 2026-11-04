@@ -1,14 +1,8 @@
+# Retired execution: see ops/local and docs/engineering/local-mac-acceptance.md.
 name: WK100 Disposable SQL Concurrency and Signed-in Storage ACL
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize, converted_to_draft, ready_for_review]
-    branches: [main]
-    paths:
-      - '.github/workflows/wk100-disposable-security.yml'
-      - 'scripts/acceptance/run-wk100-two-session-disposable-ci.sh'
-      - 'scripts/acceptance/wk100-genuine-auth-storage-disposable-ci.mjs'
-      - 'supabase/migrations/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,8 +13,8 @@ concurrency:
 
 jobs:
   disposable-wk100-security:
+    if: ${{ false }}
     name: disposable-two-session-and-signed-in-acl
-    if: ${{ github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

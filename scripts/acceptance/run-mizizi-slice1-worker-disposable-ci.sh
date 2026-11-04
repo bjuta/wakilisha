@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 SQL="$ROOT/scripts/acceptance/mizizi-slice1-worker-disposable-ci.sql"
 CORPUS="$ROOT/scripts/acceptance/mizizi-slice1-32-source-corpus-disposable-ci.sql"
-[ "$GITHUB_ACTIONS" = "true" ] || { echo 'STOP_NOT_DISPOSABLE_GITHUB_RUNNER'; exit 20; }
-[ "$GITHUB_EVENT_NAME" = "pull_request" ] || { echo 'STOP_NOT_PULL_REQUEST'; exit 20; }
+(node scripts/local/disposable-context.mjs || [ "${GITHUB_ACTIONS:-}" = "true" ]) || { echo 'STOP_NOT_DISPOSABLE_GITHUB_RUNNER'; exit 20; }
+(node scripts/local/disposable-context.mjs || [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]) || { echo 'STOP_NOT_PULL_REQUEST'; exit 20; }
 [ -z "$(printenv SUPABASE_ACCESS_TOKEN || true)" ] &&
 [ -z "$(printenv SUPABASE_PROJECT_REF || true)" ] || {
   echo 'STOP_REMOTE_SUPABASE_AUTHORITY_PRESENT'; exit 20;

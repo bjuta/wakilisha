@@ -3,7 +3,7 @@ set -euo pipefail
 # Two genuine PostgreSQL backends racing for one WK100 reservation.
 # The committed synthetic contract is DISPOSABLE-LOCAL ONLY: the parent
 # GitHub workflow destroys the entire Supabase local database afterward.
-[ "${GITHUB_ACTIONS:-}" = true ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ] || {
+(node scripts/local/disposable-context.mjs || { [ "${GITHUB_ACTIONS:-}" = true ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ]; }) || {
   echo 'STOP: must run inside isolated pull_request CI'; exit 20;
 }
 [ -z "${SUPABASE_ACCESS_TOKEN:-}" ] && [ -z "${SUPABASE_PROJECT_REF:-}" ] &&

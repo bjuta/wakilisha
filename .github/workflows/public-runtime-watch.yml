@@ -1,8 +1,7 @@
+# Retired execution: see ops/local and docs/engineering/local-mac-acceptance.md.
 name: Public Runtime Watch
 
 on:
-  schedule:
-    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -14,6 +13,7 @@ concurrency:
 
 jobs:
   public-runtime:
+    if: ${{ false }}
     name: public-runtime
     runs-on: ubuntu-latest
     timeout-minutes: 10
