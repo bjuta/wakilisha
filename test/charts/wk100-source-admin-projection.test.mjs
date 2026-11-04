@@ -133,6 +133,29 @@ test('multiple independent source IDs under one provider retain separate revisio
   assert.equal(validateWk100SourceProposal(second).canPublish,false);
 });
 
+test('WK100 six non-substitutable core provider parsers remain explicitly resolved, not admitted',()=>{
+  const core={
+    youtube_ke:'youtube_kenya_weekly_top_songs_v1',
+    spotify_ke:'spotify_kenya_offered_chart_csv_v1',
+    boomplay_ke:'boomplay_kenya_chart_v1',
+    apple_ke:'apple_kenya_chart_v1',
+    mdundo_ke:'mdundo_kenya_chart_v1',
+    shazam_ke:'shazam_kenya_discovery_v1',
+  };
+  assert.equal(Object.keys(core).length,6);
+  for(const [provider,parserClass] of Object.entries(core)){
+    const contract={provider_key:provider,source_key:provider+'_verified_candidate',
+      adapter_version:parserClass};
+    assert.equal(resolveCaptureParser(contract,{parser_class:parserClass})?.providerKey,
+      provider,provider);
+    assert.equal(resolveCaptureParser(contract,{parser_class:'audiomack_kenya_chart_v1'}),
+      null,provider);
+  }
+  assert.equal(resolveCaptureParser({source_key:'spotify_ke',provider_key:'spotify_ke'},{}),null);
+  // A parser is not an approved source or acquisition method. SQL and the
+  // authenticated review constitution remain independently required.
+});
+
 test('WK100 provider-scoped source parser requires independently sealed native class',()=>{
   const youtube={provider_key:'youtube_ke',source_key:'youtube_ke_top_songs_weekly',
     market:'KE',behavior:'video_consumption',native_metric:'rank_and_count',expected_depth:100,
@@ -310,6 +333,8 @@ test('WK100 source-method review cannot convert research-only or a mismatched pr
   for(const patch of [
     {methodClass:'research_only'},{parserClass:'apple_kenya_chart_v1'},
     {providerKey:'spotify_ke',sourceKey:'spotify_ke_chart'},
+    {providerKey:'spotify_ke',sourceKey:'spotify_ke_official_weekly',
+      parserClass:'spotify_kenya_offered_chart_csv_v1',methodClass:'offered_export'},
     {nativePeriodAuthority:'unknown'},{authorizationExpiresAt:'2026-11-02T00:00:00Z'},
     {endpointSha256:null},{extra:true},
   ])assert.throws(()=>validateWk100SourceMethodDecision({...p,...patch},{now}));
