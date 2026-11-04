@@ -8,7 +8,8 @@ import { fetchCandidateBytes, archiveCandidateBytes, sha256Hex,
   CandidateCaptureError } from './chart-candidate-capture.mjs';
 import { checkpointsForSource } from './chart-weekly-evidence.mjs';
 import { parseMdundoKenya, parseAudiomackKenya, parseBoomplayKenya,
-  parseShazamKenya, parseAppleKenya, parseYouTubeKenyaWeekly,
+  parseShazamKenya, parseAppleKenya, parseAppleKenyaPublicHtml,
+  WK100_APPLE_KE_PUBLIC_CHART_URL, parseYouTubeKenyaWeekly,
   parseSpotifyKenyaWeeklyCandidate,
 } from './chart-public-source-observations.mjs';
 
@@ -18,8 +19,14 @@ const PARSERS = Object.freeze({
   boomplay_ke: bytes => parseBoomplayKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
   shazam_ke: bytes => parseShazamKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
   spotify_ke: bytes => parseSpotifyKenyaWeeklyCandidate(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
-  apple_ke: (bytes, access) => parseAppleKenya(
-    JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)), access),
+  apple_ke: (bytes, access) => {
+    const original=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+    // The exact provider-approved URL selects the parser. An unexpected
+    // HTML payload cannot impersonate the Kenya Catalog API or vice versa.
+    return access?.endpoint===WK100_APPLE_KE_PUBLIC_CHART_URL
+      ? parseAppleKenyaPublicHtml(original,access)
+      : parseAppleKenya(JSON.parse(original),access);
+  },
   youtube_ke: (bytes, access) => parseYouTubeKenyaWeekly(
     JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)), access.native_period_key),
 });
