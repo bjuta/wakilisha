@@ -5,8 +5,8 @@
  * service collector receipts, Supabase connections, scoring or publication.
  * Run from a repository worktree with Node 22: node <this file> --fetch.
  */
-import {createHash} from 'node:crypto';
-import {mkdir,writeFile,readFile} from 'node:fs/promises';
+import {createHash,randomUUID} from 'node:crypto';
+import {mkdir,writeFile,readFile,chmod} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {homedir} from 'node:os';
 import {parseMdundoKenya,parseShazamKenya,parseAppleKenya} from
@@ -75,6 +75,7 @@ async function main(){
   const dir=resolve(process.env.WK100_PROBE_PRIVATE_DIR||
     join(homedir(),'Downloads','wk100-private-six-source-preflight'));
   await mkdir(dir,{recursive:true,mode:0o700});
+  await chmod(dir,0o700);
   const records=[];
   for(const source of SOURCES){
     const base={provider:source.id,market:'KE',endpoint:source.url??null,
@@ -122,10 +123,12 @@ async function main(){
     client:'node_server_fetch',run_at:new Date().toISOString(),
     collector_receipts:0,operational_providers:0,all_four_gates_open:true,
     records};
-  await writeFile(join(dir,'method-preflight.json'),
-    JSON.stringify(report,null,2)+'\n',{mode:0o600});
+  const reportName='method-preflight-'+new Date().toISOString().replace(/[-:.]/g,'')+
+    '-'+randomUUID().slice(0,8)+'.json';
+  await writeFile(join(dir,reportName),
+    JSON.stringify(report,null,2)+'\n',{mode:0o600,flag:'wx'});
   // No original bytes or developer token are ever printed.
-  console.log(JSON.stringify({private_directory:dir,report:'method-preflight.json',
+  console.log(JSON.stringify({private_directory:dir,report:reportName,
     summary:records.map(r=>({provider:r.provider,status:r.status,
       http_status:r.http_status??null,observed_depth:r.observed_depth??null,
       sha256:r.payload_sha256??null}))},null,2));
