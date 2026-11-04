@@ -389,8 +389,10 @@ test('WK100 original CSV duplicate safely reuses object while each observation h
 test('WK100 additive SQL ledger and restricted Edge route retain independent authority',async()=>{
   const {readdir}=await import('node:fs/promises');
   const dir=new URL('../../supabase/migrations/',import.meta.url);
-  const files=(await readdir(dir)).filter(x=>x.endsWith('_wk100_research_observation_ledger_v1.sql'));
-  assert.equal(files.length,1);
+  // The former ledger filename is retired. Test the exact active
+  // forward-only migration, not the archived PR-era migration name.
+  const files=(await readdir(dir)).filter(x=>x.endsWith('_wk100_research_observation_forward_v1.sql'));
+  assert.deepEqual(files,['20261102084049_wk100_research_observation_forward_v1.sql']);
   const sql=await readFile(new URL(files[0],dir),'utf8');
   for(const word of [
     'wk100_reserve_research_observation_v1','wk100_finalize_research_observation_v1',
