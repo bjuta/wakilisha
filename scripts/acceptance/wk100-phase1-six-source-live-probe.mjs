@@ -12,6 +12,8 @@ import {homedir} from 'node:os';
 import {parseMdundoKenya,parseShazamKenya,parseAudiomackKenya,
   parseAppleKenyaPublicHtml} from
   '../../supabase/functions/_shared/chart-public-source-observations.mjs';
+import {parseCaptureNativeRows} from
+  '../../supabase/functions/_shared/chart-capture-runtime.mjs';
 
 const MAX=4_194_304;
 const SOURCES=Object.freeze([
@@ -316,6 +318,34 @@ async function main(){
         observation.native_metric=parsed.metric;
         observation.native_period=parsed.native_period;
         observation.provider_period_label=parsed.provider_period_label??null;
+        // Replay the ACTUAL first-party bytes through the EXISTING collector's
+        // exact native row parser. This proves decoder compatibility only;
+        // there is NO service admission, SQL reservation, durable raw receipt,
+        // scheduler authorization or scoring in this preflight.
+        const parserClass={
+          apple_ke:'apple_kenya_chart_v1',
+          shazam_ke:'shazam_kenya_discovery_v1',
+          mdundo_ke:'mdundo_kenya_chart_v1',
+          audiomack_ke:'audiomack_kenya_chart_v1',
+        }[source.id];
+        if(parserClass){
+          try{
+            const rows=parseCaptureNativeRows(bytes,{
+              provider_key:source.id,source_key:source.id+'_public_replay',
+              adapter_version:parserClass,expected_depth:source.id==='shazam_ke'?200:100,
+              native_metric:parsed.metric,behavior:parsed.behavior,
+            },{endpoint:source.url,parser_class:parserClass});
+            observation.collector_parser_row_replay=rows.length;
+            observation.collector_parser_replay_status=
+              'ACTUAL_BYTES_COLLECTOR_NATIVE_DECODER_PASS_RESEARCH_ONLY';
+          }catch(err){
+            observation.collector_parser_row_replay=0;
+            observation.collector_parser_replay_status=
+              'ACTUAL_BYTES_COLLECTOR_NATIVE_DECODER_REJECTED_RESEARCH_ONLY';
+            observation.collector_parser_reject_class=
+              String(err?.code??err?.message??'invalid').slice(0,80);
+          }
+        }
         if(source.id==='audiomack_ke'){
           observation.method_diagnostics={chart_surface:parsed.chart_surface,
             rank_authority:parsed.rank_authority??null,
@@ -349,6 +379,9 @@ async function main(){
       sha256:r.payload_sha256??null,content_type:r.content_type??null,
       byte_length:r.byte_length??null,
       parse_failure:r.parse_failure??null,
+      collector_parser_row_replay:r.collector_parser_row_replay??null,
+      collector_parser_replay_status:r.collector_parser_replay_status??null,
+      collector_parser_reject_class:r.collector_parser_reject_class??null,
       requested_chart_end_date:r.requested_chart_end_date??null,
       method_diagnostics:r.method_diagnostics??null}))},null,2));
 }
