@@ -220,11 +220,11 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
   return {reads,originalReads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites};
 }
 
-test('all six core providers show truthful readiness and no invented source admission',async({page})=>{
+test('five founder-selected core providers show truthful readiness and no invented source admission',async({page})=>{
   const ctx=await install(page);
   await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',
     {waitUntil:'domcontentloaded'});
-  const table=page.getByRole('table',{name:'Six core provider readiness'});
+  const table=page.getByRole('table',{name:'Five core provider readiness'});
   await expect(table).toBeVisible({timeout:20_000});
   // The operator's source master/detail must precede secondary October research.
   const registryBeforeArchive=await page.locator('main').first().evaluate(root=>{
@@ -238,10 +238,16 @@ test('all six core providers show truthful readiness and no invented source admi
   await expect(page.getByRole('region',{name:'Selected source inspector'})).toBeVisible();
   await expect(page.getByRole('region',{name:'Selected source inspector'}).getByRole('heading',{name:'Select a source',exact:true}))
     .toBeVisible();
-  for(const provider of ['YouTube Kenya','Spotify Kenya','Boomplay Kenya',
-    'Apple Music Kenya','Mdundo Kenya','Shazam Kenya']){
+  const selectedCore=['Apple Music Kenya','Shazam Kenya','Mdundo Kenya',
+    'YouTube Kenya','Audiomack Kenya'];
+  for(const provider of selectedCore)
     await expect(table.getByText(provider,{exact:true})).toBeVisible();
-  }
+  const actualCoreRows=await table.getByRole('row').allTextContents();
+  expect(actualCoreRows).toHaveLength(6); // one header, five core sources
+  for(let i=0;i<selectedCore.length;i++)
+    expect(actualCoreRows[i+1]).toContain(selectedCore[i]);
+  await expect(table.getByText('Boomplay Kenya',{exact:true})).toHaveCount(0);
+  await expect(table.getByText('Spotify Kenya',{exact:true})).toHaveCount(0);
   // The genuine 29–30 October original-byte archive is independent of
   // candidate collection. Research remains visible with zero proposals.
   const archive=page.getByRole('table',{name:'Archived Kenya research observations'});
@@ -255,8 +261,8 @@ test('all six core providers show truthful readiness and no invented source admi
   await expect(archive.getByRole('row').filter({hasText:'Audiomack Kenya'})
     .getByText('Original retained; ranks unverified')).toBeVisible();
   await expect(page.getByRole('button',{name:'Open Ingest Studio'})).toBeVisible();
-    await expect(table.getByRole('button',{name:/^Add .+ Source$/})).toHaveCount(6);
-  await expect(table.getByText('No proposal')).toHaveCount(6);
+    await expect(table.getByRole('button',{name:/^Add .+ Source$/})).toHaveCount(5);
+  await expect(table.getByText('No proposal')).toHaveCount(5);
   await expect(table.getByText('Candidate enrolled')).toHaveCount(0);
   await table.getByRole('button',{name:'Add YouTube Kenya Source'}).click();
   await expect(page.getByRole('heading',{name:'Choose a Kenya provider'})).toBeVisible();
