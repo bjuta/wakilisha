@@ -1,5 +1,6 @@
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions/_shared/wk100-source-admin-projection.mjs';
 import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
@@ -131,6 +132,22 @@ test('multiple independent source IDs under one provider retain separate revisio
   ])assert.throws(()=>validateWk100SourceProposal(invalid));
   assert.equal(validateWk100SourceProposal(first).canCollect,false);
   assert.equal(validateWk100SourceProposal(second).canPublish,false);
+});
+
+test('WK100 five-core public-source preflight has YouTube and no paid or dropped platform',()=>{
+  // Execute the real preflight's NO_NETWORK mode, not a copied provider list.
+  const r=spawnSync(process.execPath,[
+    'scripts/acceptance/wk100-phase1-six-source-live-probe.mjs','--dry-run',
+  ],{encoding:'utf8',timeout:10_000});
+  assert.equal(r.status,0,r.stderr);
+  const report=JSON.parse(r.stdout);
+  assert.equal(report.mode,'NO_NETWORK');
+  assert.deepEqual(report.providers.map(x=>x.provider),[
+    'apple_ke','shazam_ke','mdundo_ke','youtube_ke','audiomack_ke',
+  ]);
+  assert.equal(report.providers[3].url,'https://charts.youtube.com/charts/TopSongs/ke');
+  assert.match(report.providers[3].reason,/weekly original response.*unverified/);
+  assert.ok(report.providers.every(x=>x.url?.startsWith('https://')));
 });
 
 test('WK100 five selected core provider parsers remain explicitly resolved, not admitted',()=>{
