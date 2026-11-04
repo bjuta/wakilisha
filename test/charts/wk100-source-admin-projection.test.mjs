@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { validEatWeek, projectWk100SourceHealth } from '../../supabase/functions/_shared/wk100-source-admin-projection.mjs';
 import { validateWk100SourceProposal } from '../../supabase/functions/_shared/wk100-source-proposal-v1.mjs';
 import { resolveCaptureParser, parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
+import { parseAppleKenyaPublicHtml, WK100_APPLE_KE_PUBLIC_CHART_URL } from '../../supabase/functions/_shared/chart-public-source-observations.mjs';
 import { planWk100SourceDispatch, selectWk100AuditedDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 import { fetchCandidateBytes, sha256Hex } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
 import { bindWk100DispatchAuthority, wk100EatWeekFromUtc, isWk100CaptureConstitutionCurrent } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
@@ -148,6 +149,49 @@ test('WK100 five-core public-source preflight has YouTube and no paid or dropped
   assert.equal(report.providers[3].url,'https://charts.youtube.com/charts/TopSongs/ke');
   assert.match(report.providers[3].reason,/weekly original response.*unverified/);
   assert.ok(report.providers.every(x=>x.url?.startsWith('https://')));
+});
+
+test('WK100 public Apple Kenya Top 100 is collector-parsable without API credentials',()=>{
+  const urls=Array.from({length:100},(_,i)=>
+    'https://music.apple.com/ke/song/synthetic-'+(i+1)+'/'+(100000+i));
+  const meta='<meta property="music:song_count" content="100">'+
+    urls.map((url,i)=>'<meta property="music:song" content="'+url+'">'+
+      '<meta property="music:song:track" content="'+(i+1)+'">').join('');
+  const playlist={'@type':'MusicPlaylist',numTracks:100,track:urls.map((url,i)=>({
+    '@type':'MusicRecording',url,name:'Synthetic Song '+(i+1),duration:'PT3M12S',
+  }))};
+  const html=meta+'<script type="application/ld+json">'+
+    JSON.stringify(playlist)+'</script>';
+  const access={parser_class:'apple_kenya_chart_v1',
+    endpoint:WK100_APPLE_KE_PUBLIC_CHART_URL};
+  const contract={provider_key:'apple_ke',source_key:'apple_ke_public_top100',
+    adapter_version:'apple_kenya_chart_v1',
+    expected_depth:100,native_metric:'rank',behavior:'consumption'};
+  const parsed=parseAppleKenyaPublicHtml(html,access);
+  assert.equal(parsed.candidate_only,true);
+  assert.equal(parsed.eligible_for_scoring,false);
+  assert.equal(parsed.native_period,'unknown');
+  assert.equal(parsed.chart_surface,'apple_public_daily_top_100');
+  assert.equal(parsed.rows.length,100);
+  const collector=parseCaptureNativeRows(new TextEncoder().encode(html),contract,access);
+  assert.equal(collector.length,100);
+  assert.equal(collector[0].provider_track_id,'100000');
+  assert.equal(collector[99].rank,100);
+  assert.equal(Object.hasOwn(collector[0],'view_count'),false);
+  assert.equal(Object.hasOwn(collector[0],'source_native_count'),false);
+  // Parser alone cannot grant SQL admission, scheduling or publication.
+  for(const mutated of [
+    meta+'<script type="application/ld+json">'+JSON.stringify({
+      ...playlist,track:[{...playlist.track[0],url:urls[1]},...playlist.track.slice(1)],
+    })+'</script>',
+    html.replace('music:song_count" content="100"','music:song_count" content="99"'),
+    html.replace('music:song:track" content="100"','music:song:track" content="1"'),
+    html+'<script type="application/ld+json">'+JSON.stringify(playlist)+'</script>',
+  ])assert.throws(()=>parseAppleKenyaPublicHtml(mutated,access),/apple_public_chart_/);
+  for(const endpoint of [
+    undefined,'https://music.apple.com/us/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172',
+    'https://evil.example/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172',
+  ])assert.throws(()=>parseAppleKenyaPublicHtml(html,{endpoint}),/apple_public_chart_endpoint_unverified/);
 });
 
 test('WK100 five selected core provider parsers remain explicitly resolved, not admitted',()=>{
