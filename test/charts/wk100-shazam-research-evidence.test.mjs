@@ -9,7 +9,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {prepareShazamResearchEvidence,archiveShazamResearchEvidence,prepareShazamRegistryReview} from '../../scripts/charts/wk100-shazam-research-evidence.mjs';
 import {executeWk100ResearchIntake} from '../../supabase/functions/_shared/wk100-research-intake-orchestrator.mjs';
-import {verifyWk100ShazamResearchImport,projectWk100ResearchImportStatus} from '../../supabase/functions/_shared/wk100-research-receipt-bridge.mjs';
+import {verifyWk100ShazamResearchImport,projectWk100ResearchImportStatus,coerceWk100ShazamResearchIntakeReceipt} from '../../supabase/functions/_shared/wk100-research-receipt-bridge.mjs';
 const enc=x=>new TextEncoder().encode(x);
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const csv=enc('Rank,Artist,Title\n1,Artist One,Track One\n2,Artist Two,Track Two\n');
@@ -452,6 +452,63 @@ test('WK100 Admin transport includes exact original bytes and receipt without pr
   assert.deepEqual(new Uint8Array(await form.get('original_csv').arrayBuffer()),csv);
   assert.equal(form.get('research_week_start_eat'),'2026-10-26');
 });
+test('WK100 locally checked Shazam original reaches the EXISTING private import contract',async()=>{
+  const local=await prepareWk100LocalShazamResearch({
+    originalBytes:csv,checkedAtUtc:'2026-10-29T18:00:00.123Z',
+  });
+  const {form,observedDepth}=await prepareWk100ResearchForm(browserResearchFiles({receipt:local}));
+  assert.equal(observedDepth,2);
+  assert.deepEqual([...form.keys()].sort(),['original_csv','receipt_json','research_week_start_eat']);
+  const canonical=await coerceWk100ShazamResearchIntakeReceipt({
+    originalBytes:csv,receipt:local,researchWeekStartEat:'2026-10-26',
+    authenticatedUserId:u(70),now:new Date('2026-11-04T00:00:00Z'),
+  });
+  assert.equal(canonical.observed_at,'2026-10-29T18:00:00Z');
+  assert.equal(canonical.operator_ref,'auth_user:'+u(70));
+  assert.equal(canonical.source_native_period.authority,'unknown');
+  assert.equal(canonical.acquisition_mode,'researcher_directed_public_csv');
+  const verified=await verifyWk100ShazamResearchImport({
+    originalBytes:csv,receipt:canonical,researchWeekStartEat:'2026-10-26',
+  });
+  assert.equal(verified.private_rows.length,2);
+  assert.equal(verified.source_origin_independently_attested,false);
+  assert.equal(verified.can_score,false);
+  assert.equal(verified.can_publish,false);
+});
+
+test('WK100 local Shazam receipt cannot forge origin, hash, period, source day or future observation',async()=>{
+  const local=await prepareWk100LocalShazamResearch({
+    originalBytes:csv,checkedAtUtc:'2026-10-29T18:00:00.123Z',
+  });
+  const inputs=[
+    {original_sha256:'0'.repeat(64)},
+    {source_fetch_verified:true},
+    {hosted_receipt_verified:true},
+    {native_period_authority:'provider_defined'},
+    {provider_snapshot_date:'2026-10-31'},
+    {complete_chart:true},
+    {can_score:true},
+    {source_page_url:'https://evil.example/chart'},
+  ];
+  for(const patch of inputs){
+    const receipt={...local,...patch};
+    await assert.rejects(coerceWk100ShazamResearchIntakeReceipt({
+      originalBytes:csv,receipt,researchWeekStartEat:'2026-10-26',
+      authenticatedUserId:u(70),now:new Date('2026-11-04T00:00:00Z'),
+    }),/wk100_research_import_/);
+    await assert.rejects(prepareWk100ResearchForm(browserResearchFiles({receipt})),
+      /receipt_invalid|original_bytes_mismatch/);
+  }
+  await assert.rejects(coerceWk100ShazamResearchIntakeReceipt({
+    originalBytes:csv,receipt:local,researchWeekStartEat:'2026-11-02',
+    authenticatedUserId:u(70),now:new Date('2026-11-04T00:00:00Z'),
+  }),/observation_time_invalid/);
+  await assert.rejects(coerceWk100ShazamResearchIntakeReceipt({
+    originalBytes:csv,receipt:local,researchWeekStartEat:'2026-10-26',
+    authenticatedUserId:u(70),now:new Date('2026-10-27T00:00:00Z'),
+  }),/observation_time_invalid/);
+});
+
 test('WK100 Admin rejects changed CSV before any Edge request',async()=>{
   let called=0;
   await assert.rejects(submitWk100ResearchEvidence({
@@ -929,6 +986,21 @@ test('WK100 Edge valid browser multipart reaches only the authorized intake orch
   assert.deepEqual(calls.client.map(c=>c.key),['local-mock-service','local-mock-anon']);
   assert.ok(calls.client.every(c=>c.url==='https://'+WK100_EDGE_REF+'.supabase.co'));
 });
+test('WK100 Edge local receipt resolves the authenticated operator, never provider delivery',async()=>{
+  const local=await prepareWk100LocalShazamResearch({
+    originalBytes:csv,checkedAtUtc:'2026-10-29T18:00:00.123Z',
+  });
+  const {handle,calls,ack}=wk100EdgeHarness();
+  const {form}=await prepareWk100ResearchForm(browserResearchFiles({receipt:local}));
+  const response=await handle(wk100EdgeRequest({body:form}));
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),ack);
+  assert.equal(calls.auth,1);
+  assert.deepEqual(calls.capability.map(c=>c.params.required_capability).sort(),
+    ['manage_charts','manage_ingest']);
+  assert.equal(calls.intake,1);
+});
+
 test('WK100 Edge invalid original and durable receipt errors never leak server details',async()=>{
   const {form}=await prepareWk100ResearchForm(browserResearchFiles());
   for(const [error,status,code] of [
