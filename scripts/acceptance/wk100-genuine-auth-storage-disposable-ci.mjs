@@ -1,5 +1,5 @@
-import { localDisposableContext } from '../local/disposable-context.mjs';
 #!/usr/bin/env node
+import { localDisposableContext } from '../local/disposable-context.mjs';
 /**
  * Real GoTrue-issued authenticated JWT vs PRIVATE WK100 Storage in a disposable
  * local Supabase stack. No hosted Preview/Production credentials or endpoints.

@@ -1,5 +1,5 @@
-import { localDisposableContext } from '../local/disposable-context.mjs';
 #!/usr/bin/env node
+import { localDisposableContext } from '../local/disposable-context.mjs';
 // Actual GoTrue JWT + PostgREST RPC proof in fresh unlinked LOCAL CI only.
 // Temporary role and second workspace membership are synthetic local fixtures.
 // Surrounding workflow MUST destroy the local Docker volumes on every outcome.
