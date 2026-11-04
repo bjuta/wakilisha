@@ -16,6 +16,11 @@ import {
   validateRnb18StagedFields,
   validateRnb18StagedRepositoryState,
 } from "./verify-rnb18-staged-retirement.mjs";
+import {
+  isDisposableCiReplayProof,
+  validateDisposableCiReplayProof,
+  validateDisposableCiReplayRepositoryState,
+} from "./verify-disposable-ci-replay-proof.mjs";
 
 const BASE_REF =
   process.env.CONTROL_PLANE_BASE_REF ??
@@ -681,6 +686,11 @@ function main() {
             migrationFile: entry.path,
             migrationSha256: sha256File(entry.path),
             baseMainSha: mergeBase,
+          }) : isDisposableCiReplayProof(proof) ? validateDisposableCiReplayProof({
+            proof,
+            migrationFile: entry.path,
+            migrationSha256: sha256File(entry.path),
+            baseMainSha: mergeBase,
           }) : validateReplayProof({
             proof,
             migrationFile:
@@ -785,6 +795,17 @@ function main() {
 
         const stagedMode = changedActive.some((entry) =>
           isRnb18StagedProof(proofs.get(entry.path)));
+        const disposableMode = changedActive.some((entry) =>
+          isDisposableCiReplayProof(proofs.get(entry.path)));
+        if (disposableMode && (historicalMode || stagedMode)) {
+          failures.push("Cannot mix unlinked CI proof with historical or staged migration proof");
+        }
+        if (disposableMode) {
+          for (const error of validateDisposableCiReplayRepositoryState({
+            changedActive,proofs,mergeBase,baseline,migrations,
+            latestMigration,actualTypesSha256,
+          })) failures.push("unlinked CI migration replay: " + error);
+        }
         if (stagedMode) {
           const stagedProof = proofs.get("supabase/migrations/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql");
           for (const error of validateRnb18StagedRepositoryState({
@@ -814,7 +835,7 @@ function main() {
         }
 
         if (
-          !historicalMode && !stagedMode &&
+          !historicalMode && !stagedMode && !disposableMode &&
           baseline
             .schemaSeal?.mode !==
           "preview"
@@ -836,7 +857,7 @@ function main() {
           );
         }
 
-        if (!historicalMode && !stagedMode) {
+        if (!historicalMode && !stagedMode && !disposableMode) {
         const latestChanged =
           changedActive.at(-1);
         const latestProof =
