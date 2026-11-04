@@ -97,6 +97,12 @@ function normalizeNativeRows(parsed,contract,providerKey) {
   requireValue(parsed.source_key===providerKey && parsed.market==='KE' &&
     parsed.metric===contract.native_metric && parsed.behavior===contract.behavior,
     'parser_contract_mismatch');
+  // Audiomack's live HTML currently exposes 100 song TITLE meta tags but
+  // does not yet prove that metadata order equals the displayed chart ranks.
+  // Research may preserve those observations; the governed collector must
+  // not convert an unverified order into authoritative ranked rows.
+  requireValue(parsed.rank_authority!=='metadata_order_requires_independent_verification',
+    'source_rank_unverified');
   requireValue(Array.isArray(parsed.rows) && parsed.rows.length>=1 &&
     parsed.rows.length<=contract.expected_depth,'parser_depth_invalid');
   return parsed.rows.map((r,i)=>{
