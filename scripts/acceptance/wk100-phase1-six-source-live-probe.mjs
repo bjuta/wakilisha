@@ -38,18 +38,55 @@ const EDITORIAL=Object.freeze([
   {id:'spotify_editorial_gengetone_fire',provider:'spotify_ke',kind:'public_chart_html',
     url:'https://open.spotify.com/embed/playlist/37i9dQZF1DX80fLED6RkGS'},
 ]);
+/**
+ * Alternate methods for two EXISTING core providers, not extra sources.
+ * These are NOT approved collection interfaces. YouTube's public web-client
+ * browse API is undocumented; Audiomack's playlist API may require OAuth.
+ * Test actual no-credential access before considering any integration.
+ */
+const METHOD_CANDIDATES=Object.freeze([
+  {id:'youtube_ke_weekly_browse_candidate',provider:'youtube_ke',
+    url:'https://charts.youtube.com/youtubei/v1/browse?alt=json',
+    kind:'json_post',reason:'Unpublished YouTube chart web-client browse API; stability and week authority unqualified.'},
+  {id:'audiomack_ke_playlist_api_candidate',provider:'audiomack_ke',
+    url:'https://api.audiomack.com/v1/playlist/geo-charts/kenya',
+    kind:'json_get',reason:'First-party documented playlist API shape; anonymous accessibility unverified.'},
+]);
+function youtubeResearchBody(){
+  const now=new Date();
+  const day=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));
+  const sinceThu=(day.getUTCDay()+7-4)%7;
+  // Query a completed Thursday, not a future or currently incomplete week.
+  day.setUTCDate(day.getUTCDate()-sinceThu-(sinceThu===0?7:0));
+  const requestedEnd=day.toISOString().slice(0,10).replaceAll('-','');
+  return {requestedEnd,body:JSON.stringify({
+    context:{client:{clientName:'WEB_MUSIC_ANALYTICS',clientVersion:'2.0',
+      hl:'en-GB',gl:'KE',theme:'MUSIC'}},
+    browseId:'FEmusic_analytics_charts_home',
+    query:'perspective=CHART_DETAILS&chart_params_country_code=ke'+
+      '&chart_params_chart_type=TRACKS&chart_params_period_type=WEEKLY'+
+      '&chart_params_end_date='+requestedEnd,
+  })};
+}
 function sha(bytes){return createHash('sha256').update(bytes).digest('hex');}
-async function getBounded(url,token){
+async function getBounded(url,kind='GET'){
   const u=new URL(url);
   if(u.protocol!=='https:'||u.username||u.password||u.port||u.hash)
     throw Error('invalid_fixed_endpoint');
+  const post=kind==='json_post';
+  if(post&&url!=='https://charts.youtube.com/youtubei/v1/browse?alt=json')
+    throw Error('unapproved_post_destination');
+  const requested=post?youtubeResearchBody():null;
   const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),15_000);
   try{
-    const response=await fetch(url,{method:'GET',redirect:'manual',credentials:'omit',
-      cache:'no-store',signal:abort.signal,
+    const response=await fetch(url,{method:post?'POST':'GET',
+      redirect:'manual',credentials:'omit',cache:'no-store',signal:abort.signal,
       headers:{accept:'text/csv,text/html,application/json',
-        ...(token?{authorization:'Bearer '+token}:{})}});
-    const metadata={http_status:response.status,content_type:
+        ...(post?{'content-type':'application/json'}:{})},
+      ...(post?{body:requested.body}:{})});
+    const metadata={method:post?'POST':'GET',
+      requested_chart_end_date:requested?.requestedEnd??null,
+      http_status:response.status,content_type:
       (response.headers.get('content-type')??'').split(';')[0].toLowerCase(),
       endpoint:url,client_class:'node_server_fetch',redirected:response.redirected};
     if(response.status!==200||response.redirected||response.url!==url)
@@ -85,7 +122,10 @@ async function main(){
     console.log(JSON.stringify({mode:'NO_NETWORK',providers:SOURCES.map(s=>
       ({provider:s.id,url:s.url??null,reason:s.reason})),
       supplementaryEditorial:EDITORIAL.map(s=>({source:s.id,url:s.url,provider:s.provider,
-        signal:'editorial_placement_not_streams'}))},null,2));
+        signal:'editorial_placement_not_streams'})),
+      routeCandidates:METHOD_CANDIDATES.map(s=>({source:s.id,provider:s.provider,
+        url:s.url,method:s.kind==='json_post'?'POST':'GET',
+        status:'research_method_not_admitted'}))},null,2));
     return;
   }
   const dir=resolve(process.env.WK100_PROBE_PRIVATE_DIR||
@@ -93,24 +133,27 @@ async function main(){
   await mkdir(dir,{recursive:true,mode:0o700});
   await chmod(dir,0o700);
   const records=[];
-  for(const source of [...SOURCES,...EDITORIAL]){
+  for(const source of [...SOURCES,...EDITORIAL,...METHOD_CANDIDATES]){
     const supplementary=source.provider==='spotify_ke';
-    const base={provider:supplementary?'spotify_ke':source.id,
-      source_key:source.id,signal_class:supplementary?'editorial_playlist_placement':'primary_chart',
+    const alternate=source.kind==='json_post'||source.kind==='json_get';
+    const base={provider:source.provider??source.id,
+      source_key:source.id,signal_class:alternate?'research_route_candidate':
+        supplementary?'editorial_playlist_placement':'primary_chart',
       market:'KE',endpoint:source.url??null,
       method_reason:source.reason,checked_at:new Date().toISOString(),
       can_collect:false,can_score:false,can_publish:false,collector_receipt:false};
     if(!source.url){records.push({...base,status:'EXACT_SOURCE_ROUTE_UNVERIFIED'});continue;}
     try{
-      const result=await getBounded(source.url,null);
+      const result=await getBounded(source.url,source.kind);
       const {bytes,...evidence}=result;
       if(!bytes){records.push({...base,...evidence});continue;}
       const allowed=(source.kind==='html'||source.kind==='public_chart_html')?
         evidence.content_type==='text/html':
-        source.kind==='csv'&&['text/csv','application/octet-stream'].includes(evidence.content_type);
+        source.kind==='csv'?['text/csv','application/octet-stream'].includes(evidence.content_type):
+        alternate&&evidence.content_type==='application/json';
       if(!allowed){records.push({...base,...evidence,status:'CONTENT_TYPE_UNQUALIFIED'});continue;}
       const filename=source.id+'-'+evidence.payload_sha256.slice(0,16)+'.'+
-        (source.kind==='csv'?'csv':'html');
+        (source.kind==='csv'?'csv':alternate?'json':'html');
       try{await writeFile(join(dir,filename),bytes,{flag:'wx',mode:0o600});}
       catch(e){
         if(e?.code!=='EEXIST')throw e;
