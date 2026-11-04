@@ -169,6 +169,36 @@ function inspectCandidateJson(sourceKey,bytes){
     native_period_authority:'unverified'};
 }
 
+/**
+ * Structural diagnostics only for a genuine first-party Audiomack HTML original.
+ * No track ranking or API qualification is inferred from these classifications.
+ * The sample values are public meta refs, bounded and stripped of control chars.
+ */
+function audiomackPublicMetaDiagnostics(html){
+  const tags=[...html.matchAll(/<meta\b[^>]*>/gi)].map(x=>x[0]);
+  const refs=[];
+  for(const tag of tags){
+    if(!/\bproperty\s*=\s*(["'])music:song\1/i.test(tag))continue;
+    const m=tag.match(/\bcontent\s*=\s*(["'])(.*?)\1/i);
+    refs.push(m?.[2]??'');
+  }
+  const category=v=>{
+    if(/^https:\/\/(?:www\.)?audiomack\.com\//i.test(v))return 'first_party_absolute_https';
+    if(/^https?:\/\//i.test(v))return 'other_absolute_url';
+    if(/^\/\//.test(v))return 'protocol_relative';
+    if(/^\//.test(v))return 'path_relative';
+    if(/^[a-z][a-z0-9.+-]*:/i.test(v))return 'other_uri_scheme';
+    return 'opaque_or_other';
+  };
+  const kinds={};
+  for(const ref of refs)kinds[category(ref)]=(kinds[category(ref)]??0)+1;
+  return {music_song_meta_count:refs.length,ref_classes:kinds,
+    first_three_public_meta_refs:refs.slice(0,3).map(x=>
+      x.replace(/[\u0000-\u001f\u007f]/g,'').slice(0,140)),
+    track_count_token:html.match(/"track_count"\s*:\s*(\d+)/)?.[1]??null,
+  };
+}
+
 async function main(){
   const args=process.argv.slice(2);
   if(args.length!==1||!['--dry-run','--fetch'].includes(args[0])){
@@ -251,6 +281,9 @@ async function main(){
       }catch(e){
         observation.status='ORIGINAL_CAPTURED_PARSER_NOT_QUALIFIED';
         observation.parse_failure=String(e?.message??e).slice(0,100);
+        if(source.id==='audiomack_ke')
+          observation.method_diagnostics=audiomackPublicMetaDiagnostics(
+            new TextDecoder('utf-8',{fatal:true}).decode(bytes));
       }
       records.push(observation);
     }catch(e){records.push({...base,status:'TRANSPORT_CLIENT_CLASS_UNQUALIFIED',
