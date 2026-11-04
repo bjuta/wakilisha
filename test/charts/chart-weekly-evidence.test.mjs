@@ -561,6 +561,25 @@ function wkRuntimeHarness(extra={}) {
   return {events,objects,db,storage,args};
 }
 
+test('WK100 Audiomack original URL tags and current title tags cannot become unverified collector ranks',()=>{
+  const contract={...wkRuntimeContract,source_key:'audiomack_ke_weekly_public',
+    provider_key:'audiomack_ke',adapter_version:'audiomack_kenya_chart_v1',
+    expected_depth:100};
+  const access={source_key:contract.source_key,parser_class:contract.adapter_version,
+    endpoint:'https://audiomack.com/geo-charts/playlist/kenya'};
+  assert.equal(resolveCaptureParser(contract,access)?.providerKey,'audiomack_ke');
+  const titleOriginal='<title>Weekly 100: Kenya</title>'+Array.from({length:100},(_,i)=>
+    '<meta property="music:song" content="Actual-public-title-'+(i+1)+'">').join('');
+  const oldUrlOriginal='<script>{"track_count":2}</script>'+
+    '<meta property="music:song" content="https://audiomack.com/ke-artist/song-1">'+
+    '<meta property="music:song" content="https://audiomack.com/ke-artist/song-2">';
+  for(const [original,depth] of [[titleOriginal,100],[oldUrlOriginal,2]]){
+    const bytes=new TextEncoder().encode(original);
+    assert.throws(()=>parseCaptureNativeRows(bytes,{...contract,expected_depth:depth},access),
+      e=>e?.code==='source_rank_unverified');
+  }
+});
+
 test('Spotify scoped collector adapter preserves native chart-eligible streams without YouTube view labels',()=>{
   const header='rank,uri,artist_names,track_name,source,peak_rank,previous_rank,weeks_on_chart,streams';
   const csv=[header,
