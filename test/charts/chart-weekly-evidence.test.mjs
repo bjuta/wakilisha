@@ -435,6 +435,16 @@ test('candidate HTTP evidence retains exact bytes but refuses redirect, MIME, ov
   }});
   assert.deepEqual(native.bytes,nativeBytes);
   assert.equal('providerAuthorization' in native,false);
+  // An enrolled Apple source has a distinct ID; the shared token transport
+  // must accept that exact Kenya API route, but never other query variants.
+  const scopedApple={...appleInput,sourceKey:'apple_ke_official_chart',
+    accessDecision:{...appleInput.accessDecision,source_key:'apple_ke_official_chart'}};
+  const scoped=await fetchCandidateBytes({...scopedApple,fetchImpl:async(url,options)=>{
+    assert.equal(url,chartEndpoint);
+    assert.equal(options.headers.authorization,'Bearer '+token);
+    return new Response(nativeBytes,{status:200,headers:{'content-type':'application/json'}});
+  }});
+  assert.deepEqual(scoped.bytes,nativeBytes);
   let unauthorizedRequests=0;
   const countRequest=async()=>{unauthorizedRequests++;return new Response(nativeBytes);};
   await wkCapReject(()=>fetchCandidateBytes(wkCapInput({
@@ -446,6 +456,12 @@ test('candidate HTTP evidence retains exact bytes but refuses redirect, MIME, ov
   }),'provider_authorization_invalid');
   await wkCapReject(()=>fetchCandidateBytes({...appleInput,
     providerAuthorization:{kind:'apple_developer_bearer',token:'bad\\nheader'},fetchImpl:countRequest,
+  }),'provider_authorization_invalid');
+  await wkCapReject(()=>fetchCandidateBytes({...scopedApple,
+    endpoint:chartEndpoint+'&country=us',fetchImpl:countRequest,
+  }),'provider_authorization_invalid');
+  await wkCapReject(()=>fetchCandidateBytes({...scopedApple,
+    endpoint:chartEndpoint.replace('/ke/','/us/'),fetchImpl:countRequest,
   }),'provider_authorization_invalid');
   assert.equal(unauthorizedRequests,0);
   const fixtureResponse=(body,status,type,extra={})=>async()=>new Response(body,{status,headers:{'content-type':type,...extra}});
