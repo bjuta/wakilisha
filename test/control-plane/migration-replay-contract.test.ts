@@ -24,10 +24,50 @@ import {
   validatePendingSchemaState,
   validateRepositorySchemaSnapshot,
 } from "../../scripts/control-plane/verify-repository-schema-snapshot.mjs";
+import {
+  isDisposableCiReplayProof,
+  validateDisposableCiReplayProof,
+} from "../../scripts/control-plane/verify-disposable-ci-replay-proof.mjs";
 
 describe(
   "migration replay contract",
   () => {
+    it("requires a real unlinked CI replay and independent Auth/Storage/cleanup markers", () => {
+      const proof=JSON.parse(readFileSync(
+        "docs/engineering/replay-proofs/20261104084956_wk100_spotify_offered_export_method_admission.sql.json",
+        "utf8"
+      ));
+      expect(isDisposableCiReplayProof(proof)).toBe(true);
+      const args={proof,migrationFile:proof.migration_file,
+        migrationSha256:proof.migration_sha256,baseMainSha:proof.base_main_sha};
+      expect(validateDisposableCiReplayProof(args)).toEqual([]);
+      expect(validateDisposableCiReplayProof({
+        ...args,proof:{...proof,workflow_conclusion:"failure"},
+      })).toContain("disposable CI requires successful pull-request workflow evidence");
+      expect(validateDisposableCiReplayProof({
+        ...args,proof:{...proof,ci_markers:proof.ci_markers.slice(0,-1)},
+      })).toContain("disposable CI missing ordered independent replay/auth/storage/cleanup markers");
+      expect(validateDisposableCiReplayProof({
+        ...args,proof:{...proof,hosted_preview_used:true},
+      })).toContain("disposable CI must be unlinked, not hosted or Production");
+      expect(validateDisposableCiReplayProof({
+        ...args,migrationSha256:"0".repeat(64),
+      })).toContain("disposable CI migration digest mismatch");
+    });
+    it("permits a correctly bound unlinked schema seal, not an unverified local claim", () => {
+      const baseline=JSON.parse(readFileSync(
+        "docs/engineering/live-schema-baseline.json","utf8"
+      ));
+      const args={baseline,actualTypesSha256:baseline.typesSha256,
+        expectedProjectRef:"pgzizndxdyhqmtyywjmt",
+        migrationCount:243,
+        latestMigration:"20261104084956_wk100_spotify_offered_export_method_admission.sql"};
+      expect(validateRepositorySchemaSnapshot(args)).toEqual([]);
+      expect(validateRepositorySchemaSnapshot({
+        ...args,baseline:{...baseline,schemaSeal:{...baseline.schemaSeal,workflowRunId:null}},
+      })).toContain("disposable_ci schema seal needs unlinked-local-ci and exact replay commit/run authority");
+      expect(validatePendingSchemaState({pendingCount:1,sealMode:"disposable_ci"})).toEqual([]);
+    });
     it(
       "allows ordinary replay-safe schema authority",
       () => {
