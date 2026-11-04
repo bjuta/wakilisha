@@ -272,12 +272,18 @@ async function main(){
         const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
         const parsed=source.id==='apple_ke'?parseAppleKenyaPublicHtml(text,{endpoint:source.url}):
           source.id==='mdundo_ke'?parseMdundoKenya(text):
-          source.id==='audiomack_ke'?parseAudiomackKenya(text):parseShazamKenya(text);
+          source.id==='audiomack_ke'?parseAudiomackKenya(text,{endpoint:source.url}):parseShazamKenya(text);
         observation.status='ORIGINAL_PARSED_RESEARCH_ONLY';
         observation.observed_depth=parsed.observed_depth;
         observation.native_metric=parsed.metric;
         observation.native_period=parsed.native_period;
         observation.provider_period_label=parsed.provider_period_label??null;
+        if(source.id==='audiomack_ke'){
+          observation.method_diagnostics={chart_surface:parsed.chart_surface,
+            rank_authority:parsed.rank_authority??null,
+            artist_authority:parsed.artist_authority??null,
+            provider_track_identity_authority:parsed.provider_track_identity_authority??null};
+        }
       }catch(e){
         observation.status='ORIGINAL_CAPTURED_PARSER_NOT_QUALIFIED';
         observation.parse_failure=String(e?.message??e).slice(0,100);
