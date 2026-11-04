@@ -9,6 +9,7 @@ import { fetchCandidateBytes, archiveCandidateBytes, sha256Hex,
 import { checkpointsForSource } from './chart-weekly-evidence.mjs';
 import { parseMdundoKenya, parseAudiomackKenya, parseBoomplayKenya,
   parseShazamKenya, parseAppleKenya, parseYouTubeKenyaWeekly,
+  parseSpotifyKenyaWeeklyCandidate,
 } from './chart-public-source-observations.mjs';
 
 const PARSERS = Object.freeze({
@@ -16,6 +17,7 @@ const PARSERS = Object.freeze({
   audiomack_ke: bytes => parseAudiomackKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
   boomplay_ke: bytes => parseBoomplayKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
   shazam_ke: bytes => parseShazamKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
+  spotify_ke: bytes => parseSpotifyKenyaWeeklyCandidate(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
   apple_ke: (bytes, access) => parseAppleKenya(
     JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)), access),
   youtube_ke: (bytes, access) => parseYouTubeKenyaWeekly(
@@ -30,12 +32,16 @@ const PARSER_CLASS=Object.freeze({
   audiomack_ke:'audiomack_kenya_chart_v1',
   boomplay_ke:'boomplay_kenya_chart_v1',
   shazam_ke:'shazam_kenya_discovery_v1',
+  spotify_ke:'spotify_kenya_offered_chart_csv_v1',
   apple_ke:'apple_kenya_chart_v1',
   youtube_ke:'youtube_kenya_weekly_top_songs_v1',
 });
 export function resolveCaptureParser(contract,access={}) {
   if(!contract || typeof contract.source_key!=='string')return null;
   const key=contract.source_key;
+  // No legacy Spotify collector existed. Never let a bare provider name
+  // bypass the scoped adapter digest and separately reviewed method.
+  if(key==='spotify_ke')return null;
   // Historical capture contracts selected the parser solely by source_key.
   // Their separate provider_key may be a legacy operator identifier,
   // not a native parser key. A conflicting known provider still fails.
@@ -91,10 +97,17 @@ function normalizeNativeRows(parsed,contract,providerKey) {
       provider_track_id:r.provider_track_id??null,
       title:r.title??null,artist:r.artist??null};
     if(contract.native_metric==='rank_and_count') {
-      const count=r.view_count;
+      // Spotify streams and YouTube views are separate source-native metrics.
+      // The immutable SQL column is generic source_native_count; the legacy
+      // SQL RPC accepts 'view_count' only as its *wire field*. Keep that alias
+      // confined to the final DB call rather than returning Spotify views.
+      const spotify=providerKey==='spotify_ke';
+      const count=spotify?r.chart_eligible_stream_count:r.view_count;
       requireValue(Number.isSafeInteger(count)&&count>=0,'parser_native_count_invalid');
-      item.view_count=count;
-    } else requireValue(!Object.hasOwn(r,'view_count'),'parser_native_metric_conflict');
+      if(spotify)item.source_native_count=count;
+      else item.view_count=count;
+    } else requireValue(!Object.hasOwn(r,'view_count') &&
+      !Object.hasOwn(r,'chart_eligible_stream_count'),'parser_native_metric_conflict');
     return item;
   });
 }
@@ -214,8 +227,12 @@ export async function runCandidateCapture({
     outcome=wrongWeek?'target_period_unavailable':'parse_failed';
     failureCode=wrongWeek?'source_target_period_unavailable':'source_parse_failed';
   }
+  // Preserve the old restricted SQL wire format without mislabelling
+  // Spotify stream counts in any exported normalized provider observation.
+  const sqlRows=rows.map(({source_native_count,...native})=>
+    source_native_count===undefined?native:{...native,view_count:source_native_count});
   const receipt=await db.commit({p_reservation_id:resId,p_lease_id:lease,
-    p_outcome:outcome,p_rows:rows,p_upstream_reference:access.authorization_ref,
+    p_outcome:outcome,p_rows:sqlRows,p_upstream_reference:access.authorization_ref,
     p_failure_code:failureCode,
     p_native_period_start:null,p_native_period_end:null,p_native_period_evidence_ref:null});
   return Object.freeze({...receipt,raw_object_key:raw.object_key,
