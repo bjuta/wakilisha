@@ -333,11 +333,24 @@ test('WK100 source-method review cannot convert research-only or a mismatched pr
   for(const patch of [
     {methodClass:'research_only'},{parserClass:'apple_kenya_chart_v1'},
     {providerKey:'spotify_ke',sourceKey:'spotify_ke_chart'},
-    {providerKey:'spotify_ke',sourceKey:'spotify_ke_official_weekly',
-      parserClass:'spotify_kenya_offered_chart_csv_v1',methodClass:'offered_export'},
     {nativePeriodAuthority:'unknown'},{authorizationExpiresAt:'2026-11-02T00:00:00Z'},
     {endpointSha256:null},{extra:true},
   ])assert.throws(()=>validateWk100SourceMethodDecision({...p,...patch},{now}));
+  // The source's reviewed weekly CSV may enter method review, but a
+  // browser-valid request cannot grant source access or collection itself.
+  const spotify={...p,providerKey:'spotify_ke',sourceKey:'spotify_ke_official_weekly',
+    parserClass:'spotify_kenya_offered_chart_csv_v1',methodClass:'offered_export'};
+  const acceptedSpotify=validateWk100SourceMethodDecision(spotify,{now});
+  assert.equal(acceptedSpotify.canCollect,false);
+  assert.equal(acceptedSpotify.canScore,false);
+  assert.equal(acceptedSpotify.canPublish,false);
+  for(const methodClass of ['provider_api','reviewed_page_adapter','research_only']){
+    assert.throws(()=>validateWk100SourceMethodDecision({...spotify,methodClass},{now}),
+      /method_admission_unqualified/);
+  }
+  assert.throws(()=>validateWk100SourceMethodDecision({
+    ...spotify,parserClass:'apple_kenya_chart_v1',
+  },{now}),/method_admission_unqualified/);
   const hold=validateWk100SourceMethodDecision({...p,decisionState:'held',
     parserClass:null,methodClass:'research_only',nativePeriodAuthority:null,
     nativePeriodEvidenceRef:null,endpointSha256:null,accessEvidenceSha256:null,
