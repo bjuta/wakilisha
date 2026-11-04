@@ -48,15 +48,17 @@ async function freePorts(count){
 const criticalSecurityStep={name:'Run critical security and lifecycle tests against disposable local services',run:'npm run test:critical'};
 lanes['critical-security']=[...lanes.wk100.slice(0,2),criticalSecurityStep];
 lanes.wk100.splice(2,0,criticalSecurityStep);
+lanes['schema-read']=[{name:'Read-only native schema and migration-history verification',run:'npm run schema:verify'}];
 lanes['public-runtime']=plans['public-runtime-watch'].jobs['public-runtime'].steps.filter(s=>s.run&&s.name.startsWith('Probe '));
 const dbLanes=['mizizi-sql','mizizi-auth','wk100','critical-security'];
 const lane=process.argv[2];
 if(lane==='audit'){console.log('LOCAL_WORKFLOW_AUDIT=PASS; eight retired workflows; no runner allocation');process.exit(0);}
-if(!lanes[lane])stop('Choose: audit, core, browser, source-preflight, mizizi-sql, mizizi-auth, wk100, critical-security, public-runtime. Release remains BLOCKED until all scopes and remote/provenance/protection gates pass.');
+if(!lanes[lane])stop('Choose: audit, core, browser, source-preflight, mizizi-sql, mizizi-auth, wk100, critical-security, public-runtime, schema-read. Release remains BLOCKED until all scopes and remote/provenance/protection gates pass.');
 if(process.argv.includes('--plan')){console.log(JSON.stringify({lane,steps:lanes[lane],blockedReleaseGates:['live security and schema drift','three production control-plane preflights','public runtime watch','trusted local replay provenance','enforced merge protection'],productionMutation:false},null,2));process.exit(0);}
 if(process.platform!=='darwin'||process.versions.node.split('.')[0]!=='22')stop('Run on macOS with pinned Node 22');
 // Ambient credentials and repository .env files never enter the execution clone.
 const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:os.tmpdir(),LANG:'en_US.UTF-8',CI:'true',CONTROL_PLANE_BASE_REF:'origin/main'};
+if(lane==='schema-read')env.SUPABASE_PROJECT_REF='pgzizndxdyhqmtyywjmt';
 if(lane==='public-runtime'){
  const c=JSON.parse(fs.readFileSync(process.env.WK_LOCAL_PUBLIC_CONFIG??'', 'utf8'));
  if(c.url!=='https://pgzizndxdyhqmtyywjmt.supabase.co')stop('Public runtime project mismatch');

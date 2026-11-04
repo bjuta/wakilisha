@@ -34,7 +34,7 @@ test('linked or credentialed scratch trees cannot authorize disposable writes',(
  }finally{process.chdir(cwd);process.env=old;fs.rmSync(scratch,{recursive:true});}
 });
 test('all scopes retain real suites and explicitly block incomplete release acceptance',()=>{
- for(const lane of ['core','browser','source-preflight','mizizi-sql','mizizi-auth','wk100','critical-security','public-runtime']){
+ for(const lane of ['core','browser','source-preflight','mizizi-sql','mizizi-auth','wk100','critical-security','public-runtime','schema-read']){
   const r=spawnSync(process.execPath,['scripts/local/verify.mjs',lane,'--plan'],{encoding:'utf8'});
   assert.equal(r.status,0,r.stderr);const p=JSON.parse(r.stdout);assert.ok(p.steps.length>0);assert.equal(p.productionMutation,false);assert.ok(p.blockedReleaseGates.includes('trusted local replay provenance'));
  }
