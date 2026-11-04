@@ -1,4 +1,5 @@
 import path from "node:path";
+import {createHash} from "node:crypto";
 import { spawnSync } from "node:child_process";
 
 export const DISPOSABLE_CI_REPLAY_PROOF_MODE = "disposable_ci_clean_replay_v1";
@@ -83,19 +84,30 @@ export function validateDisposableCiReplayRepositoryState({
     const atHead=git(["hash-object",entry.path],{allowFailure:true});
     if(atReplay.status!==0 || atHead.status!==0 || atReplay.stdout.trim()!==atHead.stdout.trim())
       errors.push(entry.path+": candidate migration bytes changed since successful CI replay");
-    const typesReplay=git(["rev-parse",replay+":"+TYPE_FILE],{allowFailure:true});
-    const typesNow=git(["hash-object",TYPE_FILE],{allowFailure:true});
-    if(typesReplay.status!==0 || typesNow.status!==0 ||
-        typesReplay.stdout.trim()!==typesNow.stdout.trim())
-      errors.push("disposable CI accepted database types changed since replay");
+    // Each historical receipt binds its OWN successful replay tree. The newest
+    // receipt alone must additionally cover the complete current schema.
+    const typesReplay=git(["show",replay+":"+TYPE_FILE],{allowFailure:true});
+    const replayTypesSha256=createHash("sha256").update(typesReplay.stdout).digest("hex");
     const atReplayNames=git(["ls-tree","-r","--name-only",replay,"--",MIGRATIONS_DIR],{allowFailure:true})
       .stdout.split(/\r?\n/).filter(x=>x.endsWith(".sql")).map(x=>path.basename(x)).sort();
-    if(JSON.stringify(atReplayNames)!==JSON.stringify(migrations))
-      errors.push("disposable CI migration filename set changed since replay");
-    if(proof.schema_types_sha256!==actualTypesSha256 ||
-        proof.schema_migration_count!==migrations.length ||
-        proof.schema_migration_head!==path.basename(latestMigration).slice(0,14))
-      errors.push("disposable CI proof does not bind current types and active migration head");
+    if(typesReplay.status!==0 || proof.schema_types_sha256!==replayTypesSha256 ||
+        proof.schema_migration_count!==atReplayNames.length ||
+        proof.schema_migration_head!==atReplayNames.at(-1)?.slice(0,14))
+      errors.push("disposable CI proof does not bind its recorded replay schema");
+    if(JSON.stringify(atReplayNames)!==JSON.stringify(migrations.slice(0,atReplayNames.length)))
+      errors.push("disposable CI historical migration set is not an unchanged current prefix");
+    const changedOld=git(["diff","--name-only","--diff-filter=DMRTUXB",replay,"--",MIGRATIONS_DIR],{allowFailure:true});
+    if(changedOld.status!==0 || changedOld.stdout.trim())
+      errors.push("disposable CI previously replayed migration bytes changed or were removed");
+    if(entry.path===changedActive.at(-1).path){
+      if(JSON.stringify(atReplayNames)!==JSON.stringify(migrations))
+        errors.push("disposable CI migration filename set changed since replay");
+      if(proof.schema_types_sha256!==actualTypesSha256 ||
+          proof.schema_migration_count!==migrations.length ||
+          proof.schema_migration_head!==path.basename(latestMigration).slice(0,14))
+        errors.push("disposable CI proof does not bind current types and active migration head");
+    }
+
   }
   const seal=baseline.schemaSeal??{};
   const newest=proofs.get(changedActive.at(-1).path);
