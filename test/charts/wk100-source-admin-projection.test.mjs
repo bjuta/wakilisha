@@ -149,6 +149,22 @@ test('WK100 five-core public-source preflight has YouTube and no paid or dropped
   assert.equal(report.providers[3].url,'https://charts.youtube.com/charts/TopSongs/ke');
   assert.match(report.providers[3].reason,/weekly original response.*unverified/);
   assert.ok(report.providers.every(x=>x.url?.startsWith('https://')));
+  // These method probes do not expand the core roster, grant a source
+  // admission, or turn four editorial playlists into four platforms.
+  assert.deepEqual(report.supplementaryEditorial.map(x=>x.source),[
+    'spotify_editorial_hot_hits_ke','spotify_editorial_nmf_ke',
+    'spotify_editorial_made_in_ke','spotify_editorial_gengetone_fire',
+  ]);
+  assert.ok(report.supplementaryEditorial.every(x=>x.provider==='spotify_ke'&&
+    x.signal==='editorial_placement_not_streams'));
+  assert.deepEqual(report.routeCandidates.map(x=>[x.provider,x.method]),[
+    ['youtube_ke','POST'],['audiomack_ke','GET'],
+  ]);
+  assert.ok(report.routeCandidates.every(x=>x.status==='research_method_not_admitted'));
+  assert.equal(report.routeCandidates[0].url,
+    'https://charts.youtube.com/youtubei/v1/browse?alt=json');
+  assert.equal(report.routeCandidates[1].url,
+    'https://api.audiomack.com/v1/playlist/geo-charts/kenya');
 });
 
 test('WK100 public Apple Kenya Top 100 is collector-parsable without API credentials',()=>{
