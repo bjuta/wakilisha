@@ -333,7 +333,7 @@ test('a stale reviewed method does not appear as an enrolled, current platform s
   const ctx=await install(page,{existingProposals:[proposal],existingMethods:[oldDecision]});
   await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',
     {waitUntil:'domcontentloaded'});
-  const roster=page.getByRole('table',{name:'Six core provider readiness'});
+  const roster=page.getByRole('table',{name:'Five core provider readiness'});
   const youtube=roster.getByRole('row').filter({hasText:'YouTube Kenya'});
   await expect(youtube.getByText('Method review needed')).toBeVisible({timeout:20_000});
   await expect(youtube.getByText('Candidate enrolled')).toHaveCount(0);
