@@ -127,7 +127,6 @@ begin
     when 'boomplay_ke' then 'boomplay_kenya_chart_v1'
     when 'mdundo_ke' then 'mdundo_kenya_chart_v1'
     when 'shazam_ke' then 'shazam_kenya_discovery_v1'
-    when 'spotify_ke' then 'spotify_kenya_offered_chart_csv_v1'
     when 'audiomack_ke' then 'audiomack_kenya_chart_v1'
     else null end;
   v_parser:=p_payload->>'parserClass';
@@ -149,11 +148,6 @@ begin
       or (v_p.provider_key='youtube_ke' and
         (v_p.behavior<>'video_consumption' or
          v_p.native_metric<>'rank_and_count' or v_p.cadence_kind<>'weekly'))
-      or (v_p.provider_key='spotify_ke' and
-         (v_p.behavior<>'consumption' or
-          v_p.native_metric<>'rank_and_count' or
-          v_p.cadence_kind<>'weekly' or
-          v_p.method_class<>'offered_export'))
       or p_payload->>'methodClass'<>v_p.method_class
       or p_payload->>'nativePeriodAuthority'<>'provider_defined'
       or coalesce(length(p_payload->>'nativePeriodEvidenceRef'),0)<3
@@ -396,7 +390,6 @@ begin
     when 'boomplay_ke' then 'boomplay_kenya_chart_v1'
     when 'mdundo_ke' then 'mdundo_kenya_chart_v1'
     when 'shazam_ke' then 'shazam_kenya_discovery_v1'
-    when 'spotify_ke' then 'spotify_kenya_offered_chart_csv_v1'
     when 'audiomack_ke' then 'audiomack_kenya_chart_v1'
     else null end;
   if v_expected_parser is null or v_decision.parser_class<>v_expected_parser
@@ -404,11 +397,6 @@ begin
        (v_proposal.behavior<>'video_consumption'
         or v_proposal.native_metric<>'rank_and_count'
         or v_proposal.cadence_kind<>'weekly'))
-     or (v_proposal.provider_key='spotify_ke' and
-       (v_proposal.behavior<>'consumption' or
-        v_proposal.native_metric<>'rank_and_count' or
-        v_proposal.cadence_kind<>'weekly' or
-        v_proposal.method_class<>'offered_export'))
   then raise exception 'wk100_contract_parser_unqualified'; end if;
 
   -- Phase 1 allows one immutable capture contract per source. Later
