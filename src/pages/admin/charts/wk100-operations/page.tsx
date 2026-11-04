@@ -280,6 +280,26 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     return ids;
   },[report,phase,proposals,proposalPhase,methodDecisions,methodPhase]);
   const reviewedCandidateContracts=reviewedSourceIds.size;
+  // An as-of original supports an Edition only if its verified acquisition
+  // happened in this EAT week and the CURRENT method/contract still match.
+  // This says nothing about the provider's measurement interval.
+  const observedAsOfCaptureIds=useMemo(()=>{
+    const ids=new Set<string>();
+    if(!report||phase!=='ready'||methodPhase!=='ready'||proposalPhase!=='ready')return ids;
+    for(const source of report.sources){
+      if(!source.receiptSha256||!source.lastSuccessfulAt||
+        !reviewedSourceIds.has(source.id))continue;
+      const instant=Date.parse(source.lastSuccessfulAt);
+      if(!Number.isFinite(instant)||
+        wk100CurrentWeekStartEat(new Date(instant))!==week)continue;
+      if(methodDecisions.some(method=>method.sourceKey===source.sourceKey&&
+        method.providerKey===source.provider&&
+        method.captureContractVersion===source.version&&
+        method.decisionState==='collector_admitted'&&
+        method.nativePeriodAuthority==='observed_as_of'))ids.add(source.id);
+    }
+    return ids;
+  },[report,phase,proposalPhase,methodPhase,methodDecisions,reviewedSourceIds,week]);
   // The source-master must include pre-enrollment proposals. A proposal is
   // neither an enrolled capture contract nor a current-week evidence receipt.
   const registryRows=useMemo<RegistrySource[]>(()=>{
@@ -453,7 +473,12 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                   ?'Source review authority unavailable. Qualification cannot be inferred.'
                   :reviewedCandidateContracts+' current reviewed candidate contracts. A reviewed contract is not an approved live source constitution.'},
               {id:'receipts',label:'Original source evidence',status:report.successfulSources>0?'pending':'blocked',description:report.successfulSources+' verifiable capture receipts'},
-              {id:'period',label:'Provider-native measurement periods',status:report.sources.some(x=>x.receiptSha256&&x.nativePeriodAuthority==='provider_defined')?'pending':'blocked',description:'Capture time is not native-period authority'},
+              {id:'period',label:'Reporting dates and observation time',
+                status:report.sources.some(x=>x.receiptSha256&&x.nativePeriodAuthority==='provider_defined'&&x.nativePeriodStart&&x.nativePeriodEnd)||
+                  observedAsOfCaptureIds.size>0?'pending':'blocked',
+                description:observedAsOfCaptureIds.size>0
+                  ?observedAsOfCaptureIds.size+' verified as-of observation(s). Provider measurement windows remain unknown.'
+                  :'No verified provider reporting period or reviewed as-of original for this week.'},
               {id:'identity',label:'Canonical recording identities',status:'blocked',description:'Registry and MIZIZI reconciliation is Phase 2'},
               {id:'eligibility',label:'Complete eligibility and corrections',status:'blocked',description:'All applicable filter checks are Phase 2'},
               {id:'ranking',label:'Frozen methodology and private Top 100',status:'blocked',description:'A private ranking is not inferred from captures'},
@@ -524,7 +549,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               {key:'metric',label:'Metric · period · depth',render:row=>
                 <span className="text-wk-text-soft">
                   {row.contract?.metric??row.proposal?.metric??'Unknown'} ·
-                  {row.contract?.nativePeriodAuthority==='provider_defined'?' Defined':' Unverified'} ·
+                   {row.method?.nativePeriodAuthority==='observed_as_of'?
+                     (row.contract&&observedAsOfCaptureIds.has(row.contract.id)?' Observed as-of':' As-of method, not collected'):
+                     row.contract?.nativePeriodAuthority==='provider_defined'?' Defined':' Unverified'} ·
                   {' '+(row.contract?.expectedDepth??row.proposal?.expectedDepth??'Unknown')}
                 </span>},
               {key:'cadence',label:'Candidate Timing',render:row=>
@@ -577,6 +604,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                   {label:'Expected depth',value:
                     selectedRegistrySource.contract?.expectedDepth??selectedRegistrySource.proposal?.expectedDepth??'Unknown'},
                   {label:'Capture contract',value:selectedRegistrySource.contract?.version??'Not enrolled'},
+                   {label:'Reporting date authority',value:selectedCurrentMethod?.nativePeriodAuthority==='observed_as_of'
+                     ?'WAKILISHA observed-as-of. Provider reporting period unknown.'
+                     :selectedCurrentMethod?.nativePeriodAuthority==='provider_defined'
+                     ?'Provider-declared period':'No approved period method'},
+                   {label:'Original observation time',value:selectedRegistrySource.contract&&
+                     observedAsOfCaptureIds.has(selectedRegistrySource.contract.id)
+                       ?when(selectedRegistrySource.contract.lastSuccessfulAt)
+                       :'No verified as-of original for this week'},
                   {label:'Native period',value:selectedRegistrySource.contract?.nativePeriodAuthority==='provider_defined'?
                     when(selectedRegistrySource.contract.nativePeriodStart)+' to '+
                     when(selectedRegistrySource.contract.nativePeriodEnd):'Unverified'},
@@ -883,6 +918,10 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             {label:'Minimum healthy checkpoints',value:detail.minimumHealthyCheckpoints},
             {label:'Adapter revision',value:detail.adapterVersion||'Not recorded'},
             {label:'Source contract version',value:detail.version},
+             {label:'Original observation time',value:detail.receiptSha256?when(detail.lastSuccessfulAt):'No verified original'},
+             {label:'WAKILISHA observed-as-of',value:observedAsOfCaptureIds.has(detail.id)?
+               'Verified for this EAT Edition. Provider measurement period remains unknown.':
+               'No approved as-of evidence for this Edition'},
             {label:'Native measurement period',value:detail.nativePeriodAuthority==='provider_defined'
               ?when(detail.nativePeriodStart)+' to '+when(detail.nativePeriodEnd):'Unknown'},
           ]}/>
@@ -895,7 +934,12 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           <WkReadinessList items={[
             {id:'market',label:'Market and surface',status:detail.market==='KE'?'pending':'blocked',description:'A Kenya label does not independently establish source qualification'},
             {id:'method',label:'Independent source method',status:'blocked',description:'No accepted WK100 source admission has been established for this candidate'},
-            {id:'native',label:'Native measurement period',status:detail.nativePeriodAuthority==='provider_defined'?'pending':'blocked',description:'Period evidence must be evaluated against the approved week'},
+             {id:'native',label:'Reporting date evidence',
+               status:detail.nativePeriodAuthority==='provider_defined'||observedAsOfCaptureIds.has(detail.id)
+                 ?'pending':'blocked',
+               description:observedAsOfCaptureIds.has(detail.id)
+                 ?'Verified collection date only. The provider reporting period is unknown.'
+                 :'Provider reporting dates or reviewed as-of capture remain unverified'},
             {id:'score',label:'Scoring authority',status:'blocked',description:'Candidate capture contracts do not grant scoring authority'},
           ]}/>
         </div>}

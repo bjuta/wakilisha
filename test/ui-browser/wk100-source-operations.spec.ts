@@ -200,7 +200,8 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         ?String(body.weekStartEat):'';
       await json(route,{
         schemaVersion:'wk100-admin-source-health-v1',weekStartEat:week,
-        sourceCount:existingSources.length,successfulSources:0,
+        sourceCount:existingSources.length,
+        successfulSources:existingSources.filter(s=>typeof s.receiptSha256==='string'&&/^[a-f0-9]{64}$/.test(s.receiptSha256)).length,
         failedSources:existingSources.filter(s=>s.captureState==='transport_failed').length,
         qualifiedSources:0,canScore:false,canPublish:invalid,sources:existingSources,
       });return;
@@ -354,13 +355,69 @@ test('a stale reviewed method does not appear as an enrolled, current platform s
   expect(ctx.unexpected).toEqual([]);
 });
 
+test('observed-as-of receipts are visible without asserting provider-native measurement dates',async({page})=>{
+  const sourceKey='apple_ke_public_top100';
+  const sourceId='88888888-8888-4888-8888-888888888888';
+  const originalTime='2026-11-03T10:02:00Z';
+  const proposals=[{
+    id:'77777777-7777-4777-8777-777777777777',
+    providerKey:'apple_ke',sourceKey,revision:1,
+    surface:'Apple public Kenya Top 100',methodClass:'reviewed_page_adapter',
+    behavior:'consumption',metric:'rank',expectedDepth:100,
+    cadence:'daily',intervalHours:null,eatHour:12,eatMinute:0,
+    weekdayEat:null,minimumHealthyCheckpoints:1,
+    evidenceReference:'reviewed_first_party_apple_chart',
+    reason:null,createdAt:'2026-11-02T10:00:00Z',state:'proposed',
+    canCollect:false,canScore:false,canPublish:false,
+  }];
+  const methods=[{
+    sourceKey,providerKey:'apple_ke',proposalRevision:1,decisionRevision:1,
+    decisionState:'collector_admitted',constitutionVersion:'ci-accepted-only-v1',
+    nativePeriodAuthority:'observed_as_of',captureContractVersion:'ci-v1',
+    hasMethodEvidence:true,createdAt:'2026-11-02T10:00:00Z',
+    canScore:false,canPublish:false,
+  }];
+  const sources=[{
+    id:sourceId,sourceKey,provider:'apple_ke',surface:'Apple public Kenya Top 100',
+    market:'KE',metric:'rank',behavior:'consumption',expectedDepth:100,
+    cadence:'daily',version:'ci-v1',intervalHours:null,eatHour:12,eatMinute:0,
+    weekdayEat:null,minimumHealthyCheckpoints:1,adapterVersion:'apple_kenya_chart_v1',
+    admissionState:'candidate',captureState:'succeeded',attemptCount:1,
+    lastAttemptAt:originalTime,lastScheduledAt:'2026-11-03T10:00:00Z',lastAttemptNumber:1,
+    lastSuccessfulAt:originalTime,observedDepth:100,nativePeriodAuthority:'unknown',
+    nativePeriodStart:null,nativePeriodEnd:null,receiptSha256:'a'.repeat(64),
+    failureCode:null,canScore:false,canPublish:false,
+    recentAttempts:[{id:'99999999-9999-4999-8999-999999999999',status:'succeeded',
+      attemptedAt:originalTime,scheduledAt:'2026-11-03T10:00:00Z',
+      attemptNumber:1,fetchedAt:originalTime,failureCode:null,observedDepth:100}],
+  }];
+  const ctx=await install(page,{existingProposals:proposals,existingMethods:methods,
+    existingSources:sources});
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  await expect(page.getByText('Reporting dates and observation time')).toBeVisible({timeout:20_000});
+  await expect(page.getByText('1 verified as-of observation(s). Provider measurement windows remain unknown.')).toBeVisible();
+  await expect(page.getByText('Private · Not ready')).toBeVisible();
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  await page.getByRole('table',{name:'Source registry'}).getByRole('button',{
+    name:'Apple public Kenya Top 100'}).click();
+  await expect(page.getByText('WAKILISHA observed-as-of. Provider reporting period unknown.')).toBeVisible();
+  await page.goto('/admin/charts/wk100-operations/collection?week=2026-11-02',
+    {waitUntil:'domcontentloaded'});
+  await page.getByRole('table',{name:'Weekly source collection'}).getByRole('button',{
+    name:'Apple public Kenya Top 100'}).click();
+  await expect(page.getByText('Verified for this EAT Edition. Provider measurement period remains unknown.')).toBeVisible();
+  expect(ctx.unexpected).toEqual([]);
+});
+
 test('source overview stays truthful, carries EAT week through navigation and uses no publisher',async({page})=>{
   const ctx=await install(page);
   await page.goto('/admin/charts/wk100-operations?week=2026-10-26',{waitUntil:'domcontentloaded'});
   await expect(page.getByRole('heading',{name:'Weekly Overview'})).toBeVisible({timeout:20_000});
   await expect(page.getByText('No enrolled capture sources yet.')).toBeVisible();
   for(const gate of ['Qualified source constitution','Original source evidence',
-    'Provider-native measurement periods','Canonical recording identities',
+    'Reporting dates and observation time','Canonical recording identities',
     'Complete eligibility and corrections','Frozen methodology and private Top 100',
     'Edition staging and explicit publication']){
     await expect(page.getByText(gate,{exact:true})).toBeVisible();
