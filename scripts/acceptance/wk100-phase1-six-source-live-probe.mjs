@@ -27,6 +27,16 @@ const SOURCES=Object.freeze([
   {id:'audiomack_ke',url:'https://audiomack.com/geo-charts/playlist/kenya',
     kind:'html',reason:'Provider-owned Weekly 100 Kenya geo chart. Preserve native ranks, not invented streams.'},
 ]);
+const EDITORIAL=Object.freeze([
+  {id:'spotify_editorial_hot_hits_ke',provider:'spotify_ke',kind:'public_chart_html',
+    url:'https://open.spotify.com/embed/playlist/37i9dQZF1DWWWXigQZAD8B'},
+  {id:'spotify_editorial_nmf_ke',provider:'spotify_ke',kind:'public_chart_html',
+    url:'https://open.spotify.com/embed/playlist/37i9dQZF1DX5lbl7P6kJFp'},
+  {id:'spotify_editorial_made_in_ke',provider:'spotify_ke',kind:'public_chart_html',
+    url:'https://open.spotify.com/embed/playlist/37i9dQZF1DX7z7RLIui5KP'},
+  {id:'spotify_editorial_gengetone_fire',provider:'spotify_ke',kind:'public_chart_html',
+    url:'https://open.spotify.com/embed/playlist/37i9dQZF1DX80fLED6RkGS'},
+]);
 function sha(bytes){return createHash('sha256').update(bytes).digest('hex');}
 async function getBounded(url,token){
   const u=new URL(url);
@@ -72,7 +82,9 @@ async function main(){
   }
   if(args[0]==='--dry-run'){
     console.log(JSON.stringify({mode:'NO_NETWORK',providers:SOURCES.map(s=>
-      ({provider:s.id,url:s.url??null,reason:s.reason}))},null,2));
+      ({provider:s.id,url:s.url??null,reason:s.reason})),
+      supplementaryEditorial:EDITORIAL.map(s=>({source:s.id,url:s.url,provider:s.provider,
+        signal:'editorial_placement_not_streams'}))},null,2));
     return;
   }
   const dir=resolve(process.env.WK100_PROBE_PRIVATE_DIR||
@@ -80,8 +92,11 @@ async function main(){
   await mkdir(dir,{recursive:true,mode:0o700});
   await chmod(dir,0o700);
   const records=[];
-  for(const source of SOURCES){
-    const base={provider:source.id,market:'KE',endpoint:source.url??null,
+  for(const source of [...SOURCES,...EDITORIAL]){
+    const supplementary=source.provider==='spotify_ke';
+    const base={provider:supplementary?'spotify_ke':source.id,
+      source_key:source.id,signal_class:supplementary?'editorial_playlist_placement':'primary_chart',
+      market:'KE',endpoint:source.url??null,
       method_reason:source.reason,checked_at:new Date().toISOString(),
       can_collect:false,can_score:false,can_publish:false,collector_receipt:false};
     if(!source.url){records.push({...base,status:'EXACT_SOURCE_ROUTE_UNVERIFIED'});continue;}
@@ -98,15 +113,20 @@ async function main(){
       try{await writeFile(join(dir,filename),bytes,{flag:'wx',mode:0o600});}
       catch(e){
         if(e?.code!=='EEXIST')throw e;
-        const prior=await readFile(join(dir,filename));
-        if(prior.length!==bytes.length||sha(prior)!==evidence.payload_sha256)
-          throw Error('immutable_original_conflict');
       }
+      // Every actual acquisition must be verified against the file bytes
+      // independently, including a first-write path, before claiming a
+      // captured original. Never overwrite a conflicting same-name original.
+      const prior=await readFile(join(dir,filename));
+      if(prior.length!==bytes.length||sha(prior)!==evidence.payload_sha256||
+          !prior.equals(bytes))throw Error('immutable_original_conflict');
       const observation={...base,...evidence,original_file:filename,status:'ORIGINAL_SAVED_RESEARCH_ONLY'};
       if(source.kind==='public_chart_html'){
-        // Preserve the first-party original; unlike the API adapter there is
-        // no reviewed public HTML rank decoder. Never invent a parse result.
-        observation.status='ORIGINAL_CAPTURED_PUBLIC_CHART_DECODER_PENDING';
+        // A public playlist/landing HTML is not a proven observation list,
+        // reporting period, provider stream count, or governed collector receipt.
+        observation.status=supplementary?
+          'SPOTIFY_EDITORIAL_ORIGINAL_CAPTURED_NO_RANK_VALIDATION':
+          'ORIGINAL_CAPTURED_PUBLIC_CHART_DECODER_PENDING';
         records.push(observation);
         continue;
       }
@@ -137,8 +157,10 @@ async function main(){
     JSON.stringify(report,null,2)+'\n',{mode:0o600,flag:'wx'});
   // No original bytes or developer token are ever printed.
   console.log(JSON.stringify({private_directory:dir,report:reportName,
-    summary:records.map(r=>({provider:r.provider,status:r.status,
+    summary:records.map(r=>({provider:r.provider,source:r.source_key,
+      signal_class:r.signal_class,status:r.status,
       http_status:r.http_status??null,observed_depth:r.observed_depth??null,
-      sha256:r.payload_sha256??null}))},null,2));
+      sha256:r.payload_sha256??null,content_type:r.content_type??null,
+      byte_length:r.byte_length??null}))},null,2));
 }
 await main();
