@@ -43,12 +43,12 @@ type RecoveryAction = {
   reason:string;createdAt:string;canCollect:false;canScore:false;canPublish:false;
 };
 const CORE_PROVIDERS=[
-  {key:'youtube_ke',label:'YouTube Kenya'},
-  {key:'spotify_ke',label:'Spotify Kenya'},
-  {key:'boomplay_ke',label:'Boomplay Kenya'},
+  // Founder-approved five-core priority order, issue #1338.
   {key:'apple_ke',label:'Apple Music Kenya'},
-  {key:'mdundo_ke',label:'Mdundo Kenya'},
   {key:'shazam_ke',label:'Shazam Kenya'},
+  {key:'mdundo_ke',label:'Mdundo Kenya'},
+  {key:'youtube_ke',label:'YouTube Kenya'},
+  {key:'audiomack_ke',label:'Audiomack Kenya'},
 ] as const;
 type ProviderReadiness={
   key:string;label:string;proposalCount:number;decisionCount:number;
@@ -628,8 +628,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         </Card>
         <Card title="Core Provider Readiness">
           <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
-            Six Kenya platforms are in scope for future collection. The following
-            source proposals and method decisions are separate from factual research.
+            Five founder-selected Kenya platforms are in scope, in the displayed order.
+            Source selection is not collector admission; existing research and historical
+            source records remain separately auditable.
             Candidate enrollment does not activate collection or publishing.
           </p>
           {(proposalPhase==='loading'||methodPhase==='loading')&&
@@ -640,7 +641,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             </p>}
           {proposalPhase==='ready'&&methodPhase==='ready'&&
             <WkDataTable<ProviderReadiness> rows={providerReadiness} getKey={p=>p.key}
-              ariaLabel="Six core provider readiness" empty="No core providers configured."
+              ariaLabel="Five core provider readiness" empty="No core providers configured."
               columns={[
                 {key:'provider',label:'Platform',render:p=>
                   <span className="font-semibold text-wk-text">{p.label}</span>},
