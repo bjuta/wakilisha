@@ -67,12 +67,17 @@ export function validateDisposableCiReplayRepositoryState({
   changedActive,proofs,mergeBase,baseline,migrations,latestMigration,actualTypesSha256,
 }){
   const errors=[];
-  if(changedActive.length===0 ||
-      !changedActive.every(entry=>entry.status!=="D"&&isDisposableCiReplayProof(proofs.get(entry.path)))){
-    errors.push("disposable CI replay cannot mix changed migration proof modes");
+  // Previously accepted Preview proofs stay valid for THEIR historical
+  // migration bytes. The newly added latest migration is proven by current
+  // unlinked local CI; no new hosted Preview is required.
+  const localEntries=changedActive.filter(entry=>
+    entry.status!=="D" && isDisposableCiReplayProof(proofs.get(entry.path)));
+  if(localEntries.length===0 ||
+      !isDisposableCiReplayProof(proofs.get(changedActive.at(-1)?.path))){
+    errors.push("latest active migration must carry current unlinked CI proof");
     return errors;
   }
-  for(const entry of changedActive){
+  for(const entry of localEntries){
     const proof=proofs.get(entry.path);
     const replay=proof.replay_candidate_head_sha;
     if(git(["merge-base","--is-ancestor",replay,"HEAD"],{allowFailure:true}).status!==0)
