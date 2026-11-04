@@ -97,7 +97,10 @@ finally {
    command('Destroy only this newly owned disposable stack','supabase stop --no-backup');
    const owned=capture('docker',['ps','-a','--filter',`label=com.supabase.cli.project=${path.basename(dir)}`,'--format','{{.Names}}'],{env});
    const volumes=capture('docker',['volume','ls','--filter',`label=com.supabase.cli.project=${path.basename(dir)}`,'--format','{{.Name}}'],{env});
-   if(owned||volumes)stop('Owned resources remain');report.cleanup='pass';
+   const allNames=capture('docker',['ps','-a','--format','{{.Names}}'],{env}).split('\n');
+   const allVolumes=capture('docker',['volume','ls','--format','{{.Name}}'],{env}).split('\n');
+   const suffix='_'+path.basename(dir);
+   if(owned||volumes||allNames.some(n=>n.startsWith('supabase_')&&n.endsWith(suffix))||allVolumes.some(n=>n.startsWith('supabase_')&&n.endsWith(suffix)))stop('Owned resources remain');report.cleanup='pass';
   }catch(e){report.cleanup='fail';report.result='fail';report.reason=e.message;process.exitCode=1;}
  }
  if(locked)fs.rmdirSync(lock);
