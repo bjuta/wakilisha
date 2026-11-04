@@ -18,7 +18,6 @@ const PROVIDERS=Object.freeze({
   boomplay_ke:'boomplay_kenya_chart_v1',
   mdundo_ke:'mdundo_kenya_chart_v1',
   shazam_ke:'shazam_kenya_discovery_v1',
-  spotify_ke:'spotify_kenya_offered_chart_csv_v1',
   audiomack_ke:'audiomack_kenya_chart_v1',
 });
 const METHOD=new Set(['provider_api','offered_export','reviewed_page_adapter','research_only']);
@@ -53,7 +52,7 @@ export function validateWk100SourceMethodDecision(payload,{now=new Date()}={}){
     !(now instanceof Date)||!Number.isFinite(now.valueOf()))fail('method_review_invalid');
   const p=payload;
   if(typeof p.sourceKey!=='string'||!SOURCE.test(p.sourceKey)||
-    typeof p.providerKey!=='string'||!Object.hasOwn(PROVIDERS,p.providerKey)||
+    typeof p.providerKey!=='string'||!Object.hasOwn({...PROVIDERS,spotify_ke:null},p.providerKey)||
     !p.sourceKey.startsWith(p.providerKey+'_')||
     !Number.isInteger(p.proposalRevision)||p.proposalRevision<1||p.proposalRevision>100000||
     !STATE.has(p.decisionState)||!METHOD.has(p.methodClass)||
@@ -68,7 +67,6 @@ export function validateWk100SourceMethodDecision(payload,{now=new Date()}={}){
   if(p.decisionState==='collector_admitted'){
     if(!PROVIDERS[p.providerKey]||p.parserClass!==PROVIDERS[p.providerKey]||
       p.methodClass==='research_only'||
-      (p.providerKey==='spotify_ke'&&p.methodClass!=='offered_export')||
       p.nativePeriodAuthority!=='provider_defined'||
       typeof p.nativePeriodEvidenceRef!=='string'||p.nativePeriodEvidenceRef.length<3||
       !HEX.test(p.endpointSha256??'')||!HEX.test(p.accessEvidenceSha256??'')||
