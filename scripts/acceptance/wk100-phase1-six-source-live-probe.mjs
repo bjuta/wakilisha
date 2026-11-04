@@ -131,7 +131,7 @@ function inspectCandidateJson(sourceKey,bytes){
   if(sourceKey!=='youtube_ke_weekly_browse_candidate')
     return {status:'UNEXPECTED_CANDIDATE_JSON'};
   let nodes=0,lists=0,maxDepth=0,validCountRows=0,periodLabels=0;
-  const periods=new Set(),periodMetadata=[];
+  const periods=new Set(),periodMetadata=[],trackViewPaths=[];
   const periodMetaKey=/^(perspectiveMetadata|entityId|chartPeriod|periodLabel|startDate|endDate|dateRange|chartKey|chartId|periodKey|period_key|period)$/i;
   // Only shallow, bounded provider metadata values; no artist, song,
   // user, or internal arbitrary-content dump into CI logs.
@@ -140,16 +140,17 @@ function inspectCandidateJson(sourceKey,bytes){
       /^[A-Za-z0-9 _:/.,-]+$/.test(v))return v;
     return null;
   };
-  function walk(value,depth=0){
+  function walk(value,depth=0,path='root'){
     nodes++;
     if(nodes>120_000||depth>35)throw Error('candidate_json_traversal_limit');
     if(!value||typeof value!=='object')return;
     if(Array.isArray(value)){
-      for(const item of value)walk(item,depth+1);
+      for(const item of value)walk(item,depth+1,path+'[]');
       return;
     }
     if(Array.isArray(value.trackViews)){
       lists++;
+      if(trackViewPaths.length<4)trackViewPaths.push(path+'.trackViews');
       maxDepth=Math.max(maxDepth,value.trackViews.length);
       for(const row of value.trackViews){
         const position=row?.chartEntryMetadata?.currentPosition;
@@ -162,6 +163,7 @@ function inspectCandidateJson(sourceKey,bytes){
       }
     }
     for(const [key,child] of Object.entries(value)){
+      const nextPath=path+'.'+key.replace(/[^a-zA-Z0-9_]/g,'_').slice(0,48);
       if(periodMetaKey.test(key)&&periodMetadata.length<20){
         if(key==='perspectiveMetadata'&&child&&typeof child==='object'&&!Array.isArray(child)){
           const fields=Object.entries(child).filter(([k])=>periodMetaKey.test(k))
@@ -169,14 +171,14 @@ function inspectCandidateJson(sourceKey,bytes){
           periodMetadata.push({key,fields:fields.slice(0,8)});
         }else{
           const v=metaValue(child);
-          if(v)periodMetadata.push({key,value:v});
+          if(v)periodMetadata.push({key,value:v,path:nextPath});
         }
       }
       if(['periodKey','period_key','period'].includes(key)&&
         typeof child==='string'&&/^weekly:[0-9]{8}:[0-9]{8}:ke$/.test(child)){
         periodLabels++;periods.add(child);
       }
-      if(key!=='trackViews')walk(child,depth+1);
+      if(key!=='trackViews')walk(child,depth+1,nextPath);
     }
   }
   try{walk(root);}catch{return {status:'YOUTUBE_INTERNAL_JSON_TOO_COMPLEX'};}
@@ -187,6 +189,7 @@ function inspectCandidateJson(sourceKey,bytes){
     rows_with_rank_and_view_count:validCountRows,
     exact_period_label_count:periodLabels,distinct_period_labels:periods.size,
     bounded_provider_period_metadata:periodMetadata,
+    bounded_track_views_paths:trackViewPaths,
     native_period_authority:'unverified'};
 }
 
@@ -352,7 +355,8 @@ async function main(){
           observation.method_diagnostics={chart_surface:parsed.chart_surface,
             rank_authority:parsed.rank_authority??null,
             artist_authority:parsed.artist_authority??null,
-            provider_track_identity_authority:parsed.provider_track_identity_authority??null};
+            provider_track_identity_authority:parsed.provider_track_identity_authority??null,
+            first_party_structural_rank_evidence:audiomackPublicMetaDiagnostics(text)};
         }
       }catch(e){
         observation.status='ORIGINAL_CAPTURED_PARSER_NOT_QUALIFIED';
