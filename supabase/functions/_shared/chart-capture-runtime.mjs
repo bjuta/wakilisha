@@ -15,7 +15,8 @@ import { parseMdundoKenya, parseAudiomackKenya, parseBoomplayKenya,
 
 const PARSERS = Object.freeze({
   mdundo_ke: bytes => parseMdundoKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
-  audiomack_ke: bytes => parseAudiomackKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
+  audiomack_ke: (bytes,access) => parseAudiomackKenya(
+    new TextDecoder('utf-8',{fatal:true}).decode(bytes),access),
   boomplay_ke: bytes => parseBoomplayKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
   shazam_ke: bytes => parseShazamKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
   spotify_ke: bytes => parseSpotifyKenyaWeeklyCandidate(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
