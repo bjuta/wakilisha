@@ -30,7 +30,7 @@ alter table platform_private.wk100_source_method_decisions_v1
       length(native_period_evidence_ref) between 3 and 240 and
       native_period_evidence_ref !~ '[[:cntrl:]<>?&=#@]' and
       (native_period_authority<>'observed_as_of' or (
-        provider_key not in ('youtube_ke','spotify_ke') and
+        provider_key in ('apple_ke','shazam_ke','mdundo_ke','audiomack_ke') and
         native_period_evidence_ref ~
           '^observed_as_of/[a-z0-9][a-z0-9_.-]{2,119}$')) and
       endpoint_sha256 is not null and
@@ -131,7 +131,7 @@ begin
       -- YouTube Top Songs and Spotify exported charts stay period-bound until
       -- an independently reviewed as-of-specific adapter exists.
       or (p_payload->>'nativePeriodAuthority'='observed_as_of' and (
-        v_p.provider_key in ('youtube_ke','spotify_ke') or
+        v_p.provider_key not in ('apple_ke','shazam_ke','mdundo_ke','audiomack_ke') or
         coalesce(p_payload->>'nativePeriodEvidenceRef','') !~
           '^observed_as_of/[a-z0-9][a-z0-9_.-]{2,119}$'))
       or coalesce(length(p_payload->>'nativePeriodEvidenceRef'),0)<3
@@ -218,7 +218,7 @@ begin
     or v_decision.decision_state<>'collector_admitted'
     or coalesce(v_decision.native_period_authority,'') not in ('provider_defined','observed_as_of')
     or (v_decision.native_period_authority='observed_as_of' and (
-      v_decision.provider_key in ('youtube_ke','spotify_ke') or
+      v_decision.provider_key not in ('apple_ke','shazam_ke','mdundo_ke','audiomack_ke') or
       v_decision.native_period_evidence_ref !~
         '^observed_as_of/[a-z0-9][a-z0-9_.-]{2,119}$'))
     or v_decision.authorization_expires_at<=now()
@@ -326,7 +326,7 @@ begin
     and d.method_class=p.method_class and p.method_class<>'research_only'
     and d.native_period_authority in ('provider_defined','observed_as_of')
     and (d.native_period_authority<>'observed_as_of' or (
-      d.provider_key not in ('youtube_ke','spotify_ke') and
+      d.provider_key in ('apple_ke','shazam_ke','mdundo_ke','audiomack_ke') and
       d.native_period_evidence_ref ~
         '^observed_as_of/[a-z0-9][a-z0-9_.-]{2,119}$'))
     and d.authorization_expires_at>now();

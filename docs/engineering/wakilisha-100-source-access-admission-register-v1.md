@@ -45,7 +45,9 @@ as-of evidence affects scoring and source-family caps, not Phase 1.
 
 **Current implementation boundary:** This additive Phase 1 forward contract
 permits `observed_as_of` for an independently qualified ranked-source method;
-it does not qualify Audiomack's unverified title metadata order. YouTube's
+it does not qualify Audiomack's unverified title metadata order. Boomplay
+is excluded by the founder-approved constitution and cannot enter this
+as-of admission route. YouTube's
 current weekly `trackViews` parser demands a bound provider period and its
 undocumented web-client POST is not an approved unattended GET; Spotify's
 official weekly chart export is also period-specific. Those two existing

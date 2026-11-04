@@ -23,6 +23,7 @@ const PROVIDERS=Object.freeze({
 });
 const METHOD=new Set(['provider_api','offered_export','reviewed_page_adapter','research_only']);
 const PERIOD_AUTHORITY=new Set(['provider_defined','observed_as_of']);
+const OBSERVED_PROVIDERS=new Set(['apple_ke','shazam_ke','mdundo_ke','audiomack_ke']);
 // Reviewed missing-period evidence reference, never a claimed provider-native week.
 const OBSERVED_POLICY=/^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/;
 const STATE=new Set(['held','collector_admitted','paused','retired']);
@@ -75,8 +76,8 @@ export function validateWk100SourceMethodDecision(payload,{now=new Date()}={}){
       !PERIOD_AUTHORITY.has(p.nativePeriodAuthority)||
       // Neither the Spotify weekly chart-export method nor the YouTube
       // period-bound weekly parser may silently become an as-of-only adapter.
-      (['spotify_ke','youtube_ke'].includes(p.providerKey)&&
-        p.nativePeriodAuthority==='observed_as_of')||
+      (p.nativePeriodAuthority==='observed_as_of'&&
+        !OBSERVED_PROVIDERS.has(p.providerKey))||
       (p.nativePeriodAuthority==='observed_as_of'&&
         !OBSERVED_POLICY.test(p.nativePeriodEvidenceRef??''))||
       typeof p.nativePeriodEvidenceRef!=='string'||p.nativePeriodEvidenceRef.length<3||

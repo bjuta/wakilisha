@@ -56,6 +56,7 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
     setDraft(d=>({...d,[key]:value}));setError('');
   };
   const admitted=draft.decisionState==='collector_admitted';
+  const supportsObservedAsOf=['apple_ke','shazam_ke','mdundo_ke','audiomack_ke'].includes(proposal.providerKey);
   const parser=PARSERS[proposal.providerKey]??null;
   const allowedAdmission=!!parser&&proposal.methodClass!=='research_only'&&
     (proposal.providerKey!=='spotify_ke'||(proposal.methodClass==='offered_export'&&
@@ -63,7 +64,7 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
       proposal.cadence==='weekly'));
   const valid=draft.constitutionVersion.trim().length>=2&&
     (!admitted||periodAuthority==='provider_defined'||
-      (!['youtube_ke','spotify_ke'].includes(proposal.providerKey)&&
+      (supportsObservedAsOf&&
        /^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(draft.nativePeriodEvidenceRef.trim())))&&
     draft.reason.trim().length>=6&&
     (!admitted||(allowedAdmission&&
@@ -198,7 +199,7 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
           onChange={value=>{setPeriodAuthority(value as PeriodAuthority);setError('');}}
           options={[
             {value:'provider_defined',label:'Provider-declared reporting period or chart date'},
-            ...(!['youtube_ke','spotify_ke'].includes(proposal.providerKey)?[
+            ...(supportsObservedAsOf?[
               {value:'observed_as_of',label:'WAKILISHA observed-as-of (native period unknown)'},
             ]:[]),
           ]}/>

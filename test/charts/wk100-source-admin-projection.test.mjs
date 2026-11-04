@@ -456,6 +456,7 @@ test('WK100 source-method review cannot convert research-only or a mismatched pr
     {nativePeriodAuthority:'unknown'},
     {providerKey:'youtube_ke',sourceKey:'youtube_ke_weekly',parserClass:'youtube_kenya_weekly_top_songs_v1'},
     {providerKey:'spotify_ke',sourceKey:'spotify_ke_chart',parserClass:'spotify_kenya_offered_chart_csv_v1'},
+    {providerKey:'boomplay_ke',sourceKey:'boomplay_ke_chart',parserClass:'boomplay_kenya_chart_v1'},
   ])assert.throws(()=>validateWk100SourceMethodDecision({...asOf,...patch},{now}),
     /method_admission_unqualified/);
   for(const patch of [

@@ -58,7 +58,7 @@ export async function bindWk100DispatchAuthority({
       !['provider_defined','observed_as_of'].includes(row.native_period_state)||
       (row.native_period_state==='observed_as_of'&&
         (!/^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(row.native_period_evidence_ref??'')||
-         ['youtube_ke','spotify_ke'].includes(row.provider_key)))||
+         !['apple_ke','shazam_ke','mdundo_ke','audiomack_ke'].includes(row.provider_key)))||
       !SHA.test(row.evidence_sha256)||
       !SHA.test(row.endpoint_sha256)||typeof entry.endpoint!=='string'||
       entry.endpoint.length>1200||
@@ -134,7 +134,7 @@ export function isWk100CaptureConstitutionCurrent({
     ['provider_defined','observed_as_of'].includes(r.native_period_state) &&
     (r.native_period_state!=='observed_as_of'||
       (/^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(r.native_period_evidence_ref??'')&&
-       !/^(youtube_ke|spotify_ke)(?:_|$)/.test(r.source_key))) &&
+       /^(apple_ke|shazam_ke|mdundo_ke|audiomack_ke)_/.test(r.source_key))) &&
     typeof r.native_period_evidence_ref==='string' &&
     r.native_period_evidence_ref.length>=3 &&
     Number.isFinite(Date.parse(r.authorization_expires_at)) &&

@@ -46,7 +46,7 @@ function isQualified(d,c,now) {
     d.native_period_evidence_ref.length<3||
     (d.native_period_state==='observed_as_of'&&
       (!/^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(d.native_period_evidence_ref)||
-       ['youtube_ke','spotify_ke'].includes(d.provider_key))))
+       !['apple_ke','shazam_ke','mdundo_ke','audiomack_ke'].includes(d.provider_key))))
     return 'native_period_unverified';
   if(typeof d.authorization_ref!=='string'||d.authorization_ref.length<3||
     !SHA.test(d.evidence_sha256)||!SHA.test(d.endpoint_sha256)||
