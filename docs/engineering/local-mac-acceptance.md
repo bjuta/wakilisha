@@ -1,12 +1,17 @@
-# Mac local verification migration — staged, not release accepted
+# Mac local verification migration — supervised review
 
 4 November 2026 (Africa/Nairobi). Audited PR #1345 head:
 `0ae76e4595083505a208a5e4b834675b28563810`.
 Observed current main: `24ec5400327a70a9d5610d350a4ca487f28c1e13`.
 
+Current policy: supervised review of the exact-commit local evidence; no signing
+key is required. Main review protection is enabled on the now-public repository.
+Earlier account-plan observations below are historical. Production release is a
+separate supervised action.
+
 This record supersedes the hosted-execution recommendations in
 `ci-budget-recovery-and-draft-gates-20261104.md`. This branch is an isolated
-implementation candidate. Do not publish or merge it as a completed rollout.
+implementation candidate published for review; it has not been merged.
 
 ## Complete hosted workflow inventory
 
@@ -71,25 +76,23 @@ blocker; do not infer that protection is enforced or delete required contexts.
 Private-repository protected branches require a qualifying GitHub plan:
 https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches
 
-A safe rollout needs an owner-controlled independent verifier identity, e.g. a
-restricted GitHub App that publishes **new** `mac-local/*` checks only after it
-verifies signed, complete receipts against current PR head AND base, required
-scope coverage, command/source/lock digests, actual test results, cleanup and
-reviewer identity. Re-query head/base before publishing and invalidate on either
-change. Keep PR review, stale-review dismissal, conversation resolution,
-no-force-push/no-deletion, strict current-base validation and admin enforcement.
-Only then replace obsolete hosted required contexts with App-bound local contexts.
-Never write success to old `critical*` or pretend the Mac is GitHub Actions.
-No statuses, rules, review decisions or merges are changed by this implementation.
+The selected rollout uses explicit human review of local evidence. No signing
+key or GitHub App is required for this supervised process. Before approving a
+merge, the reviewer must compare the current candidate and main SHAs to the
+batch, check all eight scope results and their evidence hashes, confirm real
+SQL/Auth/Storage/browser coverage and successful scoped cleanup, and review the
+actual diff. Any executable change or changed base requires fresh verification.
+A documentation-only follow-up must be separately reviewed against the tested
+commit and must not be described as having run the original batch itself.
 
-Existing replay-proof validation still requires authentic hosted receipt identity.
-It has deliberately NOT been weakened to accept a hand-written JSON or fake URL.
-New local replay evidence must be signed by the independent verifier, bind the
-complete migration ledger and bytes, generated types, candidate/base, genuine
-Auth/Storage/race markers, and cleanup before adding a separate proof mode.
-Historical proof formats and signatures must remain valid for their own bytes.
-Until this trusted verifier/proof mode exists, new local reports cannot authorize
-migration merge or production release.
+GitHub enforces PR review, stale-review dismissal, resolved conversations, admin
+enforcement, no force pushes and no deletion. It does not automatically enforce
+the local test results. No old hosted check is marked successful and no new
+required automated status is fabricated. The existing hosted historical replay
+proof contracts remain unchanged; local evidence is separately identified and
+cannot be passed off as a hosted receipt. Any future automated acceptance system
+needs its own reviewed trust design; the optional signature verifier is not a
+prerequisite for this manual review process.
 
 Production preflight is not harmless: the existing Release broker temporarily
 PUTs JIT access/roles even in preflight mode. It was inspected, not executed,
@@ -109,8 +112,8 @@ No local acceptance flag bypasses these gates.
    broad-container acceptance must not be attempted on them. Use a dedicated
    Docker context/VM or an owner-reviewed resource reconciliation; do not stop them
    unattended. Existing tests hardcode localhost:54321 and broad DB discovery.
-3. Establish trusted verifier/provenance and verifiable merge protection. Keep the
-   release hold while any of these is missing.
+3. Review the exact-head local evidence under the supervised process above.
+   Verify the enabled GitHub review protection before merging.
 4. Land the zero-minute workflow retirement only with a complete reviewed local
    gate replacement. Do not ready the PR under the current remote workflows:
    that would still trigger billable Actions before this candidate is merged.
@@ -176,15 +179,27 @@ an independently pinned public-key fingerprint and exact head/base. Preparation
 hashes each report, step log and evidence bundle, enforces eight distinct scopes,
 and requires real disposable cleanup/isolation. Receipt tampering, unsigned or
 untrusted keys, stale heads/bases, missing scopes and failed cleanup are rejected.
-The private signing key must be controlled by a trusted operator outside this
+If automated signature verification is selected in future, the private signing
+key must be controlled by a trusted operator outside this
 repository and outside the agent's signing authority. The fingerprint must come
 from that operator's established policy, not from this repository or a generated
 assistant key. An operator must independently reproduce or audit the execution;
 blindly signing a JSON file does not establish independent verification.
 
 A verified development receipt expressly grants **no** Production deployment
-permission. Enforced merge protection/App identity and production JIT/preflight,
+permission. Human merge review and production JIT/preflight,
 exact-main/pending-set, promotion, frontend deployment and postflight gates remain
-separate. The account-plan 403 is not bypassed, and production launchers remain
-on hold. The batch produces a concrete review package, not a fabricated green
+separate. The earlier account-plan limitation was resolved when the owner made the
+repository public; main review protection is enabled. Production launchers remain
+on hold pending the separate deployment process. The batch produces a concrete review package, not a fabricated green
 GitHub-hosted check or a self-signed release approval.
+
+## Selected supervised review policy — 4 November 2026
+
+The owner selected ordinary review of saved Mac test evidence. Digital signatures
+are optional future tooling, not a merge prerequisite. All eight scopes passed
+at commit `2486898b9722e2d2e9300f3ce710970909ce5c09` against main
+`24ec5400327a70a9d5610d350a4ca487f28c1e13`. This policy follow-up changes
+documentation only; it does not rerun or relabel that evidence. A reviewer must
+inspect this documentation diff as well. Approval of development verification
+does not authorize production changes or source admission.
