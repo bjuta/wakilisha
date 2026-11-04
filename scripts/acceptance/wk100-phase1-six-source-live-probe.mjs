@@ -112,6 +112,63 @@ async function getBounded(url,kind='GET'){
       byte_length:bytes.byteLength,payload_sha256:sha(bytes)};
   }finally{clearTimeout(timer);abort.abort();}
 }
+// Structural research diagnostics from genuine bytes. Deliberately refuses to
+// assert chart-native week authority, row count acceptance or an API grant.
+function inspectCandidateJson(sourceKey,bytes){
+  let body;
+  try{body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}
+  catch{return {status:'FIRST_PARTY_JSON_INVALID'};}
+  const root=body&&typeof body==='object'&&!Array.isArray(body)?body:null;
+  if(!root)return {status:'FIRST_PARTY_JSON_SHAPE_UNQUALIFIED'};
+  if(sourceKey==='audiomack_ke_playlist_api_candidate'){
+    // The documented API may return access restrictions or a playlist
+    // projection; keys alone never qualify a 100-rank Kenya chart.
+    return {status:'AUDIOMACK_PLAYLIST_API_SCHEMA_UNVERIFIED',
+      root_keys:Object.keys(root).sort().slice(0,16)};
+  }
+  if(sourceKey!=='youtube_ke_weekly_browse_candidate')
+    return {status:'UNEXPECTED_CANDIDATE_JSON'};
+  let nodes=0,lists=0,maxDepth=0,validCountRows=0,periodLabels=0;
+  const periods=new Set();
+  function walk(value,depth=0){
+    nodes++;
+    if(nodes>120_000||depth>35)throw Error('candidate_json_traversal_limit');
+    if(!value||typeof value!=='object')return;
+    if(Array.isArray(value)){
+      for(const item of value)walk(item,depth+1);
+      return;
+    }
+    if(Array.isArray(value.trackViews)){
+      lists++;
+      maxDepth=Math.max(maxDepth,value.trackViews.length);
+      for(const row of value.trackViews){
+        const position=row?.chartEntryMetadata?.currentPosition;
+        const count=row?.viewCount;
+        if((typeof position==='number'&&Number.isInteger(position)&&position>0||
+            typeof position==='string'&&/^[1-9][0-9]{0,3}$/.test(position))&&
+          (typeof count==='number'&&Number.isSafeInteger(count)&&count>=0||
+            typeof count==='string'&&/^[0-9]{1,15}$/.test(count)))
+          validCountRows++;
+      }
+    }
+    for(const [key,child] of Object.entries(value)){
+      if(['periodKey','period_key','period'].includes(key)&&
+        typeof child==='string'&&/^weekly:[0-9]{8}:[0-9]{8}:ke$/.test(child)){
+        periodLabels++;periods.add(child);
+      }
+      if(key!=='trackViews')walk(child,depth+1);
+    }
+  }
+  try{walk(root);}catch{return {status:'YOUTUBE_INTERNAL_JSON_TOO_COMPLEX'};}
+  return {status:lists===1&&validCountRows>0?
+    'YOUTUBE_INTERNAL_VIEW_ROWS_OBSERVED_PERIOD_NOT_ADMITTED':
+    'YOUTUBE_INTERNAL_TRACKVIEWS_NOT_QUALIFIED',
+    track_view_lists:lists,max_candidate_depth:maxDepth,
+    rows_with_rank_and_view_count:validCountRows,
+    exact_period_label_count:periodLabels,distinct_period_labels:periods.size,
+    native_period_authority:'unverified'};
+}
+
 async function main(){
   const args=process.argv.slice(2);
   if(args.length!==1||!['--dry-run','--fetch'].includes(args[0])){
@@ -165,6 +222,13 @@ async function main(){
       if(prior.length!==bytes.length||sha(prior)!==evidence.payload_sha256||
           !prior.equals(bytes))throw Error('immutable_original_conflict');
       const observation={...base,...evidence,original_file:filename,status:'ORIGINAL_SAVED_RESEARCH_ONLY'};
+      if(alternate){
+        const checked=inspectCandidateJson(source.id,bytes);
+        observation.status=checked.status;
+        observation.method_diagnostics=checked;
+        records.push(observation);
+        continue;
+      }
       if(source.kind==='public_chart_html'&&source.id!=='apple_ke'){
         // A public playlist/landing HTML is not a proven observation list,
         // reporting period, provider stream count, or governed collector receipt.
@@ -207,6 +271,8 @@ async function main(){
       http_status:r.http_status??null,observed_depth:r.observed_depth??null,
       sha256:r.payload_sha256??null,content_type:r.content_type??null,
       byte_length:r.byte_length??null,
-      parse_failure:r.parse_failure??null}))},null,2));
+      parse_failure:r.parse_failure??null,
+      requested_chart_end_date:r.requested_chart_end_date??null,
+      method_diagnostics:r.method_diagnostics??null}))},null,2));
 }
 await main();
