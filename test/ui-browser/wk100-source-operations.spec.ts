@@ -248,6 +248,23 @@ test('five founder-selected core providers show truthful readiness and no invent
     expect(actualCoreRows[i+1]).toContain(selectedCore[i]);
   await expect(table.getByText('Boomplay Kenya',{exact:true})).toHaveCount(0);
   await expect(table.getByText('Spotify Kenya',{exact:true})).toHaveCount(0);
+  // Required editorial observations remain visible outside the five primary
+  // readiness rows. Four playlists are ONE supplementary provider family.
+  const editorial=page.getByRole('list',{name:'Required Spotify editorial sources'});
+  await expect(editorial).toBeVisible();
+  const editorialLinks=[
+    ['Hot Hits Kenya','37i9dQZF1DWWWXigQZAD8B'],
+    ['New Music Friday Kenya','37i9dQZF1DX5lbl7P6kJFp'],
+    ['Made In Kenya','37i9dQZF1DX7z7RLIui5KP'],
+    ['Gengetone Fire','37i9dQZF1DX80fLED6RkGS'],
+  ];
+  for(const [name,id] of editorialLinks){
+    await expect(editorial.getByRole('link',{name,exact:true}))
+      .toHaveAttribute('href','https://open.spotify.com/playlist/'+id);
+  }
+  await expect(editorial.getByRole('listitem')).toHaveCount(4);
+  await expect(page.getByText('Numeric weighting and anti-double-counting are approved in Phase 3.',{exact:false}))
+    .toBeVisible();
   // The genuine 29–30 October original-byte archive is independent of
   // candidate collection. Research remains visible with zero proposals.
   const archive=page.getByRole('table',{name:'Archived Kenya research observations'});
