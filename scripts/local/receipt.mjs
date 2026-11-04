@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash,createPublicKey,verify} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-export const REQUIRED_LOCAL_LANES=Object.freeze(['core','browser','source-preflight','mizizi-sql','mizizi-auth','wk100','public-runtime']);
+export const REQUIRED_LOCAL_LANES=Object.freeze(['core','browser','source-preflight','mizizi-sql','mizizi-auth','wk100','public-runtime','schema-read']);
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const hex40=x=>/^[0-9a-f]{40}$/.test(x??'');
 const hex64=x=>/^[0-9a-f]{64}$/.test(x??'');
@@ -51,7 +51,7 @@ export function prepareReceipt({head,base,reportPaths}){
   }
   return {lane:r.lane,result:r.result,head:r.head,base:r.base,planSha256:r.plan_sha256,reportSha256:sha(bytes),bundleSha256:sha(JSON.stringify(r.files)),stepCount:r.steps.length,nonzeroSteps:r.steps.filter(s=>s.exit!==0).length,cleanup:r.cleanup,unrelatedResourcesPreserved:r.unrelated_resources_preserved};
  });
- if(lanes.length!==REQUIRED_LOCAL_LANES.length||REQUIRED_LOCAL_LANES.some(l=>lanes.filter(x=>x.lane===l).length!==1))throw Error('All seven distinct real acceptance scopes are required');
+ if(lanes.length!==REQUIRED_LOCAL_LANES.length||REQUIRED_LOCAL_LANES.some(l=>lanes.filter(x=>x.lane===l).length!==1))throw Error('All eight distinct real acceptance scopes are required');
  return {kind:'mac-local-development-acceptance-v1',head,base,planSha256,githubHostedCheck:false,productionDeploymentAuthorized:false,lanes:lanes.sort((a,b)=>a.lane.localeCompare(b.lane)),constraints:{liveSchemaDriftRequiresSeparateEvidence:true,productionPreflightsRequireSeparateAuthorization:true,enforcedMergePolicyRequiresSeparateEvidence:true}};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){

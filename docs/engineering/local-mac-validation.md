@@ -112,3 +112,69 @@ The Supabase changelog checked during implementation announces CLI v3 changes on
 4 November; the existing v2 pins are intentionally retained. See the official
 [CLI notice](https://supabase.com/changelog/supabase-cli-v3) and
 [local-stack CLI reference](https://supabase.com/docs/reference/cli/supabase-start).
+
+## Superseding results after Desktop cleanup
+
+These scoped results replace the earlier blockers where explicitly stated; they
+are not yet a single final-head acceptance bundle.
+
+| Scope | Candidate | Report directory | Actual result |
+| --- | --- | --- | --- |
+| MIZIZI SQL/corpus/concurrency | `fc6094b9` | `wakilisha-local-fFy2sD` | PASS, full replay, SQL corpus, W31 concurrency, cleanup, pre-existing resources preserved |
+| MIZIZI genuine JWT/operator browsers/H38/O25 | `c82a0341` | `wakilisha-local-iskdND` | PASS, full replay, real clients, cleanup, pre-existing resources preserved |
+| WK100 and critical security | `4aefdada` | `wakilisha-local-wuxLVU` | PASS; critical suite: 677 Vitest tests + 48 Node tests; genuine lease/Auth/Storage/live-source tests; cleanup and existing resources preserved |
+| Core/build | `17429fbb` | `wakilisha-local-9RTmZY` | PASS, all 35 steps; 481 Vitest test executions + 152 Node test executions (includes repeated contract suites); authoritative DDEX conformance and build |
+| Public-source diagnostic preflight | `fc6094b9` | `wakilisha-local-rOhU1e` | Process PASS; source statuses retain qualification limits below |
+| Public data/Edge/live browser | `01a71cb7` | `wakilisha-local-GqDmP2` | PASS, 8 integration tests and complete public browser runtime watch |
+| Canonical native schema/history | `2da29ba2` | `wakilisha-local-ThJ8T5` | PASS, pinned native CLI list/link/dry-run/schema reads; no apply, JIT toggle or deploy |
+
+All directories above are under `artifacts/local`, with commit/base/command-plan
+binding, hashed step logs and evidence inventories. None represents a hosted
+GitHub check. Later independent receipt tests reject cross-head aggregation;
+these scoped results must not be relabeled as a final-head release receipt.
+
+The public preflight process passing does not mean all sources are collector
+qualified. Apple (100), Shazam (200), Mdundo (100) and Audiomack public HTML (100)
+were parsed as research-only with unknown native period. YouTube public bytes
+were captured with the decoder still pending; its separate internal candidate
+observed view rows but had no admitted period. Four Spotify editorial originals
+were captured without rank validation. The Audiomack playlist API candidate
+returned 401 and remains unqualified. No source admission, publisher activation,
+scoring or Production capture was granted by these diagnostics.
+
+The replay failure was traced to a validator defect, not invalidating the
+historical successful replay itself: the 243-migration receipt exactly matches
+its replay tree, and the latest 244-migration receipt exactly matches its tree.
+The corrected validator preserves both identities and requires the newest
+receipt to cover the current full schema. A fresh Git-history regression test
+rejects historical snapshot tampering, changed SQL, stale latest replay and
+current-type mismatch. Existing 19 replay contract tests pass unchanged in their
+security assertions. No receipt URL, run result, SQL or database type was forged.
+
+The public runtime failure was an obsolete nonempty-row expectation for the
+retired legacy Edition surface. A read-only transaction confirmed zero rows;
+anonymous HTTP reads returned 200 with zero rows. The revised gate requires
+successful public access and absence of all 18 canonical retired IDs, while
+preserving the populated adjacent Registry/Guide/Release checks. The rerun passed.
+
+The DDEX server returned HTTP 522 in one core attempt (`wakilisha-local-rCD0Yh`);
+this failure was retained. A subsequent independent-gate core run passed the
+unchanged authoritative checksum/XSD gate and all remaining checks. Core now
+collects independent gate failures for diagnosis and keeps its aggregate failed
+if any gate fails; it never turns a failed prerequisite into release success.
+
+A read-only Production ledger observation found 236 applied migrations, head
+`20261101210335`, versus 244 canonical local files, eight pending and zero
+remote-only filenames. Exact filenames are in
+`artifacts/local/live-migration-ledger.json`. This observation did not apply,
+repair or reconcile any ledger entry. Canonical native schema verification also
+passed afterward. The pending set still requires separately authorized exact-main
+native promotion; it is not permission to deploy this candidate.
+
+The local receipt protocol and final-head batch are now implemented. Six tests
+cover orchestration, ownership, historical replay and detached signature trust,
+including rejection of missing/untrusted keys, stale head/base, incomplete scopes,
+failed cleanup and tampering. No production operator key was generated or used.
+The account-plan protection 403, independent trusted verifier identity, final-head
+batch/signature and separately authorized production operations remain rollout
+requirements. Production control planes remain on hold.

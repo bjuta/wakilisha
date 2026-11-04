@@ -124,3 +124,67 @@ No local acceptance flag bypasses these gates.
 
 See `local-mac-validation.md` for actual results and limitations. Core/browser/
 disposable success must never be inferred from plan generation or syntax checks.
+
+## Superseding implementation after disk recovery
+
+The empty-Docker-host limitation above is resolved in the local candidate.
+Every disposable run now has a private ownership manifest bound to its temporary
+checkout, a unique project ID, separately allocated local service ports, and an
+exact anchored container-name filter. The helper rejects malformed manifests,
+remote authority and links. No local execution claims a GitHub identity. The
+runner requires a local Unix Docker endpoint and CLI 2.121.0; cleanup uses an
+explicit `--project-id`, verifies both names and labels, and requires preservation
+of all pre-existing container IDs/names and volume names. Existing stacks can
+coexist and are not selected by broad legacy queries. Each full SQL replay and
+authentication test remains real, not mocked.
+
+`wk100` now runs the original `npm run test:critical` against real local Auth,
+REST and PostgreSQL before loading the lease/Storage fixtures. This retains the
+anonymous insert-denial tests without attempting writes against Production.
+`critical-security` is also available as an independent diagnostic lane.
+`schema-read` runs the existing native schema/history verifier (local link,
+migration list, native dry-run and schema reads), with no promotion or JIT toggle.
+`public-runtime` uses only an enabled anonymous/publishable key, verifies the
+exact project URL, and retains the public data, Edge and live browser probes.
+It does not run the privileged production control planes or install a schedule.
+
+The historical replay validator bug is corrected: earlier receipts must bind
+their actual replay commit's migration set, types and count, remain ancestors,
+and cover an unchanged current migration prefix. The newest receipt must still
+bind the entire current migration set/types/head and the baseline seal. Tests
+reject forged historical counts, changed migration bytes, a stale newest replay,
+and changed current types. Historical Actions URLs/run identities and successful
+real replay markers remain mandatory; no local receipt is substituted into an
+old hosted proof mode.
+
+The public runtime test no longer demands artificial nonempty legacy Edition
+data. Read-only Production and anonymous reads confirmed that surface is empty.
+The test now requires a successful public read and absence of the exact 18
+retired IDs from the canonical preserved RNB18 SQL. Nonempty Guide, Release
+relationships and adjacent Registry checks remain. No historical rows are
+manufactured and no Production state is changed.
+
+The exact-head batch entry point is `scripts/local/run-batch.mjs`. It locks its
+candidate and base logically by rechecking them before every lane, runs all eight
+required scopes, retains individual reports, and refuses an unsigned receipt if
+any scope fails, is stale/missing, or has changed evidence files. Cleanup or
+unrelated-resource preservation failure stops the batch. It does not create
+trusted keys, publish checks, merge, deploy or promote migrations.
+
+`scripts/local/receipt.mjs` verifies a detached Ed25519 operator signature against
+an independently pinned public-key fingerprint and exact head/base. Preparation
+hashes each report, step log and evidence bundle, enforces eight distinct scopes,
+and requires real disposable cleanup/isolation. Receipt tampering, unsigned or
+untrusted keys, stale heads/bases, missing scopes and failed cleanup are rejected.
+The private signing key must be controlled by a trusted operator outside this
+repository and outside the agent's signing authority. The fingerprint must come
+from that operator's established policy, not from this repository or a generated
+assistant key. An operator must independently reproduce or audit the execution;
+blindly signing a JSON file does not establish independent verification.
+
+A verified development receipt expressly grants **no** Production deployment
+permission. Enforced merge protection/App identity and production JIT/preflight,
+exact-main/pending-set, promotion, frontend deployment and postflight gates remain
+separate. The account-plan 403 is not bypassed, and production launchers remain
+on hold. The batch produces a concrete review package, not a fabricated green
+GitHub-hosted check or a self-signed release approval.
