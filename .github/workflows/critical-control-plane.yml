@@ -197,7 +197,9 @@ jobs:
         run: node --test test/charts/wk100-private-preview.test.mjs
 
       - name: Verify WK100 offline authority-bound intake
-        run: node --test test/charts/wk100-offline-intake-authority.test.mjs
+        run: |
+          node --test test/charts/wk100-offline-intake-authority.test.mjs
+          node --test test/charts/wk100-shazam-research-evidence.test.mjs
 
       - name: Verify WK100 server-only Admin preview and confidentiality
         run: |
