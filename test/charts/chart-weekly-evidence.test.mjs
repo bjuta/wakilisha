@@ -114,7 +114,7 @@ test('the kernel has no policy for converting native rank to stream counts',()=>
 import {
   parseMdundoKenya, parseAudiomackKenya, parseBoomplayKenya,
   parseShazamKenya, parseAppleKenya, parseYouTubeKenyaWeekly,
-  parseSpotifyChartCsvCandidate,
+  parseSpotifyChartCsvCandidate, parseSpotifyKenyaWeeklyCandidate,
 } from '../../supabase/functions/_shared/chart-public-source-observations.mjs';
 
 test('Mdundo parses explicit Kenya playlist ranks, and rejects unexplained rank gaps',()=>{
@@ -487,7 +487,7 @@ test('candidate archive stops on digest, missing ledger, corrupt readback and in
 });
 
 // Integrated WK100 candidate-only collector contract. Existing chart suite owner.
-import { runCandidateCapture,validateCaptureSlot } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
+import { runCandidateCapture,validateCaptureSlot,resolveCaptureParser,parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
 import { isWk100AppleCatalogChart,resolveWk100AppleProviderAuthorization } from '../../supabase/functions/_shared/wk100-apple-service-credential.mjs';
 import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 const wkRuntimeSlot='2026-10-19T09:00:00Z';
@@ -523,6 +523,88 @@ function wkRuntimeHarness(extra={}) {
     ...extra};
   return {events,objects,db,storage,args};
 }
+
+test('Spotify scoped collector adapter preserves native chart-eligible streams without YouTube view labels',()=>{
+  const header='rank,uri,artist_names,track_name,source,peak_rank,previous_rank,weeks_on_chart,streams';
+  const csv=[header,
+    '1,spotify:track:'+ 'A'.repeat(22)+',"Singer, Guest","Song, Mix",Label,1,0,2,2433',
+    '2,spotify:track:'+ 'B'.repeat(22)+',Another,Second,Label,2,1,1,2000',
+  ].join('\n');
+  const parsed=parseSpotifyKenyaWeeklyCandidate(csv);
+  assert.equal(parsed.source_key,'spotify_ke');
+  assert.equal(parsed.market,'KE'); // Contract-bound territory, not attested by CSV.
+  assert.equal(parsed.source_market_authority,'external_method_review_required');
+  assert.equal(parsed.source_period_authority,'unknown');
+  assert.equal(parsed.eligible_for_scoring,false);
+  assert.equal(parsed.source_admitted,false);
+  assert.equal(parsed.can_collect,false);assert.equal(parsed.can_publish,false);
+  const contract={...wkRuntimeContract,provider_key:'spotify_ke',
+    source_key:'spotify_ke_official_weekly',adapter_version:'spotify_kenya_offered_chart_csv_v1',
+    behavior:'consumption',native_metric:'rank_and_count',expected_depth:2};
+  const access={parser_class:'spotify_kenya_offered_chart_csv_v1'};
+  assert.equal(resolveCaptureParser(contract,access)?.providerKey,'spotify_ke');
+  assert.equal(resolveCaptureParser({...contract,source_key:'spotify_ke'},access),null);
+  assert.equal(resolveCaptureParser({...contract,source_key:'spotify_ke_playlist'},{}),null);
+  assert.equal(resolveCaptureParser({...contract,adapter_version:'youtube_kenya_weekly_top_songs_v1'},access),null);
+  assert.equal(resolveCaptureParser({...contract,provider_key:'youtube_ke'},access),null);
+  const rows=parseCaptureNativeRows(new TextEncoder().encode(csv),contract,access);
+  assert.equal(rows.length,2);
+  assert.deepEqual(rows.map(r=>r.source_native_count),[2433,2000]);
+  assert(rows.every(r=>!Object.hasOwn(r,'view_count')));
+  assert.equal(rows[0].title,'Song, Mix');
+  assert.equal(rows[0].artist,'Singer, Guest');
+  assert.throws(()=>parseCaptureNativeRows(new TextEncoder().encode(csv),
+    {...contract,native_metric:'rank'},access),/parser_contract_mismatch/);
+  assert.throws(()=>parseCaptureNativeRows(new TextEncoder().encode(csv),
+    contract,{}),e=>e?.code==='source_unimplemented');
+});
+
+test('Spotify collector candidate uses existing original-byte Storage/SQL lease without granting source authority',async()=>{
+  // Synthetic fixture, NOT official KE chart evidence or authorized Spotify egress.
+  const csv=['rank,uri,artist_names,track_name,source,peak_rank,previous_rank,weeks_on_chart,streams',
+    '1,spotify:track:'+ 'A'.repeat(22)+',Artist,Song,Label,1,0,1,200',
+    '2,spotify:track:'+ 'B'.repeat(22)+',Another,Second,Label,2,1,1,150'].join('\n');
+  const bytes=new TextEncoder().encode(csv);
+  const contract={...wkRuntimeContract,source_key:'spotify_ke_official_weekly',
+    provider_key:'spotify_ke',adapter_version:'spotify_kenya_offered_chart_csv_v1',
+    behavior:'consumption',native_metric:'rank_and_count',expected_depth:2};
+  const access={source_key:contract.source_key,
+    endpoint:'https://example.org/reviewed-spotify-candidate-not-real',
+    authorization_ref:'WK100-ACCESS-TEST-1',parser_class:contract.adapter_version};
+  const f=wkRuntimeHarness({contract,access,
+    fetchImpl:async()=>{f.events.push('fetch');return new Response(bytes,{
+      status:200,headers:{'content-type':'text/csv'},
+    });},
+  });
+  let pRows=null;
+  f.db.commit=async p=>{
+    f.events.push('commit');
+    assert.equal(p.p_outcome,'succeeded');
+    assert.equal(p.p_native_period_start,null);
+    assert.equal(p.p_native_period_end,null);
+    assert.equal(p.p_native_period_evidence_ref,null);
+    pRows=p.p_rows;
+    return {status:p.p_outcome,receipt_id:'fixture-receipt'};
+  };
+  const result=await runCandidateCapture(f.args);
+  assert.equal(result.status,'succeeded');
+  assert.equal(result.can_publish,false);
+  assert.deepEqual(pRows.map(r=>r.view_count),[200,150]);
+  assert.deepEqual(pRows.map(r=>r.provider_track_id),['A'.repeat(22),'B'.repeat(22)]);
+  assert(f.events.includes('fetch')&&f.events.includes('put')&&
+    f.events.includes('read')&&f.events.includes('commit'));
+  assert.equal(f.objects.size,1);
+  const stored=[...f.objects.values()][0];
+  assert.deepEqual(stored,bytes);
+  assert.equal(result.payload_sha256,
+    await (await import('../../supabase/functions/_shared/chart-candidate-capture.mjs')).sha256Hex(bytes));
+  const denied=wkRuntimeHarness({contract,access,
+    verifyAccess:async()=>false,
+    fetchImpl:async()=>{throw Error('must not fetch unapproved Spotify source');},
+  });
+  await assert.rejects(()=>runCandidateCapture(denied.args),/source_access_not_authorized/);
+  assert.deepEqual(denied.events,[]);
+});
 
 test('WK100 Apple signing is exact-route, opt-in, project-local and never creates collection authority',async()=>{
   const {webcrypto}=await import('node:crypto');
