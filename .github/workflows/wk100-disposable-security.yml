@@ -71,6 +71,10 @@ jobs:
 
       - name: Prove real signed-in JWT cannot read or list private WK100 raw object
         shell: bash
+        # Only the active Phase 1 delivery PR does real public provider egress.
+        # No hosted Preview, Production secret, cron, or fake release admission.
+        env:
+          WK100_LIVE_SOURCE_ACCEPTANCE: ${{ github.event.pull_request.number == 1345 && 'true' || 'false' }}
         run: node scripts/acceptance/wk100-genuine-auth-storage-disposable-ci.mjs
 
       - name: Destroy disposable database Auth Storage containers and volumes
