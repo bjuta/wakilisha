@@ -478,6 +478,53 @@ describe(
     );
 
     it(
+      "keeps heavyweight CI off draft PR runners and requires ready-to-review validation",
+      () => {
+        const critical = readFileSync(
+          ".github/workflows/critical-control-plane.yml",
+          "utf8",
+        );
+        const wk100 = readFileSync(
+          ".github/workflows/wk100-disposable-security.yml",
+          "utf8",
+        );
+        const mizizi = readFileSync(
+          ".github/workflows/mizizi-slice1-disposable-postgres.yml",
+          "utf8",
+        );
+
+        for (const workflow of [critical, wk100, mizizi]) {
+          expect(workflow).toContain(
+            "types: [opened, reopened, synchronize, converted_to_draft, ready_for_review]",
+          );
+          expect(workflow).toContain(
+            "github.event.pull_request.draft == false",
+          );
+        }
+
+        const nonDraftOrMain =
+          "if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}";
+        expect(critical.split(nonDraftOrMain)).toHaveLength(3);
+        expect(critical).toContain(
+          "if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}",
+        );
+        expect(critical).toContain("  push:\n    branches:\n      - main");
+        expect(critical).toContain(
+          'test "$CORE_RESULT" = "success"',
+        );
+        expect(critical).toContain(
+          'test "$BROWSER_RESULT" = "success"',
+        );
+        expect(wk100).toContain(
+          "if: ${{ github.event.pull_request.draft == false }}",
+        );
+        expect(mizizi).toContain(
+          "if: ${{ github.event.pull_request.draft == false }}",
+        );
+      },
+    );
+
+    it(
       "keeps Production migration promotion single-dispatch, serialized, and exact-main bound",
       () => {
         const workflow =

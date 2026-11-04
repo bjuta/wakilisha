@@ -2,6 +2,7 @@ name: Critical Control Plane
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, converted_to_draft, ready_for_review]
   push:
     branches:
       - main
@@ -17,6 +18,7 @@ concurrency:
 jobs:
   critical-core:
     name: critical-core
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # Live schema CLI authentication and Production JIT must not overlap.
@@ -240,6 +242,7 @@ jobs:
 
   critical-browser:
     name: critical-browser
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
@@ -305,7 +308,7 @@ jobs:
 
   critical:
     name: critical
-    if: ${{ always() }}
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
     needs:
       - critical-core
       - critical-browser

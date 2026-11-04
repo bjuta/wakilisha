@@ -2,6 +2,7 @@ name: MIZIZI Slice 1 Disposable PostgreSQL Proof
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, converted_to_draft, ready_for_review]
     branches: [main]
     paths:
       - ".github/workflows/mizizi-slice1-disposable-postgres.yml"
@@ -30,6 +31,7 @@ concurrency:
 jobs:
   disposable-worker-sql:
     name: disposable-worker-sql
+    if: ${{ github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
