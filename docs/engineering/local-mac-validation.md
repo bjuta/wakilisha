@@ -21,7 +21,8 @@ base/main was `24ec5400327a70a9d5610d350a4ca487f28c1e13` on recheck.
   Every original hosted workflow used Ubuntu. All automatic triggers are removed
   in this candidate and every job is unconditionally disabled. No remote workflow
   was changed. The reference inventory covers 28 tracked text files with workflow
-  paths or Actions-run provenance URLs (`ops/local/reference-audit.json`). These
+  paths or Actions-run provenance URLs (`ops/local/reference-audit.json`), each
+  classified with an explicit preservation, retirement or blocking disposition. These
   historical references are preserved, not rewritten into fictitious local proof.
 - Four local orchestration/negative-context tests pass, including after the final
   disk-space and WebKit prerequisite corrections.
@@ -78,8 +79,25 @@ base/main was `24ec5400327a70a9d5610d350a4ca487f28c1e13` on recheck.
 
 ## Browser outcome
 
-Pending final result from the approved local browser run bound to `9bab14a6`.
-No browser success is claimed until its report records all real browser steps.
+Approved browser run bound to `9bab14a623f1362579f5d2b9ebfd70626123fcce`,
+base `24ec5400327a70a9d5610d350a4ca487f28c1e13`, Node `v22.23.2`:
+process exit 0, **154 passed, 1 flaky, 3 skipped** in the full interaction suite;
+**3 passed** in the separate isolated authoring fixture suite. The three skips
+are not counted as passes. Real Chromium and mobile WebKit viewport/audio
+projects ran. The one flaky test was the subscriber private-preview denial test,
+which encountered `ENOSPC` before passing on the configured retry. This is a
+qualified suite result, not a clean release gate.
+
+Evidence: `artifacts/local/wakilisha-local-aiTPKx/report.json`, hashed logs `3.log`
+and `4.log`, and 48 retained screenshot files. Run time: 20:28:35–20:36:32 EAT.
+The preflight installed Chromium; the required WebKit revision 2359 was already
+installed and used. Future browser runs explicitly install both engines.
+
+Focused confirmation after disk cleanup: the exact subscriber-denial test
+passed **1/1 with retries disabled**, against the same isolated checkout and
+same local-server runner. It completed in 8.3 seconds with exit code 0.
+The original disk-related flake remains in the full-run record; the focused
+confirmation does not rewrite that history or qualify the entire release.
 
 ## Scope and next decisions
 
