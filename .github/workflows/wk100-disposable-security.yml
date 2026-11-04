@@ -48,6 +48,20 @@ jobs:
         with:
           version: 2.121.0
 
+      # ONE-SHOT CLI FILENAME MINT FOR PHASE 1. Remove after recording path.
+      # This cannot connect to any hosted Supabase project and deletes the
+      # temporary blank migration BEFORE full schema replay starts.
+      - name: Mint observed-as-of migration filename via pinned project CI CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration new wk100_phase1_observed_as_of_period_authority_v1
+          path="$(find supabase/migrations -maxdepth 1 -type f -name '*_wk100_phase1_observed_as_of_period_authority_v1.sql' -print)"
+          test -n "$path"
+          test "$(printf '%s\\n' "$path" | wc -l | tr -d ' ')" = 1
+          echo "WK100_CLI_MINTED_PERIOD_AUTHORITY_PATH=$path"
+          rm -- "$path"
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
