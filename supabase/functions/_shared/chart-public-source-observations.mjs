@@ -257,6 +257,33 @@ export function parseSpotifyChartCsvCandidate(raw) {
 }
 
 /**
+ * Spotify weekly Kenya candidate decoder for the EXISTING governed collector.
+ *
+ * The provider's nine-column offered export carries chart-eligible streams,
+ * NOT YouTube views. The CSV carries neither an independently provable
+ * country nor source-native week boundaries. A successful decode therefore
+ * cannot admit an endpoint, authenticate a Kenya chart, infer a UTC week,
+ * score an Edition or allow a fetch. Those remain separate reviewed,
+ * server-side source-method/manifest duties. Do not use playlists as a
+ * substitute for Spotify's official regional weekly chart.
+ */
+export function parseSpotifyKenyaWeeklyCandidate(raw) {
+  const provisional=parseSpotifyChartCsvCandidate(raw);
+  if(provisional.market!=='unverified' ||
+     provisional.source_admitted!==false ||
+     provisional.native_period!=='unknown' ||
+     provisional.eligible_for_scoring!==false)
+    fail('spotify_candidate_preflight_invalid');
+  return normalizeRows('spotify_ke',provisional.rows,provisional.rows.length,{
+    market:'KE',behavior:'consumption',metric:'rank_and_count',
+    chart_surface:'unverified_offered_csv',
+    source_market_authority:'external_method_review_required',
+    source_period_authority:'unknown',
+    source_admitted:false,can_collect:false,can_score:false,can_publish:false,
+  });
+}
+
+/**
  * Apple Kenya native charts. Two distinct public chart schemas are supported:
  * the historical country-bearing RSS feed and the MusicKit catalog charts API.
  * The API payload has no trustworthy storefront field; its territory must be
