@@ -22,3 +22,7 @@ This gate prevents draft-push runner allocation. It does not refund November usa
 ## Scope
 
 Only the three existing CI workflow YAMLs, an added assertion in the **existing** migration replay contract test file, and this record change. No database, Edge Function, Production frontend, permission, or deployment mutation.
+
+## WK100 local Docker coexistence — 5 November 2026 addendum
+
+A real Mac acceptance run independently exercised the 245-migration replay, two genuine GoTrue identities, PostgreSQL lease contention, private Storage ACLs, and project-scoped cleanup without stopping the operator's other active or retained Supabase Docker projects. The **supported reusable procedure and exact operator-reported PASS markers** are documented in [WK100 isolated local Docker coexistence and acceptance](./wk100-disposable-local-docker-coexistence-and-acceptance-v1.md). Always consult it before preparing another local runner. It is not permission to remove old containers/volumes, bypass hosted authorization or fabricate a successful pull-request CI replay. This addendum does not change the draft CI budget gate above.
