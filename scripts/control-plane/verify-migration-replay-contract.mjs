@@ -21,6 +21,11 @@ import {
   validateDisposableCiReplayProof,
   validateDisposableCiReplayRepositoryState,
 } from "./verify-disposable-ci-replay-proof.mjs";
+import {
+  isOfflineOperatorReplayProof,
+  validateOfflineOperatorReplayProof,
+  validateOfflineOperatorReplayRepositoryState,
+} from "./verify-offline-operator-replay-proof.mjs";
 
 const BASE_REF =
   process.env.CONTROL_PLANE_BASE_REF ??
@@ -686,7 +691,12 @@ function main() {
             migrationFile: entry.path,
             migrationSha256: sha256File(entry.path),
             baseMainSha: mergeBase,
-          }) : isDisposableCiReplayProof(proof) ? validateDisposableCiReplayProof({
+          }) : isOfflineOperatorReplayProof(proof) ? validateOfflineOperatorReplayProof({
+             proof,
+             migrationFile: entry.path,
+             migrationSha256: sha256File(entry.path),
+             baseMainSha: mergeBase,
+           }) : isDisposableCiReplayProof(proof) ? validateDisposableCiReplayProof({
             proof,
             migrationFile: entry.path,
             migrationSha256: sha256File(entry.path),
@@ -797,14 +807,25 @@ function main() {
           isRnb18StagedProof(proofs.get(entry.path)));
         const disposableMode = changedActive.some((entry) =>
           isDisposableCiReplayProof(proofs.get(entry.path)));
-        if (disposableMode && (historicalMode || stagedMode)) {
+        const offlineMode = changedActive.some((entry) =>
+          isOfflineOperatorReplayProof(proofs.get(entry.path)));
+        if (disposableMode && !offlineMode && (historicalMode || stagedMode)) {
           failures.push("Cannot mix unlinked CI proof with historical or staged migration proof");
         }
-        if (disposableMode) {
+        if (disposableMode && !offlineMode) {
           for (const error of validateDisposableCiReplayRepositoryState({
             changedActive,proofs,mergeBase,baseline,migrations,
             latestMigration,actualTypesSha256,
           })) failures.push("unlinked CI migration replay: " + error);
+        }
+        if (offlineMode) {
+          if (historicalMode || stagedMode) {
+            failures.push("Offline operator proof cannot mix with historical/staged migration modes");
+          }
+          for (const error of validateOfflineOperatorReplayRepositoryState({
+            changedActive,proofs,mergeBase,baseline,migrations,
+            latestMigration,actualTypesSha256,
+          })) failures.push("offline operator migration replay: " + error);
         }
         if (stagedMode) {
           const stagedProof = proofs.get("supabase/migrations/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql");
@@ -835,7 +856,7 @@ function main() {
         }
 
         if (
-          !historicalMode && !stagedMode && !disposableMode &&
+          !historicalMode && !stagedMode && !disposableMode && !offlineMode &&
           baseline
             .schemaSeal?.mode !==
           "preview"
@@ -857,7 +878,7 @@ function main() {
           );
         }
 
-        if (!historicalMode && !stagedMode && !disposableMode) {
+        if (!historicalMode && !stagedMode && !disposableMode && !offlineMode) {
         const latestChanged =
           changedActive.at(-1);
         const latestProof =
