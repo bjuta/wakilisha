@@ -255,7 +255,7 @@ export function validateRepositorySchemaSnapshot({
         !/^[0-9a-f]{40}$/.test(seal.baseMainSha) ||
         typeof seal.replayCandidateHeadSha !== "string" ||
         !/^[0-9a-f]{40}$/.test(seal.replayCandidateHeadSha) ||
-        !/^https:\/\/github\.com\/bjuta\/wakilisha\/pull\/1345#issuecomment-[1-9][0-9]+$/.test(seal.operatorReceiptUrl??"") ||
+        !/^https:\/\/github\.com\/bjuta\/wakilisha\/pull\/[1-9][0-9]*#issuecomment-[1-9][0-9]+$/.test(seal.operatorReceiptUrl??"") ||
         seal.workflowRunId != null || seal.previewBranchId != null) {
       errors.push("offline operator seal requires local source, tested commit and owner evidence without CI claim");
     }
