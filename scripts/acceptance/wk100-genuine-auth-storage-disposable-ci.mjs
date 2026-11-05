@@ -298,6 +298,22 @@ async function main(){
     "(SELECT has_function_privilege('service_role','public.wk100_service_retry_requests_v1(date)','EXECUTE'))::text;",db)==='0|false|true',
     'STOP_WK100_W3_CANDIDATE_ACL_OR_EMPTY_LEDGER');
   console.log('WK100_W3_ACTIVE_PG17_FULL_REPLAY_AND_ACL=PASS');
+  // Install only the exact SHA-accepted Collect Now candidate in the disposable,
+  // UNLINKED local database. It never enters the hosted Preview/Production ledger.
+  const collectNowCandidate=readFileSync(
+    'scripts/acceptance/wk100-collect-now-forward-candidate-v1.sql','utf8');
+  check(sha(Buffer.from(collectNowCandidate,'utf8'))===
+    'd25c7912e47c7cafd16741a0f520081785dffd4e353d545a831ba3c7ec362fd5'&&
+    collectNowCandidate.trimEnd().endsWith('commit;')&&
+    query("SELECT (to_regclass('platform_private.wk100_collect_now_requests_v1') IS NULL)::text;",db)==='true',
+    'STOP_COLLECT_NOW_DISPOSABLE_CANDIDATE_SHA_OR_BASELINE_DRIFT');
+  query(collectNowCandidate,db,true);
+  check(query("SELECT (to_regclass('platform_private.wk100_collect_now_requests_v1') IS NOT NULL)::text||'|'||"+
+    "(SELECT has_function_privilege('anon','public.wk100_request_collect_now_v1(uuid,uuid)','EXECUTE'))::text||'|'||"+
+    "(SELECT has_function_privilege('authenticated','public.wk100_request_collect_now_v1(uuid,uuid)','EXECUTE'))::text||'|'||"+
+    "(SELECT count(*) FROM platform_private.wk100_collect_now_requests_v1)::text;",db)==='true|false|true|0',
+    'STOP_COLLECT_NOW_DISPOSABLE_SQL_AND_ACL');
+  console.log('WK100_COLLECT_NOW_DISPOSABLE_EXACT_SHA_SQL_AND_ACL=PASS');
   const admin=client(url,v.SERVICE_ROLE_KEY),anon=client(url,v.ANON_KEY);
   const identity=randomUUID(); const email=`wk100-ci-${identity}@example.test`;
   const password=randomBytes(30).toString('base64url');
@@ -316,6 +332,15 @@ async function main(){
     !verified.error&&verified.data.user?.id===created.data.user.id,
     'STOP_GOTRUE_AUTHENTICATED_IDENTITY_NOT_PROVEN');
   console.log('WK100_GENUINE_LOCAL_GOTRUE_SIGNED_IN_USER=PASS');
+  // Real GoTrue JWT with no management grants cannot manufacture a ticket.
+  const forbiddenArgs={p_contract_id:randomUUID(),p_operation_id:randomUUID()};
+  const forbiddenAnon=await anon.rpc('wk100_request_collect_now_v1',forbiddenArgs);
+  const forbiddenSigned=await signed.rpc('wk100_request_collect_now_v1',forbiddenArgs);
+  const forbiddenService=await admin.rpc('wk100_request_collect_now_v1',forbiddenArgs);
+  check(!!forbiddenAnon.error&&!!forbiddenSigned.error&&!!forbiddenService.error&&
+    query("SELECT count(*) FROM platform_private.wk100_collect_now_requests_v1;",db)==='0',
+    'STOP_COLLECT_NOW_UNPRIVILEGED_OR_SERVICE_TICKET_ALLOWED');
+  console.log('WK100_COLLECT_NOW_ANON_SIGNED_UNPRIVILEGED_AND_SERVICE_DENIED=PASS');
   // Both RPCs run through PostgREST using the same genuine GoTrue-signed JWT.
   // They must fail before an active manage_ingest assignment, and again after
   // live revocation without obtaining a new JWT or refreshing its claims.
@@ -489,6 +514,52 @@ async function main(){
   const localEat=new Date(captureSlotEat);
   localEat.setUTCDate(localEat.getUTCDate()-((localEat.getUTCDay()+6)%7));
   const currentWeek=localEat.toISOString().slice(0,10);
+  // Signed-in Admin may request a real-clock, nonpublishing ticket only for a
+  // currently admitted contract. The caller never controls scheduled_at.
+  const collectOperation=randomUUID();
+  const collectStart=Date.now();
+  const collectArgs={p_contract_id:enrolled.data.contractId,
+    p_operation_id:collectOperation};
+  const collectTicket=await signed.rpc('wk100_request_collect_now_v1',collectArgs);
+  const collectSlot=collectTicket.data?.scheduledAt;
+  check(!collectTicket.error&&collectTicket.data?.status==='requested'&&
+    collectTicket.data?.operationId===collectOperation&&
+    collectTicket.data?.contractId===enrolled.data.contractId&&
+    collectTicket.data?.sourceKey===proposalC.sourceKey&&
+    UUID.test(collectTicket.data?.requestId||'')&&
+    typeof collectSlot==='string'&&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00Z$/.test(collectSlot)&&
+    Date.parse(collectSlot)>=collectStart-60000&&
+    Date.parse(collectSlot)<=Date.now()+5000&&
+    collectTicket.data?.weekStartEat===wk100EatWeekFromUtc(new Date(collectSlot))&&
+    collectTicket.data?.canScore===false&&collectTicket.data?.canPublish===false,
+    'STOP_COLLECT_NOW_SIGNED_REAL_CLOCK_TICKET_INVALID');
+  const replayTicket=await signed.rpc('wk100_request_collect_now_v1',collectArgs);
+  check(!replayTicket.error&&replayTicket.data?.status==='already_requested'&&
+    replayTicket.data?.operationId===collectOperation&&
+    replayTicket.data?.scheduledAt===collectSlot&&
+    replayTicket.data?.canPublish===false,
+    'STOP_COLLECT_NOW_OPERATION_IDEMPOTENCE_INVALID');
+  const serviceTickets=await admin.rpc('wk100_service_collect_now_requests_v1',{
+    p_week:collectTicket.data.weekStartEat});
+  const privateTickets=await signed.rpc('wk100_service_collect_now_requests_v1',{
+    p_week:collectTicket.data.weekStartEat});
+  const privateReservation=await signed.rpc('wk_chart_runtime_reserve_now_v1',{
+    p_contract_id:enrolled.data.contractId,
+    p_week_start_eat:collectTicket.data.weekStartEat,
+    p_scheduled_at:collectSlot,p_attempt_number:1});
+  check(!serviceTickets.error&&Array.isArray(serviceTickets.data)&&
+    serviceTickets.data.length===1&&
+    serviceTickets.data[0]?.operation_id===collectOperation&&
+    serviceTickets.data[0]?.contract_id===enrolled.data.contractId&&
+    serviceTickets.data[0]?.source_key===proposalC.sourceKey&&
+    serviceTickets.data[0]?.scheduled_at===collectSlot&&
+    !!privateTickets.error&&!!privateReservation.error&&
+    query("SELECT (SELECT count(*) FROM platform_private.wk100_collect_now_requests_v1)::text||'|'||"+
+      "(SELECT count(*) FROM private.wk_chart_runtime_reservations_v1)::text||'|'||"+
+      "(SELECT count(*) FROM public.wk_chart_capture_attempts_v1)::text;",db)==='1|0|0',
+    'STOP_COLLECT_NOW_SERVICE_PROJECTION_OR_PRIVATE_LEASE_GATE');
+  console.log('WK100_COLLECT_NOW_GENUINE_JWT_REQUEST_REPLAY_SERVICE_READ_AND_DENIAL=PASS');
   const w3Read=await signed.rpc('wk100_list_collection_actions_v1',{p_week:currentWeek});
   check(!w3Read.error&&Array.isArray(w3Read.data)&&w3Read.data.length===0,
     'STOP_W3_SUPERADMIN_EMPTY_ACTIONS_UNAVAILABLE');
@@ -605,6 +676,15 @@ async function main(){
     "(SELECT count(*) FROM public.wk_chart_capture_attempts_v1)::text;",db)==='3|1|1',
     'STOP_REAL_GOTRUE_METHOD_AUDIT_OR_UNINTENDED_CAPTURE');
   console.log('WK100_GOTRUE_METHOD_PAUSE_AND_LIVE_ROLE_REVOCATION=PASS');
+  const revokedCollect=await signed.rpc('wk100_request_collect_now_v1',{
+    p_contract_id:enrolled.data.contractId,p_operation_id:randomUUID()});
+  const pausedCollectService=await admin.rpc('wk100_service_collect_now_requests_v1',{
+    p_week:collectTicket.data.weekStartEat});
+  check(!!revokedCollect.error&&!pausedCollectService.error&&
+    Array.isArray(pausedCollectService.data)&&pausedCollectService.data.length===0&&
+    query("SELECT count(*) FROM platform_private.wk100_collect_now_requests_v1;",db)==='1',
+    'STOP_COLLECT_NOW_REVOKED_ROLE_OR_PAUSED_METHOD_BYPASS');
+  console.log('WK100_COLLECT_NOW_REVOKED_JWT_AND_PAUSED_METHOD_FAIL_CLOSED=PASS');
 
   const bucket='wk-chart-raw-evidence-v1';
   const key=`acceptance/wk100-auth-disposable/${identity}.bin`;
