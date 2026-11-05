@@ -1049,7 +1049,7 @@ test('W3 Collect Now uses current-week signed-in SQL intent, never a browser col
   await expect(collect).toBeVisible({timeout:20_000});
   await collect.click();
   await expect(table.getByRole('button',{name:'Request Recorded'})).toBeDisabled();
-  await expect(page.getByRole('status').getByText('No capture receipt is confirmed yet.',{exact:false}))
+  await expect(page.getByRole('status').filter({hasText:'No capture receipt is confirmed yet.'}))
     .toBeVisible();
   expect(ctx.collectNowWrites).toHaveLength(1);
   expect(ctx.collectNowWrites[0].p_contract_id).toBe(source.id);
