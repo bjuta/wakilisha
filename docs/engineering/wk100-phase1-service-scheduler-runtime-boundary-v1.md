@@ -2,6 +2,8 @@
 
 **Status:** Candidate implementation only. This document does not admit a real source, activate a timer, apply a migration, enable provider access, establish a qualifying week or grant publication. This belongs to the existing [four-phase control plan](./wakilisha-100-four-phase-delivery-and-admin-handoff-v1.md) and issue #1338.
 
+**Local acceptance operation:** Before running another WAKILISHA 100 PG17/GoTrue/Storage acceptance on the Mac, follow [WK100 isolated local Docker coexistence and acceptance](./wk100-disposable-local-docker-coexistence-and-acceptance-v1.md). The operator-reported 5 November 2026 245-migration disposable PASS does not itself authorize hosted source capture, scoring or release.
+
 ## One collector, separate authorities
 
 1. W2A appends a *candidate* source proposal. An ordinary proposal does not start a job.
