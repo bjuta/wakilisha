@@ -560,6 +560,36 @@ async function main(){
       "(SELECT count(*) FROM public.wk_chart_capture_attempts_v1)::text;",db)==='1|0|0',
     'STOP_COLLECT_NOW_SERVICE_PROJECTION_OR_PRIVATE_LEASE_GATE');
   console.log('WK100_COLLECT_NOW_GENUINE_JWT_REQUEST_REPLAY_SERVICE_READ_AND_DENIAL=PASS');
+  // A second independently issued GoTrue identity cannot replay the Admin's
+  // operation ID or see method authority. No hosted user is ever created.
+  const deniedIdentity=randomUUID();
+  const deniedEmail=`wk100-ci-denied-${deniedIdentity}@example.test`;
+  const deniedPassword=randomBytes(30).toString('base64url');
+  const deniedCreated=await admin.auth.admin.createUser({
+    email:deniedEmail,password:deniedPassword,email_confirm:true});
+  check(!deniedCreated.error&&UUID.test(deniedCreated.data.user?.id||''),
+    'STOP_COLLECT_NOW_SECOND_DISPOSABLE_GOTRUE_IDENTITY');
+  const deniedClient=client(url,v.ANON_KEY);
+  const deniedLogin=await deniedClient.auth.signInWithPassword({
+    email:deniedEmail,password:deniedPassword});
+  const deniedVerify=await deniedClient.auth.getUser();
+  check(!deniedLogin.error&&!!deniedLogin.data.session?.access_token&&
+    deniedLogin.data.user?.id===deniedCreated.data.user.id&&
+    !deniedVerify.error&&deniedVerify.data.user?.id===deniedCreated.data.user.id&&
+    deniedCreated.data.user.id!==created.data.user.id,
+    'STOP_COLLECT_NOW_SECOND_GENUINE_JWT_NOT_VERIFIED');
+  const deniedIngest=await deniedClient.rpc('current_user_has_capability',{
+    required_capability:'manage_ingest'});
+  const deniedCharts=await deniedClient.rpc('current_user_has_capability',{
+    required_capability:'manage_charts'});
+  const deniedReplay=await deniedClient.rpc('wk100_request_collect_now_v1',collectArgs);
+  const deniedMethodRead=await deniedClient.rpc('wk100_list_source_method_decisions_v1');
+  check(!deniedIngest.error&&deniedIngest.data===false&&
+    !deniedCharts.error&&deniedCharts.data===false&&
+    !!deniedReplay.error&&!!deniedMethodRead.error&&
+    query("SELECT count(*) FROM platform_private.wk100_collect_now_requests_v1;",db)==='1',
+    'STOP_COLLECT_NOW_INDEPENDENT_GOTRUE_ROLE_DENIAL_OR_TICKET_LEAK');
+  console.log('WK100_COLLECT_NOW_SECOND_REAL_JWT_DENIED_AND_CROSS_ACTOR_REPLAY=PASS');
   const w3Read=await signed.rpc('wk100_list_collection_actions_v1',{p_week:currentWeek});
   check(!w3Read.error&&Array.isArray(w3Read.data)&&w3Read.data.length===0,
     'STOP_W3_SUPERADMIN_EMPTY_ACTIONS_UNAVAILABLE');
@@ -715,10 +745,10 @@ async function main(){
   // This synthetic Auth account lives only in the disposable local database.
   // Account deletion exercises unrelated user-retirement triggers, not the WK100
   // Storage ACL. CI always destroys Auth/Storage/DB volumes without backup.
-  check(query('SELECT count(*) FROM auth.users;',db)==='1',
+  check(query('SELECT count(*) FROM auth.users;',db)==='2',
     'STOP_LOCAL_SYNTHETIC_AUTH_FIXTURE_IDENTITY_DRIFT');
   console.log('WK100_SYNTHETIC_STORAGE_OBJECT_REMOVED=PASS');
-  console.log('WK100_SYNTHETIC_AUTH_USER_LOCAL_VOLUME_DESTRUCTION_REQUIRED=PASS');
+  console.log('WK100_SYNTHETIC_AUTH_USERS_LOCAL_VOLUME_DESTRUCTION_REQUIRED=PASS');
   if(process.env.WK100_LIVE_SOURCE_ACCEPTANCE==='true')
     await runActualProviderDisposableCapture({signed,admin,db,userId:created.data.user.id});
   console.log('WK100_NO_HOSTED_SUPABASE_PROVIDER_OR_PRODUCTION_ACCESS=PASS');
