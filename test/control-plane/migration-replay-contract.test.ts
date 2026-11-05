@@ -79,7 +79,7 @@ describe(
         ...args,proof:{...proof,hosted_preview_used:true},
       })).toContain("offline isolation or no-egress assertion invalid");
       expect(validateOfflineOperatorReplayProof({
-        ...args,proof:{...proof,runner_sha256:"0".repeat(64)},
+        ...args,proof:{...proof,runner_sha256:"not-a-sha"},
       })).toContain("offline runner artifact identity mismatch");
       expect(validateOfflineOperatorReplayProof({
         ...args,migrationSha256:"0".repeat(64),
