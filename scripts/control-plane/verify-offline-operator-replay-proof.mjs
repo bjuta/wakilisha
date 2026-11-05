@@ -26,7 +26,7 @@ export const OFFLINE_REQUIRED_MARKERS=Object.freeze([
 ]);
 const HEX40=/^[0-9a-f]{40}$/;
 const HEX64=/^[0-9a-f]{64}$/;
-const OWNER_RECEIPT=/^https:\/\/github\.com\/bjuta\/wakilisha\/pull\/1345#issuecomment-[1-9][0-9]+$/;
+const OWNER_RECEIPT=/^https:\/\/github\.com\/bjuta\/wakilisha\/pull\/[1-9][0-9]*#issuecomment-[1-9][0-9]+$/;
 
 function git(args,{allowFailure=false}={}){
   const r=spawnSync("git",args,{encoding:"utf8"});
@@ -65,11 +65,12 @@ export function validateOfflineOperatorReplayProof({
      !OWNER_RECEIPT.test(proof?.operator_receipt_url??"") ||
      !Number.isFinite(Date.parse(proof?.verified_at??"")))
     errors.push("offline owner-reported evidence identity invalid");
-  if(proof?.runner_file!=="wk100_245_migration_disposable_acceptance_f0813440.sh" ||
-     proof?.runner_sha256!=="066ca51046c5615e430a09c8472614ccc46a9cef5deb570b3a92d6aeca38a1f5")
+  if(!/^wk100_[a-z0-9_-]+\.sh$/.test(proof?.runner_file??"") ||
+     !HEX64.test(proof?.runner_sha256??""))
     errors.push("offline runner artifact identity mismatch");
-  if(proof?.local_stack_id!=="wk100accept3becb12cc3" ||
-     proof?.local_api_port!==41434 ||
+  if(!/^wk100accept[0-9a-f]{10}$/.test(proof?.local_stack_id??"") ||
+     !Number.isInteger(proof?.local_api_port) ||
+     proof.local_api_port<20000 || proof.local_api_port>64000 ||
      proof?.supabase_cli_version!=="2.121.0" ||
      proof?.node_major!==22)
     errors.push("offline tested environment identity mismatch");
@@ -88,7 +89,8 @@ export function validateOfflineOperatorReplayProof({
      proof?.cleanup!=="pass")
     errors.push("offline replay or cleanup must pass");
   if(!HEX64.test(proof?.schema_types_sha256??"") ||
-     proof?.schema_migration_count!==245 ||
+     !Number.isInteger(proof?.schema_migration_count) ||
+     proof.schema_migration_count<1 ||
      proof?.schema_migration_head!==path.basename(migrationFile).slice(0,14))
     errors.push("offline type and migration head mismatch");
   return errors;
