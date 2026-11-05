@@ -138,6 +138,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const [recoveryPhase,setRecoveryPhase]=useState<'loading'|'ready'|'unavailable'>('loading');
   const [recoveryActions,setRecoveryActions]=useState<RecoveryAction[]>([]);
   const [recoveryTarget,setRecoveryTarget]=useState<{kind:Wk100RecoveryKind;source:Source;revision:number}|null>(null);
+  // A signed-in request is not a captured receipt. The separately enabled
+  // service scheduler alone may dispatch the governed collector.
+  const collectNowOperations=useRef(new Map<string,string>());
+  const [collectNow,setCollectNow]=useState<{
+    contractId:string;week:string;phase:'requesting'|'requested'|'failed';
+    scheduledAt?:string;error?:string;
+  }|null>(null);
+  useEffect(()=>{setCollectNow(null)},[week]);
   const originalSequence=useRef(0);
   const [originalReadback,setOriginalReadback]=useState<{
     contractId:string;attemptId:string;phase:'loading'|'verified'|'unavailable';
@@ -401,6 +409,50 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       target:'/collection',button:'Review Evidence',
     };
   })();
+  const requestCollectNow=async(source:Source)=>{
+    const proposal=proposals.find(p=>p.sourceKey===source.sourceKey);
+    const decision=methodDecisions.find(d=>d.sourceKey===source.sourceKey);
+    if(week!==wk100CurrentWeekStartEat()||
+      proposalPhase!=='ready'||methodPhase!=='ready'||
+      source.market!=='KE'||source.admissionState!=='candidate'||
+      !proposal||!decision||decision.decisionState!=='collector_admitted'||
+      decision.proposalRevision!==proposal.revision||
+      decision.captureContractVersion!==source.version||
+      collectNow?.phase==='requesting'||collectNow?.phase==='requested')return;
+    const key=week+':'+source.id;
+    let operationId=collectNowOperations.current.get(key);
+    if(!operationId){
+      operationId=crypto.randomUUID();
+      collectNowOperations.current.set(key,operationId);
+    }
+    setCollectNow({contractId:source.id,week,phase:'requesting'});
+    try{
+      const {data,error}=await supabase.rpc('wk100_request_collect_now_v1',{
+        p_contract_id:source.id,p_operation_id:operationId,
+      });
+      if(error){
+        const code=String(error.code??'');
+        throw new Error(code==='42501'?'Your account cannot request collection.':
+          code==='22023'?'This source method is no longer eligible. Refresh its review.':
+          code==='23505'?'A collection request already exists for this source and minute.':
+          'The service did not confirm the collection request.');
+      }
+      const slot=typeof data?.scheduledAt==='string'?Date.parse(data.scheduledAt):NaN;
+      if(!data||data.operationId!==operationId||
+        data.contractId!==source.id||data.sourceKey!==source.sourceKey||
+        data.weekStartEat!==week||
+        !['requested','already_requested'].includes(data.status)||
+        !Number.isFinite(slot)||
+        data.canScore!==false||data.canPublish!==false)
+        throw new Error('The service returned an invalid collection acknowledgement.');
+      setCollectNow({contractId:source.id,week,phase:'requested',
+        scheduledAt:data.scheduledAt});
+      void load();void loadRecovery();
+    }catch(e){
+      setCollectNow({contractId:source.id,week,phase:'failed',
+        error:e instanceof Error?e.message:'Collection could not be requested.'});
+    }
+  };
   const verifyOriginal=async(source:Source,attemptId:string)=>{
     const seq=++originalSequence.current;
     setOriginalReadback({contractId:source.id,attemptId,phase:'loading'});
@@ -779,7 +831,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         <WkOperationsHero eyebrow={'Collection · EAT week '+week} title="Collection"
           description="Source-specific reporting periods, captured evidence and attempt integrity are tracked separately. A successful download does not grant scoring qualification."
           aside={<WkStateBadge tone={report.failedSources?'danger':'neutral'}>{report.failedSources?report.failedSources+' source failures':'No admitted collection'}</WkStateBadge>}
-          action={<span className="text-xs text-wk-text-muted">Choose a source below for recovery options</span>}/>
+          action={<span className="text-xs text-wk-text-muted">Choose a reviewed source below to request collection or inspect recovery</span>}/>
         <WkSurface className="rounded-2xl p-4 sm:p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <div><p className="text-[11px] font-bold uppercase tracking-[.1em] text-wk-text-muted">Qualified coverage</p>
@@ -822,6 +874,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         {recoveryPhase==='unavailable'&&<p role="alert" className="text-sm text-wk-text-muted">
           The protected recovery service is unavailable. No retry or coverage decision can be recorded.
         </p>}
+         {collectNow?.week===week&&<p role={collectNow.phase==='failed'?'alert':'status'}
+           className="rounded-xl border border-wk-border p-3 text-sm text-wk-text">
+           {collectNow.phase==='requesting'?'Recording the collection request…':
+             collectNow.phase==='requested'?
+             'Collection requested at '+when(collectNow.scheduledAt??null)+
+             '. The service scheduler must be enabled separately. No capture receipt is confirmed yet.':
+             collectNow.error}
+         </p>}
          <Card title="Source collection">
           <WkDataTable<Source> rows={report.sources} getKey={s=>s.id} ariaLabel="Weekly source collection"
             empty="No source capture contracts or attempts exist for this week. Collection scheduling has not been enabled."
@@ -868,12 +928,27 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                 if(decision?.decisionState==='paused')
                   return <WkStateBadge tone="warning">Paused</WkStateBadge>;
                 if(decision?.decisionState!=='collector_admitted'||!proposal||
-                   proposal.revision!==decision.proposalRevision)
+                   proposal.revision!==decision.proposalRevision||
+                   decision.captureContractVersion!==s.version)
                   return <span className="text-xs text-wk-text-muted">No current admitted method</span>;
-                return <button type="button" className="wk-button wk-button-secondary wk-button-sm"
-                  onClick={()=>{setIncidentPause(true);setReviewing(proposal)}}>
-                  Pause Collection
-                </button>;
+                const active=collectNow?.contractId===s.id&&collectNow.week===week;
+                const accepted=active&&collectNow.phase==='requested';
+                return <div className="flex flex-wrap gap-2">
+                  {week===wk100CurrentWeekStartEat()&&s.market==='KE'&&
+                    s.admissionState==='candidate'&&
+                    <button type="button" className="wk-button wk-button-primary wk-button-sm"
+                      disabled={accepted||(active&&collectNow.phase==='requesting')}
+                      onClick={()=>void requestCollectNow(s)}>
+                      {accepted?'Request Recorded':active&&collectNow.phase==='requesting'?
+                        'Requesting…':'Collect Now'}
+                    </button>}
+                  {week!==wk100CurrentWeekStartEat()&&
+                    <span className="text-xs text-wk-text-muted">Current week only</span>}
+                  <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+                    onClick={()=>{setIncidentPause(true);setReviewing(proposal)}}>
+                    Pause Collection
+                  </button>
+                </div>;
               }},
             ] satisfies WkDataColumn<Source>[]} />
         </Card>
