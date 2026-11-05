@@ -3,9 +3,17 @@ set -euo pipefail
 # Two genuine PostgreSQL backends racing for one WK100 reservation.
 # The committed synthetic contract is DISPOSABLE-LOCAL ONLY: the parent
 # GitHub workflow destroys the entire Supabase local database afterward.
-[ "${GITHUB_ACTIONS:-}" = true ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ] || {
-  echo 'STOP: must run inside isolated pull_request CI'; exit 20;
-}
+# The explicit Mac mode is permitted only for a local disposable stack.
+# It does not impersonate GitHub Actions or grant a hosted project target.
+if [ "${GITHUB_ACTIONS:-}" = true ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ]; then
+  echo 'WK100_DISPOSABLE_EXECUTION_CONTEXT=CI_PULL_REQUEST'
+elif [ "${WK100_LOCAL_DISPOSABLE_ACCEPTANCE:-}" = true ] &&
+     [ -z "${GITHUB_ACTIONS:-}" ] && [ -z "${GITHUB_EVENT_NAME:-}" ] &&
+     [ "${WK100_LIVE_SOURCE_ACCEPTANCE:-false}" = false ]; then
+  echo 'WK100_DISPOSABLE_EXECUTION_CONTEXT=EXPLICIT_LOCAL_NO_PROVIDER_EGRESS'
+else
+  echo 'STOP: CI PR or explicit no-egress local disposable mode required'; exit 20
+fi
 [ -z "${SUPABASE_ACCESS_TOKEN:-}" ] && [ -z "${SUPABASE_PROJECT_REF:-}" ] &&
 [ ! -e supabase/.temp/project-ref ] || {
   echo 'STOP: remote Supabase authority or link present'; exit 20;
