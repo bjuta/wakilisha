@@ -622,6 +622,26 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
   const asOf=await bindWk100DispatchAuthority({...args,methodRows:[observedRow],
     manifest:{sources:[observedEntry]}});
   assert.equal(asOf.length,1);
+  // A real signed-in SQL review can persist a subsecond timestamptz expiry.
+  // It must remain dispatchable after the service bridge rounds down to its
+  // strict UTC-second planner wire format; no expiry extension is allowed.
+  const subsecondExpiry='2027-01-01T00:00:00.537Z';
+  const subsecond=await bindWk100DispatchAuthority({...args,
+    methodRows:[{...observedRow,authorization_expires_at:subsecondExpiry}],
+    manifest:{sources:[{...observedEntry,authorization_expires_at:subsecondExpiry}]}});
+  assert.equal(subsecond.length,1);
+  assert.equal(subsecond[0].authorization_expires_at,'2027-01-01T00:00:00Z');
+  const dispatch=planWk100SourceDispatch({
+    weekStartEat:'2026-11-02',nowUtc:'2026-11-02T06:01:00Z',
+    executionEnabled:true,
+    sourceContracts:[{...contract,id:'11111111-1111-4111-8111-111111111111',
+      behavior:'consumption',native_metric:'rank',expected_depth:100,
+      cadence_kind:'weekly',interval_hours:null,eat_hour:9,eat_minute:0,
+      weekday_eat:0,minimum_healthy_checkpoints:1}],
+    approvedDecisions:subsecond,attempts:[],
+  });
+  assert.equal(dispatch.jobs.length,1);
+  assert.equal(dispatch.blocked.length,0);
   for(const altered of [
     {...observedEntry,native_period_key:'fabricated_week'},
   ])assert.equal((await bindWk100DispatchAuthority({...args,
