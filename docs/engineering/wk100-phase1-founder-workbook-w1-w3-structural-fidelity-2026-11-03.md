@@ -1,8 +1,11 @@
 # WK100 Phase 1 founder-workbook structural fidelity audit
 
-**Date:** 3 November 2026 (EAT)  
-**PR:** [#1345](https://github.com/bjuta/wakilisha/pull/1345)  
-**Controlling source:** Founder-supplied `Charts Ingest Workbook.html`, size **315,560 bytes**, SHA-256 `91ded11f49ef0531f02b69d3c2ee73126eaa4af5625e34ae97527446c043ed96`. File identity has been reverified from the actual attachment.  
+**Date:** 3 November 2026 (EAT)
+
+**PR:** [#1345](https://github.com/bjuta/wakilisha/pull/1345)
+
+**Controlling source:** Founder-supplied `Charts Ingest Workbook.html`, size **315,560 bytes**, SHA-256 `91ded11f49ef0531f02b69d3c2ee73126eaa4af5625e34ae97527446c043ed96`. File identity has been reverified from the actual attachment.
+
 **Authoritative exceptions:** [Issue #1338, workbook design authority](https://github.com/bjuta/wakilisha/issues/1338#issuecomment-6583961265). Do **not** implement W1S, fictional role-holder approvals, mock MIZIZI routes, fake rankings or declared provider qualifications. Keep existing light/dark semantic tokens and real permission/capture/publication boundaries.
 
 ## Scope and evaluation limits
