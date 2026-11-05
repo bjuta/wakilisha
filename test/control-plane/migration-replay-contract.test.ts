@@ -28,6 +28,11 @@ import {
   isDisposableCiReplayProof,
   validateDisposableCiReplayProof,
 } from "../../scripts/control-plane/verify-disposable-ci-replay-proof.mjs";
+import {
+  isOfflineOperatorReplayProof,
+  validateOfflineOperatorReplayProof,
+  OFFLINE_REQUIRED_MARKERS,
+} from "../../scripts/control-plane/verify-offline-operator-replay-proof.mjs";
 
 describe(
   "migration replay contract",
@@ -54,18 +59,48 @@ describe(
         ...args,migrationSha256:"0".repeat(64),
       })).toContain("disposable CI migration digest mismatch");
     });
-    it("permits a correctly bound unlinked schema seal, not an unverified local claim", () => {
+    it("seals the exact owner-reported local replay without impersonating GitHub Actions", () => {
+      const proof=JSON.parse(readFileSync(
+        "docs/engineering/replay-proofs/20261105131250_wk100_collect_now_authorized_v1.sql.json",
+        "utf8"
+      ));
+      expect(isOfflineOperatorReplayProof(proof)).toBe(true);
+      expect(OFFLINE_REQUIRED_MARKERS).toHaveLength(17);
+      const args={proof,migrationFile:proof.migration_file,
+        migrationSha256:proof.migration_sha256,baseMainSha:proof.base_main_sha};
+      expect(validateOfflineOperatorReplayProof(args)).toEqual([]);
+      expect(validateOfflineOperatorReplayProof({
+        ...args,proof:{...proof,operator_reported_markers:proof.operator_reported_markers.slice(1)},
+      })).toContain("offline required operator markers missing or reordered");
+      expect(validateOfflineOperatorReplayProof({
+        ...args,proof:{...proof,github_ci_claimed:true,workflow_run_id:1234},
+      })).toContain("offline proof must never claim GitHub CI");
+      expect(validateOfflineOperatorReplayProof({
+        ...args,proof:{...proof,hosted_preview_used:true},
+      })).toContain("offline isolation or no-egress assertion invalid");
+      expect(validateOfflineOperatorReplayProof({
+        ...args,proof:{...proof,runner_sha256:"0".repeat(64)},
+      })).toContain("offline runner artifact identity mismatch");
+      expect(validateOfflineOperatorReplayProof({
+        ...args,migrationSha256:"0".repeat(64),
+      })).toContain("offline migration digest mismatch");
+    });
+    it("validates an offline schema seal and rejects fake workflow evidence", () => {
       const baseline=JSON.parse(readFileSync(
         "docs/engineering/live-schema-baseline.json","utf8"
       ));
       const args={baseline,actualTypesSha256:baseline.typesSha256,
         expectedProjectRef:"pgzizndxdyhqmtyywjmt",
-        migrationCount:243,
-        latestMigration:"20261104084956_wk100_spotify_offered_export_method_admission.sql"};
+        migrationCount:245,
+        latestMigration:"20261105131250_wk100_collect_now_authorized_v1.sql"};
       expect(validateRepositorySchemaSnapshot(args)).toEqual([]);
       expect(validateRepositorySchemaSnapshot({
-        ...args,baseline:{...baseline,schemaSeal:{...baseline.schemaSeal,workflowRunId:null}},
-      })).toContain("disposable_ci schema seal needs unlinked-local-ci and exact replay commit/run authority");
+        ...args,baseline:{...baseline,schemaSeal:{...baseline.schemaSeal,workflowRunId:1234}},
+      })).toContain("offline operator seal requires local source, tested commit and owner evidence without CI claim");
+      expect(validateRepositorySchemaSnapshot({
+        ...args,baseline:{...baseline,schemaSeal:{...baseline.schemaSeal,operatorReceiptUrl:""}},
+      })).toContain("offline operator seal requires local source, tested commit and owner evidence without CI claim");
+      expect(validatePendingSchemaState({pendingCount:1,sealMode:"offline_operator"})).toEqual([]);
       expect(validatePendingSchemaState({pendingCount:1,sealMode:"disposable_ci"})).toEqual([]);
     });
     it(
