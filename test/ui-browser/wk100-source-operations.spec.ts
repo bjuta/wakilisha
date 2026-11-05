@@ -22,6 +22,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
   const methodWrites:unknown[]=[];
   const contractWrites:unknown[]=[];
   const recoveryWrites:Record<string,unknown>[]=[];
+  const collectNowWrites:Record<string,unknown>[]=[];
   const recoveryRecords:Record<string,unknown>[]=[];
   const methodRecords:Record<string,unknown>[]=[...existingMethods] as Record<string,unknown>[];
   const proposalRecords:Record<string,unknown>[]=[...existingProposals] as Record<string,unknown>[];
@@ -83,6 +84,21 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
       recoveryRecords.push(event);
       recoveryWrites.push(body);
       await json(route,saved);return;
+    }
+    if(url.pathname==='/rest/v1/rpc/wk100_request_collect_now_v1'){
+      let payload:Record<string,unknown>;
+      try{payload=JSON.parse(req.postData()||'null');}catch{payload={};}
+      collectNowWrites.push(payload);
+      if(deny){await json(route,{code:'42501',message:'not_authorized'},403);return;}
+      const now=new Date(),east=new Date(now.valueOf()+3*60*60*1000);
+      east.setUTCDate(east.getUTCDate()-((east.getUTCDay()+6)%7));
+      await json(route,{
+        operationId:payload.p_operation_id,contractId:payload.p_contract_id,
+        sourceKey:'apple_ke_catalog_most_played',
+        weekStartEat:east.toISOString().slice(0,10),
+        scheduledAt:now.toISOString().slice(0,16)+':00Z',
+        status:'requested',canScore:false,canPublish:false,
+      });return;
     }
     if(url.pathname==='/rest/v1/rpc/wk100_get_admin_draft_v1') {
       if(req.method()!=='POST'){await json(route,{error:'method_not_allowed'},405);return;}
@@ -218,7 +234,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         app_metadata:{},user_metadata:{},identities:[],created_at:'2026-10-21T00:00:00Z'},
     }));
   },{ref:PROJECT_REF,id:USER_ID});
-  return {reads,originalReads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites};
+  return {reads,originalReads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites,collectNowWrites};
 }
 
 test('five founder-selected core providers show truthful readiness and no invented source admission',async({page})=>{
@@ -997,5 +1013,74 @@ test('W3 incident pause uses the existing protected method command and cannot re
   expect(review.decision.endpointSha256).toBeNull();
   expect(review.decision.authorizationRef).toBeNull();
   expect(ctx.contractWrites).toHaveLength(0);
+  expect(ctx.unexpected).toEqual([]);
+});
+
+
+test('W3 Collect Now uses current-week signed-in SQL intent, never a browser collector',async({page})=>{
+  const now=new Date(),east=new Date(now.valueOf()+3*60*60*1000);
+  east.setUTCDate(east.getUTCDate()-((east.getUTCDay()+6)%7));
+  const week=east.toISOString().slice(0,10);
+  const source={
+    id:'33333333-3333-4333-8333-333333333333',
+    sourceKey:'apple_ke_catalog_most_played',provider:'apple_ke',
+    surface:'Apple Music Kenya',market:'KE',metric:'rank',behavior:'consumption',
+    expectedDepth:100,cadence:'weekly',version:'v1',intervalHours:null,
+    eatHour:9,eatMinute:0,weekdayEat:0,minimumHealthyCheckpoints:1,
+    adapterVersion:'apple_kenya_chart_v1',admissionState:'candidate',
+    captureState:'not_collected',attemptCount:0,lastAttemptAt:null,
+    lastScheduledAt:null,lastAttemptNumber:null,lastSuccessfulAt:null,
+    observedDepth:0,nativePeriodAuthority:'unknown',
+    nativePeriodStart:null,nativePeriodEnd:null,receiptSha256:null,
+    failureCode:null,recentAttempts:[],canScore:false,canPublish:false,
+  };
+  const proposal={providerKey:'apple_ke',sourceKey:source.sourceKey,
+    revision:1,surface:source.surface,state:'proposed',
+    canCollect:false,canScore:false,canPublish:false};
+  const method={providerKey:'apple_ke',sourceKey:source.sourceKey,
+    proposalRevision:1,decisionRevision:1,decisionState:'collector_admitted',
+    captureContractVersion:'v1',canScore:false,canPublish:false};
+  const ctx=await install(page,{existingSources:[source],
+    existingProposals:[proposal],existingMethods:[method]});
+  await page.goto('/admin/charts/wk100-operations/collection?week='+week,
+    {waitUntil:'domcontentloaded'});
+  const table=page.getByRole('table',{name:'Weekly source collection'});
+  const collect=table.getByRole('button',{name:'Collect Now'});
+  await expect(collect).toBeVisible({timeout:20_000});
+  await collect.click();
+  await expect(table.getByRole('button',{name:'Request Recorded'})).toBeDisabled();
+  await expect(page.getByRole('status').getByText('No capture receipt is confirmed yet.',{exact:false}))
+    .toBeVisible();
+  expect(ctx.collectNowWrites).toHaveLength(1);
+  expect(ctx.collectNowWrites[0].p_contract_id).toBe(source.id);
+  expect(ctx.collectNowWrites[0].p_operation_id).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.recoveryWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+  const previous=new Date(east.valueOf()-7*24*60*60*1000).toISOString().slice(0,10);
+  await page.goto('/admin/charts/wk100-operations/collection?week='+previous,
+    {waitUntil:'domcontentloaded'});
+  await expect(table.getByRole('button',{name:'Collect Now'})).toHaveCount(0);
+  expect(ctx.collectNowWrites).toHaveLength(1);
+});
+
+test('W3 does not expose Collect Now without a current reviewed and enrolled method',async({page})=>{
+  const now=new Date(),east=new Date(now.valueOf()+3*60*60*1000);
+  east.setUTCDate(east.getUTCDate()-((east.getUTCDay()+6)%7));
+  const week=east.toISOString().slice(0,10);
+  const ctx=await install(page,{existingSources:[{
+    id:'33333333-3333-4333-8333-333333333333',
+    sourceKey:'apple_ke_catalog_most_played',provider:'apple_ke',
+    surface:'Apple Music Kenya',market:'KE',version:'v1',
+    admissionState:'candidate',captureState:'not_collected',
+    recentAttempts:[],receiptSha256:null,canScore:false,canPublish:false,
+  }]});
+  await page.goto('/admin/charts/wk100-operations/collection?week='+week,
+    {waitUntil:'domcontentloaded'});
+  const table=page.getByRole('table',{name:'Weekly source collection'});
+  await expect(table.getByText('No current admitted method')).toBeVisible();
+  await expect(table.getByRole('button',{name:'Collect Now'})).toHaveCount(0);
+  expect(ctx.collectNowWrites).toEqual([]);
   expect(ctx.unexpected).toEqual([]);
 });
