@@ -1,6 +1,8 @@
 # WAKILISHA 100: Four-Phase Delivery and Final Admin Handoff
 
 **Status:** controlling delivery plan, not implementation acceptance or permission to deploy or publish.  
+
+**Offline execution/release authority — owner directive, 5 November 2026:** The [permanent offline-first acceptance policy](./offline-first-acceptance-and-release-authority-20261105.md) supersedes any wording below implying that GitHub-hosted CI minutes are prerequisite to completion or merge. Preserve full technical/product/browser/Preview/source-integrity acceptance, exact-commit evidence and founder release authority; use verified offline execution and operator proof, not skipped jobs or paid CI. No automatic publication is authorized.
 **Date:** 2 November 2026 (EAT).  
 **Delivery issue:** [#1338](https://github.com/bjuta/wakilisha/issues/1338).  
 **Source and editorial authority:** [#1264](https://github.com/bjuta/wakilisha/issues/1264).  
