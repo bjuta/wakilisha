@@ -418,7 +418,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       !proposal||!decision||decision.decisionState!=='collector_admitted'||
       decision.proposalRevision!==proposal.revision||
       decision.captureContractVersion!==source.version||
-      collectNow?.phase==='requesting'||collectNow?.phase==='requested')return;
+      collectNow?.phase==='requesting'||
+      (collectNow?.phase==='requested'&&collectNow.contractId===source.id&&
+        collectNow.week===week))return;
     const key=week+':'+source.id;
     let operationId=collectNowOperations.current.get(key);
     if(!operationId){
