@@ -129,6 +129,38 @@ export function validateOfflineOperatorReplayRepositoryState({
     .map(v=>path.basename(v)).sort();
   if(JSON.stringify(candidateNames)!==JSON.stringify(migrations))
     errors.push("offline active migration filename set changed after acceptance");
+  // Earlier PR migrations may retain authentic disposable_ci receipts.
+  // Their original tested SQL/types must remain immutable even though the
+  // newer offline proof adds later migrations to the active filename set.
+  for(const entry of changedActive){
+    const prior=proofs.get(entry.path);
+    if(prior?.proof_mode!=="disposable_ci_clean_replay_v1")continue;
+    const tested=prior.replay_candidate_head_sha;
+    if(!HEX40.test(tested??"") ||
+       git(["merge-base","--is-ancestor",tested,"HEAD"],{allowFailure:true}).status!==0){
+      errors.push("historical CI source commit is not an ancestor of current HEAD");
+      continue;
+    }
+    const original=git(["rev-parse",tested+":"+entry.path],{allowFailure:true});
+    const current=git(["hash-object",entry.path],{allowFailure:true});
+    if(original.status!==0 || current.status!==0 ||
+       original.stdout.trim()!==current.stdout.trim())
+      errors.push(entry.path+": historically CI-accepted migration bytes changed");
+    const originalTypes=git(["rev-parse",tested+":src/types/database.types.ts"],
+      {allowFailure:true});
+    const currentTypes=git(["hash-object","src/types/database.types.ts"],
+      {allowFailure:true});
+    if(originalTypes.status!==0 || currentTypes.status!==0 ||
+       originalTypes.stdout.trim()!==currentTypes.stdout.trim())
+      errors.push("historical CI-tested database types changed after acceptance");
+    // Only additive migrations are permitted after a historical accepted
+    // snapshot. Modifying or deleting prior SQL would require a new proof.
+    const changes=git(["diff","--name-status",tested,"HEAD","--","supabase/migrations"],
+      {allowFailure:true});
+    if(changes.status!==0 || changes.stdout.split(/\r?\n/)
+       .filter(Boolean).some(line=>!/^A\t(?:supabase\/migrations\/)\d{14}_[\w-]+\.sql$/.test(line)))
+      errors.push("historical CI migration set changed non-additively");
+  }
   const seal=baseline.schemaSeal??{};
   if(seal.mode!==OFFLINE_OPERATOR_SCHEMA_SEAL_MODE ||
      seal.sourceProjectRef!==OFFLINE_OPERATOR_SOURCE ||
