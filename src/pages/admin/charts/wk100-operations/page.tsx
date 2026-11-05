@@ -400,7 +400,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     };
     if(report.successfulSources===0)return {
       title:'Verify a source capture',
-      description:'A reviewed candidate exists, but this EAT week has no verified capture receipt. Collection still needs separate approval.',
+      description:week===wk100CurrentWeekStartEat()?
+        'A reviewed source has no original this week. Request Collect Now in Collection. Only the approved service scheduler can act on it.':
+        'This historical week has no verified capture. Collect Now cannot backdate an observation.',
       target:'/collection',button:'Review Collection',
     };
     return {
