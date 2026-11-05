@@ -85,7 +85,9 @@ export async function bindWk100DispatchAuthority({
       parser_class:row.parser_class,
       evidence_sha256:row.evidence_sha256,endpoint_sha256:row.endpoint_sha256,
       authorization_ref:row.authorization_ref,
-      // SQL keeps subsecond expiries; the exact expiry was checked above.\n      // Round DOWN only for the planner's strict whole-second UTC wire format.\n      authorization_expires_at:new Date(expires).toISOString().replace(/\.\d{3}Z$/,'Z'),
+      // SQL keeps subsecond expiries; the exact expiry was checked above.
+      // Round DOWN only for the planner's strict whole-second UTC wire format.
+      authorization_expires_at:new Date(expires).toISOString().replace(/\.\d{3}Z$/,'Z'),
       constitution_version:row.constitution_version,
     }));
   }
