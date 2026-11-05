@@ -317,22 +317,29 @@ async function main(){
     "(SELECT has_function_privilege('service_role','public.wk100_service_retry_requests_v1(date)','EXECUTE'))::text;",db)==='0|false|true',
     'STOP_WK100_W3_CANDIDATE_ACL_OR_EMPTY_LEDGER');
   console.log('WK100_W3_ACTIVE_PG17_FULL_REPLAY_AND_ACL=PASS');
-  // Install only the exact SHA-accepted Collect Now candidate in the disposable,
-  // UNLINKED local database. It never enters the hosted Preview/Production ledger.
+  // Collect Now must be an ACTIVE source-controlled, already-replayed migration.
+  // Never reapply candidate SQL on top of a successfully replayed schema.
   const collectNowCandidate=readFileSync(
     'scripts/acceptance/wk100-collect-now-forward-candidate-v1.sql','utf8');
-  check(sha(Buffer.from(collectNowCandidate,'utf8'))===
+  const collectNowPath=
+    'supabase/migrations/20261105131250_wk100_collect_now_authorized_v1.sql';
+  const collectNowActive=readFileSync(collectNowPath,'utf8');
+  const collectNowVersion='20261105131250';
+  check(collectNowCandidate===collectNowActive&&
+    sha(Buffer.from(collectNowActive,'utf8'))===
     'd25c7912e47c7cafd16741a0f520081785dffd4e353d545a831ba3c7ec362fd5'&&
-    collectNowCandidate.trimEnd().endsWith('commit;')&&
-    query("SELECT (to_regclass('platform_private.wk100_collect_now_requests_v1') IS NULL)::text;",db)==='true',
-    'STOP_COLLECT_NOW_DISPOSABLE_CANDIDATE_SHA_OR_BASELINE_DRIFT');
-  query(collectNowCandidate,db,true);
+    collectNowActive.trimEnd().endsWith('commit;')&&
+    expectedVersions.includes(collectNowVersion)&&
+    appliedVersions.includes(collectNowVersion)&&
+    expectedVersions.at(-1)===collectNowVersion&&
+    appliedVersions.at(-1)===collectNowVersion,
+    'STOP_COLLECT_NOW_ACTIVE_MIGRATION_SHA_OR_LEDGER_DRIFT');
   check(query("SELECT (to_regclass('platform_private.wk100_collect_now_requests_v1') IS NOT NULL)::text||'|'||"+
     "(SELECT has_function_privilege('anon','public.wk100_request_collect_now_v1(uuid,uuid)','EXECUTE'))::text||'|'||"+
     "(SELECT has_function_privilege('authenticated','public.wk100_request_collect_now_v1(uuid,uuid)','EXECUTE'))::text||'|'||"+
     "(SELECT count(*) FROM platform_private.wk100_collect_now_requests_v1)::text;",db)==='true|false|true|0',
-    'STOP_COLLECT_NOW_DISPOSABLE_SQL_AND_ACL');
-  console.log('WK100_COLLECT_NOW_DISPOSABLE_EXACT_SHA_SQL_AND_ACL=PASS');
+    'STOP_COLLECT_NOW_ACTIVE_SQL_AND_ACL');
+  console.log('WK100_COLLECT_NOW_ACTIVE_245TH_MIGRATION_EXACT_SHA_SQL_AND_ACL=PASS');
   const admin=client(url,v.SERVICE_ROLE_KEY),anon=client(url,v.ANON_KEY);
   const identity=randomUUID(); const email=`wk100-ci-${identity}@example.test`;
   const password=randomBytes(30).toString('base64url');
