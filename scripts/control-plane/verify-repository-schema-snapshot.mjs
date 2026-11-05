@@ -12,6 +12,11 @@ import {
   RNB18_TYPES_SHA256,
 } from "./verify-rnb18-staged-retirement.mjs";
 
+import {
+  OFFLINE_OPERATOR_SCHEMA_SEAL_MODE,
+  OFFLINE_OPERATOR_SOURCE,
+} from "./verify-offline-operator-replay-proof.mjs";
+
 const TYPE_FILE =
   "src/types/database.types.ts";
 const BASELINE_FILE =
@@ -151,16 +156,18 @@ export function validateRepositorySchemaSnapshot({
       "production",
       "preview",
       "disposable_ci",
+      OFFLINE_OPERATOR_SCHEMA_SEAL_MODE,
       RNB18_STAGED_MODE,
     ].includes(seal.mode)
   ) {
     errors.push(
-      "schemaSeal.mode must be production, preview, or approved disposable_ci",
+      "schemaSeal.mode must use an approved production, preview, CI, offline operator, or staged proof",
     );
   }
 
   if (
     seal.mode !== "disposable_ci" &&
+    seal.mode !== OFFLINE_OPERATOR_SCHEMA_SEAL_MODE &&
     (typeof seal.sourceProjectRef !==
       "string" ||
     !/^[a-z0-9]{20}$/.test(
@@ -242,6 +249,18 @@ export function validateRepositorySchemaSnapshot({
     }
   }
 
+  if (seal.mode === OFFLINE_OPERATOR_SCHEMA_SEAL_MODE) {
+    if (seal.sourceProjectRef !== OFFLINE_OPERATOR_SOURCE ||
+        typeof seal.baseMainSha !== "string" ||
+        !/^[0-9a-f]{40}$/.test(seal.baseMainSha) ||
+        typeof seal.replayCandidateHeadSha !== "string" ||
+        !/^[0-9a-f]{40}$/.test(seal.replayCandidateHeadSha) ||
+        !/^https:\/\/github\.com\/bjuta\/wakilisha\/pull\/1345#issuecomment-[1-9][0-9]+$/.test(seal.operatorReceiptUrl??"") ||
+        seal.workflowRunId != null || seal.previewBranchId != null) {
+      errors.push("offline operator seal requires local source, tested commit and owner evidence without CI claim");
+    }
+  }
+
   if (seal.mode === RNB18_STAGED_MODE) {
     if (expectedProjectRef !== "pgzizndxdyhqmtyywjmt" ||
         migrationCount !== 237 || latestMigration !== RNB18_STAGE1 ||
@@ -280,6 +299,7 @@ export function validatePendingSchemaState({
     pendingCount > 0 &&
     sealMode !== "preview" &&
     sealMode !== "disposable_ci" &&
+    sealMode !== OFFLINE_OPERATOR_SCHEMA_SEAL_MODE &&
     sealMode !== RNB18_STAGED_MODE
   ) {
     errors.push(
