@@ -18,10 +18,28 @@ fi
 [ ! -e supabase/.temp/project-ref ] || {
   echo 'STOP: remote Supabase authority or link present'; exit 20;
 }
-CONTAINER="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
-[ -n "$CONTAINER" ] && [ "$(printf '%s\n' "$CONTAINER" | wc -l | tr -d ' ')" = 1 ] || {
-  echo 'STOP: expected one disposable database container'; exit 20;
-}
+# Existing unrelated local Supabase stacks must never be considered candidates
+# for disposable SQL fixtures. Select only the explicitly named test stack.
+if [ "${WK100_LOCAL_DISPOSABLE_ACCEPTANCE:-}" = true ]; then
+  STACK_ID="${WK100_LOCAL_STACK_ID:-}"
+  [[ "$STACK_ID" =~ ^wk100accept[a-z0-9]{10}$ ]] || {
+    echo 'STOP: invalid disposable local stack identity'; exit 20;
+  }
+  CONTAINER="$(docker ps --filter "name=^supabase_db_${STACK_ID}$" --format '{{.Names}}')"
+  [ "$CONTAINER" = "supabase_db_${STACK_ID}" ] || {
+    echo 'STOP: isolated disposable database container not found'; exit 20;
+  }
+  OWNER="$(docker inspect --format '{{index .Config.Labels "com.supabase.cli.project"}}' "$CONTAINER")"
+  [ "$OWNER" = "$STACK_ID" ] || {
+    echo 'STOP: disposable database Docker ownership mismatch'; exit 20;
+  }
+else
+  CONTAINER="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+  [ -n "$CONTAINER" ] &&
+    [ "$(printf '%s\n' "$CONTAINER" | wc -l | tr -d ' ')" = 1 ] || {
+    echo 'STOP: expected one disposable database container in CI'; exit 20;
+  }
+fi
 db_sql() {
   docker exec -i "$CONTAINER" psql -X -q -A -t -v ON_ERROR_STOP=1 \
     -U supabase_admin -d postgres -c "$1"
