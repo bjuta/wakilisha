@@ -72,7 +72,7 @@ Deno.serve(async(req:Request)=>{
   if(!url||!anon)return reply(req,503,{error:'backend_unavailable'});
   // Caller JWT is verified by GoTrue and passed through the authenticated
   // PostgREST RPC. No service-role credential or caller-selected project URL.
-  const caller=createClient(url,anon,{global:{headers:{authorization:bearer}},
+  const caller=createClient(url,anon,{global:{headers:{Authorization:bearer}},
     auth:{persistSession:false,autoRefreshToken:false}});
   const user=await caller.auth.getUser(bearer.slice(7));
   if(user.error||!user.data.user?.id)return reply(req,401,{error:'authentication_required'});

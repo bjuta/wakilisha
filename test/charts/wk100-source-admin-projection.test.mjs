@@ -827,6 +827,13 @@ test('WK100 restricted source health and proposal endpoints require the verified
   const proposal=await readFile('supabase/functions/wk100-source-admin-proposals/index.ts','utf8');
   assert.match(health,/admin\.auth\.getUser\(token\)/);
   assert.match(proposal,/caller\.auth\.getUser\(bearer\.slice\(7\)\)/);
+  const methods=await readFile('supabase/functions/wk100-source-admin-methods/index.ts','utf8');
+  // GoTrue adds Authorization on getUser(jwt). Match its exact key case so
+  // Fetch never combines a second lowercase authorization bearer value.
+  for(const edge of [proposal,methods]){
+    assert.match(edge,/global:\{headers:\{Authorization:bearer\}\}/);
+    assert.doesNotMatch(edge,/global:\{headers:\{authorization:bearer\}\}/);
+  }
   for(const file of [health,proposal]){
     assert.match(file,/required_capability:'manage_ingest'/);
     assert.match(file,/required_capability:'manage_charts'/);

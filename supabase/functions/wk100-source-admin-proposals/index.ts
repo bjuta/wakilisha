@@ -50,7 +50,7 @@ Deno.serve(async(req:Request)=>{
   const url=Deno.env.get('SUPABASE_URL')??'';
   const anon=Deno.env.get('SUPABASE_ANON_KEY')??'';
   if(!url||!anon)return reply(req,503,{error:'backend_unavailable'});
-  const caller=createClient(url,anon,{global:{headers:{authorization:bearer}},
+  const caller=createClient(url,anon,{global:{headers:{Authorization:bearer}},
     auth:{persistSession:false,autoRefreshToken:false}});
   const user=await caller.auth.getUser(bearer.slice(7));
   if(user.error||!user.data.user?.id)return reply(req,401,{error:'authentication_required'});
