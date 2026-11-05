@@ -8,6 +8,7 @@ import { sha256Hex } from '../_shared/chart-candidate-capture.mjs';
 import { isGatewayVerifiedServiceRole, runtimeProjectApiUrl } from '../_shared/chart-capture-gateway-role.mjs';
 import { wk100EatWeekFromUtc, bindWk100DispatchAuthority } from '../_shared/wk100-source-scheduler-authority.mjs';
 import { planWk100SourceDispatch, selectWk100AuditedDispatch } from '../_shared/wk100-source-dispatch-plan.mjs';
+import { selectWk100CollectNowDispatch } from '../_shared/wk100-collect-now-authority.mjs';
 
 const JSON_HEADERS={'content-type':'application/json','cache-control':'no-store'};
 const reply=(status:number,body:Record<string,unknown>)=>
@@ -95,7 +96,16 @@ Deno.serve(async(req:Request)=>{
     const authorized=selectWk100AuditedDispatch({
       jobs:plan.jobs,sourceContracts:currentContracts,retryRequests:queued.data,
     });
-    const jobs=authorized.jobs;
+    const collectNow=await db.rpc('wk100_service_collect_now_requests_v1',{p_week:week});
+    if(collectNow.error||!Array.isArray(collectNow.data)||collectNow.data.length>100)
+      return reply(503,{error:'collect_now_requests_unavailable',canPublish:false});
+    const immediate=selectWk100CollectNowDispatch({
+      requests:collectNow.data,sourceContracts:currentContracts,
+      approvedDecisions:approved,attempts,nowUtc,weekStartEat:week,
+    });
+    const immediateSlots=new Set(immediate.jobs.map(j=>j.source_key+'/'+j.scheduled_at));
+    const jobs=[...immediate.jobs,...authorized.jobs.filter(j=>
+      !immediateSlots.has(j.source_key+'/'+j.scheduled_at))];
     // A single trigger dispatches at most four source slots. A subsequent
     // five-minute tick can address the rest without exhausting Edge runtime.
     // The capture service owns SQL reservation, leases and private receipts.
@@ -118,7 +128,7 @@ Deno.serve(async(req:Request)=>{
     }
     return reply(200,{schemaVersion:'wk100-source-scheduler-v1',
       status:'evaluated',weekStartEat:week,
-      eligible:jobs.length,dispatched,rejected,
+      eligible:jobs.length,collectNowEligible:immediate.jobs.length,dispatched,rejected,
       withheldRetries:authorized.withheldRetryCount,
       blocked:plan.blocked.length,canScore:false,canPublish:false});
   }catch{return reply(503,{error:'scheduler_evaluation_failed',canPublish:false});}

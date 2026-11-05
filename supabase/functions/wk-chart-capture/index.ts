@@ -87,7 +87,7 @@ Deno.serve(async (req:Request) => {
     for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
     const value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
     if(!value || typeof value!=='object' || Array.isArray(value) ||
-      Object.keys(value).some(k=>!['source_key','contract_version','week_start_eat','scheduled_at','attempt_number'].includes(k)))
+      Object.keys(value).some(k=>!['source_key','contract_version','week_start_eat','scheduled_at','attempt_number','collection_mode'].includes(k)))
       return json(400,{error:'request_invalid'});
     payload=value;
   } catch {return json(400,{error:'request_invalid'});}
@@ -95,6 +95,9 @@ Deno.serve(async (req:Request) => {
   if(typeof key!=='string'||typeof version!=='string' ||
     typeof payload.week_start_eat!=='string' || typeof payload.scheduled_at!=='string' ||
     !Number.isInteger(payload.attempt_number)) return json(400,{error:'source_invalid'});
+  if(payload.collection_mode!==undefined && payload.collection_mode!=='collect_now')
+    return json(400,{error:'collection_mode_invalid'});
+  const collectionMode=payload.collection_mode==='collect_now'?'collect_now':'scheduled';
   const now=new Date();
   const entry=approvedEntry(manifest,key,version,now);
   if(!entry) return json(403,{error:'source_access_not_authorized'});
@@ -134,6 +137,24 @@ Deno.serve(async (req:Request) => {
      found.data.adapter_sha256!==entry.adapter_sha256 ||
      found.data.adapter_version!==entry.parser_class)
     return json(409,{error:'source_adapter_digest_mismatch',can_publish:false});
+  // The service-role token alone cannot invent an Admin Collect Now request.
+  // A signed-in Admin must have created its exact current-clock SQL ticket.
+  // The separate SQL reserve_now function repeats this check atomically.
+  if(collectionMode==='collect_now'){
+    if(payload.attempt_number!==1)
+      return json(403,{error:'collect_now_retry_forbidden',can_publish:false});
+    const tickets=await db.rpc('wk100_service_collect_now_requests_v1',{
+      p_week:payload.week_start_eat,
+    });
+    if(tickets.error||!Array.isArray(tickets.data)||tickets.data.length>100)
+      return json(503,{error:'collect_now_authority_unavailable',can_publish:false});
+    const allowed=tickets.data.some(t=>
+      t.contract_id===found.data.id &&
+      t.source_key===key && t.contract_version===version &&
+      Number.isFinite(Date.parse(t.scheduled_at)) &&
+      Date.parse(t.scheduled_at)===Date.parse(String(payload.scheduled_at)));
+    if(!allowed)return json(403,{error:'collect_now_not_authorized',can_publish:false});
+  }
   // This endpoint is independently callable by a service credential. It
   // must not trust the scheduler as the only guard for attempt 2..8.
   // Query the service-only immutable action ledger before credentials,
@@ -203,6 +224,7 @@ Deno.serve(async (req:Request) => {
   };
   const backend={
     reserve:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_reserve_v1',args),
+    reserveNow:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_reserve_now_v1',args),
     advance:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_advance_v1',args),
     commit:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_commit_v1',args),
     fail:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_fail_v1',args),
@@ -217,7 +239,7 @@ Deno.serve(async (req:Request) => {
   try {
     const result=await runCandidateCapture({contract:found.data,
       weekStartEat:String(payload.week_start_eat),scheduledAt:String(payload.scheduled_at),
-      attemptNumber:Number(payload.attempt_number),
+      attemptNumber:Number(payload.attempt_number),collectionMode,
       access:{source_key:key,endpoint:entry.endpoint,authorization_ref:entry.authorization_ref,
         native_period_key:entry.native_period_key,parser_class:entry.parser_class,providerAuthorization},
       verifyAccess,db:backend,storage,

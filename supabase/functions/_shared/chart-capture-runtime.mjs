@@ -80,14 +80,30 @@ function sourceContractForKernel(c) {
       eat_hour:c.eat_hour,eat_minute:c.eat_minute,weekday_eat:c.weekday_eat??undefined},
     minimum_healthy_checkpoints:c.minimum_healthy_checkpoints};
 }
-export function validateCaptureSlot({contract,weekStartEat,scheduledAt,attemptNumber,access={},clock=new Date()}) {
+export function validateCaptureSlot({contract,weekStartEat,scheduledAt,attemptNumber,access={},clock=new Date(),collectionMode='scheduled'}) {
   requireValue(resolveCaptureParser(contract,access),'source_unimplemented');
   requireValue(contract.admission_state==='candidate' && contract.market==='KE', 'source_unadmitted');
   requireValue(exactUtc(scheduledAt),'slot_invalid');
   requireValue(Number.isInteger(attemptNumber)&&attemptNumber>=1&&attemptNumber<=8,'attempt_number_invalid');
   requireValue(clock instanceof Date && !Number.isNaN(clock.valueOf()),'clock_invalid');
-  const slots=checkpointsForSource(weekStartEat,sourceContractForKernel(contract));
-  requireValue(slots.some(x=>x.scheduled_at===scheduledAt),'slot_unexpected');
+  requireValue(collectionMode==='scheduled'||collectionMode==='collect_now','collection_mode_invalid');
+  if(collectionMode==='scheduled'){
+    const slots=checkpointsForSource(weekStartEat,sourceContractForKernel(contract));
+    requireValue(slots.some(x=>x.scheduled_at===scheduledAt),'slot_unexpected');
+  }else{
+    // Collect Now is NOT an alternate schedule. The signed-in Admin's exact
+    // current-minute ticket is independently enforced by a service-only SQL
+    // reservation. This local check protects the worker before DB/egress.
+    requireValue(attemptNumber===1,'collect_now_retry_forbidden');
+    requireValue(/^\d{4}-\d{2}-\d{2}$/.test(weekStartEat),'collect_now_week_invalid');
+    const monday=Date.parse(weekStartEat+'T00:00:00Z');
+    requireValue(Number.isFinite(monday)&&new Date(monday).toISOString().slice(0,10)===weekStartEat&&
+      new Date(monday).getUTCDay()===1,'collect_now_week_invalid');
+    const minute=Date.parse(scheduledAt);
+    requireValue(minute%60000===0,'collect_now_minute_invalid');
+    const start=monday-3*60*60*1000;
+    requireValue(minute>=start&&minute<start+7*86400000,'collect_now_week_mismatch');
+  }
   const elapsed=clock.valueOf()-Date.parse(scheduledAt);
   requireValue(elapsed>=0 && elapsed<=20*60*1000,'slot_outside_capture_window');
 }
@@ -144,12 +160,14 @@ function dependency(db, names) {
 
 /**
  * The authority/credential/source manifest must be independently approved.
- * No catch-up: execution is allowed only at the designated EAT checkpoint within 20 min.
+ * Scheduled collection requires the exact EAT checkpoint. Explicit signed-in
+ * Admin Collect Now uses a separately approved current-minute SQL ticket.
+ * Both paths preserve the same 20-minute bounded real-clock window.
  * Reservation precedes fetch; a bound object is always resumed from Storage,
  * NEVER silently re-fetched after crash. Source-invalid errors are not receipt claims.
  */
 export async function runCandidateCapture({
-  contract,weekStartEat,scheduledAt,attemptNumber=1,access,
+  contract,weekStartEat,scheduledAt,attemptNumber=1,access,collectionMode='scheduled',
   verifyAccess,db,storage,fetchImpl=fetch,clock=()=>new Date(),
   enabled=false, timeoutMs=12000,
 }) {
@@ -161,7 +179,7 @@ export async function runCandidateCapture({
     typeof verifyAccess==='function' &&
     typeof access.endpoint==='string' && typeof access.authorization_ref==='string',
     'access_not_configured');
-  validateCaptureSlot({contract,weekStartEat,scheduledAt,attemptNumber,access,clock:clock()});
+  validateCaptureSlot({contract,weekStartEat,scheduledAt,attemptNumber,access,clock:clock(),collectionMode});
   const accessDecision={source_key:contract.source_key,exact_endpoint:access.endpoint,
     authorization_ref:access.authorization_ref,purpose:'candidate_raw_evidence'};
   // Do not reserve an unauthorized endpoint. Bound authority check also stops
@@ -178,7 +196,10 @@ export async function runCandidateCapture({
     ]);
   } finally {clearTimeout(authorityTimer);}
   requireValue(allowed===true,'source_access_not_authorized');
-  const reservation=await db.reserve({p_contract_id:contract.id,
+  if(collectionMode==='collect_now')
+    requireValue(typeof db.reserveNow==='function','collect_now_reservation_missing');
+  const reserve=collectionMode==='collect_now'?db.reserveNow:db.reserve;
+  const reservation=await reserve({p_contract_id:contract.id,
     p_week_start_eat:weekStartEat,p_scheduled_at:scheduledAt,p_attempt_number:attemptNumber});
   requireValue(reservation && typeof reservation.state==='string','reservation_invalid');
   if (reservation.state==='committed') return Object.freeze({status:'already_committed',

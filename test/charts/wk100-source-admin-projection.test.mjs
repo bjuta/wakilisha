@@ -11,6 +11,8 @@ import { planWk100SourceDispatch, selectWk100AuditedDispatch } from '../../supab
 import { fetchCandidateBytes, sha256Hex } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
 import { bindWk100DispatchAuthority, wk100EatWeekFromUtc, isWk100CaptureConstitutionCurrent } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
 import { validateWk100SourceMethodDecision, validateWk100ContractEnrollmentIntent } from '../../supabase/functions/_shared/wk100-source-method-decision-v1.mjs';
+import { selectWk100CollectNowDispatch } from '../../supabase/functions/_shared/wk100-collect-now-authority.mjs';
+import { validateCaptureSlot } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
 
 test('WK100 source read model preserves empty real Production state',()=>{
   const model=projectWk100SourceHealth([],[],'2026-11-02');
@@ -856,3 +858,73 @@ test('WK100 private original readback binds exact signed-in receipt and hashes s
   assert.doesNotMatch(code,/signedUrl|createSignedUrl/);
 });
 
+
+test('Collect Now is distinct from the weekly checkpoint and cannot claim an invented slot',()=>{
+  const contract={
+    id:'11111111-1111-4111-8111-111111111111',
+    source_key:'apple_ke_catalog_most_played',provider_key:'apple_ke',
+    contract_version:'v1',market:'KE',admission_state:'candidate',
+    adapter_version:'apple_kenya_chart_v1',
+    behavior:'consumption',native_metric:'rank',expected_depth:100,
+    cadence_kind:'weekly',eat_hour:9,eat_minute:0,weekday_eat:0,
+    minimum_healthy_checkpoints:1,
+  };
+  const args={contract,weekStartEat:'2026-11-02',
+    scheduledAt:'2026-11-05T12:00:00Z',attemptNumber:1,
+    access:{parser_class:'apple_kenya_chart_v1'},
+    clock:new Date('2026-11-05T12:00:30Z')};
+  assert.throws(()=>validateCaptureSlot(args),/slot_unexpected/);
+  assert.doesNotThrow(()=>validateCaptureSlot({...args,collectionMode:'collect_now'}));
+  for(const bad of [
+    {attemptNumber:2},{weekStartEat:'2026-11-09'},
+    {scheduledAt:'2026-11-05T12:00:01Z'},
+    {clock:new Date('2026-11-05T12:21:00Z')},
+    {clock:new Date('2026-11-05T11:59:59Z')},
+    {collectionMode:'unsupported'},
+  ])assert.throws(()=>validateCaptureSlot({...args,collectionMode:'collect_now',...bad}));
+});
+test('Collect Now only dispatches a current, admitted, exact SQL-ticket source',()=>{
+  const contract={id:'11111111-1111-4111-8111-111111111111',
+    source_key:'apple_ke_catalog_most_played',contract_version:'v1'};
+  const decision={source_key:contract.source_key,contract_version:'v1',
+    state:'collector_admitted',enabled:true};
+  const request={operation_id:'22222222-2222-4222-8222-222222222222',
+    actor_user_id:'33333333-3333-4333-8333-333333333333',
+    contract_id:contract.id,source_key:contract.source_key,contract_version:'v1',
+    week_start_eat:'2026-11-02',scheduled_at:'2026-11-05T12:00:00+00:00'};
+  const input={requests:[request],sourceContracts:[contract],
+    approvedDecisions:[decision],attempts:[],
+    nowUtc:'2026-11-05T12:00:30Z',weekStartEat:'2026-11-02'};
+  const ok=selectWk100CollectNowDispatch(input);
+  assert.equal(ok.jobs.length,1);
+  assert.equal(ok.jobs[0].collection_mode,'collect_now');
+  assert.equal(ok.jobs[0].attempt_number,1);
+  assert.equal(ok.jobs[0].scheduled_at,'2026-11-05T12:00:00Z');
+  assert.equal(ok.canPublish,false);
+  for(const invalid of [
+    {requests:[{...request,actor_user_id:null}]},
+    {requests:[{...request,contract_id:'44444444-4444-4444-8444-444444444444'}]},
+    {requests:[{...request,scheduled_at:'2026-11-05T12:00:20Z'}]},
+    {requests:[{...request,week_start_eat:'2026-11-09'}]},
+    {approvedDecisions:[{...decision,state:'paused'}]},
+    {nowUtc:'2026-11-05T12:21:01Z'},
+    {attempts:[{contract_id:contract.id,scheduled_at:request.scheduled_at}]},
+  ])assert.equal(selectWk100CollectNowDispatch({...input,...invalid}).jobs.length,0);
+  assert.throws(()=>selectWk100CollectNowDispatch({
+    ...input,requests:[request,request]}),/request_duplicate/);
+});
+test('Collect Now keeps approved UI untouched and SQL remains an independent gate',async()=>{
+  const worker=await readFile('supabase/functions/wk-chart-capture/index.ts','utf8');
+  const scheduler=await readFile('supabase/functions/wk100-source-scheduler/index.ts','utf8');
+  const runtime=await readFile('supabase/functions/_shared/chart-capture-runtime.mjs','utf8');
+  const sql=await readFile('scripts/acceptance/wk100-collect-now-forward-candidate-v1.sql','utf8');
+  assert.match(worker,/wk100_service_collect_now_requests_v1/);
+  assert.match(worker,/wk_chart_runtime_reserve_now_v1/);
+  assert.match(scheduler,/selectWk100CollectNowDispatch/);
+  assert.match(runtime,/collect_now_reservation_missing/);
+  assert.match(sql,/wk100_request_collect_now_v1/);
+  assert.match(sql,/wk_chart_runtime_reserve_now_v1/);
+  assert.match(sql,/wk100_service_collect_now_requests_v1/);
+  assert.match(sql,/current_user_has_capability\('manage_ingest'\)/);
+  assert.match(sql,/private\.wk_chart_runtime_guard_v1\(\)/);
+});
