@@ -1,6 +1,6 @@
 # WK100: isolated local Supabase/Docker acceptance alongside existing projects
 
-**Operational runbook v1 — 5 November 2026 (EAT).** Scope: WAKILISHA 100 Phase 1 disposable PostgreSQL 17 / GoTrue / PostgREST / private Storage acceptance on the operator's Mac. The established source of truth for the implementation remains PR [#1345](https://github.com/bjuta/wakilisha/pull/1345) and the accepted [deployment workflow](../../README.md) where applicable. This runbook explains *how to run an isolated temporary stack without interfering with any already-running or retained Docker resources*. It does not authorize hosted Preview mutations, provider collection, publication, Production deployment, CI green status or merge.
+**Operational runbook v1 — 5 November 2026 (EAT).** Scope: WAKILISHA 100 Phase 1 disposable PostgreSQL 17 / GoTrue / PostgREST / private Storage acceptance on the operator's Mac. The implementation authority remains PR [#1345](https://github.com/bjuta/wakilisha/pull/1345), the repository's deployment controls and the [CI-budget/draft-gate policy](./ci-budget-recovery-and-draft-gates-20261104.md). This runbook explains *how to run an isolated temporary stack without interfering with any already-running or retained Docker resources*. It does not authorize hosted Preview mutations, provider collection, publication, Production deployment, CI green status or merge.
 
 ## Non-negotiable Docker ownership boundary
 
