@@ -231,11 +231,17 @@ async function runActualProviderDisposableCapture({signed,admin,db,userId}){
 }
 
 async function main(){
-  check(process.env.GITHUB_ACTIONS==='true'&&
-   process.env.GITHUB_EVENT_NAME==='pull_request'&&
+  const ciMode=process.env.GITHUB_ACTIONS==='true'&&
+    process.env.GITHUB_EVENT_NAME==='pull_request';
+  const localMode=process.env.WK100_LOCAL_DISPOSABLE_ACCEPTANCE==='true'&&
+    !process.env.GITHUB_ACTIONS&&!process.env.GITHUB_EVENT_NAME&&
+    process.env.WK100_LIVE_SOURCE_ACCEPTANCE==='false';
+  check((ciMode||localMode)&&
    !process.env.SUPABASE_PROJECT_REF&&!process.env.SUPABASE_ACCESS_TOKEN&&
    !existsSync('supabase/.temp/project-ref'),
-   'STOP_NOT_UNLINKED_DISPOSABLE_PR_RUNNER');
+   'STOP_NOT_UNLINKED_DISPOSABLE_PR_OR_EXPLICIT_LOCAL_RUNNER');
+  console.log('WK100_DISPOSABLE_EXECUTION_CONTEXT='+
+    (ciMode?'CI_PULL_REQUEST':'EXPLICIT_LOCAL_NO_PROVIDER_EGRESS'));
   const v=env(); const url=v.API_URL||v.SUPABASE_URL;
   const parsed=new URL(url||'http://invalid.invalid');
   check(parsed.protocol==='http:'&&parsed.hostname==='127.0.0.1'&&
