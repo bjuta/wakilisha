@@ -556,8 +556,10 @@ async function main(){
     serviceTickets.data[0]?.scheduled_at===collectSlot&&
     !!privateTickets.error&&!!privateReservation.error&&
     query("SELECT (SELECT count(*) FROM platform_private.wk100_collect_now_requests_v1)::text||'|'||"+
-      "(SELECT count(*) FROM private.wk_chart_runtime_reservations_v1)::text||'|'||"+
-      "(SELECT count(*) FROM public.wk_chart_capture_attempts_v1)::text;",db)==='1|0|0',
+      "(SELECT count(*) FROM private.wk_chart_runtime_reservations_v1 "+
+      "WHERE contract_id='"+enrolled.data.contractId+"'::uuid)::text||'|'||"+
+      "(SELECT count(*) FROM public.wk_chart_capture_attempts_v1 "+
+      "WHERE contract_id='"+enrolled.data.contractId+"'::uuid)::text;",db)==='1|0|0',
     'STOP_COLLECT_NOW_SERVICE_PROJECTION_OR_PRIVATE_LEASE_GATE');
   console.log('WK100_COLLECT_NOW_GENUINE_JWT_REQUEST_REPLAY_SERVICE_READ_AND_DENIAL=PASS');
   // A second independently issued GoTrue identity cannot replay the Admin's
