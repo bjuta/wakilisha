@@ -105,6 +105,84 @@ export function parseMdundoKenya(raw) {
  */
 export const WK100_AUDIOMACK_KE_PUBLIC_CHART_URL =
   'https://audiomack.com/geo-charts/playlist/kenya';
+
+/**
+ * Read the exact first-party Next.js Flight playlist, not the HTML title order
+ * by itself. The original response is capped by the collector at 4 MiB.
+ * A missing or changed server structure is research-only, never ranked rows.
+ */
+function audiomackEmbeddedPlaylist(html) {
+  let found=null;
+  for(const hit of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)){
+    const script=hit[1];
+    if(!script.startsWith('self.__next_f.push(')||
+      !script.includes('\\"music\\":{'))continue;
+    if(!script.endsWith(')'))fail('audiomack_playlist_serialization_invalid');
+    let frame;
+    try{frame=JSON.parse(script.slice('self.__next_f.push('.length,-1));}
+    catch{fail('audiomack_playlist_serialization_invalid');}
+    if(!Array.isArray(frame)||frame[0]!==1||typeof frame[1]!=='string')
+      fail('audiomack_playlist_serialization_invalid');
+    const stream=frame[1],marker='"music":{',position=stream.indexOf(marker);
+    if(position<0||stream.indexOf(marker,position+1)!==-1||found)
+      fail('audiomack_playlist_ambiguous');
+    const start=position+'"music":'.length;
+    let depth=0,inString=false,escaped=false,end=-1;
+    for(let i=start;i<stream.length;i++){
+      const ch=stream[i];
+      if(inString){
+        if(escaped)escaped=false;
+        else if(ch==='\\')escaped=true;
+        else if(ch==='"')inString=false;
+        continue;
+      }
+      if(ch==='"'){inString=true;continue;}
+      if(ch==='{')depth++;
+      else if(ch==='}'&&--depth===0){end=i+1;break;}
+    }
+    if(end<0)fail('audiomack_playlist_serialization_invalid');
+    if((stream.slice(start,end).match(/"tracks":\[/g)||[]).length!==1)
+      fail('audiomack_playlist_ambiguous');
+    try{found=JSON.parse(stream.slice(start,end));}
+    catch{fail('audiomack_playlist_serialization_invalid');}
+  }
+  return found;
+}
+function parseAudiomackEmbeddedKenya(html,refs) {
+  const p=record(audiomackEmbeddedPlaylist(html));
+  if(!p)return null;
+  if(p.id!=='18474189'||p.title!=='Weekly 100: Kenya'||
+    p.href!=='/geo-charts/playlist/kenya'||p.urlSlug!=='kenya'||
+    record(p.uploadedBy)?.slug!=='geo-charts'||p.trackCount!==100||
+    !Number.isSafeInteger(p.updatedAt)||p.updatedAt<1500000000||
+    !Array.isArray(p.tracks)||p.tracks.length!==100||refs.length!==100)
+    fail('audiomack_embedded_chart_unverified');
+  const rows=p.tracks.map((item,i)=>{
+    const v=record(item),parent=record(v?.parentPlaylist),
+      id=text(v?.id,180),name=text(v?.title),artist=text(v?.artistName);
+    if(v?.type!=='song'||!id||!/^\d{1,16}$/.test(id)||
+      v.songId!==id||!name||!artist||name!==refs[i]||
+      parent?.id!==p.id||parent?.href!==p.href||
+      typeof v.href!=='string'||
+      !/^\/[a-zA-Z0-9_-]+\/song\/[a-zA-Z0-9_-]+$/.test(v.href))
+      fail('audiomack_embedded_track_mismatch');
+    return track(i+1,id,name,artist,{
+      provider_url:'https://audiomack.com'+v.href,
+    });
+  });
+  return normalizeRows('audiomack_ke',rows,100,{
+    behavior:'consumption',metric:'rank',
+    chart_surface:'audiomack_first_party_embedded_kenya_weekly_100',
+    rank_authority:'first_party_embedded_playlist_metadata_crosschecked',
+    provider_track_identity_authority:'first_party_song_id',
+    artist_authority:'first_party_playlist_entry',
+    provider_playlist_id:p.id,
+    provider_updated_at:new Date(p.updatedAt*1000).toISOString(),
+    // A playlist update timestamp is not its native consumption interval.
+    native_period:'unknown',
+  });
+}
+
 export function parseAudiomackKenya(raw,access={}) {
   const html=assertString(raw,'audiomack');
   const count=html.match(/"track_count"\s*:\s*(\d+)/i);
@@ -144,6 +222,10 @@ export function parseAudiomackKenya(raw,access={}) {
     !/<title\b[^>]*>[^<]*Weekly 100:\s*Kenya\b/i.test(html)||
     refs.some(x=>/^[a-z][a-z0-9.+-]*:|^\/|[<>]|[\u0000-\u001f\u007f]/i.test(x)))
     fail('audiomack_public_titles_unqualified');
+  // Only an identical 100-entry provider playlist and meta-order attestation
+  // can supply stable Audiomack song IDs and ranked candidate rows.
+  const embedded=parseAudiomackEmbeddedKenya(html,refs);
+  if(embedded)return embedded;
   const rows=refs.map((title,i)=>track(i+1,null,title));
   return normalizeRows('audiomack_ke',rows,100,{
     behavior:'consumption',metric:'rank',
@@ -451,6 +533,52 @@ export function parseAppleKenyaPublicHtml(raw,access={}) {
   });
 }
 
+
+/**
+ * The actual YouTube Charts web response encloses trackViews with its own
+ * CHART_PERIOD_TYPE_WEEKLY and endDate, not a synthetic periodKey string.
+ * The requested target only verifies that native date; it never supplies it.
+ * A full start/end interval is NOT claimed from an end-date-only response.
+ */
+export const WK100_YOUTUBE_KE_CHART_RESPONSE_URL =
+  'https://charts.youtube.com/youtubei/v1/browse?alt=json';
+function youtubeNativeWeeklyTrackViews(payload,target,access) {
+  const list=record(record(payload?.contents)?.sectionListRenderer);
+  if(!list)return null; // Keep the earlier explicit-period fixture decoder.
+  const candidates=[];
+  for(const section of arr(list.contents)){
+    const content=record(record(section?.musicAnalyticsSectionRenderer)?.content);
+    for(const item of arr(content?.trackTypes)){
+      const o=record(item);
+      if(o&&(o.listType==='TOP_VIEWS_CHART'||
+        o.chartPeriodType==='CHART_PERIOD_TYPE_WEEKLY')){
+        if(o.listType!=='TOP_VIEWS_CHART'||
+          o.chartPeriodType!=='CHART_PERIOD_TYPE_WEEKLY')
+          fail('youtube_source_chart_type_unverified');
+        candidates.push(o);
+      }
+    }
+  }
+  if(candidates.length===0)fail('youtube_source_chart_type_unverified');
+  if(access?.endpoint!==WK100_YOUTUBE_KE_CHART_RESPONSE_URL)
+    fail('youtube_source_endpoint_unverified');
+  if(candidates.length!==1)fail('youtube_ambiguous_weekly_track_views');
+  const native=candidates[0],endDate=native.endDate;
+  if(typeof endDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(endDate)||
+    !Number.isFinite(Date.parse(endDate+'T00:00:00Z'))||
+    new Date(Date.parse(endDate+'T00:00:00Z')).toISOString().slice(0,10)!==endDate)
+    fail('youtube_native_week_end_invalid');
+  const parts=target.match(/^weekly:(\d{8}):(\d{8}):ke$/);
+  const ending=Date.parse(endDate+'T00:00:00Z');
+  const expectedFriday=new Date(ending-6*86400000)
+    .toISOString().slice(0,10).replaceAll('-','');
+  if(!parts||parts[2]!==endDate.replaceAll('-','')||
+    parts[1]!==expectedFriday||new Date(ending).getUTCDay()!==4)
+    fail('youtube_target_period_unavailable');
+  if(!Array.isArray(native.trackViews))fail('youtube_missing_track_views');
+  return {rows:native.trackViews,endDate};
+}
+
 // Bind trackViews to its nearest explicit provider period. The previous
 // document-wide period search could accept a matching label in unrelated
 // metadata and then choose a different week's (larger) chart list.
@@ -480,11 +608,13 @@ function findPeriodBoundTrackViews(payload,target,matches,period=null,depth=0) {
   }
 }
 /** YouTube weekly Kenya tracks: rank AND native view count, not audio plays. */
-export function parseYouTubeKenyaWeekly(raw, targetPeriodKey) {
+export function parseYouTubeKenyaWeekly(raw, targetPeriodKey, access={}) {
   if(typeof targetPeriodKey!=='string'||!YOUTUBE_PERIOD.test(targetPeriodKey)) fail('youtube_invalid_target_period');
   if(!record(raw))fail('youtube_target_period_unavailable');
+  const native=youtubeNativeWeeklyTrackViews(raw,targetPeriodKey,access);
   const lists=[];
-  findPeriodBoundTrackViews(raw,targetPeriodKey,lists);
+  if(native)lists.push(native.rows);
+  else findPeriodBoundTrackViews(raw,targetPeriodKey,lists);
   // Multiple candidate charts for the same week need an explicit reviewed
   // selector; never arbitrarily choose the largest provider list.
   if(lists.length>1)fail('youtube_ambiguous_weekly_track_views');
@@ -497,11 +627,15 @@ export function parseYouTubeKenyaWeekly(raw, targetPeriodKey) {
     if(!rank)fail('youtube_missing_rank');
     const provider_id=text(v.encryptedVideoId,180);
     const count=nonnegativeCount(v.viewCount);
+    if(native&&(!provider_id||!ID_RE.test(provider_id)||!text(v.name)))
+      fail('youtube_native_row_unverified');
     if(count===null)fail('youtube_missing_native_view_count');
     const artists=arr(v.artists).map(a=>text(record(a)?.name)).filter(Boolean);
     return track(rank,provider_id,text(v.name),artists.join(', ')||null,{view_count:count});
   });
   const result=normalizeRows('youtube_ke',rows,top.length,{behavior:'video_consumption',metric:'rank_and_count',
-    source_period_key:targetPeriodKey});
+    source_period_key:targetPeriodKey,
+    ...(native?{provider_period_type:'weekly',provider_week_ending_date:native.endDate}:{}),
+    native_period:'unknown'});
   return result;
 }

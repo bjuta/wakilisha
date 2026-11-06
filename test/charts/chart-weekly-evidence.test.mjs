@@ -325,6 +325,38 @@ test('YouTube provider weekly observation retains views, exact target period and
     {periodKey:target,trackViews:payload.charts.trackViews},
   ]};
   assert.equal(parseYouTubeKenyaWeekly(both,target).rows[0].provider_track_id,'xyz');
+
+  // Real first-party web-chart response shape: weekly type + source endDate
+  // own the rank/view rows; a requested period string never creates that date.
+  const siteNode={listType:'TOP_VIEWS_CHART',
+    chartPeriodType:'CHART_PERIOD_TYPE_WEEKLY',endDate:'2026-10-22',
+    trackViews:payload.charts.trackViews};
+  const asSite=(node)=>({contents:{sectionListRenderer:{contents:[
+    {musicAnalyticsSectionRenderer:{content:{trackTypes:[node]}}}
+  ]}}});
+  const access={endpoint:'https://charts.youtube.com/youtubei/v1/browse?alt=json'};
+  const native=parseYouTubeKenyaWeekly(asSite(siteNode),target,access);
+  assert.equal(native.rows[0].view_count,12400);
+  assert.equal(native.provider_week_ending_date,'2026-10-22');
+  assert.equal(native.native_period,'unknown');
+  assert.equal(native.eligible_for_scoring,false);
+  assert.throws(()=>parseYouTubeKenyaWeekly(asSite(siteNode),target,
+    {endpoint:'https://charts.youtube.com/charts/TopSongs/us'}),
+  /youtube_source_endpoint_unverified/);
+  for(const changed of [
+    {...siteNode,endDate:'2026-10-15'},
+    {...siteNode,endDate:'2026-10-23'},
+    {...siteNode,chartPeriodType:'CHART_PERIOD_TYPE_DAILY'},
+    {...siteNode,listType:'TOP_VIDEOS_CHART'},
+  ])assert.throws(()=>parseYouTubeKenyaWeekly(asSite(changed),target,access),/youtube_/);
+  assert.throws(()=>parseYouTubeKenyaWeekly(asSite(siteNode),
+    'weekly:20261017:20261022:ke',access),/youtube_target_period_unavailable/);
+  assert.throws(()=>parseYouTubeKenyaWeekly({
+    contents:{sectionListRenderer:{contents:[{
+      musicAnalyticsSectionRenderer:{content:{trackTypes:[siteNode,siteNode]}}
+    }]}}
+  },target,access),/youtube_ambiguous_weekly_track_views/);
+
   assert.throws(()=>parseYouTubeKenyaWeekly({
     periodKey:target,charts:{trackViews:payload.charts.trackViews,
       competing:{periodKey:target,trackViews:payload.charts.trackViews}},

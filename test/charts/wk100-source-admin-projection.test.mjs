@@ -190,6 +190,44 @@ test('WK100 Audiomack public title metadata is candidate-only with no invented s
   assert.equal(parsed.rows.length,100);
   assert.equal(parsed.rows[0].title,'Synthetic Title 1');
   assert.equal(parsed.rows[0].provider_track_id,null);
+
+  // The first-party Kenya page's embedded Next.js Flight playlist has
+  // 100 ordered song IDs, separate from the 100 music:song title metas.
+  const playlist={id:'18474189',title:'Weekly 100: Kenya',
+    href:'/geo-charts/playlist/kenya',urlSlug:'kenya',
+    uploadedBy:{slug:'geo-charts'},trackCount:100,updatedAt:1793811472,
+    tracks:Array.from({length:100},(_,i)=>({
+      id:String(i+100000),songId:String(i+100000),type:'song',
+      title:'Synthetic Title '+(i+1),artistName:'First-party Artist',
+      href:'/kenya-artist/song/track-'+(i+1),
+      parentPlaylist:{id:'18474189',href:'/geo-charts/playlist/kenya'},
+    }))};
+  const original=(p)=>html+'<script>self.__next_f.push('+
+    JSON.stringify([1,'7:[{"music":'+JSON.stringify(p)+'}]'])+
+    ')</script>';
+  const validated=parseAudiomackKenya(original(playlist),access);
+  assert.equal(validated.chart_surface,'audiomack_first_party_embedded_kenya_weekly_100');
+  assert.equal(validated.rank_authority,'first_party_embedded_playlist_metadata_crosschecked');
+  assert.equal(validated.provider_playlist_id,'18474189');
+  assert.equal(validated.provider_updated_at,'2026-11-04T16:57:52.000Z');
+  assert.equal(validated.native_period,'unknown');
+  assert.equal(validated.rows.length,100);
+  assert.equal(validated.rows[99].provider_track_id,'100099');
+  const accepted=parseCaptureNativeRows(new TextEncoder().encode(original(playlist)),
+    contract,access);
+  assert.equal(accepted.length,100);
+  assert.equal(accepted[0].provider_track_id,'100000');
+  assert.equal(Object.hasOwn(accepted[0],'view_count'),false);
+  for(const bad of [
+    {...playlist,id:'other-id'},
+    {...playlist,tracks:[...playlist.tracks.slice(1),playlist.tracks[0]]},
+    {...playlist,tracks:[...playlist.tracks.slice(0,99)]},
+    {...playlist,tracks:[...playlist.tracks.slice(0,99),playlist.tracks[0]]},
+    {...playlist,tracks:[...playlist.tracks.slice(0,99),
+      {...playlist.tracks[99],parentPlaylist:{id:'wrong',href:playlist.href}}]},
+    {...playlist,trackCount:99},
+  ])assert.throws(()=>parseCaptureNativeRows(
+    new TextEncoder().encode(original(bad)),contract,access),/audiomack_/);
   // Research can read this first-party metadata, but no authoritative
   // display-order proof exists. Collector row commitment must fail closed.
   assert.throws(()=>parseCaptureNativeRows(new TextEncoder().encode(html),contract,access),

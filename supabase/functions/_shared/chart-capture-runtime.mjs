@@ -29,7 +29,7 @@ const PARSERS = Object.freeze({
       : parseAppleKenya(JSON.parse(original),access);
   },
   youtube_ke: (bytes, access) => parseYouTubeKenyaWeekly(
-    JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)), access.native_period_key),
+    JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)), access.native_period_key,access),
 });
 
 /** A source ID is distinct from its provider parser; IDs never grant fetch authority.
@@ -113,15 +113,13 @@ function normalizeNativeRows(parsed,contract,providerKey) {
   requireValue(parsed.source_key===providerKey && parsed.market==='KE' &&
     parsed.metric===contract.native_metric && parsed.behavior===contract.behavior,
     'parser_contract_mismatch');
-  // Audiomack's live HTML currently exposes 100 song TITLE meta tags but
-  // does not yet prove that metadata order equals the displayed chart ranks.
-  // Research may preserve those observations; the governed collector must
-  // not convert an unverified order into authoritative ranked rows.
-  // Every Audiomack metadata representation, including older song-URL tags,
-  // lacks independently attested display-order ranks. A source-bound title or
-  // URL is genuine research evidence, never collector rank authority by itself.
+  // A bare music:song title/URL list is not ranked evidence. Only the
+  // exact first-party 100-track playlist, matching 100 ordered metadata
+  // entries with stable IDs and the fixed Kenya playlist identity, qualifies
+  // its source-native ordered candidates. This parser still cannot enroll a
+  // method, enable collection, score or publish an Edition.
   if(providerKey==='audiomack_ke')
-    requireValue(parsed.rank_authority==='independently_verified_display_order',
+    requireValue(parsed.rank_authority==='first_party_embedded_playlist_metadata_crosschecked',
       'source_rank_unverified');
   requireValue(Array.isArray(parsed.rows) && parsed.rows.length>=1 &&
     parsed.rows.length<=contract.expected_depth,'parser_depth_invalid');
