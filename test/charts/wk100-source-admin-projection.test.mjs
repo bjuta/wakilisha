@@ -498,6 +498,20 @@ test('WK100 source-method review cannot convert research-only or a mismatched pr
   },{now});
   assert.equal(heldYoutube.decisionState,'held');
   assert.equal(heldYoutube.canCollect,false);
+  // Audiomack's admitted parser accepts only the exact 100-track Kenya HTML
+  // surface, not an unevidenced playlist API or title-only feed method.
+  const audiomack={...p,providerKey:'audiomack_ke',
+    sourceKey:'audiomack_ke_public_weekly_100',
+    parserClass:'audiomack_kenya_chart_v1',
+    methodClass:'reviewed_page_adapter',
+    nativePeriodAuthority:'observed_as_of',
+    nativePeriodEvidenceRef:'observed_as_of/kenya_playlist_proof'};
+  const acceptedAudiomack=validateWk100SourceMethodDecision(audiomack,{now});
+  assert.equal(acceptedAudiomack.canCollect,false);
+  for(const methodClass of ['provider_api','offered_export','research_only'])
+    assert.throws(()=>validateWk100SourceMethodDecision({
+      ...audiomack,methodClass,
+    },{now}),/method_admission_unqualified/);
   assert.equal(accepted.canCollect,false);
   assert.equal(accepted.canScore,false);assert.equal(accepted.canPublish,false);
   // As-of is a reviewed observation strategy, not invented source-native dates.

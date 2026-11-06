@@ -76,6 +76,10 @@ export function validateWk100SourceMethodDecision(payload,{now=new Date()}={}){
       // separately reviewed, exact first-party POST route. A generic GET
       // page adapter cannot be labeled collector-admitted by W2A.
       (p.providerKey==='youtube_ke'&&p.methodClass!=='provider_api')||
+      // Only the official Kenya Weekly 100 HTML has verified 100-track
+      // order and IDs in this adapter revision. Its separate API is NOT
+      // an enrolled collector surface and must not be approved by W2A.
+      (p.providerKey==='audiomack_ke'&&p.methodClass!=='reviewed_page_adapter')||
       (p.providerKey==='spotify_ke'&&p.methodClass!=='offered_export')||
       !PERIOD_AUTHORITY.has(p.nativePeriodAuthority)||
       // Neither the Spotify weekly chart-export method nor the YouTube

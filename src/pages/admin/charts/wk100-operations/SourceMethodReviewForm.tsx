@@ -64,6 +64,11 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
     (proposal.providerKey!=='youtube_ke'||(proposal.methodClass==='provider_api'&&
       proposal.behavior==='video_consumption'&&proposal.metric==='rank_and_count'&&
       proposal.cadence==='weekly'))&&
+    // The accepted Audiomack source is the ordered first-party HTML page,
+    // not an unverified provider API endpoint or a raw title-only feed.
+    (proposal.providerKey!=='audiomack_ke'||(proposal.methodClass==='reviewed_page_adapter'&&
+      proposal.behavior==='consumption'&&proposal.metric==='rank'&&
+      proposal.cadence==='weekly'))&&
     (proposal.providerKey!=='spotify_ke'||(proposal.methodClass==='offered_export'&&
       proposal.behavior==='consumption'&&proposal.metric==='rank_and_count'&&
       proposal.cadence==='weekly'));
