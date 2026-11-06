@@ -525,6 +525,67 @@ test('candidate HTTP evidence retains exact bytes but refuses redirect, MIME, ov
   await wkCapReject(()=>fetchCandidateBytes(wkCapInput({timeoutMs:100,fetchImpl:async()=>new Promise(()=>{})})), 'transport_timeout');
 });
 
+
+test('WK100 candidate transport only POSTs a first-party YouTube Kenya native weekly chart',async()=>{
+  const endpoint='https://charts.youtube.com/youtubei/v1/browse?alt=json';
+  const key='weekly:20261023:20261029:ke';
+  const source='youtube_ke_weekly_top_songs';
+  let sent=0,verified=0;
+  const nativeBytes=new TextEncoder().encode('{"firstParty":true}');
+  const input={sourceKey:source,endpoint,method:'POST',nativePeriodKey:key,
+    accessDecision:{source_key:source,exact_endpoint:endpoint,
+      authorization_ref:'wk-source-access-v1/fixture',purpose:'candidate_raw_evidence'},
+    verifyAccess:async (_authority,meta)=>{
+      verified++;assert.equal(meta.method,'POST');return true;
+    },
+    fetchImpl:async (_url,opts)=>{
+      sent++;
+      assert.equal(opts.method,'POST');
+      assert.equal(opts.redirect,'manual');
+      assert.equal(opts.credentials,'omit');
+      assert.equal(opts.headers['content-type'],'application/json');
+      assert.equal(opts.headers.authorization,undefined);
+      const body=JSON.parse(opts.body);
+      assert.equal(body.browseId,'FEmusic_analytics_charts_home');
+      assert.equal(body.context.client.gl,'KE');
+      assert.equal(body.query.includes('chart_params_chart_type=TRACKS'),true);
+      assert.equal(body.query.includes('chart_params_period_type=WEEKLY'),true);
+      assert.equal(body.query.includes('chart_params_end_date=20261029'),true);
+      return new Response(nativeBytes,{status:200,
+        headers:{'content-type':'application/json'}});
+    }};
+  const allowed=await fetchCandidateBytes(input);
+  assert.deepEqual(allowed.bytes,nativeBytes);
+  assert.equal(sent,1);assert.equal(verified,1);
+  for(const invalid of [
+    {sourceKey:'audiomack_ke_weekly_100',
+      accessDecision:{...input.accessDecision,source_key:'audiomack_ke_weekly_100'}},
+    {sourceKey:'youtube_ke',
+      accessDecision:{...input.accessDecision,source_key:'youtube_ke'}},
+    {endpoint:'https://charts.youtube.com/youtubei/v1/browse?alt=json&us=1',
+      accessDecision:{...input.accessDecision,exact_endpoint:'https://charts.youtube.com/youtubei/v1/browse?alt=json&us=1'}},
+    {endpoint:'https://charts.youtube.com.evil.example/youtubei/v1/browse?alt=json',
+      accessDecision:{...input.accessDecision,exact_endpoint:'https://charts.youtube.com.evil.example/youtubei/v1/browse?alt=json'}},
+    {nativePeriodKey:'weekly:20261023:20261030:ke'},
+    {nativePeriodKey:'weekly:20261016:20261029:ke'},
+    {nativePeriodKey:'weekly:20261023:20261029:us'},
+    {nativePeriodKey:'weekly:20260230:20260305:ke'},
+    {nativePeriodKey:null},
+    {method:'PUT'},
+    {providerAuthorization:{kind:'apple_developer_bearer',token:'not-a-real-token'}},
+  ]){
+    await assert.rejects(()=>fetchCandidateBytes({...input,...invalid}),
+      e=>e instanceof CandidateCaptureError);
+  }
+  assert.equal(sent,1,'invalid attempts must not reach first-party network');
+  assert.equal(verified,1,'invalid attempts must not reach authorization');
+  await wkCapReject(()=>fetchCandidateBytes({...input,
+    verifyAccess:async()=>false,
+    fetchImpl:async()=>{sent++;throw Error('should not fetch');}}),
+    'source_access_not_authorized');
+  assert.equal(sent,1);
+});
+
 test('candidate private archive persists reservation before create-only, rechecks bytes and never publishes',async()=>{
   const capture=await fetchCandidateBytes(wkCapInput());
   const f=wkCapStorage();

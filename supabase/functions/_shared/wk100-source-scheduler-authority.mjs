@@ -4,6 +4,7 @@
  * A provider method decision, a matching capture contract, a SHA-sealed
  * server manifest and an explicitly selected constitution must all agree.
  */
+import { isWk100YouTubeNativePost } from './chart-candidate-capture.mjs';
 const SHA=/^[0-9a-f]{64}$/;
 const IDENT=/^[a-z][a-z0-9_]{2,63}$/;
 function fail(code){throw new Error(code);}
@@ -49,7 +50,12 @@ export async function bindWk100DispatchAuthority({
       continue;
     const contract=contracts.get(keyOf(row)),entry=entries.get(keyOf(row));
     if(!contract||!entry||entry.enabled!==true||entry.market!=='KE'||
-      entry.method!=='GET'||entry.purpose!=='candidate_raw_evidence'||
+      (entry.method!=='GET'&&
+        !(entry.method==='POST'&&row.method_class==='provider_api'&&
+          row.provider_key==='youtube_ke'&&
+          row.native_period_state==='provider_defined'&&
+          isWk100YouTubeNativePost(row.source_key,entry.endpoint,entry.native_period_key)))||
+      entry.purpose!=='candidate_raw_evidence'||
       contract.provider_key!==row.provider_key||
       contract.adapter_version!==row.parser_class||
       !SHA.test(contract.adapter_sha256)||!SHA.test(entry.adapter_sha256)||
@@ -113,9 +119,9 @@ export async function bindWk100DispatchAuthority({
  */
 export function isWk100CaptureConstitutionCurrent({
   rows,sourceKey,contractVersion,endpointSha256,authorizationRef,
-  parserClass,constitutionVersion,nowUtc,
+  parserClass,constitutionVersion,nowUtc,httpMethod='GET',
 }){
-  if(!Array.isArray(rows)||rows.length>100||
+  if(!['GET','POST'].includes(httpMethod)||!Array.isArray(rows)||rows.length>100||
     typeof sourceKey!=='string'||!IDENT.test(sourceKey)||
     typeof contractVersion!=='string'||contractVersion.length<2||
     typeof endpointSha256!=='string'||!SHA.test(endpointSha256)||
@@ -133,6 +139,8 @@ export function isWk100CaptureConstitutionCurrent({
     r.endpoint_sha256===endpointSha256 &&
     r.authorization_ref===authorizationRef &&
     r.parser_class===parserClass &&
+    (httpMethod==='GET'||(httpMethod==='POST'&&r.provider_key==='youtube_ke'&&
+      r.method_class==='provider_api'&&r.native_period_state==='provider_defined')) &&
     ['provider_defined','observed_as_of'].includes(r.native_period_state) &&
     (r.native_period_state!=='observed_as_of'||
       (/^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(r.native_period_evidence_ref??'')&&

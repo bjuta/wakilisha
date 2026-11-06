@@ -5,7 +5,7 @@
  * Does not publish a chart, rank providers against each other or alter the Registry.
  */
 import { fetchCandidateBytes, archiveCandidateBytes, sha256Hex,
-  CandidateCaptureError } from './chart-candidate-capture.mjs';
+  CandidateCaptureError, wk100YouTubeNativePostRequest } from './chart-candidate-capture.mjs';
 import { checkpointsForSource } from './chart-weekly-evidence.mjs';
 import { parseMdundoKenya, parseAudiomackKenya, parseBoomplayKenya,
   parseShazamKenya, parseAppleKenya, parseAppleKenyaPublicHtml,
@@ -82,6 +82,14 @@ function sourceContractForKernel(c) {
 }
 export function validateCaptureSlot({contract,weekStartEat,scheduledAt,attemptNumber,access={},clock=new Date(),collectionMode='scheduled'}) {
   requireValue(resolveCaptureParser(contract,access),'source_unimplemented');
+  requireValue(access.method===undefined||access.method==='GET'||
+    access.method==='POST','source_method_unqualified');
+  if(access.method==='POST'){
+    // Fail before SQL reservation, not after provider egress.
+    wk100YouTubeNativePostRequest(contract.source_key,access.endpoint,
+      access.native_period_key);
+    requireValue(contract.provider_key==='youtube_ke','source_method_unqualified');
+  }
   requireValue(contract.admission_state==='candidate' && contract.market==='KE', 'source_unadmitted');
   requireValue(exactUtc(scheduledAt),'slot_invalid');
   requireValue(Number.isInteger(attemptNumber)&&attemptNumber>=1&&attemptNumber<=8,'attempt_number_invalid');
@@ -210,7 +218,9 @@ export async function runCandidateCapture({
     try {
       capture=await fetchCandidateBytes({sourceKey:contract.source_key,
         endpoint:access.endpoint,accessDecision,verifyAccess,
-        providerAuthorization:access.providerAuthorization,fetchImpl,timeoutMs,now:clock});
+        providerAuthorization:access.providerAuthorization,
+        method:access.method??'GET',nativePeriodKey:access.native_period_key,
+        fetchImpl,timeoutMs,now:clock});
     } catch(e) {
       if (e instanceof CandidateCaptureError &&
         ['transport_failed','transport_timeout','upstream_http_unaccepted',

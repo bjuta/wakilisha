@@ -7,7 +7,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { runCandidateCapture } from '../_shared/chart-capture-runtime.mjs';
 import { selectWk100AuditedDispatch } from '../_shared/wk100-source-dispatch-plan.mjs';
 import { isWk100CaptureConstitutionCurrent } from '../_shared/wk100-source-scheduler-authority.mjs';
-import { sha256Hex } from '../_shared/chart-candidate-capture.mjs';
+import { sha256Hex, isWk100YouTubeNativePost } from '../_shared/chart-candidate-capture.mjs';
 import { isGatewayVerifiedServiceRole, runtimeProjectApiUrl } from '../_shared/chart-capture-gateway-role.mjs';
 import { isWk100AppleCatalogChart, resolveWk100AppleProviderAuthorization } from '../_shared/wk100-apple-service-credential.mjs';
 
@@ -39,7 +39,10 @@ function approvedEntry(manifest:Record<string,unknown>,sourceKey:string,version:
   if(hit.length!==1) return null;
   const source=hit[0];
   if(source.enabled!==true || source.market!=='KE' ||
-    source.method!=='GET' || source.purpose!=='candidate_raw_evidence' ||
+    (source.method!=='GET'&&
+      !(source.method==='POST'&&
+        isWk100YouTubeNativePost(sourceKey,source.endpoint,source.native_period_key))) ||
+    source.purpose!=='candidate_raw_evidence' ||
     typeof source.endpoint!=='string' || typeof source.authorization_ref!=='string' ||
     typeof source.adapter_sha256!=='string' ||
     !/^[a-f0-9]{64}$/.test(source.adapter_sha256) ||
@@ -125,6 +128,7 @@ Deno.serve(async (req:Request) => {
         rows:current.data,sourceKey:key,contractVersion:version,
         endpointSha256,authorizationRef:entry.authorization_ref,
         parserClass:entry.parser_class,constitutionVersion,nowUtc:new Date(),
+        httpMethod:entry.method,
       });
   };
   if(!await methodAllowed())
@@ -241,7 +245,8 @@ Deno.serve(async (req:Request) => {
       weekStartEat:String(payload.week_start_eat),scheduledAt:String(payload.scheduled_at),
       attemptNumber:Number(payload.attempt_number),collectionMode,
       access:{source_key:key,endpoint:entry.endpoint,authorization_ref:entry.authorization_ref,
-        native_period_key:entry.native_period_key,parser_class:entry.parser_class,providerAuthorization},
+        method:entry.method,native_period_key:entry.native_period_key,
+        parser_class:entry.parser_class,providerAuthorization},
       verifyAccess,db:backend,storage,
       clock:()=>new Date(),enabled:true,timeoutMs:12000});
     // Never serialize upstream content or credential values into the response.

@@ -586,6 +586,9 @@ test('WK100 capture authorization is service-only and bound to latest proposal a
 test('WK100 capture endpoint rechecks current method admission before a provider GET',async()=>{
   const edge=await readFile('supabase/functions/wk-chart-capture/index.ts','utf8');
   assert.match(edge,/wk100_service_capture_method_allowed_v1/);
+  assert.match(edge,/isWk100YouTubeNativePost(sourceKey,source.endpoint,source.native_period_key)/);
+  assert.match(edge,/httpMethod:entry.method/);
+  assert.match(edge,/method:entry.method,native_period_key:entry.native_period_key/);
   assert.match(edge,/if\(!await methodAllowed\(\)\)/);
   assert.match(edge,/current\.authorization_ref===decision\.authorization_ref &&\s*await methodAllowed\(\)/);
   assert.match(edge,/p_endpoint_sha256:endpointSha256/);
@@ -689,6 +692,46 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
   assert.equal((await bindWk100DispatchAuthority({...args,
     methodRows:[{...observedRow,native_period_evidence_ref:'fake_period'}],
     manifest:{sources:[observedEntry]}})).length,0);
+  // A POST is permissible only for a separately reviewed, provider-defined
+  // first-party YouTube weekly chart, never an arbitrary method override.
+  const youtubeEndpoint='https://charts.youtube.com/youtubei/v1/browse?alt=json';
+  const youtubePeriod='weekly:20261023:20261029:ke';
+  const youtubeContract={...contract,provider_key:'youtube_ke',
+    source_key:'youtube_ke_weekly_top_songs',
+    adapter_version:'youtube_kenya_weekly_top_songs_v1'};
+  const youtubeRow={...row,source_key:youtubeContract.source_key,
+    provider_key:'youtube_ke',parser_class:youtubeContract.adapter_version,
+    method_class:'provider_api',native_period_state:'provider_defined',
+    endpoint_sha256:await sha256Hex(new TextEncoder().encode(youtubeEndpoint))};
+  const youtubeEntry={...entry,source_key:youtubeContract.source_key,
+    endpoint:youtubeEndpoint,method:'POST',
+    parser_class:youtubeContract.adapter_version,
+    native_period_key:youtubePeriod};
+  const youtubeArgs={...args,methodRows:[youtubeRow],
+    sourceContracts:[youtubeContract],manifest:{sources:[youtubeEntry]}};
+  const enabledYoutube=await bindWk100DispatchAuthority(youtubeArgs);
+  assert.equal(enabledYoutube.length,1);
+  assert.equal(isWk100CaptureConstitutionCurrent({
+    rows:[youtubeRow],sourceKey:youtubeContract.source_key,
+    contractVersion:'v1',endpointSha256:youtubeRow.endpoint_sha256,
+    authorizationRef:youtubeRow.authorization_ref,parserClass:youtubeRow.parser_class,
+    constitutionVersion:'approved-v1',nowUtc:new Date('2026-11-03T08:00:00Z'),
+    httpMethod:'POST'}),true);
+  for(const changed of [
+    {methodRows:[{...youtubeRow,method_class:'reviewed_page_adapter'}]},
+    {methodRows:[{...youtubeRow,native_period_state:'observed_as_of'}]},
+    {manifest:{sources:[{...youtubeEntry,native_period_key:'weekly:20261023:20261030:ke'}]}},
+    {manifest:{sources:[{...youtubeEntry,endpoint:'https://charts.youtube.com/charts/TopSongs/ke'}]}},
+    {manifest:{sources:[{...youtubeEntry,method:'PATCH'}]}},
+    {manifest:{sources:[{...youtubeEntry,source_key:'shazam_ke_public_top200'}]}},
+  ])assert.equal((await bindWk100DispatchAuthority({...youtubeArgs,...changed})).length,0);
+  assert.equal(isWk100CaptureConstitutionCurrent({
+    rows:[{...youtubeRow,method_class:'research_only'}],
+    sourceKey:youtubeContract.source_key,contractVersion:'v1',
+    endpointSha256:youtubeRow.endpoint_sha256,
+    authorizationRef:youtubeRow.authorization_ref,parserClass:youtubeRow.parser_class,
+    constitutionVersion:'approved-v1',nowUtc:new Date('2026-11-03T08:00:00Z'),
+    httpMethod:'POST'}),false);
   for(const override of [
     {constitutionVersion:'not-approved'},
     {methodRows:[{...row,decision_state:'paused'}]},
