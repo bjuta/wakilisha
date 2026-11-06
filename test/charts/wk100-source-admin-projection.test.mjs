@@ -586,7 +586,7 @@ test('WK100 capture authorization is service-only and bound to latest proposal a
 test('WK100 capture endpoint rechecks current method admission before a provider GET',async()=>{
   const edge=await readFile('supabase/functions/wk-chart-capture/index.ts','utf8');
   assert.match(edge,/wk100_service_capture_method_allowed_v1/);
-  assert.match(edge,/isWk100YouTubeNativePost(sourceKey,source.endpoint,source.native_period_key)/);
+  assert.match(edge,/isWk100YouTubeNativePost\(sourceKey,source\.endpoint,source\.native_period_key\)/);
   assert.match(edge,/httpMethod:entry.method/);
   assert.match(edge,/method:entry.method,native_period_key:entry.native_period_key/);
   assert.match(edge,/if\(!await methodAllowed\(\)\)/);
