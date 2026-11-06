@@ -59,6 +59,11 @@ export function SourceMethodReviewForm({proposal,previous,initialDecisionState='
   const supportsObservedAsOf=['apple_ke','shazam_ke','mdundo_ke','audiomack_ke'].includes(proposal.providerKey);
   const parser=PARSERS[proposal.providerKey]??null;
   const allowedAdmission=!!parser&&proposal.methodClass!=='research_only'&&
+    // Match the collector's exact YouTube POST method and native row contract.
+    // An unsupported proposal can be HELD, never falsely marked admitted.
+    (proposal.providerKey!=='youtube_ke'||(proposal.methodClass==='provider_api'&&
+      proposal.behavior==='video_consumption'&&proposal.metric==='rank_and_count'&&
+      proposal.cadence==='weekly'))&&
     (proposal.providerKey!=='spotify_ke'||(proposal.methodClass==='offered_export'&&
       proposal.behavior==='consumption'&&proposal.metric==='rank_and_count'&&
       proposal.cadence==='weekly'));

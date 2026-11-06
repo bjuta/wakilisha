@@ -483,6 +483,21 @@ test('WK100 source-method review cannot convert research-only or a mismatched pr
     constitutionVersion:'wk100-test-v1',reason:'Reviewed original source method'};
   const now=new Date('2026-11-03T00:00:00Z');
   const accepted=validateWk100SourceMethodDecision(p,{now});
+  // The signed-in W2A review cannot admit a YouTube GET/page/export method:
+  // the first-party weekly transport only supports a reviewed provider POST.
+  // A held research proposal remains valid; no method is auto-admitted.
+  for(const methodClass of ['reviewed_page_adapter','offered_export','research_only'])
+    assert.throws(()=>validateWk100SourceMethodDecision({
+      ...p,methodClass,
+    },{now}),/method_admission_unqualified/);
+  const heldYoutube=validateWk100SourceMethodDecision({
+    ...p,methodClass:'reviewed_page_adapter',decisionState:'held',
+    parserClass:null,nativePeriodAuthority:null,nativePeriodEvidenceRef:null,
+    endpointSha256:null,accessEvidenceSha256:null,authorizationRef:null,
+    authorizationExpiresAt:null,
+  },{now});
+  assert.equal(heldYoutube.decisionState,'held');
+  assert.equal(heldYoutube.canCollect,false);
   assert.equal(accepted.canCollect,false);
   assert.equal(accepted.canScore,false);assert.equal(accepted.canPublish,false);
   // As-of is a reviewed observation strategy, not invented source-native dates.

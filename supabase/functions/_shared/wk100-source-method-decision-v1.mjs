@@ -72,6 +72,10 @@ export function validateWk100SourceMethodDecision(payload,{now=new Date()}={}){
   if(p.decisionState==='collector_admitted'){
     if(!PROVIDERS[p.providerKey]||p.parserClass!==PROVIDERS[p.providerKey]||
       p.methodClass==='research_only'||
+      // The only transport-capable YouTube weekly chart method is the
+      // separately reviewed, exact first-party POST route. A generic GET
+      // page adapter cannot be labeled collector-admitted by W2A.
+      (p.providerKey==='youtube_ke'&&p.methodClass!=='provider_api')||
       (p.providerKey==='spotify_ke'&&p.methodClass!=='offered_export')||
       !PERIOD_AUTHORITY.has(p.nativePeriodAuthority)||
       // Neither the Spotify weekly chart-export method nor the YouTube
