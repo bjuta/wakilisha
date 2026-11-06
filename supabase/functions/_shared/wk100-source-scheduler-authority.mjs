@@ -8,6 +8,22 @@ import { isWk100YouTubeNativePost } from './chart-candidate-capture.mjs';
 const SHA=/^[0-9a-f]{64}$/;
 const IDENT=/^[a-z][a-z0-9_]{2,63}$/;
 function fail(code){throw new Error(code);}
+/**
+ * Enforce provider-owned transport before constructing scheduler jobs and in
+ * the independently called capture worker. Source admission is still separate.
+ * Other provider-scoped routes retain their existing GET-only behavior.
+ */
+export function isWk100FirstPartyTransport(sourceKey,method,endpoint,nativePeriodKey){
+  if(typeof sourceKey!=='string'||!IDENT.test(sourceKey)||
+    typeof endpoint!=='string')return false;
+  if(sourceKey==='youtube_ke'||sourceKey.startsWith('youtube_ke_'))
+    return method==='POST'&&
+      isWk100YouTubeNativePost(sourceKey,endpoint,nativePeriodKey);
+  if(sourceKey==='audiomack_ke'||sourceKey.startsWith('audiomack_ke_'))
+    return method==='GET'&&nativePeriodKey===null&&
+      endpoint==='https://audiomack.com/geo-charts/playlist/kenya';
+  return method==='GET';
+}
 export function wk100EatWeekFromUtc(now){
   if(!(now instanceof Date)||!Number.isFinite(now.valueOf()))fail('scheduler_clock_invalid');
   const k=new Date(now.valueOf()+3*60*60*1000);
@@ -50,11 +66,12 @@ export async function bindWk100DispatchAuthority({
       continue;
     const contract=contracts.get(keyOf(row)),entry=entries.get(keyOf(row));
     if(!contract||!entry||entry.enabled!==true||entry.market!=='KE'||
-      (entry.method!=='GET'&&
+      !isWk100FirstPartyTransport(row.source_key,entry.method,entry.endpoint,entry.native_period_key)||
+      (row.provider_key==='youtube_ke'&&
         !(entry.method==='POST'&&row.method_class==='provider_api'&&
-          row.provider_key==='youtube_ke'&&
-          row.native_period_state==='provider_defined'&&
-          isWk100YouTubeNativePost(row.source_key,entry.endpoint,entry.native_period_key)))||
+          row.native_period_state==='provider_defined'))||
+      (row.provider_key==='audiomack_ke'&&
+        !(entry.method==='GET'&&row.method_class==='reviewed_page_adapter'))||
       entry.purpose!=='candidate_raw_evidence'||
       contract.provider_key!==row.provider_key||
       contract.adapter_version!==row.parser_class||
@@ -139,8 +156,12 @@ export function isWk100CaptureConstitutionCurrent({
     r.endpoint_sha256===endpointSha256 &&
     r.authorization_ref===authorizationRef &&
     r.parser_class===parserClass &&
-    (httpMethod==='GET'||(httpMethod==='POST'&&r.provider_key==='youtube_ke'&&
-      r.method_class==='provider_api'&&r.native_period_state==='provider_defined')) &&
+    (r.provider_key==='youtube_ke'
+      ? httpMethod==='POST'&&r.method_class==='provider_api'&&
+        r.native_period_state==='provider_defined'
+      : r.provider_key==='audiomack_ke'
+        ? httpMethod==='GET'&&r.method_class==='reviewed_page_adapter'
+        : httpMethod==='GET') &&
     ['provider_defined','observed_as_of'].includes(r.native_period_state) &&
     (r.native_period_state!=='observed_as_of'||
       (/^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(r.native_period_evidence_ref??'')&&

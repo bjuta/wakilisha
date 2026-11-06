@@ -6,8 +6,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { runCandidateCapture } from '../_shared/chart-capture-runtime.mjs';
 import { selectWk100AuditedDispatch } from '../_shared/wk100-source-dispatch-plan.mjs';
-import { isWk100CaptureConstitutionCurrent } from '../_shared/wk100-source-scheduler-authority.mjs';
-import { sha256Hex, isWk100YouTubeNativePost } from '../_shared/chart-candidate-capture.mjs';
+import { isWk100CaptureConstitutionCurrent, isWk100FirstPartyTransport } from '../_shared/wk100-source-scheduler-authority.mjs';
+import { sha256Hex } from '../_shared/chart-candidate-capture.mjs';
 import { isGatewayVerifiedServiceRole, runtimeProjectApiUrl } from '../_shared/chart-capture-gateway-role.mjs';
 import { isWk100AppleCatalogChart, resolveWk100AppleProviderAuthorization } from '../_shared/wk100-apple-service-credential.mjs';
 
@@ -39,9 +39,8 @@ function approvedEntry(manifest:Record<string,unknown>,sourceKey:string,version:
   if(hit.length!==1) return null;
   const source=hit[0];
   if(source.enabled!==true || source.market!=='KE' ||
-    (source.method!=='GET'&&
-      !(source.method==='POST'&&
-        isWk100YouTubeNativePost(sourceKey,source.endpoint,source.native_period_key))) ||
+    !isWk100FirstPartyTransport(sourceKey,source.method,source.endpoint,
+      source.native_period_key??null) ||
     source.purpose!=='candidate_raw_evidence' ||
     typeof source.endpoint!=='string' || typeof source.authorization_ref!=='string' ||
     typeof source.adapter_sha256!=='string' ||

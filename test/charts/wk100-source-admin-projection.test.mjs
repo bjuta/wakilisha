@@ -9,7 +9,7 @@ import { parseAppleKenyaPublicHtml, WK100_APPLE_KE_PUBLIC_CHART_URL,
   parseAudiomackKenya, WK100_AUDIOMACK_KE_PUBLIC_CHART_URL } from '../../supabase/functions/_shared/chart-public-source-observations.mjs';
 import { planWk100SourceDispatch, selectWk100AuditedDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 import { fetchCandidateBytes, sha256Hex } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
-import { bindWk100DispatchAuthority, wk100EatWeekFromUtc, isWk100CaptureConstitutionCurrent } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
+import { bindWk100DispatchAuthority, wk100EatWeekFromUtc, isWk100CaptureConstitutionCurrent, isWk100FirstPartyTransport } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
 import { validateWk100SourceMethodDecision, validateWk100ContractEnrollmentIntent } from '../../supabase/functions/_shared/wk100-source-method-decision-v1.mjs';
 import { selectWk100CollectNowDispatch } from '../../supabase/functions/_shared/wk100-collect-now-authority.mjs';
 import { validateCaptureSlot } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
@@ -615,7 +615,7 @@ test('WK100 capture authorization is service-only and bound to latest proposal a
 test('WK100 capture endpoint rechecks current method admission before a provider GET',async()=>{
   const edge=await readFile('supabase/functions/wk-chart-capture/index.ts','utf8');
   assert.match(edge,/wk100_service_capture_method_allowed_v1/);
-  assert.match(edge,/isWk100YouTubeNativePost\(sourceKey,source\.endpoint,source\.native_period_key\)/);
+  assert.match(edge,/isWk100FirstPartyTransport\(sourceKey,source\.method,source\.endpoint/);
   assert.match(edge,/httpMethod:entry.method/);
   assert.match(edge,/method:entry.method,native_period_key:entry.native_period_key/);
   assert.match(edge,/if\(!await methodAllowed\(\)\)/);
@@ -761,6 +761,58 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
     authorizationRef:youtubeRow.authorization_ref,parserClass:youtubeRow.parser_class,
     constitutionVersion:'approved-v1',nowUtc:new Date('2026-11-03T08:00:00Z'),
     httpMethod:'POST'}),false);
+  // A YouTube GET could previously pass the generic method branch.
+  // It must never be authorized for a first-party weekly chart, even if
+  // a reviewed SQL row and sealed endpoint hash otherwise match.
+  assert.equal(isWk100CaptureConstitutionCurrent({
+    rows:[youtubeRow],sourceKey:youtubeContract.source_key,
+    contractVersion:'v1',endpointSha256:youtubeRow.endpoint_sha256,
+    authorizationRef:youtubeRow.authorization_ref,parserClass:youtubeRow.parser_class,
+    constitutionVersion:'approved-v1',nowUtc:new Date('2026-11-03T08:00:00Z'),
+    httpMethod:'GET'}),false);
+  assert.equal((await bindWk100DispatchAuthority({
+    ...youtubeArgs,manifest:{sources:[{...youtubeEntry,method:'GET'}]},
+  })).length,0);
+  // Audiomack's accepted decoder is the exact first-party Kenya HTML.
+  // Do not accept a playlist API endpoint, impostor host, or provider POST.
+  const audiomackEndpoint='https://audiomack.com/geo-charts/playlist/kenya';
+  const audiomackContract={...contract,source_key:'audiomack_ke_weekly_100',
+    provider_key:'audiomack_ke',adapter_version:'audiomack_kenya_chart_v1'};
+  const audiomackRow={...row,source_key:audiomackContract.source_key,
+    provider_key:'audiomack_ke',parser_class:audiomackContract.adapter_version,
+    method_class:'reviewed_page_adapter',
+    native_period_state:'observed_as_of',
+    native_period_evidence_ref:'observed_as_of/kenya_playlist_observation',
+    endpoint_sha256:await sha256Hex(new TextEncoder().encode(audiomackEndpoint))};
+  const audiomackEntry={...entry,source_key:audiomackContract.source_key,
+    endpoint:audiomackEndpoint,method:'GET',
+    parser_class:audiomackContract.adapter_version,native_period_key:null};
+  const audiomackArgs={...args,methodRows:[audiomackRow],
+    sourceContracts:[audiomackContract],manifest:{sources:[audiomackEntry]}};
+  assert.equal((await bindWk100DispatchAuthority(audiomackArgs)).length,1);
+  assert.equal(isWk100CaptureConstitutionCurrent({
+    rows:[audiomackRow],sourceKey:audiomackContract.source_key,
+    contractVersion:'v1',endpointSha256:audiomackRow.endpoint_sha256,
+    authorizationRef:audiomackRow.authorization_ref,parserClass:audiomackRow.parser_class,
+    constitutionVersion:'approved-v1',nowUtc:new Date('2026-11-03T08:00:00Z'),
+    httpMethod:'GET'}),true);
+  for(const patch of [
+    {methodRows:[{...audiomackRow,method_class:'provider_api'}]},
+    {manifest:{sources:[{...audiomackEntry,method:'POST'}]}},
+    {manifest:{sources:[{...audiomackEntry,endpoint:'https://api.audiomack.com/v1/playlist/geo-charts/kenya'}]}},
+    {manifest:{sources:[{...audiomackEntry,endpoint:'https://audiomack.com.evil.example/geo-charts/playlist/kenya'}]}},
+  ])assert.equal((await bindWk100DispatchAuthority({...audiomackArgs,...patch})).length,0);
+  assert.equal(isWk100CaptureConstitutionCurrent({
+    rows:[{...audiomackRow,method_class:'provider_api'}],
+    sourceKey:audiomackContract.source_key,contractVersion:'v1',
+    endpointSha256:audiomackRow.endpoint_sha256,
+    authorizationRef:audiomackRow.authorization_ref,parserClass:audiomackRow.parser_class,
+    constitutionVersion:'approved-v1',nowUtc:new Date('2026-11-03T08:00:00Z'),
+    httpMethod:'GET'}),false);
+  assert.equal(isWk100FirstPartyTransport(audiomackContract.source_key,
+    'GET',audiomackEndpoint,null),true);
+  assert.equal(isWk100FirstPartyTransport(audiomackContract.source_key,
+    'GET',audiomackEndpoint,'weekly:20261023:20261029:ke'),false);
   for(const override of [
     {constitutionVersion:'not-approved'},
     {methodRows:[{...row,decision_state:'paused'}]},
