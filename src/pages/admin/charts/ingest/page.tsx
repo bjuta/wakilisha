@@ -285,8 +285,11 @@ export default function AdminChartsIngest() {
       {...scope,createdAt:scope.createdAt??"",updatedAt:scope.updatedAt??""},
     ]);
   },[]);
+  // Wait for the editor's profile/scope bootstrap before hydrating a saved draft.
+  // Otherwise a later default-list load can overwrite the server snapshots
+  // and strand the acknowledged draft in "loading" in another Admin session.
   const wk100Save=useWk100DraftAutosave({
-    enabled:isWk100 && wk100WeekInitialized && isWk100WeekStartEat(editionDate),weekStartEat:editionDate,
+    enabled:!loading && isWk100 && wk100WeekInitialized && isWk100WeekStartEat(editionDate),weekStartEat:editionDate,
     config:wk100Config,onHydrate:hydrateWk100,
   });
 
