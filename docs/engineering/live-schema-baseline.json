@@ -1,18 +1,18 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-05T16:49:00Z",
+  "generatedAt": "2026-11-07T08:50:50Z",
   "typesSha256": "8fbb66dd8863675fb283be5715ee49e4a6a13bc5e5dfb56b6339298eb4fa532d",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 245,
-  "latestMigration": "20261105131250_wk100_collect_now_authorized_v1.sql",
+  "migrationCount": 246,
+  "latestMigration": "20261106125825_wk100_firstparty_admitted_method_class_v1.sql",
   "schemaSeal": {
-    "mode": "offline_operator",
-    "sourceProjectRef": "unlinked-local-operator",
-    "migrationHead": "20261105131250",
+    "mode": "disposable_ci",
+    "sourceProjectRef": "unlinked-local-ci",
+    "migrationHead": "20261106125825",
     "baseMainSha": "24ec5400327a70a9d5610d350a4ca487f28c1e13",
-    "replayCandidateHeadSha": "f0813440c527f8861da1ca13dc9761ecd38c2ffd",
-    "operatorReceiptUrl": "https://github.com/bjuta/wakilisha/pull/1345#issuecomment-6664186822"
+    "replayCandidateHeadSha": "062c770e7e7b623d38c4e3aba86b59cedc30282c",
+    "workflowRunId": 42356997322
   },
-  "reverifiedAt": "2026-11-05T16:49:00Z"
+  "reverifiedAt": "2026-11-07T08:50:50Z"
 }
