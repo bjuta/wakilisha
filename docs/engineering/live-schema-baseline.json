@@ -1,18 +1,15 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-07T08:50:50Z",
-  "typesSha256": "8fbb66dd8863675fb283be5715ee49e4a6a13bc5e5dfb56b6339298eb4fa532d",
+  "generatedAt": "2026-11-07T09:35:00Z",
+  "typesSha256": "0e684d6e44e79a4bfdee4dbd080f2726827fcf4c2e5106e4981d722be27d2612",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 246,
   "latestMigration": "20261106125825_wk100_firstparty_admitted_method_class_v1.sql",
   "schemaSeal": {
-    "mode": "disposable_ci",
-    "sourceProjectRef": "unlinked-local-ci",
-    "migrationHead": "20261106125825",
-    "baseMainSha": "24ec5400327a70a9d5610d350a4ca487f28c1e13",
-    "replayCandidateHeadSha": "062c770e7e7b623d38c4e3aba86b59cedc30282c",
-    "workflowRunId": 42356997322
+    "mode": "production",
+    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
+    "migrationHead": "20261106125825"
   },
-  "reverifiedAt": "2026-11-07T08:50:50Z"
+  "reverifiedAt": "2026-11-07T09:35:00Z"
 }
