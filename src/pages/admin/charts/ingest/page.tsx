@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   cancelIngestRun,
   commitIngestRun,
@@ -117,6 +117,10 @@ function getISOWeekNumber(d: Date): number {
 
 export default function AdminChartsIngest() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Weekly Overview links to the existing server-sealed, revision-safe writer.
+  // Invalid week hints are ignored, never used to select or persist a draft.
+  const requestedWk100Week = searchParams.get("wk100Week");
   const mode = getIngestionMode();
 
   const [kpis, setKpis] = useState<IngestStudioKpi | null>(null);
@@ -144,6 +148,13 @@ export default function AdminChartsIngest() {
   const [coverStyle, setCoverStyle] = useState("default");
   const [saveAsRecurring, setSaveAsRecurring] = useState(false);
   const [existingSeriesId, setExistingSeriesId] = useState("");
+  useEffect(() => {
+    if (!requestedWk100Week || !isWk100WeekStartEat(requestedWk100Week)) return;
+    setExistingSeriesId("top100");
+    setEditionDate(requestedWk100Week);
+    setWk100WeekInitialized(true);
+    setStep("configure");
+  }, [requestedWk100Week]);
   const [selectedEligibilityProfileId, setSelectedEligibilityProfileId] = useState("elig_all_artists");
   const [selectedMarketScopeId, setSelectedMarketScopeId] = useState("scope_kenya");
   const [detectedProviders, setDetectedProviders] = useState<ProviderName[]>([]);

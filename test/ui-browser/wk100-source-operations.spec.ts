@@ -448,6 +448,19 @@ test('source overview stays truthful, carries EAT week through navigation and us
   expect(ctx.unexpected).toEqual([]);
 });
 
+test('W1 opens the established sealed Edition editor for the selected EAT week without a second draft writer',async({page})=>{
+  const ctx=await install(page);
+  await page.goto('/admin/charts/wk100-operations?week=2026-10-26',
+    {waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('heading',{name:'Weekly Overview'})).toBeVisible({timeout:20_000});
+  await page.getByRole('button',{name:'Configure this Edition'}).click();
+  await expect.poll(()=>new URL(page.url()).pathname).toBe('/admin/charts/ingest');
+  await expect.poll(()=>new URL(page.url()).searchParams.get('wk100Week')).toBe('2026-10-26');
+  expect(ctx.editionReads).toContainEqual({p_week:'2026-10-26'});
+  expect(ctx.recoveryWrites).toEqual([]);
+  expect(ctx.collectNowWrites).toEqual([]);
+});
+
 test('W1 founder-workbook hierarchy is two-column on desktop and stacked on mobile',async({page})=>{
   const ctx=await install(page);
   await page.setViewportSize({width:1440,height:900});

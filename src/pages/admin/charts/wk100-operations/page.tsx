@@ -487,6 +487,11 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     <WkSurface className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3">
       <div className="flex items-center gap-2"><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Previous week" onClick={()=>setWeek(v=>nextWeek(v,-1))}>‹</button><div className="min-w-40 text-center"><p className="text-xs text-wk-text-muted">Edition week · Monday EAT</p><p className="text-sm font-bold text-wk-text">{week}</p></div><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Next week" onClick={()=>setWeek(v=>nextWeek(v,1))}>›</button></div>
       <div className="flex flex-wrap items-center gap-2">
+        {view==='overview'&&<button type="button"
+          className="wk-button wk-button-secondary wk-button-sm"
+          onClick={()=>navigate('/admin/charts/ingest?wk100Week='+encodeURIComponent(week))}>
+          Configure this Edition
+        </button>}
         <span role="status" className="rounded-full border border-wk-border px-3 py-1 text-xs font-semibold text-wk-text-soft">
           {editionPhase==='loading'?'Checking Edition configuration…':
             editionPhase==='unavailable'?'Edition configuration unavailable':
