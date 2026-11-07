@@ -28200,6 +28200,15 @@ export type Database = {
         }
         Returns: Json
       }
+      wk_chart_runtime_reserve_now_v1: {
+        Args: {
+          p_attempt_number: number
+          p_contract_id: string
+          p_scheduled_at: string
+          p_week_start_eat: string
+        }
+        Returns: Json
+      }
       wk_chart_runtime_reserve_v1: {
         Args: {
           p_attempt_number: number
@@ -28301,6 +28310,10 @@ export type Database = {
         Args: { p_proposal: Json }
         Returns: string
       }
+      wk100_request_collect_now_v1: {
+        Args: { p_contract_id: string; p_operation_id: string }
+        Returns: Json
+      }
       wk100_reserve_html_research_observation_v1: {
         Args: {
           p_acquisition_mode: string
@@ -28343,6 +28356,10 @@ export type Database = {
           p_source_key: string
         }
         Returns: boolean
+      }
+      wk100_service_collect_now_requests_v1: {
+        Args: { p_week: string }
+        Returns: Json
       }
       wk100_service_retry_requests_v1: {
         Args: { p_week: string }
