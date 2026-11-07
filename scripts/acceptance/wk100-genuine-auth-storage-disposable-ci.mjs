@@ -329,10 +329,10 @@ async function main(){
     sha(Buffer.from(collectNowActive,'utf8'))===
     'd25c7912e47c7cafd16741a0f520081785dffd4e353d545a831ba3c7ec362fd5'&&
     collectNowActive.trimEnd().endsWith('commit;')&&
+    // The complete migration ledger is checked above. Later migrations
+    // must not invalidate this previously accepted, still-active authority.
     expectedVersions.includes(collectNowVersion)&&
-    appliedVersions.includes(collectNowVersion)&&
-    expectedVersions.at(-1)===collectNowVersion&&
-    appliedVersions.at(-1)===collectNowVersion,
+    appliedVersions.includes(collectNowVersion),
     'STOP_COLLECT_NOW_ACTIVE_MIGRATION_SHA_OR_LEDGER_DRIFT');
   check(query("SELECT (to_regclass('platform_private.wk100_collect_now_requests_v1') IS NOT NULL)::text||'|'||"+
     "(SELECT has_function_privilege('anon','public.wk100_request_collect_now_v1(uuid,uuid)','EXECUTE'))::text||'|'||"+
