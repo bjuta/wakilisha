@@ -453,14 +453,19 @@ const routePaths = [
  * PR #1274 adds one private WK100 Admin Charts path:
  * - wk100-preview
  *
- * Current route authority is therefore 181 paths. Removing the Credits paths,
- * the Messages paths, the Artist Studio path, the Field intake path, the Admin
+ * Current route authority is therefore 184 paths, including the three protected WK100 Operations routes. Removing the Credits paths,
+ * the Messages paths, the three WK100 Operations paths, the Artist Studio path, the Field intake path, the Admin
  * MIZIZI path, the five declared public Audio and Show paths, the two K5B Admin
  * Video paths, and the two public Video paths reproduces the exact 163-path
  * preserved pre-M1 sequence.
  */
-const expectedRoutePathCount = 181;
+const expectedRoutePathCount = 184;
 const wk100PrivateChartsPath = "wk100-preview";
+const wk100OperationsPaths = [
+  "wk100-operations",
+  "wk100-operations/sources",
+  "wk100-operations/collection",
+];
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -488,6 +493,21 @@ if (routePaths.length !== expectedRoutePathCount) {
 if (routePaths.filter((path) => path === wk100PrivateChartsPath).length !== 1 ||
     !config.includes('{ path: "wk100-preview", element: <Wk100PrivateAdminPreview /> }')) {
   fail("accepted private WK100 Admin Charts route must appear exactly once");
+}
+
+// All three WK100 views share the accepted lazy Admin Operations module.
+// A route count alone must not authorize missing, duplicated or unguarded views.
+for (const [wk100Path, wk100View] of [
+  ["wk100-operations", "overview"],
+  ["wk100-operations/sources", "sources"],
+  ["wk100-operations/collection", "collection"],
+]) {
+  if (
+    routePaths.filter((path) => path === wk100Path).length !== 1 ||
+    !config.includes(`{ path: "${wk100Path}", element: <Wk100OperationsPage view="${wk100View}" /> }`)
+  ) {
+    fail(`accepted private WK100 Operations route missing or duplicated: ${wk100Path}`);
+  }
 }
 
 for (const retiredRoutePath of [
@@ -566,6 +586,7 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== adminFieldPath &&
     routePath !== adminMiziziPath &&
     routePath !== wk100PrivateChartsPath &&
+    !wk100OperationsPaths.includes(routePath) &&
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&
