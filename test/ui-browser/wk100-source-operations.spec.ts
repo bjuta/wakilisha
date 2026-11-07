@@ -453,6 +453,9 @@ test('W1 opens the established sealed Edition editor for the selected EAT week w
   await page.goto('/admin/charts/wk100-operations?week=2026-10-26',
     {waitUntil:'domcontentloaded'});
   await expect(page.getByRole('heading',{name:'Weekly Overview'})).toBeVisible({timeout:20_000});
+  // A completed protected W1 read, not merely a mounted heading, is the
+  // prerequisite for proving the handoff preserved the selected Edition.
+  await expect(page.getByText('No saved Edition configuration')).toBeVisible({timeout:20_000});
   await page.getByRole('button',{name:'Configure this Edition'}).click();
   await expect.poll(()=>new URL(page.url()).pathname).toBe('/admin/charts/ingest');
   await expect.poll(()=>new URL(page.url()).searchParams.get('wk100Week')).toBe('2026-10-26');
