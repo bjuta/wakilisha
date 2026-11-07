@@ -2,6 +2,7 @@
  * WK100 browser transport for an existing researcher-directed Shazam receipt.
  * This module never persists original bytes, actor references or rank labels.
  */
+import {prepareWk100LocalShazamResearch} from './wk100LocalShazamResearch.mjs';
 const MAX_ORIGINAL=4194304, MAX_RECEIPT=4096;
 const SHA=/^[a-f0-9]{64}$/;
 const UTC=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
@@ -32,28 +33,45 @@ export async function prepareWk100ResearchForm({originalCsv,receiptFile,weekStar
   let receipt,receiptText;
   try{receiptText=await receiptFile.text();receipt=JSON.parse(receiptText);}
   catch{fail("receipt_invalid");}
-  if(!exact(receipt,KEYS)||receipt.schema_version!=="wk100-shazam-research-receipt-v1"||
-    receipt.source_key!=="shazam_ke"||!URLs.has(receipt.source_url)||
-    !validUTC(receipt.observed_at)||typeof receipt.operator_ref!=="string"||
-    !ACTOR.test(receipt.operator_ref)||
-    receipt.acquisition_mode!=="researcher_directed_public_csv"||
-    !SHA.test(receipt.raw_sha256)||receipt.byte_length!==originalCsv.size||
-    !Number.isInteger(receipt.observed_depth)||receipt.observed_depth<1||
-    receipt.observed_depth>200||
-    !exact(receipt.source_native_period,["authority","starts_at","ends_at"])||
-    receipt.source_native_period.authority!=="unknown"||
-    receipt.source_native_period.starts_at!==null||
-    receipt.source_native_period.ends_at!==null||
-    receipt.identity_state!=="unresolved"||receipt.can_publish!==false)fail("receipt_invalid");
-
-  const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",await originalCsv.arrayBuffer()));
+  const local=receipt?.schema_version==="wk100-local-public-research-receipt/v1";
+  const bytes=new Uint8Array(await originalCsv.arrayBuffer());
+  let observedDepth;
+  if(local){
+    // A locally generated receipt is a verified research observation, not
+    // evidence that the provider served the bytes at a specific UTC time.
+    let reproduced;
+    try{reproduced=await prepareWk100LocalShazamResearch({
+      originalBytes:bytes,checkedAtUtc:receipt.checked_at_utc,
+    });}catch{fail("receipt_invalid");}
+    if(!exact(receipt,Object.keys(reproduced))||
+      Object.keys(reproduced).some(k=>receipt[k]!==reproduced[k]))
+      fail("receipt_invalid");
+    observedDepth=receipt.observed_rank_count;
+  }else{
+    if(!exact(receipt,KEYS)||receipt.schema_version!=="wk100-shazam-research-receipt-v1"||
+      receipt.source_key!=="shazam_ke"||!URLs.has(receipt.source_url)||
+      !validUTC(receipt.observed_at)||typeof receipt.operator_ref!=="string"||
+      !ACTOR.test(receipt.operator_ref)||
+      receipt.acquisition_mode!=="researcher_directed_public_csv"||
+      !SHA.test(receipt.raw_sha256)||receipt.byte_length!==originalCsv.size||
+      !Number.isInteger(receipt.observed_depth)||receipt.observed_depth<1||
+      receipt.observed_depth>200||
+      !exact(receipt.source_native_period,["authority","starts_at","ends_at"])||
+      receipt.source_native_period.authority!=="unknown"||
+      receipt.source_native_period.starts_at!==null||
+      receipt.source_native_period.ends_at!==null||
+      receipt.identity_state!=="unresolved"||receipt.can_publish!==false)fail("receipt_invalid");
+    observedDepth=receipt.observed_depth;
+  }
+  const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",bytes));
   const sha=Array.from(digest,b=>b.toString(16).padStart(2,"0")).join("");
-  if(sha!==receipt.raw_sha256)fail("original_bytes_mismatch");
+  if(sha!==(local?receipt.original_sha256:receipt.raw_sha256))
+    fail("original_bytes_mismatch");
   const form=new FormData();
   form.append("original_csv",originalCsv,"original.csv"); // Never transmit the local filename.
   form.append("receipt_json",receiptText);
   form.append("research_week_start_eat",weekStartEat);
-  return {form,observedDepth:receipt.observed_depth};
+  return {form,observedDepth};
 }
 
 export async function submitWk100ResearchEvidence({originalCsv,receiptFile,weekStartEat,invoke}){

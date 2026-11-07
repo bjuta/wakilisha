@@ -7,6 +7,8 @@
  * Storage and durable attempt-ledger interfaces are injected; this module
  * does not manufacture privileges or connect to Production on its own.
  */
+import { isWk100AppleCatalogChart } from './wk100-apple-service-credential.mjs';
+
 const MAX_BYTES = 4_194_304;
 const MIME_TYPES = new Set(['text/html', 'text/csv', 'application/json', 'application/octet-stream']);
 const SOURCE = /^[a-z][a-z0-9_]{2,63}$/;
@@ -55,29 +57,74 @@ export async function sha256Hex(value) {
   return [...new Uint8Array(digest)].map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
+
+// Research-derived shape from YouTube's first-party Kenya weekly chart client.
+// This does not independently authorize the undocumented unattended method.
+// A current, reviewed SQL decision and SHA-sealed manifest remain mandatory.
+export const WK100_YOUTUBE_CHART_POST_ENDPOINT =
+  'https://charts.youtube.com/youtubei/v1/browse?alt=json';
+const YOUTUBE_SCOPED_SOURCE=/^youtube_ke_[a-z][a-z0-9_]{1,45}$/;
+export function wk100YouTubeNativePostRequest(sourceKey,endpoint,nativePeriodKey) {
+  assert(typeof sourceKey==='string'&&YOUTUBE_SCOPED_SOURCE.test(sourceKey)&&
+    endpoint===WK100_YOUTUBE_CHART_POST_ENDPOINT,
+    'youtube_post_source_unqualified');
+  const period=typeof nativePeriodKey==='string'?
+    /^weekly:(\d{8}):(\d{8}):ke$/.exec(nativePeriodKey):null;
+  assert(period!==null,'youtube_post_period_unqualified');
+  const parseDay=s=>{
+    const m=/^(\d{4})(\d{2})(\d{2})$/.exec(s);
+    if(!m)return null;
+    const timestamp=Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3]));
+    const day=new Date(timestamp);
+    return day.toISOString().slice(0,10).replaceAll('-','')===s?timestamp:null;
+  };
+  const start=parseDay(period[1]),end=parseDay(period[2]);
+  assert(start!==null&&end!==null&&end-start===6*86400000&&
+    new Date(end).getUTCDay()===4,'youtube_post_period_unqualified');
+  return Object.freeze({
+    method:'POST',
+    body:JSON.stringify({
+      context:{client:{clientName:'WEB_MUSIC_ANALYTICS',clientVersion:'2.0',
+        hl:'en-GB',gl:'KE',theme:'MUSIC'}},
+      browseId:'FEmusic_analytics_charts_home',
+      query:'perspective=CHART_DETAILS&chart_params_country_code=ke'+
+        '&chart_params_chart_type=TRACKS&chart_params_period_type=WEEKLY'+
+        '&chart_params_end_date='+period[2],
+    }),
+  });
+}
+export function isWk100YouTubeNativePost(sourceKey,endpoint,nativePeriodKey) {
+  try{wk100YouTubeNativePostRequest(sourceKey,endpoint,nativePeriodKey);return true;}
+  catch{return false;}
+}
+
 /**
  * Safe transport. The verifier MUST consult a separately controlled and
  * current access decision; a caller-supplied string is not authorization.
  * No redirects, arbitrary hosts, credentials, or unbounded response bodies.
  */
 export async function fetchCandidateBytes({ sourceKey, endpoint, accessDecision,
-  verifyAccess, providerAuthorization, fetchImpl = fetch, timeoutMs = 12_000,
+  verifyAccess, providerAuthorization, method='GET', nativePeriodKey=null,
+  fetchImpl = fetch, timeoutMs = 12_000,
   now = () => new Date() }) {
   assert(SOURCE.test(sourceKey), 'source_key_invalid');
   const url = approvedHttpsEndpoint(endpoint);
+  assert(method==='GET'||method==='POST','source_method_unqualified');
+  // Only a reviewed YouTube Kenya source may POST, using a synthesized
+  // country/week/client body. No untrusted request body enters this transport.
+  const youtubePost=method==='POST'?
+    wk100YouTubeNativePostRequest(sourceKey,endpoint,nativePeriodKey):null;
   // Tokens only travel to Apple's exact native chart API; never allow a
   // manifest entry to redirect credentials to another HTTPS host or route.
   let providerHeaders = null;
   if(providerAuthorization !== undefined) {
     exactKeys(providerAuthorization, ['kind','token'], 'provider_authorization_invalid');
-    assert(sourceKey === 'apple_ke' && url.hostname === 'api.music.apple.com' &&
-      url.pathname === '/v1/catalog/ke/charts' &&
-      url.searchParams.get('types') === 'songs' &&
-      url.searchParams.get('chart') === 'most-played' &&
+    assert(isWk100AppleCatalogChart(sourceKey,endpoint) &&
       providerAuthorization.kind === 'apple_developer_bearer' &&
       typeof providerAuthorization.token === 'string' &&
       /^[a-zA-Z0-9_.-]{20,8192}$/.test(providerAuthorization.token),
       'provider_authorization_invalid');
+    assert(method==='GET','provider_authorization_invalid');
     providerHeaders = { authorization: 'Bearer ' + providerAuthorization.token };
   }
   exactKeys(accessDecision, ['source_key', 'exact_endpoint', 'authorization_ref', 'purpose'], 'source_access_invalid');
@@ -96,7 +143,7 @@ export async function fetchCandidateBytes({ sourceKey, endpoint, accessDecision,
   });
   try {
     const work = (async () => {
-      assert(await verifyAccess(accessDecision, { sourceKey, endpoint, hostname: url.hostname, signal:controller.signal }) === true,
+      assert(await verifyAccess(accessDecision, { sourceKey, endpoint, method, hostname: url.hostname, signal:controller.signal }) === true,
         'source_access_not_authorized');
       // A slow authority check can settle after the Promise.race deadline.
       // Never dispatch a provider request once the capture has timed out.
@@ -104,10 +151,12 @@ export async function fetchCandidateBytes({ sourceKey, endpoint, accessDecision,
       let response;
       try {
         response = await fetchImpl(endpoint, {
-          method: 'GET', redirect: 'manual', credentials: 'omit',
+          method, redirect: 'manual', credentials: 'omit',
           cache: 'no-store', signal: controller.signal,
           headers: { accept: 'application/json, text/html, text/csv, application/octet-stream',
+            ...(youtubePost?{'content-type':'application/json'}:{}),
             ...(providerHeaders || {}) },
+          ...(youtubePost?{body:youtubePost.body}:{}),
         });
       } catch { reject('transport_failed'); }
       assert(response && typeof response.status === 'number', 'transport_failed');

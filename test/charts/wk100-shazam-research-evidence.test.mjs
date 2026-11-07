@@ -2,12 +2,14 @@ import {test} from 'node:test';
 import {storeWk100ResearchOriginalBytes} from '../../supabase/functions/_shared/wk100-research-private-object-store.mjs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {webcrypto} from 'node:crypto';
+import {prepareWk100LocalShazamResearch} from '../../src/services/chartsIngestion/wk100LocalShazamResearch.mjs';
 import {mkdtemp,rm,readFile,stat,symlink,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {prepareShazamResearchEvidence,archiveShazamResearchEvidence,prepareShazamRegistryReview} from '../../scripts/charts/wk100-shazam-research-evidence.mjs';
 import {executeWk100ResearchIntake} from '../../supabase/functions/_shared/wk100-research-intake-orchestrator.mjs';
-import {verifyWk100ShazamResearchImport,projectWk100ResearchImportStatus} from '../../supabase/functions/_shared/wk100-research-receipt-bridge.mjs';
+import {verifyWk100ShazamResearchImport,projectWk100ResearchImportStatus,coerceWk100ShazamResearchIntakeReceipt} from '../../supabase/functions/_shared/wk100-research-receipt-bridge.mjs';
 const enc=x=>new TextEncoder().encode(x);
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const csv=enc('Rank,Artist,Title\n1,Artist One,Track One\n2,Artist Two,Track Two\n');
@@ -387,8 +389,10 @@ test('WK100 original CSV duplicate safely reuses object while each observation h
 test('WK100 additive SQL ledger and restricted Edge route retain independent authority',async()=>{
   const {readdir}=await import('node:fs/promises');
   const dir=new URL('../../supabase/migrations/',import.meta.url);
-  const files=(await readdir(dir)).filter(x=>x.endsWith('_wk100_research_observation_ledger_v1.sql'));
-  assert.equal(files.length,1);
+  // The former ledger filename is retired. Test the exact active
+  // forward-only migration, not the archived PR-era migration name.
+  const files=(await readdir(dir)).filter(x=>x.endsWith('_wk100_research_observation_forward_v1.sql'));
+  assert.deepEqual(files,['20261102084049_wk100_research_observation_forward_v1.sql']);
   const sql=await readFile(new URL(files[0],dir),'utf8');
   for(const word of [
     'wk100_reserve_research_observation_v1','wk100_finalize_research_observation_v1',
@@ -450,6 +454,63 @@ test('WK100 Admin transport includes exact original bytes and receipt without pr
   assert.deepEqual(new Uint8Array(await form.get('original_csv').arrayBuffer()),csv);
   assert.equal(form.get('research_week_start_eat'),'2026-10-26');
 });
+test('WK100 locally checked Shazam original reaches the EXISTING private import contract',async()=>{
+  const local=await prepareWk100LocalShazamResearch({
+    originalBytes:csv,checkedAtUtc:'2026-10-29T18:00:00.123Z',
+  });
+  const {form,observedDepth}=await prepareWk100ResearchForm(browserResearchFiles({receipt:local}));
+  assert.equal(observedDepth,2);
+  assert.deepEqual([...form.keys()].sort(),['original_csv','receipt_json','research_week_start_eat']);
+  const canonical=await coerceWk100ShazamResearchIntakeReceipt({
+    originalBytes:csv,receipt:local,researchWeekStartEat:'2026-10-26',
+    authenticatedUserId:u(70),now:new Date('2026-11-04T00:00:00Z'),
+  });
+  assert.equal(canonical.observed_at,'2026-10-29T18:00:00Z');
+  assert.equal(canonical.operator_ref,'auth_user:'+u(70));
+  assert.equal(canonical.source_native_period.authority,'unknown');
+  assert.equal(canonical.acquisition_mode,'researcher_directed_public_csv');
+  const verified=await verifyWk100ShazamResearchImport({
+    originalBytes:csv,receipt:canonical,researchWeekStartEat:'2026-10-26',
+  });
+  assert.equal(verified.private_rows.length,2);
+  assert.equal(verified.source_origin_independently_attested,false);
+  assert.equal(verified.can_score,false);
+  assert.equal(verified.can_publish,false);
+});
+
+test('WK100 local Shazam receipt cannot forge origin, hash, period, source day or future observation',async()=>{
+  const local=await prepareWk100LocalShazamResearch({
+    originalBytes:csv,checkedAtUtc:'2026-10-29T18:00:00.123Z',
+  });
+  const inputs=[
+    {original_sha256:'0'.repeat(64)},
+    {source_fetch_verified:true},
+    {hosted_receipt_verified:true},
+    {native_period_authority:'provider_defined'},
+    {provider_snapshot_date:'2026-10-31'},
+    {complete_chart:true},
+    {can_score:true},
+    {source_page_url:'https://evil.example/chart'},
+  ];
+  for(const patch of inputs){
+    const receipt={...local,...patch};
+    await assert.rejects(coerceWk100ShazamResearchIntakeReceipt({
+      originalBytes:csv,receipt,researchWeekStartEat:'2026-10-26',
+      authenticatedUserId:u(70),now:new Date('2026-11-04T00:00:00Z'),
+    }),/wk100_research_import_/);
+    await assert.rejects(prepareWk100ResearchForm(browserResearchFiles({receipt})),
+      /receipt_invalid|original_bytes_mismatch/);
+  }
+  await assert.rejects(coerceWk100ShazamResearchIntakeReceipt({
+    originalBytes:csv,receipt:local,researchWeekStartEat:'2026-11-02',
+    authenticatedUserId:u(70),now:new Date('2026-11-04T00:00:00Z'),
+  }),/observation_time_invalid/);
+  await assert.rejects(coerceWk100ShazamResearchIntakeReceipt({
+    originalBytes:csv,receipt:local,researchWeekStartEat:'2026-10-26',
+    authenticatedUserId:u(70),now:new Date('2026-10-27T00:00:00Z'),
+  }),/observation_time_invalid/);
+});
+
 test('WK100 Admin rejects changed CSV before any Edge request',async()=>{
   let called=0;
   await assert.rejects(submitWk100ResearchEvidence({
@@ -529,6 +590,63 @@ test('WK100 Admin errors or rejected receipts never report verified evidence',as
     }),
   }),/wk100_research_ui_server_unavailable/);
 });
+test('new researcher-downloaded Shazam CSV becomes an offline, nonpublishing original-byte receipt',async()=>{
+  const original=enc('"Wednesday, 28 October 2026 [performance over the past 7 days]"\n'+
+    'Rank,Artist,Title\n1,Artist One,Song One\n2,Artist Two,Song Two\n');
+  const receipt=await prepareWk100LocalShazamResearch({
+    originalBytes:original,checkedAtUtc:'2026-11-03T12:34:56.789Z',
+    subtle:webcrypto.subtle,
+  });
+  assert.equal(receipt.source_key,'shazam_ke');
+  assert.equal(receipt.market,'KE');
+  assert.equal(receipt.original_sha256,hash(original));
+  assert.equal(receipt.original_byte_length,original.byteLength);
+  assert.equal(receipt.observed_rank_count,2);
+  assert.equal(receipt.complete_chart,false); // Never call a two-row CSV a Top 200.
+  assert.equal(receipt.provider_snapshot_date,'2026-10-28');
+  assert.equal(receipt.provider_rolling_window_days,7);
+  assert.equal(receipt.checked_at_utc,'2026-11-03T12:34:56.789Z');
+  assert.equal(receipt.source_retrieved_at_utc,null);
+  assert.equal(receipt.source_fetch_verified,false);
+  assert.equal(receipt.native_period_start,null);
+  assert.equal(receipt.native_period_end,null);
+  assert.equal(receipt.native_period_authority,'unknown');
+  assert.equal(receipt.original_bytes_in_receipt,false);
+  assert.equal(receipt.hosted_receipt_verified,false);
+  assert.equal(receipt.source_admitted,false);
+  assert.equal(receipt.can_score,false);
+  assert.equal(receipt.can_publish,false);
+  assert.doesNotMatch(JSON.stringify(receipt),/Artist One|Song One|operator_email|private_filename/);
+  assert.doesNotThrow(()=>JSON.parse(JSON.stringify(receipt)+'\n'));
+  const modified=enc('"Wednesday, 28 October 2026 [performance over the past 7 days]"\n'+
+    'Rank,Artist,Title\n1,Artist One,Song ONe\n2,Artist Two,Song Two\n');
+  assert.equal(modified.byteLength,original.byteLength);
+  const changed=await prepareWk100LocalShazamResearch({
+    originalBytes:modified,checkedAtUtc:'2026-11-03T12:34:56.789Z',
+    subtle:webcrypto.subtle,
+  });
+  assert.notEqual(changed.original_sha256,receipt.original_sha256);
+  assert.equal(changed.source_fetch_verified,false);
+});
+test('offline Shazam research rejects malformed charts and false source-time precision',async()=>{
+  const base={checkedAtUtc:'2026-11-03T12:34:56.789Z',subtle:webcrypto.subtle};
+  await assert.rejects(prepareWk100LocalShazamResearch({
+    ...base,originalBytes:new Uint8Array(),
+  }),/wk100_local_shazam_research_invalid/);
+  await assert.rejects(prepareWk100LocalShazamResearch({
+    ...base,originalBytes:enc('Rank,Artist,Title\n1,A,B\n3,C,D\n'),
+  }),/wk100_local_shazam_research_invalid/);
+  await assert.rejects(prepareWk100LocalShazamResearch({
+    ...base,originalBytes:enc('not a chart csv'),
+  }),/wk100_local_shazam_research_invalid/);
+  await assert.rejects(prepareWk100LocalShazamResearch({
+    ...base,checkedAtUtc:'2026-11-03',originalBytes:enc('Rank,Artist,Title\n1,A,B\n'),
+  }),/wk100_local_shazam_research_invalid/);
+  await assert.rejects(prepareWk100LocalShazamResearch({
+    ...base,originalBytes:new Uint8Array(4*1024*1024+1),
+  }),/wk100_local_shazam_research_invalid/);
+});
+
 test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic publish',async()=>{
   const config=await readFile(new URL('../../supabase/config.toml',import.meta.url),'utf8');
   const page=await readFile(new URL('../../src/pages/admin/charts/ingest/page.tsx',import.meta.url),'utf8');
@@ -538,6 +656,22 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
   assert.match(panel,/disabled=\{!ready\}/);
   assert.doesNotMatch(panel,/commitIngestRun|runDryRun|publishEdition|localStorage/);
   assert.match(panel,/getWk100ArchivedResearchPortfolio/);
+  assert.match(panel,/verifyWk100ArchivedOriginal/);
+  assert.match(panel,/prepareWk100LocalShazamResearch/);
+  assert.match(panel,/aria-label="New local Shazam research"/);
+  const localNew=panel.slice(panel.indexOf('aria-label="New local Shazam research"'),
+    panel.indexOf('<form className="mt-4 space-y-3" onSubmit={upload}>'));
+  assert.ok(localNew.length>800);
+  assert.doesNotMatch(localNew,/supabase|\.invoke\(|submitWk100|saveWk100|publishEdition/);
+  assert.match(localNew,/Open Shazam Kenya Top 200/);
+  assert.match(localNew,/Save Local Research Receipt/);
+  assert.match(panel,/localOriginal\.size!==source\.byteLength/);
+  assert.match(panel,/disabled=\{!localOriginal\|\|localChecking\}/);
+  const localSection=panel.slice(panel.indexOf('aria-label="Local archived original verification"'),
+    panel.indexOf('Verify preserved Apple or Mdundo HTML'));
+  assert.ok(localSection.length>500);
+  assert.doesNotMatch(localSection,/supabase|\.invoke\(|submitWk100|saveWk100|publishEdition/);
+  assert.match(localSection,/No network upload, database write/);
   const archived=getWk100ArchivedResearchPortfolio('2026-10-26');
   assert.equal(archived.length,4);
   assert.deepEqual(archived.map(x=>x.sourceKey),
@@ -550,6 +684,12 @@ test('WK100 Admin dedicated intake is JWT enforced and cannot invoke generic pub
   await assert.rejects(verifyWk100ArchivedOriginal({
     weekStartEat:'2026-10-26',sourceKey:'apple_ke_public_playlist',
     originalBytes:enc('not-the-original-private-bytes'),
+  }),/wk100_archived_original_mismatch/);
+  // Equal-size fabricated bytes still fail their cryptographic receipt.
+  // Neither a file length alone nor a guessed filename establishes provenance.
+  await assert.rejects(verifyWk100ArchivedOriginal({
+    weekStartEat:'2026-10-26',sourceKey:'shazam_ke',
+    originalBytes:new Uint8Array(archived[0].byteLength),
   }),/wk100_archived_original_mismatch/);
   // These are synthetic PARSER contracts, not substitutes for October originals.
   const mdundo=Array.from({length:100},(_,i)=>
@@ -848,6 +988,21 @@ test('WK100 Edge valid browser multipart reaches only the authorized intake orch
   assert.deepEqual(calls.client.map(c=>c.key),['local-mock-service','local-mock-anon']);
   assert.ok(calls.client.every(c=>c.url==='https://'+WK100_EDGE_REF+'.supabase.co'));
 });
+test('WK100 Edge local receipt resolves the authenticated operator, never provider delivery',async()=>{
+  const local=await prepareWk100LocalShazamResearch({
+    originalBytes:csv,checkedAtUtc:'2026-10-29T18:00:00.123Z',
+  });
+  const {handle,calls,ack}=wk100EdgeHarness();
+  const {form}=await prepareWk100ResearchForm(browserResearchFiles({receipt:local}));
+  const response=await handle(wk100EdgeRequest({body:form}));
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),ack);
+  assert.equal(calls.auth,1);
+  assert.deepEqual(calls.capability.map(c=>c.params.required_capability).sort(),
+    ['manage_charts','manage_ingest']);
+  assert.equal(calls.intake,1);
+});
+
 test('WK100 Edge invalid original and durable receipt errors never leak server details',async()=>{
   const {form}=await prepareWk100ResearchForm(browserResearchFiles());
   for(const [error,status,code] of [

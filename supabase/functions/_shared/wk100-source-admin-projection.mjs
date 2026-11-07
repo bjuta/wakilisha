@@ -29,6 +29,8 @@ export function projectWk100SourceHealth(contracts, attempts, weekStartEat) {
       admissionState:'candidate', // This legacy capture contract cannot be 'qualified'.
       captureState: latest ? key(latest.status) : 'not_collected',
       attemptCount:history.length,lastAttemptAt:latest?.created_at||null,
+      lastScheduledAt:typeof latest?.scheduled_at==='string'?latest.scheduled_at:null,
+      lastAttemptNumber:Number.isInteger(latest?.attempt_number)&&latest.attempt_number>=1&&latest.attempt_number<=8?latest.attempt_number:null,
       lastSuccessfulAt:success?.fetched_at||null,
       observedDepth:integer(success?.observed_depth),
       nativePeriodAuthority:key(success?.native_period_authority||'unknown'),
@@ -38,6 +40,8 @@ export function projectWk100SourceHealth(contracts, attempts, weekStartEat) {
       failureCode:latest?.failure_code?key(latest.failure_code):null,
       recentAttempts:history.slice(0,12).map(a=>({
         id:key(a.id),status:key(a.status),attemptedAt:a.created_at||null,
+        scheduledAt:typeof a.scheduled_at==='string'?a.scheduled_at:null,
+        attemptNumber:Number.isInteger(a.attempt_number)&&a.attempt_number>=1&&a.attempt_number<=8?a.attempt_number:null,
         fetchedAt:a.fetched_at||null,failureCode:a.failure_code?key(a.failure_code):null,
         observedDepth:integer(a.observed_depth),
       })),

@@ -2,6 +2,7 @@ name: Critical Control Plane
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, converted_to_draft, ready_for_review]
   push:
     branches:
       - main
@@ -17,6 +18,7 @@ concurrency:
 jobs:
   critical-core:
     name: critical-core
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # Live schema CLI authentication and Production JIT must not overlap.
@@ -197,7 +199,10 @@ jobs:
         run: node --test test/charts/wk100-private-preview.test.mjs
 
       - name: Verify WK100 offline authority-bound intake
-        run: node --test test/charts/wk100-offline-intake-authority.test.mjs
+        run: |
+          node --test test/charts/wk100-offline-intake-authority.test.mjs
+          node --test test/charts/wk100-shazam-research-evidence.test.mjs
+          node --test test/charts/wk100-source-admin-projection.test.mjs
 
       - name: Verify WK100 server-only Admin preview and confidentiality
         run: |
@@ -237,6 +242,7 @@ jobs:
 
   critical-browser:
     name: critical-browser
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
@@ -255,6 +261,20 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
+
+      # One-shot, PR-scoped source qualification on a credential-free runner.
+      # Outputs only nonsecret status, byte counts and SHA-256 in the logs.
+      # No new workflow, Supabase credentials, hosted Preview, persisted
+      # artifacts, collector admission, scheduling or Production mutation.
+      - name: WK100 five primary plus four editorial public source preflight
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 1345 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          private_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/wk100-public-source.XXXXXXXX")"
+          trap 'rm -rf -- "$private_dir"' EXIT
+          WK100_PROBE_PRIVATE_DIR="$private_dir" \
+            node scripts/acceptance/wk100-phase1-six-source-live-probe.mjs --fetch
 
       - name: Run WAKILISHA real-browser interaction acceptance
         run: npm run test:ui-browser
@@ -288,7 +308,7 @@ jobs:
 
   critical:
     name: critical
-    if: ${{ always() }}
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
     needs:
       - critical-core
       - critical-browser

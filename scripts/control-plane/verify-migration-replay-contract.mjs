@@ -16,6 +16,16 @@ import {
   validateRnb18StagedFields,
   validateRnb18StagedRepositoryState,
 } from "./verify-rnb18-staged-retirement.mjs";
+import {
+  isDisposableCiReplayProof,
+  validateDisposableCiReplayProof,
+  validateDisposableCiReplayRepositoryState,
+} from "./verify-disposable-ci-replay-proof.mjs";
+import {
+  isOfflineOperatorReplayProof,
+  validateOfflineOperatorReplayProof,
+  validateOfflineOperatorReplayRepositoryState,
+} from "./verify-offline-operator-replay-proof.mjs";
 
 const BASE_REF =
   process.env.CONTROL_PLANE_BASE_REF ??
@@ -120,7 +130,7 @@ export function analyzeMigrationText(
     ],
     [
       "reviewed production boundary",
-      /\breviewed\b[\s\S]{0,120}\b(?:(?:manifest|cardinality|revision|count)\b|boundary\b[\s\S]{0,80}\b(?:changed|drift(?:ed)?|mismatch|exact(?:ly)?|expected|lock(?:ed)?|revision|count|cardinality|manifest)\b)/i,
+      /\breviewed\b[\s\S]{0,120}\bboundary\b[\s\S]{0,80}\b(?:changed|drift(?:ed)?|mismatch|exact(?:ly)?|expected|lock(?:ed)?|revision|count|cardinality|manifest)\b|\breviewed\s+production\b[\s\S]{0,120}\b(?:manifest|cardinality|revision|count)\b/i,
     ],
     [
       "manifest digest lock",
@@ -480,6 +490,15 @@ function readJson(
   }
 }
 
+/** The most recent changed migration owns the overall replay seal.
+ * Earlier offline and CI receipts remain independently validated above. */
+export function newestReplayEvidenceMode(changedActive, proofs) {
+  const latest = proofs.get(changedActive.at(-1)?.path);
+  if (isDisposableCiReplayProof(latest)) return "disposable_ci";
+  if (isOfflineOperatorReplayProof(latest)) return "offline_operator";
+  return null;
+}
+
 function main() {
   const mergeBaseResult =
     runGit(
@@ -681,6 +700,16 @@ function main() {
             migrationFile: entry.path,
             migrationSha256: sha256File(entry.path),
             baseMainSha: mergeBase,
+          }) : isOfflineOperatorReplayProof(proof) ? validateOfflineOperatorReplayProof({
+             proof,
+             migrationFile: entry.path,
+             migrationSha256: sha256File(entry.path),
+             baseMainSha: mergeBase,
+           }) : isDisposableCiReplayProof(proof) ? validateDisposableCiReplayProof({
+            proof,
+            migrationFile: entry.path,
+            migrationSha256: sha256File(entry.path),
+            baseMainSha: mergeBase,
           }) : validateReplayProof({
             proof,
             migrationFile:
@@ -785,6 +814,36 @@ function main() {
 
         const stagedMode = changedActive.some((entry) =>
           isRnb18StagedProof(proofs.get(entry.path)));
+        const disposableMode = changedActive.some((entry) =>
+          isDisposableCiReplayProof(proofs.get(entry.path)));
+        const offlineMode = changedActive.some((entry) =>
+          isOfflineOperatorReplayProof(proofs.get(entry.path)));
+        const latestMode = newestReplayEvidenceMode(changedActive, proofs);
+        // An earlier 245-migration offline receipt remains valid evidence
+        // when a later 246-migration CI receipt seals the entire active set.
+        // Do not select repository authority merely because an older proof
+        // of a different kind is still present in this PR.
+        if ((disposableMode || offlineMode) && latestMode === null) {
+          failures.push("Newest changed migration must have an accepted CI or offline replay proof");
+        }
+        if (latestMode === "disposable_ci" && (historicalMode || stagedMode)) {
+          failures.push("Cannot mix unlinked CI proof with historical or staged migration proof");
+        }
+        if (latestMode === "disposable_ci") {
+          for (const error of validateDisposableCiReplayRepositoryState({
+            changedActive,proofs,mergeBase,baseline,migrations,
+            latestMigration,actualTypesSha256,
+          })) failures.push("unlinked CI migration replay: " + error);
+        }
+        if (latestMode === "offline_operator") {
+          if (historicalMode || stagedMode) {
+            failures.push("Offline operator proof cannot mix with historical/staged migration modes");
+          }
+          for (const error of validateOfflineOperatorReplayRepositoryState({
+            changedActive,proofs,mergeBase,baseline,migrations,
+            latestMigration,actualTypesSha256,
+          })) failures.push("offline operator migration replay: " + error);
+        }
         if (stagedMode) {
           const stagedProof = proofs.get("supabase/migrations/20261101210335_rnb18_stage1_archive_replay_authority_v1.sql");
           for (const error of validateRnb18StagedRepositoryState({
@@ -814,7 +873,7 @@ function main() {
         }
 
         if (
-          !historicalMode && !stagedMode &&
+          !historicalMode && !stagedMode && !disposableMode && !offlineMode &&
           baseline
             .schemaSeal?.mode !==
           "preview"
@@ -836,7 +895,7 @@ function main() {
           );
         }
 
-        if (!historicalMode && !stagedMode) {
+        if (!historicalMode && !stagedMode && !disposableMode && !offlineMode) {
         const latestChanged =
           changedActive.at(-1);
         const latestProof =

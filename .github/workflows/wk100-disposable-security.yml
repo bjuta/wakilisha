@@ -2,6 +2,7 @@ name: WK100 Disposable SQL Concurrency and Signed-in Storage ACL
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, converted_to_draft, ready_for_review]
     branches: [main]
     paths:
       - '.github/workflows/wk100-disposable-security.yml'
@@ -19,6 +20,7 @@ concurrency:
 jobs:
   disposable-wk100-security:
     name: disposable-two-session-and-signed-in-acl
+    if: ${{ github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -71,6 +73,10 @@ jobs:
 
       - name: Prove real signed-in JWT cannot read or list private WK100 raw object
         shell: bash
+        # Only the active Phase 1 delivery PR does real public provider egress.
+        # No hosted Preview, Production secret, cron, or fake release admission.
+        env:
+          WK100_LIVE_SOURCE_ACCEPTANCE: ${{ github.event.pull_request.number == 1345 && 'true' || 'false' }}
         run: node scripts/acceptance/wk100-genuine-auth-storage-disposable-ci.mjs
 
       - name: Destroy disposable database Auth Storage containers and volumes

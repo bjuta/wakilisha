@@ -3,17 +3,43 @@ set -euo pipefail
 # Two genuine PostgreSQL backends racing for one WK100 reservation.
 # The committed synthetic contract is DISPOSABLE-LOCAL ONLY: the parent
 # GitHub workflow destroys the entire Supabase local database afterward.
-[ "${GITHUB_ACTIONS:-}" = true ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ] || {
-  echo 'STOP: must run inside isolated pull_request CI'; exit 20;
-}
+# The explicit Mac mode is permitted only for a local disposable stack.
+# It does not impersonate GitHub Actions or grant a hosted project target.
+if [ "${GITHUB_ACTIONS:-}" = true ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ]; then
+  echo 'WK100_DISPOSABLE_EXECUTION_CONTEXT=CI_PULL_REQUEST'
+elif [ "${WK100_LOCAL_DISPOSABLE_ACCEPTANCE:-}" = true ] &&
+     [ -z "${GITHUB_ACTIONS:-}" ] && [ -z "${GITHUB_EVENT_NAME:-}" ] &&
+     [ "${WK100_LIVE_SOURCE_ACCEPTANCE:-false}" = false ]; then
+  echo 'WK100_DISPOSABLE_EXECUTION_CONTEXT=EXPLICIT_LOCAL_NO_PROVIDER_EGRESS'
+else
+  echo 'STOP: CI PR or explicit no-egress local disposable mode required'; exit 20
+fi
 [ -z "${SUPABASE_ACCESS_TOKEN:-}" ] && [ -z "${SUPABASE_PROJECT_REF:-}" ] &&
 [ ! -e supabase/.temp/project-ref ] || {
   echo 'STOP: remote Supabase authority or link present'; exit 20;
 }
-CONTAINER="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
-[ -n "$CONTAINER" ] && [ "$(printf '%s\n' "$CONTAINER" | wc -l | tr -d ' ')" = 1 ] || {
-  echo 'STOP: expected one disposable database container'; exit 20;
-}
+# Existing unrelated local Supabase stacks must never be considered candidates
+# for disposable SQL fixtures. Select only the explicitly named test stack.
+if [ "${WK100_LOCAL_DISPOSABLE_ACCEPTANCE:-}" = true ]; then
+  STACK_ID="${WK100_LOCAL_STACK_ID:-}"
+  [[ "$STACK_ID" =~ ^wk100accept[a-z0-9]{10}$ ]] || {
+    echo 'STOP: invalid disposable local stack identity'; exit 20;
+  }
+  CONTAINER="$(docker ps --filter "name=^supabase_db_${STACK_ID}$" --format '{{.Names}}')"
+  [ "$CONTAINER" = "supabase_db_${STACK_ID}" ] || {
+    echo 'STOP: isolated disposable database container not found'; exit 20;
+  }
+  OWNER="$(docker inspect --format '{{index .Config.Labels "com.supabase.cli.project"}}' "$CONTAINER")"
+  [ "$OWNER" = "$STACK_ID" ] || {
+    echo 'STOP: disposable database Docker ownership mismatch'; exit 20;
+  }
+else
+  CONTAINER="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+  [ -n "$CONTAINER" ] &&
+    [ "$(printf '%s\n' "$CONTAINER" | wc -l | tr -d ' ')" = 1 ] || {
+    echo 'STOP: expected one disposable database container in CI'; exit 20;
+  }
+fi
 db_sql() {
   docker exec -i "$CONTAINER" psql -X -q -A -t -v ON_ERROR_STOP=1 \
     -U supabase_admin -d postgres -c "$1"

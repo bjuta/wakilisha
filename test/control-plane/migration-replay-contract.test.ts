@@ -10,6 +10,7 @@ import {
   analyzeMigrationText,
   validateReplayProof,
   validateRetiredMigrationReceipt,
+  newestReplayEvidenceMode,
 } from "../../scripts/control-plane/verify-migration-replay-contract.mjs";
 import {
   validateHistoricalCleanReplayProof,
@@ -24,10 +25,113 @@ import {
   validatePendingSchemaState,
   validateRepositorySchemaSnapshot,
 } from "../../scripts/control-plane/verify-repository-schema-snapshot.mjs";
+import {
+  isDisposableCiReplayProof,
+  validateDisposableCiReplayProof,
+} from "../../scripts/control-plane/verify-disposable-ci-replay-proof.mjs";
+import {
+  isOfflineOperatorReplayProof,
+  validateOfflineOperatorReplayProof,
+  OFFLINE_REQUIRED_MARKERS,
+} from "../../scripts/control-plane/verify-offline-operator-replay-proof.mjs";
 
 describe(
   "migration replay contract",
   () => {
+    it("requires a real unlinked CI replay and independent Auth/Storage/cleanup markers", () => {
+      const proof=JSON.parse(readFileSync(
+        "docs/engineering/replay-proofs/20261104084956_wk100_spotify_offered_export_method_admission.sql.json",
+        "utf8"
+      ));
+      expect(isDisposableCiReplayProof(proof)).toBe(true);
+      const args={proof,migrationFile:proof.migration_file,
+        migrationSha256:proof.migration_sha256,baseMainSha:proof.base_main_sha};
+      expect(validateDisposableCiReplayProof(args)).toEqual([]);
+      expect(validateDisposableCiReplayProof({
+        ...args,proof:{...proof,workflow_conclusion:"failure"},
+      })).toContain("disposable CI requires successful pull-request workflow evidence");
+      expect(validateDisposableCiReplayProof({
+        ...args,proof:{...proof,ci_markers:proof.ci_markers.slice(0,-1)},
+      })).toContain("disposable CI missing ordered independent replay/auth/storage/cleanup markers");
+      expect(validateDisposableCiReplayProof({
+        ...args,proof:{...proof,hosted_preview_used:true},
+      })).toContain("disposable CI must be unlinked, not hosted or Production");
+      expect(validateDisposableCiReplayProof({
+        ...args,migrationSha256:"0".repeat(64),
+      })).toContain("disposable CI migration digest mismatch");
+    });
+    it("seals the exact owner-reported local replay without impersonating GitHub Actions", () => {
+      const proof=JSON.parse(readFileSync(
+        "docs/engineering/replay-proofs/20261105131250_wk100_collect_now_authorized_v1.sql.json",
+        "utf8"
+      ));
+      expect(isOfflineOperatorReplayProof(proof)).toBe(true);
+      expect(OFFLINE_REQUIRED_MARKERS).toHaveLength(17);
+      const args={proof,migrationFile:proof.migration_file,
+        migrationSha256:proof.migration_sha256,baseMainSha:proof.base_main_sha};
+      expect(validateOfflineOperatorReplayProof(args)).toEqual([]);
+      expect(validateOfflineOperatorReplayProof({
+        ...args,proof:{...proof,operator_reported_markers:proof.operator_reported_markers.slice(1)},
+      })).toContain("offline required operator markers missing or reordered");
+      expect(validateOfflineOperatorReplayProof({
+        ...args,proof:{...proof,github_ci_claimed:true,workflow_run_id:1234},
+      })).toContain("offline proof must never claim GitHub CI");
+      expect(validateOfflineOperatorReplayProof({
+        ...args,proof:{...proof,hosted_preview_used:true},
+      })).toContain("offline isolation or no-egress assertion invalid");
+      expect(validateOfflineOperatorReplayProof({
+        ...args,proof:{...proof,runner_sha256:"not-a-sha"},
+      })).toContain("offline runner artifact identity mismatch");
+      expect(validateOfflineOperatorReplayProof({
+        ...args,migrationSha256:"0".repeat(64),
+      })).toContain("offline migration digest mismatch");
+    });
+    it("selects newest CI replay authority while preserving prior offline evidence", () => {
+      const entries=[{path:"245.sql"},{path:"246.sql"}];
+      const offline={proof_mode:"offline_operator_clean_replay_v1"};
+      const ci={proof_mode:"disposable_ci_clean_replay_v1"};
+      expect(newestReplayEvidenceMode(entries,new Map([
+        ["245.sql",offline],["246.sql",ci],
+      ]))).toBe("disposable_ci");
+      expect(newestReplayEvidenceMode(entries,new Map([
+        ["245.sql",ci],["246.sql",offline],
+      ]))).toBe("offline_operator");
+      expect(newestReplayEvidenceMode(entries,new Map([
+        ["245.sql",offline],["246.sql",{}],
+      ]))).toBeNull();
+    });
+    it("validates a historical offline seal without assuming current baseline is 245", () => {
+      const current=JSON.parse(readFileSync(
+        "docs/engineering/live-schema-baseline.json","utf8"
+      ));
+      const proof=JSON.parse(readFileSync(
+        "docs/engineering/replay-proofs/20261105131250_wk100_collect_now_authorized_v1.sql.json","utf8"
+      ));
+      const baseline={...current,
+        migrationCount:proof.schema_migration_count,
+        latestMigration:proof.migration_file.split("/").at(-1),
+        schemaSeal:{
+          mode:"offline_operator",sourceProjectRef:"unlinked-local-operator",
+          migrationHead:proof.schema_migration_head,
+          baseMainSha:proof.base_main_sha,
+          replayCandidateHeadSha:proof.replay_candidate_head_sha,
+          operatorReceiptUrl:proof.operator_receipt_url,
+        },
+      };
+      const args={baseline,actualTypesSha256:baseline.typesSha256,
+        expectedProjectRef:"pgzizndxdyhqmtyywjmt",
+        migrationCount:proof.schema_migration_count,
+        latestMigration:baseline.latestMigration};
+      expect(validateRepositorySchemaSnapshot(args)).toEqual([]);
+      expect(validateRepositorySchemaSnapshot({
+        ...args,baseline:{...baseline,schemaSeal:{...baseline.schemaSeal,workflowRunId:1234}},
+      })).toContain("offline operator seal requires local source, tested commit and owner evidence without CI claim");
+      expect(validateRepositorySchemaSnapshot({
+        ...args,baseline:{...baseline,schemaSeal:{...baseline.schemaSeal,operatorReceiptUrl:""}},
+      })).toContain("offline operator seal requires local source, tested commit and owner evidence without CI claim");
+      expect(validatePendingSchemaState({pendingCount:1,sealMode:"offline_operator"})).toEqual([]);
+      expect(validatePendingSchemaState({pendingCount:1,sealMode:"disposable_ci"})).toEqual([]);
+    });
     it(
       "allows ordinary replay-safe schema authority",
       () => {
@@ -77,6 +181,26 @@ describe(
           analyzeMigrationText(`
             raise exception
               'STOP: reviewed Production boundary is exactly 8 Release identities';
+          `),
+        ).toContain(
+          "reviewed production boundary",
+        );
+      },
+    );
+
+    it(
+      "does not classify reviewed source-method documentation as a production replay lock",
+      () => {
+        expect(
+          analyzeMigrationText(`
+            comment on table platform_private.wk100_source_method_decisions_v1 is
+              'Immutable independently reviewed source-method decisions. A decision is not a collector manifest.';
+          `),
+        ).toEqual([]);
+
+        expect(
+          analyzeMigrationText(`
+            raise exception 'STOP: reviewed Production manifest revision mismatched';
           `),
         ).toContain(
           "reviewed production boundary",
@@ -414,6 +538,62 @@ describe(
               "preview",
           }),
         ).toEqual([]);
+      },
+    );
+
+    it(
+      "keeps heavyweight CI off draft PR runners and requires ready-to-review validation",
+      () => {
+        const critical = readFileSync(
+          ".github/workflows/critical-control-plane.yml",
+          "utf8",
+        );
+        const wk100 = readFileSync(
+          ".github/workflows/wk100-disposable-security.yml",
+          "utf8",
+        );
+        const mizizi = readFileSync(
+          ".github/workflows/mizizi-slice1-disposable-postgres.yml",
+          "utf8",
+        );
+
+        for (const workflow of [critical, wk100, mizizi]) {
+          expect(workflow).toContain(
+            "types: [opened, reopened, synchronize, converted_to_draft, ready_for_review]",
+          );
+          expect(workflow).toContain(
+            "github.event.pull_request.draft == false",
+          );
+        }
+
+        const nonDraftOrMain =
+          "if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}";
+        expect(critical.split(nonDraftOrMain)).toHaveLength(3);
+        expect(critical).toContain(
+          "if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}",
+        );
+        expect(critical).toContain("  push:\n    branches:\n      - main");
+        expect(critical).toContain(
+          'test "$CORE_RESULT" = "success"',
+        );
+        expect(critical).toContain(
+          'test "$BROWSER_RESULT" = "success"',
+        );
+        expect(wk100).toContain(
+          "if: ${{ github.event.pull_request.draft == false }}",
+        );
+        expect(mizizi).toContain(
+          "if: ${{ github.event.pull_request.draft == false }}",
+        );
+        expect(wk100.split(
+          "if: ${{ github.event.pull_request.draft == false }}",
+        )).toHaveLength(2);
+        expect(mizizi.split(
+          "if: ${{ github.event.pull_request.draft == false }}",
+        )).toHaveLength(3);
+        expect(mizizi).toContain(
+          "  disposable-operator-jwt:\n    name: disposable-operator-jwt\n    if: ${{ github.event.pull_request.draft == false }}",
+        );
       },
     );
 

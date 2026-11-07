@@ -1,10 +1,110 @@
 # WAKILISHA 100: Four-Phase Delivery and Final Admin Handoff
 
 **Status:** controlling delivery plan, not implementation acceptance or permission to deploy or publish.  
+
+**Offline execution/release authority — owner directive, 5 November 2026:** The [permanent offline-first acceptance policy](./offline-first-acceptance-and-release-authority-20261105.md) supersedes any wording below implying that GitHub-hosted CI minutes are prerequisite to completion or merge. Preserve full technical/product/browser/Preview/source-integrity acceptance, exact-commit evidence and founder release authority; use verified offline execution and operator proof, not skipped jobs or paid CI. No automatic publication is authorized.
 **Date:** 2 November 2026 (EAT).  
 **Delivery issue:** [#1338](https://github.com/bjuta/wakilisha/issues/1338).  
 **Source and editorial authority:** [#1264](https://github.com/bjuta/wakilisha/issues/1264).  
 **Accepted code baseline:** [PR #1333](https://github.com/bjuta/wakilisha/pull/1333), merged as `561a323503a21184a36c8e5453c0024d329b8abc`.
+
+## Final Delivery Execution Lock — 3 November 2026 (Founder-directed)
+
+**Status: binding sequence, scope-control and stop-condition amendment to [delivery issue #1338](https://github.com/bjuta/wakilisha/issues/1338).** This does not override security, source truth, Registry, publisher, deployment authorization, or the technical phase exit requirements below. It does override loose progress language that treats an isolated green check or research helper as a finished workbook screen.
+
+### One product and one finish line
+
+The deliverable is **the exact founder-approved Charts Ingest Workbook ported natively into WAKILISHA Headquarters**, not an alternate research console or several independent products. The final workbook HTML has SHA-256 **91ded11f49ef0531f02b69d3c2ee73126eaa4af5625e34ae97527446c043ed96**. The workbook specifies visible layout and interactions; this four-phase programme specifies integrated engineering and acceptance. Reuse WAKILISHA's existing Admin shell, tokens/themes, primitives, capture, MIZIZI/Registry, filters, private ranking, publisher and audit. Do not embed the prototype runtime.
+
+**The finish line:** an authorized Admin can operate one credible Kenyan weekly WAKILISHA 100 Edition from automatic source evidence through identity, complete eligibility, private ranking, explicit Edition handling and recovery, **without routine developer commands, SQL, GitHub or manual provider downloads**. The founder accepts the integrated product walkthrough and runbook. The first public Edition still requires a separate explicit founder launch instruction.
+
+**Four engineering phases, one issue, one product.** The five Admin navigation stages remain **Collect → Identify → Qualify → Rank → Publish**. Founder exclusions remain: **no W1S**, no fictional role-holder approval relay, and no workbook mock MIZIZI implementation.
+
+### Fixed delivery order and phase exit
+
+| Phase and workbook scope | Required implementation, not an optional wish list | Objective closure |
+| --- | --- | --- |
+| **1. Collect — W0, W1, W2, W2A, W3 (current)** | Complete W2 source roster/master-detail with constitution, qualification versus health, metrics, EAT cadence and inspector; W2A **provider and supported method → approved surface → review**; W3 source coverage, original receipt drilldown, failure diagnosis, bounded retry and governed coverage exception; W1 real Edition/week/revision, seven readiness gates and one evidence-derived next action; connect to existing automatic collection | Faithful workbook UI with real authorized Admin commands; all six core sources assessed and founder-approved credible source constitution; at least one genuine service-collected, method-qualified original-byte sample with SHA-256/private readback and honest metric/period; failure/retry/quarantine/pause/nonpublication; two **logical** EAT weeks with real application orchestration plus independent **actual-clock** disposable PostgreSQL/GoTrue/Storage proof; **no 14-day wait** |
+| **2. Identify & Qualify — W4, W5, W5C, W6** | Converge governed MIZIZI/Registry recording identity; inventory and execute every applicable rule from the approximately 104 founder-referenced filters; complete queue, correction editor, batch actions, impact preview and conflict-safe re-evaluation without refetching | Every applicable rule has executable evidence and a clear disposition; no arbitrary first-20 limit; realistic identity/remix/credits/origin conflicts, stale writes and denied roles fail safely without mutating original evidence or duplicating Registry facts |
+| **3. Rank & Publish — W7, W8, W8S, W8B, W9, W9B, W10, W10C, W10O, W11** | Server-versioned methodology; deterministic private Top 100 and explanation; incomplete/stale/evidence-readiness states; private staging and deliberate Edition publication/revision/withdrawal through **the existing** governed publisher | Same frozen inputs reproduce the same explainable complete private ranking; unresolved/insufficient evidence blocks staging; real role, digest, stale revision, editorial integrity and rollback/withdrawal contracts accepted in isolation; **no actual first public Edition as a test** |
+| **4. Acceptance & Handoff — W12 plus every prior page** | Complete desktop/mobile/light/dark/keyboard/role fidelity; accelerated two-cycle whole-workflow rehearsal, independent runtime/fixture cleanup and genuine separately verified provider evidence; controlled deployment only after founder approval; Admin runbook and normal weekly operation walkthrough | Exact merged-main and deployment checks, safe rollback and no unauthorized public Edition; authorized Admin operates a normal week without engineering; founder accepts runbook, working product and handoff; **implementation stops** |
+
+**Phase 1 workbook implementation order: W2 → W2A → W3 → W1**, with W0 native primitives improved only as each screen requires. Each screen gets responsive/light/dark acceptance as it is finished, not deferred to Phase 4. W1S remains excluded.
+
+**Research-first remains binding.** Public researcher-directed chart observation and first-party offered exports continue without speculative source partnerships or invented permission gates. Reuse the accepted October original-byte research. The local original/CSV tools are valuable **exception and recovery features**, not the ordinary weekly workflow, not an alternate UI programme, and not proof of unattended capture. Exact native measurement periods and metrics must never be invented.
+
+### Ten anti-sprawl rules
+
+1. **One authority and tracker:** final workbook, this document, delivery issue **#1338**. No new parallel delivery issue, new product, or fifth phase.
+2. **One phase actively delivered at a time:** no speculative future-phase work while the present workbook screens remain incomplete, except a demonstrated surgical security/integration prerequisite.
+3. **One active implementation PR at a time:** **draft PR #1345** is frozen to discretionary feature growth. Audit and consolidate it first; preserve proven substrate, remove redundant work if necessary, and verify actual workbook alignment. It may close as a correctly scoped foundation **without claiming Phase 1 complete**. No unapproved merge, rollout, or extra branch to manufacture progress. Begin the next workbook-screen implementation only after its disposition.
+4. **No new infrastructure by default:** reuse existing capture, private Storage/receipts, source registry authority, MIZIZI/Registry, filter evaluator, publisher and shared Admin primitives. A new scheduler, uploader, database ledger, service or permanent test workflow needs a specific proven requirement that existing mechanisms cannot meet.
+5. **Three-question scope test before coding:** Which **exact workbook interaction** (or demonstrated safety defect) does it finish? Which existing **WAKILISHA authority** does it use? Which **bounded acceptance evidence** will prove it? If any answer is missing, defer the idea; do not quietly code it.
+6. **No artificial gates or rework:** do not reinstate a two-calendar-week soak, speculative platform partnerships as prerequisites to factual public research, repeated acquisition of accepted October originals, or founder-operated SQL/CLI for ordinary weekly work. Apply concrete access restrictions to concrete methods.
+7. **No CI sprawl:** extend or consolidate established suites; use genuine browser and isolated SQL/GoTrue/Storage checks as appropriate. Diagnose failures at the correct layer before changing code. A skipped hosted Preview check is never green.
+8. **No fake workbook affordances:** actions not backed by accepted audited, capability-checked, revision-safe server commands remain visibly unavailable with exact reasons. Disabled W3 retry/coverage-exception buttons are **unfinished**, not accepted UX.
+9. **No silent release:** merging, source collection, CI, private ranking, staging and Preview do not approve Production deployment, source/cron activation, scoring or the inaugural public flagship. Follow separate founder deployment and public launch controls.
+10. **No “done” from code alone:** a PR, migrated SQL, isolated test or local research note is not a finished screen. Workbook fidelity, real authorized behaviour and independent acceptance must all be proven.
+
+### One proof package per screen, one closure record per phase
+
+A screen is accepted only with (a) **direct fidelity comparison** against this exact workbook's hierarchy, geometry, density, table, drawer/dialog and interactions; (b) native shared-component reuse; (c) approximately **1440/1024/768/390 px**, light/dark, keyboard and accessible states; (d) actual permission/data/metric/evidence/revision truth including empty, loading, denied, conflict and failed states; and (e) focused existing-suite and real browser acceptance. Note any authorized design departure. Example workbook data must never become live facts. Pixel fidelity remains **unproven** without an actual rendered comparison.
+
+At each phase boundary, put **one consolidated acceptance record in #1338**: exact commit; workbook screens and interactions actually finished; source/SQL/Edge/client prerequisites; tests including real-browser and independent database/Storage; whether Preview and Production are deployed; fail-closed/nonpublication proofs; precise outstanding blockers and next action. Do not promote a former-head green CI result to a newer commit.
+
+**Founder progress report format:** current phase → workbook screens genuinely completed → acceptance proven → precise blocker → next implementation action. No commit counts presented as product progress.
+
+### Immediate next action and project stop
+
+**Do not build another local evidence widget.** First audit and disposition **PR #1345** as a reviewable foundation; then finish **W2 Source Registry** in the workbook's master/detail structure using the already protected source authority. Continue W2A, W3, W1, then the fixed remaining phases. Use the [3 November workbook gap audit](https://github.com/bjuta/wakilisha/issues/1338#issuecomment-6606118492): W0/W1/W2A partial; W2/W3 major. Green current code CI is **not** workbook-fidelity acceptance.
+
+Founder intervention is reserved for genuine product decisions: source constitution and necessary methods, methodology, authorized Production deployment, first public launch and final acceptance. Implementation decisions are engineering responsibility.
+
+**Final stop condition:** all four phase gates, exact-workbook integrated acceptance, separately authorized Production deployment, a normal Admin weekly walkthrough, and founder-accepted runbook/handoff receipt in **#1338**. Close the engineering job then. Routine weekly Editions become normal operations, not a fifth phase.
+
+---
+
+## Phase 1 Connected-House Closure Execution Contract | 3 November 2026 EAT
+
+**Status: founder-directed, binding execution correction. Phase 1 is not accepted by this document.** This section supersedes the earlier overly narrow interpretation that Phase 1 may leave workbook-required server commands disabled because their plumbing was not present. It does not supersede safety gates, the four-phase structure, the original workbook, existing Registry/MIZIZI authority, or independent launch authorization.
+
+### Governing construction rule
+
+Build complete, connected **vertical product slices**. When an interaction on W0, W1, W2, W2A, or W3 exposes a missing essential SQL, Edge, source adapter, authenticated command, audit, revision, recovery, or Admin projection, engineer that dependency **within Phase 1** and verify the whole path. Do not classify necessary load-bearing infrastructure as optional scope and do not call a disabled button a completed interaction. Keep external source facts and founder choices distinct from engineering deficiencies: code can make an integration operational but cannot fabricate provider permission, period semantics, sample data or authorization.
+
+The anti-sprawl filter remains: the feature must complete a current workbook interaction, reuse an existing WAKILISHA authority where one exists, and have a concrete acceptance test. Do not add parallel research apps, a second collector, a second publisher, unrelated future-phase processing, speculative partnership gates, or duplicate CI suites.
+
+### Phase 1 work packages | one implementation scope, not separate delivery programmes
+
+| Work package | Required connected implementation | Done only when |
+| --- | --- | --- |
+| **A. W2 Source Registry and W2A Add Source** | Workbook-faithful dense roster, statuses, filters, 480 px inspector, provider plus method first step, approved surface and schedule, review, current proposal and method revisions; real role-gated source proposal, qualification, reviewed method, exact enrollment, pause/review/history and configuration authority. Existing immutable contracts, manifest and constitution are authoritative. | Signed-in authorized Admin can take a genuinely qualified Kenya source through reviewed configuration and read it back; stale, unqualified and unauthorized requests fail; history and inspector reflect the same durable state. |
+| **B. W3 Collection and Incidents** | Genuine scheduler and existing `wk-chart-capture` worker, original-byte private receipts, source period/metric integrity, source health, incident inspector, idempotent **week/slot-bound, actor-audited retry request and dispatch**, bounded budgets, quarantine and recovery; **durable coverage-exception request/decision** with reason, role, revision and history. No earlier-week substitution, automatic reweighting, fictitious observation, or readiness override. | Admin can inspect and recover a legitimately retryable failure; duplicate/stale/revoked attempts are denied; nonrecoverable failures and exception decisions persist and are visibly truthful. |
+| **C. W1 and W0 Edition state** | Minimal server-owned weekly EAT Edition identity, monotonically checked revision and source/readiness projection; seven gates, five-stage rail, exactly one supported next action, revision-aware navigation, loading/empty/blocked/conflict views and activity timeline. Future Identify/Qualify/Rank/Publish surfaces remain accurately unavailable until implemented. | Same Edition and revision are authoritative across refresh, week change, source review, retry and exception; stale mutations reject and the UI cannot manufacture later-phase readiness. |
+| **D. Genuine source and collection qualification** | Evidence-backed six-provider assessment for YouTube, Spotify, Boomplay, Apple Music, Mdundo and Shazam; select a viable qualified source, verify accepted endpoint/method/parser/credential/native period/constitution, trigger genuine service-side acquisition, read exact original bytes privately, prove digest and immutable receipt. Prefer existing Apple service route to investigate first; do not presume it is qualified. | All six have honest written assessments, founder approves the concrete constitution choice, and at least one real qualified provider supplies a fresh collector-created private original with verified readback. |
+
+Work packages may share implementation code. Complete them within the **existing Phase 1 branch/PR #1345** and delivery issue **#1338**. Recommended screen order is W2 -> W2A -> W3 -> W1/W0, but implement each package's backend dependencies alongside the UI. Prior three-commit workbook work is the foundation, not accepted Phase 1 completion.
+
+### Exact acceptance gate | conjunctive, not averaged
+
+1. **Source and security:** prove real admin admission, method/contract binding, explicit constitution, least-privilege JWT and revocation, versioned edits, pause, denied access, no secret exposure and original provider-native semantics.
+2. **Collection and recovery:** at least one real source acquired by the governed collector with actual original bytes, private Storage readback and SHA-256 identity; prove the real scheduler, exact-week slot leases, retries, malformed responses, quarantine, missingness, coverage exceptions, audit and nonpublication.
+3. **Two logical EAT weeks:** run two consecutive injected-clock EAT weeks through actual application dispatch/collector boundaries in an isolated disposable environment, in addition to separate unmodified current-clock real GoTrue/PostgreSQL/Storage acceptance. Logical-week fixtures never substitute for real qualified-provider evidence. No fourteen-calendar-day wait.
+4. **Workbook fidelity:** compare W0/W1/W2/W2A/W3 with the exact approved HTML source, including geometry, density, focus, dialog/inspector behavior and 1440/1024/768/390 px light/dark states. The exact workbook cannot be treated as mere inspiration. Future-stage controls must be truthful.
+5. **Release integrity:** complete current migration replay and generated filename verification, SQL acceptance, target runtime/secret/ingress parity, real signed-in browser acceptance, focused existing tests and CI consolidation. Track every fixture and independently verify cleanup and rollback.
+6. **Final decision:** record each proof in #1338 against the **exact head**, then and only then mark Phase 1 accepted, merge eligible changes through established controls and proceed to Phase 2. No first public WK100 Edition or production collector activation is authorized by this gate.
+
+A green unit test, UI screenshot, historical October research file, candidate proposal, disabled command, or passing fixture week cannot individually satisfy this gate.
+
+### Minimum-commit release discipline
+
+Target **one consolidated additional implementation commit**, only if the change is fully tested before writing it, with a correction commit permitted for proven problems. This is a *target, not a reason to rush or combine unsafe unreviewed mutations*. Keep documentation and implementation in the same existing PR. No automatic new branch, issue, collector, external service or CI workflow. If an independent external source genuinely cannot be qualified, record specific evidence and evaluate the next viable source; do not disguise it as an unresolved engineering to-do.
+
+### Status and stop boundaries at this directive
+
+At the initial planning head `d2b783a6f0a175da41726b9d17ea921113f6c946`, PR #1345 is draft/unmerged. The W3 manual retry and coverage-exception commands, true W1 server Edition revision projection, founder-selected qualified constitution and fresh private service-collected original have **not** passed acceptance. This document is an engineering instruction and does not claim these are implemented. Do not apply Production SQL, enable unattended collection, score, publish or merge based solely on this section.
+
+---
 
 ## 1. Product Contract
 
@@ -34,10 +134,10 @@ These are **four acceptance phases inside one existing delivery issue**, not fou
 
 | Engineering delivery | Workbook surfaces to faithfully translate | Operational ownership and exit evidence |
 | --- | --- | --- |
-| **Phase 1: Collect** | W1 Weekly Overview; W2 Source Registry; W2A Add Source; W3 Collection and Incidents; shared W0 interaction foundations | Qualified source research and governed configuration, automated original-byte collection, accurate provider-native periods and metrics, source health, safe incidents/retries, two prospective EAT week slots. The UI cannot fabricate admission, metrics, or collection. |
+| **Phase 1: Collect** | W1 Weekly Overview; W2 Source Registry; W2A Add Source; W3 Collection and Incidents; shared W0 interaction foundations | Qualified source research and governed configuration, automated original-byte collection, accurate provider-native periods and metrics, source health, safe incidents/retries, and accelerated verification of two successive logical EAT-week cycles. The UI cannot fabricate admission, metrics, or collection. |
 | **Phase 2: Identify and Qualify** | W4 chart-facing Recording Review; W5 Eligibility Workbench; W5C Correction Editor; W6 Re-evaluation | Existing Registry/MIZIZI reconciliation, real applicable full-filter matrix, all-candidate review and evidence-backed corrections, concurrency-safe impact preview, deterministic re-evaluation without re-fetching original source evidence. |
 | **Phase 3: Rank and Publish** | W7 Methodology; W8 Ranking; W8S Score Explanation; W8B Incomplete Ranking; W9 Readiness Inspection; W9B Stale Evidence; W10 Stage/Publish; W10C Confirmation; W10O Outcomes; W11 Edition History | Reviewed versioned methodology, reproducible private Top 100, genuine source/identity/policy lineage, server-authorized readiness, staging and explicit week-specific publication, correction/withdrawal. Reconcile existing backend editorial sign-off semantics with the founder's rejected fictional handoff chain without weakening real authorization. |
-| **Phase 4: Acceptance and Handoff** | W12 Operational Audit and Recovery, plus all prior pages and interactions | Complete responsive/theme/keyboard/security acceptance; two end-to-end weekly cycles, isolation/cleanup proof, controlled deployment, private/public separation, real Admin runbook, founder acceptance. This phase verifies polish and capability implemented throughout earlier phases; it does not postpone mobile or dark-mode implementation until the end. |
+| **Phase 4: Acceptance and Handoff** | W12 Operational Audit and Recovery, plus all prior pages and interactions | Complete responsive/theme/keyboard/security acceptance; two accelerated end-to-end logical weekly cycles, isolation/cleanup proof, controlled deployment, private/public separation, real Admin runbook, founder acceptance. This phase verifies polish and capability implemented throughout earlier phases; it does not postpone mobile or dark-mode implementation until the end. |
 
 **Navigation remains a five-stage Admin experience:** **Collect -> Identify -> Qualify -> Rank -> Publish**. The four numbered engineering phases are delivery gates, not replacement navigation tabs. The shared week, evidence revision, blocked status, safe next action, and return path must remain coherent between pages.
 
@@ -65,7 +165,7 @@ A page is not accepted until all of these have evidence:
 
 - [PR #1340](https://github.com/bjuta/wakilisha/pull/1340) extended the existing candidate collector with bound Apple catalog chart parsing and transport guards; it did **not** admit or activate a source.
 - [PR #1341](https://github.com/bjuta/wakilisha/pull/1341) merged the Phase 1 native W1/W2/W2A/W3 interface foundation and shared operations primitives. Its source-health backend is read-only and not deployed to Production. Its Add Source review does **not** persist a source. Its isolated browser tests do **not** establish pixel-perfect all-state acceptance or genuine collection.
-- **Continue Phase 1 inside #1338, not a new phase issue:** inspect existing immutable candidate-capture schema and publisher/Registry authority; implement approved durable Admin source enrollment/configuration as a *separately governed* authority rather than editing historical receipts; connect it to the existing bounded service collector; add approved scheduling/health/retry contracts; qualify actual Kenya provider methods and native periods; and demonstrate two genuine EAT weeks with exact original-byte lineage. Keep Production and publication activation held until their separate gates are satisfied.
+- **Continue Phase 1 inside #1338, not a new phase issue:** inspect existing immutable candidate-capture schema and publisher/Registry authority; implement approved durable Admin source enrollment/configuration as a *separately governed* authority rather than editing historical receipts; connect it to the existing bounded service collector; add approved scheduling/health/retry contracts; qualify actual Kenya provider methods and native periods; and prove two consecutive EAT-week-equivalent cycles through the real scheduler and collector code under an isolated injected clock, corroborated by independent current-clock PostgreSQL/Storage acceptance and a real approved-source original-byte acquisition sample, without waiting fourteen calendar days. Keep Production and publication activation held until their separate gates are satisfied.
 
 No section here creates publication permission, source-method admission, deployment authorization, or an exemption from any earlier gate.
 
@@ -103,6 +203,8 @@ The binding cultural model is **assertion -> evidence -> review / reconciliation
 
 ## Phase 1. Multi-Source Collection and Automated Research
 
+**Research is not waiting for collector admission.** Public chart observation, first-party publicly offered exports, and WAKILISHA's researcher-directed analysis are valid ongoing research activities under the existing [Independent Research and Source Qualification](wakilisha-100-independent-research-source-qualification-v1.md) contract. Do not equate them with prohibited scraping merely because an internal tool helps. Do not demand speculative source partnerships or signed licences as a prerequisite to observe and record openly reported chart facts. Address actual restrictions on a precise access method when demonstrated. A separate unattended service has runtime, provenance, privacy and publication controls, but those are not barriers to factual research. See the [current first-party research checkpoint](wakilisha-100-source-access-admission-register-v1.md).
+
 **Goal:** qualified, replayable Kenyan music evidence is captured every week without ordinary manual downloads/uploads.
 
 **Work:**
@@ -117,11 +219,22 @@ The binding cultural model is **assertion -> evidence -> review / reconciliation
 
 - [ ] Six named core platforms explicitly assessed; YouTube and Spotify actively addressed, not dropped for convenience.
 - [ ] Founder-approved qualified source constitution supports credible Kenyan consumption/discovery coverage with a real, reproducible observation sample.
-- [ ] Two successive EAT week slots can collect automatically with exact source-byte and period verification, without per-week code, hardcoded hashes, or manual downloads.
+- [ ] Two successive **logical** EAT weeks exercise the real scheduler and collector orchestration, slot rules, distinct simulated private-byte storage/readback, immutable fixture receipts, failures, retries, pause/revocation, and nonpublication under a controlled clock **without touching a hosted database**. Independently prove the production PostgreSQL/Storage receipt/lease/role boundaries in the unlinked disposable stack at the database's actual time. Correlate both proofs; never claim the database itself ran two simulated weeks.
+- [ ] At least one source genuinely qualified under a founder-approved constitution is acquired by the real service from the approved provider endpoint at real wall-clock time. Its original bytes, SHA-256, market/source identity, honest native metric and independently supported native period (or explicit blocked unknown) survive private readback; the Admin can inspect and recover. This live acquisition cannot be replaced by a fixture or a historical soak.
 - [ ] Malformed, missing, duplicate, unauthorized or stale source evidence is held or quarantined, and retry cannot fabricate an independent observation.
 - [ ] Collection alone cannot publish, score unapproved evidence, or mutate Registry facts.
 
 **Output:** private, versioned source evidence and explicit gaps for identity review.
+
+### Phase 1 accelerated two-cycle acceptance (founder revision, 3 November 2026)
+
+The requirement for **two elapsed calendar weeks is removed as a Phase 1 release gate**. Waiting for a fourteen-day soak is disproportionate after the long-standing earlier soak and does not increase the evidence produced by a deterministic, isolated two-cycle test. This revision changes the duration of the proof, **not** the truth standard for live provider observations.
+
+1. **Two real software cycles without real calendar delay.** Advance an injected **application test clock** through two adjacent Monday–Sunday EAT week identities in the existing scheduler/collector code with fixture-backed provider responses and isolated storage/ledger adapters. Verify due slots, weekly rollover, distinct original bytes/digests, idempotence, wrong-period quarantine, pause/role revocation and zero score/publish. **Separately** run the unmodified PostgreSQL reservation/receipt, private Storage, signed GoTrue and concurrent lease checks in the existing unlinked disposable full stack at actual database time. This is a paired boundary proof, not a claim that the real database executed two fabricated calendar weeks. The Production RPC `wk_chart_runtime_reserve_v1` intentionally enforces PostgreSQL `now()` and a 20-minute acquisition window; **never introduce a synthetic-clock bypass into deployable SQL**. Fixture receipts remain explicitly synthetic. Do not enable mock clocks in hosted Preview or Production, or label fixtures as observed Kenyan charts.
+2. **Immediate research now; separate real service evidence.** Continue first-party public-chart research and researcher-directed offered exports immediately, without a speculative provider-partnership or licence precondition. Record observed source, time, provider-declared metric, rank, and any uncertainty honestly. For the separate runtime acceptance, use one reviewed exact source route through the existing governed service at a valid EAT slot, with credentials only when needed and concrete method restrictions respected. Verify its original bytes and SHA-256 against private Storage and the immutable receipt. A source-native period must come from provider evidence; an unknown period remains explicitly unknown and cannot become weekly scoring authority. A successful parser or historical soak is not a newly acquired service receipt. No collector or publisher is enabled simply to satisfy a test.
+3. **Pass/fail boundary.** Phase 1 can close when both independent gates above and all other Phase 1 requirements pass: the six named provider evaluations, a credible founder-approved Kenya source constitution, live original-byte provenance, Admin-owned automatic operation, and deliberate fail-closed nonpublication. **No two-week wall-clock wait**. The first live slot and the two isolated logical weeks must not be presented as the same kind of evidence. If no real source method qualifies, Phase 1 remains open for that substantive reason, not because a clock has not elapsed.
+4. **Longer observation is optional operational monitoring, not a hidden precondition** to Phase 1 or the later final handoff. Historical soak data remain historical. Any future real multiweek reliability study must be separately named, assessed for cost, and justified by a concrete risk; it cannot silently reinstate the fourteen-day gate.
+
 
 ## Phase 2. MIZIZI, Registry, Full Eligibility and Admin Corrections
 
@@ -170,13 +283,13 @@ The binding cultural model is **assertion -> evidence -> review / reconciliation
 
 **Output:** complete Admin-operated private Edition lifecycle, ready for full operational acceptance.
 
-## Phase 4. Two-Week Acceptance, Controlled Production Deployment and Handoff
+## Phase 4. Accelerated Two-Cycle Acceptance, Controlled Production Deployment and Handoff
 
 **Goal:** demonstrate ordinary weekly operation without engineers, deploy the accepted integrated product once, and stop implementation.
 
 **Work:**
 
-1. Operate **two consecutive EAT weeks** end-to-end in the existing unlinked local disposable test environment using real JWT, Registry, Storage and browser-class behavior. Exercise valid and missing sources, malformed payloads, retries, duplicate and remix conflicts, missing Artist origin, correction, policy change, re-evaluation, independent editorial approval, rejected roles and default-no-publication.
+1. Verify **two consecutive logical EAT-week cycles** across the real application scheduler/collector and week-dependent workflows under an isolated injected clock, then independently exercise protected PostgreSQL, GoTrue, Storage and browser paths at the unlinked database's actual time. Prove the correlation of these tests in one acceptance run instead of waiting fourteen days; do not weaken the deployable SQL reservation clock or call synthetic weeks live provider observations. Exercise valid and missing sources, malformed payloads, retries, duplicate and remix conflicts, missing Artist origin, correction, policy change, re-evaluation, independent editorial approval, rejected roles and default-no-publication.
 2. Separately prove genuine current-source qualification and evidence. Synthetic two-week rehearsal proves workflow mechanics, not Kenyan consumption facts.
 3. Consolidate existing critical/domain/SQL/real-browser tests. No automatic extra permanent suite or new milestone scaffolding. Verify real fixture lifecycle: tracked IDs, always-run teardown, stopped-container and volume absence, independently verified zero residue, including interrupted paths. **Never create disposable test Admins or immutable test receipts in accepted Preview/Production.** The founder is never a cleanup mechanism.
 4. Audit exact merged-main migrations and generated filenames, SQL postflight, source-method admission, secrets/role/CORS/runtime dependencies, real browser acceptance, CI, and production regression risk. Every new dependency must be proven rather than guessed.
@@ -186,7 +299,7 @@ The binding cultural model is **assertion -> evidence -> review / reconciliation
 
 **Phase 4 exit, all required:**
 
-- [ ] Two successive weekly cycles, all correction/approval/error paths, and independent automatic fixture cleanup pass.
+- [ ] Two successive accelerated logical weekly cycles, all correction/approval/error paths, and independent automatic fixture cleanup pass, without requiring two weeks of elapsed wall-clock time.
 - [ ] Genuine evidence/qualification and frozen ranking are verified separately from synthetic tests.
 - [ ] Exact-head CI, SQL/Edge/frontend deployment controls, real-client and publisher denial/rollback checks pass.
 - [ ] Production canary proves **zero unauthorized public WK100 Editions**, preserved unrelated programmes and no unwanted data mutations.
@@ -218,7 +331,7 @@ exact PR head**; this paragraph is not a claim that CI has run.
 **Remaining gates:** native Edge deployed to a migration-equivalent, secret-inventoried
 isolated target and tested with an actual authorized browser/client, source-method
 qualification and credentials governance, scheduler integration with accepted
-capture receipts, two real EAT weeks, and separate founder authorization for any
+capture receipts, accelerated dual-week acceptance with separate genuine live original-byte proof, and separate founder authorization for any
 Production promotion or public flagship publication. This branch must not be
 interpreted as Phase 1 exit or permission to activate collection.
 

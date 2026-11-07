@@ -28246,6 +28246,16 @@ export type Database = {
         Args: { p_proposal: Json }
         Returns: string
       }
+      wk100_enroll_source_capture_contract_v1: {
+        Args: {
+          p_adapter_sha256: string
+          p_contract_version: string
+          p_expected_decision_revision: number
+          p_expected_proposal_revision: number
+          p_source_key: string
+        }
+        Returns: Json
+      }
       wk100_finalize_html_research_observation_v1: {
         Args: { p_reservation_id: string; p_rows: Json; p_sha256: string }
         Returns: Json
@@ -28264,10 +28274,28 @@ export type Database = {
         }
         Returns: string
       }
+      wk100_list_collection_actions_v1: {
+        Args: { p_week: string }
+        Returns: Json
+      }
+      wk100_list_source_method_decisions_v1: { Args: never; Returns: Json }
       wk100_list_source_proposals_v1: { Args: never; Returns: Json }
       wk100_publish_governed_weekly_edition_v1: {
         Args: { p_proposal_sha256: string; p_week: string }
         Returns: string
+      }
+      wk100_record_collection_action_v1: {
+        Args: {
+          p_action: string
+          p_contract_id: string
+          p_expected_attempt_number: number
+          p_expected_revision: number
+          p_operation_id: string
+          p_reason: string
+          p_scheduled_at: string
+          p_week: string
+        }
+        Returns: Json
       }
       wk100_register_governed_editorial_approval_v1: {
         Args: { p_proposal: Json }
@@ -28297,8 +28325,27 @@ export type Database = {
         }
         Returns: Json
       }
+      wk100_review_source_method_v1: {
+        Args: { p_expected_decision_revision: number; p_payload: Json }
+        Returns: Json
+      }
       wk100_save_admin_draft_v1: {
         Args: { p_config: Json; p_expected_revision: number; p_week: string }
+        Returns: Json
+      }
+      wk100_service_admitted_methods_v1: { Args: never; Returns: Json }
+      wk100_service_capture_method_allowed_v1: {
+        Args: {
+          p_authorization_ref: string
+          p_contract_version: string
+          p_endpoint_sha256: string
+          p_parser_class: string
+          p_source_key: string
+        }
+        Returns: boolean
+      }
+      wk100_service_retry_requests_v1: {
+        Args: { p_week: string }
         Returns: Json
       }
       wk100_stage_governed_weekly_edition_v1: {

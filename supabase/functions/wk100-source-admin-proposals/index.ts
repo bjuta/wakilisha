@@ -50,13 +50,16 @@ Deno.serve(async(req:Request)=>{
   const url=Deno.env.get('SUPABASE_URL')??'';
   const anon=Deno.env.get('SUPABASE_ANON_KEY')??'';
   if(!url||!anon)return reply(req,503,{error:'backend_unavailable'});
-  const caller=createClient(url,anon,{global:{headers:{authorization:bearer}},
+  const caller=createClient(url,anon,{global:{headers:{Authorization:bearer}},
     auth:{persistSession:false,autoRefreshToken:false}});
   const user=await caller.auth.getUser(bearer.slice(7));
   if(user.error||!user.data.user?.id)return reply(req,401,{error:'authentication_required'});
   const permission=await caller.rpc('current_user_has_capability',{required_capability:'manage_ingest'});
   if(permission.error)return reply(req,503,{error:'capability_unavailable'});
   if(permission.data!==true)return reply(req,403,{error:'not_authorized'});
+  const chartsPermission=await caller.rpc('current_user_has_capability',{required_capability:'manage_charts'});
+  if(chartsPermission.error)return reply(req,503,{error:'capability_unavailable'});
+  if(chartsPermission.data!==true)return reply(req,403,{error:'not_authorized'});
   if(list){
     const {data,error}=await caller.rpc('wk100_list_source_proposals_v1');
     if(error||!Array.isArray(data)||data.length>500)

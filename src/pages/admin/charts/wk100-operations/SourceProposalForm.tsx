@@ -19,13 +19,13 @@ type Draft={
   eatHour:number;eatMinute:number;weekdayEat:number|null;
   minimumHealthyCheckpoints:number;evidenceReference:string;reason:string|null;
 };
+// New core proposals follow the founder-selected priority roster.
+ // Older research/history records remain available in the protected registry.
 const providers=[
-  {value:'youtube_ke',label:'YouTube Kenya'},
-  {value:'spotify_ke',label:'Spotify Kenya'},
-  {value:'boomplay_ke',label:'Boomplay Kenya'},
   {value:'apple_ke',label:'Apple Music Kenya'},
-  {value:'mdundo_ke',label:'Mdundo Kenya'},
   {value:'shazam_ke',label:'Shazam Kenya'},
+  {value:'mdundo_ke',label:'Mdundo Kenya'},
+  {value:'youtube_ke',label:'YouTube Kenya'},
   {value:'audiomack_ke',label:'Audiomack Kenya'},
 ];
 const methodOptions=[
@@ -34,6 +34,22 @@ const methodOptions=[
   {value:'reviewed_page_adapter',label:'Reviewed page adapter'},
   {value:'research_only',label:'Research only'},
 ];
+// Research pointers are not a method allowlist or collector approval.
+ // Unreviewed methods may still be proposed for independent assessment.
+const methodResearchNotes:Record<string,Partial<Record<string,string>>>={
+  youtube_ke:{provider_api:'No approved YouTube Kenya weekly Charts API route is verified. The observed internal chart endpoint is not an admitted method.'},
+  spotify_ke:{provider_api:'No approved Spotify Kenya national-chart API method has been verified for unattended capture.'},
+  boomplay_ke:{reviewed_page_adapter:'A Kenya playlist alone does not prove an official chart or a permitted unattended page adapter.'},
+  apple_ke:{provider_api:'Apple documents a Kenya Catalog Charts API. The source period, server credentials and collection approval remain unverified.'},
+  mdundo_ke:{reviewed_page_adapter:'A public Kenya ranked page is available for research. Automated collection is not approved.'},
+  shazam_ke:{offered_export:'The Kenya Top 200 offers a CSV for researcher-directed observation. An unattended export method is not approved.'},
+  audiomack_ke:{reviewed_page_adapter:'A public Kenya ranking has been researched. The unattended page method is not approved.'},
+};
+function methodGuidance(provider:string,method:string){
+  if(method==='research_only')return 'Public chart facts can be recorded for research. This does not authorize unattended collection.';
+  return methodResearchNotes[provider]?.[method]??
+    'No qualified access evidence has been recorded for this provider and method. Independent review is required.';
+}
 const behaviorOptions=[
   {value:'consumption',label:'Consumption'},
   {value:'video_consumption',label:'Video consumption'},
@@ -139,19 +155,46 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
       {step===1?'Choose a Kenya provider':step===2?'Configure the proposed source method':'Review before saving'}
     </h3>
     <ol aria-label="Source proposal steps" className="mt-3 flex flex-wrap gap-2 text-xs text-wk-text-muted">
-      <li className={step===1?'font-bold text-wk-text':''}>1 Provider</li>
-      <li aria-hidden>→</li><li className={step===2?'font-bold text-wk-text':''}>2 Method and schedule</li>
+      <li className={step===1?'font-bold text-wk-text':''}>1 Provider and method</li>
+      <li aria-hidden>→</li><li className={step===2?'font-bold text-wk-text':''}>2 Proposed surface and timing</li>
       <li aria-hidden>→</li><li className={step===3?'font-bold text-wk-text':''}>3 Review</li>
     </ol>
-    {step===1&&<div className="mt-5 grid gap-2 sm:grid-cols-2">
+    {step===1&&<div className="mt-5 space-y-3">
+      <p className="text-xs leading-relaxed text-wk-text-muted">
+        Choose a Kenya provider and proposed source method. Public research remains
+        independent; selecting a method does not grant unattended collection.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
       {providers.map(provider=><button key={provider.value} type="button"
         aria-pressed={draft.providerKey===provider.value}
-        onClick={()=>setDraft(d=>({...d,providerKey:provider.value,sourceKey:provider.value+'_'}))}
+        onClick={()=>{setDraft(d=>({...d,providerKey:provider.value,
+          sourceKey:provider.value+'_',methodClass:'research_only'}));setError('')}}
         className={'min-h-20 rounded-2xl border p-4 text-left font-semibold '+
           (draft.providerKey===provider.value?'border-wk-brand bg-wk-brand-soft text-wk-text':
             'border-wk-border text-wk-text-soft hover:bg-wk-surface-raised')}>{provider.label}
         <span className="mt-1 block text-xs font-normal">{existing.filter(p=>p.providerKey===provider.value).length} existing proposed sources</span>
       </button>)}
+      </div>
+      {draft.providerKey&&<div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
+        <p className="mb-2 text-xs font-semibold text-wk-text">Choose a proposed access method</p>
+        <div role="group" aria-label="Proposed source access methods" className="grid gap-2 sm:grid-cols-2">
+          {methodOptions.map(method=><button key={method.value} type="button"
+            aria-pressed={draft.methodClass===method.value}
+            onClick={()=>change('methodClass',method.value)}
+            className={'min-h-14 rounded-xl border p-3 text-left text-xs font-semibold '+
+              (draft.methodClass===method.value?'border-wk-brand bg-wk-brand-soft text-wk-text':
+                'border-wk-border text-wk-text-soft hover:bg-wk-surface-raised')}>
+            {method.label}
+          </button>)}
+        </div>
+        <p role="status" className="mt-3 text-xs leading-relaxed text-wk-text-muted">
+          {methodGuidance(draft.providerKey,draft.methodClass)}
+        </p>
+        <p className="mt-2 text-xs text-wk-text-muted">
+          No collector method is approved by this form. The method review, source constitution
+          and runtime admission remain separate.
+        </p>
+      </div>}
     </div>}
     {step===2&&<div className="mt-5 grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
@@ -162,7 +205,15 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
       </div>
       <div className="sm:col-span-2"><ProposalField label="Source surface" value={draft.surface}
         onChange={v=>change('surface',v)} limit={180}/></div>
-      <Choose label="Access method class" value={draft.methodClass} onChange={v=>change('methodClass',v)} options={methodOptions}/>
+      <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-wk-border p-3">
+        <p className="text-xs text-wk-text-soft">
+          Proposed method: <strong className="text-wk-text">
+            {methodOptions.find(m=>m.value===draft.methodClass)?.label??'Unspecified'}
+          </strong>. No approved collection surface has been selected.
+        </p>
+        <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+          onClick={()=>setStep(1)}>Change Method</button>
+      </div>
       <Choose label="Observation behavior" value={draft.behavior} onChange={v=>change('behavior',v)} options={behaviorOptions}/>
       <Choose label="Provider-native measurement" value={draft.metric} onChange={v=>change('metric',v)} options={metricOptions}/>
       <Choose label="Expected depth" value={String(draft.expectedDepth)}

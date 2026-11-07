@@ -12,6 +12,11 @@ import {
   RNB18_TYPES_SHA256,
 } from "./verify-rnb18-staged-retirement.mjs";
 
+import {
+  OFFLINE_OPERATOR_SCHEMA_SEAL_MODE,
+  OFFLINE_OPERATOR_SOURCE,
+} from "./verify-offline-operator-replay-proof.mjs";
+
 const TYPE_FILE =
   "src/types/database.types.ts";
 const BASELINE_FILE =
@@ -150,20 +155,24 @@ export function validateRepositorySchemaSnapshot({
     ![
       "production",
       "preview",
+      "disposable_ci",
+      OFFLINE_OPERATOR_SCHEMA_SEAL_MODE,
       RNB18_STAGED_MODE,
     ].includes(seal.mode)
   ) {
     errors.push(
-      "schemaSeal.mode must be production or preview",
+      "schemaSeal.mode must use an approved production, preview, CI, offline operator, or staged proof",
     );
   }
 
   if (
-    typeof seal.sourceProjectRef !==
+    seal.mode !== "disposable_ci" &&
+    seal.mode !== OFFLINE_OPERATOR_SCHEMA_SEAL_MODE &&
+    (typeof seal.sourceProjectRef !==
       "string" ||
     !/^[a-z0-9]{20}$/.test(
       seal.sourceProjectRef,
-    )
+    ))
   ) {
     errors.push(
       "schemaSeal.sourceProjectRef must be a 20-character Supabase project ref",
@@ -223,6 +232,35 @@ export function validateRepositorySchemaSnapshot({
     }
   }
 
+  if (seal.mode === "disposable_ci") {
+    // An unlinked local replay has NO hosted Preview project identity.
+    // The exact replay commit and workflow run are separately bound by
+    // verify-migration-replay-contract.mjs to the committed migration bytes.
+    if (seal.sourceProjectRef !== "unlinked-local-ci" ||
+        typeof seal.baseMainSha !== "string" ||
+        !/^[0-9a-f]{40}$/.test(seal.baseMainSha) ||
+        typeof seal.replayCandidateHeadSha !== "string" ||
+        !/^[0-9a-f]{40}$/.test(seal.replayCandidateHeadSha) ||
+        !Number.isInteger(seal.workflowRunId) || seal.workflowRunId < 1) {
+      errors.push("disposable_ci schema seal needs unlinked-local-ci and exact replay commit/run authority");
+    }
+    if (seal.previewBranchId != null) {
+      errors.push("disposable_ci schema seal cannot claim a hosted Preview branch");
+    }
+  }
+
+  if (seal.mode === OFFLINE_OPERATOR_SCHEMA_SEAL_MODE) {
+    if (seal.sourceProjectRef !== OFFLINE_OPERATOR_SOURCE ||
+        typeof seal.baseMainSha !== "string" ||
+        !/^[0-9a-f]{40}$/.test(seal.baseMainSha) ||
+        typeof seal.replayCandidateHeadSha !== "string" ||
+        !/^[0-9a-f]{40}$/.test(seal.replayCandidateHeadSha) ||
+        !/^https:\/\/github\.com\/bjuta\/wakilisha\/pull\/[1-9][0-9]*#issuecomment-[1-9][0-9]+$/.test(seal.operatorReceiptUrl??"") ||
+        seal.workflowRunId != null || seal.previewBranchId != null) {
+      errors.push("offline operator seal requires local source, tested commit and owner evidence without CI claim");
+    }
+  }
+
   if (seal.mode === RNB18_STAGED_MODE) {
     if (expectedProjectRef !== "pgzizndxdyhqmtyywjmt" ||
         migrationCount !== 237 || latestMigration !== RNB18_STAGE1 ||
@@ -260,6 +298,8 @@ export function validatePendingSchemaState({
   if (
     pendingCount > 0 &&
     sealMode !== "preview" &&
+    sealMode !== "disposable_ci" &&
+    sealMode !== OFFLINE_OPERATOR_SCHEMA_SEAL_MODE &&
     sealMode !== RNB18_STAGED_MODE
   ) {
     errors.push(

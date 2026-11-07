@@ -75,3 +75,16 @@ verify_jwt = true
 # Candidate-only authenticated Admin proposals, no capture or admission.
 [functions.wk100-source-admin-proposals]
 verify_jwt = true
+
+# Read-only source health requires a verified caller JWT and both chart
+# management capabilities before returning restricted candidate evidence.
+[functions.wk100-source-admin-read]
+verify_jwt = true
+
+# Admin method review only. No collection, scoring, or publishing.
+[functions.wk100-source-admin-methods]
+verify_jwt = true
+
+# Service-only timed collector dispatch. OFF without explicit secret gates.
+[functions.wk100-source-scheduler]
+verify_jwt = true

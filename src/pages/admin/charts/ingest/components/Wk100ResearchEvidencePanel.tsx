@@ -1,7 +1,11 @@
-import {useState, type FormEvent} from "react";
+import {useRef, useState, type FormEvent} from "react";
 import {supabase} from "@/lib/supabase";
 import {WkUploadField} from "@/components/design-system/primitives/UploadField";
-import {getWk100ArchivedResearchPortfolio} from "@/services/chartsIngestion/wk100ResearchPortfolio.mjs";
+import {prepareWk100LocalShazamResearch} from "@/services/chartsIngestion/wk100LocalShazamResearch.mjs";
+import {
+  getWk100ArchivedResearchPortfolio,
+  verifyWk100ArchivedOriginal,
+} from "@/services/chartsIngestion/wk100ResearchPortfolio.mjs";
 import {submitWk100HtmlResearchEvidence} from "@/services/chartsIngestion/wk100HtmlResearchIntakeClient.mjs";
 import {
   submitWk100ResearchEvidence, type Wk100ResearchIntakeAck,
@@ -45,7 +49,93 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
   const [htmlError,setHtmlError]=useState<string|null>(null);
   const [htmlSaved,setHtmlSaved]=useState<string|null>(null);
   const archivedResearch=getWk100ArchivedResearchPortfolio(weekStartEat);
+  const [newResearchCsv,setNewResearchCsv]=useState<File|null>(null);
+  const [newResearchChecking,setNewResearchChecking]=useState(false);
+  const [newResearchReceipt,setNewResearchReceipt]=useState<Awaited<ReturnType<typeof prepareWk100LocalShazamResearch>>|null>(null);
+  const [newResearchError,setNewResearchError]=useState<string|null>(null);
+  const newResearchEpoch=useRef(0);
+  async function inspectNewResearch(){
+    if(!newResearchCsv||newResearchChecking)return;
+    const version=++newResearchEpoch.current;
+    setNewResearchChecking(true);
+    setNewResearchReceipt(null);
+    setNewResearchError(null);
+    try {
+      if(newResearchCsv.size<1||newResearchCsv.size>4*1024*1024)
+        throw new Error('invalid_local_csv_size');
+      const bytes=new Uint8Array(await newResearchCsv.arrayBuffer());
+      const receipt=await prepareWk100LocalShazamResearch({
+        originalBytes:bytes,checkedAtUtc:new Date().toISOString(),
+      });
+      if(version===newResearchEpoch.current)setNewResearchReceipt(receipt);
+    }catch{
+      if(version===newResearchEpoch.current)
+        setNewResearchError("The file does not contain a valid Kenya chart CSV. Nothing was saved or uploaded.");
+    }finally{
+      if(version===newResearchEpoch.current)setNewResearchChecking(false);
+    }
+  }
+  function downloadNewResearchReceipt(){
+    if(!newResearchReceipt)return;
+    const blob=new Blob([JSON.stringify(newResearchReceipt,null,2)+"\n"],
+      {type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const anchor=document.createElement('a');
+    anchor.href=url;
+    anchor.download='wk100-shazam-kenya-local-research-'+
+      newResearchReceipt.checked_at_utc.slice(0,10)+'.json';
+    anchor.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  const [localSourceKey,setLocalSourceKey]=useState("shazam_ke");
+  const [localOriginal,setLocalOriginal]=useState<File|null>(null);
+  const [localChecking,setLocalChecking]=useState(false);
+  const [localResult,setLocalResult]=useState<{matched:boolean;message:string}|null>(null);
+  const localEpoch=useRef(0);
   const ready=draftSaved&&originalCsv!==null&&receiptFile!==null&&!busy;
+  function selectLocalSource(sourceKey:string){
+    localEpoch.current+=1;
+    setLocalSourceKey(sourceKey);
+    setLocalOriginal(null);
+    setLocalResult(null);
+    setLocalChecking(false);
+  }
+  function selectLocalOriginal(file:File|null){
+    localEpoch.current+=1;
+    setLocalOriginal(file);
+    setLocalResult(null);
+    setLocalChecking(false);
+  }
+  async function verifyLocalOriginal(){
+    if(!localOriginal||localChecking)return;
+    const source=archivedResearch.find(s=>s.sourceKey===localSourceKey);
+    const token=++localEpoch.current;
+    setLocalChecking(true);setLocalResult(null);
+    try{
+      // A local browser read, not an upload. Reject wrong sizes before copying
+      // into memory. Do not retain contents, file names or raw bytes in state.
+      if(!source||localOriginal.size!==source.byteLength)
+        throw new Error("wk100_archived_original_mismatch");
+      const bytes=new Uint8Array(await localOriginal.arrayBuffer());
+      const receipt=await verifyWk100ArchivedOriginal({
+        weekStartEat,sourceKey:localSourceKey,originalBytes:bytes,
+      });
+      if(token===localEpoch.current){
+        setLocalResult({
+          matched:true,
+          message:receipt.privateOriginalMatchesArchivedReceipt
+            ?"Local SHA-256 matches the original October research receipt. No file was uploaded, no hosted receipt was created, and this does not establish a scoring period."
+            :"The original could not be verified.",
+        });
+      }
+    }catch{
+      if(token===localEpoch.current)setLocalResult({
+        matched:false,message:"This file does not match the archived original. Select the unchanged October file; nothing was uploaded.",
+      });
+    }finally{
+      if(token===localEpoch.current)setLocalChecking(false);
+    }
+  }
   function changeCsv(file:File|null){
     if(busy)return;
     setOriginalCsv(file);setAck(null);setError(null);
@@ -99,7 +189,7 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
           Private Research Evidence
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-wk-text-soft">
-          Select the original Shazam Kenya chart CSV and its existing researcher receipt.
+          Select the Shazam Kenya CSV and its matching research receipt, including one saved above.
           We verify and retain the original bytes in restricted private storage.
         </p>
       </div>
@@ -111,6 +201,59 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
       Week of {weekStartEat} (East Africa Time). The source’s native measurement period remains
       unknown. This observation does not authorize scoring, ranking or publication.
     </p>
+    <div className="mt-4 rounded-lg border border-wk-border bg-wk-surface-raised p-3"
+      aria-label="New local Shazam research">
+      <h3 className="text-sm font-semibold text-wk-text">Inspect a New Shazam Chart</h3>
+      <p className="mt-1 text-xs text-wk-text-muted">
+        Download the offered CSV from the Kenya Top 200 chart, then select it here.
+        We check its ranks and original SHA-256 on this device. We do not upload
+        the file, infer a reporting week, or add it to a published chart.
+      </p>
+      <a href="https://www.shazam.com/charts/top-200/kenya"
+        target="_blank" rel="noopener noreferrer"
+        className="mt-3 inline-flex text-sm font-semibold text-wk-text underline">
+        Open Shazam Kenya Top 200
+      </a>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <WkUploadField id="wk100-new-shazam-local"
+          label="Select downloaded Kenya chart CSV"
+          ariaLabel="Select downloaded Kenya chart CSV"
+          accept=".csv,text/csv"
+          disabled={newResearchChecking}
+          onSelect={files=>{
+            newResearchEpoch.current+=1;
+            setNewResearchCsv(files?.[0]??null);
+            setNewResearchReceipt(null);
+            setNewResearchError(null);
+            setNewResearchChecking(false);
+          }}/>
+        <button type="button" onClick={()=>{void inspectNewResearch()}}
+          disabled={!newResearchCsv||newResearchChecking}
+          className="wk-button wk-button-secondary wk-button-sm disabled:cursor-not-allowed disabled:opacity-50">
+          {newResearchChecking?"Checking local chart…":"Inspect Local Chart"}
+        </button>
+      </div>
+      {newResearchError&&<p role="alert" className="mt-3 text-xs text-wk-danger">
+        {newResearchError}
+      </p>}
+      {newResearchReceipt&&<div role="status" className="mt-3 space-y-2 text-xs text-wk-text">
+        <p>
+          {newResearchReceipt.observed_rank_count} valid discovery ranks.
+          {newResearchReceipt.complete_chart
+            ?" All 200 positions are present."
+            :" The file has fewer than 200 positions."}
+        </p>
+        <p className="break-all">Original SHA-256: {newResearchReceipt.original_sha256}</p>
+        <p>
+          File checked {newResearchReceipt.checked_at_utc}.
+          This does not establish when the provider served it or its exact measurement period.
+        </p>
+        <button type="button" onClick={downloadNewResearchReceipt}
+          className="wk-button wk-button-secondary wk-button-sm">
+          Save Local Research Receipt
+        </button>
+      </div>}
+    </div>
     <form className="mt-4 space-y-3" onSubmit={upload}>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-wk-border bg-wk-surface-raised p-3">
@@ -135,8 +278,8 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
           <WkUploadField
             id="wk100-research-receipt"
             className="mt-3"
-            label="Select receipt JSON"
-            ariaLabel="Select receipt JSON"
+            label="Select matching receipt JSON"
+            ariaLabel="Select matching receipt JSON"
             accept=".json,application/json"
             disabled={busy}
             onSelect={files=>changeReceipt(files?.[0]??null)}/>
@@ -176,6 +319,43 @@ export function Wk100ResearchEvidencePanel({weekStartEat,draftSaved}:Props){
           <p className="mt-1 text-xs text-wk-text-muted">{source.note}</p>
         </li>)}
       </ul>
+      <div className="mt-4 rounded-lg border border-wk-border bg-wk-surface-raised p-3"
+        aria-label="Local archived original verification">
+        <h4 className="text-sm font-semibold text-wk-text">Verify a preserved original locally</h4>
+        <p className="mt-1 text-xs text-wk-text-muted">
+          Compare any unchanged October CSV or HTML file against the previously audited
+          SHA-256 receipt. The browser reads the selected file only on this device.
+          No network upload, database write, saved Admin draft or collector permission is needed.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2" aria-label="Select archived research source">
+          {archivedResearch.map(source=><button key={source.sourceKey} type="button"
+            aria-pressed={localSourceKey===source.sourceKey} disabled={localChecking}
+            onClick={()=>selectLocalSource(source.sourceKey)}
+            className={localSourceKey===source.sourceKey
+              ?"wk-button wk-button-primary wk-button-sm"
+              :"wk-button wk-button-secondary wk-button-sm"}>
+            {source.displayName}
+          </button>)}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <WkUploadField id="wk100-archived-local-original"
+            label="Choose original for local verification"
+            ariaLabel="Choose original for local verification"
+            accept={localSourceKey==="shazam_ke"?".csv,text/csv":".html,text/html"}
+            disabled={localChecking}
+            onSelect={files=>selectLocalOriginal(files?.[0]??null)}/>
+          <button type="button" onClick={()=>{void verifyLocalOriginal()}}
+            disabled={!localOriginal||localChecking}
+            className="wk-button wk-button-secondary wk-button-sm disabled:cursor-not-allowed disabled:opacity-50">
+            {localChecking?"Checking local SHA-256…":"Verify original on this device"}
+          </button>
+        </div>
+        {localResult&&<p role={localResult.matched?"status":"alert"} aria-live="polite"
+          className={localResult.matched
+            ?"mt-3 text-xs text-wk-text":"mt-3 text-xs text-wk-danger"}>
+          {localResult.message}
+        </p>}
+      </div>
       <div className="mt-4 rounded-lg border border-wk-border bg-wk-surface-raised p-3">
         <h4 className="text-sm font-semibold text-wk-text">Verify preserved Apple or Mdundo HTML</h4>
         <p className="mt-1 text-xs text-wk-text-muted">

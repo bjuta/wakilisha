@@ -87,9 +87,13 @@ const lazyImportCount = (
  * - Wk100PrivateAdminPreview
  *
  * It remains lazy-loaded inside the existing guarded Admin Charts tree.
- * The current authority is therefore 102 lazy imports.
+ *
+ * The native WK100 Operations workbook adds one canonical lazy module:
+ * - Wk100OperationsPage (reused by W1/W2/W3 through three guarded routes).
+ *
+ * The current authority is therefore 103 lazy imports.
  */
-const expectedLazyImportCount = 102;
+const expectedLazyImportCount = 103;
 
 if (lazyImportCount !== expectedLazyImportCount) {
   fail(
@@ -103,6 +107,18 @@ if (
   !config.includes('{ path: "wk100-preview", element: <Wk100PrivateAdminPreview /> }')
 ) {
   fail("accepted WK100 Admin Charts route is missing or no longer lazy");
+}
+
+// One lazy workbook module serves all three already-guarded WK100 Admin views.
+// Check the actual lazy import and route bindings, not only the total count.
+if (
+  !lazyAdmin.includes("export const Wk100OperationsPage = lazy(") ||
+  !lazyAdmin.includes('import("../pages/admin/charts/wk100-operations/page")') ||
+  !config.includes('{ path: "wk100-operations", element: <Wk100OperationsPage view="overview" /> }') ||
+  !config.includes('{ path: "wk100-operations/sources", element: <Wk100OperationsPage view="sources" /> }') ||
+  !config.includes('{ path: "wk100-operations/collection", element: <Wk100OperationsPage view="collection" /> }')
+) {
+  fail("WK100 Operations workbook routes must remain lazily loaded inside Admin Charts");
 }
 
 for (const retiredMarker of [

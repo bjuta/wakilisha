@@ -1,0 +1,38 @@
+# WAKILISHA — offline-first engineering acceptance and release authority
+
+**Owner directive, 5 November 2026 (EAT). Status: governing decision for current and future work with zero GitHub-hosted CI minutes.** Supersedes the *assumption* in `ci-budget-recovery-and-draft-gates-20261104.md` that engineering and merging must wait until GitHub Actions credits return. The same evidence, security, release, and founder-approval requirements apply; **a paid CI platform is not an authority on whether working software is validated**. This is a delivery-process amendment, not a source-admission, Registry mutation, Production rollout, or public publication authorization.
+
+## Permanent posture — no budget-restoration contingency
+
+- Assume **zero GitHub-hosted Actions minutes indefinitely**. Do not ask the owner to buy minutes, restore a budget, change plan, set up a self-hosted runner, or wait for a future billing reset. Do not build platform infrastructure solely to manufacture CI status.
+- Continue the existing architecture, 4-phase WK100 plan, source admission, MIZIZI/Registry integrity, real-client browser and hosted Preview gates. No reduction in tests, no rubber-stamp merge, no fabricated check statuses or synthetic provider evidence.
+- `main` protection, documented runtime owners, Production deployment workflow and separate public Edition authority remain independently applicable. Do not secretly weaken a repository rule to get a merge through. If GitHub technically blocks merging without an unavailable check, disclose that *platform configuration constraint* explicitly and propose the smallest reviewed, owner-authorized ruleset change to accept **actual offline release evidence**; do not misrepresent it as a failed technical test or a reason to buy CI.
+- Existing workflows may stay defined and skipped. `skipped` means **not run**, never `PASS`; a real offline acceptance receipt is separately named and independently evaluated. Changes that require live provider transport or browser/CDN behavior still require appropriate real network and browser proofs; "offline-first" is an execution/control-plane choice, not a claim that all integrations can be simulated.
+
+## What replaces a green hosted CI check
+
+For every change, build an **exact-commit acceptance matrix**, with only applicable gates and explicit evidence provenance:
+
+1. **Source and scope:** frozen branch SHA, parent/merge base, changed files, dependency/runtime inventory, expected migration count/digest, direct static reviews for auth/RLS, confidentiality and source truth, and no unreviewed feature scope.
+2. **Local source tests:** actual `npm ci` under compatible pinned tools, focused unit/integration tests, consolidated repository audits and an actual `npm run build:app` where relevant. Do not claim these checks from merely reading the files. Preserve raw failure diagnostics and stop on failures.
+3. **True disposable execution:** fresh, unlinked PostgreSQL/GoTrue/Storage stack for SQL, concurrency, real JWT, ACL, immutable data, failure/retry and cleanup, scoped to one uniquely owned project; no global Docker cleanup. Follow [the proven WK100 Docker coexistence runbook](./wk100-disposable-local-docker-coexistence-and-acceptance-v1.md).
+4. **Real-client and hosted checks:** where changed, perform appropriate signed-in user/denied-role browser or HTTP acceptance and relevant Preview runtime tests. Immutable receipts, provider access methods, real payload bytes and private digests cannot be invented. Hosted tests require validated identity and a bounded lifecycle; no presumed Preview browser session.
+5. **Attested evidence:** keep an **operator-identified** transcript/excerpt (label it operator-reported when appropriate), exact test-run SHA, environment and tool versions, expected result markers, private-data-safe failure/cleanup readback, and an independent reviewer/owner decision. A local log is not a GitHub workflow run. Redact credentials and private source/Registry bytes.
+6. **No hidden release:** only after all **applicable** acceptance gates are independently satisfied, record a positive, scoped offline release decision bound to the **exact commit**, with rollback and runtime deployment plan. No merging from a missing or unreviewed proof. If a downstream platform constraint blocks the physical operation, report that constraint and resolve it through explicit owner-authorized governance—not through made-up statuses, charges or delayed plans.
+
+If a test is not relevant to a code change, mark **not applicable with a reason**, not PASS. If a test remains unrun, mark **PENDING** and do not claim its result. No blanket permission to publish a WAKILISHA 100 Edition follows from an engineering merge.
+
+## Exact-replay migration authority without GitHub Actions
+
+- Existing `disposable_ci_clean_replay_v1` records remain historical truths about **actual historical** successful GitHub workflow runs. Never fabricate a `workflow_run_id`, repaint an old workflow run as new, or backdate evidence.
+- New real local replay evidence is recorded as a **separate** `offline_operator_clean_replay_v1` proof with a frozen source commit, original SQL SHA-256, complete active migration filename set, database types SHA, exact local stack and tool identities, required signed-in/negative/cleanup markers, and operator-provided terminal provenance. A sealed local receipt cannot be presented as hosted Preview, legal source permission or signed production release.
+- Control-plane validation must verify the migration and type bytes in the **tested commit are unchanged at review**, ensure the tested commit is in the branch ancestry, require local-test evidence without a fake GitHub workflow ID, and bind the schema snapshot to that offline proof independently. An offline proof does not override SQL-risk scans, pending migration checks, or other admission/rollback gates.
+- New versions must be tested on a fresh local stack with exact current file set. An older 245-migration replay remains true only at its tested migration/type bytes; edits to any of those inputs invalidate the proof and require retest.
+
+## Recorded WK100 evidence as of 5 November
+
+Owner ran SHA-verified `wk100_245_migration_disposable_acceptance_f0813440.sh` (SHA-256 `066ca51046c5615e430a09c8472614ccc46a9cef5deb570b3a92d6aeca38a1f5`), testing **source commit** `f0813440c527f8861da1ca13dc9761ecd38c2ffd`. The operator-reported transcript includes exact 245-migration ledger, two genuine GoTrue users, anonymous/denied-role access refusal, Collect Now idempotence, PostgreSQL two-backend lease conflict, private Storage SHA-256/ACL checks and `WK100_ISOLATED_PROJECT_CLEANUP=PASS`. See [runbook](./wk100-disposable-local-docker-coexistence-and-acceptance-v1.md) and [PR #1345 acceptance record](https://github.com/bjuta/wakilisha/pull/1345#issuecomment-6664186822). This is substantive **local** acceptance, not GitHub CI.
+
+Outstanding WK100 Phase 1 gates are not "GitHub runner minutes": hosted real-user authorization where needed, independently approved Kenyan source methods, at least one genuine captured original-byte receipt with private readback and lawful provenance, two accelerated logical EAT weeks of full application orchestration, workbook UI/real-browser acceptance, no unintended mutations, and the founder's scoped acceptance/release authority. The first public Edition requires its own explicit instruction.
+
+**Operator rule:** progress the engineering using the evidence already proven; investigate the next unproven product/runtime gate. Never place a paid CI budget on the critical path by default.

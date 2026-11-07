@@ -73,8 +73,11 @@ export function useWk100DraftAutosave({
     } catch(e) {
       if(activeWeek.current===item.week){
         blocked.current=true;
+        // The Edge client converts non-2xx replies into an HTTP-status error.
+        // This draft writer returns 409 exclusively for a stale SQL revision.
         const conflict=e instanceof Error &&
-          e.message.includes("draft_revision_conflict");
+          (e.message.includes("draft_revision_conflict") ||
+           e.message.includes("(HTTP 409)"));
         setState(conflict?"conflict":"error");
         setMessage(conflict
           ? "Another Admin session saved this week. Your edits are retained; resolve the conflict before continuing."
