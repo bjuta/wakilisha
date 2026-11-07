@@ -10,6 +10,7 @@ import {
   analyzeMigrationText,
   validateReplayProof,
   validateRetiredMigrationReceipt,
+  newestReplayEvidenceMode,
 } from "../../scripts/control-plane/verify-migration-replay-contract.mjs";
 import {
   validateHistoricalCleanReplayProof,
@@ -85,14 +86,42 @@ describe(
         ...args,migrationSha256:"0".repeat(64),
       })).toContain("offline migration digest mismatch");
     });
-    it("validates an offline schema seal and rejects fake workflow evidence", () => {
-      const baseline=JSON.parse(readFileSync(
+    it("selects newest CI replay authority while preserving prior offline evidence", () => {
+      const entries=[{path:"245.sql"},{path:"246.sql"}];
+      const offline={proof_mode:"offline_operator_clean_replay_v1"};
+      const ci={proof_mode:"disposable_ci_clean_replay_v1"};
+      expect(newestReplayEvidenceMode(entries,new Map([
+        ["245.sql",offline],["246.sql",ci],
+      ]))).toBe("disposable_ci");
+      expect(newestReplayEvidenceMode(entries,new Map([
+        ["245.sql",ci],["246.sql",offline],
+      ]))).toBe("offline_operator");
+      expect(newestReplayEvidenceMode(entries,new Map([
+        ["245.sql",offline],["246.sql",{}],
+      ]))).toBeNull();
+    });
+    it("validates a historical offline seal without assuming current baseline is 245", () => {
+      const current=JSON.parse(readFileSync(
         "docs/engineering/live-schema-baseline.json","utf8"
       ));
+      const proof=JSON.parse(readFileSync(
+        "docs/engineering/replay-proofs/20261105131250_wk100_collect_now_authorized_v1.sql.json","utf8"
+      ));
+      const baseline={...current,
+        migrationCount:proof.schema_migration_count,
+        latestMigration:proof.migration_file.split("/").at(-1),
+        schemaSeal:{
+          mode:"offline_operator",sourceProjectRef:"unlinked-local-operator",
+          migrationHead:proof.schema_migration_head,
+          baseMainSha:proof.base_main_sha,
+          replayCandidateHeadSha:proof.replay_candidate_head_sha,
+          operatorReceiptUrl:proof.operator_receipt_url,
+        },
+      };
       const args={baseline,actualTypesSha256:baseline.typesSha256,
         expectedProjectRef:"pgzizndxdyhqmtyywjmt",
-        migrationCount:245,
-        latestMigration:"20261105131250_wk100_collect_now_authorized_v1.sql"};
+        migrationCount:proof.schema_migration_count,
+        latestMigration:baseline.latestMigration};
       expect(validateRepositorySchemaSnapshot(args)).toEqual([]);
       expect(validateRepositorySchemaSnapshot({
         ...args,baseline:{...baseline,schemaSeal:{...baseline.schemaSeal,workflowRunId:1234}},

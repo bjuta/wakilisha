@@ -490,6 +490,15 @@ function readJson(
   }
 }
 
+/** The most recent changed migration owns the overall replay seal.
+ * Earlier offline and CI receipts remain independently validated above. */
+export function newestReplayEvidenceMode(changedActive, proofs) {
+  const latest = proofs.get(changedActive.at(-1)?.path);
+  if (isDisposableCiReplayProof(latest)) return "disposable_ci";
+  if (isOfflineOperatorReplayProof(latest)) return "offline_operator";
+  return null;
+}
+
 function main() {
   const mergeBaseResult =
     runGit(
@@ -809,16 +818,24 @@ function main() {
           isDisposableCiReplayProof(proofs.get(entry.path)));
         const offlineMode = changedActive.some((entry) =>
           isOfflineOperatorReplayProof(proofs.get(entry.path)));
-        if (disposableMode && !offlineMode && (historicalMode || stagedMode)) {
+        const latestMode = newestReplayEvidenceMode(changedActive, proofs);
+        // An earlier 245-migration offline receipt remains valid evidence
+        // when a later 246-migration CI receipt seals the entire active set.
+        // Do not select repository authority merely because an older proof
+        // of a different kind is still present in this PR.
+        if ((disposableMode || offlineMode) && latestMode === null) {
+          failures.push("Newest changed migration must have an accepted CI or offline replay proof");
+        }
+        if (latestMode === "disposable_ci" && (historicalMode || stagedMode)) {
           failures.push("Cannot mix unlinked CI proof with historical or staged migration proof");
         }
-        if (disposableMode && !offlineMode) {
+        if (latestMode === "disposable_ci") {
           for (const error of validateDisposableCiReplayRepositoryState({
             changedActive,proofs,mergeBase,baseline,migrations,
             latestMigration,actualTypesSha256,
           })) failures.push("unlinked CI migration replay: " + error);
         }
-        if (offlineMode) {
+        if (latestMode === "offline_operator") {
           if (historicalMode || stagedMode) {
             failures.push("Offline operator proof cannot mix with historical/staged migration modes");
           }
