@@ -290,9 +290,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const reviewedCandidateContracts=reviewedSourceIds.size;
   // A retained partial original is verified evidence, not a healthy checkpoint.
   const fullDepthSources=report?.sources.filter(s=>
-    s.captureState==='succeeded'&&!!s.receiptSha256).length??0;
+    !!s.receiptSha256&&s.observedDepth===s.expectedDepth).length??0;
   const partialDepthSources=report?.sources.filter(s=>
-    s.captureState==='partial_depth'&&!!s.receiptSha256).length??0;
+    !!s.receiptSha256&&s.observedDepth>0&&s.observedDepth<s.expectedDepth).length??0;
   // An as-of original supports an Edition only if its verified acquisition
   // happened in this EAT week and the CURRENT method/contract still match.
   // This says nothing about the provider's measurement interval.
@@ -993,7 +993,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         {partialDepthSources>0&&<WkNextAction eyebrow="Incomplete original" title="A source returned fewer ranks than expected"
            description="The original is preserved with its actual depth. Missing ranks are not healthy checkpoints. This slot cannot be retried or covered by a missing-original exception."
            blocked action={<button type="button" className="wk-button wk-button-secondary wk-button-sm"
-             onClick={()=>{setDetail(report.sources.find(s=>s.captureState==='partial_depth')??null);setDetailTab('history')}}>Inspect Partial Original</button>}/>}
+             onClick={()=>{setDetail(report.sources.find(s=>!!s.receiptSha256&&s.observedDepth>0&&s.observedDepth<s.expectedDepth)??null);setDetailTab('history')}}>Inspect Partial Original</button>}/>}
          {report.failedSources>0&&<WkNextAction eyebrow="Collection incident" title="A source returned an unusable observation"
           description="Inspect the latest safe failure code and capture history. The system must not reuse another week's evidence or redistribute source weights automatically."
           blocked action={<button type="button" className="wk-button wk-button-secondary wk-button-sm"
@@ -1068,7 +1068,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             </p>
             <WkDetailList items={[
               {label:'Current source outcome',value:detail.captureState.replaceAll('_',' ')},
-              {label:'Original evidence for this week',value:detail.captureState==='partial_depth'?
+              {label:'Original evidence for this week',value:detail.receiptSha256&&detail.observedDepth>0&&detail.observedDepth<detail.expectedDepth?
                 'Partial original retained. Missing ranks remain visible and cannot be invented':detail.receiptSha256?
                 'Candidate receipt recorded, pending independent qualification':
                 'No accepted original receipt for this source'},
