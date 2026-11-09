@@ -505,7 +505,7 @@ test('W1 keeps a partial original visible after a newer failed attempt without u
   };
   const ctx=await install(page,{existingSources:[source]});
   await page.goto('/admin/charts/wk100-operations?week=2026-11-09',{waitUntil:'domcontentloaded'});
-  await expect(page.getByText('1 verified originals (0 complete, 1 partial).',{exact:false}))
+  await expect(page.getByText('1 verified original (0 complete, 1 partial).',{exact:false}))
     .toBeVisible({timeout:20_000});
   await page.goto('/admin/charts/wk100-operations/collection?week=2026-11-09',
     {waitUntil:'domcontentloaded'});
