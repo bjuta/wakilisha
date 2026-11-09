@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { validEatWeek, projectWk100SourceHealth } from '../_shared/wk100-source-admin-projection.mjs';
+import { projectWk100IdentifyObservations, wk100RegistryProviderKey } from '../_shared/wk100-identify-observations.mjs';
 
 const origins=new Set([
   'https://wakilisha.africa','https://www.wakilisha.africa',
@@ -23,7 +24,7 @@ Deno.serve(async req=>{
   if(req.method!=='POST')return reply(req,405,{error:'method_not_allowed'});
   const bearer=req.headers.get('authorization')??'';
   if(!/^Bearer [^\s]+$/.test(bearer))return reply(req,401,{error:'authentication_required'});
-  let week:string,action:'health'|'original',contractId='',receiptId='';
+  let week:string,action:'health'|'original'|'identify',contractId='',receiptId='';
   try{
     const raw=await req.text();
     if(raw.length>320)throw Error();
@@ -33,11 +34,13 @@ Deno.serve(async req=>{
     week=data.weekStartEat;
     if(data.action==='read_source_health'&&Object.keys(data).length===2){
       action='health';
-    }else if(data.action==='verify_private_original'&&Object.keys(data).length===4&&
+    }else if(['verify_private_original','read_recording_observations'].includes(data.action)&&
+      Object.keys(data).length===4&&
       typeof data.contractId==='string'&&typeof data.receiptId==='string'&&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.contractId)&&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.receiptId)){
-      action='original';contractId=data.contractId;receiptId=data.receiptId;
+      action=data.action==='verify_private_original'?'original':'identify';
+      contractId=data.contractId;receiptId=data.receiptId;
     }else throw Error();
   }catch{return reply(req,400,{error:'request_invalid'});}
   const url=Deno.env.get('SUPABASE_URL')??'';
@@ -87,6 +90,72 @@ Deno.serve(async req=>{
         canScore:false,canPublish:false,
       });
     }catch{return reply(req,503,{error:'original_readback_unavailable'});}
+  }
+  if(action==='identify'){
+    // The browser selects a real immutable receipt, never a provider URL, raw
+    // Storage path, Registry write operation, or purported canonical Track.
+    const [contractResponse,attemptResponse]=await Promise.all([
+      admin.from('wk_chart_capture_contracts_v1')
+        .select('id,source_key,provider_key,market,expected_depth')
+        .eq('id',contractId).maybeSingle(),
+      admin.from('wk_chart_capture_attempts_v1')
+        .select('id,contract_id,week_start_eat,status,payload_sha256,observed_depth,record_count')
+        .eq('id',receiptId).eq('contract_id',contractId)
+        .eq('week_start_eat',week).maybeSingle(),
+    ]);
+    if(contractResponse.error||attemptResponse.error)
+      return reply(req,503,{error:'identity_receipt_unavailable'});
+    const contract=contractResponse.data,attempt=attemptResponse.data;
+    if(!contract||!attempt)return reply(req,404,{error:'identity_receipt_not_found'});
+    if(contract.market!=='KE'||!['succeeded','partial_depth'].includes(attempt.status))
+      return reply(req,409,{error:'identity_receipt_not_reviewable'});
+    const rowsResponse=await admin.from('wk_chart_capture_rows_v1')
+      .select('id,attempt_id,source_rank,provider_track_id,title_observed,artist_observed')
+      .eq('attempt_id',receiptId).order('source_rank',{ascending:true}).limit(201);
+    if(rowsResponse.error||!Array.isArray(rowsResponse.data)||
+      rowsResponse.data.length>200)
+      return reply(req,503,{error:'identity_rows_unavailable'});
+    const rows=rowsResponse.data;
+    const ids=[...new Set(rows.map(x=>x.provider_track_id)
+      .filter((x):x is string=>typeof x==='string'&&x.length>0))];
+    const registryProvider=wk100RegistryProviderKey(contract.provider_key);
+    let typedLinks:unknown[]=[],legacyLinks:unknown[]=[];
+    if(ids.length){
+      const [typed,legacy]=await Promise.all([
+        admin.from('registry_track_provider_links')
+          .select('provider_key,provider_track_id,track_id,match_status')
+          .eq('provider_key',registryProvider).eq('match_status','matched')
+          .in('provider_track_id',ids).limit(401),
+        admin.from('provider_entity_links')
+          .select('provider,provider_entity_id,registry_entity_id,registry_entity_type,match_status')
+          .eq('provider',registryProvider).eq('registry_entity_type','track')
+          .eq('match_status','confirmed')
+          .in('provider_entity_id',ids).limit(401),
+      ]);
+      if(typed.error||legacy.error||!Array.isArray(typed.data)||!Array.isArray(legacy.data)||
+        typed.data.length>400||legacy.data.length>400)
+        return reply(req,503,{error:'identity_registry_links_unavailable'});
+      typedLinks=typed.data;legacyLinks=legacy.data;
+    }
+    const candidates=[...new Set([
+      ...typedLinks.map(x=>(x as {track_id?:string}).track_id),
+      ...legacyLinks.map(x=>(x as {registry_entity_id?:string}).registry_entity_id),
+    ].filter((x):x is string=>typeof x==='string'&&
+      /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(x)))];
+    let activeTracks:unknown[]=[];
+    if(candidates.length){
+      const tracks=await admin.from('registry_tracks')
+        .select('id,status').in('id',candidates)
+        .eq('status','active').limit(401);
+      if(tracks.error||!Array.isArray(tracks.data)||tracks.data.length>400)
+        return reply(req,503,{error:'identity_registry_tracks_unavailable'});
+      activeTracks=tracks.data;
+    }
+    try{
+      return reply(req,200,projectWk100IdentifyObservations({
+        weekStartEat:week,contract,attempt,rows,typedLinks,legacyLinks,activeTracks,
+      }));
+    }catch{return reply(req,503,{error:'identity_projection_unavailable'});}
   }
   // Only explicitly selected read-only columns are allowed across this
   // service-role boundary. No raw object keys, endpoints or credentials.
