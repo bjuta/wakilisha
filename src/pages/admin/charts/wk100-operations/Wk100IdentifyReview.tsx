@@ -297,7 +297,7 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
                 ?(r.reasonCodes?.map(x=>x.replaceAll('_',' ')).join('; ')||'No rule failures')
                 :(r.canonicalTrackId??(r.reviewReason?reasonLabel[r.reviewReason]??'Review required':'Review required'))}</p>
             </div>},
-            ...(qualify?[{key:'correction',label:'Registry review',render:(r:Row)=><a
+            ...(qualify?[{key:'correction',label:'Registry review',render:(r:Row)=><><a
               className="font-semibold text-wk-brand underline"
               href={r.canonicalTrackId&&r.registryTrackSlug
                 ?'/admin/registry/tracks/'+encodeURIComponent(r.registryTrackSlug)
@@ -305,7 +305,7 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
                   ?'?search='+encodeURIComponent(r.observedTitle.slice(0,120)):'')}
               target="_blank" rel="noopener noreferrer">
               {r.canonicalTrackId&&r.registryTrackSlug?'Edit Linked Track':'Investigate in Registry'}
-            </a>}
+            </a>
             {r.registryReleaseSlug&&<a
               className="block font-semibold text-wk-brand underline"
               href={'/admin/registry/releases/'+encodeURIComponent(r.registryReleaseSlug)}
@@ -315,7 +315,7 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
               href={'/admin/registry/artists/'+encodeURIComponent(slug)}
               target="_blank" rel="noopener noreferrer">
               Review Credited Artist {i+1}
-            </a>)}]:[]),
+            </a>)}</>}]:[]),
           ]}/>
         <p className="mt-4 text-xs text-wk-text-muted">
           {qualify
