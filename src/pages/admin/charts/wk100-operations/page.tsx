@@ -288,6 +288,11 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     return ids;
   },[report,phase,proposals,proposalPhase,methodDecisions,methodPhase]);
   const reviewedCandidateContracts=reviewedSourceIds.size;
+  // A retained partial original is verified evidence, not a healthy checkpoint.
+  const fullDepthSources=report?.sources.filter(s=>
+    !!s.receiptSha256&&s.observedDepth===s.expectedDepth).length??0;
+  const partialDepthSources=report?.sources.filter(s=>
+    !!s.receiptSha256&&s.observedDepth>0&&s.observedDepth<s.expectedDepth).length??0;
   // An as-of original supports an Edition only if its verified acquisition
   // happened in this EAT week and the CURRENT method/contract still match.
   // This says nothing about the provider's measurement interval.
@@ -348,7 +353,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
     const reviewed=!!contract&&reviewedSourceIds.has(contract.id);
     return (status==='all'||(status==='collected'?!!contract?.receiptSha256:
       status==='failed'?['transport_failed','parse_failed','target_period_unavailable','missed'].includes(health):
-      health==='not_collected'))&&
+      status==='partial'?health==='partial_depth':health==='not_collected'))&&
       (providerFilter==='all'||row.provider===providerFilter)&&
       (metricFilter==='all'||metric===metricFilter)&&
       (reviewFilter==='all'||(reviewFilter==='reviewed'?reviewed:!reviewed))&&
@@ -533,7 +538,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                 description:proposalPhase!=='ready'||methodPhase!=='ready'
                   ?'Source review authority unavailable. Qualification cannot be inferred.'
                   :reviewedCandidateContracts+' current reviewed candidate contracts. A reviewed contract is not an approved live source constitution.'},
-              {id:'receipts',label:'Original source evidence',status:report.successfulSources>0?'pending':'blocked',description:report.successfulSources+' verifiable capture receipts'},
+              {id:'receipts',label:'Original source evidence',status:report.successfulSources>0?'pending':'blocked',description:report.successfulSources+' verified original'+(report.successfulSources===1?'':'s')+' ('+fullDepthSources+' complete, '+partialDepthSources+' partial). Partial depth is not a healthy checkpoint.'},
               {id:'period',label:'Reporting dates and observation time',
                 status:report.sources.some(x=>x.receiptSha256&&x.nativePeriodAuthority==='provider_defined'&&x.nativePeriodStart&&x.nativePeriodEnd)||
                   observedAsOfCaptureIds.size>0?'pending':'blocked',
@@ -552,7 +557,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               <WkDetailList items={[
                 {label:'Registered candidates',value:report.sourceCount},
                 {label:'Reviewed candidate contracts',value:reviewedCandidateContracts},
-                {label:'Verified captures',value:report.successfulSources},
+                {label:'Verified originals',value:report.successfulSources},
+                {label:'Full-depth captures',value:fullDepthSources},
+                {label:'Partial-depth captures',value:partialDepthSources},
                 {label:'Collection failures',value:report.failedSources},
               ]}/>
             </Card>
@@ -578,7 +585,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             <WkSelect ariaLabel="Filter provider" value={providerFilter} onChange={setProviderFilter}
               options={[{value:'all',label:'All providers'},...Array.from(new Set(registryRows.map(s=>s.provider))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
             <WkSelect ariaLabel="Filter health" value={status} onChange={setStatus}
-              options={[{value:'all',label:'All health states'},{value:'collected',label:'Captured'},{value:'failed',label:'Failing'},{value:'not_collected',label:'Unknown'}]}/>
+              options={[{value:'all',label:'All health states'},{value:'collected',label:'Captured'},{value:'failed',label:'Failing'},{value:'partial',label:'Partial depth'},{value:'not_collected',label:'Unknown'}]}/>
             <WkSelect ariaLabel="Filter metric" value={metricFilter} onChange={setMetricFilter}
               options={[{value:'all',label:'All metrics'},...Array.from(new Set(registryRows.map(s=>s.contract?.metric??s.proposal?.metric??''))).filter(Boolean).map(v=>({value:v,label:v}))]}/>
             <WkSelect ariaLabel="Filter method review" value={reviewFilter} onChange={setReviewFilter}
@@ -626,12 +633,13 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                 </WkStateBadge>},
               {key:'health',label:'Health',render:row=>row.contract?
                 <WkStateBadge tone={['transport_failed','parse_failed','missed','target_period_unavailable'].includes(row.contract.captureState)?'danger':
-                  row.contract.receiptSha256?'success':'neutral'}>
-                  {['transport_failed','parse_failed','missed','target_period_unavailable'].includes(row.contract.captureState)?
-                    'Failing':row.contract.receiptSha256?'Captured':'Not collected'}
+                  row.contract.captureState==='partial_depth'?'warning':row.contract.receiptSha256?'success':'neutral'}>
+                   {['transport_failed','parse_failed','missed','target_period_unavailable'].includes(row.contract.captureState)?
+                     'Failing':row.contract.captureState==='partial_depth'?'Partial depth':
+                       row.contract.receiptSha256?'Captured':'Not collected'}
                 </WkStateBadge>:
                 <WkStateBadge>Not enrolled</WkStateBadge>},
-              {key:'last',label:'Last success',render:row=>
+              {key:'last',label:'Last original',render:row=>
                 <span className="text-wk-text-muted">{when(row.contract?.lastSuccessfulAt??null)}</span>},
               {key:'constitution',label:'Constitution',render:()=>
                 <span className="text-xs text-wk-text-muted">Out · no scoring authority</span>},
@@ -839,7 +847,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         <div data-wk-w3-master="" className="min-w-0 space-y-5">
         <WkOperationsHero eyebrow={'Collection · EAT week '+week} title="Collection"
           description="Source-specific reporting periods, captured evidence and attempt integrity are tracked separately. A successful download does not grant scoring qualification."
-          aside={<WkStateBadge tone={report.failedSources?'danger':'neutral'}>{report.failedSources?report.failedSources+' source failures':'No admitted collection'}</WkStateBadge>}
+          aside={<WkStateBadge tone={report.failedSources?'danger':partialDepthSources?'warning':'neutral'}>{report.failedSources?report.failedSources+' source failures':partialDepthSources?partialDepthSources+' partial-depth source'+(partialDepthSources===1?'':'s'):'No source failures'}</WkStateBadge>}
           action={<span className="text-xs text-wk-text-muted">Choose a reviewed source below to request collection or inspect recovery</span>}/>
         <WkSurface className="rounded-2xl p-4 sm:p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -849,9 +857,10 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             </div><WkStateBadge tone="warning">Not ready for ranking</WkStateBadge>
           </div>
           <div role="group" aria-label="Candidate collection coverage breakdown"
-            className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
             {([
               ['Receipt recorded',report.successfulSources],
+              ['Partial-depth originals',partialDepthSources],
               ['No verified original',Math.max(0,report.sourceCount-report.successfulSources)],
               ['Latest attempt failed',report.failedSources],
               ['Not yet attempted',report.sources.filter(s=>s.attemptCount===0).length],
@@ -902,9 +911,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                  <button type="button" className="text-left font-semibold text-wk-text hover:underline"
                    onClick={()=>{setDetail(s);setDetailTab('history')}}>Inspect original receipt</button>:
                  <span className="text-wk-text-muted">No verified receipt</span>},
-              {key:'status',label:'Status',render:s=><WkStateBadge tone={['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState)?'danger':s.receiptSha256?'info':'neutral'}>{s.captureState.replaceAll('_',' ')}</WkStateBadge>},
+              {key:'status',label:'Status',render:s=><WkStateBadge tone={['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState)?'danger':s.captureState==='partial_depth'?'warning':s.receiptSha256?'info':'neutral'}>{s.captureState.replaceAll('_',' ')}</WkStateBadge>},
               {key:'recovery',label:'Recovery',render:s=>{
-                if(recoveryPhase!=='ready')
+                 // SQL forbids retry and missing-original exceptions for this
+                 // retained partial original. Offer inspection only.
+                 if(s.captureState==='partial_depth')return <button type="button"
+                   className="wk-button wk-button-secondary wk-button-sm"
+                   onClick={()=>{setDetail(s);setDetailTab('history')}}>Inspect Partial Original</button>;
+                 if(recoveryPhase!=='ready')
                   return <span className="text-xs text-wk-text-muted">Recovery unavailable</span>;
                 const coverage=recoveryActions.filter(a=>a.contractId===s.id&&
                   a.actionKind!=='retry_requested')
@@ -976,7 +990,11 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             description:a.failureCode?'Safe reason: '+a.failureCode:'Rows observed: '+a.observedDepth,
           }))).sort((a,b)=>String(b.occurredAt||'').localeCompare(String(a.occurredAt||''))).slice(0,30)}/>
         </Card>
-        {report.failedSources>0&&<WkNextAction eyebrow="Collection incident" title="A source returned an unusable observation"
+        {partialDepthSources>0&&<WkNextAction eyebrow="Incomplete original" title="A source returned fewer ranks than expected"
+           description="The original is preserved with its actual depth. Missing ranks are not healthy checkpoints. This slot cannot be retried or covered by a missing-original exception."
+           blocked action={<button type="button" className="wk-button wk-button-secondary wk-button-sm"
+             onClick={()=>{setDetail(report.sources.find(s=>!!s.receiptSha256&&s.observedDepth>0&&s.observedDepth<s.expectedDepth)??null);setDetailTab('history')}}>Inspect Partial Original</button>}/>}
+         {report.failedSources>0&&<WkNextAction eyebrow="Collection incident" title="A source returned an unusable observation"
           description="Inspect the latest safe failure code and capture history. The system must not reuse another week's evidence or redistribute source weights automatically."
           blocked action={<button type="button" className="wk-button wk-button-secondary wk-button-sm"
             onClick={()=>setDetail(report.sources.find(s=>['transport_failed','parse_failed','target_period_unavailable','missed'].includes(s.captureState))??null)}>Inspect incident</button>}/>}
@@ -986,7 +1004,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       summary={<div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-wk-text-muted">{detail.provider} · {detail.market} · {detail.version}</span>
         <WkStateBadge>Candidate</WkStateBadge>
-        <WkStateBadge tone={detail.failureCode?'danger':detail.receiptSha256?'info':'neutral'}>{detail.captureState.replaceAll('_',' ')}</WkStateBadge>
+        <WkStateBadge tone={detail.failureCode?'danger':detail.captureState==='partial_depth'?'warning':detail.receiptSha256?'info':'neutral'}>{detail.captureState.replaceAll('_',' ')}</WkStateBadge>
       </div>}>
       <WkTabs ariaLabel="Source information" value={detailTab} onChange={setDetailTab}
         items={[{id:'configuration',label:'Configuration'},{id:'qualification',label:'Qualification'},{id:'history',label:'History'}]}>
@@ -1032,12 +1050,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             {label:'Most recent attempt',value:when(detail.lastAttemptAt)},
              {label:'Most recent slot',value:when(detail.lastScheduledAt)},
              {label:'Latest attempt number',value:detail.lastAttemptNumber??'Not recorded'},
-            {label:'Last successful capture',value:when(detail.lastSuccessfulAt)},
+            {label:'Last retained original',value:when(detail.lastSuccessfulAt)},
             {label:'Observed depth',value:detail.observedDepth},
             {label:'Original receipt SHA-256',value:detail.receiptSha256||'No verified receipt'},
             {label:'Recorded attempts',value:detail.attemptCount},
-            {label:'Attempts remaining',value:Math.max(0,8-(detail.lastAttemptNumber??0))+
-              ' at most, only inside the original 20-minute slot'},
+            {label:'Attempts remaining',value:['transport_failed','missed'].includes(detail.captureState)
+               ?Math.max(0,8-(detail.lastAttemptNumber??0))+
+                 ' at most, only inside the original 20-minute slot'
+               :'No retry permitted for this outcome'},
             {label:'Safe failure code',value:detail.failureCode||'None recorded'},
           ]}/>
           <div className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4">
@@ -1048,7 +1068,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
             </p>
             <WkDetailList items={[
               {label:'Current source outcome',value:detail.captureState.replaceAll('_',' ')},
-              {label:'Original evidence for this week',value:detail.receiptSha256?
+              {label:'Original evidence for this week',value:detail.receiptSha256&&detail.observedDepth>0&&detail.observedDepth<detail.expectedDepth?
+                'Partial original retained. Missing ranks remain visible and cannot be invented':detail.receiptSha256?
                 'Candidate receipt recorded, pending independent qualification':
                 'No accepted original receipt for this source'},
               {label:'Latest coverage decision',value:recoveryPhase!=='ready'?'Unavailable':
