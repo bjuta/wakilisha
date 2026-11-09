@@ -203,10 +203,10 @@ Deno.serve(async req=>{
         .map(x=>x.release_id).filter((x):x is string=>typeof x==='string'))];
       const [artistsResult,releasesResult]=await Promise.all([
         artistIds.length?admin.from('registry_artists')
-          .select('id,status,origin_iso2,gender,artist_type,metadata')
+          .select('id,slug,status,origin_iso2,gender,artist_type,metadata')
           .in('id',artistIds).limit(401):Promise.resolve({data:[],error:null}),
         releaseIds.length?admin.from('registry_releases')
-          .select('id,status,release_type,release_date,metadata')
+          .select('id,slug,status,release_type,release_date,metadata')
           .in('id',releaseIds).limit(401):Promise.resolve({data:[],error:null}),
       ]);
       if(artistsResult.error||releasesResult.error||
