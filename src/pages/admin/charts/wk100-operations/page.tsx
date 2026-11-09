@@ -538,7 +538,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                 description:proposalPhase!=='ready'||methodPhase!=='ready'
                   ?'Source review authority unavailable. Qualification cannot be inferred.'
                   :reviewedCandidateContracts+' current reviewed candidate contracts. A reviewed contract is not an approved live source constitution.'},
-              {id:'receipts',label:'Original source evidence',status:report.successfulSources>0?'pending':'blocked',description:report.successfulSources+' verified originals ('+fullDepthSources+' complete, '+partialDepthSources+' partial). Partial depth is not a healthy checkpoint.'},
+              {id:'receipts',label:'Original source evidence',status:report.successfulSources>0?'pending':'blocked',description:report.successfulSources+' verified original'+(report.successfulSources===1?'':'s')+' ('+fullDepthSources+' complete, '+partialDepthSources+' partial). Partial depth is not a healthy checkpoint.'},
               {id:'period',label:'Reporting dates and observation time',
                 status:report.sources.some(x=>x.receiptSha256&&x.nativePeriodAuthority==='provider_defined'&&x.nativePeriodStart&&x.nativePeriodEnd)||
                   observedAsOfCaptureIds.size>0?'pending':'blocked',
