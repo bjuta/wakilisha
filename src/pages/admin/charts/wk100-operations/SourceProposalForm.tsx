@@ -115,9 +115,22 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
     (initial!==null || !existingKeys.has(draft.sourceKey));
   const maxCheckpoints=draft.cadence==='weekly'?1:draft.cadence==='daily'?7:
     168/(draft.intervalHours??24);
-  const fieldValid = sourceIdValid && draft.surface.trim().length>=3 && draft.evidenceReference.trim().length>=1 &&
-    draft.expectedDepth>=1 && draft.expectedDepth<=500 &&
-    draft.minimumHealthyCheckpoints>=1 && draft.minimumHealthyCheckpoints<=maxCheckpoints;
+  // Never leave a prominent disabled Continue button without saying why.
+  // Keep these conditions identical to the existing proposal eligibility gate.
+  const validationIssues:string[]=[
+    ...(!sourceIdValid?[initial===null&&existingKeys.has(draft.sourceKey)
+      ?'Source ID already exists. Choose a different permanent ID.'
+      :'Stable source ID is incomplete or invalid. It must start with '+draft.providerKey+
+        '_ and use lowercase letters, numbers or underscores.']:[]),
+    ...(draft.surface.trim().length<3?['Enter the source surface (at least 3 characters).']:[]),
+    ...(draft.evidenceReference.trim().length<1?['Enter an internal evidence reference.']:[]),
+    ...(draft.expectedDepth<1||draft.expectedDepth>500
+      ?['Select an expected depth between 1 and 500.']:[]),
+    ...(draft.minimumHealthyCheckpoints<1||
+      draft.minimumHealthyCheckpoints>maxCheckpoints
+      ?['Select a valid minimum healthy checkpoint count.']:[]),
+  ];
+  const fieldValid=validationIssues.length===0;
   const submit=async()=>{
     if(!fieldValid||busy)return;
     setBusy(true);setError('');
@@ -142,7 +155,8 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
     footer={<div className="flex items-center justify-between gap-3">
       <button type="button" disabled={busy} className="wk-button wk-button-secondary wk-button-sm"
         onClick={()=>step===1||(initial&&step===2)?close():setStep(n=>n-1)}>{step===1||(initial&&step===2)?'Cancel':'Back'}</button>
-      {step<3?<button type="button" className="wk-button wk-button-primary wk-button-sm"
+      {step<3?<button type="button"
+        className="wk-button wk-button-primary wk-button-sm disabled:cursor-not-allowed disabled:opacity-50"
         disabled={busy||(step===1&&!draft.providerKey)||(step===2&&!fieldValid)}
         onClick={()=>setStep(n=>n+1)}>Continue</button>:
         <button type="button" className="wk-button wk-button-primary wk-button-sm"
@@ -236,6 +250,13 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
         value={draft.evidenceReference} onChange={v=>change('evidenceReference',v)} limit={240}/></div>
       <div className="sm:col-span-2"><ProposalField label="Reason for the source proposal"
         value={draft.reason??''} onChange={v=>change('reason',v||null)} limit={500} area/></div>
+      {!fieldValid&&<div role="status" aria-live="polite"
+        className="sm:col-span-2 rounded-xl border border-wk-warning/40 bg-wk-surface-raised p-3 text-sm text-wk-text">
+        <p className="font-semibold">Continue is disabled until these fields are complete:</p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          {validationIssues.map(issue=><li key={issue}>{issue}</li>)}
+        </ul>
+      </div>}
       <p className="sm:col-span-2 text-xs leading-relaxed text-wk-text-muted">
         Timing is a proposed EAT collection cadence, not a scheduled job. The source requires independent method qualification.
       </p>
