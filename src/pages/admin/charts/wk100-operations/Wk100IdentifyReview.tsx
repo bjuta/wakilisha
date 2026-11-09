@@ -7,6 +7,7 @@ import {WkSearchField} from '@/components/design-system/primitives/Field';
 import {WkDataTable} from '@/components/design-system/primitives/DataTable';
 import {WkStateBadge} from '@/components/design-system/primitives/StateBadge';
 import {WkDetailList} from '@/components/design-system/primitives/DetailList';
+import {compareWk100EligibilityRechecks} from '@/services/chartsIngestion/wk100EligibilityRecheck.mjs';
 
 type Receipt={id:string;status:string;attemptedAt:string|null;observedDepth:number};
 type Source={
@@ -19,6 +20,7 @@ type Row={
   identityState:'resolved'|'needs_review'|'conflicting'|'inactive';
   reviewReason:string|null;provisionalRef:string|null;
   outcome?:'ELIGIBLE'|'EXCLUDED'|'REVIEW_REQUIRED'|'CONFLICTED';reasonCodes?:string[];
+  registryTrackSlug?:string|null;registryFactsSha256?:string;
 };
 type Review={
   schemaVersion:'wk100-admin-identify-observations-v1'|'wk100-admin-eligibility-preview-v1';
@@ -26,7 +28,7 @@ type Review={
   registryProviderKey?:string;receiptStatus:string;observedDepth:number;
   configRevision?:number;eligibilityProfileName?:string;marketScopeName?:string;
   policySha256?:string;counts?:Record<'ELIGIBLE'|'EXCLUDED'|'REVIEW_REQUIRED'|'CONFLICTED',number>;
-  expectedDepth:number;payloadSha256:string;originalReadbackInThisRequest:false;
+  expectedDepth:number;payloadSha256:string;originalReadbackInThisRequest?:false;
   totals?:{observed:number;resolved:number;needsReview:number;conflicting:number;inactive:number};
   rows:Row[];canWriteRegistry:false;canScore:false;canPublish:false;
 };
@@ -61,12 +63,22 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
   const [readNonce,setReadNonce]=useState(0);
+  const [comparison,setComparison]=useState<{
+    changedCount:number;evaluatedRows:number;changed:{
+      captureRowId:string;rank:number;observedTitle:string|null;
+      beforeOutcome:string;afterOutcome:string;beforeReasons:string[];
+      afterReasons:string[];factsChanged:boolean;outcomeChanged:boolean;
+    }[];
+  }|null>(null);
+  const [reviewError,setReviewError]=useState<'changed'|'unavailable'>('unavailable');
+  const beforeRecheck=useRef<Review|null>(null);
   const sequence=useRef(0);
   const source=selectable.find(s=>s.id===sourceId);
   const receipts=source?.recentAttempts.filter(eligible)??[];
   useEffect(()=>{
     const seq=++sequence.current;
-    setReview(null);setSearch('');setFilter('all');
+    setReview(null);setComparison(null);
+    setSearch('');setFilter('all');
     if(!source||!receipts.some(r=>r.id===receiptId)){
       setPhase('idle');return;
     }
@@ -83,10 +95,21 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
           data.rows.length!==data.observedDepth||
           (qualify?(!data.counts||Object.values(data.counts).reduce((n:number,v:unknown)=>n+(typeof v==='number'?v:0),0)!==data.rows.length):
             data.totals?.observed!==data.rows.length)||
+          (qualify&&!data.rows.every((r:Row)=>/^[a-f0-9]{64}$/.test(r.registryFactsSha256??'')))||
           data.canWriteRegistry!==false||data.canScore!==false||data.canPublish!==false)
           throw Error('identity_response_invalid');
-        if(seq===sequence.current){setReview(data as Review);setPhase('ready');}
-      }catch{if(seq===sequence.current)setPhase('unavailable');}
+        if(seq===sequence.current){
+          if(qualify&&beforeRecheck.current){
+            const previous=beforeRecheck.current;
+            beforeRecheck.current=null;
+            try{setComparison(compareWk100EligibilityRechecks(previous,data));}
+            catch{setReviewError('changed');setPhase('unavailable');return;}
+          }
+          setReview(data as Review);setPhase('ready');
+        }
+      }catch{
+        if(seq===sequence.current){beforeRecheck.current=null;setReviewError('unavailable');setPhase('unavailable');}
+      }
     })();
     return ()=>{sequence.current+=1;};
     // Receipt selection is explicit. No current-week source is selected
@@ -117,14 +140,14 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
         <div className="space-y-1">
           <p className="text-xs font-semibold text-wk-text-muted">Captured source</p>
           <WkSelect ariaLabel="Captured source" value={sourceId} onChange={value=>{
-            setSourceId(value);setReceiptId('');
+            beforeRecheck.current=null;setSourceId(value);setReceiptId('');
           }} options={[{value:'',label:'Choose a source'},
             ...selectable.map(s=>({value:s.id,label:s.surface}))]}/>
         </div>
         <div className="space-y-1">
           <p className="text-xs font-semibold text-wk-text-muted">Exact source receipt</p>
           <WkSelect ariaLabel="Exact source receipt" value={receiptId} disabled={!source}
-            onChange={setReceiptId} options={[{value:'',label:'Choose a receipt'},
+            onChange={value=>{beforeRecheck.current=null;setReceiptId(value);}} options={[{value:'',label:'Choose a receipt'},
               ...receipts.map(r=>({value:r.id,label:r.status.replaceAll('_',' ')+' · '+when(r.attemptedAt)}))]}/>
         </div>
       </div>
@@ -142,7 +165,7 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
           onClick={()=>navigate('/admin/registry/tracks')}>Open Registry Tracks</button>
         <button type="button" className="wk-button wk-button-secondary wk-button-sm"
           disabled={!source||!receiptId||phase==='loading'}
-          onClick={()=>setReadNonce(x=>x+1)}>Refresh selected receipt</button>
+          onClick={()=>{beforeRecheck.current=null;setReadNonce(x=>x+1);}}>Refresh selected receipt</button>
       </div>
     </WkSurface>
     {phase==='loading'&&<WkSurface className="rounded-xl p-4">
@@ -150,7 +173,9 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
     </WkSurface>}
     {phase==='unavailable'&&<WkSurface className="rounded-xl p-4">
       <p role="alert" className="text-sm text-wk-danger">
-        {qualify
+        {reviewError==='changed'
+          ?'The source evidence or saved Edition policy changed. Start a new review before comparing results.'
+          :qualify
           ?'We couldn’t verify this week’s saved eligibility policy and Registry evidence. No result is accepted. Retry the read.'
           :'We couldn’t verify this receipt or its Registry links. No recording is assumed matched. Retry the read.'}
       </p>
