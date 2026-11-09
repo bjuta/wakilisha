@@ -18,13 +18,16 @@ type Row={
   providerTrackId:string|null;canonicalTrackId:string|null;
   identityState:'resolved'|'needs_review'|'conflicting'|'inactive';
   reviewReason:string|null;provisionalRef:string|null;
+  outcome?:'ELIGIBLE'|'EXCLUDED'|'REVIEW_REQUIRED'|'CONFLICTED';reasonCodes?:string[];
 };
 type Review={
-  schemaVersion:'wk100-admin-identify-observations-v1';
+  schemaVersion:'wk100-admin-identify-observations-v1'|'wk100-admin-eligibility-preview-v1';
   weekStartEat:string;contractId:string;receiptId:string;sourceKey:string;
-  registryProviderKey:string;receiptStatus:string;observedDepth:number;
+  registryProviderKey?:string;receiptStatus:string;observedDepth:number;
+  configRevision?:number;eligibilityProfileName?:string;marketScopeName?:string;
+  policySha256?:string;counts?:Record<'ELIGIBLE'|'EXCLUDED'|'REVIEW_REQUIRED'|'CONFLICTED',number>;
   expectedDepth:number;payloadSha256:string;originalReadbackInThisRequest:false;
-  totals:{observed:number;resolved:number;needsReview:number;conflicting:number;inactive:number};
+  totals?:{observed:number;resolved:number;needsReview:number;conflicting:number;inactive:number};
   rows:Row[];canWriteRegistry:false;canScore:false;canPublish:false;
 };
 const eligible=(attempt:Receipt)=>['succeeded','partial_depth'].includes(attempt.status);
@@ -47,7 +50,8 @@ function when(value:string|null){
     ?new Intl.DateTimeFormat('en-KE',{timeZone:'Africa/Nairobi',dateStyle:'medium',timeStyle:'short'}).format(date)+' EAT'
     :'Unknown time';
 }
-export function Wk100IdentifyReview({week,sources}:{week:string;sources:Source[]}){
+export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string;sources:Source[];stage?:'identify'|'qualify'}){
+  const qualify=stage==='qualify';
   const navigate=useNavigate();
   const selectable=useMemo(()=>sources.filter(s=>s.recentAttempts.some(eligible)),[sources]);
   const [sourceId,setSourceId]=useState('');
@@ -70,13 +74,15 @@ export function Wk100IdentifyReview({week,sources}:{week:string;sources:Source[]
     void (async()=>{
       try{
         const {data,error}=await supabase.functions.invoke('wk100-source-admin-read',{
-          body:{action:'read_recording_observations',
+          body:{action:qualify?'preview_recording_eligibility':'read_recording_observations',
             weekStartEat:week,contractId:source.id,receiptId},
         });
-        if(error||!data||data.schemaVersion!=='wk100-admin-identify-observations-v1'||
+        if(error||!data||data.schemaVersion!==(qualify?'wk100-admin-eligibility-preview-v1':'wk100-admin-identify-observations-v1')||
           data.weekStartEat!==week||data.contractId!==source.id||data.receiptId!==receiptId||
           data.sourceKey!==source.sourceKey||!Array.isArray(data.rows)||
-          data.rows.length!==data.observedDepth||data.totals?.observed!==data.rows.length||
+          data.rows.length!==data.observedDepth||
+          (qualify?(!data.counts||Object.values(data.counts).reduce((n:number,v:unknown)=>n+(typeof v==='number'?v:0),0)!==data.rows.length):
+            data.totals?.observed!==data.rows.length)||
           data.canWriteRegistry!==false||data.canScore!==false||data.canPublish!==false)
           throw Error('identity_response_invalid');
         if(seq===sequence.current){setReview(data as Review);setPhase('ready');}
@@ -85,24 +91,24 @@ export function Wk100IdentifyReview({week,sources}:{week:string;sources:Source[]
     return ()=>{sequence.current+=1;};
     // Receipt selection is explicit. No current-week source is selected
     // automatically for identification or downstream ranking.
-  },[sourceId,receiptId,readNonce,week,sources]);
+  },[sourceId,receiptId,readNonce,week,sources,qualify]);
   const rows=useMemo(()=>review?.rows.filter(row=>
-    (filter==='all'||row.identityState===filter)&&
+    (filter==='all'||(qualify?row.outcome===filter:row.identityState===filter))&&
     (!search||[
       row.observedTitle,row.observedArtist,row.providerTrackId,
-      row.canonicalTrackId,String(row.rank),
+      row.canonicalTrackId,String(row.rank),row.reasonCodes?.join(' '),
     ].some(v=>v?.toLowerCase().includes(search.trim().toLowerCase()))))??[],
-    [review,filter,search]);
-  return <section data-wk-identify-review className="space-y-5" aria-label="Recording review">
+    [review,filter,search,qualify]);
+  return <section data-wk-identify-review className="space-y-5" aria-label={qualify?"Eligibility review":"Recording review"}>
     <WkSurface className="rounded-xl p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold text-wk-text-muted">Identify / W4 / Kenya</p>
-          <h2 className="mt-1 text-xl font-bold text-wk-text">Recording Review</h2>
+          <p className="text-xs font-semibold text-wk-text-muted">{qualify?"Qualify / W5 / Kenya":"Identify / W4 / Kenya"}</p>
+          <h2 className="mt-1 text-xl font-bold text-wk-text">{qualify?"Eligibility Workbench":"Recording Review"}</h2>
           <p className="mt-2 max-w-3xl text-sm text-wk-text-muted">
-            Inspect observed chart positions and exact Registry links. A matching title is not proof
-            of the same recording. Unresolved details stay attached to their original evidence
-            and do not automatically prevent a later evidence-qualified Edition.
+            {qualify
+              ?'Check every captured position against this week’s saved eligibility rules. Missing Registry facts need review.'
+              :'Inspect the observed positions and exact Registry links. Similar titles do not establish recording identity.'}
           </p>
         </div>
         <WkStateBadge tone="warning">Private review only</WkStateBadge>
@@ -140,57 +146,77 @@ export function Wk100IdentifyReview({week,sources}:{week:string;sources:Source[]
       </div>
     </WkSurface>
     {phase==='loading'&&<WkSurface className="rounded-xl p-4">
-      <p role="status" className="text-sm text-wk-text-muted">Checking exact recording links…</p>
+      <p role="status" className="text-sm text-wk-text-muted">{qualify?"Checking saved eligibility rules and Registry evidence…":"Checking exact recording links…"}</p>
     </WkSurface>}
     {phase==='unavailable'&&<WkSurface className="rounded-xl p-4">
       <p role="alert" className="text-sm text-wk-danger">
-        The restricted recording review could not verify this receipt or its Registry links.
-        No recording has been assumed matched. You can retry the read.
+        {qualify
+          ?'We couldn’t verify this week’s saved eligibility policy and Registry evidence. No result is accepted. Retry the read.'
+          :'We couldn’t verify this receipt or its Registry links. No recording is assumed matched. Retry the read.'}
       </p>
     </WkSurface>}
     {phase==='ready'&&review&&<>
       <WkSurface className="rounded-xl p-4 sm:p-5">
         <div className="flex flex-wrap justify-between gap-3">
-          <div><h3 className="text-base font-bold text-wk-text">Identity coverage</h3>
+          <div><h3 className="text-base font-bold text-wk-text">{qualify?"Eligibility Review":"Identity Coverage"}</h3>
             <p className="mt-1 text-xs text-wk-text-muted">
-              Exact provider links only. Original receipt SHA is preserved. This read does not
-              replay the private original or authorize ranking.
+              {qualify
+                ?'All captured positions use this week’s saved policy and current Registry facts. Passing rules does not authorize ranking.'
+                :'Exact provider links only. The receipt digest remains unchanged. This read does not authorize ranking.'}
             </p></div>
           <WkStateBadge tone="warning">
             {review.receiptStatus==='partial_depth'?'Partial source evidence':'Candidate source evidence'}
           </WkStateBadge>
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <WkDetailList items={[
-            {label:'Observed positions',value:review.totals.observed},
+          <WkDetailList items={qualify?[
+            {label:'Observed positions',value:review.observedDepth},
             {label:'Expected positions',value:review.expectedDepth},
-            {label:'Confirmed active Registry links',value:review.totals.resolved},
-            {label:'Needs review',value:review.totals.needsReview},
-            {label:'Conflicting links',value:review.totals.conflicting},
-            {label:'Inactive linked Tracks',value:review.totals.inactive},
+            {label:'Rules met (not approved)',value:review.counts?.ELIGIBLE??0},
+            {label:'Excluded by policy',value:review.counts?.EXCLUDED??0},
+            {label:'Needs review',value:review.counts?.REVIEW_REQUIRED??0},
+            {label:'Conflicting evidence',value:review.counts?.CONFLICTED??0},
+          ]:[
+            {label:'Observed positions',value:review.totals?.observed??0},
+            {label:'Expected positions',value:review.expectedDepth},
+            {label:'Confirmed active Registry links',value:review.totals?.resolved??0},
+            {label:'Needs review',value:review.totals?.needsReview??0},
+            {label:'Conflicting links',value:review.totals?.conflicting??0},
+            {label:'Inactive linked Tracks',value:review.totals?.inactive??0},
           ]}/>
           <WkDetailList items={[
             {label:'Source key',value:review.sourceKey},
             {label:'Capture receipt',value:review.receiptId},
             {label:'Original SHA-256',value:review.payloadSha256},
-            {label:'Registry provider namespace',value:review.registryProviderKey},
+            {label:qualify?'Eligibility profile':'Registry provider namespace',
+              value:qualify?review.eligibilityProfileName??'Unavailable':review.registryProviderKey??'Unknown'},
+            ...(qualify?[
+              {label:'Edition revision',value:review.configRevision??0},
+              {label:'Policy SHA-256',value:review.policySha256??'Unavailable'},
+            ]:[]),
           ]}/>
         </div>
       </WkSurface>
       <WkSurface className="rounded-xl p-4 sm:p-5">
-        <h3 className="text-base font-bold text-wk-text">Source recording observations</h3>
+        <h3 className="text-base font-bold text-wk-text">{qualify?"Eligibility Results":"Source Recording Observations"}</h3>
         <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
           <WkSearchField value={search} onChange={setSearch} ariaLabel="Search source recordings"
             placeholder="Search title, artist, source ID, or rank"/>
-          <WkSelect value={filter} onChange={setFilter} ariaLabel="Recording link status"
-            options={[{value:'all',label:'All link states'},
+          <WkSelect value={filter} onChange={setFilter} ariaLabel={qualify?'Eligibility outcome':'Recording link status'}
+            options={qualify?[
+              {value:'all',label:'All outcomes'},
+              {value:'ELIGIBLE',label:'Rules met'},
+              {value:'EXCLUDED',label:'Excluded'},
+              {value:'REVIEW_REQUIRED',label:'Needs review'},
+              {value:'CONFLICTED',label:'Conflicting evidence'},
+            ]:[{value:'all',label:'All link states'},
               ...Object.entries(readableStatus).map(([value,label])=>({value,label}))]}/>
         </div>
         <p role="status" className="mt-3 text-xs text-wk-text-muted">
           Showing {rows.length} of {review.rows.length} source positions.
         </p>
         <WkDataTable rows={rows} getKey={row=>row.captureRowId}
-          ariaLabel="WAKILISHA 100 recorded source positions"
+          ariaLabel={qualify?"WAKILISHA 100 eligibility results":"WAKILISHA 100 recorded source positions"}
           empty="No source positions match these filters."
           columns={[
             {key:'rank',label:'Source rank',render:r=><span className="font-bold text-wk-text">{r.rank}</span>},
@@ -200,16 +226,19 @@ export function Wk100IdentifyReview({week,sources}:{week:string;sources:Source[]
             </div>},
             {key:'provider',label:'Provider track ID',render:r=>
               <span className="break-all text-wk-text-muted">{r.providerTrackId??'Not supplied'}</span>},
-            {key:'identity',label:'Registry link',render:r=><div>
-              <p className="font-semibold text-wk-text">{readableStatus[r.identityState]}</p>
-              <p className="text-wk-text-muted">
-                {r.canonicalTrackId??(r.reviewReason?reasonLabel[r.reviewReason]??'Review required':'Review required')}
-              </p>
+            {key:'identity',label:qualify?'Policy outcome':'Registry link',render:r=><div>
+              <p className="font-semibold text-wk-text">{qualify
+                ?({ELIGIBLE:'Rules met',EXCLUDED:'Excluded',REVIEW_REQUIRED:'Needs review',CONFLICTED:'Conflicting evidence'}[r.outcome??'REVIEW_REQUIRED'])
+                :readableStatus[r.identityState]}</p>
+              <p className="text-wk-text-muted">{qualify
+                ?(r.reasonCodes?.map(x=>x.replaceAll('_',' ')).join('; ')||'No rule failures')
+                :(r.canonicalTrackId??(r.reviewReason?reasonLabel[r.reviewReason]??'Review required':'Review required'))}</p>
             </div>},
           ]}/>
         <p className="mt-4 text-xs text-wk-text-muted">
-          Registry changes must go through existing governed MIZIZI or Registry review.
-          This table does not create Tracks, merge recordings, or write identity decisions.
+          {qualify
+            ?'This is a private rule preview. Exclusions and reviews need governed decisions. No rows were changed, scored, or published.'
+            :'Registry changes must use MIZIZI or Registry review. This table does not merge recordings or change identities.'}
         </p>
       </WkSurface>
     </>}

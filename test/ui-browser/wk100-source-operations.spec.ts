@@ -14,10 +14,11 @@ const cors={
 async function json(route:Route,body:unknown,status=200) {
   await route.fulfill({status,contentType:'application/json',headers:cors,body:JSON.stringify(body)});
 }
-async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[],existingEditionDraft=null}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[];existingEditionDraft?:Record<string,unknown>|null}={}) {
+async function install(page:Page,{invalid=false,deny=false,registryDenied=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[],existingEditionDraft=null}:{invalid?:boolean;deny?:boolean;registryDenied?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[];existingEditionDraft?:Record<string,unknown>|null}={}) {
   const reads:unknown[]=[];
   const originalReads:unknown[]=[];
   const identityReads:unknown[]=[];
+  const eligibilityReads:unknown[]=[];
   const editionReads:unknown[]=[];
   const writes:unknown[]=[];
   const methodWrites:unknown[]=[];
@@ -53,7 +54,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         status:'active',expires_at:null,created_at:'2026-10-21T00:00:00Z',updated_at:'2026-10-21T00:00:00Z'}]);return;
     }
     if(url.pathname==='/rest/v1/role_capabilities') {
-      await json(route,(deny?['view_dashboard','view_admin_readonly']:['view_dashboard','view_admin_readonly','view_charts_admin','manage_ingest','manage_charts'])
+      await json(route,(deny?['view_dashboard','view_admin_readonly']:['view_dashboard','view_admin_readonly','view_charts_admin','manage_ingest','manage_charts',...(registryDenied?[]:['view_registry'])])
         .map(capability_key=>({capability_key})));return;
     }
     if(url.pathname==='/rest/v1/user_access_scopes') {await json(route,[]);return;}
@@ -213,7 +214,39 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         });return;
       }
       if(body&&typeof body==='object'&&'action' in body&&
+        body.action==='preview_recording_eligibility'){
+        if(registryDenied){await json(route,{error:'registry_review_not_authorized'},403);return;}
+        eligibilityReads.push(body);
+        const choice=body as {weekStartEat:string;contractId:string;receiptId:string};
+        await json(route,{
+          schemaVersion:'wk100-admin-eligibility-preview-v1',
+          weekStartEat:choice.weekStartEat,contractId:choice.contractId,
+          receiptId:choice.receiptId,sourceKey:'apple_ke_public_top100',
+          payloadSha256:'a'.repeat(64),configRevision:1,
+          policySha256:'b'.repeat(64),eligibilityProfileName:'All artists',
+          marketScopeName:'Kenya',receiptStatus:'succeeded',
+          expectedDepth:2,observedDepth:2,
+          counts:{ELIGIBLE:0,EXCLUDED:1,REVIEW_REQUIRED:1,CONFLICTED:0},
+          rows:[
+            {captureRowId:'11111111-1111-4111-8111-111111111111',
+              rank:1,observedTitle:'Known song',observedArtist:null,
+              providerTrackId:'1',canonicalTrackId:null,identityState:'needs_review',
+              reviewReason:'provider_link_missing',provisionalRef:'wk100:obs:v1:'+'a'.repeat(64)+':11111111-1111-4111-8111-111111111111',
+              outcome:'REVIEW_REQUIRED',reasonCodes:['canonical_identity_needs_review','primary_artist_origin_unknown'],
+              canScore:false,canPublish:false},
+            {captureRowId:'22222222-2222-4222-8222-222222222222',
+              rank:2,observedTitle:'Excluded song',observedArtist:null,
+              providerTrackId:'2',canonicalTrackId:'33333333-3333-4333-8333-333333333333',
+              identityState:'resolved',reviewReason:null,provisionalRef:null,
+              outcome:'EXCLUDED',reasonCodes:['primary_artist_origin_not_allowed'],
+              canScore:false,canPublish:false},
+          ],reviewMode:'all_predicates_no_admission',
+          canScore:false,canPublish:false,canWriteRegistry:false,
+        });return;
+      }
+      if(body&&typeof body==='object'&&'action' in body&&
         body.action==='read_recording_observations'){
+        if(registryDenied){await json(route,{error:'registry_review_not_authorized'},403);return;}
         identityReads.push(body);
         const selection=body as {weekStartEat:string;contractId:string;receiptId:string};
         await json(route,{
@@ -263,7 +296,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         app_metadata:{},user_metadata:{},identities:[],created_at:'2026-10-21T00:00:00Z'},
     }));
   },{ref:PROJECT_REF,id:USER_ID});
-  return {reads,originalReads,identityReads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites,collectNowWrites};
+  return {reads,originalReads,identityReads,eligibilityReads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites,collectNowWrites};
 }
 
 test('five founder-selected core providers show truthful readiness and no invented source admission',async({page})=>{
@@ -1306,5 +1339,82 @@ test('W4 Identify inspects a chosen source receipt and exact Registry links with
   expect(ctx.methodWrites).toEqual([]);
   expect(ctx.contractWrites).toEqual([]);
   expect(ctx.recoveryWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('W5 Qualify uses the saved policy result on one exact source receipt without writing',async({page})=>{
+  const sourceId='44444444-4444-4444-8444-444444444444';
+  const receiptId='55555555-5555-4555-8555-555555555555';
+  const source={
+    id:sourceId,sourceKey:'apple_ke_public_top100',provider:'apple_ke',
+    surface:'Apple Music Kenya Top 100',market:'KE',metric:'rank',behavior:'consumption',
+    expectedDepth:2,cadence:'daily',version:'test-v1',intervalHours:null,
+    eatHour:14,eatMinute:23,weekdayEat:null,minimumHealthyCheckpoints:1,
+    adapterVersion:'apple_kenya_chart_v1',admissionState:'candidate',
+    captureState:'succeeded',attemptCount:1,lastAttemptAt:'2026-11-09T16:10:20Z',
+    lastScheduledAt:'2026-11-09T16:09:00Z',lastAttemptNumber:1,
+    lastSuccessfulAt:'2026-11-09T16:10:20Z',observedDepth:2,
+    nativePeriodAuthority:'unknown',nativePeriodStart:null,nativePeriodEnd:null,
+    receiptSha256:'a'.repeat(64),failureCode:null,
+    recentAttempts:[{id:receiptId,status:'succeeded',
+      attemptedAt:'2026-11-09T16:10:20Z',scheduledAt:'2026-11-09T16:09:00Z',
+      attemptNumber:1,fetchedAt:'2026-11-09T16:10:20Z',
+      failureCode:null,observedDepth:2}],canScore:false,canPublish:false,
+  };
+  const ctx=await install(page,{existingSources:[source]});
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-09',{waitUntil:'domcontentloaded'});
+  await page.getByRole('navigation',{name:'Chart operations stages'})
+    .getByRole('button').filter({hasText:'Qualify'}).click();
+  await expect(page.getByRole('heading',{name:'Eligibility Workbench',level:2}))
+    .toBeVisible({timeout:20_000});
+  await expect(page).toHaveURL(/stage=qualify/);
+  await expect(page.getByRole('table',{name:'WAKILISHA 100 eligibility results'})).toHaveCount(0);
+  await page.getByRole('button',{name:'Captured source'}).click();
+  await page.getByRole('option',{name:'Apple Music Kenya Top 100'}).click();
+  await page.getByRole('button',{name:'Exact source receipt'}).click();
+  await page.getByRole('option',{name:/succeeded/}).click();
+  const rows=page.getByRole('table',{name:'WAKILISHA 100 eligibility results'});
+  await expect(rows).toBeVisible({timeout:20_000});
+  await expect(rows.getByText('Known song')).toBeVisible();
+  await expect(rows.getByText('Excluded song')).toBeVisible();
+  await expect(page.getByText('Policy SHA-256')).toBeVisible();
+  await expect(page.getByText('Rules met (not approved)')).toBeVisible();
+  await page.getByRole('button',{name:'Eligibility outcome'}).click();
+  await page.getByRole('option',{name:'Excluded'}).click();
+  await expect(rows.getByText('Known song')).toHaveCount(0);
+  await expect(rows.getByText('Excluded song')).toBeVisible();
+  expect(ctx.eligibilityReads).toHaveLength(1);
+  expect(ctx.identityReads).toHaveLength(0);
+  expect(ctx.writes).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.recoveryWrites).toEqual([]);
+  expect(ctx.collectNowWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('W5 cannot read private Registry facts without view_registry capability',async({page})=>{
+  const ctx=await install(page,{registryDenied:true,existingSources:[{
+    id:'44444444-4444-4444-8444-444444444444',
+    sourceKey:'apple_ke_public_top100',surface:'Apple Music Kenya Top 100',
+    provider:'apple_ke',market:'KE',expectedDepth:2,behavior:'consumption',
+    metric:'rank',version:'test-v1',captureState:'succeeded',admissionState:'candidate',
+    nativePeriodAuthority:'unknown',receiptSha256:'a'.repeat(64),
+    recentAttempts:[{id:'55555555-5555-4555-8555-555555555555',
+      status:'succeeded',attemptedAt:'2026-11-09T16:10:20Z',observedDepth:2}],
+    canScore:false,canPublish:false,
+  }]});
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-09&stage=qualify',
+    {waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('heading',{name:'Eligibility Workbench',level:2}))
+    .toBeVisible({timeout:20_000});
+  await page.getByRole('button',{name:'Captured source'}).click();
+  await page.getByRole('option',{name:'Apple Music Kenya Top 100'}).click();
+  await page.getByRole('button',{name:'Exact source receipt'}).click();
+  await page.getByRole('option',{name:/succeeded/}).click();
+  await expect(page.getByRole('alert').filter({hasText:'No result is accepted'}))
+    .toBeVisible({timeout:20_000});
+  await expect(page.getByRole('table',{name:'WAKILISHA 100 eligibility results'}))
+    .toHaveCount(0);
+  expect(ctx.eligibilityReads).toHaveLength(0);
   expect(ctx.unexpected).toEqual([]);
 });

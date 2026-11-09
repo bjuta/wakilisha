@@ -104,6 +104,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const requestedWeek=searchParams.get('week');
   const week=requestedWeek&&isWk100WeekStartEat(requestedWeek)?requestedWeek:wk100CurrentWeekStartEat();
   const identifyActive=view==='overview'&&searchParams.get('stage')==='identify';
+  const qualifyActive=view==='overview'&&searchParams.get('stage')==='qualify';
+  const reviewActive=identifyActive||qualifyActive;
   const setWeek=(next:(week:string)=>string)=>setSearchParams(p=>{const q=new URLSearchParams(p);q.set('week',next(week));return q;});
   const readSequence=useRef(0);
   const [report,setReport]=useState<Report|null>(null);
@@ -488,13 +490,13 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   };
   const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
-    <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={identifyActive?'Recording Review':view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
+    <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={qualifyActive?'Eligibility Workbench':identifyActive?'Recording Review':view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
       <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();void loadEdition();void loadProposals();void loadMethods();if(view==='collection')void loadRecovery()}} disabled={phase==='loading'}>Refresh status</button>
     </AdminChartsPageHeader>
     <WkSurface className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3">
       <div className="flex items-center gap-2"><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Previous week" onClick={()=>setWeek(v=>nextWeek(v,-1))}>‹</button><div className="min-w-40 text-center"><p className="text-xs text-wk-text-muted">Edition week · Monday EAT</p><p className="text-sm font-bold text-wk-text">{week}</p></div><button type="button" className="wk-button wk-button-secondary wk-button-sm" aria-label="Next week" onClick={()=>setWeek(v=>nextWeek(v,1))}>›</button></div>
       <div className="flex flex-wrap items-center gap-2">
-        {view==='overview'&&!identifyActive&&<button type="button"
+        {view==='overview'&&!reviewActive&&<button type="button"
           className="wk-button wk-button-secondary wk-button-sm"
           onClick={()=>navigate('/admin/charts/ingest?wk100Week='+encodeURIComponent(week))}>
           Configure this Edition
@@ -512,23 +514,25 @@ export default function Wk100OperationsPage({view}:{view:View}) {
       steps={['Collect','Identify','Qualify','Rank','Publish'].map((label,i)=>({
         id:label.toLowerCase(),label,
         description:i===0?'Source and evidence review':
-          i===1?'Recording evidence and Registry review':'Requires later phase acceptance',
-        state:i===0?(identifyActive?'available' as const:'current' as const):
-          i===1?(identifyActive?'current' as const:'available' as const):'blocked' as const,
+          i===1?'Recording evidence and Registry review':
+          i===2?'Saved policy and evidence-backed filter results':'Requires later phase acceptance',
+        state:i===0?(reviewActive?'available' as const:'current' as const):
+          i===1?(identifyActive?'current' as const:'available' as const):
+          i===2?(qualifyActive?'current' as const:'available' as const):'blocked' as const,
       }))}
       onSelect={step=>{
         if(step.id==='collect')go('');
-        if(step.id==='identify')
-          navigate('/admin/charts/wk100-operations?week='+encodeURIComponent(week)+'&stage=identify');
+        if(step.id==='identify'||step.id==='qualify')
+          navigate('/admin/charts/wk100-operations?week='+encodeURIComponent(week)+'&stage='+step.id);
       }}/>
-    {!identifyActive&&<nav className="flex flex-wrap gap-2" aria-label="Collection workspace">
+    {!reviewActive&&<nav className="flex flex-wrap gap-2" aria-label="Collection workspace">
       {[['Overview',''],['Sources','/sources'],['Collection','/collection']].map(([name,path])=><button key={name} type="button" onClick={()=>go(path)} aria-current={(view==='overview'&&path==='')||(view==='sources'&&path==='/sources')||(view==='collection'&&path==='/collection')?'page':undefined} className={'rounded-full border px-4 py-2 text-xs font-semibold '+((view==='overview'&&path==='')||(view==='sources'&&path==='/sources')||(view==='collection'&&path==='/collection')?'border-wk-brand bg-wk-brand-soft text-wk-text':'border-wk-border text-wk-text-muted hover:bg-wk-surface-raised')}>{name}</button>)}
     </nav>}
     {phase==='loading'&&<Card title="Reading capture status"><p role="status" className="text-sm text-wk-text-muted">Checking the restricted source ledger…</p></Card>}
     {phase==='unavailable'&&<Card title="Source status unavailable"><p role="alert" className="text-sm text-wk-text-muted">The protected source service did not return a verified response. No source is assumed to be qualified or collected. Backend deployment and authorized access are needed before this view can show live status.</p></Card>}
     {phase==='ready'&&report&&<>
-      {identifyActive&&<Wk100IdentifyReview key={week} week={week} sources={report.sources}/>}
-      {view==='overview'&&!identifyActive&&<div className="space-y-5">
+      {reviewActive&&<Wk100IdentifyReview key={week+':'+(qualifyActive?'qualify':'identify')} week={week} sources={report.sources} stage={qualifyActive?'qualify':'identify'}/>}
+      {view==='overview'&&!reviewActive&&<div className="space-y-5">
         <WkOperationsHero eyebrow={'WAKILISHA 100 · Kenya · week '+week}
           title={'Week of '+new Intl.DateTimeFormat('en-KE',{day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Nairobi'}).format(new Date(week+'T12:00:00Z'))}
           description={report.sourceCount===0?'No enrolled capture sources yet. This week has no verified evidence set and cannot proceed to private ranking.':'Source research is provisional. Captures do not become scoring evidence until separately qualified.'}
