@@ -14,7 +14,7 @@ const cors={
 async function json(route:Route,body:unknown,status=200) {
   await route.fulfill({status,contentType:'application/json',headers:cors,body:JSON.stringify(body)});
 }
-async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[],existingEditionDraft=null}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[];existingEditionDraft?:Record<string,unknown>|null}={}) {
+async function install(page:Page,{invalid=false,deny=false,registryDenied=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[],existingEditionDraft=null}:{invalid?:boolean;deny?:boolean;registryDenied?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[];existingEditionDraft?:Record<string,unknown>|null}={}) {
   const reads:unknown[]=[];
   const originalReads:unknown[]=[];
   const identityReads:unknown[]=[];
@@ -54,7 +54,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         status:'active',expires_at:null,created_at:'2026-10-21T00:00:00Z',updated_at:'2026-10-21T00:00:00Z'}]);return;
     }
     if(url.pathname==='/rest/v1/role_capabilities') {
-      await json(route,(deny?['view_dashboard','view_admin_readonly']:['view_dashboard','view_admin_readonly','view_charts_admin','manage_ingest','manage_charts'])
+      await json(route,(deny?['view_dashboard','view_admin_readonly']:['view_dashboard','view_admin_readonly','view_charts_admin','manage_ingest','manage_charts',...(registryDenied?[]:['view_registry'])])
         .map(capability_key=>({capability_key})));return;
     }
     if(url.pathname==='/rest/v1/user_access_scopes') {await json(route,[]);return;}
@@ -215,6 +215,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
       }
       if(body&&typeof body==='object'&&'action' in body&&
         body.action==='preview_recording_eligibility'){
+        if(registryDenied){await json(route,{error:'registry_review_not_authorized'},403);return;}
         eligibilityReads.push(body);
         const choice=body as {weekStartEat:string;contractId:string;receiptId:string};
         await json(route,{
@@ -245,6 +246,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
       }
       if(body&&typeof body==='object'&&'action' in body&&
         body.action==='read_recording_observations'){
+        if(registryDenied){await json(route,{error:'registry_review_not_authorized'},403);return;}
         identityReads.push(body);
         const selection=body as {weekStartEat:string;contractId:string;receiptId:string};
         await json(route,{
