@@ -639,7 +639,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                        row.contract.receiptSha256?'Captured':'Not collected'}
                 </WkStateBadge>:
                 <WkStateBadge>Not enrolled</WkStateBadge>},
-              {key:'last',label:'Last success',render:row=>
+              {key:'last',label:'Last original',render:row=>
                 <span className="text-wk-text-muted">{when(row.contract?.lastSuccessfulAt??null)}</span>},
               {key:'constitution',label:'Constitution',render:()=>
                 <span className="text-xs text-wk-text-muted">Out · no scoring authority</span>},
