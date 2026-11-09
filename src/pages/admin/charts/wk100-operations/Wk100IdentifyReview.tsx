@@ -170,8 +170,8 @@ export function Wk100IdentifyReview({week,sources}:{week:string;sources:Source[]
             {label:'Inactive linked Tracks',value:review.totals.inactive},
           ]}/>
           <WkDetailList items={[
-            {label:'Source',value:review.sourceKey},
-            {label:'Receipt',value:review.receiptId},
+            {label:'Source key',value:review.sourceKey},
+            {label:'Capture receipt',value:review.receiptId},
             {label:'Original SHA-256',value:review.payloadSha256},
             {label:'Registry provider namespace',value:review.registryProviderKey},
           ]}/>
