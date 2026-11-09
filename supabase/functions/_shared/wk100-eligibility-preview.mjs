@@ -133,7 +133,9 @@ export async function projectWk100EligibilityPreview({
     rows.push({
       captureRowId:observation.captureRowId,rank:observation.rank,
       observedTitle:observation.observedTitle,observedArtist:observation.observedArtist,
+      providerTrackId:observation.providerTrackId,
       identityState:observation.identityState,canonicalTrackId:facts.canonicalTrackId,
+      reviewReason:observation.reviewReason,provisionalRef:observation.provisionalRef,
       outcome,reasonCodes:[...new Set(reasonCodes)],
       canScore:false,canPublish:false,
     });
