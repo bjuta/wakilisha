@@ -121,6 +121,16 @@ export async function projectWk100EligibilityPreview({
     const registryTrackSlug=typeof linkedTrack?.slug==='string'&&
       /^[a-z0-9][a-z0-9_-]{0,127}$/.test(linkedTrack.slug)
       ?linkedTrack.slug:null;
+    const cleanSlug=x=>typeof x==='string'&&/^[a-z0-9][a-z0-9_-]{0,127}$/.test(x)?x:null;
+    const linkedRelease=linkedTrack?.release_id?registryReleases.find(x=>
+      x?.id===linkedTrack.release_id&&x.status==='active'):null;
+    const registryReleaseSlug=cleanSlug(linkedRelease?.slug);
+    // These are existing active credits for investigation, not an assertion
+    // that an observed song automatically has correct performer attribution.
+    const registryArtistSlugs=[...new Set(registryCredits
+      .filter(x=>linkedTrack&&x?.track_id===linkedTrack.id&&x.status==='active')
+      .map(x=>registryArtists.find(a=>a?.id===x.artist_id&&a.status==='active'))
+      .map(a=>cleanSlug(a?.slug)).filter(Boolean))];
     const evaluated=await evaluateFrozenChartIngestCandidate(frozen,facts);
     ensure(['ELIGIBLE','EXCLUDED','REVIEW_REQUIRED','CONFLICTED'].includes(evaluated.status)&&
       evaluated.mayScore===false&&evaluated.mayMutateRegistry===false&&
@@ -142,7 +152,7 @@ export async function projectWk100EligibilityPreview({
       providerTrackId:observation.providerTrackId,
       identityState:observation.identityState,canonicalTrackId:facts.canonicalTrackId,
       reviewReason:observation.reviewReason,provisionalRef:observation.provisionalRef,
-      registryTrackSlug,registryFactsSha256,
+      registryTrackSlug,registryReleaseSlug,registryArtistSlugs,registryFactsSha256,
       outcome,reasonCodes:[...new Set(reasonCodes)],
       canScore:false,canPublish:false,
     });
