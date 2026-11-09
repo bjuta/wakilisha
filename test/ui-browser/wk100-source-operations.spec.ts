@@ -17,6 +17,7 @@ async function json(route:Route,body:unknown,status=200) {
 async function install(page:Page,{invalid=false,deny=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[],existingEditionDraft=null}:{invalid?:boolean;deny?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[];existingEditionDraft?:Record<string,unknown>|null}={}) {
   const reads:unknown[]=[];
   const originalReads:unknown[]=[];
+  const identityReads:unknown[]=[];
   const editionReads:unknown[]=[];
   const writes:unknown[]=[];
   const methodWrites:unknown[]=[];
@@ -211,6 +212,34 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
           nativePeriodAuthority:'unknown',canScore:false,canPublish:false,
         });return;
       }
+      if(body&&typeof body==='object'&&'action' in body&&
+        body.action==='read_recording_observations'){
+        identityReads.push(body);
+        const selection=body as {weekStartEat:string;contractId:string;receiptId:string};
+        await json(route,{
+          schemaVersion:'wk100-admin-identify-observations-v1',
+          weekStartEat:selection.weekStartEat,
+          contractId:selection.contractId,receiptId:selection.receiptId,
+          sourceKey:'apple_ke_public_top100',providerKey:'apple_ke',
+          registryProviderKey:'apple_music',receiptStatus:'succeeded',
+          expectedDepth:2,observedDepth:2,payloadSha256:'f'.repeat(64),
+          originalReadbackInThisRequest:false,
+          identityStatus:'exact_provider_links_only',
+          totals:{observed:2,resolved:1,needsReview:1,conflicting:0,inactive:0},
+          rows:[
+            {captureRowId:'11111111-1111-4111-8111-111111111111',rank:1,
+              observedTitle:'Song One',observedArtist:null,providerTrackId:'123',
+              canonicalTrackId:'33333333-3333-4333-8333-333333333333',
+              identityState:'resolved',reviewReason:null,provisionalRef:null},
+            {captureRowId:'22222222-2222-4222-8222-222222222222',rank:2,
+              observedTitle:'Song Two',observedArtist:null,providerTrackId:'456',
+              canonicalTrackId:null,identityState:'needs_review',
+              reviewReason:'provider_link_missing',
+              provisionalRef:'wk100:obs:v1:'+'f'.repeat(64)+':22222222-2222-4222-8222-222222222222'},
+          ],
+          canWriteRegistry:false,canScore:false,canPublish:false,
+        });return;
+      }
       reads.push(body);
       const week=body&&typeof body==='object'&&'weekStartEat' in body
         ?String(body.weekStartEat):'';
@@ -234,7 +263,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         app_metadata:{},user_metadata:{},identities:[],created_at:'2026-10-21T00:00:00Z'},
     }));
   },{ref:PROJECT_REF,id:USER_ID});
-  return {reads,originalReads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites,collectNowWrites};
+  return {reads,originalReads,identityReads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites,collectNowWrites};
 }
 
 test('five founder-selected core providers show truthful readiness and no invented source admission',async({page})=>{
@@ -1225,5 +1254,57 @@ test('W3 does not expose Collect Now without a current reviewed and enrolled met
   await expect(table.getByText('No current admitted method')).toBeVisible();
   await expect(table.getByRole('button',{name:'Collect Now'})).toHaveCount(0);
   expect(ctx.collectNowWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
+test('W4 Identify inspects a chosen source receipt and exact Registry links without writing',async({page})=>{
+  const contractId='44444444-4444-4444-8444-444444444444';
+  const receiptId='55555555-5555-4555-8555-555555555555';
+  const source={
+    id:contractId,sourceKey:'apple_ke_public_top100',provider:'apple_ke',
+    surface:'Apple Music Kenya Top 100',market:'KE',metric:'rank',behavior:'consumption',
+    expectedDepth:2,cadence:'daily',version:'wk100-test-v1',
+    intervalHours:null,eatHour:14,eatMinute:23,weekdayEat:null,
+    minimumHealthyCheckpoints:1,adapterVersion:'apple_kenya_chart_v1',
+    admissionState:'candidate',captureState:'succeeded',attemptCount:1,
+    lastAttemptAt:'2026-11-09T16:10:20Z',lastScheduledAt:'2026-11-09T16:09:00Z',
+    lastAttemptNumber:1,lastSuccessfulAt:'2026-11-09T16:10:20Z',
+    observedDepth:2,nativePeriodAuthority:'unknown',
+    nativePeriodStart:null,nativePeriodEnd:null,receiptSha256:'f'.repeat(64),
+    failureCode:null,canScore:false,canPublish:false,
+    recentAttempts:[{id:receiptId,status:'succeeded',
+      attemptedAt:'2026-11-09T16:10:20Z',scheduledAt:'2026-11-09T16:09:00Z',
+      attemptNumber:1,fetchedAt:'2026-11-09T16:10:20Z',
+      failureCode:null,observedDepth:2}],
+  };
+  const ctx=await install(page,{existingSources:[source]});
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-09',
+    {waitUntil:'domcontentloaded'});
+  const stages=page.getByRole('navigation',{name:'Chart operations stages'});
+  await stages.getByRole('button').filter({hasText:'Identify'}).click();
+  await expect(page.getByRole('heading',{name:'Recording Review',level:2})).toBeVisible();
+  await expect(page).toHaveURL(/stage=identify/);
+  await expect(page.getByRole('table',{name:'WAKILISHA 100 recorded source positions'})).toHaveCount(0);
+  await page.getByRole('button',{name:'Captured source'}).click();
+  await page.getByRole('option',{name:'Apple Music Kenya Top 100'}).click();
+  await page.getByRole('button',{name:'Exact source receipt'}).click();
+  await page.getByRole('option',{name:/succeeded/}).click();
+  const table=page.getByRole('table',{name:'WAKILISHA 100 recorded source positions'});
+  await expect(table).toBeVisible({timeout:20_000});
+  await expect(table.getByText('Song One')).toBeVisible();
+  await expect(table.getByText('Artist not supplied by source')).toHaveCount(2);
+  await expect(table.getByText('Linked recording')).toBeVisible();
+  await expect(table.getByText('No confirmed Registry link')).toBeVisible();
+  await expect(page.getByText('Confirmed active Registry links')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Open MIZIZI review'})).toBeVisible();
+  await page.getByRole('button',{name:'Recording link status'}).click();
+  await page.getByRole('option',{name:'Needs review'}).click();
+  await expect(table.getByText('Song One')).toHaveCount(0);
+  await expect(table.getByText('Song Two')).toBeVisible();
+  expect(ctx.identityReads).toHaveLength(1);
+  expect(ctx.writes).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.contractWrites).toEqual([]);
+  expect(ctx.recoveryWrites).toEqual([]);
   expect(ctx.unexpected).toEqual([]);
 });
