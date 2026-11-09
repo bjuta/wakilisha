@@ -99,16 +99,16 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
       row.canonicalTrackId,String(row.rank),row.reasonCodes?.join(' '),
     ].some(v=>v?.toLowerCase().includes(search.trim().toLowerCase()))))??[],
     [review,filter,search,qualify]);
-  return <section data-wk-identify-review className="space-y-5" aria-label="Recording review">
+  return <section data-wk-identify-review className="space-y-5" aria-label={qualify?"Eligibility review":"Recording review"}>
     <WkSurface className="rounded-xl p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold text-wk-text-muted">Identify / W4 / Kenya</p>
-          <h2 className="mt-1 text-xl font-bold text-wk-text">Recording Review</h2>
+          <p className="text-xs font-semibold text-wk-text-muted">{qualify?"Qualify / W5 / Kenya":"Identify / W4 / Kenya"}</p>
+          <h2 className="mt-1 text-xl font-bold text-wk-text">{qualify?"Eligibility Workbench":"Recording Review"}</h2>
           <p className="mt-2 max-w-3xl text-sm text-wk-text-muted">
-            Inspect observed chart positions and exact Registry links. A matching title is not proof
-            of the same recording. Unresolved details stay attached to their original evidence
-            and do not automatically prevent a later evidence-qualified Edition.
+            {qualify
+              ?'Check every captured position against this week’s saved eligibility rules. Missing Registry facts need review.'
+              :'Inspect the observed positions and exact Registry links. Similar titles do not establish recording identity.'}
           </p>
         </div>
         <WkStateBadge tone="warning">Private review only</WkStateBadge>
@@ -146,21 +146,23 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
       </div>
     </WkSurface>
     {phase==='loading'&&<WkSurface className="rounded-xl p-4">
-      <p role="status" className="text-sm text-wk-text-muted">Checking exact recording links…</p>
+      <p role="status" className="text-sm text-wk-text-muted">{qualify?"Checking saved eligibility rules and Registry evidence…":"Checking exact recording links…"}</p>
     </WkSurface>}
     {phase==='unavailable'&&<WkSurface className="rounded-xl p-4">
       <p role="alert" className="text-sm text-wk-danger">
-        The restricted recording review could not verify this receipt or its Registry links.
-        No recording has been assumed matched. You can retry the read.
+        {qualify
+          ?'We couldn’t verify this week’s saved eligibility policy and Registry evidence. No result is accepted. Retry the read.'
+          :'We couldn’t verify this receipt or its Registry links. No recording is assumed matched. Retry the read.'}
       </p>
     </WkSurface>}
     {phase==='ready'&&review&&<>
       <WkSurface className="rounded-xl p-4 sm:p-5">
         <div className="flex flex-wrap justify-between gap-3">
-          <div><h3 className="text-base font-bold text-wk-text">Identity coverage</h3>
+          <div><h3 className="text-base font-bold text-wk-text">{qualify?"Eligibility Review":"Identity Coverage"}</h3>
             <p className="mt-1 text-xs text-wk-text-muted">
-              Exact provider links only. Original receipt SHA is preserved. This read does not
-              replay the private original or authorize ranking.
+              {qualify
+                ?'All captured positions use this week’s saved policy and current Registry facts. Passing rules does not authorize ranking.'
+                :'Exact provider links only. The receipt digest remains unchanged. This read does not authorize ranking.'}
             </p></div>
           <WkStateBadge tone="warning">
             {review.receiptStatus==='partial_depth'?'Partial source evidence':'Candidate source evidence'}
@@ -184,7 +186,7 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
         </div>
       </WkSurface>
       <WkSurface className="rounded-xl p-4 sm:p-5">
-        <h3 className="text-base font-bold text-wk-text">Source recording observations</h3>
+        <h3 className="text-base font-bold text-wk-text">{qualify?"Eligibility Results":"Source Recording Observations"}</h3>
         <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
           <WkSearchField value={search} onChange={setSearch} ariaLabel="Search source recordings"
             placeholder="Search title, artist, source ID, or rank"/>
@@ -196,7 +198,7 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
           Showing {rows.length} of {review.rows.length} source positions.
         </p>
         <WkDataTable rows={rows} getKey={row=>row.captureRowId}
-          ariaLabel="WAKILISHA 100 recorded source positions"
+          ariaLabel={qualify?"WAKILISHA 100 eligibility results":"WAKILISHA 100 recorded source positions"}
           empty="No source positions match these filters."
           columns={[
             {key:'rank',label:'Source rank',render:r=><span className="font-bold text-wk-text">{r.rank}</span>},
@@ -214,8 +216,9 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
             </div>},
           ]}/>
         <p className="mt-4 text-xs text-wk-text-muted">
-          Registry changes must go through existing governed MIZIZI or Registry review.
-          This table does not create Tracks, merge recordings, or write identity decisions.
+          {qualify
+            ?'This is a private rule preview. Exclusions and reviews need governed decisions. No rows were changed, scored, or published.'
+            :'Registry changes must use MIZIZI or Registry review. This table does not merge recordings or change identities.'}
         </p>
       </WkSurface>
     </>}
