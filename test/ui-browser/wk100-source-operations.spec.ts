@@ -427,6 +427,66 @@ test('observed-as-of receipts are visible without asserting provider-native meas
   expect(ctx.unexpected).toEqual([]);
 });
 
+test('W1 W2 and W3 distinguish a retained partial original from full-depth health and retry authority',async({page})=>{
+  const captured=(id:string,key:string,provider:string,surface:string,status:string,depth:number,expectedDepth:number)=>({
+    id,sourceKey:key,provider,surface,market:'KE',metric:'rank',behavior:'consumption',
+    expectedDepth,version:'wk100-public-original-v1',admissionState:'candidate',
+    cadence:'daily',intervalHours:null,eatHour:9,eatMinute:0,weekdayEat:null,
+    minimumHealthyCheckpoints:1,adapterVersion:'fixture-v1',
+    captureState:status,attemptCount:1,
+    lastAttemptAt:'2026-11-09T16:10:20Z',lastSuccessfulAt:'2026-11-09T16:10:20Z',
+    lastScheduledAt:'2026-11-09T16:09:00Z',lastAttemptNumber:1,observedDepth:depth,
+    nativePeriodAuthority:'unknown',nativePeriodStart:null,nativePeriodEnd:null,
+    receiptSha256:'a'.repeat(64),failureCode:null,
+    recentAttempts:[{id,status,attemptedAt:'2026-11-09T16:10:20Z',
+      scheduledAt:'2026-11-09T16:09:00Z',attemptNumber:1,
+      fetchedAt:'2026-11-09T16:10:20Z',failureCode:null,observedDepth:depth}],
+    canScore:false,canPublish:false,
+  });
+  const sources=[
+    captured('11111111-1111-4111-8111-111111111111','shazam_ke_public_top200','shazam_ke',
+      'Shazam Kenya Top 200','succeeded',200,200),
+    captured('22222222-2222-4222-8222-222222222222','apple_ke_public_top100','apple_ke',
+      'Apple Music Kenya Top 100','succeeded',100,100),
+    captured('33333333-3333-4333-8333-333333333333','mdundo_ke_public_top_songs','mdundo_ke',
+      'Mdundo Kenya Top Songs','partial_depth',99,100),
+  ];
+  const ctx=await install(page,{existingSources:sources});
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-09',{waitUntil:'domcontentloaded'});
+  await expect(page.getByText('3 verified originals (2 complete, 1 partial).',{exact:false}))
+    .toBeVisible({timeout:20_000});
+  await expect(page.getByText('Full-depth captures',{exact:true})).toBeVisible();
+  await expect(page.getByText('Partial-depth captures',{exact:true})).toBeVisible();
+  await expect(page.getByText('Not ready for ranking',{exact:true})).toHaveCount(0);
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-09',
+    {waitUntil:'domcontentloaded'});
+  const registry=page.getByRole('table',{name:'Source registry'});
+  await expect(registry.getByRole('row').filter({hasText:'Mdundo Kenya Top Songs'})
+    .getByText('Partial depth',{exact:true})).toBeVisible({timeout:20_000});
+  await page.getByRole('button',{name:'Filter health'}).click();
+  await page.getByRole('option',{name:'Partial depth'}).click();
+  await expect(registry.getByText('Mdundo Kenya Top Songs')).toBeVisible();
+  await expect(registry.getByText('Shazam Kenya Top 200')).toHaveCount(0);
+  await page.goto('/admin/charts/wk100-operations/collection?week=2026-11-09',
+    {waitUntil:'domcontentloaded'});
+  await expect(page.getByText('1 partial-depth source',{exact:true})).toBeVisible({timeout:20_000});
+  await expect(page.getByText('Partial-depth originals',{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'A source returned fewer ranks than expected'}))
+    .toBeVisible();
+  const row=page.getByRole('table',{name:'Weekly source collection'})
+    .getByRole('row').filter({hasText:'Mdundo Kenya Top Songs'});
+  await expect(row.getByText('99',{exact:false})).toBeVisible();
+  await expect(row.getByRole('button',{name:'Request Retry'})).toHaveCount(0);
+  await expect(row.getByRole('button',{name:'Request Coverage Review'})).toHaveCount(0);
+  await row.getByRole('button',{name:'Inspect Partial Original'}).click();
+  await expect(page.getByText('No retry permitted for this outcome')).toBeVisible();
+  await expect(page.getByText('Partial original retained. Missing ranks remain visible',{exact:false}))
+    .toBeVisible();
+  expect(ctx.recoveryWrites).toEqual([]);
+  expect(ctx.collectNowWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
 test('source overview stays truthful, carries EAT week through navigation and uses no publisher',async({page})=>{
   const ctx=await install(page);
   await page.goto('/admin/charts/wk100-operations?week=2026-10-26',{waitUntil:'domcontentloaded'});
