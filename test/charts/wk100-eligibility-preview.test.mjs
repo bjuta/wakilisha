@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {projectWk100EligibilityPreview as project} from '../../supabase/functions/_shared/wk100-eligibility-preview.mjs';
+import {projectWk100EligibilityPreview as project,wk100EligibilityPolicyProvider} from '../../supabase/functions/_shared/wk100-eligibility-preview.mjs';
 const W='2026-11-09', T='11111111-1111-4111-8111-111111111111', A='22222222-2222-4222-8222-222222222222';
 const R='33333333-3333-4333-8333-333333333333';
 const canonical=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?
@@ -15,7 +15,7 @@ async function fixture(){
   trackEligibility:{explicitAllowed:true,requireIsrc:false,requirePreview:false},
   collaborationRules:{allowFeaturedArtists:true,countFeaturedArtistNationality:false,
     primaryArtistMustMatchEligibility:true,allArtistsMustMatchEligibility:false},
-  sourceRules:{allowedProviders:['mdundo_ke'],requireAtLeastOneProviderId:true,
+  sourceRules:{allowedProviders:['mdundo'],requireAtLeastOneProviderId:true,
     requireProviderAvailabilityInMarket:false},
   reviewRules:{requireManualReviewForUnknownGender:false,requireManualReviewForUnknownNationality:true,
     requireManualReviewForUnknownArtistType:false,requireManualReviewForGroups:false,
@@ -93,4 +93,26 @@ test('missing Registry Track cannot become eligible',async()=>{
 test('conflicted provider link stays conflicted regardless of other filters',async()=>{
  const x=await fixture();x.sourceReview.rows[1].identityState='conflicting';
  const r=await project(x);assert.equal(r.rows[1].outcome,'CONFLICTED');
+});
+
+test('only explicit five core namespaces map to the existing profile provider families',()=>{
+ const expected={
+   apple_music:'apple_music',shazam_ke:'shazam',mdundo_ke:'mdundo',
+   youtube_ke:'youtube',audiomack_ke:'audiomack',
+ };
+ for(const [key,val] of Object.entries(expected))
+   assert.equal(wk100EligibilityPolicyProvider(key),val);
+ assert.throws(()=>wk100EligibilityPolicyProvider('mdundo_ke_typo'),/unknown_policy_provider/);
+});
+test('saved source allow-list is enforced, never silently expanded for a core source',async()=>{
+ const x=await fixture();
+ x.draft.config_json.eligibilityProfileSnapshot.sourceRules.allowedProviders=['spotify'];
+ x.draft.config_json.ingestPolicySha256=await digest({
+   profileId:'elig_kenyan',marketScopeId:'scope_kenya',
+   eligibilityProfileSnapshot:x.draft.config_json.eligibilityProfileSnapshot,
+   marketScopeSnapshot:x.draft.config_json.marketScopeSnapshot,
+ });
+ const y=await project(x);
+ assert.equal(y.rows[0].outcome,'EXCLUDED');
+ assert(y.rows[0].reasonCodes.includes('source_provider_not_allowed'));
 });
