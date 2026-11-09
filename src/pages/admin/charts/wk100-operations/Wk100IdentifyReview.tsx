@@ -18,13 +18,16 @@ type Row={
   providerTrackId:string|null;canonicalTrackId:string|null;
   identityState:'resolved'|'needs_review'|'conflicting'|'inactive';
   reviewReason:string|null;provisionalRef:string|null;
+  outcome?:'ELIGIBLE'|'EXCLUDED'|'REVIEW_REQUIRED'|'CONFLICTED';reasonCodes?:string[];
 };
 type Review={
-  schemaVersion:'wk100-admin-identify-observations-v1';
+  schemaVersion:'wk100-admin-identify-observations-v1'|'wk100-admin-eligibility-preview-v1';
   weekStartEat:string;contractId:string;receiptId:string;sourceKey:string;
-  registryProviderKey:string;receiptStatus:string;observedDepth:number;
+  registryProviderKey?:string;receiptStatus:string;observedDepth:number;
+  configRevision?:number;eligibilityProfileName?:string;marketScopeName?:string;
+  policySha256?:string;counts?:Record<'ELIGIBLE'|'EXCLUDED'|'REVIEW_REQUIRED'|'CONFLICTED',number>;
   expectedDepth:number;payloadSha256:string;originalReadbackInThisRequest:false;
-  totals:{observed:number;resolved:number;needsReview:number;conflicting:number;inactive:number};
+  totals?:{observed:number;resolved:number;needsReview:number;conflicting:number;inactive:number};
   rows:Row[];canWriteRegistry:false;canScore:false;canPublish:false;
 };
 const eligible=(attempt:Receipt)=>['succeeded','partial_depth'].includes(attempt.status);
@@ -47,7 +50,8 @@ function when(value:string|null){
     ?new Intl.DateTimeFormat('en-KE',{timeZone:'Africa/Nairobi',dateStyle:'medium',timeStyle:'short'}).format(date)+' EAT'
     :'Unknown time';
 }
-export function Wk100IdentifyReview({week,sources}:{week:string;sources:Source[]}){
+export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string;sources:Source[];stage?:'identify'|'qualify'}){
+  const qualify=stage==='qualify';
   const navigate=useNavigate();
   const selectable=useMemo(()=>sources.filter(s=>s.recentAttempts.some(eligible)),[sources]);
   const [sourceId,setSourceId]=useState('');
@@ -70,13 +74,15 @@ export function Wk100IdentifyReview({week,sources}:{week:string;sources:Source[]
     void (async()=>{
       try{
         const {data,error}=await supabase.functions.invoke('wk100-source-admin-read',{
-          body:{action:'read_recording_observations',
+          body:{action:qualify?'preview_recording_eligibility':'read_recording_observations',
             weekStartEat:week,contractId:source.id,receiptId},
         });
-        if(error||!data||data.schemaVersion!=='wk100-admin-identify-observations-v1'||
+        if(error||!data||data.schemaVersion!==(qualify?'wk100-admin-eligibility-preview-v1':'wk100-admin-identify-observations-v1')||
           data.weekStartEat!==week||data.contractId!==source.id||data.receiptId!==receiptId||
           data.sourceKey!==source.sourceKey||!Array.isArray(data.rows)||
-          data.rows.length!==data.observedDepth||data.totals?.observed!==data.rows.length||
+          data.rows.length!==data.observedDepth||
+          (qualify?(!data.counts||Object.values(data.counts).reduce((n:number,v:unknown)=>n+(typeof v==='number'?v:0),0)!==data.rows.length):
+            data.totals?.observed!==data.rows.length)||
           data.canWriteRegistry!==false||data.canScore!==false||data.canPublish!==false)
           throw Error('identity_response_invalid');
         if(seq===sequence.current){setReview(data as Review);setPhase('ready');}
@@ -85,14 +91,14 @@ export function Wk100IdentifyReview({week,sources}:{week:string;sources:Source[]
     return ()=>{sequence.current+=1;};
     // Receipt selection is explicit. No current-week source is selected
     // automatically for identification or downstream ranking.
-  },[sourceId,receiptId,readNonce,week,sources]);
+  },[sourceId,receiptId,readNonce,week,sources,qualify]);
   const rows=useMemo(()=>review?.rows.filter(row=>
-    (filter==='all'||row.identityState===filter)&&
+    (filter==='all'||(qualify?row.outcome===filter:row.identityState===filter))&&
     (!search||[
       row.observedTitle,row.observedArtist,row.providerTrackId,
-      row.canonicalTrackId,String(row.rank),
+      row.canonicalTrackId,String(row.rank),row.reasonCodes?.join(' '),
     ].some(v=>v?.toLowerCase().includes(search.trim().toLowerCase()))))??[],
-    [review,filter,search]);
+    [review,filter,search,qualify]);
   return <section data-wk-identify-review className="space-y-5" aria-label="Recording review">
     <WkSurface className="rounded-xl p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
