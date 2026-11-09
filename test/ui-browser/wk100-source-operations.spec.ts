@@ -241,6 +241,8 @@ async function install(page:Page,{invalid=false,deny=false,registryDenied=false,
               providerTrackId:'2',canonicalTrackId:'33333333-3333-4333-8333-333333333333',
               identityState:'resolved',reviewReason:null,provisionalRef:null,
               registryTrackSlug:'linked-recording-slug',
+              registryReleaseSlug:'linked-release-slug',
+              registryArtistSlugs:['linked-artist-slug'],
               registryFactsSha256:(rechecked?'e':'d').repeat(64),
               outcome:rechecked?'REVIEW_REQUIRED':'EXCLUDED',
               reasonCodes:rechecked?['primary_artist_origin_unknown']:['primary_artist_origin_not_allowed'],
@@ -1390,6 +1392,10 @@ test('W5 Qualify uses the saved policy result on one exact source receipt withou
   await expect(rows.getByText('Excluded song')).toBeVisible();
   await expect(page.getByRole('link',{name:'Edit Linked Track'}))
     .toHaveAttribute('href','/admin/registry/tracks/linked-recording-slug');
+  await expect(page.getByRole('link',{name:'Edit Linked Release'}))
+    .toHaveAttribute('href','/admin/registry/releases/linked-release-slug');
+  await expect(page.getByRole('link',{name:'Review Credited Artist 1'}))
+    .toHaveAttribute('href','/admin/registry/artists/linked-artist-slug');
   await expect(page.getByRole('link',{name:'Investigate in Registry'}))
     .toHaveAttribute('href','/admin/registry/tracks?search=Known%20song');
   await page.getByRole('button',{name:'Re-evaluate After Corrections'}).click();
