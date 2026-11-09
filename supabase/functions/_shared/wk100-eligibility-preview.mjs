@@ -115,6 +115,12 @@ export async function projectWk100EligibilityPreview({
     seen.add(observation.captureRowId);
     const facts=factsFor(observation,sourceReview,registryTracks,registryCredits,
       registryArtists,registryReleases);
+    const registryFactsSha256=await digest(stable(facts));
+    const linkedTrack=facts.canonicalTrackId?registryTracks.find(x=>
+      x?.id===facts.canonicalTrackId&&x.status==='active'):null;
+    const registryTrackSlug=typeof linkedTrack?.slug==='string'&&
+      /^[a-z0-9][a-z0-9_-]{0,127}$/.test(linkedTrack.slug)
+      ?linkedTrack.slug:null;
     const evaluated=await evaluateFrozenChartIngestCandidate(frozen,facts);
     ensure(['ELIGIBLE','EXCLUDED','REVIEW_REQUIRED','CONFLICTED'].includes(evaluated.status)&&
       evaluated.mayScore===false&&evaluated.mayMutateRegistry===false&&
@@ -136,6 +142,7 @@ export async function projectWk100EligibilityPreview({
       providerTrackId:observation.providerTrackId,
       identityState:observation.identityState,canonicalTrackId:facts.canonicalTrackId,
       reviewReason:observation.reviewReason,provisionalRef:observation.provisionalRef,
+      registryTrackSlug,registryFactsSha256,
       outcome,reasonCodes:[...new Set(reasonCodes)],
       canScore:false,canPublish:false,
     });
