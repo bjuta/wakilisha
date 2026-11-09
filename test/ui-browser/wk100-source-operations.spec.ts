@@ -1386,6 +1386,9 @@ test('W5 Qualify uses the saved policy result on one exact source receipt withou
   await expect(rows.getByText('Excluded song')).toBeVisible();
   await expect(page.getByText('Policy SHA-256')).toBeVisible();
   await expect(page.getByText('Rules met (not approved)')).toBeVisible();
+  // A missing Registry link is visible before the Excluded-only table filter.
+  await expect(page.getByRole('link',{name:'Investigate in Registry'}))
+    .toHaveAttribute('href','/admin/registry/tracks?search=Known%20song');
   await page.getByRole('button',{name:'Eligibility outcome'}).click();
   await page.getByRole('option',{name:'Excluded'}).click();
   await expect(rows.getByText('Known song')).toHaveCount(0);
@@ -1396,8 +1399,6 @@ test('W5 Qualify uses the saved policy result on one exact source receipt withou
     .toHaveAttribute('href','/admin/registry/releases/linked-release-slug');
   await expect(page.getByRole('link',{name:'Review Credited Artist 1'}))
     .toHaveAttribute('href','/admin/registry/artists/linked-artist-slug');
-  await expect(page.getByRole('link',{name:'Investigate in Registry'}))
-    .toHaveAttribute('href','/admin/registry/tracks?search=Known%20song');
   await page.getByRole('button',{name:'Re-evaluate After Corrections'}).click();
   const delta=page.locator('[data-wk-eligibility-recheck]');
   await expect(delta.getByText('1 of 2 positions changed.')).toBeVisible({timeout:20_000});
