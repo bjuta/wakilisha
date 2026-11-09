@@ -14,6 +14,19 @@ const isObj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const word=x=>typeof x==='string'&&x.trim()?x.trim():null;
 const arr=x=>Array.isArray(x)?x:[];
 const strings=x=>arr(x).filter(v=>typeof v==='string'&&v.trim().length).map(v=>v.trim());
+/**
+ * The canonical policy provider family is distinct from the provider's
+ * Registry identity namespace. Never alter the saved policy allow-list.
+ */
+const POLICY_PROVIDERS=Object.freeze({
+  apple_music:'apple_music',shazam_ke:'shazam',mdundo_ke:'mdundo',
+  youtube_ke:'youtube',audiomack_ke:'audiomack',
+});
+export function wk100EligibilityPolicyProvider(registryProviderKey){
+  const provider=POLICY_PROVIDERS[registryProviderKey];
+  ensure(typeof provider==='string','unknown_policy_provider');
+  return provider;
+}
 const stable=v=>JSON.stringify(v,(_key,item)=>
   item&&typeof item==='object'&&!Array.isArray(item)
     ?Object.fromEntries(Object.entries(item).sort(([a],[b])=>a.localeCompare(b))):item);
@@ -51,7 +64,7 @@ function factsFor(row,source,tracks,credits,artists,releases){
     canonicalTrackId:track?.id??null,
     hasIdentityConflict:row.identityState==='conflicting',
     marketIso2:'KE', // Bound to the exact immutable Kenya contract in W4.
-    source:{provider:source.registryProviderKey,
+    source:{provider:wk100EligibilityPolicyProvider(source.registryProviderKey),
       providerTrackId:row.providerTrackId,providerReleaseId:null,
       availableMarkets:null,restrictedMarkets:null},
     credits:creditRows,
@@ -115,6 +128,22 @@ export async function projectWk100EligibilityPreview({
     seen.add(observation.captureRowId);
     const facts=factsFor(observation,sourceReview,registryTracks,registryCredits,
       registryArtists,registryReleases);
+    const registryFactsSha256=await digest(stable(facts));
+    const linkedTrack=facts.canonicalTrackId?registryTracks.find(x=>
+      x?.id===facts.canonicalTrackId&&x.status==='active'):null;
+    const registryTrackSlug=typeof linkedTrack?.slug==='string'&&
+      /^[a-z0-9][a-z0-9_-]{0,127}$/.test(linkedTrack.slug)
+      ?linkedTrack.slug:null;
+    const cleanSlug=x=>typeof x==='string'&&/^[a-z0-9][a-z0-9_-]{0,127}$/.test(x)?x:null;
+    const linkedRelease=linkedTrack?.release_id?registryReleases.find(x=>
+      x?.id===linkedTrack.release_id&&x.status==='active'):null;
+    const registryReleaseSlug=cleanSlug(linkedRelease?.slug);
+    // These are existing active credits for investigation, not an assertion
+    // that an observed song automatically has correct performer attribution.
+    const registryArtistSlugs=[...new Set(registryCredits
+      .filter(x=>linkedTrack&&x?.track_id===linkedTrack.id&&x.status==='active')
+      .map(x=>registryArtists.find(a=>a?.id===x.artist_id&&a.status==='active'))
+      .map(a=>cleanSlug(a?.slug)).filter(Boolean))];
     const evaluated=await evaluateFrozenChartIngestCandidate(frozen,facts);
     ensure(['ELIGIBLE','EXCLUDED','REVIEW_REQUIRED','CONFLICTED'].includes(evaluated.status)&&
       evaluated.mayScore===false&&evaluated.mayMutateRegistry===false&&
@@ -136,6 +165,7 @@ export async function projectWk100EligibilityPreview({
       providerTrackId:observation.providerTrackId,
       identityState:observation.identityState,canonicalTrackId:facts.canonicalTrackId,
       reviewReason:observation.reviewReason,provisionalRef:observation.provisionalRef,
+      registryTrackSlug,registryReleaseSlug,registryArtistSlugs,registryFactsSha256,
       outcome,reasonCodes:[...new Set(reasonCodes)],
       canScore:false,canPublish:false,
     });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {projectWk100EligibilityPreview as project} from '../../supabase/functions/_shared/wk100-eligibility-preview.mjs';
+import {projectWk100EligibilityPreview as project,wk100EligibilityPolicyProvider} from '../../supabase/functions/_shared/wk100-eligibility-preview.mjs';
 const W='2026-11-09', T='11111111-1111-4111-8111-111111111111', A='22222222-2222-4222-8222-222222222222';
 const R='33333333-3333-4333-8333-333333333333';
 const canonical=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?
@@ -15,7 +15,7 @@ async function fixture(){
   trackEligibility:{explicitAllowed:true,requireIsrc:false,requirePreview:false},
   collaborationRules:{allowFeaturedArtists:true,countFeaturedArtistNationality:false,
     primaryArtistMustMatchEligibility:true,allArtistsMustMatchEligibility:false},
-  sourceRules:{allowedProviders:['mdundo_ke'],requireAtLeastOneProviderId:true,
+  sourceRules:{allowedProviders:['mdundo'],requireAtLeastOneProviderId:true,
     requireProviderAvailabilityInMarket:false},
   reviewRules:{requireManualReviewForUnknownGender:false,requireManualReviewForUnknownNationality:true,
     requireManualReviewForUnknownArtistType:false,requireManualReviewForGroups:false,
@@ -46,12 +46,12 @@ async function fixture(){
     identityStatus:'exact_provider_links_only',
     totals:{observed:2,resolved:1,needsReview:1,conflicting:0,inactive:0},
     rows:[one,two],canWriteRegistry:false,canScore:false,canPublish:false},
-  registryTracks:[{id:T,title:'Song One',isrc:'KEABC2600001',release_id:R,
+  registryTracks:[{id:T,slug:'song-one-ke',title:'Song One',isrc:'KEABC2600001',release_id:R,
     explicit:false,duration_ms:180000,status:'active'}],
   registryCredits:[{id:'99999999-9999-4999-8999-999999999999',track_id:T,
     artist_id:A,role:'primary_artist',is_primary:true,status:'active'}],
-  registryArtists:[{id:A,origin_iso2:'KE',status:'active'}],
-  registryReleases:[{id:R,release_type:'single',release_date:'2026-10-20',
+  registryArtists:[{id:A,slug:'reviewed-kenyan-artist',origin_iso2:'KE',status:'active'}],
+  registryReleases:[{id:R,slug:'reviewed-kenyan-release',release_type:'single',release_date:'2026-10-20',
     status:'active',metadata:{versions:{}}}]};
 }
 test('valid linked recording meets predicates, unresolved recording needs review; neither may score',async()=>{
@@ -60,6 +60,12 @@ test('valid linked recording meets predicates, unresolved recording needs review
  assert.equal(r.counts.REVIEW_REQUIRED,1);
  assert.equal(r.rows[1].reasonCodes[0],'canonical_identity_needs_review');
  assert.equal(r.configRevision,1);
+ assert.equal(r.rows[0].registryTrackSlug,'song-one-ke');
+ assert.equal(r.rows[0].registryReleaseSlug,'reviewed-kenyan-release');
+ assert.deepEqual(r.rows[0].registryArtistSlugs,['reviewed-kenyan-artist']);
+ assert.match(r.rows[0].registryFactsSha256,/^[a-f0-9]{64}$/);
+ assert.equal(r.rows[1].registryTrackSlug,null);
+ assert.match(r.rows[1].registryFactsSha256,/^[a-f0-9]{64}$/);
  assert.equal(r.policySha256,x.draft.config_json.ingestPolicySha256);
  assert.deepEqual([r.canScore,r.canPublish,r.canWriteRegistry],[false,false,false]);
 });
@@ -87,4 +93,26 @@ test('missing Registry Track cannot become eligible',async()=>{
 test('conflicted provider link stays conflicted regardless of other filters',async()=>{
  const x=await fixture();x.sourceReview.rows[1].identityState='conflicting';
  const r=await project(x);assert.equal(r.rows[1].outcome,'CONFLICTED');
+});
+
+test('only explicit five core namespaces map to the existing profile provider families',()=>{
+ const expected={
+   apple_music:'apple_music',shazam_ke:'shazam',mdundo_ke:'mdundo',
+   youtube_ke:'youtube',audiomack_ke:'audiomack',
+ };
+ for(const [key,val] of Object.entries(expected))
+   assert.equal(wk100EligibilityPolicyProvider(key),val);
+ assert.throws(()=>wk100EligibilityPolicyProvider('mdundo_ke_typo'),/unknown_policy_provider/);
+});
+test('saved source allow-list is enforced, never silently expanded for a core source',async()=>{
+ const x=await fixture();
+ x.draft.config_json.eligibilityProfileSnapshot.sourceRules.allowedProviders=['spotify'];
+ x.draft.config_json.ingestPolicySha256=await digest({
+   profileId:'elig_kenyan',marketScopeId:'scope_kenya',
+   eligibilityProfileSnapshot:x.draft.config_json.eligibilityProfileSnapshot,
+   marketScopeSnapshot:x.draft.config_json.marketScopeSnapshot,
+ });
+ const y=await project(x);
+ assert.equal(y.rows[0].outcome,'EXCLUDED');
+ assert(y.rows[0].reasonCodes.includes('source_provider_not_allowed'));
 });
