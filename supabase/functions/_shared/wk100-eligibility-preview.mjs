@@ -14,6 +14,19 @@ const isObj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const word=x=>typeof x==='string'&&x.trim()?x.trim():null;
 const arr=x=>Array.isArray(x)?x:[];
 const strings=x=>arr(x).filter(v=>typeof v==='string'&&v.trim().length).map(v=>v.trim());
+/**
+ * The canonical policy provider family is distinct from the provider's
+ * Registry identity namespace. Never alter the saved policy allow-list.
+ */
+const POLICY_PROVIDERS=Object.freeze({
+  apple_music:'apple_music',shazam_ke:'shazam',mdundo_ke:'mdundo',
+  youtube_ke:'youtube',audiomack_ke:'audiomack',
+});
+export function wk100EligibilityPolicyProvider(registryProviderKey){
+  const provider=POLICY_PROVIDERS[registryProviderKey];
+  ensure(typeof provider==='string','unknown_policy_provider');
+  return provider;
+}
 const stable=v=>JSON.stringify(v,(_key,item)=>
   item&&typeof item==='object'&&!Array.isArray(item)
     ?Object.fromEntries(Object.entries(item).sort(([a],[b])=>a.localeCompare(b))):item);
@@ -51,7 +64,7 @@ function factsFor(row,source,tracks,credits,artists,releases){
     canonicalTrackId:track?.id??null,
     hasIdentityConflict:row.identityState==='conflicting',
     marketIso2:'KE', // Bound to the exact immutable Kenya contract in W4.
-    source:{provider:source.registryProviderKey,
+    source:{provider:wk100EligibilityPolicyProvider(source.registryProviderKey),
       providerTrackId:row.providerTrackId,providerReleaseId:null,
       availableMarkets:null,restrictedMarkets:null},
     credits:creditRows,
