@@ -14,7 +14,7 @@ const cors={
 async function json(route:Route,body:unknown,status=200) {
   await route.fulfill({status,contentType:'application/json',headers:cors,body:JSON.stringify(body)});
 }
-async function install(page:Page,{invalid=false,deny=false,registryDenied=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[],existingEditionDraft=null}:{invalid?:boolean;deny?:boolean;registryDenied?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[];existingEditionDraft?:Record<string,unknown>|null}={}) {
+async function install(page:Page,{invalid=false,deny=false,registryDenied=false,driftAfterRecheck=false,failProposal=false,existingProposals=[],existingMethods=[],existingSources=[],existingEditionDraft=null}:{invalid?:boolean;deny?:boolean;registryDenied?:boolean;driftAfterRecheck?:boolean;failProposal?:boolean;existingProposals?:unknown[];existingMethods?:unknown[];existingSources?:Record<string,unknown>[];existingEditionDraft?:Record<string,unknown>|null}={}) {
   const reads:unknown[]=[];
   const originalReads:unknown[]=[];
   const identityReads:unknown[]=[];
@@ -223,7 +223,7 @@ async function install(page:Page,{invalid=false,deny=false,registryDenied=false,
           schemaVersion:'wk100-admin-eligibility-preview-v1',
           weekStartEat:choice.weekStartEat,contractId:choice.contractId,
           receiptId:choice.receiptId,sourceKey:'apple_ke_public_top100',
-          payloadSha256:'a'.repeat(64),configRevision:1,
+          payloadSha256:'a'.repeat(64),configRevision:driftAfterRecheck&&rechecked?2:1,
           policySha256:'b'.repeat(64),eligibilityProfileName:'All artists',
           marketScopeName:'Kenya',receiptStatus:'succeeded',
           expectedDepth:2,observedDepth:2,
