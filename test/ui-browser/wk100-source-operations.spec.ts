@@ -18,6 +18,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
   const reads:unknown[]=[];
   const originalReads:unknown[]=[];
   const identityReads:unknown[]=[];
+  const eligibilityReads:unknown[]=[];
   const editionReads:unknown[]=[];
   const writes:unknown[]=[];
   const methodWrites:unknown[]=[];
@@ -213,6 +214,36 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         });return;
       }
       if(body&&typeof body==='object'&&'action' in body&&
+        body.action==='preview_recording_eligibility'){
+        eligibilityReads.push(body);
+        const choice=body as {weekStartEat:string;contractId:string;receiptId:string};
+        await json(route,{
+          schemaVersion:'wk100-admin-eligibility-preview-v1',
+          weekStartEat:choice.weekStartEat,contractId:choice.contractId,
+          receiptId:choice.receiptId,sourceKey:'apple_ke_public_top100',
+          payloadSha256:'a'.repeat(64),configRevision:1,
+          policySha256:'b'.repeat(64),eligibilityProfileName:'All artists',
+          marketScopeName:'Kenya',receiptStatus:'succeeded',
+          expectedDepth:2,observedDepth:2,
+          counts:{ELIGIBLE:0,EXCLUDED:1,REVIEW_REQUIRED:1,CONFLICTED:0},
+          rows:[
+            {captureRowId:'11111111-1111-4111-8111-111111111111',
+              rank:1,observedTitle:'Known song',observedArtist:null,
+              providerTrackId:'1',canonicalTrackId:null,identityState:'needs_review',
+              reviewReason:'provider_link_missing',provisionalRef:'wk100:obs:v1:'+'a'.repeat(64)+':11111111-1111-4111-8111-111111111111',
+              outcome:'REVIEW_REQUIRED',reasonCodes:['canonical_identity_needs_review','primary_artist_origin_unknown'],
+              canScore:false,canPublish:false},
+            {captureRowId:'22222222-2222-4222-8222-222222222222',
+              rank:2,observedTitle:'Excluded song',observedArtist:null,
+              providerTrackId:'2',canonicalTrackId:'33333333-3333-4333-8333-333333333333',
+              identityState:'resolved',reviewReason:null,provisionalRef:null,
+              outcome:'EXCLUDED',reasonCodes:['primary_artist_origin_not_allowed'],
+              canScore:false,canPublish:false},
+          ],reviewMode:'all_predicates_no_admission',
+          canScore:false,canPublish:false,canWriteRegistry:false,
+        });return;
+      }
+      if(body&&typeof body==='object'&&'action' in body&&
         body.action==='read_recording_observations'){
         identityReads.push(body);
         const selection=body as {weekStartEat:string;contractId:string;receiptId:string};
@@ -263,7 +294,7 @@ async function install(page:Page,{invalid=false,deny=false,failProposal=false,ex
         app_metadata:{},user_metadata:{},identities:[],created_at:'2026-10-21T00:00:00Z'},
     }));
   },{ref:PROJECT_REF,id:USER_ID});
-  return {reads,originalReads,identityReads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites,collectNowWrites};
+  return {reads,originalReads,identityReads,eligibilityReads,editionReads,unexpected,writes,methodWrites,contractWrites,recoveryWrites,collectNowWrites};
 }
 
 test('five founder-selected core providers show truthful readiness and no invented source admission',async({page})=>{
