@@ -46,7 +46,7 @@ async function fixture(){
     identityStatus:'exact_provider_links_only',
     totals:{observed:2,resolved:1,needsReview:1,conflicting:0,inactive:0},
     rows:[one,two],canWriteRegistry:false,canScore:false,canPublish:false},
-  registryTracks:[{id:T,title:'Song One',isrc:'KEABC2600001',release_id:R,
+  registryTracks:[{id:T,slug:'song-one-ke',title:'Song One',isrc:'KEABC2600001',release_id:R,
     explicit:false,duration_ms:180000,status:'active'}],
   registryCredits:[{id:'99999999-9999-4999-8999-999999999999',track_id:T,
     artist_id:A,role:'primary_artist',is_primary:true,status:'active'}],
@@ -60,6 +60,10 @@ test('valid linked recording meets predicates, unresolved recording needs review
  assert.equal(r.counts.REVIEW_REQUIRED,1);
  assert.equal(r.rows[1].reasonCodes[0],'canonical_identity_needs_review');
  assert.equal(r.configRevision,1);
+ assert.equal(r.rows[0].registryTrackSlug,'song-one-ke');
+ assert.match(r.rows[0].registryFactsSha256,/^[a-f0-9]{64}$/);
+ assert.equal(r.rows[1].registryTrackSlug,null);
+ assert.match(r.rows[1].registryFactsSha256,/^[a-f0-9]{64}$/);
  assert.equal(r.policySha256,x.draft.config_json.ingestPolicySha256);
  assert.deepEqual([r.canScore,r.canPublish,r.canWriteRegistry],[false,false,false]);
 });
