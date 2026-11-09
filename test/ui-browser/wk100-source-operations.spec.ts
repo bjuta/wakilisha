@@ -1391,3 +1391,30 @@ test('W5 Qualify uses the saved policy result on one exact source receipt withou
   expect(ctx.collectNowWrites).toEqual([]);
   expect(ctx.unexpected).toEqual([]);
 });
+
+test('W5 cannot read private Registry facts without view_registry capability',async({page})=>{
+  const ctx=await install(page,{registryDenied:true,existingSources:[{
+    id:'44444444-4444-4444-8444-444444444444',
+    sourceKey:'apple_ke_public_top100',surface:'Apple Music Kenya Top 100',
+    provider:'apple_ke',market:'KE',expectedDepth:2,behavior:'consumption',
+    metric:'rank',version:'test-v1',captureState:'succeeded',admissionState:'candidate',
+    nativePeriodAuthority:'unknown',receiptSha256:'a'.repeat(64),
+    recentAttempts:[{id:'55555555-5555-4555-8555-555555555555',
+      status:'succeeded',attemptedAt:'2026-11-09T16:10:20Z',observedDepth:2}],
+    canScore:false,canPublish:false,
+  }]});
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-09&stage=qualify',
+    {waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('heading',{name:'Eligibility Workbench',level:2}))
+    .toBeVisible({timeout:20_000});
+  await page.getByRole('button',{name:'Captured source'}).click();
+  await page.getByRole('option',{name:'Apple Music Kenya Top 100'}).click();
+  await page.getByRole('button',{name:'Exact source receipt'}).click();
+  await page.getByRole('option',{name:/succeeded/}).click();
+  await expect(page.getByRole('alert').filter({hasText:'No result is accepted'}))
+    .toBeVisible({timeout:20_000});
+  await expect(page.getByRole('table',{name:'WAKILISHA 100 eligibility results'}))
+    .toHaveCount(0);
+  expect(ctx.eligibilityReads).toHaveLength(0);
+  expect(ctx.unexpected).toEqual([]);
+});
