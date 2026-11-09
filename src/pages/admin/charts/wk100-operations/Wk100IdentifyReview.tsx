@@ -169,19 +169,31 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
           </WkStateBadge>
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <WkDetailList items={[
-            {label:'Observed positions',value:review.totals.observed},
+          <WkDetailList items={qualify?[
+            {label:'Observed positions',value:review.observedDepth},
             {label:'Expected positions',value:review.expectedDepth},
-            {label:'Confirmed active Registry links',value:review.totals.resolved},
-            {label:'Needs review',value:review.totals.needsReview},
-            {label:'Conflicting links',value:review.totals.conflicting},
-            {label:'Inactive linked Tracks',value:review.totals.inactive},
+            {label:'Rules met (not approved)',value:review.counts?.ELIGIBLE??0},
+            {label:'Excluded by policy',value:review.counts?.EXCLUDED??0},
+            {label:'Needs review',value:review.counts?.REVIEW_REQUIRED??0},
+            {label:'Conflicting evidence',value:review.counts?.CONFLICTED??0},
+          ]:[
+            {label:'Observed positions',value:review.totals?.observed??0},
+            {label:'Expected positions',value:review.expectedDepth},
+            {label:'Confirmed active Registry links',value:review.totals?.resolved??0},
+            {label:'Needs review',value:review.totals?.needsReview??0},
+            {label:'Conflicting links',value:review.totals?.conflicting??0},
+            {label:'Inactive linked Tracks',value:review.totals?.inactive??0},
           ]}/>
           <WkDetailList items={[
             {label:'Source key',value:review.sourceKey},
             {label:'Capture receipt',value:review.receiptId},
             {label:'Original SHA-256',value:review.payloadSha256},
-            {label:'Registry provider namespace',value:review.registryProviderKey},
+            {label:qualify?'Eligibility profile':'Registry provider namespace',
+              value:qualify?review.eligibilityProfileName??'Unavailable':review.registryProviderKey??'Unknown'},
+            ...(qualify?[
+              {label:'Edition revision',value:review.configRevision??0},
+              {label:'Policy SHA-256',value:review.policySha256??'Unavailable'},
+            ]:[]),
           ]}/>
         </div>
       </WkSurface>
@@ -190,8 +202,14 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
         <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
           <WkSearchField value={search} onChange={setSearch} ariaLabel="Search source recordings"
             placeholder="Search title, artist, source ID, or rank"/>
-          <WkSelect value={filter} onChange={setFilter} ariaLabel="Recording link status"
-            options={[{value:'all',label:'All link states'},
+          <WkSelect value={filter} onChange={setFilter} ariaLabel={qualify?'Eligibility outcome':'Recording link status'}
+            options={qualify?[
+              {value:'all',label:'All outcomes'},
+              {value:'ELIGIBLE',label:'Rules met'},
+              {value:'EXCLUDED',label:'Excluded'},
+              {value:'REVIEW_REQUIRED',label:'Needs review'},
+              {value:'CONFLICTED',label:'Conflicting evidence'},
+            ]:[{value:'all',label:'All link states'},
               ...Object.entries(readableStatus).map(([value,label])=>({value,label}))]}/>
         </div>
         <p role="status" className="mt-3 text-xs text-wk-text-muted">
@@ -208,11 +226,13 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
             </div>},
             {key:'provider',label:'Provider track ID',render:r=>
               <span className="break-all text-wk-text-muted">{r.providerTrackId??'Not supplied'}</span>},
-            {key:'identity',label:'Registry link',render:r=><div>
-              <p className="font-semibold text-wk-text">{readableStatus[r.identityState]}</p>
-              <p className="text-wk-text-muted">
-                {r.canonicalTrackId??(r.reviewReason?reasonLabel[r.reviewReason]??'Review required':'Review required')}
-              </p>
+            {key:'identity',label:qualify?'Policy outcome':'Registry link',render:r=><div>
+              <p className="font-semibold text-wk-text">{qualify
+                ?({ELIGIBLE:'Rules met',EXCLUDED:'Excluded',REVIEW_REQUIRED:'Needs review',CONFLICTED:'Conflicting evidence'}[r.outcome??'REVIEW_REQUIRED'])
+                :readableStatus[r.identityState]}</p>
+              <p className="text-wk-text-muted">{qualify
+                ?(r.reasonCodes?.map(x=>x.replaceAll('_',' ')).join('; ')||'No rule failures')
+                :(r.canonicalTrackId??(r.reviewReason?reasonLabel[r.reviewReason]??'Review required':'Review required'))}</p>
             </div>},
           ]}/>
         <p className="mt-4 text-xs text-wk-text-muted">
