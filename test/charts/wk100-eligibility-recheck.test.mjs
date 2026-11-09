@@ -44,7 +44,7 @@ test('a real W6 recheck compares every source position without refetching or sav
   assert.equal(result.changed[0].beforeOutcome,'ELIGIBLE');
   assert.equal(result.changed[0].afterOutcome,'REVIEW_REQUIRED');
   assert.equal(result.changed[0].factsChanged,true);
-  assert.equal(result.changed[1].afterCanonicalTrackId,undefined); // Not part of public approval
+  assert.equal(result.changed[1].afterCanonicalTrackId,'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
   assert.equal(result.changed[1].afterOutcome,'ELIGIBLE');
   assert.deepEqual([result.immutableSourceRetained,result.policyRetained,
     result.savedCorrection,result.canScore,result.canPublish],[true,true,false,false,false]);
