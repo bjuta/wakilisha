@@ -50,8 +50,8 @@ async function fixture(){
     explicit:false,duration_ms:180000,status:'active'}],
   registryCredits:[{id:'99999999-9999-4999-8999-999999999999',track_id:T,
     artist_id:A,role:'primary_artist',is_primary:true,status:'active'}],
-  registryArtists:[{id:A,origin_iso2:'KE',status:'active'}],
-  registryReleases:[{id:R,release_type:'single',release_date:'2026-10-20',
+  registryArtists:[{id:A,slug:'reviewed-kenyan-artist',origin_iso2:'KE',status:'active'}],
+  registryReleases:[{id:R,slug:'reviewed-kenyan-release',release_type:'single',release_date:'2026-10-20',
     status:'active',metadata:{versions:{}}}]};
 }
 test('valid linked recording meets predicates, unresolved recording needs review; neither may score',async()=>{
@@ -61,6 +61,8 @@ test('valid linked recording meets predicates, unresolved recording needs review
  assert.equal(r.rows[1].reasonCodes[0],'canonical_identity_needs_review');
  assert.equal(r.configRevision,1);
  assert.equal(r.rows[0].registryTrackSlug,'song-one-ke');
+ assert.equal(r.rows[0].registryReleaseSlug,'reviewed-kenyan-release');
+ assert.deepEqual(r.rows[0].registryArtistSlugs,['reviewed-kenyan-artist']);
  assert.match(r.rows[0].registryFactsSha256,/^[a-f0-9]{64}$/);
  assert.equal(r.rows[1].registryTrackSlug,null);
  assert.match(r.rows[1].registryFactsSha256,/^[a-f0-9]{64}$/);
