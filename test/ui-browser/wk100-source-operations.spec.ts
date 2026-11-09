@@ -487,6 +487,38 @@ test('W1 W2 and W3 distinguish a retained partial original from full-depth healt
   expect(ctx.unexpected).toEqual([]);
 });
 
+test('W1 keeps a partial original visible after a newer failed attempt without unlocking recovery',async({page})=>{
+  const source={
+    id:'33333333-3333-4333-8333-333333333333',
+    sourceKey:'mdundo_ke_public_top_songs',provider:'mdundo_ke',
+    surface:'Mdundo Kenya Top Songs',market:'KE',
+    metric:'rank',behavior:'consumption',version:'v1',expectedDepth:100,
+    cadence:'daily',intervalHours:null,eatHour:9,eatMinute:0,weekdayEat:null,
+    minimumHealthyCheckpoints:1,adapterVersion:'fixture-v1',admissionState:'candidate',
+    captureState:'transport_failed',attemptCount:2,observedDepth:99,
+    lastSuccessfulAt:'2026-11-09T13:09:00Z',
+    lastAttemptAt:'2026-11-09T16:10:00Z',
+    lastScheduledAt:'2026-11-09T16:09:00Z',lastAttemptNumber:1,
+    nativePeriodAuthority:'unknown',nativePeriodStart:null,nativePeriodEnd:null,
+    receiptSha256:'a'.repeat(64),failureCode:'source_transport_unavailable',
+    recentAttempts:[],canScore:false,canPublish:false,
+  };
+  const ctx=await install(page,{existingSources:[source]});
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-09',{waitUntil:'domcontentloaded'});
+  await expect(page.getByText('1 verified originals (0 complete, 1 partial).',{exact:false}))
+    .toBeVisible({timeout:20_000});
+  await page.goto('/admin/charts/wk100-operations/collection?week=2026-11-09',
+    {waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('heading',{name:'A source returned fewer ranks than expected'}))
+    .toBeVisible({timeout:20_000});
+  await page.getByRole('button',{name:'Inspect Partial Original'}).click();
+  await expect(page.getByText('Partial original retained. Missing ranks remain visible',{exact:false}))
+    .toBeVisible();
+  expect(ctx.recoveryWrites).toEqual([]);
+  expect(ctx.collectNowWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
 test('source overview stays truthful, carries EAT week through navigation and uses no publisher',async({page})=>{
   const ctx=await install(page);
   await page.goto('/admin/charts/wk100-operations?week=2026-10-26',{waitUntil:'domcontentloaded'});
