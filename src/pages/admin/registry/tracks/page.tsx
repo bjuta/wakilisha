@@ -256,7 +256,9 @@ export default function TracksPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const [query, setQuery] = useState("");
+  // Search is a review aid, never identity evidence or an automatic match.
+  const requestedSearch=(searchParams.get("search")??"").trim().slice(0,120);
+  const [query, setQuery] = useState(requestedSearch);
   const [qualityFilter, setQualityFilter] = useState<QualityFilter>(
     (urlFilter as QualityFilter) || "all"
   );
