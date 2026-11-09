@@ -711,6 +711,41 @@ test('W1 reads actual week-bound Edition configuration revision without inferrin
   expect(ctx.unexpected).toEqual([]);
 });
 
+test('Audiomack W2A names blocked Continue fields and advances after valid input',async({page})=>{
+  const ctx=await install(page);
+  await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-09',
+    {waitUntil:'domcontentloaded'});
+  await expect(page.getByText('No source proposals have been saved.')).toBeVisible({timeout:20_000});
+  await page.getByRole('button',{name:'Add Source'}).click();
+  const dialog=page.getByRole('dialog',{name:'Add Source'});
+  await dialog.getByRole('button',{name:/^Audiomack Kenya/}).click();
+  await dialog.getByRole('group',{name:'Proposed source access methods'})
+    .getByRole('button',{name:'Reviewed page adapter'}).click();
+  await dialog.getByRole('button',{name:'Continue'}).click();
+  const blocked=dialog.getByRole('status').filter({hasText:'Continue is disabled'});
+  await expect(blocked).toContainText('Stable source ID is incomplete or invalid');
+  await expect(blocked).toContainText('Enter the source surface');
+  await expect(blocked).toContainText('Enter an internal evidence reference');
+  await expect(dialog.getByRole('button',{name:'Continue'})).toBeDisabled();
+  const id=dialog.getByRole('textbox',{name:'Stable source ID (provider-scoped)'});
+  await id.fill('audiomack_ke_');
+  await expect(blocked).toContainText('Stable source ID is incomplete or invalid');
+  await id.fill('audiomack_ke_weekly_100');
+  await dialog.getByRole('textbox',{name:'Source surface'})
+    .fill('Audiomack Weekly 100: Kenya - official geo-chart playlist 18474189');
+  await dialog.getByRole('textbox',{name:/Internal evidence reference/})
+    .fill('issue_1264_comment_6747284109');
+  await expect(blocked).toHaveCount(0);
+  await expect(dialog.getByRole('button',{name:'Continue'})).toBeEnabled();
+  await dialog.getByRole('button',{name:'Continue'}).click();
+  await expect(dialog.getByRole('heading',{name:'Review before saving'})).toBeVisible();
+  await expect(dialog.getByText('audiomack_ke_weekly_100')).toBeVisible();
+  expect(ctx.writes).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.collectNowWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
+
 test('Add Source sends only a proposed candidate through the isolated governed endpoint',async({page})=>{
   const ctx=await install(page);
   await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-02',{waitUntil:'domcontentloaded'});
