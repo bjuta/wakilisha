@@ -181,6 +181,43 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
       </p>
     </WkSurface>}
     {phase==='ready'&&review&&<>
+      {qualify&&<WkSurface className="rounded-xl p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h3 className="text-sm font-bold text-wk-text">Review Corrections</h3>
+            <p className="mt-1 text-sm text-wk-text-muted">
+              Open the Registry editor for a linked Track, or investigate a missing link.
+              Return here after saving any corrections to compare the same source receipt.
+            </p></div>
+          <button type="button" className="wk-button wk-button-primary wk-button-sm"
+            onClick={()=>{beforeRecheck.current=review;setReadNonce(x=>x+1);}}>
+            Re-evaluate After Corrections
+          </button>
+        </div>
+        {comparison&&<div data-wk-eligibility-recheck className="mt-4 space-y-3" role="status">
+          <p className="text-sm font-semibold text-wk-text">
+            {comparison.changedCount===0
+              ?'No changes to Registry facts or eligibility results.'
+              :comparison.changedCount+' of '+comparison.evaluatedRows+' positions changed.'}
+          </p>
+          {comparison.changedCount>0&&<WkDataTable
+            ariaLabel="WAKILISHA 100 eligibility changes" rows={comparison.changed}
+            getKey={r=>r.captureRowId}
+            columns={[
+              {key:'rank',label:'Rank',render:r=>r.rank},
+              {key:'title',label:'Observed title',render:r=>r.observedTitle??'Title not supplied'},
+              {key:'outcome',label:'Before and after',render:r=>
+                <span>{r.beforeOutcome.replaceAll('_',' ')} → {r.afterOutcome.replaceAll('_',' ')}</span>},
+              {key:'reasons',label:'What changed',render:r=><span>
+                {r.factsChanged?'Registry facts changed. ':''}
+                {r.outcomeChanged?'Eligibility result changed. ':''}
+                {r.afterReasons.map(x=>x.replaceAll('_',' ')).join('; ')||'No rule failures'}
+              </span>},
+            ]}/>}
+          <p className="text-xs text-wk-text-muted">
+            This is a comparison, not an approval. The original source receipt and Edition policy remain unchanged.
+          </p>
+        </div>}
+      </WkSurface>}
       <WkSurface className="rounded-xl p-4 sm:p-5">
         <div className="flex flex-wrap justify-between gap-3">
           <div><h3 className="text-base font-bold text-wk-text">{qualify?"Eligibility Review":"Identity Coverage"}</h3>
@@ -259,6 +296,15 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
                 ?(r.reasonCodes?.map(x=>x.replaceAll('_',' ')).join('; ')||'No rule failures')
                 :(r.canonicalTrackId??(r.reviewReason?reasonLabel[r.reviewReason]??'Review required':'Review required'))}</p>
             </div>},
+            {key:'correction',label:'Registry review',render:r=><a
+              className="font-semibold text-wk-brand underline"
+              href={r.canonicalTrackId&&r.registryTrackSlug
+                ?'/admin/registry/tracks/'+encodeURIComponent(r.registryTrackSlug)
+                :'/admin/registry/tracks'+(r.observedTitle
+                  ?'?search='+encodeURIComponent(r.observedTitle.slice(0,120)):'')}
+              target="_blank" rel="noopener noreferrer">
+              {r.canonicalTrackId&&r.registryTrackSlug?'Edit Linked Track':'Investigate in Registry'}
+            </a>},
           ]}/>
         <p className="mt-4 text-xs text-wk-text-muted">
           {qualify
