@@ -217,6 +217,7 @@ async function install(page:Page,{invalid=false,deny=false,registryDenied=false,
         body.action==='preview_recording_eligibility'){
         if(registryDenied){await json(route,{error:'registry_review_not_authorized'},403);return;}
         eligibilityReads.push(body);
+        const rechecked=eligibilityReads.length>1;
         const choice=body as {weekStartEat:string;contractId:string;receiptId:string};
         await json(route,{
           schemaVersion:'wk100-admin-eligibility-preview-v1',
@@ -226,19 +227,23 @@ async function install(page:Page,{invalid=false,deny=false,registryDenied=false,
           policySha256:'b'.repeat(64),eligibilityProfileName:'All artists',
           marketScopeName:'Kenya',receiptStatus:'succeeded',
           expectedDepth:2,observedDepth:2,
-          counts:{ELIGIBLE:0,EXCLUDED:1,REVIEW_REQUIRED:1,CONFLICTED:0},
+          counts:{ELIGIBLE:0,EXCLUDED:rechecked?0:1,REVIEW_REQUIRED:rechecked?2:1,CONFLICTED:0},
           rows:[
             {captureRowId:'11111111-1111-4111-8111-111111111111',
               rank:1,observedTitle:'Known song',observedArtist:null,
               providerTrackId:'1',canonicalTrackId:null,identityState:'needs_review',
               reviewReason:'provider_link_missing',provisionalRef:'wk100:obs:v1:'+'a'.repeat(64)+':11111111-1111-4111-8111-111111111111',
+              registryTrackSlug:null,registryFactsSha256:'c'.repeat(64),
               outcome:'REVIEW_REQUIRED',reasonCodes:['canonical_identity_needs_review','primary_artist_origin_unknown'],
               canScore:false,canPublish:false},
             {captureRowId:'22222222-2222-4222-8222-222222222222',
               rank:2,observedTitle:'Excluded song',observedArtist:null,
               providerTrackId:'2',canonicalTrackId:'33333333-3333-4333-8333-333333333333',
               identityState:'resolved',reviewReason:null,provisionalRef:null,
-              outcome:'EXCLUDED',reasonCodes:['primary_artist_origin_not_allowed'],
+              registryTrackSlug:'linked-recording-slug',
+              registryFactsSha256:(rechecked?'e':'d').repeat(64),
+              outcome:rechecked?'REVIEW_REQUIRED':'EXCLUDED',
+              reasonCodes:rechecked?['primary_artist_origin_unknown']:['primary_artist_origin_not_allowed'],
               canScore:false,canPublish:false},
           ],reviewMode:'all_predicates_no_admission',
           canScore:false,canPublish:false,canWriteRegistry:false,
@@ -1383,7 +1388,16 @@ test('W5 Qualify uses the saved policy result on one exact source receipt withou
   await page.getByRole('option',{name:'Excluded'}).click();
   await expect(rows.getByText('Known song')).toHaveCount(0);
   await expect(rows.getByText('Excluded song')).toBeVisible();
-  expect(ctx.eligibilityReads).toHaveLength(1);
+  await expect(page.getByRole('link',{name:'Edit Linked Track'}))
+    .toHaveAttribute('href','/admin/registry/tracks/linked-recording-slug');
+  await expect(page.getByRole('link',{name:'Investigate in Registry'}))
+    .toHaveAttribute('href','/admin/registry/tracks?search=Known%20song');
+  await page.getByRole('button',{name:'Re-evaluate After Corrections'}).click();
+  const delta=page.locator('[data-wk-eligibility-recheck]');
+  await expect(delta.getByText('1 of 2 positions changed.')).toBeVisible({timeout:20_000});
+  await expect(page.getByRole('table',{name:'WAKILISHA 100 eligibility changes'})).toBeVisible();
+  await expect(delta.getByText(/Registry facts changed/)).toBeVisible();
+  expect(ctx.eligibilityReads).toHaveLength(2);
   expect(ctx.identityReads).toHaveLength(0);
   expect(ctx.writes).toEqual([]);
   expect(ctx.methodWrites).toEqual([]);
