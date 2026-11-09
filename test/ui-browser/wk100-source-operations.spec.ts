@@ -1282,7 +1282,7 @@ test('W4 Identify inspects a chosen source receipt and exact Registry links with
     {waitUntil:'domcontentloaded'});
   const stages=page.getByRole('navigation',{name:'Chart operations stages'});
   await stages.getByRole('button').filter({hasText:'Identify'}).click();
-  await expect(page.getByRole('heading',{name:'Recording Review'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Recording Review',level:2})).toBeVisible();
   await expect(page).toHaveURL(/stage=identify/);
   await expect(page.getByRole('table',{name:'WAKILISHA 100 recorded source positions'})).toHaveCount(0);
   await page.getByRole('button',{name:'Captured source'}).click();
