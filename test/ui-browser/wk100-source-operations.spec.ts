@@ -1339,3 +1339,53 @@ test('W4 Identify inspects a chosen source receipt and exact Registry links with
   expect(ctx.recoveryWrites).toEqual([]);
   expect(ctx.unexpected).toEqual([]);
 });
+
+test('W5 Qualify uses the saved policy result on one exact source receipt without writing',async({page})=>{
+  const sourceId='44444444-4444-4444-8444-444444444444';
+  const receiptId='55555555-5555-4555-8555-555555555555';
+  const source={
+    id:sourceId,sourceKey:'apple_ke_public_top100',provider:'apple_ke',
+    surface:'Apple Music Kenya Top 100',market:'KE',metric:'rank',behavior:'consumption',
+    expectedDepth:2,cadence:'daily',version:'test-v1',intervalHours:null,
+    eatHour:14,eatMinute:23,weekdayEat:null,minimumHealthyCheckpoints:1,
+    adapterVersion:'apple_kenya_chart_v1',admissionState:'candidate',
+    captureState:'succeeded',attemptCount:1,lastAttemptAt:'2026-11-09T16:10:20Z',
+    lastScheduledAt:'2026-11-09T16:09:00Z',lastAttemptNumber:1,
+    lastSuccessfulAt:'2026-11-09T16:10:20Z',observedDepth:2,
+    nativePeriodAuthority:'unknown',nativePeriodStart:null,nativePeriodEnd:null,
+    receiptSha256:'a'.repeat(64),failureCode:null,
+    recentAttempts:[{id:receiptId,status:'succeeded',
+      attemptedAt:'2026-11-09T16:10:20Z',scheduledAt:'2026-11-09T16:09:00Z',
+      attemptNumber:1,fetchedAt:'2026-11-09T16:10:20Z',
+      failureCode:null,observedDepth:2}],canScore:false,canPublish:false,
+  };
+  const ctx=await install(page,{existingSources:[source]});
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-09',{waitUntil:'domcontentloaded'});
+  await page.getByRole('navigation',{name:'Chart operations stages'})
+    .getByRole('button').filter({hasText:'Qualify'}).click();
+  await expect(page.getByRole('heading',{name:'Eligibility Workbench',level:2}))
+    .toBeVisible({timeout:20_000});
+  await expect(page).toHaveURL(/stage=qualify/);
+  await expect(page.getByRole('table',{name:'WAKILISHA 100 eligibility results'})).toHaveCount(0);
+  await page.getByRole('button',{name:'Captured source'}).click();
+  await page.getByRole('option',{name:'Apple Music Kenya Top 100'}).click();
+  await page.getByRole('button',{name:'Exact source receipt'}).click();
+  await page.getByRole('option',{name:/succeeded/}).click();
+  const rows=page.getByRole('table',{name:'WAKILISHA 100 eligibility results'});
+  await expect(rows).toBeVisible({timeout:20_000});
+  await expect(rows.getByText('Known song')).toBeVisible();
+  await expect(rows.getByText('Excluded song')).toBeVisible();
+  await expect(page.getByText('Policy SHA-256')).toBeVisible();
+  await expect(page.getByText('Rules met (not approved)')).toBeVisible();
+  await page.getByRole('button',{name:'Eligibility outcome'}).click();
+  await page.getByRole('option',{name:'Excluded'}).click();
+  await expect(rows.getByText('Known song')).toHaveCount(0);
+  await expect(rows.getByText('Excluded song')).toBeVisible();
+  expect(ctx.eligibilityReads).toHaveLength(1);
+  expect(ctx.identityReads).toHaveLength(0);
+  expect(ctx.writes).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.recoveryWrites).toEqual([]);
+  expect(ctx.collectNowWrites).toEqual([]);
+  expect(ctx.unexpected).toEqual([]);
+});
