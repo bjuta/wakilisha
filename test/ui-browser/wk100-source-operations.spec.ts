@@ -457,7 +457,7 @@ test('W1 W2 and W3 distinguish a retained partial original from full-depth healt
     .toBeVisible({timeout:20_000});
   await expect(page.getByText('Full-depth captures',{exact:true})).toBeVisible();
   await expect(page.getByText('Partial-depth captures',{exact:true})).toBeVisible();
-  await expect(page.getByText('Not ready for ranking',{exact:true})).toHaveCount(0);
+  await expect(page.getByText('Research only · Publication locked')).toBeVisible();
   await page.goto('/admin/charts/wk100-operations/sources?week=2026-11-09',
     {waitUntil:'domcontentloaded'});
   const registry=page.getByRole('table',{name:'Source registry'});
