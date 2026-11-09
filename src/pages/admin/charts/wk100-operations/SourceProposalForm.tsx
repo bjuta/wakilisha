@@ -124,10 +124,10 @@ export function SourceProposalForm({close,onSaved,existing,initial=null}:{
         '_ and use lowercase letters, numbers or underscores.']:[]),
     ...(draft.surface.trim().length<3?['Enter the source surface (at least 3 characters).']:[]),
     ...(draft.evidenceReference.trim().length<1?['Enter an internal evidence reference.']:[]),
-    ...(draft.expectedDepth<1||draft.expectedDepth>500
+    ...(!(draft.expectedDepth>=1&&draft.expectedDepth<=500)
       ?['Select an expected depth between 1 and 500.']:[]),
-    ...(draft.minimumHealthyCheckpoints<1||
-      draft.minimumHealthyCheckpoints>maxCheckpoints
+    ...(!(draft.minimumHealthyCheckpoints>=1&&
+      draft.minimumHealthyCheckpoints<=maxCheckpoints)
       ?['Select a valid minimum healthy checkpoint count.']:[]),
   ];
   const fieldValid=validationIssues.length===0;
