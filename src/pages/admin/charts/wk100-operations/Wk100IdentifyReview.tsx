@@ -20,7 +20,8 @@ type Row={
   identityState:'resolved'|'needs_review'|'conflicting'|'inactive';
   reviewReason:string|null;provisionalRef:string|null;
   outcome?:'ELIGIBLE'|'EXCLUDED'|'REVIEW_REQUIRED'|'CONFLICTED';reasonCodes?:string[];
-  registryTrackSlug?:string|null;registryFactsSha256?:string;
+  registryTrackSlug?:string|null;registryReleaseSlug?:string|null;
+  registryArtistSlugs?:string[];registryFactsSha256?:string;
 };
 type Review={
   schemaVersion:'wk100-admin-identify-observations-v1'|'wk100-admin-eligibility-preview-v1';
@@ -304,7 +305,17 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
                   ?'?search='+encodeURIComponent(r.observedTitle.slice(0,120)):'')}
               target="_blank" rel="noopener noreferrer">
               {r.canonicalTrackId&&r.registryTrackSlug?'Edit Linked Track':'Investigate in Registry'}
-            </a>}]:[]),
+            </a>}
+            {r.registryReleaseSlug&&<a
+              className="block font-semibold text-wk-brand underline"
+              href={'/admin/registry/releases/'+encodeURIComponent(r.registryReleaseSlug)}
+              target="_blank" rel="noopener noreferrer">Edit Linked Release</a>}
+            {r.registryArtistSlugs?.map((slug,i)=><a key={slug}
+              className="block font-semibold text-wk-brand underline"
+              href={'/admin/registry/artists/'+encodeURIComponent(slug)}
+              target="_blank" rel="noopener noreferrer">
+              Review Credited Artist {i+1}
+            </a>)}]:[]),
           ]}/>
         <p className="mt-4 text-xs text-wk-text-muted">
           {qualify
