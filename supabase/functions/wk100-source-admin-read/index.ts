@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { validEatWeek, projectWk100SourceHealth } from '../_shared/wk100-source-admin-projection.mjs';
 import { projectWk100IdentifyObservations, wk100RegistryProviderKey } from '../_shared/wk100-identify-observations.mjs';
+import { projectWk100EligibilityPreview } from '../_shared/wk100-eligibility-preview.mjs';
 
 const origins=new Set([
   'https://wakilisha.africa','https://www.wakilisha.africa',
@@ -24,7 +25,7 @@ Deno.serve(async req=>{
   if(req.method!=='POST')return reply(req,405,{error:'method_not_allowed'});
   const bearer=req.headers.get('authorization')??'';
   if(!/^Bearer [^\s]+$/.test(bearer))return reply(req,401,{error:'authentication_required'});
-  let week:string,action:'health'|'original'|'identify',contractId='',receiptId='';
+  let week:string,action:'health'|'original'|'identify'|'eligibility',contractId='',receiptId='';
   try{
     const raw=await req.text();
     if(raw.length>320)throw Error();
@@ -34,12 +35,13 @@ Deno.serve(async req=>{
     week=data.weekStartEat;
     if(data.action==='read_source_health'&&Object.keys(data).length===2){
       action='health';
-    }else if(['verify_private_original','read_recording_observations'].includes(data.action)&&
+    }else if(['verify_private_original','read_recording_observations','preview_recording_eligibility'].includes(data.action)&&
       Object.keys(data).length===4&&
       typeof data.contractId==='string'&&typeof data.receiptId==='string'&&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.contractId)&&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.receiptId)){
-      action=data.action==='verify_private_original'?'original':'identify';
+      action=data.action==='verify_private_original'?'original':
+        data.action==='preview_recording_eligibility'?'eligibility':'identify';
       contractId=data.contractId;receiptId=data.receiptId;
     }else throw Error();
   }catch{return reply(req,400,{error:'request_invalid'});}
@@ -91,7 +93,13 @@ Deno.serve(async req=>{
       });
     }catch{return reply(req,503,{error:'original_readback_unavailable'});}
   }
-  if(action==='identify'){
+  if(action==='identify'||action==='eligibility'){
+    // Registry details are private steward data; neither chart management nor
+    // service_role access substitutes for the caller's Registry read grant.
+    const registryAccess=await caller.rpc('current_user_has_capability',
+      {required_capability:'view_registry'});
+    if(registryAccess.error)return reply(req,503,{error:'registry_capability_unavailable'});
+    if(registryAccess.data!==true)return reply(req,403,{error:'registry_review_not_authorized'});
     // The browser selects a real immutable receipt, never a provider URL, raw
     // Storage path, Registry write operation, or purported canonical Track.
     const [contractResponse,attemptResponse]=await Promise.all([
@@ -151,11 +159,71 @@ Deno.serve(async req=>{
         return reply(req,503,{error:'identity_registry_tracks_unavailable'});
       activeTracks=tracks.data;
     }
+    let observation;
     try{
-      return reply(req,200,projectWk100IdentifyObservations({
+      observation=projectWk100IdentifyObservations({
         weekStartEat:week,contract,attempt,rows,typedLinks,legacyLinks,activeTracks,
-      }));
+      });
     }catch{return reply(req,503,{error:'identity_projection_unavailable'});}
+    if(action==='identify')return reply(req,200,observation);
+
+    // Existing signed-in, revisioned Edition policy, never a browser-supplied
+    // eligibility profile. A missing or invalid draft fails W5 closed.
+    const draftResponse=await caller.rpc('wk100_get_admin_draft_v1',{p_week:week});
+    if(draftResponse.error)return reply(req,503,{error:'eligibility_draft_unavailable'});
+    const current=draftResponse.data;
+    if(!current)return reply(req,409,{error:'eligibility_edition_not_configured'});
+    if(current.weekStartEat!==week||!Number.isSafeInteger(current.revision)||
+       current.revision<1||typeof current.updatedAt!=='string'||
+       !current.config||typeof current.config!=='object')
+      return reply(req,503,{error:'eligibility_draft_invalid'});
+
+    const resolvedIds=[...new Set(observation.rows
+      .filter(x=>x.identityState==='resolved'&&x.canonicalTrackId)
+      .map(x=>x.canonicalTrackId))];
+    let registryTracks:unknown[]=[],registryCredits:unknown[]=[],
+      registryArtists:unknown[]=[],registryReleases:unknown[]=[];
+    if(resolvedIds.length){
+      const [tracksResult,creditsResult]=await Promise.all([
+        admin.from('registry_tracks')
+          .select('id,title,isrc,release_id,duration_ms,explicit,preview_url,status,metadata')
+          .in('id',resolvedIds).eq('status','active').limit(401),
+        admin.from('registry_track_artists')
+          .select('id,track_id,artist_id,role,is_primary,status')
+          .in('track_id',resolvedIds).limit(401),
+      ]);
+      if(tracksResult.error||creditsResult.error||
+        !Array.isArray(tracksResult.data)||!Array.isArray(creditsResult.data)||
+        tracksResult.data.length>400||creditsResult.data.length>400)
+        return reply(req,503,{error:'eligibility_registry_read_unavailable'});
+      registryTracks=tracksResult.data;registryCredits=creditsResult.data;
+      const artistIds=[...new Set(creditsResult.data
+        .map(x=>x.artist_id).filter((x):x is string=>typeof x==='string'))];
+      const releaseIds=[...new Set(tracksResult.data
+        .map(x=>x.release_id).filter((x):x is string=>typeof x==='string'))];
+      const [artistsResult,releasesResult]=await Promise.all([
+        artistIds.length?admin.from('registry_artists')
+          .select('id,status,origin_iso2,gender,artist_type,metadata')
+          .in('id',artistIds).limit(401):Promise.resolve({data:[],error:null}),
+        releaseIds.length?admin.from('registry_releases')
+          .select('id,status,release_type,release_date,metadata')
+          .in('id',releaseIds).limit(401):Promise.resolve({data:[],error:null}),
+      ]);
+      if(artistsResult.error||releasesResult.error||
+        !Array.isArray(artistsResult.data)||!Array.isArray(releasesResult.data)||
+        artistsResult.data.length>400||releasesResult.data.length>400)
+        return reply(req,503,{error:'eligibility_registry_read_unavailable'});
+      registryArtists=artistsResult.data;registryReleases=releasesResult.data;
+    }
+    try {
+      return reply(req,200,await projectWk100EligibilityPreview({
+        weekStartEat:week,sourceReview:observation,
+        draft:{week_start_eat:week,revision:current.revision,
+          updated_by:identity.data.user.id,updated_at:current.updatedAt,
+          config_json:current.config},
+        registryTracks,registryCredits,registryArtists,registryReleases,
+      }));
+    }catch{return reply(req,503,{error:'eligibility_policy_verification_failed'});}
   }
   // Only explicitly selected read-only columns are allowed across this
   // service-role boundary. No raw object keys, endpoints or credentials.
