@@ -186,7 +186,7 @@ Deno.serve(async req=>{
     if(resolvedIds.length){
       const [tracksResult,creditsResult]=await Promise.all([
         admin.from('registry_tracks')
-          .select('id,title,isrc,release_id,duration_ms,explicit,preview_url,status,metadata')
+          .select('id,slug,title,isrc,release_id,duration_ms,explicit,preview_url,status,metadata')
           .in('id',resolvedIds).eq('status','active').limit(401),
         admin.from('registry_track_artists')
           .select('id,track_id,artist_id,role,is_primary,status')
