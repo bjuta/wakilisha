@@ -4,12 +4,15 @@
   "generatedAt": "2026-11-07T09:35:00Z",
   "typesSha256": "0e684d6e44e79a4bfdee4dbd080f2726827fcf4c2e5106e4981d722be27d2612",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 246,
-  "latestMigration": "20261106125825_wk100_firstparty_admitted_method_class_v1.sql",
+  "migrationCount": 247,
+  "latestMigration": "20261110085456_wk100_apple_artist_observations_v1.sql",
   "schemaSeal": {
-    "mode": "production",
-    "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
-    "migrationHead": "20261106125825"
+    "mode": "disposable_ci",
+    "sourceProjectRef": "unlinked-local-ci",
+    "migrationHead": "20261110085456",
+    "baseMainSha": "e416694a83b689f57d96322ad841b3e33960a34b",
+    "replayCandidateHeadSha": "c521b1e31b1c824440e01e46b76b8daa2c7556bb",
+    "workflowRunId": 42846750603
   },
-  "reverifiedAt": "2026-11-07T09:35:00Z"
+  "reverifiedAt": "2026-11-10T15:43:17Z"
 }

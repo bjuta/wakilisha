@@ -1097,3 +1097,52 @@ test('Collect Now keeps approved UI untouched and SQL remains an independent gat
   assert.match(sql,/current_user_has_capability\('manage_ingest'\)/);
   assert.match(sql,/private\.wk_chart_runtime_guard_v1\(\)/);
 });
+
+
+// WK100 Apple artist evidence report acceptance: only exact immutable receipt rows.
+import {validateWk100AppleArtistReport, sha256OfWk100ReportRaw} from '../../supabase/functions/_shared/wk100-apple-artist-evidence.mjs';
+
+test('WK100 rejects source/title/ID drift and unapproved artist report fields',async()=>{
+  const receipt={id:'de7e4965-b3db-4e04-b352-49a2dc6ee1bb',week_start_eat:'2026-11-09',
+    payload_sha256:'a'.repeat(64),status:'succeeded'};
+  const rows=Array.from({length:100},(_,i)=>({id:'row-'+(i+1),attempt_id:receipt.id,
+    source_rank:i+1,provider_track_id:String(900000+i),title_observed:'Song '+(i+1),artist_observed:null}));
+  const report={schemaVersion:'wk100-apple-artist-observation-probe-v1',
+    sourceReceipt:{source:'apple_ke_public_top100',weekStartEat:'2026-11-09',
+      receiptId:receipt.id,originalSha256:receipt.payload_sha256,
+      capturedAtUtc:'2026-11-09T13:10:18.956Z',originalArtistCount:0},
+    generatedAtUtc:'2026-11-10T08:29:09.232Z',initiatedAtUtc:'2026-11-10T08:28:44.492Z',
+    lookupEndpoint:'https://itunes.apple.com/lookup',lookupCountry:'ke',
+    batchSize:10,requestedBatches:[1,2,3,4,5,6,7,8,9,10],
+    supplierDataIsCurrentLookupNotOriginal:true,doesNotEstablishRegistryIdentity:true,
+    canMutateRegistry:false,canMutateSource:false,canScore:false,canPublish:false,
+    summary:{artist_found:100},batchesFailed:[],
+    rows:rows.map(x=>({rank:x.source_rank,providerTrackId:x.provider_track_id,
+      observedTitle:x.title_observed,status:'artist_found',artistName:'Artist '+x.source_rank,
+      providerTitle:x.title_observed,lookupRetrievedAtUtc:'2026-11-10T08:28:48.573Z',
+      evidenceSource:'Apple iTunes Search API ID lookup',originalArtistObserved:null,registryIdentityConfirmed:false}))};
+  assert.equal(validateWk100AppleArtistReport({report,receipt,rows}).length,100);
+  assert.match(await sha256OfWk100ReportRaw(JSON.stringify(report)),/^[a-f0-9]{64}$/);
+  const testBad=mutate=>{const d=structuredClone(report);mutate(d);
+    assert.throws(()=>validateWk100AppleArtistReport({report:d,receipt,rows}),/wk100_apple_artist_/);};
+  testBad(x=>{x.rows[0].providerTrackId='other';});
+  testBad(x=>{x.rows[0].observedTitle='other';});
+  testBad(x=>{x.rows[0].artistName='';});
+  testBad(x=>{x.rows[0].registryIdentityConfirmed=true;});
+  testBad(x=>{x.canMutateRegistry=true;});
+  testBad(x=>{x.rows.pop();});
+  testBad(x=>{x.sourceReceipt.originalSha256='b'.repeat(64);});
+});
+
+test('WK100 artist imports bind the approved report and reject competing receipt rows',async()=>{
+  const edge=await readFile('supabase/functions/wk100-source-admin-read/index.ts','utf8');
+  const sql=await readFile('supabase/migrations/20261110085456_wk100_apple_artist_observations_v1.sql','utf8');
+  assert.match(edge,/reportSha256!=='46a2d8f28c25ed06ee8e22ea832d1172c1c820be3c42c27b235822ec897d0296'/);
+  assert.match(sql,/unique \(source_receipt_id,capture_row_id\)/);
+  assert.doesNotMatch(sql,/unique \(source_receipt_id,capture_row_id,report_sha256\)/);
+});
+
+test('WK100 recovered provider artist is searchable in the Workbench',async()=>{
+  const ui=await readFile('src/pages/admin/charts/wk100-operations/Wk100IdentifyReview.tsx','utf8');
+  assert.match(ui,/row\.observedTitle,row\.observedArtist,row\.providerArtistName,row\.providerTrackId/);
+});

@@ -1332,7 +1332,7 @@ test('W4 Identify inspects a chosen source receipt and exact Registry links with
   const table=page.getByRole('table',{name:'WAKILISHA 100 recorded source positions'});
   await expect(table).toBeVisible({timeout:20_000});
   await expect(table.getByText('Song One')).toBeVisible();
-  await expect(table.getByText('Artist not supplied by source')).toHaveCount(2);
+  await expect(table.getByText('Artist not supplied in captured chart')).toHaveCount(2);
   await expect(table.getByText('Linked recording')).toBeVisible();
   await expect(table.getByText('No confirmed Registry link')).toBeVisible();
   await expect(page.getByText('Confirmed active Registry links')).toBeVisible();
@@ -1438,4 +1438,155 @@ test('W5 cannot read private Registry facts without view_registry capability',as
     .toHaveCount(0);
   expect(ctx.eligibilityReads).toHaveLength(0);
   expect(ctx.unexpected).toEqual([]);
+});
+
+// WK100 W5C: real React interactions; all responses stay in this local browser
+// mock. Genuine GoTrue/JWT/Edge import and SQL security are independently
+// exercised by the disposable authenticated Edge acceptance.
+test('WK100 Apple artist browser import, search, W4 provenance and mobile viewport',async({page})=>{
+  const week='2026-11-09';
+  const contractId='44444444-4444-4444-8444-444444444444';
+  const receiptId='55555555-5555-4555-8555-555555555555';
+  const sha='a'.repeat(64);
+  const source={id:contractId,sourceKey:'apple_ke_public_top100',provider:'apple_ke',
+    surface:'Apple Music Kenya Top 100',market:'KE',metric:'rank',behavior:'consumption',
+    expectedDepth:100,cadence:'daily',version:'wk100-browser-artist-v1',
+    intervalHours:null,eatHour:14,eatMinute:23,weekdayEat:null,
+    minimumHealthyCheckpoints:1,adapterVersion:'apple_kenya_chart_v1',
+    admissionState:'candidate',captureState:'succeeded',attemptCount:1,
+    lastAttemptAt:'2026-11-09T16:10:20Z',lastScheduledAt:'2026-11-09T16:09:00Z',
+    lastAttemptNumber:1,lastSuccessfulAt:'2026-11-09T16:10:20Z',
+    observedDepth:100,nativePeriodAuthority:'unknown',nativePeriodStart:null,
+    nativePeriodEnd:null,receiptSha256:sha,failureCode:null,
+    recentAttempts:[{id:receiptId,status:'succeeded',
+      attemptedAt:'2026-11-09T16:10:20Z',scheduledAt:'2026-11-09T16:09:00Z',
+      attemptNumber:1,fetchedAt:'2026-11-09T16:10:20Z',failureCode:null,
+      observedDepth:100}],canScore:false,canPublish:false};
+  const ctx=await install(page,{existingSources:[source]});
+  let imported=false;
+  const importRequests:Record<string,unknown>[]=[];
+  const recordedAt='2026-11-10T08:28:48.573+00:00';
+  const sample=Array.from({length:100},(_,i)=>({
+    captureRowId:'11111111-1111-4111-8111-'+String(i+1).padStart(12,'0'),
+    rank:i+1,observedTitle:'WK100 Test Song '+String(i+1).padStart(3,'0'),
+    observedArtist:null,providerTrackId:String(900000+i),canonicalTrackId:null,
+    identityState:'needs_review' as const,reviewReason:'provider_link_missing',
+    provisionalRef:'wk100:obs:v1:'+sha+':'+String(i+1).padStart(12,'0'),
+  }));
+  // A synthetic file proves browser upload and digest transport without
+  // fabricating a second accepted Apple historical report.
+  const acceptedRaw=JSON.stringify({schemaVersion:'browser-only-transport-fixture',
+    records:sample.map(x=>({rank:x.rank,providerTrackId:x.providerTrackId}))});
+  await page.route('**/functions/v1/wk100-source-admin-read',async route=>{
+    let payload:Record<string,unknown>={};
+    try{payload=JSON.parse(route.request().postData()||'{}');}catch{}
+    if(payload.action==='import_apple_artist_report'){
+      importRequests.push(payload);
+      if(payload.reportRaw!==acceptedRaw||payload.weekStartEat!==week||
+         payload.contractId!==contractId||payload.receiptId!==receiptId||
+         typeof payload.reportSha256!=='string'||
+         !/^[a-f0-9]{64}$/.test(payload.reportSha256)){
+        await json(route,{error:'apple_evidence_report_not_accepted'},409);return;
+      }
+      imported=true;
+      await json(route,{schemaVersion:'wk100-apple-artist-import-result-v1',
+        accepted:100,alreadyRecorded:false,reportSha256:payload.reportSha256,
+        canWriteRegistry:false,canScore:false,canPublish:false});return;
+    }
+    if(payload.action==='read_recording_observations'){
+      await json(route,{schemaVersion:'wk100-admin-identify-observations-v1',
+        weekStartEat:week,contractId,receiptId,sourceKey:source.sourceKey,
+        providerKey:'apple_ke',registryProviderKey:'apple_music',
+        receiptStatus:'succeeded',expectedDepth:100,observedDepth:100,
+        payloadSha256:sha,originalReadbackInThisRequest:false,
+        identityStatus:'exact_provider_links_only',
+        totals:{observed:100,resolved:0,needsReview:100,conflicting:0,inactive:0},
+        rows:sample.map(x=>({...x,
+          providerArtistName:imported?'WK100 Test Artist '+String(x.rank).padStart(3,'0'):null,
+          providerArtistRetrievedAt:imported?recordedAt:null,
+          providerArtistReportSha256:imported?'b'.repeat(64):null})),
+        canWriteRegistry:false,canScore:false,canPublish:false});return;
+    }
+    if(payload.action==='preview_recording_eligibility'){
+      await json(route,{schemaVersion:'wk100-admin-eligibility-preview-v1',
+        weekStartEat:week,contractId,receiptId,sourceKey:source.sourceKey,
+        receiptStatus:'succeeded',expectedDepth:100,observedDepth:100,
+        payloadSha256:sha,configRevision:1,policySha256:'c'.repeat(64),
+        eligibilityProfileName:'Kenya',marketScopeName:'Kenya',
+        counts:{ELIGIBLE:0,EXCLUDED:0,REVIEW_REQUIRED:100,CONFLICTED:0},
+        rows:sample.map(x=>({...x,registryFactsSha256:'d'.repeat(64),
+          outcome:'REVIEW_REQUIRED' as const,reasonCodes:['canonical_identity_needs_review'],
+          providerArtistName:imported?'WK100 Test Artist '+String(x.rank).padStart(3,'0'):null,
+          providerArtistRetrievedAt:imported?recordedAt:null,
+          providerArtistReportSha256:imported?'b'.repeat(64):null})),
+        reviewMode:'all_predicates_no_admission',
+        canWriteRegistry:false,canScore:false,canPublish:false});return;
+    }
+    await route.fallback();
+  });
+
+  await page.goto('/admin/charts/wk100-operations?week='+week,{waitUntil:'domcontentloaded'});
+  const stages=page.getByRole('navigation',{name:'Chart operations stages'});
+  await stages.getByRole('button').filter({hasText:'Identify'}).click();
+  await expect(page.getByRole('heading',{name:'Recording Review',level:2})).toBeVisible();
+  await page.getByRole('button',{name:'Captured source'}).click();
+  await page.getByRole('option',{name:'Apple Music Kenya Top 100'}).click();
+  await page.getByRole('button',{name:'Exact source receipt'}).click();
+  await page.getByRole('option',{name:/succeeded/}).click();
+  const w4=page.getByRole('table',{name:'WAKILISHA 100 recorded source positions'});
+  await expect(w4).toBeVisible({timeout:20_000});
+  await expect(w4.getByText('Artist not supplied in captured chart')).toHaveCount(100);
+
+  await stages.getByRole('button').filter({hasText:'Qualify'}).click();
+  await expect(page.getByRole('heading',{name:'Eligibility Workbench',level:2})).toBeVisible();
+  await page.getByRole('button',{name:'Captured source'}).click();
+  await page.getByRole('option',{name:'Apple Music Kenya Top 100'}).click();
+  await page.getByRole('button',{name:'Exact source receipt'}).click();
+  await page.getByRole('option',{name:/succeeded/}).click();
+  await expect(page.getByRole('table',{name:'WAKILISHA 100 eligibility results'}))
+    .toBeVisible({timeout:20_000});
+  await expect(page.getByRole('heading',{name:'Apple Artist Evidence'})).toBeVisible();
+  await expect(page.getByText('0 of 100 artist names checked')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Import Apple artist evidence report'}))
+    .toBeVisible();
+  const file=page.locator('input[type="file"]');
+  await expect(file).toHaveCount(1);
+  await file.setInputFiles({name:'invalid-browser-report.json',mimeType:'application/json',
+    buffer:Buffer.from('{"not":"an approved report"}')});
+  await expect(page.getByText('Artist evidence was not accepted. Check the report and selected receipt.'))
+    .toBeVisible({timeout:20_000});
+  await expect(page.getByText('0 of 100 artist names checked')).toBeVisible();
+  await file.setInputFiles({name:'approved-browser-transport.json',mimeType:'application/json',
+    buffer:Buffer.from(acceptedRaw)});
+  await expect(page.getByText('100 of 100 artist names checked')).toBeVisible({timeout:20_000});
+  await expect(page.getByText('100 Apple artist names checked. Original chart and Registry records remain unchanged.'))
+    .toBeVisible();
+  const w5=page.getByRole('table',{name:'WAKILISHA 100 eligibility results'});
+  await expect(w5.getByText('WK100 Test Artist 087',{exact:true})).toBeVisible();
+  await expect(w5.getByText(/Not supplied in the original chart or approved as a Registry credit/).first())
+    .toBeVisible();
+  await page.getByRole('searchbox',{name:'Search source recordings'}).fill('WK100 Test Artist 087');
+  await expect(page.getByText('Showing 1 of 100 source positions.')).toBeVisible();
+  await expect(w5.getByText('WK100 Test Song 087',{exact:true})).toBeVisible();
+  await expect(w5.getByText('WK100 Test Song 086',{exact:true})).toHaveCount(0);
+  await page.getByRole('searchbox',{name:'Search source recordings'}).fill('');
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.getByRole('heading',{name:'Apple Artist Evidence'})).toBeVisible();
+  await expect(page.getByText('100 of 100 artist names checked')).toBeVisible();
+  await expect(w5.getByText('WK100 Test Artist 087',{exact:true})).toBeVisible();
+
+  await stages.getByRole('button').filter({hasText:'Identify'}).click();
+  await page.getByRole('button',{name:'Captured source'}).click();
+  await page.getByRole('option',{name:'Apple Music Kenya Top 100'}).click();
+  await page.getByRole('button',{name:'Exact source receipt'}).click();
+  await page.getByRole('option',{name:/succeeded/}).click();
+  await expect(page.getByRole('table',{name:'WAKILISHA 100 recorded source positions'})
+    .getByText('WK100 Test Artist 087',{exact:true})).toBeVisible({timeout:20_000});
+  expect(importRequests).toHaveLength(2);
+  expect(ctx.unexpected).toEqual([]);
+  expect(ctx.writes).toEqual([]);
+  expect(ctx.methodWrites).toEqual([]);
+  expect(ctx.contractWrites).toEqual([]);
+  expect(ctx.recoveryWrites).toEqual([]);
+  expect(ctx.collectNowWrites).toEqual([]);
 });
