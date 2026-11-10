@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { validEatWeek, projectWk100SourceHealth } from '../_shared/wk100-source-admin-projection.mjs';
 import { projectWk100IdentifyObservations, wk100RegistryProviderKey } from '../_shared/wk100-identify-observations.mjs';
 import { projectWk100EligibilityPreview } from '../_shared/wk100-eligibility-preview.mjs';
+import { validateWk100AppleArtistReport, sha256OfWk100ReportRaw } from '../_shared/wk100-apple-artist-evidence.mjs';
 
 const origins=new Set([
   'https://wakilisha.africa','https://www.wakilisha.africa',
@@ -25,10 +26,11 @@ Deno.serve(async req=>{
   if(req.method!=='POST')return reply(req,405,{error:'method_not_allowed'});
   const bearer=req.headers.get('authorization')??'';
   if(!/^Bearer [^\s]+$/.test(bearer))return reply(req,401,{error:'authentication_required'});
-  let week:string,action:'health'|'original'|'identify'|'eligibility',contractId='',receiptId='';
+  let week:string,action:'health'|'original'|'identify'|'eligibility'|'artist_import',contractId='',receiptId='';
+  let reportRaw='', reportSha256='';
   try{
     const raw=await req.text();
-    if(raw.length>320)throw Error();
+    if(raw.length>80000)throw Error();
     const data=JSON.parse(raw);
     if(!data||typeof data!=='object'||Array.isArray(data)||
        !validEatWeek(data.weekStartEat))throw Error();
@@ -43,7 +45,17 @@ Deno.serve(async req=>{
       action=data.action==='verify_private_original'?'original':
         data.action==='preview_recording_eligibility'?'eligibility':'identify';
       contractId=data.contractId;receiptId=data.receiptId;
+    }else if(data.action==='import_apple_artist_report'&&
+      Object.keys(data).length===6&&
+      typeof data.contractId==='string'&&typeof data.receiptId==='string'&&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.contractId)&&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.receiptId)&&
+      typeof data.reportRaw==='string'&&data.reportRaw.length<=62000&&
+      typeof data.reportSha256==='string'&&/^[a-f0-9]{64}$/.test(data.reportSha256)){
+      action='artist_import'; contractId=data.contractId;receiptId=data.receiptId;
+      reportRaw=data.reportRaw;reportSha256=data.reportSha256;
     }else throw Error();
+    if(action!=='artist_import'&&raw.length>320)throw Error();
   }catch{return reply(req,400,{error:'request_invalid'});}
   const url=Deno.env.get('SUPABASE_URL')??'';
   const anon=Deno.env.get('SUPABASE_ANON_KEY')??'';
@@ -93,7 +105,7 @@ Deno.serve(async req=>{
       });
     }catch{return reply(req,503,{error:'original_readback_unavailable'});}
   }
-  if(action==='identify'||action==='eligibility'){
+  if(action==='identify'||action==='eligibility'||action==='artist_import'){
     // Registry details are private steward data; neither chart management nor
     // service_role access substitutes for the caller's Registry read grant.
     const registryAccess=await caller.rpc('current_user_has_capability',
@@ -124,6 +136,50 @@ Deno.serve(async req=>{
       rowsResponse.data.length>200)
       return reply(req,503,{error:'identity_rows_unavailable'});
     const rows=rowsResponse.data;
+    if(action==='artist_import'){
+      if(contract.provider_key!=='apple_ke'||contract.source_key!=='apple_ke_public_top100'||
+        rows.length!==100||attempt.observed_depth!==100||attempt.record_count!==100)
+        return reply(req,409,{error:'apple_evidence_receipt_not_supported'});
+      let validated:ReturnType<typeof validateWk100AppleArtistReport>;
+      try{
+        const actual=await sha256OfWk100ReportRaw(reportRaw);
+        if(actual!==reportSha256||
+          receiptId!=='de7e4965-b3db-4e04-b352-49a2dc6ee1bb'||
+          attempt.payload_sha256!=='2546ec2bf4b2a57351b6cb8bf22ff9377b5d652e3fead842c416c7f1ad7e0965'||
+          reportSha256!=='46a2d8f28c25ed06ee8e22ea832d1172c1c820be3c42c27b235822ec897d0296')
+          throw Error('unapproved_artist_evidence');
+        validated=validateWk100AppleArtistReport({report:JSON.parse(reportRaw),receipt:attempt,rows});
+      }catch{return reply(req,409,{error:'apple_evidence_report_not_accepted'});}
+      const evidence=admin.from('wk100_source_artist_evidence_v1');
+      const existing=await evidence
+        .select('capture_row_id,provider_track_id,artist_name,source_title,original_sha256,report_sha256')
+        .eq('source_receipt_id',receiptId).limit(401);
+      if(existing.error||!Array.isArray(existing.data)||existing.data.length>400)
+        return reply(req,503,{error:'artist_evidence_read_unavailable'});
+      // Idempotent exact replay. Different or partial prior evidence is not overwritten.
+      if(existing.data.length){
+        const byRow=new Map(validated.map(x=>[x.capture_row_id,x]));
+        const accepted=existing.data.length===100&&existing.data.every(x=>{
+          const next=byRow.get(x.capture_row_id);
+          return !!next&&x.report_sha256===reportSha256&&
+            x.provider_track_id===next.provider_track_id&&
+            x.artist_name===next.artist_name&&x.source_title===next.source_title&&
+            x.original_sha256===next.original_sha256;
+        });
+        if(!accepted)return reply(req,409,{error:'artist_evidence_already_reviewed_or_changed'});
+        return reply(req,200,{schemaVersion:'wk100-apple-artist-import-result-v1',
+          accepted:100,alreadyRecorded:true,reportSha256,canWriteRegistry:false,
+          canScore:false,canPublish:false});
+      }
+      const result=await evidence.insert(validated.map(({receipt_id,...x})=>({
+        ...x,source_receipt_id:receipt_id,report_sha256:reportSha256,
+        recorded_by:identity.data.user.id,
+      })));
+      if(result.error)return reply(req,409,{error:'artist_evidence_write_conflict'});
+      return reply(req,200,{schemaVersion:'wk100-apple-artist-import-result-v1',
+        accepted:100,alreadyRecorded:false,reportSha256,canWriteRegistry:false,
+        canScore:false,canPublish:false});
+    }
     const ids=[...new Set(rows.map(x=>x.provider_track_id)
       .filter((x):x is string=>typeof x==='string'&&x.length>0))];
     const registryProvider=wk100RegistryProviderKey(contract.provider_key);
@@ -165,6 +221,34 @@ Deno.serve(async req=>{
         weekStartEat:week,contract,attempt,rows,typedLinks,legacyLinks,activeTracks,
       });
     }catch{return reply(req,503,{error:'identity_projection_unavailable'});}
+    // Provider artist metadata is a separate, current lookup. Never mutate
+    // original observed artist or canonical Registry identity.
+    let evidenceByRow=new Map<string,{artist:string;retrievedAt:string;report:string}>();
+    if(contract.source_key==='apple_ke_public_top100'){
+      const lookup=await admin.from('wk100_source_artist_evidence_v1')
+        .select('capture_row_id,provider_track_id,artist_name,lookup_retrieved_at,original_sha256,report_sha256')
+        .eq('source_receipt_id',receiptId)
+        .order('lookup_retrieved_at',{ascending:false}).limit(401);
+      if(lookup.error||!Array.isArray(lookup.data)||lookup.data.length>400)
+        return reply(req,503,{error:'apple_artist_evidence_unavailable'});
+      const byId=new Map(rows.map(x=>[x.id,x]));
+      for(const entry of lookup.data){
+        const source=byId.get(entry.capture_row_id);
+        if(source&&source.provider_track_id===entry.provider_track_id&&
+          entry.original_sha256===attempt.payload_sha256&&
+          !evidenceByRow.has(entry.capture_row_id)){
+          evidenceByRow.set(entry.capture_row_id,{artist:entry.artist_name,
+            retrievedAt:entry.lookup_retrieved_at,report:entry.report_sha256});
+        }
+      }
+    }
+    const withArtist=<T extends {captureRowId:string}>(items:T[])=>items.map(r=>{
+      const e=evidenceByRow.get(r.captureRowId);
+      return {...r,providerArtistName:e?.artist??null,
+        providerArtistRetrievedAt:e?.retrievedAt??null,
+        providerArtistReportSha256:e?.report??null};
+    });
+    observation.rows=withArtist(observation.rows);
     if(action==='identify')return reply(req,200,observation);
 
     // Existing signed-in, revisioned Edition policy, never a browser-supplied
@@ -216,13 +300,14 @@ Deno.serve(async req=>{
       registryArtists=artistsResult.data;registryReleases=releasesResult.data;
     }
     try {
-      return reply(req,200,await projectWk100EligibilityPreview({
+      const preview=await projectWk100EligibilityPreview({
         weekStartEat:week,sourceReview:observation,
         draft:{week_start_eat:week,revision:current.revision,
           updated_by:identity.data.user.id,updated_at:current.updatedAt,
           config_json:current.config},
         registryTracks,registryCredits,registryArtists,registryReleases,
-      }));
+      });
+      return reply(req,200,{...preview,rows:withArtist(preview.rows)});
     }catch{return reply(req,503,{error:'eligibility_policy_verification_failed'});}
   }
   // Only explicitly selected read-only columns are allowed across this

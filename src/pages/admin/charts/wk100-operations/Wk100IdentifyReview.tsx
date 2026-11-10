@@ -22,6 +22,8 @@ type Row={
   outcome?:'ELIGIBLE'|'EXCLUDED'|'REVIEW_REQUIRED'|'CONFLICTED';reasonCodes?:string[];
   registryTrackSlug?:string|null;registryReleaseSlug?:string|null;
   registryArtistSlugs?:string[];registryFactsSha256?:string;
+  providerArtistName?:string|null;providerArtistRetrievedAt?:string|null;
+  providerArtistReportSha256?:string|null;
 };
 type Review={
   schemaVersion:'wk100-admin-identify-observations-v1'|'wk100-admin-eligibility-preview-v1';
@@ -64,6 +66,8 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
   const [readNonce,setReadNonce]=useState(0);
+  const [artistPhase,setArtistPhase]=useState<'idle'|'loading'|'ready'|'failed'>('idle');
+  const [artistMessage,setArtistMessage]=useState('');
   const [comparison,setComparison]=useState<{
     changedCount:number;evaluatedRows:number;changed:{
       captureRowId:string;rank:number;observedTitle:string|null;
@@ -119,10 +123,34 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
   const rows=useMemo(()=>review?.rows.filter(row=>
     (filter==='all'||(qualify?row.outcome===filter:row.identityState===filter))&&
     (!search||[
-      row.observedTitle,row.observedArtist,row.providerTrackId,
+      row.observedTitle,row.observedArtist,row.providerArtistName,row.providerTrackId,
       row.canonicalTrackId,String(row.rank),row.reasonCodes?.join(' '),
     ].some(v=>v?.toLowerCase().includes(search.trim().toLowerCase()))))??[],
     [review,filter,search,qualify]);
+  const importArtistEvidence=async (file:File)=>{
+    setArtistPhase('loading');setArtistMessage('Checking exact Apple song IDs and artist evidence…');
+    try{
+      if(!qualify||!source||source.sourceKey!=='apple_ke_public_top100'||
+         !receiptId||!review||file.size<1||file.size>62000)throw Error();
+      const raw=await file.text();
+      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw));
+      const sha=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
+      const {data,error}=await supabase.functions.invoke('wk100-source-admin-read',{
+        body:{action:'import_apple_artist_report',weekStartEat:week,
+          contractId:source.id,receiptId,reportRaw:raw,reportSha256:sha},
+      });
+      if(error||data?.schemaVersion!=='wk100-apple-artist-import-result-v1'||
+         data.accepted!==100||data.reportSha256!==sha||
+         data.canWriteRegistry!==false||data.canScore!==false||data.canPublish!==false)
+        throw Error();
+      beforeRecheck.current=null;setArtistPhase('ready');
+      setArtistMessage('100 Apple artist names checked. Original chart and Registry records remain unchanged.');
+      setReadNonce(x=>x+1);
+    }catch{
+      setArtistPhase('failed');
+      setArtistMessage('Artist evidence was not accepted. Check the report and selected receipt.');
+    }
+  };
   return <section data-wk-identify-review className="space-y-5" aria-label={qualify?"Eligibility review":"Recording review"}>
     <WkSurface className="rounded-xl p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -182,6 +210,27 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
       </p>
     </WkSurface>}
     {phase==='ready'&&review&&<>
+      {qualify&&source?.sourceKey==='apple_ke_public_top100'&&<WkSurface className="rounded-xl p-4 sm:p-5">
+        <h3 className="text-sm font-bold text-wk-text">Apple Artist Evidence</h3>
+        <p className="mt-1 text-sm text-wk-text-muted">
+          The original chart has no artist names. Import your checked ID lookup report to view current provider artist names.
+          This does not change Registry matches or eligibility results.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label className="wk-button wk-button-secondary wk-button-sm cursor-pointer">
+            Import Artist Report
+            <input type="file" className="sr-only" accept=".json,application/json"
+              aria-label="Import Apple artist evidence report" disabled={artistPhase==='loading'}
+              onChange={event=>{const file=event.target.files?.[0];
+                if(file)void importArtistEvidence(file);
+                event.target.value='';}} />
+          </label>
+          <p className="text-xs text-wk-text-muted">
+            {review?.rows.filter(r=>r.providerArtistName).length??0} of {review?.rows.length??0} artist names checked
+          </p>
+        </div>
+        {artistPhase!=='idle'&&<p role="status" className="mt-2 text-sm text-wk-text-muted">{artistMessage}</p>}
+      </WkSurface>}
       {qualify&&<WkSurface className="rounded-xl p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h3 className="text-sm font-bold text-wk-text">Review Corrections</h3>
@@ -285,7 +334,13 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
             {key:'rank',label:'Source rank',render:r=><span className="font-bold text-wk-text">{r.rank}</span>},
             {key:'recording',label:'Observed recording',render:r=><div className="min-w-44">
               <p className="font-semibold text-wk-text">{r.observedTitle??'Title not supplied'}</p>
-              <p className="text-wk-text-muted">{r.observedArtist??'Artist not supplied by source'}</p>
+              <p className={r.providerArtistName?'font-semibold text-wk-text':'text-wk-text-muted'}>
+                {r.providerArtistName??r.observedArtist??'Artist not supplied in captured chart'}
+              </p>
+              {r.providerArtistName&&<p className="text-xs text-wk-text-muted">
+                Apple lookup, checked {when(r.providerArtistRetrievedAt??null)}.
+                Not supplied in the original chart or approved as a Registry credit.
+              </p>}
             </div>},
             {key:'provider',label:'Provider track ID',render:r=>
               <span className="break-all text-wk-text-muted">{r.providerTrackId??'Not supplied'}</span>},
