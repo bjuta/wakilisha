@@ -868,6 +868,8 @@ async function handleWk100SaveAdminDraft(
     return json(req,{error:"invalid_draft_request"},400);
   }
   const config={...(draft as Record<string,unknown>)};
+  const explicitMethodologyProposal=Object.prototype.hasOwnProperty.call(
+    config,"methodologyCandidate");
   // The existing Edition editor does not yet send W7 data. Preserve a prior
   // proposed methodology on an otherwise authorized, exact-revision save.
   // A changed eligibility-policy digest makes that candidate STALE, not frozen.
@@ -876,7 +878,7 @@ async function handleWk100SaveAdminDraft(
   const prior=previous.data as {revision?:number;config?:Record<string,unknown>}|null;
   if ((prior?.revision??0)!==Number(revision))
     return json(req,{error:"draft_revision_conflict",retryable:false},409);
-  if (!Object.prototype.hasOwnProperty.call(config,"methodologyCandidate")&&
+  if (!explicitMethodologyProposal&&
       prior?.config?.methodologyCandidate!==undefined)
     config.methodologyCandidate=prior.config.methodologyCandidate;
   if (Object.keys(config).some(k=>!WK100_DRAFT_KEYS.has(k)) ||
@@ -916,7 +918,10 @@ async function handleWk100SaveAdminDraft(
   if(config.methodologyCandidate!==undefined){
     try{
       // A stale proposal is retained as evidence, but is not valid for ranking.
-      validateWk100MethodologyCandidate(config.methodologyCandidate,{weekStartEat:week});
+      validateWk100MethodologyCandidate(config.methodologyCandidate,{
+        weekStartEat:week,
+        ...(explicitMethodologyProposal?{ingestPolicySha256:policyDraftDigest}:{}),
+      });
     }catch{return json(req,{error:"methodology_candidate_invalid"},400);}
   }
   const sealed={...config,ingestPolicySha256:policyDraftDigest};

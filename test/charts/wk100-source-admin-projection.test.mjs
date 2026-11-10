@@ -1148,27 +1148,48 @@ test('WK100 recovered provider artist is searchable in the Workbench',async()=>{
 });
 
 // W7 uses one proposed source-family contribution, never approved ranking authority.
-test('WK100 W7 candidate validates exact families, four Spotify playlists as one vote, no scoring',async()=>{
-  const {validateWk100MethodologyCandidate,WK100_SPOTIFY_EDITORIAL_PLAYLISTS}=await import(
+test('WK100 W7 native-evidence methodology proposal rejects metric, period and governance substitution',async()=>{
+  const {validateWk100MethodologyCandidate,WK100_METHOD_FAMILIES,
+    WK100_SPOTIFY_EDITORIAL_PLAYLISTS,WK100_FAMILY_MEASUREMENTS,
+    WK100_METHOD_REVIEW_CONTROLS}=await import(
     '../../supabase/functions/_shared/wk100-methodology-candidate.mjs');
-  const sample=()=>({schemaVersion:'wk100-methodology-candidate/v1',weekStartEat:'2026-11-09',
+  const sample=()=>({schemaVersion:'wk100-methodology-candidate/v2',weekStartEat:'2026-11-09',
     ingestPolicySha256:'a'.repeat(64),weightsPercent:{apple_ke:25,shazam_ke:20,
       mdundo_ke:20,youtube_ke:20,audiomack_ke:10,spotify_editorial:5},
     spotifyEditorialPlaylistIds:[...WK100_SPOTIFY_EDITORIAL_PLAYLISTS],
+    familyMeasurements:Object.fromEntries(WK100_METHOD_FAMILIES.map(
+      key=>[key,{...WK100_FAMILY_MEASUREMENTS[key]}])),
+    reviewControls:{...WK100_METHOD_REVIEW_CONTROLS},
     normalization:'source_metric_classes_separate',missingness:'hold_without_redistribution',
     identityPolicy:'confirmed_registry_recording_only',approvalState:'proposed',
-    canScore:false,canPublish:false});
+    canScore:false,canFreeze:false,canPublish:false});
   const expected={weekStartEat:'2026-11-09',ingestPolicySha256:'a'.repeat(64)};
-  assert.equal(validateWk100MethodologyCandidate(sample(),expected).canScore,false);
+  const accepted=validateWk100MethodologyCandidate(sample(),expected);
+  assert.equal(accepted.canScore,false);
+  assert.equal(accepted.canFreeze,false);
+  assert.equal(accepted.canPublish,false);
+  assert.notEqual(WK100_FAMILY_MEASUREMENTS.youtube_ke.nativeEvidence,
+    WK100_FAMILY_MEASUREMENTS.shazam_ke.nativeEvidence);
   for(const bad of [
-    x=>{x.canScore=true},x=>{x.approvalState='frozen'},
+    x=>{x.schemaVersion='wk100-methodology-candidate/v1'},
+    x=>{x.canScore=true},x=>{x.canFreeze=true},x=>{x.approvalState='frozen'},
     x=>{x.weightsPercent.spotify_editorial=20},
+    x=>{x.weightsPercent.youtube_ke=0},
     x=>{delete x.weightsPercent.mdundo_ke},
     x=>{x.spotifyEditorialPlaylistIds.pop()},
+    x=>{x.familyMeasurements.youtube_ke.nativeEvidence='playlist_order'},
+    x=>{x.familyMeasurements.apple_ke.periodTreatment='weekly_stream_totals'},
+    x=>{x.familyMeasurements.shazam_ke.behavior='audio_consumption_rank'},
+    x=>{x.familyMeasurements.spotify_editorial.normalization='four_independent_votes'},
+    x=>{x.reviewControls.missingEvidence='redistribute'},
+    x=>{x.reviewControls.coverage='one_core_provider_enough'},
     x=>{x.normalization='mix_native_counts'},
     x=>{x.ingestPolicySha256='b'.repeat(64)},
   ]){const next=sample();bad(next);assert.throws(()=>
     validateWk100MethodologyCandidate(next,expected),/wk100_methodology_/);}
+  const edge=await readFile('supabase/functions/chart-ingest-api/index.ts','utf8');
+  assert.match(edge,/explicitMethodologyProposal/);
+  assert.match(edge,/ingestPolicySha256:policyDraftDigest/);
 });
 
 test('WK100 W5C/W6 keep ten-row presentation separate from all-row correction comparison',async()=>{

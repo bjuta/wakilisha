@@ -6,6 +6,7 @@ import {WkStateBadge} from '@/components/design-system/primitives/StateBadge';
 import {WkDetailList} from '@/components/design-system/primitives/DetailList';
 import {
   WK100_METHOD_FAMILIES,WK100_SPOTIFY_EDITORIAL_PLAYLISTS,
+  WK100_FAMILY_MEASUREMENTS,WK100_METHOD_REVIEW_CONTROLS,
   validateWk100MethodologyCandidate,
 } from '@/../supabase/functions/_shared/wk100-methodology-candidate.mjs';
 
@@ -13,7 +14,8 @@ type Family='apple_ke'|'shazam_ke'|'mdundo_ke'|'youtube_ke'|'audiomack_ke'|'spot
 const FAMILIES=[...WK100_METHOD_FAMILIES] as Family[];
 type Draft={weekStartEat:string;revision:number;configSha256:string;
   config:{weekStartEat:string;ingestPolicySha256:string;
-    methodologyCandidate?:{weightsPercent?:Record<Family,number>;ingestPolicySha256?:string};
+    methodologyCandidate?:{schemaVersion?:string;weightsPercent?:Record<Family,number>;
+      ingestPolicySha256?:string};
     [key:string]:unknown}};
 type Source={provider:string;sourceKey:string;expectedDepth:number;
   observedDepth:number;receiptSha256:string|null;nativePeriodAuthority:string};
@@ -24,6 +26,14 @@ const NAMES:Record<Family,string>={
   youtube_ke:'YouTube · weekly song views',
   audiomack_ke:'Audiomack · geo-chart placement',
   spotify_editorial:'Spotify · four editorial lists, ONE family',
+};
+const EVIDENCE_EXPLANATIONS:Record<Family,string>={
+  apple_ke:'Public daily Kenya most-played positions. These do not establish weekly streaming totals.',
+  shazam_ke:'Kenya discovery positions. These are not audio-play counts.',
+  mdundo_ke:'Kenya song-chart positions. A weekly-updated page does not prove weekly play totals.',
+  youtube_ke:'Verified Kenya weekly song views only. Playlist positions cannot replace weekly counts.',
+  audiomack_ke:'Kenya geographic chart positions. Do not infer stream totals from a placement.',
+  spotify_editorial:'Four separately evidenced playlists share one capped editorial contribution, not four platform votes.',
 };
 function blankWeights():Record<Family,number|null>{
   return Object.fromEntries(FAMILIES.map(k=>[k,null])) as Record<Family,number|null>;
@@ -65,13 +75,16 @@ export function Wk100Methodology({week,sources=[]}:{week:string;sources?:Source[
   },[week]);
   useEffect(()=>{void read();return()=>{sequence.current+=1;}},[read]);
   const candidate=useMemo(()=>revision?{
-    schemaVersion:'wk100-methodology-candidate/v1',weekStartEat:week,
+    schemaVersion:'wk100-methodology-candidate/v2',weekStartEat:week,
     ingestPolicySha256:revision.config.ingestPolicySha256,
     weightsPercent:weights,spotifyEditorialPlaylistIds:[...WK100_SPOTIFY_EDITORIAL_PLAYLISTS],
+    familyMeasurements:Object.fromEntries(FAMILIES.map(family=>
+      [family,{...WK100_FAMILY_MEASUREMENTS[family]}])),
+    reviewControls:{...WK100_METHOD_REVIEW_CONTROLS},
     normalization:'source_metric_classes_separate',
     missingness:'hold_without_redistribution',
     identityPolicy:'confirmed_registry_recording_only',
-    approvalState:'proposed',canScore:false,canPublish:false,
+    approvalState:'proposed',canScore:false,canFreeze:false,canPublish:false,
   }:null,[revision,week,weights]);
   const valid=useMemo(()=>{
     if(!candidate)return false;
@@ -80,6 +93,7 @@ export function Wk100Methodology({week,sources=[]}:{week:string;sources?:Source[
     });return true;}catch{return false;}
   },[candidate,revision,week]);
   const saved=revision?.config.methodologyCandidate;
+  const legacy=!!saved&&saved.schemaVersion!=='wk100-methodology-candidate/v2';
   const stale=!!saved&&saved.ingestPolicySha256!==revision?.config.ingestPolicySha256;
   const total=FAMILIES.reduce((n,f)=>n+(weights[f]??0),0);
   const save=async()=>{
@@ -110,8 +124,8 @@ export function Wk100Methodology({week,sources=[]}:{week:string;sources?:Source[
           <p className="text-xs font-semibold text-wk-text-muted">Rank / W7 / Kenya</p>
           <h2 className="mt-1 text-xl font-bold text-wk-text">Methodology</h2>
           <p className="mt-2 max-w-3xl text-sm text-wk-text-muted">
-            Review an explicit contribution for each source family. This is a candidate,
-            not an approved scoring formula. Ranks, discovery and weekly views stay distinct.
+            Review an explicit contribution for each source family. This is a new WAKILISHA 100 proposal,
+            not the legacy scoring model. Native ranks, discovery and weekly views stay distinct.
           </p>
         </div>
         <WkStateBadge tone="warning">Private · Ranking locked</WkStateBadge>
@@ -129,7 +143,8 @@ export function Wk100Methodology({week,sources=[]}:{week:string;sources?:Source[
           {label:'Edition week',value:week},
           {label:'Saved Edition revision',value:String(revision.revision)},
           {label:'Eligibility policy SHA-256',value:revision.config.ingestPolicySha256},
-          {label:'Methodology state',value:stale?'Needs re-review · policy changed':saved?'Proposed · not frozen':'Not yet proposed'},
+          {label:'Methodology state',value:legacy?'Earlier proposal requires re-review':
+            stale?'Needs re-review · policy changed':saved?'Proposed · not frozen':'Not yet proposed'},
         ]}/></div>
         {stale&&<p role="alert" className="mt-3 text-sm text-wk-danger">
           The saved eligibility policy differs from this methodology proposal. Review every value and save a new proposal.
@@ -141,6 +156,7 @@ export function Wk100Methodology({week,sources=[]}:{week:string;sources?:Source[
               value={weights[family]??''} min={0} max={100} step={1}
               disabled={phase==='saving'}
               onChange={value=>setWeights(old=>({...old,[family]:Number.isInteger(value)?value:null}))}/>
+            <p className="mt-2 text-xs text-wk-text-muted">{EVIDENCE_EXPLANATIONS[family]}</p>
             <p className="mt-2 text-xs text-wk-text-muted">
               {family==='spotify_editorial'
                 ?'Four named playlists share one contribution. It must be lower than each weighted core family.'
@@ -152,11 +168,12 @@ export function Wk100Methodology({week,sources=[]}:{week:string;sources?:Source[
         </div>
         <div className="mt-4 space-y-2">
           <p role="status" className="text-sm text-wk-text-muted">
-            Explicit contributions: {total}% of 100%. {valid?'Candidate values pass structural checks.':'Enter all six values totalling 100%; keep editorial lower than every positive core weight.'}
+            Explicit contributions: {total}% of 100%. {valid?'Candidate values pass native-evidence contract checks.':'Enter positive values for all five core sources and a smaller Spotify contribution, totalling 100%.'}
           </p>
           <p className="text-xs text-wk-text-muted">
             Missing source evidence is held, never reweighted. Only confirmed Registry recording identities may qualify.
-            These percentages cannot be applied to incomparable metrics before a separately governed methodology freeze.
+            Exact native periods and admitted originals are required. Independent source-removal sensitivity review is also required before any methodology freeze.
+            These percentages cannot be applied to incomparable metrics.
           </p>
           {message&&phase!=='unavailable'&&<p role="status" className="text-sm text-wk-text-muted">{message}</p>}
           <div className="flex flex-wrap gap-2">
@@ -167,6 +184,7 @@ export function Wk100Methodology({week,sources=[]}:{week:string;sources?:Source[
           </div>
           <p className="text-xs font-semibold text-wk-text-muted">
             No freeze or scoring command exists on this screen. W8 private ranking stays blocked.
+            The normalization formula, week coverage thresholds, and approval authority remain subject to review.
           </p>
         </div>
       </>}
