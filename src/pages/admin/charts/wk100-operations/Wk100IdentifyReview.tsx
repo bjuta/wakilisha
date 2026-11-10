@@ -66,6 +66,7 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
   const [phase,setPhase]=useState<'idle'|'loading'|'ready'|'unavailable'>('idle');
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
+  const [correctionPage,setCorrectionPage]=useState(0);
   const [readNonce,setReadNonce]=useState(0);
   const [artistPhase,setArtistPhase]=useState<'idle'|'loading'|'ready'|'failed'>('idle');
   const [artistMessage,setArtistMessage]=useState('');
@@ -128,6 +129,11 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
       row.canonicalTrackId,String(row.rank),row.reasonCodes?.join(' '),
     ].some(v=>v?.toLowerCase().includes(search.trim().toLowerCase()))))??[],
     [review,filter,search,qualify]);
+  // All-row validation and W6 comparison stay independent of this ten-row presentation.
+  useEffect(()=>{setCorrectionPage(0);},[week,sourceId,receiptId,search,filter,qualify]);
+  const correctionPages=Math.max(1,Math.ceil(rows.length/10));
+  const boundedCorrectionPage=Math.min(correctionPage,correctionPages-1);
+  const visibleRows=qualify?rows.slice(boundedCorrectionPage*10,boundedCorrectionPage*10+10):rows;
   const importArtistEvidence=async (file:File)=>{
     setArtistPhase('loading');setArtistMessage('Checking exact Apple song IDs and artist evidence…');
     try{
@@ -246,6 +252,10 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
             Re-evaluate After Corrections
           </button>
         </div>
+        <p className="mt-3 text-xs text-wk-text-muted">
+          Review ten receipt-bound positions at a time below. Registry edits remain in the existing
+          audited editors. Moving between pages never approves or saves a correction.
+        </p>
         {comparison&&<div data-wk-eligibility-recheck className="mt-4 space-y-3" role="status">
           <p className="text-sm font-semibold text-wk-text">
             {comparison.changedCount===0
@@ -328,9 +338,17 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
               ...Object.entries(readableStatus).map(([value,label])=>({value,label}))]}/>
         </div>
         <p role="status" className="mt-3 text-xs text-wk-text-muted">
-          Showing {rows.length} of {review.rows.length} source positions.
+          {qualify?'Reviewing '+(rows.length?boundedCorrectionPage*10+1:0)+'–'+Math.min(rows.length,(boundedCorrectionPage+1)*10)+' of '+rows.length+' matching positions.':
+            'Showing '+rows.length+' of '+review.rows.length+' source positions.'}
         </p>
-        <WkDataTable rows={rows} getKey={row=>row.captureRowId}
+        {qualify&&<div data-wk100-correction-tray className="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+            disabled={boundedCorrectionPage===0} onClick={()=>setCorrectionPage(p=>Math.max(0,p-1))}>Previous ten</button>
+          <span className="text-xs font-semibold text-wk-text-muted">Page {boundedCorrectionPage+1} of {correctionPages}</span>
+          <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+            disabled={boundedCorrectionPage>=correctionPages-1} onClick={()=>setCorrectionPage(p=>Math.min(correctionPages-1,p+1))}>Next ten</button>
+        </div>}
+        <WkDataTable rows={visibleRows} getKey={row=>row.captureRowId}
           ariaLabel={qualify?"WAKILISHA 100 eligibility results":"WAKILISHA 100 recorded source positions"}
           empty="No source positions match these filters."
           columns={[

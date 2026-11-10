@@ -1384,6 +1384,8 @@ test('W5 Qualify uses the saved policy result on one exact source receipt withou
   await expect(rows).toBeVisible({timeout:20_000});
   await expect(rows.getByText('Known song')).toBeVisible();
   await expect(rows.getByText('Excluded song')).toBeVisible();
+  await expect(page.locator('[data-wk100-correction-tray]')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Next ten'})).toBeDisabled();
   await expect(page.getByText('Policy SHA-256')).toBeVisible();
   await expect(page.getByText('Rules met (not approved)')).toBeVisible();
   // A missing Registry link is visible before the Excluded-only table filter.
@@ -1562,17 +1564,32 @@ test('WK100 Apple artist browser import, search, W4 provenance and mobile viewpo
   await expect(page.getByText('100 Apple artist names checked. Original chart and Registry records remain unchanged.'))
     .toBeVisible();
   const w5=page.getByRole('table',{name:'WAKILISHA 100 eligibility results'});
+  const tray=page.locator('[data-wk100-correction-tray]');
+  // The ten-row correction tray only shows the current page, but searches
+  // all 100 verified positions. No source row or import fact is dropped.
+  await expect(tray.getByText('Page 1 of 10')).toBeVisible();
+  await expect(w5.getByText('WK100 Test Artist 001',{exact:true})).toBeVisible();
+  await expect(w5.getByText('WK100 Test Artist 087',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Next ten'}).click();
+  await expect(tray.getByText('Page 2 of 10')).toBeVisible();
+  await expect(w5.getByText('WK100 Test Artist 011',{exact:true})).toBeVisible();
+  await expect(w5.getByText('WK100 Test Artist 001',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Previous ten'}).click();
+  await expect(tray.getByText('Page 1 of 10')).toBeVisible();
+  await page.getByRole('searchbox',{name:'Search source recordings'}).fill('WK100 Test Artist 087');
+  await expect(page.getByText('Reviewing 1–1 of 1 matching positions.')).toBeVisible();
   await expect(w5.getByText('WK100 Test Artist 087',{exact:true})).toBeVisible();
   await expect(w5.getByText(/Not supplied in the original chart or approved as a Registry credit/).first())
     .toBeVisible();
-  await page.getByRole('searchbox',{name:'Search source recordings'}).fill('WK100 Test Artist 087');
-  await expect(page.getByText('Showing 1 of 100 source positions.')).toBeVisible();
   await expect(w5.getByText('WK100 Test Song 087',{exact:true})).toBeVisible();
   await expect(w5.getByText('WK100 Test Song 086',{exact:true})).toHaveCount(0);
   await page.getByRole('searchbox',{name:'Search source recordings'}).fill('');
+  await expect(tray.getByText('Page 1 of 10')).toBeVisible();
   await page.setViewportSize({width:390,height:844});
   await expect(page.getByRole('heading',{name:'Apple Artist Evidence'})).toBeVisible();
   await expect(page.getByText('100 of 100 artist names checked')).toBeVisible();
+  await page.getByRole('searchbox',{name:'Search source recordings'}).fill('WK100 Test Artist 087');
+  await expect(tray.getByText('Page 1 of 1')).toBeVisible();
   await expect(w5.getByText('WK100 Test Artist 087',{exact:true})).toBeVisible();
 
   await stages.getByRole('button').filter({hasText:'Identify'}).click();

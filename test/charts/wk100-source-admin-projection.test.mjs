@@ -1146,3 +1146,57 @@ test('WK100 recovered provider artist is searchable in the Workbench',async()=>{
   const ui=await readFile('src/pages/admin/charts/wk100-operations/Wk100IdentifyReview.tsx','utf8');
   assert.match(ui,/row\.observedTitle,row\.observedArtist,row\.providerArtistName,row\.providerTrackId/);
 });
+
+// W7 uses one proposed source-family contribution, never approved ranking authority.
+test('WK100 W7 candidate validates exact families, four Spotify playlists as one vote, no scoring',async()=>{
+  const {validateWk100MethodologyCandidate,WK100_SPOTIFY_EDITORIAL_PLAYLISTS}=await import(
+    '../../supabase/functions/_shared/wk100-methodology-candidate.mjs');
+  const sample=()=>({schemaVersion:'wk100-methodology-candidate/v1',weekStartEat:'2026-11-09',
+    ingestPolicySha256:'a'.repeat(64),weightsPercent:{apple_ke:25,shazam_ke:20,
+      mdundo_ke:20,youtube_ke:20,audiomack_ke:10,spotify_editorial:5},
+    spotifyEditorialPlaylistIds:[...WK100_SPOTIFY_EDITORIAL_PLAYLISTS],
+    normalization:'source_metric_classes_separate',missingness:'hold_without_redistribution',
+    identityPolicy:'confirmed_registry_recording_only',approvalState:'proposed',
+    canScore:false,canPublish:false});
+  const expected={weekStartEat:'2026-11-09',ingestPolicySha256:'a'.repeat(64)};
+  assert.equal(validateWk100MethodologyCandidate(sample(),expected).canScore,false);
+  for(const bad of [
+    x=>{x.canScore=true},x=>{x.approvalState='frozen'},
+    x=>{x.weightsPercent.spotify_editorial=20},
+    x=>{delete x.weightsPercent.mdundo_ke},
+    x=>{x.spotifyEditorialPlaylistIds.pop()},
+    x=>{x.normalization='mix_native_counts'},
+    x=>{x.ingestPolicySha256='b'.repeat(64)},
+  ]){const next=sample();bad(next);assert.throws(()=>
+    validateWk100MethodologyCandidate(next,expected),/wk100_methodology_/);}
+});
+
+test('WK100 W5C/W6 keep ten-row presentation separate from all-row correction comparison',async()=>{
+  const {compareWk100EligibilityRechecks}=await import(
+    '../../src/services/chartsIngestion/wk100EligibilityRecheck.mjs');
+  const base={schemaVersion:'wk100-admin-eligibility-preview-v1',
+    weekStartEat:'2026-11-09',contractId:'11111111-1111-4111-8111-111111111111',
+    receiptId:'22222222-2222-4222-8222-222222222222',sourceKey:'apple_ke_public_top100',
+    payloadSha256:'a'.repeat(64),policySha256:'b'.repeat(64),
+    receiptStatus:'succeeded',observedDepth:10,expectedDepth:10,configRevision:1,
+    canWriteRegistry:false,canScore:false,canPublish:false,
+    counts:{ELIGIBLE:0,EXCLUDED:0,REVIEW_REQUIRED:10,CONFLICTED:0},
+    rows:Array.from({length:10},(_,i)=>({
+      captureRowId:'33333333-3333-4333-8333-'+String(i+1).padStart(12,'0'),
+      rank:i+1,observedTitle:'Original title '+i,observedArtist:null,
+      providerTrackId:String(100+i),canonicalTrackId:null,identityState:'needs_review',
+      registryFactsSha256:'c'.repeat(64),outcome:'REVIEW_REQUIRED',
+      reasonCodes:['canonical_identity_needs_review'],canScore:false,canPublish:false,
+    }))};
+  const after=structuredClone(base);
+  after.rows[7].registryFactsSha256='d'.repeat(64);
+  const result=compareWk100EligibilityRechecks(base,after);
+  assert.equal(result.evaluatedRows,10);
+  assert.equal(result.changedCount,1);
+  assert.equal(result.changed[0].rank,8);
+  assert.equal(result.immutableSourceRetained,true);
+  assert.equal(result.canScore,false);
+  const tampered=structuredClone(after);
+  tampered.rows[7].providerTrackId='changed-source-id';
+  assert.throws(()=>compareWk100EligibilityRechecks(base,tampered),/wk100_recheck_source_row_changed/);
+});
