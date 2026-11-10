@@ -1289,3 +1289,56 @@ test('WK100 W5C correction context ties every investigation to immutable source 
   assert.match(source,/not a saved decision/);
 });
 
+test('WK100 W5C migration uses CLI-minted path, private append-only history, and caller-bound CAS',async()=>{
+  const sql=await readFile(
+    'supabase/migrations/20261110190405_wk100_correction_decision_ledger_v1.sql','utf8');
+  assert.ok(sql.length>12000);
+  assert.match(sql,/Exact filename minted by Supabase CLI v2\.107\.0/);
+  for(const required of [
+    'platform_private.wk100_correction_cases_v1',
+    'platform_private.wk100_correction_events_v1',
+    'wk100_correction_events_no_update_delete_v1',
+    'wk100_correction_events_no_truncate_v1',
+    'wk100_correction_cases_truncate_guard_v1',
+    'public.wk100_record_correction_decision_v1',
+    'public.wk100_read_correction_cases_v1',
+    "current_user_has_capability('manage_ingest')",
+    "current_user_has_capability('manage_charts')",
+    "current_user_has_capability('view_registry')",
+    'v_case.revision<>v_expected_revision',
+    'v_retry.request_sha256<>v_input_hash',
+    'v_attempt.payload_sha256 is distinct from',
+    'v_draft.config_json',
+    "p_request->'canonicalWriteEventId' is distinct from 'null'::jsonb",
+    "'canonicalWriteVerified',false",
+    "'canWriteRegistry',false",
+    "'canReEvaluate',false",
+    "'canScore',false",
+    "'canPublish',false",
+  ])assert.ok(sql.includes(required),'Missing SQL authority: '+required);
+  assert.match(sql,/revoke all on platform_private\.wk100_correction_cases_v1 from public,anon,authenticated,service_role/);
+  assert.match(sql,/revoke all on function public\.wk100_record_correction_decision_v1\(jsonb\)/);
+  assert.match(sql,/grant execute on function public\.wk100_record_correction_decision_v1\(jsonb\)\s+to authenticated/);
+  assert.doesNotMatch(sql,/\b(update|insert into|delete from)\s+public\.(registry_tracks|registry_artists|registry_releases|wk_chart_capture_rows_v1|wk_chart_capture_attempts_v1)\b/i);
+  assert.doesNotMatch(sql,/grant\s+(insert|update|delete)\s+on\s+platform_private\.wk100_correction_/i);
+  assert.doesNotMatch(sql,/verified_canonical_write|registry_canonical_write_events|canonical_write_event_id/);
+  const gate=await readFile(
+    'scripts/acceptance/wk100-correction-ledger-structural-gate-v1.sql','utf8');
+  assert.match(gate,/WK100_CORRECTION_LEDGER_STRUCTURAL_GATE=PASS/);
+  assert.match(gate,/has_table_privilege\('authenticated'/);
+  assert.match(gate,/has_function_privilege\('anon'/);
+  assert.match(gate,/v_triggers<>5/);
+  assert.doesNotMatch(gate,/\b(insert into|update|delete from)\s+public\./i);
+});
+test('WK100 W5C Admin saves only explicit review decisions through guarded RPC',async()=>{
+  const ui=await readFile('src/pages/admin/charts/wk100-operations/Wk100IdentifyReview.tsx','utf8');
+  assert.match(ui,/data-wk100-correction-context/);
+  assert.match(ui,/wk100_read_correction_cases_v1/);
+  assert.match(ui,/wk100_record_correction_decision_v1/);
+  assert.match(ui,/canonicalWriteEventId:null/);
+  assert.match(ui,/expectedCaseRevision:focusedCase\?\.revision\?\?0/);
+  assert.match(ui,/pendingCaseOperation.current\?\.key===key/);
+  assert.match(ui,/Recording a review decision does not change a Registry fact/);
+  assert.doesNotMatch(ui,/\u2014/);
+});
+

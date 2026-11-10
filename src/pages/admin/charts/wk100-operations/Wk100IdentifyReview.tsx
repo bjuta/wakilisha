@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {useNavigate} from 'react-router-dom';
+import {TextField,TextArea} from 'react-aria-components';
 import {supabase} from '@/lib/supabase';
 import {WkSurface} from '@/components/design-system/primitives/Surface';
 import {WkSelect} from '@/components/design-system/primitives/Select';
@@ -70,6 +71,15 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
   const [filter,setFilter]=useState('all');
   const [correctionPage,setCorrectionPage]=useState(0);
   const [correctionFocus,setCorrectionFocus]=useState<{rowId:string;fieldPath:string}|null>(null);
+  const [caseReadNonce,setCaseReadNonce]=useState(0);
+  const [cases,setCases]=useState<{fieldPath:string;policyRevision:number;
+    revision:number;state:string;caseId:string;eventCount:number}[]|null>(null);
+  const [casePhase,setCasePhase]=useState<'idle'|'loading'|'ready'|'unavailable'|'saving'>('idle');
+  const [caseMessage,setCaseMessage]=useState('');
+  const [caseReason,setCaseReason]=useState('');
+  const [caseAction,setCaseAction]=useState<'request_registry_review'|'hold'|'closed_no_change'>(
+    'request_registry_review');
+  const pendingCaseOperation=useRef<{key:string;id:string}|null>(null);
   const [readNonce,setReadNonce]=useState(0);
   const [artistPhase,setArtistPhase]=useState<'idle'|'loading'|'ready'|'failed'>('idle');
   const [artistMessage,setArtistMessage]=useState('');
@@ -92,6 +102,7 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
   useEffect(()=>{
     const seq=++sequence.current;
     setReview(null);setComparison(null);setCorrectionFocus(null);
+    setCases(null);setCaseReason('');pendingCaseOperation.current=null;
     setSearch('');setFilter('all');
     if(!source||!receipts.some(r=>r.id===receiptId)){
       setPhase('idle');return;
@@ -150,6 +161,81 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
     :correctionContext?.route==='release'&&focusedRow?.registryReleaseSlug
       ?'/admin/registry/releases/'+encodeURIComponent(focusedRow.registryReleaseSlug)
       :'/admin/review/mizizi';
+  useEffect(()=>{
+    setCaseReason('');
+    setCaseAction('request_registry_review');
+    pendingCaseOperation.current=null;
+  },[correctionContext?.receiptId,correctionContext?.captureRowId,
+    correctionContext?.fieldPath,correctionContext?.editionPolicyRevision]);
+  useEffect(()=>{
+    let mounted=true;
+    setCases(null);setCaseMessage('');
+    if(!qualify||!correctionContext){setCasePhase('idle');return;}
+    setCasePhase('loading');
+    void (async()=>{
+      try{
+        const {data,error}=await supabase.rpc('wk100_read_correction_cases_v1',{
+          p_week:correctionContext.weekStartEat,
+          p_receipt_id:correctionContext.receiptId,
+          p_capture_row_id:correctionContext.captureRowId,
+        });
+        if(error||data?.schemaVersion!=='wk100-correction-case-list/v1'||
+          data.receiptId!==correctionContext.receiptId||
+          data.captureRowId!==correctionContext.captureRowId||
+          !Array.isArray(data.cases)||data.canWriteRegistry!==false||
+          data.canScore!==false||data.canPublish!==false)throw Error('case_read_invalid');
+        if(mounted){setCases(data.cases);setCasePhase('ready');}
+      }catch{
+        if(mounted){setCasePhase('unavailable');
+          setCaseMessage('We could not load saved decisions. Retry the review before recording changes.');}
+      }
+    })();
+    return ()=>{mounted=false;};
+  },[qualify,correctionContext,caseReadNonce]);
+  const focusedCase=cases?.find(c=>c.fieldPath===correctionContext?.fieldPath&&
+    c.policyRevision===correctionContext?.editionPolicyRevision);
+  const saveCase=async()=>{
+    if(!correctionContext||casePhase!=='ready'||!cases||
+      caseReason.trim().length<12||caseReason.trim().length>800)return;
+    const payload={
+      schemaVersion:'wk100-correction-decision/v1',
+      weekStartEat:correctionContext.weekStartEat,
+      contractId:correctionContext.contractId,
+      receiptId:correctionContext.receiptId,
+      captureRowId:correctionContext.captureRowId,
+      fieldPath:correctionContext.fieldPath,
+      originalSha256:correctionContext.sourceOriginalSha256,
+      policyRevision:correctionContext.editionPolicyRevision,
+      policySha256:correctionContext.editionPolicySha256,
+      registryFactsBeforeSha256:correctionContext.registryFactsSha256,
+      expectedCaseRevision:focusedCase?.revision??0,
+      decision:caseAction,reason:caseReason.trim(),
+      canonicalWriteEventId:null,
+    };
+    // Reuse the operation ID after an ambiguous network failure. Never
+    // manufacture an extra review event after a lost acknowledgement.
+    const key=JSON.stringify(payload);
+    const operationId=pendingCaseOperation.current?.key===key
+      ?pendingCaseOperation.current.id:crypto.randomUUID();
+    pendingCaseOperation.current={key,id:operationId};
+    setCasePhase('saving');setCaseMessage('');
+    try{
+      const {data,error}=await supabase.rpc('wk100_record_correction_decision_v1',{
+        p_request:{...payload,operationId},
+      });
+      if(error||data?.persisted!==true||data?.canWriteRegistry!==false||
+        data?.canReEvaluate!==false||data?.canScore!==false||
+        data?.canPublish!==false||!Number.isSafeInteger(data?.revision))
+        throw Error('case_save_unavailable');
+      pendingCaseOperation.current=null;
+      setCaseReason('');
+      setCaseMessage('Review decision saved. Registry facts are unchanged.');
+      setCaseReadNonce(x=>x+1);
+    }catch{
+      setCasePhase('unavailable');
+      setCaseMessage('No new decision is confirmed. Reload the case before retrying.');
+    }
+  };
   const correctionPages=Math.max(1,Math.ceil(rows.length/10));
   const boundedCorrectionPage=Math.min(correctionPage,correctionPages-1);
   const visibleRows=qualify?rows.slice(boundedCorrectionPage*10,boundedCorrectionPage*10+10):rows;
@@ -448,10 +534,47 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
               {correctionPath==='/admin/review/mizizi'?
                 'Open governed MIZIZI review':'Open existing Registry editor'}
             </a>
-            <p className="text-xs text-wk-text-muted">
-              This context is not a saved decision. The Registry editor controls any factual mutation.
-              A durable correction ledger and its replay gates remain required before W5C acceptance.
-            </p>
+            <div className="space-y-3 rounded-lg border border-wk-border p-3">
+              <h5 className="text-sm font-semibold text-wk-text">Review Decision</h5>
+              <p className="text-xs text-wk-text-muted">
+                {casePhase==='loading'?'Loading saved case history.':
+                  casePhase==='unavailable'?'Saved decisions are unavailable.':
+                  focusedCase?'Saved state: '+focusedCase.state.replaceAll('_',' ')+
+                    '. Revision '+focusedCase.revision+'. Events: '+focusedCase.eventCount+'.':
+                    'No decision recorded for this fact and policy revision.'}
+              </p>
+              <WkSelect ariaLabel="Review decision" value={caseAction}
+                disabled={casePhase!=='ready'||!!focusedCase&&
+                  ['closed_no_change','verified_canonical_write'].includes(focusedCase.state)}
+                onChange={value=>setCaseAction(value as typeof caseAction)}
+                options={[
+                  {value:'request_registry_review',label:'Request Registry Review'},
+                  {value:'hold',label:'Keep on Hold'},
+                  {value:'closed_no_change',label:'Close Without Changes'},
+                ]}/>
+              <TextField aria-label="Reason for correction decision" value={caseReason}
+                onChange={setCaseReason} isDisabled={casePhase!=='ready'}>
+                <TextArea rows={3} maxLength={800}
+                  className="wk-input w-full min-w-0 rounded-xl border-wk-border bg-wk-surface text-[16px] text-wk-text"
+                  placeholder="Explain what needs review and which evidence supports your decision."/>
+              </TextField>
+              <button type="button" className="wk-button wk-button-primary wk-button-sm"
+                disabled={casePhase!=='ready'||caseReason.trim().length<12||
+                  !!focusedCase&&['closed_no_change','verified_canonical_write'].includes(focusedCase.state)}
+                onClick={()=>void saveCase()}>
+                Record Review Decision
+              </button>
+              {caseMessage&&<p role="status" className="text-xs text-wk-text-muted">{caseMessage}</p>}
+              {casePhase==='unavailable'&&<button type="button"
+                className="wk-button wk-button-secondary wk-button-sm"
+                onClick={()=>setCaseReadNonce(x=>x+1)}>Retry Saved Case Read</button>}
+              <p className="text-xs text-wk-text-muted">
+                This context is not a saved decision until you select Record Review Decision.
+                Recording a review decision does not change a Registry fact.
+                Apply factual corrections in the existing governed editor.
+                Linking a verified Registry write requires separate acceptance.
+              </p>
+            </div>
           </>:<p role="alert" className="text-sm text-wk-danger">
             The selected receipt or Registry evidence changed. Select a verified position again.
           </p>}
