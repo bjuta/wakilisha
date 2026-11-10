@@ -1547,7 +1547,10 @@ test('WK100 Apple artist browser import, search, W4 provenance and mobile viewpo
     .toBeVisible({timeout:20_000});
   await expect(page.getByRole('heading',{name:'Apple Artist Evidence'})).toBeVisible();
   await expect(page.getByText('0 of 100 artist names checked')).toBeVisible();
-  const file=page.locator('input[aria-label="Import Apple artist evidence report"]');
+  await expect(page.getByRole('button',{name:'Import Apple artist evidence report'}))
+    .toBeVisible();
+  const file=page.locator('input[type="file"]');
+  await expect(file).toHaveCount(1);
   await file.setInputFiles({name:'invalid-browser-report.json',mimeType:'application/json',
     buffer:Buffer.from('{"not":"an approved report"}')});
   await expect(page.getByText('Artist evidence was not accepted. Check the report and selected receipt.'))

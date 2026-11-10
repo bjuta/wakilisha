@@ -4,6 +4,7 @@ import {supabase} from '@/lib/supabase';
 import {WkSurface} from '@/components/design-system/primitives/Surface';
 import {WkSelect} from '@/components/design-system/primitives/Select';
 import {WkSearchField} from '@/components/design-system/primitives/Field';
+import {WkUploadField} from '@/components/design-system/primitives/UploadField';
 import {WkDataTable} from '@/components/design-system/primitives/DataTable';
 import {WkStateBadge} from '@/components/design-system/primitives/StateBadge';
 import {WkDetailList} from '@/components/design-system/primitives/DetailList';
@@ -217,14 +218,16 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
           This does not change Registry matches or eligibility results.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="wk-button wk-button-secondary wk-button-sm cursor-pointer">
-            Import Artist Report
-            <input type="file" className="sr-only" accept=".json,application/json"
-              aria-label="Import Apple artist evidence report" disabled={artistPhase==='loading'}
-              onChange={event=>{const file=event.target.files?.[0];
-                if(file)void importArtistEvidence(file);
-                event.target.value='';}} />
-          </label>
+          <WkUploadField
+            ariaLabel="Import Apple artist evidence report"
+            label="Import Artist Report"
+            accept=".json,application/json"
+            disabled={artistPhase==='loading'}
+            onSelect={files=>{
+              const file=files?.[0];
+              if(file)void importArtistEvidence(file);
+            }}
+          />
           <p className="text-xs text-wk-text-muted">
             {review?.rows.filter(r=>r.providerArtistName).length??0} of {review?.rows.length??0} artist names checked
           </p>
