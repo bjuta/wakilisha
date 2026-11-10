@@ -1307,6 +1307,8 @@ test('WK100 W5C migration uses CLI-minted path, private append-only history, and
     "current_user_has_capability('view_registry')",
     'v_case.revision<>v_expected_revision',
     'v_retry.request_sha256<>v_input_hash',
+    'pg_catalog.pg_advisory_xact_lock(',
+    "pg_catalog.hashtextextended('wk100-correction:'||v_operation::text,0)",
     'v_attempt.payload_sha256 is distinct from',
     'v_draft.config_json',
     "p_request->'canonicalWriteEventId' is distinct from 'null'::jsonb",
@@ -1339,6 +1341,7 @@ test('WK100 W5C Admin saves only explicit review decisions through guarded RPC',
   assert.match(ui,/expectedCaseRevision:focusedCase\?\.revision\?\?0/);
   assert.match(ui,/pendingCaseOperation.current\?\.key===key/);
   assert.match(ui,/Recording a review decision does not change a Registry fact/);
+  assert.doesNotMatch(ui,/setCases\(null\);setCaseMessage\(''\)/);
   assert.doesNotMatch(ui,/\u2014/);
 });
 

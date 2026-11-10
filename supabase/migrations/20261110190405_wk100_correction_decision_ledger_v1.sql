@@ -197,6 +197,9 @@ begin
   v_receipt:=(p_request->>'receiptId')::uuid;
   v_capture_row:=(p_request->>'captureRowId')::uuid;
   v_operation:=(p_request->>'operationId')::uuid;
+  if v_operation is null then
+    raise exception 'WK100 correction operation ID required' using errcode='22023';
+  end if;
   v_policy_revision:=(p_request->>'policyRevision')::bigint;
   v_expected_revision:=(p_request->>'expectedCaseRevision')::bigint;
   v_field:=p_request->>'fieldPath';
@@ -221,6 +224,12 @@ begin
   if p_request->'canonicalWriteEventId' is distinct from 'null'::jsonb then
     raise exception 'WK100 review cannot claim a canonical write' using errcode='22023';
   end if;
+  -- Serialize duplicate operation IDs BEFORE examining event history.
+  -- Concurrent identical retries then read the committed event, not a
+  -- unique-key violation; collisions still fail with the explicit 40001.
+  -- Transaction-scoped lock is released on commit or rollback.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('wk100-correction:'||v_operation::text,0));
   -- A lost-ack replay is idempotent even after the case has progressed.
   -- The token must still have the current caller capability.
   select * into v_retry from platform_private.wk100_correction_events_v1

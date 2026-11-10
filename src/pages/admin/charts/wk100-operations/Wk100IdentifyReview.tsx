@@ -163,13 +163,14 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
       :'/admin/review/mizizi';
   useEffect(()=>{
     setCaseReason('');
+    setCaseMessage('');
     setCaseAction('request_registry_review');
     pendingCaseOperation.current=null;
   },[correctionContext?.receiptId,correctionContext?.captureRowId,
     correctionContext?.fieldPath,correctionContext?.editionPolicyRevision]);
   useEffect(()=>{
     let mounted=true;
-    setCases(null);setCaseMessage('');
+    setCases(null);
     if(!qualify||!correctionContext){setCasePhase('idle');return;}
     setCasePhase('loading');
     void (async()=>{
