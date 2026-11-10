@@ -1221,3 +1221,38 @@ test('WK100 W5C/W6 keep ten-row presentation separate from all-row correction co
   tampered.rows[7].providerTrackId='changed-source-id';
   assert.throws(()=>compareWk100EligibilityRechecks(base,tampered),/wk100_recheck_source_row_changed/);
 });
+
+test('WK100 W6 denies unexplained outcome changes and reports source-bound impact',async()=>{
+  const {compareWk100EligibilityRechecks}=await import(
+    '../../src/services/chartsIngestion/wk100EligibilityRecheck.mjs');
+  const row={captureRowId:'33333333-3333-4333-8333-333333333333',rank:1,
+    observedTitle:'Original title',observedArtist:null,providerTrackId:'one',
+    canonicalTrackId:null,identityState:'needs_review',registryFactsSha256:'a'.repeat(64),
+    outcome:'REVIEW_REQUIRED',reasonCodes:['canonical_identity_needs_review'],
+    canScore:false,canPublish:false};
+  const before={schemaVersion:'wk100-admin-eligibility-preview-v1',
+    weekStartEat:'2026-11-09',contractId:'11111111-1111-4111-8111-111111111111',
+    receiptId:'22222222-2222-4222-8222-222222222222',sourceKey:'apple_ke_public_top100',
+    receiptStatus:'succeeded',observedDepth:1,expectedDepth:100,configRevision:1,
+    payloadSha256:'b'.repeat(64),policySha256:'c'.repeat(64),
+    canWriteRegistry:false,canScore:false,canPublish:false,
+    counts:{ELIGIBLE:0,EXCLUDED:0,REVIEW_REQUIRED:1,CONFLICTED:0},rows:[row]};
+  const after=structuredClone(before);after.rows[0].outcome='ELIGIBLE';
+  after.counts.ELIGIBLE=1;after.counts.REVIEW_REQUIRED=0;
+  assert.throws(()=>compareWk100EligibilityRechecks(before,after),
+    /unexplained_evaluation_change/);
+  after.rows[0].registryFactsSha256='d'.repeat(64);
+  after.rows[0].reasonCodes=[];
+  const comparison=compareWk100EligibilityRechecks(before,after);
+  assert.equal(comparison.changedCount,1);
+  assert.equal(comparison.summary.becameEligible,1);
+  assert.equal(comparison.summary.reasonsResolved,1);
+  assert.deepEqual(comparison.changed[0].resolvedReasons,['canonical_identity_needs_review']);
+  assert.equal(comparison.verifiedRegistryOperation,false);
+  assert.equal(comparison.canScore,false);
+  assert.throws(()=>compareWk100EligibilityRechecks(before,{...after,
+    configRevision:2}),/policy_changed/);
+  assert.throws(()=>compareWk100EligibilityRechecks(before,{...after,
+    payloadSha256:'e'.repeat(64)}),/receipt_changed/);
+});
+

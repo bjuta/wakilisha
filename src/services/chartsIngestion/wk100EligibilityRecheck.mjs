@@ -30,6 +30,7 @@ function validate(rev){
       !seen.has(row.captureRowId)&&outcomes.has(row.outcome)&&
       SHA.test(row.registryFactsSha256)&&Array.isArray(row.reasonCodes)&&
       row.reasonCodes.every(x=>typeof x==='string'&&x.length>0)&&
+      new Set(row.reasonCodes).size===row.reasonCodes.length&&
       row.canScore===false&&row.canPublish===false,'invalid_row');
     seen.add(row.captureRowId);
   }
@@ -61,25 +62,41 @@ export function compareWk100EligibilityRechecks(before,after){
     const reasonsChanged=!same(previous.reasonCodes,current.reasonCodes);
     const identityChanged=previous.canonicalTrackId!==current.canonicalTrackId||
       previous.identityState!==current.identityState;
+    // Same original, policy and canonical facts must produce the same rule result.
+    assert(factsChanged||!(outcomeChanged||reasonsChanged||identityChanged),
+      'unexplained_evaluation_change');
     if(factsChanged||outcomeChanged||reasonsChanged||identityChanged){
+      const resolvedReasons=previous.reasonCodes.filter(x=>!current.reasonCodes.includes(x));
+      const newReasons=current.reasonCodes.filter(x=>!previous.reasonCodes.includes(x));
       changed.push({
         captureRowId:current.captureRowId,rank:current.rank,
         observedTitle:current.observedTitle,
         beforeOutcome:previous.outcome,afterOutcome:current.outcome,
         beforeReasons:previous.reasonCodes,afterReasons:current.reasonCodes,
+        resolvedReasons,newReasons,
         beforeCanonicalTrackId:previous.canonicalTrackId,
         afterCanonicalTrackId:current.canonicalTrackId,
         factsChanged,outcomeChanged,reasonsChanged,identityChanged,
       });
     }
   }
+  const summary={
+    becameEligible:changed.filter(x=>x.afterOutcome==='ELIGIBLE'&&x.beforeOutcome!=='ELIGIBLE').length,
+    becameExcluded:changed.filter(x=>x.afterOutcome==='EXCLUDED'&&x.beforeOutcome!=='EXCLUDED').length,
+    newConflicts:changed.filter(x=>x.afterOutcome==='CONFLICTED'&&x.beforeOutcome!=='CONFLICTED').length,
+    identityChanges:changed.filter(x=>x.identityChanged).length,
+    factsChanged:changed.filter(x=>x.factsChanged).length,
+    reasonsResolved:changed.reduce((n,x)=>n+x.resolvedReasons.length,0),
+    reasonsAdded:changed.reduce((n,x)=>n+x.newReasons.length,0),
+  };
   return {
     schemaVersion:'wk100-admin-recheck-diff-v1',
     weekStartEat:after.weekStartEat,contractId:after.contractId,
     receiptId:after.receiptId,payloadSha256:after.payloadSha256,
     configRevision:after.configRevision,policySha256:after.policySha256,
     evaluatedRows:after.rows.length,changedCount:changed.length,
-    changed,immutableSourceRetained:true,policyRetained:true,
-    savedCorrection:false,canScore:false,canPublish:false,
+    summary,changed,immutableSourceRetained:true,policyRetained:true,
+    savedCorrection:false,verifiedRegistryOperation:false,
+    canScore:false,canPublish:false,
   };
 }
