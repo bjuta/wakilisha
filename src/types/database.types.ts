@@ -19492,6 +19492,63 @@ export type Database = {
         }
         Relationships: []
       }
+      wk100_source_artist_evidence_v1: {
+        Row: {
+          artist_name: string
+          capture_row_id: string
+          id: string
+          lookup_retrieved_at: string
+          original_sha256: string
+          provider_track_id: string
+          recorded_at: string
+          recorded_by: string
+          report_sha256: string
+          source_receipt_id: string
+          source_title: string
+        }
+        Insert: {
+          artist_name: string
+          capture_row_id: string
+          id?: string
+          lookup_retrieved_at: string
+          original_sha256: string
+          provider_track_id: string
+          recorded_at?: string
+          recorded_by: string
+          report_sha256: string
+          source_receipt_id: string
+          source_title: string
+        }
+        Update: {
+          artist_name?: string
+          capture_row_id?: string
+          id?: string
+          lookup_retrieved_at?: string
+          original_sha256?: string
+          provider_track_id?: string
+          recorded_at?: string
+          recorded_by?: string
+          report_sha256?: string
+          source_receipt_id?: string
+          source_title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wk100_source_artist_evidence_v1_capture_row_id_fkey"
+            columns: ["capture_row_id"]
+            isOneToOne: false
+            referencedRelation: "wk_chart_capture_rows_v1"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wk100_source_artist_evidence_v1_source_receipt_id_fkey"
+            columns: ["source_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "wk_chart_capture_attempts_v1"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       artist_updates: {
