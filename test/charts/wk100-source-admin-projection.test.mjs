@@ -1256,3 +1256,36 @@ test('WK100 W6 denies unexplained outcome changes and reports source-bound impac
     payloadSha256:'e'.repeat(64)}),/receipt_changed/);
 });
 
+test('WK100 W5C correction context ties every investigation to immutable source and current facts',async()=>{
+  const {WK100_CORRECTION_FIELDS,describeWk100CorrectionReview}=await import(
+    '../../src/services/chartsIngestion/wk100CorrectionReviewBoundary.mjs');
+  const sample={schemaVersion:'wk100-admin-eligibility-preview-v1',
+    weekStartEat:'2026-11-09',contractId:'11111111-1111-4111-8111-111111111111',
+    receiptId:'22222222-2222-4222-8222-222222222222',sourceKey:'apple_ke_public_top100',
+    payloadSha256:'a'.repeat(64),policySha256:'b'.repeat(64),configRevision:3,
+    observedDepth:1,canWriteRegistry:false,canScore:false,canPublish:false,
+    rows:[{captureRowId:'33333333-3333-4333-8333-333333333333',rank:1,
+      canonicalTrackId:'44444444-4444-4444-8444-444444444444',
+      outcome:'REVIEW_REQUIRED',registryFactsSha256:'c'.repeat(64),
+      canScore:false,canPublish:false}]};
+  const ctx=describeWk100CorrectionReview(sample,sample.rows[0].captureRowId,'track.title');
+  assert.equal(ctx.sourceOriginalSha256,sample.payloadSha256);
+  assert.equal(ctx.editionPolicySha256,sample.policySha256);
+  assert.equal(ctx.registryFactsSha256,sample.rows[0].registryFactsSha256);
+  assert.equal(ctx.authority,'admin_patch_registry_track_profile_v1');
+  assert.equal(ctx.durability,'not_saved');
+  assert.equal(ctx.canWriteRegistry,false);
+  assert.equal(WK100_CORRECTION_FIELDS['artist.origin_iso2'].treatment,
+    'missing_origin_admission_or_separate_correction');
+  for(const field of ['source.rank','source.metric','source.native_period','track.unknown'])
+    assert.throws(()=>describeWk100CorrectionReview(sample,sample.rows[0].captureRowId,field),
+      /field_unrecognized/);
+  assert.throws(()=>describeWk100CorrectionReview(sample,
+    '55555555-5555-4555-8555-555555555555','track.title'),/row_absent/);
+  assert.throws(()=>describeWk100CorrectionReview({...sample,canScore:true},
+    sample.rows[0].captureRowId,'track.title'),/preview_invalid/);
+  const source=await readFile('src/pages/admin/charts/wk100-operations/Wk100IdentifyReview.tsx','utf8');
+  assert.match(source,/data-wk100-correction-context/);
+  assert.match(source,/not a saved decision/);
+});
+
