@@ -66,12 +66,12 @@ export function Wk100Ranking({week,sources=[],methods=[],reviewedSourceIds=[]}:{
         Source evidence is unavailable. Ranking and publication remain blocked.
       </p>}
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-wk100-w7-evidence-review>
-        {spec.families.map(family=>{
-          const item=evidence?.core.find(x=>x.family===family);
+        {spec.families.map((family:string)=>{
+          const item=evidence?.core.find((x:{family:string;chainCandidateCount:number})=>x.family===family);
           return <div key={family} className="rounded-xl border border-wk-border p-3">
             <div className="flex flex-wrap justify-between gap-2">
               <p className="text-sm font-semibold text-wk-text">{DISPLAY[family].label}</p>
-              <p className="text-xs font-semibold text-wk-text-muted">20% fixed share</p>
+              <p className="text-xs font-semibold text-wk-text-muted" >{spec.familyWeightPercent}% fixed share</p>
             </div>
             <p className="mt-1 text-xs text-wk-text-muted">{DISPLAY[family].meaning}</p>
             <p className="mt-2 text-xs text-wk-text-muted">
