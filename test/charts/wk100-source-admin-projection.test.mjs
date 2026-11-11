@@ -1686,6 +1686,12 @@ test('WK100 fixed five-source ranking primitive replays two logical EAT weeks wi
   await invalid(v=>{v.snapshots.find(x=>x.family==='audiomack_ke').observedAtUtc='2026-11-03T11:00:00Z'},
     /wk100_rank_observation_outside_week/);
   await invalid(v=>{v.sourceWeights={apple_ke:100}},/wk100_rank_input_invalid/);
+  await invalid(v=>{v.eligibilityPolicySha256={toString:()=>sha(99001)}},
+    /wk100_rank_input_invalid/);
+  await invalid(v=>{v.snapshots[0].captureReceiptSha256={toString:()=>sha(99001)}},
+    /wk100_rank_snapshot_invalid/);
+  await invalid(v=>{v.snapshots[0].rows[0].recordingId={toString:()=>uuid(1)}},
+    /wk100_rank_rank_or_identity_invalid/);
   const differentPolicy=structuredClone(first);
   differentPolicy.eligibilityPolicySha256=sha(99002);
   assert.notEqual((await compute(differentPolicy)).rankingDigest,result.rankingDigest);
