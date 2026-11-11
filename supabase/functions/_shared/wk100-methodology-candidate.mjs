@@ -143,10 +143,11 @@ const w7Original=s=>SHA.test(s.receiptSha256||'')&&
   ['succeeded','partial_depth'].includes(s.captureState)&&
   Number.isInteger(s.observedDepth)&&s.observedDepth>0&&
   Number.isInteger(s.expectedDepth)&&s.observedDepth<=s.expectedDepth;
-const w7NativeWindow=s=>{
+const w7NativeWindow=(s,weekStart)=>{
   if(s.nativePeriodAuthority!=='provider_defined')return false;
   const start=Date.parse(s.nativePeriodStart),end=Date.parse(s.nativePeriodEnd);
-  return Number.isFinite(start)&&Number.isFinite(end)&&start<end;
+  return Number.isFinite(start)&&Number.isFinite(end)&&start<end&&
+    start>=weekStart&&end<=weekStart+7*86400000;
 };
 export function reviewWk100MethodologyEvidence({weekStartEat,sources=[],methods=[]}={}){
   const start=w7WeekStart(weekStartEat);
@@ -155,6 +156,11 @@ export function reviewWk100MethodologyEvidence({weekStartEat,sources=[],methods=
      sources.some(x=>!x||typeof x!=='object'||Array.isArray(x))||
      methods.some(x=>!x||typeof x!=='object'||Array.isArray(x)))
     hold('review_read_unavailable');
+  // Duplicate source identities cannot multiply a provider's evidence.
+  const sourceKeys=sources.map(s=>s.sourceKey);
+  if(sourceKeys.some(k=>typeof k!=='string'||!k.trim())||
+     new Set(sourceKeys).size!==sourceKeys.length)
+    hold('review_source_identity_invalid');
   const core=WK100_METHOD_FAMILIES.slice(0,5).map(family=>{
     const candidates=sources.filter(s=>s.provider===family&&s.market==='KE');
     let originalCount=0,methodCandidateCount=0,nativeWindowCount=0;
@@ -166,7 +172,7 @@ export function reviewWk100MethodologyEvidence({weekStartEat,sources=[],methods=
         m.providerKey===family&&m.captureContractVersion===s.version);
       const candidate=!!method&&method.decisionState==='collector_admitted'&&
         method.hasMethodEvidence===true;
-      const native=w7NativeWindow(s)&&method?.nativePeriodAuthority==='provider_defined';
+      const native=w7NativeWindow(s,start)&&method?.nativePeriodAuthority==='provider_defined';
       const asOf=method?.nativePeriodAuthority==='observed_as_of'&&
         w7InWeek(s.lastSuccessfulAt,start);
       if(original)originalCount++;
