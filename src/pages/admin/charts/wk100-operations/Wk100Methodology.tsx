@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {supabase} from '@/lib/supabase';
+import type {Wk100MethodDecision} from './SourceMethodReviewForm';
 import {WkSurface} from '@/components/design-system/primitives/Surface';
 import {WkNumberField} from '@/components/design-system/primitives/NumberField';
 import {WkStateBadge} from '@/components/design-system/primitives/StateBadge';
@@ -7,7 +8,7 @@ import {WkDetailList} from '@/components/design-system/primitives/DetailList';
 import {
   WK100_METHOD_FAMILIES,WK100_SPOTIFY_EDITORIAL_PLAYLISTS,
   WK100_FAMILY_MEASUREMENTS,WK100_METHOD_REVIEW_CONTROLS,
-  validateWk100MethodologyCandidate,
+  validateWk100MethodologyCandidate,reviewWk100MethodologyEvidence,
 } from '@/../supabase/functions/_shared/wk100-methodology-candidate.mjs';
 
 type Family='apple_ke'|'shazam_ke'|'mdundo_ke'|'youtube_ke'|'audiomack_ke'|'spotify_editorial';
@@ -17,8 +18,11 @@ type Draft={weekStartEat:string;revision:number;configSha256:string;
     methodologyCandidate?:{schemaVersion?:string;weightsPercent?:Record<Family,number>;
       ingestPolicySha256?:string};
     [key:string]:unknown}};
-type Source={provider:string;sourceKey:string;expectedDepth:number;
-  observedDepth:number;receiptSha256:string|null;nativePeriodAuthority:string};
+type Source={provider:string;sourceKey:string;market:string;metric:string;version:string;
+  captureState:string;expectedDepth:number;observedDepth:number;
+  receiptSha256:string|null;nativePeriodAuthority:string;
+  nativePeriodStart:string|null;nativePeriodEnd:string|null;
+  lastSuccessfulAt:string|null};
 const NAMES:Record<Family,string>={
   apple_ke:'Apple Music · consumption rank',
   shazam_ke:'Shazam · discovery rank',
@@ -38,7 +42,9 @@ const EVIDENCE_EXPLANATIONS:Record<Family,string>={
 function blankWeights():Record<Family,number|null>{
   return Object.fromEntries(FAMILIES.map(k=>[k,null])) as Record<Family,number|null>;
 }
-export function Wk100Methodology({week,sources=[]}:{week:string;sources?:Source[]}){
+export function Wk100Methodology({week,sources=[],methods=[]}:{
+  week:string;sources?:Source[];methods?:Wk100MethodDecision[];
+}){
   const [revision,setRevision]=useState<Draft|null>(null);
   const [weights,setWeights]=useState<Record<Family,number|null>>(blankWeights);
   const [phase,setPhase]=useState<'loading'|'ready'|'missing'|'unavailable'|'saving'>('loading');
@@ -92,6 +98,10 @@ export function Wk100Methodology({week,sources=[]}:{week:string;sources?:Source[
       weekStartEat:week,ingestPolicySha256:revision?.config.ingestPolicySha256,
     });return true;}catch{return false;}
   },[candidate,revision,week]);
+  const evidence=useMemo(()=>{
+    try{return reviewWk100MethodologyEvidence({weekStartEat:week,sources,methods});}
+    catch{return null;}
+  },[week,sources,methods]);
   const saved=revision?.config.methodologyCandidate;
   const legacy=!!saved&&saved.schemaVersion!=='wk100-methodology-candidate/v2';
   const stale=!!saved&&saved.ingestPolicySha256!==revision?.config.ingestPolicySha256;
@@ -165,6 +175,37 @@ export function Wk100Methodology({week,sources=[]}:{week:string;sources?:Source[
                   :'No verified original shown in this view; do not infer availability.'}
             </p>
           </div>)}
+        </div>
+        <div className="mt-5 space-y-3" data-wk100-w7-evidence-review>
+          <h3 className="text-sm font-semibold text-wk-text">Source Evidence Review</h3>
+          <p className="text-xs text-wk-text-muted">
+            This readback checks source originals, current method decisions and native measurement.
+            It cannot verify Registry identities, a complete comparable week or independent approval.
+          </p>
+          {!evidence&&<p role="alert" className="text-sm text-wk-danger">
+            Evidence readback is unavailable. Methodology approval stays blocked.
+          </p>}
+          {evidence&&<>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {evidence.core.map(family=><div key={family.family} className="rounded-xl border border-wk-border p-3">
+                <p className="text-sm font-semibold text-wk-text">{NAMES[family.family as Family]}</p>
+                <p className="mt-1 text-xs text-wk-text-muted">
+                  {family.originalCount} source original(s), {family.methodCandidateCount} current method candidate(s),
+                  {' '}{family.nativeWindowCount} native period(s), {family.asOfCount} as-of observation(s).
+                </p>
+                <p className="mt-1 text-xs text-wk-text-muted">
+                  {family.chainCandidateCount>0
+                    ?'Candidate evidence chain observed. Registry and week qualification still required.'
+                    :'Evidence chain incomplete. No contribution can be qualified.'}
+                </p>
+              </div>)}
+            </div>
+            <p role="status" className="text-xs text-wk-text-muted">
+              Candidate core evidence chains: {evidence.chainCandidateFamilies} of at least {evidence.minimumCoreFamilies} required.
+              These are not confirmed source coverage. All four Spotify editorial research references still require independent evidence.
+              Normalization, completeness, concentration, sensitivity, and independent approval remain unaccepted.
+            </p>
+          </>}
         </div>
         <div className="mt-4 space-y-2">
           <p role="status" className="text-sm text-wk-text-muted">
