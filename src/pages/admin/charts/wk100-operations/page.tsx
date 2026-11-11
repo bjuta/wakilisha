@@ -517,7 +517,9 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         id:label.toLowerCase(),label,
         description:i===0?'Source and evidence review':
           i===1?'Recording evidence and Registry review':
-          i===2?'Saved policy and evidence-backed filter results':'Requires later phase acceptance',
+          i===2?'Saved policy and evidence-backed filter results':
+          i===3?'Private ranking, score detail, and evidence readiness':
+            'Publication requires separate acceptance',
         state:i===0?(reviewActive?'available' as const:'current' as const):
           i===1?(identifyActive?'current' as const:'available' as const):
           i===2?(qualifyActive?'current' as const:'available' as const):
