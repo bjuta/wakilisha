@@ -383,6 +383,11 @@ test('W8B/W9 deterministic week selection requires 11 actual complete checkpoint
   const ambiguous=inspectWk100RankWeek(duplicate);
   assert.equal(ambiguous.readyForPrivateReplay,false);
   assert(ambiguous.families[0].issues.includes('duplicate_day_or_receipt'));
+  const olderFailed=structuredClone(clean);
+  olderFailed.attempts.push({...olderFailed.attempts[0],
+    id:id(99881),status:'partial_depth',observed_depth:99,record_count:99,
+    native_period_authority:'unknown'});
+  assert.equal(inspectWk100RankWeek(olderFailed).readyForPrivateReplay,true);
   const competing=structuredClone(clean);
   competing.contracts.push({...competing.contracts[0],id:id(99999)});
   assert.equal(inspectWk100RankWeek(competing).readyForPrivateReplay,false);
