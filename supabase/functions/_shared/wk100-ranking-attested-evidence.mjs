@@ -11,6 +11,7 @@ import {computeWk100PrivateRankingCandidate,
   WK100_RANKING_SPECIFICATION_V1 as SPEC} from './wk100-ranking-primitive.mjs';
 import {projectWk100IdentifyObservations} from './wk100-identify-observations.mjs';
 import {parseCaptureNativeRows} from './chart-capture-runtime.mjs';
+import {projectWk100EligibilityPreview} from './wk100-eligibility-preview.mjs';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA=/^[a-f0-9]{64}$/;
@@ -49,8 +50,9 @@ const nativeValue=(row,family)=>family==='youtube_ke'?
  * loadCapture(id) MUST load immutable attempt + contract + all stored rows from
  * the exact ID, not browser-submitted records. readPrivateBytes(attempt) MUST
  * use the existing private bucket. loadRegistry(...) MUST read live Registry
- * links and active tracks. evaluateW5Row(...) MUST re-evaluate the current
- * saved eligibility policy and return the original registry-facts SHA.
+ * links and full current Registry facts. loadW5Draft(...) MUST return the
+ * authenticated, revisioned, currently saved weekly policy, never UI input.
+ * This bridge calls the existing frozen-policy W5 evaluator directly.
  * The default parser is the established exact native collection parser.
  * The parser override exists for isolated synthetic tests, never user input.
  *
@@ -58,7 +60,7 @@ const nativeValue=(row,family)=>family==='youtube_ke'?
  */
 export async function prepareWk100AttestedPrivateRanking({
   weekStartEat,selectedReceiptIds,eligibilityPolicySha256,
-  loadCapture,readPrivateBytes,loadRegistry,evaluateW5Row,
+  loadCapture,readPrivateBytes,loadRegistry,loadW5Draft,
   parseNativeRows=parseCaptureNativeRows,
 }){
   need(typeof weekStartEat==='string'&&/^\d{4}-\d\d-\d\d$/.test(weekStartEat),
@@ -71,8 +73,12 @@ export async function prepareWk100AttestedPrivateRanking({
   need(Array.isArray(selectedReceiptIds)&&selectedReceiptIds.length===11&&
     selectedReceiptIds.every(x=>typeof x==='string'&&UUID.test(x))&&
     unique(selectedReceiptIds),'selection_invalid');
-  need([loadCapture,readPrivateBytes,loadRegistry,evaluateW5Row,parseNativeRows]
+  need([loadCapture,readPrivateBytes,loadRegistry,loadW5Draft,parseNativeRows]
     .every(x=>typeof x==='function'),'restricted_server_dependencies_missing');
+  const savedDraft=await loadW5Draft(weekStartEat);
+  need(object(savedDraft)&&savedDraft.week_start_eat===weekStartEat&&
+    savedDraft.config_json?.ingestPolicySha256===eligibilityPolicySha256,
+    'saved_w5_policy_missing_or_stale');
   const snapshots=[],attestationFacts=[],familySourceKeys=new Map();
   const seenFamilies=new Map(SPEC.families.map(f=>[f,0]));
   const allCaptureRows=new Set();
@@ -134,32 +140,50 @@ export async function prepareWk100AttestedPrivateRanking({
         'youtube_native_count_invalid');
     }
     const evidence=await loadRegistry({contract,attempt,rows:ordered});
-    need(object(evidence)&&Array.isArray(evidence.typedLinks)&&
-      Array.isArray(evidence.legacyLinks)&&Array.isArray(evidence.activeTracks),
-      'registry_read_invalid');
+    need(object(evidence)&&['typedLinks','legacyLinks','activeTracks',
+      'registryTracks','registryCredits','registryArtists','registryReleases']
+      .every(k=>Array.isArray(evidence[k])),'registry_read_invalid');
     let identified;
     try{identified=projectWk100IdentifyObservations({weekStartEat,contract,attempt,
       rows:ordered,typedLinks:evidence.typedLinks,
       legacyLinks:evidence.legacyLinks,activeTracks:evidence.activeTracks});}
     catch{fail('registry_link_replay_invalid');}
-    need(identified.rows.length===ordered.length&&identified.totals.resolved===ordered.length&&
-      identified.totals.conflicting===0&&identified.totals.inactive===0&&
-      identified.totals.needsReview===0,'registry_identity_unresolved');
+    need(identified.rows.length===ordered.length,'registry_identity_projection_invalid');
+    let preview;
+    try{
+      preview=await projectWk100EligibilityPreview({weekStartEat,
+        sourceReview:identified,draft:savedDraft,
+        registryTracks:evidence.registryTracks,registryCredits:evidence.registryCredits,
+        registryArtists:evidence.registryArtists,registryReleases:evidence.registryReleases});
+    }catch{fail('saved_w5_evaluation_invalid');}
+    need(preview.policySha256===eligibilityPolicySha256&&
+      preview.receiptId===receiptId&&preview.contractId===contract.id&&
+      preview.rows.length===ordered.length,'saved_w5_evaluation_invalid');
     const rankingRows=[];
     for(let i=0;i<identified.rows.length;i++){
-      const row=identified.rows[i];
-      const verdict=await evaluateW5Row({weekStartEat,contract,attempt,
-        captureRow:ordered[i],canonicalTrackId:row.canonicalTrackId,
-        policySha256:eligibilityPolicySha256});
-      need(object(verdict)&&verdict.outcome==='ELIGIBLE'&&
-        verdict.policySha256===eligibilityPolicySha256&&
+      const row=identified.rows[i],verdict=preview.rows[i];
+      need(verdict.captureRowId===ordered[i].id&&verdict.rank===row.rank&&
+        verdict.canonicalTrackId===row.canonicalTrackId&&
         typeof verdict.registryFactsSha256==='string'&&
-        SHA.test(verdict.registryFactsSha256),'eligibility_or_registry_facts_unverified');
-      rankingRows.push({recordingId:row.canonicalTrackId,rank:row.rank,
-        ...(family==='youtube_ke'?
-          {nativeCount:numberFromSqlBigint(ordered[i].source_native_count)}:{})});
+        SHA.test(verdict.registryFactsSha256)&&
+        ['ELIGIBLE','EXCLUDED','REVIEW_REQUIRED','CONFLICTED'].includes(verdict.outcome),
+        'eligibility_or_registry_facts_unverified');
+      if(verdict.outcome==='ELIGIBLE'){
+        need(row.identityState==='resolved'&&UUID.test(row.canonicalTrackId),
+          'eligibility_identity_unverified');
+        rankingRows.push({recordingId:row.canonicalTrackId,rank:row.rank,
+          ...(family==='youtube_ke'?
+            {nativeCount:numberFromSqlBigint(ordered[i].source_native_count)}:{})});
+      }else{
+        // Retain the exact native position and count; grant no ranking credit.
+        // Excluded Registry IDs stay in the private provenance digest only.
+        rankingRows.push({recordingId:null,rank:row.rank,
+          disposition:verdict.outcome,
+          ...(family==='youtube_ke'?
+            {nativeCount:numberFromSqlBigint(ordered[i].source_native_count)}:{})});
+      }
       attestationFacts.push([family,receiptId,ordered[i].id,
-        row.canonicalTrackId,verdict.registryFactsSha256]);
+        row.canonicalTrackId,verdict.outcome,verdict.registryFactsSha256]);
     }
     const period=attempt.native_period_authority;
     if(period==='provider_defined')need(
@@ -200,6 +224,7 @@ export async function prepareWk100AttestedPrivateRanking({
     weekStartEat,sourceReceiptCount:11,registrySnapshotSha256,
     policySha256:eligibilityPolicySha256,
     rankingDigest:candidate.rankingDigest,privateRanking:candidate,
+    heldPositions:candidate.heldPositions,
     // This does not prove hosted admission or authorize W8 staging.
     status:'private_research_handoff',canStage:false,canPublish:false});
 }
