@@ -49,6 +49,7 @@ const weekStart=value=>{
   return ms-3*60*60*1000;
 };
 const eatDay=(ms)=>new Date(ms+3*60*60*1000).toISOString().slice(0,10);
+const asciiCmp=(a,b)=>a<b?-1:a>b?1:0;
 const qMicro=(rank,depth)=>Math.floor(((depth-rank+1)*S.scoreScale+Math.floor(depth/2))/depth);
 const snapshotFields=['family','sourceKey','captureReceiptId','captureReceiptSha256','market',
   'nativeMetric','observedAtUtc','nativePeriodAuthority','nativePeriodStartUtc',
@@ -184,11 +185,11 @@ export async function computeWk100PrivateRankingCandidate(input){
     return {recordingId,totalMicros,score:Number((totalMicros/S.scoreScale).toFixed(6)),
       contributions,
       listedFamilyCount:S.families.filter(f=>Object.hasOwn(parts,f)).length};
-  }).sort((a,b)=>b.totalMicros-a.totalMicros||a.recordingId.localeCompare(b.recordingId))
+  }).sort((a,b)=>b.totalMicros-a.totalMicros||asciiCmp(a.recordingId,b.recordingId))
     .slice(0,S.rankedSize).map((v,i)=>Object.freeze({...v,rank:i+1,
       contributions:Object.freeze(v.contributions)}));
   normalized.sort((a,b)=>S.families.indexOf(a.family)-S.families.indexOf(b.family)||
-    a.observedAtUtc.localeCompare(b.observedAtUtc));
+    asciiCmp(a.observedAtUtc,b.observedAtUtc));
   // Content digest is deterministic over sorted source evidence and the exact
   // mathematical output. Authentication, raw-byte verification and signing
   // belong to the trusted integration and independent Edition authority.
