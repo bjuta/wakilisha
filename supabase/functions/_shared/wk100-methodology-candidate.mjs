@@ -135,7 +135,10 @@ function w7WeekStart(week){
      new Date(ms).getUTCDay()!==1)hold('review_week_invalid');
   return ms-3*60*60*1000; // Monday 00:00 East Africa Time
 }
+const w7Stamped=instant=>typeof instant==='string'&&
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(instant);
 const w7InWeek=(instant,start)=>{
+  if(!w7Stamped(instant))return false;
   const ms=Date.parse(instant);
   return Number.isFinite(ms)&&ms>=start&&ms<start+7*86400000;
 };
@@ -144,20 +147,28 @@ const w7Original=s=>SHA.test(s.receiptSha256||'')&&
   Number.isInteger(s.observedDepth)&&s.observedDepth>0&&
   Number.isInteger(s.expectedDepth)&&s.observedDepth<=s.expectedDepth;
 const w7NativeWindow=(s,weekStart)=>{
-  if(s.nativePeriodAuthority!=='provider_defined')return false;
+  if(s.nativePeriodAuthority!=='provider_defined'||
+     !w7Stamped(s.nativePeriodStart)||!w7Stamped(s.nativePeriodEnd))return false;
   const start=Date.parse(s.nativePeriodStart),end=Date.parse(s.nativePeriodEnd);
   return Number.isFinite(start)&&Number.isFinite(end)&&start<end&&
     start>=weekStart&&end<=weekStart+7*86400000;
 };
-export function reviewWk100MethodologyEvidence({weekStartEat,sources=[],methods=[]}={}){
+export function reviewWk100MethodologyEvidence({
+  weekStartEat,sources=[],methods=[],reviewedSourceIds=[],
+}={}){
   const start=w7WeekStart(weekStartEat);
   if(!Array.isArray(sources)||sources.length>200||
      !Array.isArray(methods)||methods.length>500||
+     !Array.isArray(reviewedSourceIds)||reviewedSourceIds.length>200||
      sources.some(x=>!x||typeof x!=='object'||Array.isArray(x))||
      methods.some(x=>!x||typeof x!=='object'||Array.isArray(x)))
     hold('review_read_unavailable');
   // Duplicate source identities cannot multiply a provider's evidence.
   const sourceKeys=sources.map(s=>s.sourceKey);
+  const currentIds=new Set(reviewedSourceIds);
+  if(currentIds.size!==reviewedSourceIds.length||
+     reviewedSourceIds.some(id=>typeof id!=='string'||!id.trim()))
+    hold('review_method_authority_invalid');
   if(sourceKeys.some(k=>typeof k!=='string'||!k.trim())||
      new Set(sourceKeys).size!==sourceKeys.length)
     hold('review_source_identity_invalid');
@@ -168,9 +179,19 @@ export function reviewWk100MethodologyEvidence({weekStartEat,sources=[],methods=
     for(const s of candidates){
       const original=w7Original(s);
       const metric=s.metric===WK100_W7_CORE_REVIEW_METRICS[family];
-      const method=methods.find(m=>m.sourceKey===s.sourceKey&&
-        m.providerKey===family&&m.captureContractVersion===s.version);
-      const candidate=!!method&&method.decisionState==='collector_admitted'&&
+      // Method history can retain an earlier admission. The newest revision
+      // wins; a later pause/retirement or unresolved duplicate must fail closed.
+      const decisions=methods.filter(m=>m.sourceKey===s.sourceKey&&
+        m.providerKey===family);
+      const valid=decisions.filter(m=>Number.isInteger(m.decisionRevision)&&
+        m.decisionRevision>0);
+      const latest=Math.max(0,...valid.map(m=>m.decisionRevision));
+      const current=valid.filter(m=>m.decisionRevision===latest);
+      const method=current.length===1&&valid.length===decisions.length?
+        current[0]:null;
+      const candidate=!!method&&currentIds.has(s.id)&&
+        method.captureContractVersion===s.version&&
+        method.decisionState==='collector_admitted'&&
         method.hasMethodEvidence===true;
       const native=w7NativeWindow(s,start)&&method?.nativePeriodAuthority==='provider_defined';
       const asOf=method?.nativePeriodAuthority==='observed_as_of'&&
