@@ -1502,15 +1502,15 @@ test('WK100 W6 requires applied case proof and independent full-receipt readback
 
 
 
-test('WK100 W7 evidence review keeps authenticated source reports separate from qualification',async()=>{
-  const {reviewWk100MethodologyEvidence:review}=await import(
-    '../../supabase/functions/_shared/wk100-methodology-candidate.mjs');
+test('WK100 W7 fixed ranking evidence review keeps source reports separate from qualification',async()=>{
+  const {reviewWk100RankingEvidence:review}=await import(
+    '../../supabase/functions/_shared/wk100-ranking-evidence-review.mjs');
   const weekStartEat='2026-11-09';
   const empty=review({weekStartEat});
   assert.equal(empty.core.length,5);
   assert.equal(empty.chainCandidateFamilies,0);
   assert.equal(empty.sourceCoverageConfirmed,false);
-  assert.equal(empty.spotifyEditorialProven,false);
+  assert.equal('spotifyEditorialPlaylistIds' in empty,false);
   assert.deepEqual([empty.canScore,empty.canFreeze,empty.canPublish],[false,false,false]);
   assert.deepEqual(empty.core.map(f=>f.family),[
     'apple_ke','shazam_ke','mdundo_ke','youtube_ke','audiomack_ke']);
@@ -1590,7 +1590,7 @@ test('WK100 W7 evidence review keeps authenticated source reports separate from 
     nativePeriodStart:'2026-11-10T00:00:00'}],methods:[method],
     reviewedSourceIds:[original.id]}).chainCandidateFamilies,0);
   assert.throws(()=>review({weekStartEat,sources:[original,original],methods:[method]}),
-    /wk100_methodology_review_source_identity_invalid/);
+    /wk100_ranking_review_source_identity_invalid/);
   assert.throws(()=>review({weekStartEat:'2026-11-10'}),/review_week_invalid/);
 });
 
