@@ -30,4 +30,25 @@ The older `top_songs_weighted_v1` default and v1.0.1 scoring policy combine Spot
 
 The native normalization formula, per-week evidence alignment and completeness thresholds, source-concentration limits, approval role, immutable approved version and independent signed-in freeze acceptance still require explicit reviewed decisions and implementation. The contract must not pretend otherwise. Avoid recording numeric production weights or private receipt identifiers in public GitHub.
 
-W5C durable correction decisions and W6 true before/after correction acceptance remain open in the same PR. W8 ranking and the first public Edition are explicitly out of scope.
+## W7 evidence-chain review implementation, 11 November 2026
+
+The existing source-proposal and saved-week draft contracts remain authoritative. The W7 Admin now projects a **read-only evidence-review** from the source-health readback, current source-method decision readback and already-reconciled proposal/method/contract identities. Code: \`reviewWk100MethodologyEvidence\` in the existing \`wk100-methodology-candidate.mjs\`; the Admin never writes a new qualification record through this view.
+
+This projection is intentionally conservative and **cannot approve weights, score, freeze or publish**:
+
+- It reports a separate evidence chain for each of the five core families, never five unnamed metric buckets. A raw SHA, enrolled contract and method decision are separate checks; none individually establishes source qualification.
+- Candidate method evidence requires current proposal/revision reconciliation, the exact capture-contract version, the **latest** method decision, a recognized native metric and a retained original. A later pause, retirement, stale proposal, ambiguous duplicate decision, partial capture without retained original, or mismatched method version cannot pass this candidate check.
+- YouTube requires \`rank_and_count\` as the native count-bearing contract, not a rank-only playlist surrogate. The other four core families remain rank observations. This does not infer streams or weekly counts from rank.
+- A \`provider_defined\` native interval must carry explicit-offset timestamps, a forward interval and a window contained within the selected EAT week before it can be a candidate. An \`observed_as_of\` method has a distinct current-week observed instant and is **not** certified weekly measurement. Native reporting windows that cross this EAT boundary require **separate reviewed temporal alignment** rather than conversion by the UI.
+- Count source-method chains by **distinct core family**. Do not count multiple originals from one provider as independent core coverage; don't treat Spotify's four playlists as four providers. The four editorial research observations still need their own verifiable references, positions and timestamps; no positive Spotify attestation can be inferred from the source-health summary.
+- Even if two candidate core chains are displayed, \`sourceCoverageConfirmed=false\`, \`spotifyEditorialProven=false\`, \`nativeFormulaApproved=false\`, \`weekCompletenessApproved=false\`, \`concentrationAndSensitivityApproved=false\`, and \`independentApprovalRecorded=false\`. \`canScore=false\`, \`canFreeze=false\`, and \`canPublish=false\` remain non-negotiable.
+
+### Engineering decisions still required for governed W7
+
+A **numerically explicit** approved methodology must specify: (1) a rank-position transformation based only on verified provider depth, (2) a distinct YouTube count transformation using exact source-native week and auditable count evidence, (3) the treatment of multiple genuine Apple daily observations without calling them a weekly stream total, (4) one capped Spotify editorial inclusion/placement contribution with four retained playlist sources, (5) whether and how native windows qualify against an EAT Edition week, (6) per-family minimum receipt/completeness thresholds and unreallocated missingness, (7) source-concentration and leave-one-core-provider-out sensitivity tolerances, and (8) exact independent reviewer capabilities, proposal digest, version lock and append-only freeze proof.
+
+These are **unapproved decisions, not implied defaults**. The founder's chosen source order is not numeric weighting authority. The existing W7 v2 candidate may retain explicitly proposed weights, but does not authorize a formula or rank output. Avoid minting a freeze SQL migration until these decisions and independent signature authority are accepted. Do not reuse the legacy \`top_songs_weighted_v1\` formula by assumption.
+
+The same existing consolidated WK100 source-domain tests now include evidence-chain and stale-authorization negative cases. The previous 52/52 Node / 32/32 Chromium acceptance belongs to commit \`4aee9879\`; this later W7 revision needs its **own exact-head integrated acceptance**. No new workflow, SQL migration, preview, source collector, scoring endpoint or Production deployment was introduced.
+
+W5C/W6 subsequently passed exact-head \`4aee9879\` genuine disposable GoTrue JWT, typed canonical Registry writer, immutable audit and W6 independent full-receipt/drift acceptance; those historical results do not automatically validate new W7 commits. W8 ranking and the first public Edition remain out of scope.
