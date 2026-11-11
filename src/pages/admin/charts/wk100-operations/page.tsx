@@ -21,7 +21,7 @@ import { SourceProposalForm, type Wk100ProposalRecord } from './SourceProposalFo
 import { SourceMethodReviewForm, type Wk100MethodDecision } from './SourceMethodReviewForm';
 import { SourceRecoveryDialog, type Wk100RecoveryKind } from './SourceRecoveryDialog';
 import { Wk100IdentifyReview } from './Wk100IdentifyReview';
-import { Wk100Methodology } from './Wk100Methodology';
+import { Wk100Ranking } from './Wk100Ranking';
 
 type Source = {
   id:string;sourceKey:string;provider:string;surface:string;market:string;
@@ -492,7 +492,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   };
   const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
-    <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={rankActive?'Methodology':qualifyActive?'Eligibility Workbench':identifyActive?'Recording Review':view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
+    <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={rankActive?'Ranking':qualifyActive?'Eligibility Workbench':identifyActive?'Recording Review':view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
       <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();void loadEdition();void loadProposals();void loadMethods();if(view==='collection')void loadRecovery()}} disabled={phase==='loading'}>Refresh status</button>
     </AdminChartsPageHeader>
     <WkSurface className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3">
@@ -528,7 +528,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         if(step.id==='identify'||step.id==='qualify'||step.id==='rank')
           navigate('/admin/charts/wk100-operations?week='+encodeURIComponent(week)+'&stage='+step.id);
       }}/>
-    {rankActive&&<Wk100Methodology week={week} sources={report?.sources??[]}
+    {rankActive&&<Wk100Ranking week={week} sources={report?.sources??[]}
       methods={methodPhase==='ready'&&proposalPhase==='ready'?methodDecisions:[]}
       reviewedSourceIds={[...reviewedSourceIds]}/>}
     {!reviewActive&&<nav className="flex flex-wrap gap-2" aria-label="Collection workspace">
@@ -566,7 +566,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                   :'No verified provider reporting period or reviewed as-of original for this week.'},
               {id:'identity',label:'Canonical recording identities',status:'blocked',description:'Registry and MIZIZI reconciliation is Phase 2'},
               {id:'eligibility',label:'Complete eligibility and corrections',status:'blocked',description:'All applicable filter checks are Phase 2'},
-              {id:'ranking',label:'Frozen methodology and private Top 100',status:'blocked',description:'A private ranking is not inferred from captures'},
+              {id:'ranking',label:'Fixed ranking specification and private Top 100',status:'blocked',description:'A private ranking is not inferred from captures'},
               {id:'edition',label:'Edition staging and explicit publication',status:'blocked',description:'No public flagship has been authorized'},
             ]}/>
           </Card>
