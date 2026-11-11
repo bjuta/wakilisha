@@ -194,7 +194,11 @@ export function reviewWk100MethodologyEvidence({
         method.decisionState==='collector_admitted'&&
         method.hasMethodEvidence===true;
       const native=w7NativeWindow(s,start)&&method?.nativePeriodAuthority==='provider_defined';
-      const asOf=method?.nativePeriodAuthority==='observed_as_of'&&
+      // As-of rank observation is not YouTube's native weekly view-count
+      // measurement. A method/receipt period-authority contradiction is held.
+      const asOf=family!=='youtube_ke'&&
+        s.nativePeriodAuthority==='unknown'&&
+        method?.nativePeriodAuthority==='observed_as_of'&&
         w7InWeek(s.lastSuccessfulAt,start);
       if(original)originalCount++;
       if(candidate)methodCandidateCount++;
