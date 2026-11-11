@@ -201,6 +201,13 @@ export async function readWk100AttestedRankingPrivate({
   // Catch admission revocation/version drift during expensive byte+W5 replay.
   // This is a second read, NOT an atomic DB snapshot or a stage/publish grant.
   const finalAdmission=await readCurrentMethods(db);
+  const finalDraft=await caller.rpc('wk100_get_admin_draft_v1',
+    {p_week:weekStartEat});
+  need(!finalDraft.error&&finalDraft.data?.weekStartEat===weekStartEat&&
+    finalDraft.data.revision===current.revision&&
+    finalDraft.data.updatedAt===current.updatedAt&&
+    finalDraft.data.config?.ingestPolicySha256===eligibilityPolicySha256,
+    'current_w5_policy_changed');
   for(const {contract,attempt,seal} of admittedSelections.values())
     need(sourceMethodSeal(contract,attempt,finalAdmission,sourceConstitutionVersion)===seal,
       'source_method_changed');
