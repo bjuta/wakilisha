@@ -44,6 +44,7 @@ const REASONS:Record<string,string>={
   source_contract_incompatible:'The source contract does not match the fixed specification.',
   source_depth_incomplete:'The original contains fewer positions than required.',
   observation_week_unverified:'The capture does not establish this EAT week.',
+  attempt_week_mismatch:'A receipt belongs to another EAT week.',
   native_period_unverified:'The source period has not been verified.',
   duplicate_day_or_receipt:'Several captures claim the same daily checkpoint.',
   partial_original_retained:'A partial original remains on record.',
