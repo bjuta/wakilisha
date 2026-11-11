@@ -1345,3 +1345,158 @@ test('WK100 W5C Admin saves only explicit review decisions through guarded RPC',
   assert.doesNotMatch(ui,/\u2014/);
 });
 
+
+test('WK100 W5C typed correction values cannot bypass the existing Registry writer',async()=>{
+  const {normalizeWk100CorrectionPatchValue:parse}=await import(
+    '../../src/services/chartsIngestion/wk100CorrectionReviewBoundary.mjs');
+  assert.equal(parse('track.title','Nairobi Morning'),'Nairobi Morning');
+  assert.equal(parse('track.isrc','KEABC2600012'),'KEABC2600012');
+  assert.equal(parse('track.explicit','true'),true);
+  assert.equal(parse('track.explicit','false'),false);
+  assert.equal(parse('track.duration_ms','123456'),123456);
+  assert.equal(parse('release.release_type','single'),'single');
+  assert.equal(parse('release.release_date','2026-11-09'),'2026-11-09');
+  for(const field of ['track.isrc','track.explicit','track.duration_ms','release.release_date'])
+    assert.equal(parse(field,'__clear__'),null);
+  for(const [field,value] of [
+    ['track.title',''],['track.title',' __clear__ '],
+    ['track.duration_ms','-9'],['track.duration_ms','4.3'],
+    ['track.duration_ms','90000000'],['release.release_date','2026-02-31'],
+    ['release.release_type','playlist'],['recording.identity','merged'],
+    ['credits.primary_featured','other'],['source.rank','4'],
+    ['track.explicit','false?'],['track.title','__clear__'],
+    ['track.isrc',' ABC '],
+  ])assert.throws(()=>parse(field,value),/wk100_correction_value_invalid/);
+});
+
+test('WK100 W5C atomically invokes the typed Registry writer before private immutable proof',async()=>{
+  const sql=await readFile(
+    'supabase/migrations/20261110190405_wk100_correction_decision_ledger_v1.sql','utf8');
+  const name='create function public.wk100_apply_reviewed_registry_correction_v1(';
+  const start=sql.indexOf(name);
+  const end=sql.indexOf('revoke all on function public.wk100_apply_reviewed_registry_correction_v1(',start);
+  assert.ok(start>0&&end>start);
+  const body=sql.slice(start,end);
+  for(const required of [
+    "current_user_has_capability('manage_registry')",
+    "current_user_has_capability('manage_ingest')",
+    "current_user_has_capability('manage_charts')",
+    "current_user_has_capability('view_registry')",
+    "v_case.state<>'request_registry_review'",
+    'v_attempt.payload_sha256 is distinct from v_case.original_sha256',
+    'v_draft.revision is distinct from v_case.policy_revision',
+    'v_source_row.provider_track_id is distinct from v_case.provider_track_id',
+    "l.match_status='matched'",
+    "l.match_status='confirmed'",
+    "public.admin_patch_registry_track_profile_v1(",
+    "public.admin_patch_registry_release_profile_v1(",
+    "v_after is distinct from v_readback",
+    "where id=v_case.id and revision=v_case.revision",
+    "decision,reason,",
+    "'applied_registry'",
+    "pg_catalog.pg_advisory_xact_lock(",
+    "v_retry.request_sha256 is distinct from v_hash",
+  ])assert.ok(body.includes(required),'Missing atomic writer boundary: '+required);
+  assert.ok(body.indexOf('public.admin_patch_registry_track_profile_v1(')<
+    body.indexOf('insert into platform_private.wk100_correction_events_v1 ('));
+  assert.ok(body.indexOf('public.admin_patch_registry_release_profile_v1(')<
+    body.indexOf('insert into platform_private.wk100_correction_events_v1 ('));
+  assert.doesNotMatch(body,/insert into public\.(registry_canonical_write_events|registry_tracks|registry_releases)/);
+  assert.match(sql,/constraint wk100_correction_applied_event_only_with_provenance/);
+  assert.match(sql,/old.state in \('closed_no_change','applied_registry'\)/);
+  assert.match(sql,/v_case.state in \('closed_no_change','applied_registry'\)/);
+  assert.match(sql,/create function public\.wk100_read_correction_application_v1\(p_case_id uuid\)/);
+  assert.match(sql,/v_now->v_field is not distinct from v_event\.writer_after_value/);
+});
+
+test('WK100 W6 requires applied case proof and independent full-receipt readback',async()=>{
+  const {compareWk100EligibilityRechecksWithApplication:verify}=await import(
+    '../../src/services/chartsIngestion/wk100EligibilityRecheck.mjs');
+  const track='44444444-4444-4444-8444-444444444444';
+  const row='33333333-3333-4333-8333-333333333333';
+  const before={schemaVersion:'wk100-admin-eligibility-preview-v1',
+    weekStartEat:'2026-11-09',contractId:'11111111-1111-4111-8111-111111111111',
+    receiptId:'22222222-2222-4222-8222-222222222222',
+    sourceKey:'apple_ke_public_top100',payloadSha256:'a'.repeat(64),
+    policySha256:'b'.repeat(64),receiptStatus:'succeeded',
+    observedDepth:1,expectedDepth:1,configRevision:3,
+    canWriteRegistry:false,canScore:false,canPublish:false,
+    counts:{ELIGIBLE:0,EXCLUDED:0,REVIEW_REQUIRED:1,CONFLICTED:0},
+    rows:[{captureRowId:row,rank:1,observedTitle:'Source title',
+      observedArtist:null,providerTrackId:'90315517',
+      identityState:'resolved',canonicalTrackId:track,registryTrackId:track,
+      registryReleaseId:'66666666-6666-4666-8666-666666666666',
+      registryFactsSha256:'c'.repeat(64),outcome:'REVIEW_REQUIRED',
+      reasonCodes:['missing_isrc'],canScore:false,canPublish:false}]};
+  const after=structuredClone(before);
+  after.rows[0].registryFactsSha256='d'.repeat(64);
+  after.rows[0].outcome='ELIGIBLE';
+  after.rows[0].reasonCodes=[];
+  after.counts.REVIEW_REQUIRED=0;after.counts.ELIGIBLE=1;
+  const proof={
+    schemaVersion:'wk100-correction-application-proof/v1',
+    caseId:'77777777-7777-4777-8777-777777777777',
+    eventId:'88888888-8888-4888-8888-888888888888',
+    weekStartEat:before.weekStartEat,contractId:before.contractId,
+    receiptId:before.receiptId,captureRowId:row,sourceRank:1,
+    originalSha256:before.payloadSha256,policyRevision:before.configRevision,
+    policySha256:before.policySha256,registryFactsBeforeSha256:'c'.repeat(64),
+    fieldPath:'track.isrc',
+    registryEntityId:track,registryEntityType:'track',
+    writerAuthority:'admin_patch_registry_track_profile_v1',
+    beforeValue:null,afterValue:'KEABC2600012',
+    expectedUpdatedAt:'2026-11-09T08:00:00Z',
+    appliedUpdatedAt:'2026-11-09T08:01:00Z',
+    appliedAt:'2026-11-09T08:01:00Z',
+    verifiedWriterExecuted:true,canonicalAfterMatchesCurrent:true,
+    canScore:false,canPublish:false,
+  };
+  const result=verify(before,after,proof);
+  assert.equal(result.summary.becameEligible,1);
+  assert.equal(result.applicationEventId,proof.eventId);
+  assert.equal(result.verifiedRegistryOperation,true);
+  assert.equal(result.savedCorrection,true);
+  assert.equal(result.comparisonPersisted,false);
+  assert.equal(result.canScore,false);
+  for(const bad of [
+    {...proof,canonicalAfterMatchesCurrent:false},
+    {...proof,verifiedWriterExecuted:false},
+    {...proof,registryFactsBeforeSha256:'9'.repeat(64)},
+    {...proof,originalSha256:'9'.repeat(64)},
+    {...proof,policyRevision:4},
+    {...proof,writerAuthority:'manual_audit_row'},
+    {...proof,registryEntityId:'99999999-9999-4999-8999-999999999999'},
+    {...proof,sourceRank:2},
+    {...proof,afterValue:null},
+  ])assert.throws(()=>verify(before,after,bad),/wk100_recheck_application_/);
+  assert.throws(()=>verify(before,{...after,payloadSha256:'e'.repeat(64)},proof),
+    /wk100_recheck_receipt_changed/);
+  const unchanged=structuredClone(after);
+  unchanged.rows[0].registryFactsSha256='c'.repeat(64);
+  unchanged.rows[0].outcome='REVIEW_REQUIRED';
+  unchanged.rows[0].reasonCodes=['missing_isrc'];
+  unchanged.counts.REVIEW_REQUIRED=1;unchanged.counts.ELIGIBLE=0;
+  assert.throws(()=>verify(before,unchanged,proof),/facts_not_rechecked/);
+  const unrelatedBefore=structuredClone(before);
+  unrelatedBefore.rows.push({
+    ...structuredClone(before.rows[0]),
+    captureRowId:'99999999-9999-4999-8999-999999999999',
+    rank:2,registryTrackId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    canonicalTrackId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    registryFactsSha256:'e'.repeat(64),
+  });
+  unrelatedBefore.observedDepth=2;unrelatedBefore.expectedDepth=2;
+  unrelatedBefore.counts.REVIEW_REQUIRED=2;
+  const unrelatedAfter=structuredClone(unrelatedBefore);
+  unrelatedAfter.rows[0]=structuredClone(after.rows[0]);
+  unrelatedAfter.rows[1].registryFactsSha256='f'.repeat(64);
+  unrelatedAfter.counts.REVIEW_REQUIRED=1;unrelatedAfter.counts.ELIGIBLE=1;
+  assert.throws(()=>verify(unrelatedBefore,unrelatedAfter,proof),
+    /wk100_recheck_application_unattributed_registry_change/);
+  const ui=await readFile('src/pages/admin/charts/wk100-operations/Wk100IdentifyReview.tsx','utf8');
+  assert.match(ui,/wk100_apply_reviewed_registry_correction_v1/);
+  assert.match(ui,/wk100_read_correction_application_v1/);
+  assert.match(ui,/compareWk100EligibilityRechecksWithApplication/);
+  assert.match(ui,/data-wk100-canonical-application/);
+});
+

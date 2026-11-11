@@ -270,7 +270,7 @@ Deno.serve(async req=>{
     if(resolvedIds.length){
       const [tracksResult,creditsResult]=await Promise.all([
         admin.from('registry_tracks')
-          .select('id,slug,title,isrc,release_id,duration_ms,explicit,preview_url,status,metadata')
+          .select('id,slug,title,isrc,release_id,duration_ms,explicit,preview_url,status,metadata,updated_at')
           .in('id',resolvedIds).eq('status','active').limit(401),
         admin.from('registry_track_artists')
           .select('id,track_id,artist_id,role,is_primary,status')
@@ -290,7 +290,7 @@ Deno.serve(async req=>{
           .select('id,slug,status,origin_iso2,gender,artist_type,metadata')
           .in('id',artistIds).limit(401):Promise.resolve({data:[],error:null}),
         releaseIds.length?admin.from('registry_releases')
-          .select('id,slug,status,release_type,release_date,metadata')
+          .select('id,slug,status,release_type,release_date,metadata,updated_at')
           .in('id',releaseIds).limit(401):Promise.resolve({data:[],error:null}),
       ]);
       if(artistsResult.error||releasesResult.error||

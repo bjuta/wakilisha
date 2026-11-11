@@ -100,3 +100,74 @@ export function compareWk100EligibilityRechecks(before,after){
     canScore:false,canPublish:false,
   };
 }
+
+/**
+ * W6: independently re-read an applied W5C event under the caller's real
+ * Registry-read capability. Only an event from the atomic typed writer may
+ * attest the canonical mutation. This does NOT turn a session comparison
+ * into an Edition approval, scoring, or publication receipt.
+ */
+export function compareWk100EligibilityRechecksWithApplication(before,after,proof){
+  const comparison=compareWk100EligibilityRechecks(before,after);
+  const reject=(code)=>{throw new Wk100RecheckConflict('application_'+code);};
+  const ok=(test,code)=>{if(!test)reject(code);};
+  ok(proof&&typeof proof==='object'&&!Array.isArray(proof)&&
+    proof.schemaVersion==='wk100-correction-application-proof/v1'&&
+    UUID.test(proof.caseId)&&UUID.test(proof.eventId)&&
+    proof.verifiedWriterExecuted===true&&
+    proof.canonicalAfterMatchesCurrent===true&&
+    proof.canScore===false&&proof.canPublish===false,'not_verified');
+  for(const [from,to] of [
+    ['weekStartEat','weekStartEat'],['contractId','contractId'],
+    ['receiptId','receiptId'],['originalSha256','payloadSha256'],
+    ['policySha256','policySha256'],['policyRevision','configRevision']]){
+    ok(proof[from]===before[to]&&proof[from]===after[to],'lineage_'+from);
+  }
+  ok(UUID.test(proof.captureRowId)&&Number.isInteger(proof.sourceRank)&&
+    proof.sourceRank>=1&&proof.sourceRank<=before.rows.length&&
+    typeof proof.fieldPath==='string'&&
+    ['track.title','track.isrc','track.explicit','track.duration_ms',
+      'release.release_type','release.release_date'].includes(proof.fieldPath),
+    'target');
+  const old=before.rows[proof.sourceRank-1];
+  const next=after.rows[proof.sourceRank-1];
+  ok(old.captureRowId===proof.captureRowId&&next.captureRowId===proof.captureRowId&&
+    old.registryFactsSha256===proof.registryFactsBeforeSha256&&
+    next.registryFactsSha256!==old.registryFactsSha256,
+    'facts_not_rechecked');
+  const isTrack=proof.fieldPath.startsWith('track.');
+  const target=isTrack?'registryTrack':'registryRelease';
+  ok(proof.registryEntityType===(isTrack?'track':'release')&&
+    proof.writerAuthority===(isTrack?
+      'admin_patch_registry_track_profile_v1':
+      'admin_patch_registry_release_profile_v1')&&
+    UUID.test(proof.registryEntityId)&&
+    old[target+'Id']===proof.registryEntityId&&
+    next[target+'Id']===proof.registryEntityId&&
+    old.identityState==='resolved'&&next.identityState==='resolved',
+    'canonical_identity_changed');
+  // Every changed row must be attributable to the same applied entity.
+  // A Release correction may affect multiple Tracks, but unrelated Registry
+  // changes cannot silently ride along as W6 acceptance evidence.
+  for(const changed of comparison.changed){
+    const previousRow=before.rows[changed.rank-1];
+    const currentRow=after.rows[changed.rank-1];
+    ok(previousRow[target+'Id']===proof.registryEntityId&&
+      currentRow[target+'Id']===proof.registryEntityId,
+      'unattributed_registry_change');
+  }
+  ok(proof.beforeValue!==undefined&&proof.afterValue!==undefined&&
+    !same(proof.beforeValue,proof.afterValue)&&
+    typeof proof.appliedAt==='string'&&Number.isFinite(Date.parse(proof.appliedAt))&&
+    typeof proof.expectedUpdatedAt==='string'&&Number.isFinite(Date.parse(proof.expectedUpdatedAt))&&
+    typeof proof.appliedUpdatedAt==='string'&&Number.isFinite(Date.parse(proof.appliedUpdatedAt)),
+    'writer_values');
+  return {
+    ...comparison,applicationCaseId:proof.caseId,
+    applicationEventId:proof.eventId,
+    appliedFieldPath:proof.fieldPath,
+    verifiedRegistryOperation:true,savedCorrection:true,
+    comparisonPersisted:false,canScore:false,canPublish:false,
+  };
+}
+

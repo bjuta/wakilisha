@@ -13,6 +13,12 @@ begin
      or to_regclass('platform_private.wk100_governed_editorial_approvals_v1') is null
      or to_regclass('platform_private.wk100_governed_staged_editions_v1') is null
      or to_regprocedure('public.current_user_has_capability(text)') is null
+     or to_regprocedure('public.admin_patch_registry_track_profile_v1(uuid,jsonb,timestamptz)') is null
+     or to_regprocedure('public.admin_patch_registry_release_profile_v1(uuid,jsonb,timestamptz)') is null
+     or to_regclass('public.registry_track_provider_links') is null
+     or to_regclass('public.provider_entity_links') is null
+     or to_regclass('public.registry_tracks') is null
+     or to_regclass('public.registry_releases') is null
   then
     raise exception 'WK100 correction ledger requires accepted source, Registry, and Edition authorities'
       using errcode='55000';
@@ -46,7 +52,7 @@ create table platform_private.wk100_correction_cases_v1 (
     check (asserted_registry_facts_sha256 ~ '^[a-f0-9]{64}$'),
   revision bigint not null check (revision>=1),
   state text not null check (state in
-    ('hold','request_registry_review','closed_no_change')),
+    ('hold','request_registry_review','closed_no_change','applied_registry')),
   opened_by uuid not null references auth.users(id) on delete restrict,
   opened_at timestamptz not null default clock_timestamp(),
   updated_by uuid not null references auth.users(id) on delete restrict,
@@ -65,10 +71,33 @@ create table platform_private.wk100_correction_events_v1 (
   request_sha256 text not null check (request_sha256 ~ '^[a-f0-9]{64}$'),
   actor_id uuid not null references auth.users(id) on delete restrict,
   decision text not null check (decision in
-    ('hold','request_registry_review','closed_no_change')),
+    ('hold','request_registry_review','closed_no_change','applied_registry')),
   reason text not null check (length(btrim(reason)) between 12 and 800),
+  writer_authority text,
+  writer_entity_type text,
+  writer_entity_id uuid,
+  writer_before_value jsonb,
+  writer_after_value jsonb,
+  writer_before_updated_at timestamptz,
+  writer_after_updated_at timestamptz,
   created_at timestamptz not null default clock_timestamp(),
-  unique (case_id,revision)
+  unique (case_id,revision),
+  constraint wk100_correction_applied_event_only_with_provenance check (
+    (decision='applied_registry'
+      and writer_authority in ('admin_patch_registry_track_profile_v1',
+                               'admin_patch_registry_release_profile_v1')
+      and writer_entity_type in ('track','release')
+      and writer_entity_id is not null and writer_before_value is not null
+      and writer_after_value is not null
+      and writer_before_value is distinct from writer_after_value
+      and writer_before_updated_at is not null
+      and writer_after_updated_at is not null)
+    or (decision<>'applied_registry'
+      and writer_authority is null and writer_entity_type is null
+      and writer_entity_id is null and writer_before_value is null
+      and writer_after_value is null and writer_before_updated_at is null
+      and writer_after_updated_at is null)
+  )
 );
 create index wk100_correction_events_case_idx
   on platform_private.wk100_correction_events_v1(case_id,revision desc);
@@ -111,7 +140,7 @@ begin
       old.original_sha256,old.policy_revision,old.policy_sha256,
       old.asserted_registry_facts_sha256,old.opened_by,old.opened_at)
      or new.revision<>old.revision+1
-     or old.state='closed_no_change'
+     or old.state in ('closed_no_change','applied_registry')
   then
     raise exception 'WK100 correction case lineage or terminal state cannot change'
       using errcode='42501';
@@ -287,7 +316,7 @@ begin
        or v_case.week_start_eat<>v_week
        or v_case.source_rank<>v_row.source_rank
        or v_case.provider_track_id is distinct from v_row.provider_track_id
-       or v_case.state='closed_no_change'
+       or v_case.state in ('closed_no_change','applied_registry')
     then
       raise exception 'WK100 correction case stale or terminal' using errcode='40001';
     end if;
@@ -389,8 +418,335 @@ revoke all on function public.wk100_read_correction_cases_v1(date,uuid,uuid)
 grant execute on function public.wk100_read_correction_cases_v1(date,uuid,uuid)
   to authenticated;
 
+
+-- Case-bound W5C canonical application: the typed Registry writer is invoked
+-- inside THIS transaction before the private immutable event is appended.
+-- Existing public registry_audit_log/write_events rows are not trusted proof.
+create function public.wk100_apply_reviewed_registry_correction_v1(
+ p_case_id uuid,p_expected_case_revision bigint,
+ p_expected_entity_updated_at timestamptz,p_new_value jsonb,
+ p_operation_id uuid,p_reason text
+) returns jsonb language plpgsql security definer set search_path=pg_catalog
+as $apply$
+declare
+ v_actor uuid:=auth.uid();
+ v_case platform_private.wk100_correction_cases_v1%rowtype;
+ v_retry platform_private.wk100_correction_events_v1%rowtype;
+ v_attempt public.wk_chart_capture_attempts_v1%rowtype;
+ v_source_row public.wk_chart_capture_rows_v1%rowtype;
+ v_draft platform_private.wk100_admin_weekly_drafts_v1%rowtype;
+ v_provider text;
+ v_matches integer;
+ v_track_id uuid;
+ v_entity_id uuid;
+ v_entity_type text;
+ v_field text;
+ v_writer text;
+ v_before jsonb;
+ v_after jsonb;
+ v_readback jsonb;
+ v_patch jsonb;
+ v_hash text;
+ v_event uuid;
+ v_now timestamptz:=clock_timestamp();
+begin
+ if v_actor is null
+    or coalesce(public.current_user_has_capability('manage_ingest'),false) is not true
+    or coalesce(public.current_user_has_capability('manage_charts'),false) is not true
+    or coalesce(public.current_user_has_capability('view_registry'),false) is not true
+    or coalesce(public.current_user_has_capability('manage_registry'),false) is not true
+ then
+   raise exception 'W5C canonical application needs ingest, chart and Registry steward capabilities'
+     using errcode='42501';
+ end if;
+ if p_case_id is null or p_operation_id is null
+    or p_expected_case_revision is null or p_expected_case_revision<1
+    or p_expected_entity_updated_at is null or p_new_value is null
+    or p_reason is null or length(btrim(p_reason)) not between 12 and 800
+ then
+   raise exception 'W5C canonical correction request invalid' using errcode='22023';
+ end if;
+ v_hash:=encode(extensions.digest(jsonb_build_object(
+   'caseId',p_case_id,'expectedCaseRevision',p_expected_case_revision,
+   'expectedEntityUpdatedAt',p_expected_entity_updated_at,
+   'newValue',p_new_value,'operationId',p_operation_id,
+   'reason',btrim(p_reason))::text,'sha256'),'hex');
+ perform pg_catalog.pg_advisory_xact_lock(
+   pg_catalog.hashtextextended('wk100-correction:'||p_operation_id::text,0));
+ select * into v_retry from platform_private.wk100_correction_events_v1
+   where operation_id=p_operation_id;
+ if found then
+   if v_retry.actor_id is distinct from v_actor
+      or v_retry.case_id is distinct from p_case_id
+      or v_retry.request_sha256 is distinct from v_hash
+      or v_retry.decision<>'applied_registry'
+   then
+     raise exception 'W5C correction operation ID collision' using errcode='40001';
+   end if;
+   return jsonb_build_object('persisted',true,'alreadyRecorded',true,
+     'caseId',p_case_id,'eventId',v_retry.id,'revision',v_retry.revision,
+     'state','applied_registry','writerAuthority',v_retry.writer_authority,
+     'registryEntityType',v_retry.writer_entity_type,
+     'registryEntityId',v_retry.writer_entity_id,
+     'verifiedWriterExecuted',true,'canScore',false,'canPublish',false);
+ end if;
+ -- Prevent an approval/staging insert or a provider-identity reassignment
+ -- from racing the canonical write after the point-in-time checks below.
+ -- These locks are transaction-scoped and used only for the rare accepted
+ -- Registry correction, never for routine W5 preview or case review reads.
+ lock table platform_private.wk100_governed_editorial_approvals_v1,
+   platform_private.wk100_governed_staged_editions_v1 in share mode;
+ lock table public.registry_track_provider_links,
+   public.provider_entity_links in share mode;
+ select * into v_case from platform_private.wk100_correction_cases_v1
+   where id=p_case_id for update;
+ if v_case.id is null or v_case.revision is distinct from p_expected_case_revision
+    or v_case.state<>'request_registry_review'
+    or v_case.field_path not in (
+      'track.title','track.isrc','track.explicit','track.duration_ms',
+      'release.release_type','release.release_date')
+ then
+   raise exception 'W5C correction case missing, stale or not canonical-writable'
+     using errcode='40001';
+ end if;
+ select * into v_attempt from public.wk_chart_capture_attempts_v1
+   where id=v_case.receipt_id and contract_id=v_case.contract_id
+     and week_start_eat=v_case.week_start_eat;
+ select * into v_source_row from public.wk_chart_capture_rows_v1
+   where id=v_case.capture_row_id and attempt_id=v_case.receipt_id;
+ if v_attempt.id is null or v_source_row.id is null
+    or v_attempt.status not in ('succeeded','partial_depth')
+    or v_attempt.payload_sha256 is distinct from v_case.original_sha256
+    or v_source_row.source_rank is distinct from v_case.source_rank
+    or v_source_row.provider_track_id is distinct from v_case.provider_track_id
+    or v_source_row.provider_track_id is null
+ then
+   raise exception 'W5C source receipt or position changed' using errcode='40001';
+ end if;
+ select * into v_draft from platform_private.wk100_admin_weekly_drafts_v1
+   where week_start_eat=v_case.week_start_eat for share;
+ if v_draft.week_start_eat is null
+    or v_draft.revision is distinct from v_case.policy_revision
+    or v_draft.config_json->>'ingestPolicySha256'
+       is distinct from v_case.policy_sha256
+    or exists(select 1 from platform_private.wk100_governed_editorial_approvals_v1
+       where week_start_eat=v_case.week_start_eat)
+    or exists(select 1 from platform_private.wk100_governed_staged_editions_v1
+       where week_start_eat=v_case.week_start_eat)
+ then
+   raise exception 'W5C Edition policy or approval state changed' using errcode='40001';
+ end if;
+ select case when c.provider_key='apple_ke' then 'apple_music'
+             else c.provider_key end into v_provider
+   from public.wk_chart_capture_contracts_v1 c
+   where c.id=v_case.contract_id and c.market='KE';
+ if v_provider is null then
+   raise exception 'W5C capture contract missing' using errcode='40001';
+ end if;
+ -- Exact W4 provider namespace. Check ALL matched and confirmed links,
+ -- including links pointing to inactive Tracks, before active admission.
+ select count(distinct x.track_id),min(x.track_id)::uuid
+   into v_matches,v_track_id from (
+     select l.track_id::text track_id from public.registry_track_provider_links l
+       where l.provider_key=v_provider and
+         l.provider_track_id=v_source_row.provider_track_id and l.match_status='matched'
+     union
+     select l.registry_entity_id track_id from public.provider_entity_links l
+       where l.provider=v_provider and
+         l.provider_entity_id=v_source_row.provider_track_id
+         and l.registry_entity_type='track' and l.match_status='confirmed'
+         and l.registry_entity_id ~ '^[0-9a-f-]{36}$'
+   ) x;
+ if v_matches<>1 or v_track_id is null
+    or not exists(select 1 from public.registry_tracks
+      where id=v_track_id and status='active')
+ then
+   raise exception 'W5C canonical recording link is not uniquely active'
+     using errcode='40001';
+ end if;
+ v_field:=split_part(v_case.field_path,'.',2);
+ if v_case.field_path like 'track.%' then
+   v_entity_type:='track';v_entity_id:=v_track_id;
+   v_writer:='admin_patch_registry_track_profile_v1';
+ else
+   v_entity_type:='release';
+   select t.release_id into v_entity_id from public.registry_tracks t
+     where t.id=v_track_id and t.status='active';
+   v_writer:='admin_patch_registry_release_profile_v1';
+ end if;
+ if v_entity_id is null then
+   raise exception 'W5C canonical target missing' using errcode='40001';
+ end if;
+ -- A single field from the existing typed profile-writer allowlist.
+ if (v_field='title' and
+      (jsonb_typeof(p_new_value)<>'string'
+       or length(btrim(p_new_value#>>'{}')) not between 1 and 300
+       or btrim(p_new_value#>>'{}')<>p_new_value#>>'{}'))
+    or (v_field='isrc' and
+      (jsonb_typeof(p_new_value) not in ('string','null')
+       or (jsonb_typeof(p_new_value)='string' and
+          (length(p_new_value#>>'{}') not between 1 and 32 or
+           btrim(p_new_value#>>'{}')<>p_new_value#>>'{}'))))
+    or (v_field='explicit' and
+      jsonb_typeof(p_new_value) not in ('boolean','null'))
+    or (v_field='duration_ms' and
+      (jsonb_typeof(p_new_value) not in ('number','null') or
+       (jsonb_typeof(p_new_value)='number' and
+        ((p_new_value#>>'{}') !~ '^[0-9]{1,8}$' or
+         (p_new_value#>>'{}')::integer>86400000))))
+    or (v_field='release_type' and
+      (jsonb_typeof(p_new_value)<>'string' or p_new_value#>>'{}' not in
+       ('single','ep','album','mixtape','compilation','video','live','unknown')))
+    or (v_field='release_date' and
+      (jsonb_typeof(p_new_value) not in ('string','null') or
+       (jsonb_typeof(p_new_value)='string' and
+        p_new_value#>>'{}' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+ then
+   raise exception 'W5C canonical patch violates field authority'
+     using errcode='22023';
+ end if;
+ v_patch:=jsonb_build_object(v_field,p_new_value);
+ if v_entity_type='track' then
+   select to_jsonb(t) into v_before from public.registry_tracks t
+     where t.id=v_entity_id and t.status='active' for update;
+ else
+   select to_jsonb(r) into v_before from public.registry_releases r
+     where r.id=v_entity_id and r.status='active' for update;
+ end if;
+ if v_before is null or (v_before->>'updated_at')::timestamptz
+     is distinct from p_expected_entity_updated_at
+    or v_before->v_field is not distinct from p_new_value
+ then
+   raise exception 'W5C canonical fact changed or no factual difference'
+     using errcode='40001';
+ end if;
+ -- The application proof is created after the canonical writer's real
+ -- execution, in the SAME PostgreSQL transaction. Failure rolls both back.
+ if v_entity_type='track' then
+   v_after:=public.admin_patch_registry_track_profile_v1(
+     v_entity_id,v_patch,p_expected_entity_updated_at);
+   select to_jsonb(t) into v_readback from public.registry_tracks t where t.id=v_entity_id;
+ else
+   v_after:=public.admin_patch_registry_release_profile_v1(
+     v_entity_id,v_patch,p_expected_entity_updated_at);
+   select to_jsonb(r) into v_readback from public.registry_releases r where r.id=v_entity_id;
+ end if;
+ if v_after is null or v_after->>'id' is distinct from v_entity_id::text
+    or v_after is distinct from v_readback
+    or v_after->v_field is distinct from p_new_value
+    or v_after->>'updated_at' is null
+ then
+   raise exception 'W5C typed canonical writer readback mismatch'
+     using errcode='40001';
+ end if;
+ insert into platform_private.wk100_correction_events_v1 (
+   case_id,revision,operation_id,request_sha256,actor_id,decision,reason,
+   writer_authority,writer_entity_type,writer_entity_id,
+   writer_before_value,writer_after_value,
+   writer_before_updated_at,writer_after_updated_at,created_at)
+ values (v_case.id,v_case.revision+1,p_operation_id,v_hash,v_actor,
+   'applied_registry',btrim(p_reason),v_writer,v_entity_type,v_entity_id,
+   v_before->v_field,v_after->v_field,
+   (v_before->>'updated_at')::timestamptz,
+   (v_after->>'updated_at')::timestamptz,v_now)
+ returning id into v_event;
+ update platform_private.wk100_correction_cases_v1
+   set revision=revision+1,state='applied_registry',
+     updated_by=v_actor,updated_at=v_now
+   where id=v_case.id and revision=v_case.revision;
+ if not found then
+   raise exception 'W5C case changed during canonical application'
+     using errcode='40001';
+ end if;
+ return jsonb_build_object('persisted',true,'alreadyRecorded',false,
+   'caseId',v_case.id,'eventId',v_event,'revision',v_case.revision+1,
+   'state','applied_registry','writerAuthority',v_writer,
+   'registryEntityType',v_entity_type,'registryEntityId',v_entity_id,
+   'verifiedWriterExecuted',true,'canScore',false,'canPublish',false);
+end
+$apply$;
+revoke all on function public.wk100_apply_reviewed_registry_correction_v1(
+ uuid,bigint,timestamptz,jsonb,uuid,text)
+ from public,anon,authenticated,service_role;
+grant execute on function public.wk100_apply_reviewed_registry_correction_v1(
+ uuid,bigint,timestamptz,jsonb,uuid,text) to authenticated;
+
+
+-- W6 independent live Registry readback. Proof is sourced exclusively from
+-- a private event committed by the case-bound typed Registry writer above.
+-- Later edits invalidate the "current" comparison, never change history.
+create function public.wk100_read_correction_application_v1(p_case_id uuid)
+returns jsonb language plpgsql security definer set search_path=pg_catalog
+as $proof$
+declare
+ v_actor uuid:=auth.uid();
+ v_case platform_private.wk100_correction_cases_v1%rowtype;
+ v_event platform_private.wk100_correction_events_v1%rowtype;
+ v_now jsonb;
+ v_field text;
+ v_current boolean:=false;
+begin
+ if v_actor is null
+    or coalesce(public.current_user_has_capability('manage_ingest'),false) is not true
+    or coalesce(public.current_user_has_capability('manage_charts'),false) is not true
+    or coalesce(public.current_user_has_capability('view_registry'),false) is not true
+ then
+   raise exception 'W6 correction proof read denied' using errcode='42501';
+ end if;
+ if p_case_id is null then
+   raise exception 'W6 proof needs a case ID' using errcode='22023';
+ end if;
+ select * into v_case from platform_private.wk100_correction_cases_v1
+   where id=p_case_id and state='applied_registry';
+ if v_case.id is null then
+   raise exception 'W6 applied Registry case unavailable' using errcode='40001';
+ end if;
+ select * into v_event from platform_private.wk100_correction_events_v1
+   where case_id=v_case.id and revision=v_case.revision
+     and decision='applied_registry';
+ if v_event.id is null then
+   raise exception 'W6 application event unavailable' using errcode='40001';
+ end if;
+ v_field:=split_part(v_case.field_path,'.',2);
+ if v_event.writer_entity_type='track' then
+   select to_jsonb(t) into v_now from public.registry_tracks t
+     where t.id=v_event.writer_entity_id and t.status='active';
+ elsif v_event.writer_entity_type='release' then
+   select to_jsonb(r) into v_now from public.registry_releases r
+     where r.id=v_event.writer_entity_id and r.status='active';
+ end if;
+ v_current:=v_now is not null
+   and v_now->v_field is not distinct from v_event.writer_after_value
+   and (v_now->>'updated_at')::timestamptz
+       is not distinct from v_event.writer_after_updated_at;
+ return jsonb_build_object(
+   'schemaVersion','wk100-correction-application-proof/v1',
+   'caseId',v_case.id,'eventId',v_event.id,
+   'weekStartEat',v_case.week_start_eat,'contractId',v_case.contract_id,
+   'receiptId',v_case.receipt_id,'captureRowId',v_case.capture_row_id,
+   'sourceRank',v_case.source_rank,'originalSha256',v_case.original_sha256,
+   'policyRevision',v_case.policy_revision,'policySha256',v_case.policy_sha256,
+   'registryFactsBeforeSha256',v_case.asserted_registry_facts_sha256,
+   'fieldPath',v_case.field_path,'writerAuthority',v_event.writer_authority,
+   'registryEntityType',v_event.writer_entity_type,
+   'registryEntityId',v_event.writer_entity_id,
+   'beforeValue',v_event.writer_before_value,
+   'afterValue',v_event.writer_after_value,
+   'expectedUpdatedAt',v_event.writer_before_updated_at,
+   'appliedUpdatedAt',v_event.writer_after_updated_at,
+   'appliedAt',v_event.created_at,
+   'verifiedWriterExecuted',true,'canonicalAfterMatchesCurrent',v_current,
+   'canScore',false,'canPublish',false
+ );
+end
+$proof$;
+revoke all on function public.wk100_read_correction_application_v1(uuid)
+  from public,anon,authenticated,service_role;
+grant execute on function public.wk100_read_correction_application_v1(uuid)
+  to authenticated;
+
 comment on table platform_private.wk100_correction_cases_v1 is
   'Private, source-bound WK100 correction case heads. No direct browser access.';
 comment on table platform_private.wk100_correction_events_v1 is
-  'Immutable W5C case decisions. Registry edits must use existing canonical writers.';
+  'Immutable W5C review and typed Registry application events. The only applied event is created atomically with existing Track/Release profile writers.';
 commit;

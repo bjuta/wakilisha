@@ -65,3 +65,48 @@ export function describeWk100CorrectionReview(preview,captureRowId,fieldPath){
     canWriteRegistry:false,canReEvaluate:false,canScore:false,canPublish:false,
   });
 }
+
+/**
+ * Presentation-to-typed-RPC adapter. It NEVER executes a mutation.
+ * The server validates the exact source row, Edition CAS and canonical
+ * entity again, then invokes the existing Registry profile writer.
+ */
+export function normalizeWk100CorrectionPatchValue(fieldPath,raw){
+  const fail=()=>{throw new Error('wk100_correction_value_invalid');};
+  if(typeof raw!=='string'||!Object.hasOwn(WK100_CORRECTION_FIELDS,fieldPath)||
+     WK100_CORRECTION_FIELDS[fieldPath].treatment!=='existing_governed_editor')fail();
+  const clearable=['track.isrc','track.explicit','track.duration_ms','release.release_date'];
+  if(raw==='__clear__') {
+    if(!clearable.includes(fieldPath))fail();
+    return null;
+  }
+  if(raw!==raw.trim())fail();
+  if(fieldPath==='track.title'){
+    if(raw.length<1||raw.length>300)fail();
+    return raw;
+  }
+  if(fieldPath==='track.isrc'){
+    if(raw.length<1||raw.length>32)fail();
+    return raw;
+  }
+  if(fieldPath==='track.explicit'){
+    if(raw!=='true'&&raw!=='false')fail();
+    return raw==='true';
+  }
+  if(fieldPath==='track.duration_ms'){
+    if(!/^[0-9]{1,8}$/.test(raw)||Number(raw)>86400000)fail();
+    return Number(raw);
+  }
+  if(fieldPath==='release.release_type'){
+    if(!['single','ep','album','mixtape','compilation','video','live','unknown'].includes(raw))fail();
+    return raw;
+  }
+  if(fieldPath==='release.release_date'){
+    if(!/^\d{4}-\d\d-\d\d$/.test(raw))fail();
+    const parsed=new Date(raw+'T00:00:00Z');
+    if(!Number.isFinite(parsed.valueOf())||parsed.toISOString().slice(0,10)!==raw)fail();
+    return raw;
+  }
+  fail();
+}
+

@@ -1607,3 +1607,166 @@ test('WK100 Apple artist browser import, search, W4 provenance and mobile viewpo
   expect(ctx.recoveryWrites).toEqual([]);
   expect(ctx.collectNowWrites).toEqual([]);
 });
+
+
+test('W5C atomic Registry correction is case-bound and W6 rechecks the exact receipt',async({page})=>{
+  const contractId='44444444-4444-4444-8444-444444444444';
+  const receiptId='55555555-5555-4555-8555-555555555555';
+  const captureRowId='22222222-2222-4222-8222-222222222222';
+  const trackId='33333333-3333-4333-8333-333333333333';
+  const caseId='77777777-7777-4777-8777-777777777777';
+  const eventId='88888888-8888-4888-8888-888888888888';
+  const week='2026-11-09',original='a'.repeat(64),policy='b'.repeat(64);
+  const beforeFacts='d'.repeat(64),afterFacts='e'.repeat(64);
+  const previousUpdatedAt='2026-11-09T08:00:00Z';
+  const appliedUpdatedAt='2026-11-09T08:01:00Z';
+  let caseState:'none'|'request_registry_review'|'applied_registry'='none';
+  let correctionApplied=false;
+  const appWrites:Record<string,unknown>[]=[];
+  const caseWrites:Record<string,unknown>[]=[];
+  const ctx=await install(page,{existingSources:[{
+    id:contractId,sourceKey:'apple_ke_public_top100',provider:'apple_ke',
+    surface:'Apple Music Kenya Top 100',market:'KE',expectedDepth:2,
+    behavior:'consumption',metric:'rank',version:'test-v1',
+    admissionState:'candidate',captureState:'succeeded',
+    recentAttempts:[{id:receiptId,status:'succeeded',
+      attemptedAt:'2026-11-09T16:10:20Z',observedDepth:2}],
+    canScore:false,canPublish:false,receiptSha256:original,
+  }]});
+  await page.route('**/rest/v1/rpc/wk100_read_correction_cases_v1',async route=>{
+    const input=JSON.parse(route.request().postData()||'{}');
+    if(input.p_week!==week||input.p_receipt_id!==receiptId||
+       input.p_capture_row_id!==captureRowId){await json(route,{
+         schemaVersion:'wk100-correction-case-list/v1',weekStartEat:week,
+         receiptId,captureRowId:input.p_capture_row_id,cases:[],
+         canWriteRegistry:false,canScore:false,canPublish:false});return;}
+    await json(route,{
+      schemaVersion:'wk100-correction-case-list/v1',weekStartEat:week,
+      receiptId,captureRowId,
+      cases:caseState==='none'?[]:[{caseId,fieldPath:'track.isrc',
+        policyRevision:1,revision:correctionApplied?2:1,
+        state:caseState,eventCount:correctionApplied?2:1}],
+      canWriteRegistry:false,canScore:false,canPublish:false,
+    });
+  });
+  await page.route('**/rest/v1/rpc/wk100_record_correction_decision_v1',async route=>{
+    const input=JSON.parse(route.request().postData()||'{}').p_request;
+    caseWrites.push(input);
+    if(input.fieldPath!=='track.isrc'||input.expectedCaseRevision!==0||
+       input.decision!=='request_registry_review'||input.originalSha256!==original||
+       input.policySha256!==policy||typeof input.operationId!=='string'){
+      await json(route,{code:'40001',message:'stale'},409);return;
+    }
+    caseState='request_registry_review';
+    await json(route,{persisted:true,alreadyRecorded:false,caseId,
+      eventId:'99999999-9999-4999-8999-999999999999',revision:1,
+      state:caseState,canWriteRegistry:false,canReEvaluate:false,
+      canScore:false,canPublish:false});
+  });
+  await page.route('**/rest/v1/rpc/wk100_apply_reviewed_registry_correction_v1',async route=>{
+    const input=JSON.parse(route.request().postData()||'{}');
+    appWrites.push(input);
+    if(caseState!=='request_registry_review'||input.p_case_id!==caseId||
+       input.p_expected_case_revision!==1||
+       input.p_expected_entity_updated_at!==previousUpdatedAt||
+       input.p_new_value!=='KEABC2600012'||typeof input.p_operation_id!=='string'){
+      await json(route,{code:'40001',message:'stale'},409);return;
+    }
+    caseState='applied_registry';correctionApplied=true;
+    await json(route,{persisted:true,alreadyRecorded:false,caseId,eventId,
+      revision:2,state:'applied_registry',verifiedWriterExecuted:true,
+      canScore:false,canPublish:false});
+  });
+  await page.route('**/rest/v1/rpc/wk100_read_correction_application_v1',async route=>{
+    const input=JSON.parse(route.request().postData()||'{}');
+    if(!correctionApplied||input.p_case_id!==caseId){
+      await json(route,{code:'40001',message:'no_applied_case'},409);return;
+    }
+    await json(route,{
+      schemaVersion:'wk100-correction-application-proof/v1',
+      caseId,eventId,weekStartEat:week,contractId,receiptId,captureRowId,
+      sourceRank:2,originalSha256:original,policyRevision:1,
+      policySha256:policy,registryFactsBeforeSha256:beforeFacts,
+      fieldPath:'track.isrc',writerAuthority:'admin_patch_registry_track_profile_v1',
+      registryEntityType:'track',registryEntityId:trackId,
+      beforeValue:null,afterValue:'KEABC2600012',
+      expectedUpdatedAt:previousUpdatedAt,appliedUpdatedAt,
+      appliedAt:appliedUpdatedAt,
+      verifiedWriterExecuted:true,canonicalAfterMatchesCurrent:true,
+      canScore:false,canPublish:false,
+    });
+  });
+  await page.route('**/functions/v1/wk100-source-admin-read',async route=>{
+    let input:Record<string,unknown>;
+    try{input=JSON.parse(route.request().postData()||'{}');}catch{input={};}
+    if(input.action!=='preview_recording_eligibility'){await route.fallback();return;}
+    await json(route,{
+      schemaVersion:'wk100-admin-eligibility-preview-v1',
+      weekStartEat:week,contractId,receiptId,sourceKey:'apple_ke_public_top100',
+      payloadSha256:original,configRevision:1,policySha256:policy,
+      eligibilityProfileName:'All artists',marketScopeName:'Kenya',
+      receiptStatus:'succeeded',expectedDepth:2,observedDepth:2,
+      counts:{ELIGIBLE:0,EXCLUDED:correctionApplied?0:1,
+        REVIEW_REQUIRED:correctionApplied?2:1,CONFLICTED:0},
+      rows:[{
+        captureRowId:'11111111-1111-4111-8111-111111111111',rank:1,
+        observedTitle:'Unlinked song',observedArtist:null,providerTrackId:'1',
+        canonicalTrackId:null,registryTrackId:null,registryReleaseId:null,
+        identityState:'needs_review',reviewReason:'provider_link_missing',
+        registryFactsSha256:'c'.repeat(64),outcome:'REVIEW_REQUIRED',
+        reasonCodes:['canonical_identity_needs_review'],
+        canScore:false,canPublish:false,
+      },{
+        captureRowId,rank:2,observedTitle:'Excluded song',observedArtist:null,
+        providerTrackId:'2',canonicalTrackId:trackId,registryTrackId:trackId,
+        registryReleaseId:'66666666-6666-4666-8666-666666666666',
+        identityState:'resolved',reviewReason:null,
+        registryTrackSlug:'linked-recording-slug',
+        registryReleaseSlug:'linked-release-slug',
+        registryTrackUpdatedAt:correctionApplied?appliedUpdatedAt:previousUpdatedAt,
+        registryReleaseUpdatedAt:'2026-11-09T07:00:00Z',
+        registryTrackProfile:{title:'Excluded song',
+          isrc:correctionApplied?'KEABC2600012':null,
+          explicit:false,duration_ms:200000},
+        registryReleaseProfile:{release_type:'single',release_date:'2026-10-01'},
+        registryFactsSha256:correctionApplied?afterFacts:beforeFacts,
+        outcome:correctionApplied?'REVIEW_REQUIRED':'EXCLUDED',
+        reasonCodes:correctionApplied?['review_artist_origin']:['missing_isrc'],
+        canScore:false,canPublish:false,
+      }],reviewMode:'all_predicates_no_admission',
+      canWriteRegistry:false,canScore:false,canPublish:false,
+    });
+  });
+  await page.goto('/admin/charts/wk100-operations?week='+week+'&stage=qualify',
+    {waitUntil:'domcontentloaded'});
+  await page.getByRole('button',{name:'Captured source'}).click();
+  await page.getByRole('option',{name:'Apple Music Kenya Top 100'}).click();
+  await page.getByRole('button',{name:'Exact source receipt'}).click();
+  await page.getByRole('option',{name:/succeeded/}).click();
+  const rows=page.getByRole('table',{name:'WAKILISHA 100 eligibility results'});
+  await expect(rows).toBeVisible({timeout:20_000});
+  await rows.getByRole('button',{name:'Inspect correction authority'}).nth(1).click();
+  await page.getByRole('button',{name:'Correction fact to investigate'}).click();
+  await page.getByRole('option',{name:'ISRC'}).click();
+  await expect(page.getByText('No decision recorded for this fact and policy revision.'))
+    .toBeVisible({timeout:20_000});
+  await expect(page.getByRole('button',{name:'Apply Through Registry Writer'})).toBeDisabled();
+  await page.getByRole('textbox',{name:'Reason for correction decision'})
+    .fill('Evidence reviewed; request typed Registry ISRC correction.');
+  await page.getByRole('button',{name:'Record Review Decision'}).click();
+  await expect(page.getByText(/Saved state: request registry review/))
+    .toBeVisible({timeout:20_000});
+  await page.getByRole('textbox',{name:'New canonical fact value'}).fill('KEABC2600012');
+  await page.getByRole('textbox',{name:'Registry correction rationale'})
+    .fill('Confirmed against the independently checked recording identifier.');
+  await expect(page.getByRole('button',{name:'Apply Through Registry Writer'})).toBeEnabled();
+  await page.getByRole('button',{name:'Apply Through Registry Writer'}).click();
+  const comparison=page.locator('[data-wk-eligibility-recheck]');
+  await expect(comparison.getByText(/the typed Registry writer executed in the case transaction/))
+    .toBeVisible({timeout:20_000});
+  await expect(comparison.getByText(/1 of 2 positions changed/)).toBeVisible();
+  expect(caseWrites).toHaveLength(1);
+  expect(appWrites).toHaveLength(1);
+  expect(ctx.unexpected).toEqual([]);
+});
+

@@ -6,6 +6,7 @@ declare
   v_required_tables integer;
   v_triggers integer;
   v_definer integer;
+  v_application_columns integer;
 begin
   select count(*) into v_required_tables
   from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -39,6 +40,34 @@ begin
       'public.wk100_read_correction_cases_v1(date,uuid,uuid)','EXECUTE') then
     raise exception 'WK100 W5C RPC grants unsafe';
   end if;
+  if not has_function_privilege('authenticated',
+      'public.wk100_apply_reviewed_registry_correction_v1(uuid,bigint,timestamptz,jsonb,uuid,text)','EXECUTE')
+     or not has_function_privilege('authenticated',
+      'public.wk100_read_correction_application_v1(uuid)','EXECUTE')
+     or has_function_privilege('anon',
+      'public.wk100_apply_reviewed_registry_correction_v1(uuid,bigint,timestamptz,jsonb,uuid,text)','EXECUTE')
+     or has_function_privilege('service_role',
+      'public.wk100_apply_reviewed_registry_correction_v1(uuid,bigint,timestamptz,jsonb,uuid,text)','EXECUTE')
+  then
+    raise exception 'WK100 W5C atomic application RPC grants unsafe';
+  end if;
+  select count(*) into v_application_columns from information_schema.columns
+  where table_schema='platform_private'
+    and table_name='wk100_correction_events_v1'
+    and column_name in ('writer_authority','writer_entity_type','writer_entity_id',
+      'writer_before_value','writer_after_value',
+      'writer_before_updated_at','writer_after_updated_at');
+  if v_application_columns<>7 then
+    raise exception 'WK100 canonical writer evidence columns missing';
+  end if;
+  if not exists(select 1 from pg_constraint k
+    join pg_class c on c.oid=k.conrelid
+    join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='platform_private'
+      and c.relname='wk100_correction_events_v1'
+      and k.conname='wk100_correction_applied_event_only_with_provenance') then
+    raise exception 'WK100 canonical writer proof constraint missing';
+  end if;
   select count(*) into v_triggers
   from pg_trigger t join pg_class c on c.oid=t.tgrelid
     join pg_namespace n on n.oid=c.relnamespace
@@ -55,9 +84,11 @@ begin
   select count(*) into v_definer
   from pg_proc p join pg_namespace n on n.oid=p.pronamespace
   where n.nspname='public' and p.proname in (
-    'wk100_record_correction_decision_v1','wk100_read_correction_cases_v1')
+    'wk100_record_correction_decision_v1','wk100_read_correction_cases_v1',
+    'wk100_apply_reviewed_registry_correction_v1',
+    'wk100_read_correction_application_v1')
     and p.prosecdef and 'search_path=pg_catalog'=any(p.proconfig);
-  if v_definer<>2 then
+  if v_definer<>4 then
     raise exception 'WK100 W5C secured RPC bodies missing';
   end if;
   raise notice 'WK100_CORRECTION_LEDGER_STRUCTURAL_GATE=PASS';

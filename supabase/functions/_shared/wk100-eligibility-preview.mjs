@@ -166,6 +166,18 @@ export async function projectWk100EligibilityPreview({
       identityState:observation.identityState,canonicalTrackId:facts.canonicalTrackId,
       reviewReason:observation.reviewReason,provisionalRef:observation.provisionalRef,
       registryTrackSlug,registryReleaseSlug,registryArtistSlugs,registryFactsSha256,
+      registryTrackId:linkedTrack?.id??null,
+      registryReleaseId:linkedRelease?.id??null,
+      registryTrackUpdatedAt:linkedTrack?.updated_at??null,
+      registryReleaseUpdatedAt:linkedRelease?.updated_at??null,
+      registryTrackProfile:linkedTrack?{
+        title:linkedTrack.title??null,isrc:linkedTrack.isrc??null,
+        explicit:linkedTrack.explicit??null,duration_ms:linkedTrack.duration_ms??null,
+      }:null,
+      registryReleaseProfile:linkedRelease?{
+        release_type:linkedRelease.release_type??null,
+        release_date:linkedRelease.release_date??null,
+      }:null,
       outcome,reasonCodes:[...new Set(reasonCodes)],
       canScore:false,canPublish:false,
     });
