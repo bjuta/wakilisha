@@ -1,8 +1,9 @@
 /**
  * WK100 fixed-ranking: restricted server data adapter, no Edge/browser route.
- * The caller MUST separately verify source-method admission. This helper
- * independently checks the signed-in actor's ingest, charts and Registry read
- * permissions, then reads the current W5 draft through its existing RPC. The service DB
+ * The caller must bind the existing server-held source-constitution version.
+ * This helper independently checks current service-only W2A method admission,
+ * signed-in actor ingest/charts/Registry read permission, and saved W5 policy.
+ * The service DB
  * key and private Storage client must never leave the server. No writes.
  *
  * This adapter reuses the exact existing capture, private Storage and Registry
@@ -13,11 +14,57 @@ import {prepareWk100AttestedPrivateRanking}
 import {wk100RegistryProviderKey}
   from './wk100-identify-observations.mjs';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const SHA=/^[a-f0-9]{64}$/;
+const CONSTITUTION=/^[a-zA-Z0-9._-]{2,100}$/;
 const fail=code=>{throw new Error('wk100_rank_reader_'+code);};
 const need=(v,c)=>{if(!v)fail(c);};
 const uniq=xs=>[...new Set(xs)];
 const BUCKET='wk-chart-raw-evidence-v1';
 const MAX_BYTES=4_194_304;
+/** Read the existing service_role-only SQL projection. This does not
+ * authorize ranking or substitute for prospective source-science approval. */
+async function readCurrentMethods(db){
+  need(typeof db.rpc==='function','service_method_reader_missing');
+  const {data,error}=await db.rpc('wk100_service_admitted_methods_v1');
+  need(!error&&Array.isArray(data)&&data.length<=100,
+    'source_method_projection_unavailable');
+  return data;
+}
+function sourceMethodSeal(contract,attempt,methods,constitutionVersion){
+  // Refuse several simultaneously admitted versions of the same source.
+  // SQL's current proposal/review/contract join is the admission authority.
+  const matches=methods.filter(row=>row?.source_key===contract.source_key);
+  need(matches.length===1,'source_method_not_current');
+  const m=matches[0];
+  const expiry=Date.parse(m.authorization_expires_at);
+  need(m.decision_state==='collector_admitted'&&
+    m.provider_key===contract.provider_key&&
+    m.contract_version===contract.contract_version&&
+    m.parser_class===contract.adapter_version&&
+    m.constitution_version===constitutionVersion&&
+    m.native_period_state===attempt.native_period_authority&&
+    typeof m.native_period_evidence_ref==='string'&&
+    m.native_period_evidence_ref.length>=3&&
+    SHA.test(m.endpoint_sha256)&&SHA.test(m.evidence_sha256)&&
+    SHA.test(contract.adapter_sha256)&&
+    typeof m.authorization_ref==='string'&&m.authorization_ref.length>=3&&
+    Number.isInteger(m.proposal_revision)&&m.proposal_revision>=1&&
+    Number.isInteger(m.decision_revision)&&m.decision_revision>=1&&
+    Number.isFinite(expiry)&&expiry>Date.now()&&
+    (contract.provider_key!=='youtube_ke'||
+      (m.method_class==='provider_api'&&m.native_period_state==='provider_defined'))&&
+    (contract.provider_key!=='audiomack_ke'||
+      m.method_class==='reviewed_page_adapter')&&
+    (m.native_period_state!=='observed_as_of'||(
+      ['apple_ke','shazam_ke','mdundo_ke','audiomack_ke'].includes(contract.provider_key)&&
+      /^observed_as_of\/[a-z0-9][a-z0-9_.-]{2,119}$/.test(m.native_period_evidence_ref))),
+    'source_method_not_current');
+  return JSON.stringify([m.source_key,m.provider_key,m.contract_version,
+    m.parser_class,m.method_class,m.native_period_state,
+    m.native_period_evidence_ref,m.endpoint_sha256,m.evidence_sha256,
+    m.authorization_ref,m.authorization_expires_at,m.constitution_version,
+    m.proposal_revision,m.decision_revision,contract.adapter_sha256]);
+}
 async function query(db,table,columns,where,limit){
   let q=db.from(table).select(columns);
   need(q&&typeof q.eq==='function'&&typeof q.in==='function'&&
@@ -49,13 +96,16 @@ async function readInBatches(db,table,columns,where,key,ids,limit=400){
  */
 export async function readWk100AttestedRankingPrivate({
   db,storage,caller,weekStartEat,selectedReceiptIds,eligibilityPolicySha256,
-  parserAccessBySource,parseNativeRows,
+  sourceConstitutionVersion,parserAccessBySource,parseNativeRows,
 }){
   need(db&&typeof db.from==='function'&&
     storage&&typeof storage.from==='function'&&caller&&
     typeof caller.rpc==='function'&&typeof caller.auth?.getUser==='function',
     'restricted_backend_missing');
   need(typeof parserAccessBySource==='function','parser_authority_missing');
+  need(typeof sourceConstitutionVersion==='string'&&
+    CONSTITUTION.test(sourceConstitutionVersion),
+    'server_constitution_missing');
   const identity=await caller.auth.getUser();
   need(!identity.error&&UUID.test(identity.data?.user?.id),
     'authenticated_caller_missing');
@@ -74,6 +124,10 @@ export async function readWk100AttestedRankingPrivate({
   const savedDraft={week_start_eat:weekStartEat,revision:current.revision,
     updated_by:identity.data.user.id,updated_at:current.updatedAt,
     config_json:current.config};
+  // Service-only method state is consulted before any private Storage access.
+  // A candidate capture contract by itself never grants ranking provenance.
+  const admission=await readCurrentMethods(db);
+  const admittedSelections=new Map();
   const bucket=storage.from(BUCKET);
   need(bucket&&typeof bucket.download==='function','private_bucket_missing');
   const loadCapture=async receiptId=>{
@@ -82,8 +136,12 @@ export async function readWk100AttestedRankingPrivate({
       'id,contract_id,week_start_eat,status,observed_market,observed_depth,record_count,fetched_at,payload_sha256,raw_object_key,native_period_authority,native_period_start,native_period_end,native_period_evidence_ref',
       [['eq','id',receiptId],['eq','week_start_eat',weekStartEat]]);
     const contract=await one(db,'wk_chart_capture_contracts_v1',
-      'id,source_key,provider_key,market,native_metric,expected_depth,adapter_version,admission_state',
+      'id,source_key,provider_key,market,native_metric,expected_depth,adapter_version,adapter_sha256,contract_version,admission_state',
       [['eq','id',attempt.contract_id]]);
+    const seal=sourceMethodSeal(contract,attempt,admission,sourceConstitutionVersion);
+    const prior=admittedSelections.get(contract.source_key);
+    need(prior===undefined||prior.seal===seal,'source_method_changed');
+    admittedSelections.set(contract.source_key,{contract,attempt,seal});
     const rows=await query(db,'wk_chart_capture_rows_v1',
       'id,attempt_id,source_rank,provider_track_id,title_observed,artist_observed,source_native_count',
       [['eq','attempt_id',receiptId]],200);
@@ -137,7 +195,14 @@ export async function readWk100AttestedRankingPrivate({
     return {typedLinks,legacyLinks,activeTracks,registryTracks,registryCredits,
       registryArtists,registryReleases};
   };
-  return prepareWk100AttestedPrivateRanking({weekStartEat,selectedReceiptIds,
+  const result=await prepareWk100AttestedPrivateRanking({weekStartEat,selectedReceiptIds,
     eligibilityPolicySha256,loadCapture,readPrivateBytes,loadRegistry,
     loadW5Draft:async()=>savedDraft,...(parseNativeRows?{parseNativeRows}:{})});
+  // Catch admission revocation/version drift during expensive byte+W5 replay.
+  // This is a second read, NOT an atomic DB snapshot or a stage/publish grant.
+  const finalAdmission=await readCurrentMethods(db);
+  for(const {contract,attempt,seal} of admittedSelections.values())
+    need(sourceMethodSeal(contract,attempt,finalAdmission,sourceConstitutionVersion)===seal,
+      'source_method_changed');
+  return result;
 }
