@@ -1,5 +1,14 @@
 # WAKILISHA 100: W7 Native-Evidence Methodology Proposal v2
 
+## Superseding ranking-primitive decision | 11 November 2026
+
+**Historical record, not active design or write authority.** The fixed [WAKILISHA 100 Ranking Primitive v1](./wakilisha-100-ranking-primitive-v1.md) supersedes the six-family editable percentage proposal, mandatory Spotify editorial inclusion, and all W7 "Save methodology" controls described below. Historical six-family proposals remain readable for audit, but new or changed candidate writes are rejected. Source-method approvals in Collect remain distinct evidence acquisition decisions and are not ranking formulas.
+
+**Current private research decision:** five immutable ranking source families (Apple Music, Shazam, Mdundo, YouTube, Audiomack), zero Spotify ranking points, one fixed ordinal composite, independent reproducibility and sensitivity review before real-source W8 integration. No calendar-week wait, no new hosted preview, no autonomous source or public Edition activation. The text below remains as the original W7 v2 research proposal for chronology and replay.
+
+---
+
+
 **Scope:** WK100 issue #1338, same draft PR #1356. **State:** candidate only. No reviewed numeric weights, approved formula, source promotion, freeze, scoring, or publication. This document does not authorize W8.
 
 ## This is not the legacy methodology
