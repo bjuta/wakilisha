@@ -42,8 +42,9 @@ const EVIDENCE_EXPLANATIONS:Record<Family,string>={
 function blankWeights():Record<Family,number|null>{
   return Object.fromEntries(FAMILIES.map(k=>[k,null])) as Record<Family,number|null>;
 }
-export function Wk100Methodology({week,sources=[],methods=[]}:{
+export function Wk100Methodology({week,sources=[],methods=[],reviewedSourceIds=[]}:{
   week:string;sources?:Source[];methods?:Wk100MethodDecision[];
+  reviewedSourceIds?:string[];
 }){
   const [revision,setRevision]=useState<Draft|null>(null);
   const [weights,setWeights]=useState<Record<Family,number|null>>(blankWeights);
@@ -99,9 +100,9 @@ export function Wk100Methodology({week,sources=[],methods=[]}:{
     });return true;}catch{return false;}
   },[candidate,revision,week]);
   const evidence=useMemo(()=>{
-    try{return reviewWk100MethodologyEvidence({weekStartEat:week,sources,methods});}
+    try{return reviewWk100MethodologyEvidence({weekStartEat:week,sources,methods,reviewedSourceIds});}
     catch{return null;}
-  },[week,sources,methods]);
+  },[week,sources,methods,reviewedSourceIds]);
   const saved=revision?.config.methodologyCandidate;
   const legacy=!!saved&&saved.schemaVersion!=='wk100-methodology-candidate/v2';
   const stale=!!saved&&saved.ingestPolicySha256!==revision?.config.ingestPolicySha256;
