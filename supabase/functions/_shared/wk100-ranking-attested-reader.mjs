@@ -1,7 +1,8 @@
 /**
  * WK100 fixed-ranking: restricted server data adapter, no Edge/browser route.
- * The caller MUST already have authenticated a privileged Admin/service actor,
- * verified source admission and resolved the saved W5 policy. The service DB
+ * The caller MUST separately verify source-method admission. This helper
+ * independently checks the signed-in actor's ingest, charts and Registry read
+ * permissions, then reads the current W5 draft through its existing RPC. The service DB
  * key and private Storage client must never leave the server. No writes.
  *
  * This adapter reuses the exact existing capture, private Storage and Registry
@@ -47,13 +48,32 @@ async function readInBatches(db,table,columns,where,key,ids,limit=400){
  * an independently verified eligibility evaluator are REQUIRED dependencies.
  */
 export async function readWk100AttestedRankingPrivate({
-  db,storage,weekStartEat,selectedReceiptIds,eligibilityPolicySha256,
-  evaluateW5Row,parserAccessBySource,parseNativeRows,
+  db,storage,caller,weekStartEat,selectedReceiptIds,eligibilityPolicySha256,
+  parserAccessBySource,parseNativeRows,
 }){
   need(db&&typeof db.from==='function'&&
-    storage&&typeof storage.from==='function','restricted_backend_missing');
-  need(typeof evaluateW5Row==='function'&&typeof parserAccessBySource==='function',
-    'policy_or_parser_authority_missing');
+    storage&&typeof storage.from==='function'&&caller&&
+    typeof caller.rpc==='function'&&typeof caller.auth?.getUser==='function',
+    'restricted_backend_missing');
+  need(typeof parserAccessBySource==='function','parser_authority_missing');
+  const identity=await caller.auth.getUser();
+  need(!identity.error&&UUID.test(identity.data?.user?.id),
+    'authenticated_caller_missing');
+  for(const required_capability of ['manage_ingest','manage_charts','view_registry']){
+    const result=await caller.rpc('current_user_has_capability',{required_capability});
+    need(!result.error&&result.data===true,'caller_capability_missing');
+  }
+  const loadedDraft=await caller.rpc('wk100_get_admin_draft_v1',{p_week:weekStartEat});
+  need(!loadedDraft.error&&loadedDraft.data,'current_w5_draft_unavailable');
+  const current=loadedDraft.data;
+  need(current.weekStartEat===weekStartEat&&Number.isSafeInteger(current.revision)&&
+    current.revision>0&&typeof current.updatedAt==='string'&&
+    Number.isFinite(Date.parse(current.updatedAt))&&current.config&&
+    current.config.ingestPolicySha256===eligibilityPolicySha256,
+    'current_w5_policy_mismatch');
+  const savedDraft={week_start_eat:weekStartEat,revision:current.revision,
+    updated_by:identity.data.user.id,updated_at:current.updatedAt,
+    config_json:current.config};
   const bucket=storage.from(BUCKET);
   need(bucket&&typeof bucket.download==='function','private_bucket_missing');
   const loadCapture=async receiptId=>{
@@ -85,7 +105,8 @@ export async function readWk100AttestedRankingPrivate({
     const provider=wk100RegistryProviderKey(contract.provider_key);
     const providerIds=uniq(rows.map(row=>row.provider_track_id)
       .filter(x=>typeof x==='string'&&x.length>0));
-    need(providerIds.length===rows.length,'provider_identity_unavailable_or_repeated');
+    // Missing native IDs are preserved as unresolved W4 positions, not
+    // invented identifiers or an excuse to compress the original ranks.
     const typedLinks=await readInBatches(db,'registry_track_provider_links',
       'provider_key,provider_track_id,track_id,match_status',
       [['eq','provider_key',provider],['eq','match_status','matched']],
@@ -98,9 +119,25 @@ export async function readWk100AttestedRankingPrivate({
       ...legacyLinks.map(l=>l.registry_entity_id)].filter(x=>typeof x==='string'&&UUID.test(x)));
     const activeTracks=trackIds.length?await readInBatches(db,'registry_tracks',
       'id,status,updated_at',[['eq','status','active']],'id',trackIds,400):[];
-    return {typedLinks,legacyLinks,activeTracks};
+    const resolvedIds=uniq(activeTracks.map(x=>x.id));
+    const registryTracks=resolvedIds.length?await readInBatches(db,'registry_tracks',
+      'id,slug,title,isrc,release_id,duration_ms,explicit,preview_url,status,metadata,updated_at',
+      [['eq','status','active']],'id',resolvedIds,400):[];
+    const registryCredits=resolvedIds.length?await readInBatches(db,'registry_track_artists',
+      'id,track_id,artist_id,role,is_primary,status',[],
+      'track_id',resolvedIds,400):[];
+    const artistIds=uniq(registryCredits.map(x=>x.artist_id).filter(x=>typeof x==='string'));
+    const releaseIds=uniq(registryTracks.map(x=>x.release_id).filter(x=>typeof x==='string'));
+    const registryArtists=artistIds.length?await readInBatches(db,'registry_artists',
+      'id,slug,status,origin_iso2,gender,artist_type,metadata',[],
+      'id',artistIds,400):[];
+    const registryReleases=releaseIds.length?await readInBatches(db,'registry_releases',
+      'id,slug,status,release_type,release_date,metadata,updated_at',[],
+      'id',releaseIds,400):[];
+    return {typedLinks,legacyLinks,activeTracks,registryTracks,registryCredits,
+      registryArtists,registryReleases};
   };
   return prepareWk100AttestedPrivateRanking({weekStartEat,selectedReceiptIds,
     eligibilityPolicySha256,loadCapture,readPrivateBytes,loadRegistry,
-    evaluateW5Row,...(parseNativeRows?{parseNativeRows}:{})});
+    loadW5Draft:async()=>savedDraft,...(parseNativeRows?{parseNativeRows}:{})});
 }
