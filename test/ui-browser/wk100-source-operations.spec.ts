@@ -1906,3 +1906,20 @@ test('W8 never displays a forged publishable or mismatched-week readback',async(
   await expect(rank.getByRole('table',{name:'Private WAKILISHA 100 Top 100'}))
     .toHaveCount(0);
 });
+
+
+test('W8B and W9 mobile recover through the native Collection and Qualify navigation',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  const ctx=await install(page);
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-09&stage=rank',
+    {waitUntil:'domcontentloaded'});
+  const rank=page.locator('[data-wk100-ranking]');
+  await expect(rank.locator('[data-wk100-w8b-incomplete]'))
+    .toBeVisible({timeout:20_000});
+  await expect(rank.locator('[data-wk100-w9-readiness]')).toBeVisible();
+  await expect(rank.getByRole('list',{name:'Ranking readiness checks'})
+    .getByRole('listitem')).toHaveCount(7);
+  await rank.getByRole('button',{name:'Review Eligibility'}).click();
+  await expect(page).toHaveURL(/stage=qualify/);
+  expect(ctx.unexpected).toEqual([]);
+});
