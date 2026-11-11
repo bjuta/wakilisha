@@ -259,6 +259,14 @@ test('restricted Supabase/Storage shaped reader uses exact receipts, not a lates
   assert.equal(read.rankingDigest,direct.rankingDigest);
   assert.equal(read.registrySnapshotSha256,direct.registrySnapshotSha256);
   assert.equal(read.canPublish,false);
+  assert.match(read.sourceAdmissionSnapshotSha256,/^[a-f0-9]{64}$/);
+  const sourceChanged=fakeServiceBackend(fixtureData);
+  sourceChanged.methodRows[0].evidence_sha256='f'.repeat(64);
+  const changed=await readServer(sourceChanged);
+  assert.notEqual(read.sourceAdmissionSnapshotSha256,
+    changed.sourceAdmissionSnapshotSha256);
+  // Method changes do not secretly modify the fixed ranking calculation.
+  assert.equal(read.rankingDigest,changed.rankingDigest);
   const wrong={...deps,selectedReceiptIds:deps.selectedReceiptIds.map((v,i)=>i? v:id(9999))};
   await assert.rejects(()=>readServer(wrong),/exact_row_missing_wk_chart_capture_attempts_v1/);
   await assert.rejects(()=>readServer({...deps,parserAccessBySource:null}),/parser_authority_missing/);
