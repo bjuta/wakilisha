@@ -29,7 +29,8 @@ const SHA=/^[a-f0-9]{64}$/;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const UTC=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 const MONDAY=/^\d{4}-\d{2}-\d{2}$/;
-const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&
+  Object.getPrototypeOf(x)===Object.prototype;
 const exact=(x,keys)=>object(x)&&Object.keys(x).length===keys.length&&
   Object.keys(x).every(key=>keys.includes(key));
 const fail=code=>{throw new Error('wk100_rank_'+code)};
@@ -64,6 +65,8 @@ const rowKeysCount=['recordingId','rank','nativeCount'];
  */
 export async function computeWk100PrivateRankingCandidate(input){
   if(!exact(input,['weekStartEat','eligibilityPolicySha256','registrySnapshotSha256','snapshots'])||
+    typeof input.eligibilityPolicySha256!=='string'||
+    typeof input.registrySnapshotSha256!=='string'||
     !SHA.test(input.eligibilityPolicySha256)||!SHA.test(input.registrySnapshotSha256)||
     !Array.isArray(input.snapshots)||input.snapshots.length!==11)
     fail('input_invalid');
@@ -75,6 +78,8 @@ export async function computeWk100PrivateRankingCandidate(input){
     if(!exact(raw,snapshotFields)||!S.families.includes(raw.family)||
       raw.market!=='KE'||raw.nativeMetric!==S.nativeMetrics[raw.family]||
       typeof raw.sourceKey!=='string'||!/^([a-z][a-z0-9_]{2,63})$/.test(raw.sourceKey)||
+      typeof raw.captureReceiptId!=='string'||
+      typeof raw.captureReceiptSha256!=='string'||
       !UUID.test(raw.captureReceiptId)||!SHA.test(raw.captureReceiptSha256)||
       !Number.isInteger(raw.declaredDepth)||raw.declaredDepth<100||raw.declaredDepth>1000||
       !Array.isArray(raw.rows)||raw.rows.length!==raw.declaredDepth)
@@ -121,6 +126,7 @@ export async function computeWk100PrivateRankingCandidate(input){
     const seenRecording=new Set(),seenRanks=new Set();
     const rows=raw.rows.map(row=>{
       if(!exact(row,raw.family==='youtube_ke'?rowKeysCount:rowKeysRank)||
+        typeof row.recordingId!=='string'||
         !UUID.test(row.recordingId)||!Number.isInteger(row.rank)||
         row.rank<1||row.rank>raw.declaredDepth||
         seenRecording.has(row.recordingId)||seenRanks.has(row.rank))
