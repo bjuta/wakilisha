@@ -1515,6 +1515,7 @@ test('WK100 W7 evidence review keeps authenticated source reports separate from 
   assert.deepEqual(empty.core.map(f=>f.family),[
     'apple_ke','shazam_ke','mdundo_ke','youtube_ke','audiomack_ke']);
   const original={
+    id:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
     sourceKey:'youtube_ke_public_weekly',provider:'youtube_ke',market:'KE',
     metric:'rank_and_count',version:'w7-evidence-v1',captureState:'succeeded',
     expectedDepth:100,observedDepth:100,receiptSha256:'a'.repeat(64),
@@ -1524,10 +1525,12 @@ test('WK100 W7 evidence review keeps authenticated source reports separate from 
   };
   const method={
     sourceKey:original.sourceKey,providerKey:'youtube_ke',
-    captureContractVersion:'w7-evidence-v1',decisionState:'collector_admitted',
+    captureContractVersion:'w7-evidence-v1',decisionRevision:1,
+    decisionState:'collector_admitted',
     hasMethodEvidence:true,nativePeriodAuthority:'provider_defined',
   };
-  const observed=review({weekStartEat,sources:[original],methods:[method]});
+  const observed=review({weekStartEat,sources:[original],methods:[method],
+    reviewedSourceIds:[original.id]});
   const yt=observed.core.find(row=>row.family==='youtube_ke');
   assert.equal(yt.originalCount,1);
   assert.equal(yt.methodCandidateCount,1);
@@ -1545,7 +1548,8 @@ test('WK100 W7 evidence review keeps authenticated source reports separate from 
     {nativePeriodAuthority:'unknown'},
     {observedDepth:101}, // Cannot exceed the actual capture contract depth.
   ]){
-    const next=review({weekStartEat,sources:[{...original,...edit}],methods:[method]});
+    const next=review({weekStartEat,sources:[{...original,...edit}],methods:[method],
+      reviewedSourceIds:[original.id]});
     assert.equal(next.chainCandidateFamilies,0);
     assert.equal(next.canScore,false);
   }
@@ -1555,7 +1559,8 @@ test('WK100 W7 evidence review keeps authenticated source reports separate from 
     {...method,captureContractVersion:'other'},
     {...method,nativePeriodAuthority:'observed_as_of'},
   ]){
-    const next=review({weekStartEat,sources:[original],methods:[m]});
+    const next=review({weekStartEat,sources:[original],methods:[m],
+      reviewedSourceIds:[original.id]});
     assert.equal(next.chainCandidateFamilies,0);
   }
   const asOf={...original,sourceKey:'apple_ke_public_top100',
@@ -1564,7 +1569,8 @@ test('WK100 W7 evidence review keeps authenticated source reports separate from 
     lastSuccessfulAt:'2026-11-11T08:00:00Z'};
   const asOfMethod={...method,sourceKey:asOf.sourceKey,providerKey:'apple_ke',
     nativePeriodAuthority:'observed_as_of'};
-  const asOfEvidence=review({weekStartEat,sources:[asOf],methods:[asOfMethod]});
+  const asOfEvidence=review({weekStartEat,sources:[asOf],methods:[asOfMethod],
+    reviewedSourceIds:[asOf.id]});
   const apple=asOfEvidence.core.find(x=>x.family==='apple_ke');
   assert.equal(apple.asOfCount,1);
   assert.equal(apple.chainCandidateCount,1);
@@ -1572,7 +1578,17 @@ test('WK100 W7 evidence review keeps authenticated source reports separate from 
   assert.equal(asOfEvidence.canScore,false);
   assert.equal(review({weekStartEat,sources:[
     {...asOf,lastSuccessfulAt:'2026-11-02T08:00:00Z'}],
-    methods:[asOfMethod]}).chainCandidateFamilies,0);
+    methods:[asOfMethod],reviewedSourceIds:[asOf.id]}).chainCandidateFamilies,0);
+  assert.equal(review({weekStartEat,sources:[original],methods:[method],
+    reviewedSourceIds:[]}).chainCandidateFamilies,0);
+  assert.equal(review({weekStartEat,sources:[original],
+    methods:[method,{...method,decisionRevision:2,decisionState:'paused'}],
+    reviewedSourceIds:[original.id]}).chainCandidateFamilies,0);
+  assert.equal(review({weekStartEat,sources:[original],
+    methods:[method,method],reviewedSourceIds:[original.id]}).chainCandidateFamilies,0);
+  assert.equal(review({weekStartEat,sources:[{...original,
+    nativePeriodStart:'2026-11-10T00:00:00'}],methods:[method],
+    reviewedSourceIds:[original.id]}).chainCandidateFamilies,0);
   assert.throws(()=>review({weekStartEat,sources:[original,original],methods:[method]}),
     /wk100_methodology_review_source_identity_invalid/);
   assert.throws(()=>review({weekStartEat:'2026-11-10'}),/review_week_invalid/);
