@@ -1593,3 +1593,100 @@ test('WK100 W7 evidence review keeps authenticated source reports separate from 
     /wk100_methodology_review_source_identity_invalid/);
   assert.throws(()=>review({weekStartEat:'2026-11-10'}),/review_week_invalid/);
 });
+
+
+test('WK100 fixed five-source ranking primitive replays two logical EAT weeks without waiting', async()=>{
+  const {computeWk100PrivateRankingCandidate:compute,
+    WK100_RANKING_SPECIFICATION_V1:spec}=await import(
+      '../../supabase/functions/_shared/wk100-ranking-primitive.mjs');
+  const sha=n=>n.toString(16).padStart(64,'0');
+  const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+  const addDays=(day,n)=>new Date(Date.parse(day+'T00:00:00Z')+n*86400000)
+    .toISOString().slice(0,10);
+  const make=(week,shift=0)=>{
+    let seq=400000;
+    const snapshots=[];
+    const families=['apple_ke','shazam_ke','mdundo_ke','youtube_ke','audiomack_ke'];
+    for(const family of families){
+      const repeat=family==='apple_ke'?7:1;
+      const size=family==='shazam_ke'?200:100;
+      for(let day=0;day<repeat;day++){
+        const sourceDay=family==='apple_ke'?addDays(week,day):addDays(week,4);
+        const observedAtUtc=sourceDay+'T11:00:00Z';
+        const rows=Array.from({length:size},(_,k)=>({
+          recordingId:uuid(((k+shift)%size)+1),rank:k+1,
+          ...(family==='youtube_ke'?{nativeCount:10000-k*12}:{})
+        }));
+        snapshots.push({family,sourceKey:family+'_weekly_kenya',
+          captureReceiptId:uuid(seq++),captureReceiptSha256:sha(seq),market:'KE',
+          nativeMetric:family==='youtube_ke'?'rank_and_count':'rank',
+          observedAtUtc,
+          nativePeriodAuthority:family==='youtube_ke'?'provider_declared_dates':'observed_as_of',
+          nativePeriodStartUtc:null,nativePeriodEndUtc:null,
+          providerPeriodStartDate:family==='youtube_ke'?addDays(week,-3):null,
+          providerPeriodEndDate:family==='youtube_ke'?addDays(week,3):null,
+          declaredDepth:size,rows});
+      }
+    }
+    return {weekStartEat:week,eligibilityPolicySha256:sha(99001),
+      registrySnapshotSha256:sha(99123),snapshots};
+  };
+  const first=make('2026-11-09');
+  const result=await compute(first);
+  assert.equal(result.status,'private_research_candidate');
+  assert.deepEqual(result.sourceFamilies,spec.families);
+  assert.equal(result.sourcePanelCount,11);
+  assert.equal(result.ranked.length,100);
+  assert.equal(result.ranked[0].rank,1);
+  assert.equal(result.ranked[0].recordingId,uuid(1));
+  assert.equal(result.ranked[0].score,100);
+  assert.equal(result.ranked[0].listedFamilyCount,5);
+  assert.equal(result.canStage,false);
+  assert.equal(result.canPublish,false);
+  assert.match(result.rankingDigest,/^[0-9a-f]{64}$/);
+  const shuffled=structuredClone(first);
+  shuffled.snapshots.reverse();
+  for(const panel of shuffled.snapshots)panel.rows.reverse();
+  const replay=await compute(shuffled);
+  assert.equal(result.rankingDigest,replay.rankingDigest);
+  assert.deepEqual(result.ranked,replay.ranked);
+  const next=await compute(make('2026-11-16',2));
+  assert.equal(next.ranked.length,100);
+  assert.notEqual(next.rankingDigest,result.rankingDigest);
+  assert.equal(next.canPublish,false);
+  // Real source lists are positional evidence, never inferred platform streams.
+  assert.equal(result.scoreMeaning,'ordinal_chart_traction_not_streams');
+  assert.equal(spec.spotifyContributionPercent,0);
+  const invalid=async (change,regex)=>{
+    const v=structuredClone(first);change(v);
+    await assert.rejects(()=>compute(v),regex);
+  };
+  await invalid(v=>v.snapshots.pop(),/wk100_rank_input_invalid/);
+  await invalid(v=>{v.snapshots[0].rows.pop()},/wk100_rank_snapshot_invalid/);
+  await invalid(v=>{v.snapshots[0].rows[0].rank=2},/wk100_rank_rank_or_identity_invalid/);
+  await invalid(v=>{v.snapshots[0].rows[0].recordingId='not-registry'},
+    /wk100_rank_rank_or_identity_invalid/);
+  await invalid(v=>{v.snapshots[0].nativeMetric='event_count'},/wk100_rank_snapshot_invalid/);
+  await invalid(v=>{v.snapshots[0].market='US'},/wk100_rank_snapshot_invalid/);
+  await invalid(v=>{v.snapshots[0].family='spotify_ke'},/wk100_rank_snapshot_invalid/);
+  await invalid(v=>{v.snapshots[1].captureReceiptId=v.snapshots[0].captureReceiptId},
+    /wk100_rank_receipt_reused/);
+  await invalid(v=>{v.snapshots[1].observedAtUtc=v.snapshots[0].observedAtUtc},
+    /wk100_rank_apple_daily_checkpoints_incomplete/);
+  await invalid(v=>{v.snapshots.find(x=>x.family==='youtube_ke').nativePeriodAuthority='observed_as_of'},
+    /wk100_rank_period_authority_invalid/);
+  await invalid(v=>{v.snapshots.find(x=>x.family==='youtube_ke').providerPeriodStartDate='2026-11-01'},
+    /wk100_rank_youtube_week_incorrect/);
+  await invalid(v=>{v.snapshots.find(x=>x.family==='youtube_ke').rows[5].nativeCount=999999},
+    /wk100_rank_youtube_count_order_invalid/);
+  await invalid(v=>{v.snapshots.find(x=>x.family==='shazam_ke').rows[0].nativeCount=500},
+    /wk100_rank_rank_or_identity_invalid/);
+  await invalid(v=>{v.snapshots.find(x=>x.family==='mdundo_ke').rows.pop()},
+    /wk100_rank_snapshot_invalid/);
+  await invalid(v=>{v.snapshots.find(x=>x.family==='audiomack_ke').observedAtUtc='2026-11-03T11:00:00Z'},
+    /wk100_rank_observation_outside_week/);
+  await invalid(v=>{v.sourceWeights={apple_ke:100}},/wk100_rank_input_invalid/);
+  const differentPolicy=structuredClone(first);
+  differentPolicy.eligibilityPolicySha256=sha(99002);
+  assert.notEqual((await compute(differentPolicy)).rankingDigest,result.rankingDigest);
+});
