@@ -124,6 +124,9 @@ export function inspectWk100RankWeek({weekStartEat,contracts=[],attempts=[]}={})
         !Number.isInteger(c.expected_depth)||c.expected_depth<100||
         c.expected_depth>200)issues.push('source_contract_incompatible');
       for(const a of sourceAttempts){
+        if(a.week_start_eat!==weekStartEat){
+          issues.push('attempt_week_mismatch');continue;
+        }
         if(typeof a.id!=='string'||a.status!=='succeeded')continue;
         if(a.observed_depth!==c.expected_depth||a.record_count!==c.expected_depth){
           issues.push('source_depth_incomplete');continue;
