@@ -105,8 +105,7 @@ Deno.serve(async req=>{
     const sources=inventory.families.map(({receiptIds,canReplay,...item})=>({
       ...item,checkpointCandidate:canReplay}));
     const gates=[
-      {id:'source',label:'Complete source observations',
-        state:inventory.readyForPrivateReplay?'verified':'blocked'},
+      {id:'source',label:'Complete source observations',state:'blocked'},
       {id:'method',label:'Current source admission and originals',state:'blocked'},
       {id:'eligibility',label:'Registry and saved eligibility policy',state:'blocked'},
       {id:'ranking',label:'Reproducible private Top 100',state:'blocked'},
@@ -189,10 +188,21 @@ Deno.serve(async req=>{
         registrySnapshotSha256:verified.registrySnapshotSha256,
         policySha256:verified.policySha256,
         heldPositions:verified.heldPositions,gates:verifiedGates});
-    }catch{
-      // Never reveal private Registry facts, raw object paths or reason details
-      // when the restricted W8 attestation refuses a source/policy/role.
-      return reply(req,200,{...base,reason:'private_attestation_not_verified'});
+    }catch(error){
+      // Only coarse, allowlisted remediation classes leave the service.
+      // Never expose raw paths, Registry facts, secret refs or SQL messages.
+      const code=error instanceof Error?error.message:'';
+      const reason=code.includes('source_method_')?
+        'source_method_not_current':
+        code.includes('policy')||code.includes('draft')?
+          'saved_policy_not_verified':
+          code.includes('registry')||code.includes('identity')||
+          code.includes('fewer_than_100')?
+            'canonical_recordings_not_ready':
+            code.includes('original')||code.includes('native')||
+            code.includes('receipt')?
+              'original_replay_not_verified':'private_attestation_not_verified';
+      return reply(req,200,{...base,reason});
     }
   }
   if(action==='original'){
