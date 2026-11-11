@@ -149,9 +149,13 @@ export function inspectWk100RankWeek({weekStartEat,contracts=[],attempts=[]}={})
         days.add(day);
         receipts.push({id:a.id,day});
       }
-      if(sourceAttempts.some(a=>a.status==='partial_depth'))
+      // Retain old failed originals, but never let an older failed attempt
+      // veto a later complete authorized checkpoint. Two complete checkpoints
+      // for the same day still fail as ambiguous; no latest-wins selection.
+      if(receipts.length<required&&sourceAttempts.some(a=>a.status==='partial_depth'))
         issues.push('partial_original_retained');
-      if(sourceAttempts.some(a=>a.native_period_authority==='unknown'))
+      if(receipts.length<required&&
+        sourceAttempts.some(a=>a.native_period_authority==='unknown'))
         issues.push('unknown_period_receipt_retained');
       if(sourceAttempts.length>0&&receipts.length===0)
         issues.push('no_qualified_checkpoint');
