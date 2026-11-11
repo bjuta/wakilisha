@@ -260,6 +260,9 @@ test('restricted Supabase/Storage shaped reader uses exact receipts, not a lates
   assert.equal(read.registrySnapshotSha256,direct.registrySnapshotSha256);
   assert.equal(read.canPublish,false);
   assert.match(read.sourceAdmissionSnapshotSha256,/^[a-f0-9]{64}$/);
+  const reordered=await readServer({...deps,selectedReceiptIds:[...deps.selectedReceiptIds].reverse()});
+  assert.equal(read.sourceAdmissionSnapshotSha256,
+    reordered.sourceAdmissionSnapshotSha256);
   const sourceChanged=fakeServiceBackend(fixtureData);
   sourceChanged.methodRows[0].evidence_sha256='f'.repeat(64);
   const changed=await readServer(sourceChanged);
