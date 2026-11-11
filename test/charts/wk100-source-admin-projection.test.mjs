@@ -1500,3 +1500,80 @@ test('WK100 W6 requires applied case proof and independent full-receipt readback
   assert.match(ui,/data-wk100-canonical-application/);
 });
 
+
+
+test('WK100 W7 evidence review keeps authenticated source reports separate from qualification',async()=>{
+  const {reviewWk100MethodologyEvidence:review}=await import(
+    '../../supabase/functions/_shared/wk100-methodology-candidate.mjs');
+  const weekStartEat='2026-11-09';
+  const empty=review({weekStartEat});
+  assert.equal(empty.core.length,5);
+  assert.equal(empty.chainCandidateFamilies,0);
+  assert.equal(empty.sourceCoverageConfirmed,false);
+  assert.equal(empty.spotifyEditorialProven,false);
+  assert.deepEqual([empty.canScore,empty.canFreeze,empty.canPublish],[false,false,false]);
+  assert.deepEqual(empty.core.map(f=>f.family),[
+    'apple_ke','shazam_ke','mdundo_ke','youtube_ke','audiomack_ke']);
+  const original={
+    sourceKey:'youtube_ke_public_weekly',provider:'youtube_ke',market:'KE',
+    metric:'rank_and_count',version:'w7-evidence-v1',captureState:'succeeded',
+    expectedDepth:100,observedDepth:100,receiptSha256:'a'.repeat(64),
+    nativePeriodAuthority:'provider_defined',
+    nativePeriodStart:'2026-11-10T00:00:00Z',
+    nativePeriodEnd:'2026-11-11T00:00:00Z',lastSuccessfulAt:'2026-11-11T00:00:00Z',
+  };
+  const method={
+    sourceKey:original.sourceKey,providerKey:'youtube_ke',
+    captureContractVersion:'w7-evidence-v1',decisionState:'collector_admitted',
+    hasMethodEvidence:true,nativePeriodAuthority:'provider_defined',
+  };
+  const observed=review({weekStartEat,sources:[original],methods:[method]});
+  const yt=observed.core.find(row=>row.family==='youtube_ke');
+  assert.equal(yt.originalCount,1);
+  assert.equal(yt.methodCandidateCount,1);
+  assert.equal(yt.nativeWindowCount,1);
+  assert.equal(yt.chainCandidateCount,1);
+  assert(yt.holds.includes('registry_identity_and_week_alignment_unattested'));
+  assert.equal(observed.chainCandidateFamilies,1);
+  assert.equal(observed.sourceCoverageConfirmed,false);
+  assert.deepEqual([observed.canScore,observed.canFreeze,observed.canPublish],[false,false,false]);
+  for(const edit of [
+    {metric:'rank'}, // Playlist position is not a YouTube native view count.
+    {receiptSha256:'bad'}, // A claim without a valid original digest is held.
+    {captureState:'parse_failed'},
+    {nativePeriodStart:'2026-11-02T00:00:00Z'}, // Stale week is not admitted.
+    {nativePeriodAuthority:'unknown'},
+    {observedDepth:101}, // Cannot exceed the actual capture contract depth.
+  ]){
+    const next=review({weekStartEat,sources:[{...original,...edit}],methods:[method]});
+    assert.equal(next.chainCandidateFamilies,0);
+    assert.equal(next.canScore,false);
+  }
+  for(const m of [
+    {...method,decisionState:'paused'},
+    {...method,hasMethodEvidence:false},
+    {...method,captureContractVersion:'other'},
+    {...method,nativePeriodAuthority:'observed_as_of'},
+  ]){
+    const next=review({weekStartEat,sources:[original],methods:[m]});
+    assert.equal(next.chainCandidateFamilies,0);
+  }
+  const asOf={...original,sourceKey:'apple_ke_public_top100',
+    provider:'apple_ke',metric:'rank',nativePeriodAuthority:'unknown',
+    nativePeriodStart:null,nativePeriodEnd:null,
+    lastSuccessfulAt:'2026-11-11T08:00:00Z'};
+  const asOfMethod={...method,sourceKey:asOf.sourceKey,providerKey:'apple_ke',
+    nativePeriodAuthority:'observed_as_of'};
+  const asOfEvidence=review({weekStartEat,sources:[asOf],methods:[asOfMethod]});
+  const apple=asOfEvidence.core.find(x=>x.family==='apple_ke');
+  assert.equal(apple.asOfCount,1);
+  assert.equal(apple.chainCandidateCount,1);
+  assert(apple.holds.includes('as_of_not_weekly_total'));
+  assert.equal(asOfEvidence.canScore,false);
+  assert.equal(review({weekStartEat,sources:[
+    {...asOf,lastSuccessfulAt:'2026-11-02T08:00:00Z'}],
+    methods:[asOfMethod]}).chainCandidateFamilies,0);
+  assert.throws(()=>review({weekStartEat,sources:[original,original],methods:[method]}),
+    /wk100_methodology_review_source_identity_invalid/);
+  assert.throws(()=>review({weekStartEat:'2026-11-10'}),/review_week_invalid/);
+});
