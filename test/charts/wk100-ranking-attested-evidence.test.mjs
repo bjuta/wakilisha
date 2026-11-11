@@ -350,6 +350,18 @@ function completeW8Week(){
   }
   return {weekStartEat:W,contracts,attempts};
 }
+test('W8 reader rejects saved W5 policy revision changed during source replay',async()=>{
+  const deps=fakeServiceBackend(fixture());
+  const rpc=deps.caller.rpc;let draftReads=0;
+  deps.caller.rpc=async (method,args)=>{
+    const response=await rpc(method,args);
+    if(method==='wk100_get_admin_draft_v1'&&++draftReads===2)
+      return {data:{...response.data,revision:2},error:null};
+    return response;
+  };
+  await assert.rejects(()=>readServer(deps),/current_w5_policy_changed/);
+  assert.equal(draftReads,2);
+});
 test('W8B/W9 deterministic week selection requires 11 actual complete checkpoints',()=>{
   const clean=completeW8Week();
   const ready=inspectWk100RankWeek(clean);
