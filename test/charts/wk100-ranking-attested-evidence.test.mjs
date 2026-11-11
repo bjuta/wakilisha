@@ -11,7 +11,51 @@ const sha=x=>createHash('sha256').update(x).digest('hex');
 const plusDay=(d,n)=>new Date(Date.parse(d+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);
 const families=['apple_ke','shazam_ke','mdundo_ke','youtube_ke','audiomack_ke'];
 const W='2026-11-09';
-const POLICY='a'.repeat(64);
+// This is a valid synthetic saved policy, not a bypassed W5 verdict.
+const PROFILE={
+  id:'wk100-test',name:'WK100 test',slug:'wk100-test',
+  artistOriginEligibility:{mode:'any',countries:[],regions:[]},
+  artistGenderEligibility:{mode:'any'},
+  artistTypeEligibility:{mode:'any'},
+  releaseEligibility:{releaseTypes:['single'],includeReissues:true,includeRemixes:true,
+    includeAcousticVersions:true,includeInstrumentals:true},
+  trackEligibility:{explicitAllowed:true,requireIsrc:false,requirePreview:false},
+  collaborationRules:{allowFeaturedArtists:true,countFeaturedArtistNationality:false,
+    primaryArtistMustMatchEligibility:false,allArtistsMustMatchEligibility:false},
+  sourceRules:{allowedProviders:['apple_music','shazam','mdundo','youtube','audiomack'],
+    requireAtLeastOneProviderId:false,requireProviderAvailabilityInMarket:false},
+  reviewRules:{requireManualReviewForUnknownGender:false,
+    requireManualReviewForUnknownNationality:false,requireManualReviewForUnknownArtistType:false,
+    requireManualReviewForGroups:false,allowUnknownMetadataWithWarning:true},
+};
+const SCOPE={id:'ke',name:'Kenya',slug:'ke',primaryMarketSlug:'KE',
+  includedMarkets:[{marketSlug:'KE',countryCode:'KE'}],
+  aggregationMode:'combined',artistOriginCountries:[],artistOriginUnknownMode:'warn'};
+const canonical=v=>JSON.stringify(v,(_key,value)=>
+  value&&typeof value==='object'&&!Array.isArray(value)
+    ?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b))):value);
+const POLICY=sha(canonical({profileId:PROFILE.id,marketScopeId:SCOPE.id,
+  eligibilityProfileSnapshot:PROFILE,marketScopeSnapshot:SCOPE}));
+const draft=()=>({week_start_eat:W,revision:1,updated_by:id(999),
+  updated_at:'2026-11-11T11:00:00Z',config_json:{
+    schemaVersion:'wk100-admin-edition-config/v1',programId:'top100',
+    weekStartEat:W,market:'KE',chartSize:100,
+    eligibilityProfileId:PROFILE.id,marketScopeId:SCOPE.id,
+    eligibilityProfileSnapshot:PROFILE,marketScopeSnapshot:SCOPE,
+    ingestPolicySha256:POLICY}});
+function factsForRows(rows){
+  const ids=[...new Set(rows.map(r=>Number(r.provider_track_id?.slice(7)))
+    .filter(Number.isInteger))];
+  return {
+    registryTracks:ids.map(n=>({id:id(n),status:'active',title:'Song '+n,
+      release_id:id(50000+n),explicit:false,metadata:{},updated_at:'2026-11-11T10:00:00Z'})),
+    registryCredits:ids.map(n=>({track_id:id(n),artist_id:id(20000+n),
+      status:'active',role:'primary_artist',is_primary:true})),
+    registryArtists:ids.map(n=>({id:id(20000+n),status:'active',origin_iso2:'KE'})),
+    registryReleases:ids.map(n=>({id:id(50000+n),status:'active',
+      release_type:'single',release_date:'2026-09-01',metadata:{}})),
+  };
+}
 function fixture(week=W){
   const panels=new Map(),originals=new Map();let receiptSeq=10000,rowSeq=40000,contractSeq=9000;
   for(const family of families){
@@ -53,13 +97,15 @@ function adapters(f){return {weekStartEat:W,selectedReceiptIds:f.ids,
   loadCapture:async id=>f.panels.get(id),
   readPrivateBytes:async attempt=>f.originals.get(attempt.id),
   loadRegistry:async ({contract,rows})=>({
-    typedLinks:rows.map(row=>({provider_key:contract.provider_key==='apple_ke'?'apple_music':contract.provider_key,
+    typedLinks:rows.filter(row=>row.provider_track_id).map(row=>({
+      provider_key:contract.provider_key==='apple_ke'?'apple_music':contract.provider_key,
       provider_track_id:row.provider_track_id,track_id:id(Number(row.provider_track_id.slice(7))),
       match_status:'matched'})),legacyLinks:[],
-    activeTracks:rows.map(row=>({id:id(Number(row.provider_track_id.slice(7))),status:'active'})),
+    activeTracks:rows.filter(row=>row.provider_track_id).map(row=>({
+      id:id(Number(row.provider_track_id.slice(7))),status:'active'})),
+    ...factsForRows(rows),
   }),
-  evaluateW5Row:async ({policySha256})=>({outcome:'ELIGIBLE',policySha256,
-    registryFactsSha256:'b'.repeat(64)}),
+  loadW5Draft:async()=>draft(),
   // The repository's real native parser is selected in production. Test input
   // deliberately uses a synthetic JSON parser; it does not attest providers.
   parseNativeRows:async bytes=>JSON.parse(new TextDecoder().decode(bytes)),
@@ -77,12 +123,37 @@ test('server-only handoff binds 11 exact receipts, originals, Registry and W5',a
   const ordered=await prepare({...config,selectedReceiptIds:[...f.ids].reverse()});
   assert.equal(result.rankingDigest,ordered.rankingDigest);
   assert.equal(result.registrySnapshotSha256,ordered.registrySnapshotSha256);
-  const changed=await prepare({...config,evaluateW5Row:async (...args)=>
-    ({...await config.evaluateW5Row(...args),registryFactsSha256:'c'.repeat(64)})});
+  const changed=await prepare({...config,loadRegistry:async arg=>{
+    const original=await config.loadRegistry(arg);
+    return {...original,registryTracks:original.registryTracks.map((track,i)=>
+      i===0?{...track,title:'Accepted corrected title'}:track)};
+  }});
   assert.notEqual(result.registrySnapshotSha256,changed.registrySnapshotSha256);
   assert.notEqual(result.rankingDigest,changed.rankingDigest);
 });
 
+test('original excluded and unresolved ranks remain non-scoring without renumbering',async()=>{
+  const f=fixture(),a=adapters(f),load=a.loadRegistry;
+  a.loadRegistry=async arg=>{
+    const base=await load(arg);
+    const first=arg.rows[0].provider_track_id;
+    return {...base,
+      typedLinks:base.typedLinks.filter(link=>link.provider_track_id!==first),
+      registryReleases:base.registryReleases.map((release,i)=>i===1
+        ?{...release,release_type:'album'}:release)};
+  };
+  const result=await prepare(a);
+  assert.equal(result.canPublish,false);
+  assert.equal(result.privateRanking.ranked.length,100);
+  assert(result.heldPositions.REVIEW_REQUIRED>=11);
+  assert(result.heldPositions.EXCLUDED>=11);
+  assert.equal(result.privateRanking.ranked.find(x=>x.recordingId===id(1)),undefined);
+  // Original positions 1 and 2 are retained; rank 3 is not promoted to rank 1.
+  const originalFirstScore=result.privateRanking.ranked.find(x=>x.recordingId===id(3));
+  assert(originalFirstScore&&originalFirstScore.score<100);
+  const reordered=await prepare({...a,selectedReceiptIds:[...f.ids].reverse()});
+  assert.equal(result.rankingDigest,reordered.rankingDigest);
+});
 async function deny(change,expected){
   const f=fixture(),a=adapters(f);change(f,a);
   await assert.rejects(()=>prepare(a),expected);
@@ -98,11 +169,12 @@ test('private handoff fails closed on provenance, native bytes and policy',async
   await deny((f,a)=>{f.panels.get(f.ids[0]).attempt.raw_object_key='../../public.json'},/receipt_incomplete_or_unbound/);
   await deny((f,a)=>{f.panels.get(f.ids[0]).attempt.raw_object_key=f.panels.get(f.ids[0]).attempt.raw_object_key.replace('apple_ke_kenya','mdundo_ke_kenya')},/receipt_incomplete_or_unbound/);
   await deny((f,a)=>{f.panels.get(f.ids[0]).contract.provider_key='spotify_ke'},/capture_contract_invalid/);
-  await deny((f,a)=>{a.loadRegistry=async()=>({typedLinks:[],legacyLinks:[],activeTracks:[]})},/registry_identity_unresolved/);
-  await deny((f,a)=>{a.evaluateW5Row=async()=>({outcome:'EXCLUDED',policySha256:POLICY,
-    registryFactsSha256:'b'.repeat(64)})},/eligibility_or_registry_facts_unverified/);
-  await deny((f,a)=>{a.evaluateW5Row=async()=>({outcome:'ELIGIBLE',policySha256:'f'.repeat(64),
-    registryFactsSha256:'b'.repeat(64)})},/eligibility_or_registry_facts_unverified/);
+  await deny((f,a)=>{a.loadRegistry=async()=>({typedLinks:[],legacyLinks:[],
+    activeTracks:[],registryTracks:[],registryCredits:[],registryArtists:[],registryReleases:[]})},
+    /fewer_than_100_recordings/);
+  await deny((f,a)=>{a.eligibilityPolicySha256='f'.repeat(64)},
+    /saved_w5_policy_missing_or_stale/);
+  await deny((f,a)=>{a.loadW5Draft=null},/restricted_server_dependencies_missing/);
   await deny((f,a)=>{f.panels.get(f.ids[9]).attempt.native_period_evidence_ref='different'},/youtube_period_original_unbound/);
   await deny((f,a)=>{f.panels.get(f.ids[9]).rows[0].source_native_count='9000000000000000000000'},
     /native_original_does_not_match_database/);
@@ -119,7 +191,17 @@ function fakeServiceBackend(f){
         provider_key:family==='apple_ke'?'apple_music':family,
         provider_track_id:'native-'+(i+1),track_id:id(i+1),match_status:'matched'}))),
     provider_entity_links:[],
-    registry_tracks:Array.from({length:200},(_,i)=>({id:id(i+1),status:'active',updated_at:'2026-11-11T10:00:00Z'})),
+    registry_tracks:Array.from({length:200},(_,i)=>({
+      id:id(i+1),status:'active',title:'Song '+(i+1),release_id:id(50001+i),
+      explicit:false,metadata:{},updated_at:'2026-11-11T10:00:00Z'})),
+    registry_track_artists:Array.from({length:200},(_,i)=>({
+      track_id:id(i+1),artist_id:id(20001+i),status:'active',
+      role:'primary_artist',is_primary:true})),
+    registry_artists:Array.from({length:200},(_,i)=>({
+      id:id(20001+i),status:'active',origin_iso2:'KE'})),
+    registry_releases:Array.from({length:200},(_,i)=>({
+      id:id(50001+i),status:'active',release_type:'single',
+      release_date:'2026-09-01',metadata:{}})),
   };
   const db={from(table){
     assert(table in tables,table);
@@ -137,8 +219,16 @@ function fakeServiceBackend(f){
   }};
   return {db,storage,weekStartEat:W,selectedReceiptIds:f.ids,
     eligibilityPolicySha256:POLICY,
-    evaluateW5Row:async ({policySha256})=>({outcome:'ELIGIBLE',policySha256,
-      registryFactsSha256:'b'.repeat(64)}),
+    caller:{auth:{getUser:async()=>({data:{user:{id:id(999)}},error:null})},
+      rpc:async (method,args)=>{
+        if(method==='current_user_has_capability')
+          return {data:['manage_ingest','manage_charts','view_registry']
+            .includes(args.required_capability),error:null};
+        if(method==='wk100_get_admin_draft_v1')
+          return {data:{weekStartEat:W,revision:1,updatedAt:'2026-11-11T11:00:00Z',
+            config:draft().config_json},error:null};
+        throw Error('Unexpected RPC '+method);
+      }},
     parserAccessBySource:async (contract,attempt)=>
       f.panels.get(attempt.id).parserAccess,
     parseNativeRows:async bytes=>JSON.parse(new TextDecoder().decode(bytes))};
@@ -152,7 +242,11 @@ test('restricted Supabase/Storage shaped reader uses exact receipts, not a lates
   assert.equal(read.canPublish,false);
   const wrong={...deps,selectedReceiptIds:deps.selectedReceiptIds.map((v,i)=>i? v:id(9999))};
   await assert.rejects(()=>readServer(wrong),/exact_row_missing_wk_chart_capture_attempts_v1/);
-  await assert.rejects(()=>readServer({...deps,parserAccessBySource:null}),/policy_or_parser_authority_missing/);
+  await assert.rejects(()=>readServer({...deps,parserAccessBySource:null}),/parser_authority_missing/);
+  await assert.rejects(()=>readServer({...deps,caller:{...deps.caller,
+    rpc:async()=>({data:false,error:null})}}),/caller_capability_missing/);
+  await assert.rejects(()=>readServer({...deps,eligibilityPolicySha256:'f'.repeat(64)}),
+    /current_w5_policy_mismatch/);
   await assert.rejects(()=>readServer({...deps,storage:{from:()=>({download:async()=>({error:new Error('denied')})})}}),
     /private_raw_unavailable/);
 });
