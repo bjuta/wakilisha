@@ -1826,6 +1826,16 @@ test('W7 shows one fixed ranking and no editable method contribution controls',a
 });
 
 
+// React StrictMode intentionally replays mount effects in the development
+// Chromium harness. Both requests must be the SAME authorized, read-only
+// query; repeated or cross-week network activity is never accepted.
+function expectBoundedPrivateRankingReads(reads:unknown[],week:string){
+  expect(reads.length).toBeGreaterThanOrEqual(1);
+  expect(reads.length).toBeLessThanOrEqual(2);
+  for(const value of reads)
+    expect(value).toEqual({action:'read_private_ranking',weekStartEat:week});
+}
+
 test('W8B and W9 show genuine checkpoint gaps without inventing a private Top 100',async({page})=>{
   const requests=await install(page);
   await page.goto('/admin/charts/wk100-operations?week=2026-11-09&stage=rank',
@@ -1837,7 +1847,7 @@ test('W8B and W9 show genuine checkpoint gaps without inventing a private Top 10
   await expect(rank.getByRole('table',{name:'Private WAKILISHA 100 Top 100'})).toHaveCount(0);
   await expect(rank.locator('[data-wk100-w9-readiness]')).toBeVisible();
   await expect(rank.getByText('Private staging blocked. Publication blocked.')).toBeVisible();
-  expect(requests.rankingReads).toHaveLength(1);
+  expectBoundedPrivateRankingReads(requests.rankingReads,'2026-11-09');
   expect(requests.unexpected).toEqual([]);
 });
 test('W8 and W8S explain 100 synthetic private rows but do not offer staging or publishing',async({page})=>{
@@ -1888,7 +1898,7 @@ test('W8 and W8S explain 100 synthetic private rows but do not offer staging or 
   await expect(rank.locator('[data-wk100-w9-readiness]')
     .getByText('Private staging blocked. Publication blocked.')).toBeVisible();
   await expect(rank.getByRole('button',{name:/publish|stage/i})).toHaveCount(0);
-  expect(ctx.rankingReads).toHaveLength(1);
+  expectBoundedPrivateRankingReads(ctx.rankingReads,'2026-11-09');
   expect(ctx.unexpected).toEqual([]);
 });
 test('W8 never displays a forged publishable or mismatched-week readback',async({page})=>{
