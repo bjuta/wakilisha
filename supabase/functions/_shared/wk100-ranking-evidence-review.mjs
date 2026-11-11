@@ -89,3 +89,91 @@ export function reviewWk100RankingEvidence({weekStartEat,sources=[],methods=[],r
     concentrationAndSensitivityApproved:false,independentApprovalRecorded:false,
     canScore:false,canFreeze:false,canPublish:false});
 }
+
+
+/**
+ * W8B/W9 server-side source checkpoint inventory. This is a deterministic,
+ * read-only candidate selector, NOT source admission or eligibility.
+ * Only the trusted W8 reader can verify the exact bytes, native parser, W5
+ * policy, current service-only method admission and Registry facts.
+ * Never select "latest" or silently replace a missing daily checkpoint.
+ */
+export function inspectWk100RankWeek({weekStartEat,contracts=[],attempts=[]}={}){
+  const start=startOfEatWeek(weekStartEat),end=start+7*86400000;
+  if(!Array.isArray(contracts)||!Array.isArray(attempts)||
+    contracts.length>100||attempts.length>1000||
+    contracts.some(x=>!obj(x))||attempts.some(x=>!obj(x)))
+    hold('checkpoint_ledger_unavailable');
+  const contractIds=new Set();
+  for(const c of contracts){
+    if(typeof c.id!=='string'||contractIds.has(c.id))
+      hold('contract_ledger_ambiguous');
+    contractIds.add(c.id);
+  }
+  const families=RANK.families.map(family=>{
+    const required=RANK.expectedSnapshots[family];
+    const relevant=contracts.filter(c=>c.provider_key===family&&c.market==='KE');
+    const sourceAttempts=attempts.filter(a=>relevant.some(c=>c.id===a.contract_id));
+    const issues=[];
+    if(!relevant.length)issues.push('source_not_enrolled');
+    if(relevant.length>1)issues.push('multiple_source_contracts');
+    const receipts=[],days=new Set();
+    if(relevant.length===1){
+      const c=relevant[0];
+      if(c.admission_state!=='candidate'||c.native_metric!==RANK.nativeMetrics[family]||
+        !Number.isInteger(c.expected_depth)||c.expected_depth<100||
+        c.expected_depth>200)issues.push('source_contract_incompatible');
+      for(const a of sourceAttempts){
+        if(typeof a.id!=='string'||a.status!=='succeeded')continue;
+        if(a.observed_depth!==c.expected_depth||a.record_count!==c.expected_depth){
+          issues.push('source_depth_incomplete');continue;
+        }
+        const at=Date.parse(a.fetched_at);
+        if(!isStamped(a.fetched_at)||at<start||at>=end){
+          issues.push('observation_week_unverified');continue;
+        }
+        const period=a.native_period_authority;
+        const asOf=period==='observed_as_of'&&family!=='youtube_ke'&&
+          a.native_period_start==null&&a.native_period_end==null;
+        const nativePeriod=period==='provider_defined'&&
+          isStamped(a.native_period_start)&&isStamped(a.native_period_end)&&
+          typeof a.native_period_evidence_ref==='string'&&
+          a.native_period_evidence_ref.length>=3&&
+          Date.parse(a.native_period_start)<Date.parse(a.native_period_end)&&
+          Date.parse(a.native_period_end)<=at;
+        if(!asOf&&!nativePeriod){
+          issues.push('native_period_unverified');continue;
+        }
+        const day=new Date(at+3*3600000).toISOString().slice(0,10);
+        if(days.has(day))issues.push('duplicate_day_or_receipt');
+        days.add(day);
+        receipts.push({id:a.id,day});
+      }
+      if(sourceAttempts.some(a=>a.status==='partial_depth'))
+        issues.push('partial_original_retained');
+      if(sourceAttempts.some(a=>a.native_period_authority==='unknown'))
+        issues.push('unknown_period_receipt_retained');
+      if(sourceAttempts.length>0&&receipts.length===0)
+        issues.push('no_qualified_checkpoint');
+    }
+    if(receipts.length!==required)issues.push('checkpoints_missing');
+    if(new Set(receipts.map(x=>x.id)).size!==receipts.length)
+      issues.push('duplicate_receipt');
+    // No historical native period or W5 result is inferred from Admin health.
+    const selected=issues.length===0?receipts.sort((a,b)=>
+      a.day.localeCompare(b.day)).map(x=>x.id):[];
+    return Object.freeze({family,required,
+      observedAttempts:sourceAttempts.length,eligibleCheckpointCount:receipts.length,
+      observedDays:days.size,issues:Object.freeze([...new Set(issues)]),
+      receiptIds:Object.freeze(selected),canReplay:selected.length===required});
+  });
+  const selectedReceiptIds=families.flatMap(f=>f.receiptIds);
+  return Object.freeze({schemaVersion:'wk100-ranking-week-inventory/v1',
+    weekStartEat,requiredReceiptCount:11,
+    observedReceiptCount:attempts.filter(a=>
+      contracts.some(c=>c.id===a.contract_id&&RANK.families.includes(c.provider_key))).length,
+    families:Object.freeze(families),selectedReceiptIds:Object.freeze(selectedReceiptIds),
+    readyForPrivateReplay:selectedReceiptIds.length===11&&
+      families.every(f=>f.canReplay),
+    canStage:false,canPublish:false});
+}
