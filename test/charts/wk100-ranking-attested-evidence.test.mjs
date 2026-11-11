@@ -11,6 +11,7 @@ const sha=x=>createHash('sha256').update(x).digest('hex');
 const plusDay=(d,n)=>new Date(Date.parse(d+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);
 const families=['apple_ke','shazam_ke','mdundo_ke','youtube_ke','audiomack_ke'];
 const W='2026-11-09';
+const AUTH_EXPIRES=new Date(Date.now()+30*86_400_000).toISOString();
 // This is a valid synthetic saved policy, not a bypassed W5 verdict.
 const PROFILE={
   id:'wk100-test',name:'WK100 test',slug:'wk100-test',
@@ -214,8 +215,7 @@ function fakeServiceBackend(f){
     native_period_evidence_ref:contract.provider_key==='youtube_ke'
       ?'weekly:20261109:20261115:ke':'observed_as_of/kenya_research',
     endpoint_sha256:'d'.repeat(64),evidence_sha256:'e'.repeat(64),
-    authorization_ref:'reviewed_source_method',authorization_expires_at:
-      new Date(Date.now()+30*86_400_000).toISOString(),
+    authorization_ref:'reviewed_source_method',authorization_expires_at:AUTH_EXPIRES,
     constitution_version:'wk100-fixed-v1',
   }));
   const db={async rpc(name){
