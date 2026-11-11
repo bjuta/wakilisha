@@ -3,7 +3,7 @@ import {WkSurface} from '@/components/design-system/primitives/Surface';
 import {WkStateBadge} from '@/components/design-system/primitives/StateBadge';
 import type {Wk100MethodDecision} from './SourceMethodReviewForm';
 import {WK100_RANKING_SPECIFICATION_V1} from '@/../supabase/functions/_shared/wk100-ranking-primitive.mjs';
-import {reviewWk100MethodologyEvidence} from '@/../supabase/functions/_shared/wk100-methodology-candidate.mjs';
+import {reviewWk100RankingEvidence} from '@/../supabase/functions/_shared/wk100-ranking-evidence-review.mjs';
 
 type Source={id:string;provider:string;sourceKey:string;market:string;metric:string;
   version:string;captureState:string;expectedDepth:number;observedDepth:number;
@@ -23,7 +23,7 @@ export function Wk100Ranking({week,sources=[],methods=[],reviewedSourceIds=[]}:{
   reviewedSourceIds?:string[];
 }){
   const evidence=useMemo(()=>{
-    try{return reviewWk100MethodologyEvidence({
+    try{return reviewWk100RankingEvidence({
       weekStartEat:week,sources,methods,reviewedSourceIds,
     });}catch{return null;}
   },[week,sources,methods,reviewedSourceIds]);
