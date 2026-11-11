@@ -878,6 +878,14 @@ async function handleWk100SaveAdminDraft(
   const prior=previous.data as {revision?:number;config?:Record<string,unknown>}|null;
   if ((prior?.revision??0)!==Number(revision))
     return json(req,{error:"draft_revision_conflict",retryable:false},409);
+  // Ranking is now a fixed research primitive, not an editable week setting.
+  // Older proposal payloads stay in the historical draft for audit/replay, but
+  // no caller may insert or replace them through this active route.
+  if (explicitMethodologyProposal&&
+      (prior?.config?.methodologyCandidate===undefined||
+       canonicalJSON(config.methodologyCandidate)!==
+       canonicalJSON(prior.config.methodologyCandidate)))
+    return json(req,{error:"wk100_methodology_write_retired"},400);
   if (!explicitMethodologyProposal&&
       prior?.config?.methodologyCandidate!==undefined)
     config.methodologyCandidate=prior.config.methodologyCandidate;
