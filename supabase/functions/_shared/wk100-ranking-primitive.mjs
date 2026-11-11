@@ -57,6 +57,11 @@ const snapshotFields=['family','sourceKey','captureReceiptId','captureReceiptSha
   'declaredDepth','rows'];
 const rowKeysRank=['recordingId','rank'];
 const rowKeysCount=['recordingId','rank','nativeCount'];
+// Full original positions stay intact when Registry/W5 cannot grant credit.
+// Held rows carry no canonical recording ID into the mathematical ranking.
+const heldKeysRank=['recordingId','rank','disposition'];
+const heldKeysCount=['recordingId','rank','nativeCount','disposition'];
+const heldDispositions=new Set(['EXCLUDED','REVIEW_REQUIRED','CONFLICTED']);
 
 /**
  * Compute a deterministically ranked PRIVATE candidate. The input must come
@@ -126,18 +131,23 @@ export async function computeWk100PrivateRankingCandidate(input){
     }else fail('period_authority_invalid');
     const seenRecording=new Set(),seenRanks=new Set();
     const rows=raw.rows.map(row=>{
-      if(!exact(row,raw.family==='youtube_ke'?rowKeysCount:rowKeysRank)||
-        typeof row.recordingId!=='string'||
-        !UUID.test(row.recordingId)||!Number.isInteger(row.rank)||
-        row.rank<1||row.rank>raw.declaredDepth||
-        seenRecording.has(row.recordingId)||seenRanks.has(row.rank))
+      const held=object(row)&&Object.hasOwn(row,'disposition');
+      if(!exact(row,raw.family==='youtube_ke'?
+          (held?heldKeysCount:rowKeysCount):(held?heldKeysRank:rowKeysRank))||
+        !Number.isInteger(row.rank)||row.rank<1||row.rank>raw.declaredDepth||
+        seenRanks.has(row.rank)||
+        (held?(row.recordingId!==null||!heldDispositions.has(row.disposition)):
+          (typeof row.recordingId!=='string'||!UUID.test(row.recordingId)||
+            seenRecording.has(row.recordingId))))
         fail('rank_or_identity_invalid');
-      seenRecording.add(row.recordingId);seenRanks.add(row.rank);
+      seenRanks.add(row.rank);
+      if(!held)seenRecording.add(row.recordingId);
       if(raw.family==='youtube_ke'){
         if(!Number.isSafeInteger(row.nativeCount)||row.nativeCount<0)
           fail('youtube_native_count_invalid');
       }
-      return {recordingId:row.recordingId,rank:row.rank,
+      return {recordingId:held?null:row.recordingId,rank:row.rank,
+        ...(held?{disposition:row.disposition}:{}),
         ...(raw.family==='youtube_ke'?{nativeCount:row.nativeCount}:{})};
     }).sort((a,b)=>a.rank-b.rank);
     // Contiguous ordered originals are mandatory for this initial primitive.
@@ -169,8 +179,11 @@ export async function computeWk100PrivateRankingCandidate(input){
   for(const family of S.families){
     const panels=counted.get(family),acc=new Map();
     for(const panel of panels){
-      for(const row of panel.rows)acc.set(row.recordingId,
-        (acc.get(row.recordingId)||0)+qMicro(row.rank,panel.declaredDepth));
+      for(const row of panel.rows){
+        if(row.disposition)continue; // Never compress or award a held source position.
+        acc.set(row.recordingId,
+          (acc.get(row.recordingId)||0)+qMicro(row.rank,panel.declaredDepth));
+      }
     }
     for(const [id,total] of acc){
       const micro=Math.floor((total+Math.floor(panels.length/2))/panels.length);
@@ -179,6 +192,9 @@ export async function computeWk100PrivateRankingCandidate(input){
     }
   }
   if(familyContributions.size<S.rankedSize)fail('fewer_than_100_recordings');
+  const heldPositions=Object.fromEntries([...heldDispositions].map(status=>[
+    status,normalized.reduce((total,panel)=>total+
+      panel.rows.filter(row=>row.disposition===status).length,0)]));
   const ranked=[...familyContributions].map(([recordingId,parts])=>{
     const contributions=Object.fromEntries(S.families.map(f=>[f,parts[f]||0]));
     const totalMicros=S.families.reduce((sum,f)=>sum+20*contributions[f],0);
@@ -202,6 +218,7 @@ export async function computeWk100PrivateRankingCandidate(input){
   return Object.freeze({schemaVersion:'wk100-private-ranking-candidate/v1',
     specificationId:S.id,weekStartEat:input.weekStartEat,rankingDigest,
     ranked:Object.freeze(ranked),eligibleRecordings:familyContributions.size,
+    heldPositions:Object.freeze(heldPositions),
     sourceFamilies:Object.freeze([...S.families]),sourcePanelCount:normalized.length,
     sourceCompleteness:'all_required_panels_present',
     scoreMeaning:'ordinal_chart_traction_not_streams',
