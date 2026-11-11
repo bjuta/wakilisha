@@ -111,3 +111,98 @@ export function validateWk100MethodologyCandidate(value,{weekStartEat,ingestPoli
   return Object.freeze({valid:true,canScore:false,canFreeze:false,
     canPublish:false,approvalState:'proposed'});
 }
+
+
+/**
+ * W7 evidence-chain review for the existing authenticated Admin source read.
+ *
+ * This is NOT a qualification or scoring engine. The read model exposes a
+ * capture summary but cannot attest Registry identities, source-native weekly
+ * comparability, four Spotify editorial originals, or independent sign-off.
+ * Never turn candidate-chain counts into approved coverage or frozen weights.
+ */
+export const WK100_W7_CORE_REVIEW_METRICS=Object.freeze({
+  apple_ke:'rank',
+  shazam_ke:'rank',
+  mdundo_ke:'rank',
+  youtube_ke:'rank_and_count',
+  audiomack_ke:'rank',
+});
+function w7WeekStart(week){
+  if(typeof week!=='string'||!MONDAY.test(week))hold('review_week_invalid');
+  const ms=Date.parse(week+'T00:00:00Z');
+  if(!Number.isFinite(ms)||new Date(ms).toISOString().slice(0,10)!==week||
+     new Date(ms).getUTCDay()!==1)hold('review_week_invalid');
+  return ms-3*60*60*1000; // Monday 00:00 East Africa Time
+}
+const w7InWeek=(instant,start)=>{
+  const ms=Date.parse(instant);
+  return Number.isFinite(ms)&&ms>=start&&ms<start+7*86400000;
+};
+const w7Original=s=>SHA.test(s.receiptSha256||'')&&
+  ['succeeded','partial_depth'].includes(s.captureState)&&
+  Number.isInteger(s.observedDepth)&&s.observedDepth>0&&
+  Number.isInteger(s.expectedDepth)&&s.observedDepth<=s.expectedDepth;
+const w7NativeWindow=s=>{
+  if(s.nativePeriodAuthority!=='provider_defined')return false;
+  const start=Date.parse(s.nativePeriodStart),end=Date.parse(s.nativePeriodEnd);
+  return Number.isFinite(start)&&Number.isFinite(end)&&start<end;
+};
+export function reviewWk100MethodologyEvidence({weekStartEat,sources=[],methods=[]}={}){
+  const start=w7WeekStart(weekStartEat);
+  if(!Array.isArray(sources)||sources.length>200||
+     !Array.isArray(methods)||methods.length>500||
+     sources.some(x=>!x||typeof x!=='object'||Array.isArray(x))||
+     methods.some(x=>!x||typeof x!=='object'||Array.isArray(x)))
+    hold('review_read_unavailable');
+  const core=WK100_METHOD_FAMILIES.slice(0,5).map(family=>{
+    const candidates=sources.filter(s=>s.provider===family&&s.market==='KE');
+    let originalCount=0,methodCandidateCount=0,nativeWindowCount=0;
+    let asOfCount=0,metricMatchCount=0,chainCandidateCount=0;
+    for(const s of candidates){
+      const original=w7Original(s);
+      const metric=s.metric===WK100_W7_CORE_REVIEW_METRICS[family];
+      const method=methods.find(m=>m.sourceKey===s.sourceKey&&
+        m.providerKey===family&&m.captureContractVersion===s.version);
+      const candidate=!!method&&method.decisionState==='collector_admitted'&&
+        method.hasMethodEvidence===true;
+      const native=w7NativeWindow(s)&&method?.nativePeriodAuthority==='provider_defined';
+      const asOf=method?.nativePeriodAuthority==='observed_as_of'&&
+        w7InWeek(s.lastSuccessfulAt,start);
+      if(original)originalCount++;
+      if(candidate)methodCandidateCount++;
+      if(native)nativeWindowCount++;
+      if(asOf)asOfCount++;
+      if(metric)metricMatchCount++;
+      if(original&&metric&&candidate&&(native||asOf))chainCandidateCount++;
+    }
+    const holds=[];
+    if(!candidates.length)holds.push('no_enrolled_source_report');
+    if(!originalCount)holds.push('no_original_receipt_in_report');
+    if(!methodCandidateCount)holds.push('method_admission_not_confirmed');
+    if(!metricMatchCount)holds.push('native_metric_not_confirmed');
+    if(!nativeWindowCount&&!asOfCount)holds.push('native_period_not_verified');
+    if(asOfCount&&!nativeWindowCount)holds.push('as_of_not_weekly_total');
+    if(!chainCandidateCount)holds.push('evidence_chain_incomplete');
+    // An enrolled method and receipt are not a qualified week or identity.
+    holds.push('registry_identity_and_week_alignment_unattested');
+    return Object.freeze({family,sourceCount:candidates.length,
+      originalCount,methodCandidateCount,nativeWindowCount,
+      asOfCount,metricMatchCount,chainCandidateCount,
+      holds:Object.freeze(holds),canScore:false,canFreeze:false});
+  });
+  const chainCandidateFamilies=core.filter(r=>r.chainCandidateCount>0).length;
+  return Object.freeze({
+    schemaVersion:'wk100-w7-evidence-review/v1',
+    weekStartEat,core:Object.freeze(core),
+    chainCandidateFamilies,minimumCoreFamilies:2,
+    sourceCoverageConfirmed:false,
+    spotifyEditorialPlaylistIds:WK100_SPOTIFY_EDITORIAL_PLAYLISTS,
+    spotifyEditorialProven:false,
+    nativeFormulaApproved:false,
+    weekCompletenessApproved:false,
+    concentrationAndSensitivityApproved:false,
+    independentApprovalRecorded:false,
+    canScore:false,canFreeze:false,canPublish:false,
+  });
+}
