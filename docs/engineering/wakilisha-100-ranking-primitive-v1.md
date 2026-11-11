@@ -43,3 +43,23 @@ The new pure ranking module was tested directly with Node 22 using complete synt
 Before the inaugural genuine W8 ranking, perform immediate offline shadow comparison against archived source originals where verified, including a Borda/partial-order comparator, missingness and source loss, family-dominance and leave-one-source-out stability, sensitivity to plausible unequal source weights, Top-N censoring, recording identity mistakes, and provenance replay. Record any unresolved disagreements and do not tune the formula to reach a preferred song order. Confirm cadence and source-date alignment from real first-party facts; all five complete genuine weekly source inputs are not currently present. The 9 November register contains Apple 100/100, Shazam 200/200, Mdundo 99/100 (authentic partial), YouTube held and Audiomack held. Those genuine originals may be used for **research**, not relabelled as a valid five-source ranking week.
 
 The current exact head requires **new build, consolidated tests, real browser and later trusted signed-in W8 integration acceptance**. Existing W5C/W6 and Phase 1 passes remain historical evidence at their accepted SHAs, not automatic green checks for new W7 code. No Production SQL, Edge, cron, frontend activation, scoring, stage or publication is authorized by this document.
+
+
+## Independent synthetic research challenge | 11 November 2026
+
+A source-independent diagnostic is committed at \`scripts/acceptance/wk100-ranking-research-challenge.mjs\` (Node 22, zero network, database, provider egress, or publishing dependencies). Its exact Git blob SHA was independently compared to the local runner **after** execution. It constructs 240 hypothetical canonical identities, five source-family rankings (seven simulated Apple days and a count-bearing YouTube panel), and independent second-implementation recomputation of the full score. The resulting Top 100 IDs and integer micro-scores match the actual v1 ranking primitive in **all three** scenarios. The diagnostic never changes the canonical five-family weights or the calculation code.
+
+The challenge then recomputes **counterfactual rankings** without one provider (its 20-point reference share remains unfilled, never redistributed), with one family's share raised to 30 points and the other four set to 17.5 each, and with an independent nonlinear head-focused positional curve instead of the original linear rank formula. All these counterfactuals are **research comparisons**, not selectable formulas or executable publisher policies.
+
+| Simulated cross-provider scenario | Head-focused alternative: original Top 10 retained | Worst leave-one-family-out: Top 10 retained | Worst 30/17.5 sensitivity: Top 10 retained |
+| --- | ---: | ---: | ---: |
+| Correlated ranking panels | 10/10 | 9/10 | 9/10 |
+| Deliberately conflicting rankings | **4/10** | **3/10** | **5/10** |
+| One reversed core provider | 10/10 | 10/10 | 10/10 |
+
+**Interpretation:** the challenge is capable of detecting material instability instead of hardcoding a PASS. In the conflicting case, changing the rank curve or omitting one provider substantially changes the Top 10; the one-reversed-source case preserves the Top 10 but changes mid-chart ranks (the nonlinear alternative has a median **12-place** absolute movement among the original Top 100). Therefore Top-10 retention alone is insufficient as an acceptance statistic. These numbers are entirely **synthetic**, do not imply a real source distribution, and **do not validate 20% shares or a universal launch threshold**.
+
+Normalized linear Borda is algebraically equivalent to the currently selected \`q(r,d)\`; reporting a Borda match as an independent scientific model victory would be misleading. The present independent comparisons are actual alternative ranking curves and provider-influence counterfactuals. A provider-native partial-ranking/likelihood model, observed real-source correlations, missingness-censoring effects, coverage balance and defensible confidence intervals remain empirical research gates. They can be evaluated offline on qualified archived observations without waiting for another physical week; if those observations are insufficient, the evidence is recorded as insufficient rather than substituted.
+
+The active W7 evidence review has also been moved to a five-family \`wk100-ranking-evidence-review.mjs\` contract. This screen no longer imports the retired six-family methodology proposal; it cannot claim original-byte attestation, Registry identity, confirmed coverage, score, freeze, or publish authority. Legacy \`methodologyCandidate/v2\` validation remains only for preserved historical draft compatibility.
+
