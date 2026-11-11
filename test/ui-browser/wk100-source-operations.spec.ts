@@ -349,8 +349,14 @@ test('five founder-selected core providers show truthful readiness and no invent
       .toHaveAttribute('href','https://open.spotify.com/playlist/'+id);
   }
   await expect(editorial.getByRole('listitem')).toHaveCount(4);
-  await expect(page.getByText('Numeric weighting and anti-double-counting are approved in Phase 3.',{exact:false}))
+  // The fixed five-family W7 decision supersedes the former editable
+  // Phase 3 weighting proposal; the four Spotify links remain archival only.
+  await expect(page.getByText('Spotify currently contributes no points to WAKILISHA 100.',{exact:false}))
     .toBeVisible();
+  await expect(page.getByText('These links document earlier public research. They do not authorize Spotify collection, ranking input or publication.',{exact:false}))
+    .toBeVisible();
+  await expect(page.getByText('Numeric weighting and anti-double-counting are approved in Phase 3.',{exact:false}))
+    .toHaveCount(0);
   // The genuine 29–30 October original-byte archive is independent of
   // candidate collection. Research remains visible with zero proposals.
   const archive=page.getByRole('table',{name:'Archived Kenya research observations'});
