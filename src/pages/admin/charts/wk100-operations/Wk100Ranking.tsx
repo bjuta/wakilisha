@@ -61,6 +61,14 @@ const GATES=[
   ['stage','Private Edition staging'],
   ['publish','Explicit Edition publication'],
 ] as const;
+const REPLAY_REASONS:Record<string,string>={
+  saved_policy_not_verified:'The weekly eligibility policy is missing or has changed.',
+  source_constitution_unavailable:'The server has no verified source constitution.',
+  source_method_not_current:'A source method is not currently approved for this ranking.',
+  canonical_recordings_not_ready:'Canonical recording links or eligibility need more review.',
+  original_replay_not_verified:'An original could not be verified against its stored positions.',
+  private_attestation_not_verified:'The private evidence replay did not pass verification.',
+};
 const SHA=/^[a-f0-9]{64}$/;
 const uuid=/^[0-9a-f]{8}-[0-9a-f-]{27}$/i;
 const fixed=(n:number)=>Number.isFinite(n)?n.toFixed(2):'0.00';
@@ -332,8 +340,10 @@ export function Wk100Ranking({week,sources=[],methods=[],reviewedSourceIds=[]}:{
             </ul>
           </div>)}
           {result?.reason&&<p className="text-sm text-wk-text-muted">
-            The private replay could not be accepted. Review the source,
-            Registry links, and weekly eligibility policy.</p>}
+            {REPLAY_REASONS[result.reason]??
+              'The private ranking could not be verified.'}
+            {' '}Review the original source, Registry links, and weekly eligibility policy.
+          </p>}
         </div>}
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" className="wk-button wk-button-secondary wk-button-sm"
