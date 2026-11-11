@@ -62,7 +62,8 @@ function fixture(week=W){
     const days=family==='apple_ke'?7:1,depth=family==='shazam_ke'?200:100;
     const contract={id:id(contractSeq++),source_key:family+'_kenya',provider_key:family,
       market:'KE',native_metric:family==='youtube_ke'?'rank_and_count':'rank',
-      admission_state:'candidate',adapter_version:'v1',expected_depth:depth};
+      admission_state:'candidate',adapter_version:'v1',adapter_sha256:'c'.repeat(64),
+      contract_version:'v1',expected_depth:depth};
     for(let day=0;day<days;day++){
       const receiptId=id(receiptSeq++);
       const native=Array.from({length:depth},(_,k)=>({rank:k+1,
@@ -203,7 +204,24 @@ function fakeServiceBackend(f){
       id:id(50001+i),status:'active',release_type:'single',
       release_date:'2026-09-01',metadata:{}})),
   };
-  const db={from(table){
+  const methodRows=tables.wk_chart_capture_contracts_v1.map(contract=>({
+    source_key:contract.source_key,provider_key:contract.provider_key,
+    decision_state:'collector_admitted',proposal_revision:1,decision_revision:1,
+    contract_version:contract.contract_version,parser_class:contract.adapter_version,
+    method_class:contract.provider_key==='youtube_ke'?'provider_api':
+      contract.provider_key==='audiomack_ke'?'reviewed_page_adapter':'provider_api',
+    native_period_state:contract.provider_key==='youtube_ke'?'provider_defined':'observed_as_of',
+    native_period_evidence_ref:contract.provider_key==='youtube_ke'
+      ?'weekly:20261109:20261115:ke':'observed_as_of/kenya_research',
+    endpoint_sha256:'d'.repeat(64),evidence_sha256:'e'.repeat(64),
+    authorization_ref:'reviewed_source_method',authorization_expires_at:
+      new Date(Date.now()+30*86_400_000).toISOString(),
+    constitution_version:'wk100-fixed-v1',
+  }));
+  const db={async rpc(name){
+    assert.equal(name,'wk100_service_admitted_methods_v1');
+    return {data:methodRows,error:null};
+  },from(table){
     assert(table in tables,table);
     let values=tables[table];
     const q={select(){return q;},eq(k,v){values=values.filter(x=>x[k]===v);return q;},
@@ -218,7 +236,8 @@ function fakeServiceBackend(f){
     }};
   }};
   return {db,storage,weekStartEat:W,selectedReceiptIds:f.ids,
-    eligibilityPolicySha256:POLICY,
+    eligibilityPolicySha256:POLICY,sourceConstitutionVersion:'wk100-fixed-v1',
+    methodRows,
     caller:{auth:{getUser:async()=>({data:{user:{id:id(999)}},error:null})},
       rpc:async (method,args)=>{
         if(method==='current_user_has_capability')
@@ -243,10 +262,47 @@ test('restricted Supabase/Storage shaped reader uses exact receipts, not a lates
   const wrong={...deps,selectedReceiptIds:deps.selectedReceiptIds.map((v,i)=>i? v:id(9999))};
   await assert.rejects(()=>readServer(wrong),/exact_row_missing_wk_chart_capture_attempts_v1/);
   await assert.rejects(()=>readServer({...deps,parserAccessBySource:null}),/parser_authority_missing/);
+  await assert.rejects(()=>readServer({...deps,sourceConstitutionVersion:null}),
+    /server_constitution_missing/);
   await assert.rejects(()=>readServer({...deps,caller:{...deps.caller,
     rpc:async()=>({data:false,error:null})}}),/caller_capability_missing/);
   await assert.rejects(()=>readServer({...deps,eligibilityPolicySha256:'f'.repeat(64)}),
     /current_w5_policy_mismatch/);
   await assert.rejects(()=>readServer({...deps,storage:{from:()=>({download:async()=>({error:new Error('denied')})})}}),
     /private_raw_unavailable/);
+});
+test('restricted reader gates exact current service-only method, parser and constitution',async()=>{
+  const deny=async (change,expected)=>{
+    const f=fixture(),deps=fakeServiceBackend(f);
+    change(deps);
+    await assert.rejects(()=>readServer(deps),expected);
+  };
+  await deny(x=>{x.methodRows.length=0},/source_method_not_current/);
+  await deny(x=>{x.methodRows[0].decision_state='paused'},/source_method_not_current/);
+  await deny(x=>{x.methodRows[0].authorization_expires_at='2000-01-01T00:00:00Z'},
+    /source_method_not_current/);
+  await deny(x=>{x.methodRows[0].provider_key='spotify_ke'},/source_method_not_current/);
+  await deny(x=>{x.methodRows[0].contract_version='forged'},/source_method_not_current/);
+  await deny(x=>{x.methodRows[0].parser_class='wrong'},/source_method_not_current/);
+  await deny(x=>{x.methodRows[0].constitution_version='old'},/source_method_not_current/);
+  await deny(x=>{x.methodRows[0].native_period_state='provider_defined'},
+    /source_method_not_current/);
+  await deny(x=>{x.methodRows.push({...x.methodRows[0]})},/source_method_not_current/);
+  await deny(x=>{x.methodRows.find(y=>y.provider_key==='youtube_ke').method_class='reviewed_page_adapter'},
+    /source_method_not_current/);
+  await deny(x=>{x.db.rpc=async()=>({data:null,error:new Error('denied')})},
+    /source_method_projection_unavailable/);
+  await deny(x=>{x.db.rpc=null},/service_method_reader_missing/);
+});
+test('private ranking rejects source admission revoked during immutable replay',async()=>{
+  const deps=fakeServiceBackend(fixture());
+  const original=deps.db.rpc;let reads=0;
+  deps.db.rpc=async name=>{
+    const result=await original(name);
+    reads+=1;
+    if(reads===2)result.data[0].decision_revision+=1;
+    return result;
+  };
+  await assert.rejects(()=>readServer(deps),/source_method_changed/);
+  assert.equal(reads,2);
 });
