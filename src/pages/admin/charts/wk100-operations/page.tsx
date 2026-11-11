@@ -785,15 +785,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                   </div>},
               ] satisfies WkDataColumn<ProviderReadiness>[]} />}
         </Card>
-        <Card title="Spotify Editorial — Supplementary Signals">
+        <Card title="Spotify Research Archive">
           <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
-            Four founder-selected Spotify editorial playlists are required supplementary research
-            inputs for the WAKILISHA 100 methodology. Their verified inclusion and displayed
-            order may inform a lower-weight editorial signal, capped together as ONE provider
-            family. They do not report Kenya stream totals and do not count toward the five
-            primary platforms or the two-independent-provider collector receipt minimum.
+            These four playlists are historical research references, not required
+            ranking sources. Playlists can change or disappear, and inclusion does
+            not measure listening. Spotify currently contributes no points to
+            WAKILISHA 100. The five primary sources remain unchanged.
           </p>
-          <ul aria-label="Required Spotify editorial sources" className="grid gap-2 sm:grid-cols-2">
+          <ul aria-label="Archived Spotify playlist research" className="grid gap-2 sm:grid-cols-2">
             {WK100_SPOTIFY_EDITORIAL_SOURCES.map(source=>
               <li key={source.sourceKey} className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
                 <a className="font-semibold text-wk-text underline underline-offset-2"
@@ -806,8 +805,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               </li>)}
           </ul>
           <p className="mt-3 text-xs text-wk-text-muted">
-            Numeric weighting and anti-double-counting are approved in Phase 3. This source
-            register does not admit unattended Spotify collection or authorize scoring.
+            These links document earlier public research. They do not authorize
+            Spotify collection, ranking input or publication.
           </p>
         </Card>
         <Card title="Source proposals">
