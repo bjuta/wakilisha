@@ -336,7 +336,7 @@ test('five founder-selected core providers show truthful readiness and no invent
   await expect(table.getByText('Spotify Kenya',{exact:true})).toHaveCount(0);
   // Required editorial observations remain visible outside the five primary
   // readiness rows. Four playlists are ONE supplementary provider family.
-  const editorial=page.getByRole('list',{name:'Required Spotify editorial sources'});
+  const editorial=page.getByRole('list',{name:'Archived Spotify playlist research'});
   await expect(editorial).toBeVisible();
   const editorialLinks=[
     ['Hot Hits Kenya','37i9dQZF1DWWWXigQZAD8B'],
@@ -595,7 +595,7 @@ test('source overview stays truthful, carries EAT week through navigation and us
   await expect(page.getByText('No enrolled capture sources yet.')).toBeVisible();
   for(const gate of ['Qualified source constitution','Original source evidence',
     'Reporting dates and observation time','Canonical recording identities',
-    'Complete eligibility and corrections','Frozen methodology and private Top 100',
+    'Complete eligibility and corrections','Fixed ranking specification and private Top 100',
     'Edition staging and explicit publication']){
     await expect(page.getByText(gate,{exact:true})).toBeVisible();
   }
@@ -1770,3 +1770,19 @@ test('W5C atomic Registry correction is case-bound and W6 rechecks the exact rec
   expect(ctx.unexpected).toEqual([]);
 });
 
+
+
+test('W7 shows one fixed ranking and no editable method contribution controls',async({page})=>{
+  await install(page);
+  await page.goto('/admin/charts/wk100-operations?week=2026-11-09&stage=rank',
+    {waitUntil:'domcontentloaded'});
+  const ranking=page.locator('[data-wk100-ranking]');
+  await expect(ranking).toBeVisible({timeout:20_000});
+  await expect(ranking.getByRole('heading',{name:'Ranking',exact:true})).toBeVisible();
+  await expect(ranking.getByText('Five required')).toBeVisible();
+  await expect(ranking.getByText('20% fixed share')).toHaveCount(5);
+  await expect(ranking.getByRole('button',{name:'Save methodology proposal'})).toHaveCount(0);
+  await expect(ranking.locator('input[type="number"]')).toHaveCount(0);
+  await expect(ranking.getByText('No ranking, staging or publication command is available on this screen.'))
+    .toBeVisible();
+});
