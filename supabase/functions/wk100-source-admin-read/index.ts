@@ -2,6 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { validEatWeek, projectWk100SourceHealth } from '../_shared/wk100-source-admin-projection.mjs';
 import { projectWk100IdentifyObservations, wk100RegistryProviderKey } from '../_shared/wk100-identify-observations.mjs';
 import { projectWk100EligibilityPreview } from '../_shared/wk100-eligibility-preview.mjs';
+import { inspectWk100RankWeek } from '../_shared/wk100-ranking-evidence-review.mjs';
+import { readWk100AttestedRankingPrivate } from '../_shared/wk100-ranking-attested-reader.mjs';
+import { WK100_RANKING_SPECIFICATION_V1 as RANK } from '../_shared/wk100-ranking-primitive.mjs';
 import { validateWk100AppleArtistReport, sha256OfWk100ReportRaw } from '../_shared/wk100-apple-artist-evidence.mjs';
 
 const origins=new Set([
@@ -26,7 +29,7 @@ Deno.serve(async req=>{
   if(req.method!=='POST')return reply(req,405,{error:'method_not_allowed'});
   const bearer=req.headers.get('authorization')??'';
   if(!/^Bearer [^\s]+$/.test(bearer))return reply(req,401,{error:'authentication_required'});
-  let week:string,action:'health'|'original'|'identify'|'eligibility'|'artist_import',contractId='',receiptId='';
+  let week:string,action:'health'|'original'|'identify'|'eligibility'|'artist_import'|'ranking',contractId='',receiptId='';
   let reportRaw='', reportSha256='';
   try{
     const raw=await req.text();
@@ -37,6 +40,8 @@ Deno.serve(async req=>{
     week=data.weekStartEat;
     if(data.action==='read_source_health'&&Object.keys(data).length===2){
       action='health';
+    }else if(data.action==='read_private_ranking'&&Object.keys(data).length===2){
+      action='ranking';
     }else if(['verify_private_original','read_recording_observations','preview_recording_eligibility'].includes(data.action)&&
       Object.keys(data).length===4&&
       typeof data.contractId==='string'&&typeof data.receiptId==='string'&&
@@ -73,6 +78,123 @@ Deno.serve(async req=>{
   const charts=await caller.rpc('current_user_has_capability',{required_capability:'manage_charts'});
   if(charts.error)return reply(req,503,{error:'capability_unavailable'});
   if(charts.data!==true)return reply(req,403,{error:'not_authorized'});
+
+  if(action==='ranking'){
+    // W8/W8S/W8B/W9: server-selected week, read-only evidence and readiness.
+    // The browser supplies NO source IDs, receipts, formulas or Registry facts.
+    const registryAccess=await caller.rpc('current_user_has_capability',
+      {required_capability:'view_registry'});
+    if(registryAccess.error)return reply(req,503,{error:'registry_capability_unavailable'});
+    if(registryAccess.data!==true)return reply(req,403,{error:'registry_review_not_authorized'});
+    const [contractsResult,attemptsResult]=await Promise.all([
+      admin.from('wk_chart_capture_contracts_v1')
+        .select('id,source_key,provider_key,market,native_metric,expected_depth,admission_state')
+        .limit(101),
+      admin.from('wk_chart_capture_attempts_v1')
+        .select('id,contract_id,week_start_eat,status,observed_depth,record_count,fetched_at,native_period_authority,native_period_start,native_period_end,native_period_evidence_ref')
+        .eq('week_start_eat',week).limit(1001),
+    ]);
+    if(contractsResult.error||attemptsResult.error||
+       !Array.isArray(contractsResult.data)||!Array.isArray(attemptsResult.data)||
+       contractsResult.data.length>100||attemptsResult.data.length>1000)
+      return reply(req,503,{error:'ranking_source_ledger_unavailable'});
+    let inventory;
+    try{inventory=inspectWk100RankWeek({weekStartEat:week,
+      contracts:contractsResult.data,attempts:attemptsResult.data});}
+    catch{return reply(req,503,{error:'ranking_week_inventory_unavailable'});}
+    const sources=inventory.families.map(({receiptIds,canReplay,...item})=>({
+      ...item,checkpointCandidate:canReplay}));
+    const gates=[
+      {id:'source',label:'Complete source observations',
+        state:inventory.readyForPrivateReplay?'verified':'blocked'},
+      {id:'method',label:'Current source admission and originals',state:'blocked'},
+      {id:'eligibility',label:'Registry and saved eligibility policy',state:'blocked'},
+      {id:'ranking',label:'Reproducible private Top 100',state:'blocked'},
+      {id:'approval',label:'Independent editorial approval',state:'blocked'},
+      {id:'stage',label:'Private Edition staging',state:'blocked'},
+      {id:'publish',label:'Explicit Edition publication',state:'blocked'},
+    ];
+    const base={schemaVersion:'wk100-admin-private-ranking/v1',weekStartEat:week,
+      specificationId:RANK.id,rankingState:'incomplete',sourceFamilies:sources,
+      requiredReceiptCount:11,ranked:[],rankingDigest:null,
+      sourceAdmissionSnapshotSha256:null,registrySnapshotSha256:null,
+      policySha256:null,heldPositions:null,gates,
+      canStage:false,canPublish:false};
+    if(!inventory.readyForPrivateReplay)return reply(req,200,base);
+    const draftResult=await caller.rpc('wk100_get_admin_draft_v1',{p_week:week});
+    const policy=draftResult.data?.config?.ingestPolicySha256;
+    if(draftResult.error||draftResult.data?.weekStartEat!==week||
+       typeof policy!=='string'||!/^[a-f0-9]{64}$/.test(policy))
+      return reply(req,200,{...base,
+        reason:'saved_policy_not_verified'});
+    const version=Deno.env.get('WK100_SOURCE_CONSTITUTION_VERSION')??'';
+    if(!/^[a-zA-Z0-9._-]{2,100}$/.test(version))
+      return reply(req,200,{...base,reason:'source_constitution_unavailable'});
+    try{
+      const verified=await readWk100AttestedRankingPrivate({
+        db:admin,storage:admin.storage,
+        caller:{auth:{getUser:()=>caller.auth.getUser(token)},
+          rpc:(name:string,args:Record<string,unknown>)=>caller.rpc(name,args)},
+        weekStartEat:week,selectedReceiptIds:inventory.selectedReceiptIds,
+        eligibilityPolicySha256:policy,sourceConstitutionVersion:version,
+        // Parser selection comes only from the immutable capture contract and
+        // the stored period evidence. It never comes from a browser argument.
+        parserAccessBySource:async (contract,attempt)=>contract.provider_key==='youtube_ke'
+          ?{native_period_key:attempt.native_period_evidence_ref}:{},
+      });
+      const ranked=verified.privateRanking.ranked;
+      if(ranked.length!==100)throw Error('ranking_incomplete');
+      const ids=ranked.map(r=>r.recordingId);
+      const [tracksResponse,creditsResponse]=await Promise.all([
+        admin.from('registry_tracks').select('id,title,status')
+          .in('id',ids).eq('status','active').limit(101),
+        admin.from('registry_track_artists')
+          .select('track_id,artist_id,is_primary,status').in('track_id',ids).limit(1001),
+      ]);
+      if(tracksResponse.error||creditsResponse.error||
+         !Array.isArray(tracksResponse.data)||!Array.isArray(creditsResponse.data)||
+         tracksResponse.data.length!==100||creditsResponse.data.length>1000)
+        throw Error('canonical_display_unavailable');
+      const names=[...new Set(creditsResponse.data.filter(c=>c.is_primary===true&&
+        c.status==='active').map(c=>c.artist_id))];
+      const artistsResponse=names.length?await admin.from('registry_artists')
+        .select('id,display_name,status').in('id',names).limit(1001):
+        {data:[],error:null};
+      if(artistsResponse.error||!Array.isArray(artistsResponse.data)||
+         artistsResponse.data.length>1000)throw Error('artist_display_unavailable');
+      const trackById=new Map(tracksResponse.data.map(t=>[t.id,t]));
+      const artistById=new Map(artistsResponse.data.filter(a=>a.status==='active')
+        .map(a=>[a.id,a.display_name]));
+      const nameByTrack=new Map();
+      for(const credit of creditsResponse.data){
+        if(credit.is_primary&&credit.status==='active'&&!nameByTrack.has(credit.track_id))
+          nameByTrack.set(credit.track_id,artistById.get(credit.artist_id)??null);
+      }
+      const displayRanked=ranked.map(r=>({
+        rank:r.rank,recordingId:r.recordingId,
+        title:trackById.get(r.recordingId)?.title??null,
+        artist:nameByTrack.get(r.recordingId)??null,
+        score:r.score,listedFamilyCount:r.listedFamilyCount,
+        contributions:RANK.families.map(family=>({
+          family,points:Number((20*r.contributions[family]/
+            RANK.scoreScale).toFixed(6)),
+        })),
+      }));
+      const verifiedGates=gates.map(g=>
+        ['source','method','eligibility','ranking'].includes(g.id)
+          ?{...g,state:'verified'}:g);
+      return reply(req,200,{...base,rankingState:'private_candidate',
+        ranked:displayRanked,rankingDigest:verified.rankingDigest,
+        sourceAdmissionSnapshotSha256:verified.sourceAdmissionSnapshotSha256,
+        registrySnapshotSha256:verified.registrySnapshotSha256,
+        policySha256:verified.policySha256,
+        heldPositions:verified.heldPositions,gates:verifiedGates});
+    }catch{
+      // Never reveal private Registry facts, raw object paths or reason details
+      // when the restricted W8 attestation refuses a source/policy/role.
+      return reply(req,200,{...base,reason:'private_attestation_not_verified'});
+    }
+  }
   if(action==='original'){
     // Authorize the exact receipt through its contract and EAT week.
     // Neither a browser-supplied path nor arbitrary Storage key is accepted.
