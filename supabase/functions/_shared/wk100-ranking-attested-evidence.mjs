@@ -98,7 +98,8 @@ export async function prepareWk100AttestedPrivateRanking({
       attempt.record_count===rows.length&&attempt.observed_depth===rows.length&&
       typeof attempt.payload_sha256==='string'&&SHA.test(attempt.payload_sha256)&&
       typeof attempt.raw_object_key==='string'&&RAW.test(attempt.raw_object_key)&&
-      attempt.raw_object_key.startsWith('v1/'+weekStartEat+'/'),
+      attempt.raw_object_key.startsWith('v1/'+weekStartEat+'/'+contract.source_key+'/')&&
+      attempt.raw_object_key.includes('/'+attempt.payload_sha256+'.'),
       'receipt_incomplete_or_unbound');
     need(!familySourceKeys.has(family)||familySourceKeys.get(family)===contract.source_key,
       'family_source_changed');

@@ -35,7 +35,7 @@ function fixture(week=W){
       const attempt={id:receiptId,contract_id:contract.id,week_start_eat:week,
         status:'succeeded',observed_market:'KE',observed_depth:depth,record_count:depth,
         fetched_at:at,payload_sha256:digest,
-        raw_object_key:'v1/'+week+'/'+family+'/20261114T120000Z-1/'+digest+'.json',
+        raw_object_key:'v1/'+week+'/'+contract.source_key+'/20261114T120000Z-1/'+digest+'.json',
         native_period_authority:family==='youtube_ke'?'provider_defined':'observed_as_of',
         native_period_start:family==='youtube_ke'?plusDay(week,-2)+'T10:00:00Z':null,
         native_period_end:family==='youtube_ke'?plusDay(week,5)+'T10:00:00Z':null,
@@ -96,6 +96,7 @@ test('private handoff fails closed on provenance, native bytes and policy',async
   await deny((f,a)=>{f.panels.get(f.ids[0]).attempt.status='partial_depth'},/receipt_incomplete_or_unbound/);
   await deny((f,a)=>{f.panels.get(f.ids[0]).attempt.fetched_at='2026-11-01T12:00:00Z'},/observation_outside_week/);
   await deny((f,a)=>{f.panels.get(f.ids[0]).attempt.raw_object_key='../../public.json'},/receipt_incomplete_or_unbound/);
+  await deny((f,a)=>{f.panels.get(f.ids[0]).attempt.raw_object_key=f.panels.get(f.ids[0]).attempt.raw_object_key.replace('apple_ke_kenya','mdundo_ke_kenya')},/receipt_incomplete_or_unbound/);
   await deny((f,a)=>{f.panels.get(f.ids[0]).contract.provider_key='spotify_ke'},/capture_contract_invalid/);
   await deny((f,a)=>{a.loadRegistry=async()=>({typedLinks:[],legacyLinks:[],activeTracks:[]})},/registry_identity_unresolved/);
   await deny((f,a)=>{a.evaluateW5Row=async()=>({outcome:'EXCLUDED',policySha256:POLICY,
