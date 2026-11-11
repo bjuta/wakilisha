@@ -5,6 +5,8 @@ import {prepareWk100AttestedPrivateRanking as prepare}
   from '../../supabase/functions/_shared/wk100-ranking-attested-evidence.mjs';
 import {readWk100AttestedRankingPrivate as readServer}
   from '../../supabase/functions/_shared/wk100-ranking-attested-reader.mjs';
+import {inspectWk100RankWeek} from '../../supabase/functions/_shared/wk100-ranking-evidence-review.mjs';
+import {readFile} from 'node:fs/promises';
 
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const sha=x=>createHash('sha256').update(x).digest('hex');
@@ -316,4 +318,105 @@ test('private ranking rejects source admission revoked during immutable replay',
   };
   await assert.rejects(()=>readServer(deps),/source_method_changed/);
   assert.equal(reads,2);
+});
+
+
+function completeW8Week(){
+  const contracts=families.map((family,i)=>({
+    id:id(900+i),source_key:family+'_weekly_songs',
+    provider_key:family,market:'KE',native_metric:family==='youtube_ke'?
+      'rank_and_count':'rank',expected_depth:family==='shazam_ke'?200:100,
+    admission_state:'candidate',
+  }));
+  const attempts=[];let seq=11000;
+  for(const c of contracts){
+    const days=c.provider_key==='apple_ke'?7:1;
+    for(let day=0;day<days;day++){
+      const d=c.provider_key==='youtube_ke'?6:day;
+      attempts.push({
+        id:id(seq++),contract_id:c.id,week_start_eat:W,status:'succeeded',
+        observed_depth:c.expected_depth,record_count:c.expected_depth,
+        fetched_at:plusDay(W,d)+'T12:00:00Z',
+        native_period_authority:c.provider_key==='youtube_ke'?
+          'provider_defined':'observed_as_of',
+        native_period_start:c.provider_key==='youtube_ke'?
+          '2026-11-08T00:00:00Z':null,
+        native_period_end:c.provider_key==='youtube_ke'?
+          '2026-11-15T00:00:00Z':null,
+        native_period_evidence_ref:c.provider_key==='youtube_ke'?
+          'weekly:20261108:20261114:ke':null,
+      });
+    }
+  }
+  return {weekStartEat:W,contracts,attempts};
+}
+test('W8B/W9 deterministic week selection requires 11 actual complete checkpoints',()=>{
+  const clean=completeW8Week();
+  const ready=inspectWk100RankWeek(clean);
+  assert.equal(ready.readyForPrivateReplay,true);
+  assert.equal(ready.selectedReceiptIds.length,11);
+  assert.equal(ready.canStage,false);
+  assert.equal(ready.canPublish,false);
+  const shuffled=inspectWk100RankWeek({...clean,attempts:[...clean.attempts].reverse()});
+  assert.deepEqual(ready.selectedReceiptIds,shuffled.selectedReceiptIds);
+  assert.deepEqual(ready.families.map(x=>x.issues),shuffled.families.map(x=>x.issues));
+  const missing=inspectWk100RankWeek({...clean,
+    attempts:clean.attempts.filter(x=>x.id!==clean.attempts[0].id)});
+  assert.equal(missing.readyForPrivateReplay,false);
+  assert.equal(missing.selectedReceiptIds.length,4);
+  assert(missing.families[0].issues.includes('checkpoints_missing'));
+  const partial=structuredClone(clean);
+  partial.attempts.find(x=>x.contract_id===partial.contracts[2].id).status='partial_depth';
+  partial.attempts.find(x=>x.contract_id===partial.contracts[2].id).observed_depth=99;
+  partial.attempts.find(x=>x.contract_id===partial.contracts[2].id).record_count=99;
+  const held=inspectWk100RankWeek(partial);
+  assert.equal(held.readyForPrivateReplay,false);
+  assert(held.families[2].issues.includes('partial_original_retained'));
+  const unknown=structuredClone(clean);
+  unknown.attempts.find(x=>x.contract_id===unknown.contracts[0].id)
+    .native_period_authority='unknown';
+  const unverified=inspectWk100RankWeek(unknown);
+  assert.equal(unverified.readyForPrivateReplay,false);
+  assert(unverified.families[0].issues.includes('native_period_unverified'));
+  const duplicate=structuredClone(clean);
+  duplicate.attempts.push({...duplicate.attempts[0],id:id(123456)});
+  const ambiguous=inspectWk100RankWeek(duplicate);
+  assert.equal(ambiguous.readyForPrivateReplay,false);
+  assert(ambiguous.families[0].issues.includes('duplicate_day_or_receipt'));
+  const competing=structuredClone(clean);
+  competing.contracts.push({...competing.contracts[0],id:id(99999)});
+  assert.equal(inspectWk100RankWeek(competing).readyForPrivateReplay,false);
+});
+test('W8B does not promote 399 retained Production-shaped positions into a Top 100',()=>{
+  const x=completeW8Week();
+  const kept=new Set(['apple_ke','shazam_ke','mdundo_ke']);
+  x.contracts=x.contracts.filter(c=>kept.has(c.provider_key));
+  x.attempts=x.attempts.filter(a=>x.contracts.some(c=>c.id===a.contract_id));
+  x.attempts=x.attempts.filter(a=>a.contract_id!==x.contracts[0].id||
+    a.id===x.attempts[0].id);
+  x.attempts.forEach(a=>{a.native_period_authority='unknown';});
+  const m=x.attempts.find(a=>a.contract_id===x.contracts[2].id);
+  m.status='partial_depth';m.observed_depth=99;m.record_count=99;
+  const r=inspectWk100RankWeek(x);
+  assert.equal(r.readyForPrivateReplay,false);
+  assert.deepEqual(r.selectedReceiptIds,[]);
+  assert.equal(r.families.find(f=>f.family==='youtube_ke').observedAttempts,0);
+  assert.equal(r.families.find(f=>f.family==='audiomack_ke').observedAttempts,0);
+});
+test('W8 W8S W8B W9 server contract remains JWT-gated, read-only and nonpublishing',async()=>{
+  const src=await readFile('supabase/functions/wk100-source-admin-read/index.ts','utf8');
+  const ui=await readFile('src/pages/admin/charts/wk100-operations/Wk100Ranking.tsx','utf8');
+  assert.match(src,/read_private_ranking/);
+  assert.match(src,/readWk100AttestedRankingPrivate/);
+  assert.match(src,/registry_review_not_authorized/);
+  assert.match(src,/sourceConstitutionVersion:version/);
+  assert.match(src,/selectedReceiptIds:inventory.selectedReceiptIds/);
+  assert.match(src,/canStage:false,canPublish:false/);
+  assert.doesNotMatch(src,/action==='ranking'.{0,200}publishImmediately/s);
+  for(const stage of ['data-wk100-w8-ranking','data-wk100-w8s-explanation',
+    'data-wk100-w8b-incomplete','data-wk100-w9-readiness'])
+    assert(ui.includes(stage),stage);
+  assert.match(ui,/No staging or publication command is available on this screen/);
+  assert.match(ui,/rankingState==='private_candidate'/);
+  assert.match(ui,/r\.canStage!==false\|\|r\.canPublish!==false/);
 });
