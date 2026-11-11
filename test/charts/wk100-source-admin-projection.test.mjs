@@ -1696,3 +1696,28 @@ test('WK100 fixed five-source ranking primitive replays two logical EAT weeks wi
   differentPolicy.eligibilityPolicySha256=sha(99002);
   assert.notEqual((await compute(differentPolicy)).rankingDigest,result.rankingDigest);
 });
+
+
+test('WK100 independent synthetic research challenge detects model disagreement',()=>{
+  const run=spawnSync(process.execPath,[
+    'scripts/acceptance/wk100-ranking-research-challenge.mjs',
+  ],{encoding:'utf8',timeout:10_000,maxBuffer:2_000_000});
+  assert.equal(run.status,0,run.stderr);
+  const research=JSON.parse(run.stdout);
+  assert.equal(research.dataClass,'SYNTHETIC_NOT_PROVIDER_EVIDENCE');
+  assert.equal(research.settings.releaseThresholds,'not_set');
+  assert.equal(research.specificationId,'wk100-kenya-traction-ordinal-v1');
+  assert.deepEqual(research.referenceConstitution,[
+    'apple_ke','shazam_ke','mdundo_ke','youtube_ke','audiomack_ke']);
+  assert.deepEqual(research.results.map(x=>x.mode),[
+    'correlated','conflicting','one_provider_reversed']);
+  assert(research.results.every(x=>x.sourcePanelCount===11));
+  const conflict=research.results[1];
+  // A real challenge must expose instability rather than claim all models
+  // are equivalent just because their ordered inputs match.
+  assert(conflict.nonlinearHeadFocused.top10Overlap<10);
+  assert(Object.values(conflict.leaveOneFamilyOut).some(x=>x.top10Overlap<10));
+  assert(Object.values(conflict.alternativeShares30_17_5)
+    .some(x=>x.top10Overlap<10));
+  // These are model sensitivity diagnostics, NOT launch pass thresholds.
+});
