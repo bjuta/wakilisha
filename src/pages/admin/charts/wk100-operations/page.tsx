@@ -529,7 +529,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
           navigate('/admin/charts/wk100-operations?week='+encodeURIComponent(week)+'&stage='+step.id);
       }}/>
     {rankActive&&<Wk100Methodology week={week} sources={report?.sources??[]}
-      methods={methodPhase==='ready'&&proposalPhase==='ready'?methodDecisions:[]}/>}
+      methods={methodPhase==='ready'&&proposalPhase==='ready'?methodDecisions:[]}
+      reviewedSourceIds={[...reviewedSourceIds]}/>}
     {!reviewActive&&<nav className="flex flex-wrap gap-2" aria-label="Collection workspace">
       {[['Overview',''],['Sources','/sources'],['Collection','/collection']].map(([name,path])=><button key={name} type="button" onClick={()=>go(path)} aria-current={(view==='overview'&&path==='')||(view==='sources'&&path==='/sources')||(view==='collection'&&path==='/collection')?'page':undefined} className={'rounded-full border px-4 py-2 text-xs font-semibold '+((view==='overview'&&path==='')||(view==='sources'&&path==='/sources')||(view==='collection'&&path==='/collection')?'border-wk-brand bg-wk-brand-soft text-wk-text':'border-wk-border text-wk-text-muted hover:bg-wk-surface-raised')}>{name}</button>)}
     </nav>}
