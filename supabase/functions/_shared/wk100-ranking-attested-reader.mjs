@@ -204,5 +204,14 @@ export async function readWk100AttestedRankingPrivate({
   for(const {contract,attempt,seal} of admittedSelections.values())
     need(sourceMethodSeal(contract,attempt,finalAdmission,sourceConstitutionVersion)===seal,
       'source_method_changed');
-  return result;
+  // The mathematical ranking digest is deliberately distinct from the W2A
+  // admission seal. Future W8 Edition freeze must bind BOTH, independently.
+  const authorityFacts=[...admittedSelections.values()]
+    .map(({contract,seal})=>[contract.id,seal])
+    .sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
+  const digest=await crypto.subtle.digest('SHA-256',
+    new TextEncoder().encode(JSON.stringify(authorityFacts)));
+  const sourceAdmissionSnapshotSha256=Array.from(new Uint8Array(digest),
+    x=>x.toString(16).padStart(2,'0')).join('');
+  return Object.freeze({...result,sourceAdmissionSnapshotSha256});
 }
