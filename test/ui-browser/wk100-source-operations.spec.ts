@@ -1882,7 +1882,7 @@ test('W8 and W8S explain 100 synthetic private rows but do not offer staging or 
     .getByRole('listitem')).toHaveCount(5);
   await rank.getByRole('button',{name:'Next 20'}).click();
   await expect(rank.getByText('Page 2 of 5')).toBeVisible();
-  await rank.getByRole('textbox',{name:'Search private ranking'})
+  await rank.getByRole('searchbox',{name:'Search private ranking'})
     .fill('Synthetic Recording 99');
   await expect(rank.getByText('1 of 100 recordings')).toBeVisible();
   await expect(rank.locator('[data-wk100-w9-readiness]')
