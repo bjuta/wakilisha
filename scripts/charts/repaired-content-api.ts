@@ -562,6 +562,10 @@ export async function repairedResponse(resource: string, limit = 120): Promise<R
         min(ce.rank)::int as top_chart_position
       from artist_base ab
       left join wk_chart_entries_v2 ce on ce.artist_slug = ab.slug
+        and exists (
+          select 1 from wk_chart_editions_v2 visible
+          where visible.id = ce.edition_id and visible.status = 'published'
+        )
       group by ab.id_text, ab.slug, ab.name, ab.country, ab.image_url
       order by coalesce(count(distinct ce.edition_id), 0) desc, coalesce(count(distinct ce.track_slug), 0) desc, ab.name asc
       limit $1
