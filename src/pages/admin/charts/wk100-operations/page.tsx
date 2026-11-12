@@ -21,6 +21,7 @@ import { SourceProposalForm, type Wk100ProposalRecord } from './SourceProposalFo
 import { SourceMethodReviewForm, type Wk100MethodDecision } from './SourceMethodReviewForm';
 import { SourceRecoveryDialog, type Wk100RecoveryKind } from './SourceRecoveryDialog';
 import { Wk100IdentifyReview } from './Wk100IdentifyReview';
+import { Wk100Ranking } from './Wk100Ranking';
 
 type Source = {
   id:string;sourceKey:string;provider:string;surface:string;market:string;
@@ -105,7 +106,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   const week=requestedWeek&&isWk100WeekStartEat(requestedWeek)?requestedWeek:wk100CurrentWeekStartEat();
   const identifyActive=view==='overview'&&searchParams.get('stage')==='identify';
   const qualifyActive=view==='overview'&&searchParams.get('stage')==='qualify';
-  const reviewActive=identifyActive||qualifyActive;
+  const rankActive=view==='overview'&&searchParams.get('stage')==='rank';
+  const reviewActive=identifyActive||qualifyActive||rankActive;
   const setWeek=(next:(week:string)=>string)=>setSearchParams(p=>{const q=new URLSearchParams(p);q.set('week',next(week));return q;});
   const readSequence=useRef(0);
   const [report,setReport]=useState<Report|null>(null);
@@ -490,7 +492,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
   };
   const go=(path:string)=>navigate('/admin/charts/wk100-operations'+path+'?week='+encodeURIComponent(week));
   return <div className="space-y-5">
-    <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={qualifyActive?'Eligibility Workbench':identifyActive?'Recording Review':view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
+    <AdminChartsPageHeader eyebrow="WAKILISHA 100 / Kenya" title={rankActive?'Ranking':qualifyActive?'Eligibility Workbench':identifyActive?'Recording Review':view==='overview'?'Weekly Overview':view==='sources'?'Source Registry':'Collection & Incidents'} description="Private source evidence and operational readiness for the selected EAT week.">
       <button type="button" className="wk-button wk-button-secondary wk-button-sm" onClick={()=>{void load();void loadEdition();void loadProposals();void loadMethods();if(view==='collection')void loadRecovery()}} disabled={phase==='loading'}>Refresh status</button>
     </AdminChartsPageHeader>
     <WkSurface className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3">
@@ -515,23 +517,29 @@ export default function Wk100OperationsPage({view}:{view:View}) {
         id:label.toLowerCase(),label,
         description:i===0?'Source and evidence review':
           i===1?'Recording evidence and Registry review':
-          i===2?'Saved policy and evidence-backed filter results':'Requires later phase acceptance',
+          i===2?'Saved policy and evidence-backed filter results':
+          i===3?'Private ranking, score detail, and evidence readiness':
+            'Publication requires separate acceptance',
         state:i===0?(reviewActive?'available' as const:'current' as const):
           i===1?(identifyActive?'current' as const:'available' as const):
-          i===2?(qualifyActive?'current' as const:'available' as const):'blocked' as const,
+          i===2?(qualifyActive?'current' as const:'available' as const):
+          i===3?(rankActive?'current' as const:'available' as const):'blocked' as const,
       }))}
       onSelect={step=>{
         if(step.id==='collect')go('');
-        if(step.id==='identify'||step.id==='qualify')
+        if(step.id==='identify'||step.id==='qualify'||step.id==='rank')
           navigate('/admin/charts/wk100-operations?week='+encodeURIComponent(week)+'&stage='+step.id);
       }}/>
+    {rankActive&&<Wk100Ranking week={week} sources={report?.sources??[]}
+      methods={methodPhase==='ready'&&proposalPhase==='ready'?methodDecisions:[]}
+      reviewedSourceIds={[...reviewedSourceIds]}/>}
     {!reviewActive&&<nav className="flex flex-wrap gap-2" aria-label="Collection workspace">
       {[['Overview',''],['Sources','/sources'],['Collection','/collection']].map(([name,path])=><button key={name} type="button" onClick={()=>go(path)} aria-current={(view==='overview'&&path==='')||(view==='sources'&&path==='/sources')||(view==='collection'&&path==='/collection')?'page':undefined} className={'rounded-full border px-4 py-2 text-xs font-semibold '+((view==='overview'&&path==='')||(view==='sources'&&path==='/sources')||(view==='collection'&&path==='/collection')?'border-wk-brand bg-wk-brand-soft text-wk-text':'border-wk-border text-wk-text-muted hover:bg-wk-surface-raised')}>{name}</button>)}
     </nav>}
     {phase==='loading'&&<Card title="Reading capture status"><p role="status" className="text-sm text-wk-text-muted">Checking the restricted source ledger…</p></Card>}
     {phase==='unavailable'&&<Card title="Source status unavailable"><p role="alert" className="text-sm text-wk-text-muted">The protected source service did not return a verified response. No source is assumed to be qualified or collected. Backend deployment and authorized access are needed before this view can show live status.</p></Card>}
     {phase==='ready'&&report&&<>
-      {reviewActive&&<Wk100IdentifyReview key={week+':'+(qualifyActive?'qualify':'identify')} week={week} sources={report.sources} stage={qualifyActive?'qualify':'identify'}/>}
+      {(identifyActive||qualifyActive)&&<Wk100IdentifyReview key={week+':'+(qualifyActive?'qualify':'identify')} week={week} sources={report.sources} stage={qualifyActive?'qualify':'identify'}/>}
       {view==='overview'&&!reviewActive&&<div className="space-y-5">
         <WkOperationsHero eyebrow={'WAKILISHA 100 · Kenya · week '+week}
           title={'Week of '+new Intl.DateTimeFormat('en-KE',{day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Nairobi'}).format(new Date(week+'T12:00:00Z'))}
@@ -560,7 +568,7 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                   :'No verified provider reporting period or reviewed as-of original for this week.'},
               {id:'identity',label:'Canonical recording identities',status:'blocked',description:'Registry and MIZIZI reconciliation is Phase 2'},
               {id:'eligibility',label:'Complete eligibility and corrections',status:'blocked',description:'All applicable filter checks are Phase 2'},
-              {id:'ranking',label:'Frozen methodology and private Top 100',status:'blocked',description:'A private ranking is not inferred from captures'},
+              {id:'ranking',label:'Fixed ranking specification and private Top 100',status:'blocked',description:'A private ranking is not inferred from captures'},
               {id:'edition',label:'Edition staging and explicit publication',status:'blocked',description:'No public flagship has been authorized'},
             ]}/>
           </Card>
@@ -779,15 +787,14 @@ export default function Wk100OperationsPage({view}:{view:View}) {
                   </div>},
               ] satisfies WkDataColumn<ProviderReadiness>[]} />}
         </Card>
-        <Card title="Spotify Editorial — Supplementary Signals">
+        <Card title="Spotify Research Archive">
           <p className="mb-3 text-xs leading-relaxed text-wk-text-muted">
-            Four founder-selected Spotify editorial playlists are required supplementary research
-            inputs for the WAKILISHA 100 methodology. Their verified inclusion and displayed
-            order may inform a lower-weight editorial signal, capped together as ONE provider
-            family. They do not report Kenya stream totals and do not count toward the five
-            primary platforms or the two-independent-provider collector receipt minimum.
+            These four playlists are historical research references, not required
+            ranking sources. Playlists can change or disappear, and inclusion does
+            not measure listening. Spotify currently contributes no points to
+            WAKILISHA 100. The five primary sources remain unchanged.
           </p>
-          <ul aria-label="Required Spotify editorial sources" className="grid gap-2 sm:grid-cols-2">
+          <ul aria-label="Archived Spotify playlist research" className="grid gap-2 sm:grid-cols-2">
             {WK100_SPOTIFY_EDITORIAL_SOURCES.map(source=>
               <li key={source.sourceKey} className="rounded-xl border border-wk-border bg-wk-bg-subtle p-3">
                 <a className="font-semibold text-wk-text underline underline-offset-2"
@@ -800,8 +807,8 @@ export default function Wk100OperationsPage({view}:{view:View}) {
               </li>)}
           </ul>
           <p className="mt-3 text-xs text-wk-text-muted">
-            Numeric weighting and anti-double-counting are approved in Phase 3. This source
-            register does not admit unattended Spotify collection or authorize scoring.
+            These links document earlier public research. They do not authorize
+            Spotify collection, ranking input or publication.
           </p>
         </Card>
         <Card title="Source proposals">

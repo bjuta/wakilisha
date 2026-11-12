@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {useNavigate} from 'react-router-dom';
+import {TextField,TextArea,Input} from 'react-aria-components';
 import {supabase} from '@/lib/supabase';
 import {WkSurface} from '@/components/design-system/primitives/Surface';
 import {WkSelect} from '@/components/design-system/primitives/Select';
@@ -8,7 +9,12 @@ import {WkUploadField} from '@/components/design-system/primitives/UploadField';
 import {WkDataTable} from '@/components/design-system/primitives/DataTable';
 import {WkStateBadge} from '@/components/design-system/primitives/StateBadge';
 import {WkDetailList} from '@/components/design-system/primitives/DetailList';
-import {compareWk100EligibilityRechecks} from '@/services/chartsIngestion/wk100EligibilityRecheck.mjs';
+import {compareWk100EligibilityRechecks,
+  compareWk100EligibilityRechecksWithApplication}
+  from '@/services/chartsIngestion/wk100EligibilityRecheck.mjs';
+import {WK100_CORRECTION_FIELDS,describeWk100CorrectionReview,
+  normalizeWk100CorrectionPatchValue}
+  from '@/services/chartsIngestion/wk100CorrectionReviewBoundary.mjs';
 
 type Receipt={id:string;status:string;attemptedAt:string|null;observedDepth:number};
 type Source={
@@ -22,6 +28,10 @@ type Row={
   reviewReason:string|null;provisionalRef:string|null;
   outcome?:'ELIGIBLE'|'EXCLUDED'|'REVIEW_REQUIRED'|'CONFLICTED';reasonCodes?:string[];
   registryTrackSlug?:string|null;registryReleaseSlug?:string|null;
+  registryTrackId?:string|null;registryReleaseId?:string|null;
+  registryTrackUpdatedAt?:string|null;registryReleaseUpdatedAt?:string|null;
+  registryTrackProfile?:{title:string|null;isrc:string|null;explicit:boolean|null;duration_ms:number|null}|null;
+  registryReleaseProfile?:{release_type:string|null;release_date:string|null}|null;
   registryArtistSlugs?:string[];registryFactsSha256?:string;
   providerArtistName?:string|null;providerArtistRetrievedAt?:string|null;
   providerArtistReportSha256?:string|null;
@@ -66,14 +76,38 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
   const [phase,setPhase]=useState<'idle'|'loading'|'ready'|'unavailable'>('idle');
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
+  const [correctionPage,setCorrectionPage]=useState(0);
+  const [correctionFocus,setCorrectionFocus]=useState<{rowId:string;fieldPath:string}|null>(null);
+  const [caseReadNonce,setCaseReadNonce]=useState(0);
+  const [cases,setCases]=useState<{fieldPath:string;policyRevision:number;
+    revision:number;state:string;caseId:string;eventCount:number}[]|null>(null);
+  const [casePhase,setCasePhase]=useState<'idle'|'loading'|'ready'|'unavailable'|'saving'>('idle');
+  const [caseMessage,setCaseMessage]=useState('');
+  const [caseReason,setCaseReason]=useState('');
+  const [newCanonicalValue,setNewCanonicalValue]=useState('');
+  const [clearCanonicalValue,setClearCanonicalValue]=useState(false);
+  const [applyReason,setApplyReason]=useState('');
+  const [applyPhase,setApplyPhase]=useState<'idle'|'saving'|'unavailable'|'applied'>('idle');
+  const [applyMessage,setApplyMessage]=useState('');
+  const pendingApplyOperation=useRef<{key:string;id:string}|null>(null);
+  const applicationCaseForRecheck=useRef<string|null>(null);
+  const [caseAction,setCaseAction]=useState<'request_registry_review'|'hold'|'closed_no_change'>(
+    'request_registry_review');
+  const pendingCaseOperation=useRef<{key:string;id:string}|null>(null);
   const [readNonce,setReadNonce]=useState(0);
   const [artistPhase,setArtistPhase]=useState<'idle'|'loading'|'ready'|'failed'>('idle');
   const [artistMessage,setArtistMessage]=useState('');
   const [comparison,setComparison]=useState<{
-    changedCount:number;evaluatedRows:number;changed:{
+    changedCount:number;evaluatedRows:number;
+    verifiedRegistryOperation?:boolean;savedCorrection?:boolean;
+    applicationEventId?:string;comparisonPersisted?:boolean;
+    summary:{becameEligible:number;becameExcluded:number;newConflicts:number;
+      identityChanges:number;factsChanged:number;reasonsResolved:number;reasonsAdded:number};
+    changed:{
       captureRowId:string;rank:number;observedTitle:string|null;
       beforeOutcome:string;afterOutcome:string;beforeReasons:string[];
-      afterReasons:string[];factsChanged:boolean;outcomeChanged:boolean;
+      afterReasons:string[];resolvedReasons:string[];newReasons:string[];
+      factsChanged:boolean;outcomeChanged:boolean;
     }[];
   }|null>(null);
   const [reviewError,setReviewError]=useState<'changed'|'unavailable'>('unavailable');
@@ -81,9 +115,11 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
   const sequence=useRef(0);
   const source=selectable.find(s=>s.id===sourceId);
   const receipts=source?.recentAttempts.filter(eligible)??[];
+  useEffect(()=>{applicationCaseForRecheck.current=null;},[sourceId,receiptId,week]);
   useEffect(()=>{
     const seq=++sequence.current;
-    setReview(null);setComparison(null);
+    setReview(null);setComparison(null);setCorrectionFocus(null);
+    setCases(null);setCaseReason('');pendingCaseOperation.current=null;
     setSearch('');setFilter('all');
     if(!source||!receipts.some(r=>r.id===receiptId)){
       setPhase('idle');return;
@@ -108,9 +144,21 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
           if(qualify&&beforeRecheck.current){
             const previous=beforeRecheck.current;
             beforeRecheck.current=null;
-            try{setComparison(compareWk100EligibilityRechecks(previous,data));}
-            catch{setReviewError('changed');setPhase('unavailable');return;}
+            try{
+              const applicationCaseId=applicationCaseForRecheck.current;
+              applicationCaseForRecheck.current=null;
+              if(applicationCaseId){
+                const {data:proof,error:proofError}=await supabase.rpc(
+                  'wk100_read_correction_application_v1',{p_case_id:applicationCaseId});
+                if(seq!==sequence.current)return;
+                if(proofError||!proof)throw Error('application_proof_unavailable');
+                setComparison(compareWk100EligibilityRechecksWithApplication(previous,data,proof));
+              }else{
+                setComparison(compareWk100EligibilityRechecks(previous,data));
+              }
+            }catch{setReviewError('changed');setPhase('unavailable');return;}
           }
+          if(seq!==sequence.current)return;
           setReview(data as Review);setPhase('ready');
         }
       }catch{
@@ -128,6 +176,158 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
       row.canonicalTrackId,String(row.rank),row.reasonCodes?.join(' '),
     ].some(v=>v?.toLowerCase().includes(search.trim().toLowerCase()))))??[],
     [review,filter,search,qualify]);
+  // All-row validation and W6 comparison stay independent of this ten-row presentation.
+  useEffect(()=>{setCorrectionPage(0);},[week,sourceId,receiptId,search,filter,qualify]);
+  const focusedRow=review?.rows.find(row=>row.captureRowId===correctionFocus?.rowId);
+  const correctionContext=useMemo(()=>{
+    if(!qualify||!review||!correctionFocus)return null;
+    try{return describeWk100CorrectionReview(
+      review,correctionFocus.rowId,correctionFocus.fieldPath);
+    }catch{return null;}
+  },[qualify,review,correctionFocus]);
+  const correctionPath=correctionContext?.route==='track'&&focusedRow?.registryTrackSlug
+    ?'/admin/registry/tracks/'+encodeURIComponent(focusedRow.registryTrackSlug)
+    :correctionContext?.route==='release'&&focusedRow?.registryReleaseSlug
+      ?'/admin/registry/releases/'+encodeURIComponent(focusedRow.registryReleaseSlug)
+      :'/admin/review/mizizi';
+  useEffect(()=>{
+    setCaseReason('');
+    setCaseMessage('');
+    setNewCanonicalValue('');
+    setClearCanonicalValue(false);
+    setApplyReason('');
+    setApplyPhase('idle');
+    setApplyMessage('');
+    pendingApplyOperation.current=null;
+    setCaseAction('request_registry_review');
+    pendingCaseOperation.current=null;
+  },[correctionContext?.receiptId,correctionContext?.captureRowId,
+    correctionContext?.fieldPath,correctionContext?.editionPolicyRevision]);
+  useEffect(()=>{
+    let mounted=true;
+    setCases(null);
+    if(!qualify||!correctionContext){setCasePhase('idle');return;}
+    setCasePhase('loading');
+    void (async()=>{
+      try{
+        const {data,error}=await supabase.rpc('wk100_read_correction_cases_v1',{
+          p_week:correctionContext.weekStartEat,
+          p_receipt_id:correctionContext.receiptId,
+          p_capture_row_id:correctionContext.captureRowId,
+        });
+        if(error||data?.schemaVersion!=='wk100-correction-case-list/v1'||
+          data.receiptId!==correctionContext.receiptId||
+          data.captureRowId!==correctionContext.captureRowId||
+          !Array.isArray(data.cases)||data.canWriteRegistry!==false||
+          data.canScore!==false||data.canPublish!==false)throw Error('case_read_invalid');
+        if(mounted){setCases(data.cases);setCasePhase('ready');}
+      }catch{
+        if(mounted){setCasePhase('unavailable');
+          setCaseMessage('We could not load saved decisions. Retry the review before recording changes.');}
+      }
+    })();
+    return ()=>{mounted=false;};
+  },[qualify,correctionContext,caseReadNonce]);
+  const focusedCase=cases?.find(c=>c.fieldPath===correctionContext?.fieldPath&&
+    c.policyRevision===correctionContext?.editionPolicyRevision);
+  const saveCase=async()=>{
+    if(!correctionContext||casePhase!=='ready'||!cases||
+      caseReason.trim().length<12||caseReason.trim().length>800)return;
+    const payload={
+      schemaVersion:'wk100-correction-decision/v1',
+      weekStartEat:correctionContext.weekStartEat,
+      contractId:correctionContext.contractId,
+      receiptId:correctionContext.receiptId,
+      captureRowId:correctionContext.captureRowId,
+      fieldPath:correctionContext.fieldPath,
+      originalSha256:correctionContext.sourceOriginalSha256,
+      policyRevision:correctionContext.editionPolicyRevision,
+      policySha256:correctionContext.editionPolicySha256,
+      registryFactsBeforeSha256:correctionContext.registryFactsSha256,
+      expectedCaseRevision:focusedCase?.revision??0,
+      decision:caseAction,reason:caseReason.trim(),
+      canonicalWriteEventId:null,
+    };
+    // Reuse the operation ID after an ambiguous network failure. Never
+    // manufacture an extra review event after a lost acknowledgement.
+    const key=JSON.stringify(payload);
+    const operationId=pendingCaseOperation.current?.key===key
+      ?pendingCaseOperation.current.id:crypto.randomUUID();
+    pendingCaseOperation.current={key,id:operationId};
+    setCasePhase('saving');setCaseMessage('');
+    try{
+      const {data,error}=await supabase.rpc('wk100_record_correction_decision_v1',{
+        p_request:{...payload,operationId},
+      });
+      if(error||data?.persisted!==true||data?.canWriteRegistry!==false||
+        data?.canReEvaluate!==false||data?.canScore!==false||
+        data?.canPublish!==false||!Number.isSafeInteger(data?.revision))
+        throw Error('case_save_unavailable');
+      pendingCaseOperation.current=null;
+      setCaseReason('');
+      setCaseMessage('Review decision saved. Registry facts are unchanged.');
+      setCaseReadNonce(x=>x+1);
+    }catch{
+      setCasePhase('unavailable');
+      setCaseMessage('No new decision is confirmed. Reload the case before retrying.');
+    }
+  };
+  const supportedCanonicalField=correctionContext?.treatment==='existing_governed_editor';
+  const expectedEntityUpdatedAt=correctionContext?.route==='track'
+    ?focusedRow?.registryTrackUpdatedAt
+    :correctionContext?.route==='release'?focusedRow?.registryReleaseUpdatedAt:null;
+  const currentCanonicalValue=correctionContext?.route==='track'
+    ?focusedRow?.registryTrackProfile?.[correctionContext.fieldPath.slice(6) as
+      keyof NonNullable<Row['registryTrackProfile']>]
+    :correctionContext?.route==='release'
+      ?focusedRow?.registryReleaseProfile?.[correctionContext.fieldPath.slice(8) as
+        keyof NonNullable<Row['registryReleaseProfile']>]:null;
+  const canApplyCanonical=!!supportedCanonicalField&&casePhase==='ready'&&
+    focusedCase?.state==='request_registry_review'&&
+    !!focusedRow?.canonicalTrackId&&!!expectedEntityUpdatedAt&&
+    Number.isFinite(Date.parse(expectedEntityUpdatedAt))&&
+    applyReason.trim().length>=12&&applyReason.trim().length<=800&&
+    applyPhase!=='saving';
+  const applyCanonicalCorrection=async()=>{
+    if(!canApplyCanonical||!correctionContext||!focusedCase||!review||
+      !expectedEntityUpdatedAt)return;
+    let value:unknown;
+    try{value=normalizeWk100CorrectionPatchValue(correctionContext.fieldPath,
+      clearCanonicalValue?'__clear__':newCanonicalValue);}
+    catch{setApplyPhase('unavailable');setApplyMessage('Choose a valid value before applying.');return;}
+    const payload={
+      p_case_id:focusedCase.caseId,p_expected_case_revision:focusedCase.revision,
+      p_expected_entity_updated_at:expectedEntityUpdatedAt,
+      p_new_value:value,p_reason:applyReason.trim(),
+    };
+    const key=JSON.stringify(payload);
+    const operationId=pendingApplyOperation.current?.key===key
+      ?pendingApplyOperation.current.id:crypto.randomUUID();
+    pendingApplyOperation.current={key,id:operationId};
+    setApplyPhase('saving');setApplyMessage('');
+    try{
+      const {data,error}=await supabase.rpc('wk100_apply_reviewed_registry_correction_v1',
+        {...payload,p_operation_id:operationId});
+      if(error||data?.persisted!==true||data?.state!=='applied_registry'||
+        data?.caseId!==focusedCase.caseId||data?.verifiedWriterExecuted!==true||
+        data?.canScore!==false||data?.canPublish!==false)
+        throw Error('registry_correction_not_verified');
+      pendingApplyOperation.current=null;
+      setApplyPhase('applied');
+      setApplyMessage('The typed Registry writer saved this correction. Verifying all source positions now.');
+      // The old whole-receipt result is kept only until the independent
+      // current-Registry readback and same-policy W6 comparison complete.
+      beforeRecheck.current=review;
+      applicationCaseForRecheck.current=focusedCase.caseId;
+      setReadNonce(n=>n+1);
+    }catch{
+      setApplyPhase('unavailable');
+      setApplyMessage('No canonical correction is confirmed. Reload the saved case before retrying.');
+    }
+  };
+  const correctionPages=Math.max(1,Math.ceil(rows.length/10));
+  const boundedCorrectionPage=Math.min(correctionPage,correctionPages-1);
+  const visibleRows=qualify?rows.slice(boundedCorrectionPage*10,boundedCorrectionPage*10+10):rows;
   const importArtistEvidence=async (file:File)=>{
     setArtistPhase('loading');setArtistMessage('Checking exact Apple song IDs and artist evidence…');
     try{
@@ -246,11 +446,25 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
             Re-evaluate After Corrections
           </button>
         </div>
+        <p className="mt-3 text-xs text-wk-text-muted">
+          Review ten receipt-bound positions at a time below. Registry edits remain in the existing
+          audited editors. Moving between pages never approves or saves a correction.
+        </p>
         {comparison&&<div data-wk-eligibility-recheck className="mt-4 space-y-3" role="status">
           <p className="text-sm font-semibold text-wk-text">
             {comparison.changedCount===0
               ?'No changes to Registry facts or eligibility results.'
               :comparison.changedCount+' of '+comparison.evaluatedRows+' positions changed.'}
+          </p>
+          <p className="text-xs text-wk-text-muted">
+            {comparison.verifiedRegistryOperation
+              ?'Verified: the typed Registry writer executed in the case transaction and the updated fact matches the current Registry readback.'
+              :'Unverified comparison only. No case-bound applied Registry write was confirmed.'}
+          </p>
+          <p className="text-xs text-wk-text-muted">
+            Newly eligible: {comparison.summary.becameEligible}. Newly excluded: {comparison.summary.becameExcluded}.
+            New conflicts: {comparison.summary.newConflicts}. Identity changes: {comparison.summary.identityChanges}.
+            Reasons resolved: {comparison.summary.reasonsResolved}; added: {comparison.summary.reasonsAdded}.
           </p>
           {comparison.changedCount>0&&<WkDataTable
             ariaLabel="WAKILISHA 100 eligibility changes" rows={comparison.changed}
@@ -263,11 +477,13 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
               {key:'reasons',label:'What changed',render:r=><span>
                 {r.factsChanged?'Registry facts changed. ':''}
                 {r.outcomeChanged?'Eligibility result changed. ':''}
-                {r.afterReasons.map(x=>x.replaceAll('_',' ')).join('; ')||'No rule failures'}
+                {r.resolvedReasons.length?'Resolved: '+r.resolvedReasons.join(', ')+'. ':''}
+                {r.newReasons.length?'New: '+r.newReasons.join(', ')+'. ':''}
+                {r.afterReasons.map(x=>x.replaceAll('_',' ')).join('; ')||'No remaining rule failures'}
               </span>},
             ]}/>}
           <p className="text-xs text-wk-text-muted">
-            This is a comparison, not an approval. The original source receipt and Edition policy remain unchanged.
+            This is a live full-receipt comparison, not a persisted W6 decision or approval. The source and policy are unchanged. Nothing was scored or published.
           </p>
         </div>}
       </WkSurface>}
@@ -328,9 +544,17 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
               ...Object.entries(readableStatus).map(([value,label])=>({value,label}))]}/>
         </div>
         <p role="status" className="mt-3 text-xs text-wk-text-muted">
-          Showing {rows.length} of {review.rows.length} source positions.
+          {qualify?'Reviewing '+(rows.length?boundedCorrectionPage*10+1:0)+'–'+Math.min(rows.length,(boundedCorrectionPage+1)*10)+' of '+rows.length+' matching positions.':
+            'Showing '+rows.length+' of '+review.rows.length+' source positions.'}
         </p>
-        <WkDataTable rows={rows} getKey={row=>row.captureRowId}
+        {qualify&&<div data-wk100-correction-tray className="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+            disabled={boundedCorrectionPage===0} onClick={()=>setCorrectionPage(p=>Math.max(0,p-1))}>Previous ten</button>
+          <span className="text-xs font-semibold text-wk-text-muted">Page {boundedCorrectionPage+1} of {correctionPages}</span>
+          <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+            disabled={boundedCorrectionPage>=correctionPages-1} onClick={()=>setCorrectionPage(p=>Math.min(correctionPages-1,p+1))}>Next ten</button>
+        </div>}
+        <WkDataTable rows={visibleRows} getKey={row=>row.captureRowId}
           ariaLabel={qualify?"WAKILISHA 100 eligibility results":"WAKILISHA 100 recorded source positions"}
           empty="No source positions match these filters."
           columns={[
@@ -355,7 +579,11 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
                 ?(r.reasonCodes?.map(x=>x.replaceAll('_',' ')).join('; ')||'No rule failures')
                 :(r.canonicalTrackId??(r.reviewReason?reasonLabel[r.reviewReason]??'Review required':'Review required'))}</p>
             </div>},
-            ...(qualify?[{key:'correction',label:'Registry review',render:(r:Row)=><><a
+            ...(qualify?[{key:'correction',label:'Registry review',render:(r:Row)=><>
+              <button type="button" className="mb-2 block font-semibold text-wk-brand underline"
+                onClick={()=>setCorrectionFocus({rowId:r.captureRowId,fieldPath:'recording.identity'})}>
+                Inspect correction authority
+              </button><a
               className="font-semibold text-wk-brand underline"
               href={r.canonicalTrackId&&r.registryTrackSlug
                 ?'/admin/registry/tracks/'+encodeURIComponent(r.registryTrackSlug)
@@ -375,6 +603,138 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
               Review Credited Artist {i+1}
             </a>)}</>}]:[]),
           ]}/>
+        {qualify&&correctionFocus&&<div data-wk100-correction-context
+          className="mt-4 space-y-3 rounded-xl border border-wk-border p-4">
+          <h4 className="text-sm font-bold text-wk-text">Correction authority and original evidence</h4>
+          {correctionContext&&focusedRow?<>
+            <p className="text-xs text-wk-text-muted">
+              Source position {correctionContext.sourceRank} · Receipt {correctionContext.receiptId}
+            </p>
+            <WkSelect ariaLabel="Correction fact to investigate"
+              value={correctionFocus.fieldPath}
+              onChange={fieldPath=>setCorrectionFocus(current=>current?
+                {...current,fieldPath}:null)}
+              options={Object.entries(WK100_CORRECTION_FIELDS).map(([value,entry])=>
+                ({value,label:entry.label}))}/>
+            <WkDetailList items={[
+              {label:'Existing authority',value:correctionContext.authority},
+              {label:'Correction treatment',value:correctionContext.treatment.replaceAll('_',' ')},
+              {label:'Original source SHA-256',value:correctionContext.sourceOriginalSha256},
+              {label:'Current Registry facts SHA-256',value:correctionContext.registryFactsSha256},
+              {label:'Saved eligibility policy SHA-256',value:correctionContext.editionPolicySha256},
+            ]}/>
+            <a className="inline-block font-semibold text-wk-brand underline"
+              href={correctionPath} target="_blank" rel="noopener noreferrer">
+              {correctionPath==='/admin/review/mizizi'?
+                'Open governed MIZIZI review':'Open existing Registry editor'}
+            </a>
+            <div className="space-y-3 rounded-lg border border-wk-border p-3">
+              <h5 className="text-sm font-semibold text-wk-text">Review Decision</h5>
+              <p className="text-xs text-wk-text-muted">
+                {casePhase==='loading'?'Loading saved case history.':
+                  casePhase==='unavailable'?'Saved decisions are unavailable.':
+                  focusedCase?'Saved state: '+focusedCase.state.replaceAll('_',' ')+
+                    '. Revision '+focusedCase.revision+'. Events: '+focusedCase.eventCount+'.':
+                    'No decision recorded for this fact and policy revision.'}
+              </p>
+              <WkSelect ariaLabel="Review decision" value={caseAction}
+                disabled={casePhase!=='ready'||!!focusedCase&&
+                  ['closed_no_change','applied_registry'].includes(focusedCase.state)}
+                onChange={value=>setCaseAction(value as typeof caseAction)}
+                options={[
+                  {value:'request_registry_review',label:'Request Registry Review'},
+                  {value:'hold',label:'Keep on Hold'},
+                  {value:'closed_no_change',label:'Close Without Changes'},
+                ]}/>
+              <TextField aria-label="Reason for correction decision" value={caseReason}
+                onChange={setCaseReason} isDisabled={casePhase!=='ready'}>
+                <TextArea rows={3} maxLength={800}
+                  className="wk-input w-full min-w-0 rounded-xl border-wk-border bg-wk-surface text-[16px] text-wk-text"
+                  placeholder="Explain what needs review and which evidence supports your decision."/>
+              </TextField>
+              <button type="button" className="wk-button wk-button-primary wk-button-sm"
+                disabled={casePhase!=='ready'||caseReason.trim().length<12||
+                  !!focusedCase&&['closed_no_change','applied_registry'].includes(focusedCase.state)}
+                onClick={()=>void saveCase()}>
+                Record Review Decision
+              </button>
+              {caseMessage&&<p role="status" className="text-xs text-wk-text-muted">{caseMessage}</p>}
+              {casePhase==='unavailable'&&<button type="button"
+                className="wk-button wk-button-secondary wk-button-sm"
+                onClick={()=>setCaseReadNonce(x=>x+1)}>Retry Saved Case Read</button>}
+              {supportedCanonicalField&&<div data-wk100-canonical-application
+                className="space-y-3 rounded-lg border border-wk-border p-3">
+                <h5 className="text-sm font-semibold text-wk-text">
+                  Apply Reviewed Registry Fact
+                </h5>
+                <p className="text-xs text-wk-text-muted">
+                  This uses the existing typed Registry writer and requires Registry edit permission.
+                  Save a Request Registry Review decision first. The case, writer and audit
+                  succeed or fail in one database transaction.
+                </p>
+                <WkDetailList items={[
+                  {label:'Current canonical value',
+                    value:currentCanonicalValue===null||currentCanonicalValue===undefined
+                      ?'Unknown / not recorded':String(currentCanonicalValue)},
+                  {label:'Expected Registry revision',
+                    value:expectedEntityUpdatedAt??'Not available. Refresh the receipt.'},
+                ]}/>
+                {['track.isrc','track.explicit','track.duration_ms','release.release_date']
+                  .includes(correctionContext.fieldPath)&&<WkSelect
+                    ariaLabel="Canonical fact operation" value={clearCanonicalValue?'clear':'replace'}
+                    disabled={!canApplyCanonical&&focusedCase?.state!=='request_registry_review'}
+                    onChange={value=>setClearCanonicalValue(value==='clear')}
+                    options={[{value:'replace',label:'Replace value'},
+                      {value:'clear',label:'Clear to unknown'}]}/>}
+                {!clearCanonicalValue&&(correctionContext.fieldPath==='track.explicit'
+                  ?<WkSelect ariaLabel="New explicit status" value={newCanonicalValue}
+                    onChange={setNewCanonicalValue}
+                    disabled={applyPhase==='saving'}
+                    options={[{value:'',label:'Choose status'},
+                      {value:'true',label:'Explicit'},
+                      {value:'false',label:'Not explicit'}]}/>
+                  :correctionContext.fieldPath==='release.release_type'
+                    ?<WkSelect ariaLabel="New release type" value={newCanonicalValue}
+                      onChange={setNewCanonicalValue}
+                      disabled={applyPhase==='saving'}
+                      options={[{value:'',label:'Choose release type'},
+                        ...['single','ep','album','mixtape','compilation','video','live','unknown']
+                          .map(value=>({value,label:value.replaceAll('_',' ')}))]}/>
+                    :<TextField aria-label="New canonical fact value"
+                      value={newCanonicalValue} onChange={setNewCanonicalValue}
+                      isDisabled={applyPhase==='saving'}>
+                      <Input type="text" maxLength={300}
+                        className="wk-input w-full rounded-xl border-wk-border bg-wk-surface text-[16px] text-wk-text"
+                        placeholder={correctionContext.fieldPath==='release.release_date'
+                          ?'YYYY-MM-DD':correctionContext.fieldPath==='track.duration_ms'
+                            ?'Duration in milliseconds':'Corrected factual value'}/>
+                    </TextField>)}
+                <TextField aria-label="Registry correction rationale" value={applyReason}
+                  onChange={setApplyReason} isDisabled={applyPhase==='saving'}>
+                  <TextArea rows={3} maxLength={800}
+                    className="wk-input w-full rounded-xl border-wk-border bg-wk-surface text-[16px] text-wk-text"
+                    placeholder="Record why this canonical change is supported by evidence."/>
+                </TextField>
+                <button type="button" className="wk-button wk-button-primary wk-button-sm"
+                  disabled={!canApplyCanonical}
+                  onClick={()=>void applyCanonicalCorrection()}>
+                  Apply Through Registry Writer
+                </button>
+                {applyMessage&&<p role="status" className="text-xs text-wk-text-muted">
+                  {applyMessage}
+                </p>}
+              </div>}
+              <p className="text-xs text-wk-text-muted">
+                This context is not a saved decision until you select Record Review Decision.
+                Recording a review decision does not change a Registry fact.
+                Apply factual corrections in the existing governed editor.
+                Linking a verified Registry write requires separate acceptance.
+              </p>
+            </div>
+          </>:<p role="alert" className="text-sm text-wk-danger">
+            The selected receipt or Registry evidence changed. Select a verified position again.
+          </p>}
+        </div>}
         <p className="mt-4 text-xs text-wk-text-muted">
           {qualify
             ?'This is a private rule preview. Exclusions and reviews need governed decisions. No rows were changed, scored, or published.'

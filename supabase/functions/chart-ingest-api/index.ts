@@ -5,6 +5,7 @@ import { previewFullIngestFilters, ChartIngestPreviewHold } from "../_shared/cha
 import { executeFullFilterStage, FullFilterStageHold } from "../_shared/chart-ingest-full-filter-stage.mjs";
 import { createIngestPolicySnapshot, ChartIngestPolicyError, assertIngestEvaluatorReady } from "../_shared/chart-ingest-policy-snapshot.mjs";
 import { canonicalJSON, digestSHA256 } from "../_shared/chart-weekly-evidence.mjs";
+import { validateWk100MethodologyCandidate } from "../_shared/wk100-methodology-candidate.mjs";
 import {
   compactProviderIdentityPart as compactIdentityPart,
   normalizeIsrc,
@@ -831,6 +832,7 @@ const WK100_DRAFT_KEYS = new Set([
   "chartSize","market","chartKind","coverStyle","sourceUrls",
   "saveAsRecurring","eligibilityProfileId","marketScopeId",
   "eligibilityProfileSnapshot","marketScopeSnapshot",
+  "methodologyCandidate","ingestPolicySha256",
 ]);
 
 function validWk100Week(week: unknown): week is string {
@@ -865,7 +867,28 @@ async function handleWk100SaveAdminDraft(
       !draft || Array.isArray(draft) || typeof draft!=="object") {
     return json(req,{error:"invalid_draft_request"},400);
   }
-  const config=draft as Record<string,unknown>;
+  const config={...(draft as Record<string,unknown>)};
+  const explicitMethodologyProposal=Object.prototype.hasOwnProperty.call(
+    config,"methodologyCandidate");
+  // The existing Edition editor does not yet send W7 data. Preserve a prior
+  // proposed methodology on an otherwise authorized, exact-revision save.
+  // A changed eligibility-policy digest makes that candidate STALE, not frozen.
+  const previous=await db.rpc("wk100_get_admin_draft_v1",{p_week:week});
+  if(previous.error)return json(req,{error:"draft_read_unavailable"},503);
+  const prior=previous.data as {revision?:number;config?:Record<string,unknown>}|null;
+  if ((prior?.revision??0)!==Number(revision))
+    return json(req,{error:"draft_revision_conflict",retryable:false},409);
+  // Ranking is now a fixed research primitive, not an editable week setting.
+  // Older proposal payloads stay in the historical draft for audit/replay, but
+  // no caller may insert or replace them through this active route.
+  if (explicitMethodologyProposal&&
+      (prior?.config?.methodologyCandidate===undefined||
+       canonicalJSON(config.methodologyCandidate)!==
+       canonicalJSON(prior.config.methodologyCandidate)))
+    return json(req,{error:"wk100_methodology_write_retired"},400);
+  if (!explicitMethodologyProposal&&
+      prior?.config?.methodologyCandidate!==undefined)
+    config.methodologyCandidate=prior.config.methodologyCandidate;
   if (Object.keys(config).some(k=>!WK100_DRAFT_KEYS.has(k)) ||
       config.schemaVersion!==WK100_DRAFT_SCHEMA ||
       config.programId!=="top100" || config.weekStartEat!==week ||
@@ -900,6 +923,15 @@ async function handleWk100SaveAdminDraft(
     eligibilityProfileSnapshot:config.eligibilityProfileSnapshot,
     marketScopeSnapshot:config.marketScopeSnapshot,
   }));
+  if(config.methodologyCandidate!==undefined){
+    try{
+      // A stale proposal is retained as evidence, but is not valid for ranking.
+      validateWk100MethodologyCandidate(config.methodologyCandidate,{
+        weekStartEat:week,
+        ...(explicitMethodologyProposal?{ingestPolicySha256:policyDraftDigest}:{}),
+      });
+    }catch{return json(req,{error:"methodology_candidate_invalid"},400);}
+  }
   const sealed={...config,ingestPolicySha256:policyDraftDigest};
   if(JSON.stringify(sealed).length>100000)return json(req,{error:"configuration_too_large"},413);
   const {data,error}=await db.rpc("wk100_save_admin_draft_v1",{
