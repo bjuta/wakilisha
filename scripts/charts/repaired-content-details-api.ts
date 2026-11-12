@@ -323,6 +323,7 @@ async function artistChartEntries(artistSlug: string): Promise<Row[]> {
           order by coalesce(ce.rank, 999999)::int asc
         ) as rn
       from wk_chart_entries_v2 ce
+      join wk_chart_editions_v2 ed on ed.id = ce.edition_id and ed.status = 'published'
       where ce.artist_slug = $1
     )
     select rank, title, artist, slug, movement, movement_amount, peak_position, weeks_on_chart, artwork_url
@@ -516,8 +517,8 @@ async function trackChartStats(trackSlug: string, artistSlug = "", trackTitle = 
       coalesce(ce.artist_name, '') as artist_name,
       coalesce(ce.artwork_url, '') as artwork_url
     from wk_chart_entries_v2 ce
-    left join wk_chart_editions_v2 ed
-      on ed.id::text = ce.edition_id::text
+    join wk_chart_editions_v2 ed
+      on ed.id::text = ce.edition_id::text and ed.status = 'published'
     where (
       ce.track_slug = $1
       or lower(ce.track_title) = lower($3)
@@ -662,7 +663,10 @@ async function getTrackDetail(slug: string, artistSlug = ""): Promise<Record<str
         min(rank)::int as top_chart_position,
         count(distinct edition_id)::int as chart_count
       from wk_chart_entries_v2
-      where track_slug = $1
+      where exists (
+        select 1 from wk_chart_editions_v2 visible
+        where visible.id = edition_id and visible.status = 'published'
+      ) and track_slug = $1
         and ($2 = '' or artist_slug = $2)
       group by track_slug, track_title, artist_name, artist_slug, artwork_url
       order by chart_count desc, top_chart_position asc nulls last
