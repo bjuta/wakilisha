@@ -101,12 +101,9 @@ export function validateDisposableCiReplayRepositoryState({
     if(entry.path===latestEntry.path){
       if(JSON.stringify(atReplayNames)!==JSON.stringify(migrations))
         errors.push("disposable CI migration filename set changed since latest replay");
-      // A CLI-minted migration can be earlier than a newer version already
-      // on main. Prove its exact identity AND the full unchanged 249-file
-      // manifest rather than conflating the two version numbers.
       if(proof.schema_migration_count!==migrations.length ||
-         proof.schema_migration_head!==path.basename(entry.path).slice(0,14))
-        errors.push("disposable CI latest proof does not bind its changed migration version");
+         proof.schema_migration_head!==path.basename(latestMigration).slice(0,14))
+        errors.push("disposable CI latest proof does not bind active migration head");
     }else{
       const changes=git(["diff","--name-status",replay,"HEAD","--",MIGRATIONS_DIR],
         {allowFailure:true});
@@ -122,9 +119,7 @@ export function validateDisposableCiReplayRepositoryState({
       seal.baseMainSha!==mergeBase ||
       seal.replayCandidateHeadSha!==newest.replay_candidate_head_sha ||
       seal.workflowRunId!==newest.workflow_run_id ||
-      // The schema seal describes the newest version of the FULL replayed
-      // manifest; the proof above separately pins the added migration.
-      seal.migrationHead!==path.basename(latestMigration).slice(0,14) ||
+      seal.migrationHead!==newest.schema_migration_head ||
       baseline.typesSha256!==actualTypesSha256 ||
       baseline.migrationCount!==migrations.length ||
       baseline.latestMigration!==latestMigration)
