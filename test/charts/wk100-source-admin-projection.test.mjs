@@ -1291,7 +1291,7 @@ test('WK100 W5C correction context ties every investigation to immutable source 
 
 test('WK100 W5C migration uses CLI-minted path, private append-only history, and caller-bound CAS',async()=>{
   const sql=await readFile(
-    'supabase/migrations/20261110190405_wk100_correction_decision_ledger_v1.sql','utf8');
+    'supabase/migrations/20261112164236_wk100_correction_decision_ledger_forward_v1.sql','utf8');
   assert.ok(sql.length>12000);
   assert.match(sql,/Exact filename minted by Supabase CLI v2\.107\.0/);
   for(const required of [
@@ -1371,7 +1371,7 @@ test('WK100 W5C typed correction values cannot bypass the existing Registry writ
 
 test('WK100 W5C atomically invokes the typed Registry writer before private immutable proof',async()=>{
   const sql=await readFile(
-    'supabase/migrations/20261110190405_wk100_correction_decision_ledger_v1.sql','utf8');
+    'supabase/migrations/20261112164236_wk100_correction_decision_ledger_forward_v1.sql','utf8');
   const name='create function public.wk100_apply_reviewed_registry_correction_v1(';
   const start=sql.indexOf(name);
   const end=sql.indexOf('revoke all on function public.wk100_apply_reviewed_registry_correction_v1(',start);
