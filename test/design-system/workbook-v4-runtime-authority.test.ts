@@ -1,4 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
+import { createHmac } from "node:crypto";
+import { verifyBriefingWebhookSignature } from "../../supabase/functions/_shared/briefing-webhook-verification";
 import { describe, expect, it } from "vitest";
 
 const read = (name: string) => readFileSync(name, "utf8");
@@ -327,6 +329,48 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(messages).toContain('sendMessage(selectedId, composer.trim())');
     expect(notifications).toContain('handleMarkAll()');
     expect(notifications).toContain('notificationTarget(');
+  });
+
+  it("verifies Resend Svix raw-body signatures and rejects unsigned or replayed briefing callbacks", async () => {
+    const sender = read("supabase/functions/briefing-handler/index.ts");
+    expect(sender).toContain('if (!RW) return jE("webhook_not_configured"');
+    expect(sender).toContain("await verifyBriefingWebhookSignature(RW, req.headers, bodyText)");
+    expect(sender).toContain('eq("status", "published")');
+    expect(sender).not.toContain("hexToBytes(");
+    const key = Buffer.alloc(32, 7);
+    const secret = "whsec_" + key.toString("base64");
+    const nowMs = Date.UTC(2026, 10, 12, 12, 0, 0);
+    const timestamp = String(Math.floor(nowMs / 1000));
+    const id = "msg_wakilisha_test_001";
+    const body = '{"type":"email.delivered","data":{"email_id":"fixture-123"}}';
+    const signature = createHmac("sha256", key)
+      .update(`${id}.${timestamp}.${body}`).digest("base64");
+    const headers = new Headers({
+      "svix-id": id,
+      "svix-timestamp": timestamp,
+      "svix-signature": `v1,${signature}`,
+    });
+    const verify = (secretValue: string, h: Headers, payload: string, clock = nowMs) =>
+      verifyBriefingWebhookSignature(secretValue, h, payload, clock);
+    expect(await verify(secret, headers, body)).toBe(true);
+    expect(await verify(secret, new Headers({
+      ...Object.fromEntries(headers.entries()),
+      "svix-signature": `v2,AAAA v1,${signature}`,
+    }), body)).toBe(true);
+    expect(await verify("", headers, body)).toBe(false);
+    expect(await verify("whsec_invalid", headers, body)).toBe(false);
+    expect(await verify(secret, headers, body + " ")).toBe(false);
+    expect(await verify(secret, new Headers({ ...Object.fromEntries(headers.entries()),
+      "svix-id": "msg_different" }), body)).toBe(false);
+    expect(await verify(secret, new Headers({ ...Object.fromEntries(headers.entries()),
+      "svix-signature": "v1,AAAA" }), body)).toBe(false);
+    expect(await verify(secret, new Headers({ ...Object.fromEntries(headers.entries()),
+      "svix-signature": "v2," + signature }), body)).toBe(false);
+    expect(await verify(secret, new Headers({ ...Object.fromEntries(headers.entries()),
+      "svix-signature": "not-a-versioned-signature" }), body)).toBe(false);
+    expect(await verify(secret, new Headers(), body)).toBe(false);
+    expect(await verify(secret, headers, body, nowMs + 301_000)).toBe(false);
+    expect(await verify(secret, headers, body, nowMs - 301_000)).toBe(false);
   });
 
 });
