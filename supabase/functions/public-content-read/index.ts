@@ -1630,17 +1630,29 @@ Deno.serve(async (req) => {
       const metaAlbums = Array.isArray(meta.studio_albums) ? meta.studio_albums as any[] : [];
       const metaEps = Array.isArray(meta.eps_compilations) ? meta.eps_compilations as any[] : [];
       // Discography and initial chart evidence are independent canonical reads.
-      const publishedChartIds = await loadPublishedChartEditionIds(supabase);
+      // Fetch the publication allowlist inside the Chart promise, so that
+      // verification never serializes an unrelated Registry discography read.
+      let publishedChartIds: string[] = [];
       const [releases, chartResult] = await Promise.all([
         getArtistDiscography(supabase, String(artist.id), displayName, slug, metaAlbums, metaEps),
-        publishedChartIds.length > 0
-          ? supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").eq("artist_slug", slug).in("edition_id", publishedChartIds).order("rank", { ascending: true }).limit(50)
-          : Promise.resolve({ data: [] }),
+        (async () => {
+          publishedChartIds = await loadPublishedChartEditionIds(supabase);
+          return publishedChartIds.length > 0
+            ? await supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").eq("artist_slug", slug).in("edition_id", publishedChartIds).order("rank", { ascending: true }).limit(50)
+            : { data: [] };
+        })(),
       ]);
       const allGenres = curatedGenres;
       const { data: chartEntriesBySlug } = chartResult;
       let chartEntries = chartEntriesBySlug ?? [];
-      if (chartEntries.length === 0 && displayName && publishedChartIds.length > 0) { const { data: chartEntriesByName } = await supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").ilike("artist_name", displayName).in("edition_id", publishedChartIds).order("rank", { ascending: true }).limit(50); chartEntries = chartEntriesByName ?? []; }
+      if (chartEntries.length === 0 && displayName) {
+        // Artist-name fallback is permitted only within the same verified
+        // published Edition set. No unrestricted fallback is ever issued.
+        if (publishedChartIds.length > 0) {
+          const { data: chartEntriesByName } = await supabase.from("wk_chart_entries_v2").select("rank, track_title, track_slug, movement, previous_rank, artwork_url, edition_id, artist_name").ilike("artist_name", displayName).in("edition_id", publishedChartIds).order("rank", { ascending: true }).limit(50);
+          chartEntries = chartEntriesByName ?? [];
+        }
+      }
       const chartEntryList = chartEntries.map((e: any) => { const prev = Number(e.previous_rank || 0); const curr = Number(e.rank || 0); let movement: string = String(e.movement || "same"); let movementAmount = 0; if (prev > 0 && curr > 0) { if (curr < prev) { movement = "up"; movementAmount = prev - curr; } else if (curr > prev) { movement = "down"; movementAmount = curr - prev; } } return { rank: curr, title: String(e.track_title || ""), artist: String(e.artist_name || ""), slug: String(e.track_slug || ""), movement, movementAmount, peakPosition: curr, weeksOnChart: 1, artworkUrl: e.artwork_url || "" }; });
       const relatedArtistsMap = new Map<string, any>();
 
