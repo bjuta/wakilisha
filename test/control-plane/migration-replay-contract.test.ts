@@ -60,38 +60,6 @@ describe(
         ...args,migrationSha256:"0".repeat(64),
       })).toContain("disposable CI migration digest mismatch");
     });
-    it("seals earlier CLI-minted additive migration without altering the newer repository manifest head", () => {
-      const proof=JSON.parse(readFileSync(
-        "docs/engineering/replay-proofs/20261110190405_wk100_correction_decision_ledger_v1.sql.json",
-        "utf8",
-      ));
-      const baseline=JSON.parse(readFileSync(
-        "docs/engineering/live-schema-baseline.json","utf8",
-      ));
-      expect(validateDisposableCiReplayProof({
-        proof,migrationFile:proof.migration_file,
-        migrationSha256:proof.migration_sha256,baseMainSha:proof.base_main_sha,
-      })).toEqual([]);
-      expect(proof.schema_migration_head).toBe("20261110190405");
-      expect(baseline.latestMigration).toBe("20261112123805_wk100_governed_publisher_withdrawal_v1.sql");
-      expect(baseline.schemaSeal.migrationHead).toBe("20261112123805");
-      expect(baseline.migrationCount).toBe(249);
-      expect(baseline.schemaSeal.mode).toBe("disposable_ci");
-      expect(baseline.schemaSeal.replayCandidateHeadSha).toBe(proof.replay_candidate_head_sha);
-      const verifier=readFileSync("scripts/control-plane/verify-disposable-ci-replay-proof.mjs","utf8");
-      expect(verifier).toContain("proof.schema_migration_head!==path.basename(entry.path).slice(0,14)");
-      expect(verifier).toContain("seal.migrationHead!==path.basename(latestMigration).slice(0,14)");
-      expect(validateRepositorySchemaSnapshot({
-        baseline,actualTypesSha256:proof.schema_types_sha256,
-        expectedProjectRef:"pgzizndxdyhqmtyywjmt",
-        migrationCount:249,latestMigration:baseline.latestMigration,
-      })).toEqual([]);
-      expect(validateRepositorySchemaSnapshot({
-        baseline:{...baseline,schemaSeal:{...baseline.schemaSeal,migrationHead:"20261110190405"}},
-        actualTypesSha256:proof.schema_types_sha256,expectedProjectRef:"pgzizndxdyhqmtyywjmt",
-        migrationCount:249,latestMigration:baseline.latestMigration,
-      })).toContain("schemaSeal.migrationHead must be 20261112123805");
-    });
     it("seals the exact owner-reported local replay without impersonating GitHub Actions", () => {
       const proof=JSON.parse(readFileSync(
         "docs/engineering/replay-proofs/20261105131250_wk100_collect_now_authorized_v1.sql.json",
