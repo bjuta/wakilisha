@@ -120,6 +120,8 @@ async function v2Request<T>(path: string): Promise<T> {
   try {
     const response = await fetch(`${PUBLIC_V2_API_BASE}${path}`, {
       method: "GET",
+      // A previously published Edition must not reappear from browser HTTP cache.
+      cache: "no-store",
       headers: { Accept: "application/json", ...buildAuthHeaders() },
       signal: controller.signal,
     });

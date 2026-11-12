@@ -550,8 +550,28 @@ async function fetchRecentArticles(db: any, limit = 5): Promise<BriefingContent[
 
 async function fetchChartHighlights(db: any, limit = 5): Promise<BriefingContent["chartHighlights"]> {
   try {
-    const { data } = await db.from("wk_chart_entries_v2").select("rank, movement, track_title, artist_name, wk_chart_editions_v2!inner(slug, title, edition_date)").order("wk_chart_editions_v2(edition_date)", { ascending: false }).limit(limit);
-    return (data ?? []).map((e: any) => ({ track_title: e.track_title ?? "", artist_name: e.artist_name ?? "", rank: e.rank ?? 0, movement: e.movement ?? undefined, chart_name: (e.wk_chart_editions_v2 as any)?.title ?? "", edition_slug: (e.wk_chart_editions_v2 as any)?.slug ?? undefined }));
+    // There is no Entries-to-Editions FK. A service-role newsletter must first
+    // establish a currently published Edition, not replay an old chart snapshot.
+    const { data: editions, error: editionError } = await db.from("wk_chart_editions_v2")
+      .select("id, edition_slug, edition_label").eq("status", "published")
+      .order("edition_date", { ascending: false }).limit(5);
+    if (editionError) return [];
+    for (const edition of editions ?? []) {
+      const { data: entries, error } = await db.from("wk_chart_entries_v2")
+        .select("rank, movement, track_title, artist_name")
+        .eq("edition_id", edition.id).order("rank", { ascending: true }).limit(limit);
+      if (error) return [];
+      if ((entries ?? []).length === 0) continue;
+      return (entries ?? []).map((e: any) => ({
+        track_title: e.track_title ?? "",
+        artist_name: e.artist_name ?? "",
+        rank: e.rank ?? 0,
+        movement: e.movement ?? undefined,
+        chart_name: edition.edition_label ?? "",
+        edition_slug: edition.edition_slug ?? undefined,
+      }));
+    }
+    return [];
   } catch { return []; }
 }
 

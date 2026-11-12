@@ -799,7 +799,7 @@ test('EAT deadline, editorial exception review and nonpublishing authority',asyn
  }
 });
 
-test('WK100 SQL draft remains inert and binds source admissions, editorial roles, week lock, and Registry handoff',async()=>{
+test('WK100 publication contracts and public-read boundaries stay fail-closed',async()=>{
  const sql=await readFile('scripts/acceptance/wk100-governed-editorial-approval-candidate-v1.sql','utf8');
  const interlock=sql.indexOf('WK100_CANDIDATE_EXECUTION_PROHIBITED');
  const firstDDL=sql.indexOf('create table platform_private.');
@@ -825,4 +825,31 @@ test('WK100 SQL draft remains inert and binds source admissions, editorial roles
  assert.match(sql,/wk100_governed_source_admissions_v1/);
  assert.match(sql,/100,100,'draft'/);
  assert.doesNotMatch(sql,/100,100,'published'/);
+ // A withdrawal must never become a public Edition through a permissive
+ // status mapper, service-role projection, alternate SQL path, or stale cache.
+ const gateway=await readFile('supabase/functions/public-content-read/index.ts','utf8');
+ const runtime=await readFile('src/services/chartsPublic/supabaseRuntime.ts','utf8');
+ const repository=await readFile('scripts/charts/v2-api-repository.ts','utf8');
+ const alternate=await readFile('scripts/charts/repaired-content-details-api.ts','utf8');
+ const artistIndex=await readFile('scripts/charts/repaired-content-api.ts','utf8');
+ const chartClient=await readFile('src/services/chartsPublic/client.ts','utf8');
+ const browserApi=await readFile('src/services/chartsPublic/v2Adapter.ts','utf8');
+ const briefing=await readFile('supabase/functions/briefing-handler/index.ts','utf8');
+ assert.match(gateway,/async function loadPublishedChartEditionIds\(/);
+ assert.equal((gateway.match(/\.in\("edition_id", publishedChartIds\)/g)||[]).length,8);
+ assert.match(gateway,/\.eq\("status", "published"\)/);
+ assert.match(runtime,/\.eq\("status", "published"\)/);
+ assert.match(runtime,/\.in\("edition_id", publishedIds\)/);
+ assert.match(runtime,/if \(!stillPublished \|\| stillPublished\.id !== editionId\) return \[\]/);
+ assert.doesNotMatch(runtime,/status: asString\(row\.status, "published"\)/);
+ assert.doesNotMatch(runtime,/matching\.length > 0 \? matching : editions/);
+ assert.match(repository,/AND e\.status = 'published'/);
+ assert.match(repository,/AND visible\.status = 'published'/);
+ assert.match(alternate,/ed\.status = 'published'/);
+ assert.match(artistIndex,/visible\.status = 'published'/);
+ assert.match(briefing,/\.eq\("status", "published"\)/);
+ assert.match(briefing,/\.eq\("edition_id", edition\.id\)/);
+ assert.doesNotMatch(chartClient,/getCachedChart|setCachedChart|isStale: true/);
+ assert.equal((chartClient.match(/return readChartFresh\(/g)||[]).length,8);
+ assert.match(browserApi,/cache: "no-store"/);
 });
