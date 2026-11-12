@@ -28308,6 +28308,17 @@ export type Database = {
         }
         Returns: string
       }
+      wk100_apply_reviewed_registry_correction_v1: {
+        Args: {
+          p_case_id: string
+          p_expected_case_revision: number
+          p_expected_entity_updated_at: string
+          p_new_value: Json
+          p_operation_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       wk100_attest_private_ranking_replay_v1: {
         Args: { p_proposal: Json }
         Returns: string
@@ -28350,6 +28361,14 @@ export type Database = {
         Args: { p_proposal_sha256: string; p_week: string }
         Returns: string
       }
+      wk100_read_correction_application_v1: {
+        Args: { p_case_id: string }
+        Returns: Json
+      }
+      wk100_read_correction_cases_v1: {
+        Args: { p_capture_row_id: string; p_receipt_id: string; p_week: string }
+        Returns: Json
+      }
       wk100_record_collection_action_v1: {
         Args: {
           p_action: string
@@ -28361,6 +28380,10 @@ export type Database = {
           p_scheduled_at: string
           p_week: string
         }
+        Returns: Json
+      }
+      wk100_record_correction_decision_v1: {
+        Args: { p_request: Json }
         Returns: Json
       }
       wk100_register_governed_editorial_approval_v1: {
