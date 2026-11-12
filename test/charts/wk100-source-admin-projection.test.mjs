@@ -1293,7 +1293,7 @@ test('WK100 W5C migration uses CLI-minted path, private append-only history, and
   const sql=await readFile(
     'supabase/migrations/20261112164236_wk100_correction_decision_ledger_forward_v1.sql','utf8');
   assert.ok(sql.length>12000);
-  assert.match(sql,/Exact filename minted by Supabase CLI v2\.107\.0/);
+  assert.match(sql,/Forward migration filename minted by Supabase CLI v2\.107\.0/);
   for(const required of [
     'platform_private.wk100_correction_cases_v1',
     'platform_private.wk100_correction_events_v1',
