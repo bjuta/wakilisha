@@ -1,0 +1,29 @@
+name: WK100 Ephemeral Native CLI Migration Filename Authority
+on:
+  push:
+    branches:
+      - tooling/wk100-forward-cli-mint-20261112
+permissions:
+  contents: read
+jobs:
+  mint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+          github-token: ${{ github.token }}
+      - name: Mint exact forward filename; no repository, cloud, or database mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --version
+          test -z "$(git status --porcelain)"
+          supabase migration new wk100_correction_decision_ledger_forward_v1
+          name="$(find supabase/migrations -maxdepth 1 -type f -name '[0-9]*_wk100_correction_decision_ledger_forward_v1.sql' -printf '%f\n')"
+          test "$(printf '%s\n' "$name" | wc -l | tr -d ' ')" = "1"
+          test "$(printf '%s' "$name" | grep -Ec '^[0-9]{14}_wk100_correction_decision_ledger_forward_v1\.sql$')" = "1"
+          echo "WK100_CLI_MINTED_FORWARD_FILENAME=$name"
+          echo "WK100_CLI_MINT_NO_DATABASE_OPERATION=PASS"
