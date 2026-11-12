@@ -799,7 +799,7 @@ test('EAT deadline, editorial exception review and nonpublishing authority',asyn
  }
 });
 
-test('WK100 SQL draft remains inert and binds source admissions, editorial roles, week lock, and Registry handoff',async()=>{
+test('WK100 publication contracts and public-read boundaries stay fail-closed',async()=>{
  const sql=await readFile('scripts/acceptance/wk100-governed-editorial-approval-candidate-v1.sql','utf8');
  const interlock=sql.indexOf('WK100_CANDIDATE_EXECUTION_PROHIBITED');
  const firstDDL=sql.indexOf('create table platform_private.');
@@ -825,4 +825,68 @@ test('WK100 SQL draft remains inert and binds source admissions, editorial roles
  assert.match(sql,/wk100_governed_source_admissions_v1/);
  assert.match(sql,/100,100,'draft'/);
  assert.doesNotMatch(sql,/100,100,'published'/);
+ // A withdrawal must never become a public Edition through a permissive
+ // status mapper, service-role projection, alternate SQL path, or stale cache.
+ const gateway=await readFile('supabase/functions/public-content-read/index.ts','utf8');
+ const runtime=await readFile('src/services/chartsPublic/supabaseRuntime.ts','utf8');
+ const repository=await readFile('scripts/charts/v2-api-repository.ts','utf8');
+ const alternate=await readFile('scripts/charts/repaired-content-details-api.ts','utf8');
+ const artistIndex=await readFile('scripts/charts/repaired-content-api.ts','utf8');
+ const chartClient=await readFile('src/services/chartsPublic/client.ts','utf8');
+ const browserApi=await readFile('src/services/chartsPublic/v2Adapter.ts','utf8');
+ const briefing=await readFile('supabase/functions/briefing-handler/index.ts','utf8');
+ assert.match(gateway,/async function loadPublishedChartEditionIds\(/);
+ assert.equal((gateway.match(/\.in\("edition_id", publishedChartIds\)/g)||[]).length,8);
+ assert.match(gateway,/\.eq\("status", "published"\)/);
+ assert.match(runtime,/\.eq\("status", "published"\)/);
+ assert.match(runtime,/\.in\("edition_id", publishedIds\)/);
+ assert.match(runtime,/if \(!stillPublished \|\| stillPublished\.id !== editionId\) return \[\]/);
+ assert.doesNotMatch(runtime,/status: asString\(row\.status, "published"\)/);
+ assert.doesNotMatch(runtime,/matching\.length > 0 \? matching : editions/);
+ assert.match(repository,/AND e\.status = 'published'/);
+ assert.match(repository,/AND visible\.status = 'published'/);
+ assert.match(alternate,/ed\.status = 'published'/);
+ assert.match(artistIndex,/visible\.status = 'published'/);
+ assert.match(briefing,/\.eq\("status", "published"\)/);
+ assert.match(briefing,/\.eq\("edition_id", edition\.id\)/);
+ assert.doesNotMatch(chartClient,/getCachedChart|setCachedChart|isStale: true/);
+ assert.equal((chartClient.match(/return readChartFresh\(/g)||[]).length,8);
+ assert.match(browserApi,/cache: "no-store"/);
+});
+
+
+test('WK100 governed withdrawal SQL retains immutable receipt authority and forbids visibility resurrection', async () => {
+ const sql=await readFile('supabase/migrations/20261112123805_wk100_governed_publisher_withdrawal_v1.sql','utf8');
+ assert.equal((sql.match(/^begin;$/gm)||[]).length,1);
+ assert.equal((sql.match(/^commit;$/gm)||[]).length,1);
+ assert.doesNotMatch(sql,/^rollback;$/m);
+ assert.match(sql,/references platform_private\.wk100_governed_publications_v1\(id\)/);
+ assert.match(sql,/references public\.wk_chart_editions_v2\(id\)/);
+ assert.match(sql,/unique\(program_id, week_start_eat\)/);
+ assert.match(sql,/enable row level security/);
+ assert.match(sql,/wk100_withdrawal_receipt_immutable_rows/);
+ assert.match(sql,/wk100_withdrawal_receipt_immutable_truncate/);
+ assert.match(sql,/wk100_block_editorial_approval_mutation_v1\(\)/);
+ assert.match(sql,/revoke all on platform_private\.wk100_governed_withdrawals_v1[\s\S]*?from public, anon, authenticated, service_role/);
+ assert.match(sql,/revoke execute on function public\.wk100_withdraw_governed_weekly_edition_v1\(date,text,text\)[\s\S]*?from public,anon,authenticated,service_role/);
+ assert.match(sql,/grant execute on function public\.wk100_withdraw_governed_weekly_edition_v1\(date,text,text\)[\s\S]*?to authenticated/);
+ assert.match(sql,/current_user_has_capability\('publish_charts'\)/);
+ assert.match(sql,/current_user_has_capability\('manage_charts'\)/);
+ assert.match(sql,/v_actor uuid:=auth\.uid\(\)/);
+ assert.match(sql,/v_prior\.withdrawn_by is distinct from v_actor/);
+ assert.match(sql,/v_prior\.reason is distinct from trim\(p_reason\)/);
+ assert.match(sql,/v_prior\.publication_id is distinct from v_publication\.id/);
+ assert.match(sql,/v_prior\.proposal_sha256 is distinct from p_proposal_sha256/);
+ assert.match(sql,/v_edition\.status is distinct from 'withdrawn'/);
+ assert.match(sql,/v_edition\.published_at is null/);
+ assert.match(sql,/v_publication\.approved_review_id is distinct from v_stage\.approval_id/);
+ assert.match(sql,/\(select count\(\*\) from public\.wk_chart_entries_v2 e where e\.edition_id=v_edition\.id\) <> 100/);
+ assert.match(sql,/w\.authorized_tx=txid_current\(\) and w\.withdrawn_by=auth\.uid\(\)/);
+ assert.match(sql,/old\.status='published' and new\.status='withdrawn'/);
+ assert.match(sql,/new\.published_by is not distinct from old\.published_by/);
+ assert.match(sql,/new\.published_at is not distinct from old\.published_at/);
+ assert.match(sql,/where id=v_stage\.edition_id and program_id='top100' and status='published'/);
+ assert.doesNotMatch(sql,/\b(update|delete\s+from|truncate)\s+public\.wk_chart_entries_v2\b/i);
+ assert.doesNotMatch(sql,/drop\s+(table|function)/i);
+ assert.doesNotMatch(sql,/set\s+status\s*=\s*'published'/i);
 });

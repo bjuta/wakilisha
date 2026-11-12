@@ -14,5 +14,21 @@ describe("public Artist full-profile query concurrency", () => {
     expect(artist).toContain("const [releases, chartResult] = await Promise.all([");
     expect(artist).toContain("const { data: chartEntriesBySlug } = chartResult");
     expect(artist).toContain("if (chartEntries.length === 0 && displayName)");
+    // Publication verification must run inside the Chart promise, not before
+    // both reads begin; the Artist-name fallback must reuse that allowlist.
+    const chartStart = artist.indexOf("const [releases, chartResult] = await Promise.all([");
+    const chartEnd = artist.indexOf("const allGenres = curatedGenres;", chartStart);
+    expect(chartStart).toBeGreaterThan(-1);
+    expect(chartEnd).toBeGreaterThan(chartStart);
+    const chartPromise = artist.slice(chartStart, chartEnd);
+    expect(chartPromise).toContain("publishedChartIds = await loadPublishedChartEditionIds(supabase)");
+    expect(chartPromise).toContain('in("edition_id", publishedChartIds)');
+    expect(artist).toContain("if (publishedChartIds.length > 0)");
+    expect(artist).toContain('ilike("artist_name", displayName).in("edition_id", publishedChartIds)');
+    const preflight = artist.slice(
+      artist.indexOf("// Discography and initial chart evidence"),
+      chartStart,
+    );
+    expect(preflight).not.toContain("await loadPublishedChartEditionIds(supabase)");
   });
 });

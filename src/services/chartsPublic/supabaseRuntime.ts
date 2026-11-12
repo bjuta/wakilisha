@@ -111,6 +111,8 @@ function toEdition(row: DbRow, familySlug: string): ChartEdition {
   const slug = slugify(pick(row, ["slug", "edition_slug", "public_slug"], date || id), id);
   const label = pick(row, ["label", "title", "name", "edition_title", "edition_label"], `${familySlug.replaceAll("-", " ")} ${date}`.trim());
 
+  if (row.status !== "published") throw new Error("Public Chart Edition must be published");
+
   return {
     id,
     familyId: familySlug,
@@ -119,7 +121,7 @@ function toEdition(row: DbRow, familySlug: string): ChartEdition {
     date,
     periodStart: dateOnly(row.period_start ?? row.periodStart ?? row.start_date) || date,
     periodEnd: dateOnly(row.period_end ?? row.periodEnd ?? row.end_date) || date,
-    status: asString(row.status, "published") === "draft" ? "draft" : "published",
+    status: "published",
     ingestJobId: asString(row.ingest_job_id ?? row.ingestRunId) || null,
     publishedAt: asString(row.published_at) || null,
     publishedBy: asString(row.published_by) || null,
@@ -170,6 +172,7 @@ async function loadEditionLookups(): Promise<EditionLookup[]> {
   const { data, error } = await supabase
     .from("wk_chart_editions_v2")
     .select("*, program:wk_chart_programs_v2!inner(id, public_slug, public_label, series_slug, market_slug)")
+    .eq("status", "published")
     .order("edition_date", { ascending: false })
     .limit(500);
 
@@ -213,13 +216,13 @@ export async function getSupabaseChartFamilies(): Promise<ChartFamily[]> {
 
 export async function getSupabaseChartFamily(familySlug: string): Promise<ChartFamily | null> {
   const families = await getSupabaseChartFamilies();
-  return families.find((family) => family.slug === familySlug || family.publicSlug === familySlug || family.familyKey === familySlug) ?? families[0] ?? null;
+  return families.find((family) => family.slug === familySlug || family.publicSlug === familySlug || family.familyKey === familySlug) ?? null;
 }
 
 export async function getSupabaseChartEditionsForFamily(familySlug: string): Promise<ChartEdition[]> {
   const editions = await loadEditionLookups();
   const matching = editions.filter((lookup) => lookup.familySlug === familySlug).map((lookup) => lookup.edition);
-  return matching.length > 0 ? matching : editions.map((lookup) => lookup.edition);
+  return matching;
 }
 
 export async function getSupabaseLatestChartEdition(familySlug: string): Promise<ChartEdition | null> {
@@ -229,12 +232,13 @@ export async function getSupabaseLatestChartEdition(familySlug: string): Promise
 
 export async function getSupabaseChartEdition(familySlug: string, editionSlug: string): Promise<ChartEdition | null> {
   const editions = await getSupabaseChartEditionsForFamily(familySlug);
-  return editions.find((edition) => edition.slug === editionSlug || edition.id === editionSlug) ?? editions[0] ?? null;
+  return editions.find((edition) => edition.slug === editionSlug || edition.id === editionSlug) ?? null;
 }
 
 export async function getSupabaseChartEditionEntries(_familySlug: string, editionSlug: string): Promise<ChartEditionEntry[]> {
   const edition = await getSupabaseChartEdition(_familySlug, editionSlug);
-  const editionId = edition?.id || editionSlug;
+  if (!edition) return [];
+  const editionId = edition.id;
   const { data, error } = await supabase
     .from("wk_chart_entries_v2")
     .select("*")
@@ -243,14 +247,28 @@ export async function getSupabaseChartEditionEntries(_familySlug: string, editio
     .limit(150);
 
   if (error) throw new Error(error.message);
+  // A withdrawal between the Edition lookup and entry read must not be returned.
+  const stillPublished = await getSupabaseChartEdition(_familySlug, editionSlug);
+  if (!stillPublished || stillPublished.id !== editionId) return [];
   return deepDecode(((data || []) as DbRow[])).map((row) => toEntry(row, editionId));
 }
 
 export async function getSupabaseTrackChartHistory(trackSlug: string): Promise<TrackChartHistory | null> {
+  // No Edition foreign key exists on wk_chart_entries_v2. Admit only exact
+  // currently published Edition IDs before querying historical appearances.
+  const { data: publishedEditions, error: editionError } = await supabase
+    .from("wk_chart_editions_v2")
+    .select("id")
+    .eq("status", "published")
+    .limit(1000);
+  if (editionError) throw new Error(editionError.message);
+  const publishedIds = (publishedEditions ?? []).map((row) => String(row.id));
+  if (publishedIds.length === 0) return null;
   const { data, error } = await supabase
     .from("wk_chart_entries_v2")
     .select("*")
     .eq("track_slug", trackSlug)
+    .in("edition_id", publishedIds)
     .order("created_at", { ascending: false })
     .limit(100);
 

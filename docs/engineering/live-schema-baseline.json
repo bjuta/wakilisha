@@ -1,15 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-10T16:25:53.327Z",
-  "typesSha256": "ae8e2755f47bed24ae4b7bff305ba20bd11ff9c120ad2b26cdda2b61efde8675",
+  "generatedAt": "2026-11-12T15:49:48.473Z",
+  "typesSha256": "ad77a7a9c461e28359777589cbe67a059fd051b8c49fa385f454104924eef244",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 247,
-  "latestMigration": "20261110085456_wk100_apple_artist_observations_v1.sql",
+  "migrationCount": 248,
+  "latestMigration": "20261112123805_wk100_governed_publisher_withdrawal_v1.sql",
   "schemaSeal": {
     "mode": "production",
     "sourceProjectRef": "pgzizndxdyhqmtyywjmt",
-    "migrationHead": "20261110085456"
+    "migrationHead": "20261112123805",
+    "promotionWorkflowRunId": 43251087030
   },
-  "reverifiedAt": "2026-11-10T16:25:53.327Z"
+  "reverifiedAt": "2026-11-12T15:49:48.473Z"
 }
