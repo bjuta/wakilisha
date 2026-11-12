@@ -1,6 +1,7 @@
 // briefing-handler — WAKILISHA email briefing infrastructure
 // v10.1: 10 briefings, catalog-driven, app-matching styles + CD-specific rendering fixes
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { verifyBriefingWebhookSignature } from "../_shared/briefing-webhook-verification.ts";
 
 const SU = Deno.env.get("SUPABASE_URL")!;
 const SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -1533,7 +1534,19 @@ async function handleBriefingAnalytics(body: any, c: Record<string, string>) {
 // ═══ WEBHOOK ═══
 async function handleWebhook(req: Request): Promise<Response> {
   const c: Record<string, string> = { "Content-Type": "application/json" };
-  try { if (RW) { const svixId = req.headers.get("svix-id"); const svixTimestamp = req.headers.get("svix-timestamp"); const svixSignature = req.headers.get("svix-signature"); if (!svixId || !svixTimestamp || !svixSignature) return new Response(JSON.stringify({ error: "Missing Svix headers" }), { status: 401, headers: c }); const bodyText = await req.text(); const signedContent = `${svixId}.${svixTimestamp}.${bodyText}`; const encoder = new TextEncoder(); const keyData = encoder.encode(RW.split("whsec_").pop() || RW); const key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["verify"]); const signature = hexToBytes(svixSignature); const isValid = await crypto.subtle.verify("HMAC", key, signature, encoder.encode(signedContent)); if (!isValid) return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 401, headers: c }); const body = JSON.parse(bodyText); return await processWebhookEvent(body, c); } const body = await req.json(); return await processWebhookEvent(body, c); } catch (err) { const m = err instanceof Error ? err.message : String(err); return new Response(JSON.stringify({ error: "internal_error", message: m }), { status: 500, headers: c }); }
+  // Resend is optional, but unsigned processing of webhook events is not.
+  if (!RW) return jE("webhook_not_configured", "Webhook verification is unavailable.", c, 503);
+
+  const bodyText = await req.text();
+  const verified = await verifyBriefingWebhookSignature(RW, req.headers, bodyText);
+  if (!verified) return jE("invalid_webhook_signature", "Invalid webhook signature.", c, 401);
+
+  try {
+    return await processWebhookEvent(JSON.parse(bodyText), c);
+  } catch {
+    // Do not echo provider payloads or internal errors to webhook callers.
+    return jE("webhook_processing_failed", "Could not process webhook event.", c, 500);
+  }
 }
 
 async function processWebhookEvent(body: any, c: Record<string, string>): Promise<Response> {
@@ -1548,7 +1561,6 @@ async function processWebhookEvent(body: any, c: Record<string, string>): Promis
   return jO({ processed: true, event_type: eventType, message_id: messageId, matched_recipients: recipients.length, analytics_event: aen }, c);
 }
 
-function hexToBytes(hex: string): Uint8Array { const bytes = new Uint8Array(hex.length / 2); for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16); return bytes; }
 
 function getIsoWeek(d: Date): string { const tmp = new Date(d.getTime()); tmp.setHours(0, 0, 0, 0); tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7)); const week1 = new Date(tmp.getFullYear(), 0, 4); const weekNum = 1 + Math.round(((tmp.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7); return `${tmp.getFullYear()}-W${String(weekNum).padStart(2, "0")}`; }
 
