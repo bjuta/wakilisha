@@ -361,6 +361,7 @@ export class DatabaseV2Repository implements V2Repository {
               e.entry_count
             FROM wk_chart_editions_v2 e
             WHERE e.program_id = p.id
+              AND e.status = 'published'
               AND e.entry_count > 0
           ) edition_row
         ), '[]'::json) AS archive_json
@@ -391,6 +392,7 @@ export class DatabaseV2Repository implements V2Repository {
       SELECT *
       FROM wk_chart_editions_v2
       WHERE program_id = ${sqlLiteral(programId(program))}
+        AND status = 'published'
       ORDER BY edition_date DESC, edition_slug DESC
     `);
   }
@@ -400,6 +402,7 @@ export class DatabaseV2Repository implements V2Repository {
       SELECT *
       FROM wk_chart_editions_v2
       WHERE program_id = ${sqlLiteral(programId(program))}
+        AND status = 'published'
         AND entry_count > 0
       ORDER BY edition_date DESC, edition_slug DESC
       LIMIT 1
@@ -412,6 +415,7 @@ export class DatabaseV2Repository implements V2Repository {
       FROM wk_chart_editions_v2
       WHERE program_id = ${sqlLiteral(programId(program))}
         AND edition_slug = ${sqlLiteral(editionSlug)}
+        AND status = 'published'
       LIMIT 1
     `);
   }
@@ -440,6 +444,10 @@ export class DatabaseV2Repository implements V2Repository {
         NULL::numeric AS score
       FROM wk_chart_entries_v2
       WHERE edition_id = ${sqlLiteral(str(edition, "id"))}
+        AND EXISTS (
+          SELECT 1 FROM wk_chart_editions_v2 visible
+          WHERE visible.id = edition_id AND visible.status = 'published'
+        )
       ORDER BY rank ASC
     `);
   }
@@ -482,6 +490,7 @@ export class DatabaseV2Repository implements V2Repository {
       FROM wk_chart_entries_v2 ce
       INNER JOIN wk_chart_editions_v2 e ON e.id = ce.edition_id
       WHERE ce.track_slug = ${sqlLiteral(trackSlug)}
+        AND e.status = 'published'
       ORDER BY e.edition_date ASC, ce.rank ASC
     `);
     if (!rows.length) return null;
