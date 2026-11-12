@@ -20,6 +20,29 @@ export type HeadquartersDurableCase = Readonly<{
   updatedAt: string;
   nextActionAt: string | null;
 }>;
+/** A deliberately bounded, read-only machine representation of the same
+ * authorized case projection shown in Headquarters. This is NOT an API,
+ * evidence adjudication, publication decision, or operation grant.
+ */
+export function projectHeadquartersCaseMachineReadV1(row: HeadquartersDurableCase) {
+  return Object.freeze({
+    schemaVersion: "wakilisha.mizizi.headquarters.case-read.v1",
+    objectType: "investigation_case",
+    caseId: row.caseId,
+    revision: row.caseRevision,
+    subject: Object.freeze({type: row.subjectType, id: row.subjectId}),
+    claim: Object.freeze({family: row.claimFamily, key: row.claimKey}),
+    lifecycle: Object.freeze({state: row.state, stage: row.stage}),
+    evidenceReferences: Object.freeze({
+      linkedRegistryReviewId: row.reviewId,
+      linkedReceiptCount: row.receiptCount,
+    }),
+    updatedAt: row.updatedAt,
+    actionAuthority: "not_included_in_read_only_projection",
+    publicationAuthority: "not_included_in_read_only_projection",
+  });
+}
+
 export type HeadquartersHold = Readonly<{
   holdId: string;
   holdKey: string;
