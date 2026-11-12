@@ -28430,6 +28430,10 @@ export type Database = {
         Args: { p_expected_revision: number; p_payload: Json }
         Returns: Json
       }
+      wk100_withdraw_governed_weekly_edition_v1: {
+        Args: { p_proposal_sha256: string; p_reason: string; p_week: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
