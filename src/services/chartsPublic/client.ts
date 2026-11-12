@@ -5,13 +5,7 @@ import type {
   TrackChartHistory,
 } from "./types";
 
-import {
-  getCachedChart,
-  setCachedChart,
-  clearChartCache,
-  DEFAULT_CACHE_TTL,
-  type PublicChartCacheSource,
-} from "./cache";
+import { clearChartCache, type PublicChartCacheSource } from "./cache";
 
 import {
   getV2ChartFamilies,
@@ -57,45 +51,18 @@ function now(): string {
   return new Date().toISOString();
 }
 
-function cacheMeta(entry: {
-  source: PublicChartCacheSource;
-  fetchedAt: number;
-  isStale: boolean;
-}): ChartFetchMeta {
-  return {
-    source: "cache",
-    fetchedAt: new Date(entry.fetchedAt).toISOString(),
-    isStale: entry.isStale,
-  };
-}
-
-async function withCache<T>(
-  key: string,
-  fetchFn: () => Promise<{ data: T; source: PublicChartCacheSource }>,
-  ttlMs = DEFAULT_CACHE_TTL
+// Publication can be withdrawn after a response is read. Do not reuse an
+// in-memory Edition response or return stale chart data when validation fails.
+async function readChartFresh<T>(
+  _key: string,
+  fetchFn: () => Promise<{ data: T; source: PublicChartCacheSource }>
 ): Promise<ChartResult<T>> {
-  const cached = getCachedChart<T>(key);
-  if (cached && !cached.isStale) {
-    return { data: cached.data, meta: cacheMeta(cached) };
-  }
-
-  try {
-    const { data, source } = await fetchFn();
-    setCachedChart(key, data, source, ttlMs);
-    return { data, meta: { source, fetchedAt: now(), isStale: false } };
-  } catch (err) {
-    if (cached) {
-      return {
-        data: cached.data,
-        meta: { ...cacheMeta(cached), isStale: true },
-      };
-    }
-    throw err;
-  }
+  const { data, source } = await fetchFn();
+  return { data, meta: { source, fetchedAt: now(), isStale: false } };
 }
 
 export function getChartFamilies(): Promise<ChartResult<{ families: ChartFamily[]; editions: ChartEdition[] }>> {
-  return withCache("chart_families_public_api", async () => ({
+  return readChartFresh("chart_families_public_api", async () => ({
     data: await getV2ChartFamilies(),
     source: "wordpress",
   }));
@@ -103,7 +70,7 @@ export function getChartFamilies(): Promise<ChartResult<{ families: ChartFamily[
 
 export function getChartFamily(familySlug: string, marketSlug?: string | null): Promise<ChartResult<ChartFamily | null>> {
   const marketKey = marketSlug || "default";
-  return withCache(`chart_family_public_api_${familySlug}_${marketKey}`, async () => ({
+  return readChartFresh(`chart_family_public_api_${familySlug}_${marketKey}`, async () => ({
     data: await getV2ChartFamily(familySlug, marketSlug),
     source: "wordpress",
   }));
@@ -111,7 +78,7 @@ export function getChartFamily(familySlug: string, marketSlug?: string | null): 
 
 export function getChartEditionsForFamily(familySlug: string, marketSlug?: string | null): Promise<ChartResult<ChartEdition[]>> {
   const marketKey = marketSlug || "default";
-  return withCache(`chart_family_editions_public_api_${familySlug}_${marketKey}`, async () => ({
+  return readChartFresh(`chart_family_editions_public_api_${familySlug}_${marketKey}`, async () => ({
     data: await getV2ChartEditionsForFamily(familySlug, marketSlug),
     source: "wordpress",
   }));
@@ -119,7 +86,7 @@ export function getChartEditionsForFamily(familySlug: string, marketSlug?: strin
 
 export function getLatestChartEdition(familySlug: string, marketSlug?: string | null): Promise<ChartResult<ChartEdition | null>> {
   const marketKey = marketSlug || "default";
-  return withCache(`chart_latest_public_api_${familySlug}_${marketKey}`, async () => ({
+  return readChartFresh(`chart_latest_public_api_${familySlug}_${marketKey}`, async () => ({
     data: await getV2LatestChartEdition(familySlug, marketSlug),
     source: "wordpress",
   }));
@@ -127,7 +94,7 @@ export function getLatestChartEdition(familySlug: string, marketSlug?: string | 
 
 export function getLatestChartEditionWithEntries(familySlug: string, marketSlug?: string | null): Promise<ChartResult<{ edition: ChartEdition | null; entries: ChartEditionEntry[] }>> {
   const marketKey = marketSlug || "default";
-  return withCache(`chart_latest_entries_public_api_${familySlug}_${marketKey}`, async () => ({
+  return readChartFresh(`chart_latest_entries_public_api_${familySlug}_${marketKey}`, async () => ({
     data: await getV2LatestChartEditionWithEntries(familySlug, marketSlug),
     source: "wordpress",
   }));
@@ -135,7 +102,7 @@ export function getLatestChartEditionWithEntries(familySlug: string, marketSlug?
 
 export function getChartEdition(familySlug: string, editionSlug: string, marketSlug?: string | null): Promise<ChartResult<ChartEdition | null>> {
   const marketKey = marketSlug || "default";
-  return withCache(`chart_edition_public_api_${familySlug}_${marketKey}_${editionSlug}`, async () => ({
+  return readChartFresh(`chart_edition_public_api_${familySlug}_${marketKey}_${editionSlug}`, async () => ({
     data: await getV2ChartEdition(familySlug, editionSlug, marketSlug),
     source: "wordpress",
   }));
@@ -143,14 +110,14 @@ export function getChartEdition(familySlug: string, editionSlug: string, marketS
 
 export function getChartEditionEntries(familySlug: string, editionSlug: string, marketSlug?: string | null): Promise<ChartResult<ChartEditionEntry[]>> {
   const marketKey = marketSlug || "default";
-  return withCache(`chart_entries_public_api_${familySlug}_${marketKey}_${editionSlug}`, async () => ({
+  return readChartFresh(`chart_entries_public_api_${familySlug}_${marketKey}_${editionSlug}`, async () => ({
     data: await getV2ChartEditionEntries(familySlug, editionSlug, marketSlug),
     source: "wordpress",
   }));
 }
 
 export function getTrackChartHistory(trackSlug: string): Promise<ChartResult<TrackChartHistory | null>> {
-  return withCache(`track_history_public_api_${trackSlug}`, async () => ({
+  return readChartFresh(`track_history_public_api_${trackSlug}`, async () => ({
     data: await getV2TrackChartHistory(trackSlug),
     source: "wordpress",
   }));
