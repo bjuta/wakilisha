@@ -621,40 +621,21 @@ export function parseYouTubeKenyaWeekly(raw, targetPeriodKey, access={}) {
   const top=lists[0];
   if(!top)fail('youtube_target_period_unavailable');
   if(!top?.length || top.length>MAX_ROWS) fail('youtube_missing_track_views');
-  let unresolvedNativeVideoIds=0;
-  const nativeChartRowIds=new Set();
   const rows=top.map((x)=>{
     const v=record(x),meta=record(v?.chartEntryMetadata);
     const rank=positiveInt(meta?.currentPosition);
     if(!rank)fail('youtube_missing_rank');
-    // Weekly Top Songs counts a song's combined views, not necessarily one video.
-    // A chart's opaque row id is NOT an encryptedVideoId.
-    const nativeRowId=text(v?.id,180);
-    if(native&&nativeRowId){
-      if(/[\u0000-\u001f\u007f]/.test(nativeRowId)||nativeChartRowIds.has(nativeRowId))
-        fail('youtube_native_row_unverified');
-      nativeChartRowIds.add(nativeRowId);
-    }
-    const provider_id=text(v?.encryptedVideoId,180);
-    const count=nonnegativeCount(v?.viewCount);
-    if(native&&(!text(v?.name)||
-      (provider_id!==null&&!ID_RE.test(provider_id))))
+    const provider_id=text(v.encryptedVideoId,180);
+    const count=nonnegativeCount(v.viewCount);
+    if(native&&(!provider_id||!ID_RE.test(provider_id)||!text(v.name)))
       fail('youtube_native_row_unverified');
-    if(native&&provider_id===null){
-      // Retain authentic rank/count with an unresolved recording identity.
-      // Never substitute an opaque chart id, drop a row, or grant scoring.
-      unresolvedNativeVideoIds++;
-      if(!nativeRowId||unresolvedNativeVideoIds>1)
-        fail('youtube_native_row_unverified');
-    }
     if(count===null)fail('youtube_missing_native_view_count');
-    const artists=arr(v?.artists).map(a=>text(record(a)?.name)).filter(Boolean);
-    return track(rank,provider_id,text(v?.name),artists.join(', ')||null,{view_count:count});
+    const artists=arr(v.artists).map(a=>text(record(a)?.name)).filter(Boolean);
+    return track(rank,provider_id,text(v.name),artists.join(', ')||null,{view_count:count});
   });
   const result=normalizeRows('youtube_ke',rows,top.length,{behavior:'video_consumption',metric:'rank_and_count',
     source_period_key:targetPeriodKey,
-    ...(native?{provider_period_type:'weekly',provider_week_ending_date:native.endDate,
-      unresolved_provider_identity_rows:unresolvedNativeVideoIds}:{}),
+    ...(native?{provider_period_type:'weekly',provider_week_ending_date:native.endDate}:{}),
     native_period:'unknown'});
   return result;
 }
