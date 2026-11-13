@@ -40,12 +40,17 @@ A lexical scan of authenticated privileged bodies found **279** without a simple
    - Before and after, `anon` and `authenticated` **do not have table-level INSERT**. Service role retains INSERT; the privileged recording RPC and existing user-facing share feature remain intact.
    - A guarded rollback test preceded migration; PostgreSQL confirmed the policy absent after apply. The warning appeared in uploaded export but was already absent from the current MCP advisory output.
 
-All three applied SQL bodies are reconciled to exact migration filenames in isolated GitHub branches. **No compute, WK100, Registry, data rows, app deployment, or user session mutation** was performed in these changes.
+4. **20261113194113** `advisors_editorial_rls_initplan_cohort_b_20261113`
+   - Six additional Editorial reference-table authenticated SELECT policies, all originally exactly `auth.uid() IS NOT NULL`, now use the statement-scoped `(SELECT auth.uid()) IS NOT NULL`.
+   - Fail-closed rollback trial PASS; applied migration PASS; live `pg_policies` confirms original roles/commands and optimized clauses.
+   - RLS InitPlan WARN **86 -> 80** (eight total optimized).
+
+All four applied SQL bodies are reconciled to exact migration filenames in isolated GitHub branches. **No compute, WK100, Registry, data rows, app deployment, or user session mutation** was performed in these changes.
 
 ## Current Production advisory balance
 
 - Security: **785 WARN + 199 INFO = 984**. The 785 consist of 618 authenticated definer, 82 anonymous definer, 81 mutable search paths, and four public extensions.
-- Performance: **249 WARN** after two RLS changes; informational items fluctuate (e.g., unused-index count changed from 684 to 683 because counters only cover the period after PostgreSQL restarted). Do not count such fluctuations as fixes.
+- Performance: **243 WARN** after eight RLS changes; informational items fluctuate (e.g., unused-index count changed from 684 to 683 because counters only cover the period after PostgreSQL restarted). Do not count such fluctuations as fixes.
 
 ## Prioritized remaining engineering queue
 
@@ -53,7 +58,7 @@ All three applied SQL bodies are reconciled to exact migration filenames in isol
 
 **P1, safe search paths:** finish the 18 other unpinned privileged functions in family-specific cohorts after resolving unqualified relation/function names. One is `public.exec_sql(text)`, restricted to service role but dynamically executes SQL; it requires explicit dependency and retirement review, NOT blind search-path alteration. Review the remaining ~63 invoker warnings separately.
 
-**P1, query performance:** fix the remaining 86 InitPlan policy warnings using exact policy predicates and member/nonmember acceptance; then audit 161 multiple-permissive-policy warnings for equivalent authorization consolidation. These are not blanket rewrite targets.
+**P1, query performance:** fix the remaining 80 InitPlan policy warnings using exact policy predicates and member/nonmember acceptance; then audit 161 multiple-permissive-policy warnings for equivalent authorization consolidation. These are not blanket rewrite targets.
 
 **P2, indexes and physical footprint:** review two duplicate-index pairs for constraint ownership and usage first. Do not drop the 683+ 'unused' indexes based on just-resetted statistics, or auto-create 499 missing FK indexes; both increase change and IO risk.
 
