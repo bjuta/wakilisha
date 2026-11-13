@@ -29,6 +29,9 @@ Every migration body is recorded under `ops/security` and `supabase/migrations` 
 | Anonymous analytics with an invalid URL | Rejected with SQLSTATE 22023 |
 | Anonymous share RPC with an invalid platform | Rejected with SQLSTATE 22023 |
 | Anonymous guest-follow intent with 49 raw elements | Rejected before array expansion with SQLSTATE 22023 |
+| Anonymous guest Follow with one active Artist | One transient private intent with one Artist, rolled back |
+| Anonymous four-argument sharing RPC | One transient share counter and share event, rolled back |
+| Legacy two-argument share RPC | Existing PostgreSQL overload ambiguity confirmed, not changed; direct call fails when the four-argument overload retains defaults |
 | Anonymous Community digest with requested limit 999999 | 50 items returned |
 | Anonymous replies with requested limit 999999 | Bounded query; 0 rows for nonexistent parent |
 | Anonymous private-profile engagement counts | Returned comment/save/follow counts of 0 |
@@ -36,6 +39,10 @@ Every migration body is recorded under `ops/security` and `supabase/migrations` 
 | Live database storage | Approximately 524 MB; no data cleanup executed by this deployment |
 
 The SQL actor simulations are database-level role/claims acceptance, **not HTTP/browser/Edge or credential-authentication acceptance**. They ran under transaction rollback and did not persist test fixtures. The privacy check used an existing private profile and disclosed no identity or underlying counts in the acceptance record.
+
+## Share compatibility exception
+
+The frontend currently passes all four parameters to `increment_share_count` and that accepted path works. A direct two-argument SQL call remains ambiguous because a second four-argument overload defines defaults for its final arguments. PostgreSQL prohibits removing defaults with CREATE OR REPLACE FUNCTION; removing them requires a drop/recreate operation. The rollback-only rehearsal failed closed; **no change was made to either share overload**. Do not drop or recreate these functions without mapping and testing dependent callers first.
 
 ## What has been closed, and what has not
 
