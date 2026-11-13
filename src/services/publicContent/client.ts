@@ -4,6 +4,7 @@ import { getPublicTrackProvenanceById } from "@/services/musicProvenance";
 import { withPlaceholderImage } from "@/utils/imagePlaceholders";
 import { supabase } from "@/lib/supabase";
 import { resolvePublicContentApiBase } from "@/services/publicContent/runtimeBase";
+import { PositiveReadCoalescer } from "@/services/publicContent/positiveReadCoalescer";
 import { releaseUrl, releaseTypeLabelFromActiveTrackCount, slugify } from "@/utils/releaseUrl";
 import { normalizeGenres } from "@/services/publicContent/genreNormalization";
 import {
@@ -383,55 +384,53 @@ export interface RegistryAppearsOnRelease extends RegistryDiscographyRelease {
 
 /* ─── Shared cache for edge function response ─── */
 
-const discographyCache = new Map<string, { releases: RegistryDiscographyRelease[]; appearsOn: RegistryAppearsOnRelease[] }>();
+type DiscographyPayload = {
+  releases: RegistryDiscographyRelease[];
+  appearsOn: RegistryAppearsOnRelease[];
+};
+
+// A profile may request Discography and Appears On in parallel. One canonical
+// request must serve both; an invalidation must not restore an older response.
+const discographyReads = new PositiveReadCoalescer<string, DiscographyPayload>(
+  (value) => value.releases.length > 0 || value.appearsOn.length > 0,
+);
 
 async function fetchDiscographyFromEdge(
   artistSlug: string
-): Promise<{ releases: RegistryDiscographyRelease[]; appearsOn: RegistryAppearsOnRelease[] }> {
-  const cached = discographyCache.get(artistSlug);
-  if (cached) return cached;
-
-  const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
-  const anonKey = (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "";
-  const t = Date.now();
-  const resp = await fetch(
-    `${supabaseUrl}/functions/v1/public-content-read/artists/${encodeURIComponent(artistSlug)}/discography?t=${t}`,
-    {
-      headers: {
-        Accept: "application/json",
-        apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`,
-      },
-      cache: "no-store",
+): Promise<DiscographyPayload> {
+  return discographyReads.read(artistSlug, async () => {
+    const supabaseUrl = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) || "";
+    const anonKey = (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string) || "";
+    const resp = await fetch(
+      `${supabaseUrl}/functions/v1/public-content-read/artists/${encodeURIComponent(artistSlug)}/discography`,
+      {
+        headers: {
+          Accept: "application/json",
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+        // Keep content publication/withdrawal freshness semantics unchanged:
+        // coalesce only simultaneous requests, not browser or CDN responses.
+        cache: "no-store",
+      }
+    );
+    if (!resp.ok) {
+      console.warn(`fetchDiscographyFromEdge failed: ${resp.status} ${resp.statusText}`);
+      return { releases: [], appearsOn: [] };
     }
-  );
-  if (!resp.ok) {
-    console.warn(`fetchDiscographyFromEdge failed: ${resp.status} ${resp.statusText}`);
-    const empty = { releases: [], appearsOn: [] };
-    return empty;
-  }
-  const payload = await resp.json();
-  const result = {
-    releases: (payload?.releases || []) as RegistryDiscographyRelease[],
-    appearsOn: (payload?.appearsOn || []) as RegistryAppearsOnRelease[],
-  };
-  // Only cache when there's actual data, not empty responses — prevents
-  // stale-empty caches from hiding newly ingested discography data.
-  if (result.releases.length > 0 || result.appearsOn.length > 0) {
-    discographyCache.set(artistSlug, result);
-  }
-  return result;
+
+    const payload = await resp.json();
+    return {
+      releases: (payload?.releases || []) as RegistryDiscographyRelease[],
+      appearsOn: (payload?.appearsOn || []) as RegistryAppearsOnRelease[],
+    };
+  });
 }
 
-/** Clear the in-memory discography cache so the public artist page re-fetches
- *  fresh data from the registry edge function. Call this after running the
- *  Apple Music intake to ensure the public profile picks up new releases. */
+/** Refresh the existing public Discography projection after reviewed intake.
+ *  Invalidate any request in flight so it cannot re-cache stale content. */
 export function clearDiscographyCache(artistSlug?: string): void {
-  if (artistSlug) {
-    discographyCache.delete(artistSlug);
-  } else {
-    discographyCache.clear();
-  }
+  discographyReads.clear(artistSlug);
 }
 
 export async function getArtistDiscographyFromRegistry(
