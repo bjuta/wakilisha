@@ -9,9 +9,10 @@ import { fetchCandidateBytes, archiveCandidateBytes, sha256Hex,
 import { checkpointsForSource } from './chart-weekly-evidence.mjs';
 import { parseMdundoKenya, parseAudiomackKenya, parseBoomplayKenya,
   parseShazamKenya, parseAppleKenya, parseAppleKenyaPublicHtml,
-  WK100_APPLE_KE_PUBLIC_CHART_URL, parseYouTubeKenyaWeekly,
+  WK100_APPLE_KE_PUBLIC_CHART_URL,
   parseSpotifyKenyaWeeklyCandidate,
 } from './chart-public-source-observations.mjs';
+import {parseYouTubeKenyaWeeklyCandidate} from './wk100-youtube-kenya-unresolved-native-row.mjs';
 
 const PARSERS = Object.freeze({
   mdundo_ke: bytes => parseMdundoKenya(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),
@@ -28,7 +29,7 @@ const PARSERS = Object.freeze({
       ? parseAppleKenyaPublicHtml(original,access)
       : parseAppleKenya(JSON.parse(original),access);
   },
-  youtube_ke: (bytes, access) => parseYouTubeKenyaWeekly(
+  youtube_ke: (bytes, access) => parseYouTubeKenyaWeeklyCandidate(
     JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)), access.native_period_key,access),
 });
 
