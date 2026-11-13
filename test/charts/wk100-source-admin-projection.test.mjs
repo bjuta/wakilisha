@@ -617,7 +617,10 @@ test('WK100 capture endpoint rechecks current method admission before a provider
   assert.match(edge,/wk100_service_capture_method_allowed_v1/);
   assert.match(edge,/isWk100FirstPartyTransport\(sourceKey,source\.method,source\.endpoint/);
   assert.match(edge,/httpMethod:entry.method/);
-  assert.match(edge,/method:entry.method,native_period_key:entry.native_period_key/);
+  // The sealed source method remains unchanged; only YouTube's native
+  // request date is resolved from its authenticated scheduled slot.
+  assert.match(edge,/wk100YouTubePeriodForSlot\(key,entry,String\(payload\.scheduled_at\)\)/);
+  assert.match(edge,/method:entry.method,native_period_key:nativePeriodKey/);
   assert.match(edge,/if\(!await methodAllowed\(\)\)/);
   assert.match(edge,/current\.authorization_ref===decision\.authorization_ref &&\s*await methodAllowed\(\)/);
   assert.match(edge,/p_endpoint_sha256:endpointSha256/);
