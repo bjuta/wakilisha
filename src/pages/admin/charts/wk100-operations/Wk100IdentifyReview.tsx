@@ -15,6 +15,8 @@ import {compareWk100EligibilityRechecks,
 import {WK100_CORRECTION_FIELDS,describeWk100CorrectionReview,
   normalizeWk100CorrectionPatchValue}
   from '@/services/chartsIngestion/wk100CorrectionReviewBoundary.mjs';
+import {projectWk100RecordingQCCandidates}
+  from '@/services/chartsIngestion/wk100RecordingQCCandidates.mjs';
 
 type Receipt={id:string;status:string;attemptedAt:string|null;observedDepth:number};
 type Source={
@@ -46,6 +48,27 @@ type Review={
   totals?:{observed:number;resolved:number;needsReview:number;conflicting:number;inactive:number};
   rows:Row[];canWriteRegistry:false;canScore:false;canPublish:false;
 };
+type QcPosition={
+  rowId:string;sourceKey:string;receiptId:string;rank:number;
+  title:string;artist:string;providerTrackId:string|null;identityState:Row['identityState'];
+};
+type QcGroup={
+  kind:string;key:string;title:string;artists:string[];sourceCount:number;
+  positions:QcPosition[];
+};
+type QcReport={
+  schemaVersion:string;weekStartEat:string;reviewedSourceCount:number;
+  observedRows:number;confirmedActiveLinks:number;missingProviderIds:number;
+  unknownArtistLabels:number;groups:QcGroup[];counts:Record<string,number>;
+  interpretation:'review_candidates_only';
+  canWriteRegistry:false;canScore:false;canPublish:false;
+};
+const qcKindLabels:Record<string,string>={
+  same_title_artist:'Matching title and artist labels across sources',
+  title_artist_variation:'Same title with different artist credits',
+  within_source_repeat:'Repeated title and artist within one source',
+  provider_id_repeat:'Repeated provider track ID within one source',
+};
 const eligible=(attempt:Receipt)=>['succeeded','partial_depth'].includes(attempt.status);
 const readableStatus:Record<Row['identityState'],string>={
   resolved:'Linked recording',
@@ -70,6 +93,14 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
   const qualify=stage==='qualify';
   const navigate=useNavigate();
   const selectable=useMemo(()=>sources.filter(s=>s.recentAttempts.some(eligible)),[sources]);
+  const [qcState,setQcState]=useState<'idle'|'loading'|'ready'|'unavailable'>('idle');
+  const [qcMessage,setQcMessage]=useState('');
+  const [qcSelectedReceipts,setQcSelectedReceipts]=useState<Record<string,string>>({});
+  const [qcReport,setQcReport]=useState<QcReport|null>(null);
+  const [qcKind,setQcKind]=useState('all');
+  const [qcSearch,setQcSearch]=useState('');
+  const [qcPage,setQcPage]=useState(0);
+  const qcSequence=useRef(0);
   const [sourceId,setSourceId]=useState('');
   const [receiptId,setReceiptId]=useState('');
   const [review,setReview]=useState<Review|null>(null);
@@ -115,6 +146,16 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
   const sequence=useRef(0);
   const source=selectable.find(s=>s.id===sourceId);
   const receipts=source?.recentAttempts.filter(eligible)??[];
+  const qcFingerprint=selectable.map(s=>s.id+':'+s.recentAttempts
+    .filter(eligible).map(r=>r.id).join(',')).join('|');
+  useEffect(()=>{
+    qcSequence.current+=1;setQcState('idle');setQcReport(null);
+    setQcMessage('');setQcSearch('');setQcKind('all');setQcPage(0);
+    setQcSelectedReceipts(Object.fromEntries(selectable.map(s=>{
+      const options=s.recentAttempts.filter(eligible);
+      return [s.id,options.length===1?options[0].id:''];
+    })));
+  },[week,qcFingerprint]);
   useEffect(()=>{applicationCaseForRecheck.current=null;},[sourceId,receiptId,week]);
   useEffect(()=>{
     const seq=++sequence.current;
@@ -169,6 +210,54 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
     // Receipt selection is explicit. No current-week source is selected
     // automatically for identification or downstream ranking.
   },[sourceId,receiptId,readNonce,week,sources,qualify]);
+  const inspectCrossSourceQC=async()=>{
+    // A single exact selected receipt per source is required. Do not silently
+    // choose the newest candidate or suppress a competing real observation.
+    const selections=selectable.map(s=>({source:s,attempts:s.recentAttempts.filter(eligible),
+      selectedId:qcSelectedReceipts[s.id]}));
+    if(selections.length<2||selections.length>8||
+      selections.some(x=>!x.selectedId||
+        !x.attempts.some(a=>a.id===x.selectedId))){
+      setQcReport(null);setQcState('unavailable');
+      setQcMessage('Select one exact captured receipt for each source before comparing.');
+      return;
+    }
+    const seq=++qcSequence.current;setQcState('loading');setQcReport(null);
+    setQcMessage('');
+    try{
+      const reviews=await Promise.all(selections.map(async({source,selectedId})=>{
+        const receiptId=selectedId;
+        const {data,error}=await supabase.functions.invoke('wk100-source-admin-read',{
+          body:{action:'read_recording_observations',weekStartEat:week,
+            contractId:source.id,receiptId},
+        });
+        if(error||!data||data.schemaVersion!=='wk100-admin-identify-observations-v1'||
+          data.weekStartEat!==week||data.contractId!==source.id||
+          data.receiptId!==receiptId||data.sourceKey!==source.sourceKey)
+          throw Error('review_unavailable');
+        return data as Review;
+      }));
+      const result=projectWk100RecordingQCCandidates({weekStartEat:week,reviews}) as QcReport;
+      if(seq!==qcSequence.current)return;
+      if(result.canScore!==false||result.canPublish!==false||
+        result.canWriteRegistry!==false||result.interpretation!=='review_candidates_only')
+        throw Error('not_review_only');
+      setQcReport(result);setQcState('ready');setQcPage(0);
+    }catch{
+      if(seq!==qcSequence.current)return;
+      setQcState('unavailable');
+      setQcMessage('No cross-source result was accepted. Check each source receipt and your Registry permissions before retrying.');
+    }
+  };
+  const qcMatches=useMemo(()=>qcReport?.groups.filter(g=>
+    (qcKind==='all'||g.kind===qcKind)&&
+    (!qcSearch.trim()||[g.title,...g.artists,...g.positions.map(p=>p.sourceKey),
+      ...g.positions.map(p=>p.providerTrackId??'')].some(v=>
+      v.toLowerCase().includes(qcSearch.trim().toLowerCase()))))??[],
+    [qcReport,qcKind,qcSearch]);
+  const qcPages=Math.max(1,Math.ceil(qcMatches.length/10));
+  const qcCurrentPage=Math.min(qcPage,qcPages-1);
+  const qcVisible=qcMatches.slice(qcCurrentPage*10,qcCurrentPage*10+10);
   const rows=useMemo(()=>review?.rows.filter(row=>
     (filter==='all'||(qualify?row.outcome===filter:row.identityState===filter))&&
     (!search||[
@@ -398,6 +487,106 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
           onClick={()=>{beforeRecheck.current=null;setReadNonce(x=>x+1);}}>Refresh selected receipt</button>
       </div>
     </WkSurface>
+    {!qualify&&<WkSurface className="rounded-xl p-4 sm:p-5" data-wk100-cross-source-qc>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-wk-text">Cross-Source Recording QC</h3>
+          <p className="mt-1 max-w-3xl text-sm text-wk-text-muted">
+            Compare the exact captured receipts for possible repeat recordings, artist credit differences, and missing provider IDs.
+            Matching labels are only review candidates. Nothing is merged, scored, or published here.
+          </p>
+        </div>
+        <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+          disabled={qcState==='loading'||selectable.length<2}
+          onClick={()=>void inspectCrossSourceQC()}>
+          {qcState==='loading'?'Checking source evidence…':'Inspect Cross-Source Evidence'}
+        </button>
+      </div>
+      {selectable.length>=2&&<div className="mt-4 grid gap-3 md:grid-cols-2">
+        {selectable.map(s=><div key={s.id} className="space-y-1">
+          <p className="text-xs font-semibold text-wk-text-muted">{s.surface}</p>
+          <WkSelect ariaLabel={'Exact QC receipt for '+s.surface}
+            value={qcSelectedReceipts[s.id]??''}
+            onChange={value=>{
+              qcSequence.current+=1;setQcSelectedReceipts(current=>({...current,[s.id]:value}));
+              setQcReport(null);setQcState('idle');setQcMessage('');
+            }}
+            options={[{value:'',label:'Choose the exact capture'},
+              ...s.recentAttempts.filter(eligible).map(r=>({value:r.id,
+                label:r.status.replaceAll('_',' ')+' · '+when(r.attemptedAt)}))]}/>
+        </div>)}
+      </div>}
+      {qcState==='unavailable'&&<p role="alert" className="mt-3 text-sm text-wk-danger">
+        {qcMessage}
+      </p>}
+      {qcState==='ready'&&qcReport&&<div className="mt-4 space-y-4">
+        <WkDetailList items={[
+          {label:'Source receipts reviewed',value:qcReport.reviewedSourceCount},
+          {label:'Observed source positions',value:qcReport.observedRows},
+          {label:'Confirmed active Registry links',value:qcReport.confirmedActiveLinks},
+          {label:'Provider IDs missing',value:qcReport.missingProviderIds},
+          {label:'Artist labels missing',value:qcReport.unknownArtistLabels},
+          {label:'Matching title and artist groups',value:qcReport.counts.same_title_artist??0},
+          {label:'Artist credit differences',value:qcReport.counts.title_artist_variation??0},
+          {label:'Repeated labels within a source',value:qcReport.counts.within_source_repeat??0},
+          {label:'Provider ID repeats',value:qcReport.counts.provider_id_repeat??0},
+        ]}/>
+        <p className="text-xs text-wk-text-muted">
+          These are possible matches and conflicts, not certified recording identities.
+          Resolve version and identifier evidence in the existing Registry and MIZIZI review before ranking.
+        </p>
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_260px]">
+          <WkSearchField value={qcSearch} onChange={value=>{setQcSearch(value);setQcPage(0);}}
+            ariaLabel="Search cross-source recording candidates"
+            placeholder="Search title, Artist, or source ID"/>
+          <WkSelect value={qcKind} onChange={value=>{setQcKind(value);setQcPage(0);}}
+            ariaLabel="Recording QC category"
+            options={[{value:'all',label:'All review candidates'},
+              ...Object.entries(qcKindLabels).map(([value,label])=>({value,label}))]}/>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p role="status" className="text-xs text-wk-text-muted">
+            {qcMatches.length} review groups. Page {qcCurrentPage+1} of {qcPages}.
+          </p>
+          <div className="flex gap-2">
+            <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+              disabled={qcCurrentPage===0} onClick={()=>setQcPage(p=>Math.max(0,p-1))}>
+              Previous ten
+            </button>
+            <button type="button" className="wk-button wk-button-secondary wk-button-sm"
+              disabled={qcCurrentPage>=qcPages-1}
+              onClick={()=>setQcPage(p=>Math.min(qcPages-1,p+1))}>
+              Next ten
+            </button>
+          </div>
+        </div>
+        <WkDataTable rows={qcVisible} getKey={g=>g.key}
+          ariaLabel="WAKILISHA 100 cross-source recording QC candidates"
+          empty="No candidate groups match these filters."
+          columns={[
+            {key:'kind',label:'Review reason',render:g=>
+              <span>{qcKindLabels[g.kind]??'Review candidate'}</span>},
+            {key:'recording',label:'Observed labels',render:g=><div className="min-w-40">
+              <p className="font-semibold text-wk-text">{g.title}</p>
+              <p className="text-xs text-wk-text-muted">{g.artists.join(' / ')||'Artist not supplied'}</p>
+              <p className="text-xs text-wk-text-muted">{g.sourceCount} sources, {g.positions.length} positions</p>
+            </div>},
+            {key:'positions',label:'Original source positions',render:g=><div className="space-y-2">
+              {g.positions.map(p=><div key={p.rowId} className="flex flex-wrap items-center gap-2 text-xs">
+                <span>{p.sourceKey} #{p.rank}</span>
+                <span className="text-wk-text-muted">{p.artist||'Artist unavailable'}</span>
+                <button type="button" className="font-semibold text-wk-brand underline"
+                  onClick={()=>{
+                    const chosen=selectable.find(s=>s.sourceKey===p.sourceKey);
+                    if(!chosen)return;
+                    setSourceId(chosen.id);setReceiptId(p.receiptId);
+                    setReadNonce(n=>n+1);
+                  }}>Inspect receipt</button>
+              </div>)}
+            </div>},
+          ]}/>
+      </div>}
+    </WkSurface>}
     {phase==='loading'&&<WkSurface className="rounded-xl p-4">
       <p role="status" className="text-sm text-wk-text-muted">{qualify?"Checking saved eligibility rules and Registry evidence…":"Checking exact recording links…"}</p>
     </WkSurface>}

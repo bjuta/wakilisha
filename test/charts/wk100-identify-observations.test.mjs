@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {projectWk100RecordingQCCandidates} from '../../src/services/chartsIngestion/wk100RecordingQCCandidates.mjs';
 import assert from 'node:assert/strict';
 import {projectWk100IdentifyObservations as project,wk100RegistryProviderKey}
   from '../../supabase/functions/_shared/wk100-identify-observations.mjs';
@@ -88,4 +89,77 @@ test('tampered rank, mismatched receipt, fabricated healthy partial, or non-Mond
    attempt:attempt(),rows:[row(1,'1'),row(2,'2'),row(3,'3')],
    typedLinks:[],legacyLinks:[],activeTracks:[]}),/week_invalid/);
  assert.throws(()=>go({rows:[{...row(1,'1'),attempt_id:trackA},row(2,'2'),row(3,'3')]}),/row_invalid/);
+});
+
+const qweek='2026-11-09';
+const qid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+const qrow=(n,rank,title,artist,id)=>({
+  captureRowId:qid(n),rank,observedTitle:title,observedArtist:artist,
+  providerArtistName:null,providerTrackId:id,identityState:'needs_review',
+});
+const qreceipt=(n,sourceKey,rows)=>({
+  schemaVersion:'wk100-admin-identify-observations-v1',weekStartEat:qweek,
+  sourceKey,receiptId:qid(n),payloadSha256:'f'.repeat(64),
+  receiptStatus:'succeeded',expectedDepth:rows.length,observedDepth:rows.length,
+  originalReadbackInThisRequest:false,rows,
+  canWriteRegistry:false,canScore:false,canPublish:false,
+});
+
+test('WK100 W4 cross-source QC treats artist variants and within-source repeats as review candidates only',()=>{
+  const apple=qreceipt(1,'apple_ke_public_top100',[
+    qrow(10,1,'Kitemeo',null,'6793757785'),
+    qrow(11,2,'Wrong Places','Joshua Baraka','1808449129'),
+  ]);
+  apple.rows[0].providerArtistName='Kapitani';
+  const youtube=qreceipt(2,'youtube_ke_top_songs_weekly',[
+    qrow(20,1,'Kitemeo','Kapitani','97mJYdIMkyI'),
+    qrow(21,2,'Wrong Places','Joshua Baraka, JAE5','jeKPLNFDoHA'),
+  ]);
+  const mdundo=qreceipt(3,'mdundo_ke_top100',[
+    qrow(30,1,'Kitemeo','Zien Kapitani','7025545'),
+    qrow(31,2,'Trap 2020','Free Beats & Instrumentals','1579655'),
+    qrow(32,3,'Trap 2020','Free Beats & Instrumentals','1616707'),
+  ]);
+  const result=projectWk100RecordingQCCandidates({weekStartEat:qweek,
+    reviews:[apple,youtube,mdundo]});
+  assert.equal(result.observedRows,7);
+  assert.deepEqual(result.counts,{
+    same_title_artist:1,title_artist_variation:2,
+    within_source_repeat:1,provider_id_repeat:0,
+  });
+  assert.equal(result.groups.find(g=>g.kind==='within_source_repeat').positions.length,2);
+  assert.equal(result.groups.find(g=>g.kind==='same_title_artist').sourceCount,2);
+  assert.deepEqual([result.canWriteRegistry,result.canScore,result.canPublish],
+    [false,false,false]);
+});
+
+test('WK100 W4 cross-source QC never merges songs just because the title agrees',()=>{
+  const a=qreceipt(4,'a_provider',[qrow(40,1,'Wewe','Harmonize','idA')]);
+  const b=qreceipt(5,'b_provider',[qrow(50,1,'Wewe','Johmarley','idB')]);
+  const result=projectWk100RecordingQCCandidates({weekStartEat:qweek,reviews:[a,b]});
+  assert.equal(result.counts.same_title_artist,0);
+  assert.equal(result.counts.title_artist_variation,1);
+  assert.equal(result.confirmedActiveLinks,0);
+});
+
+test('WK100 W4 QC flags reused native provider IDs without granting any match',()=>{
+  const a=qreceipt(6,'a_provider',[
+    qrow(60,1,'Track A','Artist','SAME'),
+    qrow(61,2,'Track B','Artist','SAME'),
+  ]);
+  const b=qreceipt(7,'b_provider',[qrow(70,1,'Other','Other','different')]);
+  const result=projectWk100RecordingQCCandidates({weekStartEat:qweek,reviews:[a,b]});
+  assert.equal(result.counts.provider_id_repeat,1);
+  assert.equal(result.counts.within_source_repeat,0);
+});
+
+test('WK100 W4 QC rejects stale receipts, identity claims and malformed row rank',()=>{
+  const a=qreceipt(8,'a_provider',[qrow(80,1,'A','Artist','id1')]);
+  const b=qreceipt(9,'b_provider',[qrow(90,1,'B','Artist','id2')]);
+  const run=(r)=>projectWk100RecordingQCCandidates({weekStartEat:qweek,reviews:[a,r]});
+  assert.throws(()=>run({...b,weekStartEat:'2026-11-16'}),/receipt_invalid/);
+  assert.throws(()=>run({...a,sourceKey:'b_provider'}),/receipt_invalid/);
+  assert.throws(()=>run({...b,canPublish:true}),/receipt_invalid/);
+  assert.throws(()=>run({...b,rows:[{...b.rows[0],rank:2}]}),/row_invalid/);
+  assert.throws(()=>run({...b,receiptStatus:'partial_depth'}),/receipt_invalid/);
 });
