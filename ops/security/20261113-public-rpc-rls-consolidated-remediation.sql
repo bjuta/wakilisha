@@ -74,7 +74,7 @@ BEGIN
   WHERE r.id = ANY(p_release_ids)
     AND (v_can_review OR r.status='active');
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_releases_by_ids_v2(p_release_ids uuid[])
@@ -100,7 +100,7 @@ BEGIN
   WHERE r.id = ANY(p_release_ids)
     AND (v_can_review OR r.status='active');
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_tracks_by_ids(p_track_ids uuid[])
@@ -126,7 +126,7 @@ BEGIN
   WHERE t.id = ANY(p_track_ids)
     AND (v_can_review OR t.status='active');
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_release_tracks_by_ids(p_release_ids uuid[])
@@ -154,7 +154,7 @@ BEGIN
   WHERE rrt.release_id = ANY(p_release_ids)
     AND (v_can_review OR (rrt.status='active' AND r.status='active' AND t.status='active'));
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_release_artists_for_anon(p_artist_slug text)
@@ -181,7 +181,7 @@ BEGIN
   WHERE rra.artist_slug = p_artist_slug
     AND (v_can_review OR (rra.status='active' AND r.status='active'));
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_release_artists_for_anon_v2(p_artist_slug text)
@@ -233,7 +233,7 @@ BEGIN
       WHERE rra2.artist_slug = p_artist_slug
     );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.track_analytics_event(p_event_name text, p_page_url text, p_page_type text DEFAULT NULL::text, p_entity_slug text DEFAULT NULL::text, p_entity_type text DEFAULT NULL::text, p_context jsonb DEFAULT '{}'::jsonb, p_session_id text DEFAULT NULL::text, p_user_id uuid DEFAULT NULL::uuid, p_referrer text DEFAULT NULL::text)
@@ -269,7 +269,7 @@ BEGIN
 
   RETURN v_id;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.increment_share_count(p_page_url text, p_platform text, p_article_slug text DEFAULT NULL::text, p_article_title text DEFAULT NULL::text)
@@ -302,7 +302,7 @@ BEGIN
 
   RETURN new_count;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.increment_share_count(p_page_url text, p_platform text)
@@ -314,7 +314,7 @@ AS $function$
 BEGIN
   RETURN public.increment_share_count(p_page_url, p_platform, NULL, NULL);
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.community_create_guest_follow_intent(p_artist_ids uuid[])
@@ -419,7 +419,7 @@ begin
       v_intent.expires_at
   );
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.community_get_digest(p_limit integer DEFAULT 20)
@@ -456,7 +456,7 @@ BEGIN
 
   RETURN COALESCE(result, '[]'::jsonb);
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.community_get_comment_replies(p_parent_id uuid, p_limit integer DEFAULT 3)
@@ -504,7 +504,7 @@ BEGIN
 
   RETURN COALESCE(result, '[]'::jsonb);
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.community_get_user_stats(p_user_id uuid)
@@ -549,7 +549,7 @@ BEGIN
     'follow_count', follow_count
   );
 END;
-$function$
+$function$;
 
 SELECT cron.schedule('wk_guest_follow_expiry_v1','10 3 * * *',
   $cleanup$DELETE FROM private.guest_follow_intents WHERE ctid IN (
