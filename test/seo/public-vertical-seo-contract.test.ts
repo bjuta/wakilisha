@@ -1,6 +1,13 @@
 import {
   readFileSync,
+  writeFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
 } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import {
   describe,
   expect,
@@ -48,6 +55,99 @@ const adminSeo =
     "src/pages/admin/settings/seo/page.tsx",
     "utf8",
   );
+
+describe("incident-safe offline SEO build", () => {
+  it("keeps the default build entirely off live SEO and public-content functions", () => {
+    const build = JSON.parse(readFileSync("package.json", "utf8")).scripts.build as string;
+    const restore = readFileSync("scripts/seo/restore-accepted-prerender.mjs", "utf8");
+    expect(build).toContain("restore-accepted-prerender.mjs --check");
+    expect(build).toContain("restore-accepted-prerender.mjs --restore");
+    expect(build).not.toContain("node scripts/seo/prerender-metadata.mjs");
+    expect(build).not.toContain("node scripts/seo/build-public-magazine-fallback.mjs");
+    expect(restore).not.toContain("fetch(");
+    expect(restore).toContain("WAKILISHA_ACCEPTED_PRERENDER_SHA256");
+  });
+
+  it("rehydrates an accepted SEO snapshot with new app assets, and fails on tampering", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "wk-incident-seo-"));
+    const accepted = path.join(root, "accepted");
+    const work = path.join(root, "work");
+    const output = path.join(work, "dist");
+    const script = path.resolve("scripts/seo/restore-accepted-prerender.mjs");
+    const fallback = {
+      generatedAt: "2026-11-13T00:00:00.000Z",
+      stories: [{ id: "a", slug: "story", title: "Story", heroUrl: "https://media.wakilisha.africa/uploads/story.webp" }],
+    };
+    const inline = '<script id="wk-magazine-fallback" type="application/json">' + JSON.stringify(fallback) + '</script>';
+    const hero = '<link rel="preload" as="image" href="https://media.wakilisha.africa/uploads/story.webp" fetchpriority="high" data-wakilisha-lcp-preload="magazine" data-wakilisha-lcp-path="/magazine" />';
+    const html = (route: string, body: string) => '<!doctype html><html><head>' +
+      '<title>' + route + ' | WAKILISHA</title>' +
+      '<meta name="robots" content="index, follow" />' +
+      '<link rel="canonical" href="https://wakilisha.africa' + route + '" />' +
+      '<meta property="og:title" content="WAKILISHA" />' +
+      '<script id="wk-jsonld-primary" type="application/ld+json">' + JSON.stringify({ "@context": "https://schema.org", "@type": "WebPage", url: "https://wakilisha.africa" + route }) + '</script>' +
+      '</head><body><div id="root"></div>' + body + '</body></html>';
+    const env = { ...process.env, WAKILISHA_ACCEPTED_PRERENDER_DIR: accepted, WAKILISHA_ACCEPTED_PRERENDER_SHA256: "" };
+
+    try {
+      mkdirSync(path.join(accepted, "magazine"), { recursive: true });
+      mkdirSync(output, { recursive: true });
+      writeFileSync(path.join(accepted, "index.html"), html("/", inline));
+      writeFileSync(path.join(accepted, "magazine", "index.html"), html("/magazine", hero + inline));
+      writeFileSync(path.join(accepted, "seo-metadata-manifest.json"), JSON.stringify({ "/magazine": { title: "Magazine" } }));
+      writeFileSync(path.join(accepted, "public-magazine-fallback.json"), JSON.stringify(fallback));
+      writeFileSync(path.join(accepted, "sitemap.xml"), '<urlset><url><loc>https://wakilisha.africa/magazine</loc></url></urlset>');
+      writeFileSync(path.join(output, "index.html"), '<!doctype html><html><head><title>New application</title><link rel="canonical" href="https://wakilisha.africa/" /></head><body><div id="root"></div><script src="/assets/new-entry.js"></script></body></html>');
+
+      const magazinePath = path.join(accepted, "magazine", "index.html");
+      const acceptedMagazine = readFileSync(magazinePath, "utf8");
+      writeFileSync(magazinePath, acceptedMagazine.replace(
+        'href="https://wakilisha.africa/magazine"',
+        'href="https://wakilisha.africa/not-magazine"',
+      ));
+      const badCanonicalSeal = spawnSync(process.execPath, [script, "--seal"], { cwd: work, env, encoding: "utf8" });
+      expect(badCanonicalSeal.status).not.toBe(0);
+      expect(badCanonicalSeal.stderr).toContain("Canonical route mismatch");
+      writeFileSync(magazinePath, acceptedMagazine);
+
+      const fallbackPath = path.join(accepted, "public-magazine-fallback.json");
+      writeFileSync(fallbackPath, JSON.stringify({
+        ...fallback,
+        stories: [{ ...fallback.stories[0], title: "Unaccepted change" }],
+      }));
+      const badFallbackSeal = spawnSync(process.execPath, [script, "--seal"], { cwd: work, env, encoding: "utf8" });
+      expect(badFallbackSeal.status).not.toBe(0);
+      expect(badFallbackSeal.stderr).toContain("Magazine inline fallback differs");
+      writeFileSync(fallbackPath, JSON.stringify(fallback));
+
+      const seal = spawnSync(process.execPath, [script, "--seal"], { cwd: work, env, encoding: "utf8" });
+      expect(seal.status, seal.stderr).toBe(0);
+      const hash = seal.stdout.match(/ACCEPTED_PRERENDER_SHA256=([a-f0-9]{64})/)?.[1];
+      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+
+      const pinned = { ...env, WAKILISHA_ACCEPTED_PRERENDER_SHA256: hash };
+      const check = spawnSync(process.execPath, [script, "--check"], { cwd: work, env: pinned, encoding: "utf8" });
+      expect(check.status, check.stderr).toBe(0);
+      const restore = spawnSync(process.execPath, [script, "--restore"], { cwd: work, env: pinned, encoding: "utf8" });
+      expect(restore.status, restore.stderr).toBe(0);
+      const rootHtml = readFileSync(path.join(output, "index.html"), "utf8");
+      const magazineHtml = readFileSync(path.join(output, "magazine", "index.html"), "utf8");
+      expect(rootHtml).toContain("/assets/new-entry.js");
+      expect(rootHtml).toContain("wk-jsonld-primary");
+      expect(rootHtml).toContain("wk-magazine-fallback");
+      expect(magazineHtml).toContain(hero);
+      expect(magazineHtml).toContain("https://wakilisha.africa/magazine");
+      expect(readFileSync(path.join(output, "sitemap.xml"), "utf8")).toContain("<urlset>");
+
+      writeFileSync(path.join(accepted, "seo-metadata-manifest.json"), '{"changed":true}');
+      const tamper = spawnSync(process.execPath, [script, "--check"], { cwd: work, env: pinned, encoding: "utf8" });
+      expect(tamper.status).not.toBe(0);
+      expect(tamper.stderr).toContain("Accepted snapshot file changed");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 describe(
   "public SEO vertical contract",
