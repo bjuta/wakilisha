@@ -72,6 +72,22 @@ describe("public Article trust contract", () => {
     expect(gateway).toContain("normalizePublicArticleTrust(trust)");
   });
 
+  it("keeps public-read admission off PostgreSQL and bounds in-flight reads", () => {
+    const gateway = fs.readFileSync(
+      path.resolve("supabase/functions/public-content-read/index.ts"),
+      "utf8",
+    );
+
+    expect(gateway).not.toContain('from("rate_limit_log")');
+    expect(gateway).not.toContain("await checkRateLimit(");
+    expect(gateway).toContain("const rl = checkRateLimit(rateLimitKey)");
+    expect(gateway).toContain("MAX_IN_FLIGHT_PUBLIC_READS");
+    expect(gateway).toContain("inFlightPublicReads -= 1;");
+    expect(gateway).toContain("AbortSignal.timeout(PUBLIC_DB_DEADLINE_MS)");
+    expect(gateway).toContain('status: 503');
+    expect(gateway).toContain('"Retry-After": "2"');
+  });
+
   it("makes trust part of PublicArticleDetail", () => {
     const client = fs.readFileSync(
       path.resolve("src/services/publicContent/client.ts"),
