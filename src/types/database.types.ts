@@ -28247,6 +28247,20 @@ export type Database = {
         }
         Returns: Json
       }
+      wk_chart_runtime_commit_v2: {
+        Args: {
+          p_failure_code?: string
+          p_lease_id: string
+          p_native_period_end?: string
+          p_native_period_evidence_ref?: string
+          p_native_period_start?: string
+          p_outcome: string
+          p_reservation_id: string
+          p_rows: Json
+          p_upstream_reference: string
+        }
+        Returns: Json
+      }
       wk_chart_runtime_fail_v1: {
         Args: {
           p_failure_code: string
