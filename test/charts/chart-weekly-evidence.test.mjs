@@ -363,6 +363,54 @@ test('YouTube provider weekly observation retains views, exact target period and
   },target),/ambiguous_weekly_track_views/);
 });
 
+test('YouTube first-party weekly Top Songs preserves one unresolved native video identity without inventing a video id',()=>{
+  const week='weekly:20261030:20261105:ke';
+  const access={endpoint:'https://charts.youtube.com/youtubei/v1/browse?alt=json'};
+  const rows=Array.from({length:100},(_,i)=>({
+    id:'chart:opaque:'+String(i).padStart(3,'0'),
+    encryptedVideoId:'v'+String(i).padStart(10,'0'),
+    name:'Synthetic Song '+(i+1),artists:[{name:'Synthetic Artist'}],
+    viewCount:String(12000-i),chartEntryMetadata:{currentPosition:i+1},
+  }));
+  delete rows[88].encryptedVideoId;
+  const native=trackViews=>({contents:{sectionListRenderer:{contents:[{
+    musicAnalyticsSectionRenderer:{content:{trackTypes:[{
+      listType:'TOP_VIEWS_CHART',chartPeriodType:'CHART_PERIOD_TYPE_WEEKLY',
+      endDate:'2026-11-05',trackViews,
+    }]}}
+  }]}}});
+  const found=parseYouTubeKenyaWeekly(native(rows),week,access);
+  assert.equal(found.observed_depth,100);
+  assert.equal(found.rows.length,100);
+  assert.equal(found.rows[88].rank,89);
+  assert.equal(found.rows[88].view_count,11912);
+  assert.equal(found.rows[88].provider_track_id,null);
+  assert.equal(found.unresolved_provider_identity_rows,1);
+  assert.equal(found.candidate_only,true);
+  assert.equal(found.eligible_for_scoring,false);
+  const altered=change=>{
+    const copy=rows.map(row=>({...row,chartEntryMetadata:{...row.chartEntryMetadata}}));
+    change(copy);return native(copy);
+  };
+  assert.throws(()=>parseYouTubeKenyaWeekly(altered(x=>{
+    delete x[87].encryptedVideoId;
+  }),week,access),/youtube_native_row_unverified/);
+  assert.throws(()=>parseYouTubeKenyaWeekly(altered(x=>{
+    delete x[88].id;
+  }),week,access),/youtube_native_row_unverified/);
+  assert.throws(()=>parseYouTubeKenyaWeekly(altered(x=>{
+    x[88].id=x[0].id;
+  }),week,access),/youtube_native_row_unverified/);
+  assert.throws(()=>parseYouTubeKenyaWeekly(altered(x=>{
+    delete x[88].viewCount;
+  }),week,access),/youtube_missing_native_view_count/);
+  const complete=parseYouTubeKenyaWeekly(altered(x=>{
+    x[88].encryptedVideoId='v0000000088';
+  }),week,access);
+  assert.equal(complete.unresolved_provider_identity_rows,0);
+  assert.equal(complete.rows[88].provider_track_id,'v0000000088');
+});
+
 test('YouTube rejects absent counts, duplicated ranks and invented provider periods',()=>{
   const target='weekly:20261016:20261022:ke';
   const payload={period:target,trackViews:[
