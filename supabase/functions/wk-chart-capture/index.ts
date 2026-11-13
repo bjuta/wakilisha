@@ -229,7 +229,7 @@ Deno.serve(async (req:Request) => {
     reserve:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_reserve_v1',args),
     reserveNow:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_reserve_now_v1',args),
     advance:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_advance_v1',args),
-    commit:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_commit_v1',args),
+    commit:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_commit_v2',args),
     fail:(args:Record<string,unknown>)=>rpc('wk_chart_runtime_fail_v1',args),
   };
   const verifyAccess=async (decision:{source_key:string;exact_endpoint:string;authorization_ref:string})=>{

@@ -390,6 +390,15 @@ test('W8B/W9 deterministic week selection requires 11 actual complete checkpoint
   const unverified=inspectWk100RankWeek(unknown);
   assert.equal(unverified.readyForPrivateReplay,false);
   assert(unverified.families[0].issues.includes('native_period_unverified'));
+  const endOnly=structuredClone(clean);
+  const yt=endOnly.attempts.find(a=>a.contract_id===endOnly.contracts[3].id);
+  yt.native_period_authority='provider_declared_end_date';
+  yt.native_period_start=null;yt.native_period_end=null;
+  yt.native_period_evidence_ref='youtube_week_end:2026-11-05';
+  const sourceDateOnly=inspectWk100RankWeek(endOnly);
+  assert.equal(sourceDateOnly.readyForPrivateReplay,false);
+  assert(sourceDateOnly.families.find(f=>f.family==='youtube_ke').issues
+    .includes('provider_end_date_only_unqualified'));
   const duplicate=structuredClone(clean);
   duplicate.attempts.push({...duplicate.attempts[0],id:id(123456)});
   const ambiguous=inspectWk100RankWeek(duplicate);

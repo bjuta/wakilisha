@@ -387,6 +387,18 @@ test('YouTube first-party weekly Top Songs preserves one unresolved native video
   assert.equal(found.rows[88].view_count,11912);
   assert.equal(found.rows[88].provider_track_id,null);
   assert.equal(found.unresolved_provider_identity_rows,1);
+  const periodContract={source_key:'youtube_ke_top_songs_weekly',provider_key:'youtube_ke',
+    adapter_version:'youtube_kenya_weekly_top_songs_v1'};
+  const periodAccess={...access,parser_class:'youtube_kenya_weekly_top_songs_v1',
+    native_period_key:week};
+  const encoded=new TextEncoder().encode(JSON.stringify(native(rows)));
+  assert.equal(captureProviderPeriodEvidence(encoded,periodContract,periodAccess),
+    'youtube_week_end:2026-11-05');
+  // A requested periodKey is not a provider endDate. Even a valid ranked
+  // fixture may not acquire stronger date-only authority from its own request.
+  const requestedOnly=new TextEncoder().encode(JSON.stringify({metadata:{periodKey:week},
+    charts:{trackViews:rows}}));
+  assert.equal(captureProviderPeriodEvidence(requestedOnly,periodContract,periodAccess),null);
   assert.equal(found.candidate_only,true);
   assert.equal(found.eligible_for_scoring,false);
   const altered=change=>{
@@ -666,7 +678,8 @@ test('candidate archive stops on digest, missing ledger, corrupt readback and in
 });
 
 // Integrated WK100 candidate-only collector contract. Existing chart suite owner.
-import { runCandidateCapture,validateCaptureSlot,resolveCaptureParser,parseCaptureNativeRows } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
+import { runCandidateCapture,validateCaptureSlot,resolveCaptureParser,parseCaptureNativeRows,
+  captureProviderPeriodEvidence } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
 import { isWk100AppleCatalogChart,resolveWk100AppleProviderAuthorization } from '../../supabase/functions/_shared/wk100-apple-service-credential.mjs';
 import { planWk100SourceDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 const wkRuntimeSlot='2026-10-19T09:00:00Z';
@@ -1047,6 +1060,13 @@ test('WK100 preserves wrong YouTube native week as quarantined receipt, distinct
   assert.equal(wrong.commits[0].p_outcome,'target_period_unavailable');
   assert.equal(wrong.commits[0].p_failure_code,'source_target_period_unavailable');
   assert.equal(wrong.objects.size,1); // exact original bytes remain archived privately
+  // A matching requested period without a first-party endDate cannot
+  // keep previously decoded rows under a failed period evidence claim.
+  const missingDate=make(periodFixture(target,'12400'));
+  const noDate=await runCandidateCapture(missingDate.args);
+  assert.equal(noDate.status,'parse_failed');
+  assert.equal(missingDate.commits[0].p_rows.length,0);
+  assert.equal(missingDate.commits[0].p_native_period_evidence_ref,null);
   const malformed=make(periodFixture(target,'not-a-count'));
   const parsed=await runCandidateCapture(malformed.args);
   assert.equal(parsed.status,'parse_failed');
