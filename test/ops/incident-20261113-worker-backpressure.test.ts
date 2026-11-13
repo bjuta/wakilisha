@@ -34,6 +34,10 @@ for file, kind in [
     spec = importlib.util.spec_from_file_location("wk_" + kind, file)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    # The harness never uses a real Supabase URL or service key.
+    # URL construction happens before the mocked urlopen is invoked.
+    mod.SUPABASE_URL = "https://supabase.invalid"
+    mod.SERVICE_KEY = "offline-test-only"
 
     for attempt in range(1, 13):
         delay = mod.retry_backoff_seconds(attempt)
@@ -43,6 +47,7 @@ for file, kind in [
 
     observed = []
     def return_503(request, timeout):
+        assert request.full_url == "https://supabase.invalid/rest/v1/rpc/recover_test"
         observed.append(timeout)
         raise urllib.error.HTTPError(
             request.full_url, 503, "Unavailable", {},
