@@ -13,6 +13,10 @@ BEGIN;
 SET LOCAL lock_timeout = '750ms';
 SET LOCAL statement_timeout = '5000ms';
 
+-- Hold the exclusive lock BEFORE checking insert counters; do not allow
+-- a new Admin/Briefing rate-limit record to arrive between proof and TRUNCATE.
+LOCK TABLE public.rate_limit_log IN ACCESS EXCLUSIVE MODE NOWAIT;
+
 DO $wk$
 DECLARE
   inserted_since_start bigint;
@@ -52,7 +56,6 @@ BEGIN
 END
 $wk$;
 
-LOCK TABLE public.rate_limit_log IN ACCESS EXCLUSIVE MODE NOWAIT;
 TRUNCATE TABLE public.rate_limit_log CONTINUE IDENTITY;
 COMMIT;
 
