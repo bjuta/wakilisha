@@ -567,7 +567,9 @@ BEGIN
  SELECT count(*) INTO c FROM pg_policies WHERE schemaname='public'
  AND ((tablename='registry_releases' AND policyname='Public users can read releases' AND qual='(status = ''active''::text)')
  OR (tablename='registry_tracks' AND policyname='Public users can read tracks linked to active releases' AND qual='(status = ''active''::text)')
- OR (tablename IN ('registry_release_artists','registry_release_tracks','registry_track_artists') AND qual LIKE '%status = ''active''%'));
+ OR (tablename='registry_release_artists' AND policyname='Public users can read release artist links' AND qual LIKE '%status = ''active''%')
+ OR (tablename='registry_release_tracks' AND policyname='Public users can read tracks for active releases' AND qual LIKE '%status = ''active''%')
+ OR (tablename='registry_track_artists' AND policyname='Public users can read track artist links' AND qual LIKE '%status = ''active''%'));
  IF c<>5 THEN RAISE EXCEPTION 'STOP: policy postcondition failed (%)',c; END IF;
  IF (SELECT count(*) FROM cron.job WHERE jobname='wk_guest_follow_expiry_v1' AND active)<>1 THEN RAISE EXCEPTION 'STOP: missing guest cleanup job'; END IF;
 END
