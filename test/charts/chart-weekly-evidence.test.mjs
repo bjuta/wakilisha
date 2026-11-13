@@ -116,6 +116,7 @@ import {
   parseShazamKenya, parseAppleKenya, parseYouTubeKenyaWeekly,
   parseSpotifyChartCsvCandidate, parseSpotifyKenyaWeeklyCandidate,
 } from '../../supabase/functions/_shared/chart-public-source-observations.mjs';
+import {parseYouTubeKenyaWeeklyCandidate} from '../../supabase/functions/_shared/wk100-youtube-kenya-unresolved-native-row.mjs';
 
 test('Mdundo parses explicit Kenya playlist ranks, and rejects unexplained rank gaps',()=>{
   const html='<div class="md-playlist-song-item" data-index="1" data-id="543" data-playlist-url="/top-charts/ke" data-title="Song A" data-artist="A"></div>'+
@@ -379,7 +380,7 @@ test('YouTube first-party weekly Top Songs preserves one unresolved native video
       endDate:'2026-11-05',trackViews,
     }]}}
   }]}}});
-  const found=parseYouTubeKenyaWeekly(native(rows),week,access);
+  const found=parseYouTubeKenyaWeeklyCandidate(native(rows),week,access);
   assert.equal(found.observed_depth,100);
   assert.equal(found.rows.length,100);
   assert.equal(found.rows[88].rank,89);
@@ -392,19 +393,19 @@ test('YouTube first-party weekly Top Songs preserves one unresolved native video
     const copy=rows.map(row=>({...row,chartEntryMetadata:{...row.chartEntryMetadata}}));
     change(copy);return native(copy);
   };
-  assert.throws(()=>parseYouTubeKenyaWeekly(altered(x=>{
+  assert.throws(()=>parseYouTubeKenyaWeeklyCandidate(altered(x=>{
     delete x[87].encryptedVideoId;
   }),week,access),/youtube_native_row_unverified/);
-  assert.throws(()=>parseYouTubeKenyaWeekly(altered(x=>{
+  assert.throws(()=>parseYouTubeKenyaWeeklyCandidate(altered(x=>{
     delete x[88].id;
   }),week,access),/youtube_native_row_unverified/);
-  assert.throws(()=>parseYouTubeKenyaWeekly(altered(x=>{
+  assert.throws(()=>parseYouTubeKenyaWeeklyCandidate(altered(x=>{
     x[88].id=x[0].id;
   }),week,access),/youtube_native_row_unverified/);
-  assert.throws(()=>parseYouTubeKenyaWeekly(altered(x=>{
+  assert.throws(()=>parseYouTubeKenyaWeeklyCandidate(altered(x=>{
     delete x[88].viewCount;
   }),week,access),/youtube_missing_native_view_count/);
-  const complete=parseYouTubeKenyaWeekly(altered(x=>{
+  const complete=parseYouTubeKenyaWeeklyCandidate(altered(x=>{
     x[88].encryptedVideoId='v0000000088';
   }),week,access);
   assert.equal(complete.unresolved_provider_identity_rows,0);
