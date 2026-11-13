@@ -46,23 +46,36 @@ function jsonResponse(data: unknown, origin: string, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: fullHeaders(origin) });
 }
 
-// ── Rate Limiter ──
+// ── Public admission: no database work before rate limiting ──
+// These counters are local to one Edge isolate, not a globally distributed quota.
+// The concurrent-request guard bounds this isolate's database work even if a
+// client rotates its IP or the database is unavailable.
 const RATE_LIMIT_MAX = 1000;
 const RATE_LIMIT_WINDOW_SECONDS = 60;
+const RATE_LIMIT_MAX_CLIENTS = 2048;
+const MAX_IN_FLIGHT_PUBLIC_READS = 6;
+const PUBLIC_DB_DEADLINE_MS = 12000;
+const rateLimitBuckets = new Map<string, { count: number; resetAtMs: number }>();
+let inFlightPublicReads = 0;
 
-async function checkRateLimit(supabase: ReturnType<typeof createClient>, key: string): Promise<{ allowed: boolean; remaining: number; resetAt: string }> {
-  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
-  try {
-    const { count, error } = await supabase.from("rate_limit_log").select("*", { count: "exact", head: true }).eq("bucket_key", key).gte("created_at", windowStart);
-    if (error) return { allowed: true, remaining: RATE_LIMIT_MAX, resetAt: "" };
-    const current = count ?? 0;
-    const remaining = Math.max(0, RATE_LIMIT_MAX - current - 1);
-    const resetAt = new Date(Date.now() + RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
-    supabase.from("rate_limit_log").insert({ bucket_key: key, created_at: iso() }).then(() => {});
-    return { allowed: current < RATE_LIMIT_MAX, remaining, resetAt };
-  } catch {
-    return { allowed: true, remaining: RATE_LIMIT_MAX, resetAt: "" };
+function checkRateLimit(key: string): { allowed: boolean; remaining: number; resetAt: string } {
+  const now = Date.now();
+  const clientKey = key.slice(0, 128);
+  const previous = rateLimitBuckets.get(clientKey);
+  const current = previous && previous.resetAtMs > now ? previous : { count: 0, resetAtMs: now + RATE_LIMIT_WINDOW_SECONDS * 1000 };
+  const allowed = current.count < RATE_LIMIT_MAX;
+  if (allowed) current.count += 1;
+  if (!previous && rateLimitBuckets.size >= RATE_LIMIT_MAX_CLIENTS) {
+    // Bound isolate memory under rotating client identifiers.
+    const oldest = rateLimitBuckets.keys().next().value;
+    if (oldest) rateLimitBuckets.delete(oldest);
   }
+  rateLimitBuckets.set(clientKey, current);
+  return {
+    allowed,
+    remaining: Math.max(0, RATE_LIMIT_MAX - current.count),
+    resetAt: new Date(current.resetAtMs).toISOString(),
+  };
 }
 
 // ── Utility functions ──
@@ -1130,14 +1143,31 @@ Deno.serve(async (req) => {
     return new Response(null, { status: 204, headers: { ...corsHeaders, ...securityHeaders } });
   }
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
-  const rateLimitKey = `public:${clientIp}`;
-  const rl = await checkRateLimit(supabase, rateLimitKey);
-  if (!rl.allowed) {
-    return new Response(JSON.stringify({ error: "Too many requests", retryAfter: rl.resetAt }), { status: 429, headers: { ...fullHeaders(origin), "Retry-After": String(RATE_LIMIT_WINDOW_SECONDS), "X-RateLimit-Remaining": String(rl.remaining), "X-RateLimit-Reset": rl.resetAt } });
+  if (inFlightPublicReads >= MAX_IN_FLIGHT_PUBLIC_READS) {
+    return new Response(JSON.stringify({ error: "Public read capacity reached" }), {
+      status: 503,
+      headers: { ...fullHeaders(origin), "Retry-After": "2" },
+    });
   }
+
+  inFlightPublicReads += 1;
+  const deadline = AbortSignal.timeout(PUBLIC_DB_DEADLINE_MS);
+  try {
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+    const rateLimitKey = `public:${clientIp}`;
+    const rl = checkRateLimit(rateLimitKey);
+    if (!rl.allowed) {
+      return new Response(JSON.stringify({ error: "Too many requests", retryAfter: rl.resetAt }), { status: 429, headers: { ...fullHeaders(origin), "Retry-After": String(RATE_LIMIT_WINDOW_SECONDS), "X-RateLimit-Remaining": String(rl.remaining), "X-RateLimit-Reset": rl.resetAt } });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
+      global: {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, {
+          ...init,
+          signal: init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline,
+        }),
+      },
+    });
 
   const url = new URL(req.url);
   const path = normalizePath(url.pathname);
@@ -3025,7 +3055,16 @@ Deno.serve(async (req) => {
 
     return jsonResponse({ data }, origin);
   } catch (err) {
+    if (deadline.aborted) {
+      return new Response(JSON.stringify({ error: "Public read deadline exceeded" }), {
+        status: 503,
+        headers: { ...fullHeaders(origin), "Retry-After": "2" },
+      });
+    }
     const message = err instanceof Error ? err.message : "Unknown error";
     return jsonResponse({ error: message }, origin, 500);
+  }
+  } finally {
+    inFlightPublicReads -= 1;
   }
 });
