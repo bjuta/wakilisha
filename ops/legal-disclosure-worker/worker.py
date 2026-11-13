@@ -4,6 +4,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import random
 import shutil
 import socket
 import time
@@ -93,7 +94,7 @@ def require_runtime():
     PROCESSING_ROOT.mkdir(parents=True, exist_ok=True)
 
 
-def rpc(name, payload):
+def rpc(name, payload, timeout_seconds=120):
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     request = urllib.request.Request(
         f"{SUPABASE_URL}/rest/v1/rpc/{name}",
@@ -106,7 +107,7 @@ def rpc(name, payload):
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=120) as response:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             raw = response.read()
     except urllib.error.HTTPError as exc:
         raw = exc.read().decode("utf-8", errors="replace")
@@ -295,6 +296,7 @@ def recover_expired_jobs(force=False):
             "p_limit": 20,
             "p_retry_delay_seconds": 60,
         },
+        timeout_seconds=10,
     )
     LAST_RECOVERY = now
     if isinstance(result, dict) and result.get("recovered_jobs"):
@@ -884,6 +886,7 @@ def claim_jobs():
             "p_limit": 1,
             "p_lease_seconds": LEASE_SECONDS,
         },
+        timeout_seconds=10,
     )
     if result is None:
         return []
@@ -937,6 +940,15 @@ def process_claim(job):
             )
 
 
+def retry_backoff_seconds(consecutive_failures):
+    # Protect PostgREST while it is unhealthy, without slowing healthy jobs.
+    seconds = min(
+        120.0,
+        max(POLL_SECONDS, 2) * (2 ** min(consecutive_failures, 6)),
+    )
+    return min(120.0, seconds + random.uniform(0.0, seconds * 0.2))
+
+
 def main():
     require_runtime()
     log(
@@ -946,18 +958,41 @@ def main():
         processing_root=str(PROCESSING_ROOT),
         lease_seconds=LEASE_SECONDS,
     )
-    recover_expired_jobs(force=True)
+    initial_recovery_pending = True
+    consecutive_failures = 0
     while True:
         try:
-            recover_expired_jobs()
+            # Startup recovery must be inside the guarded loop: a transient
+            # PostgREST 503 must not trigger a systemd restart every 5 seconds.
+            recover_expired_jobs(force=initial_recovery_pending)
+            initial_recovery_pending = False
             jobs = claim_jobs()
+            consecutive_failures = 0
             if jobs:
                 process_claim(jobs[0])
                 continue
         except RetryableDisclosureError as exc:
-            log("Legal disclosure worker transport retry.", error=str(exc))
+            consecutive_failures += 1
+            delay = retry_backoff_seconds(consecutive_failures)
+            log(
+                "Legal disclosure worker transport retry.",
+                error=str(exc),
+                consecutive_failures=consecutive_failures,
+                retry_seconds=round(delay, 2),
+            )
+            time.sleep(delay)
+            continue
         except Exception as exc:
-            log("Legal disclosure worker loop failure.", error=str(exc))
+            consecutive_failures += 1
+            delay = retry_backoff_seconds(consecutive_failures)
+            log(
+                "Legal disclosure worker loop failure.",
+                error=str(exc),
+                consecutive_failures=consecutive_failures,
+                retry_seconds=round(delay, 2),
+            )
+            time.sleep(delay)
+            continue
         time.sleep(POLL_SECONDS)
 
 
