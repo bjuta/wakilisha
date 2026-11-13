@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 import os
+import random
 import shutil
 import socket
 import subprocess
@@ -136,7 +137,7 @@ def require_runtime():
     )
 
 
-def rpc(name, payload):
+def rpc(name, payload, timeout_seconds=120):
     body = json.dumps(
         payload,
         separators=(",", ":"),
@@ -156,7 +157,7 @@ def rpc(name, payload):
     try:
         with urllib.request.urlopen(
             request,
-            timeout=120,
+            timeout=timeout_seconds,
         ) as response:
             raw = response.read()
     except urllib.error.HTTPError as exc:
@@ -1884,6 +1885,16 @@ def process_job(job):
         ACTIVE_JOB_ID = None
 
 
+def retry_backoff_seconds(consecutive_failures):
+    # Bound repeated PostgREST 503/connection failures without delaying jobs
+    # on the healthy path. Jitter prevents multiple workers resynchronizing.
+    seconds = min(
+        120.0,
+        max(POLL_SECONDS, 2) * (2 ** min(consecutive_failures, 6)),
+    )
+    return min(120.0, seconds + random.uniform(0.0, seconds * 0.2))
+
+
 def loop():
     require_runtime()
     cleanup_old_staging()
@@ -1897,6 +1908,7 @@ def loop():
     )
 
     last_cleanup = time.time()
+    consecutive_failures = 0
 
     while True:
         try:
@@ -1906,6 +1918,7 @@ def loop():
                     "p_limit": 10,
                     "p_retry_delay_seconds": 30,
                 },
+                timeout_seconds=10,
             )
 
             if recovered:
@@ -1917,41 +1930,34 @@ def loop():
             jobs = rpc(
                 "claim_media_processing_jobs_v1",
                 {
-                    "p_worker_id":
-                        WORKER_ID,
-                    "p_limit":
-                        1,
-                    "p_lease_seconds":
-                        LEASE_SECONDS,
+                    "p_worker_id": WORKER_ID,
+                    "p_limit": 1,
+                    "p_lease_seconds": LEASE_SECONDS,
                 },
+                timeout_seconds=10,
             )
 
+            consecutive_failures = 0
             if jobs:
-                process_job(
-                    jobs[0]
-                )
+                process_job(jobs[0])
             else:
-                time.sleep(
-                    POLL_SECONDS
-                )
+                time.sleep(POLL_SECONDS)
 
-            if (
-                time.time()
-                - last_cleanup
-                > 3600
-            ):
+            if time.time() - last_cleanup > 3600:
                 cleanup_old_staging()
                 last_cleanup = time.time()
         except KeyboardInterrupt:
             raise
         except Exception as exc:
+            consecutive_failures += 1
+            delay = retry_backoff_seconds(consecutive_failures)
             log(
                 "media_processor_loop_error",
                 error=str(exc)[-4000:],
+                consecutive_failures=consecutive_failures,
+                retry_seconds=round(delay, 2),
             )
-            time.sleep(
-                POLL_SECONDS
-            )
+            time.sleep(delay)
 
 
 if __name__ == "__main__":
