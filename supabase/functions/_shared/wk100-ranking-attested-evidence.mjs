@@ -186,6 +186,10 @@ export async function prepareWk100AttestedPrivateRanking({
         row.canonicalTrackId,verdict.outcome,verdict.registryFactsSha256]);
     }
     const period=attempt.native_period_authority;
+    // Only the provider's genuine endDate was retained. A matching request
+    // cannot manufacture a provider start date or qualifying weekly window.
+    if(family==='youtube_ke'&&period==='provider_declared_end_date')
+      fail('youtube_provider_end_date_only');
     if(period==='provider_defined')need(
       typeof attempt.native_period_evidence_ref==='string'&&
       attempt.native_period_evidence_ref.length>0,'native_period_evidence_missing');

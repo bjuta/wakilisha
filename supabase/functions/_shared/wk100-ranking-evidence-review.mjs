@@ -145,6 +145,10 @@ export function inspectWk100RankWeek({weekStartEat,contracts=[],attempts=[]}={})
           Date.parse(a.native_period_start)<Date.parse(a.native_period_end)&&
           Date.parse(a.native_period_end)<=at;
         if(!asOf&&!nativePeriod){
+          // A YouTube source-owned weekly endDate alone cannot be promoted
+          // into a UTC interval or a qualifying current EAT observation week.
+          if(period==='provider_declared_end_date')
+            issues.push('provider_end_date_only_unqualified');
           issues.push('native_period_unverified');continue;
         }
         const day=new Date(at+3*3600000).toISOString().slice(0,10);

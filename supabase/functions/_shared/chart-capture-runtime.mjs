@@ -161,6 +161,24 @@ export function parseCaptureNativeRows(bytes,contract,access={}) {
   return normalizeNativeRows(PARSERS[adapter.providerKey](bytes,access),contract,adapter.providerKey);
 }
 
+/** Source-owned YouTube calendar date, NEVER an inferred seven-day UTC window.
+ * A purely requested periodKey or an endDate on an unrelated chart is NOT evidence. */
+export function captureProviderPeriodEvidence(bytes,contract,access={}) {
+  const adapter=resolveCaptureParser(contract,access);
+  requireValue(adapter,'source_unimplemented');
+  if(adapter.providerKey!=='youtube_ke')return null;
+  requireValue(bytes instanceof Uint8Array&&bytes.byteLength>=1&&
+    bytes.byteLength<=4_194_304,'raw_bytes_invalid');
+  const native=PARSERS.youtube_ke(bytes,access);
+  const end=native?.provider_week_ending_date;
+  const target=typeof access.native_period_key==='string'
+    ?/^weekly:(\d{8}):(\d{8}):ke$/.exec(access.native_period_key):null;
+  if(native?.provider_period_type!=='weekly'||typeof end!=='string'||
+    !/^\d{4}-\d{2}-\d{2}$/.test(end)||!target||
+    end.replaceAll('-','')!==target[2])return null;
+  return 'youtube_week_end:'+end;
+}
+
 function dependency(db, names) {
   requireValue(db && names.every(n=>typeof db[n]==='function'),'capture_backend_missing');
 }
@@ -260,11 +278,18 @@ export async function runCandidateCapture({
     if(reservation.state!=='verified') await db.advance({p_reservation_id:resId,p_lease_id:lease,p_action:'verified'});
     raw={object_key:reservation.object_key,payload_sha256:reservation.payload_sha256};
   }
-  let rows=[],outcome='parse_failed',failureCode=null;
+  let rows=[],outcome='parse_failed',failureCode=null,periodRef=null;
   try {
     rows=parseCaptureNativeRows(capture.bytes,contract,access);
+    if(resolveCaptureParser(contract,access)?.providerKey==='youtube_ke'){
+      periodRef=captureProviderPeriodEvidence(capture.bytes,contract,access);
+      requireValue(periodRef!==null,'youtube_original_end_date_unverified');
+    }
     outcome=rows.length===contract.expected_depth?'succeeded':'partial_depth';
   } catch (error) {
+    // A decoder may have produced rows before period provenance failed.
+    // No failed outcome may attempt a successful-row SQL commit.
+    rows=[];periodRef=null;
     // A real provider response for a *different* weekly chart is not a
     // malformed source body. Preserve its original private bytes and exact
     // receipt, but quarantine the due slot as target_period_unavailable.
@@ -282,7 +307,7 @@ export async function runCandidateCapture({
   const receipt=await db.commit({p_reservation_id:resId,p_lease_id:lease,
     p_outcome:outcome,p_rows:sqlRows,p_upstream_reference:access.authorization_ref,
     p_failure_code:failureCode,
-    p_native_period_start:null,p_native_period_end:null,p_native_period_evidence_ref:null});
+    p_native_period_start:null,p_native_period_end:null,p_native_period_evidence_ref:periodRef});
   return Object.freeze({...receipt,raw_object_key:raw.object_key,
     payload_sha256:raw.payload_sha256,can_publish:false});
 }

@@ -42,7 +42,12 @@ function sourceMethodSeal(contract,attempt,methods,constitutionVersion){
     m.contract_version===contract.contract_version&&
     m.parser_class===contract.adapter_version&&
     m.constitution_version===constitutionVersion&&
-    m.native_period_state===attempt.native_period_authority&&
+    (m.native_period_state===attempt.native_period_authority||
+      (contract.provider_key==='youtube_ke'&&
+       m.native_period_state==='provider_defined'&&
+       attempt.native_period_authority==='provider_declared_end_date'&&
+       /^youtube_week_end:\d{4}-\d{2}-\d{2}$/.test(
+         attempt.native_period_evidence_ref??'')))&&
     typeof m.native_period_evidence_ref==='string'&&
     m.native_period_evidence_ref.length>=3&&
     SHA.test(m.endpoint_sha256)&&SHA.test(m.evidence_sha256)&&
