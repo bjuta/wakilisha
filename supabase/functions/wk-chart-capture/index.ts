@@ -6,7 +6,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { runCandidateCapture } from '../_shared/chart-capture-runtime.mjs';
 import { selectWk100AuditedDispatch } from '../_shared/wk100-source-dispatch-plan.mjs';
-import { isWk100CaptureConstitutionCurrent, isWk100FirstPartyTransport } from '../_shared/wk100-source-scheduler-authority.mjs';
+import { wk100YouTubePeriodForSlot, isWk100CaptureConstitutionCurrent, isWk100FirstPartyTransport } from '../_shared/wk100-source-scheduler-authority.mjs';
 import { sha256Hex } from '../_shared/chart-candidate-capture.mjs';
 import { isGatewayVerifiedServiceRole, runtimeProjectApiUrl } from '../_shared/chart-capture-gateway-role.mjs';
 import { isWk100AppleCatalogChart, resolveWk100AppleProviderAuthorization } from '../_shared/wk100-apple-service-credential.mjs';
@@ -239,12 +239,19 @@ Deno.serve(async (req:Request) => {
       current.authorization_ref===decision.authorization_ref &&
       await methodAllowed();
   };
+  // Signed source date rollover is a REQUEST selector, never native evidence.
+  // The immutable first-party original must declare the selected week.
+  const nativePeriodKey=key.startsWith('youtube_ke_')
+    ?wk100YouTubePeriodForSlot(key,entry,String(payload.scheduled_at))
+    :entry.native_period_key;
+  if(key.startsWith('youtube_ke_')&&!nativePeriodKey)
+    return json(409,{error:'youtube_weekly_request_unqualified',can_publish:false});
   try {
     const result=await runCandidateCapture({contract:found.data,
       weekStartEat:String(payload.week_start_eat),scheduledAt:String(payload.scheduled_at),
       attemptNumber:Number(payload.attempt_number),collectionMode,
       access:{source_key:key,endpoint:entry.endpoint,authorization_ref:entry.authorization_ref,
-        method:entry.method,native_period_key:entry.native_period_key,
+        method:entry.method,native_period_key:nativePeriodKey,
         parser_class:entry.parser_class,providerAuthorization},
       verifyAccess,db:backend,storage,
       clock:()=>new Date(),enabled:true,timeoutMs:12000});

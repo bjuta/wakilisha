@@ -9,7 +9,7 @@ import { parseAppleKenyaPublicHtml, WK100_APPLE_KE_PUBLIC_CHART_URL,
   parseAudiomackKenya, WK100_AUDIOMACK_KE_PUBLIC_CHART_URL } from '../../supabase/functions/_shared/chart-public-source-observations.mjs';
 import { planWk100SourceDispatch, selectWk100AuditedDispatch } from '../../supabase/functions/_shared/wk100-source-dispatch-plan.mjs';
 import { fetchCandidateBytes, sha256Hex } from '../../supabase/functions/_shared/chart-candidate-capture.mjs';
-import { bindWk100DispatchAuthority, wk100EatWeekFromUtc, isWk100CaptureConstitutionCurrent, isWk100FirstPartyTransport } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
+import { bindWk100DispatchAuthority, wk100YouTubePeriodForSlot, wk100EatWeekFromUtc, isWk100CaptureConstitutionCurrent, isWk100FirstPartyTransport } from '../../supabase/functions/_shared/wk100-source-scheduler-authority.mjs';
 import { validateWk100SourceMethodDecision, validateWk100ContractEnrollmentIntent } from '../../supabase/functions/_shared/wk100-source-method-decision-v1.mjs';
 import { selectWk100CollectNowDispatch } from '../../supabase/functions/_shared/wk100-collect-now-authority.mjs';
 import { validateCaptureSlot } from '../../supabase/functions/_shared/chart-capture-runtime.mjs';
@@ -617,7 +617,10 @@ test('WK100 capture endpoint rechecks current method admission before a provider
   assert.match(edge,/wk100_service_capture_method_allowed_v1/);
   assert.match(edge,/isWk100FirstPartyTransport\(sourceKey,source\.method,source\.endpoint/);
   assert.match(edge,/httpMethod:entry.method/);
-  assert.match(edge,/method:entry.method,native_period_key:entry.native_period_key/);
+  // The sealed source method remains unchanged; only YouTube's native
+  // request date is resolved from its authenticated scheduled slot.
+  assert.match(edge,/wk100YouTubePeriodForSlot\(key,entry,String\(payload\.scheduled_at\)\)/);
+  assert.match(edge,/method:entry.method,native_period_key:nativePeriodKey/);
   assert.match(edge,/if\(!await methodAllowed\(\)\)/);
   assert.match(edge,/current\.authorization_ref===decision\.authorization_ref &&\s*await methodAllowed\(\)/);
   assert.match(edge,/p_endpoint_sha256:endpointSha256/);
@@ -740,6 +743,35 @@ test('WK100 scheduler binds exact reviewed source, constitution, access digest a
     sourceContracts:[youtubeContract],manifest:{sources:[youtubeEntry]}};
   const enabledYoutube=await bindWk100DispatchAuthority(youtubeArgs);
   assert.equal(enabledYoutube.length,1);
+  // A fixed source week must stop dispatching as the Kenya week advances.
+  const nextWeek=new Date('2026-11-10T08:00:00Z');
+  assert.equal(wk100YouTubePeriodForSlot(youtubeContract.source_key,
+    youtubeEntry,nextWeek),null);
+  assert.equal((await bindWk100DispatchAuthority({...youtubeArgs,
+    nowUtc:nextWeek})).length,0);
+  const rolling={...youtubeEntry,native_period_rollover:'completed_weekly_thursday_v1'};
+  assert.equal(wk100YouTubePeriodForSlot(youtubeContract.source_key,
+    rolling,new Date('2026-11-03T08:00:00Z')),youtubePeriod);
+  assert.equal(wk100YouTubePeriodForSlot(youtubeContract.source_key,
+    rolling,nextWeek),'weekly:20261030:20261105:ke');
+  assert.equal(wk100YouTubePeriodForSlot(youtubeContract.source_key,
+    rolling,new Date('2026-11-17T08:00:00Z')),'weekly:20261106:20261112:ke');
+  assert.equal((await bindWk100DispatchAuthority({...youtubeArgs,
+    nowUtc:new Date('2026-11-17T08:00:00Z'),
+    manifest:{sources:[rolling]}})).length,1);
+  for(const bad of [
+    {...rolling,native_period_rollover:'latest_unverified'},
+    {...rolling,native_period_key:'weekly:20261024:20261030:ke'},
+    {...rolling,endpoint:'https://youtube.com/other'},
+  ])assert.equal(wk100YouTubePeriodForSlot(youtubeContract.source_key,
+    bad,nextWeek),null);
+  assert.equal(wk100YouTubePeriodForSlot(youtubeContract.source_key,
+    rolling,new Date('2026-10-27T08:00:00Z')),null);
+  assert.equal(wk100YouTubePeriodForSlot(youtubeContract.source_key,
+    rolling,new Date('invalid')),null);
+  assert.equal((await bindWk100DispatchAuthority({...youtubeArgs,
+    manifest:{sources:[{...youtubeEntry,native_period_rollover:'unknown'}]}})).length,0);
+
   assert.equal(isWk100CaptureConstitutionCurrent({
     rows:[youtubeRow],sourceKey:youtubeContract.source_key,
     contractVersion:'v1',endpointSha256:youtubeRow.endpoint_sha256,

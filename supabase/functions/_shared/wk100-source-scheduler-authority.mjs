@@ -30,6 +30,43 @@ export function wk100EatWeekFromUtc(now){
   k.setUTCDate(k.getUTCDate()-((k.getUTCDay()+6)%7));
   return k.toISOString().slice(0,10);
 }
+/**
+ * Sealed weekly YouTube date rollover selects only a REQUEST hypothesis.
+ * The first-party weekly original must still declare this exact endDate.
+ * This does not attest to source publication or native consumption bounds.
+ */
+export function wk100YouTubePeriodForSlot(sourceKey,entry,scheduledAt){
+  if(typeof sourceKey!=='string'||!sourceKey.startsWith('youtube_ke_')||
+    !entry||typeof entry!=='object'||
+    !isWk100YouTubeNativePost(sourceKey,entry.endpoint,entry.native_period_key))
+    return null;
+  const mode=entry.native_period_rollover??null;
+  if(mode!==null&&mode!=='completed_weekly_thursday_v1')return null;
+  const m=/^weekly:(\d{8}):(\d{8}):ke$/.exec(entry.native_period_key);
+  const day=s=>{
+    const found=/^(\d{4})(\d{2})(\d{2})$/.exec(s??'');
+    if(!found)return null;
+    const t=Date.UTC(+found[1],+found[2]-1,+found[3]);
+    return Number.isFinite(t)&&new Date(t).toISOString().slice(0,10).replaceAll('-','')===s
+      ?t:null;
+  };
+  const baselineEnd=day(m?.[2]);
+  const at=scheduledAt instanceof Date?scheduledAt:new Date(scheduledAt);
+  if(baselineEnd===null||!Number.isFinite(at.valueOf()))return null;
+  // Thursday native chart end + four days = following EAT Monday.
+  const anchorMonday=baselineEnd+4*86_400_000;
+  const observationWeek=Date.parse(wk100EatWeekFromUtc(at)+'T00:00:00Z');
+  const weeks=(observationWeek-anchorMonday)/(7*86_400_000);
+  if(!Number.isInteger(weeks)||weeks<0||weeks>57)return null;
+  // A pinned, non-rolling weekly key must never be reused next week.
+  if(mode===null&&weeks!==0)return null;
+  const targetEnd=baselineEnd+weeks*7*86_400_000;
+  if(targetEnd>=at.valueOf())return null;
+  const fmt=t=>new Date(t).toISOString().slice(0,10).replaceAll('-','');
+  const query='weekly:'+fmt(targetEnd-6*86_400_000)+':'+fmt(targetEnd)+':ke';
+  return isWk100YouTubeNativePost(sourceKey,entry.endpoint,query)?query:null;
+}
+
 export async function bindWk100DispatchAuthority({
   methodRows,manifest,sourceContracts,sha256Hex,nowUtc,constitutionVersion,
 }){
@@ -65,6 +102,12 @@ export async function bindWk100DispatchAuthority({
     if(row.decision_state!=='collector_admitted'||row.constitution_version!==constitutionVersion)
       continue;
     const contract=contracts.get(keyOf(row)),entry=entries.get(keyOf(row));
+    // A scheduler may plan the current EAT week only when the signed source
+    // date selector is fresh. The worker repeats this with the exact slot.
+    if((row.provider_key==='youtube_ke'&&
+        !wk100YouTubePeriodForSlot(row.source_key,entry,nowUtc))||
+       (row.provider_key!=='youtube_ke'&&entry?.native_period_rollover!=null))
+      continue;
     if(!contract||!entry||entry.enabled!==true||entry.market!=='KE'||
       !isWk100FirstPartyTransport(row.source_key,entry.method,entry.endpoint,entry.native_period_key)||
       (row.provider_key==='youtube_ke'&&
