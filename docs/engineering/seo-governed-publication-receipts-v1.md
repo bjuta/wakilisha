@@ -84,7 +84,7 @@ Connection environment:
 - WAKILISHA_SEO_SOURCE_DB_ROLE: supabase_read_only_user
 - WAKILISHA_SEO_SOURCE_DATABASE_URL: exact TLS PostgreSQL URI for that host and approved role, with password supplied by the accepted private secret process; no connection string overrides
 
-**Read-only role evidence.** On November 14, the database role catalog established that supabase_read_only_user is login-enabled, BYPASSRLS, non-superuser, not CREATERULE/CREATEDB, with SELECT on all 229 Public and 92 Editorial tables and no table-level write grants. That is a metadata check, not proof that the credential, direct-host connectivity, or a live collector run is available. The collector independently verifies transaction mode, role, BYPASSRLS, selected table privileges and zero DML grants at runtime. No role creation or SQL migration is proposed here.
+**Read-only role evidence.** On November 14, the database role catalog established that supabase_read_only_user is login-enabled, BYPASSRLS, non-superuser, not CREATEROLE/CREATEDB, with SELECT on all 229 Public and 92 Editorial tables and no table-level write grants. That is a metadata check, not proof that the credential, direct-host connectivity, or a live collector run is available. The collector independently verifies transaction mode, role, BYPASSRLS, selected table privileges and zero DML grants at runtime. No role creation or SQL migration is proposed here.
 
 **Operator syntax after connection authority approval:**
 
