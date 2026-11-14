@@ -121,11 +121,27 @@ function strictUrl(raw,role,hostname) {
   if (url.port && (!/^\d+$/.test(url.port) || Number(url.port)<1 || Number(url.port)>65535)) fail('Invalid database port');
   return {host:hostname,port:Number(url.port)||5432,database:'postgres',user:role,password:decodeURIComponent(url.password),ssl:{rejectUnauthorized:true},connectionTimeoutMillis:8000,query_timeout:8000};
 }
+function projectDbCa(env) {
+  const filename=env.WAKILISHA_SEO_SOURCE_DB_CA_FILE;
+  if (typeof filename!=='string' || !path.isAbsolute(filename)) fail('Approved Supabase database CA file requires an absolute path');
+  const stat=fs.lstatSync(filename,{throwIfNoEntry:false});
+  if (!stat || !stat.isFile() || stat.isSymbolicLink() || stat.size>32768) fail('Missing or unsafe approved database CA file');
+  const pem=fs.readFileSync(filename,'utf8');
+  if (!/^-----BEGIN CERTIFICATE-----\\r?\\n[A-Za-z0-9+/=\\r\\n]+-----END CERTIFICATE-----\\s*$/.test(pem)) fail('Invalid database CA PEM (exactly one certificate required)');
+  let certificate;
+  try {certificate=new crypto.X509Certificate(pem);} catch {fail('Invalid database CA certificate');}
+  const now=Date.now();
+  if (!certificate.ca || Date.parse(certificate.validFrom)>now || Date.parse(certificate.validTo)<=now) fail('Supplied database CA is not a currently valid CA');
+  return pem;
+}
 function exactEnvironment(env) {
   const host = env.WAKILISHA_SEO_SOURCE_DB_HOST;
   const role = env.WAKILISHA_SEO_SOURCE_DB_ROLE;
   if (env.WAKILISHA_SEO_SOURCE_PROJECT_REF!==PROJECT || host!==`db.${PROJECT}.supabase.co` || role!=='supabase_read_only_user') fail('Unapproved database host, project ref, or dedicated read-only role');
-  return {host,role,config:strictUrl(env.WAKILISHA_SEO_SOURCE_DATABASE_URL,role,host)};
+  const config=strictUrl(env.WAKILISHA_SEO_SOURCE_DATABASE_URL,role,host);
+  config.ssl.ca=projectDbCa(env);
+  config.ssl.servername=host;
+  return {host,role,config};
 }
 async function ensureReadAuthority(client,role) {
   const state=await client.query(`SELECT current_user AS role, current_database() AS database, current_setting('transaction_read_only') AS read_only, current_setting('transaction_isolation') AS isolation, txid_current_snapshot()::text AS tx_snapshot, clock_timestamp()::text AS captured_at`);
