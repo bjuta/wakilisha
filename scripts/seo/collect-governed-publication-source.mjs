@@ -121,7 +121,7 @@ function strictUrl(raw,role,hostname) {
 function exactEnvironment(env) {
   const host = env.WAKILISHA_SEO_SOURCE_DB_HOST;
   const role = env.WAKILISHA_SEO_SOURCE_DB_ROLE;
-  if (env.WAKILISHA_SEO_SOURCE_PROJECT_REF!==PROJECT || host!==`db.${PROJECT}.supabase.co` || !role || !/^[a-z][a-z0-9_]{2,63}$/.test(role) || ['postgres','service_role','supabase_admin','authenticator'].includes(role)) fail('Unapproved database host, project ref, or dedicated read-only role');
+  if (env.WAKILISHA_SEO_SOURCE_PROJECT_REF!==PROJECT || host!==`db.${PROJECT}.supabase.co` || role!=='supabase_read_only_user') fail('Unapproved database host, project ref, or dedicated read-only role');
   return {host,role,config:strictUrl(env.WAKILISHA_SEO_SOURCE_DATABASE_URL,role,host)};
 }
 async function ensureReadAuthority(client,role) {
