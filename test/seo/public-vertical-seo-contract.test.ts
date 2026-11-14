@@ -704,13 +704,12 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
         if (sql.includes("to_regclass")) return { rows: [{
           relkind: "r", sel: true, ins: Boolean(options.writeGrant), upd: false, del: false, trunc: false,
         }] };
-        if (sql.includes("count(DISTINCT")) return { rows: [{ total: "0", unique_count: options.badKey ? "-1" : "0" }] };
         if (sql.startsWith("SELECT txid_current_snapshot()")) return { rows: [{
           tx_snapshot: options.drift ? "different" : "5:5:", captured_at: "2026-11-14T10:00:00Z",
         }] };
         if (sql.includes("to_jsonb(src)")) { options.mutateStatic?.(); return { rows:
           sql.includes('"wk_articles"') && Number(args?.[1]) === 0
-            ? [{ row: { id: "a1", title } }] : [],
+            ? (options.badKey ? [{ row: { id: "a1", title } }, { row: { id: "a1", title } }] : [{ row: { id: "a1", title } }]) : [],
         }; }
         throw new Error("Unexpected source-scan SQL");
       },
@@ -738,7 +737,10 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
       db.change();
       const corrected = await collectWithClient(db.client, { role: "supabase_read_only_user", repositoryRoot: root });
       expect(corrected.sourceEpoch).not.toBe(first.sourceEpoch);
-      expect(SOURCE_SCAN_TABLES.length).toBe(37);
+      expect(SOURCE_SCAN_TABLES.length).toBe(40);
+      expect(SOURCE_SCAN_TABLES.some(d => d.table === "wk_guides" || d.table === "wk_resource_index")).toBe(false);
+      expect(SOURCE_SCAN_TABLES.some(d => d.schema === "public" && d.table === "guides")).toBe(true);
+      expect(SOURCE_SCAN_TABLES.some(d => d.schema === "editorial" && d.table === "resource_aliases")).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -779,7 +781,7 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
       const badKey = mockDb({ badKey: true });
       await expect(collectWithClient(badKey.client, {
         role: "supabase_read_only_user", repositoryRoot: root,
-      })).rejects.toThrow("Nonunique or oversized source key");
+      })).rejects.toThrow("Duplicate adjacent canonical row key");
       expect(badKey.commands.at(-1)).toBe("ROLLBACK");
     } finally {
       rmSync(root, { recursive: true, force: true });
