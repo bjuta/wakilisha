@@ -62,6 +62,9 @@ const DEFINITIONS = Object.freeze([
   { name:'seo_overrides', schema:'public', table:'seo_content_overrides', key:['id'], columns:['id','target_url','title','description','social_title','social_description','payload','status','applied_at','archived_at','updated_at'], surfaces:['magazine','artists','releases','tracks','genres','labels','guides','briefings','charts','playlists','people','organizations','taxonomy','authors','static'] },
   { name:'media_assets', schema:'public', table:'registry_media_assets', key:['id'], columns:['id','source_entity','source_record_id','url','status','rights_status','credit_text','metadata','updated_at'], surfaces:['magazine','artists','releases','tracks','people','organizations','playlists'] },
 ]);
+// These two existing tables have no declared unique index; enforce exact
+// key cardinality inside the same repeatable-read source transaction.
+const UNCONSTRAINED_KEY_TABLES = new Set(['guides','resources']);
 const STATIC_INPUTS = Object.freeze([
   'src/router/config.tsx',
   'public/seo-prerender-routes.txt',
@@ -136,6 +139,17 @@ async function ensureReadAuthority(client,role) {
   return state.rows[0];
 }
 async function scanTable(client,d,budget) {
+  let exactCount=null;
+  if (UNCONSTRAINED_KEY_TABLES.has(d.name)) {
+    if (++budget.queries>MAX_QUERIES) fail('Source scan query budget exhausted');
+    const column=d.key.map(x=>'"'+x+'"').join(',');
+    const countSql=`SELECT count(*)::text AS total, count(DISTINCT (${column}))::text AS unique_count FROM "${d.schema}"."${d.table}"`;
+    const checked=await client.query(countSql);
+    const row=checked.rows?.[0];
+    const total=Number(row?.total), unique=Number(row?.unique_count);
+    if (checked.rows.length!==1 || !Number.isSafeInteger(total) || !Number.isSafeInteger(unique) || total!==unique || total>MAX_ROWS_PER_TABLE) fail('Nonunique or oversized source key in '+d.name);
+    exactCount=total;
+  }
   const hash=crypto.createHash('sha256');
   hash.update(d.schema+'.'+d.table+'\n');
   let rows=0;
@@ -161,6 +175,7 @@ async function scanTable(client,d,budget) {
     if (rows>MAX_ROWS_PER_TABLE || budget.rows>MAX_ROWS_TOTAL) fail('Source scan row budget exhausted');
     if (result.rows.length<PAGE_SIZE) break;
   }
+  if (exactCount!==null && rows!==exactCount) fail('Source pagination count mismatch in '+d.name);
   return {rowCount:rows,digest:hash.digest('hex')};
 }
 async function collectWithClient(client,{role,repositoryRoot,now}={}) {
