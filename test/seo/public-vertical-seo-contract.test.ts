@@ -641,7 +641,7 @@ describe("governed publication receipt parity", () => {
       const passed = spawnSync(process.execPath, [script, "--verify", acceptedFile, currentFile, dir], { env, encoding: "utf8" });
       expect(passed.status, passed.stderr).toBe(0);
       expect(passed.stdout).toContain("PRODUCTION_NETWORK_READS=0");
-      expect(passed.stdout).toContain("GOVERNED_PUBLICATION_PARITY=PASS");
+      expect(passed.stdout).toContain("GOVERNED_PUBLICATION_ARTIFACT_PARITY=PASS");
 
       put(dir, "current.json", JSON.stringify({ ...accepted, extra: "tamper" }));
       const tampered = spawnSync(process.execPath, [script, "--verify", acceptedFile, currentFile, dir], { env, encoding: "utf8" });
