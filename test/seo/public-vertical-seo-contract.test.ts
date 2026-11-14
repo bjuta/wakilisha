@@ -753,6 +753,10 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
     };
     expect(exactSourceEnvironment(env).config.ssl.rejectUnauthorized).toBe(true);
     expect(() => exactSourceEnvironment({ ...env, WAKILISHA_SEO_SOURCE_PROJECT_REF: "other" })).toThrow("Unapproved");
+    expect(() => exactSourceEnvironment({ ...env,
+      WAKILISHA_SEO_SOURCE_DB_ROLE: "supabase_etl_admin",
+      WAKILISHA_SEO_SOURCE_DATABASE_URL: env.WAKILISHA_SEO_SOURCE_DATABASE_URL.replaceAll("supabase_read_only_user", "supabase_etl_admin"),
+    })).toThrow("Unapproved");
     expect(() => exactSourceEnvironment({ ...env, WAKILISHA_SEO_SOURCE_DATABASE_URL: env.WAKILISHA_SEO_SOURCE_DATABASE_URL + "?sslmode=no-verify" })).toThrow("no connection-string overrides");
     const root = fixture();
     try {
