@@ -1,6 +1,7 @@
 import { collectWithClient, DEFINITIONS as SOURCE_SCAN_TABLES, stableJson as stableSourceJson, exactEnvironment as exactSourceEnvironment } from "../../scripts/seo/collect-governed-publication-source.mjs";
 
 import crypto from "node:crypto";
+import tls from "node:tls";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { SURFACES, verifyReceipt, differences, extractSeo, auditArtifact } from "../../scripts/seo/verify-governed-publication.mjs";
@@ -747,20 +748,29 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
   });
 
   it("rejects unsafe credentials, write privileges, RLS-filtered readers and torn source snapshots", async () => {
+    const root = fixture();
+    const caFile = path.join(root, "approved-test-db-ca.pem");
+    writeFileSync(caFile, tls.rootCertificates[0]);
     const env = {
       WAKILISHA_SEO_SOURCE_PROJECT_REF: "pgzizndxdyhqmtyywjmt",
       WAKILISHA_SEO_SOURCE_DB_HOST: "db.pgzizndxdyhqmtyywjmt.supabase.co",
       WAKILISHA_SEO_SOURCE_DB_ROLE: "supabase_read_only_user",
+      WAKILISHA_SEO_SOURCE_DB_CA_FILE: caFile,
       WAKILISHA_SEO_SOURCE_DATABASE_URL: "postgres://supabase_read_only_user:fixture@db.pgzizndxdyhqmtyywjmt.supabase.co/postgres",
     };
     expect(exactSourceEnvironment(env).config.ssl.rejectUnauthorized).toBe(true);
+    expect(exactSourceEnvironment(env).config.ssl.servername).toBe("db.pgzizndxdyhqmtyywjmt.supabase.co");
+    expect(exactSourceEnvironment(env).config.ssl.ca).toContain("BEGIN CERTIFICATE");
+    expect(() => exactSourceEnvironment({ ...env, WAKILISHA_SEO_SOURCE_DB_CA_FILE: "" })).toThrow("absolute path");
+    const bogusCa = path.join(root, "not-a-ca.pem");
+    writeFileSync(bogusCa, "untrusted certificate");
+    expect(() => exactSourceEnvironment({ ...env, WAKILISHA_SEO_SOURCE_DB_CA_FILE: bogusCa })).toThrow("Invalid database CA PEM");
     expect(() => exactSourceEnvironment({ ...env, WAKILISHA_SEO_SOURCE_PROJECT_REF: "other" })).toThrow("Unapproved");
     expect(() => exactSourceEnvironment({ ...env,
       WAKILISHA_SEO_SOURCE_DB_ROLE: "supabase_etl_admin",
       WAKILISHA_SEO_SOURCE_DATABASE_URL: env.WAKILISHA_SEO_SOURCE_DATABASE_URL.replaceAll("supabase_read_only_user", "supabase_etl_admin"),
     })).toThrow("Unapproved");
     expect(() => exactSourceEnvironment({ ...env, WAKILISHA_SEO_SOURCE_DATABASE_URL: env.WAKILISHA_SEO_SOURCE_DATABASE_URL + "?sslmode=no-verify" })).toThrow("no connection-string overrides");
-    const root = fixture();
     try {
       for (const options of [{ writeGrant: true }, { bypassRls: false }, { drift: true }]) {
         const db = mockDb(options);
