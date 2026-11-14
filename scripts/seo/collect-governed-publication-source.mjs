@@ -33,9 +33,12 @@ const DEFINITIONS = Object.freeze([
   { name:'track_artists', schema:'public', table:'registry_track_artists', key:['id'], columns:['id','track_id','artist_id','artist_slug','artist_name_text','role','is_primary','is_featured','credit_order','display_credit','status','metadata','updated_at'], surfaces:['tracks','artists'] },
   { name:'genres', schema:'public', table:'registry_genres', key:['id'], columns:['id','slug','name','parent_genre_id','description','status','metadata','updated_at'], surfaces:['genres'] },
   { name:'labels', schema:'public', table:'registry_labels', key:['id'], columns:['id','slug','name','description','country_code','status','metadata','updated_at'], surfaces:['labels','releases'] },
-  { name:'guides', schema:'public', table:'wk_guides', key:['id'], columns:['id','slug','title','excerpt','content','wp_status','updated_at','hero_url','metadata'], surfaces:['guides','briefings'] },
+  { name:'guides', schema:'public', table:'guides', key:['id'], columns:['id','source_wp_post_id','slug','title','excerpt','dek','content','status','published_at','created_at','updated_at','hero_url','hero_image_id','download_url','download_label','downloadables','metadata'], surfaces:['guides','briefings','magazine'] },
   { name:'authors', schema:'public', table:'registry_authors', key:['id'], columns:['id','slug','name','bio','url','avatar_url','cover_url','role','location','social_links','updated_at'], surfaces:['authors','magazine'] },
-  { name:'resources', schema:'public', table:'wk_resource_index', key:['resource_id'], columns:['resource_id','resource_kind','canonical_record_id','canonical_path','visibility','lifecycle_state','updated_at'], surfaces:['people','organizations','playlists'] },
+  { name:'resources', schema:'editorial', table:'resources', key:['id'], columns:['id','resource_kind','owner_id','visibility','lifecycle_state','created_by','created_at','updated_at','current_working_version_id','current_submitted_version_id','current_approved_version_id','current_published_version_id'], surfaces:['people','organizations','playlists','magazine'] },
+  { name:'resource_aliases', schema:'editorial', table:'resource_aliases', key:['id'], columns:['id','resource_id','path','is_canonical','redirect_status','retired_at','replacement_alias_id','created_by','created_at'], surfaces:['people','organizations','playlists','magazine','taxonomy'] },
+  { name:'article_resources', schema:'editorial', table:'article_resources', key:['resource_id'], columns:['resource_id','resource_kind','article_id'], surfaces:['magazine','people'] },
+  { name:'registry_artist_resources', schema:'editorial', table:'registry_artist_resources', key:['resource_id'], columns:['resource_id','resource_kind','artist_id'], surfaces:['artists','people'] },
   { name:'organizations', schema:'editorial', table:'organizations', key:['resource_id'], columns:['resource_id','resource_kind','organization_state','display_name','description','logo_url','cover_url','location_text','website_url','updated_at'], surfaces:['organizations'] },
   { name:'person_identity_events', schema:'editorial', table:'person_identity_events', key:['id'], columns:['id','person_resource_id','event_type','identity_link_id','related_person_resource_id','prior_identity_revision','resulting_identity_revision','reason','created_at'], surfaces:['people'] },
   { name:'playlists', schema:'public', table:'wk_playlists', key:['id'], columns:['id','title','slug','description','status','cover_image_url','canonical_url','published_at','updated_at','authority_revision','playlist_kind'], surfaces:['playlists'] },
@@ -62,9 +65,9 @@ const DEFINITIONS = Object.freeze([
   { name:'seo_overrides', schema:'public', table:'seo_content_overrides', key:['id'], columns:['id','target_url','title','description','social_title','social_description','payload','status','applied_at','archived_at','updated_at'], surfaces:['magazine','artists','releases','tracks','genres','labels','guides','briefings','charts','playlists','people','organizations','taxonomy','authors','static'] },
   { name:'media_assets', schema:'public', table:'registry_media_assets', key:['id'], columns:['id','source_entity','source_record_id','url','status','rights_status','credit_text','metadata','updated_at'], surfaces:['magazine','artists','releases','tracks','people','organizations','playlists'] },
 ]);
-// These two existing tables have no declared unique index; enforce exact
-// key cardinality inside the same repeatable-read source transaction.
-const UNCONSTRAINED_KEY_TABLES = new Set(['guides','resources']);
+// Registered inputs are physical source relations with declared unique keys.
+// Preserve the optional cardinality safeguard for future explicitly reviewed inputs.
+const UNCONSTRAINED_KEY_TABLES = new Set();
 const STATIC_INPUTS = Object.freeze([
   'src/router/config.tsx',
   'public/seo-prerender-routes.txt',
