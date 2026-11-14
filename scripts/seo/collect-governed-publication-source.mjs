@@ -127,7 +127,7 @@ function projectDbCa(env) {
   const stat=fs.lstatSync(filename,{throwIfNoEntry:false});
   if (!stat || !stat.isFile() || stat.isSymbolicLink() || stat.size>32768) fail('Missing or unsafe approved database CA file');
   const pem=fs.readFileSync(filename,'utf8');
-  if (!/^-----BEGIN CERTIFICATE-----\\r?\\n[A-Za-z0-9+/=\\r\\n]+-----END CERTIFICATE-----\\s*$/.test(pem)) fail('Invalid database CA PEM (exactly one certificate required)');
+  if (!/^-----BEGIN CERTIFICATE-----\r?\n[A-Za-z0-9+/=\r\n]+-----END CERTIFICATE-----\s*$/.test(pem)) fail('Invalid database CA PEM (exactly one certificate required)');
   let certificate;
   try {certificate=new crypto.X509Certificate(pem);} catch {fail('Invalid database CA certificate');}
   const now=Date.now();
