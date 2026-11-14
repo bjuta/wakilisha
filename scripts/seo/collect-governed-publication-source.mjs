@@ -188,7 +188,7 @@ async function collectWithClient(client,{role,repositoryRoot,now}={}) {
       surfaces[surface]={rowCount:refs.reduce((n,x)=>n+x.rowCount,0),digest:digest(stableJson(refs)),tableCount:refs.length};
     }
     const sourceEpoch=digest(stableJson({project:PROJECT,surfaces}));
-    return {format:1,kind:'wakilisha-governed-source-scan',origin:ORIGIN,projectRef:PROJECT,readOnly:true,isolation:'repeatable read',databaseRole:role,transactionSnapshot:evidence.tx_snapshot,sourceEpoch,capturedAt:now||new Date(finish.rows[0].captured_at).toISOString(),tables,surfaces,static:staticFiles,queryCount:budget.queries,rowCount:budget.rows,completeSourceScan:true,publicationReceipt:false,publicationActivationAuthority:false};
+    return {format:1,kind:'wakilisha-governed-source-scan',origin:ORIGIN,projectRef:PROJECT,readOnly:true,isolation:'repeatable read',databaseRole:role,transactionSnapshot:evidence.tx_snapshot,sourceEpoch,capturedAt:now||new Date(finish.rows[0].captured_at).toISOString(),tables,surfaces,static:staticFiles,queryCount:budget.queries,rowCount:budget.rows,completeAllowlistScan:true,sourceAuthorityCoverage:'review-required',publicationReceipt:false,publicationActivationAuthority:false};
   } catch (err) {
     if (begun) {try {await client.query('ROLLBACK');} catch { /* no output on failed transaction */ }}
     throw err;
