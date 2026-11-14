@@ -686,7 +686,7 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
     return root;
   };
 
-  const mockDb = (options: { writeGrant?: boolean; drift?: boolean; bypassRls?: boolean } = {}) => {
+  const mockDb = (options: { writeGrant?: boolean; drift?: boolean; bypassRls?: boolean; mutateStatic?: () => void } = {}) => {
     const commands: string[] = [];
     let title = "Published";
     const client = {
@@ -707,10 +707,10 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
         if (sql.startsWith("SELECT txid_current_snapshot()")) return { rows: [{
           tx_snapshot: options.drift ? "different" : "5:5:", captured_at: "2026-11-14T10:00:00Z",
         }] };
-        if (sql.includes("to_jsonb(src)")) return { rows:
+        if (sql.includes("to_jsonb(src)")) { options.mutateStatic?.(); return { rows:
           sql.includes('"wk_articles"') && Number(args?.[1]) === 0
             ? [{ row: { id: "a1", title } }] : [],
-        };
+        }; }
         throw new Error("Unexpected source-scan SQL");
       },
     };
@@ -763,6 +763,14 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
         expect(db.commands.at(-1)).toBe("ROLLBACK");
         expect(db.commands).not.toContain("COMMIT");
       }
+      let mutated = false;
+      const changed = mockDb({ mutateStatic: () => {
+        if (!mutated) { mutated = true; writeFileSync(path.join(root, "public/seo-prerender-routes.txt"), "changed"); }
+      } });
+      await expect(collectWithClient(changed.client, {
+        role: "supabase_read_only_user", repositoryRoot: root,
+      })).rejects.toThrow("Static route/code authority changed");
+      expect(changed.commands.at(-1)).toBe("ROLLBACK");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
