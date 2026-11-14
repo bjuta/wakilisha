@@ -686,7 +686,7 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
     return root;
   };
 
-  const mockDb = (options: { writeGrant?: boolean; drift?: boolean; bypassRls?: boolean; mutateStatic?: () => void } = {}) => {
+  const mockDb = (options: { writeGrant?: boolean; drift?: boolean; bypassRls?: boolean; badKey?: boolean; mutateStatic?: () => void } = {}) => {
     const commands: string[] = [];
     let title = "Published";
     const client = {
@@ -704,6 +704,7 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
         if (sql.includes("to_regclass")) return { rows: [{
           relkind: "r", sel: true, ins: Boolean(options.writeGrant), upd: false, del: false, trunc: false,
         }] };
+        if (sql.includes("count(DISTINCT")) return { rows: [{ total: "0", unique_count: options.badKey ? "-1" : "0" }] };
         if (sql.startsWith("SELECT txid_current_snapshot()")) return { rows: [{
           tx_snapshot: options.drift ? "different" : "5:5:", captured_at: "2026-11-14T10:00:00Z",
         }] };
@@ -771,6 +772,11 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
         role: "supabase_read_only_user", repositoryRoot: root,
       })).rejects.toThrow("Static route/code authority changed");
       expect(changed.commands.at(-1)).toBe("ROLLBACK");
+      const badKey = mockDb({ badKey: true });
+      await expect(collectWithClient(badKey.client, {
+        role: "supabase_read_only_user", repositoryRoot: root,
+      })).rejects.toThrow("Nonunique or oversized source key");
+      expect(badKey.commands.at(-1)).toBe("ROLLBACK");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
