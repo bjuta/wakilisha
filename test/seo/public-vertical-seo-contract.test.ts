@@ -570,6 +570,9 @@ describe("governed publication receipt parity", () => {
     current.surfaces.static.digest = sha("corrected SEO source");
     expect(differences(accepted, current)).toContain("ROUTE_CHANGED /magazine");
     current.sourceEpoch = accepted.sourceEpoch;
+    for (const surface of Object.values(current.surfaces) as any[]) {
+      surface.sourceEpoch = accepted.sourceEpoch;
+    }
     assert.throws(() => differences(accepted, current), /Content changed inside one source epoch/);
   });
 
