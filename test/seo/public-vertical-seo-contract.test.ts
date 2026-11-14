@@ -723,7 +723,8 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
       const db = mockDb();
       const first = await collectWithClient(db.client, { role: "supabase_read_only_user", repositoryRoot: root });
       expect(first.sourceEpoch).toMatch(/^[a-f0-9]{64}$/);
-      expect(first.completeSourceScan).toBe(true);
+      expect(first.completeAllowlistScan).toBe(true);
+      expect(first.sourceAuthorityCoverage).toBe("review-required");
       expect(first.publicationReceipt).toBe(false);
       expect(first.publicationActivationAuthority).toBe(false);
       expect(first.tables.articles.rowCount).toBe(1);
