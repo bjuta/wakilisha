@@ -180,6 +180,7 @@ async function collectWithClient(client,{role,repositoryRoot,now}={}) {
     for (const d of DEFINITIONS) tables[d.name]=await scanTable(client,d,budget);
     const finish=await client.query('SELECT txid_current_snapshot()::text AS tx_snapshot, clock_timestamp()::text AS captured_at');
     if (finish.rows.length!==1 || finish.rows[0].tx_snapshot!==evidence.tx_snapshot) fail('Lost repeatable-read transaction snapshot');
+    if (staticEvidence(root).digest!==staticFiles.digest) fail('Static route/code authority changed during source scan');
     await client.query('COMMIT'); begun=false;
     const surfaces={};
     for (const surface of SURFACES) {
