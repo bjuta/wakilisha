@@ -83,6 +83,9 @@ Connection environment:
 - WAKILISHA_SEO_SOURCE_DB_HOST: db.pgzizndxdyhqmtyywjmt.supabase.co
 - WAKILISHA_SEO_SOURCE_DB_ROLE: supabase_read_only_user
 - WAKILISHA_SEO_SOURCE_DATABASE_URL: exact TLS PostgreSQL URI for that host and approved role, with password supplied by the accepted private secret process; no connection string overrides
+- WAKILISHA_SEO_SOURCE_DB_CA_FILE: absolute path to the project's verified PEM **database root CA**, downloaded through the authenticated Supabase Dashboard → Database Settings → SSL Configuration → Download Certificate. Never retrieve CA trust from the unverified TCP endpoint or use TLS verification bypasses.
+
+**TLS trust (verified after the network incident):** The collector now fails closed without a valid, non-symlink project CA PEM, checks that its X.509 certificate is a current CA, and configures the direct PostgreSQL driver with `ssl: { rejectUnauthorized: true, ca: <approved certificate>, servername: db.pgzizndxdyhqmtyywjmt.supabase.co }`. Transport may use the already approved Lightsail SSH forward, but TLS must continue to validate the *original database hostname*, not `127.0.0.1`. Supabase documentation explicitly requires the Dashboard certificate for verified PostgreSQL TLS. A private reader URI remains a separate requirement. No permission change, SQL mutation, or paid IPv4 add-on is part of this work.
 
 **Read-only role evidence.** On November 14, the database role catalog established that supabase_read_only_user is login-enabled, BYPASSRLS, non-superuser, not CREATEROLE/CREATEDB, with SELECT on all 229 Public and 92 Editorial tables and no table-level write grants. That is a metadata check, not proof that the credential, direct-host connectivity, or a live collector run is available. The collector independently verifies transaction mode, role, BYPASSRLS, selected table privileges and zero DML grants at runtime. No role creation or SQL migration is proposed here.
 
