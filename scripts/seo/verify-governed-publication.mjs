@@ -125,6 +125,7 @@ function auditArtifact(rootDir, current) {
   if (!isObject(manifest)) stop('Missing SEO manifest');
   const locations = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
   const sitemapRoutes = new Set(locations);
+  const expectedUrls = new Set(current.routes.map(r => ORIGIN + r.path));
   if (locations.length !== sitemapRoutes.size) stop('Duplicate sitemap canonical route');
   for (const route of current.routes) {
     const relative = route.path === '/' ? 'index.html' : route.path.slice(1) + '/index.html';
@@ -134,7 +135,7 @@ function auditArtifact(rootDir, current) {
   }
   for (const url of sitemapRoutes) {
     if (!url.startsWith(ORIGIN + '/')) stop('Foreign sitemap authority: ' + url);
-    if (!current.routes.some(r => ORIGIN + r.path === url)) stop('Unlisted public sitemap route: ' + url);
+    if (!expectedUrls.has(url)) stop('Unlisted public sitemap route: ' + url);
   }
   for (const retired of current.retired) {
     const relative = retired.path === '/' ? 'index.html' : retired.path.slice(1) + '/index.html';
@@ -162,8 +163,9 @@ function main() {
   if (process.argv[2] === '--verify') {
     const count = auditArtifact(process.argv[5], current);
     console.log('GOVERNED_PUBLICATION_ARTIFACT_ROUTES=' + count);
+    console.log('GOVERNED_PUBLICATION_ARTIFACT_PARITY=PASS');
   }
-  console.log('GOVERNED_PUBLICATION_PARITY=PASS');
+  console.log('GOVERNED_PUBLICATION_RECEIPT_PARITY=PASS');
   console.log('PRODUCTION_NETWORK_READS=0');
 }
 
