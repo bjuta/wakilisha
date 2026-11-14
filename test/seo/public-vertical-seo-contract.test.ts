@@ -1,3 +1,8 @@
+import crypto from "node:crypto";
+import assert from "node:assert/strict";
+import * as fs from "node:fs";
+import { SURFACES, verifyReceipt, differences, extractSeo, auditArtifact } from "../../scripts/seo/verify-governed-publication.mjs";
+
 import {
   readFileSync,
   writeFileSync,
@@ -495,3 +500,174 @@ describe(
     );
   },
 );
+
+
+describe("governed publication receipt parity", () => {
+  // The current receipt is only trustworthy after a separate, governed source
+  // projection. These deterministic cases test parity, not receipt acquisition.
+  const sha = (value: string | Buffer) =>
+    crypto.createHash("sha256").update(value).digest("hex");
+
+  const html = (route: string) =>
+    '<!doctype html><html><head><title>' + route + ' | WAKILISHA</title>' +
+    '<meta name="robots" content="index, follow" />' +
+    '<link rel="canonical" href="https://wakilisha.africa' + route + '" />' +
+    '<meta property="og:title" content="WAKILISHA" />' +
+    '<script id="wk-jsonld-primary" type="application/ld+json">' +
+    JSON.stringify({ "@type": "WebPage", url: "https://wakilisha.africa" + route }) +
+    '</script></head><body></body></html>';
+
+  const item = (route: string, source: string, subjectId: string, revision = "v1") => ({
+    path: route,
+    source,
+    subjectId,
+    revision: sha(revision),
+    seoSha256: extractSeo(html(route), route),
+  });
+
+  const receipt = (): any => {
+    const epoch = sha("epoch-one");
+    return {
+      format: 1,
+      origin: "https://wakilisha.africa",
+      complete: true,
+      sourceEpoch: epoch,
+      capturedAt: "2026-11-14T10:00:00Z",
+      surfaces: Object.fromEntries(SURFACES.map(source => [
+        source,
+        { complete: true, sourceEpoch: epoch, rowCount: source === "static" ? 2 : 0, digest: sha(source) },
+      ])),
+      routes: [
+        item("/", "static", "root"),
+        item("/magazine", "static", "magazine"),
+      ],
+      retired: [],
+    };
+  };
+  const nextEpoch = (value: any) => {
+    const epoch = sha("epoch-two");
+    value.sourceEpoch = epoch;
+    for (const surface of Object.values(value.surfaces) as any[]) surface.sourceEpoch = epoch;
+  };
+  const put = (root: string, relative: string, body: string) => {
+    const target = path.join(root, relative);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, body);
+  };
+
+  it("replays an unchanged complete source and invalidates new publications or corrections", () => {
+    const accepted = receipt();
+    const current = structuredClone(accepted);
+    nextEpoch(current);
+    expect(differences(accepted, current)).toEqual([]);
+
+    current.routes.push(item("/artists/new-artist", "artists", "artist-uuid"));
+    current.surfaces.artists.digest = sha("new publication");
+    expect(differences(accepted, current)).toContain("ROUTE_ADDED /artists/new-artist");
+
+    current.routes.pop();
+    current.routes[1].revision = sha("corrected article");
+    current.surfaces.static.digest = sha("corrected SEO source");
+    expect(differences(accepted, current)).toContain("ROUTE_CHANGED /magazine");
+    current.sourceEpoch = accepted.sourceEpoch;
+    for (const surface of Object.values(current.surfaces) as any[]) {
+      surface.sourceEpoch = accepted.sourceEpoch;
+    }
+    assert.throws(() => differences(accepted, current), /Content changed inside one source epoch/);
+  });
+
+  it("requires exact withdrawal and route-retirement receipts without resurrecting private paths", () => {
+    const accepted = receipt();
+    const current = structuredClone(accepted);
+    nextEpoch(current);
+    current.routes.pop();
+    assert.throws(() => differences(accepted, current), /without exact governed retirement/);
+
+    current.retired.push({
+      path: "/magazine",
+      source: "static",
+      subjectId: "magazine",
+      reason: "withdrawn",
+      eventSha256: sha("withdrawal-event"),
+    });
+    expect(differences(accepted, current)).toContain("ROUTE_RETIRED /magazine reason=withdrawn");
+
+    current.routes.push(item("/journal", "static", "magazine"));
+    assert.throws(() => verifyReceipt(current, "bad"), /Nonpublic subject still has active route/);
+    current.retired[0].reason = "redirected";
+    current.retired[0].target = "/journal";
+    expect(differences(accepted, current)).toContain("ROUTE_ADDED /journal");
+    current.retired[0].target = "/";
+    assert.throws(() => verifyReceipt(current, "bad"), /Redirect target missing or changes subject/);
+  });
+
+  it("rejects incomplete scans, stale receipts, changed path ownership, and private-route leaks", () => {
+    const accepted = receipt();
+    const current = structuredClone(accepted);
+    current.surfaces.people.complete = false;
+    assert.throws(() => differences(accepted, current), /Incomplete source scan/);
+
+    const older = structuredClone(accepted);
+    older.capturedAt = "2026-11-13T10:00:00Z";
+    assert.throws(() => differences(accepted, older), /predates accepted publication/);
+
+    const reused = structuredClone(accepted);
+    nextEpoch(reused);
+    reused.routes[1].subjectId = "different-subject";
+    assert.throws(() => differences(accepted, reused), /Canonical path reused/);
+
+    const privateRoute = structuredClone(accepted);
+    privateRoute.routes.push(item("/admin/secret", "static", "secret"));
+    assert.throws(() => verifyReceipt(privateRoute, "bad"), /Private route/);
+  });
+
+  it("pins both receipts, rejects tampering, and audits real SEO output without network reads", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "wk-governed-seo-"));
+    const accepted = receipt();
+    const currentFile = path.join(dir, "current.json");
+    const acceptedFile = path.join(dir, "accepted.json");
+    const script = path.resolve("scripts/seo/verify-governed-publication.mjs");
+    try {
+      put(dir, "index.html", html("/"));
+      put(dir, "magazine/index.html", html("/magazine"));
+      put(dir, "seo-metadata-manifest.json", JSON.stringify({ "/": {}, "/magazine": {} }));
+      put(dir, "sitemap.xml", '<urlset><url><loc>https://wakilisha.africa/</loc></url><url><loc>https://wakilisha.africa/magazine</loc></url></urlset>');
+      expect(auditArtifact(dir, accepted)).toBe(2);
+
+      put(dir, "accepted.json", JSON.stringify(accepted));
+      put(dir, "current.json", JSON.stringify(accepted));
+      const env = {
+        ...process.env,
+        WAKILISHA_ACCEPTED_PUBLICATION_SHA256: sha(readFileSync(acceptedFile)),
+        WAKILISHA_CURRENT_PUBLICATION_SHA256: sha(readFileSync(currentFile)),
+      };
+      const passed = spawnSync(process.execPath, [script, "--verify", acceptedFile, currentFile, dir], { env, encoding: "utf8" });
+      expect(passed.status, passed.stderr).toBe(0);
+      expect(passed.stdout).toContain("PRODUCTION_NETWORK_READS=0");
+      expect(passed.stdout).toContain("GOVERNED_PUBLICATION_ARTIFACT_PARITY=PASS");
+
+      put(dir, "current.json", JSON.stringify({ ...accepted, extra: "tamper" }));
+      const tampered = spawnSync(process.execPath, [script, "--verify", acceptedFile, currentFile, dir], { env, encoding: "utf8" });
+      expect(tampered.status).not.toBe(0);
+      expect(tampered.stderr).toContain("current receipt hash mismatch");
+
+      put(dir, "magazine/index.html", html("/changed-canonical"));
+      assert.throws(() => auditArtifact(dir, accepted), /Canonical mismatch/);
+      put(dir, "magazine/index.html", html("/magazine"));
+
+      accepted.routes.pop();
+      accepted.retired.push({
+        path: "/magazine",
+        source: "static",
+        subjectId: "magazine",
+        reason: "withdrawn",
+        eventSha256: sha("withdrawal"),
+      });
+      assert.throws(() => auditArtifact(dir, accepted), /Unlisted public sitemap route/);
+      put(dir, "sitemap.xml", '<urlset><url><loc>https://wakilisha.africa/</loc></url></urlset>');
+      assert.throws(() => auditArtifact(dir, accepted), /Retired route still has public HTML/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
