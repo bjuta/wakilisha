@@ -1,4 +1,7 @@
+import { collectWithClient, DEFINITIONS as SOURCE_SCAN_TABLES, stableJson as stableSourceJson, exactEnvironment as exactSourceEnvironment } from "../../scripts/seo/collect-governed-publication-source.mjs";
+
 import crypto from "node:crypto";
+import tls from "node:tls";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { SURFACES, verifyReceipt, differences, extractSeo, auditArtifact } from "../../scripts/seo/verify-governed-publication.mjs";
@@ -668,6 +671,130 @@ describe("governed publication receipt parity", () => {
       assert.throws(() => auditArtifact(dir, accepted), /Retired route still has public HTML/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+
+describe("governed source scanning is an out-of-band read-only transaction", () => {
+  const fixture = () => {
+    const root = mkdtempSync(path.join(tmpdir(), "wk-source-scan-"));
+    for (const name of ["src/router/config.tsx", "public/seo-prerender-routes.txt", "scripts/seo/prerender-metadata.mjs"]) {
+      const target = path.join(root, name);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, name + "\n");
+    }
+    return root;
+  };
+
+  const mockDb = (options: { writeGrant?: boolean; drift?: boolean; bypassRls?: boolean; badKey?: boolean; mutateStatic?: () => void } = {}) => {
+    const commands: string[] = [];
+    let title = "Published";
+    const client = {
+      async query(sql: string, args?: unknown[]) {
+        commands.push(sql);
+        if (sql.startsWith("BEGIN") || sql.startsWith("SET LOCAL") || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
+        if (sql.includes("current_user AS role")) return { rows: [{
+          role: "supabase_read_only_user", database: "postgres", read_only: "on",
+          isolation: "repeatable read", tx_snapshot: "5:5:", captured_at: "2026-11-14T10:00:00Z",
+        }] };
+        if (sql.includes("FROM pg_roles")) return { rows: [{
+          rolsuper: false, rolbypassrls: options.bypassRls !== false,
+          rolcreaterole: false, rolcreatedb: false, rolreplication: false,
+        }] };
+        if (sql.includes("to_regclass")) return { rows: [{
+          relkind: "r", sel: true, ins: Boolean(options.writeGrant), upd: false, del: false, trunc: false,
+        }] };
+        if (sql.startsWith("SELECT txid_current_snapshot()")) return { rows: [{
+          tx_snapshot: options.drift ? "different" : "5:5:", captured_at: "2026-11-14T10:00:00Z",
+        }] };
+        if (sql.includes("to_jsonb(src)")) { options.mutateStatic?.(); return { rows:
+          sql.includes('"wk_articles"') && Number(args?.[1]) === 0
+            ? (options.badKey ? [{ row: { id: "a1", title } }, { row: { id: "a1", title } }] : [{ row: { id: "a1", title } }]) : [],
+        }; }
+        throw new Error("Unexpected source-scan SQL");
+      },
+    };
+    return { client, commands, change: () => { title = "Corrected"; } };
+  };
+
+  it("fingerprints source corrections and preserves one bounded repeatable-read transaction", async () => {
+    const root = fixture();
+    try {
+      const db = mockDb();
+      const first = await collectWithClient(db.client, { role: "supabase_read_only_user", repositoryRoot: root });
+      expect(first.sourceEpoch).toMatch(/^[a-f0-9]{64}$/);
+      expect(first.completeAllowlistScan).toBe(true);
+      expect(first.sourceAuthorityCoverage).toBe("review-required");
+      expect(first.publicationReceipt).toBe(false);
+      expect(first.publicationActivationAuthority).toBe(false);
+      expect(first.tables.articles.rowCount).toBe(1);
+      expect(Object.keys(first.surfaces)).toHaveLength(15);
+      expect(db.commands[0]).toContain("REPEATABLE READ READ ONLY");
+      expect(db.commands.at(-1)).toBe("COMMIT");
+      expect(JSON.stringify(first)).not.toContain("Published");
+      expect(stableSourceJson({ z: 1, a: { y: 2, b: 3 } }))
+        .toBe(stableSourceJson({ a: { b: 3, y: 2 }, z: 1 }));
+      db.change();
+      const corrected = await collectWithClient(db.client, { role: "supabase_read_only_user", repositoryRoot: root });
+      expect(corrected.sourceEpoch).not.toBe(first.sourceEpoch);
+      expect(SOURCE_SCAN_TABLES.length).toBe(40);
+      expect(SOURCE_SCAN_TABLES.some(d => d.table === "wk_guides" || d.table === "wk_resource_index")).toBe(false);
+      expect(SOURCE_SCAN_TABLES.some(d => d.schema === "public" && d.table === "guides")).toBe(true);
+      expect(SOURCE_SCAN_TABLES.some(d => d.schema === "editorial" && d.table === "resource_aliases")).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects unsafe credentials, write privileges, RLS-filtered readers and torn source snapshots", async () => {
+    const root = fixture();
+    const caFile = path.join(root, "approved-test-db-ca.pem");
+    writeFileSync(caFile, tls.rootCertificates[0]);
+    const env = {
+      WAKILISHA_SEO_SOURCE_PROJECT_REF: "pgzizndxdyhqmtyywjmt",
+      WAKILISHA_SEO_SOURCE_DB_HOST: "db.pgzizndxdyhqmtyywjmt.supabase.co",
+      WAKILISHA_SEO_SOURCE_DB_ROLE: "supabase_read_only_user",
+      WAKILISHA_SEO_SOURCE_DB_CA_FILE: caFile,
+      WAKILISHA_SEO_SOURCE_DATABASE_URL: "postgres://supabase_read_only_user:fixture@db.pgzizndxdyhqmtyywjmt.supabase.co/postgres",
+    };
+    expect(exactSourceEnvironment(env).config.ssl.rejectUnauthorized).toBe(true);
+    expect(exactSourceEnvironment(env).config.ssl.servername).toBe("db.pgzizndxdyhqmtyywjmt.supabase.co");
+    expect(exactSourceEnvironment(env).config.ssl.ca).toContain("BEGIN CERTIFICATE");
+    expect(() => exactSourceEnvironment({ ...env, WAKILISHA_SEO_SOURCE_DB_CA_FILE: "" })).toThrow("absolute path");
+    const bogusCa = path.join(root, "not-a-ca.pem");
+    writeFileSync(bogusCa, "untrusted certificate");
+    expect(() => exactSourceEnvironment({ ...env, WAKILISHA_SEO_SOURCE_DB_CA_FILE: bogusCa })).toThrow("Invalid database CA PEM");
+    expect(() => exactSourceEnvironment({ ...env, WAKILISHA_SEO_SOURCE_PROJECT_REF: "other" })).toThrow("Unapproved");
+    expect(() => exactSourceEnvironment({ ...env,
+      WAKILISHA_SEO_SOURCE_DB_ROLE: "supabase_etl_admin",
+      WAKILISHA_SEO_SOURCE_DATABASE_URL: env.WAKILISHA_SEO_SOURCE_DATABASE_URL.replaceAll("supabase_read_only_user", "supabase_etl_admin"),
+    })).toThrow("Unapproved");
+    expect(() => exactSourceEnvironment({ ...env, WAKILISHA_SEO_SOURCE_DATABASE_URL: env.WAKILISHA_SEO_SOURCE_DATABASE_URL + "?sslmode=no-verify" })).toThrow("no connection-string overrides");
+    try {
+      for (const options of [{ writeGrant: true }, { bypassRls: false }, { drift: true }]) {
+        const db = mockDb(options);
+        await expect(collectWithClient(db.client, {
+          role: "supabase_read_only_user", repositoryRoot: root,
+        })).rejects.toThrow();
+        expect(db.commands.at(-1)).toBe("ROLLBACK");
+        expect(db.commands).not.toContain("COMMIT");
+      }
+      let mutated = false;
+      const changed = mockDb({ mutateStatic: () => {
+        if (!mutated) { mutated = true; writeFileSync(path.join(root, "public/seo-prerender-routes.txt"), "changed"); }
+      } });
+      await expect(collectWithClient(changed.client, {
+        role: "supabase_read_only_user", repositoryRoot: root,
+      })).rejects.toThrow("Static route/code authority changed");
+      expect(changed.commands.at(-1)).toBe("ROLLBACK");
+      const badKey = mockDb({ badKey: true });
+      await expect(collectWithClient(badKey.client, {
+        role: "supabase_read_only_user", repositoryRoot: root,
+      })).rejects.toThrow("Duplicate adjacent canonical row key");
+      expect(badKey.commands.at(-1)).toBe("ROLLBACK");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });
