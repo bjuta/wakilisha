@@ -1696,7 +1696,9 @@ test('WK100 fixed five-source ranking primitive replays two logical EAT weeks wi
   const receiptRef='wk100:obs:v1:'+firstPanel.captureReceiptSha256+':'+uuid(990001);
   firstPanel.rows[1].recordingId=receiptRef;
   const receiptResult=await compute(receiptOnly);
-  assert.equal(receiptResult.ranked.some(x=>x.recordingId===receiptRef),true);
+  assert.equal(receiptResult.eligibleRecordings,result.eligibleRecordings+1);
+  assert.notEqual(receiptResult.rankingDigest,result.rankingDigest);
+  // A low-scoring receipt-local observation need not reach the Top 100.
   assert.equal(receiptResult.canPublish,false);
   assert.match(result.rankingDigest,/^[0-9a-f]{64}$/);
   const shuffled=structuredClone(first);
