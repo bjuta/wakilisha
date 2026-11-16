@@ -89,9 +89,17 @@ identity contract and public display projection must be reviewed for nullable
 canonical Track IDs and chart-scoped references, without rewriting historical
 observations, reweighting absent sources or bypassing source authorization.
 Existing W5 Registry policy outcome remains intact; the new chart-only
-predicate is private W8 scoring input only. No automatic Registry admission,
-SQL migration, Production Edge deployment or public WK100 Edition is
-authorized by this source branch.
+predicate is private W8 scoring input only. The server-only attestor also
+returns bounded source labels verified against original private bytes. The
+signed-in Admin reader separates Registry UUID lookup from chart-only
+references and shows source wording variation without inventing a canonical
+Track, Artist or cross-provider identity. The Admin frontend validates both
+typed identities and labels chart-only entries plainly. No automatic
+Registry admission, SQL migration, Production Edge deployment, frontend
+deployment or public WK100 Edition is authorized by this source branch.
+After independent Preview acceptance and a reviewed merge, deploy only the
+changed WK100 Admin Edge function, then the exact merged-main frontend
+through the normal Finish Update, with rollback and private signed-in canary.
 
 **Future integrated acceptance:** An international-only hit contributes to
 a private ranked candidate while canonical_track_id stays null. African-led
