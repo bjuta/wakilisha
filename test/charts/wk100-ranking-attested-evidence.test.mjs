@@ -6,6 +6,8 @@ import {prepareWk100AttestedPrivateRanking as prepare}
 import {readWk100AttestedRankingPrivate as readServer}
   from '../../supabase/functions/_shared/wk100-ranking-attested-reader.mjs';
 import {inspectWk100RankWeek} from '../../supabase/functions/_shared/wk100-ranking-evidence-review.mjs';
+import {wk100ChartScopedObservationRef as chartRef}
+  from '../../supabase/functions/_shared/wk100-identify-observations.mjs';
 import {readFile} from 'node:fs/promises';
 
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
@@ -134,6 +136,66 @@ test('server-only handoff binds 11 exact receipts, originals, Registry and W5',a
   }});
   assert.notEqual(result.registrySnapshotSha256,changed.registrySnapshotSha256);
   assert.notEqual(result.rankingDigest,changed.rankingDigest);
+});
+
+test('all-origin native evidence ranks without canonical Registry IDs under unrestricted saved policy',async()=>{
+  const f=fixture(),a=adapters(f);
+  // This reproduces the saved 9 Nov Production profile semantics, but uses
+  // synthetic exact originals. It does not claim genuine provider admission.
+  const broadProfile=structuredClone(PROFILE);
+  broadProfile.releaseEligibility.releaseTypes=
+    ['single','ep','album','mixtape','compilation','video','live'];
+  const broadScope=structuredClone(SCOPE);
+  broadScope.artistOriginUnknownMode='include';
+  const broadPolicy=sha(canonical({profileId:broadProfile.id,marketScopeId:broadScope.id,
+    eligibilityProfileSnapshot:broadProfile,marketScopeSnapshot:broadScope}));
+  const broadDraft=draft();
+  broadDraft.config_json={...broadDraft.config_json,
+    eligibilityProfileSnapshot:broadProfile,marketScopeSnapshot:broadScope,
+    ingestPolicySha256:broadPolicy};
+  a.eligibilityPolicySha256=broadPolicy;
+  a.loadW5Draft=async()=>broadDraft;
+  const load=a.loadRegistry;
+  a.loadRegistry=async arg=>{
+    const evidence=await load(arg);
+    return {...evidence,typedLinks:evidence.typedLinks.filter(link=>
+      link.provider_track_id!=='native-1')};
+  };
+  const result=await prepare(a);
+  assert.equal(result.canStage,false);assert.equal(result.canPublish,false);
+  assert.equal(result.privateRanking.ranked.length,100);
+  assert.equal(result.heldPositions.REVIEW_REQUIRED,0);
+  // Same Apple native ID appears on seven independently verified daily
+  // originals. It is one *Apple-scoped* chart observation, not a Registry UUID.
+  const firstApple=f.panels.get(f.ids[0]).attempt;
+  const ref=await chartRef({providerKey:'apple_ke',providerTrackId:'native-1',
+    receiptSha256:firstApple.payload_sha256,captureRowId:f.panels.get(f.ids[0]).rows[0].id});
+  const apple=result.privateRanking.ranked.find(r=>r.recordingId===ref);
+  assert.equal(apple?.score,20);
+  assert.equal(apple?.listedFamilyCount,1);
+  assert.equal(result.privateRanking.ranked.find(r=>r.recordingId===id(1)),undefined);
+  // No automatic cross-provider equivalence. The same apparent song/artist
+  // produces provider-specific references until independent evidence proves a
+  // shared recording. All five are private-only and noncanonical.
+  const refs=await Promise.all(families.map(providerKey=>chartRef({
+    providerKey,providerTrackId:'native-1',
+    receiptSha256:firstApple.payload_sha256,captureRowId:f.panels.get(f.ids[0]).rows[0].id})));
+  assert.equal(new Set(refs).size,5);
+  assert(refs.every(key=>result.privateRanking.ranked.some(x=>x.recordingId===key)));
+  assert(refs.every(key=>!key.startsWith('00000000-')));
+  const reordered=await prepare({...a,selectedReceiptIds:[...f.ids].reverse()});
+  assert.equal(reordered.rankingDigest,result.rankingDigest);
+  // A real restrictive origin policy is never silently bypassed by this
+  // chart-only lane. The held source positions stay at their original ranks.
+  const restrictedProfile=structuredClone(broadProfile);
+  restrictedProfile.artistOriginEligibility={mode:'country_only',countries:['KE'],regions:[]};
+  const restrictivePolicy=sha(canonical({profileId:restrictedProfile.id,
+    marketScopeId:broadScope.id,eligibilityProfileSnapshot:restrictedProfile,
+    marketScopeSnapshot:broadScope}));
+  const restrictedDraft={...broadDraft,config_json:{...broadDraft.config_json,
+    eligibilityProfileSnapshot:restrictedProfile,ingestPolicySha256:restrictivePolicy}};
+  await assert.rejects(()=>prepare({...a,eligibilityPolicySha256:restrictivePolicy,
+    loadW5Draft:async()=>restrictedDraft}),/fewer_than_100_recordings/);
 });
 
 test('original excluded and unresolved ranks remain non-scoring without renumbering',async()=>{
