@@ -209,8 +209,10 @@ jobs:
           node --test test/charts/wk100-private-admin-preview.test.mjs
           npx vitest run test/charts/wk100-admin-role-expiry.test.ts
 
-      - name: Verify WK100 W4 to W6 source identity and filter recheck contracts
+      - name: Verify Chart raw source identity and WK100 W4 to W6 eligibility
         run: |
+          node --test test/charts/wk100/chart-ingest-run-provenance.test.mjs
+          node --test test/charts/wk100/chart-ingest-full-filter-stage.test.mjs
           node --test test/charts/wk100-identify-observations.test.mjs
           node --test test/charts/wk100-eligibility-preview.test.mjs
           node --test test/charts/wk100-eligibility-recheck.test.mjs
