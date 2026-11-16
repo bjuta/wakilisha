@@ -268,7 +268,8 @@ export function toChartEntryRowViewModel(
     artistNames: entry.artistNames,
     artistSlugs: entry.artistSlugs ?? [],
     artworkUrl: entry.artworkUrl,
-    slug: normalizedSlug || entry.trackSlug,
+    // Unlinked rows still need a stable in-page key, not a Registry route.
+    slug: entry.canonicalTrackId ? (normalizedSlug || entry.trackSlug) : `chart-entry-${entry.id}`,
     registryTrackId: entry.canonicalTrackId ?? null,
     genre: rich.genre ?? null,
     peakPosition: entry.peakPosition ?? entry.rank,
