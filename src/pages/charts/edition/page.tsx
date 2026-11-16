@@ -37,7 +37,7 @@ import { ChartRow } from "@/components/design-system/music/ChartRow";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
 import { ArtistRolodex } from "@/pages/charts/directory/components/ArtistRolodex";
 import { SkeletonChartEdition } from "@/components/skeletons/Skeletons";
-import { trackUrl } from "@/utils/trackUrl";
+import { ChartRecordingLink } from "@/components/charts/ChartRecordingLink";
 import { NewsletterSubscribe } from "@/components/feature/NewsletterSubscribe";
 import { enrichChartEntriesWithPlaybackData } from "@/services/chartsPublic/playbackEnrichment";
 import {
@@ -778,9 +778,9 @@ export default function ChartEdition() {
           </div>
           <div className="chart-podium-v2">
             {top3.map((entry, idx) => (
-              <Link
+              <ChartRecordingLink
                 key={`${entry.rank}-${entry.slug}`}
-                to={trackUrl(entry.slug, entry.artistSlugs)}
+                slug={entry.slug} artistSlugs={entry.artistSlugs} registryTrackId={entry.registryTrackId}
                 className="chart-podium-v2-card"
               >
                 <img src={entry.artworkUrl} alt="" className="chart-podium-v2-img" />
@@ -815,7 +815,7 @@ export default function ChartEdition() {
                     </div>
                   </div>
                 </div>
-              </Link>
+              </ChartRecordingLink>
             ))}
           </div>
         </section>
@@ -836,8 +836,8 @@ export default function ChartEdition() {
             <div className="chart-movers-duet">
               {/* ── Biggest climber ── */}
               {biggestUpMover ? (
-                <Link
-                  to={trackUrl(biggestUpMover.slug, biggestUpMover.artistSlugs)}
+                <ChartRecordingLink
+                  slug={biggestUpMover.slug} artistSlugs={biggestUpMover.artistSlugs} registryTrackId={biggestUpMover.registryTrackId}
                   className="chart-mover-card chart-mover-card--up"
                 >
                   <div className="chart-mover-card-badge chart-mover-card-badge--up">
@@ -881,7 +881,7 @@ export default function ChartEdition() {
                       </div>
                     </div>
                   </div>
-                </Link>
+                </ChartRecordingLink>
               ) : (
                 <div className="chart-mover-card chart-mover-card--empty">
                   <div className="chart-mover-card-badge chart-mover-card-badge--neutral">
@@ -895,8 +895,8 @@ export default function ChartEdition() {
 
               {/* ── Biggest fall ── */}
               {biggestDownMover ? (
-                <Link
-                  to={trackUrl(biggestDownMover.slug, biggestDownMover.artistSlugs)}
+                <ChartRecordingLink
+                  slug={biggestDownMover.slug} artistSlugs={biggestDownMover.artistSlugs} registryTrackId={biggestDownMover.registryTrackId}
                   className="chart-mover-card chart-mover-card--down"
                 >
                   <div className="chart-mover-card-badge chart-mover-card-badge--down">
@@ -940,7 +940,7 @@ export default function ChartEdition() {
                       </div>
                     </div>
                   </div>
-                </Link>
+                </ChartRecordingLink>
               ) : (
                 <div className="chart-mover-card chart-mover-card--empty">
                   <div className="chart-mover-card-badge chart-mover-card-badge--neutral">
@@ -1008,9 +1008,9 @@ export default function ChartEdition() {
               <div className="chart-sidebox-v2">
                 <div className="chart-sidebox-v2-title">New entries</div>
                 {newEntries.map((entry) => (
-                  <Link
+                  <ChartRecordingLink
                     key={`new-${entry.rank}-${entry.slug}`}
-                    to={trackUrl(entry.slug, entry.artistSlugs)}
+                    slug={entry.slug} artistSlugs={entry.artistSlugs} registryTrackId={entry.registryTrackId}
                     className="chart-sidebox-v2-row"
                   >
                     <span className="chart-sidebox-v2-row-metric">NEW</span>
@@ -1022,7 +1022,7 @@ export default function ChartEdition() {
                       <div className="chart-sidebox-v2-row-sub">{entry.artist}</div>
                     </div>
                     <WkIcon name="ArrowRightS" size={13} />
-                  </Link>
+                  </ChartRecordingLink>
                 ))}
                 {newEntries.length === 0 && (
                   <p className="text-[12px] text-[var(--wk-text-faint)] py-2">No new entries in this edition.</p>
@@ -1042,9 +1042,9 @@ export default function ChartEdition() {
               <div className="chart-sidebox-v2">
                 <div className="chart-sidebox-v2-title">Biggest climbers</div>
                 {climbers.map((entry) => (
-                  <Link
+                  <ChartRecordingLink
                     key={`climb-${entry.rank}-${entry.slug}`}
-                    to={trackUrl(entry.slug, entry.artistSlugs)}
+                    slug={entry.slug} artistSlugs={entry.artistSlugs} registryTrackId={entry.registryTrackId}
                     className="chart-sidebox-v2-row"
                   >
                     <span className="chart-sidebox-v2-row-metric">+{entry.movementAmount ?? 0}</span>
@@ -1056,7 +1056,7 @@ export default function ChartEdition() {
                       <div className="chart-sidebox-v2-row-sub">{entry.artist}</div>
                     </div>
                     <WkIcon name="ArrowRightS" size={13} />
-                  </Link>
+                  </ChartRecordingLink>
                 ))}
                 {climbers.length === 0 && (
                   <p className="text-[12px] text-[var(--wk-text-faint)] py-2">No climbers in this edition.</p>
