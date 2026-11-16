@@ -69,16 +69,29 @@ daily identity without manufacturing a cross-provider match. Existing source
 tests exercise stable native IDs, mixed canonical/noncanonical scoring,
 cross-provider forgery rejection and private nonpublication.
 
-**Not implemented by this slice:** The authenticated W8 attestor still awards
-ranking credit only to W5 ELIGIBLE rows with an accepted canonical Registry
-UUID. The chart-scoped reference helper is **not yet wired** into that pathway.
-A separate explicit chart-only eligibility decision must be verified against
-the frozen saved policy and original bytes. Independent reviewed equivalence
+**Private W8 attestation now integrates the chart-only lane:** After exact
+original-byte replay, current source-method authorization and authenticated
+saved W5 configuration are verified, a separate fail-closed predicate checks
+whether the frozen policy is genuinely origin-unrestricted and imposes no
+unverifiable metadata restrictions. The existing W5 Registry review verdict
+is preserved; chart-only participation uses a verified native or receipt-local
+reference instead of manufacturing a Registry UUID. Known EXCLUDED,
+CONFLICTED or inactive identities remain held. The default released W8 bridge
+does not stage or publish anything. A focused synthetic integration test
+proves private scoring under the 9 Nov all-origin profile shape while the
+narrower prior profile remains restrictive.
+
+**Not implemented by this slice:** Independent human-reviewed equivalence
 for the *same recording across different providers* remains required before
-one published ranking aggregates those providers. The policy must not bypass
-unknown identity conflicts, native-period gaps or other eligibility
-restrictions. No automatic Registry admission or public WK100 Edition is
-authorized by these changes.
+one published ranking aggregates those providers. A shared title or Artist
+label must never count as matching evidence. The governed publisher's current
+identity contract and public display projection must be reviewed for nullable
+canonical Track IDs and chart-scoped references, without rewriting historical
+observations, reweighting absent sources or bypassing source authorization.
+Existing W5 Registry policy outcome remains intact; the new chart-only
+predicate is private W8 scoring input only. No automatic Registry admission,
+SQL migration, Production Edge deployment or public WK100 Edition is
+authorized by this source branch.
 
 **Future integrated acceptance:** An international-only hit contributes to
 a private ranked candidate while canonical_track_id stays null. African-led
