@@ -74,6 +74,39 @@ test('all-origin chart-only evidence retains provider identity without minting R
   assert.notEqual(foreign.chartRecordingRef,original.chartRecordingRef);
 });
 
+test('source-only IDs hold exact cross-candidate ISRC collisions without title matching',async()=>{
+  const x=fixture();
+  x.acceptedMatches=[];
+  x.rawRows[0].isrc='KEABC2600001';
+  x.candidates.push({id:CAND2,run_id:RUN,title:'Another song',
+    artist_display:'Different singer',provider_ids_json:{spotify:['sp-456']},
+    source_count:1});
+  x.runSources.push({id:SOURCE2,run_id:RUN,provider:'spotify',enabled:true});
+  x.rawRows.push({id:RAW2,run_id:RUN,source_id:SOURCE2,
+    provider:'spotify',provider_track_id:'sp-456',source_position:2,
+    title_raw:'Another song',artist_raw:'Different singer',
+    isrc:'KE-ABC-26-00001',raw_payload_json:{}});
+  const project=async(candidateId)=>chartOnlyRef({association:reconcile(x),
+    rawRows:x.rawRows,acceptedMatches:x.acceptedMatches,candidateId});
+  assert.equal(reconcile(x).runIntegrityComplete,true);
+  const first=await project(CAND),second=await project(CAND2);
+  assert.equal(first.status,'HELD');
+  assert.equal(second.status,'HELD');
+  assert.equal(first.reason,'cross_candidate_isrc_equivalence_unreviewed');
+  assert.equal(second.reason,'cross_candidate_isrc_equivalence_unreviewed');
+  assert.equal(first.chartRecordingRef,null);
+  for(const key of ['canScore','canCommit','canPublish','canAdmitRegistry'])
+    assert.equal(first[key],false,key);
+  x.rawRows[1].isrc='KEABC2600002';
+  assert.equal((await project(CAND)).status,'SOURCE_ONLY');
+  assert.equal((await project(CAND2)).status,'SOURCE_ONLY');
+  // Coincidentally matching source titles are never sufficient to merge.
+  x.rawRows[1].isrc=null;
+  x.rawRows[1].title_raw=x.rawRows[0].title_raw;
+  x.rawRows[1].artist_raw=x.rawRows[0].artist_raw;
+  assert.equal((await project(CAND)).status,'SOURCE_ONLY');
+});
+
 test('chart-only source evidence refuses canonical links, ambiguous IDs and missing original labels',async()=>{
   const project=async x=>chartOnlyRef({
     association:reconcile(x),rawRows:x.rawRows,
