@@ -40,6 +40,10 @@ test('real snapshot + source + Registry + full evaluator => persisted REVIEW, no
  assert.equal(r.decisions[0].decision.policyDigest,x.run.rule_snapshot_json.ingestPolicy.sha256);
  assert(r.decisions[0].decision.reasonCodes.includes('external_acceptance_not_verified'));
  assert.equal(r.summary.canScore,false);assert.equal(r.summary.canCommit,false);
+ assert.equal(r.chartOnlyIdentityPreview.length,1);
+ assert.equal(r.chartOnlyIdentityPreview[0].status,'HELD');
+ assert.equal(r.chartOnlyIdentityPreview[0].chartRecordingRef,null);
+ assert.equal(r.chartOnlyIdentityPreview[0].canPublish,false);
  assert.equal(r.expectedRunUpdatedAt,timestamp);
 });
 test('verified foreign primary is excluded by country filter without scoring',async()=>{
