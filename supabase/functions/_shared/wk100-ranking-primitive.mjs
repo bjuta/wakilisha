@@ -7,6 +7,8 @@
  * Edition, stage it or publish it. Only a trusted server may assemble inputs.
  * Historical methodologies are not configuration inputs to this primitive.
  */
+import {wk100RegistryProviderKey} from './wk100-identify-observations.mjs';
+
 export const WK100_RANKING_SPECIFICATION_V1 = Object.freeze({
   id:'wk100-kenya-traction-ordinal-v1',
   market:'KE',
@@ -27,6 +29,8 @@ export const WK100_RANKING_SPECIFICATION_V1 = Object.freeze({
 const S=WK100_RANKING_SPECIFICATION_V1;
 const SHA=/^[a-f0-9]{64}$/;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const CHART_NATIVE=/^wk100:source:v1:(apple_music|audiomack|mdundo|shazam|youtube):[a-f0-9]{64}$/;
+const CHART_OBS=/^wk100:obs:v1:([a-f0-9]{64}):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const UTC=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 const MONDAY=/^\d{4}-\d{2}-\d{2}$/;
 const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&
@@ -78,7 +82,7 @@ export async function computeWk100PrivateRankingCandidate(input){
     fail('input_invalid');
   const start=weekStart(input.weekStartEat),end=start+7*86_400_000;
   const counted=new Map(S.families.map(f=>[f,[]]));
-  const receiptIds=new Set(),sourceIds=new Map();
+  const receiptIds=new Set(),sourceIds=new Map(),observationRefs=new Set();
   const normalized=[];
   for(const raw of input.snapshots){
     if(!exact(raw,snapshotFields)||!S.families.includes(raw.family)||
@@ -130,18 +134,34 @@ export async function computeWk100PrivateRankingCandidate(input){
         raw.providerPeriodEndDate!==null)fail('period_authority_invalid');
     }else fail('period_authority_invalid');
     const seenRecording=new Set(),seenRanks=new Set();
+    // Chart-only source identities are private ranking references, not Registry
+    // UUIDs. Their scoped namespace prevents unreviewed cross-provider merges.
+    // The trusted attestor must derive these from authenticated original rows.
+    const registryProvider=wk100RegistryProviderKey(raw.family);
     const rows=raw.rows.map(row=>{
       const held=object(row)&&Object.hasOwn(row,'disposition');
+      const observation=typeof row?.recordingId==='string'
+        ?row.recordingId.match(CHART_OBS):null;
+      const nativeRef=typeof row?.recordingId==='string'&&
+        CHART_NATIVE.test(row.recordingId)&&
+        row.recordingId.startsWith('wk100:source:v1:'+registryProvider+':');
+      const observationRef=!!observation&&
+        observation[1]===raw.captureReceiptSha256;
+      const identityValid=typeof row?.recordingId==='string'&&
+        (UUID.test(row.recordingId)||nativeRef||observationRef);
       if(!exact(row,raw.family==='youtube_ke'?
           (held?heldKeysCount:rowKeysCount):(held?heldKeysRank:rowKeysRank))||
         !Number.isInteger(row.rank)||row.rank<1||row.rank>raw.declaredDepth||
         seenRanks.has(row.rank)||
         (held?(row.recordingId!==null||!heldDispositions.has(row.disposition)):
-          (typeof row.recordingId!=='string'||!UUID.test(row.recordingId)||
-            seenRecording.has(row.recordingId))))
+          (!identityValid||seenRecording.has(row.recordingId)||
+            (observationRef&&observationRefs.has(row.recordingId)))))
         fail('rank_or_identity_invalid');
       seenRanks.add(row.rank);
-      if(!held)seenRecording.add(row.recordingId);
+      if(!held){
+        seenRecording.add(row.recordingId);
+        if(observationRef)observationRefs.add(row.recordingId);
+      }
       if(raw.family==='youtube_ke'){
         if(!Number.isSafeInteger(row.nativeCount)||row.nativeCount<0)
           fail('youtube_native_count_invalid');
