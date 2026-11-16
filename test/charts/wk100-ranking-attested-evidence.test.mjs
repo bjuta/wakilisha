@@ -214,8 +214,13 @@ test('all-origin native evidence ranks without canonical Registry IDs under unre
     marketScopeSnapshot:broadScope}));
   const restrictedDraft={...broadDraft,config_json:{...broadDraft.config_json,
     eligibilityProfileSnapshot:restrictedProfile,ingestPolicySha256:restrictivePolicy}};
-  await assert.rejects(()=>prepare({...a,eligibilityPolicySha256:restrictivePolicy,
-    loadW5Draft:async()=>restrictedDraft}),/fewer_than_100_recordings/);
+  const restrictive=await prepare({...a,eligibilityPolicySha256:restrictivePolicy,
+    loadW5Draft:async()=>restrictedDraft});
+  assert(restrictive.heldPositions.REVIEW_REQUIRED>=11);
+  assert.equal(restrictive.chartOnlyDisplayRows.length,0);
+  assert.equal(restrictive.privateRanking.ranked.some(x=>
+    x.recordingId.startsWith('wk100:source:v1:')),false);
+  assert.equal(restrictive.canPublish,false);
 });
 
 test('original excluded and unresolved ranks remain non-scoring without renumbering',async()=>{
