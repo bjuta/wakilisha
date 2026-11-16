@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { validEatWeek, projectWk100SourceHealth } from '../_shared/wk100-source-admin-projection.mjs';
 import { projectWk100IdentifyObservations, wk100RegistryProviderKey } from '../_shared/wk100-identify-observations.mjs';
+import { projectMiziziWk100RegistryCandidates, wk100CandidateTitleKey } from '../_shared/mizizi-wk100-registry-candidates.mjs';
 import { projectWk100EligibilityPreview } from '../_shared/wk100-eligibility-preview.mjs';
 import { inspectWk100RankWeek } from '../_shared/wk100-ranking-evidence-review.mjs';
 import { readWk100AttestedRankingPrivate } from '../_shared/wk100-ranking-attested-reader.mjs';
@@ -381,6 +382,55 @@ Deno.serve(async req=>{
         providerArtistReportSha256:e?.report??null};
     });
     observation.rows=withArtist(observation.rows);
+
+    // MIZIZI's existing Registry is the discovery authority. These are
+    // read-only candidate hints, never accepted links or recording identities.
+    const titleKeys=[...new Set(observation.rows
+      .map(r=>wk100CandidateTitleKey(r.observedTitle)).filter(Boolean))];
+    let candidateTracks:unknown[]=[],candidateCredits:unknown[]=[],
+      candidateArtists:unknown[]=[],candidateAliases:unknown[]=[];
+    if(titleKeys.length){
+      const lookup=await admin.from('registry_tracks')
+        .select('id,title,normalized_title,isrc,status')
+        .eq('status','active').in('normalized_title',titleKeys).limit(401);
+      if(lookup.error||!Array.isArray(lookup.data)||lookup.data.length>400)
+        return reply(req,503,{error:'mizizi_candidate_registry_unavailable'});
+      candidateTracks=lookup.data;
+      const candidateTrackIds=lookup.data.map(x=>x.id);
+      if(candidateTrackIds.length){
+        const credits=await admin.from('registry_track_artists')
+          .select('track_id,artist_id,artist_name_text,status')
+          .eq('status','active').in('track_id',candidateTrackIds).limit(1601);
+        if(credits.error||!Array.isArray(credits.data)||credits.data.length>1600)
+          return reply(req,503,{error:'mizizi_candidate_credits_unavailable'});
+        candidateCredits=credits.data;
+        const candidateArtistIds=[...new Set(credits.data
+          .map(x=>x.artist_id).filter((x):x is string=>typeof x==='string'))];
+        if(candidateArtistIds.length){
+          const [artists,aliases]=await Promise.all([
+            admin.from('registry_artists').select('id,display_name,status')
+              .in('id',candidateArtistIds).limit(801),
+            admin.from('registry_artist_aliases')
+              .select('canonical_artist_id,alias_display_name,status')
+              .eq('status','active').in('canonical_artist_id',candidateArtistIds).limit(801),
+          ]);
+          if(artists.error||aliases.error||!Array.isArray(artists.data)||
+             !Array.isArray(aliases.data)||artists.data.length>800||aliases.data.length>800)
+            return reply(req,503,{error:'mizizi_candidate_artists_unavailable'});
+          candidateArtists=artists.data;candidateAliases=aliases.data;
+        }
+      }
+    }
+    try{
+      const research=projectMiziziWk100RegistryCandidates({
+        rows:observation.rows,registryTracks:candidateTracks,
+        registryCredits:candidateCredits,registryArtists:candidateArtists,
+        registryAliases:candidateAliases,
+      });
+      if(research.canWriteRegistry!==false||research.canScore!==false||
+         research.canPublish!==false)throw Error('candidate_authority_violation');
+      observation.rows=research.rows;
+    }catch{return reply(req,503,{error:'mizizi_candidate_projection_unavailable'});}
     if(action==='identify')return reply(req,200,observation);
 
     // Existing signed-in, revisioned Edition policy, never a browser-supplied
