@@ -2,6 +2,10 @@ import {
   readFileSync,
 } from "node:fs";
 import { visibleWakilishaNavigation } from "@/components/navigation/wakilishaNavigation";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
+import { ChartRecordingLink } from "@/components/charts/ChartRecordingLink";
 import {
   describe,
   expect,
@@ -1790,6 +1794,56 @@ describe("public discovery final refinement regressions", () => {
       expect(mobileAppLayoutFinal).not.toContain("wakilisha-thunderbolt.png");
     },
   );
+});
+
+describe("public Chart entries without canonical Registry identity", () => {
+  it("renders source-only titles as plain content and canonical titles as real Track links", () => {
+    const render = (registryTrackId: string | null, slug = "example-song") =>
+      renderToStaticMarkup(
+        createElement(MemoryRouter, {},
+          createElement(ChartRecordingLink, {
+            registryTrackId, slug, artistSlugs: ["african-artist"],
+          }, "Example song"),
+        ),
+      );
+
+    const chartOnly = render(null);
+    expect(chartOnly).toContain("Example song");
+    expect(chartOnly).not.toContain('href="/tracks/');
+    expect(chartOnly).not.toContain("<a");
+
+    const malformed = render("not-a-registry-uuid");
+    expect(malformed).not.toContain("<a");
+
+    const canonical = render("11111111-1111-4111-8111-111111111111");
+    expect(canonical).toContain('href="/tracks/african-artist/example-song"');
+    expect(canonical).toContain("<a");
+  });
+
+  it("keeps public adapters, Chart cards, and SEO from inventing Registry pages", () => {
+    const v2 = readFileSync("src/services/chartsPublic/v2Adapter.ts", "utf8");
+    const runtime = readFileSync("src/services/chartsPublic/supabaseRuntime.ts", "utf8");
+    const viewModels = readFileSync("src/services/chartsPublic/viewModels.ts", "utf8");
+    const seo = readFileSync("scripts/seo/prerender-metadata.mjs", "utf8");
+    const chartRow = readFileSync("src/components/design-system/music/ChartRow.tsx", "utf8");
+    expect(v2).toContain('trackSlug: entry.canonicalTrackId ? (entry.trackSlug ?? "") : ""');
+    expect(runtime).toContain('const trackSlug = canonicalTrackId ? pick(row, ["track_slug"]) : ""');
+    expect(viewModels).toContain("entry.canonicalTrackId ? (normalizedSlug || entry.trackSlug)");
+    expect(seo).toContain("linkedToRegistry && artistSlug && entry.trackSlug");
+    expect(chartRow).toContain("slug && registryTrackId");
+
+    for (const path of [
+      "src/pages/charts/directory/page.tsx",
+      "src/pages/charts/edition/page.tsx",
+      "src/pages/mobile/charts/directory/page.tsx",
+      "src/pages/mobile/charts/edition/page.tsx",
+      "src/pages/mobile/charts/page.tsx",
+    ]) {
+      const page = readFileSync(path, "utf8");
+      expect(page).toContain("<ChartRecordingLink");
+      expect(page).not.toContain("to={trackUrl(");
+    }
+  });
 });
 
 describe("public charts empty-program discovery regression", () => {
