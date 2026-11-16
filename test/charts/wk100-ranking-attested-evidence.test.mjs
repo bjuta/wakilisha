@@ -174,6 +174,10 @@ test('all-origin native evidence ranks without canonical Registry IDs under unre
   assert.equal(apple?.score,20);
   assert.equal(apple?.listedFamilyCount,1);
   assert.equal(result.privateRanking.ranked.find(r=>r.recordingId===id(1)),undefined);
+  assert.equal(result.chartOnlyDisplayRows.length,5);
+  assert.deepEqual(result.chartOnlyDisplayRows.find(x=>x.recordingId===ref),{
+    recordingId:ref,title:'Song 1',artist:'Artist 1',labelVariation:false,
+  });
   // No automatic cross-provider equivalence. The same apparent song/artist
   // produces provider-specific references until independent evidence proves a
   // shared recording. All five are private-only and noncanonical.
@@ -185,6 +189,22 @@ test('all-origin native evidence ranks without canonical Registry IDs under unre
   assert(refs.every(key=>!key.startsWith('00000000-')));
   const reordered=await prepare({...a,selectedReceiptIds:[...f.ids].reverse()});
   assert.equal(reordered.rankingDigest,result.rankingDigest);
+  // Exact provider ID stayed the same, but the source changed its label on
+  // one Apple day. Show that uncertainty instead of quietly rewriting labels.
+  const secondReceipt=f.ids[1];
+  const second=f.panels.get(secondReceipt),original=f.originals.get(secondReceipt);
+  const nativeRows=JSON.parse(new TextDecoder().decode(original));
+  nativeRows[0].title='Song 1 alternate source wording';
+  const changedBytes=new TextEncoder().encode(JSON.stringify(nativeRows));
+  second.rows[0].title_observed=nativeRows[0].title;
+  const changedSha=sha(changedBytes);
+  second.attempt.raw_object_key=second.attempt.raw_object_key
+    .replace(second.attempt.payload_sha256,changedSha);
+  second.attempt.payload_sha256=changedSha;
+  f.originals.set(secondReceipt,changedBytes);
+  const changed=await prepare(a);
+  assert.equal(changed.chartOnlyDisplayRows.find(x=>x.recordingId===ref)?.labelVariation,true);
+  assert.notEqual(changed.rankingDigest,result.rankingDigest);
   // A real restrictive origin policy is never silently bypassed by this
   // chart-only lane. The held source positions stay at their original ranks.
   const restrictedProfile=structuredClone(broadProfile);
@@ -500,6 +520,11 @@ test('W8 W8S W8B W9 server contract remains JWT-gated, read-only and nonpublishi
   assert.match(src,/sourceConstitutionVersion:version/);
   assert.match(src,/selectedReceiptIds:inventory.selectedReceiptIds/);
   assert.match(src,/canStage:false,canPublish:false/);
+  assert.match(src,/canonicalIds=ranked\.map/);
+  assert.match(src,/chartByRef=new Map/);
+  assert.match(src,/chartOnlyDisplayRows/);
+  assert.match(ui,/Chart evidence only\. Not linked to a Registry recording\./);
+  assert.match(ui,/sourceLabelVariation/);
   assert.doesNotMatch(src,/action==='ranking'.{0,200}publishImmediately/s);
   for(const stage of ['data-wk100-w8-ranking','data-wk100-w8s-explanation',
     'data-wk100-w8b-incomplete','data-wk100-w9-readiness'])
