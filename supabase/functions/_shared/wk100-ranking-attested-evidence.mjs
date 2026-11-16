@@ -9,9 +9,11 @@
  */
 import {computeWk100PrivateRankingCandidate,
   WK100_RANKING_SPECIFICATION_V1 as SPEC} from './wk100-ranking-primitive.mjs';
-import {projectWk100IdentifyObservations} from './wk100-identify-observations.mjs';
+import {projectWk100IdentifyObservations,wk100ChartScopedObservationRef}
+  from './wk100-identify-observations.mjs';
 import {parseCaptureNativeRows} from './chart-capture-runtime.mjs';
-import {projectWk100EligibilityPreview} from './wk100-eligibility-preview.mjs';
+import {projectWk100EligibilityPreview,wk100CanScoreChartOnlyObservation}
+  from './wk100-eligibility-preview.mjs';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA=/^[a-f0-9]{64}$/;
@@ -168,22 +170,36 @@ export async function prepareWk100AttestedPrivateRanking({
         SHA.test(verdict.registryFactsSha256)&&
         ['ELIGIBLE','EXCLUDED','REVIEW_REQUIRED','CONFLICTED'].includes(verdict.outcome),
         'eligibility_or_registry_facts_unverified');
+      let rankingRef=null;
       if(verdict.outcome==='ELIGIBLE'){
         need(row.identityState==='resolved'&&UUID.test(row.canonicalTrackId),
           'eligibility_identity_unverified');
-        rankingRows.push({recordingId:row.canonicalTrackId,rank:row.rank,
+        rankingRef=row.canonicalTrackId;
+      }else if(wk100CanScoreChartOnlyObservation({
+        sourceReview:identified,row,verdict,savedConfig:savedDraft.config_json,
+      })){
+        // The provider reference is derived ONLY after original-byte replay
+        // and a verified, unrestricted saved chart policy. It is not a
+        // canonical Registry UUID or reviewed cross-provider equivalence.
+        rankingRef=await wk100ChartScopedObservationRef({
+          providerKey:contract.provider_key,providerTrackId:row.providerTrackId,
+          receiptSha256:attempt.payload_sha256,captureRowId:row.captureRowId,
+        });
+      }
+      if(rankingRef!==null){
+        rankingRows.push({recordingId:rankingRef,rank:row.rank,
           ...(family==='youtube_ke'?
             {nativeCount:numberFromSqlBigint(ordered[i].source_native_count)}:{})});
       }else{
-        // Retain the exact native position and count; grant no ranking credit.
-        // Excluded Registry IDs stay in the private provenance digest only.
+        // Keep the original native position/count. No compressed ranks or
+        // credit for conflicts, restricted policy or unknown source fields.
         rankingRows.push({recordingId:null,rank:row.rank,
           disposition:verdict.outcome,
           ...(family==='youtube_ke'?
             {nativeCount:numberFromSqlBigint(ordered[i].source_native_count)}:{})});
       }
       attestationFacts.push([family,receiptId,ordered[i].id,
-        row.canonicalTrackId,verdict.outcome,verdict.registryFactsSha256]);
+        row.canonicalTrackId,rankingRef,verdict.outcome,verdict.registryFactsSha256]);
     }
     const period=attempt.native_period_authority;
     // Only the provider's genuine endDate was retained. A matching request
