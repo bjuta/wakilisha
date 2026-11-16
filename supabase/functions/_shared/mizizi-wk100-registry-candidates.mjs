@@ -15,7 +15,8 @@ export const MIZIZI_WK100_CANDIDATE_CONTRACT = 'mizizi-wk100-registry-candidates
 export const wk100CandidateTitleKey = normalize;
 
 function artistParts(value) {
-  return normalize(value).split(/\s+(?:feat|ft|featuring|with|and|x)\s+|[,;&]+/)
+  return (typeof value === 'string' ? value : '')
+    .split(/,|;|&|\b(?:feat|ft|featuring|with|and|x)\b/gi)
     .map(normalize).filter(Boolean);
 }
 function matchingCredit(observedArtist, credits) {
