@@ -13,11 +13,17 @@ const check=(ok,code)=>{if(!ok)fail(code);};
 const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const text=x=>typeof x==='string'&&x.length>0?x:null;
 
-// The public Apple Kenya playlist exposes the same Apple Music song IDs as
-// the existing typed Registry provider, whose stored key is "apple_music".
-// This explicit identity namespace mapping is not a fuzzy match.
+// Convert the five fixed WK100 capture families to the existing Registry's
+// provider-neutral identity vocabulary. W8 imports this same exact mapping.
+// Unknown providers fail closed; this does not infer a recording match.
+const WK100_REGISTRY_PROVIDERS=Object.freeze({
+  apple_ke:'apple_music',audiomack_ke:'audiomack',mdundo_ke:'mdundo',
+  shazam_ke:'shazam',youtube_ke:'youtube',
+});
 export function wk100RegistryProviderKey(providerKey){
-  return providerKey==='apple_ke'?'apple_music':providerKey;
+  if(!Object.prototype.hasOwnProperty.call(WK100_REGISTRY_PROVIDERS,providerKey))
+    fail('provider_unsupported');
+  return WK100_REGISTRY_PROVIDERS[providerKey];
 }
 
 export function projectWk100IdentifyObservations({
