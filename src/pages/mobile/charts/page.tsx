@@ -15,7 +15,7 @@ import {
   type ChartEntryRowViewModel,
 } from "@/services/chartsPublic/viewModels";
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
-import { trackUrl } from "@/utils/trackUrl";
+import { ChartRecordingLink } from "@/components/charts/ChartRecordingLink";
 
 export default function MobileCharts() {
   const [activeSeries, setActiveSeries] = useState("weekly-top-40");
@@ -276,9 +276,9 @@ export default function MobileCharts() {
         <div className="mb-3 text-[10px] font-bold uppercase tracking-wider text-[var(--wk-text-muted)]">Top 3</div>
         <div className="space-y-3">
           {top3.map((entry, i) => (
-            <Link
+            <ChartRecordingLink
               key={entry.rank}
-              to={trackUrl(entry.slug, entry.artistSlugs)}
+              slug={entry.slug} artistSlugs={entry.artistSlugs} registryTrackId={entry.registryTrackId}
               className="group flex items-center gap-4 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)] p-4 transition-all hover:border-[var(--wk-brand)]/40 active:scale-[0.98] active:opacity-80"
             >
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--wk-surface-raised)]">
@@ -322,7 +322,7 @@ export default function MobileCharts() {
                   </span>
                 )}
               </div>
-            </Link>
+            </ChartRecordingLink>
           ))}
         </div>
       </div>
