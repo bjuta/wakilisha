@@ -18,6 +18,6 @@ This obscured existing names without proving they were missing from the Registry
 
 ## Verification and launch gates
 
-Run `node --test test/charts/wk100-identify-observations.test.mjs test/charts/wk100-mizizi-registry-candidates.test.mjs test/charts/wk100-eligibility-preview.test.mjs` and existing WK100 UI/type build and regression gates. Test legitimate Mboka/Siaka leads, missing source IDs, false title match, unaccepted aliases, inactive identities, all five provider namespaces, and the exact no-write/no-score/no-publish flags.
+Run `node --test test/charts/wk100-identify-observations.test.mjs test/charts/wk100-eligibility-preview.test.mjs` and existing WK100 UI/type build and regression gates. Test legitimate Mboka/Siaka leads, missing source IDs, false title match, unaccepted aliases, inactive identities, all five provider namespaces, and the exact no-write/no-score/no-publish flags.
 
 Before claiming Production completion: protected exact-head CI, review, separately managed `wk100-source-admin-read` Edge deployment, real super-admin W4+W5 browser checks on pinned 9 Nov receipts, and source/Registry postconditions. A GitHub merge alone does not deploy the Edge Function or the frontend. The founder's one-week five-original-evidence exception changes neither canonical identity admission nor ordinary subsequent-week ranking requirements. Issue #1338 remains open until the real inaugural Edition is admitted, staged and published.
