@@ -5,7 +5,7 @@
  */
 import { chromium } from "@playwright/test";
 import { createServer } from "vite";
-import { readFileSync } from "node:fs";
+import { readFileSync,mkdirSync } from "node:fs";
 
 const assert=(ok,code)=>{if(!ok)throw new Error(code);};
 async function signedIn(page,base,identity){
@@ -15,6 +15,20 @@ async function signedIn(page,base,identity){
  await page.getByRole("textbox",{name:"Admin email"}).fill(identity.email,{timeout:30000});
  await page.getByLabel("Password",{exact:true}).fill(identity.password,{timeout:30000});
  await page.getByRole("button",{name:"Enter Admin Studio"}).click();
+ // v3 Workbench intentionally places operations behind an accessible Disclosure.
+ // Verify the real case-first view and explicitly open controls for legacy JWT probes.
+ await page.locator('article[aria-label="Selected investigation"]').waitFor({
+  state:"visible",timeout:45000,
+ });
+ const controls=page.getByRole("button",{
+  name:"Case controls, complete journal and Hold Writes",
+ });
+ await controls.waitFor({state:"visible",timeout:30000});
+ assert(await controls.getAttribute("aria-expanded")==="false",
+  "STOP_MIZIZI_CASE_CONTROLS_NOT_CLOSED_AT_REST");
+ await controls.click();
+ assert(await controls.getAttribute("aria-expanded")==="true",
+  "STOP_MIZIZI_CASE_CONTROLS_DID_NOT_EXPAND");
  await page.locator("[data-wk-mizizi-durable-cases]").waitFor({
   state:"visible",timeout:45000,
  });
@@ -63,6 +77,113 @@ async function mobileOverflow(page){
  assert(metrics.full<=metrics.width+3&&metrics.panel>0,
   "STOP_BROWSER_MOBILE_HEADQUARTERS_HORIZONTAL_OVERFLOW");
 }
+
+/**
+ * Phase 1 workbook M1 shell geometry: genuine signed-in local Supabase data,
+ * actual Chromium CSS and font loading, no mocked RPC responses or hosted calls.
+ * Captures reflect viewport/layout only; NOT public/production visual acceptance.
+ */
+async function verifyCanonicalWorkbenchViewportsV1(desktop,mobile){
+ const sizes=[390,480,768,1024,1280,1440];
+ mkdirSync("test-results/mizizi-phase1-m1",{recursive:true});
+ for(const width of sizes){
+  // 390/480 are real touch-client contexts. Width 768 deliberately probes
+  // the mobile-to-desktop shell boundary using the same authenticated client.
+  const page=width<=768?mobile:desktop;
+  await page.setViewportSize({width,height:width<768?844:900});
+  await page.locator('article[aria-label="Selected investigation"]').waitFor({
+   state:"visible",timeout:30000,
+  });
+  // Resizing across the 768px mobile breakpoint remounts ResponsiveAppLayout.
+  // Wait for that authenticated layout to settle, not an outgoing shell's DOM.
+  await page.waitForFunction((w)=>{
+   const app=document.querySelector('[data-wk-mizizi-workspace].mz-port');
+   const story=app?.querySelector('article[aria-label="Selected investigation"]');
+   const appWidth=app?.getBoundingClientRect().width||0;
+   const storyWidth=story?.getBoundingClientRect().width||0;
+   return storyWidth>0&&(w>=768||appWidth>=w-40);
+  },width,{timeout:30000});
+  await page.getByRole("tab",{name:"Workbench"}).waitFor({
+   state:"visible",timeout:30000,
+  });
+  await page.evaluate(async()=>{
+   await document.fonts.ready;
+   // The app may use smooth scrolling. Capture from a stable, actual top
+   // rather than stitching a full-page screenshot mid-scroll after disclosure.
+   document.documentElement.style.scrollBehavior="auto";
+   document.body.style.scrollBehavior="auto";
+   window.scrollTo({top:0,left:0,behavior:"instant"});
+  });
+  await page.waitForFunction(()=>window.scrollY===0,undefined,{timeout:10000});
+  const v=await page.evaluate(()=>{
+   const workspace=document.querySelector('[data-wk-mizizi-workspace].mz-port');
+   const productShell=document.querySelector('main[data-wk-mizizi-product-shell="true"]');
+   const nestedAdmin=document.querySelector("[data-wk-admin-studio-sidebar]");
+   const brand=workspace?.querySelector(".mz-v3-rail-brand");
+   const toolbar=workspace?.querySelector(".mz-head");
+   const tabs=workspace?.querySelector(".mz-v3-tabs > [role='tablist']");
+   const tab=workspace?.querySelector(".mz-v3-rail [role='tab']");
+   const caseStory=workspace?.querySelector('article[aria-label="Selected investigation"]');
+   return {
+    windowScrollY:window.scrollY,
+    documentWidth:document.documentElement.scrollWidth,
+    viewportWidth:document.documentElement.clientWidth,
+    appWidth:workspace?.getBoundingClientRect().width||0,
+    productShellPresent:Boolean(productShell),
+    nestedAdminPresent:Boolean(nestedAdmin),
+    publicHeaderPresent:Boolean(document.querySelector("[data-wk-mobile-app-header]")),
+    publicShellPresent:Boolean(document.querySelector("[data-wk-unified-public-shell]")),
+    brandWidth:brand?.getBoundingClientRect().width||0,
+    brandTop:brand?.getBoundingClientRect().top??0,
+    toolbarTop:toolbar?.getBoundingClientRect().top??0,
+    brandVisible:brand?getComputedStyle(brand).display!=="none":false,
+    toolbarHeight:toolbar?.getBoundingClientRect().height||0,
+    tablistWidth:tabs?.getBoundingClientRect().width||0,
+    tablistTop:tabs?.getBoundingClientRect().top??-1,
+    tablistDirection:tabs?getComputedStyle(tabs).flexDirection:"",
+    firstTabHeight:tab?.getBoundingClientRect().height||0,
+    caseWidth:caseStory?.getBoundingClientRect().width||0,
+   };
+  });
+  assert(v.windowScrollY===0,
+   "STOP_MIZIZI_M1_SCREENSHOT_NOT_TOP_"+width+"_"+JSON.stringify(v));
+  assert(v.productShellPresent&&!v.nestedAdminPresent&&
+   !v.publicHeaderPresent&&!v.publicShellPresent,
+   "STOP_MIZIZI_DOUBLE_APPLICATION_CHROME_"+width+"_"+JSON.stringify(v));
+  assert(v.appWidth>0&&v.caseWidth>0&&Math.abs(v.appWidth-width)<=2,
+   "STOP_MIZIZI_M1_VISIBLE_CASE_MISSING_"+width+"_"+JSON.stringify(v));
+  assert(v.documentWidth<=v.viewportWidth+3,
+   "STOP_MIZIZI_M1_VIEWPORT_OVERFLOW_"+width+"_"+JSON.stringify(v));
+  assert(v.firstTabHeight>=43.5,
+   "STOP_MIZIZI_M1_NAV_TARGET_BELOW_44_"+width);
+  if(width>768){
+   assert(v.brandVisible&&Math.abs(v.brandWidth-248)<=2&&
+    Math.abs(v.tablistWidth-248)<=2&&v.tablistDirection==="column"&&
+    v.toolbarHeight>=63.5&&Math.abs(v.brandTop)<=2&&Math.abs(v.toolbarTop)<=2,
+    "STOP_MIZIZI_M1_DESKTOP_RAIL_TOOLBAR_DRIFT_"+width+"_"+JSON.stringify(v));
+  }else{
+   assert(!v.brandVisible&&v.tablistDirection==="row"&&
+    Math.abs(v.toolbarTop)<=2&&
+    v.tablistTop>=v.toolbarHeight-2&&
+    v.tablistTop<=v.toolbarHeight+2,
+    "STOP_MIZIZI_M1_MOBILE_TOP_CHROME_DRIFT_"+width+"_"+JSON.stringify(v));
+  }
+  // First fold is separately reviewable and avoids a fullPage sticky capture
+  // being mistaken for actual visual position.
+  await page.screenshot({
+   path:"test-results/mizizi-phase1-m1/workbench-"+width+"-fold.png",
+   fullPage:false,
+  });
+  await page.screenshot({
+   path:"test-results/mizizi-phase1-m1/workbench-"+width+".png",
+   fullPage:true,
+  });
+  console.log("WK_MIZIZI_REAL_JWT_M1_VIEWPORT_"+width+"=PASS "+JSON.stringify(v));
+ }
+ await desktop.setViewportSize({width:1440,height:900});
+ await mobile.setViewportSize({width:390,height:844});
+}
+
 export async function verifyLocalHeadquartersBrowsersV1({
  api,anonKey,first,second,caseId,
 }){
@@ -93,6 +214,13 @@ export async function verifyLocalHeadquartersBrowsersV1({
    const desk=await desktop.newPage(),phone=await mobile.newPage();
    await signedIn(desk,base,first);
    await signedIn(phone,base,second);
+   const controlName="Case controls, complete journal and Hold Writes";
+   await desk.getByRole("button",{name:controlName}).click();
+   await phone.getByRole("button",{name:controlName}).click();
+   await verifyCanonicalWorkbenchViewportsV1(desk,phone);
+   await desk.getByRole("button",{name:controlName}).click();
+   await phone.getByRole("button",{name:controlName}).click();
+   await desk.locator("[data-wk-mizizi-durable-cases]").waitFor({state:"visible",timeout:30000});
    await desk.getByRole("button",{name:"View Recorded Case Journal"}).click();
    const actual=desk.locator('section[aria-label="Immutable case event timeline"]');
    await actual.getByText("Revision 2").waitFor({timeout:30000});
@@ -102,6 +230,17 @@ export async function verifyLocalHeadquartersBrowsersV1({
    console.log("WK_BROWSER_TWO_REAL_LOGIN_DESKTOP_MOBILE_DB02_JOURNAL=PASS");
    await mobileOverflow(phone);
    console.log("WK_BROWSER_MOBILE_390PX_NO_DOCUMENT_OVERFLOW=PASS");
+
+   // The case-first v3 Workbench deliberately collapses the separate Registry
+   // inventory. Open it as an operator would; review-session behavior below
+   // remains the same real authenticated, bounded interaction.
+   const inventoryTrigger=desk.locator(".mz-review-inventory-trigger");
+   await inventoryTrigger.waitFor({state:"visible",timeout:30000});
+   assert(await inventoryTrigger.getAttribute("aria-expanded")==="false",
+    "STOP_MIZIZI_REGISTRY_INVENTORY_NOT_COLLAPSED_AT_REST");
+   await inventoryTrigger.click();
+   assert(await inventoryTrigger.getAttribute("aria-expanded")==="true",
+    "STOP_MIZIZI_REGISTRY_INVENTORY_DISCLOSURE_DID_NOT_OPEN");
 
    // Original Slice 1 time-box and Done for Now: real authenticated UI.
    // This exits the bounded review session; it DOES NOT approve the Registry

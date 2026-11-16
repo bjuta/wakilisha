@@ -170,10 +170,10 @@ export function MiziziReviewRoots({ queue, onInspect, subjects }: {
             </div>
             <p className="mt-2 break-all font-mono text-[11px] text-wk-text-muted">{selectedReview.id}</p>
             {selectedReview.updatedAt ? <p className="mt-1 text-[11px] text-wk-text-muted">Recorded update: <WkZonedTimestamp value={selectedReview.updatedAt} /></p> : null}
-            <p className="mt-2 text-[12px] text-wk-text-muted">Explore this recorded review here before opening its evidence in Cores.</p>
+            <p className="mt-2 text-[12px] text-wk-text-muted">Explore this recorded review here before opening its evidence in Workbench.</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <WkButton variant="soft" className="wk-button-sm"
-                onClick={() => onInspect(selectedReview.id)}>Inspect in Cores <WkIcon name="ArrowRight" size={13} /></WkButton>
+                onClick={() => onInspect(selectedReview.id)}>Inspect in Workbench <WkIcon name="ArrowRight" size={13} /></WkButton>
               <WkButton variant="ghost" className="wk-button-sm"
                 onClick={() => setSelectedReviewId(null)}>Close detail</WkButton>
             </div>

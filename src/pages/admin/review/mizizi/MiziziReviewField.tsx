@@ -10,7 +10,7 @@ import {
 } from "@/services/miziziCaseField";
 import type { HeadquartersQueueV2 } from "@/services/miziziHeadquartersBrief";
 
-/** Canvas and floating controls ported from the supplied MIZIZI HTML Field.
+/** Canvas and floating controls ported from the supplied MIZIZI HTML relationship graph (now Orion).
  * Only authenticated, exact-ID Registry review/recording/artist-credit edges
  * enter this graph. No generated catalogue, people, locations or agent activity.
  */
@@ -345,15 +345,15 @@ export function MiziziReviewField({ queue, onInspect }: {
   }, []);
 
   return (
-    <section data-wk-mizizi-field className="field" aria-label="MIZIZI Field">
+    <section data-wk-mizizi-field className="field" aria-label="MIZIZI Orion">
       <canvas ref={canvasRef} id="fieldCanvas" role="img"
         aria-label={"Authenticated Registry case graph. " + cases.length + " source-linked reviews; each square is a review, each ring is a recorded artist credit. Lines are exact recorded credits."}
         onPointerDown={down} onPointerMove={move} onPointerUp={up}
         onPointerCancel={e => { pointers.current.delete(e.pointerId); pinch.current = null; }}
         onPointerLeave={() => setHover(null)} />
       <div className="mz-field-panel">
-        <h2>The Field</h2>
-        <p>Explore recorded credits and reviews. Lines connect exact Registry IDs. Scroll to zoom, drag to move.</p>
+        <h2>Orion</h2>
+        <p>Explore recorded credits and reviews. Links reflect Registry records, not proven authorship or ownership. Scroll to zoom, drag to move.</p>
         <WkSearchField ariaLabel="Find a recorded artist credit, recording, release, or ISRC"
           className="wk-mizizi-search" inputClassName="h-11"
           placeholder="Search artist, recording, or ISRC" value={search}
@@ -477,7 +477,7 @@ export function MiziziReviewField({ queue, onInspect }: {
                           {record.isrc ? <p>ISRC {record.isrc}</p> : null}
                           <p className="break-all font-mono text-[10px]">{record.reviewId}</p>
                           <button type="button" className="wk-button wk-button-soft wk-button-sm"
-                            onClick={() => onInspect(record.reviewId)}>Inspect in Cores</button>
+                            onClick={() => onInspect(record.reviewId)}>Inspect in Workbench</button>
                         </div>
                       )}
                     </div>
@@ -511,7 +511,7 @@ export function MiziziReviewField({ queue, onInspect }: {
                 ))}
               </div>
               <button type="button" className="wk-button wk-button-soft wk-button-sm mt-3"
-                onClick={() => onInspect(focused.record.reviewId)}>Inspect in Cores</button>
+                onClick={() => onInspect(focused.record.reviewId)}>Inspect in Workbench</button>
             </>
           )}
         </aside>

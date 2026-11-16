@@ -1,9 +1,19 @@
 import { buildRedactedHeadquartersAuditV1 } from "@/services/miziziRedactedAudit";
+import {
+ loadMiziziCaseQuestionsV1,freezeMiziziQuestionV1,
+ loadMiziziSourceAttestationsV1,
+ type QuestionReadV1,type QuestionAttestationReadV1,
+ type QuestionFreezeInputV1,
+} from "@/services/miziziQuestionRead";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { useCallback, useEffect, useState } from "react";
-import { TextArea, TextField, Label } from "react-aria-components";
+import { Input, TextArea, TextField, Label } from "react-aria-components";
 import { WkButton } from "@/components/design-system/primitives/Button";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
+import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkIcon } from "@/components/design-system/Icon";
+import type { HeadquartersQueueV2 } from "@/services/miziziHeadquartersBrief";
 import { WkZonedTimestamp } from "@/components/data-viz/WkZonedTimestamp";
 import {
   beginMiziziCaseResearchV1,
@@ -11,6 +21,7 @@ import {
   canOfferInternalWorkspaceSetupV1,
   HeadquartersAuthorizationDeniedError,
   loadHeadquartersDashboardV1,
+  projectHeadquartersCaseMachineReadV1,
   loadHeadquartersCaseEventsV1,
   type HeadquartersCaseEvent,
   type HeadquartersDashboardLoadV1,
@@ -30,11 +41,214 @@ function ReasonField({value,onChange,label}:{value:string;onChange:(v:string)=>v
   </TextField>;
 }
 
+/** QV3 metadata is signed and redacted by the server. It does not confer
+ * independent evidence status, source-use permission or an ACH grade.
+ */
+function MiziziQuestionEvidenceState({record,questionId,questionRevision}:{
+ record:HeadquartersDurableCase;questionId:string;questionRevision:number;
+}) {
+ const [state,setState]=useState<QuestionAttestationReadV1 | {kind:"loading"}>({kind:"loading"});
+ useEffect(()=>{
+  let active=true;
+  setState({kind:"loading"});
+  void loadMiziziSourceAttestationsV1({
+   workspaceId:record.workspaceId,caseId:record.caseId,caseRevision:record.caseRevision,
+  },questionId,questionRevision).then(value=>{if(active)setState(value);});
+  return ()=>{active=false;};
+ },[record.workspaceId,record.caseId,record.caseRevision,questionId,questionRevision]);
+ if(state.kind==="loading")return <p role="status" className="mt-3 text-[12px] text-wk-text-muted">Checking recorded source reviews…</p>;
+ if(state.kind==="not_recorded")
+  return <p className="mt-3 text-[12px] text-wk-text-muted">No reviewed source correspondences recorded yet.</p>;
+ if(state.kind==="stale")
+  return <p role="status" className="mt-3 text-[12px] text-wk-text-muted">Source review is out of date. Refresh the case.</p>;
+ if(state.kind==="denied")
+  return <p role="status" className="mt-3 text-[12px] text-wk-text-muted">Source-review details are restricted for this account.</p>;
+ if(state.kind==="unavailable")
+  return <p role="alert" className="mt-3 text-[12px] text-wk-text-muted">Current source-review status could not be verified.</p>;
+ return <section className="mt-4 border-t border-wk-border pt-3" aria-label="Source review status">
+   <p className="text-[12px] font-semibold text-wk-text">Recorded source reviews</p>
+   <ul className="mt-2 space-y-1">
+    {state.rows.map(row=><li key={row.assertionId} className="text-[12px] text-wk-text-muted">
+      {row.decision==="human_reviewed"
+       ?"Human correspondence recorded. Independent review is still required."
+       :"Source correspondence is withdrawn or unavailable."}
+      {" "}Review revision {row.reviewRevision}.
+    </li>)}
+   </ul>
+   <p className="mt-2 text-[12px] text-wk-text-muted">
+     No independent source families or ACH assessments have been verified.
+   </p>
+ </section>;
+}
+
+type QuestionDraft={
+ questionId:string;expectedQuestionRevision:number;
+ question:string;hypotheses:{id:string;label:string}[];reason:string;
+};
+function newQuestionDraft():QuestionDraft{
+ return {
+  questionId:crypto.randomUUID(),expectedQuestionRevision:0,question:"",
+  hypotheses:[{id:crypto.randomUUID(),label:""},{id:crypto.randomUUID(),label:""}],
+  reason:"",
+ };
+}
+
+/** Existing QV2 steward writer and QV1 reader, shown in the same case view.
+ * All mutation permission, scope, revision and Hold checks remain server-side.
+ */
+function MiziziRecordedQuestions({record}: {record:HeadquartersDurableCase}) {
+ const [result,setResult]=useState<QuestionReadV1 | {kind:"loading"}>({kind:"loading"});
+ const [refresh,setRefresh]=useState(0);
+ const [draft,setDraft]=useState<QuestionDraft|null>(null);
+ const [busy,setBusy]=useState(false);
+ const [notice,setNotice]=useState("");
+ useEffect(()=>{
+  let active=true;
+  setDraft(null);
+  setNotice("");
+  return ()=>{active=false;};
+ },[record.caseId,record.caseRevision]);
+ useEffect(()=>{
+  let active=true;
+  setResult({kind:"loading"});
+  void loadMiziziCaseQuestionsV1({
+   workspaceId:record.workspaceId,caseId:record.caseId,caseRevision:record.caseRevision,
+  }).then(questions=>{if(active)setResult(questions);});
+  return ()=>{active=false;};
+ },[record.workspaceId,record.caseId,record.caseRevision,refresh]);
+ const canCompose=result.kind==="not_recorded"||result.kind==="ready";
+ const validDraft=Boolean(draft&&
+  draft.question===draft.question.trim()&&
+  draft.question.length>=20&&draft.question.length<=500&&
+  draft.reason===draft.reason.trim()&&
+  draft.reason.length>=12&&draft.reason.length<=1000&&
+  draft.hypotheses.length>=2&&draft.hypotheses.length<=12&&
+  draft.hypotheses.every(h=>h.label===h.label.trim()&&h.label.length>=3&&h.label.length<=200)&&
+  new Set(draft.hypotheses.map(h=>h.label.toLocaleLowerCase())).size===draft.hypotheses.length);
+ const submit=async(event:React.FormEvent)=>{
+  event.preventDefault();
+  if(busy||!draft||!validDraft||!canCompose)return;
+  setBusy(true);setNotice("");
+  const payload:QuestionFreezeInputV1={...draft};
+  const response=await freezeMiziziQuestionV1({
+   workspaceId:record.workspaceId,caseId:record.caseId,caseRevision:record.caseRevision,
+  },payload);
+  setBusy(false);
+  if(response.kind==="recorded"){
+   setDraft(null);
+   setNotice(response.outcome==="replayed"?
+    "The question was already recorded. Its receipt matches this request.":
+    "Question revision recorded. Another reviewer must assess its sources.");
+   setRefresh(n=>n+1);
+  }else{
+   const messages={
+    denied:"Only an authorized Headquarters steward can freeze questions. No permission was granted.",
+    stale:"This question or case has changed. Refresh the case before trying again.",
+    invalid:"Check the question, competing explanations, and review reason.",
+    unavailable:"The result could not be confirmed. Keep this draft and retry the same request before creating another.",
+   };
+   setNotice(messages[response.kind]);
+  }
+ };
+ return <section aria-label="Frozen investigation questions" className="mt-4">
+  {result.kind==="loading" ? <p role="status">Checking frozen questions for this case…</p> : null}
+  {result.kind==="not_recorded" ? <p role="status">No independently reviewed question set is connected to this case yet.</p> : null}
+  {result.kind==="stale" ? <p role="status">The case revision has changed. Refresh Records to read its current questions.</p> : null}
+  {result.kind==="denied" ? <p role="status">Your account cannot read this case's frozen questions.</p> : null}
+  {result.kind==="unavailable" ? <p role="alert">The question record could not be verified. No finding is shown.</p> : null}
+  {result.kind==="ready" ? <>
+   <p className="text-[12px] text-wk-text-muted">
+    {result.questions.length} frozen {result.questions.length===1?"question":"questions"}.
+    These are competing explanations, not reviewed evidence findings.
+   </p>
+   <ol className="mt-3 space-y-4">
+    {result.questions.map(question=><li key={question.questionId}
+     className="rounded-xl border border-wk-border bg-wk-surface p-4">
+     <p className="mz-case-eyebrow">Question revision {question.questionRevision}</p>
+     <h4 className="mt-2 text-[16px] font-semibold text-wk-text">{question.question}</h4>
+     <ul aria-label="Competing explanations" className="mt-3 space-y-2">
+      {question.hypotheses.map(hypothesis=><li key={hypothesis.id}
+       className="rounded-lg border border-wk-border bg-wk-surface-raised px-3 py-2 text-[13px] text-wk-text">
+       {hypothesis.label}
+      </li>)}
+     </ul>
+     <MiziziQuestionEvidenceState record={record} questionId={question.questionId}
+      questionRevision={question.questionRevision}/>
+     <p className="mt-3 text-[12px] text-wk-text-muted">
+      No independently assessed source grades or findings are recorded by this reader.
+     </p>
+     <WkButton variant="soft" className="wk-button-sm mt-3"
+      disabled={busy||draft!==null}
+      onClick={()=>{
+       setNotice("");
+       setDraft({
+        questionId:question.questionId,expectedQuestionRevision:question.questionRevision,
+        question:question.question,
+        hypotheses:question.hypotheses.map(h=>({id:h.id,label:h.label})),reason:"",
+       });
+      }}>Propose a revised question</WkButton>
+    </li>)}
+   </ol>
+  </> : null}
+  {canCompose&&!draft ? <div className="mt-4">
+   <WkButton variant="soft" className="wk-button-sm"
+    onClick={()=>{setNotice("");setDraft(newQuestionDraft());}}>
+    Add an investigation question
+   </WkButton>
+  </div> : null}
+  {draft&&canCompose ? <form onSubmit={submit}
+   className="mt-4 space-y-3 rounded-xl border border-wk-border bg-wk-surface p-4"
+   aria-label="Review and freeze an investigation question">
+   <div>
+    <h4 className="text-[15px] font-semibold text-wk-text">
+     {draft.expectedQuestionRevision>0?"Propose a new revision":"New investigation question"}
+    </h4>
+    <p className="mt-1 text-[12px] text-wk-text-muted">
+     A steward records competing explanations. This does not approve evidence or change the Registry.
+    </p>
+   </div>
+   <TextField value={draft.question}
+    onChange={value=>setDraft(current=>current?{...current,question:value}:current)}
+    className="block">
+    <Label className="mb-1 block text-[12px] font-semibold text-wk-text">Question</Label>
+    <TextArea rows={3} maxLength={500} className="wk-input w-full min-w-0 rounded-xl p-3 text-[13px]"/>
+   </TextField>
+   {draft.hypotheses.map((h,index)=><TextField key={h.id}
+    value={h.label}
+    onChange={value=>setDraft(current=>current?{...current,hypotheses:current.hypotheses.map(x=>x.id===h.id?{...x,label:value}:x)}:current)}
+    className="block">
+    <Label className="mb-1 block text-[12px] font-semibold text-wk-text">
+     Competing explanation {index+1}
+    </Label>
+    <Input maxLength={200} className="wk-input w-full min-w-0 rounded-xl p-3 text-[13px]"/>
+   </TextField>)}
+   <TextField value={draft.reason}
+    onChange={value=>setDraft(current=>current?{...current,reason:value}:current)}
+    className="block">
+    <Label className="mb-1 block text-[12px] font-semibold text-wk-text">Reason for review</Label>
+    <TextArea rows={2} maxLength={1000} className="wk-input w-full min-w-0 rounded-xl p-3 text-[13px]"/>
+   </TextField>
+   <div className="flex flex-wrap items-center gap-2">
+    <WkButton type="submit" variant="primary" className="wk-button-sm"
+     disabled={!validDraft||busy}>
+     {busy?"Checking authority…":"Freeze question for review"}
+    </WkButton>
+    <WkButton type="button" variant="ghost" className="wk-button-sm"
+     disabled={busy} onClick={()=>{setDraft(null);setNotice("");}}>Cancel</WkButton>
+   </div>
+  </form> : null}
+  {notice ? <p role="status" className="mt-3 text-[12px] text-wk-text-muted">{notice}</p> : null}
+ </section>;
+}
+
 /** The Registry queue above remains the source of review facts.
  * This panel only renders actual DB02 case/DB05 hold receipts from the
  * authenticated, capability-gated Data API. No heuristic review-to-case promotion.
  */
-export function MiziziDurableCasesPanel() {
+export function MiziziDurableCasesPanel({ queue, onInspectReview }: {
+  queue?: HeadquartersQueueV2 | null;
+  onInspectReview?: (reviewId: string) => void;
+}) {
   const admin=useAdminUser();
   const canOfferSetup=canOfferInternalWorkspaceSetupV1(
     admin.loading,admin.can("manage_registry"),admin.can("manage_users"),
@@ -42,6 +256,11 @@ export function MiziziDurableCasesPanel() {
   const [state,setState] = useState<State>({kind:"loading"});
   const [refreshToken,setRefreshToken] = useState(0);
   const [selectedCase,setSelectedCase] = useState<string|null>(null);
+  const [activeCaseId,setActiveCaseId] = useState<string|null>(null);
+  const [recordView,setRecordView] = useState<"human"|"machine">("human");
+  const [detailTab,setDetailTab] = useState<"questions"|"evidence"|"next"|"history">("questions");
+  const [recentEvents,setRecentEvents] = useState<readonly HeadquartersCaseEvent[]>([]);
+  const [recentEventsState,setRecentEventsState] = useState<"loading"|"ready"|"error">("loading");
   const [timelineCase,setTimelineCase] = useState<string|null>(null);
   const [timeline,setTimeline] = useState<readonly HeadquartersCaseEvent[]>([]);
   const [timelineError,setTimelineError] = useState(false);
@@ -70,6 +289,25 @@ export function MiziziDurableCasesPanel() {
     );
     return ()=>{live=false;};
   },[timelineCase,refreshToken]);
+  const cases = state.kind === "ready" ? state.cases : [];
+  const focusedCase = cases.find(item => item.caseId === activeCaseId) ?? cases[0] ?? null;
+  const sourceReview = focusedCase?.reviewId
+    ? queue?.items.find(item => item.id === focusedCase.reviewId) ?? null
+    : null;
+  const activeHolds = state.kind === "ready"
+    ? state.holds.filter(item => item.status === "active") : [];
+  useEffect(() => {
+    if (!focusedCase) { setRecentEvents([]); return; }
+    let active = true;
+    setRecentEventsState("loading");
+    setRecentEvents([]);
+    void loadHeadquartersCaseEventsV1(focusedCase.caseId).then(
+      events => { if (active) { setRecentEvents(events); setRecentEventsState("ready"); } },
+      () => { if (active) setRecentEventsState("error"); },
+    );
+    return () => { active = false; };
+  }, [focusedCase?.caseId, refreshToken]);
+  const displayClaim = (value: string) => value.replaceAll("_", " ");
   const takeAction=async (job:()=>Promise<void>,success:string)=>{
     if(busy)return;
     setBusy(true);setNotice(null);
@@ -100,7 +338,181 @@ export function MiziziDurableCasesPanel() {
       setNotice("We could not verify a complete audit. No file was exported.");
     } finally {setBusy(false);}
   };
-  return <WkSurface className="mt-6 space-y-4 p-5" data-wk-mizizi-durable-cases>
+  return <div className="mz-case-home" data-wk-mizizi-investigation-first>
+    {state.kind === "ready" && focusedCase ? null : (
+      <header className="mz-case-introduction">
+        <span className="mz-case-eyebrow">MIZIZI / Headquarters / Investigate</span>
+        <h1>Start with the investigation.</h1>
+        <p>What does the record support, what remains uncertain, and which action is actually permitted?</p>
+      </header>
+    )}
+    {state.kind === "loading" ? (
+      <p role="status" className="mz-case-readstate">Checking recorded cases and access…</p>
+    ) : state.kind === "denied" ? (
+      <p role="status" className="mz-case-readstate">No authorized Headquarters case view is available. Open case controls to inspect your access path.</p>
+    ) : state.kind === "unavailable" ? (
+      <p role="alert" className="mz-case-readstate">The case authority could not be verified. No case outcome can be displayed.</p>
+    ) : null}
+    {state.kind === "ready" && !focusedCase ? (
+      <div className="mz-case-empty">
+        <WkIcon name="Folder" size={20} aria-hidden="true" />
+        <h2>No recorded investigations in this workspace.</h2>
+        <p>Registry review totals are separate from durable cases. Nothing has been promoted into an investigation here.</p>
+      </div>
+    ) : null}
+    {state.kind === "ready" && focusedCase ? (
+      <div className="mz-case-layout">
+        <div className="mz-case-switcher" aria-label="Recorded investigations">
+          <WkSelect
+            ariaLabel="Switch recorded investigation"
+            className="mz-case-select"
+            triggerClassName="mz-case-select-trigger"
+            value={focusedCase.caseId}
+            onChange={(caseId) => {
+              if (!cases.some(item => item.caseId === caseId)) return;
+              setActiveCaseId(caseId);
+              setDetailTab("questions");
+              setRecordView("human");
+            }}
+            options={cases.map(item => ({
+              value: item.caseId,
+              label: queue?.items.find(review => review.id === item.reviewId)?.title
+                || displayClaim(item.claimFamily),
+              description: `${item.subjectType} · ${item.caseId.slice(0,8)} · ${item.stage.replaceAll("_"," ")}`,
+            }))}
+          />
+          <span className="mz-case-switcher-count">
+            {cases.length} recorded {cases.length === 1 ? "case" : "cases"}
+          </span>
+        </div>
+        <article className="mz-case-story" aria-label="Selected investigation">
+          <header className="mz-case-hero">
+            <div className="mz-case-hero-art" aria-label="No authorized artefact image is connected">
+              <WkIcon name="FileText" size={23} aria-hidden="true" />
+              <span>Artefact unavailable</span>
+            </div>
+            <div className="mz-case-hero-copy">
+              <div className="mz-case-hero-meta">
+                <span className="mz-case-eyebrow">{focusedCase.subjectType} / {displayClaim(focusedCase.claimFamily)}</span>
+                <span className="mz-case-lifecycle">{focusedCase.state.replaceAll("_"," ")} · {focusedCase.stage.replaceAll("_"," ")}</span>
+              </div>
+              <h2>{sourceReview?.title || displayClaim(focusedCase.claimFamily)}</h2>
+              <p>Case {focusedCase.caseId} · Revision {focusedCase.caseRevision}</p>
+              <p className="mz-case-hero-context">Canonical subject {focusedCase.subjectId}. The case stage is operational state, not a verified finding about music identity or rights.</p>
+            </div>
+          </header>
+          <dl className="mz-case-stats" aria-label="Recorded case status and research limits">
+            <div><dt>Questions decided</dt><dd>Not recorded</dd></div>
+            <div><dt>Linked receipts</dt><dd>{focusedCase.receiptCount.toLocaleString()}</dd></div>
+            <div><dt>Next due</dt><dd>{focusedCase.nextActionAt
+              ? <WkZonedTimestamp value={focusedCase.nextActionAt}/>
+              : "Not scheduled"}</dd></div>
+            <div><dt>MIZIZI research</dt><dd>Runtime status unavailable</dd></div>
+          </dl>
+          <div className="mz-case-view-switch" role="group" aria-label="Selected case representation">
+            <button type="button" className="mz-case-view-option"
+              aria-pressed={recordView === "human"} onClick={() => setRecordView("human")}>Human View</button>
+            <button type="button" className="mz-case-view-option"
+              aria-pressed={recordView === "machine"} onClick={() => setRecordView("machine")}>Machine View</button>
+          </div>
+          {recordView === "human" ? (
+            <>
+          <div className="mz-case-detail-tabs" role="group" aria-label="Case reading views">
+            {([
+              ["questions","Questions"],["evidence","Evidence"],
+              ["next","Next evidence"],["history","History"],
+            ] as const).map(([id,label]) => (
+              <button key={id} type="button" aria-pressed={detailTab===id}
+                onClick={()=>setDetailTab(id)}>{label}</button>
+            ))}
+          </div>
+          {detailTab === "questions" ? (
+            <>
+              <section className="mz-case-focus">
+            <div className="mz-case-section-head"><span className="mz-case-eyebrow">Linked review lead</span><span className="mz-case-unresolved">Not adjudicated here</span></div>
+            <h3>{sourceReview?.title || displayClaim(focusedCase.claimFamily)}</h3>
+            <MiziziRecordedQuestions key={`${focusedCase.caseId}:${focusedCase.caseRevision}:${refreshToken}`} record={focusedCase} />
+            <p>The attached Registry review is a research lead. Inspect its original record before choosing an explanation. A review's status does not establish independent evidence or ownership.</p>
+          </section>
+              <footer className="mz-case-next">
+            <div><strong>Next step</strong><p>Examine the source review and the case journal. Only an authorized operator can change case stage or activate Holds.</p></div>
+            <span className="mz-case-next-state">{activeHolds.length} active workspace {activeHolds.length === 1 ? "hold" : "holds"}</span>
+          </footer>
+            </>
+          ) : detailTab === "evidence" ? (
+            <>
+              <p className="mz-case-pane-explanation">Only authorized linked receipts and the governed Registry review are available here.
+                The source-grade, ACH and custody library require their own accepted evidence records.</p>
+              <div className="mz-case-facts">
+            <section aria-label="Source and provenance">
+              <span className="mz-case-eyebrow">Source and provenance</span>
+              <strong>{focusedCase.receiptCount} linked {focusedCase.receiptCount === 1 ? "receipt" : "receipts"}</strong>
+              <p>{focusedCase.reviewId ? "An exact Registry review is linked to this case." : "No source review reference is recorded for this case."}</p>
+              {focusedCase.reviewId && sourceReview && onInspectReview ? (
+                <WkButton variant="soft" className="wk-button-sm"
+                  onClick={() => onInspectReview(focusedCase.reviewId!)}>Inspect evidence in Workbench</WkButton>
+              ) : focusedCase.reviewId ? (
+                <a className="mz-case-link" href={`/admin/review/queue?review=${encodeURIComponent(focusedCase.reviewId)}`}>
+                  Inspect source review
+                </a>
+              ) : null}
+            </section>
+            <section aria-label="Decision and execution boundary">
+              <span className="mz-case-eyebrow">Decision boundary</span>
+              <strong>No automatic Registry correction</strong>
+              <p>The current case interface does not confer publication, external disclosure, a rights decision, or a write grant.</p>
+              <span className="mz-case-muted-state">Decision authority remains separate</span>
+            </section>
+          </div>
+            </>
+          ) : detailTab === "next" ? (
+            <section className="mz-case-future" aria-label="Next evidence for this case">
+              <span className="mz-case-eyebrow">Next evidence</span>
+              <h3>No recorded evidence requests available.</h3>
+              <p>The current authorized case read does not contain source-backed proposed collection tasks,
+                custodian consent or a research request queue.</p>
+              <p>{focusedCase.nextActionAt
+                ? <>Recorded case next-action time: <WkZonedTimestamp value={focusedCase.nextActionAt}/></>
+                : "No case next-action date has been recorded."}</p>
+            </section>
+          ) : (
+            <>
+              <section className="mz-case-history" aria-label="Recent case journal">
+            <div className="mz-case-section-head"><span className="mz-case-eyebrow">Recorded activity</span><span className="mz-case-eyebrow">Immutable case events</span></div>
+            {recentEventsState === "loading" ? <p role="status">Loading case history…</p> : null}
+            {recentEventsState === "error" ? <p role="alert">The case journal could not be verified.</p> : null}
+            {recentEventsState === "ready" && !recentEvents.length ? <p>No recorded case events were returned.</p> : null}
+            {recentEventsState === "ready" ? recentEvents.slice(0, 3).map(event => (
+              <div className="mz-case-event" key={event.eventId}>
+                <span className="mz-case-event-rev">Rev {event.revision}</span>
+                <div><strong>{event.stage.replaceAll("_"," ")}</strong><p>{event.reason}</p></div>
+                <WkZonedTimestamp value={event.recordedAt}/>
+              </div>
+            )) : null}
+          </section>
+              <p className="mz-case-pane-explanation">This is a recent journal view, not the complete authenticated case export.
+                Open case controls for the full verified event timeline.</p>
+            </>
+          )}
+            </>
+          ) : (
+            <section className="mz-case-machine" aria-label="Authorized case machine record">
+              <h3>Machine View</h3>
+              <p>This read-only record comes from the same authorized case as the Human View.
+                It does not grant actions, verify evidence, or authorize publication.</p>
+              <pre><code>{JSON.stringify(projectHeadquartersCaseMachineReadV1(focusedCase), null, 2)}</code></pre>
+            </section>
+          )}
+        </article>
+      </div>
+    ) : null}
+    <WkDisclosure
+      summary="Case controls, complete journal and Hold Writes"
+      className="mz-case-operations"
+      triggerClassName="mz-case-operations-trigger"
+      contentClassName="mz-case-operations-detail"
+    >
+      <WkSurface className="space-y-4 p-5" data-wk-mizizi-durable-cases>
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="text-[18px] font-semibold text-wk-text">Recorded Cases</h2>
         <p className="mt-1 text-[12px] text-wk-text-muted">Actual case, receipt, and Hold Writes records. Registry reviews remain separate.</p></div>
@@ -181,5 +593,7 @@ export function MiziziDurableCasesPanel() {
       </div>
     </> : null}
     {notice ? <p role="status" className="text-[12px] text-wk-text-muted">{notice}</p> : null}
-  </WkSurface>;
+      </WkSurface>
+    </WkDisclosure>
+  </div>;
 }
