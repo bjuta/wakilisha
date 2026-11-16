@@ -138,6 +138,19 @@ export async function projectChartOnlySourceIdentity({
      !/^[a-z][a-z0-9_]{1,40}$/.test(cert.provider)||
      /[\u0000-\u001f\u007f]/u.test(cert.providerTrackId))
     return held('exact_native_observation_unverified');
+  // A provider-local ID is not proof that distinct provider observations
+  // identify distinct recordings. A shared exact ISRC across two independent
+  // candidate owners is an equivalence conflict, not a second Chart entry.
+  // Never infer equivalence from title or Artist spelling.
+  const normalizedIsrc=row=>{
+    const id=val(row?.isrc)?.toUpperCase().replace(/[\s-]/g,'')||null;
+    return id&&/^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(id)?id:null;
+  };
+  const isrc=normalizedIsrc(original);
+  if(isrc&&association.perCandidate.some(p=>
+    p.candidateId!==candidateId&&p.certificates.some(c=>
+      normalizedIsrc(rawRows.find(r=>r.id===c.rawRowId))===isrc)))
+    return held('cross_candidate_isrc_equivalence_unreviewed');
   if(typeof globalThis.crypto?.subtle?.digest!=='function')
     return held('digest_authority_unavailable');
   const bytes=new TextEncoder().encode(JSON.stringify([
