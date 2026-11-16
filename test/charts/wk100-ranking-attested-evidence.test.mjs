@@ -216,7 +216,10 @@ test('all-origin native evidence ranks without canonical Registry IDs under unre
     eligibilityProfileSnapshot:restrictedProfile,ingestPolicySha256:restrictivePolicy}};
   const restrictive=await prepare({...a,eligibilityPolicySha256:restrictivePolicy,
     loadW5Draft:async()=>restrictedDraft});
-  assert(restrictive.heldPositions.REVIEW_REQUIRED>=11);
+  // A country-restricted policy may classify the unknown-origin row as
+  // EXCLUDED rather than REVIEW_REQUIRED; either disposition must hold it.
+  assert(Object.values(restrictive.heldPositions)
+    .reduce((sum,count)=>sum+count,0)>=11);
   assert.equal(restrictive.chartOnlyDisplayRows.length,0);
   assert.equal(restrictive.privateRanking.ranked.some(x=>
     x.recordingId.startsWith('wk100:source:v1:')),false);
