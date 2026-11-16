@@ -1,0 +1,13 @@
+[Unit]
+Description=Five-minute WK100 source scheduler tick (nonpublishing)
+Documentation=https://github.com/bjuta/wakilisha/issues/1338
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00 UTC
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=false
+Unit=wakilisha-wk100-source-scheduler.service
+
+[Install]
+WantedBy=timers.target
