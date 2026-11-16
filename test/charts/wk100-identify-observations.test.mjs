@@ -32,7 +32,9 @@ const go=(options={})=>project({
 });
 test('Apple Kenya provider IDs use exact existing Apple Music Registry namespace',()=>{
  assert.equal(wk100RegistryProviderKey('apple_ke'),'apple_music');
- assert.equal(wk100RegistryProviderKey('mdundo_ke'),'mdundo_ke');
+ assert.deepEqual(['apple_ke','audiomack_ke','mdundo_ke','shazam_ke','youtube_ke']
+   .map(wk100RegistryProviderKey),['apple_music','audiomack','mdundo','shazam','youtube']);
+ assert.throws(()=>wk100RegistryProviderKey('spotify_ke'),/provider_unsupported/);
  const v=go({rows:[row(1,'10001','Song title',null),row(2,'10002'),row(3,null)],
    typedLinks:[{provider_key:'apple_music',provider_track_id:'10001',
      track_id:trackA,match_status:'matched'}],
@@ -162,4 +164,20 @@ test('WK100 W4 QC rejects stale receipts, identity claims and malformed row rank
   assert.throws(()=>run({...b,canPublish:true}),/receipt_invalid/);
   assert.throws(()=>run({...b,rows:[{...b.rows[0],rank:2}]}),/row_invalid/);
   assert.throws(()=>run({...b,receiptStatus:'partial_depth'}),/receipt_invalid/);
+});
+
+test('all five WK100 native provider namespaces consume reviewed canonical Registry links',()=>{
+ const pairs=[['apple_ke','apple_music'],['audiomack_ke','audiomack'],
+   ['mdundo_ke','mdundo'],['shazam_ke','shazam'],['youtube_ke','youtube']];
+ for(const [family,namespace] of pairs){
+   const v=go({provider:family,rows:[row(1,'native-id'),row(2,'second'),row(3,null)],
+     typedLinks:[{provider_key:namespace,provider_track_id:'native-id',track_id:trackA,match_status:'matched'}],
+     activeTracks:[{id:trackA,status:'active'}]});
+   assert.equal(v.registryProviderKey,namespace);
+   assert.equal(v.rows[0].canonicalTrackId,trackA);
+   assert.equal(v.rows[0].identityState,'resolved');
+   assert.equal(v.rows[1].identityState,'needs_review');
+   assert.equal(v.rows[2].identityState,'needs_review');
+   assert.deepEqual([v.canWriteRegistry,v.canScore,v.canPublish],[false,false,false]);
+ }
 });
