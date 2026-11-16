@@ -774,7 +774,7 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
                 ?(r.reasonCodes?.map(x=>x.replaceAll('_',' ')).join('; ')||'No rule failures')
                 :(r.canonicalTrackId??(r.reviewReason?reasonLabel[r.reviewReason]??'Review required':'Review required'))}</p>
               {!!r.registryCandidates?.length&&<div className="mt-2 space-y-1">
-                <p className="text-xs font-semibold text-wk-text">MIZIZI found a possible existing Track. Review needed.</p>
+                <p className="text-xs font-semibold text-wk-text">Possible existing Registry Track. Recording match not yet confirmed.</p>
                 {r.registryCandidates.map(candidate=><p key={candidate.trackId} className="text-xs text-wk-text-muted">
                   {candidate.title} ({candidate.basis==='artist_credit_variant'?'Artist credit differs':'Artist credit overlaps'}).
                   {' '}<a className="font-semibold text-wk-brand underline" target="_blank"
