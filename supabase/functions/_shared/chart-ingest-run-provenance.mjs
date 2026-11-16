@@ -103,6 +103,56 @@ export function reconcileRunRawEvidence({runId,candidates,rawRows,runSources}={}
 }
 
 /**
+ * One provider-native observation may be retained for chart research without
+ * creating a Registry identity. This is deliberately narrower than a recording
+ * match: the exact provider+native-ID pair proves only a provider-local source
+ * reference, never equivalence across providers, versions or collaborators.
+ *
+ * Inputs are server-owned, complete run evidence. The caller must separately
+ * prove source authorization, native period, frozen chart policy and scoring.
+ * Nothing returned here grants Registry admission, scoring or publication.
+ */
+export async function projectChartOnlySourceIdentity({
+  association,rawRows,acceptedMatches,candidateId,
+}={}){
+  const held=(reason)=>Object.freeze({candidateId,status:'HELD',reason,
+    chartRecordingRef:null,canonicalTrackId:null,
+    canScore:false,canCommit:false,canPublish:false,canAdmitRegistry:false});
+  if(!uuid(candidateId)||!Array.isArray(rawRows)||!Array.isArray(acceptedMatches)||
+     !isObject(association)||association.runIntegrityComplete!==true||
+     !Array.isArray(association.perCandidate))
+    return held('complete_source_evidence_unverified');
+  const snapshot=association.perCandidate.find(x=>x.candidateId===candidateId);
+  if(!snapshot||snapshot.problems.length>0||
+     snapshot.certificates.length!==1||snapshot.operatorKeys.length!==1)
+    return held('unique_provider_observation_unverified');
+  const matches=acceptedMatches.filter(m=>m.candidate_id===candidateId);
+  if(matches.length!==0)return held('registry_match_requires_separate_review');
+  const cert=snapshot.certificates[0];
+  const original=rawRows.find(x=>x.id===cert.rawRowId);
+  if(!original||original.run_id!==association.runId||
+     original.provider_track_id!==cert.providerTrackId||
+     pkey(original.provider)!==cert.provider||
+     !val(original.title_raw)||!val(original.artist_raw)||
+     typeof cert.providerTrackId!=='string'||cert.providerTrackId.length>250||
+     !/^[a-z][a-z0-9_]{1,40}$/.test(cert.provider)||
+     /[\u0000-\u001f\u007f]/u.test(cert.providerTrackId))
+    return held('exact_native_observation_unverified');
+  if(typeof globalThis.crypto?.subtle?.digest!=='function')
+    return held('digest_authority_unavailable');
+  const bytes=new TextEncoder().encode(JSON.stringify([
+    'wakilisha-chart-only-native/v1',cert.provider,cert.providerTrackId,
+  ]));
+  const hash=new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256',bytes));
+  const hex=Array.from(hash,x=>x.toString(16).padStart(2,'0')).join('');
+  return Object.freeze({candidateId,status:'SOURCE_ONLY',
+    chartRecordingRef:'wkchart:source:v1:'+cert.provider+':'+hex,
+    canonicalTrackId:null,rawRowId:cert.rawRowId,
+    identityScope:'PROVIDER_ONLY_UNREVIEWED',
+    canScore:false,canCommit:false,canPublish:false,canAdmitRegistry:false});
+}
+
+/**
  * A canonical Registry Track may carry provider links that are not yet matched.
  * The accepted production RLS originally exposed only matched links, hiding
  * review-state conflicts from caller-scoped readers. The accompanying narrow
