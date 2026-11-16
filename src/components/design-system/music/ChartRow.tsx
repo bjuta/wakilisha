@@ -219,7 +219,7 @@ export function ChartRow({
         {/* Info */}
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex min-w-0 items-start gap-2">
-            {slug ? (
+            {slug && registryTrackId && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(registryTrackId) ? (
               <Link
                 to={trackUrl(slug, artistSlugs)}
                 onClick={(e) => e.stopPropagation()}

@@ -1528,7 +1528,9 @@ function pageSchema(model, url) {
       itemListElement: entries.map((entry) => {
         const artistSlug = Array.isArray(entry.artistSlugs) ? entry.artistSlugs[0] : "";
         const artistName = Array.isArray(entry.artistNames) ? entry.artistNames.join(", ") : "";
-        const trackUrl = artistSlug && entry.trackSlug ? canonicalUrl(`/tracks/${artistSlug}/${entry.trackSlug}`) : undefined;
+        const linkedToRegistry = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(entry.canonicalTrackId || ""));
+        const trackUrl = linkedToRegistry && artistSlug && entry.trackSlug
+          ? canonicalUrl(`/tracks/${artistSlug}/${entry.trackSlug}`) : undefined;
 
         return compactSchema({
           "@type": "ListItem",

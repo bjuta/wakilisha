@@ -135,8 +135,10 @@ function toEntry(row: DbRow, editionId: string): ChartEditionEntry {
   const sourceEntryId = pick(row, ["source_entry_id", "legacy_entry_id", "entry_id", "id"]);
   const trackTitle = pick(row, ["track_title", "title", "name"], "Untitled track");
   const artistName = pick(row, ["artist_name", "artist", "artists"], "Unknown artist");
-  const trackSlug = pick(row, ["track_slug"], slugify(trackTitle, sourceEntryId || "track"));
-  const artistSlug = pick(row, ["artist_slug"], slugify(artistName, "artist"));
+  const canonicalTrackId = pick(row, ["canonical_track_id", "canonicalTrackId"]) || null;
+  // Source-only Chart entries must not inherit invented Registry slugs.
+  const trackSlug = canonicalTrackId ? pick(row, ["track_slug"]) : "";
+  const artistSlug = canonicalTrackId ? pick(row, ["artist_slug"]) : "";
   const rank = asNumber(row.rank ?? row.position, 0);
 
   return {
@@ -149,6 +151,7 @@ function toEntry(row: DbRow, editionId: string): ChartEditionEntry {
     weeksOnChart: asNullableNumber(row.weeks_on_chart ?? row.weeksOnChart) ?? 1,
     trackSlug,
     trackTitle,
+    canonicalTrackId,
     artistSlugs: artistSlug ? [artistSlug] : [],
     artistNames: artistName ? artistName.split(",").map((name) => name.trim()).filter(Boolean) : [],
     artworkUrl: pick(row, ["artwork_url", "image_url", "cover_url"]) || null,

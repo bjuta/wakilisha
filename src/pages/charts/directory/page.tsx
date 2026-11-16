@@ -23,7 +23,7 @@ import type { ChartEdition, ChartEditionEntry } from "@/services/chartsPublic/ty
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
-import { trackUrl } from "@/utils/trackUrl";
+import { ChartRecordingLink } from "@/components/charts/ChartRecordingLink";
 
 // ─── Constants ───
 
@@ -167,13 +167,13 @@ function LeaderboardRow({
         <div className="min-w-0 flex-1 py-0.5">
           {/* Title row */}
           <div className="flex items-center gap-1.5">
-            <Link
-              to={trackUrl(entry.slug, entry.artistSlugs)}
+            <ChartRecordingLink
+              slug={entry.slug} artistSlugs={entry.artistSlugs} registryTrackId={entry.registryTrackId}
               onClick={(e) => e.stopPropagation()}
               className="truncate text-[13px] font-bold text-[var(--wk-text)] hover:text-[var(--wk-brand)] transition-colors leading-tight md:text-[14px]"
             >
               {entry.title}
-            </Link>
+            </ChartRecordingLink>
             {entry.movement === "new" && (
               <span className="shrink-0 rounded-full bg-[var(--wk-brand-soft)] px-1.5 py-px text-[8px] font-black uppercase tracking-wider text-[var(--wk-brand)]">
                 NEW
@@ -302,8 +302,8 @@ function MiniEntryRow({
   badge: string;
 }) {
   return (
-    <Link
-      to={trackUrl(entry.slug, entry.artistSlugs)}
+    <ChartRecordingLink
+      slug={entry.slug} artistSlugs={entry.artistSlugs} registryTrackId={entry.registryTrackId}
       className="flex items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-[var(--wk-bg)] group"
     >
       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--wk-brand)] text-[10px] font-black text-[var(--wk-brand-on)] tabular-nums">
@@ -323,7 +323,7 @@ function MiniEntryRow({
         <div className="truncate text-[10px] text-[var(--wk-text-muted)] mt-0.5">{entry.artist}</div>
       </div>
       <span className="shrink-0 text-[10px] font-bold text-[var(--wk-brand)] uppercase">{badge}</span>
-    </Link>
+    </ChartRecordingLink>
   );
 }
 

@@ -29,7 +29,7 @@ import {
 } from "@/services/chartsPublic/chartRoutes";
 import { ChartRefreshButton } from "@/components/charts/ChartRefreshButton";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
-import { trackUrl } from "@/utils/trackUrl";
+import { ChartRecordingLink } from "@/components/charts/ChartRecordingLink";
 import { enrichChartEntriesWithPlaybackData } from "@/services/chartsPublic/playbackEnrichment";
 import { PlaybackAccessNotice } from "@/components/playback/PlaybackAccessNotice";
 import {
@@ -125,8 +125,8 @@ function FreshCard({ entry, onJump }: { entry: ChartEntryRowViewModel; onJump: (
 function MoverCard({ entry, direction }: { entry: ChartEntryRowViewModel; direction: "up" | "down" }) {
   const isUp = direction === "up";
   return (
-    <Link
-      to={trackUrl(entry.slug, entry.artistSlugs)}
+    <ChartRecordingLink
+      slug={entry.slug} artistSlugs={entry.artistSlugs} registryTrackId={entry.registryTrackId}
       className="flex flex-col overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] active:scale-[0.98] transition-transform"
     >
       {/* Artwork header */}
@@ -166,7 +166,7 @@ function MoverCard({ entry, direction }: { entry: ChartEntryRowViewModel; direct
           </span>
         </div>
       </div>
-    </Link>
+    </ChartRecordingLink>
   );
 }
 
@@ -628,9 +628,9 @@ export default function MobileChartEdition() {
           {top3.map((entry, i) => {
             const rankColor = RANK_COLORS[entry.rank] ?? "var(--wk-text)";
             return (
-              <Link
+              <ChartRecordingLink
                 key={entry.rank}
-                to={trackUrl(entry.slug, entry.artistSlugs)}
+                slug={entry.slug} artistSlugs={entry.artistSlugs} registryTrackId={entry.registryTrackId}
                 className="group flex items-center gap-3.5 overflow-hidden rounded-2xl border border-[var(--wk-border)] bg-[var(--wk-surface)] active:scale-[0.98] active:bg-[var(--wk-surface-raised)] transition-all"
               >
                 {/* Artwork */}
@@ -675,7 +675,7 @@ export default function MobileChartEdition() {
                 >
                   <i className="ri-play-fill" />
                 </button>
-              </Link>
+              </ChartRecordingLink>
             );
           })}
         </div>
