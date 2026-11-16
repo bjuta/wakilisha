@@ -8,6 +8,7 @@ import { readWk100AttestedRankingPrivate } from '../_shared/wk100-ranking-attest
 import { WK100_RANKING_SPECIFICATION_V1 as RANK } from '../_shared/wk100-ranking-primitive.mjs';
 import { validateWk100AppleArtistReport, sha256OfWk100ReportRaw } from '../_shared/wk100-apple-artist-evidence.mjs';
 
+const RANK_REGISTRY_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const origins=new Set([
   'https://wakilisha.africa','https://www.wakilisha.africa',
   'https://staging.wakilisha.africa','http://localhost:5173',
@@ -144,17 +145,37 @@ Deno.serve(async req=>{
       });
       const ranked=verified.privateRanking.ranked;
       if(ranked.length!==100)throw Error('ranking_incomplete');
-      const ids=ranked.map(r=>r.recordingId);
-      const [tracksResponse,creditsResponse]=await Promise.all([
-        admin.from('registry_tracks').select('id,title,status')
-          .in('id',ids).eq('status','active').limit(101),
-        admin.from('registry_track_artists')
-          .select('track_id,artist_id,is_primary,status').in('track_id',ids).limit(1001),
-      ]);
+      const canonicalIds=ranked.map(r=>r.recordingId)
+        .filter((id:string)=>RANK_REGISTRY_UUID.test(id));
+      // Chart-only references must never be passed to UUID-typed Registry
+      // queries. Their labels come only from authenticated original-byte
+      // replay, never from fuzzy title matching or a fabricated Registry row.
+      const [tracksResponse,creditsResponse]=canonicalIds.length?
+        await Promise.all([
+          admin.from('registry_tracks').select('id,title,status')
+            .in('id',canonicalIds).eq('status','active').limit(101),
+          admin.from('registry_track_artists')
+            .select('track_id,artist_id,is_primary,status')
+            .in('track_id',canonicalIds).limit(1001),
+        ]):[{data:[],error:null},{data:[],error:null}];
       if(tracksResponse.error||creditsResponse.error||
          !Array.isArray(tracksResponse.data)||!Array.isArray(creditsResponse.data)||
-         tracksResponse.data.length!==100||creditsResponse.data.length>1000)
+         tracksResponse.data.length!==canonicalIds.length||
+         creditsResponse.data.length>1000)
         throw Error('canonical_display_unavailable');
+      const chartOnly=verified.chartOnlyDisplayRows;
+      if(!Array.isArray(chartOnly)||chartOnly.length>100||
+         chartOnly.some(r=>typeof r?.recordingId!=='string'||
+           typeof r.title!=='string'||r.title.trim().length===0||
+           (r.artist!==null&&typeof r.artist!=='string')||
+           typeof r.labelVariation!=='boolean'))
+        throw Error('chart_display_unavailable');
+      const chartByRef=new Map(chartOnly.map(r=>[r.recordingId,r]));
+      if(chartByRef.size!==chartOnly.length||
+         ranked.some(r=>!RANK_REGISTRY_UUID.test(r.recordingId)&&
+           !chartByRef.has(r.recordingId))||
+         chartOnly.some(r=>!ranked.some(item=>item.recordingId===r.recordingId)))
+        throw Error('chart_display_unavailable');
       const names=[...new Set(creditsResponse.data.filter(c=>c.is_primary===true&&
         c.status==='active').map(c=>c.artist_id))];
       const artistsResponse=names.length?await admin.from('registry_artists')
@@ -172,8 +193,8 @@ Deno.serve(async req=>{
       }
       const displayRanked=ranked.map(r=>({
         rank:r.rank,recordingId:r.recordingId,
-        title:trackById.get(r.recordingId)?.title??null,
-        artist:nameByTrack.get(r.recordingId)??null,
+        title:trackById.get(r.recordingId)?.title??chartByRef.get(r.recordingId)?.title??null,
+        artist:nameByTrack.get(r.recordingId)??chartByRef.get(r.recordingId)?.artist??null,
         score:r.score,listedFamilyCount:r.listedFamilyCount,
         contributions:RANK.families.map(family=>({
           family,points:Number((20*r.contributions[family]/
@@ -182,7 +203,8 @@ Deno.serve(async req=>{
       }));
       const verifiedGates=gates.map(g=>
         ['source','method','eligibility','ranking'].includes(g.id)
-          ?{...g,state:'verified'}:g);
+          ?{...g,state:'verified',
+            ...(g.id==='eligibility'?{label:'Verified chart policy and source evidence'}:{})}:g);
       return reply(req,200,{...base,rankingState:'private_candidate',
         ranked:displayRanked,rankingDigest:verified.rankingDigest,
         sourceAdmissionSnapshotSha256:verified.sourceAdmissionSnapshotSha256,
