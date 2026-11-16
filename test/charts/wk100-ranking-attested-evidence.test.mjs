@@ -6,7 +6,7 @@ import {prepareWk100AttestedPrivateRanking as prepare}
 import {readWk100AttestedRankingPrivate as readServer}
   from '../../supabase/functions/_shared/wk100-ranking-attested-reader.mjs';
 import {inspectWk100RankWeek} from '../../supabase/functions/_shared/wk100-ranking-evidence-review.mjs';
-import {wk100ChartScopedObservationRef as chartRef}
+import {wk100ChartScopedObservationRef as chartRef,wk100RegistryProviderKey}
   from '../../supabase/functions/_shared/wk100-identify-observations.mjs';
 import {readFile} from 'node:fs/promises';
 
@@ -104,7 +104,7 @@ function adapters(f){return {weekStartEat:W,selectedReceiptIds:f.ids,
   readPrivateBytes:async attempt=>f.originals.get(attempt.id),
   loadRegistry:async ({contract,rows})=>({
     typedLinks:rows.filter(row=>row.provider_track_id).map(row=>({
-      provider_key:contract.provider_key==='apple_ke'?'apple_music':contract.provider_key,
+      provider_key:wk100RegistryProviderKey(contract.provider_key),
       provider_track_id:row.provider_track_id,track_id:id(Number(row.provider_track_id.slice(7))),
       match_status:'matched'})),legacyLinks:[],
     activeTracks:rows.filter(row=>row.provider_track_id).map(row=>({
@@ -254,7 +254,7 @@ function fakeServiceBackend(f){
     wk_chart_capture_rows_v1:panels.flatMap(x=>x.rows),
     registry_track_provider_links:families.flatMap(family=>
       Array.from({length:family==='shazam_ke'?200:100},(_,i)=>({
-        provider_key:family==='apple_ke'?'apple_music':family,
+        provider_key:wk100RegistryProviderKey(family),
         provider_track_id:'native-'+(i+1),track_id:id(i+1),match_status:'matched'}))),
     provider_entity_links:[],
     registry_tracks:Array.from({length:200},(_,i)=>({
