@@ -7,7 +7,7 @@
  */
 import {verifyIngestPolicySnapshot} from './chart-ingest-policy-snapshot.mjs';
 import {readCallerScopedChartRun} from './chart-ingest-caller-read.mjs';
-import {reconcileRunRawEvidence,inspectProductionShapedRunCandidate,projectSameRunMetadataReview} from './chart-ingest-run-provenance.mjs';
+import {reconcileRunRawEvidence,inspectProductionShapedRunCandidate,projectSameRunMetadataReview,projectChartOnlySourceIdentity} from './chart-ingest-run-provenance.mjs';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const canonical=(obj)=>JSON.stringify(obj,(_key,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
@@ -68,6 +68,16 @@ export async function prepareFullFilterStage(db,runId,{read=readCallerScopedChar
   assert(typeof data.run.updated_at==='string'&&data.run.updated_at.length>0,'run_version_missing');
   assert(data.candidates.every(c=>typeof c.updated_at==='string'&&c.updated_at.length>0),'candidate_version_missing');
   const association=reconcileRunRawEvidence(data);
+  // Read-only candidate references never imply Registry admission or claim
+  // cross-provider recording equivalence. Do not persist them as an eligible
+  // W5 decision or bypass the stage's independent source-period holds.
+  const chartOnlyIdentityPreview=[];
+  for(const candidate of data.candidates){
+    chartOnlyIdentityPreview.push(await projectChartOnlySourceIdentity({
+      association,rawRows:data.rawRows,
+      acceptedMatches:data.acceptedMatches,candidateId:candidate.id,
+    }));
+  }
   const input={runId,runSources:data.runSources,rawRows:data.rawRows,candidates:data.candidates,
     acceptedMatches:data.acceptedMatches,registryTracks:data.registryTracks,registryCredits:data.registryCredits,
     registryArtists:data.registryArtists,registryReleases:data.registryReleases,
@@ -127,6 +137,7 @@ export async function prepareFullFilterStage(db,runId,{read=readCallerScopedChar
   });
   assert(decisions.length===data.candidates.length,'decision_count_mismatch');
   return {runId,policy,expectedRunUpdatedAt:data.run.updated_at,decisions,
+    chartOnlyIdentityPreview,
     summary:{contract:STAGE_DECISION_VERSION,runId,candidateCount:decisions.length,predicateCounts:projection.counts,
       reviewRequired:decisions.filter(d=>d.status==='needs_review').length,
       excluded:decisions.filter(d=>d.status==='excluded').length,
