@@ -195,6 +195,7 @@ Deno.serve(async req=>{
         rank:r.rank,recordingId:r.recordingId,
         title:trackById.get(r.recordingId)?.title??chartByRef.get(r.recordingId)?.title??null,
         artist:nameByTrack.get(r.recordingId)??chartByRef.get(r.recordingId)?.artist??null,
+        sourceLabelVariation:chartByRef.get(r.recordingId)?.labelVariation??false,
         score:r.score,listedFamilyCount:r.listedFamilyCount,
         contributions:RANK.families.map(family=>({
           family,points:Number((20*r.contributions[family]/
