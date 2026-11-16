@@ -82,6 +82,7 @@ export async function prepareWk100AttestedPrivateRanking({
     savedDraft.config_json?.ingestPolicySha256===eligibilityPolicySha256,
     'saved_w5_policy_missing_or_stale');
   const snapshots=[],attestationFacts=[],familySourceKeys=new Map();
+  const chartOnlyLabelEvidence=[];
   const seenFamilies=new Map(SPEC.families.map(f=>[f,0]));
   const allCaptureRows=new Set();
   for(const receiptId of selectedReceiptIds){
@@ -185,6 +186,9 @@ export async function prepareWk100AttestedPrivateRanking({
           providerKey:contract.provider_key,providerTrackId:row.providerTrackId,
           receiptSha256:attempt.payload_sha256,captureRowId:row.captureRowId,
         });
+        chartOnlyLabelEvidence.push({recordingId:rankingRef,
+          observedAtUtc:canonicalUtc(attempt.fetched_at),sourceRank:row.rank,
+          receiptId,title:row.observedTitle,artist:row.observedArtist});
       }
       if(rankingRef!==null){
         rankingRows.push({recordingId:rankingRef,rank:row.rank,
@@ -240,10 +244,35 @@ export async function prepareWk100AttestedPrivateRanking({
     eligibilityPolicySha256,registrySnapshotSha256,snapshots});
   need(candidate.canPublish===false&&candidate.canStage===false&&
     candidate.sourcePanelCount===11,'rank_preview_authority_invalid');
+  // Only authenticated, original-byte-verified labels for ranked chart-only
+  // references may be used by the private Admin display. A Registry lookup
+  // must never be fabricated from a source-scoped non-UUID reference.
+  const neededChartRefs=new Set(candidate.ranked.filter(x=>!UUID.test(x.recordingId))
+    .map(x=>x.recordingId));
+  const chartLabels=new Map();
+  chartOnlyLabelEvidence.sort((a,b)=>
+    order(a.recordingId,b.recordingId)||
+    order(b.observedAtUtc,a.observedAtUtc)||
+    a.sourceRank-b.sourceRank||order(a.receiptId,b.receiptId));
+  for(const evidence of chartOnlyLabelEvidence){
+    if(!neededChartRefs.has(evidence.recordingId))continue;
+    const before=chartLabels.get(evidence.recordingId);
+    if(before){
+      if(before.title!==evidence.title||before.artist!==evidence.artist)
+        before.labelVariation=true;
+    }else chartLabels.set(evidence.recordingId,{
+      recordingId:evidence.recordingId,title:evidence.title,
+      artist:evidence.artist,labelVariation:false,
+    });
+  }
+  need(chartLabels.size===neededChartRefs.size,'chart_display_evidence_incomplete');
+  const chartOnlyDisplayRows=Object.freeze([...chartLabels.values()]
+    .sort((a,b)=>order(a.recordingId,b.recordingId)).map(x=>Object.freeze(x)));
   return Object.freeze({schemaVersion:'wk100-attested-private-ranking-handoff/v1',
     weekStartEat,sourceReceiptCount:11,registrySnapshotSha256,
     policySha256:eligibilityPolicySha256,
     rankingDigest:candidate.rankingDigest,privateRanking:candidate,
+    chartOnlyDisplayRows,
     heldPositions:candidate.heldPositions,
     // This does not prove hosted admission or authorize W8 staging.
     status:'private_research_handoff',canStage:false,canPublish:false});
