@@ -165,6 +165,8 @@ export async function projectWk100EligibilityPreview({
       providerTrackId:observation.providerTrackId,
       identityState:observation.identityState,canonicalTrackId:facts.canonicalTrackId,
       reviewReason:observation.reviewReason,provisionalRef:observation.provisionalRef,
+      // MIZIZI research hints remain distinct from policy and canonical facts.
+      registryCandidates:observation.registryCandidates??[],
       registryTrackSlug,registryReleaseSlug,registryArtistSlugs,registryFactsSha256,
       registryTrackId:linkedTrack?.id??null,
       registryReleaseId:linkedRelease?.id??null,
