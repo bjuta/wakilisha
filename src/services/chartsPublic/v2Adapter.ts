@@ -278,10 +278,11 @@ function toEntry(entry: V2Entry, editionSlug: string): ChartEditionEntry {
       : "same",
     peakPosition: entry.rank,
     weeksOnChart: null,
-    trackSlug: entry.trackSlug ?? entry.id,
+    // A Chart entry ID is not a Registry Track slug. Do not fabricate one.
+    trackSlug: entry.canonicalTrackId ? (entry.trackSlug ?? "") : "",
     trackTitle: entry.trackTitle,
     canonicalTrackId: entry.canonicalTrackId ?? null,
-    artistSlugs: entry.artistSlugs ?? [],
+    artistSlugs: entry.canonicalTrackId ? (entry.artistSlugs ?? []) : [],
     artistNames: entry.artistNames ?? [],
     artworkUrl: entry.artworkUrl,
     score: typeof entry.score === "number" ? entry.score : 0,

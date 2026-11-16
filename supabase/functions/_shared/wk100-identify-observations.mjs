@@ -26,6 +26,42 @@ export function wk100RegistryProviderKey(providerKey){
   return WK100_REGISTRY_PROVIDERS[providerKey];
 }
 
+/**
+ * A chart-scoped observation reference, never a Registry Track identity.
+ *
+ * The caller must first independently verify the native original bytes and
+ * the exact immutable receipt/row binding. Provider-native IDs are opaque:
+ * case, punctuation and leading zeros are part of provider identity.
+ *
+ * Same provider + same native ID can retain one chart identity across the
+ * provider's daily panels. Different providers are NEVER joined by a title,
+ * Artist name or this helper. A missing native ID remains one receipt-local
+ * observation and cannot claim repeat/cross-provider corroboration.
+ *
+ * This produces no canonical UUID and grants no scoring/publication rights.
+ */
+export async function wk100ChartScopedObservationRef({
+  providerKey, providerTrackId, receiptSha256, captureRowId,
+}){
+  const provider=wk100RegistryProviderKey(providerKey);
+  check(typeof receiptSha256==='string'&&SHA.test(receiptSha256)&&
+    typeof captureRowId==='string'&&UUID.test(captureRowId),
+    'chart_observation_receipt_invalid');
+  if(providerTrackId===null){
+    return 'wk100:obs:v1:'+receiptSha256+':'+captureRowId.toLowerCase();
+  }
+  check(typeof providerTrackId==='string'&&providerTrackId.length>=1&&
+    providerTrackId.length<=200&&providerTrackId===providerTrackId.trim()&&
+    !/[\u0000-\u001f\u007f]/u.test(providerTrackId),
+    'chart_provider_id_invalid');
+  check(typeof crypto?.subtle?.digest==='function','chart_digest_unavailable');
+  const payload=JSON.stringify(['wk100-chart-native-observation/v1',provider,providerTrackId]);
+  const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',
+    new TextEncoder().encode(payload)));
+  const hex=Array.from(digest,b=>b.toString(16).padStart(2,'0')).join('');
+  return 'wk100:source:v1:'+provider+':'+hex;
+}
+
 export function projectWk100IdentifyObservations({
   weekStartEat,contract,attempt,rows,typedLinks,legacyLinks,activeTracks,
 }){

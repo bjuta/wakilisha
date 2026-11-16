@@ -15,6 +15,7 @@ type Source={id:string;provider:string;sourceKey:string;market:string;metric:str
   lastSuccessfulAt:string|null};
 type Family=typeof SPEC.families[number];
 type RankingRow={rank:number;recordingId:string;title:string|null;artist:string|null;
+  sourceLabelVariation:boolean;
   score:number;listedFamilyCount:number;
   contributions:{family:string;points:number}[]};
 type RankResult={
@@ -56,7 +57,7 @@ const REASONS:Record<string,string>={
 const GATES=[
   ['source','Complete source observations'],
   ['method','Current source admission and originals'],
-  ['eligibility','Registry and saved eligibility policy'],
+  ['eligibility','Verified chart policy and source evidence'],
   ['ranking','Reproducible private Top 100'],
   ['approval','Independent editorial approval'],
   ['stage','Private Edition staging'],
@@ -66,12 +67,16 @@ const REPLAY_REASONS:Record<string,string>={
   saved_policy_not_verified:'The weekly eligibility policy is missing or has changed.',
   source_constitution_unavailable:'The server has no verified source constitution.',
   source_method_not_current:'A source method is not currently approved for this ranking.',
-  canonical_recordings_not_ready:'Canonical recording links or eligibility need more review.',
+  canonical_recordings_not_ready:'A recording link or saved chart rule needs more review.',
   original_replay_not_verified:'An original could not be verified against its stored positions.',
   private_attestation_not_verified:'The private evidence replay did not pass verification.',
 };
 const SHA=/^[a-f0-9]{64}$/;
 const uuid=/^[0-9a-f]{8}-[0-9a-f-]{27}$/i;
+const chartSource=/^wk100:source:v1:(apple_music|audiomack|mdundo|shazam|youtube):[a-f0-9]{64}$/;
+const chartObservation=/^wk100:obs:v1:[a-f0-9]{64}:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+const validChartIdentity=(value:string)=>uuid.test(value)||
+  chartSource.test(value)||chartObservation.test(value);
 const fixed=(n:number)=>Number.isFinite(n)?n.toFixed(2):'0.00';
 function verify(result:unknown,week:string):result is RankResult{
   if(!result||typeof result!=='object'||Array.isArray(result))return false;
@@ -95,7 +100,8 @@ function verify(result:unknown,week:string):result is RankResult{
   return r.ranked.length===100&&
     [r.rankingDigest,r.registrySnapshotSha256,r.policySha256,
       r.sourceAdmissionSnapshotSha256].every(x=>typeof x==='string'&&SHA.test(x))&&
-    r.ranked.every((row,i)=>row.rank===i+1&&uuid.test(row.recordingId)&&
+    r.ranked.every((row,i)=>row.rank===i+1&&validChartIdentity(row.recordingId)&&
+      typeof row.sourceLabelVariation==='boolean'&&
       Number.isFinite(row.score)&&row.score>=0&&row.score<=100&&
       Number.isInteger(row.listedFamilyCount)&&
       Array.isArray(row.contributions)&&row.contributions.length===5&&
@@ -255,7 +261,13 @@ export function Wk100Ranking({week,sources=[],methods=[],reviewedSourceIds=[]}:{
               <td className="p-2"><span className="font-semibold">
                 {row.title||'Recording title unavailable'}</span>
                 <span className="block text-xs text-wk-text-muted">
-                  {row.artist||'Artist name unavailable'}</span></td>
+                  {row.artist||'Artist name unavailable'}</span>
+                {!uuid.test(row.recordingId)&&<span className="block text-xs text-wk-text-muted">
+                  Chart evidence only. Not linked to a Registry recording.
+                </span>}
+                {row.sourceLabelVariation&&<span className="block text-xs text-wk-text-muted">
+                  Captured source labels differ across dates. Review before publication.
+                </span>}</td>
               <td className="p-2">{fixed(row.score)}</td>
               <td className="p-2">{row.listedFamilyCount} of five</td>
               <td className="p-2"><button type="button"
@@ -281,7 +293,7 @@ export function Wk100Ranking({week,sources=[],methods=[],reviewedSourceIds=[]}:{
         </div>
       </div>:<p className="mt-3 text-sm text-wk-text-muted">
         The Top 100 appears here only after the server verifies every required
-        original, source method, canonical recording, and saved eligibility rule.
+        original, source method, recording evidence, and saved chart rule.
       </p>}
     </WkSurface>
 

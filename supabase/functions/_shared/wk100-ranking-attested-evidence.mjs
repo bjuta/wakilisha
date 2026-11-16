@@ -9,9 +9,11 @@
  */
 import {computeWk100PrivateRankingCandidate,
   WK100_RANKING_SPECIFICATION_V1 as SPEC} from './wk100-ranking-primitive.mjs';
-import {projectWk100IdentifyObservations} from './wk100-identify-observations.mjs';
+import {projectWk100IdentifyObservations,wk100ChartScopedObservationRef}
+  from './wk100-identify-observations.mjs';
 import {parseCaptureNativeRows} from './chart-capture-runtime.mjs';
-import {projectWk100EligibilityPreview} from './wk100-eligibility-preview.mjs';
+import {projectWk100EligibilityPreview,wk100CanScoreChartOnlyObservation}
+  from './wk100-eligibility-preview.mjs';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA=/^[a-f0-9]{64}$/;
@@ -80,6 +82,7 @@ export async function prepareWk100AttestedPrivateRanking({
     savedDraft.config_json?.ingestPolicySha256===eligibilityPolicySha256,
     'saved_w5_policy_missing_or_stale');
   const snapshots=[],attestationFacts=[],familySourceKeys=new Map();
+  const chartOnlyLabelEvidence=[];
   const seenFamilies=new Map(SPEC.families.map(f=>[f,0]));
   const allCaptureRows=new Set();
   for(const receiptId of selectedReceiptIds){
@@ -168,22 +171,39 @@ export async function prepareWk100AttestedPrivateRanking({
         SHA.test(verdict.registryFactsSha256)&&
         ['ELIGIBLE','EXCLUDED','REVIEW_REQUIRED','CONFLICTED'].includes(verdict.outcome),
         'eligibility_or_registry_facts_unverified');
+      let rankingRef=null;
       if(verdict.outcome==='ELIGIBLE'){
         need(row.identityState==='resolved'&&UUID.test(row.canonicalTrackId),
           'eligibility_identity_unverified');
-        rankingRows.push({recordingId:row.canonicalTrackId,rank:row.rank,
+        rankingRef=row.canonicalTrackId;
+      }else if(wk100CanScoreChartOnlyObservation({
+        sourceReview:identified,row,verdict,savedConfig:savedDraft.config_json,
+      })){
+        // The provider reference is derived ONLY after original-byte replay
+        // and a verified, unrestricted saved chart policy. It is not a
+        // canonical Registry UUID or reviewed cross-provider equivalence.
+        rankingRef=await wk100ChartScopedObservationRef({
+          providerKey:contract.provider_key,providerTrackId:row.providerTrackId,
+          receiptSha256:attempt.payload_sha256,captureRowId:row.captureRowId,
+        });
+        chartOnlyLabelEvidence.push({recordingId:rankingRef,
+          observedAtUtc:canonicalUtc(attempt.fetched_at),sourceRank:row.rank,
+          receiptId,title:row.observedTitle,artist:row.observedArtist});
+      }
+      if(rankingRef!==null){
+        rankingRows.push({recordingId:rankingRef,rank:row.rank,
           ...(family==='youtube_ke'?
             {nativeCount:numberFromSqlBigint(ordered[i].source_native_count)}:{})});
       }else{
-        // Retain the exact native position and count; grant no ranking credit.
-        // Excluded Registry IDs stay in the private provenance digest only.
+        // Keep the original native position/count. No compressed ranks or
+        // credit for conflicts, restricted policy or unknown source fields.
         rankingRows.push({recordingId:null,rank:row.rank,
           disposition:verdict.outcome,
           ...(family==='youtube_ke'?
             {nativeCount:numberFromSqlBigint(ordered[i].source_native_count)}:{})});
       }
       attestationFacts.push([family,receiptId,ordered[i].id,
-        row.canonicalTrackId,verdict.outcome,verdict.registryFactsSha256]);
+        row.canonicalTrackId,rankingRef,verdict.outcome,verdict.registryFactsSha256]);
     }
     const period=attempt.native_period_authority;
     // Only the provider's genuine endDate was retained. A matching request
@@ -224,10 +244,35 @@ export async function prepareWk100AttestedPrivateRanking({
     eligibilityPolicySha256,registrySnapshotSha256,snapshots});
   need(candidate.canPublish===false&&candidate.canStage===false&&
     candidate.sourcePanelCount===11,'rank_preview_authority_invalid');
+  // Only authenticated, original-byte-verified labels for ranked chart-only
+  // references may be used by the private Admin display. A Registry lookup
+  // must never be fabricated from a source-scoped non-UUID reference.
+  const neededChartRefs=new Set(candidate.ranked.filter(x=>!UUID.test(x.recordingId))
+    .map(x=>x.recordingId));
+  const chartLabels=new Map();
+  chartOnlyLabelEvidence.sort((a,b)=>
+    order(a.recordingId,b.recordingId)||
+    order(b.observedAtUtc,a.observedAtUtc)||
+    a.sourceRank-b.sourceRank||order(a.receiptId,b.receiptId));
+  for(const evidence of chartOnlyLabelEvidence){
+    if(!neededChartRefs.has(evidence.recordingId))continue;
+    const before=chartLabels.get(evidence.recordingId);
+    if(before){
+      if(before.title!==evidence.title||before.artist!==evidence.artist)
+        before.labelVariation=true;
+    }else chartLabels.set(evidence.recordingId,{
+      recordingId:evidence.recordingId,title:evidence.title,
+      artist:evidence.artist,labelVariation:false,
+    });
+  }
+  need(chartLabels.size===neededChartRefs.size,'chart_display_evidence_incomplete');
+  const chartOnlyDisplayRows=Object.freeze([...chartLabels.values()]
+    .sort((a,b)=>order(a.recordingId,b.recordingId)).map(x=>Object.freeze(x)));
   return Object.freeze({schemaVersion:'wk100-attested-private-ranking-handoff/v1',
     weekStartEat,sourceReceiptCount:11,registrySnapshotSha256,
     policySha256:eligibilityPolicySha256,
     rankingDigest:candidate.rankingDigest,privateRanking:candidate,
+    chartOnlyDisplayRows,
     heldPositions:candidate.heldPositions,
     // This does not prove hosted admission or authorize W8 staging.
     status:'private_research_handoff',canStage:false,canPublish:false});

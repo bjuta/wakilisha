@@ -1675,6 +1675,31 @@ test('WK100 fixed five-source ranking primitive replays two logical EAT weeks wi
   assert.equal(result.ranked[0].listedFamilyCount,5);
   assert.equal(result.canStage,false);
   assert.equal(result.canPublish,false);
+  // A provider-scoped reference participates in PRIVATE math without minting
+  // a Registry UUID. Seven Apple daily panels preserve one native-source
+  // identity; unrelated providers cannot silently claim the same recording.
+  const chartOnly=structuredClone(first);
+  const appleRef='wk100:source:v1:apple_music:'+'b'.repeat(64);
+  for(const panel of chartOnly.snapshots.filter(x=>x.family==='apple_ke'))
+    panel.rows[0].recordingId=appleRef;
+  const chartResult=await compute(chartOnly);
+  const appleResult=chartResult.ranked.find(x=>x.recordingId===appleRef);
+  assert.equal(appleResult?.score,20);
+  assert.equal(appleResult?.listedFamilyCount,1);
+  assert.equal(chartResult.ranked.find(x=>x.recordingId===uuid(1))?.score,80);
+  assert.equal(chartResult.canStage,false);
+  assert.equal(chartResult.canPublish,false);
+  // One exact original without a provider-native ID remains one private
+  // receipt-local observation, never a cross-panel/cross-operator merge.
+  const receiptOnly=structuredClone(first);
+  const firstPanel=receiptOnly.snapshots[0];
+  const receiptRef='wk100:obs:v1:'+firstPanel.captureReceiptSha256+':'+uuid(990001);
+  firstPanel.rows[1].recordingId=receiptRef;
+  const receiptResult=await compute(receiptOnly);
+  assert.equal(receiptResult.eligibleRecordings,result.eligibleRecordings+1);
+  assert.notEqual(receiptResult.rankingDigest,result.rankingDigest);
+  // A low-scoring receipt-local observation need not reach the Top 100.
+  assert.equal(receiptResult.canPublish,false);
   assert.match(result.rankingDigest,/^[0-9a-f]{64}$/);
   const shuffled=structuredClone(first);
   shuffled.snapshots.reverse();
@@ -1693,6 +1718,20 @@ test('WK100 fixed five-source ranking primitive replays two logical EAT weeks wi
     const v=structuredClone(first);change(v);
     await assert.rejects(()=>compute(v),regex);
   };
+  await invalid(v=>{
+    v.snapshots.find(x=>x.family==='youtube_ke').rows[0].recordingId=
+      'wk100:source:v1:apple_music:'+'b'.repeat(64);
+  },/wk100_rank_rank_or_identity_invalid/);
+  await invalid(v=>{
+    const panel=v.snapshots[0];
+    panel.rows[0].recordingId='wk100:obs:v1:'+'f'.repeat(64)+':'+uuid(910001);
+  },/wk100_rank_rank_or_identity_invalid/);
+  await invalid(v=>{
+    const panels=v.snapshots.filter(x=>x.family==='apple_ke');
+    const ref='wk100:obs:v1:'+panels[0].captureReceiptSha256+':'+uuid(910002);
+    panels[0].rows[0].recordingId=ref;
+    panels[1].rows[0].recordingId=ref;
+  },/wk100_rank_rank_or_identity_invalid/);
   await invalid(v=>v.snapshots.pop(),/wk100_rank_input_invalid/);
   await invalid(v=>{v.snapshots[0].rows.pop()},/wk100_rank_snapshot_invalid/);
   await invalid(v=>{v.snapshots[0].rows[0].rank=2},/wk100_rank_rank_or_identity_invalid/);

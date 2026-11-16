@@ -211,11 +211,12 @@ jobs:
           node --test test/charts/wk100-private-admin-preview.test.mjs
           npx vitest run test/charts/wk100-admin-role-expiry.test.ts
 
-      - name: Verify WK100 W4 to W6 source identity and filter recheck contracts
+      - name: Verify WK100 W4 to W8 source identity and private original-byte ranking
         run: |
           node --test test/charts/wk100-identify-observations.test.mjs
           node --test test/charts/wk100-eligibility-preview.test.mjs
           node --test test/charts/wk100-eligibility-recheck.test.mjs
+          node --test test/charts/wk100-ranking-attested-evidence.test.mjs
 
       - name: Enforce Post draft and authored Thread authority
         run: >-

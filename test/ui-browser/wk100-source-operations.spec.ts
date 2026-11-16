@@ -1868,8 +1868,10 @@ test('W8 and W8S explain 100 synthetic private rows but do not offer staging or 
       observedAttempts:i===0?7:1,eligibleCheckpointCount:i===0?7:1,
       observedDays:i===0?7:1,issues:[],checkpointCandidate:true})),
     ranked:Array.from({length:100},(_,i)=>({
-      rank:i+1,recordingId:uid(i+1),title:'Synthetic Recording '+(i+1),
+      rank:i+1,recordingId:i===0?'wk100:source:v1:apple_music:'+'e'.repeat(64):uid(i+1),
+      title:'Synthetic Recording '+(i+1),
       artist:'Synthetic Artist '+(i+1),score:80,listedFamilyCount:5,
+      sourceLabelVariation:i===0,
       contributions:families.map(family=>({family,points:16})),
     })),
     rankingDigest:'a'.repeat(64),registrySnapshotSha256:'b'.repeat(64),
@@ -1884,6 +1886,10 @@ test('W8 and W8S explain 100 synthetic private rows but do not offer staging or 
   await expect(rank.getByRole('table',{name:'Private WAKILISHA 100 Top 100'}))
     .toBeVisible({timeout:20_000});
   await expect(rank.getByText('100 of 100 recordings')).toBeVisible();
+  await expect(rank.getByText('Chart evidence only. Not linked to a Registry recording.'))
+    .toBeVisible();
+  await expect(rank.getByText('Captured source labels differ across dates. Review before publication.'))
+    .toBeVisible();
   await expect(rank.locator('[data-wk100-w8b-incomplete]')).toHaveCount(0);
   await rank.getByRole('button',{name:'Explain Score'}).nth(1).click();
   await expect(rank.locator('[data-wk100-w8s-explanation]')
