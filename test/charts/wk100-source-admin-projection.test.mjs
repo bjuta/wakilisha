@@ -1753,3 +1753,28 @@ test('WK100 independent synthetic research challenge detects model disagreement'
     .some(x=>x.top10Overlap<10));
   // These are model sensitivity diagnostics, NOT launch pass thresholds.
 });
+
+test('WK100 external systemd trigger isolates privileged credentials and never enables backfill',async()=>{
+  const [timer,service,trigger]=await Promise.all([
+    readFile('ops/systemd/wakilisha-wk100-source-scheduler.timer','utf8'),
+    readFile('ops/systemd/wakilisha-wk100-source-scheduler.service','utf8'),
+    readFile('ops/wk100-scheduler/trigger.py','utf8'),
+  ]);
+  assert.match(timer,/OnCalendar=\*-\*-\* \*:0\/5:00 UTC/);
+  assert.match(timer,/Persistent=false/);
+  assert.match(timer,/RandomizedDelaySec=0/);
+  assert.match(service,/LoadCredential=wk100_service_jwt:\/etc\/wakilisha-wk100-source-scheduler\.jwt/);
+  assert.match(service,/DynamicUser=yes/);
+  assert.match(service,/NoNewPrivileges=yes/);
+  assert.match(service,/ProtectSystem=strict/);
+  assert.match(service,/ProtectHome=yes/);
+  assert.match(service,/TimeoutStartSec=180s/);
+  assert.match(trigger,/CREDENTIALS_DIRECTORY/);
+  assert.match(trigger,/NoRedirect\(\)/);
+  assert.match(trigger,/urllib\.request\.ProxyHandler\(\{\}\)/);
+  assert.match(trigger,/\.supabase\.co\/functions\/v1\/wk100-source-scheduler/);
+  assert.match(trigger,/result\.get\("canPublish"\) is not False/);
+  assert.match(trigger,/result\.get\("canScore"\) is not False/);
+  assert.doesNotMatch(trigger,/SUPABASE_SERVICE_ROLE_KEY|sys\.argv\[1\]|pg_net|net\.http_post|\bcron\.schedule\b/);
+  assert.doesNotMatch(service,/EnvironmentFile=|\bExecStart=.*(curl|--token|--password)/);
+});
