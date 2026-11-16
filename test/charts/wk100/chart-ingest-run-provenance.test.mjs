@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createIngestPolicySnapshot} from '../../../supabase/functions/_shared/chart-ingest-policy-snapshot.mjs';
-import {reconcileRunRawEvidence as reconcile,inspectProductionShapedRunCandidate as inspect} from '../../../supabase/functions/_shared/chart-ingest-run-provenance.mjs';
+import {reconcileRunRawEvidence as reconcile,inspectProductionShapedRunCandidate as inspect,projectChartOnlySourceIdentity as chartOnlyRef} from '../../../supabase/functions/_shared/chart-ingest-run-provenance.mjs';
 const RUN='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const CAND='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const TRACK='11111111-1111-4111-8111-111111111111';
@@ -42,6 +42,61 @@ const freeze=()=>createIngestPolicySnapshot(policy(),'local-isolated-test','2026
 const run=async(x=fixture())=>inspect(await freeze(),x,CAND);
 test('production raw row does not store candidate_id',()=>{let x=fixture();assert.equal('candidate_id' in x.rawRows[0],false)});
 test('certifies exact unique source->raw->candidate link',()=>{let a=reconcile(fixture());assert.equal(a.perCandidate[0].certificates[0].method,'NORMALIZED_UNIQUE_PROVIDER_TRACK_ID_IN_RUN');assert.equal(a.perCandidate[0].operatorKeys[0],'mdundo');assert.equal(a.perCandidate[0].problems.length,0)});
+test('all-origin chart-only evidence retains provider identity without minting Registry IDs',async()=>{
+  const x=fixture();x.acceptedMatches=[];
+  const projection=async item=>chartOnlyRef({
+    association:reconcile(item),rawRows:item.rawRows,
+    acceptedMatches:item.acceptedMatches,candidateId:CAND,
+  });
+  const original=await projection(x);
+  assert.equal(original.status,'SOURCE_ONLY');
+  assert.match(original.chartRecordingRef,/^wkchart:source:v1:mdundo:[a-f0-9]{64}$/);
+  assert.equal(original.canonicalTrackId,null);
+  assert.equal(original.identityScope,'PROVIDER_ONLY_UNREVIEWED');
+  for(const right of ['canScore','canCommit','canPublish','canAdmitRegistry'])
+    assert.equal(original[right],false,right);
+  assert.equal((await projection(x)).chartRecordingRef,original.chartRecordingRef);
+
+  // Distinct original provider spellings may share a lossy ingest alias.
+  // They must never share a chart-scoped identity without review.
+  x.rawRows[0].provider_track_id='MDUNDO_123';
+  const changed=await projection(x);
+  assert.equal(changed.status,'SOURCE_ONLY');
+  assert.notEqual(changed.chartRecordingRef,original.chartRecordingRef);
+  x.rawRows[0].provider_track_id='mdundo-123';
+
+  // Exact same native ID on another provider is not a cross-provider match.
+  x.runSources[0].provider='spotify';
+  x.rawRows[0].provider='spotify';
+  x.candidates[0].provider_ids_json={spotify:['mdundo-123']};
+  const foreign=await projection(x);
+  assert.equal(foreign.status,'SOURCE_ONLY');
+  assert.notEqual(foreign.chartRecordingRef,original.chartRecordingRef);
+});
+
+test('chart-only source evidence refuses canonical links, ambiguous IDs and missing original labels',async()=>{
+  const project=async x=>chartOnlyRef({
+    association:reconcile(x),rawRows:x.rawRows,
+    acceptedMatches:x.acceptedMatches,candidateId:CAND,
+  });
+  const canonical=await project(fixture());
+  assert.equal(canonical.status,'HELD');
+  assert.equal(canonical.reason,'registry_match_requires_separate_review');
+  assert.equal(canonical.chartRecordingRef,null);
+  const missing=fixture();missing.acceptedMatches=[];
+  missing.rawRows[0].provider_track_id=null;
+  assert.equal((await project(missing)).status,'HELD');
+  const ambiguous=fixture();ambiguous.acceptedMatches=[];
+  ambiguous.candidates.push({...ambiguous.candidates[0],id:CAND2});
+  assert.equal((await project(ambiguous)).status,'HELD');
+  const unknown=fixture();unknown.acceptedMatches=[];
+  unknown.rawRows[0].artist_raw=null;
+  assert.equal((await project(unknown)).reason,'exact_native_observation_unverified');
+  const untrusted=fixture();untrusted.acceptedMatches=[];
+  assert.equal((await chartOnlyRef({association:reconcile(untrusted),
+    rawRows:untrusted.rawRows,candidateId:CAND})).status,'HELD');
+});
+
 test('a clean KE case is predicate eligible, never scoreable',async()=>{let z=await run();assert.equal(z.outcome,'ELIGIBLE');assert.equal(z.mayScore,false);assert.equal(z.mayPublish,false);assert.equal(z.associationCertificate.rawRowId,RAW)});
 test('not a source-native time attestation or chart publication',async()=>{let z=await run();assert.equal(z.associationCertificate.method,'NORMALIZED_UNIQUE_PROVIDER_TRACK_ID_IN_RUN');assert.equal(z.mayPublish,false);assert.equal(z.mayScore,false)});
 test('foreign artist excluded from KE even though source is Kenya',async()=>{let x=fixture();x.registryArtists[0].origin_iso2='NG';let z=await run(x);assert.equal(z.outcome,'EXCLUDED')});
