@@ -97,7 +97,9 @@ test('conflicted provider link stays conflicted regardless of other filters',asy
 
 test('only explicit five core namespaces map to the existing profile provider families',()=>{
  const expected={
-   apple_music:'apple_music',shazam_ke:'shazam',mdundo_ke:'mdundo',
+   apple_music:'apple_music',shazam:'shazam',mdundo:'mdundo',
+   youtube:'youtube',audiomack:'audiomack',
+   shazam_ke:'shazam',mdundo_ke:'mdundo',
    youtube_ke:'youtube',audiomack_ke:'audiomack',
  };
  for(const [key,val] of Object.entries(expected))
@@ -115,4 +117,20 @@ test('saved source allow-list is enforced, never silently expanded for a core so
  const y=await project(x);
  assert.equal(y.rows[0].outcome,'EXCLUDED');
  assert(y.rows[0].reasonCodes.includes('source_provider_not_allowed'));
+});
+
+test('canonical Registry provider and MIZIZI candidate-only hints cannot bypass W5 identity',async()=>{
+ const x=await fixture();x.sourceReview.registryProviderKey='mdundo';
+ x.sourceReview.rows[1].registryCandidates=[{
+   trackId:T,title:'Song Two',registryIsrc:'KEABC2600001',
+   basis:'exact_artist_credit',identifierCorroborated:false,
+   status:'research_candidate_only',
+ }];
+ const r=await project(x);
+ assert.equal(r.rows[0].outcome,'ELIGIBLE');
+ assert.equal(r.rows[1].outcome,'REVIEW_REQUIRED');
+ assert.equal(r.rows[1].canonicalTrackId,null);
+ assert.equal(r.rows[1].registryCandidates[0].status,'research_candidate_only');
+ assert(r.rows[1].reasonCodes.includes('canonical_identity_needs_review'));
+ assert.deepEqual([r.canScore,r.canPublish,r.canWriteRegistry],[false,false,false]);
 });
