@@ -91,3 +91,48 @@ must exercise direct service-role INSERT denial, denied editor enrollment,
 accepted super-admin enrollment, stale proposal/decision denial, duplicate
 contract denial, immutable enrollment audit and no durable fixture after
 rollback; real GoTrue/hosted Edge tests and clean CLI replay must follow.
+
+## Candidate external timed trigger: credential-isolated systemd, not activated
+
+15 November host audit and 16 November read-only Mac preflight established that the
+existing Lightsail host runs systemd 255, synchronizes its clock, and has an
+active Media maintenance timer. No WK100 service, timer or dedicated JWT file
+was installed at preflight. This is host-readiness evidence only.
+
+The new candidate uses `ops/wk100-scheduler/trigger.py` with a dedicated
+`wakilisha-wk100-source-scheduler.service` and `.timer`. The existing Edge
+scheduler remains the only dispatch planner; `wk-chart-capture`, PostgreSQL
+reservation, the source constitution, W3 retry action ledger, and private raw
+receipt pipeline are unchanged. Both Edge functions retain `verify_jwt=true`.
+
+The timer fires at UTC minute 00, 05, 10, ... every hour, without persistent
+missed-tick catch-up. Each invocation makes one POST with an empty body to the
+exact configured Supabase project. Hosted JWT signature verification remains
+mandatory. The process performs only a local untrusted token-shape preflight;
+that check does not assert JWT authenticity. The runner refuses redirects and
+outbound proxy configuration. It never logs bearer, key, response body or source
+metadata. It treats worker rejection as a failed service tick. Four dispatches
+per tick remain the Edge scheduler's existing cap, so five simultaneous Thursday
+slots need at least two eligible ticks before the original 20-minute deadline.
+
+The dedicated JWT is provisioned only through a separately accepted secret
+procedure into `/etc/wakilisha-wk100-source-scheduler.jwt` (owner root, mode 0600).
+Systemd `LoadCredential` passes it to the one-shot service in a protected
+credentials directory; `DynamicUser=yes` ensures the Python process does not
+run as root or reuse the existing Media worker environment. No JWT belongs in
+`pg_net`, Git, unit files, command line, Python source, or journal.
+
+**Non-activation gate:** this candidate is NOT installed, enabled, or granted
+credentials by the source change. First prove Python offline negatives, the
+existing consolidated WK100 contract, exact source/secret parity, host isolation,
+HTTPS ingress, disabled-response behavior under real gateway auth, watchdog and
+rollback. Then separately obtain founder approval for the supervised Production
+credential provisioning and timer activation. Service-role key rotation requires
+another bounded rollout and cannot be silently treated as active. A passing tick
+never means scoring, MIZIZI writes, ranking, an Edition, or publication.
+
+Rollback after a separately accepted activation is to stop and disable the
+single WK100 timer, prove no further WK100 invocation, and preserve the SQL,
+Storage, source admission, raw evidence and audit history. Revoke or rotate the
+dedicated credential under the accepted secret procedure if compromised; do not
+alter the unrelated Media timers, jobs or global service-role users.
