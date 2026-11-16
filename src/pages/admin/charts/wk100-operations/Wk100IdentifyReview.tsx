@@ -23,9 +23,15 @@ type Source={
   id:string;sourceKey:string;surface:string;provider:string;expectedDepth:number;
   recentAttempts:Receipt[];
 };
+type RegistryCandidate={
+  trackId:string;title:string;registryIsrc:string|null;
+  basis:'exact_artist_credit'|'listed_artist_credit'|'artist_credit_variant';
+  identifierCorroborated:false;status:'research_candidate_only';
+};
 type Row={
   captureRowId:string;rank:number;observedTitle:string|null;observedArtist:string|null;
   providerTrackId:string|null;canonicalTrackId:string|null;
+  registryCandidates?:RegistryCandidate[];
   identityState:'resolved'|'needs_review'|'conflicting'|'inactive';
   reviewReason:string|null;provisionalRef:string|null;
   outcome?:'ELIGIBLE'|'EXCLUDED'|'REVIEW_REQUIRED'|'CONFLICTED';reasonCodes?:string[];
@@ -767,6 +773,17 @@ export function Wk100IdentifyReview({week,sources,stage='identify'}:{week:string
               <p className="text-wk-text-muted">{qualify
                 ?(r.reasonCodes?.map(x=>x.replaceAll('_',' ')).join('; ')||'No rule failures')
                 :(r.canonicalTrackId??(r.reviewReason?reasonLabel[r.reviewReason]??'Review required':'Review required'))}</p>
+              {!!r.registryCandidates?.length&&<div className="mt-2 space-y-1">
+                <p className="text-xs font-semibold text-wk-text">Possible existing Registry Track. Recording match not yet confirmed.</p>
+                {r.registryCandidates.map(candidate=><p key={candidate.trackId} className="text-xs text-wk-text-muted">
+                  {candidate.title} ({candidate.basis==='artist_credit_variant'?'Artist credit differs':'Artist credit overlaps'}).
+                  {' '}<a className="font-semibold text-wk-brand underline" target="_blank"
+                    rel="noopener noreferrer"
+                    href={'/admin/registry/tracks?search='+encodeURIComponent(candidate.title)}>
+                    Inspect Registry
+                  </a>
+                </p>)}
+              </div>}
             </div>},
             ...(qualify?[{key:'correction',label:'Registry review',render:(r:Row)=><>
               <button type="button" className="mb-2 block font-semibold text-wk-brand underline"

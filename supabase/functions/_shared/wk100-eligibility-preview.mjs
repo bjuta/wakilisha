@@ -19,7 +19,11 @@ const strings=x=>arr(x).filter(v=>typeof v==='string'&&v.trim().length).map(v=>v
  * Registry identity namespace. Never alter the saved policy allow-list.
  */
 const POLICY_PROVIDERS=Object.freeze({
-  apple_music:'apple_music',shazam_ke:'shazam',mdundo_ke:'mdundo',
+  // W4 and W8 now use these exact Registry namespaces.
+  apple_music:'apple_music',shazam:'shazam',mdundo:'mdundo',
+  youtube:'youtube',audiomack:'audiomack',
+  // Preserve legacy read-only W5 fixtures and historical projections.
+  shazam_ke:'shazam',mdundo_ke:'mdundo',
   youtube_ke:'youtube',audiomack_ke:'audiomack',
 });
 export function wk100EligibilityPolicyProvider(registryProviderKey){
@@ -165,6 +169,8 @@ export async function projectWk100EligibilityPreview({
       providerTrackId:observation.providerTrackId,
       identityState:observation.identityState,canonicalTrackId:facts.canonicalTrackId,
       reviewReason:observation.reviewReason,provisionalRef:observation.provisionalRef,
+      // MIZIZI research hints remain distinct from policy and canonical facts.
+      registryCandidates:observation.registryCandidates??[],
       registryTrackSlug,registryReleaseSlug,registryArtistSlugs,registryFactsSha256,
       registryTrackId:linkedTrack?.id??null,
       registryReleaseId:linkedRelease?.id??null,
