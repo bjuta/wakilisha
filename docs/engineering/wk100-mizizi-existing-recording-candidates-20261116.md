@@ -21,3 +21,89 @@ This obscured existing names without proving they were missing from the Registry
 Run `node --test test/charts/wk100-identify-observations.test.mjs test/charts/wk100-eligibility-preview.test.mjs` and existing WK100 UI/type build and regression gates. Test legitimate Mboka/Siaka leads, missing source IDs, false title match, unaccepted aliases, inactive identities, all five provider namespaces, and the exact no-write/no-score/no-publish flags.
 
 Before claiming Production completion: protected exact-head CI, review, separately managed `wk100-source-admin-read` Edge deployment, real super-admin W4+W5 browser checks on pinned 9 Nov receipts, and source/Registry postconditions. A GitHub merge alone does not deploy the Edge Function or the frontend. The founder's one-week five-original-evidence exception changes neither canonical identity admission nor ordinary subsequent-week ranking requirements. Issue #1338 remains open until the real inaugural Edition is admitted, staged and published.
+
+
+## African-first Registry; all-origin Kenyan chart (16 November 2026)
+
+**Founder decision:** A Kenyan audience chart measures observed listening and
+discovery irrespective of the performer's origin. It must never become a mass
+Registry import. Retiring an origin filter for chart participation is **not**
+authority to create an Artist, Track, Release, ISRC assertion or provider link.
+
+The canonical Registry prioritizes African musical and cultural participation.
+A non-African performer can be relevant to the Registry through a documented
+collaboration with an African performer, including either lead/featured
+direction. Inclusion is limited to the evidenced work, relationships and
+contributor identity necessary to describe it correctly. It does not authorize
+importing an entire unrelated international discography. Nationality, country
+of residence, artist name similarity or a Kenya chart position alone is never
+sufficient evidence. Unknown origin or collaboration is a review state, not
+automatic exclusion from chart observation or automatic canonical inclusion.
+
+### Existing source and identity lanes
+
+- **WK100 source evidence:** Immutable rank/metric, exact bytes,
+  provider-native identifier when present, Kenya period and source admission.
+  All origins remain observable.
+- **Chart-scoped reference:** An exact provider namespace/native-ID hash,
+  with prefix wk100:source:v1:, stable across that provider's repeated daily
+  observations. This is an opaque source observation key, not a canonical
+  recording UUID. Two providers' matching titles or Artist labels cannot
+  be conflated. If a native ID is genuinely missing, the existing exact
+  receipt-local wk100:obs:v1: reference survives and cannot claim independent
+  provider corroboration.
+- **Registry identity:** Only reviewed exact links to current active canonical
+  Tracks, plus typed MIZIZI human-granted operations. Existing international
+  records, if any, are not implicitly deleted or rewritten.
+- **Chart participation:** Requires source period/depth and method
+  qualification, frozen chart eligibility, independently reviewed recording
+  equivalence where cross-provider grouping is claimed, and governed
+  publication authority. No source-scoped ref alone authorizes a public entry.
+
+### Inert source-only implementation under this issue
+
+The pure W4 reference helper and private W8 mathematical kernel now recognize
+source-scoped and receipt-scoped references. The kernel validates namespace,
+receipt SHA for local observation refs, rank continuity and repeated Apple
+daily identity without manufacturing a cross-provider match. Existing source
+tests exercise stable native IDs, mixed canonical/noncanonical scoring,
+cross-provider forgery rejection and private nonpublication.
+
+**Private W8 attestation now integrates the chart-only lane:** After exact
+original-byte replay, current source-method authorization and authenticated
+saved W5 configuration are verified, a separate fail-closed predicate checks
+whether the frozen policy is genuinely origin-unrestricted and imposes no
+unverifiable metadata restrictions. The existing W5 Registry review verdict
+is preserved; chart-only participation uses a verified native or receipt-local
+reference instead of manufacturing a Registry UUID. Known EXCLUDED,
+CONFLICTED or inactive identities remain held. The default released W8 bridge
+does not stage or publish anything. A focused synthetic integration test
+proves private scoring under the 9 Nov all-origin profile shape while the
+narrower prior profile remains restrictive.
+
+**Not implemented by this slice:** Independent human-reviewed equivalence
+for the *same recording across different providers* remains required before
+one published ranking aggregates those providers. A shared title or Artist
+label must never count as matching evidence. The governed publisher's current
+identity contract and public display projection must be reviewed for nullable
+canonical Track IDs and chart-scoped references, without rewriting historical
+observations, reweighting absent sources or bypassing source authorization.
+Existing W5 Registry policy outcome remains intact; the new chart-only
+predicate is private W8 scoring input only. The server-only attestor also
+returns bounded source labels verified against original private bytes. The
+signed-in Admin reader separates Registry UUID lookup from chart-only
+references and shows source wording variation without inventing a canonical
+Track, Artist or cross-provider identity. The Admin frontend validates both
+typed identities and labels chart-only entries plainly. No automatic
+Registry admission, SQL migration, Production Edge deployment, frontend
+deployment or public WK100 Edition is authorized by this source branch.
+After independent Preview acceptance and a reviewed merge, deploy only the
+changed WK100 Admin Edge function, then the exact merged-main frontend
+through the normal Finish Update, with rollback and private signed-in canary.
+
+**Future integrated acceptance:** An international-only hit contributes to
+a private ranked candidate while canonical_track_id stays null. African-led
+and international-led collaborations preserve exact credited Artists and
+evidence-based Registry context. Ambiguous or conflicting identities remain
+unresolved without false corroboration. Protected CI and real signed-in
+readback are necessary before any proposed Edition publication.

@@ -6,6 +6,8 @@ import {prepareWk100AttestedPrivateRanking as prepare}
 import {readWk100AttestedRankingPrivate as readServer}
   from '../../supabase/functions/_shared/wk100-ranking-attested-reader.mjs';
 import {inspectWk100RankWeek} from '../../supabase/functions/_shared/wk100-ranking-evidence-review.mjs';
+import {wk100ChartScopedObservationRef as chartRef,wk100RegistryProviderKey}
+  from '../../supabase/functions/_shared/wk100-identify-observations.mjs';
 import {readFile} from 'node:fs/promises';
 
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
@@ -102,7 +104,7 @@ function adapters(f){return {weekStartEat:W,selectedReceiptIds:f.ids,
   readPrivateBytes:async attempt=>f.originals.get(attempt.id),
   loadRegistry:async ({contract,rows})=>({
     typedLinks:rows.filter(row=>row.provider_track_id).map(row=>({
-      provider_key:contract.provider_key==='apple_ke'?'apple_music':contract.provider_key,
+      provider_key:wk100RegistryProviderKey(contract.provider_key),
       provider_track_id:row.provider_track_id,track_id:id(Number(row.provider_track_id.slice(7))),
       match_status:'matched'})),legacyLinks:[],
     activeTracks:rows.filter(row=>row.provider_track_id).map(row=>({
@@ -134,6 +136,94 @@ test('server-only handoff binds 11 exact receipts, originals, Registry and W5',a
   }});
   assert.notEqual(result.registrySnapshotSha256,changed.registrySnapshotSha256);
   assert.notEqual(result.rankingDigest,changed.rankingDigest);
+});
+
+test('all-origin native evidence ranks without canonical Registry IDs under unrestricted saved policy',async()=>{
+  const f=fixture(),a=adapters(f);
+  // This reproduces the saved 9 Nov Production profile semantics, but uses
+  // synthetic exact originals. It does not claim genuine provider admission.
+  const broadProfile=structuredClone(PROFILE);
+  broadProfile.releaseEligibility.releaseTypes=
+    ['single','ep','album','mixtape','compilation','video','live'];
+  const broadScope=structuredClone(SCOPE);
+  broadScope.artistOriginUnknownMode='include';
+  const broadPolicy=sha(canonical({profileId:broadProfile.id,marketScopeId:broadScope.id,
+    eligibilityProfileSnapshot:broadProfile,marketScopeSnapshot:broadScope}));
+  const broadDraft=draft();
+  broadDraft.config_json={...broadDraft.config_json,
+    eligibilityProfileSnapshot:broadProfile,marketScopeSnapshot:broadScope,
+    ingestPolicySha256:broadPolicy};
+  a.eligibilityPolicySha256=broadPolicy;
+  a.loadW5Draft=async()=>broadDraft;
+  const load=a.loadRegistry;
+  a.loadRegistry=async arg=>{
+    const evidence=await load(arg);
+    return {...evidence,typedLinks:evidence.typedLinks.filter(link=>
+      link.provider_track_id!=='native-1')};
+  };
+  const result=await prepare(a);
+  assert.equal(result.canStage,false);assert.equal(result.canPublish,false);
+  assert.equal(result.privateRanking.ranked.length,100);
+  assert.equal(result.heldPositions.REVIEW_REQUIRED,0);
+  // Same Apple native ID appears on seven independently verified daily
+  // originals. It is one *Apple-scoped* chart observation, not a Registry UUID.
+  const firstApple=f.panels.get(f.ids[0]).attempt;
+  const ref=await chartRef({providerKey:'apple_ke',providerTrackId:'native-1',
+    receiptSha256:firstApple.payload_sha256,captureRowId:f.panels.get(f.ids[0]).rows[0].id});
+  const apple=result.privateRanking.ranked.find(r=>r.recordingId===ref);
+  assert.equal(apple?.score,20);
+  assert.equal(apple?.listedFamilyCount,1);
+  assert.equal(result.privateRanking.ranked.find(r=>r.recordingId===id(1)),undefined);
+  assert.equal(result.chartOnlyDisplayRows.length,5);
+  assert.deepEqual(result.chartOnlyDisplayRows.find(x=>x.recordingId===ref),{
+    recordingId:ref,title:'Song 1',artist:'Artist 1',labelVariation:false,
+  });
+  // No automatic cross-provider equivalence. The same apparent song/artist
+  // produces provider-specific references until independent evidence proves a
+  // shared recording. All five are private-only and noncanonical.
+  const refs=await Promise.all(families.map(providerKey=>chartRef({
+    providerKey,providerTrackId:'native-1',
+    receiptSha256:firstApple.payload_sha256,captureRowId:f.panels.get(f.ids[0]).rows[0].id})));
+  assert.equal(new Set(refs).size,5);
+  assert(refs.every(key=>result.privateRanking.ranked.some(x=>x.recordingId===key)));
+  assert(refs.every(key=>!key.startsWith('00000000-')));
+  const reordered=await prepare({...a,selectedReceiptIds:[...f.ids].reverse()});
+  assert.equal(reordered.rankingDigest,result.rankingDigest);
+  // Exact provider ID stayed the same, but the source changed its label on
+  // one Apple day. Show that uncertainty instead of quietly rewriting labels.
+  const secondReceipt=f.ids[1];
+  const second=f.panels.get(secondReceipt),original=f.originals.get(secondReceipt);
+  const nativeRows=JSON.parse(new TextDecoder().decode(original));
+  nativeRows[0].title='Song 1 alternate source wording';
+  const changedBytes=new TextEncoder().encode(JSON.stringify(nativeRows));
+  second.rows[0].title_observed=nativeRows[0].title;
+  const changedSha=sha(changedBytes);
+  second.attempt.raw_object_key=second.attempt.raw_object_key
+    .replace(second.attempt.payload_sha256,changedSha);
+  second.attempt.payload_sha256=changedSha;
+  f.originals.set(secondReceipt,changedBytes);
+  const changed=await prepare(a);
+  assert.equal(changed.chartOnlyDisplayRows.find(x=>x.recordingId===ref)?.labelVariation,true);
+  assert.notEqual(changed.rankingDigest,result.rankingDigest);
+  // A real restrictive origin policy is never silently bypassed by this
+  // chart-only lane. The held source positions stay at their original ranks.
+  const restrictedProfile=structuredClone(broadProfile);
+  restrictedProfile.artistOriginEligibility={mode:'country_only',countries:['KE'],regions:[]};
+  const restrictivePolicy=sha(canonical({profileId:restrictedProfile.id,
+    marketScopeId:broadScope.id,eligibilityProfileSnapshot:restrictedProfile,
+    marketScopeSnapshot:broadScope}));
+  const restrictedDraft={...broadDraft,config_json:{...broadDraft.config_json,
+    eligibilityProfileSnapshot:restrictedProfile,ingestPolicySha256:restrictivePolicy}};
+  const restrictive=await prepare({...a,eligibilityPolicySha256:restrictivePolicy,
+    loadW5Draft:async()=>restrictedDraft});
+  // A country-restricted policy may classify the unknown-origin row as
+  // EXCLUDED rather than REVIEW_REQUIRED; either disposition must hold it.
+  assert(Object.values(restrictive.heldPositions)
+    .reduce((sum,count)=>sum+count,0)>=11);
+  assert.equal(restrictive.chartOnlyDisplayRows.length,0);
+  assert.equal(restrictive.privateRanking.ranked.some(x=>
+    x.recordingId.startsWith('wk100:source:v1:')),false);
+  assert.equal(restrictive.canPublish,false);
 });
 
 test('original excluded and unresolved ranks remain non-scoring without renumbering',async()=>{
@@ -192,7 +282,7 @@ function fakeServiceBackend(f){
     wk_chart_capture_rows_v1:panels.flatMap(x=>x.rows),
     registry_track_provider_links:families.flatMap(family=>
       Array.from({length:family==='shazam_ke'?200:100},(_,i)=>({
-        provider_key:family==='apple_ke'?'apple_music':family,
+        provider_key:wk100RegistryProviderKey(family),
         provider_track_id:'native-'+(i+1),track_id:id(i+1),match_status:'matched'}))),
     provider_entity_links:[],
     registry_tracks:Array.from({length:200},(_,i)=>({
@@ -438,6 +528,11 @@ test('W8 W8S W8B W9 server contract remains JWT-gated, read-only and nonpublishi
   assert.match(src,/sourceConstitutionVersion:version/);
   assert.match(src,/selectedReceiptIds:inventory.selectedReceiptIds/);
   assert.match(src,/canStage:false,canPublish:false/);
+  assert.match(src,/canonicalIds=ranked\.map/);
+  assert.match(src,/chartByRef=new Map/);
+  assert.match(src,/chartOnlyDisplayRows/);
+  assert.match(ui,/Chart evidence only\. Not linked to a Registry recording\./);
+  assert.match(ui,/sourceLabelVariation/);
   assert.doesNotMatch(src,/action==='ranking'.{0,200}publishImmediately/s);
   for(const stage of ['data-wk100-w8-ranking','data-wk100-w8s-explanation',
     'data-wk100-w8b-incomplete','data-wk100-w9-readiness'])

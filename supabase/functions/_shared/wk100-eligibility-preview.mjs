@@ -31,6 +31,75 @@ export function wk100EligibilityPolicyProvider(registryProviderKey){
   ensure(typeof provider==='string','unknown_policy_provider');
   return provider;
 }
+/**
+ * Chart-only score candidate, distinct from W5 Registry enrichment eligibility.
+ *
+ * The W8 server may call this ONLY after it has independently verified the
+ * exact original source bytes, provider native rows, current service method
+ * authorization and the saved W5 draft/policy digest. W5 itself is unchanged.
+ *
+ * This narrow rule requires an explicitly unrestricted origin + metadata
+ * profile. If any configured filter requires facts absent from native source
+ * evidence, fail closed rather than pretending a Registry record exists.
+ * No ID, score, Registry writer, stage or publisher right is granted here.
+ */
+export function wk100CanScoreChartOnlyObservation({sourceReview,row,verdict,savedConfig}){
+  if(!isObj(sourceReview)||!isObj(row)||!isObj(verdict)||!isObj(savedConfig)||
+    row.identityState!=='needs_review'||row.canonicalTrackId!==null||
+    !['provider_link_missing','provider_identity_unavailable'].includes(row.reviewReason)||
+    verdict.captureRowId!==row.captureRowId||verdict.rank!==row.rank||
+    verdict.canonicalTrackId!==null||verdict.outcome!=='REVIEW_REQUIRED'||
+    !word(row.observedTitle)||!UUID.test(row.captureRowId)||
+    row.provisionalRef!=='wk100:obs:v1:'+sourceReview.payloadSha256+':'+row.captureRowId.toLowerCase())
+    return false;
+  if(row.providerTrackId===null&&!word(row.observedArtist))return false;
+  if(row.providerTrackId!==null&&(!word(row.providerTrackId)||
+    row.providerTrackId.length>200||row.providerTrackId!==row.providerTrackId.trim()||
+    /[\u0000-\u001f\u007f]/u.test(row.providerTrackId)))return false;
+  const profile=savedConfig.eligibilityProfileSnapshot;
+  const scope=savedConfig.marketScopeSnapshot;
+  if(!isObj(profile)||!isObj(scope)||!isObj(profile.artistOriginEligibility)||
+    !isObj(profile.artistGenderEligibility)||!isObj(profile.artistTypeEligibility)||
+    !isObj(profile.collaborationRules)||!isObj(profile.releaseEligibility)||
+    !isObj(profile.trackEligibility)||!isObj(profile.sourceRules)||
+    !isObj(profile.reviewRules))return false;
+  if(savedConfig.programId!=='top100'||savedConfig.market!=='KE'||
+    profile.artistOriginEligibility.mode!=='any'||
+    arr(scope.artistOriginCountries).length!==0||
+    !['include','warn'].includes(scope.artistOriginUnknownMode)||
+    scope.aggregationMode!=='combined'||
+    !Array.isArray(scope.includedMarkets)||scope.includedMarkets.length!==1||
+    scope.includedMarkets[0]?.countryCode!=='KE'||
+    profile.artistGenderEligibility.mode!=='any'||
+    profile.artistTypeEligibility.mode!=='any')return false;
+  const collaboration=profile.collaborationRules;
+  if(collaboration.allowFeaturedArtists!==true||
+    collaboration.allArtistsMustMatchEligibility===true||
+    collaboration.minEligibleArtistsRequired!=null)return false;
+  const release=profile.releaseEligibility;
+  const allReleases=['single','ep','album','mixtape','compilation','video','live'];
+  if(!Array.isArray(release.releaseTypes)||
+    !allReleases.every(t=>release.releaseTypes.includes(t))||
+    release.releaseWindowFrom!=null||release.releaseWindowTo!=null||
+    ['includeReissues','includeRemixes','includeAcousticVersions','includeInstrumentals']
+      .some(k=>release[k]!==true))return false;
+  const track=profile.trackEligibility;
+  if(track.explicitAllowed!==true||track.requireIsrc!==false||
+    track.requirePreview!==false||track.minDurationMs!=null||
+    track.maxDurationMs!=null||['allowedLanguages','allowedGenres','excludedGenres']
+      .some(k=>arr(track[k]).length>0))return false;
+  const source=profile.sourceRules;
+  if(source.requireProviderAvailabilityInMarket!==false||
+    (source.requireAtLeastOneProviderId===true&&row.providerTrackId===null)||
+    !arr(source.allowedProviders).includes(sourceReview.registryProviderKey))
+    return false;
+  const review=profile.reviewRules;
+  if(['requireManualReviewForUnknownGender','requireManualReviewForUnknownNationality',
+    'requireManualReviewForUnknownArtistType','requireManualReviewForGroups']
+      .some(k=>review[k]!==false))return false;
+  return true;
+}
+
 const stable=v=>JSON.stringify(v,(_key,item)=>
   item&&typeof item==='object'&&!Array.isArray(item)
     ?Object.fromEntries(Object.entries(item).sort(([a],[b])=>a.localeCompare(b))):item);

@@ -6,7 +6,8 @@ import {
   wk100CandidateTitleKey,
   MIZIZI_WK100_CANDIDATE_CONTRACT,
 } from '../../supabase/functions/_shared/mizizi-wk100-registry-candidates.mjs';
-import {projectWk100IdentifyObservations as project,wk100RegistryProviderKey}
+import {projectWk100IdentifyObservations as project,wk100RegistryProviderKey,
+  wk100ChartScopedObservationRef as chartRef}
   from '../../supabase/functions/_shared/wk100-identify-observations.mjs';
 
 const contractId='11111111-1111-4111-8111-111111111111';
@@ -57,6 +58,31 @@ test('Apple Kenya provider IDs use exact existing Apple Music Registry namespace
  assert.equal(v.originalReadbackInThisRequest,false);
  assert.deepEqual([v.canWriteRegistry,v.canScore,v.canPublish],[false,false,false]);
 });
+test('all-origin chart evidence has stable provider-scoped references without Registry admission',async()=>{
+  const ref=async (providerKey,providerTrackId,receiptSha256=sha,captureRowId=row(1,'1').id)=>
+    chartRef({providerKey,providerTrackId,receiptSha256,captureRowId});
+  const apple=await ref('apple_ke','1882060336');
+  assert.match(apple,/^wk100:source:v1:apple_music:[a-f0-9]{64}$/);
+  assert.equal(apple,await ref('apple_ke','1882060336','b'.repeat(64),row(2,'2').id));
+  assert.notEqual(apple,await ref('apple_ke','1882060337'));
+  assert.notEqual(apple,await ref('audiomack_ke','1882060336'));
+  assert.notEqual(apple,await ref('apple_ke','01882060336'));
+  assert.notEqual(apple,await ref('apple_ke','1882060336'.toLowerCase()+'X'));
+  assert.equal(await ref('youtube_ke',null),
+    'wk100:obs:v1:'+sha+':'+row(1,'1').id);
+  assert.notEqual(await ref('youtube_ke',null),await ref('youtube_ke',null,'b'.repeat(64)));
+  for(const bad of ['spotify_ke','youtube','shazam'])await assert.rejects(
+    ()=>ref(bad,'exact-1'),/wk100_identify_provider_unsupported/);
+  for(const bad of ['', ' 1', '1 ', 'bad\nid'])await assert.rejects(
+    ()=>ref('apple_ke',bad),/wk100_identify_chart_provider_id_invalid/);
+  await assert.rejects(()=>ref('apple_ke','ok','a'),/wk100_identify_chart_observation_receipt_invalid/);
+  await assert.rejects(()=>ref('apple_ke',null,sha,'not-a-uuid'),
+    /wk100_identify_chart_observation_receipt_invalid/);
+  // These are source observations, not Registry UUIDs and cannot mint Artist,
+  // Track, provider-link, score or Edition publication authority.
+  assert.equal(/^[0-9a-f]{8}-/.test(apple),false);
+});
+
 test('Mdundo partial-depth original remains inspectable without inventing the missing rank',()=>{
  const v=go({expected:4,count:3,status:'partial_depth',provider:'mdundo_ke'});
  assert.equal(v.receiptStatus,'partial_depth');
