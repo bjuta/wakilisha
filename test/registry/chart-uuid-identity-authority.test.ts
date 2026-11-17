@@ -1,10 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const runtime = readFileSync(
-  "supabase/functions/chart-ingest-api/index.ts",
-  "utf8",
-);
+// chart-ingest-api retired in the 2026-11-17 Charts reset; runtime-source
+// assertions retired with it. Database authority assertions remain.
 const migration = readFileSync(
   "supabase/migrations/20260923063254_chart_uuid_identity_authority_v1.sql",
   "utf8",
@@ -43,74 +41,7 @@ describe("Chart UUID identity authority", () => {
     );
   });
 
-  it("executes the existing identity stages before carry-forward, eligibility and scoring", () => {
-    const pipeline = between(
-      runtime,
-      "async function handleRunFullPipeline",
-      "// COMMIT",
-    );
-
-    const canonical = pipeline.indexOf("handleRunCanonicalMatch");
-    const entity = pipeline.indexOf("handleRunEntityResolution");
-    const carry = pipeline.indexOf("handleRunCarryForward");
-    const eligibility = pipeline.indexOf(
-      "handleRunEligibilityWithReleaseWindow",
-    );
-    const scoring = pipeline.indexOf("handleRunScoring");
-    const shortlist = pipeline.indexOf("handleRunShortlist");
-
-    expect(canonical).toBeGreaterThanOrEqual(0);
-    expect(entity).toBeGreaterThan(canonical);
-    expect(carry).toBeGreaterThan(entity);
-    expect(eligibility).toBeGreaterThan(carry);
-    expect(scoring).toBeGreaterThan(eligibility);
-    expect(shortlist).toBeGreaterThan(scoring);
-  });
-
-  it("keeps commit and re-ingest projection-only", () => {
-    const commit = between(
-      runtime,
-      "async function handleCommitRun",
-      "async function handleRunAirplayDetection",
-    );
-    const reingest = between(
-      runtime,
-      "async function handleReingestEdition",
-      "async function handleCreateDryRun",
-    );
-
-    for (const source of [commit, reingest]) {
-      expect(source).not.toContain("materializeChartCandidate(");
-      expect(source).toContain("canonical_track_id");
-      expect(source).toContain("registry_tracks");
-      expect(source).toContain("registry_track_artists");
-    }
-
-    expect(commit).toContain('primaryCredits.length < 1');
-    expect(commit).toContain('const routeCredit = primaryCredits[0] ?? null');
-    expect(commit).toContain('Number(a.credit_order ?? Number.MAX_SAFE_INTEGER)');
-    expect(commit).not.toContain("exact_primary_artist_credit");
-    expect(commit).not.toContain(
-      'normalizeSlug(String(candidate.artist_display || ""))',
-    );
-    expect(reingest).toContain('const routeCredit = primaryCredits[0] ?? null');
-    expect(reingest).not.toContain("exact_primary_artist_credit");
-    expect(reingest).toContain("registry_presentation_incomplete");
-  });
-
   it("limits Registry admission to explicit review under manage_registry", () => {
-    const decisions = between(
-      runtime,
-      "async function handleApplyRowDecision",
-      "async function handleGetOriginReviewQueue",
-    );
-
-    expect(decisions).toContain('action === "create_shell"');
-    expect(decisions).toContain('requireCap(db, "manage_registry")');
-    expect(decisions).toContain("parsedCredits.credits");
-    expect(runtime).toContain("p_artist_credits: artistCredits");
-    expect(decisions).toContain("forbidden_registry_admission");
-
     expect(migration).toContain(
       "Current user cannot issue this chart Registry grant.",
     );

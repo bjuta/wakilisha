@@ -21,18 +21,15 @@ const mediaService = fs.readFileSync(
   "utf8",
 );
 
+// The Admin Charts ingest runtime retired in the 2026-11-17 Charts reset.
+// The remaining chart runtime is the public Supabase reader.
 const chartClient = fs.readFileSync(
-  "src/services/chartsIngestion/client.ts",
+  "src/services/chartsPublic/client.ts",
   "utf8",
 );
 
-const chartHealth = fs.readFileSync(
-  "src/pages/admin/charts/ingest-health/page.tsx",
-  "utf8",
-);
-
-const integrationMap = fs.readFileSync(
-  "src/pages/admin/charts/integration-map/page.tsx",
+const chartRuntime = fs.readFileSync(
+  "src/services/chartsPublic/supabaseRuntime.ts",
   "utf8",
 );
 
@@ -85,8 +82,7 @@ describe(
     it("exposes only the Supabase chart runtime", () => {
       for (const source of [
         chartClient,
-        chartHealth,
-        integrationMap,
+        chartRuntime,
       ]) {
         expect(source).not.toContain(
           "testWordPressConnection",
@@ -105,18 +101,14 @@ describe(
         );
       }
 
-      expect(chartClient).toContain(
-        'backend: "supabase"',
-      );
-      expect(chartHealth).toContain(
-        "authenticated Supabase session",
-      );
-      expect(chartHealth).toContain(
-        "RUNTIME_CHART_ENDPOINTS",
-      );
-      expect(integrationMap).toContain(
-        "testAPIConnection",
-      );
+      expect(chartRuntime).toContain('from("wk_chart_editions_v2")');
+      for (const retired of [
+        "src/services/chartsIngestion/client.ts",
+        "src/pages/admin/charts/ingest-health/page.tsx",
+        "src/pages/admin/charts/integration-map/page.tsx",
+      ]) {
+        expect(fs.existsSync(retired)).toBe(false);
+      }
     });
 
     it("does not classify retired routes in application code", () => {

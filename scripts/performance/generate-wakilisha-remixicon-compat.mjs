@@ -133,8 +133,6 @@ const textExtensions =
 
 const allowedDynamicFiles =
   new Set([
-    "src/pages/admin/charts/ingest/detail/components/FetchStep.tsx",
-    "src/pages/admin/charts/ingest/detail/components/SourcesStep.tsx",
   ]);
 
 const discovered =

@@ -1835,9 +1835,7 @@ describe("public Chart entries without canonical Registry identity", () => {
     for (const path of [
       "src/pages/charts/directory/page.tsx",
       "src/pages/charts/edition/page.tsx",
-      "src/pages/mobile/charts/directory/page.tsx",
       "src/pages/mobile/charts/edition/page.tsx",
-      "src/pages/mobile/charts/page.tsx",
     ]) {
       const page = readFileSync(path, "utf8");
       expect(page).toContain("<ChartRecordingLink");

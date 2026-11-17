@@ -76,22 +76,6 @@ export default function AdminDashboardPage() {
             Command center for WAKILISHA operations. What needs attention today.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate("/admin/charts/ingest")}
-            className="wk-button wk-button-primary wk-button-sm whitespace-nowrap"
-          >
-            <WkIcon name="Plus" size={14} />
-            New Ingest
-          </button>
-          <button
-            onClick={() => navigate("/admin/charts/ingest-health")}
-            className="wk-button wk-button-ghost wk-button-sm whitespace-nowrap"
-          >
-            <WkIcon name="HeartPulse" size={14} />
-            Health
-          </button>
-        </div>
       </div>
 
       {/* KPI Cards */}

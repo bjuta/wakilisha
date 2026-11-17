@@ -149,7 +149,7 @@ export default function AdminSettingsIntegrations() {
     saveDomainSettings("integrations", next);
     setSettings(next);
 
-    // Sync to server (so chart-ingest-api can read from admin_settings_secrets)
+    // Sync to server (so provider edge functions can read from admin_settings_secrets)
     setSyncing((prev) => ({ ...prev, [providerKey]: true }));
     const sr = await syncProviderCredentialsToServer(providerKey, values);
     setSyncResults((prev) => ({ ...prev, [providerKey]: sr }));

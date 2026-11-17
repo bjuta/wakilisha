@@ -500,26 +500,6 @@ describe("Provider Identity resolver kernel", () => {
     ]);
   });
 
-  it("is the canonical exact-match kernel consumed by chart ingest", () => {
-    const source = fs.readFileSync(
-      path.resolve(
-        process.cwd(),
-        "supabase/functions/chart-ingest-api/index.ts",
-      ),
-      "utf8",
-    );
-
-    expect(source).toContain('resolveTrackIdentityV1');
-    expect(source).toContain('from "../_shared/provider-identity.ts"');
-    expect(source).toContain('trackIdsByIsrc,');
-    expect(source).toContain('providerBindingsByKey: providerLinkByAlias');
-
-    // Exact-match normalization is owned by the shared primitive now.
-    expect(source).not.toMatch(/function normalizeProviderKey\s*\(/);
-    expect(source).not.toMatch(/function normalizeIsrc\s*\(/);
-    expect(source).not.toMatch(/function compactIdentityPart\s*\(/);
-  });
-
   it("preserves chart-ingest exact-match compatibility states", () => {
     const noMatch = resolveTrackIdentityV1({
       isrc: "KE-ABC-26-00001",

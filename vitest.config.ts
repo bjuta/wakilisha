@@ -3,17 +3,8 @@ import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
 /**
- * Vitest configuration for the WAKILISHA chart scoring engine test suite.
- *
+ * Vitest configuration for the WAKILISHA test suite.
  * Tests live in test/ at the repo root — never in src/.
- * The scoring module coverage requirement is 100% line + branch (brief §8).
- *
- * Scoring module files under coverage:
- *   src/services/chartsScoring/scoringEngine.ts
- *   src/services/chartsScoring/normalize.ts
- *   src/services/chartsScoring/airplayEngine.ts
- *   src/services/chartsScoring/eligibilityEngine.ts
- *   src/services/chartsScoring/scoringPipeline.ts
  */
 export default defineConfig({
   esbuild: {
@@ -26,26 +17,6 @@ export default defineConfig({
     environment: 'node',
     include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
     reporters: ['verbose'],
-    coverage: {
-      provider: 'v8',
-      include: [
-        'src/services/chartsScoring/scoringEngine.ts',
-        'src/services/chartsScoring/normalize.ts',
-        'src/services/chartsScoring/airplayEngine.ts',
-        'src/services/chartsScoring/eligibilityEngine.ts',
-        'src/services/chartsScoring/scoringPipeline.ts',
-      ],
-      exclude: [
-        'src/services/chartsScoring/normalize.smoke.ts',
-        'src/services/chartsScoring/scoringTypes.ts',
-      ],
-      reporter: ['text', 'lcov', 'json-summary'],
-      thresholds: {
-        lines: 95,
-        branches: 90,
-        functions: 100,
-      },
-    },
   },
   resolve: {
     alias: {

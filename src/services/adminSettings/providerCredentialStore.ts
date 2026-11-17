@@ -132,7 +132,7 @@ export function getProviderCredentialTemplateFromSchema(schema: ProviderCredenti
 }
 
 // ──── Server sync — pushes credentials to admin_settings_secrets table ────
-// The chart-ingest-api edge function reads from Deno.env first, then falls
+// Provider edge functions read from Deno.env first, then fall
 // back to admin_settings_secrets. This bridges the admin UI → edge function gap.
 
 export type ServerSyncResult = {

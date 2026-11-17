@@ -739,7 +739,7 @@ function adminUrlForEntity(entityType: string, slug: string): string {
   if (entityType === "genre") return `/admin/registry/genres/${slug}`;
   if (entityType === "article") return `/admin/content/articles/${slug}`;
   if (entityType === "guide") return `/admin/content/guides/${slug}/edit`;
-  if (entityType === "chart") return "/admin/charts/dashboard";
+  if (entityType === "chart") return "/admin/charts/analytics";
   return "/admin/analytics";
 }
 

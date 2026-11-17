@@ -159,30 +159,6 @@
       "legacyDebt": false
     },
     {
-      "id": "chart-ingest-api",
-      "kind": "edge_function",
-      "entrypoint": "supabase/functions/chart-ingest-api/index.ts",
-      "authentication": "request_bearer_user",
-      "authorization": "action_specific_capabilities",
-      "executionAuthority": "caller_jwt_rls_plus_typed_registry_operations",
-      "targets": [
-        "wk_chart_programs_v2",
-        "wk_chart_editions_v2",
-        "wk_chart_entries_v2",
-        "chart_materialize_candidate_registry_v1",
-        "chart_admit_artist_origin_v1",
-        "chart_create_artist_origin_shell_v1"
-      ],
-      "riskClass": "high",
-      "disposition": "keep",
-      "futureBoundary": "caller_jwt_rls_and_typed_registry_operations",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": false,
-      "canonicalMutation": false,
-      "legacyDebt": false
-    },
-    {
       "id": "admin-router-registry",
       "kind": "edge_function",
       "entrypoint": "supabase/functions/admin-router/index.ts",
@@ -267,27 +243,6 @@
       "riskClass": "low",
       "disposition": "keep",
       "futureBoundary": "registry_artist_origin_admin_admission",
-      "miziziCallable": false,
-      "humanCallable": true,
-      "publicCallable": false,
-      "canonicalMutation": true,
-      "legacyDebt": false
-    },
-    {
-      "id": "run-chart-playback-enrichment",
-      "kind": "edge_function",
-      "entrypoint": "supabase/functions/run-chart-playback-enrichment/index.ts",
-      "authentication": "request_user",
-      "authorization": "admin_or_manage_charts",
-      "executionAuthority": "caller_jwt_manage_charts_plus_typed_exact_grant_provider_link_admission",
-      "targets": [
-        "registry_track_provider_links",
-        "registry_tracks",
-        "wk_chart_entries_v2"
-      ],
-      "riskClass": "medium",
-      "disposition": "keep",
-      "futureBoundary": "typed_registry_provider_link_admission",
       "miziziCallable": false,
       "humanCallable": true,
       "publicCallable": false,
