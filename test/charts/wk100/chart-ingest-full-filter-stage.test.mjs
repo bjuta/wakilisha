@@ -44,7 +44,32 @@ test('real snapshot + source + Registry + full evaluator => persisted REVIEW, no
  assert.equal(r.chartOnlyIdentityPreview[0].status,'HELD');
  assert.equal(r.chartOnlyIdentityPreview[0].chartRecordingRef,null);
  assert.equal(r.chartOnlyIdentityPreview[0].canPublish,false);
+ assert.equal(r.sourceOriginalEvidencePreview.status,'HELD');
+ assert.equal(r.sourceOriginalEvidencePreview.sourceResponseHashPresentCount,0);
+ assert.equal(r.sourceOriginalEvidencePreview.privateOriginalRefPresentCount,0);
+ assert.equal(r.sourceOriginalEvidencePreview.rawRowHashPresentCount,0);
+ assert.equal(r.sourceOriginalEvidencePreview.originalBytesVerified,false);
+ assert(r.decisions[0].decision.reasonCodes.includes('original_source_bytes_not_attested'));
  assert.equal(r.expectedRunUpdatedAt,timestamp);
+});
+test('source metadata alone never attests private original bytes or authorizes an Edition',async()=>{
+ const x=await fixture();
+ x.runSources[0].raw_response_hash='a'.repeat(64);
+ x.runSources[0].raw_payload_ref='private-chart-original/receipt-example';
+ x.rawRows[0].raw_payload_hash='b'.repeat(64);
+ x.sourceNativePeriodVerified=true;
+ x.callerAuthorizationVerified=true;
+ const r=await prepare(x);
+ assert.equal(r.sourceOriginalEvidencePreview.metadataPresent,true);
+ assert.equal(r.sourceOriginalEvidencePreview.sourceResponseHashPresentCount,1);
+ assert.equal(r.sourceOriginalEvidencePreview.privateOriginalRefPresentCount,1);
+ assert.equal(r.sourceOriginalEvidencePreview.rawRowHashPresentCount,1);
+ assert.equal(r.sourceOriginalEvidencePreview.originalBytesVerified,false);
+ assert.equal(r.summary.externalGatesAccepted,false);
+ assert.equal(r.summary.canScore,false);
+ assert.equal(r.summary.canCommit,false);
+ assert.equal(r.decisions[0].status,'needs_review');
+ assert(r.decisions[0].decision.reasonCodes.includes('original_source_bytes_not_attested'));
 });
 test('verified foreign primary is excluded by country filter without scoring',async()=>{
  const x=await fixture();x.registryArtists[0].origin_iso2='NG';
