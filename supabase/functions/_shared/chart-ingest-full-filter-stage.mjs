@@ -68,6 +68,28 @@ export async function prepareFullFilterStage(db,runId,{read=readCallerScopedChar
   assert(typeof data.run.updated_at==='string'&&data.run.updated_at.length>0,'run_version_missing');
   assert(data.candidates.every(c=>typeof c.updated_at==='string'&&c.updated_at.length>0),'candidate_version_missing');
   const association=reconcileRunRawEvidence(data);
+  // Counts are a read-only inventory, not a source attestation. Original
+  // response hashes and Storage references must be read back and checked
+  // against actual private bytes before any downstream publishing authority.
+  const enabledSources=data.runSources.filter(s=>s.enabled===true);
+  const validDigest=x=>typeof x==='string'&&/^[a-f0-9]{64}$/i.test(x);
+  const sourceHashCount=enabledSources.filter(s=>validDigest(s.raw_response_hash)).length;
+  const privateOriginalCount=enabledSources.filter(s=>
+    typeof s.raw_payload_ref==='string'&&s.raw_payload_ref.trim().length>0).length;
+  const rawPayloadHashCount=data.rawRows.filter(r=>validDigest(r.raw_payload_hash)).length;
+  const sourceOriginalMetadataComplete=enabledSources.length>0&&data.rawRows.length>0&&
+    sourceHashCount===enabledSources.length&&privateOriginalCount===enabledSources.length&&
+    rawPayloadHashCount===data.rawRows.length;
+  // This reader has NO private-original readback or source-native period
+  // attestor. Even complete-looking metadata cannot grant score/commit rights.
+  const sourceOriginalEvidencePreview=Object.freeze({
+    status:'HELD',enabledSourceCount:enabledSources.length,
+    sourceResponseHashPresentCount:sourceHashCount,
+    privateOriginalRefPresentCount:privateOriginalCount,
+    rawRowCount:data.rawRows.length,rawRowHashPresentCount:rawPayloadHashCount,
+    metadataPresent:sourceOriginalMetadataComplete,
+    originalBytesVerified:false,canScore:false,canCommit:false,canPublish:false,
+  });
   // Read-only candidate references never imply Registry admission or claim
   // cross-provider recording equivalence. Do not persist them as an eligible
   // W5 decision or bypass the stage's independent source-period holds.
@@ -98,7 +120,7 @@ export async function prepareFullFilterStage(db,runId,{read=readCallerScopedChar
   // predicate-ELIGIBLE result is persisted as NEEDS_REVIEW, NEVER eligible.
   const periodsVerified=data.sourceNativePeriodVerified===true;
   const completenessVerified=data.readCompleteness===true&&association.runIntegrityComplete===true;
-  const independentAcceptance=periodsVerified&&completenessVerified&&data.callerAuthorizationVerified===true;
+  const independentAcceptance=periodsVerified&&completenessVerified&&data.callerAuthorizationVerified===true&&sourceOriginalEvidencePreview.originalBytesVerified===true;
   const cById=new Map(data.candidates.map(c=>[c.id,c]));
   const protectedReasons=new Map();
   const preservedExclusions=data.exclusions.filter(ex=>ex.reason_code==='manual_exclude' ||
@@ -127,6 +149,7 @@ export async function prepareFullFilterStage(db,runId,{read=readCallerScopedChar
     if(protectedExclusion)reasonCodes.push('preexisting_exclusion_preserved',...(protectedReasons.get(row.candidateId)||[]));
     if(openIssueIds.has(row.candidateId)||runWideReviewHold)reasonCodes.push('open_blocking_review_issue');
     if(row.outcome==='ELIGIBLE'&&!independentAcceptance)reasonCodes.push('external_acceptance_not_verified');
+    if(row.outcome==='ELIGIBLE')reasonCodes.push('original_source_bytes_not_attested');
     return {candidateId:row.candidateId,expectedUpdatedAt:sourceCandidate.updated_at,status,
       decision:{contract:STAGE_DECISION_VERSION,outcome:ignored||protectedExclusion?'EXCLUDED':row.outcome,status,policyDigest:policy.sha256,
         reasonCodes:unique(reasonCodes),requiresReview:status==='needs_review' || openIssueIds.has(row.candidateId)||runWideReviewHold,
@@ -137,7 +160,7 @@ export async function prepareFullFilterStage(db,runId,{read=readCallerScopedChar
   });
   assert(decisions.length===data.candidates.length,'decision_count_mismatch');
   return {runId,policy,expectedRunUpdatedAt:data.run.updated_at,decisions,
-    chartOnlyIdentityPreview,
+    chartOnlyIdentityPreview,sourceOriginalEvidencePreview,
     summary:{contract:STAGE_DECISION_VERSION,runId,candidateCount:decisions.length,predicateCounts:projection.counts,
       reviewRequired:decisions.filter(d=>d.status==='needs_review').length,
       excluded:decisions.filter(d=>d.status==='excluded').length,
