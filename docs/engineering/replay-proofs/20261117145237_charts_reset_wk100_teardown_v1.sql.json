@@ -1,0 +1,37 @@
+{
+  "migration_file": "supabase/migrations/20261117145237_charts_reset_wk100_teardown_v1.sql",
+  "migration_sha256": "795e7ad3903c6467ce9216d43597d5ff68d8730f64fb11ecb5b76b71445278a8",
+  "base_main_sha": "e720c880eb3d2c2355c21ba5ceb311f8f53275c4",
+  "preview_project_ref": "itaklfjovfbmqzyjnjlk",
+  "preview_branch_id": "e62bd9dc-80a2-4fe4-9a2d-d84fbac7ed37",
+  "preview_migration_head": "20261117145237",
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "verifier_file": "ops/charts-reset/03-postflight-readonly.sql",
+  "schema_types_sha256": "304beb9f59e289e5c562d1c6d1b4920f186bf96ce9a5c91bda6a953af95da976",
+  "schema_migration_count": 260,
+  "schema_migration_head": "20261117145237",
+  "verified_at": "2026-11-17T16:15:54.918Z",
+  "replay_evidence": {
+    "kind": "operator_pasted_terminal_output",
+    "source_receipt": "https://github.com/bjuta/wakilisha/issues/1338#issuecomment-6953223937",
+    "method": "fresh_unlinked_local_260_migrations_supabase_cli_2_121_0",
+    "replay_marker": "C2F2_INDEPENDENT_UNLINKED_CLEAN_260_REPLAY=PASS",
+    "physical_local_ledger_count": 260,
+    "physical_local_migration_head": "20261117145237",
+    "clean_replay_database_postflight": "8_of_8_pass",
+    "local_containers_removed": true,
+    "linked_to_hosted_project": false,
+    "github_actions_run_claimed": false
+  },
+  "hosted_preview_evidence": {
+    "application_receipt": "https://github.com/bjuta/wakilisha/issues/1338#issuecomment-6952747624",
+    "original_branch_required_manual_pg_cron_bootstrap": true,
+    "hosted_preview_clean_replay_claimed": false,
+    "applied_exact_candidate": true,
+    "ledger_count": 260,
+    "database_postflight": "8_of_8_pass",
+    "raw_evidence_bucket_deleted": false
+  }
+}

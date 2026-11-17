@@ -1,17 +1,16 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-13T20:52:20Z",
-  "typesSha256": "da98f1441b4bed22737bb8d2512a4ac353493c1f65a68f57662698c8d5b0dbde",
+  "generatedAt": "2026-11-17T16:15:54Z",
+  "typesSha256": "304beb9f59e289e5c562d1c6d1b4920f186bf96ce9a5c91bda6a953af95da976",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 259,
-  "latestMigration": "20261113203414_public_registry_rpc_service_role_draft_parity_20261113.sql",
+  "migrationCount": 260,
+  "latestMigration": "20261117145237_charts_reset_wk100_teardown_v1.sql",
   "schemaSeal": {
-    "mode": "disposable_ci",
-    "sourceProjectRef": "unlinked-local-ci",
-    "migrationHead": "20261113203414",
-    "baseMainSha": "45bf4edc8ee1252f7ee0bfecf2462cd4bd169499",
-    "replayCandidateHeadSha": "08d11227884b7260d3da6448bdc3cfc9398dfdd9",
-    "workflowRunId": 43505141421
+    "mode": "preview",
+    "sourceProjectRef": "itaklfjovfbmqzyjnjlk",
+    "migrationHead": "20261117145237",
+    "baseMainSha": "e720c880eb3d2c2355c21ba5ceb311f8f53275c4",
+    "previewBranchId": "e62bd9dc-80a2-4fe4-9a2d-d84fbac7ed37"
   }
 }
