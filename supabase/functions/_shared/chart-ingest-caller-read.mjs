@@ -25,7 +25,7 @@ export class IngestReadHold extends Error {
 // Sensitive input is never embedded in error messages.
 export const REQUIRED_READS = Object.freeze({
   chart_ingest_runs: 'id,status,market_slug,eligibility_profile_id,market_scope_snapshot_json,rule_snapshot_json,updated_at',
-  chart_ingest_run_sources: 'id,run_id,provider,source_url,enabled,fetch_status',
+  chart_ingest_run_sources: 'id,run_id,provider,source_url,enabled,fetch_status,raw_response_hash,raw_payload_ref',
   chart_ingest_raw_rows: 'id,run_id,source_id,provider,provider_track_id,provider_release_id,source_position,isrc,explicit,preview_url,raw_payload_hash',
   chart_ingest_candidates: 'id,run_id,provider_ids_json,source_count,status,title,artist_display,isrc,release_date,explicit,preview_url,updated_at,version',
   chart_ingest_matches: 'id,run_id,candidate_id,entity_type,status,canonical_entity_id,match_method',
