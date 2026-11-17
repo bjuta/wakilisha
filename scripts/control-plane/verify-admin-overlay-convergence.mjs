@@ -64,10 +64,6 @@ const nonDialogViewportChrome = new Map([
     "mobile Settings navigation backdrop and sidebar",
   ],
   [
-    "src/pages/admin/charts/AdminChartsLayout.tsx",
-    "mobile Charts navigation backdrop and sidebar",
-  ],
-  [
     "src/pages/admin/registry/tracks/page.tsx",
     "card hover affordance and toast only",
   ],

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import {
@@ -16,7 +15,6 @@ import { WkNumberField } from "@/components/design-system/primitives/NumberField
 
 
 export default function AdminSettingsRegistry() {
-  const navigate = useNavigate();
   const [settings, setSettings] = useState<RegistrySettings>(getRegistrySettings());
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -150,14 +148,6 @@ export default function AdminSettingsRegistry() {
         {saved && <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--wk-success)]"><WkIcon name="Check" size={14} /> Saved</span>}
       </div>
 
-      <WkSurface className="p-4 border-l-4 border-[var(--wk-brand)]">
-        <h3 className="text-[13px] font-bold text-[var(--wk-text)] mb-2">Actions</h3>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => navigate("/admin/charts/review-queue")} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap">Open Review Queue</button>
-          <button onClick={() => navigate("/admin/charts/release-shells")} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap">Open Release Shells</button>
-          <button onClick={() => navigate("/admin/charts/canon-gaps")} className="rounded-md border border-[var(--wk-border)] bg-[var(--wk-surface-raised)] px-3 py-1.5 text-[12px] font-semibold text-[var(--wk-text-soft)] hover:text-[var(--wk-brand)] transition-colors whitespace-nowrap">Open Canon Gaps</button>
-        </div>
-      </WkSurface>
     </div>
   );
 }

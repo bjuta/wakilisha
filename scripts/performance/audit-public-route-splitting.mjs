@@ -450,22 +450,21 @@ const routePaths = [
  * - /credits
  * - /credits/invite/:inviteRef
  *
- * PR #1274 adds one private WK100 Admin Charts path:
- * - wk100-preview
+ * PR #1274 added one private WK100 Admin Charts path (wk100-preview) and
+ * three WK100 Operations paths. The 2026-11-17 Charts reset retired those four
+ * paths together with the legacy Admin Charts engine routes (dashboard,
+ * families, ingest, backfill, editions, artist-resolution, snapshots,
+ * integration-map, public-api-qa, review-queue, no-match, canon-gaps,
+ * ingest-runs, ingest-health, scoring-runs, edition detail) and the two
+ * Chart Defaults settings routes. Admin charts analytics paths remain.
  *
- * Current route authority is therefore 184 paths, including the three protected WK100 Operations routes. Removing the Credits paths,
- * the Messages paths, the three WK100 Operations paths, the Artist Studio path, the Field intake path, the Admin
+ * Current route authority is therefore 160 paths after the Charts reset. Removing the Credits paths,
+ * the Messages paths, the Artist Studio path, the Field intake path, the Admin
  * MIZIZI path, the five declared public Audio and Show paths, the two K5B Admin
- * Video paths, and the two public Video paths reproduces the exact 163-path
+ * Video paths, and the two public Video paths reproduces the exact 143-path
  * preserved pre-M1 sequence.
  */
-const expectedRoutePathCount = 184;
-const wk100PrivateChartsPath = "wk100-preview";
-const wk100OperationsPaths = [
-  "wk100-operations",
-  "wk100-operations/sources",
-  "wk100-operations/collection",
-];
+const expectedRoutePathCount = 160;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -490,23 +489,18 @@ if (routePaths.length !== expectedRoutePathCount) {
   );
 }
 
-if (routePaths.filter((path) => path === wk100PrivateChartsPath).length !== 1 ||
-    !config.includes('{ path: "wk100-preview", element: <Wk100PrivateAdminPreview /> }')) {
-  fail("accepted private WK100 Admin Charts route must appear exactly once");
-}
-
-// All three WK100 views share the accepted lazy Admin Operations module.
-// A route count alone must not authorize missing, duplicated or unguarded views.
-for (const [wk100Path, wk100View] of [
-  ["wk100-operations", "overview"],
-  ["wk100-operations/sources", "sources"],
-  ["wk100-operations/collection", "collection"],
+for (const retiredChartsAdminPath of [
+  "wk100-preview",
+  "wk100-operations",
+  "wk100-operations/sources",
+  "wk100-operations/collection",
+  "ingest",
+  "ingest/:jobId",
+  "scoring-runs",
+  "chart-defaults",
 ]) {
-  if (
-    routePaths.filter((path) => path === wk100Path).length !== 1 ||
-    !config.includes(`{ path: "${wk100Path}", element: <Wk100OperationsPage view="${wk100View}" /> }`)
-  ) {
-    fail(`accepted private WK100 Operations route missing or duplicated: ${wk100Path}`);
+  if (routePaths.includes(retiredChartsAdminPath)) {
+    fail(`retired Charts Admin route returned: ${retiredChartsAdminPath}`);
   }
 }
 
@@ -585,17 +579,15 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== adminMessagesPath &&
     routePath !== adminFieldPath &&
     routePath !== adminMiziziPath &&
-    routePath !== wk100PrivateChartsPath &&
-    !wk100OperationsPaths.includes(routePath) &&
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&
     routePath !== publicVideoStandalonePath,
 );
 
-if (preM1RoutePaths.length !== 163) {
+if (preM1RoutePaths.length !== 143) {
   fail(
-    `expected 163 preserved pre-M1 route paths after removing declared later route families, found ${preM1RoutePaths.length}`,
+    `expected 143 preserved pre-M1 route paths after removing declared later route families, found ${preM1RoutePaths.length}`,
   );
 }
 
@@ -608,7 +600,7 @@ const routeChecksum = crypto
   .digest("hex");
 
 const expectedRouteChecksum =
-  "25fde8d962f925ecf0ddc9b56d5118c08ad195ec0967dd9ee12292688ac4db9f";
+  "24be7f7ce761189ac52b2c40a717c6754a43d7d1ae96205ea3fb498e2684d70a";
 
 if (
   routeChecksum !==

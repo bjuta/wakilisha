@@ -88,92 +88,6 @@ export const AdminCategoriesPage = lazy(() =>
   import("../pages/admin/content/categories/page"),
 );
 
-export const AdminChartsArtistResolution = lazy(() =>
-  import("../pages/admin/charts/artist-resolution/page"),
-);
-
-export const AdminChartsBackfillPlanner = lazy(() =>
-  import("../pages/admin/charts/backfill/page"),
-);
-
-export const AdminChartsCanonGaps = lazy(() =>
-  import("../pages/admin/charts/canon-gaps/page"),
-);
-
-export const AdminChartsDashboard = lazy(() =>
-  import("../pages/admin/charts/dashboard/page"),
-);
-
-export const AdminChartsEditionDetail = lazy(() =>
-  import("../pages/admin/charts/edition-detail/page"),
-);
-
-export const AdminChartsEditions = lazy(() =>
-  import("../pages/admin/charts/editions/page"),
-);
-
-export const AdminChartsFamilies = lazy(() =>
-  import("../pages/admin/charts/families/page"),
-);
-
-export const AdminChartsIngest = lazy(() =>
-  import("../pages/admin/charts/ingest/page"),
-);
-
-export const AdminChartsIngestDetail = lazy(() =>
-  import("../pages/admin/charts/ingest/detail/page"),
-);
-
-export const AdminChartsIngestHealth = lazy(() =>
-  import("../pages/admin/charts/ingest-health/page"),
-);
-
-export const AdminChartsIngestRunDetail = lazy(() =>
-  import("../pages/admin/charts/ingest-run-detail/page"),
-);
-
-export const AdminChartsIngestRuns = lazy(() =>
-  import("../pages/admin/charts/ingest-runs/page"),
-);
-
-export const AdminChartsIntegrationMap = lazy(() =>
-  import("../pages/admin/charts/integration-map/page"),
-);
-
-export const AdminChartsLayout = lazy(() =>
-  import("../pages/admin/charts/AdminChartsLayout").then((module) => ({
-    default: module.AdminChartsLayout,
-  })),
-);
-
-export const AdminChartsNoMatch = lazy(() =>
-  import("../pages/admin/charts/no-match/page"),
-);
-
-export const AdminChartsPublicApiQa = lazy(() =>
-  import("../pages/admin/charts/public-api-qa/page"),
-);
-
-export const AdminChartsReviewQueue = lazy(() =>
-  import("../pages/admin/charts/review-queue/page"),
-);
-
-export const Wk100OperationsPage = lazy(() =>
-  import("../pages/admin/charts/wk100-operations/page"),
-);
-
-export const Wk100PrivateAdminPreview = lazy(() =>
-  import('../pages/admin/charts/wk100-preview/page'),
-);
-
-export const AdminChartsScoringRuns = lazy(() =>
-  import("../pages/admin/charts/scoring-runs/page"),
-);
-
-export const AdminChartsSnapshots = lazy(() =>
-  import("../pages/admin/charts/snapshots/page"),
-);
-
 export const AdminCommunityPage = lazy(() =>
   import("../pages/admin/community/page"),
 );
@@ -330,14 +244,6 @@ export const AdminSettingsAudience = lazy(() =>
 
 export const AdminSettingsAudit = lazy(() =>
   import("../pages/admin/settings/audit/page"),
-);
-
-export const AdminSettingsChartDefaults = lazy(() =>
-  import("../pages/admin/settings/chart-defaults/page"),
-);
-
-export const AdminSettingsChartDefaultsMarketScopes = lazy(() =>
-  import("../pages/admin/settings/chart-defaults/market-scopes/page"),
 );
 
 export const AdminSettingsDesignSystem = lazy(() =>

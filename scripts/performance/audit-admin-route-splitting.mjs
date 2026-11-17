@@ -83,42 +83,20 @@ const lazyImportCount = (
  * Dedicated MIZIZI Admin workflow adds one lazy Review route:
  * - AdminMiziziWorkspacePage
  *
- * PR #1274 adds one private WK100 Charts Admin route:
- * - Wk100PrivateAdminPreview
+ * PR #1274 and the WK100 Operations workbook added Wk100PrivateAdminPreview
+ * and Wk100OperationsPage. The 2026-11-17 Charts reset retired both, the
+ * legacy Admin Charts engine (layout plus 18 pages) and the two Chart Defaults
+ * settings pages.
  *
- * It remains lazy-loaded inside the existing guarded Admin Charts tree.
- *
- * The native WK100 Operations workbook adds one canonical lazy module:
- * - Wk100OperationsPage (reused by W1/W2/W3 through three guarded routes).
- *
- * The current authority is therefore 103 lazy imports.
+ * The current authority is therefore 80 lazy imports.
  */
-const expectedLazyImportCount = 103;
+// 2026-11-17 Charts reset: 23 Admin Charts engine, WK100 and Chart Defaults lazy imports retired (103 -> 80).
+const expectedLazyImportCount = 80;
 
 if (lazyImportCount !== expectedLazyImportCount) {
   fail(
     `expected ${expectedLazyImportCount} lazy Admin Studio imports, found ${lazyImportCount}`,
   );
-}
-
-if (
-  !lazyAdmin.includes("export const Wk100PrivateAdminPreview = lazy(") ||
-  !lazyAdmin.includes("import('../pages/admin/charts/wk100-preview/page')") ||
-  !config.includes('{ path: "wk100-preview", element: <Wk100PrivateAdminPreview /> }')
-) {
-  fail("accepted WK100 Admin Charts route is missing or no longer lazy");
-}
-
-// One lazy workbook module serves all three already-guarded WK100 Admin views.
-// Check the actual lazy import and route bindings, not only the total count.
-if (
-  !lazyAdmin.includes("export const Wk100OperationsPage = lazy(") ||
-  !lazyAdmin.includes('import("../pages/admin/charts/wk100-operations/page")') ||
-  !config.includes('{ path: "wk100-operations", element: <Wk100OperationsPage view="overview" /> }') ||
-  !config.includes('{ path: "wk100-operations/sources", element: <Wk100OperationsPage view="sources" /> }') ||
-  !config.includes('{ path: "wk100-operations/collection", element: <Wk100OperationsPage view="collection" /> }')
-) {
-  fail("WK100 Operations workbook routes must remain lazily loaded inside Admin Charts");
 }
 
 for (const retiredMarker of [
@@ -139,6 +117,22 @@ for (const retiredMarker of [
   }
 }
 
+for (const retiredChartsMarker of [
+  "Wk100PrivateAdminPreview",
+  "Wk100OperationsPage",
+  "AdminChartsLayout",
+  "AdminChartsIngest",
+  "AdminChartsScoringRuns",
+  "AdminSettingsChartDefaults",
+]) {
+  if (
+    lazyAdmin.includes(`export const ${retiredChartsMarker}`) ||
+    config.includes(retiredChartsMarker)
+  ) {
+    fail(`retired Charts Admin route returned: ${retiredChartsMarker}`);
+  }
+}
+
 for (const marker of [
   "AdminShell",
   "AdminLoginPage",
@@ -154,7 +148,6 @@ for (const marker of [
   "AdminPlaylistsPage",
   "AdminNewPlaylistPage",
   "AdminPlaylistDetailPage",
-  "AdminChartsLayout",
   "AdminSettingsLayout",
   "AdminApiDocsPage",
 ]) {

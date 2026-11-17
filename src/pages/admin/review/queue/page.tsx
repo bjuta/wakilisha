@@ -488,10 +488,6 @@ export default function AdminReviewQueuePage() {
             onClick={() => navigate("/admin/review/mizizi")}>
             <WkIcon name="GitBranch" size={16} /> Explore MIZIZI
           </button>
-          <button type="button" className="wk-button wk-button-ghost wk-button-sm"
-            onClick={() => navigate("/admin/charts/review-queue")}>
-            <WkIcon name="BarChart3" size={16} /> Chart Reviews
-          </button>
         </div>
       </header>
 

@@ -57,10 +57,6 @@ const BASELINE_COUNTS = new Map([
   ["src/services/migrationImportJobs.ts::Direct Supabase Storage object operation", 2],
   ["supabase/functions/migrate-media-from-wp/index.ts::Direct Supabase Storage object operation", 6],
   ["supabase/functions/migrate-wp-images/index.ts::Direct Supabase Storage object operation", 2],
-  ["scripts/charts/repaired-content-api.ts::Direct Supabase public storage URL", 6],
-  ["scripts/charts/repaired-content-api.ts::Hard-coded Supabase storage object URL", 6],
-  ["scripts/charts/repaired-content-details-api.ts::Direct Supabase public storage URL", 1],
-  ["scripts/charts/repaired-content-details-api.ts::Hard-coded Supabase storage object URL", 1],
   ["scripts/imports/process-wordpress-zips.ts::Direct Supabase Storage object operation", 1],
   ["scripts/imports/stage-wordpress-records.ts::Direct Supabase Storage object operation", 1],
 ]);

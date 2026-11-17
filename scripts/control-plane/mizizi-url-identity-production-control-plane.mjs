@@ -2655,7 +2655,7 @@ async function runAudit(
   );
 }
 
-async function currentCandidateState(pool) {
+async function currentCandidateState(pool, chartCorpusCount) {
   const releaseCurrentResult =
     await pool.query(releaseCandidateSql);
   const chartResult =
@@ -2756,7 +2756,17 @@ async function currentCandidateState(pool) {
   let chartState = "";
   let chartProgramme = null;
 
-  if (
+  if (chartCorpusCount === 0) {
+    // The accepted Charts reset starts with no live Chart V2 entries.
+    // Keep the Registry journal parity check, but do not demand a
+    // historical 161-row candidate freeze from an empty live corpus.
+    assertFields(
+      chartCurrent,
+      { candidateCount: 0 },
+      "Retired empty Chart corpus",
+    );
+    chartState = "retired_empty";
+  } else if (
     Number(chartJournal.verified_operations) === 0 &&
     chartCurrent.candidateCount ===
       EXPECTED_CHART_CANDIDATES &&
@@ -2783,15 +2793,17 @@ async function currentCandidateState(pool) {
     );
   }
 
-  assertFields(
-    chartProgramme,
-    {
-      candidateCount: EXPECTED_CHART_CANDIDATES,
-      candidateFingerprint:
-        EXPECTED_CHART_CANDIDATE_FINGERPRINT,
-    },
-    "Chart Track-slug programme freeze",
-  );
+  if (chartState !== "retired_empty") {
+    assertFields(
+      chartProgramme,
+      {
+        candidateCount: EXPECTED_CHART_CANDIDATES,
+        candidateFingerprint:
+          EXPECTED_CHART_CANDIDATE_FINGERPRINT,
+      },
+      "Chart Track-slug programme freeze",
+    );
+  }
 
   let trackZeroState = "";
 
@@ -3997,6 +4009,18 @@ async function main() {
       Number(
         chartCountResult.rows[0]?.candidate_count || 0,
       );
+    const chartCorpusResult =
+      await jit.pool.query(
+        "select count(*)::int as corpus_count from public.wk_chart_entries_v2",
+      );
+    const currentChartCorpusCount =
+      Number(chartCorpusResult.rows[0]?.corpus_count);
+    if (
+      !Number.isSafeInteger(currentChartCorpusCount) ||
+      currentChartCorpusCount < 0
+    ) {
+      throw new Error("Chart corpus count is invalid");
+    }
     const resumeMigrationReady =
       releaseResumeMigrationApplied();
 
@@ -4011,12 +4035,23 @@ async function main() {
       "before",
       currentReleaseCandidates,
     );
-    await runAudit(
-      jit.url,
-      "chart",
-      "before",
-      currentChartCandidates,
-    );
+    if (currentChartCorpusCount === 0) {
+      assertFields(
+        { currentChartCandidates },
+        { currentChartCandidates: 0 },
+        "Retired Chart preflight candidate count",
+      );
+      console.log(
+        "PASS: empty Chart V2 corpus; historical Chart-only audit retired",
+      );
+    } else {
+      await runAudit(
+        jit.url,
+        "chart",
+        "before",
+        currentChartCandidates,
+      );
+    }
 
     if (
       MODE === "preflight" &&
@@ -4074,7 +4109,10 @@ async function main() {
     );
 
     const candidates =
-      await currentCandidateState(jit.pool);
+      await currentCandidateState(
+        jit.pool,
+        currentChartCorpusCount,
+      );
 
     fs.writeFileSync(
       ARTIFACT_DIR + "/candidate-state.json",
@@ -4122,6 +4160,14 @@ async function main() {
     }
 
     const scope = trigger.scopeConfig;
+    if (
+      scope.entity === "chart" &&
+      candidates.chartState === "retired_empty"
+    ) {
+      throw new Error(
+        "Chart synchronization is retired while the corpus is empty",
+      );
+    }
     const before = journalSnapshot(scope);
     const expectedApplyCount =
       scope.entity === "release"

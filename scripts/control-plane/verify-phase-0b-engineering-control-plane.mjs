@@ -260,7 +260,6 @@ for (const requiredWriter of [
   "scrape-artist-data",
   "artist-registry-intake",
   "ingest-artist-discography",
-  "chart-ingest-api",
   "admin-router-registry",
   "registry-enrich-artist",
   "backfill-artist-origin",
@@ -532,30 +531,10 @@ for (const functionName of canonicalDatabaseMutatorNames) {
   }
 }
 
-const chartPlaybackEnrichmentSource = fs.readFileSync(
-  "supabase/functions/run-chart-playback-enrichment/index.ts",
-  "utf8",
-);
-
-if (
-  !chartPlaybackEnrichmentSource.includes(
-    '"chart_admit_track_provider_link_v1"',
-  )
-) {
-  throw new Error(
-    "Chart playback enrichment must route accepted provider persistence through the typed provider-link admission RPC.",
-  );
-}
-
-for (const forbiddenPattern of [
-  /\.from\(\s*["']registry_track_provider_links["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
-  /\.from\(\s*["']registry_tracks["']\s*\)\s*\.\s*(insert|update|upsert|delete)\s*\(/s,
-]) {
-  if (forbiddenPattern.test(chartPlaybackEnrichmentSource)) {
-    throw new Error(
-      "Chart playback enrichment reintroduced direct canonical Registry provider/Track DML.",
-    );
-  }
+// run-chart-playback-enrichment was retired in the 2026-11-17 Charts reset;
+// its provider-link admission guard retired with it.
+if (fs.existsSync("supabase/functions/run-chart-playback-enrichment")) {
+  throw new Error("retired run-chart-playback-enrichment function returned without a reviewed guard.");
 }
 
 const providerLinkClientSource = fs.readFileSync(

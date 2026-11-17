@@ -299,6 +299,23 @@ describe("MIZIZI current URL-identity production control plane", () => {
     expect(currentControlPlane).toContain(
       "Chart audit corpus regressed below accepted historical floor",
     );
+    // An intentionally empty Chart V2 corpus must not fail the historical
+    // Chart-only count/freeze gates or permit Chart apply in retirement.
+    expect(currentControlPlane).toContain(
+      "if (currentChartCorpusCount === 0)",
+    );
+    expect(currentControlPlane).toContain(
+      "if (chartCorpusCount === 0)",
+    );
+    expect(currentControlPlane).toContain(
+      'chartState = "retired_empty"',
+    );
+    expect(currentControlPlane).toContain(
+      "Retired Chart preflight candidate count",
+    );
+    expect(currentControlPlane).toContain(
+      "Chart synchronization is retired while the corpus is empty",
+    );
     expect(currentControlPlane).toContain(
       "Chart canonical Track-slug findings",
     );

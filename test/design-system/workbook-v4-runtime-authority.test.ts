@@ -88,8 +88,6 @@ describe("Workbook v4 is the only active product design authority", () => {
   it("does not fabricate photos for chart data, registry or design specimens", () => {
     for (const path of [
       "src/data/registry/registry.ts",
-      "scripts/charts/generate-public-csv-data.ts",
-      "scripts/charts/repaired-content-details-api.ts",
       "src/pages/admin/design-system/components/RichSpecimenBoards.ts",
       "src/design-system/wakilisha.elements.foundation.css",
     ]) expect(read(path)).not.toContain("picsum.photos");

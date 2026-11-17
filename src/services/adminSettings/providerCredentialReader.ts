@@ -10,7 +10,7 @@
  *   2. import.meta.env (VITE_* keys)      — build-time .env.local
  *   3. null                               — no credential available
  *
- * The edge functions (chart-ingest-api, backfill-chart-artwork) have their
+ * Provider edge functions have their
  * own `readCredential()` that checks Deno.env → admin_settings_secrets.
  * This reader is the FRONTEND counterpart.
  */

@@ -1,4 +1,3 @@
-import { getIngestionMode } from "@/services/chartsIngestion/client";
 
 export type AdminSettingsDomain =
   | "charts"
@@ -39,15 +38,7 @@ export const SETTINGS_DOMAINS: SettingsDomainMeta[] = [
     health: "healthy",
     primaryAction: "Edit identity",
   },
-  {
-    key: "charts",
-    label: "Charts",
-    description: "Chart-specific defaults, V2 program defaults, ingest rules, commit gating",
-    icon: "BarChart3",
-    route: "/admin/settings/chart-defaults",
-    health: "healthy",
-    primaryAction: "Edit defaults",
-  },
+
   {
     key: "designSystem",
     label: "Design System",
@@ -242,7 +233,8 @@ export const DEFAULT_INTEGRATION_SETTINGS: IntegrationSettings = {
     { name: "YouTube", key: "youtube", envVar: "YOUTUBE_API_KEY", connected: false, lastTested: null, health: "unknown", description: "oEmbed previews and watch page metadata." },
     { name: "Airplay", key: "airplay", envVar: "AIRPLAY_API_KEY, AIRPLAY_API_BASE", connected: false, lastTested: null, health: "unknown", description: "Airplay provider for radio monitoring and detections." },
   ],
-  apiMode: getIngestionMode(),
+  // Former chartsIngestion runtime constant; value preserved.
+  apiMode: "production" as IntegrationSettings["apiMode"],
 };
 
 export interface GscSettings { enabled: boolean; propertyUrl: string; lastSyncAt: string | null; }

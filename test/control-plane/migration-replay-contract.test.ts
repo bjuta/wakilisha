@@ -548,16 +548,12 @@ describe(
           ".github/workflows/critical-control-plane.yml",
           "utf8",
         );
-        const wk100 = readFileSync(
-          ".github/workflows/wk100-disposable-security.yml",
-          "utf8",
-        );
         const mizizi = readFileSync(
           ".github/workflows/mizizi-slice1-disposable-postgres.yml",
           "utf8",
         );
 
-        for (const workflow of [critical, wk100, mizizi]) {
+        for (const workflow of [critical, mizizi]) {
           expect(workflow).toContain(
             "types: [opened, reopened, synchronize, converted_to_draft, ready_for_review]",
           );
@@ -579,15 +575,9 @@ describe(
         expect(critical).toContain(
           'test "$BROWSER_RESULT" = "success"',
         );
-        expect(wk100).toContain(
-          "if: ${{ github.event.pull_request.draft == false }}",
-        );
         expect(mizizi).toContain(
           "if: ${{ github.event.pull_request.draft == false }}",
         );
-        expect(wk100.split(
-          "if: ${{ github.event.pull_request.draft == false }}",
-        )).toHaveLength(2);
         expect(mizizi.split(
           "if: ${{ github.event.pull_request.draft == false }}",
         )).toHaveLength(3);

@@ -421,18 +421,10 @@ function EmptySourceNotice({ selectedSource }: { selectedSource: SourceType }) {
   if (selectedSource === "charts") {
     return (
       <div className="rounded-2xl border border-[#dfe4d8] bg-white p-5">
-        <p className="text-[15px] font-black text-[#171712]">Charts begin in Chart Artist Resolution</p>
+        <p className="text-[15px] font-black text-[#171712]">Chart artist resolution is paused</p>
         <p className="mt-2 text-[13px] leading-relaxed text-[#697062]">
-          Chart-origin coupled credits should be diagnosed from the chart row first. That surface already knows the edition,
-          rank, raw artist string, parsed tokens, canonical track, and chart decision status.
+          The Charts admin workspace is being rebuilt. Chart-origin coupled credits will be reviewed there when it returns.
         </p>
-        <a
-          href="/admin/charts/artist-resolution"
-          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#5f8f2f] px-4 py-2 text-[12px] font-black text-white"
-        >
-          <WkIcon name="ArrowRight" size={13} />
-          Open Chart Artist Resolution
-        </a>
       </div>
     );
   }

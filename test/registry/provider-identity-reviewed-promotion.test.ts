@@ -6,24 +6,6 @@ const read = (relative: string) =>
   fs.readFileSync(path.resolve(process.cwd(), relative), "utf8");
 
 describe("Provider Identity reviewed candidate promotion", () => {
-  it("keeps reviewed promotion behind existing manage_registry authority", () => {
-    const page = read("src/pages/admin/charts/edition-detail/page.tsx");
-
-    expect(page).toContain('useAdminUser');
-    expect(page).toContain('adminUser.can("manage_registry")');
-    expect(page).toContain('upsertTrackProviderLink');
-    expect(page).toContain('matchMethod: "manual"');
-    expect(page).toContain('matchStatus: "matched"');
-    expect(page).toContain('status: "matched"');
-    expect(page).toContain('provider_identity_review');
-    expect(page).toContain(
-      'authority: "admin_admit_registry_track_provider_link_v1"',
-    );
-
-    expect(page).not.toContain('"chart_admit_track_provider_link_v1"');
-    expect(page).not.toContain('.from("registry_track_provider_links")');
-  });
-
   it("reuses the accepted generic Registry provider-link broker", () => {
     const client = read("src/services/registry/providerLinks.ts");
 
@@ -87,9 +69,6 @@ describe("Provider Identity reviewed candidate promotion", () => {
   });
   it("retires the legacy Phase 9 direct provider-link write road", () => {
     const packageJson = read("package.json");
-    const ingestRunPage = read(
-      "src/pages/admin/charts/ingest-run-detail/page.tsx",
-    );
     const legacyScript = path.resolve(
       process.cwd(),
       "scripts/registry/phase9-apple-music-chart-enrichment.ts",
@@ -99,11 +78,8 @@ describe("Provider Identity reviewed candidate promotion", () => {
       '"registry:phase9:apple-music-chart-enrichment"',
     );
     expect(fs.existsSync(legacyScript)).toBe(false);
-    expect(ingestRunPage).not.toContain(
-      "registry:phase9:apple-music-chart-enrichment",
-    );
-    expect(ingestRunPage).toContain("Apple Music Playback Enrichment");
-    expect(ingestRunPage).toContain("Return to the chart edition");
+    // Admin Charts ingest-run-detail page retired in the 2026-11-17 Charts reset.
+    expect(fs.existsSync(path.resolve(process.cwd(), "src/pages/admin/charts/ingest-run-detail/page.tsx"))).toBe(false);
   });
 
 });
