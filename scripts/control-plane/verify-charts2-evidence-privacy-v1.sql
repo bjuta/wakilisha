@@ -141,6 +141,43 @@ begin
     if sqlerrm <> 'charts2_receipt_unverified' then raise; end if;
   end;
 
+  -- Local transaction only: prove that a reviewed first-party YouTube POST
+  -- becomes retrievable while a separately reviewed Apple POST cannot.
+  -- Both review changes are discarded by the enclosing rollback.
+  update platform_private.charts2_source_methods_v1
+  set exact_endpoint='https://charts.youtube.com/youtubei/v1/browse?alt=json',
+      reviewed_method='POST',
+      review_state='collector_admitted',
+      reviewed_by='00000000-0000-4000-8000-000000000001'::uuid,
+      reviewed_at=now()-interval '1 minute',
+      authorization_expires_at=now()+interval '1 hour',
+      access_evidence_sha256=repeat('a',64),
+      method_revision=1
+  where source_key='youtube_ke';
+
+  if (select count(*) from public.charts2_get_collector_method_v1('youtube_ke')
+      where reviewed_method='POST'
+        and exact_endpoint='https://charts.youtube.com/youtubei/v1/browse?alt=json'
+        and method_revision=1) <> 1 then
+    raise exception 'charts2_youtube_native_post_method_gate_invalid';
+  end if;
+
+  update platform_private.charts2_source_methods_v1
+  set exact_endpoint='https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172',
+      reviewed_method='POST',
+      review_state='collector_admitted',
+      reviewed_by='00000000-0000-4000-8000-000000000001'::uuid,
+      reviewed_at=now()-interval '1 minute',
+      authorization_expires_at=now()+interval '1 hour',
+      access_evidence_sha256=repeat('b',64),
+      method_revision=1
+  where source_key='apple_ke';
+
+  if exists (select 1 from public.charts2_get_collector_method_v1('apple_ke')) then
+    raise exception 'charts2_non_youtube_post_unexpectedly_admitted';
+  end if;
+  raise notice 'WK_CHARTS2_LOCAL_YOUTUBE_POST_ONLY=PASS';
+
   raise notice 'WK_CHARTS2_LOCAL_SERVICE_RPC_HELD_AND_PRIVATE=PASS';
 
   raise notice 'WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_DB_SECURITY=PASS';
