@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { transpileModule, ScriptTarget, ModuleKind, DiagnosticCategory } from "typescript";
 
 // chart-ingest-api retired in the 2026-11-17 Charts reset; runtime-source
 // assertions retired with it. Database authority assertions remain.
@@ -325,6 +326,21 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(migrationSql).toContain("charts2_private_original_missing");
     expect(migrationSql).toContain("charts2_duplicate_original_provenance_conflict");
     expect(migrationSql).not.toContain("update public.wk_chart_programs_v2");
+  });
+
+  it("transpiles the actual Edge worker as TypeScript without syntax errors", () => {
+    const result = transpileModule(edge, {
+      fileName: "charts2-capture/index.ts",
+      compilerOptions: {
+        target: ScriptTarget.ES2022,
+        module: ModuleKind.ESNext,
+      },
+      reportDiagnostics: true,
+    });
+    expect(result.diagnostics?.filter(
+      diagnostic => diagnostic.category === DiagnosticCategory.Error,
+    ) ?? []).toEqual([]);
+    expect(result.outputText).toContain("server_sha256_storage_readback");
   });
 
   it("keeps all captures evidence-only and server-rehashed", () => {
