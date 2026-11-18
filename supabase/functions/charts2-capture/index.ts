@@ -68,6 +68,27 @@ function expectedUrl(source_key:string, endpoint: string) {
 function decodeContentType(raw:string|null) {
   return (raw??"").split(";")[0].toLowerCase().trim();
 }
+async function readCappedStream(body:ReadableStream<Uint8Array>|null,limit:number) {
+  if(!body)throw new Reject(400,"charts2_original_required");
+  const reader=body.getReader();
+  const chunks:Uint8Array[]=[];
+  let total=0;
+  try {
+    for(;;) {
+      const {value,done}=await reader.read();
+      if(done)break;
+      total+=value.byteLength;
+      if(total>limit)throw new Reject(413,"charts2_original_size_invalid");
+      chunks.push(value);
+    }
+  } finally {reader.releaseLock();}
+  if(total<1)throw new Reject(400,"charts2_original_required");
+  const merged=new Uint8Array(total);
+  let position=0;
+  for(const c of chunks){merged.set(c,position);position+=c.byteLength;}
+  return merged;
+}
+
 async function bodyBytes(source_key:string, blob:Blob) {
   if(blob.size < 1 || blob.size > MAX_BYTES)
     throw new Reject(413,"charts2_original_size_invalid");
@@ -137,7 +158,12 @@ async function handle(req:Request) {
     const declared=Number(req.headers.get("content-length")??0);
     if(Number.isFinite(declared)&&declared>MAX_REQUEST_BYTES)
       throw new Reject(413,"charts2_request_too_large");
-    const form=await req.formData();
+    const bounded=await readCappedStream(req.body,MAX_REQUEST_BYTES);
+    const form=await new Response(bounded,{
+      headers:{"content-type":req.headers.get("content-type")??""},
+    }).formData().catch(()=>{
+      throw new Reject(400,"charts2_form_invalid");
+    });
     key=sourceKey(form.get("source_key"));
     endpoint=String(form.get("source_endpoint")??"");
     expectedUrl(key,endpoint);
@@ -166,18 +192,19 @@ async function handle(req:Request) {
     expectedUrl(key,endpoint);
     const controller=new AbortController();
     const abort=setTimeout(()=>controller.abort(),12000);
-    let upstream:Response;
     try {
-      upstream=await fetch(endpoint,{method:"GET",redirect:"error",
+      const upstream=await fetch(endpoint,{method:"GET",redirect:"error",
         credentials:"omit",headers:{accept:MIME[key]},signal:controller.signal});
-    }catch{throw new Reject(502,"charts2_source_transport_failed");}
-    finally{clearTimeout(abort);}
-    if(upstream.status!==200)throw new Reject(502,"charts2_source_non_200");
-    contentType=decodeContentType(upstream.headers.get("content-type"));
-    if(contentType!==MIME[key])throw new Reject(415,"charts2_source_type_unqualified");
-    const size=Number(upstream.headers.get("content-length")??0);
-    if(size>MAX_BYTES)throw new Reject(413,"charts2_source_too_large");
-    bytes=await bodyBytes(key,new Blob([await upstream.arrayBuffer()],{type:contentType}));
+      if(upstream.status!==200)throw new Reject(502,"charts2_source_non_200");
+      contentType=decodeContentType(upstream.headers.get("content-type"));
+      if(contentType!==MIME[key])throw new Reject(415,"charts2_source_type_unqualified");
+      const size=Number(upstream.headers.get("content-length")??0);
+      if(size>MAX_BYTES)throw new Reject(413,"charts2_source_too_large");
+      bytes=await readCappedStream(upstream.body,MAX_BYTES);
+    }catch(e) {
+      if(e instanceof Reject)throw e;
+      throw new Reject(502,"charts2_source_transport_failed");
+    } finally {clearTimeout(abort);}
     captureMode="service_original";
   } else {
     throw new Reject(400,"charts2_mode_unrecognized");
