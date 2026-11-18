@@ -123,6 +123,8 @@ describe("Charts 2.0 original-byte source adapters (candidate only)", () => {
     expect(rows.every((r: any) => r.endpoint_state.length > 0)).toBe(true);
     expect(rows.find((r: any) => r.source_key === "mdundo_ke")?.first_party_endpoint)
       .toBe("https://play.mdundo.com/top-charts/ke");
+    expect(rows.find((r: any) => r.source_key === "shazam_ke")?.first_party_endpoint)
+      .toBe("https://www.shazam.com/services/charts/csv/top-200/kenya");
   });
 
   it("preserves an authentic 99/100 Mdundo-style rank sequence as partial, not full-depth", async () => {
@@ -144,7 +146,7 @@ describe("Charts 2.0 original-byte source adapters (candidate only)", () => {
   it("keeps Shazam recognition at native Top 200 with no invented IDs", async () => {
     const original = charts2Bytes(charts2Shazam(200));
     const result = await decodeCharts2Original({
-      source_key: "shazam_ke", endpoint: "https://www.shazam.com/charts/top-200/kenya",
+      source_key: "shazam_ke", endpoint: "https://www.shazam.com/services/charts/csv/top-200/kenya",
       observed_at: charts2ObservedAt, original_bytes: original,
     });
     expect(result.declared_depth).toBe(200);
@@ -234,6 +236,10 @@ describe("Charts 2.0 original-byte source adapters (candidate only)", () => {
       .rejects.toThrow("charts2_source_endpoint_unreviewed");
     await expect(decodeCharts2Original({
       ...baseInput, endpoint:"https://mdundo.com/top-charts/ke",
+    })).rejects.toThrow("charts2_source_endpoint_unreviewed");
+    await expect(decodeCharts2Original({
+      ...baseInput, source_key:"shazam_ke",
+      endpoint:"https://www.shazam.com/charts/top-200/kenya",
     })).rejects.toThrow("charts2_source_endpoint_unreviewed");
     await expect(decodeCharts2Original({...baseInput,observed_at:"2026-11-18"}))
       .rejects.toThrow("charts2_observed_time_invalid");
