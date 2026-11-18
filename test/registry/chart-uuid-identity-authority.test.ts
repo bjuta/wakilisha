@@ -353,6 +353,10 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     "supabase/migrations/20261118164450_charts2_private_capture_gateway_v1.sql",
     "utf8",
   );
+  const nativePostSql = readFileSync(
+    "supabase/migrations/20261118185142_charts2_youtube_native_post_v1.sql",
+    "utf8",
+  );
   const edge = readFileSync("supabase/functions/charts2-capture/index.ts", "utf8");
   const config = readFileSync("supabase/config.toml", "utf8");
 
@@ -370,6 +374,20 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(migrationSql).toContain("charts2_private_original_missing");
     expect(migrationSql).toContain("charts2_duplicate_original_provenance_conflict");
     expect(migrationSql).not.toContain("update public.wk_chart_programs_v2");
+  });
+
+  it("changes exactly the two service-only SQL method gates for native YouTube POST", () => {
+    expect(nativePostSql).toContain("GitHub Actions run 44374242383");
+    expect(nativePostSql.match(/create or replace function public\\.charts2_/g)?.length).toBe(2);
+    expect(nativePostSql.match(/m\\.reviewed_method = 'POST'/g)?.length).toBe(2);
+    expect(nativePostSql.match(/m\\.source_key <> 'youtube_ke' and m\\.reviewed_method = 'GET'/g)?.length).toBe(2);
+    expect(nativePostSql.match(/https:\\/\\/charts\\.youtube\\.com\\/youtubei\\/v1\\/browse\\?alt=json/g)?.length).toBe(2);
+    expect(nativePostSql).toContain("authorization_expires_at > now()");
+    expect(nativePostSql).toContain("from public, anon, authenticated");
+    expect(nativePostSql).toContain("to service_role");
+    expect(nativePostSql).not.toContain("update public.wk_chart_programs_v2");
+    expect(nativePostSql).not.toContain("create table ");
+    expect(nativePostSql).not.toContain("create trigger ");
   });
 
   it("transpiles the actual Edge worker as TypeScript without syntax errors", () => {
