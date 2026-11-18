@@ -108,6 +108,41 @@ begin
     if sqlerrm <> 'charts2_capture_rank_sequence_invalid' then raise; end if;
   end;
 
+
+  if not has_function_privilege(
+      'service_role','public.charts2_get_collector_method_v1(text)','EXECUTE'
+    ) or not has_function_privilege(
+      'service_role','public.charts2_commit_verified_original_v1(jsonb)','EXECUTE'
+    ) or has_function_privilege(
+      'anon','public.charts2_get_collector_method_v1(text)','EXECUTE'
+    ) or has_function_privilege(
+      'authenticated','public.charts2_commit_verified_original_v1(jsonb)','EXECUTE'
+    ) or has_function_privilege(
+      'anon','public.charts2_commit_verified_original_v1(jsonb)','EXECUTE'
+    ) then
+    raise exception 'charts2_capture_service_only_rpc_grant_invalid';
+  end if;
+
+  if exists(select 1 from public.charts2_get_collector_method_v1('apple_ke')) then
+    raise exception 'charts2_held_source_unexpectedly_collectable';
+  end if;
+
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      jsonb_build_object(
+        'source_key','mdundo_ke',
+        'captured_by','00000000-0000-4000-8000-000000000001',
+        'original_sha256',repeat('b',64),
+        'observations',jsonb_build_array(jsonb_build_object('rank',1))
+      )
+    );
+    raise exception 'charts2_unverified_rpc_should_reject';
+  exception when others then
+    if sqlerrm <> 'charts2_receipt_unverified' then raise; end if;
+  end;
+
+  raise notice 'WK_CHARTS2_LOCAL_SERVICE_RPC_HELD_AND_PRIVATE=PASS';
+
   raise notice 'WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_DB_SECURITY=PASS';
 end
 $charts2_verify$;
