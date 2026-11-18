@@ -51,6 +51,37 @@ jobs:
           # A readable official YouTube chart page is not the internal Top Songs JSON API.
           probe youtube_public "https://charts.youtube.com/charts/TopSongs/ke/weekly"
           probe youtube_get "https://charts.youtube.com/youtubei/v1/browse?alt=json"
+          # One researcher-origin request using the retained, precisely scoped
+          # original YouTube web-client POST. Not autonomous collector admission.
+          node --input-type=module <<'YOUTUBE_REQUEST'
+          import {writeFileSync} from 'node:fs';
+          const payload={
+            context:{client:{clientName:'WEB_MUSIC_ANALYTICS',
+              clientVersion:'2.0',hl:'en-GB',gl:'KE',theme:'MUSIC'}},
+            browseId:'FEmusic_analytics_charts_home',
+            query:'perspective=CHART_DETAILS&chart_params_country_code=ke'+
+              '&chart_params_chart_type=TRACKS&chart_params_period_type=WEEKLY'+
+              '&chart_params_end_date=20261112',
+          };
+          writeFileSync('/tmp/charts2-probe/youtube.request.json',JSON.stringify(payload));
+          YOUTUBE_REQUEST
+          YOUTUBE_RC=0
+          YOUTUBE_RESULT="$(curl --silent --show-error --connect-timeout 6 --max-time 22 \
+            --max-filesize 4000000 --request POST \
+            --header 'content-type: application/json' --header 'accept: application/json' \
+            --data-binary @/tmp/charts2-probe/youtube.request.json \
+            --output /tmp/charts2-probe/youtube_native.body \
+            --write-out '%{http_code} %{content_type}' \
+            'https://charts.youtube.com/youtubei/v1/browse?alt=json')" || YOUTUBE_RC="$?"
+          if test -f /tmp/charts2-probe/youtube_native.body; then
+            YOUTUBE_SIZE="$(wc -c < /tmp/charts2-probe/youtube_native.body | tr -d ' ')"
+            YOUTUBE_DIGEST="$(sha256sum /tmp/charts2-probe/youtube_native.body | cut -d' ' -f1)"
+          else
+            YOUTUBE_SIZE=0
+            YOUTUBE_DIGEST=none
+          fi
+          printf 'WK_CHARTS2_YOUTUBE_NATIVE_RESEARCH_POST curl_exit=%s http=%s bytes=%s sha256=%s\n' \
+            "$YOUTUBE_RC" "$YOUTUBE_RESULT" "$YOUTUBE_SIZE" "$YOUTUBE_DIGEST"
 
           function_probe() {
             local label="$1" method="$2" origin="$3"
@@ -97,6 +128,7 @@ jobs:
             ['shazam_csv','shazam_ke','https://www.shazam.com/services/charts/csv/top-200/kenya'],
             ['shazam_csv_slash','shazam_ke','https://www.shazam.com/services/charts/csv/top-200/kenya/'],
             ['youtube_get','youtube_ke','https://charts.youtube.com/youtubei/v1/browse?alt=json'],
+            ['youtube_native','youtube_ke','https://charts.youtube.com/youtubei/v1/browse?alt=json'],
           ];
           for (const [label,source_key,endpoint] of items) {
             const path='/tmp/charts2-probe/'+label+'.body';
@@ -107,6 +139,8 @@ jobs:
             try {
               const out=await decodeCharts2Original({
                 source_key, endpoint, observed_at,
+                ...(label==='youtube_native'
+                  ? {target_period_key:'weekly:20261106:20261112:ke'} : {}),
                 original_bytes:new Uint8Array(readFileSync(path)),
               });
               console.log('WK_CHARTS2_ORIGINAL_DECODE key='+label+
