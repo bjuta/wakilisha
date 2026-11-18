@@ -243,7 +243,7 @@ export function parseAudiomackKenya(raw,access={}) {
   });
 }
 
-/** Boomplay public chart: rank-preserving ordered /songs/ anchors. */
+/** Strict CSV decoding for Shazam's offered Kenya Top 200 original. */
 function csvRows(csv) {
   let row=[], cell='', quoted=false, closedQuote=false, out=[];
   for (let i=0;i<csv.length;i++) {
