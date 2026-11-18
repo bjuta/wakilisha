@@ -76,7 +76,7 @@ begin
   row_data := p_capture->'observations';
   method_rev := nullif(p_capture->>'method_revision','')::integer;
 
-  if p_capture->>'verification_state' <> 'server_sha256_storage_readback'
+  if (p_capture->>'verification_state') is distinct from 'server_sha256_storage_readback'
     or sha is null or sha !~ '^[a-f0-9]{64}$'
     or row_data is null or jsonb_typeof(row_data) <> 'array'
     or jsonb_array_length(row_data) not between 1 and 200
