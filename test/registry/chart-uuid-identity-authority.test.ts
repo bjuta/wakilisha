@@ -301,3 +301,45 @@ describe("Charts 2.0 private evidence migration authority", () => {
     expect(charts2Sql).toContain("charts2_capture_duplicate_provider_identity");
   });
 });
+
+
+describe("Charts 2.0 restricted capture gateway v1", () => {
+  const migrationSql = readFileSync(
+    "supabase/migrations/20261118164450_charts2_private_capture_gateway_v1.sql",
+    "utf8",
+  );
+  const edge = readFileSync("supabase/functions/charts2-capture/index.ts", "utf8");
+  const config = readFileSync("supabase/config.toml", "utf8");
+
+  it("exposes only service-role method read and candidate-receipt persistence", () => {
+    expect(migrationSql).toContain("security definer");
+    expect(migrationSql).toContain("set search_path = ''");
+    expect(migrationSql).toContain("public.charts2_get_collector_method_v1");
+    expect(migrationSql).toContain("public.charts2_commit_verified_original_v1");
+    expect(migrationSql).toContain("to service_role");
+    expect(migrationSql).toContain("from public, anon, authenticated");
+    expect(migrationSql).toContain("authorization_expires_at > now()");
+    expect(migrationSql).toContain("m.reviewed_method = 'GET'");
+    expect(migrationSql).toContain("review_state = 'collector_admitted'");
+    expect(migrationSql).toContain("charts2_source_method_not_admitted");
+    expect(migrationSql).toContain("charts2_private_original_missing");
+    expect(migrationSql).toContain("charts2_duplicate_original_provenance_conflict");
+    expect(migrationSql).not.toContain("update public.wk_chart_programs_v2");
+  });
+
+  it("keeps all captures evidence-only and server-rehashed", () => {
+    expect(edge).toContain('required_capability:"manage_charts"');
+    expect(edge).toContain('server_sha256_storage_readback');
+    expect(edge).toContain('upsert:false');
+    expect(edge).toContain('reread.data.arrayBuffer()');
+    expect(edge).toContain('crypto.subtle.digest("SHA-256",original)');
+    expect(edge).toContain('candidate.can_score!==false');
+    expect(edge).toContain('candidate.can_publish!==false');
+    expect(edge).toContain('source_method_held');
+    expect(edge).toContain('credentials:"omit"');
+    expect(edge).toContain('redirect:"error"');
+    expect(edge).not.toContain("publish_charts");
+    expect(edge).not.toContain("chart_assert_publishable_edition");
+    expect(config).toContain("[functions.charts2-capture]\\nverify_jwt = true");
+  });
+});
