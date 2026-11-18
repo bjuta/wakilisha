@@ -248,7 +248,7 @@ describe("Charts 2.0 original-byte source adapters (candidate only)", () => {
     })).rejects.toThrow("charts2_original_utf8_invalid");
     await expect(decodeCharts2Original({
       ...baseInput,original_bytes:charts2Bytes(charts2Mdundo(101)),
-    })).rejects.toThrow("mdundo_duplicate_or_invalid_rank");
+    })).rejects.toThrow("mdundo_invalid_rows");
     const gap = charts2Mdundo(3).replace('data-index="2"', 'data-index="7"');
     await expect(decodeCharts2Original({...baseInput,original_bytes:charts2Bytes(gap)}))
       .rejects.toThrow("mdundo_noncontiguous_rank");
