@@ -89,9 +89,8 @@ jobs:
           set -euo pipefail
           DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
           test -n "$DB"
-          test "$(printf '%s\\n' "$DB" | wc -l | tr -d ' ')" = "1"
-          docker exec -i "$DB" psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \\
-            < scripts/control-plane/verify-charts2-evidence-privacy-v1.sql
+          test "$(printf '%s\n' "$DB" | wc -l | tr -d ' ')" = "1"
+          docker exec -i "$DB" psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres < scripts/control-plane/verify-charts2-evidence-privacy-v1.sql
           echo WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_SQL=PASS
 
       - name: Verify RNB18 empty historical archive and immutable authority (read only)
