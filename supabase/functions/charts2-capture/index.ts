@@ -8,6 +8,8 @@ import { decodeCharts2Original, listCharts2SourceContracts } from "../_shared/ch
 const MAX_BYTES = 4_000_000;
 const MAX_REQUEST_BYTES = 6_000_000;
 const BUCKET = "charts2-evidence-private-v1";
+// Manual authenticated research only, never the held unattended collector.
+const RESEARCH_GET_SOURCES = new Set(["apple_ke","mdundo_ke","audiomack_ke","shazam_ke"]);
 const SOURCES = new Map(listCharts2SourceContracts().map((s) => [s.source_key, s]));
 const MIME = Object.freeze({
   apple_ke:"text/html",mdundo_ke:"text/html",audiomack_ke:"text/html",
@@ -144,6 +146,28 @@ async function storeOriginal(server:any, source_key:string, bytes:Uint8Array,
   return key;
 }
 
+async function fetchFirstPartyOriginal(key:string,endpoint:string):Promise<{
+  bytes:Uint8Array,contentType:string
+}> {
+  expectedUrl(key,endpoint);
+  const controller=new AbortController();
+  const abort=setTimeout(()=>controller.abort(),12000);
+  try {
+    const upstream=await fetch(endpoint,{method:"GET",redirect:"error",
+      credentials:"omit",headers:{accept:MIME[key]},signal:controller.signal});
+    if(upstream.status!==200)throw new Reject(502,"charts2_source_non_200");
+    const contentType=decodeContentType(upstream.headers.get("content-type"));
+    if(contentType!==MIME[key])throw new Reject(415,"charts2_source_type_unqualified");
+    const size=Number(upstream.headers.get("content-length")??0);
+    if(size>MAX_BYTES)throw new Reject(413,"charts2_source_too_large");
+    const bytes=await readCappedStream(upstream.body,MAX_BYTES);
+    return {bytes,contentType};
+  }catch(e) {
+    if(e instanceof Reject)throw e;
+    throw new Reject(502,"charts2_source_transport_failed");
+  } finally {clearTimeout(abort);}
+}
+
 async function handle(req:Request) {
   if(req.headers.get("origin")&&!ORIGINS.has(req.headers.get("origin")!))
     throw new Reject(403,"charts2_origin_not_allowed");
@@ -189,23 +213,28 @@ async function handle(req:Request) {
       throw new Reject(409,"charts2_source_method_held");
     endpoint=method.exact_endpoint;
     methodRevision=method.method_revision;
-    expectedUrl(key,endpoint);
-    const controller=new AbortController();
-    const abort=setTimeout(()=>controller.abort(),12000);
-    try {
-      const upstream=await fetch(endpoint,{method:"GET",redirect:"error",
-        credentials:"omit",headers:{accept:MIME[key]},signal:controller.signal});
-      if(upstream.status!==200)throw new Reject(502,"charts2_source_non_200");
-      contentType=decodeContentType(upstream.headers.get("content-type"));
-      if(contentType!==MIME[key])throw new Reject(415,"charts2_source_type_unqualified");
-      const size=Number(upstream.headers.get("content-length")??0);
-      if(size>MAX_BYTES)throw new Reject(413,"charts2_source_too_large");
-      bytes=await readCappedStream(upstream.body,MAX_BYTES);
-    }catch(e) {
-      if(e instanceof Reject)throw e;
-      throw new Reject(502,"charts2_source_transport_failed");
-    } finally {clearTimeout(abort);}
+    ({bytes,contentType}=await fetchFirstPartyOriginal(key,endpoint));
     captureMode="service_original";
+  } else if(mode==="research") {
+    // A real signed-in chart operator deliberately requests one exact
+    // provider-owned public chart. This is not scheduled/source-method admission.
+    if(decodeContentType(req.headers.get("content-type"))!=="application/json")
+      throw new Reject(415,"charts2_research_type_invalid");
+    const raw=await readCappedStream(req.body,1024);
+    let supplied:unknown;
+    try { supplied=JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(raw)); }
+    catch { throw new Reject(400,"charts2_research_body_invalid"); }
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+      Object.keys(supplied).length!==1||!("source_key" in supplied))
+      throw new Reject(400,"charts2_research_arguments_invalid");
+    key=sourceKey((supplied as {source_key:unknown}).source_key);
+    if(!RESEARCH_GET_SOURCES.has(key))
+      throw new Reject(409,"charts2_source_research_held");
+    endpoint=SOURCES.get(key)?.first_party_endpoint;
+    if(typeof endpoint!=="string")
+      throw new Reject(409,"charts2_source_research_held");
+    ({bytes,contentType}=await fetchFirstPartyOriginal(key,endpoint));
+    captureMode="research_original_upload";
   } else {
     throw new Reject(400,"charts2_mode_unrecognized");
   }
