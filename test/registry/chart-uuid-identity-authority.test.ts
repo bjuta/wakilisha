@@ -378,10 +378,10 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
 
   it("changes exactly the two service-only SQL method gates for native YouTube POST", () => {
     expect(nativePostSql).toContain("GitHub Actions run 44374242383");
-    expect(nativePostSql.match(/create or replace function public\\.charts2_/g)?.length).toBe(2);
-    expect(nativePostSql.match(/m\\.reviewed_method = 'POST'/g)?.length).toBe(2);
-    expect(nativePostSql.match(/m\\.source_key <> 'youtube_ke' and m\\.reviewed_method = 'GET'/g)?.length).toBe(2);
-    expect(nativePostSql.match(/https:\\/\\/charts\\.youtube\\.com\\/youtubei\\/v1\\/browse\\?alt=json/g)?.length).toBe(2);
+    expect(nativePostSql.split("create or replace function public.charts2_").length - 1).toBe(2);
+    expect(nativePostSql.split("m.reviewed_method = 'POST'").length - 1).toBe(2);
+    expect(nativePostSql.split("m.source_key <> 'youtube_ke' and m.reviewed_method = 'GET'").length - 1).toBe(2);
+    expect(nativePostSql.split("https://charts.youtube.com/youtubei/v1/browse?alt=json").length - 1).toBe(2);
     expect(nativePostSql).toContain("authorization_expires_at > now()");
     expect(nativePostSql).toContain("from public, anon, authenticated");
     expect(nativePostSql).toContain("to service_role");
