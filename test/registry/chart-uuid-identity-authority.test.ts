@@ -93,6 +93,7 @@ import { createHash } from "node:crypto";
 import {
   decodeCharts2Original,
   listCharts2SourceContracts,
+  charts2YouTubeNativeWeeklyPost,
 } from "../../supabase/functions/_shared/charts2-original-candidate.mjs";
 
 const charts2ObservedAt = "2026-11-18T12:00:00.000Z";
@@ -111,6 +112,38 @@ const charts2AudiomackUrl = "https://audiomack.com/geo-charts/playlist/kenya";
 const charts2YoutubeUrl = "https://charts.youtube.com/youtubei/v1/browse?alt=json";
 
 describe("Charts 2.0 original-byte source adapters (candidate only)", () => {
+  it("reuses the exact Kenya Top Songs native POST with a checked provider week", () => {
+    const request = charts2YouTubeNativeWeeklyPost(
+      "youtube_ke", charts2YoutubeUrl, "weekly:20261030:20261105:ke");
+    expect(request.method).toBe("POST");
+    const data = JSON.parse(request.body);
+    expect(data.context.client.clientName).toBe("WEB_MUSIC_ANALYTICS");
+    expect(data.context.client.gl).toBe("KE");
+    expect(data.browseId).toBe("FEmusic_analytics_charts_home");
+    expect(data.query).toContain("chart_params_country_code=ke");
+    expect(data.query).toContain("chart_params_chart_type=TRACKS");
+    expect(data.query).toContain("chart_params_period_type=WEEKLY");
+    expect(data.query).toContain("chart_params_end_date=20261105");
+    expect(() => charts2YouTubeNativeWeeklyPost(
+      "apple_ke", charts2YoutubeUrl, "weekly:20261030:20261105:ke"))
+      .toThrow("charts2_youtube_post_source_unqualified");
+    expect(() => charts2YouTubeNativeWeeklyPost(
+      "youtube_ke", "https://www.youtube.com/results", "weekly:20261030:20261105:ke"))
+      .toThrow("charts2_youtube_post_source_unqualified");
+    for (const period of [
+      "weekly:20261030:20261112:ke", // requested period is not exactly seven days
+      "weekly:20261031:20261105:ke",
+      "weekly:20261101:20261106:ke", // YouTube native week must end Thursday
+      "weekly:20260225:20260230:ke", // invalid calendar date
+      "weekly:20261030:20261105:us",
+      "20261105",
+    ]) {
+      expect(() => charts2YouTubeNativeWeeklyPost(
+        "youtube_ke", charts2YoutubeUrl, period))
+        .toThrow("charts2_youtube_post_period_unqualified");
+    }
+  });
+
   it("selects exactly five Kenya first-party families and their native depths", () => {
     const rows = listCharts2SourceContracts();
     expect(rows.map((r: any) => [r.source_key, r.market, r.depth])).toEqual([
@@ -363,6 +396,10 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(edge).toContain('candidate.can_score!==false');
     expect(edge).toContain('candidate.can_publish!==false');
     expect(edge).toContain('source_method_held');
+    expect(edge).toContain('charts2YouTubeNativeWeeklyPost');
+    expect(edge).toContain('key==="youtube_ke"&&method.reviewed_method==="POST"');
+    expect(edge).toContain('key!=="youtube_ke"&&method.reviewed_method==="GET"');
+    expect(edge).toContain('charts2_youtube_period_unqualified');
     expect(edge).toContain('credentials:"omit"');
     expect(edge).toContain('redirect:"error"');
     expect(edge).not.toContain("publish_charts");
