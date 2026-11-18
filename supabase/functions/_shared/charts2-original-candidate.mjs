@@ -26,14 +26,14 @@ const SOURCE_CONTRACTS = Object.freeze({
   shazam_ke: Object.freeze({
     market: 'KE', depth: 200, behavior: 'discovery', metric: 'rank',
     canonical_chart: 'Shazam Kenya Top 200',
-    first_party_endpoint: null,
-    endpoint_state: 'offered_csv_exact_method_requires_new_review',
+    first_party_endpoint: 'https://www.shazam.com/services/charts/csv/top-200/kenya',
+    endpoint_state: 'verified_first_party_csv_research_original_collector_method_held',
   }),
   mdundo_ke: Object.freeze({
     market: 'KE', depth: 100, behavior: 'consumption', metric: 'rank',
     canonical_chart: 'Mdundo Kenya Top Songs',
-    first_party_endpoint: null,
-    endpoint_state: 'first_party_page_exact_method_requires_new_review',
+    first_party_endpoint: 'https://play.mdundo.com/top-charts/ke',
+    endpoint_state: 'verified_first_party_research_original_collector_method_held',
   }),
   youtube_ke: Object.freeze({
     market: 'KE', depth: 100, behavior: 'video_consumption',
@@ -72,24 +72,9 @@ function endpointAllowed(sourceKey, endpoint) {
   if (typeof endpoint !== 'string' || endpoint.length > 2048)
     fail('charts2_source_endpoint_missing');
   const spec = SOURCE_CONTRACTS[sourceKey];
-  if (spec.first_party_endpoint) {
-    if (endpoint !== spec.first_party_endpoint) fail('charts2_source_endpoint_unreviewed');
-    return;
-  }
-  // Shazam and Mdundo exact capture URLs require a separately reviewed
-  // method ledger. Candidate parsing alone cannot provide that authority.
-  let url;
-  try { url = new URL(endpoint); } catch { fail('charts2_source_endpoint_unreviewed'); }
-  if (url.protocol !== 'https:' || url.username || url.password ||
-    url.port || url.hash || url.search)
-    fail('charts2_source_endpoint_unreviewed');
-  if (sourceKey === 'mdundo_ke' &&
-      !['mdundo.com','www.mdundo.com'].includes(url.hostname))
-    fail('charts2_source_endpoint_unreviewed');
-  if (sourceKey === 'shazam_ke' &&
-      !['shazam.com','www.shazam.com'].includes(url.hostname))
-    fail('charts2_source_endpoint_unreviewed');
-  if (!['mdundo_ke','shazam_ke'].includes(sourceKey))
+  // An exact chart URL prevents title-only/unrelated Shazam and Mdundo
+  // pages from ever being recorded as the selected national ranking.
+  if (!spec.first_party_endpoint || endpoint !== spec.first_party_endpoint)
     fail('charts2_source_endpoint_unreviewed');
 }
 

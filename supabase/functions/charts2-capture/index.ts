@@ -55,7 +55,7 @@ function expectedUrl(source_key:string, endpoint: string) {
   const permitted:Record<string,string[]> = {
     apple_ke:["music.apple.com"],
     shazam_ke:["shazam.com","www.shazam.com"],
-    mdundo_ke:["mdundo.com","www.mdundo.com"],
+    mdundo_ke:["play.mdundo.com"],
     youtube_ke:["charts.youtube.com"],
     audiomack_ke:["audiomack.com","www.audiomack.com"],
   };
