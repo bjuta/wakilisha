@@ -230,9 +230,10 @@ async function handle(req:Request) {
     key=sourceKey((supplied as {source_key:unknown}).source_key);
     if(!RESEARCH_GET_SOURCES.has(key))
       throw new Reject(409,"charts2_source_research_held");
-    endpoint=SOURCES.get(key)?.first_party_endpoint;
-    if(typeof endpoint!=="string")
+    const pinned=SOURCES.get(key)?.first_party_endpoint;
+    if(typeof pinned!=="string")
       throw new Reject(409,"charts2_source_research_held");
+    endpoint=pinned;
     ({bytes,contentType}=await fetchFirstPartyOriginal(key,endpoint));
     captureMode="research_original_upload";
   } else {
