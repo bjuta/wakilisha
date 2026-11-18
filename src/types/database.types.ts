@@ -21418,6 +21418,19 @@ export type Database = {
         Args: { p_config_json: Json; p_family_id: string }
         Returns: Json
       }
+      charts2_commit_verified_original_v1: {
+        Args: { p_capture: Json }
+        Returns: string
+      }
+      charts2_get_collector_method_v1: {
+        Args: { p_source_key: string }
+        Returns: {
+          exact_endpoint: string
+          method_revision: number
+          reviewed_method: string
+          source_key: string
+        }[]
+      }
       claim_media_processing_jobs_v1: {
         Args: {
           p_lease_seconds?: number
