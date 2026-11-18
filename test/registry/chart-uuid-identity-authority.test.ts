@@ -254,3 +254,50 @@ describe("Charts 2.0 original-byte source adapters (candidate only)", () => {
       .rejects.toThrow("mdundo_ke_noncontiguous_rank");
   });
 });
+
+
+describe("Charts 2.0 private evidence migration authority", () => {
+  const charts2Sql = readFileSync(
+    "supabase/migrations/20261118152352_charts2_source_evidence_v1.sql",
+    "utf8",
+  );
+
+  it("uses the exact pinned Supabase CLI-generated migration path and limits scope", () => {
+    expect(charts2Sql).toContain("GitHub run 44335133638");
+    expect(charts2Sql).toContain("begin;");
+    expect(charts2Sql.trimEnd().endsWith("commit;")).toBe(true);
+    expect(charts2Sql).not.toContain("update public.wk_chart_programs_v2");
+    expect(charts2Sql).not.toContain("create extension");
+    expect(charts2Sql).not.toContain("wk100_");
+  });
+
+  it("seeds only the five approved Kenya sources without granting admission", () => {
+    for (const key of ["apple_ke","shazam_ke","mdundo_ke","youtube_ke","audiomack_ke"]) {
+      expect(charts2Sql).toContain(`('${key}',${key === "shazam_ke" ? "200" : "100"})`);
+    }
+    expect(charts2Sql).toContain("default 'held'");
+    expect(charts2Sql).toContain("constraint charts2_method_admission_complete");
+    expect(charts2Sql).toContain("reviewed_by is not null");
+    expect(charts2Sql).toContain("authorization_expires_at > reviewed_at");
+  });
+
+  it("keeps private evidence immutable and nonpublishing, with no public grants", () => {
+    expect(charts2Sql).toContain("create trigger charts2_receipt_immutable_v1");
+    expect(charts2Sql).toContain("create trigger charts2_guard_receipt_rows_v1");
+    expect(charts2Sql).toContain("candidate_only boolean not null default true");
+    expect(charts2Sql).toContain("can_score boolean not null default false");
+    expect(charts2Sql).toContain("can_publish boolean not null default false");
+    expect(charts2Sql).toContain("alter table platform_private.charts2_capture_receipts_v1 enable row level security");
+    expect(charts2Sql).toContain("revoke all on platform_private.charts2_capture_receipts_v1 from public,anon,authenticated");
+    expect(charts2Sql).not.toMatch(/grant (select|insert|update|delete|all) on platform_private\.charts2_/i);
+  });
+
+  it("uses a nonpublic 4 MiB Storage bucket and both native chart depths", () => {
+    expect(charts2Sql).toContain("'charts2-evidence-private-v1'");
+    expect(charts2Sql).toContain("false,4000000");
+    expect(charts2Sql).toContain("source_key = 'shazam_ke' and expected_depth = 200");
+    expect(charts2Sql).toContain("source_key <> 'shazam_ke' and expected_depth = 100");
+    expect(charts2Sql).toContain("charts2_capture_rank_sequence_invalid");
+    expect(charts2Sql).toContain("charts2_capture_duplicate_provider_identity");
+  });
+});
