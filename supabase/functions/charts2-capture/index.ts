@@ -3,7 +3,7 @@
 // No scoring, Registry mutation, publication, timer or key exposure.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
-import { decodeCharts2Original, listCharts2SourceContracts } from "../_shared/charts2-original-candidate.mjs";
+import { decodeCharts2Original, listCharts2SourceContracts, charts2YouTubeNativeWeeklyPost } from "../_shared/charts2-original-candidate.mjs";
 
 const MAX_BYTES = 4_000_000;
 const MAX_REQUEST_BYTES = 6_000_000;
@@ -185,16 +185,34 @@ async function handle(req:Request) {
     const decision=await server.rpc("charts2_get_collector_method_v1",{p_source_key:key});
     if(decision.error)throw new Reject(503,"charts2_source_method_read_failed");
     const method=decision.data?.[0];
-    if(!method||method.reviewed_method!=="GET")
+    // Only YouTube's native Kenya Top Songs request may use an admitted POST.
+    // Other four approved source methods stay GET-only.
+    if(!method||!((key==="youtube_ke"&&method.reviewed_method==="POST")||
+      (key!=="youtube_ke"&&method.reviewed_method==="GET")))
       throw new Reject(409,"charts2_source_method_held");
     endpoint=method.exact_endpoint;
     methodRevision=method.method_revision;
     expectedUrl(key,endpoint);
+    let nativeRequest:{method:"POST",body:string}|null=null;
+    if(key==="youtube_ke") {
+      try {
+        nativeRequest=charts2YouTubeNativeWeeklyPost(key,endpoint,target_period_key);
+      } catch {
+        throw new Reject(422,"charts2_youtube_period_unqualified");
+      }
+    }
     const controller=new AbortController();
     const abort=setTimeout(()=>controller.abort(),12000);
     try {
-      const upstream=await fetch(endpoint,{method:"GET",redirect:"error",
-        credentials:"omit",headers:{accept:MIME[key]},signal:controller.signal});
+      const upstream=await fetch(endpoint,{
+        method:nativeRequest?.method??"GET",redirect:"error",
+        credentials:"omit",cache:"no-store",
+        headers:{accept:nativeRequest
+          ?"application/json, text/html, text/csv, application/octet-stream"
+          :MIME[key],...(nativeRequest?{"content-type":"application/json"}:{})},
+        ...(nativeRequest?{body:nativeRequest.body}:{}),
+        signal:controller.signal,
+      });
       if(upstream.status!==200)throw new Reject(502,"charts2_source_non_200");
       contentType=decodeContentType(upstream.headers.get("content-type"));
       if(contentType!==MIME[key])throw new Reject(415,"charts2_source_type_unqualified");

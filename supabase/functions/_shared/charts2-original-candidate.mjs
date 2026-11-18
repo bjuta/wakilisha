@@ -84,6 +84,42 @@ export function listCharts2SourceContracts() {
 }
 
 /**
+ * Reuse the archived, Production-proven YouTube Kenya weekly Top Songs
+ * request shape. This is only a request builder, not source-method admission.
+ * The collector and SQL gateway must separately authorize exact POST access.
+ */
+export function charts2YouTubeNativeWeeklyPost(sourceKey, endpoint, targetPeriodKey) {
+  if (sourceKey !== 'youtube_ke' ||
+      endpoint !== SOURCE_CONTRACTS.youtube_ke.first_party_endpoint)
+    fail('charts2_youtube_post_source_unqualified');
+  const parts = typeof targetPeriodKey === 'string'
+    ? /^weekly:(\d{8}):(\d{8}):ke$/.exec(targetPeriodKey) : null;
+  if (!parts) fail('charts2_youtube_post_period_unqualified');
+  const parseDay = value => {
+    const m = /^(\d{4})(\d{2})(\d{2})$/.exec(value);
+    if (!m) return null;
+    const time = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return new Date(time).toISOString().slice(0, 10).replaceAll('-', '') === value
+      ? time : null;
+  };
+  const start = parseDay(parts[1]), end = parseDay(parts[2]);
+  if (start === null || end === null || end - start !== 6 * 86400000 ||
+      new Date(end).getUTCDay() !== 4)
+    fail('charts2_youtube_post_period_unqualified');
+  return Object.freeze({
+    method: 'POST',
+    body: JSON.stringify({
+      context: {client: {clientName: 'WEB_MUSIC_ANALYTICS', clientVersion: '2.0',
+        hl: 'en-GB', gl: 'KE', theme: 'MUSIC'}},
+      browseId: 'FEmusic_analytics_charts_home',
+      query: 'perspective=CHART_DETAILS&chart_params_country_code=ke' +
+        '&chart_params_chart_type=TRACKS&chart_params_period_type=WEEKLY' +
+        '&chart_params_end_date=' + parts[2],
+    }),
+  });
+}
+
+/**
  * Offline-only decoding of a privately supplied original. This function does
  * not assert that an external endpoint was reached or that its bytes are
  * genuine. Provider-byte provenance must be established by the caller.

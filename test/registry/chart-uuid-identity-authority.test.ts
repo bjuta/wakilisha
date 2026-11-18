@@ -93,6 +93,7 @@ import { createHash } from "node:crypto";
 import {
   decodeCharts2Original,
   listCharts2SourceContracts,
+  charts2YouTubeNativeWeeklyPost,
 } from "../../supabase/functions/_shared/charts2-original-candidate.mjs";
 
 const charts2ObservedAt = "2026-11-18T12:00:00.000Z";
@@ -111,6 +112,38 @@ const charts2AudiomackUrl = "https://audiomack.com/geo-charts/playlist/kenya";
 const charts2YoutubeUrl = "https://charts.youtube.com/youtubei/v1/browse?alt=json";
 
 describe("Charts 2.0 original-byte source adapters (candidate only)", () => {
+  it("reuses the exact Kenya Top Songs native POST with a checked provider week", () => {
+    const request = charts2YouTubeNativeWeeklyPost(
+      "youtube_ke", charts2YoutubeUrl, "weekly:20261030:20261105:ke");
+    expect(request.method).toBe("POST");
+    const data = JSON.parse(request.body);
+    expect(data.context.client.clientName).toBe("WEB_MUSIC_ANALYTICS");
+    expect(data.context.client.gl).toBe("KE");
+    expect(data.browseId).toBe("FEmusic_analytics_charts_home");
+    expect(data.query).toContain("chart_params_country_code=ke");
+    expect(data.query).toContain("chart_params_chart_type=TRACKS");
+    expect(data.query).toContain("chart_params_period_type=WEEKLY");
+    expect(data.query).toContain("chart_params_end_date=20261105");
+    expect(() => charts2YouTubeNativeWeeklyPost(
+      "apple_ke", charts2YoutubeUrl, "weekly:20261030:20261105:ke"))
+      .toThrow("charts2_youtube_post_source_unqualified");
+    expect(() => charts2YouTubeNativeWeeklyPost(
+      "youtube_ke", "https://www.youtube.com/results", "weekly:20261030:20261105:ke"))
+      .toThrow("charts2_youtube_post_source_unqualified");
+    for (const period of [
+      "weekly:20261030:20261112:ke", // requested period is not exactly seven days
+      "weekly:20261031:20261105:ke",
+      "weekly:20261101:20261106:ke", // YouTube native week must end Thursday
+      "weekly:20260225:20260230:ke", // invalid calendar date
+      "weekly:20261030:20261105:us",
+      "20261105",
+    ]) {
+      expect(() => charts2YouTubeNativeWeeklyPost(
+        "youtube_ke", charts2YoutubeUrl, period))
+        .toThrow("charts2_youtube_post_period_unqualified");
+    }
+  });
+
   it("selects exactly five Kenya first-party families and their native depths", () => {
     const rows = listCharts2SourceContracts();
     expect(rows.map((r: any) => [r.source_key, r.market, r.depth])).toEqual([
@@ -320,6 +353,10 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     "supabase/migrations/20261118164450_charts2_private_capture_gateway_v1.sql",
     "utf8",
   );
+  const nativePostSql = readFileSync(
+    "supabase/migrations/20261118185142_charts2_youtube_native_post_v1.sql",
+    "utf8",
+  );
   const edge = readFileSync("supabase/functions/charts2-capture/index.ts", "utf8");
   const config = readFileSync("supabase/config.toml", "utf8");
 
@@ -337,6 +374,20 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(migrationSql).toContain("charts2_private_original_missing");
     expect(migrationSql).toContain("charts2_duplicate_original_provenance_conflict");
     expect(migrationSql).not.toContain("update public.wk_chart_programs_v2");
+  });
+
+  it("changes exactly the two service-only SQL method gates for native YouTube POST", () => {
+    expect(nativePostSql).toContain("GitHub Actions run 44374242383");
+    expect(nativePostSql.split("create or replace function public.charts2_").length - 1).toBe(2);
+    expect(nativePostSql.split("m.reviewed_method = 'POST'").length - 1).toBe(2);
+    expect(nativePostSql.split("m.source_key <> 'youtube_ke' and m.reviewed_method = 'GET'").length - 1).toBe(2);
+    expect(nativePostSql.split("https://charts.youtube.com/youtubei/v1/browse?alt=json").length - 1).toBe(2);
+    expect(nativePostSql).toContain("authorization_expires_at > now()");
+    expect(nativePostSql).toContain("from public, anon, authenticated");
+    expect(nativePostSql).toContain("to service_role");
+    expect(nativePostSql).not.toContain("update public.wk_chart_programs_v2");
+    expect(nativePostSql).not.toContain("create table ");
+    expect(nativePostSql).not.toContain("create trigger ");
   });
 
   it("transpiles the actual Edge worker as TypeScript without syntax errors", () => {
@@ -363,6 +414,12 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(edge).toContain('candidate.can_score!==false');
     expect(edge).toContain('candidate.can_publish!==false');
     expect(edge).toContain('source_method_held');
+    expect(edge).toContain('charts2YouTubeNativeWeeklyPost');
+    expect(edge).toContain('key==="youtube_ke"&&method.reviewed_method==="POST"');
+    expect(edge).toContain('key!=="youtube_ke"&&method.reviewed_method==="GET"');
+    expect(edge).toContain('charts2_youtube_period_unqualified');
+    expect(edge).toContain('cache:"no-store"');
+    expect(edge).toContain('"application/json, text/html, text/csv, application/octet-stream"');
     expect(edge).toContain('credentials:"omit"');
     expect(edge).toContain('redirect:"error"');
     expect(edge).not.toContain("publish_charts");
