@@ -356,6 +356,6 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(edge).toContain('redirect:"error"');
     expect(edge).not.toContain("publish_charts");
     expect(edge).not.toContain("chart_assert_publishable_edition");
-    expect(config).toContain("[functions.charts2-capture]\\nverify_jwt = true");
+    expect(config).toContain(["[functions.charts2-capture]", "verify_jwt = true"].join(String.fromCharCode(10)));
   });
 });
