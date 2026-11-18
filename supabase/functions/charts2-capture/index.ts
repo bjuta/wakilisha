@@ -206,8 +206,10 @@ async function handle(req:Request) {
     try {
       const upstream=await fetch(endpoint,{
         method:nativeRequest?.method??"GET",redirect:"error",
-        credentials:"omit",
-        headers:{accept:MIME[key],...(nativeRequest?{"content-type":"application/json"}:{})},
+        credentials:"omit",cache:"no-store",
+        headers:{accept:nativeRequest
+          ?"application/json, text/html, text/csv, application/octet-stream"
+          :MIME[key],...(nativeRequest?{"content-type":"application/json"}:{})},
         ...(nativeRequest?{body:nativeRequest.body}:{}),
         signal:controller.signal,
       });
