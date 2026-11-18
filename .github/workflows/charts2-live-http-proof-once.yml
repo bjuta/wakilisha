@@ -113,6 +113,19 @@ jobs:
                 ' result=HOLD reason='+sanitized);
             }
           }
+          // Mdundo's current, separately verified play.mdundo.com route must
+          // be checked as a parser-only candidate before updating its endpoint contract.
+          try {
+            const path='/tmp/charts2-probe/mdundo_first_party.body';
+            const {parseMdundoKenya}=await import('./supabase/functions/_shared/charts2-source-parsers.mjs');
+            const parsed=parseMdundoKenya(readFileSync(path,'utf8'));
+            console.log('WK_CHARTS2_MDUNDO_CURRENT_PARSER result='+parsed.status+
+              ' depth='+parsed.observed_depth+'/'+parsed.chart_depth);
+          } catch (e) {
+            const error=(e instanceof Error?e.message:'unknown');
+            console.log('WK_CHARTS2_MDUNDO_CURRENT_PARSER result=HOLD reason='+
+              error.replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,150));
+          }
           console.log('WK_CHARTS2_DECODE_RESEARCH_ONLY_NO_STORAGE_OR_SCORE=TRUE');
           NODE
       - name: Remove unretained originals
