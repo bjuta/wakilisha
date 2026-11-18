@@ -45,6 +45,11 @@ jobs:
           probe mdundo_old "https://mdundo.com/top-charts/ke"
           probe mdundo_first_party "https://play.mdundo.com/top-charts/ke"
           probe shazam "https://www.shazam.com/charts/top-200/kenya"
+          # Shazam's provider-owned chart CSV link is a separate native surface.
+          probe shazam_csv "https://www.shazam.com/services/charts/csv/top-200/kenya"
+          probe shazam_csv_slash "https://www.shazam.com/services/charts/csv/top-200/kenya/"
+          # A readable official YouTube chart page is not the internal Top Songs JSON API.
+          probe youtube_public "https://charts.youtube.com/charts/TopSongs/ke/weekly"
           probe youtube_get "https://charts.youtube.com/youtubei/v1/browse?alt=json"
 
           function_probe() {
@@ -89,6 +94,8 @@ jobs:
             ['audiomack','audiomack_ke','https://audiomack.com/geo-charts/playlist/kenya'],
             ['mdundo_old','mdundo_ke','https://mdundo.com/top-charts/ke'],
             ['shazam','shazam_ke','https://www.shazam.com/charts/top-200/kenya'],
+            ['shazam_csv','shazam_ke','https://www.shazam.com/services/charts/csv/top-200/kenya'],
+            ['shazam_csv_slash','shazam_ke','https://www.shazam.com/services/charts/csv/top-200/kenya/'],
             ['youtube_get','youtube_ke','https://charts.youtube.com/youtubei/v1/browse?alt=json'],
           ];
           for (const [label,source_key,endpoint] of items) {
