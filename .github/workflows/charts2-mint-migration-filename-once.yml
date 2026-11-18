@@ -1,0 +1,30 @@
+# TEMPORARY ONE-SHOT PATH MINT. Remove before PR.
+# Uses the identical pinned CLI version as the protected repository workflow.
+name: Charts2 Phase1 migration filename mint (temporary)
+on:
+  push:
+    branches:
+      - feat/charts2-phase1-evidence-store
+    paths:
+      - .github/workflows/charts2-mint-migration-filename-once.yml
+permissions:
+  contents: read
+jobs:
+  generate-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+      - name: Generate exact canonical CLI filename (no SQL, no DB writes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --version
+          supabase migration new charts2_source_evidence_v1
+          path="$(find supabase/migrations -maxdepth 1 -type f -name '*_charts2_source_evidence_v1.sql' -print | sort | tail -1)"
+          test -n "$path"
+          test "$(find supabase/migrations -maxdepth 1 -type f -name '*_charts2_source_evidence_v1.sql' -print | wc -l | tr -d ' ')" -eq 1
+          echo "CHARTS2_CLI_GENERATED_MIGRATION_PATH=$path"
+          echo "NO_DATABASE_CONNECTION_OR_WRITE=TRUE"
