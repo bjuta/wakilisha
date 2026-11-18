@@ -32,8 +32,8 @@ const SOURCE_CONTRACTS = Object.freeze({
   mdundo_ke: Object.freeze({
     market: 'KE', depth: 100, behavior: 'consumption', metric: 'rank',
     canonical_chart: 'Mdundo Kenya Top Songs',
-    first_party_endpoint: null,
-    endpoint_state: 'first_party_page_exact_method_requires_new_review',
+    first_party_endpoint: 'https://play.mdundo.com/top-charts/ke',
+    endpoint_state: 'verified_first_party_research_original_collector_method_held',
   }),
   youtube_ke: Object.freeze({
     market: 'KE', depth: 100, behavior: 'video_consumption',
@@ -83,13 +83,8 @@ function endpointAllowed(sourceKey, endpoint) {
   if (url.protocol !== 'https:' || url.username || url.password ||
     url.port || url.hash || url.search)
     fail('charts2_source_endpoint_unreviewed');
-  if (sourceKey === 'mdundo_ke' &&
-      !['mdundo.com','www.mdundo.com'].includes(url.hostname))
-    fail('charts2_source_endpoint_unreviewed');
-  if (sourceKey === 'shazam_ke' &&
+  if (sourceKey !== 'shazam_ke' ||
       !['shazam.com','www.shazam.com'].includes(url.hostname))
-    fail('charts2_source_endpoint_unreviewed');
-  if (!['mdundo_ke','shazam_ke'].includes(sourceKey))
     fail('charts2_source_endpoint_unreviewed');
 }
 
