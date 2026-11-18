@@ -1,0 +1,123 @@
+# One-shot private-readonly acceptance probe. Never merge this workflow.
+name: Charts2 Phase 1 Live HTTP Proof (one-shot)
+on:
+  push:
+    branches: [probe/charts2-phase1-live-http-20261118]
+    paths:
+      - .github/workflows/charts2-live-http-proof-once.yml
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: First-party provider HTTP and public function ingress, no credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/charts2-probe
+          probe() {
+            local key="$1"
+            local url="$2"
+            local out="/tmp/charts2-probe/${key}.body"
+            local headers="/tmp/charts2-probe/${key}.headers"
+            local result=""
+            local exit_code=0
+            result="$(curl --silent --show-error --location --max-redirs 2 \
+              --connect-timeout 6 --max-time 22 --max-filesize 4000000 \
+              --request GET --output "$out" --dump-header "$headers" \
+              --write-out '%{http_code} %{content_type} %{url_effective}' "$url")" || exit_code="$?"
+            local bytes="0" hash="none"
+            if test -f "$out"; then
+              bytes="$(wc -c < "$out" | tr -d ' ')"
+              hash="$(sha256sum "$out" | cut -d' ' -f1)"
+            fi
+            printf 'WK_CHARTS2_SOURCE_HTTP key=%s curl_exit=%s http=%s bytes=%s sha256=%s\n' \
+              "$key" "$exit_code" "$result" "$bytes" "$hash"
+          }
+          probe apple "https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172"
+          probe audiomack "https://audiomack.com/geo-charts/playlist/kenya"
+          probe mdundo_old "https://mdundo.com/top-charts/ke"
+          probe mdundo_first_party "https://play.mdundo.com/top-charts/ke"
+          probe shazam "https://www.shazam.com/charts/top-200/kenya"
+          probe youtube_get "https://charts.youtube.com/youtubei/v1/browse?alt=json"
+
+          function_probe() {
+            local label="$1" method="$2" origin="$3"
+            local url="https://pgzizndxdyhqmtyywjmt.supabase.co/functions/v1/charts2-capture"
+            local opts=()
+            if test "$origin" != "none"; then
+              opts+=(-H "Origin: $origin")
+            fi
+            if test "$method" = "OPTIONS"; then
+              opts+=(-H 'Access-Control-Request-Method: POST' \
+                     -H 'Access-Control-Request-Headers: authorization,apikey,content-type')
+            fi
+            local resp="" rc=0
+            resp="$(curl --silent --show-error --connect-timeout 8 --max-time 15 \
+              --request "$method" "${opts[@]}" \
+              --output /dev/null --write-out '%{http_code}' --dump-header "/tmp/charts2-probe/${label}.headers" "$url")" || rc="$?"
+            local allow="none"
+            if test -f "/tmp/charts2-probe/${label}.headers"; then
+              allow="$(grep -i '^access-control-allow-origin:' "/tmp/charts2-probe/${label}.headers" | tail -1 | tr -d '\r' || true)"
+              test -n "$allow" || allow="none"
+            fi
+            printf 'WK_CHARTS2_FUNCTION_HTTP key=%s curl_exit=%s http=%s cors=%s\n' "$label" "$rc" "$resp" "$allow"
+          }
+          function_probe no_token_get GET none
+          function_probe no_token_post POST none
+          function_probe approved_origin_preflight OPTIONS https://wakilisha.africa
+          function_probe untrusted_origin_preflight OPTIONS https://untrusted.example
+          echo WK_CHARTS2_EXTERNAL_HTTP_PROBE_COMPLETE=TRUE
+      - name: Strict decode of retrieved first-party originals, candidate only
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync, existsSync } from 'node:fs';
+          import { webcrypto } from 'node:crypto';
+          import {decodeCharts2Original} from './supabase/functions/_shared/charts2-original-candidate.mjs';
+          if (!globalThis.crypto) globalThis.crypto=webcrypto;
+          const observed_at = new Date().toISOString();
+          const items=[
+            ['apple','apple_ke','https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172'],
+            ['audiomack','audiomack_ke','https://audiomack.com/geo-charts/playlist/kenya'],
+            ['mdundo_old','mdundo_ke','https://mdundo.com/top-charts/ke'],
+            ['shazam','shazam_ke','https://www.shazam.com/charts/top-200/kenya'],
+            ['youtube_get','youtube_ke','https://charts.youtube.com/youtubei/v1/browse?alt=json'],
+          ];
+          for (const [label,source_key,endpoint] of items) {
+            const path='/tmp/charts2-probe/'+label+'.body';
+            if (!existsSync(path) || readFileSync(path).length===0) {
+              console.log('WK_CHARTS2_ORIGINAL_DECODE key='+label+' result=NO_ORIGINAL');
+              continue;
+            }
+            try {
+              const out=await decodeCharts2Original({
+                source_key, endpoint, observed_at,
+                original_bytes:new Uint8Array(readFileSync(path)),
+              });
+              console.log('WK_CHARTS2_ORIGINAL_DECODE key='+label+
+                ' result='+out.status+' depth='+out.observed_depth+
+                '/'+out.declared_depth+' can_publish='+out.can_publish+
+                ' digest='+out.payload_sha256);
+            } catch(e) {
+              const error=(e instanceof Error?e.message:'unknown');
+              const sanitized=error.replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,160);
+              console.log('WK_CHARTS2_ORIGINAL_DECODE key='+label+
+                ' result=HOLD reason='+sanitized);
+            }
+          }
+          console.log('WK_CHARTS2_DECODE_RESEARCH_ONLY_NO_STORAGE_OR_SCORE=TRUE');
+          NODE
+      - name: Remove unretained originals
+        if: always()
+        shell: bash
+        run: |
+          rm -rf /tmp/charts2-probe
+          echo WK_CHARTS2_TEMP_ORIGINALS_PURGED=TRUE
