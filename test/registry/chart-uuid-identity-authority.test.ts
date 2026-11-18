@@ -363,6 +363,16 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(edge).toContain('candidate.can_score!==false');
     expect(edge).toContain('candidate.can_publish!==false');
     expect(edge).toContain('source_method_held');
+    // Manual first-party research remains distinct from admitted GET collection.
+    expect(edge).toContain('mode==="research"');
+    expect(edge).toContain('RESEARCH_GET_SOURCES = new Set(["apple_ke","mdundo_ke","audiomack_ke","shazam_ke"])');
+    expect(edge).toContain('const {user,server}=await session(req)');
+    expect(edge).toContain('Object.keys(supplied).length!==1');
+    expect(edge).toContain('charts2_source_research_held');
+    expect(edge).toContain('endpoint=pinned');
+    expect(edge).toContain('fetchFirstPartyOriginal(key,endpoint)');
+    expect(edge).toContain('captureMode="research_original_upload"');
+    expect(edge).not.toContain('RESEARCH_GET_SOURCES = new Set(["youtube_ke"');
     expect(edge).toContain('credentials:"omit"');
     expect(edge).toContain('redirect:"error"');
     expect(edge).not.toContain("publish_charts");
