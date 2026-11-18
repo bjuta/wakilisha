@@ -418,6 +418,8 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(edge).toContain('key==="youtube_ke"&&method.reviewed_method==="POST"');
     expect(edge).toContain('key!=="youtube_ke"&&method.reviewed_method==="GET"');
     expect(edge).toContain('charts2_youtube_period_unqualified');
+    expect(edge).toContain('cache:"no-store"');
+    expect(edge).toContain('"application/json, text/html, text/csv, application/octet-stream"');
     expect(edge).toContain('credentials:"omit"');
     expect(edge).toContain('redirect:"error"');
     expect(edge).not.toContain("publish_charts");
