@@ -7,6 +7,16 @@ export const DISPOSABLE_CI_SOURCE = "unlinked-local-ci";
 const MIGRATIONS_DIR = "supabase/migrations";
 const TYPE_FILE = "src/types/database.types.ts";
 const WORKFLOW = "WK100 Disposable SQL Concurrency and Signed-in Storage ACL";
+export const CHARTS2_CI_REPLAY_PROOF_MODE = "charts2_disposable_ci_clean_replay_v1";
+const CHARTS2_CI_WORKFLOW = "MIZIZI Slice 1 Disposable PostgreSQL Proof";
+const CHARTS2_CI_MARKERS = Object.freeze([
+  "WK_CI_NO_REMOTE_TARGET=PASS",
+  "WK_CI_LOCAL_MIGRATION_REPLAY_FINISHED=PASS",
+  "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_DB_SECURITY=PASS",
+  "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS",
+  "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_SQL=PASS",
+  "WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS",
+]);
 const CI_MARKERS = Object.freeze([
   "WK100_CI_DISPOSABLE_NO_REMOTE_TARGET=PASS",
   "WK100_CI_LOCAL_FULL_MIGRATION_REPLAY=PASS",
@@ -25,7 +35,8 @@ function git(args,{allowFailure=false}={}) {
   return {status:r.status,stdout:r.stdout??""};
 }
 export function isDisposableCiReplayProof(proof){
-  return proof?.proof_mode===DISPOSABLE_CI_REPLAY_PROOF_MODE;
+  return proof?.proof_mode===DISPOSABLE_CI_REPLAY_PROOF_MODE ||
+    proof?.proof_mode===CHARTS2_CI_REPLAY_PROOF_MODE;
 }
 export function validateDisposableCiReplayProof({proof,migrationFile,migrationSha256,baseMainSha}){
   const e=[];
@@ -38,14 +49,17 @@ export function validateDisposableCiReplayProof({proof,migrationFile,migrationSh
   if(!HEX40.test(proof?.replay_candidate_head_sha??""))e.push("disposable CI replay head SHA missing");
   if(proof?.replay_environment!=="supabase-local-unlinked" || proof?.hosted_preview_used!==false ||
       proof?.production_mutation!==false)e.push("disposable CI must be unlinked, not hosted or Production");
-  if(proof?.workflow_name!==WORKFLOW || !Number.isInteger(proof?.workflow_run_id)||
+  const isCharts2 = proof?.proof_mode===CHARTS2_CI_REPLAY_PROOF_MODE;
+  const expectedWorkflow = isCharts2 ? CHARTS2_CI_WORKFLOW : WORKFLOW;
+  const expectedMarkers = isCharts2 ? CHARTS2_CI_MARKERS : CI_MARKERS;
+  if(proof?.workflow_name!==expectedWorkflow || !Number.isInteger(proof?.workflow_run_id)||
       proof.workflow_run_id<1 || proof?.workflow_run_url!==
       "https://github.com/bjuta/wakilisha/actions/runs/"+proof.workflow_run_id)
     e.push("disposable CI workflow evidence URL/identity mismatch");
   if(proof?.workflow_conclusion!=="success" || proof?.workflow_event!=="pull_request")
     e.push("disposable CI requires successful pull-request workflow evidence");
-  if(!Array.isArray(proof?.ci_markers) || proof.ci_markers.length!==CI_MARKERS.length ||
-      !CI_MARKERS.every((marker,index)=>proof.ci_markers[index]===marker))
+  if(!Array.isArray(proof?.ci_markers) || proof.ci_markers.length!==expectedMarkers.length ||
+      !expectedMarkers.every((marker,index)=>proof.ci_markers[index]===marker))
     e.push("disposable CI missing ordered independent replay/auth/storage/cleanup markers");
   if(proof?.baseline_replay!=="pass" || proof?.candidate_apply!=="pass" ||
       proof?.verifier!=="pass" || proof?.cleanup!=="pass")
