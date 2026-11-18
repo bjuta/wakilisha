@@ -56,3 +56,8 @@ allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]
 
 [functions.music-work-resolver]
 verify_jwt = true
+
+# A manual/admin-only collector; JWT verification is on and scheduled calls
+# remain disabled until source-method admission is independently reviewed.
+[functions.charts2-capture]
+verify_jwt = true
