@@ -4,6 +4,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { decodeCharts2Original, listCharts2SourceContracts, charts2YouTubeNativeWeeklyPost } from "../_shared/charts2-original-candidate.mjs";
+import {scoreCharts2PrivatePreviewV1,CHARTS2_PRIVATE_METHODOLOGY_V1} from "../_shared/charts2-private-scoring-v1.mjs";
 
 const MAX_BYTES = 4_000_000;
 const MAX_REQUEST_BYTES = 6_000_000;
@@ -145,6 +146,156 @@ async function storeOriginal(server:any, source_key:string, bytes:Uint8Array,
 }
 
 
+
+/** Only verified actor session may invoke the service-role snapshot. */
+async function studioSnapshot(server:any) {
+  const read=await server.rpc("charts2_studio_private_snapshot_v1");
+  if(read.error||read.data?.contract!=="charts2-private-studio/v1")
+    throw new Reject(503,"charts2_studio_snapshot_unavailable");
+  return read.data;
+}
+async function verifyPrivateOriginal(server:any,receipt:any) {
+  if(!receipt||typeof receipt.original_object_key!=="string" ||
+     receipt.original_bucket!==BUCKET ||
+     !/^[a-f0-9]{64}$/.test(receipt.original_sha256??"")||
+     !Number.isInteger(receipt.original_byte_length) ||
+     receipt.original_byte_length<1||receipt.original_byte_length>MAX_BYTES)
+    throw new Reject(409,"charts2_studio_original_invalid");
+  const storage=await server.storage.from(BUCKET).download(receipt.original_object_key);
+  if(storage.error||!storage.data)
+    throw new Reject(503,"charts2_studio_original_unavailable");
+  const bytes=new Uint8Array(await storage.data.arrayBuffer());
+  if(bytes.length!==receipt.original_byte_length)
+    throw new Reject(409,"charts2_studio_original_mismatch");
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),
+    x=>x.toString(16).padStart(2,"0")).join("");
+  if(hash!==receipt.original_sha256)
+    throw new Reject(409,"charts2_studio_original_mismatch");
+}
+async function requireRegistryReviewer(authClient:any) {
+  const result=await authClient.rpc("current_user_has_capability",{
+    required_capability:"manage_registry",
+  });
+  if(result.error||result.data!==true)
+    throw new Reject(403,"charts2_manage_registry_required");
+}
+const TRACK_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+async function studioAction(mode:string,req:Request,server:any,authClient:any) {
+  if(mode==="studio_preview") {
+    const snapshot=await studioSnapshot(server);
+    const receipts=snapshot.receipts??[];
+    if(!Array.isArray(receipts)||receipts.length!==5) {
+      return {state:"incomplete_source_set",can_publish:false,
+        source_methods:snapshot.source_methods,methodology:snapshot.methodology,
+        receipt_count:receipts.length};
+    }
+    await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)));
+    let preview;
+    try {
+      preview=scoreCharts2PrivatePreviewV1({
+        receipts,registry_links:snapshot.registry_links,
+      });
+    } catch {throw new Reject(409,"charts2_studio_unqualified_snapshot");}
+    if(snapshot.methodology?.version!==CHARTS2_PRIVATE_METHODOLOGY_V1.version||
+       snapshot.methodology?.scoring_policy_version!==
+         CHARTS2_PRIVATE_METHODOLOGY_V1.scoring_policy_version)
+      throw new Reject(409,"charts2_studio_methodology_mismatch");
+    return {state:"private_review",preview,source_methods:snapshot.source_methods,
+      history:snapshot.history??[],read_at:snapshot.read_at,
+      server_verified_originals:receipts.length,can_publish:false};
+  }
+  if(mode==="studio_track_search") {
+    await requireRegistryReviewer(authClient);
+    const supplied=await req.json().catch(()=>null);
+    if(!supplied||typeof supplied.query!=="string" ||
+       Object.keys(supplied).some(k=>k!=="query"))
+      throw new Reject(400,"charts2_studio_track_search_invalid");
+    const q=supplied.query.trim();
+    if(q.length<2||q.length>80)
+      throw new Reject(400,"charts2_studio_track_search_invalid");
+    const safe=q.replace(/[\\%_]/g,"\\$&");
+    const result=TRACK_UUID.test(q)
+      ? await server.from("registry_tracks")
+          .select("id,title,isrc,status,release_id").eq("id",q).limit(10)
+      : await server.from("registry_tracks")
+          .select("id,title,isrc,status,release_id")
+          .ilike("title","%"+safe+"%").limit(10);
+    if(result.error)throw new Reject(503,"charts2_studio_registry_search_failed");
+    return {state:"registry_candidates",tracks:(result.data??[])
+      .filter((r:any)=>r.status==="active"),can_publish:false};
+  }
+  if(mode==="studio_review_link") {
+    await requireRegistryReviewer(authClient);
+    const supplied=await req.json().catch(()=>null);
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "source_key","rank","receipt_id","original_sha256",
+         "track_id","review_note","evidence_url","acknowledgement"
+       ].includes(k)))
+      throw new Reject(400,"charts2_studio_review_invalid");
+    const source=sourceKey(supplied.source_key);
+    if(!Number.isSafeInteger(supplied.rank)||supplied.rank<1||
+       !TRACK_UUID.test(supplied.track_id??"")||
+       !TRACK_UUID.test(supplied.receipt_id??"")||
+       !/^[a-f0-9]{64}$/.test(supplied.original_sha256??"")||
+       typeof supplied.review_note!=="string"||
+       supplied.review_note.trim().length<40||
+       supplied.review_note.trim().length>1000||
+       typeof supplied.evidence_url!=="string"||
+       supplied.acknowledgement!==
+         "I have independently verified this exact recording and authorize its Registry provider link.")
+      throw new Reject(400,"charts2_studio_review_invalid");
+    let url:URL;
+    try {url=new URL(supplied.evidence_url);} catch {
+      throw new Reject(400,"charts2_studio_review_evidence_url_invalid");
+    }
+    if(url.protocol!=="https:"||url.username||url.password||
+       url.hostname==="localhost"||url.hostname.endsWith(".local"))
+      throw new Reject(400,"charts2_studio_review_evidence_url_invalid");
+    const snapshot=await studioSnapshot(server);
+    const receipt=(snapshot.receipts??[]).find((r:any)=>
+      r.source_key===source&&r.id===supplied.receipt_id &&
+      r.original_sha256===supplied.original_sha256);
+    const observation=receipt?.observations?.find((o:any)=>o.rank===supplied.rank);
+    if(!observation||typeof observation.provider_track_id!=="string"||
+       !observation.provider_track_id.trim())
+      throw new Reject(409,"charts2_studio_recording_id_unavailable");
+    await verifyPrivateOriginal(server,receipt);
+    const canonical=await server.from("registry_tracks").select("id,status")
+      .eq("id",supplied.track_id).maybeSingle();
+    if(canonical.error||canonical.data?.status!=="active")
+      throw new Reject(409,"charts2_studio_track_ineligible");
+    const provider=CHARTS2_PRIVATE_METHODOLOGY_V1.sources[source].provider_key;
+    const existing=(snapshot.registry_links??[]).filter((x:any)=>
+      x.provider_key===provider&&
+      x.provider_track_id===observation.provider_track_id&&
+      x.match_status==="matched");
+    if(existing.some((x:any)=>x.track_id!==supplied.track_id))
+      throw new Reject(409,"charts2_studio_registry_identity_conflict");
+    // Canonical writes go through Registry's accepted human-reviewed broker.
+    // The actor's own JWT is sent, NEVER the service-role client.
+    const accepted=await authClient.rpc("admin_admit_registry_track_provider_link_v1",{
+      p_track_id:supplied.track_id,p_provider_key:provider,
+      p_provider_track_id:observation.provider_track_id,
+      p_match_method:"manual",p_match_confidence:1,p_match_status:"matched",
+      p_raw_payload:{
+        charts2_studio_review_v1:true,source_key:source,
+        receipt_id:receipt.id,original_sha256:receipt.original_sha256,
+        provider_track_id:observation.provider_track_id,
+        review_note:supplied.review_note.trim(),
+        evidence_url:url.toString(),
+      },
+    });
+    if(accepted.error)
+      throw new Reject(409,"charts2_studio_registry_review_rejected");
+    return {state:"registry_review_submitted",source_key:source,
+      rank:supplied.rank,receipt_id:receipt.id,
+      // Existing Registry broker owns the authoritative mutation and audit.
+      broker_result:accepted.data,can_publish:false};
+  }
+  throw new Reject(400,"charts2_mode_unrecognized");
+}
+
 /** The single bounded original-byte transport for collector and method probe. */
 async function fetchSourceOriginal(source_key:string, endpoint:string,
   nativeRequest:{method:"POST",body:string}|null) {
@@ -179,6 +330,8 @@ async function handle(req:Request) {
   const {user,server,authClient}=await session(req);
   const url=new URL(req.url);
   const mode=url.searchParams.get("mode")??"upload";
+  if(["studio_preview","studio_track_search","studio_review_link"].includes(mode))
+    return studioAction(mode,req,server,authClient);
   let key:string, endpoint:string, target_period_key:string|null=null;
   let contentType:string, bytes:Uint8Array, methodRevision:number|null=null;
   let captureMode:"research_original_upload"|"service_original";
