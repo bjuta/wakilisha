@@ -63,6 +63,7 @@ function score(receipts:any[],registry_links:any[]=[]){
 
 const STUDIO_SQL=readFileSync("supabase/migrations/20261119101415_charts2_studio_private_reader_v1.sql","utf8");
 const FREEZE_SQL=readFileSync("supabase/migrations/20261119111655_charts2_private_freeze_authority_v1.sql","utf8");
+const ORIGIN_SQL=readFileSync("supabase/migrations/20261119180542_charts2_top100_origin_neutral_integrity_v1.sql","utf8");
 const STUDIO_WORKER=readFileSync("supabase/functions/charts2-capture/index.ts","utf8");
 const STUDIO_PAGE=readFileSync("src/pages/admin/charts/studio/page.tsx","utf8");
 const ROUTER=readFileSync("src/router/config.tsx","utf8");
@@ -291,6 +292,31 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).toContain('freezeConsent');
     expect(STUDIO_PAGE).toContain('!gate?.freeze_ready');
     expect(STUDIO_PAGE).not.toContain('publish_edition');
+  });
+
+  it("limits artist-origin neutrality to the new top100 method and blocks its publisher",()=>{
+    expect(ORIGIN_SQL).toContain("CREATE OR REPLACE FUNCTION public.chart_get_edition_integrity_report");
+    for(const term of [
+      "public.chart_get_edition_integrity_report(p_edition_id text)",
+      "e.program_id='top100'",
+      "p.public_slug='top100'",
+      "p.market_slug='KE'",
+      "e.methodology_version='consumption_led_cultural_presence_v1'",
+      "e.scoring_policy_version='charts2-private-ordinal-v1'",
+      "then true else false end as charts2_origin_neutral",
+      "s.unresolved_origin_entries > 0 and not s.charts2_origin_neutral",
+      "s.country_ineligible_entries > 0 and not s.charts2_origin_neutral",
+      "not ed.charts2_origin_neutral",
+      "'charts2_requires_exact_100'",
+      "'charts2_publisher_not_enabled'",
+    ]) expect(ORIGIN_SQL).toContain(term);
+    expect(ORIGIN_SQL).not.toContain("update public.wk_chart_programs_v2");
+    expect(ORIGIN_SQL).not.toContain("insert into public.wk_chart_editions_v2");
+    expect(ORIGIN_SQL).not.toContain("insert into public.wk_chart_entries_v2");
+    expect(ORIGIN_SQL).not.toContain("create or replace function public.chart_assert_publishable_edition");
+    expect(ORIGIN_SQL).not.toContain("create or replace function public.wk_chart_editions_publish_integrity_guard");
+    expect(ORIGIN_SQL).not.toContain("create policy");
+    // No frontend copy or wording is changed by the migration.
   });
 
   it("preserves provider time without inventing synchronized weeks",()=>{
