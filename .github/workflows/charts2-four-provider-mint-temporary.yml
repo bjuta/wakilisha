@@ -1,0 +1,32 @@
+name: Temporary Charts2 Four First-Party GET Method Migration Mint
+on:
+  push:
+    branches:
+      - feat/charts2-four-provider-governed-get
+    paths:
+      - .github/workflows/charts2-four-provider-mint-temporary.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/charts2-four-provider-mint-temporary.yml
+permissions:
+  contents: read
+jobs:
+  mint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+      - name: Mint canonical filename
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --version
+          supabase migration new charts2_four_first_party_get_review_v1
+          p="$(find supabase/migrations -maxdepth 1 -name '*_charts2_four_first_party_get_review_v1.sql' -print | sort | tail -1)"
+          test -n "$p"
+          echo "CHARTS2_FOUR_GET_MINTED_FILE=$p"
+          echo "CHARTS2_FOUR_GET_MINT=PASS"
