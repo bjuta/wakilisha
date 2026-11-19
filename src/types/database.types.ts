@@ -21450,6 +21450,10 @@ export type Database = {
           source_key: string
         }[]
       }
+      charts2_studio_private_snapshot_v1: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       charts2_record_get_method_probe_v1: {
         Args: {
           p_actor: string
