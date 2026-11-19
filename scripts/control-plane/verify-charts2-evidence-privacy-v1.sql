@@ -399,6 +399,20 @@ begin
     raise exception 'charts2_get_cross_source_endpoint_allowed';
   exception when check_violation then null;
   end;
+  -- Widening the probe table must never make a native YouTube week optional.
+  begin
+    insert into platform_private.charts2_source_method_probes_v1
+      (source_key,exact_endpoint,reviewed_method,
+       target_period_key,provider_week_ending_date,
+       actor_id,expected_method_revision,original_sha256,
+       original_object_key,original_byte_length,observed_depth)
+    values
+      ('youtube_ke','https://charts.youtube.com/youtubei/v1/browse?alt=json',
+       'POST',null,'2026-11-12'::date,fake_actor,0,repeat('a',64),
+       'youtube_ke/aa/'||repeat('a',64)||'.json',700,100);
+    raise exception 'charts2_youtube_null_provider_week_key_allowed';
+  exception when check_violation then null;
+  end;
   raise notice 'WK_CHARTS2_LOCAL_FOUR_FIRST_PARTY_GET_REVIEW_AND_REVOCATION=PASS';
 end
 $charts2_four_get_review$;
