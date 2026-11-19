@@ -18,6 +18,9 @@ const NAV_GROUPS: NavGroup[] = [
     { path: "/admin", label: "Overview", icon: "LayoutDashboard", requiredCapability: "view_dashboard" },
     { path: "/admin/analytics", label: "Analytics", icon: "BarChart3", requiredCapability: "view_dashboard" },
   ] },
+  { label: "Charts", icon: "BarChart3", visible: (can) => can("manage_charts"), items: [
+    { path: "/admin/charts/studio", label: "Charts Studio", icon: "BarChart3", requiredCapability: "manage_charts" },
+  ] },
   { label: "Field", icon: "Upload", visible: (can) => can("view_field_intake"), items: [
     { path: "/admin/field", label: "Intake", icon: "Upload", requiredCapability: "view_field_intake" },
   ] },
