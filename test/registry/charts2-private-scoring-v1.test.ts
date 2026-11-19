@@ -130,7 +130,7 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     const partial=structuredClone(fixtures);
     partial[0].observed_status="partial_depth";
     expect(()=>buildCharts2PrivateNativeReviewV1({receipts:partial}))
-      .toThrow("charts2_native_review_requires_five_full_originals");
+      .toThrow("charts2_scoring_unqualified_receipt");
     const repeated=structuredClone(fixtures);
     repeated[0].observations[1].title=repeated[0].observations[0].title;
     const review=buildCharts2PrivateNativeReviewV1({receipts:repeated});
