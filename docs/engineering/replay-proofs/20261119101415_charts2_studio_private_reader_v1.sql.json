@@ -3,13 +3,13 @@
   "migration_file": "supabase/migrations/20261119101415_charts2_studio_private_reader_v1.sql",
   "migration_sha256": "38bbb9d9c0c741d3ac74f29b99ada02176f3b2ee72711ca3c1b52a67a17f06af",
   "base_main_sha": "d631221097ce33709146fa81573a5be741df4cdf",
-  "replay_candidate_head_sha": "9dba55bd3e4dccc081a4cef6570fa4968e3248bd",
+  "replay_candidate_head_sha": "d7a2eb611900251e69d7f1c99bc50ada92bddc89",
   "replay_environment": "supabase-local-unlinked",
   "hosted_preview_used": false,
   "production_mutation": false,
   "workflow_name": "MIZIZI Slice 1 Disposable PostgreSQL Proof",
-  "workflow_run_id": 44506590418,
-  "workflow_run_url": "https://github.com/bjuta/wakilisha/actions/runs/44506590418",
+  "workflow_run_id": 44517091287,
+  "workflow_run_url": "https://github.com/bjuta/wakilisha/actions/runs/44517091287",
   "workflow_conclusion": "success",
   "workflow_event": "pull_request",
   "ci_markers": [
@@ -24,9 +24,9 @@
   "candidate_apply": "pass",
   "verifier": "pass",
   "cleanup": "pass",
-  "schema_types_sha256": "55467d419da4f9f85a1d4548c8f95783cc472d68ea904d208bcadb20c3f8d716",
-  "schema_migration_count": 266,
+  "schema_types_sha256": "0177d2edc99c443e8d6582f00ac687706e2ccda879a1988f59c0671f4d6e70b3",
+  "schema_migration_count": 267,
   "schema_migration_head": "20261119101415",
-  "verified_at": "2026-11-19T10:35:45Z",
-  "notes": "Exact-head unlinked 266-migration replay with service-only charts2_studio_private_snapshot_v1 reader and private-only 30/25/20/15/10 methodology. SQL verifier emitted WK_CHARTS2_LOCAL_PRIVATE_STUDIO_SERVICE_READER=PASS, restricted grants, allowed source/state returns, and exact weights. Both disposable PostgreSQL and operator-JWT jobs completed SUCCESS. All fixture data rolled back and disposable containers/volumes destroyed. No Production migration or chart publication."
+  "verified_at": "2026-11-19T11:46:01Z",
+  "notes": "Historical Take 2 service-only Studio snapshot migration carried forward unchanged into final exact-head 267-migration unlinked clean replay #44517091287, now sharing the exact generated types snapshot with the Take 3 freeze. Verified Studio service-only ACL, private-only 30/25/20/15/10 methodology, zero Production mutation, and complete local rollback/cleanup. Original 266-migration replay #44506590418 also remains independently green."
 }
