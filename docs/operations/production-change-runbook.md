@@ -33,6 +33,28 @@
 
 ## Frontend deployment
 
+**Offline SEO snapshot gate:** The canonical `scripts/deploy/production-frontend.sh`
+runner requires `WAKILISHA_ACCEPTED_PRERENDER_DIR` (an absolute local
+directory outside the fresh `dist`) and
+`WAKILISHA_ACCEPTED_PRERENDER_SHA256` (the 64-character digest of its
+`wakilisha-accepted-prerender-index.json`). Its wrapper now runs the
+repository's existing `restore-accepted-prerender.mjs --check` **before**
+dependency installation, critical tests, compilation, SSH, staging or
+activation. A missing, unsealed or tampered snapshot must stop immediately.
+
+These environment variables do **not** confer publication authority: source
+files must originate in the currently deployed and previously accepted
+Lightsail public frontend, be copied read-only to a separate local directory,
+and have their governed publication freshness independently accepted.
+See `docs/engineering/incident-20261113-public-read-load-containment.md`
+and `docs/engineering/seo-governed-publication-receipts-v1.md`. Never create
+a seal for arbitrary local `dist`, skip the accepted SEO rebuild with
+`build:app`, or treat a passing checksum as proof that no article, Artist,
+Track or Chart publication changed. If acceptance evidence is absent, keep
+the live frontend in place. Once the snapshot is approved, use the **same
+canonical frontend runner**, with both inputs exported, and preserve its
+rollback and staged/live parity gates.
+
 - Deploy only when frontend output changed.
 - Run the complete production application build from exact merged `main`.
 - Run targeted route tests and build-time SEO/route canaries before upload.
