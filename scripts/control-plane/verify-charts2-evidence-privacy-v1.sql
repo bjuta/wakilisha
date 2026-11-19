@@ -632,5 +632,58 @@ begin
 end
 $charts2_freeze_actual_100$;
 
+-- Charts 2.0 origin-neutrality uses the retained Chart V2 integrity RPC.
+-- All three draft rows are disposable, in this verifier's outer transaction.
+insert into public.wk_chart_editions_v2
+(id,program_id,edition_slug,edition_label,entry_count,status,
+ methodology_version,scoring_policy_version,chart_size)
+values
+('charts2-ci-origin-new','top100','ci-origin-new','CI new origin',1,'draft',
+ 'consumption_led_cultural_presence_v1','charts2-private-ordinal-v1',100),
+('charts2-ci-origin-legacy','top100','ci-origin-legacy','CI legacy origin',1,'draft',
+ 'weighted_streaming_v1','legacy_policy',100),
+('charts2-ci-origin-rnb','toprnb','ci-origin-rnb','CI RnB origin',1,'draft',
+ 'consumption_led_cultural_presence_v1','charts2-private-ordinal-v1',20);
+
+insert into public.wk_chart_entries_v2
+(id,edition_id,rank,track_title,artist_slug,artist_name,total_score)
+values
+('charts2-ci-origin-entry-new','charts2-ci-origin-new',1,
+ 'CI Recording','no-such-origin-ci-fixture','No Such CI Artist',1),
+('charts2-ci-origin-entry-legacy','charts2-ci-origin-legacy',1,
+ 'CI Recording','no-such-origin-ci-fixture','No Such CI Artist',1),
+('charts2-ci-origin-entry-rnb','charts2-ci-origin-rnb',1,
+ 'CI Recording','no-such-origin-ci-fixture','No Such CI Artist',1);
+
+do $charts2_origin_neutral_acceptance$
+declare v_new jsonb;v_legacy jsonb;v_rnb jsonb;
+begin
+  v_new:=public.chart_get_edition_integrity_report('charts2-ci-origin-new');
+  v_legacy:=public.chart_get_edition_integrity_report('charts2-ci-origin-legacy');
+  v_rnb:=public.chart_get_edition_integrity_report('charts2-ci-origin-rnb');
+
+  if v_new->'blockers' ? 'unresolved_artist_origins'
+     or v_new->'blockers' ? 'country_ineligible_entries'
+     or not (v_new->'blockers' ? 'charts2_publisher_not_enabled')
+     or not (v_new->'blockers' ? 'charts2_requires_exact_100')
+     or v_new->>'publishable' <> 'false'
+     or jsonb_array_length(v_new->'invalidRows') <> 0
+  then raise exception 'charts2_origin_neutral_new_guard_failed: %',v_new;
+  end if;
+
+  if not (v_legacy->'blockers' ? 'unresolved_artist_origins')
+     or v_legacy->'blockers' ? 'charts2_publisher_not_enabled'
+  then raise exception 'charts2_origin_neutral_legacy_changed: %',v_legacy;
+  end if;
+
+  if not (v_rnb->'blockers' ? 'unresolved_artist_origins')
+     or v_rnb->'blockers' ? 'charts2_publisher_not_enabled'
+  then raise exception 'charts2_origin_neutral_toprnb_changed: %',v_rnb;
+  end if;
+
+  raise notice 'WK_CHARTS2_ORIGIN_NEUTRAL_LEGACY_AND_RNB_PRESERVED=PASS';
+end
+$charts2_origin_neutral_acceptance$;
+
 rollback;
 \echo WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS
