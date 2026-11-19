@@ -85,6 +85,7 @@ declare
   expected_depth integer;
   source_weight integer;
   observed_rank integer;
+  rank_count integer;
   credit_units integer;
   receipt_id text;
   provider_id text;
@@ -227,7 +228,8 @@ begin
               'credit_units',credit_units,'registry_provider_link_id',l->>'id'))),
         true);
     end loop;
-    if jsonb_object_length(seen_ranks)<>expected_depth
+    select count(*) into rank_count from jsonb_object_keys(seen_ranks);
+    if rank_count<>expected_depth
     then raise exception 'charts2_freeze_rank_depth_gap'; end if;
   end loop;
   if source_count<>5 then raise exception 'charts2_freeze_source_count_invalid';end if;
