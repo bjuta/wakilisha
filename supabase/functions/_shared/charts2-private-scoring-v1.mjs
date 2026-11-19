@@ -23,7 +23,7 @@ const SOURCE_CONTRACTS = new Map(
   listCharts2SourceContracts().map(s=>[s.source_key,s])
 );
 const SOURCE_KEYS=Object.keys(CHARTS2_PRIVATE_METHODOLOGY_V1.sources).sort();
-const ALLOWED_MATCH_METHODS=new Set(['exact_provider_id','reviewed_provider_id']);
+const ALLOWED_MATCH_METHODS=new Set(['exact_provider_id','reviewed_provider_id','manual']);
 function fail(code){throw new Error(code);}
 function validDate(v){return typeof v==='string' && Number.isFinite(Date.parse(v));}
 function positiveInteger(v){return Number.isSafeInteger(v)&&v>=1;}
@@ -163,7 +163,19 @@ export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[]}={}){
         continue;
       }
       const key=policy.provider_key+'\0'+o.provider_track_id;
-      const matches=bindings.get(key)??[];
+      const matches=(bindings.get(key)??[]).filter(link=>{
+        if(link.match_method!=='manual')return true;
+        const proof=link.review_evidence;
+        return proof?.charts2_studio_review_v1===true &&
+          proof?.source_key===source_key && proof?.receipt_id===receipt.id &&
+          proof?.original_sha256===receipt.original_sha256 &&
+          proof?.provider_track_id===o.provider_track_id &&
+          typeof proof?.review_note==='string' &&
+          proof.review_note.trim().length>=40 &&
+          typeof proof?.evidence_url==='string' &&
+          /^https:\/\//.test(proof.evidence_url) &&
+          Number(link.match_confidence)===1;
+      });
       if(matches.length===0){
         unresolved.push({...observation,reason:'registry_authoritative_link_missing'});
         continue;
