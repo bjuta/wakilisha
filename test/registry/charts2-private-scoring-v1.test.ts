@@ -61,6 +61,7 @@ function score(receipts:any[],registry_links:any[]=[]){
 }
 
 const STUDIO_SQL=readFileSync("supabase/migrations/20261119101415_charts2_studio_private_reader_v1.sql","utf8");
+const FREEZE_SQL=readFileSync("supabase/migrations/20261119111655_charts2_private_freeze_authority_v1.sql","utf8");
 const STUDIO_WORKER=readFileSync("supabase/functions/charts2-capture/index.ts","utf8");
 const STUDIO_PAGE=readFileSync("src/pages/admin/charts/studio/page.tsx","utf8");
 const ROUTER=readFileSync("src/router/config.tsx","utf8");
@@ -247,6 +248,48 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(preview.candidates[99].score_points).toBe("0.20");
     expect(preview.frozen).toBe(false);
     expect(preview.can_publish).toBe(false);
+  });
+
+  it("freezes only an immutable reviewed private 100 with exact SQL digest and revision",()=>{
+    expect(FREEZE_SQL).toContain("create table platform_private.charts2_private_freezes_v1");
+    expect(FREEZE_SQL).toContain("before update or delete");
+    expect(FREEZE_SQL).toContain("charts2_private_freezes_immutable_v1");
+    expect(FREEZE_SQL).toContain("enable row level security");
+    expect(FREEZE_SQL).toContain("jsonb_array_length(ranking)=100");
+    expect(FREEZE_SQL).toContain("to authenticated;");
+    expect(FREEZE_SQL).toContain("to service_role;");
+    expect(FREEZE_SQL).toContain("from public,anon,authenticated,service_role;");
+    expect(FREEZE_SQL).toContain("public.current_user_has_capability('manage_charts')");
+    expect(FREEZE_SQL).toContain("public.current_user_has_capability('manage_registry')");
+    expect(FREEZE_SQL).toContain("auth.uid()");
+    expect(FREEZE_SQL).toContain("pg_advisory_xact_lock");
+    expect(FREEZE_SQL).toContain("charts2_private_freeze_stale_snapshot");
+    expect(FREEZE_SQL).toContain("charts2_private_freeze_revision_conflict");
+    expect(FREEZE_SQL).toContain("charts2_private_freeze_insufficient_registry_authority");
+    expect(FREEZE_SQL).toContain("charts2_private_freeze_digest_conflict");
+    expect(FREEZE_SQL).toContain("return jsonb_build_object('id',duplicate.id");
+    expect(FREEZE_SQL).toContain("source_receipts jsonb not null");
+    expect(FREEZE_SQL).toContain("input_sha256 text not null unique");
+    expect(FREEZE_SQL).toContain("can_publish boolean not null default false");
+    expect(FREEZE_SQL).toContain("jsonb_array_length(material->'ranking')<>100");
+    expect(FREEZE_SQL).not.toContain("insert into public.wk_chart_entries_v2");
+    expect(FREEZE_SQL).not.toContain("insert into public.wk_chart_editions_v2");
+  });
+
+  it("never accepts browser-crafted ranks or a service-role actor for freezing",()=>{
+    expect(STUDIO_WORKER).toContain('mode==="studio_freeze"');
+    expect(STUDIO_WORKER).toContain('await requireRegistryReviewer(authClient)');
+    expect(STUDIO_WORKER).toContain('authClient.rpc("charts2_freeze_private_candidate_v1"');
+    expect(STUDIO_WORKER).not.toContain('server.rpc("charts2_freeze_private_candidate_v1"');
+    expect(STUDIO_WORKER).toContain('server.rpc("charts2_private_freeze_preflight_v1"');
+    expect(STUDIO_WORKER).toContain('charts2_private_freeze_score_disagreement');
+    expect(STUDIO_WORKER).toContain('await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)))');
+    expect(STUDIO_PAGE).toContain('Freeze Exact 100-Recording Private Candidate');
+    expect(STUDIO_PAGE).toContain('freeze_gate');
+    expect(STUDIO_PAGE).toContain('WkCheckbox');
+    expect(STUDIO_PAGE).toContain('freezeConsent');
+    expect(STUDIO_PAGE).toContain('!gate?.freeze_ready');
+    expect(STUDIO_PAGE).not.toContain('publish_edition');
   });
 
   it("preserves provider time without inventing synchronized weeks",()=>{
