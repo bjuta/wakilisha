@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { decodeCharts2Original, listCharts2SourceContracts, charts2YouTubeNativeWeeklyPost } from "../_shared/charts2-original-candidate.mjs";
 import {scoreCharts2PrivatePreviewV1,CHARTS2_PRIVATE_METHODOLOGY_V1} from "../_shared/charts2-private-scoring-v1.mjs";
+import {buildCharts2PrivateNativeReviewV1} from "../_shared/charts2-private-native-review-v1.mjs";
 
 const MAX_BYTES = 4_000_000;
 const MAX_REQUEST_BYTES = 6_000_000;
@@ -221,7 +222,13 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
          r.track_id!==preview.candidates[i]?.track_id||
          r.score_units!==preview.candidates[i]?.score_units))
       throw new Reject(409,"charts2_private_freeze_score_disagreement");
-    return {state:"private_review",preview,source_methods:snapshot.source_methods,
+    // Provisional appearances are independent from the Registry freeze gate.
+    // If a source-label collision makes review unsafe, leave the existing
+    // verified Studio and freeze preflight available without a false list.
+    let native_review=null;
+    try {native_review=buildCharts2PrivateNativeReviewV1({receipts});}
+    catch {native_review=null;}
+    return {state:"private_review",preview,native_review,source_methods:snapshot.source_methods,
       history:snapshot.history??[],read_at:snapshot.read_at,
       server_verified_originals:receipts.length,
       freeze_gate:{
