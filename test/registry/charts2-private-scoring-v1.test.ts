@@ -217,6 +217,7 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_WORKER).toContain('authClient.rpc("admin_admit_registry_track_provider_link_v1"');
     expect(STUDIO_WORKER).not.toContain('server.rpc("admin_admit_registry_track_provider_link_v1"');
     expect(STUDIO_WORKER).toContain('p_match_method:"manual",p_match_confidence:1');
+    expect(STUDIO_WORKER).toContain('storedWeights[name]!==policy.weight_points');
     expect(ROUTER).toContain('path: "studio", element: <AdminGuard capabilities={["manage_charts"]}><AdminChartsStudioPage /></AdminGuard>');
     expect(SHELL).toContain('path: "/admin/charts/studio"');
     for (const action of ["studio_preview","studio_review_link","studio_track_search","verify_method","review_method"]) {
