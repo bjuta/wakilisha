@@ -1,7 +1,7 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-19T08:56:29Z",
+  "generatedAt": "2026-11-19T09:06:36Z",
   "typesSha256": "0ef14660eadf1732e3d5227074cfed62450c956a662a83e8c40b351cf4419e0b",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 265,
@@ -11,7 +11,7 @@
     "sourceProjectRef": "unlinked-local-ci",
     "migrationHead": "20261119084830",
     "baseMainSha": "9e7f4a661ecca897aa14b0e81eb513b7ef425183",
-    "replayCandidateHeadSha": "553538b538ec4e2809a2debba91ee9e14762bdf9",
-    "workflowRunId": 44491497116
+    "replayCandidateHeadSha": "e0aa07eb9f162620e328bd9f8a26d72e2d4af24b",
+    "workflowRunId": 44492960642
   }
 }
