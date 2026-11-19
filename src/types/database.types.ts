@@ -21441,6 +21441,14 @@ export type Database = {
         }
         Returns: Json
       }
+      charts2_freeze_private_candidate_v1: {
+        Args: {
+          p_ack: string
+          p_expected_input_sha256: string
+          p_expected_previous_id: string
+        }
+        Returns: Json
+      }
       charts2_get_collector_method_v1: {
         Args: { p_source_key: string }
         Returns: {
@@ -21450,22 +21458,7 @@ export type Database = {
           source_key: string
         }[]
       }
-      charts2_private_freeze_preflight_v1: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      charts2_freeze_private_candidate_v1: {
-        Args: {
-          p_expected_input_sha256: string
-          p_expected_previous_id: string | null
-          p_ack: string
-        }
-        Returns: Json
-      }
-      charts2_studio_private_snapshot_v1: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      charts2_private_freeze_preflight_v1: { Args: never; Returns: Json }
       charts2_record_get_method_probe_v1: {
         Args: {
           p_actor: string
@@ -21489,6 +21482,7 @@ export type Database = {
         }
         Returns: Json
       }
+      charts2_studio_private_snapshot_v1: { Args: never; Returns: Json }
       claim_media_processing_jobs_v1: {
         Args: {
           p_lease_seconds?: number
