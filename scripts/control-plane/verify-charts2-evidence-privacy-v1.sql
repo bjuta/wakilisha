@@ -417,5 +417,37 @@ begin
 end
 $charts2_four_get_review$;
 
+-- Charts 2.0 Studio service-only read contract and versioned, private-only weights.
+do $charts2_studio_snapshot$
+declare
+  snap jsonb;
+  weights jsonb;
+begin
+  if not has_function_privilege('service_role',
+       'public.charts2_studio_private_snapshot_v1()','EXECUTE')
+     or has_function_privilege('authenticated',
+       'public.charts2_studio_private_snapshot_v1()','EXECUTE')
+     or has_function_privilege('anon',
+       'public.charts2_studio_private_snapshot_v1()','EXECUTE')
+  then raise exception 'charts2_studio_acl_broadened'; end if;
+  select rule_set->'weights' into weights
+  from public.wk_chart_methodologies_v2
+  where methodology_version='consumption_led_cultural_presence_v1'
+    and scoring_policy_version='charts2-private-ordinal-v1';
+  if weights is null or
+     weights <> '{"youtube_ke":30,"mdundo_ke":25,"apple_ke":20,"audiomack_ke":15,"shazam_ke":10}'::jsonb
+  then raise exception 'charts2_studio_weights_invalid'; end if;
+  snap:=public.charts2_studio_private_snapshot_v1();
+  if snap->>'contract'<>'charts2-private-studio/v1' or
+     pg_catalog.jsonb_typeof(snap->'receipts')<>'array' or
+     pg_catalog.jsonb_typeof(snap->'registry_links')<>'array' or
+     pg_catalog.jsonb_typeof(snap->'source_methods')<>'array' or
+     pg_catalog.jsonb_typeof(snap->'history')<>'array' or
+     snap->'methodology'->>'version'<>'consumption_led_cultural_presence_v1'
+  then raise exception 'charts2_studio_snapshot_invalid'; end if;
+  raise notice 'WK_CHARTS2_LOCAL_PRIVATE_STUDIO_SERVICE_READER=PASS';
+end
+$charts2_studio_snapshot$;
+
 rollback;
 \echo WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS
