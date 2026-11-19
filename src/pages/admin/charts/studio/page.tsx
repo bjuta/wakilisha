@@ -54,8 +54,27 @@ type FreezeGate = {
   unresolved_count: number; conflict_count: number; freeze_ready: boolean;
   latest_freeze_id: string | null; recent_freezes: FreezeRecord[];
 };
+type SourceAppearance = {
+  source_key: SourceKey; native_rank: number; provider_track_id: string | null;
+  title: string; artist: string | null; credit_units: number;
+};
+type NativeReviewEntry = {
+  position?: number; title: string; artist: string | null;
+  source_count: number; score_points: string; needs_recording_review: boolean;
+  contributions: SourceAppearance[];
+};
+type AppleTitleLead = {
+  title: string; apple_rank: number; apple_provider_track_id: string | null;
+  possible_sources: SourceKey[]; possible_artists: string[];
+  contributes_extra_score: false;
+};
+type NativeReview = {
+  contract: string; count: number; candidate_count: number;
+  entries: NativeReviewEntry[]; multi_source_occurrences: NativeReviewEntry[];
+  apple_title_review: AppleTitleLead[]; freeze_ready: false; can_publish: false;
+};
 type StudioResponse = {
-  ok: boolean; state: string; preview?: Preview; freeze_gate?: FreezeGate;
+  ok: boolean; state: string; preview?: Preview; native_review?: NativeReview | null; freeze_gate?: FreezeGate;
   server_verified_originals?: number; source_methods?: SourceMethod[];
   history?: ReceiptHistory[]; read_at?: string;
   receipt_count?: number; error?: string;
@@ -125,6 +144,8 @@ export default function ChartsStudioPage() {
   const [evidenceUrl,setEvidenceUrl]=useState("");
   const [reviewConsent,setReviewConsent]=useState(false);
   const [freezeConsent,setFreezeConsent]=useState(false);
+  const [showAllAppearances,setShowAllAppearances]=useState(false);
+  const [showAllAppleLeads,setShowAllAppleLeads]=useState(false);
 
   const refresh=useCallback(async()=>{
     setLoading(true);setError("");
@@ -484,6 +505,86 @@ export default function ChartsStudioPage() {
           </WkSurface>
         </div>
       </section>}
+
+      {tab==="preview" && snapshot?.native_review?.contract==="charts2-private-native-review/v1" &&
+        <section aria-label="Recording chart review" className="space-y-4">
+          <WkSurface className="space-y-2 p-4">
+            <h2 className="text-[16px] font-black text-wk-text">Top 100 to Review</h2>
+            <p className="text-[12px] text-wk-text-muted">
+              See how recordings appear across our five charts. Check matching versions before approval.
+            </p>
+            <p className="text-[12px] font-semibold text-wk-text">
+              {snapshot.native_review.count} recordings to review
+            </p>
+          </WkSurface>
+          <WkSurface className="overflow-hidden">
+            <div className="divide-y divide-wk-border">
+              {snapshot.native_review.entries.map((entry,i)=>
+                <div key={entry.position??i} className="flex flex-wrap items-start gap-3 p-4">
+                  <strong className="w-7 text-[13px] tabular-nums text-wk-text">{entry.position}</strong>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-bold text-wk-text">{entry.title}</p>
+                    {entry.artist && <p className="text-[12px] text-wk-text-muted">{entry.artist}</p>}
+                    <p className="mt-1 text-[11px] text-wk-text-muted">
+                      {entry.contributions.map(c=>SOURCE_LABEL[c.source_key]+": #"+c.native_rank).join(" · ")}
+                    </p>
+                  </div>
+                  <strong className="text-[16px] tabular-nums text-wk-text">{entry.score_points}</strong>
+                </div>)}
+            </div>
+          </WkSurface>
+          <WkSurface className="space-y-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-[14px] font-black text-wk-text">Across More Than One Chart</h3>
+                <p className="text-[12px] text-wk-text-muted">
+                  {snapshot.native_review.multi_source_occurrences.length} possible matches, including those outside the Top 100.
+                </p>
+              </div>
+              <button type="button" className={buttonSecondary}
+                onClick={()=>setShowAllAppearances(v=>!v)}>
+                {showAllAppearances?"Show Fewer":"Show All Matches"}
+              </button>
+            </div>
+            <div className="divide-y divide-wk-border">
+              {snapshot.native_review.multi_source_occurrences
+                .slice(0,showAllAppearances?undefined:12).map((entry,i)=>
+                <div key={entry.title+"-"+i} className="py-3">
+                  <p className="text-[13px] font-bold text-wk-text">{entry.title}</p>
+                  {entry.artist && <p className="text-[12px] text-wk-text-muted">{entry.artist}</p>}
+                  <p className="mt-1 text-[11px] text-wk-text-muted">
+                    {entry.contributions.map(c=>SOURCE_LABEL[c.source_key]+": #"+c.native_rank).join(" · ")}
+                  </p>
+                </div>)}
+            </div>
+          </WkSurface>
+          <WkSurface className="space-y-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-[14px] font-black text-wk-text">Apple Music Matches to Check</h3>
+                <p className="text-[12px] text-wk-text-muted">
+                  {snapshot.native_review.apple_title_review.length} titles also appear on other charts. No points are combined yet.
+                </p>
+              </div>
+              <button type="button" className={buttonSecondary}
+                onClick={()=>setShowAllAppleLeads(v=>!v)}>
+                {showAllAppleLeads?"Show Fewer":"Show All Titles"}
+              </button>
+            </div>
+            <div className="divide-y divide-wk-border">
+              {snapshot.native_review.apple_title_review
+                .slice(0,showAllAppleLeads?undefined:8).map((lead,i)=>
+                <div key={lead.apple_provider_track_id??i} className="py-3">
+                  <p className="text-[13px] font-bold text-wk-text">{lead.title}</p>
+                  <p className="text-[12px] text-wk-text-muted">
+                    Apple Music: #{lead.apple_rank} · {lead.possible_sources.map(k=>SOURCE_LABEL[k]).join(", ")}
+                  </p>
+                  {lead.possible_artists.length>0 &&
+                    <p className="mt-1 text-[11px] text-wk-text-muted">{lead.possible_artists.join(", ")}</p>}
+                </div>)}
+            </div>
+          </WkSurface>
+        </section>}
       {tab==="preview" && <section aria-label="Private Top 100 scoring" className="space-y-4">
         <WkSurface className="space-y-2 p-4">
           <h2 className="text-[15px] font-black text-wk-text">Private ordinal preview</h2>
