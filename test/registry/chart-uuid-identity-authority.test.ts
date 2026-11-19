@@ -357,6 +357,10 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     "supabase/migrations/20261118185142_charts2_youtube_native_post_v1.sql",
     "utf8",
   );
+  const methodReviewSql = readFileSync(
+    "supabase/migrations/20261119061730_charts2_governed_source_method_review_v1.sql",
+    "utf8",
+  );
   const edge = readFileSync("supabase/functions/charts2-capture/index.ts", "utf8");
   const config = readFileSync("supabase/config.toml", "utf8");
 
@@ -388,6 +392,42 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(nativePostSql).not.toContain("update public.wk_chart_programs_v2");
     expect(nativePostSql).not.toContain("create table ");
     expect(nativePostSql).not.toContain("create trigger ");
+  });
+
+  it("requires independently verified first-party probe evidence and explicit JWT review", () => {
+    expect(methodReviewSql).toContain("GitHub run 44471059204");
+    expect(methodReviewSql).toContain("platform_private.charts2_source_method_probes_v1");
+    expect(methodReviewSql).toContain("platform_private.charts2_source_method_decisions_v1");
+    expect(methodReviewSql).toContain("charts2_method_probe_immutable_v1");
+    expect(methodReviewSql).toContain("charts2_method_decision_immutable_v1");
+    expect(methodReviewSql).toContain("charts2_record_youtube_method_probe_v1");
+    expect(methodReviewSql).toContain("charts2_decide_youtube_method_v1");
+    expect(methodReviewSql).toContain("public.current_user_has_capability('manage_charts')");
+    expect(methodReviewSql).toContain("actor uuid := auth.uid()");
+    expect(methodReviewSql).toContain("p_expected_revision");
+    expect(methodReviewSql).toContain("for update;");
+    expect(methodReviewSql).toContain("e.checked_at > now()-interval '20 minutes'");
+    expect(methodReviewSql).toContain("expiration := now()+interval '24 hours'");
+    expect(methodReviewSql).toContain("grant execute on function public.charts2_decide_youtube_method_v1");
+    expect(methodReviewSql).toContain("to authenticated;");
+    expect(methodReviewSql).toContain("grant execute on function public.charts2_record_youtube_method_probe_v1");
+    expect(methodReviewSql).toContain("to service_role;");
+    expect(methodReviewSql).not.toContain("update public.wk_chart_programs_v2");
+    expect(methodReviewSql).not.toContain("update public.wk_chart_entries_v2");
+    expect(methodReviewSql).not.toContain("publish_charts");
+  });
+
+  it("keeps verification separate from actor-authorized source admission", () => {
+    expect(edge).toContain('mode==="verify_method"');
+    expect(edge).toContain('mode==="review_method"');
+    expect(edge).toContain('action_required:"explicit_method_review"');
+    expect(edge).toContain('charts2_record_youtube_method_probe_v1');
+    expect(edge).toContain('authClient.rpc("charts2_decide_youtube_method_v1"');
+    expect(edge).not.toContain('server.rpc("charts2_decide_youtube_method_v1"');
+    expect(edge).toContain('sourceKey(supplied.source_key)!=="youtube_ke"');
+    expect(edge).toContain('credentials:"omit"');
+    expect(edge).toContain('redirect:"error"');
+    expect(edge).toContain('upsert:false');
   });
 
   it("transpiles the actual Edge worker as TypeScript without syntax errors", () => {
