@@ -152,7 +152,10 @@ export default function ChartsStudioPage() {
     operate("approve"+source,async()=>{
       const probe=probes[source];
       if(!probe||sourceConsent!==source)throw new Error("Verify the current source and explicitly consent before admission.");
-      const firstParty=SOURCE_LABEL[source];
+      // YouTube's already-deployed approval contract predates the Studio's
+      // display label: exact SQL attestation omits the word "Weekly".
+      const firstParty=source==="youtube_ke"
+        ?"YouTube Kenya Top Songs":SOURCE_LABEL[source];
       const method=source==="youtube_ke"?"POST":"GET";
       const acknowledgement="I approve first-party "+firstParty+" "+method+
         " for evidence-only manual collection.";
