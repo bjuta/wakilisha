@@ -88,6 +88,22 @@ select pg_catalog.jsonb_build_object(
       order by r.source_key
     ) from latest r
   ),'[]'::jsonb),
+  'history',coalesce((
+    select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+      'id',h.id,'source_key',h.source_key,'observed_at',h.observed_at,
+      'original_sha256',h.original_sha256,
+      'observed_depth',h.observed_depth,'expected_depth',h.expected_depth,
+      'observed_status',h.observed_status,'native_period_authority',h.native_period_authority,
+      'provider_week_ending_date',h.provider_week_ending_date
+    ) order by h.observed_at desc,h.id desc)
+    from (
+      select id,source_key,observed_at,original_sha256,observed_depth,
+        expected_depth,observed_status,native_period_authority,
+        provider_week_ending_date
+      from platform_private.charts2_capture_receipts_v1
+      order by observed_at desc,id desc limit 35
+    ) h
+  ),'[]'::jsonb),
   'source_methods',coalesce((
     select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
       'source_key',m.source_key,'review_state',m.review_state,
