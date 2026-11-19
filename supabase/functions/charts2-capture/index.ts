@@ -184,56 +184,72 @@ async function handle(req:Request) {
   let captureMode:"research_original_upload"|"service_original";
 
   if(mode==="verify_method") {
-    // A signed-in manual, evidence-only probe. It NEVER admits collection.
+    // Signed-in, capability-gated first-party probe; never auto-admits any
+    // source method. GET providers remain native as-of observations, not weeks.
     const supplied=await req.json().catch(()=>null);
     if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
        Object.keys(supplied).some(k=>k!=="source_key"&&k!=="target_period_key"))
       throw new Reject(400,"charts2_method_probe_arguments_invalid");
-    if(sourceKey(supplied.source_key)!=="youtube_ke")
-      throw new Reject(422,"charts2_method_probe_source_unqualified");
+    key=sourceKey(supplied.source_key);
     const period=supplied.target_period_key;
-    if(typeof period!=="string")
+    if(key==="youtube_ke" && typeof period!=="string")
       throw new Reject(422,"charts2_method_probe_period_invalid");
-    const endpoint=SOURCES.get("youtube_ke").first_party_endpoint;
-    expectedUrl("youtube_ke",endpoint);
-    let nativeRequest:{method:"POST",body:string};
-    try {
-      nativeRequest=charts2YouTubeNativeWeeklyPost("youtube_ke",endpoint,period);
-    } catch {
-      throw new Reject(422,"charts2_method_probe_period_invalid");
+    if(key!=="youtube_ke" && period!==undefined && period!==null)
+      throw new Reject(422,"charts2_get_probe_period_forbidden");
+    const source=SOURCES.get(key);
+    endpoint=source.first_party_endpoint;
+    expectedUrl(key,endpoint);
+    let nativeRequest:{method:"POST",body:string}|null=null;
+    if(key==="youtube_ke") {
+      try {
+        nativeRequest=charts2YouTubeNativeWeeklyPost(key,endpoint,period);
+      } catch {
+        throw new Reject(422,"charts2_method_probe_period_invalid");
+      }
     }
-    const result=await fetchSourceOriginal("youtube_ke",endpoint,nativeRequest);
+    const result=await fetchSourceOriginal(key,endpoint,nativeRequest);
     let verified;
     try {
       verified=await decodeCharts2Original({
-        source_key:"youtube_ke",endpoint,target_period_key:period,
+        source_key:key,endpoint,
+        target_period_key:key==="youtube_ke"?period:null,
         observed_at:new Date().toISOString(),original_bytes:result.bytes,
       });
     } catch {
       throw new Reject(422,"charts2_method_probe_original_unqualified");
     }
     if(verified.evidence_only!==true||verified.can_score!==false||
-       verified.can_publish!==false||!verified.provider_week_ending_date||
-       verified.observed_depth<1||verified.observed_depth>100)
+       verified.can_publish!==false||verified.observed_depth<1||
+       verified.observed_depth>source.depth ||
+       (key==="youtube_ke"&&!verified.provider_week_ending_date))
       throw new Reject(422,"charts2_method_probe_original_unqualified");
     const objectKey=await storeOriginal(
-      server,"youtube_ke",result.bytes,verified.payload_sha256,result.contentType);
-    const recorded=await server.rpc("charts2_record_youtube_method_probe_v1",{
-      p_actor:user.id,p_period:period,
-      p_end_date:verified.provider_week_ending_date,
-      p_sha:verified.payload_sha256,p_object_key:objectKey,
-      p_size:result.bytes.byteLength,p_depth:verified.observed_depth,
-    });
+      server,key,result.bytes,verified.payload_sha256,result.contentType);
+    const recorded=key==="youtube_ke"
+      ? await server.rpc("charts2_record_youtube_method_probe_v1",{
+          p_actor:user.id,p_period:period,
+          p_end_date:verified.provider_week_ending_date,
+          p_sha:verified.payload_sha256,p_object_key:objectKey,
+          p_size:result.bytes.byteLength,p_depth:verified.observed_depth,
+        })
+      : await server.rpc("charts2_record_get_method_probe_v1",{
+          p_source_key:key,p_actor:user.id,
+          p_sha:verified.payload_sha256,p_object_key:objectKey,
+          p_size:result.bytes.byteLength,p_depth:verified.observed_depth,
+        });
     if(recorded.error||!recorded.data?.probe_id||
        !Number.isInteger(recorded.data.expected_revision))
       throw new Reject(503,"charts2_method_probe_record_failed");
     return {
-      source_key:"youtube_ke",method:"POST",review_state:"unchanged",
+      source_key:key,method:nativeRequest?"POST":"GET",review_state:"unchanged",
       probe_id:recorded.data.probe_id,
       expected_revision:recorded.data.expected_revision,
       original_sha256:verified.payload_sha256,
       provider_week_ending_date:verified.provider_week_ending_date,
-      observed_depth:verified.observed_depth,expected_depth:100,
+      provider_updated_at:verified.provider_updated_at,
+      native_period:verified.native_period,
+      observed_status:verified.status,
+      observed_depth:verified.observed_depth,expected_depth:source.depth,
       unresolved_identity_count:verified.unresolved_identity_count,
       can_score:false,can_publish:false,
       action_required:"explicit_method_review",
@@ -248,8 +264,7 @@ async function handle(req:Request) {
          "source_key","action","probe_id","expected_revision","acknowledgement"
        ].includes(k)))
       throw new Reject(400,"charts2_method_review_arguments_invalid");
-    if(sourceKey(supplied.source_key)!=="youtube_ke")
-      throw new Reject(422,"charts2_method_review_source_unqualified");
+    key=sourceKey(supplied.source_key);
     if(!["admit","hold"].includes(supplied.action)||
        !Number.isInteger(supplied.expected_revision)||
        supplied.expected_revision<0||supplied.expected_revision>2147483645||
@@ -259,11 +274,16 @@ async function handle(req:Request) {
     if(probe!==null&&(typeof probe!=="string"||
        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(probe)))
       throw new Reject(400,"charts2_method_review_probe_invalid");
-    const outcome=await authClient.rpc("charts2_decide_youtube_method_v1",{
+    const args={
       p_action:supplied.action,p_probe_id:probe,
       p_expected_revision:supplied.expected_revision,
       p_ack:supplied.acknowledgement,
-    });
+    };
+    const outcome=key==="youtube_ke"
+      ? await authClient.rpc("charts2_decide_youtube_method_v1",args)
+      : await authClient.rpc("charts2_decide_get_method_v1",{
+          ...args,p_source_key:key,
+        });
     if(outcome.error||!outcome.data) {
       const code=outcome.error?.message??"";
       if(code.includes("charts2_method_review_revision_conflict"))
@@ -304,7 +324,9 @@ async function handle(req:Request) {
     if(Object.keys(supplied??{}).some(k=>k!=="source_key"&&k!=="target_period_key"))
       throw new Reject(400,"charts2_collect_arguments_invalid");
     const period=supplied?.target_period_key;
-    target_period_key=period===undefined?null:String(period);
+    if(key!=="youtube_ke"&&period!==undefined&&period!==null)
+      throw new Reject(422,"charts2_get_collect_period_forbidden");
+    target_period_key=period===undefined||period===null?null:String(period);
     const decision=await server.rpc("charts2_get_collector_method_v1",{p_source_key:key});
     if(decision.error)throw new Reject(503,"charts2_source_method_read_failed");
     const method=decision.data?.[0];

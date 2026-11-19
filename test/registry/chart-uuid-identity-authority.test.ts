@@ -361,6 +361,10 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     "supabase/migrations/20261119061730_charts2_governed_source_method_review_v1.sql",
     "utf8",
   );
+  const fourGetSql = readFileSync(
+    "supabase/migrations/20261119084830_charts2_four_first_party_get_review_v1.sql",
+    "utf8",
+  );
   const edge = readFileSync("supabase/functions/charts2-capture/index.ts", "utf8");
   const config = readFileSync("supabase/config.toml", "utf8");
 
@@ -428,10 +432,39 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(edge).toContain('charts2_record_youtube_method_probe_v1');
     expect(edge).toContain('authClient.rpc("charts2_decide_youtube_method_v1"');
     expect(edge).not.toContain('server.rpc("charts2_decide_youtube_method_v1"');
-    expect(edge).toContain('sourceKey(supplied.source_key)!=="youtube_ke"');
+    expect(edge).toContain('key=sourceKey(supplied.source_key)');
+    expect(edge).toContain('charts2_record_get_method_probe_v1');
+    expect(edge).toContain('authClient.rpc("charts2_decide_get_method_v1"');
+    expect(edge).not.toContain('server.rpc("charts2_decide_get_method_v1"');
     expect(edge).toContain('credentials:"omit"');
     expect(edge).toContain('redirect:"error"');
     expect(edge).toContain('upsert:false');
+  });
+
+  it("shares the immutable reviewer across exact first-party GET sources without a second UI", () => {
+    expect(fourGetSql).toContain("GitHub Actions run 44490723953");
+    expect(fourGetSql).toContain("charts2_probe_first_party_method_v2");
+    expect(fourGetSql).toContain("charts2_decisions_source_scope_v2");
+    expect(fourGetSql).toContain("public.charts2_record_get_method_probe_v1");
+    expect(fourGetSql).toContain("public.charts2_decide_get_method_v1");
+    for (const source of ["apple_ke","mdundo_ke","audiomack_ke","shazam_ke"]) {
+      expect(fourGetSql).toContain("when '" + source + "' then");
+    }
+    expect(fourGetSql).toContain("'I approve first-party ' || source_title");
+    expect(fourGetSql).toContain("e.actor_id=actor");
+    expect(fourGetSql).toContain("e.expected_method_revision=p_expected_revision");
+    expect(fourGetSql).toContain("e.checked_at > now()-interval '20 minutes'");
+    expect(fourGetSql).toContain("expiration := now()+interval '24 hours'");
+    expect(fourGetSql).toContain("m.source_key=p_source_key");
+    expect(fourGetSql).toContain("method_row.method_revision <> p_expected_revision");
+    expect(fourGetSql).toContain("grant execute on function public.charts2_decide_get_method_v1");
+    expect(fourGetSql).toContain("to authenticated;");
+    expect(fourGetSql).toContain("grant execute on function public.charts2_record_get_method_probe_v1");
+    expect(fourGetSql).toContain("to service_role;");
+    expect(fourGetSql).not.toContain("alter table public.wk_chart_");
+    expect(fourGetSql).not.toContain("publish_edition");
+    expect(edge).toContain('charts2_get_probe_period_forbidden');
+    expect(edge).toContain('charts2_get_collect_period_forbidden');
   });
 
   it("transpiles the actual Edge worker as TypeScript without syntax errors", () => {

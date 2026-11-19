@@ -21422,6 +21422,16 @@ export type Database = {
         Args: { p_capture: Json }
         Returns: string
       }
+      charts2_decide_get_method_v1: {
+        Args: {
+          p_ack: string
+          p_action: string
+          p_expected_revision: number
+          p_probe_id: string
+          p_source_key: string
+        }
+        Returns: Json
+      }
       charts2_decide_youtube_method_v1: {
         Args: {
           p_ack: string
@@ -21439,6 +21449,17 @@ export type Database = {
           reviewed_method: string
           source_key: string
         }[]
+      }
+      charts2_record_get_method_probe_v1: {
+        Args: {
+          p_actor: string
+          p_depth: number
+          p_object_key: string
+          p_sha: string
+          p_size: number
+          p_source_key: string
+        }
+        Returns: Json
       }
       charts2_record_youtube_method_probe_v1: {
         Args: {
