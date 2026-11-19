@@ -9,7 +9,7 @@ import {
 const SOURCE_ORDER = ['youtube_ke','mdundo_ke','apple_ke','audiomack_ke','shazam_ke'];
 const SOURCE_DEPTH = {youtube_ke:100,mdundo_ke:100,apple_ke:100,audiomack_ke:100,shazam_ke:200};
 const label = value => typeof value === 'string'
-  ? value.normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase() : '';
+  ? value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'') : '';
 const display = units => (units / 200).toFixed(2);
 function fail(code) {throw new Error(code);}
 
@@ -80,6 +80,8 @@ export function buildCharts2PrivateNativeReviewV1({receipts}={}) {
     if(!group){unanchored_observations++;continue;}
     group.source_contributions.push(r);group.score_units+=r.credit_units;
   }
+  // Report every source overlap, not just those within the Top 100.
+  // An exact display label is not an authoritative recording identity.
   const all=[...groups.values()].map(g=>({
     identity_key:g.key,
     title:g.title,artist:g.artist,score_units:g.score_units,
@@ -91,6 +93,34 @@ export function buildCharts2PrivateNativeReviewV1({receipts}={}) {
   })).sort((a,b)=>b.score_units-a.score_units||
     (a.identity_key<b.identity_key?-1:a.identity_key>b.identity_key?1:0));
   const top=all.slice(0,100).map((r,i)=>({position:i+1,...r}));
+  const multi_source_occurrences=all.filter(r=>r.source_count>1);
+  const source_occurrences_in_groups=multi_source_occurrences.reduce((n,r)=>n+r.source_count,0);
+  const multi_source_by_count=Object.fromEntries([2,3,4,5].map(n=>[
+    String(n),multi_source_occurrences.filter(r=>r.source_count===n).length,
+  ]));
+  // Apple has native IDs and titles but no artist labels in these originals.
+  // Expose every possible title match without merging unverified points.
+  const titles=new Map();
+  for(const r of records.filter(r=>r.source_key!=='apple_ke')){
+    const k=label(r.title), bucket=titles.get(k)??[];
+    bucket.push(r);titles.set(k,bucket);
+  }
+  const apple_title_review=[];
+  for(const r of records.filter(r=>r.source_key==='apple_ke')){
+    const matches=titles.get(label(r.title))??[];
+    if(!matches.length)continue;
+    apple_title_review.push({
+      title:r.title,apple_rank:r.native_rank,
+      apple_provider_track_id:r.provider_track_id,
+      possible_sources:[...new Set(matches.map(x=>x.source_key))].sort(),
+      possible_artists:[...new Set(matches.map(x=>x.artist).filter(Boolean))].sort(),
+      other_source_positions:matches.map(x=>({
+        source_key:x.source_key,rank:x.native_rank,title:x.title,artist:x.artist,
+        provider_track_id:x.provider_track_id,
+      })),
+      needs_recording_review:true,contributes_extra_score:false,
+    });
+  }
   return {
     contract:'charts2-private-native-review/v1',
     methodology_version:CHARTS2_PRIVATE_METHODOLOGY_V1.version,
@@ -98,6 +128,8 @@ export function buildCharts2PrivateNativeReviewV1({receipts}={}) {
     count:top.length,candidate_count:all.length,
     native_recording_ids:Object.fromEntries(nativePerSource),
     unanchored_observations,ambiguous_source_labels,
-    entries:top,review_required:true,freeze_ready:false,can_publish:false,
+    entries:top,multi_source_occurrences,multi_source_by_count,
+    source_occurrences_in_groups,apple_title_review,
+    review_required:true,freeze_ready:false,can_publish:false,
   };
 }
