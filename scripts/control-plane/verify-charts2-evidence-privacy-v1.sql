@@ -252,9 +252,12 @@ begin
      result->>'method_revision' <> '1' then
     raise exception 'charts2_review_approved_state_invalid';
   end if;
+  -- The GET collector RPC is service-only: never grant it to an actor.
+  execute 'reset role';
   if (select count(*) from public.charts2_get_collector_method_v1('youtube_ke')) <> 1 then
     raise exception 'charts2_review_approved_method_unavailable';
   end if;
+  execute 'set local role authenticated';
   begin
     perform public.charts2_decide_youtube_method_v1(
       'admit',sample_probe,0,
@@ -265,11 +268,13 @@ begin
   end;
   result:=public.charts2_decide_youtube_method_v1(
     'hold',null,1,'Revocation of the synthetic local source-method admission.');
-  if result->>'review_state' <> 'held' or result->>'method_revision' <> '2' or
-     exists(select 1 from public.charts2_get_collector_method_v1('youtube_ke')) then
+  if result->>'review_state' <> 'held' or result->>'method_revision' <> '2' then
     raise exception 'charts2_method_revocation_failed';
   end if;
   execute 'reset role';
+  if exists(select 1 from public.charts2_get_collector_method_v1('youtube_ke')) then
+    raise exception 'charts2_method_revocation_failed';
+  end if;
   if (select count(*) from platform_private.charts2_source_method_decisions_v1
       where actor_id=fake_actor) <> 2 then
     raise exception 'charts2_review_audit_not_append_only';
