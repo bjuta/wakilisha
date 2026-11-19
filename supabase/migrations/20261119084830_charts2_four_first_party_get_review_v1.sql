@@ -19,7 +19,7 @@ alter table platform_private.charts2_source_method_probes_v1
      exact_endpoint='https://charts.youtube.com/youtubei/v1/browse?alt=json' and
      reviewed_method='POST' and
      target_period_key is not null and
-     target_period_key ~ '^weekly:[0-9]{8}:[0-9]{8}:ke
+     target_period_key ~ '^weekly:[0-9]{8}:[0-9]{8}:ke$' and
      provider_week_ending_date is not null and
      observed_depth between 1 and 100)
     or
