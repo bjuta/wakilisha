@@ -100,7 +100,7 @@ export default function ChartsStudioPage() {
   const [notice,setNotice]=useState("");
   const [week,setWeek]=useState("");
   const [probes,setProbes]=useState<Partial<Record<SourceKey,Probe>>>({});
-  const [sourceConsent,setSourceConsent]=useState(false);
+  const [sourceConsent,setSourceConsent]=useState<SourceKey|null>(null);
   const [holdReason,setHoldReason]=useState("");
   const [reviewFilter,setReviewFilter]=useState<SourceKey|"all">("all");
   const [search,setSearch]=useState("");
@@ -139,7 +139,7 @@ export default function ChartsStudioPage() {
       const result=await invokeStudio(mode,payload);
       if(mode==="verify_method"){
         setProbes(old=>({...old,[source]:result as Probe}));
-        setSourceConsent(false);
+        setSourceConsent(null);
         setNotice(SOURCE_LABEL[source]+": genuine original verified. Review the SHA and depth before approval.");
       }else{
         setNotice(SOURCE_LABEL[source]+": "+String(result.status)+". Evidence receipt recorded.");
@@ -149,7 +149,7 @@ export default function ChartsStudioPage() {
   const approval=async(source:SourceKey)=>
     operate("approve"+source,async()=>{
       const probe=probes[source];
-      if(!probe||!sourceConsent)throw new Error("Verify the current source and explicitly consent before admission.");
+      if(!probe||sourceConsent!==source)throw new Error("Verify the current source and explicitly consent before admission.");
       const firstParty=SOURCE_LABEL[source];
       const method=source==="youtube_ke"?"POST":"GET";
       const acknowledgement="I approve first-party "+firstParty+" "+method+
@@ -161,7 +161,7 @@ export default function ChartsStudioPage() {
       setNotice(firstParty+": "+String(result.review_state)+
         ". Authorization expires "+DATE(result.authorization_expires_at)+".");
       setProbes(old=>({...old,[source]:undefined}));
-      setSourceConsent(false);
+      setSourceConsent(null);
       await refresh();
     });
   const hold=async(source:SourceKey,revision:number)=>
@@ -317,10 +317,10 @@ export default function ChartsStudioPage() {
                   SHA-256: {probe.original_sha256}
                 </p>
                 <label className="flex items-start gap-2 text-[12px] text-wk-text">
-                  <input type="checkbox" checked={sourceConsent} onChange={e=>setSourceConsent(e.target.checked)}/>
+                  <input type="checkbox" checked={sourceConsent===source.key} onChange={e=>setSourceConsent(e.target.checked?source.key:null)}/>
                   I inspected this source, endpoint and original evidence, and explicitly approve a 24-hour evidence-only admission.
                 </label>
-                <button type="button" className={buttonPrimary} disabled={!sourceConsent||!!busy}
+                <button type="button" className={buttonPrimary} disabled={sourceConsent!==source.key||!!busy}
                   onClick={()=>void approval(source.key)}>Approve exact method</button>
               </div>}
               {method && <details className="text-[12px] text-wk-text-muted">
