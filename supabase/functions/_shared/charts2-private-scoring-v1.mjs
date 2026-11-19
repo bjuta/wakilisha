@@ -221,8 +221,11 @@ export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[]}={}){
     source_coverage:coverage,
     candidates,
     unresolved,conflicts,
+    // Some providers (notably native Shazam CSV) disclose rankings without
+    // provider recording IDs. Missing observations stay explicitly unresolved,
+    // but they never fabricate rank credit or bar 100 genuinely linked tracks.
     review_status:conflicts.length?'identity_conflict':
-      unresolved.length||candidates.length<100?'identity_review_required':
+      candidates.length<100?'identity_review_required':
       'eligible_for_private_review',
     frozen:false,can_publish:false,
   };
