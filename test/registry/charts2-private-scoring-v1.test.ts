@@ -1,5 +1,6 @@
 import {describe,expect,it} from "vitest";
 import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
+import {buildCharts2PrivateNativeReviewV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import { readFileSync } from "node:fs";
 import {
   CHARTS2_PRIVATE_METHODOLOGY_V1,
@@ -93,6 +94,51 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
       .toThrow("charts2_scoring_unqualified_receipt");
     expect(()=>score([...r.slice(0,4),{...r[4],original_verified_at:"2026-11-19T09:26:00Z"}]))
       .toThrow("charts2_scoring_unqualified_receipt");
+  });
+
+  it("retains every provisional multi-source occurrence, without making Registry identity claims",()=>{
+    const receipts=fullReceipts();
+    receipts.find(r=>r.source_key==="apple_ke")!.observations.forEach(o=>{o.artist=null as any;});
+    receipts.find(r=>r.source_key==="shazam_ke")!.observations.forEach(o=>{o.provider_track_id=null as any;});
+    expect(score(receipts).candidates).toHaveLength(0);
+    const review=buildCharts2PrivateNativeReviewV1({receipts});
+    expect(review.contract).toBe("charts2-private-native-review/v1");
+    expect(review.count).toBe(100);
+    expect(review.candidate_count).toBe(200);
+    expect(review.multi_source_occurrences).toHaveLength(100);
+    expect(review.multi_source_by_count["4"]).toBe(100);
+    expect(review.source_occurrences_in_groups).toBe(400);
+    expect(review.entries[0].score_units).toBe(16000);
+    expect(review.entries[0].source_count).toBe(4);
+    expect(review.entries[0].score_points).toBe("80.00");
+    expect(review.native_recording_ids.shazam_ke).toBe(0);
+    expect(review.native_recording_ids.apple_ke).toBe(100);
+    expect(review.apple_title_review).toHaveLength(100);
+    expect(review.apple_title_review.every(x=>x.contributes_extra_score===false)).toBe(true);
+    expect(review.can_publish).toBe(false);
+    expect(review.freeze_ready).toBe(false);
+    expect(review.review_required).toBe(true);
+  });
+
+  it("quarantines duplicate native IDs, incomplete receipts, and repeated same-source labels",()=>{
+    const fixtures=fullReceipts();
+    fixtures.find(r=>r.source_key==="shazam_ke")!.observations.forEach(o=>{o.provider_track_id=null as any;});
+    const duplicate=structuredClone(fixtures);
+    duplicate[0].observations[1].provider_track_id=duplicate[0].observations[0].provider_track_id;
+    expect(()=>buildCharts2PrivateNativeReviewV1({receipts:duplicate}))
+      .toThrow("charts2_native_review_duplicate_provider_recording");
+    const partial=structuredClone(fixtures);
+    partial[0].observed_status="partial_depth";
+    expect(()=>buildCharts2PrivateNativeReviewV1({receipts:partial}))
+      .toThrow("charts2_native_review_requires_five_full_originals");
+    const repeated=structuredClone(fixtures);
+    repeated[0].observations[1].title=repeated[0].observations[0].title;
+    const review=buildCharts2PrivateNativeReviewV1({receipts:repeated});
+    expect(review.ambiguous_source_labels).toBe(2);
+    expect(review.multi_source_occurrences).toHaveLength(100);
+    expect(review.multi_source_occurrences.find(x=>x.title==="Unresolved recording 1")?.source_count)
+      .toBe(3);
+    expect(review.can_publish).toBe(false);
   });
 
   it("does not infer recording identity or award invented zero ranks",()=>{
