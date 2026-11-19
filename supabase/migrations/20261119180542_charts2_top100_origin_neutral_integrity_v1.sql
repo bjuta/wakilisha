@@ -183,7 +183,7 @@ AS $function$
     'invalidRows', invalid_rows.rows
   )
   from blockers b, invalid_rows;
-$function$
+$function$;
 
 comment on function public.chart_get_edition_integrity_report(text) is
   'Shared Chart V2 integrity. Charts 2.0 top100 considers artist origin informational only, while publication remains blocked until a separately authorized frozen-candidate publisher is enabled.';
