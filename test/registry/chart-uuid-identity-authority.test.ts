@@ -421,6 +421,10 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
     expect(edge).toContain('mode==="verify_method"');
     expect(edge).toContain('mode==="review_method"');
     expect(edge).toContain('action_required:"explicit_method_review"');
+    expect(edge).toContain('expected_revision:recorded.data.expected_revision');
+    expect(edge).toContain('review_state:"unchanged"');
+    expect(edge).toContain('charts2_method_probe_original_unqualified');
+    expect(methodReviewSql).toContain("'expected_revision',rev");
     expect(edge).toContain('charts2_record_youtube_method_probe_v1');
     expect(edge).toContain('authClient.rpc("charts2_decide_youtube_method_v1"');
     expect(edge).not.toContain('server.rpc("charts2_decide_youtube_method_v1"');
