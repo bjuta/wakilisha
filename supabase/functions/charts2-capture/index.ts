@@ -196,9 +196,14 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
         receipts,registry_links:snapshot.registry_links,
       });
     } catch {throw new Reject(409,"charts2_studio_unqualified_snapshot");}
-    if(snapshot.methodology?.version!==CHARTS2_PRIVATE_METHODOLOGY_V1.version||
-       snapshot.methodology?.scoring_policy_version!==
-         CHARTS2_PRIVATE_METHODOLOGY_V1.scoring_policy_version)
+    const locked=CHARTS2_PRIVATE_METHODOLOGY_V1;
+    const storedWeights=snapshot.methodology?.rule_set?.weights;
+    if(snapshot.methodology?.version!==locked.version||
+       snapshot.methodology?.scoring_policy_version!==locked.scoring_policy_version||
+       !storedWeights||typeof storedWeights!=="object"||
+       Object.keys(storedWeights).length!==Object.keys(locked.sources).length||
+       Object.entries(locked.sources).some(([name,policy])=>
+         storedWeights[name]!==policy.weight_points))
       throw new Reject(409,"charts2_studio_methodology_mismatch");
     return {state:"private_review",preview,source_methods:snapshot.source_methods,
       history:snapshot.history??[],read_at:snapshot.read_at,
