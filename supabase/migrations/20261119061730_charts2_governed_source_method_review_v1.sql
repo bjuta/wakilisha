@@ -61,7 +61,7 @@ create function public.charts2_record_youtube_method_probe_v1(
 ) returns jsonb
 language plpgsql security definer
 set search_path = ''
-as $
+as $$
 declare
   rev integer;
   probe_id uuid;
@@ -104,7 +104,7 @@ begin
     'probe_id',probe_id,'expected_revision',rev
   );
 end;
-$;
+$$;
 revoke all on function public.charts2_record_youtube_method_probe_v1(
   uuid,text,date,text,text,integer,integer
 ) from public,anon,authenticated,service_role;
