@@ -458,13 +458,15 @@ const routePaths = [
  * ingest-runs, ingest-health, scoring-runs, edition detail) and the two
  * Chart Defaults settings routes. Admin charts analytics paths remain.
  *
- * Current route authority is therefore 160 paths after the Charts reset. Removing the Credits paths,
+ * The Charts reset left 160 paths; Charts 2.0 Phase 2 adds the guarded
+ * private Admin Charts Studio path (studio), bringing route authority to 161.
+ * Removing the new Studio path and the Credits paths,
  * the Messages paths, the Artist Studio path, the Field intake path, the Admin
  * MIZIZI path, the five declared public Audio and Show paths, the two K5B Admin
  * Video paths, and the two public Video paths reproduces the exact 143-path
  * preserved pre-M1 sequence.
  */
-const expectedRoutePathCount = 160;
+const expectedRoutePathCount = 161;
 const publicAudioIndexPath = "/audio";
 const publicAudioPath = "/audio/:slug";
 const publicShowIndexPath = "/shows";
@@ -478,6 +480,7 @@ const publicMessagesPath = "/messages";
 const adminMessagesPath = "messages";
 const adminFieldPath = "field";
 const adminMiziziPath = "mizizi";
+const adminChartsStudioPath = "studio";
 const adminVideoIndexPath = "video";
 const adminVideoDetailPath = "video/:publicationId";
 const publicVideoIndexPath = "/video";
@@ -540,6 +543,7 @@ for (const [routePath, label] of [
   [adminMessagesPath, "Admin Messages Control Center"],
   [adminFieldPath, "Admin Field"],
   [adminMiziziPath, "Admin MIZIZI"],
+  [adminChartsStudioPath, "Private Charts Studio"],
   [adminVideoIndexPath, "Admin Video Directory"],
   [adminVideoDetailPath, "Admin Video Detail"],
   [publicVideoIndexPath, "Public Video Directory"],
@@ -579,6 +583,7 @@ const preM1RoutePaths = routePaths.filter(
     routePath !== adminMessagesPath &&
     routePath !== adminFieldPath &&
     routePath !== adminMiziziPath &&
+    routePath !== adminChartsStudioPath &&
     routePath !== adminVideoIndexPath &&
     routePath !== adminVideoDetailPath &&
     routePath !== publicVideoIndexPath &&

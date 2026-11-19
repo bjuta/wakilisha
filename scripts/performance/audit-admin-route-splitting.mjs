@@ -88,10 +88,12 @@ const lazyImportCount = (
  * legacy Admin Charts engine (layout plus 18 pages) and the two Chart Defaults
  * settings pages.
  *
- * The current authority is therefore 80 lazy imports.
+ * The post-reset authority was therefore 80 lazy imports.
+ * Charts 2.0 Phase 2 adds the guarded AdminChartsStudioPage, bringing the
+ * accepted Admin Studio route authority to 81 lazy imports.
  */
-// 2026-11-17 Charts reset: 23 Admin Charts engine, WK100 and Chart Defaults lazy imports retired (103 -> 80).
-const expectedLazyImportCount = 80;
+// 2026-11-17 reset: 103 -> 80; Charts 2.0 private Admin Studio: 80 -> 81.
+const expectedLazyImportCount = 81;
 
 if (lazyImportCount !== expectedLazyImportCount) {
   fail(
@@ -141,6 +143,7 @@ for (const marker of [
   "AdminFieldPage",
   "AdminArtistClaimsPage",
   "AdminMiziziWorkspacePage",
+  "AdminChartsStudioPage",
   "AdminAudioPage",
   "AdminAudioDetailPage",
   "AdminVideoPage",
