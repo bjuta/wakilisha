@@ -1,8 +1,8 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-19T06:31:28Z",
-  "typesSha256": "f1afac3239817284c7a5126e676221d6d33123ede8e8a07e8c9fb0b8a4370483",
+  "generatedAt": "2026-11-19T06:46:02Z",
+  "typesSha256": "6dcc0209db11790bd77f1326eb4486e63a0b570449e9284956b150f23274ba03",
   "authoritativeMigrationDirectory": "supabase/migrations",
   "migrationCount": 264,
   "latestMigration": "20261119061730_charts2_governed_source_method_review_v1.sql",
@@ -11,7 +11,7 @@
     "sourceProjectRef": "unlinked-local-ci",
     "migrationHead": "20261119061730",
     "baseMainSha": "98d9624009104575e42eb5bb0e416f4ac1d11c38",
-    "replayCandidateHeadSha": "a4bacc96a4faa95929245a0f5951a3b1e53e3718",
-    "workflowRunId": 44472306263
+    "replayCandidateHeadSha": "23d2d095e6d98ff8aa919b2c6b64a8a595f1a9d1",
+    "workflowRunId": 44473973646
   }
 }
