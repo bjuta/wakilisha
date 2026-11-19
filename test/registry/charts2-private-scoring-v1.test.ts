@@ -1,4 +1,5 @@
 import {describe,expect,it} from "vitest";
+import { readFileSync } from "node:fs";
 import {
   CHARTS2_PRIVATE_METHODOLOGY_V1,
   scoreCharts2PrivatePreviewV1,
@@ -50,6 +51,12 @@ function link(source_key:string,rank:number,track:number,version:number=1){
 function score(receipts:any[],registry_links:any[]=[]){
   return scoreCharts2PrivatePreviewV1({receipts,registry_links});
 }
+
+const STUDIO_SQL=readFileSync("supabase/migrations/20261119101415_charts2_studio_private_reader_v1.sql","utf8");
+const STUDIO_WORKER=readFileSync("supabase/functions/charts2-capture/index.ts","utf8");
+const STUDIO_PAGE=readFileSync("src/pages/admin/charts/studio/page.tsx","utf8");
+const ROUTER=readFileSync("src/router/config.tsx","utf8");
+const SHELL=readFileSync("src/pages/admin/AdminShell.tsx","utf8");
 
 describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
   it("locks five weights, exact 200-unit scale and never publishes",()=>{
@@ -171,6 +178,52 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     const c=score(r,[link("youtube_ke",1,300),link("youtube_ke",2,301)]);
     expect(c.candidates.map((x:any)=>x.score_units))
       .toEqual([6000,5940]);
+  });
+
+  it("credits only receipt-bound, exact corroborated manual Registry admission",()=>{
+    const receipts=fullReceipts();
+    const method={
+      ...link("mdundo_ke",1,701),match_method:"manual",match_confidence:1,
+      review_evidence:{
+        charts2_studio_review_v1:true,source_key:"mdundo_ke",
+        receipt_id:receipts[1].id,
+        original_sha256:receipts[1].original_sha256,
+        provider_track_id:"mdundo_ke:1",
+        review_note:"Independent recording version identity was verified against reliable source metadata.",
+        evidence_url:"https://example.com/recording",
+      },
+    };
+    expect(score(receipts,[method]).candidates[0].score_points).toBe("25.00");
+    expect(score(receipts,[{...method,review_evidence:{
+      ...method.review_evidence,receipt_id:UUID(789),
+    }}]).candidates).toHaveLength(0);
+    expect(score(receipts,[{...method,match_confidence:0.5}]).candidates).toHaveLength(0);
+    expect(score(receipts,[{...method,review_evidence:{
+      ...method.review_evidence,evidence_url:"http://example.com/",
+    }}]).candidates).toHaveLength(0);
+  });
+
+  it("protects private Studio snapshot, real JWT broker and no-publication route",()=>{
+    expect(STUDIO_SQL).toContain("charts2_studio_private_snapshot_v1");
+    expect(STUDIO_SQL).toContain("to service_role;");
+    expect(STUDIO_SQL).toContain("from public,anon,authenticated,service_role;");
+    expect(STUDIO_SQL).toContain("consumption_led_cultural_presence_v1");
+    expect(STUDIO_SQL).toContain("platform_private.charts2_capture_receipts_v1");
+    expect(STUDIO_SQL).not.toContain("insert into public.wk_chart_editions_v2");
+    expect(STUDIO_SQL).not.toContain("insert into public.wk_chart_entries_v2");
+    expect(STUDIO_WORKER).toContain('server.rpc("charts2_studio_private_snapshot_v1"');
+    expect(STUDIO_WORKER).toContain('required_capability:"manage_registry"');
+    expect(STUDIO_WORKER).toContain('crypto.subtle.digest("SHA-256",bytes)');
+    expect(STUDIO_WORKER).toContain('authClient.rpc("admin_admit_registry_track_provider_link_v1"');
+    expect(STUDIO_WORKER).not.toContain('server.rpc("admin_admit_registry_track_provider_link_v1"');
+    expect(STUDIO_WORKER).toContain('p_match_method:"manual",p_match_confidence:1');
+    expect(ROUTER).toContain('path: "studio", element: <AdminGuard capabilities={["manage_charts"]}><AdminChartsStudioPage /></AdminGuard>');
+    expect(SHELL).toContain('path: "/admin/charts/studio"');
+    for (const action of ["studio_preview","studio_review_link","studio_track_search","verify_method","review_method"]) {
+      expect(STUDIO_PAGE).toContain(action);
+    }
+    expect(STUDIO_PAGE).toContain("Collect / retry");
+    expect(STUDIO_PAGE).not.toContain("publish_edition");
   });
 
   it("preserves provider time without inventing synchronized weeks",()=>{
