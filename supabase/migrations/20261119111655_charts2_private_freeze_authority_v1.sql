@@ -81,6 +81,7 @@ declare
   rank_sha text;
   source_key text;
   provider_key text;
+  expected_endpoint text;
   original_sha text;
   expected_depth integer;
   source_weight integer;
@@ -123,14 +124,19 @@ begin
     case source_key
       when 'youtube_ke' then
         provider_key:='youtube';expected_depth:=100;source_weight:=30;
+        expected_endpoint:='https://charts.youtube.com/youtubei/v1/browse?alt=json';
       when 'mdundo_ke' then
         provider_key:='mdundo';expected_depth:=100;source_weight:=25;
+        expected_endpoint:='https://play.mdundo.com/top-charts/ke';
       when 'apple_ke' then
         provider_key:='apple_music';expected_depth:=100;source_weight:=20;
+        expected_endpoint:='https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172';
       when 'audiomack_ke' then
         provider_key:='audiomack';expected_depth:=100;source_weight:=15;
+        expected_endpoint:='https://audiomack.com/geo-charts/playlist/kenya';
       when 'shazam_ke' then
         provider_key:='shazam';expected_depth:=200;source_weight:=10;
+        expected_endpoint:='https://www.shazam.com/services/charts/csv/top-200/kenya';
       else raise exception 'charts2_freeze_source_invalid';
     end case;
     if (source_receipts @> jsonb_build_array(jsonb_build_object('source_key',source_key)))
@@ -138,6 +144,7 @@ begin
     receipt_id:=r->>'id';
     original_sha:=r->>'original_sha256';
     if r->>'receipt_schema' is distinct from 'charts2-original-receipt/v1'
+       or r->>'source_endpoint' is distinct from expected_endpoint
        or r->>'market' is distinct from 'KE'
        or r->>'capture_mode' is distinct from 'service_original'
        or r->>'original_bucket' is distinct from 'charts2-evidence-private-v1'
@@ -146,7 +153,7 @@ begin
          source_key||'/'||left(original_sha,2)||'/'||original_sha||
          (case when source_key='youtube_ke' then '.json'
                when source_key='shazam_ke' then '.csv' else '.html' end)
-       or coalesce((r->>'original_byte_length')::integer,0)<1
+       or coalesce((r->>'original_byte_length')::integer,0) not between 1 and 4000000
        or coalesce((r->>'method_revision')::integer,0)<1
        or coalesce((r->>'expected_depth')::integer,0)<>expected_depth
        or coalesce((r->>'observed_depth')::integer,0)<>expected_depth
@@ -156,7 +163,8 @@ begin
        or (r->>'can_publish')::boolean is distinct from false
        or nullif(r->>'observed_at','') is null
        or nullif(r->>'original_verified_at','') is null
-       or r->>'observed_at' > r->>'original_verified_at'
+       or (r->>'observed_at')::timestamptz >
+           (r->>'original_verified_at')::timestamptz
        or jsonb_typeof(r->'observations') is distinct from 'array'
        or jsonb_array_length(r->'observations')<>expected_depth
     then raise exception 'charts2_freeze_receipt_unqualified_%',source_key; end if;
@@ -200,7 +208,7 @@ begin
            or p->'review_evidence'->>'original_sha256' is distinct from original_sha
            or p->'review_evidence'->>'provider_track_id' is distinct from provider_id
            or length(btrim(coalesce(p->'review_evidence'->>'review_note','')))<40
-           or p->'review_evidence'->>'evidence_url' not like 'https://%'
+           or coalesce(p->'review_evidence'->>'evidence_url','') not like 'https://%'
         then continue; end if;
         matches:=matches+1;l:=p;
       end loop;
