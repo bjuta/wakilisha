@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { AdminChartsPageHeader } from "@/pages/admin/charts/components/AdminChartsPageHeader";
 
 type SourceKey = "youtube_ke" | "mdundo_ke" | "apple_ke" | "audiomack_ke" | "shazam_ke";
@@ -316,22 +318,24 @@ export default function ChartsStudioPage() {
                 <p className="break-all font-mono text-[11px] text-wk-text-muted">
                   SHA-256: {probe.original_sha256}
                 </p>
-                <label className="flex items-start gap-2 text-[12px] text-wk-text">
-                  <input type="checkbox" checked={sourceConsent===source.key} onChange={e=>setSourceConsent(e.target.checked?source.key:null)}/>
+                <WkCheckbox checked={sourceConsent===source.key}
+                  onChange={checked=>setSourceConsent(checked?source.key:null)}>
                   I inspected this source, endpoint and original evidence, and explicitly approve a 24-hour evidence-only admission.
-                </label>
+                </WkCheckbox>
                 <button type="button" className={buttonPrimary} disabled={sourceConsent!==source.key||!!busy}
                   onClick={()=>void approval(source.key)}>Approve exact method</button>
               </div>}
-              {method && <details className="text-[12px] text-wk-text-muted">
-                <summary className="cursor-pointer font-bold">Method controls and revocation</summary>
+              {method && <WkDisclosure className="text-[12px] text-wk-text-muted"
+                summary="Method controls and revocation"
+                triggerClassName="min-h-11 text-left font-bold text-wk-text underline underline-offset-4"
+                contentClassName="space-y-2 pt-2">
                 <p className="mt-2">Revision {method.method_revision} · Expires {DATE(method.authorization_expires_at)}</p>
                 <label className="mt-2 block" htmlFor={"hold-"+source.key}>Reason for audited HOLD</label>
                 <input id={"hold-"+source.key} value={holdReason} onChange={e=>setHoldReason(e.target.value)}
                   placeholder="Write a source-specific, factual hold reason" className={fieldClass}/>
                 <button type="button" className={buttonSecondary} disabled={!!busy||holdReason.trim().length<24}
                   onClick={()=>void hold(source.key,method.method_revision)}>Hold / revoke method</button>
-              </details>}
+              </WkDisclosure>}
             </WkSurface>;
           })}
         </section>
@@ -437,10 +441,9 @@ export default function ChartsStudioPage() {
               <textarea id="studio-note" rows={4} className={fieldClass}
                 placeholder="Document corroborated performer, version, release or ISRC. Name similarity alone is insufficient."
                 value={reviewNote} onChange={e=>setReviewNote(e.target.value)}/>
-              <label className="flex items-start gap-2 text-[12px] text-wk-text">
-                <input type="checkbox" checked={reviewConsent} onChange={e=>setReviewConsent(e.target.checked)}/>
+              <WkCheckbox checked={reviewConsent} onChange={setReviewConsent}>
                 {DECLARATION}
-              </label>
+              </WkCheckbox>
               <button type="button" className={buttonPrimary} disabled={!!busy||!selectedTrack||
                 !reviewConsent||reviewNote.trim().length<40||!evidenceUrl.startsWith("https://")}
                 onClick={()=>void commitReview()}>Submit reviewed provider link to Registry</button>
