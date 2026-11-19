@@ -285,7 +285,7 @@ export default function ChartsStudioPage() {
         ].map(([label,value])=>
           <WkSurface key={label} className="p-4">
             <p className="text-[11px] font-black uppercase tracking-wider text-wk-text-muted">{label}</p>
-            <p className="mt-2 text-[27px] font-black tabular-nums text-wk-text">{loading?"—":value}</p>
+            <p className="mt-2 text-[27px] font-black tabular-nums text-wk-text">{loading?"…":value}</p>
           </WkSurface>
         )}
       </div>
