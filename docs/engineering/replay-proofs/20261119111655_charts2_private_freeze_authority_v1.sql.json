@@ -15,11 +15,9 @@
   "ci_markers": [
     "WK_CI_NO_REMOTE_TARGET=PASS",
     "WK_CI_LOCAL_MIGRATION_REPLAY_FINISHED=PASS",
-    "WK_CHARTS2_LOCAL_PRIVATE_STUDIO_SERVICE_READER=PASS",
-    "WK_CHARTS2_LOCAL_PRIVATE_FREEZE_AUTHORITY=PASS",
-    "WK_CHARTS2_LOCAL_PRIVATE_FREEZE_100_EXACT_REPLAY=PASS",
-    "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_SQL=PASS",
+    "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_DB_SECURITY=PASS",
     "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS",
+    "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_SQL=PASS",
     "WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS"
   ],
   "baseline_replay": "pass",
@@ -30,5 +28,5 @@
   "schema_migration_count": 267,
   "schema_migration_head": "20261119111655",
   "verified_at": "2026-11-19T11:46:01Z",
-  "notes": "Exact-head unlinked 267-migration replay; service-only immutable private freezes, actor-bound JWT authorization and CAS, private ACL and mutation rejection. SQL verifier independently recomputed 100 synthetic exact-ranked canonical recordings with 500 intentionally unresolved source observations, 100/100 deterministic ordering, and repeat-stable input/ranking SHA-256: WK_CHARTS2_LOCAL_PRIVATE_FREEZE_100_EXACT_REPLAY=PASS. Both disposable SQL and genuine operator-JWT acceptance jobs SUCCESS, full rollback and container/volume destruction. No Production mutation, actual 100-song acceptance, scheduler or publication."
+  "notes": "Exact-head unlinked 267-migration replay #44517091287: immutable private 100-position freeze table, authenticated-only actor RPC, service-only preview ACL, transaction-locked digest/revision CAS, and SQL 100-rank deterministic positive fixture. SQL logs include WK_CHARTS2_LOCAL_PRIVATE_FREEZE_AUTHORITY=PASS and WK_CHARTS2_LOCAL_PRIVATE_FREEZE_100_EXACT_REPLAY=PASS with 100 reviewed synthetic Apple records and 500 unresolved other observations. Both SQL and signed-in JWT jobs passed, rollback and container/volume destruction. No Production mutation or real 100-song acceptance."
 }
