@@ -1,4 +1,5 @@
 import {describe,expect,it} from "vitest";
+import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
 import { readFileSync } from "node:fs";
 import {
   CHARTS2_PRIVATE_METHODOLOGY_V1,
@@ -305,4 +306,83 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(result.source_coverage.find((s:any)=>s.source_key==="audiomack_ke")
       ?.provider_updated_at).toBe("2026-11-18T16:57:11Z");
   });
+  it("preflights only an actual immutable private 100-recording freeze for an offline Chart V2 projection",()=>{
+    const ROW_UUID=(n:number)=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
+    const READ_RECEIPTS=SOURCE.map(([source_key],i)=>({
+      source_key,receipt_id:ROW_UUID(500+i),original_sha256:String(i+1).repeat(64),
+      observed_at:"2026-11-19T09:27:00+00:00",
+      native_period_authority:source_key==="youtube_ke"?"provider_declared_end_date":"unknown",
+      provider_week_ending_date:source_key==="youtube_ke"?"2026-11-12":null,
+      provider_updated_at:null,
+    }));
+    const rows=Array.from({length:100},(_,i)=>{
+      const rank=i+1,units=40*(101-rank);
+      return {position:rank,track_id:ROW_UUID(1001+i),score_units:units,
+        score_points:(units/200).toFixed(2),source_contributions:[{
+          source_key:"apple_ke",receipt_id:READ_RECEIPTS[2].receipt_id,
+          original_sha256:READ_RECEIPTS[2].original_sha256,rank,
+          source_weight_points:20,credit_units:units,
+          registry_provider_link_id:ROW_UUID(4001+i),
+        }]};
+    });
+    const freeze={id:ROW_UUID(200),frozen_by:ROW_UUID(300),frozen_at:"2026-11-19T18:30:00Z",
+      lifecycle:"frozen_private",can_publish:false,
+      methodology_version:"consumption_led_cultural_presence_v1",
+      scoring_policy_version:"charts2-private-ordinal-v1",
+      input_sha256:"a".repeat(64),ranking_sha256:"b".repeat(64),
+      source_receipts:READ_RECEIPTS,ranking:rows,unresolved_observations:500};
+    const preflight={contract:"charts2-private-freeze-preflight/v1",freeze_ready:true,
+      can_publish:false,eligible_count:100,conflict_count:0,
+      input_sha256:freeze.input_sha256,ranking_sha256:freeze.ranking_sha256,
+      latest_freeze_id:freeze.id,
+      recent_freezes:[{id:freeze.id,input_sha256:freeze.input_sha256,
+        ranking_sha256:freeze.ranking_sha256,frozen_private:true}],
+      source_receipts:structuredClone(READ_RECEIPTS),ranking:structuredClone(rows)};
+    const programme={id:"top100",series_slug:"top100",public_slug:"top100",
+      market_slug:"KE",chart_size:100,default_methodology_version:"weighted_streaming_v1"};
+    const methodology={methodology_version:freeze.methodology_version,
+      scoring_policy_version:freeze.scoring_policy_version,
+      rule_set:{scope:"private_review_only",can_publish:false,unit_denominator:200,
+        weights:{youtube_ke:30,mdundo_ke:25,apple_ke:20,audiomack_ke:15,shazam_ke:10}}};
+    const registryTracks=Array.from({length:100},(_,i)=>({
+      id:ROW_UUID(1001+i),slug:"recording-"+(i+1),title:"Recording "+(i+1),status:"active"}));
+    const fixture={freeze,preflight,programme,methodology,registryTracks};
+    const clone=()=>structuredClone(fixture);
+    const projection=inspectCharts2FrozenEditionProjectionV1(clone());
+    expect(projection.contract).toBe("charts2-chart-v2-projection/v1");
+    expect(projection.entries).toHaveLength(100);
+    expect(projection.entries[0].score_points).toBe("20.00");
+    expect(projection.entries[99].score_points).toBe("0.20");
+    expect(projection.can_stage).toBe(false);
+    expect(projection.can_publish).toBe(false);
+    expect(projection.outstanding_gates).toContain("actual_registry_artist_origin_integrity");
+    expect(projection).not.toHaveProperty("edition_id");
+    expect(projection).not.toHaveProperty("publish");
+    const deny=(mutate:(x:any)=>void,reason:string)=>{
+      const candidate=clone(); mutate(candidate);
+      expect(()=>inspectCharts2FrozenEditionProjectionV1(candidate))
+        .toThrow("charts2_bridge_"+reason);
+    };
+    deny(x=>{delete x.freeze;},"immutable_private_freeze_required");
+    deny(x=>{x.freeze.can_publish=true;},"immutable_private_freeze_required");
+    deny(x=>{x.freeze.frozen_by="browser";},"immutable_private_freeze_required");
+    deny(x=>{x.preflight.freeze_ready=false;},"current_authority_or_digest_missing");
+    deny(x=>{x.preflight.input_sha256="c".repeat(64);},"current_authority_or_digest_missing");
+    deny(x=>{x.preflight.latest_freeze_id=ROW_UUID(201);},"current_authority_or_digest_missing");
+    deny(x=>{x.programme.id="toprnb";},"programme_not_prospectively_authorized");
+    deny(x=>{x.methodology.rule_set.weights.youtube_ke=40;},"methodology_authority_drift");
+    deny(x=>{x.freeze.source_receipts.pop();},"five_receipts_required");
+    deny(x=>{x.preflight.source_receipts[2].original_sha256="f".repeat(64);},"source_original_changed");
+    deny(x=>{x.freeze.ranking.pop();},"exact_100_rank_required");
+    deny(x=>{x.freeze.ranking[1].track_id=x.freeze.ranking[0].track_id;},"ranking_or_track_identity_invalid");
+    deny(x=>{x.freeze.ranking[0].score_units=3900;x.freeze.ranking[0].score_points="19.50";},"current_ranking_changed");
+    deny(x=>{x.freeze.ranking[0].source_contributions[0].credit_units=3999;},"source_credit_invalid");
+    deny(x=>{x.freeze.ranking[0].source_contributions[0].registry_provider_link_id=null;},"source_credit_invalid");
+    deny(x=>{x.registryTracks[0].status="needs_review";},"registry_track_invalid");
+    // The private projection is never permission to mutate retained Chart V2 tables.
+    const contract=readFileSync("supabase/functions/_shared/charts2-publication-bridge-v1.mjs","utf8");
+    expect(contract).not.toMatch(/\b(?:INSERT|UPDATE|DELETE)\s+INTO\s+public\.wk_chart_/i);
+    expect(contract).not.toContain("supabase.functions.invoke");
+  });
+
 });
