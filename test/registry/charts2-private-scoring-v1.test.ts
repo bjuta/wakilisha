@@ -44,8 +44,16 @@ function link(source_key:string,rank:number,track:number,version:number=1){
     id:UUID(version*100000+SOURCE.findIndex(s=>s[0]===source_key)*1000+rank),
     track_id:UUID(track),provider_key:KEY[source_key],
     provider_track_id:source_key+":"+String(rank),
-    match_status:"matched",match_method:"exact_provider_id",
-    track_status:"active",
+    match_status:"matched",match_method:"manual",
+    match_confidence:1,track_status:"active",
+    review_evidence:{
+      charts2_studio_review_v1:true,source_key,
+      receipt_id:fullReceipts().find(r=>r.source_key===source_key)!.id,
+      original_sha256:fullReceipts().find(r=>r.source_key===source_key)!.original_sha256,
+      provider_track_id:source_key+":"+String(rank),
+      review_note:"Independent version-specific recording evidence has been reviewed against the Registry.",
+      evidence_url:"https://example.com/recording-evidence",
+    },
   };
 }
 function score(receipts:any[],registry_links:any[]=[]){
