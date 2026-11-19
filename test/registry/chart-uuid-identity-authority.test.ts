@@ -395,7 +395,7 @@ describe("Charts 2.0 restricted capture gateway v1", () => {
   });
 
   it("requires independently verified first-party probe evidence and explicit JWT review", () => {
-    expect(methodReviewSql).toContain("GitHub run 44471059204");
+    expect(methodReviewSql).toContain("PR #1399 run 44471059204");
     expect(methodReviewSql).toContain("platform_private.charts2_source_method_probes_v1");
     expect(methodReviewSql).toContain("platform_private.charts2_source_method_decisions_v1");
     expect(methodReviewSql).toContain("charts2_method_probe_immutable_v1");
