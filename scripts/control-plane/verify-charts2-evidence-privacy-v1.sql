@@ -417,5 +417,220 @@ begin
 end
 $charts2_four_get_review$;
 
+-- Charts 2.0 Studio service-only read contract and versioned, private-only weights.
+do $charts2_studio_snapshot$
+declare
+  snap jsonb;
+  weights jsonb;
+begin
+  if not has_function_privilege('service_role',
+       'public.charts2_studio_private_snapshot_v1()','EXECUTE')
+     or has_function_privilege('authenticated',
+       'public.charts2_studio_private_snapshot_v1()','EXECUTE')
+     or has_function_privilege('anon',
+       'public.charts2_studio_private_snapshot_v1()','EXECUTE')
+  then raise exception 'charts2_studio_acl_broadened'; end if;
+  select rule_set->'weights' into weights
+  from public.wk_chart_methodologies_v2
+  where methodology_version='consumption_led_cultural_presence_v1'
+    and scoring_policy_version='charts2-private-ordinal-v1';
+  if weights is null or
+     weights <> '{"youtube_ke":30,"mdundo_ke":25,"apple_ke":20,"audiomack_ke":15,"shazam_ke":10}'::jsonb
+  then raise exception 'charts2_studio_weights_invalid'; end if;
+  snap:=public.charts2_studio_private_snapshot_v1();
+  if snap->>'contract'<>'charts2-private-studio/v1' or
+     pg_catalog.jsonb_typeof(snap->'receipts')<>'array' or
+     pg_catalog.jsonb_typeof(snap->'registry_links')<>'array' or
+     pg_catalog.jsonb_typeof(snap->'source_methods')<>'array' or
+     pg_catalog.jsonb_typeof(snap->'history')<>'array' or
+     snap->'methodology'->>'version'<>'consumption_led_cultural_presence_v1'
+  then raise exception 'charts2_studio_snapshot_invalid'; end if;
+  raise notice 'WK_CHARTS2_LOCAL_PRIVATE_STUDIO_SERVICE_READER=PASS';
+end
+$charts2_studio_snapshot$;
+
+-- Phase 2 private freeze stays immutable, actor-authorized, and invisible to Data API.
+do $charts2_freeze_authority$
+begin
+  if to_regclass('platform_private.charts2_private_freezes_v1') is null
+    or to_regprocedure('public.charts2_private_freeze_preflight_v1()') is null
+    or to_regprocedure('public.charts2_freeze_private_candidate_v1(text,uuid,text)') is null
+    or to_regprocedure('platform_private.charts2_compute_private_freeze_v1()') is null
+  then raise exception 'charts2_private_freeze_missing';end if;
+
+  if not exists (
+    select 1 from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='platform_private'
+      and c.relname='charts2_private_freezes_v1' and c.relrowsecurity
+  ) or has_schema_privilege('anon','platform_private','USAGE')
+    or has_schema_privilege('authenticated','platform_private','USAGE')
+    or has_table_privilege('anon','platform_private.charts2_private_freezes_v1','SELECT')
+    or has_table_privilege('authenticated','platform_private.charts2_private_freezes_v1','SELECT')
+    or has_table_privilege('service_role','platform_private.charts2_private_freezes_v1','INSERT')
+  then raise exception 'charts2_freeze_table_privacy_failure'; end if;
+
+  if not has_function_privilege('service_role',
+    'public.charts2_private_freeze_preflight_v1()','EXECUTE')
+    or has_function_privilege('anon',
+      'public.charts2_private_freeze_preflight_v1()','EXECUTE')
+    or has_function_privilege('authenticated',
+      'public.charts2_private_freeze_preflight_v1()','EXECUTE')
+    or not has_function_privilege('authenticated',
+      'public.charts2_freeze_private_candidate_v1(text,uuid,text)','EXECUTE')
+    or has_function_privilege('anon',
+      'public.charts2_freeze_private_candidate_v1(text,uuid,text)','EXECUTE')
+    or has_function_privilege('service_role',
+      'public.charts2_freeze_private_candidate_v1(text,uuid,text)','EXECUTE')
+    or has_function_privilege('authenticated',
+      'platform_private.charts2_compute_private_freeze_v1()','EXECUTE')
+  then raise exception 'charts2_freeze_rpc_grant_boundary_failure'; end if;
+
+  if not exists (
+    select 1 from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid=t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='platform_private'
+      and c.relname='charts2_private_freezes_v1'
+      and t.tgname='charts2_private_freezes_immutable_v1'
+      and not t.tgisinternal
+  ) then raise exception 'charts2_freeze_immutable_trigger_missing';end if;
+
+  if exists (select 1 from platform_private.charts2_private_freezes_v1)
+  then raise exception 'charts2_freeze_local_fixture_leak';end if;
+
+  raise notice 'WK_CHARTS2_LOCAL_PRIVATE_FREEZE_AUTHORITY=PASS';
+end
+$charts2_freeze_authority$;
+
+-- Replace ONLY the SQL reader inside the disposable verifier transaction.
+-- This exercise never creates Production originals or canonical Registry links.
+create or replace function public.charts2_studio_private_snapshot_v1()
+returns jsonb language plpgsql stable security definer
+set search_path=''
+as $synthetic$
+declare
+  spec record;
+  i integer;
+  receipts jsonb:='[]'::jsonb;
+  links jsonb:='[]'::jsonb;
+  observations jsonb;
+  method jsonb;
+  sha text;
+  rid text;
+  track_uuid text;
+  provider_key text;
+  native_period text;
+  ending text;
+  ext text;
+begin
+  select jsonb_build_object(
+    'version','consumption_led_cultural_presence_v1',
+    'scoring_policy_version','charts2-private-ordinal-v1',
+    'rule_set',rule_set) into method
+  from public.wk_chart_methodologies_v2
+  where methodology_version='consumption_led_cultural_presence_v1';
+
+  for spec in
+    select * from (values
+      ('youtube_ke','youtube','a',100,1,'application/json','.json',
+        'https://charts.youtube.com/youtubei/v1/browse?alt=json'),
+      ('mdundo_ke','mdundo','b',100,2,'text/html','.html',
+        'https://play.mdundo.com/top-charts/ke'),
+      ('apple_ke','apple_music','c',100,3,'text/html','.html',
+        'https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172'),
+      ('audiomack_ke','audiomack','d',100,4,'text/html','.html',
+        'https://audiomack.com/geo-charts/playlist/kenya'),
+      ('shazam_ke','shazam','e',200,5,'text/csv','.csv',
+        'https://www.shazam.com/services/charts/csv/top-200/kenya')
+    ) v(source_key,provider_key,sha_letter,depth,receipt_number,mime,extension,endpoint)
+  loop
+    sha:=repeat(spec.sha_letter,64);
+    rid:='00000000-0000-4000-8000-'||lpad(spec.receipt_number::text,12,'0');
+    select coalesce(jsonb_agg(
+      jsonb_build_object('rank',num,'title','Fixture Track '||num,
+        'artist','Fixture Artist',
+        'provider_track_id',case when spec.source_key='shazam_ke' then null
+             else spec.source_key||':'||num end)
+      order by num),'[]'::jsonb)
+    into observations
+    from generate_series(1,spec.depth) num;
+    native_period:=case when spec.source_key='youtube_ke'
+      then 'provider_declared_end_date' else 'unknown' end;
+    ending:=case when spec.source_key='youtube_ke' then '2026-11-12'
+      else null end;
+    receipts:=receipts||jsonb_build_array(jsonb_build_object(
+      'id',rid,
+      'receipt_schema','charts2-original-receipt/v1',
+      'source_key',spec.source_key,'market','KE',
+      'source_endpoint',spec.endpoint,'method_revision',1,
+      'capture_mode','service_original',
+      'original_bucket','charts2-evidence-private-v1',
+      'original_object_key',spec.source_key||'/'||
+        left(sha,2)||'/'||sha||spec.extension,
+      'original_sha256',sha,'original_byte_length',1024,
+      'original_content_type',spec.mime,
+      'observed_at','2026-11-19T10:00:00Z',
+      'original_verified_at','2026-11-19T10:01:00Z',
+      'native_period_authority',native_period,
+      'provider_week_ending_date',ending,
+      'expected_depth',spec.depth,'observed_depth',spec.depth,
+      'observed_status','succeeded',
+      'candidate_only',true,'can_score',false,'can_publish',false,
+      'observations',observations));
+
+    if spec.source_key='apple_ke' then
+      for i in 1..100 loop
+        track_uuid:='00000000-0000-4000-8000-'||lpad(i::text,12,'0');
+        links:=links||jsonb_build_array(jsonb_build_object(
+          'id','00000000-0000-4000-8000-'||lpad((1000+i)::text,12,'0'),
+          'track_id',track_uuid,
+          'provider_key',spec.provider_key,
+          'provider_track_id','apple_ke:'||i,
+          'match_method','manual','match_status','matched',
+          'match_confidence',1,'track_status','active',
+          'review_evidence',jsonb_build_object(
+            'charts2_studio_review_v1',true,'source_key','apple_ke',
+            'receipt_id',rid,'original_sha256',sha,
+            'provider_track_id','apple_ke:'||i,
+            'review_note','Independently reviewed exact version-specific recording evidence for this native chart track.',
+            'evidence_url','https://example.org/fixture-evidence/'||i)));
+      end loop;
+    end if;
+  end loop;
+  return jsonb_build_object(
+    'contract','charts2-private-studio/v1',
+    'methodology',method,'receipts',receipts,'registry_links',links,
+    'history','[]'::jsonb,'source_methods','[]'::jsonb);
+end
+$synthetic$;
+
+do $charts2_freeze_actual_100$
+declare
+  a jsonb;
+  b jsonb;
+begin
+  a:=public.charts2_private_freeze_preflight_v1();
+  b:=public.charts2_private_freeze_preflight_v1();
+  if a->>'contract' is distinct from 'charts2-private-freeze-preflight/v1'
+     or (a->>'freeze_ready')::boolean is distinct from true
+     or (a->>'eligible_count')::integer is distinct from 100
+     or (a->>'unresolved_count')::integer is distinct from 500
+     or (a->>'conflict_count')::integer is distinct from 0
+     or jsonb_array_length(a->'ranking')<>100
+     or a->'ranking'->0->>'track_id' is distinct from
+        '00000000-0000-4000-8000-000000000001'
+     or (a->'ranking'->0->>'score_units')::integer<>4000
+     or a->'ranking'->0->>'score_points' is distinct from '20.00'
+     or (a->'ranking'->99->>'score_units')::integer<>40
+     or a->>'input_sha256' is distinct from b->>'input_sha256'
+     or a->>'ranking_sha256' is distinct from b->>'ranking_sha256'
+     or length(a->>'input_sha256')<>64
+     or length(a->>'ranking_sha256')<>64
+  then raise exception 'charts2_private_freeze_100_rank_replay_failed';end if;
+  raise notice 'WK_CHARTS2_LOCAL_PRIVATE_FREEZE_100_EXACT_REPLAY=PASS';
+end
+$charts2_freeze_actual_100$;
+
 rollback;
 \echo WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS

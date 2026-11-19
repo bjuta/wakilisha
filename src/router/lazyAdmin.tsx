@@ -12,6 +12,10 @@ export const AdminAnalyticsPage = lazy(() =>
   import("../pages/admin/analytics/page"),
 );
 
+export const AdminChartsStudioPage = lazy(() =>
+  import("../pages/admin/charts/studio/page"),
+);
+
 export const AdminApiDocsPage = lazy(() =>
   import("../pages/admin/api-docs/page"),
 );
