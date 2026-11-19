@@ -235,6 +235,20 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).not.toContain("publish_edition");
   });
 
+  it("allows 100 separately reviewed canonical recordings while preserving 500 unresolved observations",()=>{
+    const receipts=fullReceipts();
+    const links=Array.from({length:100},(_,i)=>link("apple_ke",i+1,1000+i));
+    const preview=score(receipts,links);
+    expect(preview.candidates).toHaveLength(100);
+    expect(preview.unresolved).toHaveLength(500);
+    expect(preview.conflicts).toHaveLength(0);
+    expect(preview.review_status).toBe("eligible_for_private_review");
+    expect(preview.candidates[0].score_points).toBe("20.00");
+    expect(preview.candidates[99].score_points).toBe("0.20");
+    expect(preview.frozen).toBe(false);
+    expect(preview.can_publish).toBe(false);
+  });
+
   it("preserves provider time without inventing synchronized weeks",()=>{
     const r=fullReceipts();
     const result=score(r);
