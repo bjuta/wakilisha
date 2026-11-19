@@ -297,5 +297,111 @@ begin
 end
 $charts2_method_review$;
 
+-- Four non-YouTube source methods: identical signed-in approval and
+-- revocation boundary, tested with local-only synthetic Storage metadata.
+-- No first-party network success is implied by fixture-only acceptance.
+do $charts2_four_get_review$
+declare
+  fake_actor uuid := '00000000-0000-4000-8000-000000009991'::uuid;
+  src text; provider_name text; endpoint text; extension text;
+  mark text; sha text; keyname text; probe jsonb; decided jsonb;
+  current_method text;
+begin
+  if not has_function_privilege('service_role',
+       'public.charts2_record_get_method_probe_v1(text,uuid,text,text,integer,integer)','EXECUTE')
+     or has_function_privilege('authenticated',
+       'public.charts2_record_get_method_probe_v1(text,uuid,text,text,integer,integer)','EXECUTE')
+     or has_function_privilege('anon',
+       'public.charts2_decide_get_method_v1(text,text,uuid,integer,text)','EXECUTE')
+     or not has_function_privilege('authenticated',
+       'public.charts2_decide_get_method_v1(text,text,uuid,integer,text)','EXECUTE')
+  then raise exception 'charts2_get_review_acl_failure'; end if;
+  for src,provider_name,endpoint,extension,mark in
+    select * from (values
+      ('apple_ke','Apple Music Kenya Top 100',
+       'https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172','.html','d'),
+      ('mdundo_ke','Mdundo Kenya Top Songs',
+       'https://play.mdundo.com/top-charts/ke','.html','e'),
+      ('audiomack_ke','Audiomack Kenya Weekly 100',
+       'https://audiomack.com/geo-charts/playlist/kenya','.html','f'),
+      ('shazam_ke','Shazam Kenya Top 200',
+       'https://www.shazam.com/services/charts/csv/top-200/kenya','.csv','9')
+    ) as fixed(source_key,title,source_endpoint,file_extension,sha_character)
+  loop
+    update platform_private.charts2_source_methods_v1
+    set review_state='held',reviewed_method=null,exact_endpoint=null,
+        reviewed_by=null,reviewed_at=null,authorization_expires_at=null,
+        access_evidence_sha256=null,method_revision=0
+    where source_key=src;
+    sha:=repeat(mark,64);
+    keyname:=src||'/'||substring(sha,1,2)||'/'||sha||extension;
+    begin
+      perform public.charts2_record_get_method_probe_v1(src,fake_actor,sha,keyname,700,
+        case when src='shazam_ke' then 200 else 100 end);
+      raise exception 'charts2_get_probe_missing_original_allowed';
+    exception when others then
+      if sqlerrm <> 'charts2_get_probe_original_unverified' then raise; end if;
+    end;
+    insert into storage.objects(bucket_id,name,metadata)
+    values('charts2-evidence-private-v1',keyname,
+           jsonb_build_object('size',700,'mimetype',
+             case when src='shazam_ke' then 'text/csv' else 'text/html' end));
+    probe:=public.charts2_record_get_method_probe_v1(src,fake_actor,sha,keyname,700,
+      case when src='shazam_ke' then 200 else 100 end);
+    if probe->>'source_key' <> src or probe->>'expected_revision' <> '0' or
+       (probe->>'probe_id')::uuid is null then
+      raise exception 'charts2_get_probe_revision_invalid_%',src;
+    end if;
+    perform set_config('request.jwt.claim.sub',fake_actor::text,true);
+    perform set_config('request.jwt.claim.role','authenticated',true);
+    execute 'set local role authenticated';
+    decided:=public.charts2_decide_get_method_v1(src,'admit',
+      (probe->>'probe_id')::uuid,0,
+      'I approve first-party '||provider_name||' GET for evidence-only manual collection.');
+    if decided->>'review_state'<>'collector_admitted' or
+       decided->>'method_revision'<>'1' then
+      raise exception 'charts2_get_review_admission_failed_%',src;
+    end if;
+    begin
+      perform public.charts2_decide_get_method_v1(src,'admit',
+        (probe->>'probe_id')::uuid,0,
+        'I approve first-party '||provider_name||' GET for evidence-only manual collection.');
+      raise exception 'charts2_get_stale_review_allowed';
+    exception when others then
+      if sqlerrm <> 'charts2_method_review_revision_conflict' then raise; end if;
+    end;
+    execute 'reset role';
+    if (select count(*) from public.charts2_get_collector_method_v1(src)
+        where reviewed_method='GET' and exact_endpoint=endpoint and method_revision=1) <> 1
+    then raise exception 'charts2_get_collector_method_missing_%',src; end if;
+    execute 'set local role authenticated';
+    decided:=public.charts2_decide_get_method_v1(src,'hold',null,1,
+      'Revocation of the disposable four-source GET method admission.');
+    if decided->>'review_state'<>'held' or decided->>'method_revision'<>'2'
+    then raise exception 'charts2_get_revocation_failed_%',src; end if;
+    execute 'reset role';
+    if exists(select 1 from public.charts2_get_collector_method_v1(src)) then
+      raise exception 'charts2_get_revocation_leaked_%',src;
+    end if;
+  end loop;
+  if (select count(*) from platform_private.charts2_source_method_decisions_v1
+      where source_key <> 'youtube_ke') <> 8 then
+    raise exception 'charts2_four_get_decision_audit_missing';
+  end if;
+  begin
+    insert into platform_private.charts2_source_method_probes_v1
+      (source_key,exact_endpoint,reviewed_method,
+       actor_id,expected_method_revision,original_sha256,
+       original_object_key,original_byte_length,observed_depth)
+    values
+      ('apple_ke','https://play.mdundo.com/top-charts/ke','GET',fake_actor,0,
+       repeat('b',64),'apple_ke/bb/'||repeat('b',64)||'.html',700,100);
+    raise exception 'charts2_get_cross_source_endpoint_allowed';
+  exception when check_violation then null;
+  end;
+  raise notice 'WK_CHARTS2_LOCAL_FOUR_FIRST_PARTY_GET_REVIEW_AND_REVOCATION=PASS';
+end
+$charts2_four_get_review$;
+
 rollback;
 \echo WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS
