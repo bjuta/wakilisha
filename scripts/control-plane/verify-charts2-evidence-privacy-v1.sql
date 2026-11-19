@@ -449,5 +449,59 @@ begin
 end
 $charts2_studio_snapshot$;
 
+-- Phase 2 private freeze stays immutable, actor-authorized, and invisible to Data API.
+do $charts2_freeze_authority$
+begin
+  if to_regclass('platform_private.charts2_private_freezes_v1') is null
+    or to_regprocedure('public.charts2_private_freeze_preflight_v1()') is null
+    or to_regprocedure('public.charts2_freeze_private_candidate_v1(text,uuid,text)') is null
+    or to_regprocedure('platform_private.charts2_compute_private_freeze_v1()') is null
+  then raise exception 'charts2_private_freeze_missing';end if;
+
+  if not exists (
+    select 1 from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='platform_private'
+      and c.relname='charts2_private_freezes_v1' and c.relrowsecurity
+  ) or has_schema_privilege('anon','platform_private','USAGE')
+    or has_schema_privilege('authenticated','platform_private','USAGE')
+    or has_table_privilege('anon','platform_private.charts2_private_freezes_v1','SELECT')
+    or has_table_privilege('authenticated','platform_private.charts2_private_freezes_v1','SELECT')
+    or has_table_privilege('service_role','platform_private.charts2_private_freezes_v1','INSERT')
+  then raise exception 'charts2_freeze_table_privacy_failure'; end if;
+
+  if not has_function_privilege('service_role',
+    'public.charts2_private_freeze_preflight_v1()','EXECUTE')
+    or has_function_privilege('anon',
+      'public.charts2_private_freeze_preflight_v1()','EXECUTE')
+    or has_function_privilege('authenticated',
+      'public.charts2_private_freeze_preflight_v1()','EXECUTE')
+    or not has_function_privilege('authenticated',
+      'public.charts2_freeze_private_candidate_v1(text,uuid,text)','EXECUTE')
+    or has_function_privilege('anon',
+      'public.charts2_freeze_private_candidate_v1(text,uuid,text)','EXECUTE')
+    or has_function_privilege('service_role',
+      'public.charts2_freeze_private_candidate_v1(text,uuid,text)','EXECUTE')
+    or has_function_privilege('authenticated',
+      'platform_private.charts2_compute_private_freeze_v1()','EXECUTE')
+  then raise exception 'charts2_freeze_rpc_grant_boundary_failure'; end if;
+
+  if not exists (
+    select 1 from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid=t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='platform_private'
+      and c.relname='charts2_private_freezes_v1'
+      and t.tgname='charts2_private_freezes_immutable_v1'
+      and not t.tgisinternal
+  ) then raise exception 'charts2_freeze_immutable_trigger_missing';end if;
+
+  if exists (select 1 from platform_private.charts2_private_freezes_v1)
+  then raise exception 'charts2_freeze_local_fixture_leak';end if;
+
+  raise notice 'WK_CHARTS2_LOCAL_PRIVATE_FREEZE_AUTHORITY=PASS';
+end
+$charts2_freeze_authority$;
+
 rollback;
 \echo WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS
