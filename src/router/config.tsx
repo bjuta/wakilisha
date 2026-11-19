@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import {
   AdminGuard,
   AdminAnalyticsPage,
+  AdminChartsStudioPage,
   AdminApiDocsPage,
   AdminArticleDetailPage,
   AdminArticlesPage,
