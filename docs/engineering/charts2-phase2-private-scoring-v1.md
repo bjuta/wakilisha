@@ -1,6 +1,6 @@
 # Charts 2.0 Phase 2 — private scoring and Registry identity v1
 
-**Status:** Take 1 protected-CI PASS; Take 2 implementation under final protected review. No Production deployment or Phase 2 acceptance.
+**Current status (19 Nov 2026):** Phase 2 scoring and secure Admin Studio implementation is Production-deployed and engineering-accepted under the founder's bounded-identity scope amendment. The historical Take 1/2 notes below describe implementation-stage evidence. A genuine 100-track private freeze and full five-work-area interactive acceptance remain open Phase 3 launch prerequisites; neither has been fabricated.
 **Authority:** [Approved three-phase plan](charts-2-0-three-phase-execution-plan.md), parent [#1391](https://github.com/bjuta/wakilisha/issues/1391).
 **Runtime boundary:** `supabase/functions/_shared/charts2-private-scoring-v1.mjs`, pure module. No RPC, Edge deployment, public API, Registry write, edition write or scheduler is introduced by Take 1.
 
@@ -69,3 +69,19 @@ A reviewed link may contribute score credit only if it is a successful broker-so
 - **Take 3:** persisted immutable, reproducible private freeze; permissions, concurrency, adversarial and real desktop/mobile acceptance, full protected CI/Production gates and closure. Fail closed if 100 genuinely Registry-qualified recordings are not obtained. No public edition until separately approved Phase 3.
 
 Phase 2 must not be called complete merely because five provider captures contain 600 ranks.
+
+## 19 November bounded Registry review packet (read-only, not approved links)
+
+The founder elected to connect Charts to the existing Registry **only when recording identity is straightforward**. Ambiguities are left unresolved. Independent Production comparison of five immutable receipts and active Registry track/artist rows found just **four unique exact title-and-artist observation matches to three distinct active Registry tracks**; these are a reviewer shortlist only. Native provider IDs and exact rank context are retained below, without copying private originals.
+
+| Existing active Registry Track | Source observation | Native provider identity and corroborating first-party link | Registry ISRC |
+| --- | --- | --- | --- |
+| `7dc86b38-880d-4d2f-95a2-d12c8ff4895e`, Chai ya saa kumi (Ywaya Tajiri) | YouTube Kenya rank 9, Audiomack Kenya rank 16 | YouTube `xnQbCpY1a2g`, https://www.youtube.com/watch?v=xnQbCpY1a2g ; Audiomack `101662128`, https://audiomack.com/ywaya-tajiri/song/chai-ya-saa-kumi-0221086 | `QZMEP2658919` |
+| `0dc1a17b-5261-407b-adfe-d1eca895b455`, LAST DANCE (Wakadinali) | Audiomack Kenya rank 8 | Audiomack `99834056`, https://audiomack.com/wakadinali/song/last-dance ; independent artist-channel release https://www.youtube.com/watch?v=Oe0FkOex-4s | `QZWFH2616765` |
+| `4a610192-c5bf-483c-9e4b-bf715836d640`, Mboka (Mejja) | Audiomack Kenya rank 25 | Audiomack `86142684`, https://audiomack.com/mejja/song/mboka ; separate artist release listing https://music.apple.com/us/song/1882060336 | `QZQAY2651792` |
+
+The two-source Chai candidate is still **one distinct Registry Track**. Title/artist correspondence, official artist pages, Registry ISRCs and plausible duration are **not** substitutes for actor-reviewed recording-version equivalence or explicit approved broker evidence. The independent source verification here is pre-review research, not a Registry mutation or accepted identity assertion. No automatic provider links were written, no score credit was awarded and no source receipt was modified.
+
+The existing Apple `Finale` source observation at native rank 34 has a matching legacy Apple provider ID, but its Registry target is `needs_review` and its link is `exact_title_artist` (confidence 0.93). It is excluded from this shortlist and does not qualify for scoring. Apple source observations contain no artist names in the captured original; all 200 Shazam rows have no native provider track ID.
+
+**Safe handoff:** An authorised `manage_registry` reviewer may work through only the three shortlisted active recordings in the already deployed Identity Review tab, proving exact recording version and independent HTTPS evidence before explicit approval. Any nontrivial mismatch is a HOLD, not a task to force through. The broader 600-observation identity queue is an independent future Registry/MIZIZI programme, not a condition for finishing the Phase 2 engineering slice. The 100-recording freeze and any public edition remain guarded by the original immutable database contract.
