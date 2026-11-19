@@ -470,6 +470,7 @@ const routes: RouteObject[] = [
         ],
       },
       { path: "charts", children: [
+        { path: "studio", element: <AdminGuard capabilities={["manage_charts"]}><AdminChartsStudioPage /></AdminGuard> },
         { path: "share-analytics", element: <AdminAnalyticsPage /> },
         { path: "analytics", element: <AdminAnalyticsPage /> },
       ] },
