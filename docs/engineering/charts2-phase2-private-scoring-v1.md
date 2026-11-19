@@ -1,6 +1,6 @@
 # Charts 2.0 Phase 2 — private scoring and Registry identity v1
 
-**Status:** Take 1 implementation and proof; not a Phase 2 acceptance or launch.
+**Status:** Take 1 protected-CI PASS; Take 2 implementation under final protected review. No Production deployment or Phase 2 acceptance.
 **Authority:** [Approved three-phase plan](charts-2-0-three-phase-execution-plan.md), parent [#1391](https://github.com/bjuta/wakilisha/issues/1391).
 **Runtime boundary:** `supabase/functions/_shared/charts2-private-scoring-v1.mjs`, pure module. No RPC, Edge deployment, public API, Registry write, edition write or scheduler is introduced by Take 1.
 
@@ -44,10 +44,28 @@ For every source, validate the immutable receipt schema, exact official endpoint
 
 The output is a **private, nonpersisted review preview** with per-source receipt lineage, exact integer score contributions, unresolved identity queue, conflicts and review state. It always says `frozen=false, can_publish=false`. It cannot itself produce a frozen 100-position edition.
 
+## Take 2: one actual Admin Charts Studio (not yet deployed)
+
+**Route:** `/admin/charts/studio`, lazy-loaded under the existing Admin shell and guarded by `manage_charts`. Navigation appears only for a capable operator. Uses WAKILISHA `WkSurface`, `WkCheckbox` and `WkDisclosure` rather than native browser control chrome; desktop/mobile and theme tokens share the existing design system.
+
+**Private data authority:** A single pinned CLI migration, `20261119101415_charts2_studio_private_reader_v1.sql`, registers the versioned `consumption_led_cultural_presence_v1` methodology with locked weights and adds `public.charts2_studio_private_snapshot_v1()`, executable by **service_role only**. It returns five latest immutable private receipts, existing Registry canonical provider links, exact source-method health and at most 35 historical receipt summaries. No raw original Storage contents or captured operator IDs are exposed. The existing authenticated `charts2-capture` worker is the only entry point.
+
+**Live preflight:** `POST charts2-capture?mode=studio_preview` re-downloads each current original from private Storage, checks exact byte length and recomputes SHA-256, then evaluates the Take 1 integer-credit kernel. Incomplete five-source evidence fails closed. There is no browser-supplied score, identity authority or publish path. Studio displays private rankings only when exact Registry identities are actually present; otherwise it reports real unresolved and conflicting observations.
+
+**Operator controls:** Source Health exposes the *existing* first-party `verify_method`, explicit source-specific `review_method` admission or audited hold, and `collect`/retry behind current expiring method authorization. Reviewer actions remain independent per source and preserve prior receipts. The exact YouTube provider week must be supplied; GET observations never invent it.
+
+**Identity review:** Only an actor with both `manage_charts` and `manage_registry` may search existing active Registry Tracks and submit a canonical provider link. `studio_review_link` verifies the selected observation's exact latest immutable receipt and SHA-256 original again, requires a nonempty native provider ID, selected active canonical Track UUID, independent HTTPS recording evidence, 40+ character review rationale and explicit approval. It invokes the **existing** authenticated `admin_admit_registry_track_provider_link_v1` governed broker, never a new Registry writer. The user-JWT RPC and canonical evidence/operation/audit remain the durable identity authority.
+
+A reviewed link may contribute score credit only if it is a successful broker-sourced `manual` match with confidence 1, exact source+provider ID, original receipt ID/SHA-256, and evidence note/HTTPS URL; old title/artist matches remain non-scoring. A Shazam row missing its native provider recording ID remains unresolved; reviewers cannot fill it from a title.
+
+**Work areas:** Source health & collect; evidence and source-period details; paginated identity review and Registry search; private Top 100 score preview; bounded immutable receipt history. No freeze, publish, staging, scheduling or live `top100` methodology change is available in Take 2. Take 3 owns an immutable private freeze and all final security and acceptance gates.
+
+**Validation:** disposable 266-migration unlinked local replay [#44506590418](https://github.com/bjuta/wakilisha/actions/runs/44506590418) PASS: database reader grants and methodology, operator JWT, rollback and cleanup. Protected final-head Critical Control Plane and actual frontend/browser tests remain a separate release gate. The database and Edge additions in this PR are **not yet deployed**; never treat the static UI or local SQL fixture as a positive Production Admin Studio run.
+
 ## Three-take handoff
 
-- **Take 1 (this work):** exact scoring and Registry identity quarantine, adversarial deterministic tests, no Production mutation.
-- **Take 2:** authenticated server-only score preview, source-health and identity review through existing Registry/MIZIZI authority; one custom Admin Charts Studio. Persist only reviewed decisions through canonical CLI migration.
+- **Take 1 (verified):** exact scoring and Registry identity quarantine, adversarial deterministic tests, no Production mutation.
+- **Take 2 (in branch, not Production):** authenticated server-only score preview, source-health and exact identity review through existing Registry/MIZIZI authority; one custom Admin Charts Studio. Persist governed decisions through existing Registry broker; method SQL uses one CLI-minted forward migration.
 - **Take 3:** persisted immutable, reproducible private freeze; permissions, concurrency, adversarial and real desktop/mobile acceptance, full protected CI/Production gates and closure. Fail closed if 100 genuinely Registry-qualified recordings are not obtained. No public edition until separately approved Phase 3.
 
 Phase 2 must not be called complete merely because five provider captures contain 600 ranks.
