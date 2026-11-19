@@ -1,15 +1,15 @@
 {
   "proof_mode": "charts2_disposable_ci_clean_replay_v1",
   "migration_file": "supabase/migrations/20261119084830_charts2_four_first_party_get_review_v1.sql",
-  "migration_sha256": "821004bfda9002c163568f4bda42d274e6e2961780407edea78d8165f0823e26",
+  "migration_sha256": "f52ec044e1683452e5cdb15dfd7a7be3374c76989df128b9b35ebf3b65afd5f9",
   "base_main_sha": "9e7f4a661ecca897aa14b0e81eb513b7ef425183",
-  "replay_candidate_head_sha": "553538b538ec4e2809a2debba91ee9e14762bdf9",
+  "replay_candidate_head_sha": "e0aa07eb9f162620e328bd9f8a26d72e2d4af24b",
   "replay_environment": "supabase-local-unlinked",
   "hosted_preview_used": false,
   "production_mutation": false,
   "workflow_name": "MIZIZI Slice 1 Disposable PostgreSQL Proof",
-  "workflow_run_id": 44491497116,
-  "workflow_run_url": "https://github.com/bjuta/wakilisha/actions/runs/44491497116",
+  "workflow_run_id": 44492960642,
+  "workflow_run_url": "https://github.com/bjuta/wakilisha/actions/runs/44492960642",
   "workflow_conclusion": "success",
   "workflow_event": "pull_request",
   "ci_markers": [
@@ -27,6 +27,6 @@
   "schema_types_sha256": "0ef14660eadf1732e3d5227074cfed62450c956a662a83e8c40b351cf4419e0b",
   "schema_migration_count": 265,
   "schema_migration_head": "20261119084830",
-  "verified_at": "2026-11-19T08:56:29Z",
-  "notes": "Exact-head unlinked 265-migration clean replay, four first-party GET source methods on existing private probe/decision tables. SQL verifier emitted WK_CHARTS2_LOCAL_FOUR_FIRST_PARTY_GET_REVIEW_AND_REVOCATION=PASS: actual SQL method gates with synthetic local actor, per-source admission, revocation, stale denial and cross-provider endpoint denial. Both SQL and operator JWT jobs SUCCESS; fixture transaction rolled back and local containers/volumes destroyed. No Production mutation, no chart publication, no third-party sources."
+  "verified_at": "2026-11-19T09:06:36Z",
+  "notes": "Exact-head unlinked 265-migration replay, single corrected migration. Four fixed first-party GET source methods on existing immutable private evidence ledgers, with separate signed-in review. WK_CHARTS2_LOCAL_FOUR_FIRST_PARTY_GET_REVIEW_AND_REVOCATION=PASS includes individual source admission, stale rejection, revocation, cross-endpoint rejection, and YouTube nonnull native-period guard. Both disposable SQL and genuine operator-JWT acceptance jobs SUCCESS; synthetic fixtures rolled back and all local resources removed. No Production mutation, scoring or publication."
 }
