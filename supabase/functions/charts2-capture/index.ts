@@ -1,5 +1,5 @@
 // WAKILISHA Charts 2.0 Phase 1: one signed-in, capability-gated
-// research-original and authorized-GET capture worker.
+// research-original, reviewed GET and first-party YouTube POST capture worker.
 // No scoring, Registry mutation, publication, timer or key exposure.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
@@ -112,7 +112,7 @@ async function session(req:Request) {
   });
   if(capability.error||capability.data!==true)
     throw new Reject(403,"charts2_manage_charts_required");
-  return {user:data.user,
+  return {user:data.user,authClient:client,
     server:createClient(url,required("SUPABASE_SERVICE_ROLE_KEY"),
       {auth:{persistSession:false}})};
 }
@@ -144,15 +144,138 @@ async function storeOriginal(server:any, source_key:string, bytes:Uint8Array,
   return key;
 }
 
+
+/** The single bounded original-byte transport for collector and method probe. */
+async function fetchSourceOriginal(source_key:string, endpoint:string,
+  nativeRequest:{method:"POST",body:string}|null) {
+  const controller=new AbortController();
+  const abort=setTimeout(()=>controller.abort(),12000);
+  try {
+    const upstream=await fetch(endpoint,{
+      method:nativeRequest?.method??"GET",redirect:"error",
+      credentials:"omit",cache:"no-store",
+      headers:{accept:nativeRequest
+        ?"application/json, text/html, text/csv, application/octet-stream"
+        :MIME[source_key],...(nativeRequest?{"content-type":"application/json"}:{})},
+      ...(nativeRequest?{body:nativeRequest.body}:{}),
+      signal:controller.signal,
+    });
+    if(upstream.status!==200)throw new Reject(502,"charts2_source_non_200");
+    const contentType=decodeContentType(upstream.headers.get("content-type"));
+    if(contentType!==MIME[source_key])throw new Reject(415,"charts2_source_type_unqualified");
+    const size=Number(upstream.headers.get("content-length")??0);
+    if(size>MAX_BYTES)throw new Reject(413,"charts2_source_too_large");
+    const bytes=await readCappedStream(upstream.body,MAX_BYTES);
+    return {bytes,contentType};
+  } catch(e) {
+    if(e instanceof Reject)throw e;
+    throw new Reject(502,"charts2_source_transport_failed");
+  } finally {clearTimeout(abort);}
+}
+
 async function handle(req:Request) {
   if(req.headers.get("origin")&&!ORIGINS.has(req.headers.get("origin")!))
     throw new Reject(403,"charts2_origin_not_allowed");
-  const {user,server}=await session(req);
+  const {user,server,authClient}=await session(req);
   const url=new URL(req.url);
   const mode=url.searchParams.get("mode")??"upload";
   let key:string, endpoint:string, target_period_key:string|null=null;
   let contentType:string, bytes:Uint8Array, methodRevision:number|null=null;
   let captureMode:"research_original_upload"|"service_original";
+
+  if(mode==="verify_method") {
+    // A signed-in manual, evidence-only probe. It NEVER admits collection.
+    const supplied=await req.json().catch(()=>null);
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>k!=="source_key"&&k!=="target_period_key"))
+      throw new Reject(400,"charts2_method_probe_arguments_invalid");
+    if(sourceKey(supplied.source_key)!=="youtube_ke")
+      throw new Reject(422,"charts2_method_probe_source_unqualified");
+    const period=supplied.target_period_key;
+    if(typeof period!=="string")
+      throw new Reject(422,"charts2_method_probe_period_invalid");
+    const endpoint=SOURCES.get("youtube_ke").first_party_endpoint;
+    expectedUrl("youtube_ke",endpoint);
+    let nativeRequest:{method:"POST",body:string};
+    try {
+      nativeRequest=charts2YouTubeNativeWeeklyPost("youtube_ke",endpoint,period);
+    } catch {
+      throw new Reject(422,"charts2_method_probe_period_invalid");
+    }
+    const result=await fetchSourceOriginal("youtube_ke",endpoint,nativeRequest);
+    let verified;
+    try {
+      verified=await decodeCharts2Original({
+        source_key:"youtube_ke",endpoint,target_period_key:period,
+        observed_at:new Date().toISOString(),original_bytes:result.bytes,
+      });
+    } catch {
+      throw new Reject(422,"charts2_method_probe_original_unqualified");
+    }
+    if(verified.evidence_only!==true||verified.can_score!==false||
+       verified.can_publish!==false||!verified.provider_week_ending_date||
+       verified.observed_depth<1||verified.observed_depth>100)
+      throw new Reject(422,"charts2_method_probe_original_unqualified");
+    const objectKey=await storeOriginal(
+      server,"youtube_ke",result.bytes,verified.payload_sha256,result.contentType);
+    const recorded=await server.rpc("charts2_record_youtube_method_probe_v1",{
+      p_actor:user.id,p_period:period,
+      p_end_date:verified.provider_week_ending_date,
+      p_sha:verified.payload_sha256,p_object_key:objectKey,
+      p_size:result.bytes.byteLength,p_depth:verified.observed_depth,
+    });
+    if(recorded.error||!recorded.data?.probe_id||
+       !Number.isInteger(recorded.data.expected_revision))
+      throw new Reject(503,"charts2_method_probe_record_failed");
+    return {
+      source_key:"youtube_ke",method:"POST",review_state:"unchanged",
+      probe_id:recorded.data.probe_id,
+      expected_revision:recorded.data.expected_revision,
+      original_sha256:verified.payload_sha256,
+      provider_week_ending_date:verified.provider_week_ending_date,
+      observed_depth:verified.observed_depth,expected_depth:100,
+      unresolved_identity_count:verified.unresolved_identity_count,
+      can_score:false,can_publish:false,
+      action_required:"explicit_method_review",
+    };
+  }
+  if(mode==="review_method") {
+    // Source admission or revocation is authorized by the user's own JWT
+    // inside the SQL RPC, never by passing a claimed reviewer through service_role.
+    const supplied=await req.json().catch(()=>null);
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "source_key","action","probe_id","expected_revision","acknowledgement"
+       ].includes(k)))
+      throw new Reject(400,"charts2_method_review_arguments_invalid");
+    if(sourceKey(supplied.source_key)!=="youtube_ke")
+      throw new Reject(422,"charts2_method_review_source_unqualified");
+    if(!["admit","hold"].includes(supplied.action)||
+       !Number.isInteger(supplied.expected_revision)||
+       supplied.expected_revision<0||supplied.expected_revision>2147483645||
+       typeof supplied.acknowledgement!=="string")
+      throw new Reject(400,"charts2_method_review_arguments_invalid");
+    const probe=supplied.probe_id??null;
+    if(probe!==null&&(typeof probe!=="string"||
+       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(probe)))
+      throw new Reject(400,"charts2_method_review_probe_invalid");
+    const outcome=await authClient.rpc("charts2_decide_youtube_method_v1",{
+      p_action:supplied.action,p_probe_id:probe,
+      p_expected_revision:supplied.expected_revision,
+      p_ack:supplied.acknowledgement,
+    });
+    if(outcome.error||!outcome.data) {
+      const code=outcome.error?.message??"";
+      if(code.includes("charts2_method_review_revision_conflict"))
+        throw new Reject(409,"charts2_method_review_revision_conflict");
+      if(code.includes("charts2_method_review_not_authorized"))
+        throw new Reject(403,"charts2_manage_charts_required");
+      if(code.includes("charts2_method_review_evidence_unqualified"))
+        throw new Reject(409,"charts2_method_review_evidence_unqualified");
+      throw new Reject(422,"charts2_method_review_rejected");
+    }
+    return outcome.data;
+  }
 
   if(mode==="upload") {
     const declared=Number(req.headers.get("content-length")??0);
@@ -201,28 +324,9 @@ async function handle(req:Request) {
         throw new Reject(422,"charts2_youtube_period_unqualified");
       }
     }
-    const controller=new AbortController();
-    const abort=setTimeout(()=>controller.abort(),12000);
-    try {
-      const upstream=await fetch(endpoint,{
-        method:nativeRequest?.method??"GET",redirect:"error",
-        credentials:"omit",cache:"no-store",
-        headers:{accept:nativeRequest
-          ?"application/json, text/html, text/csv, application/octet-stream"
-          :MIME[key],...(nativeRequest?{"content-type":"application/json"}:{})},
-        ...(nativeRequest?{body:nativeRequest.body}:{}),
-        signal:controller.signal,
-      });
-      if(upstream.status!==200)throw new Reject(502,"charts2_source_non_200");
-      contentType=decodeContentType(upstream.headers.get("content-type"));
-      if(contentType!==MIME[key])throw new Reject(415,"charts2_source_type_unqualified");
-      const size=Number(upstream.headers.get("content-length")??0);
-      if(size>MAX_BYTES)throw new Reject(413,"charts2_source_too_large");
-      bytes=await readCappedStream(upstream.body,MAX_BYTES);
-    }catch(e) {
-      if(e instanceof Reject)throw e;
-      throw new Reject(502,"charts2_source_transport_failed");
-    } finally {clearTimeout(abort);}
+    const result=await fetchSourceOriginal(key,endpoint,nativeRequest);
+    bytes=result.bytes;
+    contentType=result.contentType;
     captureMode="service_original";
   } else {
     throw new Reject(400,"charts2_mode_unrecognized");

@@ -21422,6 +21422,15 @@ export type Database = {
         Args: { p_capture: Json }
         Returns: string
       }
+      charts2_decide_youtube_method_v1: {
+        Args: {
+          p_ack: string
+          p_action: string
+          p_expected_revision: number
+          p_probe_id: string
+        }
+        Returns: Json
+      }
       charts2_get_collector_method_v1: {
         Args: { p_source_key: string }
         Returns: {
@@ -21430,6 +21439,18 @@ export type Database = {
           reviewed_method: string
           source_key: string
         }[]
+      }
+      charts2_record_youtube_method_probe_v1: {
+        Args: {
+          p_actor: string
+          p_depth: number
+          p_end_date: string
+          p_object_key: string
+          p_period: string
+          p_sha: string
+          p_size: number
+        }
+        Returns: Json
       }
       claim_media_processing_jobs_v1: {
         Args: {

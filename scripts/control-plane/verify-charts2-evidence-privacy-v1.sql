@@ -183,5 +183,119 @@ begin
   raise notice 'WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_DB_SECURITY=PASS';
 end
 $charts2_verify$;
+-- Governed method admission, revocation, stale revision, private proof,
+-- and append-only review records. Synthetic fixture, unlinked local DB only.
+do $charts2_method_review$
+declare
+  fake_actor uuid := '00000000-0000-4000-8000-000000009991'::uuid;
+  sample_sha text := repeat('c',64);
+  sample_key text := 'youtube_ke/cc/' || repeat('c',64) || '.json';
+  sample_probe uuid;
+  result jsonb;
+begin
+  if not has_function_privilege('service_role',
+      'public.charts2_record_youtube_method_probe_v1(uuid,text,date,text,text,integer,integer)',
+      'EXECUTE') or
+     has_function_privilege('authenticated',
+      'public.charts2_record_youtube_method_probe_v1(uuid,text,date,text,text,integer,integer)',
+      'EXECUTE') or
+     has_function_privilege('anon',
+      'public.charts2_decide_youtube_method_v1(text,uuid,integer,text)','EXECUTE') or
+     not has_function_privilege('authenticated',
+      'public.charts2_decide_youtube_method_v1(text,uuid,integer,text)','EXECUTE') or
+     has_table_privilege('authenticated',
+      'platform_private.charts2_source_method_probes_v1','SELECT') or
+     has_table_privilege('authenticated',
+      'platform_private.charts2_source_method_decisions_v1','INSERT')
+  then raise exception 'charts2_review_privileges_broadened'; end if;
+  begin
+    perform public.charts2_decide_youtube_method_v1(
+      'hold',null,0,'Unauthenticated caller must not approve or hold source');
+    raise exception 'charts2_method_unauthorized_review_allowed';
+  exception when others then
+    if sqlerrm <> 'charts2_method_review_not_authorized' then raise; end if;
+  end;
+  begin
+    perform public.charts2_record_youtube_method_probe_v1(
+      fake_actor,'weekly:20261106:20261112:ke','2026-11-12'::date,
+      sample_sha,sample_key,700,100);
+    raise exception 'charts2_method_unverified_object_allowed';
+  exception when others then
+    if sqlerrm <> 'charts2_method_probe_original_unverified' then raise; end if;
+  end;
+  -- Only disposable schema metadata; no actual original provider data is
+  -- manufactured or treated as Production success.
+  insert into storage.objects(bucket_id,name)
+  values ('charts2-evidence-private-v1',sample_key);
+  update platform_private.charts2_source_methods_v1
+  set review_state='held',reviewed_method=null,exact_endpoint=null,
+      reviewed_by=null,reviewed_at=null,authorization_expires_at=null,
+      access_evidence_sha256=null,method_revision=0
+  where source_key='youtube_ke';
+  insert into auth.users(id) values(fake_actor);
+  insert into public.user_role_assignments(user_id,role_key,status)
+  values(fake_actor,'chart_editor_global','active');
+  perform set_config('request.jwt.claim.sub',fake_actor::text,true);
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  insert into platform_private.charts2_source_method_probes_v1
+    (target_period_key,provider_week_ending_date,actor_id,
+     expected_method_revision,original_sha256,original_object_key,
+     original_byte_length,observed_depth)
+  values ('weekly:20261106:20261112:ke','2026-11-12',fake_actor,
+          0,sample_sha,sample_key,700,100)
+  returning id into sample_probe;
+  execute 'set local role authenticated';
+  result:=public.charts2_decide_youtube_method_v1(
+    'admit',sample_probe,0,
+    'I approve first-party YouTube Kenya Top Songs POST for evidence-only manual collection.');
+  if result->>'review_state' <> 'collector_admitted' or
+     result->>'method_revision' <> '1' then
+    raise exception 'charts2_review_approved_state_invalid';
+  end if;
+  -- The GET collector RPC is service-only: never grant it to an actor.
+  execute 'reset role';
+  if (select count(*) from public.charts2_get_collector_method_v1('youtube_ke')) <> 1 then
+    raise exception 'charts2_review_approved_method_unavailable';
+  end if;
+  execute 'set local role authenticated';
+  begin
+    perform public.charts2_decide_youtube_method_v1(
+      'admit',sample_probe,0,
+      'I approve first-party YouTube Kenya Top Songs POST for evidence-only manual collection.');
+    raise exception 'charts2_review_stale_revision_allowed';
+  exception when others then
+    if sqlerrm <> 'charts2_method_review_revision_conflict' then raise; end if;
+  end;
+  result:=public.charts2_decide_youtube_method_v1(
+    'hold',null,1,'Revocation of the synthetic local source-method admission.');
+  if result->>'review_state' <> 'held' or result->>'method_revision' <> '2' then
+    raise exception 'charts2_method_revocation_failed';
+  end if;
+  execute 'reset role';
+  if exists(select 1 from public.charts2_get_collector_method_v1('youtube_ke')) then
+    raise exception 'charts2_method_revocation_failed';
+  end if;
+  if (select count(*) from platform_private.charts2_source_method_decisions_v1
+      where actor_id=fake_actor) <> 2 then
+    raise exception 'charts2_review_audit_not_append_only';
+  end if;
+  begin
+    delete from platform_private.charts2_source_method_probes_v1
+    where id=sample_probe;
+    raise exception 'charts2_review_probe_deleted';
+  exception when others then
+    if sqlerrm <> 'charts2_evidence_is_immutable' then raise; end if;
+  end;
+  begin
+    update platform_private.charts2_source_method_decisions_v1
+    set acknowledged_scope='unauthorized change' where actor_id=fake_actor;
+    raise exception 'charts2_review_audit_mutable';
+  exception when others then
+    if sqlerrm <> 'charts2_evidence_is_immutable' then raise; end if;
+  end;
+  raise notice 'WK_CHARTS2_LOCAL_GOVERNED_METHOD_REVIEW_AND_REVOCATION=PASS';
+end
+$charts2_method_review$;
+
 rollback;
 \echo WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS
