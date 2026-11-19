@@ -73,6 +73,47 @@ describe("incident-safe offline SEO build", () => {
     expect(restore).toContain("WAKILISHA_ACCEPTED_PRERENDER_SHA256");
   });
 
+  it("stops frontend deployment before dependencies, tests or SSH if accepted SEO inputs are absent or invalid", () => {
+    const runner = path.resolve("scripts/deploy/production-frontend.sh");
+    const run = (envOverrides: Record<string, string>) => spawnSync("bash", [
+      runner,
+      "--expected-main", "a".repeat(40),
+      "--label", "seo-preflight-test",
+    ], {
+      cwd: process.cwd(),
+      env: { ...process.env, ...envOverrides },
+      encoding: "utf8",
+    });
+
+    const missingDir = run({
+      WAKILISHA_ACCEPTED_PRERENDER_DIR: "",
+      WAKILISHA_ACCEPTED_PRERENDER_SHA256: "",
+    });
+    expect(missingDir.status).not.toBe(0);
+    expect(missingDir.stdout).toContain("PRODUCTION_FRONTEND_RUNNER=FAIL_ACCEPTED_PRERENDER_DIR_UNSET");
+
+    const missingPin = run({
+      WAKILISHA_ACCEPTED_PRERENDER_DIR: path.resolve("."),
+      WAKILISHA_ACCEPTED_PRERENDER_SHA256: "",
+    });
+    expect(missingPin.status).not.toBe(0);
+    expect(missingPin.stdout).toContain("PRODUCTION_FRONTEND_RUNNER=FAIL_ACCEPTED_PRERENDER_PIN_UNSET");
+
+    const invalidSource = run({
+      WAKILISHA_ACCEPTED_PRERENDER_DIR: path.resolve("."),
+      WAKILISHA_ACCEPTED_PRERENDER_SHA256: "0".repeat(64),
+    });
+    expect(invalidSource.status).not.toBe(0);
+    expect(invalidSource.stdout).toContain("PRODUCTION_FRONTEND_RUNNER=FAIL_ACCEPTED_PRERENDER_CHECK");
+
+    for (const result of [missingDir, missingPin, invalidSource]) {
+      expect(result.stdout).not.toContain("EXACT_MERGED_MAIN=PASS");
+      expect(result.stdout).not.toContain("MERGED_MAIN_DEPENDENCIES=PASS");
+      expect(result.stdout).not.toContain("ROLLBACK_SNAPSHOT=PASS");
+      expect(result.stdout).not.toContain("FRONTEND_ACTIVATION=COMPLETE");
+    }
+  });
+
   it("rehydrates an accepted SEO snapshot with new app assets, and fails on tampering", () => {
     const root = mkdtempSync(path.join(tmpdir(), "wk-incident-seo-"));
     const accepted = path.join(root, "accepted");

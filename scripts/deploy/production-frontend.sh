@@ -304,6 +304,33 @@ if [ -n "$FORBID_REF" ]; then
   }
 fi
 
+# A code-only Production build MUST reuse independently accepted public SEO.
+# Verify the signed-off snapshot before npm ci, critical tests or any remote write.
+# The default build repeats this check; this gate prevents wasting an operator's
+# time when either accepted snapshot input is missing or invalid.
+printf '\n=== ACCEPTED PRERENDER RELEASE PREFLIGHT ===\n'
+if [ -z "${WAKILISHA_ACCEPTED_PRERENDER_DIR:-}" ]; then
+  echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_ACCEPTED_PRERENDER_DIR_UNSET'
+  echo 'STOP: Supply an independently accepted, absolute SEO snapshot directory.'
+  exit 1
+fi
+
+if [ -z "${WAKILISHA_ACCEPTED_PRERENDER_SHA256:-}" ]; then
+  echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_ACCEPTED_PRERENDER_PIN_UNSET'
+  echo 'STOP: Supply the SHA-256 seal of that accepted snapshot.'
+  exit 1
+fi
+
+if ! (
+  cd "$SCRIPT_DIR/../.."
+  node scripts/seo/restore-accepted-prerender.mjs --check
+); then
+  echo 'PRODUCTION_FRONTEND_RUNNER=FAIL_ACCEPTED_PRERENDER_CHECK'
+  echo 'STOP: Do not reseal an arbitrary or stale snapshot to bypass this gate.'
+  exit 1
+fi
+echo 'ACCEPTED_PRERENDER_PREFLIGHT=PASS'
+
 TMP_RUNNER="$(
   mktemp "${TMPDIR:-/tmp}/wakilisha-production-frontend.XXXXXX.sh"
 )"
