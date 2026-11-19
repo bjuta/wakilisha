@@ -8,7 +8,7 @@ import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { AdminChartsPageHeader } from "@/pages/admin/charts/components/AdminChartsPageHeader";
 
 type SourceKey = "youtube_ke" | "mdundo_ke" | "apple_ke" | "audiomack_ke" | "shazam_ke";
-type Tab = "sources" | "review" | "preview" | "history";
+type Tab = "sources" | "review" | "preview" | "history" | "freeze";
 type EvidenceRow = {
   source_key: SourceKey; receipt_id: string; rank: number;
   title: string; artist: string | null; provider_track_id: string | null;
@@ -45,8 +45,17 @@ type Preview = {
   source_coverage: Coverage[]; candidates: Candidate[];
   unresolved: EvidenceRow[]; conflicts: EvidenceRow[];
 };
+type FreezeRecord = {
+  id: string; frozen_at: string; input_sha256: string;
+  ranking_sha256: string; frozen_private: boolean;
+};
+type FreezeGate = {
+  input_sha256: string; ranking_sha256: string; eligible_count: number;
+  unresolved_count: number; conflict_count: number; freeze_ready: boolean;
+  latest_freeze_id: string | null; recent_freezes: FreezeRecord[];
+};
 type StudioResponse = {
-  ok: boolean; state: string; preview?: Preview;
+  ok: boolean; state: string; preview?: Preview; freeze_gate?: FreezeGate;
   server_verified_originals?: number; source_methods?: SourceMethod[];
   history?: ReceiptHistory[]; read_at?: string;
   receipt_count?: number; error?: string;
@@ -67,6 +76,7 @@ const SOURCES: Array<{key: SourceKey; label: string; weight: number; method: str
 ];
 const SOURCE_LABEL = Object.fromEntries(SOURCES.map(s=>[s.key,s.label])) as Record<SourceKey,string>;
 const DECLARATION = "I have independently verified this exact recording and authorize its Registry provider link.";
+const FREEZE_DECLARATION = "I approve freezing this exact 100-recording private chart candidate. It will not publish.";
 const DATE = (value?:string|null) => value
   ? new Date(value).toLocaleString("en-KE",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Nairobi"})
   : "Not declared";
@@ -114,6 +124,7 @@ export default function ChartsStudioPage() {
   const [reviewNote,setReviewNote]=useState("");
   const [evidenceUrl,setEvidenceUrl]=useState("");
   const [reviewConsent,setReviewConsent]=useState(false);
+  const [freezeConsent,setFreezeConsent]=useState(false);
 
   const refresh=useCallback(async()=>{
     setLoading(true);setError("");
@@ -211,6 +222,23 @@ export default function ChartsStudioPage() {
     await refresh();
   });
 
+  const gate=snapshot?.freeze_gate;
+  const freezeCandidate=async()=>operate("private-freeze",async()=>{
+    if(!admin.can("manage_charts")||!admin.can("manage_registry"))
+      throw new Error("Charts and Registry review permissions are both required.");
+    if(!gate?.freeze_ready||gate.eligible_count<100||
+       gate.conflict_count!==0||!freezeConsent)
+      throw new Error("The private freeze is blocked until 100 eligible recordings are verified.");
+    const result=await invokeStudio("studio_freeze",{
+      expected_input_sha256:gate.input_sha256,
+      expected_previous_id:gate.latest_freeze_id,
+      acknowledgement:FREEZE_DECLARATION,
+    });
+    setNotice("Private candidate frozen with 100 reviewed recordings. No public chart was changed."+
+      (result.idempotent?" This exact evidence snapshot was already frozen.":""));
+    setFreezeConsent(false);
+    await refresh();
+  });
   const preview=snapshot?.preview;
   const coverage=preview?.source_coverage??[];
   const methods=snapshot?.source_methods??[];
@@ -263,8 +291,9 @@ export default function ChartsStudioPage() {
       </div>
       <nav aria-label="Charts Studio work areas" className="flex flex-wrap gap-2">
         {([
-          ["sources","Source health & collect"],["review","Identity review"],
-          ["preview","Top 100 private preview"],["history","Receipt history"],
+          ["sources","Source Health and Collect"],["review","Identity Review"],
+          ["preview","Top 100 Private Preview"],["history","Receipt History"],
+          ["freeze","Private Freeze"],
         ] as Array<[Tab,string]>).map(([id,label])=>
           <button type="button" key={id} onClick={()=>setTab(id)} aria-current={tab===id?"page":undefined}
             className={"rounded-xl px-4 py-2.5 text-[12px] font-bold transition-colors "+
@@ -506,6 +535,73 @@ export default function ChartsStudioPage() {
               {row.native_period_authority.replaceAll("_"," ")}
             </span>
           </WkSurface>)}
+      </section>}
+      {tab==="freeze" && <section aria-label="Private chart freeze controls" className="space-y-4">
+        <WkSurface className="space-y-3 p-5">
+          <h2 className="text-[16px] font-black text-wk-text">Freeze a Private Top 100</h2>
+          <p className="text-[13px] text-wk-text-muted">
+            Only recordings verified in the Registry can enter this candidate.
+            A freeze preserves the exact scores and five original receipts. It does not publish a chart.
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl bg-wk-surface-raised p-3">
+              <p className="text-[11px] font-bold text-wk-text-muted">Eligible Recordings</p>
+              <p className="text-[22px] font-black tabular-nums text-wk-text">
+                {gate?.eligible_count??0} / 100
+              </p>
+            </div>
+            <div className="rounded-xl bg-wk-surface-raised p-3">
+              <p className="text-[11px] font-bold text-wk-text-muted">Open Reviews</p>
+              <p className="text-[22px] font-black tabular-nums text-wk-text">{gate?.unresolved_count??0}</p>
+            </div>
+            <div className="rounded-xl bg-wk-surface-raised p-3">
+              <p className="text-[11px] font-bold text-wk-text-muted">Identity Conflicts</p>
+              <p className="text-[22px] font-black tabular-nums text-wk-text">{gate?.conflict_count??0}</p>
+            </div>
+            <div className="rounded-xl bg-wk-surface-raised p-3">
+              <p className="text-[11px] font-bold text-wk-text-muted">Private Freezes</p>
+              <p className="text-[22px] font-black tabular-nums text-wk-text">{gate?.recent_freezes?.length??0}</p>
+            </div>
+          </div>
+          <p className={"text-[12px] font-bold "+(gate?.freeze_ready?"text-wk-success":"text-wk-warning")}>
+            {gate?.freeze_ready
+              ?"The database confirms 100 eligible tracks with no conflicts."
+              :"The database is holding the freeze until enough recordings have verified Registry links."}
+          </p>
+          {gate && <p className="break-all rounded-lg border border-wk-border p-3 font-mono text-[11px] text-wk-text-muted">
+            Exact evidence digest: {gate.input_sha256}
+          </p>}
+          <WkCheckbox checked={freezeConsent} onChange={setFreezeConsent}
+            disabled={!gate?.freeze_ready||!admin.can("manage_registry")}>
+            {FREEZE_DECLARATION}
+          </WkCheckbox>
+          <button type="button" className={buttonPrimary}
+            disabled={!freezeConsent||!gate?.freeze_ready||!admin.can("manage_registry")||!!busy||loading}
+            onClick={()=>void freezeCandidate()}>
+            Freeze Exact 100-Recording Private Candidate
+          </button>
+          <p className="text-[12px] text-wk-text-muted">
+            WAKILISHA checks your Charts and Registry permissions again on the server.
+            A changed original, Registry link, or earlier freeze invalidates this confirmation.
+          </p>
+        </WkSurface>
+        <WkSurface className="p-4">
+          <h3 className="text-[14px] font-black text-wk-text">Immutable Freeze History</h3>
+          {(gate?.recent_freezes??[]).length===0
+            ?<p className="mt-3 text-[12px] text-wk-text-muted">
+              No private candidate has passed the 100-recording gate yet.
+            </p>
+            :(gate?.recent_freezes??[]).map(item=>
+              <div key={item.id} className="mt-3 border-t border-wk-border pt-3">
+                <p className="text-[12px] font-bold text-wk-text">{DATE(item.frozen_at)}. Private only.</p>
+                <p className="mt-1 break-all font-mono text-[11px] text-wk-text-muted">
+                  Frozen candidate: {item.id}
+                </p>
+                <p className="mt-1 break-all font-mono text-[11px] text-wk-text-muted">
+                  Ranking SHA-256: {item.ranking_sha256}
+                </p>
+              </div>)}
+        </WkSurface>
       </section>}
       <footer className="border-t border-wk-border pt-4 text-[11px] text-wk-text-muted">
         Five-source evidence is private. Identity review is performed through Registry/MIZIZI authority.
