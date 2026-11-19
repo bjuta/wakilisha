@@ -150,16 +150,20 @@ export function inspectCharts2FrozenEditionProjectionV1({freeze,preflight,progra
       score_units:row.score_units,score_points:row.score_points,
       source_count:row.source_contributions.length}));
   }
-  // The existing Chart V2 guard also requires real resolved artist origins.
-  // No artist, country, week, Edition ID, approval or publication fields are
-  // projected here because no evidence authorizes fabricating them.
+  // Charts 2.0 artist country-of-origin is informational, NOT a ranking,
+  // eligibility, or public-release gate. The retained Chart V2 integrity RPC
+  // currently blocks unresolved/non-KE origins, so Phase 3 must prospectively
+  // scope its replacement ONLY to the new top100 methodology before release.
+  // Do not weaken historical edition or toprnb integrity rules.
+  // No invented artist, week, Edition ID, approval or publication fields.
   return Object.freeze({contract:'charts2-chart-v2-projection/v1',
     state:'offline_private_review_only',freeze_id:freeze.id,
     input_sha256:freeze.input_sha256,ranking_sha256:freeze.ranking_sha256,
     programme_id:'top100',market:'KE',entry_count:100,
+    artist_origin_policy:'informational_non_blocking',
     entries:Object.freeze(rows),can_stage:false,can_publish:false,
     outstanding_gates:Object.freeze([
-      'actor_bound_release_approval','actual_registry_artist_origin_integrity',
+      'actor_bound_release_approval','top100_scoped_origin_neutral_integrity',
       'prospective_methodology_promotion','chart_v2_transactional_publisher',
       'founder_edition_confirmation',
     ])});
