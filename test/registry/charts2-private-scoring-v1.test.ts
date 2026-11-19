@@ -355,7 +355,11 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(projection.entries[99].score_points).toBe("0.20");
     expect(projection.can_stage).toBe(false);
     expect(projection.can_publish).toBe(false);
-    expect(projection.outstanding_gates).toContain("actual_registry_artist_origin_integrity");
+    expect(projection.artist_origin_policy).toBe("informational_non_blocking");
+    expect(projection.outstanding_gates).toContain("top100_scoped_origin_neutral_integrity");
+    expect(projection.outstanding_gates).not.toContain("actual_registry_artist_origin_integrity");
+    // No artist country-of-origin is supplied by the valid 100-row fixture.
+    // Missing, unknown or non-KE origins must never reject a Chart 2.0 track.
     expect(projection).not.toHaveProperty("edition_id");
     expect(projection).not.toHaveProperty("publish");
     const deny=(mutate:(x:any)=>void,reason:string)=>{
