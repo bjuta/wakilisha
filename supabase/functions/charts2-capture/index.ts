@@ -205,9 +205,76 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
        Object.entries(locked.sources).some(([name,policy])=>
          storedWeights[name]!==policy.weight_points))
       throw new Reject(409,"charts2_studio_methodology_mismatch");
+    // Independent PostgreSQL authority recomputes the same canonical
+    // order. Never expose an unverified Edge-only ranking as freeze-ready.
+    const gate=await server.rpc("charts2_private_freeze_preflight_v1");
+    if(gate.error||gate.data?.contract!=="charts2-private-freeze-preflight/v1")
+      throw new Reject(503,"charts2_freeze_preflight_unavailable");
+    const preflight=gate.data;
+    const dbRanking=preflight.ranking??[];
+    if(!Array.isArray(dbRanking)||
+       preflight.eligible_count!==preview.candidates.length||
+       preflight.unresolved_count!==preview.unresolved.length||
+       preflight.conflict_count!==preview.conflicts.length||
+       dbRanking.length!==Math.min(preview.candidates.length,100)||
+       dbRanking.some((r:any,i:number)=>
+         r.track_id!==preview.candidates[i]?.track_id||
+         r.score_units!==preview.candidates[i]?.score_units))
+      throw new Reject(409,"charts2_private_freeze_score_disagreement");
     return {state:"private_review",preview,source_methods:snapshot.source_methods,
       history:snapshot.history??[],read_at:snapshot.read_at,
-      server_verified_originals:receipts.length,can_publish:false};
+      server_verified_originals:receipts.length,
+      freeze_gate:{
+        input_sha256:preflight.input_sha256,
+        ranking_sha256:preflight.ranking_sha256,
+        eligible_count:preflight.eligible_count,
+        unresolved_count:preflight.unresolved_count,
+        conflict_count:preflight.conflict_count,
+        freeze_ready:preflight.freeze_ready,
+        latest_freeze_id:preflight.latest_freeze_id,
+        recent_freezes:preflight.recent_freezes??[],
+      },
+      can_publish:false};
+  }
+  if(mode==="studio_freeze") {
+    await requireRegistryReviewer(authClient);
+    const supplied=await req.json().catch(()=>null);
+    const ack="I approve freezing this exact 100-recording private chart candidate. It will not publish.";
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "expected_input_sha256","expected_previous_id","acknowledgement",
+       ].includes(k))||
+       typeof supplied.expected_input_sha256!=="string"||
+       !/^[a-f0-9]{64}$/.test(supplied.expected_input_sha256)||
+       (supplied.expected_previous_id!==null&&
+        (typeof supplied.expected_previous_id!=="string"||
+         !TRACK_UUID.test(supplied.expected_previous_id)))||
+       supplied.acknowledgement!==ack)
+      throw new Reject(400,"charts2_freeze_explicit_approval_invalid");
+    const snapshot=await studioSnapshot(server);
+    const receipts=snapshot.receipts??[];
+    if(!Array.isArray(receipts)||receipts.length!==5)
+      throw new Reject(409,"charts2_freeze_requires_five_receipts");
+    await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)));
+    // The database recomputes the entire ranking and expected digest under
+    // a transaction-serialized CAS. It ignores any browser-submitted scores.
+    const outcome=await authClient.rpc("charts2_freeze_private_candidate_v1",{
+      p_expected_input_sha256:supplied.expected_input_sha256,
+      p_expected_previous_id:supplied.expected_previous_id,
+      p_ack:supplied.acknowledgement,
+    });
+    if(outcome.error||!outcome.data) {
+      const m=outcome.error?.message??"";
+      if(m.includes("charts2_private_freeze_requires_charts_and_registry"))
+        throw new Reject(403,"charts2_freeze_review_authority_required");
+      if(m.includes("charts2_private_freeze_stale_snapshot")||
+         m.includes("charts2_private_freeze_revision_conflict"))
+        throw new Reject(409,"charts2_freeze_stale_review_reload");
+      if(m.includes("charts2_private_freeze_insufficient_registry_authority"))
+        throw new Reject(409,"charts2_freeze_identity_review_incomplete");
+      throw new Reject(422,"charts2_private_freeze_rejected");
+    }
+    return {state:"private_frozen",...outcome.data,can_publish:false};
   }
   if(mode==="studio_track_search") {
     await requireRegistryReviewer(authClient);
@@ -335,7 +402,7 @@ async function handle(req:Request) {
   const {user,server,authClient}=await session(req);
   const url=new URL(req.url);
   const mode=url.searchParams.get("mode")??"upload";
-  if(["studio_preview","studio_track_search","studio_review_link"].includes(mode))
+  if(["studio_preview","studio_track_search","studio_review_link","studio_freeze"].includes(mode))
     return studioAction(mode,req,server,authClient);
   let key:string, endpoint:string, target_period_key:string|null=null;
   let contentType:string, bytes:Uint8Array, methodRevision:number|null=null;
