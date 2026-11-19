@@ -203,10 +203,15 @@ async function handle(req:Request) {
       throw new Reject(422,"charts2_method_probe_period_invalid");
     }
     const result=await fetchSourceOriginal("youtube_ke",endpoint,nativeRequest);
-    const verified=await decodeCharts2Original({
-      source_key:"youtube_ke",endpoint,target_period_key:period,
-      observed_at:new Date().toISOString(),original_bytes:result.bytes,
-    });
+    let verified;
+    try {
+      verified=await decodeCharts2Original({
+        source_key:"youtube_ke",endpoint,target_period_key:period,
+        observed_at:new Date().toISOString(),original_bytes:result.bytes,
+      });
+    } catch {
+      throw new Reject(422,"charts2_method_probe_original_unqualified");
+    }
     if(verified.evidence_only!==true||verified.can_score!==false||
        verified.can_publish!==false||!verified.provider_week_ending_date||
        verified.observed_depth<1||verified.observed_depth>100)
@@ -219,11 +224,14 @@ async function handle(req:Request) {
       p_sha:verified.payload_sha256,p_object_key:objectKey,
       p_size:result.bytes.byteLength,p_depth:verified.observed_depth,
     });
-    if(recorded.error||!recorded.data)
+    if(recorded.error||!recorded.data?.probe_id||
+       !Number.isInteger(recorded.data.expected_revision))
       throw new Reject(503,"charts2_method_probe_record_failed");
     return {
-      source_key:"youtube_ke",method:"POST",review_state:"held",
-      probe_id:recorded.data,original_sha256:verified.payload_sha256,
+      source_key:"youtube_ke",method:"POST",review_state:"unchanged",
+      probe_id:recorded.data.probe_id,
+      expected_revision:recorded.data.expected_revision,
+      original_sha256:verified.payload_sha256,
       provider_week_ending_date:verified.provider_week_ending_date,
       observed_depth:verified.observed_depth,expected_depth:100,
       unresolved_identity_count:verified.unresolved_identity_count,
