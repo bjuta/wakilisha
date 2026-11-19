@@ -1,6 +1,6 @@
 # Charts 2.0: Five-Source Kenya Top 100, three-phase execution plan
 
-**Status:** Approved product direction; engineering implementation not started.  
+**Status:** Phase 1 accepted; Phase 2 engineering accepted under the 19 November 2026 bounded-identity amendment below. Phase 3 engineering may begin, but public publication and automation remain gated.  
 **Decision date:** 18 November 2026 (EAT).  
 **Target:** Existing Kenya `top100` programme and public chart routes.  
 **Scope:** One repeatable consumption-led chart, one Admin operations workspace, one secure collector.  
@@ -129,3 +129,19 @@ Relevant references: [Charts Reset](charts-reset-2026-11-17.md), [archived WK100
 **First visible engineering proof:** Five independent source execution reports, including authentic ordered positions and checksummed originals where a method is qualified; any genuinely blocked source has a specific non-fabricated hold reason. That is the data foundation for Phase 2.
 
 **Status at documentation commit:** PLAN ONLY. No collector, Admin Chart Studio, new schema, Storage bucket, timer, published edition, or Production activation is claimed by this document.
+
+## 7. Founder-approved Phase 2 bounded-identity amendment (19 November 2026)
+
+The founder has narrowed the present Registry task: **connect only genuinely straightforward recording identities; leave ambiguity unresolved and move on**. This amends the **Phase 2 engineering exit criterion**, not the scoring method or the requirements for a genuine published Top 100. Sections 1-6 retain their original decision history.
+
+### Phase 2 engineering acceptance, with explicitly recorded holds
+
+- **Implemented and deployed:** all five genuine source receipts and 600 native observations; versioned integer scoring at fixed 30/25/20/15/10; guarded Charts Studio; source health, receipt history, Registry review, private preview, and freeze controls; actor-bound immutable 100-rank freeze contract; protected CI and Production SQL/Edge/frontend deployment.
+- **Verified Production authority:** exact frontend `main@52b11d4e695334eafa7d9ad7f96b75aa5fc131ab`, `charts2-capture` v6 with JWT verification, 267 repository migrations, private source receipts 5, original Storage files 8, zero public Chart V2 editions/entries, zero Charts 2.0 schedules. Desktop and mobile screenshots verify **Source Health visual/data rendering only**. This is not full interaction acceptance of all five work areas.
+- **Bounded read-only identity triage:** of the 600 observations, 400 from four sources contain native provider track IDs; Shazam's 200 do not. Exactly four observations (three distinct active Registry tracks) have unique exact title/artist Registry candidates under a case-insensitive, active-track comparison. These are **review leads**, not approved scoring links. There is one legacy Apple provider-ID join, but its candidate Registry track is `needs_review` and its link is title/artist-based, so it is not qualified. **Zero exact receipt-bound, independently evidenced, actor-reviewed strong links were established.**
+- **Operational HOLD, not fabricated PASS:** current live `charts2_private_freeze_preflight_v1()` returns `eligible_count=0`, `unresolved_count=600`, `freeze_ready=false`. There is no real private frozen 100. It is forbidden to manufacture the missing tracks, infer missing provider IDs, treat title similarity as approval, or lower the immutability/freeze security threshold.
+- **Deferrals:** broad cross-catalog identity reconciliation, ambiguous recording versions, manual review of unresolved provider IDs, full signed-in interaction acceptance of the other four Studio work areas, and actual 100-recording actor-authorized freeze move to the **Phase 3 public-launch prerequisites**. They do not prevent *Phase 3 engineering design/implementation*.
+
+**Decision:** Phase 2 **engineering implementation** is complete with the above explicit operational holds. Do not describe the **100-position private candidate** as complete, reviewed, frozen, or ready for publication. Phase 3 code for the guarded Chart V2 publication bridge may be developed and tested while the freeze remains unready, but **no actual Chart V2 edition write, public publication, scheduling activation, default methodology switch, or old `top100`/`toprnb` change** is authorized until the legitimate freeze and all release-specific acceptance gates pass. The existing SQL 100-rank freeze gate, `can_publish=false`, and `manage_charts`/`manage_registry` actor requirements remain unchanged. No new source weights or retrospective periods are authorized.
+
+The parent implementation issue #1391 remains open as the cross-phase authority. A distinct Phase 3 implementation slice should explicitly separate **safe code readiness** from **blocked Production release**.
