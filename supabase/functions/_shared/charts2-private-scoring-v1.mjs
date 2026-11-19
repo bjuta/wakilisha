@@ -23,7 +23,10 @@ const SOURCE_CONTRACTS = new Map(
   listCharts2SourceContracts().map(s=>[s.source_key,s])
 );
 const SOURCE_KEYS=Object.keys(CHARTS2_PRIVATE_METHODOLOGY_V1.sources).sort();
-const ALLOWED_MATCH_METHODS=new Set(['exact_provider_id','reviewed_provider_id','manual']);
+// Existing Registry accepts manual evidence, ISRC claims and title-based matches.
+// Charts 2.0 deliberately credits only an explicitly broker-reviewed manual
+// provider link with immutable original receipt provenance.
+const ALLOWED_MATCH_METHODS=new Set(['manual']);
 function fail(code){throw new Error(code);}
 function validDate(v){return typeof v==='string' && Number.isFinite(Date.parse(v));}
 function positiveInteger(v){return Number.isSafeInteger(v)&&v>=1;}
