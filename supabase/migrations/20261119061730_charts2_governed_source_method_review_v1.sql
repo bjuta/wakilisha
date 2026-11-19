@@ -58,10 +58,10 @@ revoke all on platform_private.charts2_source_method_decisions_v1 from public, a
 create function public.charts2_record_youtube_method_probe_v1(
   p_actor uuid,p_period text,p_end_date date,p_sha text,
   p_object_key text,p_size integer,p_depth integer
-) returns uuid
+) returns jsonb
 language plpgsql security definer
 set search_path = ''
-as $$
+as $
 declare
   rev integer;
   probe_id uuid;
@@ -100,9 +100,11 @@ begin
      original_byte_length,observed_depth)
   values (p_period,p_end_date,p_actor,rev,p_sha,p_object_key,p_size,p_depth)
   returning id into probe_id;
-  return probe_id;
+  return pg_catalog.jsonb_build_object(
+    'probe_id',probe_id,'expected_revision',rev
+  );
 end;
-$$;
+$;
 revoke all on function public.charts2_record_youtube_method_probe_v1(
   uuid,text,date,text,text,integer,integer
 ) from public,anon,authenticated,service_role;
