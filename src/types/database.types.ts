@@ -21450,7 +21450,7 @@ export type Database = {
           p_sha: string
           p_size: number
         }
-        Returns: string
+        Returns: Json
       }
       claim_media_processing_jobs_v1: {
         Args: {
