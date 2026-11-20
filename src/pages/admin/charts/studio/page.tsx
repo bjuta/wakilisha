@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import {appendChartReviewReference,parseChartReviewReference,type ChartReviewReference} from "@/services/chartsPrivate/chartReviewContext";
 import { supabase } from "@/lib/supabase";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
@@ -133,6 +134,11 @@ async function invokeStudio(mode:string,body:Record<string,unknown> = {}) {
 
 export default function ChartsStudioPage() {
   const admin=useAdminUser();
+  const navigate=useNavigate();
+  const [urlParams]=useSearchParams();
+  const returnContext=parseChartReviewReference(urlParams);
+  const returnContextKey=returnContext?JSON.stringify(returnContext):"";
+  const returnLoaded=useRef("");
   const [tab,setTab]=useState<Tab>("sources");
   const [snapshot,setSnapshot]=useState<StudioResponse|null>(null);
   const [loading,setLoading]=useState(true);
@@ -375,6 +381,56 @@ export default function ChartsStudioPage() {
     await refresh();
   });
   const preview=snapshot?.preview;
+  // Restoration revalidates the receipt and SHA against the current Studio
+  // preview, never URL-supplied song titles, artist or provider identifiers.
+  useEffect(()=>{
+    if(!returnContext || !snapshot?.preview || returnLoaded.current===returnContextKey)return;
+    returnLoaded.current=returnContextKey;
+    setTab("review");
+    const coverage=snapshot.preview.source_coverage.find(source=>
+      source.source_key===returnContext.source_key &&
+      source.receipt_id===returnContext.receipt_id &&
+      source.original_sha256===returnContext.original_sha256);
+    const row=snapshot.preview.unresolved.find(entry=>
+      entry.source_key===returnContext.source_key &&
+      entry.receipt_id===returnContext.receipt_id &&
+      entry.rank===returnContext.rank);
+    if(!coverage || !row){
+      setNotice("This chart position has changed or already been resolved. Review current evidence before making another decision.");
+      return;
+    }
+    setSelected(row);
+    setBatchMode(false);setBatchRows([]);setSelectedTrack(null);
+    setRegistryMatches([]);setRegistrySearchAttempted(false);
+    setRegistryQuery(row.title);setReviewConsent(false);
+    setReviewFilter(row.source_key);
+    setSearch(row.title);setPage(0);
+  },[snapshot?.preview,returnContextKey]);
+  const selectedReference=(()=>{
+    if(!selected)return null;
+    const original=preview?.source_coverage.find(source=>
+      source.source_key===selected.source_key&&source.receipt_id===selected.receipt_id);
+    if(!original)return null;
+    const reference:ChartReviewReference={
+      source_key:selected.source_key,receipt_id:selected.receipt_id,
+      original_sha256:original.original_sha256,rank:selected.rank,
+    };
+    return reference;
+  })();
+  const startGovernedTrackIntake=async()=>operate("stage-track-intake",async()=>{
+    if(!selectedReference||!admin.can("manage_registry")||!admin.can("manage_charts"))
+      throw new Error("Exact Charts and Registry review authority required.");
+    const staged=await invokeStudio("studio_stage_intake",{
+      ...selectedReference,
+      acknowledgement:"I request governed Track Intake for this exact chart position. No identity is approved.",
+    });
+    const id=String(staged.suggestion_id??"");
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
+      throw new Error("Registry did not return an exact Track Intake review reference.");
+    navigate(appendChartReviewReference(
+      "/admin/registry/tracks/intake?suggestion="+id,selectedReference,
+    ));
+  });
   const filteredReviewSongs=useMemo(()=>{
     const q=reviewSongQuery.trim().toLocaleLowerCase("en");
     return (snapshot?.native_review?.entries??[]).filter(entry=>
@@ -702,6 +758,34 @@ export default function ChartsStudioPage() {
                   Source ID: {selected.provider_track_id??"Not supplied"}
                 </p>
               </div>
+              {selectedReference &&
+                <div className="space-y-2 rounded-xl border border-wk-border p-3">
+                  <h3 className="text-[13px] font-black text-wk-text">Work with the Registry</h3>
+                  <p className="text-[11px] text-wk-text-muted">
+                    Each Registry screen verifies this source receipt and rank.
+                    Artist, Track, credit and duplicate decisions remain separately governed.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Link className={buttonSecondary}
+                      to={appendChartReviewReference("/admin/registry/artist-aliases",selectedReference)}>
+                      Review Artist Aliases
+                    </Link>
+                    <Link className={buttonSecondary}
+                      to={appendChartReviewReference("/admin/relationships/duplicates",selectedReference,selectedTrack?.id)}>
+                      Review Registry Duplicates
+                    </Link>
+                    <button type="button" className={buttonSecondary}
+                      disabled={!!busy||!admin.can("manage_registry")||!admin.can("manage_charts")}
+                      onClick={()=>void startGovernedTrackIntake()}>
+                      {busy==="stage-track-intake"?"Opening Intake…":"Start Governed Track Intake"}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-wk-text-muted">
+                    Starting Intake creates a receipt-bound review item only. The Registry
+                    separately approves identity, Artist credits, metadata and activation
+                    before a Track can be linked back to this chart.
+                  </p>
+                </div>}
               <label htmlFor="studio-registry-query" className="text-[12px] font-bold text-wk-text">Find The Recording To Keep</label>
               <form onSubmit={e=>{e.preventDefault();void lookUpTrack();}}
                 className="flex flex-col gap-2 sm:flex-row">

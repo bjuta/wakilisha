@@ -1,3 +1,4 @@
+import { ChartReviewReturnContext } from "@/components/admin/charts/ChartReviewReturnContext";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { WkIcon } from "@/components/design-system/Icon";
 import { supabase } from "@/lib/supabase";
@@ -474,6 +475,7 @@ export default function AdminDuplicateMergePage() {
 
   return (
     <div className="space-y-6">
+      <ChartReviewReturnContext consequence="track_duplicate" />
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 rounded-xl border px-4 py-3 text-[13px] font-semibold shadow-lg ${
           toast.type === "success"
