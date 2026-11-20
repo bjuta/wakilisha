@@ -190,7 +190,7 @@ export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[],observa
         }
         review=reviewedShazam.get(receipt.id+'\0'+receipt.original_sha256+'\0'+o.rank)??null;
         if(review?.action!=='approve'){
-          unresolved.push({...observation,reason:'shazam_recording_review_missing'});
+          unresolved.push({...observation,reason:'provider_recording_id_missing'});
           continue;
         }
         if(review.title!==o.title ||
