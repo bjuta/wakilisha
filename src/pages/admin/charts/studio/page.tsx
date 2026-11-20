@@ -78,10 +78,16 @@ type NativeReview = {
   entries: NativeReviewEntry[]; multi_source_occurrences: NativeReviewEntry[];
   apple_title_review: AppleTitleLead[]; freeze_ready: false; can_publish: false;
 };
+type ShazamReviewEvent = {
+  id:string;source_key:"shazam_ke";receipt_id:string;original_sha256:string;
+  rank:number;title:string;artist:string|null;track_id:string|null;
+  action:"approve"|"revoke";event_fingerprint:string;
+};
 type StudioResponse = {
   ok: boolean; state: string; preview?: Preview; native_review?: NativeReview | null; freeze_gate?: FreezeGate;
   server_verified_originals?: number; source_methods?: SourceMethod[];
   history?: ReceiptHistory[]; read_at?: string;
+  observation_reviews?:ShazamReviewEvent[];
   receipt_count?: number; error?: string;
 };
 type RegistryTrack = {
@@ -107,6 +113,7 @@ const SOURCES: Array<{key: SourceKey; label: string; weight: number; method: str
 const SOURCE_LABEL = Object.fromEntries(SOURCES.map(s=>[s.key,s.label])) as Record<SourceKey,string>;
 const DECLARATION = "I have independently verified this exact recording and authorize its Registry provider link.";
 const SHAZAM_DECLARATION = "I independently verified this exact Shazam position and authorize its private Registry recording resolution.";
+const SHAZAM_REVOKE_DECLARATION = "I revoke this exact private Shazam recording resolution after independent re-review.";
 const FREEZE_DECLARATION = "I approve freezing this exact 100-recording private chart candidate. It will not publish.";
 const DATE = (value?:string|null) => value
   ? new Date(value).toLocaleString("en-KE",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Nairobi"})
@@ -299,6 +306,29 @@ export default function ChartsStudioPage() {
       setHoldReason("");
       await refresh();
     });
+  const reviewShazamCorrection=async()=>operate("shazam-revoke",async()=>{
+    if(!selected || selected.source_key!=="shazam_ke" || selected.provider_track_id)
+      throw new Error("Only a previously reviewed Shazam position can be corrected.");
+    const coverage=snapshot?.preview?.source_coverage.find(x=>
+      x.source_key==="shazam_ke"&&x.receipt_id===selected.receipt_id);
+    const previous=snapshot?.observation_reviews?.find(e=>
+      e.source_key==="shazam_ke"&&e.receipt_id===selected.receipt_id&&
+      e.rank===selected.rank&&e.action==="approve");
+    if(!coverage||!previous)
+      throw new Error("This approved Shazam review is no longer current.");
+    if(!reviewConsent || reviewNote.trim().length<40 ||
+       !/^https:\/\//.test(evidenceUrl.trim()))
+      throw new Error("Independent evidence, explanation and explicit revocation consent are required.");
+    await invokeStudio("studio_review_no_id",{
+      action:"revoke",source_key:"shazam_ke",
+      receipt_id:coverage.receipt_id,original_sha256:coverage.original_sha256,
+      rank:selected.rank,track_id:null,review_note:reviewNote.trim(),
+      evidence_url:evidenceUrl.trim(),acknowledgement:SHAZAM_REVOKE_DECLARATION,
+    });
+    setSelected(null);setSelectedTrack(null);setReviewConsent(false);
+    setNotice("Shazam position #"+selected.rank+" review revoked. Its private rank credit is removed.");
+    await refresh();
+  });
   const lookUpTrack=async()=>{
     const q=registryQuery.trim();
     const sequence=++registrySearchSequence.current;
@@ -367,6 +397,11 @@ export default function ChartsStudioPage() {
   });
 
   const gate=snapshot?.freeze_gate;
+  const currentShazamReviews=(snapshot?.observation_reviews??[])
+    .filter(item=>item.source_key==="shazam_ke"&&item.action==="approve");
+  const selectedShazamReview=selected?.source_key==="shazam_ke"?
+    currentShazamReviews.find(item=>item.receipt_id===selected.receipt_id&&
+      item.rank===selected.rank):undefined;
   const freezeCandidate=async()=>operate("private-freeze",async()=>{
     if(!admin.can("manage_charts")||!admin.can("manage_registry"))
       throw new Error("Charts and Registry review permissions are both required.");
@@ -614,6 +649,36 @@ export default function ChartsStudioPage() {
             intake will be connected here through governed, receipt-bound handoffs.
           </p>
         </WkSurface>
+        {currentShazamReviews.length>0 &&
+          <WkSurface className="space-y-2 p-4">
+            <h3 className="text-[15px] font-black text-wk-text">Reviewed Shazam Positions</h3>
+            <p className="text-[12px] text-wk-text-muted">
+              Each Shazam position has a separate review receipt, not an invented
+              provider ID. Incorrect reviews can be explicitly revoked.
+            </p>
+            {currentShazamReviews.map(item=>
+              <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 border-t border-wk-border pt-3">
+                <div className="min-w-0">
+                  <p className="text-[12px] font-bold text-wk-text">#{item.rank} {item.title}</p>
+                  <p className="text-[11px] text-wk-text-muted">
+                    {item.artist??"No source Artist"} · Registry Track {item.track_id}
+                  </p>
+                </div>
+                <button type="button" className={buttonSecondary}
+                  disabled={!!busy||!admin.can("manage_registry")||!admin.can("manage_charts")}
+                  onClick={()=>{
+                    setBatchMode(false);setBatchRows([]);
+                    setSelected({source_key:"shazam_ke",receipt_id:item.receipt_id,
+                      rank:item.rank,title:item.title,artist:item.artist,
+                      provider_track_id:null,reason:"previously_reviewed"});
+                    setRegistryQuery(item.title);setRegistryMatches([]);
+                    setSelectedTrack(null);setRegistrySearchAttempted(false);
+                    setReviewConsent(false);setReviewNote("");setEvidenceUrl("");
+                  }}>
+                  Inspect or Revoke
+                </button>
+              </div>)}
+          </WkSurface>}
         <WkSurface className="space-y-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -861,20 +926,27 @@ export default function ChartsStudioPage() {
                 <WkCheckbox checked={reviewConsent} onChange={setReviewConsent}
                   className="w-full items-start">
                   <span className="block min-w-0 whitespace-normal leading-relaxed">
-                    I independently verified every selected source position against the
-                    correct recording. I authorize its governed Registry provider link
-                    or exact no-ID Shazam resolution. Nothing will be published.
+                    {selectedShazamReview?
+                      "I independently re-reviewed this exact Shazam position and authorize revoking its existing private recording resolution.":
+                      "I independently verified every selected source position against the correct recording. I authorize its governed Registry provider link or exact no-ID Shazam resolution. Nothing will be published."}
                   </span>
                 </WkCheckbox>
                 <div className="flex flex-wrap items-center justify-end gap-3">
-                  <button type="button" className={buttonPrimary+" min-h-11 w-full sm:w-auto"}
-                    disabled={!!busy||!selectedTrack||(batchMode&&!batchRows.length)||
-                      !reviewConsent||reviewNote.trim().length<40||
-                      !evidenceUrl.startsWith("https://")}
-                    onClick={()=>void commitReview()}>
-                    {busy==="registry-link"?"Recording review…":
-                      batchMode?"Confirm Selected Matches":"Confirm Recording Match"}
-                  </button>
+                  {selectedShazamReview?
+                    <button type="button" className={buttonSecondary+" min-h-11 w-full sm:w-auto"}
+                      disabled={!!busy||!reviewConsent||reviewNote.trim().length<40||
+                        !evidenceUrl.startsWith("https://")}
+                      onClick={()=>void reviewShazamCorrection()}>
+                      {busy==="shazam-revoke"?"Recording correction…":"Revoke This Shazam Resolution"}
+                    </button>:
+                    <button type="button" className={buttonPrimary+" min-h-11 w-full sm:w-auto"}
+                      disabled={!!busy||!selectedTrack||(batchMode&&!batchRows.length)||
+                        !reviewConsent||reviewNote.trim().length<40||
+                        !evidenceUrl.startsWith("https://")}
+                      onClick={()=>void commitReview()}>
+                      {busy==="registry-link"?"Recording review…":
+                        batchMode?"Confirm Selected Matches":"Confirm Recording Match"}
+                    </button>}
                 </div>
                 <p className="text-[11px] leading-relaxed text-wk-text-muted">
                   Provider matches are recorded in the Registry. Shazam positions without IDs
