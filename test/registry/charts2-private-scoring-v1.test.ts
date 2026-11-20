@@ -259,6 +259,25 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
       .toHaveLength(0);
   });
 
+  it("does not chain two same-source positions through a third chart",()=>{
+    const rows=[
+      {source_key:"youtube_ke",receipt_id:UUID(1),rank:8,
+        title:"Mboka",artist:"Mejja",provider_track_id:"yt:one"},
+      {source_key:"youtube_ke",receipt_id:UUID(1),rank:42,
+        title:"Mboka",artist:"Mejja Genge",provider_track_id:"yt:two"},
+      {source_key:"audiomack_ke",receipt_id:UUID(2),rank:11,
+        title:"Mboka",artist:"Mejja",provider_track_id:"am:one"},
+      {source_key:"apple_ke",receipt_id:UUID(3),rank:18,
+        title:"Mboka",artist:null,provider_track_id:"apple:one"},
+    ];
+    const groups=suggestRecordingReviewGroups(rows);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].observations.filter(row=>row.source_key==="youtube_ke")).toHaveLength(1);
+    expect(groups[0].observations.map(row=>row.source_key).sort())
+      .toEqual(["apple_ke","audiomack_ke","youtube_ke"]);
+    expect(groups[0].observations.find(row=>row.source_key==="youtube_ke")?.rank).toBe(8);
+  });
+
   it("quarantines duplicate native IDs, incomplete receipts, and repeated same-source labels",()=>{
     const fixtures=fullReceipts();
     fixtures.find(r=>r.source_key==="shazam_ke")!.observations.forEach(o=>{o.provider_track_id=null as any;});
