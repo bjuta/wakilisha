@@ -37,7 +37,7 @@ interface RegistryArtistHit {
 interface IntakeRow {
   suggestion_id: string;
   status: string;
-  intake_origin: "playlist_editor" | "public_contribution" | "artist_submission";
+  intake_origin: "playlist_editor" | "public_contribution" | "artist_submission" | "chart_studio";
   source_contribution_id: string | null;
   contribution_status: string | null;
   contribution_payload: Record<string, unknown>;
@@ -249,6 +249,9 @@ export default function TrackIntakePage() {
     useState<Record<string, string>>({});
   const [reviewNotes, setReviewNotes] =
     useState<Record<string, string>>({});
+  const [chartCreditName,setChartCreditName]=useState<Record<string,string>>({});
+  const [chartCreditNote,setChartCreditNote]=useState<Record<string,string>>({});
+  const [chartCreditEvidence,setChartCreditEvidence]=useState<Record<string,string>>({});
 
   const [artistQuery, setArtistQuery] =
     useState<Record<string, string>>({});
@@ -944,6 +947,34 @@ export default function TrackIntakePage() {
         null,
       );
     }
+  }
+
+  async function appendChartCredit(row:IntakeRow) {
+    const id=row.suggestion_id;
+    if(row.intake_origin!=="chart_studio"||row.status!=="needs_review"){
+      setError("New chart credits require an open, verified Chart-origin intake case.");
+      return;
+    }
+    const name=(chartCreditName[id]??"").trim();
+    const explanation=(chartCreditNote[id]??"").trim();
+    const evidence=(chartCreditEvidence[id]??"").trim();
+    if(!name||name.length>300||explanation.length<40||!/^https:\/\//.test(evidence)){
+      setError("Enter the separately verified Artist name, a substantial explanation, and HTTPS evidence.");
+      return;
+    }
+    setBusy("chart-credit:"+id);setError(null);
+    try{
+      await untypedRpc("admin_append_charts2_track_intake_credit_v1",{
+        p_suggestion_id:id,p_observed_name:name,
+        p_review_note:explanation,p_evidence_url:evidence,
+      });
+      setChartCreditName(old=>({...old,[id]:""}));
+      setChartCreditNote(old=>({...old,[id]:""}));
+      setChartCreditEvidence(old=>({...old,[id]:""}));
+      await loadQueue();
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:"Credit staging rejected.");
+    }finally{setBusy(null);}
   }
 
   async function searchProvider(row: IntakeRow) {
@@ -2352,13 +2383,14 @@ export default function TrackIntakePage() {
                             Open provider evidence
                           </a>
                         ) : null}
-                        <a
-                          href={`/admin/content/playlists/${row.playlist_id}`}
-                          className="wk-button wk-button-ghost wk-button-sm"
-                        >
-                          <WkIcon name="ArrowLeft" size={14} />
-                          Back to Playlist
-                        </a>
+                        {row.playlist_id &&
+                          <a
+                            href={`/admin/content/playlists/${row.playlist_id}`}
+                            className="wk-button wk-button-ghost wk-button-sm"
+                          >
+                            <WkIcon name="ArrowLeft" size={14} />
+                            Back to Playlist
+                          </a>}
                       </div>
                     </div>
 
@@ -2390,6 +2422,45 @@ export default function TrackIntakePage() {
                               </a>
                             </div>
 
+                            {row.intake_origin==="chart_studio" &&
+                              <div className="mt-4 space-y-3 rounded-xl border border-wk-border p-3">
+                                <p className="text-xs font-bold">Add a Separately Verified Artist Credit</p>
+                                <p className="text-xs leading-5 text-wk-text-muted">
+                                  The original credit is retained as evidence. Enter each additional
+                                  Artist separately. Every new credit begins Unresolved. Primary,
+                                  Featured, and co-primary decisions are made through the
+                                  existing reviewed Artist-credit controls below.
+                                </p>
+                                <label className="block text-xs font-bold" htmlFor={`chart-credit-name-${suggestionId}`}>
+                                  Artist Name
+                                </label>
+                                <input id={`chart-credit-name-${suggestionId}`} value={chartCreditName[suggestionId]??""}
+                                  onChange={e=>setChartCreditName(v=>({...v,[suggestionId]:e.target.value}))}
+                                  className="w-full rounded-xl border border-wk-border bg-wk-surface p-3 text-sm"
+                                  placeholder="Independently verified Artist name"/>
+                                <label className="block text-xs font-bold" htmlFor={`chart-credit-note-${suggestionId}`}>
+                                  Identity and Credit Evidence
+                                </label>
+                                <textarea id={`chart-credit-note-${suggestionId}`}
+                                  value={chartCreditNote[suggestionId]??""} rows={3}
+                                  onChange={e=>setChartCreditNote(v=>({...v,[suggestionId]:e.target.value}))}
+                                  className="w-full rounded-xl border border-wk-border bg-wk-surface p-3 text-sm"
+                                  placeholder="Describe the evidence for this exact Artist credit"/>
+                                <label className="block text-xs font-bold" htmlFor={`chart-credit-url-${suggestionId}`}>
+                                  Evidence URL
+                                </label>
+                                <input id={`chart-credit-url-${suggestionId}`} value={chartCreditEvidence[suggestionId]??""}
+                                  onChange={e=>setChartCreditEvidence(v=>({...v,[suggestionId]:e.target.value}))}
+                                  className="w-full rounded-xl border border-wk-border bg-wk-surface p-3 text-sm"
+                                  placeholder="https://"/>
+                                <button type="button" className="wk-button wk-button-ghost wk-button-sm"
+                                  disabled={busy!==null||!(chartCreditName[suggestionId]??"").trim()||
+                                    (chartCreditNote[suggestionId]??"").trim().length<40||
+                                    !(chartCreditEvidence[suggestionId]??"").startsWith("https://")}
+                                  onClick={()=>void appendChartCredit(row)}>
+                                  {busy==="chart-credit:"+suggestionId?"Adding Credit…":"Add Unresolved Credit"}
+                                </button>
+                              </div>}
                             <div className="mt-3 space-y-3">
                               {(row.artist_credits ?? []).map(
                                 (credit) => {
