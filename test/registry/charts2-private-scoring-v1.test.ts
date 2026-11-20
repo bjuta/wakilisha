@@ -2,6 +2,12 @@ import {describe,expect,it} from "vitest";
 import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
 import {buildCharts2PrivateNativeReviewV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import {suggestRecordingReviewGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
+import {
+  appendChartReviewReference,
+  chartStudioReturnHref,
+  parseChartReviewReference,
+  isChartReviewReference,
+} from "../../src/services/chartsPrivate/chartReviewContext";
 import { readFileSync } from "node:fs";
 import {
   CHARTS2_PRIVATE_METHODOLOGY_V1,
@@ -67,6 +73,11 @@ const STUDIO_SQL=readFileSync("supabase/migrations/20261119101415_charts2_studio
 const FREEZE_SQL=readFileSync("supabase/migrations/20261119111655_charts2_private_freeze_authority_v1.sql","utf8");
 const ORIGIN_SQL=readFileSync("supabase/migrations/20261119180542_charts2_top100_origin_neutral_integrity_v1.sql","utf8");
 const STUDIO_WORKER=readFileSync("supabase/functions/charts2-capture/index.ts","utf8");
+const CHART_REVIEW_REF=readFileSync("src/services/chartsPrivate/chartReviewContext.ts","utf8");
+const CHART_RETURN=readFileSync("src/components/admin/charts/ChartReviewReturnContext.tsx","utf8");
+const TRACK_INTAKE_PAGE=readFileSync("src/pages/admin/registry/tracks/intake/page.tsx","utf8");
+const ALIAS_PAGE=readFileSync("src/pages/admin/registry/artist-aliases/page.tsx","utf8");
+const DUPLICATE_PAGE=readFileSync("src/pages/admin/relationships/duplicates/page.tsx","utf8");
 const STUDIO_PAGE=readFileSync("src/pages/admin/charts/studio/page.tsx","utf8");
 const MUSIC_ROW=readFileSync("src/components/admin/charts/StudioChartMusicRow.tsx","utf8");
 const APPLE_META=readFileSync("src/services/chartsPrivate/appleCatalogReview.ts","utf8");
@@ -416,6 +427,43 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(score(receipts,[{...method,review_evidence:{
       ...method.review_evidence,evidence_url:"http://example.com/",
     }}]).candidates).toHaveLength(0);
+  });
+
+  it("passes only exact immutable chart observation coordinates to Registry workspaces",()=>{
+    const item={
+      source_key:"youtube_ke" as const,
+      receipt_id:UUID(1),original_sha256:"a".repeat(64),rank:14,
+    };
+    expect(isChartReviewReference(item)).toBe(true);
+    const href=appendChartReviewReference("/admin/registry/tracks/intake",item);
+    const params=new URLSearchParams(href.split("?")[1]);
+    expect(parseChartReviewReference(params)).toEqual(item);
+    expect(chartStudioReturnHref(item)).toContain("tab=review");
+    expect(chartStudioReturnHref(item)).toContain("chart_rank=14");
+    expect(()=>appendChartReviewReference("https://example.com",item)).toThrow();
+    expect(()=>appendChartReviewReference("/admin/evil",{
+      ...item,original_sha256:"not-a-sha",
+    })).toThrow();
+    expect(parseChartReviewReference(new URLSearchParams("chart_source=shazam_ke&chart_rank=201"+
+      "&chart_receipt="+UUID(1)+"&chart_sha="+"a".repeat(64)))).toBeNull();
+    expect(CHART_REVIEW_REF).not.toContain("service_role");
+    expect(CHART_RETURN).toContain("studio_review_context");
+    expect(CHART_RETURN).toContain("item.original_sha256!==reference.original_sha256");
+    expect(STUDIO_WORKER).toContain('mode==="studio_review_context"');
+    expect(STUDIO_WORKER).toContain('await verifyPrivateOriginal(server,receipt)');
+    expect(STUDIO_WORKER).toContain('"charts2_review_context_receipt_changed"');
+    expect(STUDIO_WORKER).toContain('"charts2_review_context_position_changed"');
+    expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/registry/tracks/intake"');
+    expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/registry/artist-aliases"');
+    expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/relationships/duplicates"');
+    expect(STUDIO_PAGE).toContain('source.original_sha256===returnContext.original_sha256');
+    expect(TRACK_INTAKE_PAGE).toContain("<ChartReviewReturnContext />");
+    expect(ALIAS_PAGE).toContain('<ChartReviewReturnContext consequence="artist_alias" />');
+    expect(DUPLICATE_PAGE).toContain('<ChartReviewReturnContext consequence="track_duplicate" />');
+    expect(CHART_RETURN).toContain("may also update existing public chart artist references");
+    expect(CHART_RETURN).toContain("can move public chart rows");
+    // This handoff does not claim to create intake records or auto-approve.
+    expect(CHART_RETURN).not.toContain('admin_create_registry_track_intake_identity_v1');
   });
 
   it("protects private Studio snapshot, real JWT broker and no-publication route",()=>{
