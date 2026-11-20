@@ -122,14 +122,48 @@ export function suggestRecordingReviewGroups(
     else { parent[y] = x; rank[x]++; }
   };
   const reasons = new Map<string, Set<string>>();
+  // First form groups only through positive artist evidence. A missing artist
+  // must never become a bridge joining two otherwise separate Artists.
   for (let i = 0; i < rows.length; i++) {
+    if (!normalize(rows[i].artist)) continue;
     for (let j = i + 1; j < rows.length; j++) {
+      if (!normalize(rows[j].artist)) continue;
       const reason = pairReason(rows[i], rows[j], identities);
       if (!reason) continue;
       unite(i, j);
-      const k = String(i) + ":" + String(j);
-      reasons.set(k, new Set([reason]));
+      reasons.set(String(i) + ":" + String(j), new Set([reason]));
     }
+  }
+
+  // Missing-credit rows are still useful review leads, but only when *one*
+  // established cross-source artist group fits. Never join two components,
+  // invent a credit, or attach an ambiguous same-source second position.
+  const anchored = new Map<number, number[]>();
+  rows.forEach((row, i) => {
+    if (!normalize(row.artist)) return;
+    const root = find(i);
+    anchored.set(root, [...(anchored.get(root) ?? []), i]);
+  });
+  const proposals: Array<{row: number; root: number; anchor: number}> = [];
+  rows.forEach((row, i) => {
+    if (normalize(row.artist)) return;
+    const eligible = [...anchored.entries()].filter(([,members]) =>
+      members.length >= 2 &&
+      !members.some(j => rows[j].source_key === row.source_key) &&
+      members.some(j => pairReason(rows[i], rows[j], identities) === "Check Missing Artist Credit")
+    );
+    if (eligible.length !== 1) return;
+    const [root, members] = eligible[0];
+    proposals.push({row:i,root,anchor:members.find(j =>
+      pairReason(rows[i],rows[j],identities) === "Check Missing Artist Credit")!});
+  });
+  for (const proposal of proposals) {
+    if (proposals.filter(p => p.root === proposal.root &&
+      rows[p.row].source_key === rows[proposal.row].source_key).length !== 1) continue;
+    unite(proposal.row, proposal.root);
+    const i = Math.min(proposal.row,proposal.anchor);
+    const j = Math.max(proposal.row,proposal.anchor);
+    reasons.set(String(i) + ":" + String(j), new Set(["Check Missing Artist Credit"]));
   }
   const groups = new Map<number, number[]>();
   rows.forEach((_, i) => {
