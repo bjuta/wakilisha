@@ -75,6 +75,10 @@ const ORIGIN_SQL=readFileSync("supabase/migrations/20261119180542_charts2_top100
 const STUDIO_WORKER=readFileSync("supabase/functions/charts2-capture/index.ts","utf8");
 const CHART_REVIEW_REF=readFileSync("src/services/chartsPrivate/chartReviewContext.ts","utf8");
 const CHART_RETURN=readFileSync("src/components/admin/charts/ChartReviewReturnContext.tsx","utf8");
+const CHART_ALIAS_REVIEW=readFileSync("src/components/admin/charts/ChartAliasReview.tsx","utf8");
+const CHART_ARTIST_INTAKE_SQL=readFileSync("docs/engineering/charts2-artist-origin-intake-proposed-sql-v1.sql","utf8");
+const CHART_ARTIST_INTAKE_PAGE=readFileSync("src/pages/admin/registry/artists/intake/page.tsx","utf8");
+const CHART_ARTIST_INTAKE_EDGE=readFileSync("supabase/functions/artist-registry-intake/index.ts","utf8");
 const TRACK_INTAKE_PAGE=readFileSync("src/pages/admin/registry/tracks/intake/page.tsx","utf8");
 const ALIAS_PAGE=readFileSync("src/pages/admin/registry/artist-aliases/page.tsx","utf8");
 const DUPLICATE_PAGE=readFileSync("src/pages/admin/relationships/duplicates/page.tsx","utf8");
@@ -221,7 +225,7 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).toContain("Review Matches");
     expect(STUDIO_PAGE).toContain("Before You Approve");
     expect(STUDIO_PAGE).toContain("Manage Artist Aliases");
-    expect(STUDIO_PAGE).toContain('await invokeStudio("studio_review_link"');
+    expect(STUDIO_PAGE).toContain('noId?"studio_review_no_id":"studio_review_link"');
     expect(STUDIO_PAGE).toContain("Choose only one source position per recording");
     expect(STUDIO_PAGE).toContain("setBatchMode(true);setBatchRows([]);");
     expect(STUDIO_PAGE).toContain("old.filter(item=>item.source_key!==row.source_key)");
@@ -362,6 +366,57 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(original).toHaveLength(5);
   });
 
+  it("scores exact reviewed Shazam positions with genuine missing provider IDs",()=>{
+    const receipts=fullReceipts();
+    const shazam=receipts.find(r=>r.source_key==="shazam_ke")!;
+    shazam.observations.forEach(o=>{o.provider_track_id=null as any;});
+    const review={
+      id:UUID(501),source_key:"shazam_ke",receipt_id:shazam.id,
+      original_sha256:shazam.original_sha256,rank:3,
+      title:shazam.observations[2].title,artist:shazam.observations[2].artist,
+      provider_track_id:null,track_id:UUID(900),track_status:"active",
+      action:"approve",
+      review_note:"I independently verified the same Shazam chart position against canonical recording and release evidence.",
+      evidence_url:"https://example.com/canonical-release-evidence",
+      event_fingerprint:"a".repeat(64),
+    };
+    const only=scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[review]});
+    expect(only.candidates).toHaveLength(1);
+    expect(only.candidates[0].track_id).toBe(UUID(900));
+    expect(only.candidates[0].source_count).toBe(1);
+    expect(only.candidates[0].score_points).toBe("9.90");
+    expect(only.candidates[0].source_contributions[0].registry_observation_resolution_id)
+      .toBe(review.id);
+    expect(only.candidates[0].source_contributions[0].registry_provider_link_id)
+      .toBeUndefined();
+    expect(only.unresolved).toHaveLength(599);
+    const withProvider=scoreCharts2PrivatePreviewV1({
+      receipts,registry_links:[link("youtube_ke",1,900)],observation_reviews:[review],
+    });
+    expect(withProvider.candidates.find(c=>c.track_id===UUID(900))?.score_points)
+      .toBe("39.90");
+    for(const [key, value] of [
+      ["original_sha256","f".repeat(64)],
+      ["title","Wrong title"],["artist","Unrelated Artist"],
+      ["track_status","archived"],["review_note","Not independently verified"],
+      ["evidence_url","http://untrusted.example"],["event_fingerprint","invalid"],
+    ] as const){
+      const invalid=scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[
+        {...review,[key]:value},
+      ]});
+      expect(invalid.candidates).toHaveLength(0);
+    }
+    const revoked=scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[
+      {...review,action:"revoke",track_id:null},
+    ]});
+    expect(revoked.candidates).toHaveLength(0);
+    expect(()=>scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[review,review]}))
+      .toThrow("charts2_scoring_observation_review_conflict");
+    expect(()=>scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[
+      {...review,provider_track_id:"invented"},
+    ]})).toThrow("charts2_scoring_observation_review_unqualified");
+  });
+
   it("never merges based on existing weak title/artist Registry links",()=>{
     const weak={...link("apple_ke",1,67),match_method:"exact_title_artist"};
     const result=score(fullReceipts(),[weak]);
@@ -453,9 +508,27 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_WORKER).toContain('await verifyPrivateOriginal(server,receipt)');
     expect(STUDIO_WORKER).toContain('"charts2_review_context_receipt_changed"');
     expect(STUDIO_WORKER).toContain('"charts2_review_context_position_changed"');
-    expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/registry/tracks/intake"');
+    expect(STUDIO_PAGE).toContain('"/admin/registry/tracks/intake?suggestion="+id');
     expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/registry/artist-aliases"');
     expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/relationships/duplicates"');
+    expect(STUDIO_PAGE).toContain('startGovernedArtistIntake');
+    expect(STUDIO_PAGE).toContain('studio_stage_artist_intake');
+    expect(CHART_ARTIST_INTAKE_PAGE).toContain('chartRunId');
+    expect(CHART_ARTIST_INTAKE_PAGE).toContain('<ChartReviewReturnContext />');
+    expect(CHART_ARTIST_INTAKE_PAGE).toContain('loadResults(initialChartRun.current,"no_match")');
+    expect(CHART_ARTIST_INTAKE_EDGE).toContain('charts2_chart_observation');
+    expect(CHART_ARTIST_INTAKE_EDGE).toContain('chart_artist_claim_only!==true');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain('admin_stage_charts2_artist_intake_v1');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain('registry_artist_intake_review_snapshot_v1');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain('registry_artist_intake_review_fingerprint_v1');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain('admin_review_registry_artist_intake_v1');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain('platform_private.assert_charts2_artist_intake_receipt_v1');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain("source_origin_iso2");
+    expect(CHART_ARTIST_INTAKE_SQL).toContain("'charts2_chart_observation'");
+    expect(CHART_ALIAS_REVIEW).toContain('admin_set_registry_artist_alias_v1');
+    expect(CHART_ALIAS_REVIEW).toContain('may also correct existing public chart Artist references');
+    expect(DUPLICATE_PAGE).toContain('track.id,');
+    expect(DUPLICATE_PAGE).toContain('urlParams.get("chart_track")');
     expect(STUDIO_PAGE).toContain('source.original_sha256===returnContext.original_sha256');
     expect(TRACK_INTAKE_PAGE).toContain("<ChartReviewReturnContext />");
     expect(ALIAS_PAGE).toContain('<ChartReviewReturnContext consequence="artist_alias" />');
@@ -479,6 +552,24 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_WORKER).toContain('crypto.subtle.digest("SHA-256",bytes)');
     expect(STUDIO_WORKER).toContain('authClient.rpc("admin_admit_registry_track_provider_link_v1"');
     expect(STUDIO_WORKER).not.toContain('server.rpc("admin_admit_registry_track_provider_link_v1"');
+    expect(STUDIO_WORKER).toContain('mode==="studio_review_no_id"');
+    expect(STUDIO_WORKER).toContain('authClient.rpc("admin_review_charts2_no_id_observation_v1"');
+    expect(STUDIO_WORKER).toContain('p_expected_previous_event_id:previous?.id??null');
+    expect(STUDIO_WORKER).toContain('observation_reviews:snapshot.observation_reviews??[]');
+    expect(STUDIO_WORKER).toContain('p_action:action');
+    expect(STUDIO_WORKER).toContain('p_track_id:action==="revoke"?null:supplied.track_id');
+    expect(STUDIO_PAGE).toContain('currentShazamReviews');
+    expect(STUDIO_PAGE).toContain('Revoke This Shazam Resolution');
+    expect(STUDIO_PAGE).toContain('SHAZAM_REVOKE_DECLARATION');
+    expect(STUDIO_WORKER).not.toContain('server.rpc("admin_review_charts2_no_id_observation_v1"');
+    expect(STUDIO_WORKER).toContain("observation_reviews:snapshot.observation_reviews??[]");
+    expect(STUDIO_PAGE).toContain('SHAZAM_DECLARATION');
+    expect(STUDIO_PAGE).toContain('noId?"studio_review_no_id":"studio_review_link"');
+    expect(STUDIO_PAGE).toContain('"Review Shazam Position"');
+    expect(PUBLIC_CHART_MODELS).not.toContain('registry_observation_resolution_id');
+    const offlineBridge=readFileSync("supabase/functions/_shared/charts2-publication-bridge-v1.mjs","utf8");
+    expect(offlineBridge).toContain("registry_observation_resolution_id");
+    expect(offlineBridge).toContain("c.registry_provider_link_id == null");
     expect(STUDIO_WORKER).toContain('p_match_method:"manual",p_match_confidence:1');
     expect(STUDIO_WORKER).toContain('storedWeights[name]!==policy.weight_points');
     expect(ROUTER).toContain('path: "studio", element: <AdminGuard capabilities={["manage_charts"]}><AdminChartsStudioPage /></AdminGuard>');
@@ -488,6 +579,39 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     }
     expect(STUDIO_PAGE).toContain("Collect / retry");
     expect(STUDIO_PAGE).not.toContain("publish_edition");
+  });
+
+  it("keeps Shazam no-ID SQL review decisions append-only and independently audited",()=>{
+    const proposed=readFileSync("docs/engineering/charts2-no-id-observation-resolution-proposed-sql-v1.sql","utf8");
+    const intake=readFileSync("docs/engineering/charts2-chart-origin-intake-proposed-sql-v1.sql","utf8");
+    expect(proposed).toContain("platform_private.charts2_observation_review_events_v1");
+    expect(proposed).toContain("before update or delete");
+    expect(proposed).toContain("admin_review_charts2_no_id_observation_v1");
+    expect(proposed).toContain("reviewer_id uuid not null");
+    expect(proposed).toContain("p_expected_previous_event_id");
+    expect(proposed).toContain("v_prev.action=p_action");
+    expect(proposed).toContain("default 'shazam_ke'");
+    expect(proposed).toContain("registry_observation_resolution_id");
+    expect(proposed).toContain("review_policy','exact_manual_receipt_plus_shazam_v1'");
+    expect(proposed).toContain("I revoke this exact private Shazam recording resolution");
+    expect(intake).toContain("registry_provider_track_suggestions_chart_origin_evidence_check");
+    expect(intake).toContain("public.admin_stage_charts2_track_intake_v1");
+    expect(intake).toContain("insert into public.registry_provider_track_suggestion_artists(");
+    expect(intake).toContain("v_item.id,1,'unresolved','unresolved',null,v_artist");
+    expect(intake).toContain("admin_append_charts2_track_intake_credit_v1");
+    expect(intake).toContain("chart_review_evidence");
+    expect(intake).toContain("perform platform_private.assert_charts2_intake_receipt_v1(p_suggestion_id)");
+    expect(TRACK_INTAKE_PAGE).toContain('row.intake_origin==="chart_studio"');
+    expect(TRACK_INTAKE_PAGE).toContain('"admin_append_charts2_track_intake_credit_v1"');
+    expect(TRACK_INTAKE_PAGE).toContain("Add Unresolved Credit");
+    expect(TRACK_INTAKE_PAGE).toContain("Choose whether this artist is Primary or Featured.");
+    expect(intake).toContain("platform_private.assert_charts2_intake_receipt_v1");
+    expect(intake).toContain("order by newest.created_at desc,newest.id desc");
+    expect(intake).toContain("'public_contribution','artist_submission','chart_studio'");
+    expect(intake).not.toContain("insert into public.registry_tracks");
+    expect(intake).not.toContain("insert into public.wk_chart_entries_v2");
+    expect(proposed).not.toContain("insert into public.registry_track_provider_links");
+    expect(proposed).not.toContain("insert into public.wk_chart_entries_v2");
   });
 
   it("allows 100 separately reviewed canonical recordings while preserving 500 unresolved observations",()=>{

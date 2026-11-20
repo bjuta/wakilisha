@@ -685,5 +685,144 @@ begin
 end
 $charts2_origin_neutral_acceptance$;
 
+-- Chart→Registry convergence is accepted only through existing governed
+-- operations. All fixtures below are entirely rolled back and never use a
+-- hosted or Production database. This SQL role simulation is not a genuine
+-- signed-in browser/JWT runtime acceptance.
+do $charts2_registry_convergence_v1$
+declare
+  actor_id uuid:=gen_random_uuid();
+  youtube_receipt uuid:=gen_random_uuid();
+  shazam_receipt uuid:=gen_random_uuid();
+  youtube_sha text:=repeat('a',64);
+  shazam_sha text:=repeat('b',64);
+  positions jsonb;
+  intake jsonb;
+  artist_intake jsonb;
+  credit jsonb;
+  canonical_track uuid;
+  approved jsonb;
+  revoked jsonb;
+  independent_note text:=
+    'Independent review verified this exact recording and each distinct Artist credit against a reliable release and provider source.';
+begin
+  insert into auth.users(id) values(actor_id);
+  perform set_config('request.jwt.claim.sub',actor_id::text,true);
+  -- Signed-in alone must not grant Registry or Charts authority.
+  begin
+    perform public.admin_stage_charts2_track_intake_v1(
+      'youtube_ke',youtube_receipt,youtube_sha,1);
+    raise exception 'charts2_track_intake_unprivileged_allowed';
+  exception when insufficient_privilege then null;end;
+  insert into public.user_role_assignments(user_id,role_key,status)
+    values(actor_id,'super_admin','active');
+  if not public.current_user_has_capability('manage_charts')
+     or not public.current_user_has_capability('manage_registry')
+  then raise exception 'charts2_steward_capabilities_missing';end if;
+
+  select jsonb_agg(jsonb_build_object('rank',n,'title','CI Original Recording',
+    'artist','CI First Artist','provider_track_id','youtube-ci-'||n)
+    order by n) into positions from generate_series(1,100) n;
+  insert into platform_private.charts2_capture_receipts_v1(
+    id,source_key,source_endpoint,method_revision,capture_mode,observed_at,
+    original_object_key,original_byte_length,original_sha256,
+    original_verified_at,original_content_type,expected_depth,observed_depth,
+    observations,parser_version
+  ) values (
+    youtube_receipt,'youtube_ke','https://youtube.example.org/source',
+    1,'research_original_upload',now(),'ci-youtube-'||youtube_receipt,
+    512,youtube_sha,now(),'application/json',100,100,
+    positions,'ci-original-v1'
+  );
+  intake:=public.admin_stage_charts2_track_intake_v1(
+    'youtube_ke',youtube_receipt,youtube_sha,1);
+  if intake->>'status' is distinct from 'needs_review'
+     or (select count(*) from public.registry_provider_track_suggestion_artists
+       where suggestion_id=(intake->>'suggestion_id')::uuid
+         and credit_role='unresolved' and resolution_mode='unresolved')<>1
+  then raise exception 'charts2_track_intake_original_credit_not_preserved';end if;
+  if (public.admin_stage_charts2_track_intake_v1(
+    'youtube_ke',youtube_receipt,youtube_sha,1
+  )->>'idempotent_replay')::boolean is not true
+  then raise exception 'charts2_track_intake_idempotent_replay_failed';end if;
+  credit:=public.admin_append_charts2_track_intake_credit_v1(
+    (intake->>'suggestion_id')::uuid,'CI Second Artist',
+    independent_note,'https://example.org/ci-artist-evidence');
+  if (credit->>'credit_order')::integer<>2
+     or credit->>'credit_role' is distinct from 'unresolved'
+  then raise exception 'charts2_additional_credit_prematurely_approved';end if;
+  artist_intake:=public.admin_stage_charts2_artist_intake_v1(
+    'youtube_ke',youtube_receipt,youtube_sha,1);
+  if (artist_intake->>'staging_id') is null
+     or not exists (
+       select 1 from public.provider_intake_artist_staging a
+       where a.id=(artist_intake->>'staging_id')::uuid
+         and a.source_artist_name='CI First Artist'
+         and a.source_origin_iso2 is null and a.source_spotify_id is null
+         and a.source_metadata->>'chart_artist_claim_only'='true'
+     )
+  then raise exception 'charts2_artist_intake_invented_metadata';end if;
+  -- A bad original cannot stage another governing identity.
+  begin
+    perform public.admin_stage_charts2_artist_intake_v1(
+      'youtube_ke',youtube_receipt,repeat('f',64),1);
+    raise exception 'charts2_stale_artist_source_allowed';
+  exception when serialization_failure then null;end;
+
+  insert into public.registry_tracks(slug,title,normalized_title,status)
+  values('ci-chart-'||substr(actor_id::text,1,8),
+    'CI Original Recording','ci original recording','active')
+  returning id into canonical_track;
+  select jsonb_agg(jsonb_build_object('rank',n,'title','CI Original Recording',
+    'artist','CI First Artist','provider_track_id',null)
+    order by n) into positions from generate_series(1,200) n;
+  insert into platform_private.charts2_capture_receipts_v1(
+    id,source_key,source_endpoint,method_revision,capture_mode,observed_at,
+    original_object_key,original_byte_length,original_sha256,
+    original_verified_at,original_content_type,expected_depth,observed_depth,
+    observations,parser_version
+  ) values (
+    shazam_receipt,'shazam_ke','https://shazam.example.org/source',
+    1,'research_original_upload',now(),'ci-shazam-'||shazam_receipt,
+    512,shazam_sha,now(),'application/json',200,200,
+    positions,'ci-original-v1'
+  );
+  approved:=public.admin_review_charts2_no_id_observation_v1(
+    shazam_receipt,shazam_sha,1,'approve',canonical_track,
+    independent_note,'https://example.org/ci-track-evidence',null,
+    'I independently verified this exact Shazam position and authorize its private Registry recording resolution.');
+  if approved->>'event_id' is null
+     or (select count(*) from platform_private.charts2_observation_review_events_v1
+        where receipt_id=shazam_receipt and rank=1 and action='approve')<>1
+  then raise exception 'charts2_shazam_approval_receipt_missing';end if;
+  begin
+    perform public.admin_review_charts2_no_id_observation_v1(
+      shazam_receipt,shazam_sha,1,'approve',canonical_track,
+      independent_note,'https://example.org/ci-track-evidence',
+      gen_random_uuid(),
+      'I independently verified this exact Shazam position and authorize its private Registry recording resolution.');
+    raise exception 'charts2_shazam_stale_approval_allowed';
+  exception when serialization_failure then null;end;
+  revoked:=public.admin_review_charts2_no_id_observation_v1(
+    shazam_receipt,shazam_sha,1,'revoke',null,
+    independent_note,'https://example.org/ci-correction-evidence',
+    (approved->>'event_id')::uuid,
+    'I revoke this exact private Shazam recording resolution after independent re-review.');
+  if revoked->>'event_id' is null
+     or (select count(*) from platform_private.charts2_observation_review_events_v1
+         where receipt_id=shazam_receipt and rank=1)<>2
+  then raise exception 'charts2_shazam_revocation_not_append_only';end if;
+  begin
+    update platform_private.charts2_observation_review_events_v1
+    set action='approve' where id=(revoked->>'event_id')::uuid;
+    raise exception 'charts2_shazam_review_ledger_mutable';
+  exception when insufficient_privilege then null;end;
+  if exists(select 1 from public.registry_track_provider_links
+    where track_id=canonical_track)
+  then raise exception 'charts2_shazam_fabricated_provider_link';end if;
+  raise notice 'WK_CHARTS2_LOCAL_GOVERNED_REGISTRY_INTAKE_SHZAM_REVIEW=PASS';
+end
+$charts2_registry_convergence_v1$;
+
 rollback;
 \echo WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS

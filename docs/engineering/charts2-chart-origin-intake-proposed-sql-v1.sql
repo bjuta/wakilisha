@@ -106,8 +106,8 @@ begin
       and original_verified_at is not null;
   if not found or r.id is distinct from (
     select newest.id from platform_private.charts2_capture_receipts_v1 newest
-    where newest.source_key=r.source_key and newest.observed_status='succeeded'
-    order by newest.observed_at desc,newest.id desc limit 1
+    where newest.source_key=r.source_key
+    order by newest.created_at desc,newest.id desc limit 1
   ) then
     raise exception using errcode='40001',
       message='Original Chart receipt no longer matches the accepted source.';
@@ -154,7 +154,8 @@ begin
   ) or p_receipt_id is null
     or p_original_sha256 !~ '^[a-f0-9]{64}$'
     or p_rank is null or p_rank<1 or
-      p_rank>case when p_source_key='shazam_ke' then 200 else 100 end
+      ((p_source_key='shazam_ke' and p_rank>200) or
+        (p_source_key<>'shazam_ke' and p_rank>100))
   then raise exception using errcode='22023',
     message='Exact Chart source, receipt, SHA and rank required.';
   end if;
@@ -167,8 +168,8 @@ begin
       and original_verified_at is not null;
   if not found or r.id is distinct from (
     select newest.id from platform_private.charts2_capture_receipts_v1 newest
-    where newest.source_key=p_source_key and newest.observed_status='succeeded'
-    order by newest.observed_at desc,newest.id desc limit 1
+    where newest.source_key=p_source_key
+    order by newest.created_at desc,newest.id desc limit 1
   ) then raise exception using errcode='40001',
     message='Original Chart receipt no longer current or verified.';
   end if;
@@ -223,6 +224,16 @@ begin
       'chart_method_revision',r.method_revision
     ),'unresolved','needs_review'
   ) returning * into v_item;
+  -- Source credit is a raw observation, not a primary/featured classification.
+  -- The accepted reviewed-credit operator must resolve identity and role.
+  if v_artist is not null then
+    insert into public.registry_provider_track_suggestion_artists(
+      suggestion_id,credit_order,credit_role,resolution_mode,
+      registry_artist_id,observed_name
+    ) values (
+      v_item.id,1,'unresolved','unresolved',null,v_artist
+    );
+  end if;
   return jsonb_build_object('suggestion_id',v_item.id,
     'status','needs_review','idempotent_replay',false,'can_publish',false);
 end
@@ -231,6 +242,86 @@ revoke all on function public.admin_stage_charts2_track_intake_v1(
   text,uuid,text,integer) from public,anon,authenticated,service_role;
 grant execute on function public.admin_stage_charts2_track_intake_v1(
   text,uuid,text,integer) to authenticated;
+
+-- An original combined Artist string is retained unsplit. More than one
+-- primary/featured Artist must be admitted only from independent evidence.
+-- This column records *additional* staging-credit evidence and does not
+-- replace the already accepted reviewed-credit mutation journal.
+alter table public.registry_provider_track_suggestion_artists
+  add column chart_review_evidence jsonb;
+
+create function public.admin_append_charts2_track_intake_credit_v1(
+  p_suggestion_id uuid,p_observed_name text,
+  p_review_note text,p_evidence_url text
+) returns jsonb
+language plpgsql security definer
+set search_path=pg_catalog,auth,public,platform_private
+as $append$
+declare
+  v_user uuid:=auth.uid();
+  v_suggestion public.registry_provider_track_suggestions%rowtype;
+  v_name text:=nullif(btrim(p_observed_name),'');
+  v_order integer;
+  v_credit public.registry_provider_track_suggestion_artists%rowtype;
+begin
+  if v_user is null
+     or not coalesce(public.current_user_has_capability('manage_registry'),false)
+     or not coalesce(public.current_user_has_capability('manage_charts'),false)
+  then raise exception using errcode='42501',
+    message='Charts and Registry stewardship required.';
+  end if;
+  if p_suggestion_id is null
+     or v_name is null or length(v_name)>300
+     or length(btrim(coalesce(p_review_note,'')))<40
+     or p_evidence_url not like 'https://%'
+  then raise exception using errcode='22023',
+    message='A separately verified Artist credit and evidence are required.';
+  end if;
+  select * into v_suggestion
+  from public.registry_provider_track_suggestions
+  where id=p_suggestion_id for update;
+  if not found or v_suggestion.intake_origin<>'chart_studio'
+     or v_suggestion.status<>'needs_review'
+  then raise exception using errcode='42501',
+    message='Only pending exact Chart-origin Track Intake accepts new credits.';
+  end if;
+  perform platform_private.assert_charts2_intake_receipt_v1(p_suggestion_id);
+  if exists (
+    select 1 from public.registry_provider_track_suggestion_artists credit
+    where credit.suggestion_id=p_suggestion_id
+      and lower(btrim(credit.observed_name))=lower(v_name)
+  ) then raise exception using errcode='23505',
+    message='This Artist credit is already present for review.';
+  end if;
+  select coalesce(max(credit_order),0)+1 into v_order
+  from public.registry_provider_track_suggestion_artists
+  where suggestion_id=p_suggestion_id;
+  insert into public.registry_provider_track_suggestion_artists(
+    suggestion_id,credit_order,credit_role,resolution_mode,
+    registry_artist_id,observed_name,chart_review_evidence
+  ) values (
+    p_suggestion_id,v_order,'unresolved','unresolved',null,v_name,
+    jsonb_build_object(
+      'chart_credit_added_v1',true,
+      'actor_id',v_user,
+      'source_receipt_id',v_suggestion.validation_snapshot->>'chart_receipt_id',
+      'source_original_sha256',v_suggestion.validation_snapshot->>'chart_original_sha256',
+      'independent_review_note',btrim(p_review_note),
+      'evidence_url',btrim(p_evidence_url)
+    )
+  ) returning * into v_credit;
+  return jsonb_build_object(
+    'suggestion_id',p_suggestion_id,'credit_id',v_credit.id,
+    'credit_order',v_credit.credit_order,
+    'credit_role','unresolved','resolution_mode','unresolved',
+    'identity_approved',false,'can_publish',false
+  );
+end
+$append$;
+revoke all on function public.admin_append_charts2_track_intake_credit_v1(
+  uuid,text,text,text) from public,anon,authenticated,service_role;
+grant execute on function public.admin_append_charts2_track_intake_credit_v1(
+  uuid,text,text,text) to authenticated;
 
 -- The existing finalizer will be copied by exact Production definition and
 -- modified ONLY for the chart_studio no-Playlist guard and the additional
@@ -409,7 +500,7 @@ begin
     'idempotent_replay',false
   );
 end
-$function$
+$function$;
 
 -- END EXACT PRODUCTION FINALIZER REPLACEMENT
 commit;
