@@ -8,6 +8,7 @@ import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { AdminChartsPageHeader } from "@/pages/admin/charts/components/AdminChartsPageHeader";
 import { StudioChartMusicRow } from "@/components/admin/charts/StudioChartMusicRow";
 import { loadVerifiedAppleChartSongs, type VerifiedAppleChartSong } from "@/services/chartsPrivate/appleCatalogReview";
+import { suggestRecordingReviewGroups, type ReviewedArtistAlias, type ReviewedArtist } from "@/services/chartsPrivate/recordingReviewSuggestions";
 
 type SourceKey = "youtube_ke" | "mdundo_ke" | "apple_ke" | "audiomack_ke" | "shazam_ke";
 type Tab = "sources" | "review" | "preview" | "history" | "freeze";
@@ -151,6 +152,13 @@ export default function ChartsStudioPage() {
   const [reviewSongQuery,setReviewSongQuery]=useState("");
   const [reviewMultipleOnly,setReviewMultipleOnly]=useState(false);
   const [appleSongs,setAppleSongs]=useState<Record<string,VerifiedAppleChartSong>>({});
+  const [artistAliases,setArtistAliases]=useState<ReviewedArtistAlias[]>([]);
+  const [registryArtists,setRegistryArtists]=useState<ReviewedArtist[]>([]);
+  const [aliasLookupWarning,setAliasLookupWarning]=useState(false);
+  const [showAllDuplicateGroups,setShowAllDuplicateGroups]=useState(false);
+  const [batchMode,setBatchMode]=useState(false);
+  const [batchRows,setBatchRows]=useState<EvidenceRow[]>([]);
+
   useEffect(()=>{
     if(tab!=="preview" || !snapshot?.native_review) return;
     const requested=new Map<string,string>();
@@ -183,6 +191,28 @@ export default function ChartsStudioPage() {
     finally{setLoading(false);}
   },[]);
   useEffect(()=>{void refresh();},[refresh]);
+  useEffect(()=>{
+    if(!snapshot?.preview)return;
+    let active=true;
+    void supabase.from("registry_artist_aliases")
+      .select("alias_slug,alias_display_name,canonical_artist_id,registry_artists!inner(id,display_name)")
+      .eq("status","active").limit(1000).then(result=>{
+        if(!active)return;
+        if(result.error){
+          setArtistAliases([]);setRegistryArtists([]);setAliasLookupWarning(true);
+          return;
+        }
+        type AliasResult = ReviewedArtistAlias & {registry_artists:ReviewedArtist | null};
+        const reviewed=(result.data??[]) as AliasResult[];
+        setArtistAliases(reviewed.map(({alias_slug,alias_display_name,canonical_artist_id})=>({
+          alias_slug,alias_display_name,canonical_artist_id,
+        })));
+        setRegistryArtists(reviewed.map(row=>row.registry_artists)
+          .filter((artist):artist is ReviewedArtist=>Boolean(artist)));
+        setAliasLookupWarning(false);
+      }).catch(()=>{if(active)setAliasLookupWarning(true);});
+    return ()=>{active=false;};
+  },[snapshot?.preview]);
 
   const operate=async(key:string,fn:()=>Promise<void>)=>{
     if(busy)return;
@@ -251,23 +281,49 @@ export default function ChartsStudioPage() {
   const commitReview=async()=>operate("registry-link",async()=>{
     if(!admin.can("manage_registry"))
       throw new Error("Manage Registry permission is required for canonical provider-link review.");
-    if(!selected?.provider_track_id||!selectedTrack||!reviewConsent)
-      throw new Error("Choose an existing Registry Track and affirm the exact recording evidence.");
-    const source=snapshot?.preview?.source_coverage.find(x=>x.source_key===selected.source_key);
-    if(!source)throw new Error("The source receipt is no longer available. Reload the Studio.");
+    const rows=batchMode?batchRows:(selected?[selected]:[]);
+    if(!rows.length||!selectedTrack||!reviewConsent)
+      throw new Error("Select source rows, one existing Registry recording, and confirm your review.");
+    if(rows.some(row=>!row.provider_track_id))
+      throw new Error("Source rows without a provider ID cannot be linked.");
+    if(new Set(rows.map(row=>row.source_key)).size!==rows.length)
+      throw new Error("Choose only one source position per recording for this review.");
     if(reviewNote.trim().length<40)
       throw new Error("Document at least 40 characters of independent recording identity evidence.");
     if(!/^https:\/\//.test(evidenceUrl.trim()))
-      throw new Error("Provide an independent HTTPS evidence URL.");
-    await invokeStudio("studio_review_link",{
-      source_key:selected.source_key,rank:selected.rank,
-      receipt_id:source.receipt_id,original_sha256:source.original_sha256,
-      track_id:selectedTrack.id,review_note:reviewNote.trim(),
-      evidence_url:evidenceUrl.trim(),acknowledgement:DECLARATION,
-    });
-    setNotice("Registry review accepted for "+selected.title+
-      ". Recalculating private scores.");
+      throw new Error("Provide an independent HTTPS recording evidence URL.");
+    let accepted=0;
+    for(const row of rows){
+      const source=snapshot?.preview?.source_coverage.find(x=>x.source_key===row.source_key);
+      if(!source)throw new Error("The source receipt is no longer available. Reload the Studio.");
+      try {
+        // Each source goes through the existing actor-authorized Registry broker.
+        // A failed later row never masquerades as an atomic batch success.
+        await invokeStudio("studio_review_link",{
+          source_key:row.source_key,rank:row.rank,
+          receipt_id:source.receipt_id,original_sha256:source.original_sha256,
+          track_id:selectedTrack.id,review_note:reviewNote.trim(),
+          evidence_url:evidenceUrl.trim(),acknowledgement:DECLARATION,
+        });
+        accepted++;
+      }catch(e){
+        // A partially accepted batch must not be blindly resubmitted. Reopen
+        // from the newly recomputed queue to review only outstanding sources.
+        await refresh();
+        if(accepted>0){
+          setBatchMode(false);setBatchRows([]);setSelected(null);
+          setSelectedTrack(null);setReviewConsent(false);
+        }
+        const cause=e instanceof Error?e.message:"Review rejected";
+        throw new Error(String(accepted)+" of "+String(rows.length)+
+          " links accepted. "+SOURCE_LABEL[row.source_key]+" #"+row.rank+
+          " was rejected: "+cause+". Accepted links remain recorded. Recheck before continuing.");
+      }
+    }
+    setNotice(String(accepted)+" Registry source links accepted for "+selectedTrack.title+
+      ". Private rankings are being recalculated.");
     setSelected(null);setSelectedTrack(null);setRegistryMatches([]);
+    setBatchMode(false);setBatchRows([]);
     setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
     await refresh();
   });
@@ -302,6 +358,19 @@ export default function ChartsStudioPage() {
     return apple?.provider_track_id?appleSongs[apple.provider_track_id]??null:null;
   };
 
+  const duplicateGroups=useMemo(()=>suggestRecordingReviewGroups(
+    preview?.unresolved??[],artistAliases,registryArtists,
+  ),[preview?.unresolved,artistAliases,registryArtists]);
+  const openDuplicateGroup=(rows: EvidenceRow[])=>{
+    const selectable=rows.filter(row=>Boolean(row.provider_track_id));
+    if(!selectable.length)return;
+    setBatchMode(true);setBatchRows([]);
+    const anchor=selectable.find(row=>Boolean(row.artist))??selectable[0];
+    setSelected(anchor);setRegistryQuery(anchor.title);
+    setRegistryMatches([]);setSelectedTrack(null);
+    setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
+    setTab("review");
+  };
   const coverage=preview?.source_coverage??[];
   const methods=snapshot?.source_methods??[];
   const unresolved=useMemo(()=>{
@@ -435,12 +504,11 @@ export default function ChartsStudioPage() {
       }
       {tab==="review" && <section aria-label="Recording identity review" className="space-y-4">
         <WkSurface className="p-4">
-          <h2 className="text-[15px] font-black text-wk-text">Recording authority, not title similarity</h2>
+          <h2 className="text-[15px] font-black text-wk-text">Review Recordings</h2>
           <p className="mt-1 text-[12px] text-wk-text-muted">
-            Every unresolved observation retains its exact receipt and native rank.
-            Strong canonical links require separately corroborated recording evidence and the
-            existing Registry's governed provider-link approval.
-            Shazam records with no provider ID cannot be assigned an invented one.
+            Find songs that may be the same recording. Compare the versions, then choose
+            which Registry recording they belong to. Your approval preserves each chart position.
+            Entries without a source ID remain on the review list.
           </p>
           <p className="mt-2 text-[12px] font-semibold text-wk-text">
             {admin.can("manage_registry")?"Registry review capability available":
@@ -448,6 +516,49 @@ export default function ChartsStudioPage() {
           </p>
           <Link className="text-[12px] font-bold text-wk-brand underline" to="/admin/registry/tracks">
             Open existing Registry track authority
+          </Link>
+        </WkSurface>
+        <WkSurface className="space-y-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-[15px] font-black text-wk-text">Songs That Might Match</h3>
+              <p className="mt-1 text-[12px] text-wk-text-muted">
+                {duplicateGroups.length} possible groups. Song titles and known artist names help us find them.
+              </p>
+            </div>
+            {duplicateGroups.length>12 &&
+              <button type="button" className={buttonSecondary}
+                onClick={()=>setShowAllDuplicateGroups(value=>!value)}>
+                {showAllDuplicateGroups?"Show Fewer":"Show All"}
+              </button>}
+          </div>
+          {aliasLookupWarning &&
+            <p className="text-[12px] text-wk-warning" role="status">
+              We couldn’t check every artist alias. Please review the names carefully.
+            </p>}
+          <div className="divide-y divide-wk-border">
+            {duplicateGroups.slice(0,showAllDuplicateGroups?undefined:12).map(group=>
+              <div key={group.key} className="flex flex-wrap items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-black text-wk-text">{group.title}</p>
+                  <p className="text-[11px] text-wk-text-muted">{group.reason}</p>
+                  <p className="mt-1 text-[11px] text-wk-text-muted">
+                    {group.observations.map(row=>SOURCE_LABEL[row.source_key as SourceKey].split(" ")[0]+
+                      " #"+row.rank+" ("+(row.artist??"Artist not given")+")").join(" · ")}
+                  </p>
+                </div>
+                <button type="button" className={buttonSecondary}
+                  disabled={!!busy||!admin.can("manage_registry")||
+                    !group.observations.some(row=>row.provider_track_id)}
+                  onClick={()=>openDuplicateGroup(group.observations as EvidenceRow[])}>
+                  Review Matches
+                </button>
+              </div>)}
+            {!duplicateGroups.length &&
+              <p className="py-3 text-[12px] text-wk-text-muted">No matching songs to review right now.</p>}
+          </div>
+          <Link to="/admin/registry/artist-aliases" className="text-[12px] font-bold text-wk-brand underline">
+            Manage Artist Aliases
           </Link>
         </WkSurface>
         <div className="flex flex-wrap gap-2">
@@ -478,6 +589,7 @@ export default function ChartsStudioPage() {
                   <button type="button" className={buttonSecondary}
                     disabled={!row.provider_track_id||!admin.can("manage_registry")}
                     onClick={()=>{
+                      setBatchMode(false);setBatchRows([]);
                       setSelected(row);setRegistryQuery(row.title);
                       setRegistryMatches([]);setSelectedTrack(null);
                       setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
@@ -498,16 +610,39 @@ export default function ChartsStudioPage() {
             </div>
           </WkSurface>
           <WkSurface className="space-y-3 p-4">
-            <h2 className="text-[15px] font-black text-wk-text">Governed Registry review</h2>
+            <h2 className="text-[15px] font-black text-wk-text">Choose The Recording</h2>
             {!selected?<p className="text-[12px] text-wk-text-muted">
-              Select a provider observation to review its exact recording. No automatic title match is made.
+              Choose a song from the list to compare it with a Registry recording.
             </p>:<>
+              {batchMode && <div className="space-y-2 rounded-lg border border-wk-border p-3">
+                <p className="text-[12px] font-black text-wk-text">
+                  Choose The Songs To Link ({batchRows.length} Selected)
+                </p>
+                <p className="text-[11px] text-wk-text-muted">
+                  Select the verified matches. Choose only one position per source.
+                </p>
+                {duplicateGroups.find(group=>group.observations.some(row=>
+                  row.receipt_id===selected.receipt_id&&row.rank===selected.rank))
+                  ?.observations.map(row=>{
+                    const checked=batchRows.some(item=>item.receipt_id===row.receipt_id&&
+                      item.rank===row.rank);
+                    return <WkCheckbox key={row.receipt_id+":"+row.rank}
+                      checked={checked} disabled={!row.provider_track_id}
+                      onChange={value=>setBatchRows(old=>value?
+                        [...old.filter(item=>item.source_key!==row.source_key),row as EvidenceRow]:
+                        old.filter(item=>!(item.receipt_id===row.receipt_id&&item.rank===row.rank)))}>
+                      {SOURCE_LABEL[row.source_key as SourceKey].split(" ")[0]} #{row.rank}
+                      {" "}· {row.title} · {row.artist??"Artist not given"}
+                      {!row.provider_track_id?" (No provider ID)":""}
+                    </WkCheckbox>;
+                  })}
+              </div>}
               <div className="rounded-lg bg-wk-surface-raised p-3">
                 <p className="font-bold text-wk-text">{selected.title}</p>
-                <p className="text-[12px] text-wk-text-muted">{selected.artist} · {SOURCE_LABEL[selected.source_key]} · #{selected.rank}</p>
+                <p className="text-[12px] text-wk-text-muted">{selected.artist??"Artist not supplied"} · {SOURCE_LABEL[selected.source_key]} · #{selected.rank}</p>
                 <p className="mt-1 break-all font-mono text-[11px] text-wk-text-muted">{selected.provider_track_id}</p>
               </div>
-              <label htmlFor="studio-registry-query" className="text-[12px] font-bold text-wk-text">Find an existing Registry recording</label>
+              <label htmlFor="studio-registry-query" className="text-[12px] font-bold text-wk-text">Find The Recording To Keep</label>
               <div className="flex gap-2">
                 <input id="studio-registry-query" value={registryQuery}
                   onChange={e=>setRegistryQuery(e.target.value)} className={fieldClass}/>
@@ -526,21 +661,36 @@ export default function ChartsStudioPage() {
                     <span className="block text-[11px] text-wk-text-muted">ISRC: {track.isrc??"Not recorded"}</span>
                   </button>)}
               </div>
-              <label htmlFor="studio-evidence" className="text-[12px] font-bold text-wk-text">Independent HTTPS recording evidence</label>
+              <label htmlFor="studio-evidence" className="text-[12px] font-bold text-wk-text">Link To Recording Evidence</label>
               <input id="studio-evidence" type="url" className={fieldClass}
                 placeholder="https://… specific recording / release evidence"
                 value={evidenceUrl} onChange={e=>setEvidenceUrl(e.target.value)}/>
-              <label htmlFor="studio-note" className="text-[12px] font-bold text-wk-text">Recording identity rationale</label>
+              <label htmlFor="studio-note" className="text-[12px] font-bold text-wk-text">Why Do These Songs Match?</label>
               <textarea id="studio-note" rows={4} className={fieldClass}
-                placeholder="Document corroborated performer, version, release or ISRC. Name similarity alone is insufficient."
+                placeholder="Add the matching ISRC, release details, or other evidence that confirms the recording."
                 value={reviewNote} onChange={e=>setReviewNote(e.target.value)}/>
+              {batchMode &&
+                <div className="space-y-2 rounded-xl border border-wk-border bg-wk-surface-raised p-3">
+                  <h3 className="text-[12px] font-black text-wk-text">Before You Approve</h3>
+                  <p className="text-[12px] text-wk-text">
+                    {batchRows.length} chart positions will link to
+                    {" "}<strong>{selectedTrack?.title??"the Registry recording you choose"}</strong>.
+                  </p>
+                  <p className="text-[11px] text-wk-text-muted">
+                    We’ll keep every original chart position. We won’t delete tracks, change
+                    artist aliases, or publish a chart. If one link fails, accepted links stay recorded.
+                  </p>
+                </div>}
               <WkCheckbox checked={reviewConsent} onChange={setReviewConsent}>
                 {DECLARATION}
               </WkCheckbox>
               <button type="button" className={buttonPrimary} disabled={!!busy||!selectedTrack||
-                !reviewConsent||reviewNote.trim().length<40||!evidenceUrl.startsWith("https://")}
-                onClick={()=>void commitReview()}>Submit reviewed provider link to Registry</button>
-              <p className="text-[11px] text-wk-text-muted">The Registry broker checks its own actor permission, exact evidence and audit. Charts Studio never directly writes canonical Track identities.</p>
+                (batchMode&&!batchRows.length)||!reviewConsent||
+                reviewNote.trim().length<40||!evidenceUrl.startsWith("https://")}
+                onClick={()=>void commitReview()}>
+                {batchMode?"Confirm Selected Matches":"Confirm Recording Match"}
+              </button>
+              <p className="text-[11px] text-wk-text-muted">Every approved match is recorded in the Registry. This won’t change the public chart.</p>
             </>}
           </WkSurface>
         </div>
