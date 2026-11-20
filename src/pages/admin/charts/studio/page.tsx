@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {appendChartReviewReference,parseChartReviewReference,type ChartReviewReference} from "@/services/chartsPrivate/chartReviewContext";
 import { supabase } from "@/lib/supabase";
 import { useAdminUser } from "@/hooks/useAdminUser";
@@ -134,6 +134,7 @@ async function invokeStudio(mode:string,body:Record<string,unknown> = {}) {
 
 export default function ChartsStudioPage() {
   const admin=useAdminUser();
+  const navigate=useNavigate();
   const [urlParams]=useSearchParams();
   const returnContext=parseChartReviewReference(urlParams);
   const returnContextKey=returnContext?JSON.stringify(returnContext):"";
@@ -416,6 +417,20 @@ export default function ChartsStudioPage() {
     };
     return reference;
   })();
+  const startGovernedTrackIntake=async()=>operate("stage-track-intake",async()=>{
+    if(!selectedReference||!admin.can("manage_registry")||!admin.can("manage_charts"))
+      throw new Error("Exact Charts and Registry review authority required.");
+    const staged=await invokeStudio("studio_stage_intake",{
+      ...selectedReference,
+      acknowledgement:"I request governed Track Intake for this exact chart position. No identity is approved.",
+    });
+    const id=String(staged.suggestion_id??"");
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
+      throw new Error("Registry did not return an exact Track Intake review reference.");
+    navigate(appendChartReviewReference(
+      "/admin/registry/tracks/intake?suggestion="+id,selectedReference,
+    ));
+  });
   const filteredReviewSongs=useMemo(()=>{
     const q=reviewSongQuery.trim().toLocaleLowerCase("en");
     return (snapshot?.native_review?.entries??[]).filter(entry=>
@@ -759,14 +774,16 @@ export default function ChartsStudioPage() {
                       to={appendChartReviewReference("/admin/relationships/duplicates",selectedReference,selectedTrack?.id)}>
                       Review Registry Duplicates
                     </Link>
-                    <Link className={buttonSecondary}
-                      to={appendChartReviewReference("/admin/registry/tracks/intake",selectedReference)}>
-                      Open Governed Track Intake
-                    </Link>
+                    <button type="button" className={buttonSecondary}
+                      disabled={!!busy||!admin.can("manage_registry")||!admin.can("manage_charts")}
+                      onClick={()=>void startGovernedTrackIntake()}>
+                      {busy==="stage-track-intake"?"Opening Intake…":"Start Governed Track Intake"}
+                    </button>
                   </div>
-                  <p className="text-[11px] text-wk-warning">
-                    Creating an intake case directly from this chart position still requires
-                    Chart-origin authority. Opening Intake does not create or approve a Track.
+                  <p className="text-[11px] text-wk-text-muted">
+                    Starting Intake creates a receipt-bound review item only. The Registry
+                    separately approves identity, Artist credits, metadata and activation
+                    before a Track can be linked back to this chart.
                   </p>
                 </div>}
               <label htmlFor="studio-registry-query" className="text-[12px] font-bold text-wk-text">Find The Recording To Keep</label>
