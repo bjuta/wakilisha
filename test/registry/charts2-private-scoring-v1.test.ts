@@ -229,6 +229,10 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_WORKER).toContain('server.from("registry_artist_aliases").select("canonical_artist_id")');
     expect(STUDIO_WORKER).toContain('server.from("registry_tracks").select("id").eq("status","active")');
     expect(STUDIO_WORKER).toContain('artist_names:artists.get(track.id)??[]');
+    expect(STUDIO_WORKER).toContain('artist_credits:artistCredits.get(track.id)??[]');
+    expect(STUDIO_WORKER).toContain('String(row.match_method??"unknown")');
+    expect(STUDIO_PAGE).toContain('Other credited Artists:');
+    expect(STUDIO_PAGE).toContain('Existing provider links (method, not proof):');
     expect(STUDIO_WORKER).not.toContain('mode==="studio_auto_admit"');
   });
 
