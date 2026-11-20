@@ -94,6 +94,10 @@ export function ChartRow({
   };
 
   // Resolve artist names array from the artist string if not provided explicitly
+  const visibleDuration = typeof duration === "number" && Number.isFinite(duration) &&
+    duration > 0 && duration < 3600
+    ? Math.floor(duration / 60) + ":" + String(Math.floor(duration % 60)).padStart(2, "0")
+    : null;
   const resolvedArtistNames = artistNames ?? artist.split(", ");
   const resolvedArtistSlugs = artistSlugs ?? [];
   const resolvedArtistLinks = resolvedArtistNames
@@ -124,7 +128,7 @@ export function ChartRow({
           iconClassName="h-6 w-6 text-[11px]"
         >
           {artworkUrl ? (
-            <img src={artworkUrl} alt="" className="h-full w-full object-cover object-top" />
+            <img src={artworkUrl} alt="" className="h-full w-full object-contain" />
           ) : (
             <Ch19GradientImage slug={slug || trackId} name={title} />
           )}
@@ -210,7 +214,7 @@ export function ChartRow({
           className="h-14 w-14 rounded-lg bg-[var(--wk-surface-raised)]"
         >
           {artworkUrl ? (
-            <img src={artworkUrl} alt="" className="h-full w-full object-cover object-top" />
+            <img src={artworkUrl} alt="" className="h-full w-full object-contain" />
           ) : (
             <Ch19GradientImage slug={slug || trackId} name={title} />
           )}
@@ -258,6 +262,11 @@ export function ChartRow({
               <span>{artist}</span>
             )}
           </div>
+          {visibleDuration && (
+            <p className="mt-1 text-[11px] font-semibold tabular-nums text-[var(--wk-text-muted)]">
+              {visibleDuration}
+            </p>
+          )}
           {(genre || label || previousWeek !== undefined) && (
             <div className="mt-1 hidden items-center gap-2 text-[11px] md:flex" style={{ color: "var(--wk-text-faint)" }}>
               {genre && <span>{genre}</span>}
