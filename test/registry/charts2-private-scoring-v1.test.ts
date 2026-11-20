@@ -71,6 +71,8 @@ const MUSIC_ROW=readFileSync("src/components/admin/charts/StudioChartMusicRow.ts
 const APPLE_META=readFileSync("src/services/chartsPrivate/appleCatalogReview.ts","utf8");
 const PUBLIC_CHART_ROW=readFileSync("src/components/design-system/music/ChartRow.tsx","utf8");
 const PUBLIC_CHART_DIRECTORY=readFileSync("src/pages/charts/directory/page.tsx","utf8");
+const PUBLIC_CHART_MODELS=readFileSync("src/services/chartsPublic/viewModels.ts","utf8");
+const PUBLIC_CHART_EDITION=readFileSync("src/pages/charts/edition/page.tsx","utf8");
 const PLAYLIST_ROW=readFileSync("src/pages/playlists/detail/page.tsx","utf8");
 
 const ROUTER=readFileSync("src/router/config.tsx","utf8");
@@ -111,6 +113,11 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(PUBLIC_CHART_ROW).toContain('object-contain');
     expect(PUBLIC_CHART_ROW).toContain('visibleDuration');
     expect(PUBLIC_CHART_DIRECTORY).toContain('object-contain');
+    expect(PUBLIC_CHART_EDITION).toContain('chart-podium-v2-img object-contain');
+    expect(PUBLIC_CHART_MODELS).toContain('duration: rich.duration,');
+    expect(PUBLIC_CHART_MODELS).not.toContain('180 + ((entry.trackTitle.length * 7) % 120)');
+    expect(STUDIO_PAGE).not.toContain('consumption_led_cultural_presence_v1 ·');
+    expect(STUDIO_PAGE).toContain('Private review only. Nothing is published from this page.');
     expect(PLAYLIST_ROW).toContain('h-full w-full object-contain');
   });
 
