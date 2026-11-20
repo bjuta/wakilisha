@@ -232,6 +232,7 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     return {state:"private_review",preview,native_review,source_methods:snapshot.source_methods,
       history:snapshot.history??[],read_at:snapshot.read_at,
       server_verified_originals:receipts.length,
+      observation_reviews:snapshot.observation_reviews??[],
       freeze_gate:{
         input_sha256:preflight.input_sha256,
         ranking_sha256:preflight.ranking_sha256,
@@ -322,18 +323,22 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     if(charts.error||charts.data!==true)
       throw new Reject(403,"charts2_manage_charts_required");
     const supplied=await req.json().catch(()=>null);
-    const acknowledgement=
-      "I independently verified this exact Shazam position and authorize its private Registry recording resolution.";
+    const action=supplied?.action==="revoke"?"revoke":"approve";
+    const acknowledgement=action==="revoke"
+      ?"I revoke this exact private Shazam recording resolution after independent re-review."
+      :"I independently verified this exact Shazam position and authorize its private Registry recording resolution.";
     if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
        Object.keys(supplied).some(k=>![
          "source_key","receipt_id","original_sha256","rank",
-         "track_id","review_note","evidence_url","acknowledgement",
+         "track_id","review_note","evidence_url","action","acknowledgement",
        ].includes(k))||
        supplied.source_key!=="shazam_ke" ||
        !TRACK_UUID.test(supplied.receipt_id??"")||
        !/^[a-f0-9]{64}$/.test(supplied.original_sha256??"")||
        !Number.isSafeInteger(supplied.rank)||supplied.rank<1||supplied.rank>200||
-       !TRACK_UUID.test(supplied.track_id??"")||
+       !["approve","revoke"].includes(supplied.action)||
+       (action==="approve"?!TRACK_UUID.test(supplied.track_id??""):
+          supplied.track_id!==null)||
        typeof supplied.review_note!=="string"||
        supplied.review_note.trim().length<40||
        typeof supplied.evidence_url!=="string"||
@@ -356,8 +361,8 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
       p_receipt_id:receipt.id,
       p_original_sha256:receipt.original_sha256,
       p_rank:observation.rank,
-      p_action:"approve",
-      p_track_id:supplied.track_id,
+      p_action:action,
+      p_track_id:action==="revoke"?null:supplied.track_id,
       p_review_note:supplied.review_note.trim(),
       p_evidence_url:supplied.evidence_url.trim(),
       p_expected_previous_event_id:previous?.id??null,
@@ -365,7 +370,7 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     });
     if(reviewed.error||!reviewed.data?.event_id)
       throw new Reject(409,"charts2_shazam_governed_review_rejected");
-    return {state:"shazam_recording_review_recorded",source_key:"shazam_ke",
+    return {state:"shazam_recording_review_recorded",action,source_key:"shazam_ke",
       rank:supplied.rank,receipt_id:receipt.id,
       event_id:reviewed.data.event_id,
       idempotent_replay:reviewed.data.idempotent_replay===true,
