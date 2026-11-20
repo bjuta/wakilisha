@@ -195,6 +195,7 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     try {
       preview=scoreCharts2PrivatePreviewV1({
         receipts,registry_links:snapshot.registry_links,
+        observation_reviews:snapshot.observation_reviews??[],
       });
     } catch {throw new Reject(409,"charts2_studio_unqualified_snapshot");}
     const locked=CHARTS2_PRIVATE_METHODOLOGY_V1;
@@ -312,6 +313,63 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
       title:observation.title,artist:observation.artist??null,
       provider_track_id:observation.provider_track_id??null,
       observed_at:receipt.observed_at,can_publish:false};
+  }
+  if(mode==="studio_review_no_id") {
+    await requireRegistryReviewer(authClient);
+    const charts=await authClient.rpc("current_user_has_capability",{
+      required_capability:"manage_charts",
+    });
+    if(charts.error||charts.data!==true)
+      throw new Reject(403,"charts2_manage_charts_required");
+    const supplied=await req.json().catch(()=>null);
+    const acknowledgement=
+      "I independently verified this exact Shazam position and authorize its private Registry recording resolution.";
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "source_key","receipt_id","original_sha256","rank",
+         "track_id","review_note","evidence_url","acknowledgement",
+       ].includes(k))||
+       supplied.source_key!=="shazam_ke" ||
+       !TRACK_UUID.test(supplied.receipt_id??"")||
+       !/^[a-f0-9]{64}$/.test(supplied.original_sha256??"")||
+       !Number.isSafeInteger(supplied.rank)||supplied.rank<1||supplied.rank>200||
+       !TRACK_UUID.test(supplied.track_id??"")||
+       typeof supplied.review_note!=="string"||
+       supplied.review_note.trim().length<40||
+       typeof supplied.evidence_url!=="string"||
+       !/^https:\/\//.test(supplied.evidence_url)||
+       supplied.acknowledgement!==acknowledgement)
+      throw new Reject(400,"charts2_shazam_review_invalid");
+    const snapshot=await studioSnapshot(server);
+    const receipt=(snapshot.receipts??[]).find((r:any)=>
+      r.source_key==="shazam_ke"&&r.id===supplied.receipt_id&&
+      r.original_sha256===supplied.original_sha256);
+    const observation=receipt?.observations?.find((o:any)=>o.rank===supplied.rank);
+    if(!observation||observation.provider_track_id!=null)
+      throw new Reject(409,"charts2_shazam_original_position_changed");
+    await verifyPrivateOriginal(server,receipt);
+    const previous=(snapshot.observation_reviews??[]).find((row:any)=>
+      row.source_key==="shazam_ke"&&row.receipt_id===receipt.id&&
+      row.original_sha256===receipt.original_sha256&&
+      row.rank===supplied.rank);
+    const reviewed=await authClient.rpc("admin_review_charts2_no_id_observation_v1",{
+      p_receipt_id:receipt.id,
+      p_original_sha256:receipt.original_sha256,
+      p_rank:observation.rank,
+      p_action:"approve",
+      p_track_id:supplied.track_id,
+      p_review_note:supplied.review_note.trim(),
+      p_evidence_url:supplied.evidence_url.trim(),
+      p_expected_previous_event_id:previous?.id??null,
+      p_acknowledgement:acknowledgement,
+    });
+    if(reviewed.error||!reviewed.data?.event_id)
+      throw new Reject(409,"charts2_shazam_governed_review_rejected");
+    return {state:"shazam_recording_review_recorded",source_key:"shazam_ke",
+      rank:supplied.rank,receipt_id:receipt.id,
+      event_id:reviewed.data.event_id,
+      idempotent_replay:reviewed.data.idempotent_replay===true,
+      can_publish:false};
   }
   if(mode==="studio_stage_intake") {
     await requireRegistryReviewer(authClient);
@@ -550,7 +608,7 @@ async function handle(req:Request) {
   const {user,server,authClient}=await session(req);
   const url=new URL(req.url);
   const mode=url.searchParams.get("mode")??"upload";
-  if(["studio_preview","studio_track_search","studio_review_context","studio_stage_intake","studio_review_link","studio_freeze"].includes(mode))
+  if(["studio_preview","studio_track_search","studio_review_context","studio_stage_intake","studio_review_no_id","studio_review_link","studio_freeze"].includes(mode))
     return studioAction(mode,req,server,authClient);
   let key:string, endpoint:string, target_period_key:string|null=null;
   let contentType:string, bytes:Uint8Array, methodRevision:number|null=null;
