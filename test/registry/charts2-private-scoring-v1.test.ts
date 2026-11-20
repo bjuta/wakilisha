@@ -568,7 +568,7 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(proposed).toContain("reviewer_id uuid not null");
     expect(proposed).toContain("p_expected_previous_event_id");
     expect(proposed).toContain("v_prev.action=p_action");
-    expect(proposed).toContain("'source_key','shazam_ke'");
+    expect(proposed).toContain("default 'shazam_ke'");
     expect(proposed).toContain("registry_observation_resolution_id");
     expect(proposed).toContain("review_policy','exact_manual_receipt_plus_shazam_v1'");
     expect(proposed).toContain("I revoke this exact private Shazam recording resolution");
