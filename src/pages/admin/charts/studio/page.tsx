@@ -86,7 +86,9 @@ type StudioResponse = {
 type RegistryTrack = {
   id: string; title: string; isrc: string | null; status: string;
   slug: string | null; duration_ms: number | null;
-  artist_names: string[]; provider_keys: string[];
+  artist_names: string[];
+  artist_credits: Array<{name:string;is_primary:boolean}>;
+  provider_keys: string[];
 };
 type Probe = {
   source_key: SourceKey; probe_id: string; expected_revision: number;
@@ -725,10 +727,16 @@ export default function ChartsStudioPage() {
                         "border-wk-border bg-wk-surface text-wk-text")}>
                     <span className="block font-black">{track.title}</span>
                     <span className="mt-1 block text-[11px] text-wk-text-muted">
-                      {track.artist_names?.join(", ")||"Artist credits not recorded"}
+                      Primary: {track.artist_credits?.filter(c=>c.is_primary).map(c=>c.name).join(", ")||"Not recorded"}
                     </span>
                     <span className="block text-[11px] text-wk-text-muted">
-                      ISRC: {track.isrc??"Not recorded"} · Providers: {track.provider_keys?.join(", ")||"None"}
+                      Other credited Artists: {track.artist_credits?.filter(c=>!c.is_primary).map(c=>c.name).join(", ")||"None recorded"}
+                    </span>
+                    <span className="block text-[11px] text-wk-text-muted">
+                      ISRC: {track.isrc??"Not recorded"}
+                    </span>
+                    <span className="block text-[11px] text-wk-text-muted">
+                      Existing provider links (method, not proof): {track.provider_keys?.join(", ")||"None"}
                     </span>
                     <span className="mt-1 block break-all font-mono text-[10px] text-wk-text-muted">{track.id}</span>
                   </button>)}
