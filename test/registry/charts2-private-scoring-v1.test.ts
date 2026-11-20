@@ -217,7 +217,42 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).toContain("if(accepted>0)");
     expect(STUDIO_PAGE).toContain("setBatchMode(false);setBatchRows([]);setSelected(null);");
     expect(STUDIO_PAGE).toContain("Artist not supplied");
-    expect(STUDIO_PAGE).not.toContain('studio_bulk_publish');
+    expect(STUDIO_PAGE).toContain('<Modal open={Boolean(selected)}');
+    expect(STUDIO_PAGE).toContain("Official Apple catalogue artist:");
+    expect(STUDIO_PAGE).toContain("Artist not supplied in original");
+    expect(STUDIO_PAGE).toContain("No active Registry recording matches this search.");
+    expect(STUDIO_PAGE).toContain("setRegistrySearchAttempted(true)");
+    expect(STUDIO_PAGE).not.toContain("Open existing Registry track authority");
+    expect(STUDIO_PAGE).not.toContain("xl:grid-cols-[minmax(0,1fr)_420px]");
+    expect(STUDIO_WORKER).toContain('server.from("registry_track_artists").select("track_id")');
+    expect(STUDIO_WORKER).toContain('server.from("registry_track_provider_links").select("track_id")');
+    expect(STUDIO_WORKER).toContain('server.from("registry_artist_aliases").select("canonical_artist_id")');
+    expect(STUDIO_WORKER).toContain('server.from("registry_tracks").select("id").eq("status","active")');
+    expect(STUDIO_WORKER).toContain('artist_names:artists.get(track.id)??[]');
+    expect(STUDIO_WORKER).not.toContain('mode==="studio_auto_admit"');
+  });
+
+  it("keeps artistless title observations from merging unrelated recording identities",()=>{
+    const rows=[
+      {source_key:"youtube_ke",receipt_id:UUID(1),rank:1,
+        title:"Homebound",artist:"Artist A",provider_track_id:"youtube:a"},
+      {source_key:"mdundo_ke",receipt_id:UUID(2),rank:2,
+        title:"Homebound",artist:"Artist A",provider_track_id:"mdundo:a"},
+      {source_key:"audiomack_ke",receipt_id:UUID(3),rank:3,
+        title:"Homebound",artist:"Artist B",provider_track_id:"audiomack:b"},
+      {source_key:"shazam_ke",receipt_id:UUID(4),rank:4,
+        title:"Homebound",artist:"Artist B",provider_track_id:null},
+      {source_key:"apple_ke",receipt_id:UUID(5),rank:5,
+        title:"Homebound",artist:null,provider_track_id:"apple:unknown"},
+    ];
+    const leads=suggestRecordingReviewGroups(rows);
+    expect(leads).toHaveLength(2);
+    expect(leads.every(g=>g.observations.length===2)).toBe(true);
+    expect(leads.every(g=>g.observations.every(row=>row.artist!==null))).toBe(true);
+    expect(leads.flatMap(g=>g.observations).some(row=>row.source_key==="apple_ke")).toBe(false);
+    // An unidentified artist cannot form a group from title alone.
+    expect(suggestRecordingReviewGroups(rows.filter(row=>row.artist===null)))
+      .toHaveLength(0);
   });
 
   it("quarantines duplicate native IDs, incomplete receipts, and repeated same-source labels",()=>{
