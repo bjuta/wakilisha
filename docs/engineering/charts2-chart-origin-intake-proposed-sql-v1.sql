@@ -409,7 +409,7 @@ begin
     'idempotent_replay',false
   );
 end
-$function$
+$function$;
 
 -- END EXACT PRODUCTION FINALIZER REPLACEMENT
 commit;
