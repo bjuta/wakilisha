@@ -532,6 +532,13 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_WORKER).not.toContain('server.rpc("admin_admit_registry_track_provider_link_v1"');
     expect(STUDIO_WORKER).toContain('mode==="studio_review_no_id"');
     expect(STUDIO_WORKER).toContain('authClient.rpc("admin_review_charts2_no_id_observation_v1"');
+    expect(STUDIO_WORKER).toContain('p_expected_previous_event_id:previous?.id??null');
+    expect(STUDIO_WORKER).toContain('observation_reviews:snapshot.observation_reviews??[]');
+    expect(STUDIO_WORKER).toContain('p_action:action');
+    expect(STUDIO_WORKER).toContain('p_track_id:action==="revoke"?null:supplied.track_id');
+    expect(STUDIO_PAGE).toContain('currentShazamReviews');
+    expect(STUDIO_PAGE).toContain('Revoke This Shazam Resolution');
+    expect(STUDIO_PAGE).toContain('SHAZAM_REVOKE_DECLARATION');
     expect(STUDIO_WORKER).not.toContain('server.rpc("admin_review_charts2_no_id_observation_v1"');
     expect(STUDIO_WORKER).toContain("observation_reviews:snapshot.observation_reviews??[]");
     expect(STUDIO_PAGE).toContain('SHAZAM_DECLARATION');
@@ -550,6 +557,30 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     }
     expect(STUDIO_PAGE).toContain("Collect / retry");
     expect(STUDIO_PAGE).not.toContain("publish_edition");
+  });
+
+  it("keeps Shazam no-ID SQL review decisions append-only and independently audited",()=>{
+    const proposed=readFileSync("docs/engineering/charts2-no-id-observation-resolution-proposed-sql-v1.sql","utf8");
+    const intake=readFileSync("docs/engineering/charts2-chart-origin-intake-proposed-sql-v1.sql","utf8");
+    expect(proposed).toContain("platform_private.charts2_observation_review_events_v1");
+    expect(proposed).toContain("before update or delete");
+    expect(proposed).toContain("admin_review_charts2_no_id_observation_v1");
+    expect(proposed).toContain("reviewer_id uuid not null");
+    expect(proposed).toContain("p_expected_previous_event_id");
+    expect(proposed).toContain("v_prev.action=p_action");
+    expect(proposed).toContain("'source_key','shazam_ke'");
+    expect(proposed).toContain("registry_observation_resolution_id");
+    expect(proposed).toContain("review_policy','exact_manual_receipt_plus_shazam_v1'");
+    expect(proposed).toContain("I revoke this exact private Shazam recording resolution");
+    expect(intake).toContain("registry_provider_track_suggestions_chart_origin_evidence_check");
+    expect(intake).toContain("public.admin_stage_charts2_track_intake_v1");
+    expect(intake).toContain("platform_private.assert_charts2_intake_receipt_v1");
+    expect(intake).toContain("order by newest.created_at desc,newest.id desc");
+    expect(intake).toContain("'public_contribution','artist_submission','chart_studio'");
+    expect(intake).not.toContain("insert into public.registry_tracks");
+    expect(intake).not.toContain("insert into public.wk_chart_entries_v2");
+    expect(proposed).not.toContain("insert into public.registry_track_provider_links");
+    expect(proposed).not.toContain("insert into public.wk_chart_entries_v2");
   });
 
   it("allows 100 separately reviewed canonical recordings while preserving 500 unresolved observations",()=>{
