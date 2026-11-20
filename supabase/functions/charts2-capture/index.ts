@@ -283,6 +283,36 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     }
     return {state:"private_frozen",...outcome.data,can_publish:false};
   }
+  if(mode==="studio_review_context") {
+    await requireRegistryReviewer(authClient);
+    const supplied=await req.json().catch(()=>null);
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "source_key","receipt_id","original_sha256","rank",
+       ].includes(k))||
+       !TRACK_UUID.test(supplied.receipt_id??"")||
+       !/^[a-f0-9]{64}$/.test(supplied.original_sha256??"")||
+       !Number.isSafeInteger(supplied.rank)||supplied.rank<1)
+      throw new Reject(400,"charts2_review_context_invalid");
+    const source=sourceKey(supplied.source_key);
+    const snapshot=await studioSnapshot(server);
+    const receipt=(snapshot.receipts??[]).find((r:any)=>
+      r.source_key===source&&r.id===supplied.receipt_id&&
+      r.original_sha256===supplied.original_sha256);
+    if(!receipt)throw new Reject(409,"charts2_review_context_receipt_changed");
+    const observation=receipt.observations?.find((o:any)=>
+      o.rank===supplied.rank);
+    if(!observation||typeof observation.title!=="string"||
+       !observation.title.trim())
+      throw new Reject(409,"charts2_review_context_position_changed");
+    await verifyPrivateOriginal(server,receipt);
+    return {state:"verified_chart_review_context",
+      source_key:source,receipt_id:receipt.id,
+      original_sha256:receipt.original_sha256,rank:observation.rank,
+      title:observation.title,artist:observation.artist??null,
+      provider_track_id:observation.provider_track_id??null,
+      observed_at:receipt.observed_at,can_publish:false};
+  }
   if(mode==="studio_track_search") {
     await requireRegistryReviewer(authClient);
     const supplied=await req.json().catch(()=>null);
@@ -478,7 +508,7 @@ async function handle(req:Request) {
   const {user,server,authClient}=await session(req);
   const url=new URL(req.url);
   const mode=url.searchParams.get("mode")??"upload";
-  if(["studio_preview","studio_track_search","studio_review_link","studio_freeze"].includes(mode))
+  if(["studio_preview","studio_track_search","studio_review_context","studio_review_link","studio_freeze"].includes(mode))
     return studioAction(mode,req,server,authClient);
   let key:string, endpoint:string, target_period_key:string|null=null;
   let contentType:string, bytes:Uint8Array, methodRevision:number|null=null;
