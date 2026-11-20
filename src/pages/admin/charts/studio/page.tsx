@@ -106,6 +106,7 @@ const SOURCES: Array<{key: SourceKey; label: string; weight: number; method: str
 ];
 const SOURCE_LABEL = Object.fromEntries(SOURCES.map(s=>[s.key,s.label])) as Record<SourceKey,string>;
 const DECLARATION = "I have independently verified this exact recording and authorize its Registry provider link.";
+const SHAZAM_DECLARATION = "I independently verified this exact Shazam position and authorize its private Registry recording resolution.";
 const FREEZE_DECLARATION = "I approve freezing this exact 100-recording private chart candidate. It will not publish.";
 const DATE = (value?:string|null) => value
   ? new Date(value).toLocaleString("en-KE",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Nairobi"})
@@ -314,13 +315,13 @@ export default function ChartsStudioPage() {
     });
   };
   const commitReview=async()=>operate("registry-link",async()=>{
-    if(!admin.can("manage_registry"))
-      throw new Error("Manage Registry permission is required for canonical provider-link review.");
+    if(!admin.can("manage_registry")||!admin.can("manage_charts"))
+      throw new Error("Both Registry and Charts review permission are required.");
     const rows=batchMode?batchRows:(selected?[selected]:[]);
     if(!rows.length||!selectedTrack||!reviewConsent)
       throw new Error("Select source rows, one existing Registry recording, and confirm your review.");
-    if(rows.some(row=>!row.provider_track_id))
-      throw new Error("Source rows without a provider ID cannot be linked.");
+    if(rows.some(row=>!row.provider_track_id&&row.source_key!=="shazam_ke"))
+      throw new Error("Only reviewed Shazam positions may resolve without a provider recording ID.");
     if(new Set(rows.map(row=>row.source_key)).size!==rows.length)
       throw new Error("Choose only one source position per recording for this review.");
     if(reviewNote.trim().length<40)
@@ -332,13 +333,15 @@ export default function ChartsStudioPage() {
       const source=snapshot?.preview?.source_coverage.find(x=>x.source_key===row.source_key);
       if(!source)throw new Error("The source receipt is no longer available. Reload the Studio.");
       try {
-        // Each source goes through the existing actor-authorized Registry broker.
-        // A failed later row never masquerades as an atomic batch success.
-        await invokeStudio("studio_review_link",{
+        // No-ID Shazam is NOT a Registry provider link. Each source decision
+        // has its own accepted caller-authorized broker and durable receipt.
+        const noId=row.source_key==="shazam_ke"&&!row.provider_track_id;
+        await invokeStudio(noId?"studio_review_no_id":"studio_review_link",{
           source_key:row.source_key,rank:row.rank,
           receipt_id:source.receipt_id,original_sha256:source.original_sha256,
           track_id:selectedTrack.id,review_note:reviewNote.trim(),
-          evidence_url:evidenceUrl.trim(),acknowledgement:DECLARATION,
+          evidence_url:evidenceUrl.trim(),
+          acknowledgement:noId?SHAZAM_DECLARATION:DECLARATION,
         });
         accepted++;
       }catch(e){
@@ -351,11 +354,11 @@ export default function ChartsStudioPage() {
         }
         const cause=e instanceof Error?e.message:"Review rejected";
         throw new Error(String(accepted)+" of "+String(rows.length)+
-          " links accepted. "+SOURCE_LABEL[row.source_key]+" #"+row.rank+
-          " was rejected: "+cause+". Accepted links remain recorded. Recheck before continuing.");
+          " reviews accepted. "+SOURCE_LABEL[row.source_key]+" #"+row.rank+
+          " was rejected: "+cause+". Accepted decisions remain recorded. Recheck before continuing.");
       }
     }
-    setNotice(String(accepted)+" Registry source links accepted for "+selectedTrack.title+
+    setNotice(String(accepted)+" independently reviewed chart positions recorded for "+selectedTrack.title+
       ". Private rankings are being recalculated.");
     setSelected(null);setSelectedTrack(null);setRegistryMatches([]);
     setBatchMode(false);setBatchRows([]);
@@ -453,7 +456,7 @@ export default function ChartsStudioPage() {
     preview?.unresolved??[],artistAliases,registryArtists,
   ),[preview?.unresolved,artistAliases,registryArtists]);
   const openDuplicateGroup=(rows: EvidenceRow[])=>{
-    const selectable=rows.filter(row=>Boolean(row.provider_track_id));
+    const selectable=rows.filter(row=>Boolean(row.provider_track_id)||row.source_key==="shazam_ke");
     if(!selectable.length)return;
     setBatchMode(true);setBatchRows([]);
     const anchor=selectable.find(row=>Boolean(row.artist))??selectable[0];
@@ -641,8 +644,8 @@ export default function ChartsStudioPage() {
                   </p>
                 </div>
                 <button type="button" className={buttonSecondary}
-                  disabled={!!busy||!admin.can("manage_registry")||
-                    !group.observations.some(row=>row.provider_track_id)}
+                  disabled={!!busy||!admin.can("manage_registry")||!admin.can("manage_charts")||
+                    !group.observations.some(row=>row.provider_track_id||row.source_key==="shazam_ke")}
                   onClick={()=>openDuplicateGroup(group.observations as EvidenceRow[])}>
                   Review Matches
                 </button>
@@ -686,7 +689,8 @@ export default function ChartsStudioPage() {
                     <p className="mt-1 text-[11px] text-wk-warning">{row.reason.replaceAll("_"," ")}</p>
                   </div>
                   <button type="button" className={buttonSecondary}
-                    disabled={!row.provider_track_id||!admin.can("manage_registry")}
+                    disabled={(!row.provider_track_id&&row.source_key!=="shazam_ke")||
+                      !admin.can("manage_registry")||!admin.can("manage_charts")}
                     onClick={()=>{
                       setBatchMode(false);setBatchRows([]);
                       setSelected(row);setRegistryQuery(row.title);
@@ -694,7 +698,8 @@ export default function ChartsStudioPage() {
                       setRegistryMatches([]);setRegistrySearchAttempted(false);setSelectedTrack(null);
                       setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
                     }}>
-                    {row.provider_track_id?"Review exact identity":"No provider ID"}
+                    {row.provider_track_id?"Review exact identity":
+                       row.source_key==="shazam_ke"?"Review Shazam Position":"No provider ID"}
                   </button>
                 </div>)}
               {unresolved.length===0 && <p className="p-5 text-[13px] text-wk-text-muted">No unresolved observations in this filter.</p>}
@@ -735,13 +740,13 @@ export default function ChartsStudioPage() {
                     const checked=batchRows.some(item=>item.receipt_id===row.receipt_id&&
                       item.rank===row.rank);
                     return <WkCheckbox key={row.receipt_id+":"+row.rank}
-                      checked={checked} disabled={!row.provider_track_id}
+                      checked={checked} disabled={!row.provider_track_id&&row.source_key!=="shazam_ke"}
                       onChange={value=>setBatchRows(old=>value?
                         [...old.filter(item=>item.source_key!==row.source_key),row as EvidenceRow]:
                         old.filter(item=>!(item.receipt_id===row.receipt_id&&item.rank===row.rank)))}>
                       {SOURCE_LABEL[row.source_key as SourceKey].split(" ")[0]} #{row.rank}
                       {" "}· {row.title} · {sourceArtistDisplay(row)}
-                      {!row.provider_track_id?" (No provider ID)":""}
+                      {!row.provider_track_id?" (no native ID, review chart position)":""}
                     </WkCheckbox>;
                   })}
               </div>}
@@ -843,18 +848,23 @@ export default function ChartsStudioPage() {
                 <div className="space-y-2 rounded-xl border border-wk-border bg-wk-surface-raised p-3">
                   <h3 className="text-[12px] font-black text-wk-text">Before You Approve</h3>
                   <p className="text-[12px] text-wk-text">
-                    {batchRows.length} chart positions will link to
+                    {batchRows.length} chart positions will be independently reviewed against
                     {" "}<strong>{selectedTrack?.title??"the Registry recording you choose"}</strong>.
                   </p>
                   <p className="text-[11px] text-wk-text-muted">
-                    We’ll keep every original chart position. We won’t delete tracks, change
-                    artist aliases, or publish a chart. If one link fails, accepted links stay recorded.
+                    Identified provider recordings use Registry provider links. Shazam positions
+                    without IDs use a distinct, receipt-bound review. Original ranks are
+                    retained. An interrupted batch preserves individually accepted decisions.
                   </p>
                 </div>}
               <div className="space-y-3 border-t border-wk-border pt-4">
                 <WkCheckbox checked={reviewConsent} onChange={setReviewConsent}
                   className="w-full items-start">
-                  <span className="block min-w-0 whitespace-normal leading-relaxed">{DECLARATION}</span>
+                  <span className="block min-w-0 whitespace-normal leading-relaxed">
+                    I independently verified every selected source position against the
+                    correct recording. I authorize its governed Registry provider link
+                    or exact no-ID Shazam resolution. Nothing will be published.
+                  </span>
                 </WkCheckbox>
                 <div className="flex flex-wrap items-center justify-end gap-3">
                   <button type="button" className={buttonPrimary+" min-h-11 w-full sm:w-auto"}
@@ -867,7 +877,8 @@ export default function ChartsStudioPage() {
                   </button>
                 </div>
                 <p className="text-[11px] leading-relaxed text-wk-text-muted">
-                  Every approved match is recorded in the Registry. This won’t change the public chart.
+                  Provider matches are recorded in the Registry. Shazam positions without IDs
+                  are reviewed separately. Neither changes the public chart.
                 </p>
               </div>
             </>}
