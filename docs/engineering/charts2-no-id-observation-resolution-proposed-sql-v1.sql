@@ -136,7 +136,7 @@ begin
       and observed_depth=200;
   if not found or r.id is distinct from (
     select latest.id from platform_private.charts2_capture_receipts_v1 latest
-    where latest.source_key='shazam_ke' and latest.observed_status='succeeded'
+    where latest.source_key='shazam_ke
     order by latest.created_at desc,latest.id desc limit 1
   ) then raise exception using errcode='40001',
     message='Shazam original is no longer the exact current verified receipt.';
