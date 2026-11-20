@@ -71,6 +71,24 @@ const ROUTER=readFileSync("src/router/config.tsx","utf8");
 const SHELL=readFileSync("src/pages/admin/AdminShell.tsx","utf8");
 
 describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
+  it("keeps the native Top 100 preview private and visible only through Studio",()=>{
+    expect(STUDIO_WORKER).toContain('import {buildCharts2PrivateNativeReviewV1}');
+    expect(STUDIO_WORKER).toContain('native_review=buildCharts2PrivateNativeReviewV1({receipts})');
+    expect(STUDIO_WORKER).toContain('return {state:"private_review",preview,native_review');
+    expect(STUDIO_WORKER).toContain('await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)))');
+    expect(STUDIO_WORKER).toContain('charts2_private_freeze_score_disagreement');
+    expect(STUDIO_WORKER).not.toContain('mode==="studio_native_publish"');
+    expect(STUDIO_PAGE).toContain('Top 100 to Review');
+    expect(STUDIO_PAGE).toContain('Across More Than One Chart');
+    expect(STUDIO_PAGE).toContain('Apple Music Matches to Check');
+    expect(STUDIO_PAGE).toContain('Show All Matches');
+    expect(STUDIO_PAGE).toContain('Show All Titles');
+    expect(STUDIO_PAGE).toContain('entry.contributions.map');
+    expect(STUDIO_PAGE).toContain('snapshot.native_review.multi_source_occurrences');
+    expect(STUDIO_PAGE).toContain('snapshot.native_review.apple_title_review');
+    expect(STUDIO_PAGE).toContain('No points are combined yet.');
+  });
+
   it("locks five weights, exact 200-unit scale and never publishes",()=>{
     expect(CHARTS2_PRIVATE_METHODOLOGY_V1.version)
       .toBe("consumption_led_cultural_presence_v1");
