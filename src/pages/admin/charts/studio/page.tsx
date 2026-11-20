@@ -861,10 +861,14 @@ export default function ChartsStudioPage() {
                       to={appendChartReviewReference("/admin/registry/artist-aliases",selectedReference)}>
                       Review Artist Aliases
                     </Link>
-                    <Link className={buttonSecondary}
-                      to={appendChartReviewReference("/admin/relationships/duplicates",selectedReference,selectedTrack?.id)}>
-                      Review Registry Duplicates
-                    </Link>
+                    {selectedTrack?
+                      <Link className={buttonSecondary}
+                        to={appendChartReviewReference("/admin/relationships/duplicates",selectedReference,selectedTrack.id)}>
+                        Check Duplicate Risk for {selectedTrack.title}
+                      </Link>:
+                      <span className="self-center text-[11px] text-wk-text-muted">
+                        Select an existing Registry Track before checking duplicate risk.
+                      </span>}
                     <button type="button" className={buttonSecondary}
                       disabled={!!busy||!admin.can("manage_registry")||!admin.can("manage_charts")}
                       onClick={()=>void startGovernedTrackIntake()}>
