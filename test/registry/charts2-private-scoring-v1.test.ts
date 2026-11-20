@@ -596,6 +596,15 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(proposed).toContain("I revoke this exact private Shazam recording resolution");
     expect(intake).toContain("registry_provider_track_suggestions_chart_origin_evidence_check");
     expect(intake).toContain("public.admin_stage_charts2_track_intake_v1");
+    expect(intake).toContain("insert into public.registry_provider_track_suggestion_artists(");
+    expect(intake).toContain("v_item.id,1,'unresolved','unresolved',null,v_artist");
+    expect(intake).toContain("admin_append_charts2_track_intake_credit_v1");
+    expect(intake).toContain("chart_review_evidence");
+    expect(intake).toContain("perform platform_private.assert_charts2_intake_receipt_v1(p_suggestion_id)");
+    expect(TRACK_INTAKE_PAGE).toContain('row.intake_origin==="chart_studio"');
+    expect(TRACK_INTAKE_PAGE).toContain('"admin_append_charts2_track_intake_credit_v1"');
+    expect(TRACK_INTAKE_PAGE).toContain("Add Unresolved Credit");
+    expect(TRACK_INTAKE_PAGE).toContain("Choose whether this artist is Primary or Featured.");
     expect(intake).toContain("platform_private.assert_charts2_intake_receipt_v1");
     expect(intake).toContain("order by newest.created_at desc,newest.id desc");
     expect(intake).toContain("'public_contribution','artist_submission','chart_studio'");
