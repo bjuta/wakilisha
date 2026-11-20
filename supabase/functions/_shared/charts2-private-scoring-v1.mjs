@@ -122,6 +122,26 @@ function indexAuthoritativeLinks(links){
   }
   return index;
 }
+function indexReviewedShazamObservations(rows){
+  if(!Array.isArray(rows))fail('charts2_scoring_observation_reviews_invalid');
+  const index=new Map();
+  for(const row of rows){
+    if(!row || typeof row!=='object' || row.source_key!=='shazam_ke' ||
+       !UUID.test(row.id) || !UUID.test(row.receipt_id) ||
+       !SHA.test(row.original_sha256) ||
+       !positiveInteger(row.rank) || row.rank>200 ||
+       row.provider_track_id!=null ||
+       typeof row.title!=='string'||!row.title.trim() ||
+       !['approve','revoke'].includes(row.action))
+      fail('charts2_scoring_observation_review_unqualified');
+    const key=row.receipt_id+'\0'+row.original_sha256+'\0'+row.rank;
+    if(index.has(key))fail('charts2_scoring_observation_review_conflict');
+    // The immutable latest event is supplied only from the server-side SQL
+    // private reader. Revocations preserve provenance but award no points.
+    index.set(key,row);
+  }
+  return index;
+}
 /**
  * A preview of source-rank credits, NOT a frozen edition or chart ranking.
  *
@@ -129,7 +149,7 @@ function indexAuthoritativeLinks(links){
  * Production receipts; registry_links ONLY after server-side Registry read.
  * Neither parameter is a browser-submitted identity decision.
  */
-export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[]}={}){
+export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[],observation_reviews=[]}={}){
   if(!Array.isArray(receipts)||receipts.length!==SOURCE_KEYS.length)
     fail('charts2_scoring_receipt_set_incomplete');
   const perSource=new Map();
@@ -142,6 +162,7 @@ export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[]}={}){
   if(SOURCE_KEYS.some(s=>!perSource.has(s)))
     fail('charts2_scoring_receipt_set_incomplete');
   const bindings=indexAuthoritativeLinks(registry_links);
+  const reviewedShazam=indexReviewedShazamObservations(observation_reviews);
   const scores=new Map(),unresolved=[],conflicts=[],coverage=[];
   const seenCanonicalBySource=new Map();
   for(const source_key of SOURCE_KEYS){
@@ -161,33 +182,55 @@ export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[]}={}){
         provider_track_id:o.provider_track_id??null,
         title:o.title,artist:o.artist??null,
       };
+      let binding=null,review=null,track_id=null;
       if(!o.provider_track_id){
-        unresolved.push({...observation,reason:'provider_recording_id_missing'});
-        continue;
+        if(source_key!=='shazam_ke'){
+          unresolved.push({...observation,reason:'provider_recording_id_missing'});
+          continue;
+        }
+        review=reviewedShazam.get(receipt.id+'\0'+receipt.original_sha256+'\0'+o.rank)??null;
+        if(review?.action!=='approve'){
+          unresolved.push({...observation,reason:'shazam_recording_review_missing'});
+          continue;
+        }
+        if(review.title!==o.title ||
+           (review.artist??null)!==(o.artist??null) ||
+           review.track_status!=='active' || !UUID.test(review.track_id??'') ||
+           typeof review.review_note!=='string' ||
+           review.review_note.trim().length<40 ||
+           typeof review.evidence_url!=='string' ||
+           !/^https:\/\//.test(review.evidence_url) ||
+           !SHA.test(review.event_fingerprint??'')){
+          conflicts.push({...observation,reason:'shazam_review_identity_invalid'});
+          continue;
+        }
+        track_id=review.track_id.toLowerCase();
+      } else {
+        const key=policy.provider_key+'\0'+o.provider_track_id;
+        const matches=(bindings.get(key)??[]).filter(link=>{
+          if(link.match_method!=='manual')return true;
+          const proof=link.review_evidence;
+          return proof?.charts2_studio_review_v1===true &&
+            proof?.source_key===source_key && proof?.receipt_id===receipt.id &&
+            proof?.original_sha256===receipt.original_sha256 &&
+            proof?.provider_track_id===o.provider_track_id &&
+            typeof proof?.review_note==='string' &&
+            proof.review_note.trim().length>=40 &&
+            typeof proof?.evidence_url==='string' &&
+            /^https:\/\//.test(proof.evidence_url) &&
+            Number(link.match_confidence)===1;
+        });
+        if(matches.length===0){
+          unresolved.push({...observation,reason:'registry_authoritative_link_missing'});
+          continue;
+        }
+        if(new Set(matches.map(m=>m.track_id)).size!==1){
+          conflicts.push({...observation,reason:'registry_provider_identity_conflict'});
+          continue;
+        }
+        binding=matches[0];
+        track_id=binding.track_id.toLowerCase();
       }
-      const key=policy.provider_key+'\0'+o.provider_track_id;
-      const matches=(bindings.get(key)??[]).filter(link=>{
-        if(link.match_method!=='manual')return true;
-        const proof=link.review_evidence;
-        return proof?.charts2_studio_review_v1===true &&
-          proof?.source_key===source_key && proof?.receipt_id===receipt.id &&
-          proof?.original_sha256===receipt.original_sha256 &&
-          proof?.provider_track_id===o.provider_track_id &&
-          typeof proof?.review_note==='string' &&
-          proof.review_note.trim().length>=40 &&
-          typeof proof?.evidence_url==='string' &&
-          /^https:\/\//.test(proof.evidence_url) &&
-          Number(link.match_confidence)===1;
-      });
-      if(matches.length===0){
-        unresolved.push({...observation,reason:'registry_authoritative_link_missing'});
-        continue;
-      }
-      if(new Set(matches.map(m=>m.track_id)).size!==1){
-        conflicts.push({...observation,reason:'registry_provider_identity_conflict'});
-        continue;
-      }
-      const binding=matches[0],track_id=binding.track_id.toLowerCase();
       const canonicalKey=source_key+'\0'+track_id;
       if(seenCanonicalBySource.has(canonicalKey)){
         conflicts.push({...observation,reason:'duplicate_source_recording',
@@ -201,7 +244,9 @@ export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[]}={}){
       current.source_contributions.push({
         source_key,receipt_id:receipt.id,rank:o.rank,depth:contract.depth,
         weight_points:policy.weight_points,credit_units:units,
-        credit_points:displayPoints(units),registry_provider_link_id:binding.id,
+        credit_points:displayPoints(units),
+        ...(review?{registry_observation_resolution_id:review.id}:
+          {registry_provider_link_id:binding.id}),
       });
       scores.set(track_id,current);
     }
