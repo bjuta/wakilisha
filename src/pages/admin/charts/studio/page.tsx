@@ -566,10 +566,13 @@ export default function ChartsStudioPage() {
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <label htmlFor="charts-studio-track-search" className="sr-only">Find a song or artist</label>
-                <input id="charts-studio-track-search" type="search"
+                <input id="charts-studio-track-search" type="text" inputMode="search"
                   value={reviewSongQuery} onChange={event=>setReviewSongQuery(event.target.value)}
                   placeholder="Find a song or artist"
                   className={fieldClass+" min-w-[180px] flex-1 sm:max-w-[360px]"}/>
+                {reviewSongQuery &&
+                  <button type="button" onClick={()=>setReviewSongQuery("")}
+                    className={buttonSecondary} aria-label="Clear Song Search">Clear</button>}
                 <button type="button" aria-pressed={!reviewMultipleOnly}
                   className={!reviewMultipleOnly?buttonPrimary:buttonSecondary}
                   onClick={()=>setReviewMultipleOnly(false)}>All Songs</button>
