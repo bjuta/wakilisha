@@ -582,7 +582,7 @@ export default function ArtistAliasesPage() {
 
   return (
     <div className="min-h-screen bg-[#f7f7f2] space-y-5">
-      <ChartReviewReturnContext />
+      <ChartReviewReturnContext consequence="artist_alias" />
       {/* Toast */}
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 rounded-2xl border px-5 py-3 text-[13px] font-bold shadow-xl transition-all ${
