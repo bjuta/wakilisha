@@ -292,16 +292,7 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     const q=supplied.query.trim();
     if(q.length<2||q.length>80)
       throw new Reject(400,"charts2_studio_track_search_invalid");
-    const safe=q.replace(/[\\%_]/g,"\\    const safe=q.replace(/[\\%_]/g,"\\$&");
-    const result=TRACK_UUID.test(q)
-      ? await server.from("registry_tracks")
-          .select("id,title,isrc,status,release_id").eq("id",q).limit(10)
-      : await server.from("registry_tracks")
-          .select("id,title,isrc,status,release_id")
-          .ilike("title","%"+safe+"%").limit(10);
-    if(result.error)throw new Reject(503,"charts2_studio_registry_search_failed");
-    return {state:"registry_candidates",tracks:(result.data??[])
-      .filter((r:any)=>r.status==="active"),can_publish:false};");
+    const safe=q.replace(/[\\%_]/g,"\\$&");
     const pattern="%"+safe+"%";
     // The existing Track Intake searches titles, ISRC and reviewed Artist
     // credits. Charts uses the same Registry read surfaces, adding accepted
