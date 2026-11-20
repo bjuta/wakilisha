@@ -455,6 +455,21 @@ export default function ChartsStudioPage() {
     };
     return reference;
   })();
+  const startGovernedArtistIntake=async()=>operate("stage-artist-intake",async()=>{
+    if(!selectedReference||!selected?.artist||
+       !admin.can("manage_charts")||!admin.can("manage_registry"))
+      throw new Error("Exact original Artist credit and authorized review are required.");
+    const staged=await invokeStudio("studio_stage_artist_intake",{
+      ...selectedReference,
+      acknowledgement:"I request governed Artist Intake using this exact original chart credit. No Artist identity is approved.",
+    });
+    const id=String(staged.run_id??"");
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
+      throw new Error("Registry Artist Intake did not provide a valid reviewed run.");
+    navigate(appendChartReviewReference(
+      "/admin/registry/artists/intake?run="+id,selectedReference,
+    ));
+  });
   const startGovernedTrackIntake=async()=>operate("stage-track-intake",async()=>{
     if(!selectedReference||!admin.can("manage_registry")||!admin.can("manage_charts"))
       throw new Error("Exact Charts and Registry review authority required.");
@@ -836,6 +851,12 @@ export default function ChartsStudioPage() {
                     Artist, Track, credit and duplicate decisions remain separately governed.
                   </p>
                   <div className="flex flex-wrap gap-2">
+                    <button type="button" className={buttonSecondary}
+                      disabled={!!busy||!selected.artist||
+                        !admin.can("manage_registry")||!admin.can("manage_charts")}
+                      onClick={()=>void startGovernedArtistIntake()}>
+                      {busy==="stage-artist-intake"?"Opening Artist Intake…":"Start Governed Artist Intake"}
+                    </button>
                     <Link className={buttonSecondary}
                       to={appendChartReviewReference("/admin/registry/artist-aliases",selectedReference)}>
                       Review Artist Aliases
@@ -851,9 +872,9 @@ export default function ChartsStudioPage() {
                     </button>
                   </div>
                   <p className="text-[11px] text-wk-text-muted">
-                    Starting Intake creates a receipt-bound review item only. The Registry
-                    separately approves identity, Artist credits, metadata and activation
-                    before a Track can be linked back to this chart.
+                    Each Intake starts a receipt-bound review item only. New Artists remain
+                    drafts until independently activated. Track identity, credits and source
+                    links receive their own separately authorized decisions.
                   </p>
                 </div>}
               <label htmlFor="studio-registry-query" className="text-[12px] font-bold text-wk-text">Find The Recording To Keep</label>
