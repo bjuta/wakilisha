@@ -307,7 +307,13 @@ export default function ChartsStudioPage() {
         });
         accepted++;
       }catch(e){
+        // A partially accepted batch must not be blindly resubmitted. Reopen
+        // from the newly recomputed queue to review only outstanding sources.
         await refresh();
+        if(accepted>0){
+          setBatchMode(false);setBatchRows([]);setSelected(null);
+          setSelectedTrack(null);setReviewConsent(false);
+        }
         const cause=e instanceof Error?e.message:"Review rejected";
         throw new Error(String(accepted)+" of "+String(rows.length)+
           " links accepted. "+SOURCE_LABEL[row.source_key]+" #"+row.rank+
@@ -359,7 +365,8 @@ export default function ChartsStudioPage() {
     const selectable=rows.filter(row=>Boolean(row.provider_track_id));
     if(!selectable.length)return;
     setBatchMode(true);setBatchRows([]);
-    setSelected(selectable[0]);setRegistryQuery(selectable[0].title);
+    const anchor=selectable.find(row=>Boolean(row.artist))??selectable[0];
+    setSelected(anchor);setRegistryQuery(anchor.title);
     setRegistryMatches([]);setSelectedTrack(null);
     setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
     setTab("review");
@@ -632,7 +639,7 @@ export default function ChartsStudioPage() {
               </div>}
               <div className="rounded-lg bg-wk-surface-raised p-3">
                 <p className="font-bold text-wk-text">{selected.title}</p>
-                <p className="text-[12px] text-wk-text-muted">{selected.artist} · {SOURCE_LABEL[selected.source_key]} · #{selected.rank}</p>
+                <p className="text-[12px] text-wk-text-muted">{selected.artist??"Artist not supplied"} · {SOURCE_LABEL[selected.source_key]} · #{selected.rank}</p>
                 <p className="mt-1 break-all font-mono text-[11px] text-wk-text-muted">{selected.provider_track_id}</p>
               </div>
               <label htmlFor="studio-registry-query" className="text-[12px] font-bold text-wk-text">Find The Recording To Keep</label>
