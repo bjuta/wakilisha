@@ -351,9 +351,9 @@ export default function ChartsStudioPage() {
     preview?.unresolved??[],artistAliases,registryArtists,
   ),[preview?.unresolved,artistAliases,registryArtists]);
   const openDuplicateGroup=(rows: EvidenceRow[])=>{
-    const selectable=rows.filter(row=>Boolean(row.provider_track_id)).slice(0,10);
+    const selectable=rows.filter(row=>Boolean(row.provider_track_id));
     if(!selectable.length)return;
-    setBatchMode(true);setBatchRows(selectable);
+    setBatchMode(true);setBatchRows([]);
     setSelected(selectable[0]);setRegistryQuery(selectable[0].title);
     setRegistryMatches([]);setSelectedTrack(null);
     setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
@@ -607,7 +607,7 @@ export default function ChartsStudioPage() {
                   Choose The Songs To Link ({batchRows.length} Selected)
                 </p>
                 <p className="text-[11px] text-wk-text-muted">
-                  Tick only the versions you have confirmed are the same recording.
+                  Select the verified matches. Choose only one position per source.
                 </p>
                 {duplicateGroups.find(group=>group.observations.some(row=>
                   row.receipt_id===selected.receipt_id&&row.rank===selected.rank))
@@ -617,7 +617,7 @@ export default function ChartsStudioPage() {
                     return <WkCheckbox key={row.receipt_id+":"+row.rank}
                       checked={checked} disabled={!row.provider_track_id}
                       onChange={value=>setBatchRows(old=>value?
-                        [...old,row as EvidenceRow]:
+                        [...old.filter(item=>item.source_key!==row.source_key),row as EvidenceRow]:
                         old.filter(item=>!(item.receipt_id===row.receipt_id&&item.rank===row.rank)))}>
                       {SOURCE_LABEL[row.source_key as SourceKey].split(" ")[0]} #{row.rank}
                       {" "}· {row.title} · {row.artist??"Artist not given"}
