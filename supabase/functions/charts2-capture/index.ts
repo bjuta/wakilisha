@@ -338,23 +338,29 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
         .eq("status","active").in("id",ids),
       server.from("registry_track_artists").select("track_id,artist_name_text,is_primary")
         .eq("status","active").in("track_id",ids).limit(120),
-      server.from("registry_track_provider_links").select("track_id,provider_key,match_status")
+      server.from("registry_track_provider_links").select("track_id,provider_key,match_method,match_status")
         .eq("match_status","matched").in("track_id",ids).limit(120),
     ]);
     if(trackRows.error||artistRows.error||providerRows.error)
       throw new Reject(503,"charts2_studio_registry_search_failed");
     const artists=new Map<string,string[]>();
+    const artistCredits=new Map<string,Array<{name:string;is_primary:boolean}>>();
     for(const row of artistRows.data??[]){
       const name=String(row.artist_name_text??"").trim();
       if(!name)continue;
       const names=artists.get(row.track_id)??[];
       if(!names.includes(name))names.push(name);
       artists.set(row.track_id,names);
+      const credits=artistCredits.get(row.track_id)??[];
+      if(!credits.some(x=>x.name===name && x.is_primary===Boolean(row.is_primary)))
+        credits.push({name,is_primary:Boolean(row.is_primary)});
+      artistCredits.set(row.track_id,credits);
     }
     const providers=new Map<string,string[]>();
     for(const row of providerRows.data??[]){
       const names=providers.get(row.track_id)??[];
-      if(!names.includes(row.provider_key))names.push(row.provider_key);
+      const label=String(row.provider_key)+" ("+String(row.match_method??"unknown")+")";
+      if(!names.includes(label))names.push(label);
       providers.set(row.track_id,names);
     }
     const order=new Map<string,number>(ids.map((id:string,i:number):[string,number]=>[id,i]));
@@ -362,6 +368,7 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
       .sort((a:any,b:any)=>(order.get(a.id)??99)-(order.get(b.id)??99))
       .map((track:any)=>({...track,
         artist_names:artists.get(track.id)??[],
+        artist_credits:artistCredits.get(track.id)??[],
         provider_keys:providers.get(track.id)??[],
       })),can_publish:false};
   }
