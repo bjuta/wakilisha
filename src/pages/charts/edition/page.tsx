@@ -783,7 +783,7 @@ export default function ChartEdition() {
                 slug={entry.slug} artistSlugs={entry.artistSlugs} registryTrackId={entry.registryTrackId}
                 className="chart-podium-v2-card"
               >
-                <img src={entry.artworkUrl} alt="" className="chart-podium-v2-img" />
+                <img src={entry.artworkUrl} alt="" className="chart-podium-v2-img object-contain" />
                 <div className="chart-podium-v2-overlay" />
                 <div className={`chart-podium-v2-rank ${rankTone(entry.rank)}`}>{entry.rank}</div>
                 <div className="chart-podium-v2-body">
