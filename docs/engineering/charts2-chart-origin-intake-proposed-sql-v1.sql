@@ -106,7 +106,7 @@ begin
       and original_verified_at is not null;
   if not found or r.id is distinct from (
     select newest.id from platform_private.charts2_capture_receipts_v1 newest
-    where newest.source_key=r.source_key and newest.observed_status='succeeded'
+    where newest.source_key=r.source_key
     order by newest.created_at desc,newest.id desc limit 1
   ) then
     raise exception using errcode='40001',
@@ -167,7 +167,7 @@ begin
       and original_verified_at is not null;
   if not found or r.id is distinct from (
     select newest.id from platform_private.charts2_capture_receipts_v1 newest
-    where newest.source_key=p_source_key and newest.observed_status='succeeded'
+    where newest.source_key=p_source_key
     order by newest.created_at desc,newest.id desc limit 1
   ) then raise exception using errcode='40001',
     message='Original Chart receipt no longer current or verified.';
