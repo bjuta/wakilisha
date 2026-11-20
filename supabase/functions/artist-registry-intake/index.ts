@@ -478,7 +478,7 @@ serve(async (req) => {
              review.source_origin_iso2 || review.source_popularity != null ||
              review.source_followers != null ||
              (Array.isArray(review.source_genres) && review.source_genres.length>0) ||
-             review.source_images ||
+             (review.source_images && Object.keys(review.source_images).length>0) ||
              (review.source_metadata?.chart_artist_claim_only!==true)
           )) {
             throw new Error("Chart Artist Intake may create reviewed identity only; provider facts and origin require separate independent evidence.");
