@@ -94,7 +94,8 @@ begin
  if p_source_key not in ('youtube_ke','mdundo_ke','apple_ke','audiomack_ke','shazam_ke')
   or p_receipt_id is null or p_original_sha256 !~ '^[a-f0-9]{64}$'
   or p_rank is null or p_rank<1 or
-  p_rank>case when p_source_key='shazam_ke' then 200 else 100 end
+  ((p_source_key='shazam_ke' and p_rank>200) or
+        (p_source_key<>'shazam_ke' and p_rank>100))
  then raise exception using errcode='22023',
    message='A qualified exact chart original is required.';end if;
  perform pg_catalog.pg_advisory_xact_lock(
