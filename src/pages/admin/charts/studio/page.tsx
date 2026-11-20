@@ -657,10 +657,7 @@ export default function ChartsStudioPage() {
           dismissable={!busy}>
           {error && <p role="alert" className="mb-3 rounded-lg border border-wk-danger p-3 text-[12px] text-wk-danger">{error}</p>}
           <div className="space-y-4">
-            <h2 className="text-[15px] font-black text-wk-text">Choose The Recording</h2>
-            {!selected?<p className="text-[12px] text-wk-text-muted">
-              Choose a song from the list to compare it with a Registry recording.
-            </p>:<>
+            {selected && <>
               {batchMode && <div className="space-y-2 rounded-lg border border-wk-border p-3">
                 <p className="text-[12px] font-black text-wk-text">
                   Choose The Songs To Link ({batchRows.length} Selected)
