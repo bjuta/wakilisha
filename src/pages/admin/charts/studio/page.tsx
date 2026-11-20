@@ -6,6 +6,8 @@ import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { AdminChartsPageHeader } from "@/pages/admin/charts/components/AdminChartsPageHeader";
+import { StudioChartMusicRow } from "@/components/admin/charts/StudioChartMusicRow";
+import { loadVerifiedAppleChartSongs, type VerifiedAppleChartSong } from "@/services/chartsPrivate/appleCatalogReview";
 
 type SourceKey = "youtube_ke" | "mdundo_ke" | "apple_ke" | "audiomack_ke" | "shazam_ke";
 type Tab = "sources" | "review" | "preview" | "history" | "freeze";
@@ -146,6 +148,33 @@ export default function ChartsStudioPage() {
   const [freezeConsent,setFreezeConsent]=useState(false);
   const [showAllAppearances,setShowAllAppearances]=useState(false);
   const [showAllAppleLeads,setShowAllAppleLeads]=useState(false);
+  const [reviewSongQuery,setReviewSongQuery]=useState("");
+  const [reviewMultipleOnly,setReviewMultipleOnly]=useState(false);
+  const [appleSongs,setAppleSongs]=useState<Record<string,VerifiedAppleChartSong>>({});
+  useEffect(()=>{
+    if(tab!=="preview" || !snapshot?.native_review) return;
+    const requested=new Map<string,string>();
+    for(const entry of snapshot.native_review.entries){
+      for(const position of entry.contributions){
+        if(position.source_key==="apple_ke" && position.provider_track_id)
+          requested.set(position.provider_track_id,entry.title);
+      }
+    }
+    for(const lead of snapshot.native_review.apple_title_review){
+      if(lead.apple_provider_track_id)
+        requested.set(lead.apple_provider_track_id,lead.title);
+    }
+    const controller=new AbortController();
+    let current=true;
+    void loadVerifiedAppleChartSongs([...requested].map(([id,title])=>({id,title})),
+      controller.signal).then(songs=>{
+        if(current)setAppleSongs(songs);
+      }).catch(()=>{
+        if(current)setAppleSongs({});
+      });
+    return ()=>{current=false;controller.abort();};
+  },[tab,snapshot?.native_review]);
+
 
   const refresh=useCallback(async()=>{
     setLoading(true);setError("");
@@ -261,6 +290,18 @@ export default function ChartsStudioPage() {
     await refresh();
   });
   const preview=snapshot?.preview;
+  const filteredReviewSongs=useMemo(()=>{
+    const q=reviewSongQuery.trim().toLocaleLowerCase("en");
+    return (snapshot?.native_review?.entries??[]).filter(entry=>
+      (!reviewMultipleOnly||entry.contributions.length>1) &&
+      (!q||(entry.title+" "+(entry.artist??"")).toLocaleLowerCase("en").includes(q))
+    );
+  },[snapshot?.native_review,reviewSongQuery,reviewMultipleOnly]);
+  const songForEntry=(entry:NativeReviewEntry)=>{
+    const apple=entry.contributions.find(c=>c.source_key==="apple_ke");
+    return apple?.provider_track_id?appleSongs[apple.provider_track_id]??null:null;
+  };
+
   const coverage=preview?.source_coverage??[];
   const methods=snapshot?.source_methods??[];
   const unresolved=useMemo(()=>{
@@ -506,39 +547,54 @@ export default function ChartsStudioPage() {
         </div>
       </section>}
 
+
       {tab==="preview" && snapshot?.native_review?.contract==="charts2-private-native-review/v1" &&
-        <section aria-label="Recording chart review" className="space-y-4">
-          <WkSurface className="space-y-2 p-4">
-            <h2 className="text-[16px] font-black text-wk-text">Top 100 to Review</h2>
-            <p className="text-[12px] text-wk-text-muted">
-              See how recordings appear across our five charts. Check matching versions before approval.
-            </p>
-            <p className="text-[12px] font-semibold text-wk-text">
-              {snapshot.native_review.count} recordings to review
-            </p>
-          </WkSurface>
+        <section aria-label="Recording chart review" className="space-y-5">
           <WkSurface className="overflow-hidden">
-            <div className="divide-y divide-wk-border">
-              {snapshot.native_review.entries.map((entry,i)=>
-                <div key={entry.position??i} className="flex flex-wrap items-start gap-3 p-4">
-                  <strong className="w-7 text-[13px] tabular-nums text-wk-text">{entry.position}</strong>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-bold text-wk-text">{entry.title}</p>
-                    {entry.artist && <p className="text-[12px] text-wk-text-muted">{entry.artist}</p>}
-                    <p className="mt-1 text-[11px] text-wk-text-muted">
-                      {entry.contributions.map(c=>SOURCE_LABEL[c.source_key]+": #"+c.native_rank).join(" · ")}
-                    </p>
-                  </div>
-                  <strong className="text-[16px] tabular-nums text-wk-text">{entry.score_points}</strong>
-                </div>)}
+            <div className="border-b border-wk-border bg-wk-surface-raised/60 p-4 sm:p-5">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="font-[var(--wk-font-display)] text-[24px] font-black tracking-[-0.04em] text-wk-text sm:text-[30px]">
+                    Top 100 to Review
+                  </h2>
+                  <p className="mt-1 text-[12px] text-wk-text-muted">
+                    Songs from Kenya’s leading music charts. Check the recording before approval.
+                  </p>
+                </div>
+                <span className="text-[13px] font-semibold tabular-nums text-wk-text-soft">
+                  {filteredReviewSongs.length} of {snapshot.native_review.count}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <label htmlFor="charts-studio-track-search" className="sr-only">Find a song or artist</label>
+                <input id="charts-studio-track-search" type="search"
+                  value={reviewSongQuery} onChange={event=>setReviewSongQuery(event.target.value)}
+                  placeholder="Find a song or artist"
+                  className={fieldClass+" min-w-[180px] flex-1 sm:max-w-[360px]"}/>
+                <button type="button" aria-pressed={!reviewMultipleOnly}
+                  className={!reviewMultipleOnly?buttonPrimary:buttonSecondary}
+                  onClick={()=>setReviewMultipleOnly(false)}>All Songs</button>
+                <button type="button" aria-pressed={reviewMultipleOnly}
+                  className={reviewMultipleOnly?buttonPrimary:buttonSecondary}
+                  onClick={()=>setReviewMultipleOnly(true)}>Multiple Charts</button>
+              </div>
+            </div>
+            <div>
+              {filteredReviewSongs.map((entry,i)=>
+                <StudioChartMusicRow key={entry.position??i} entry={entry}
+                  catalogSong={songForEntry(entry)}/>)}
+              {!filteredReviewSongs.length &&
+                <p className="px-5 py-8 text-center text-[13px] text-wk-text-muted">
+                  No songs match this search.
+                </p>}
             </div>
           </WkSurface>
-          <WkSurface className="space-y-3 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <WkSurface className="overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-wk-border px-4 py-4 sm:px-5">
               <div>
-                <h3 className="text-[14px] font-black text-wk-text">Across More Than One Chart</h3>
-                <p className="text-[12px] text-wk-text-muted">
-                  {snapshot.native_review.multi_source_occurrences.length} possible matches, including those outside the Top 100.
+                <h3 className="text-[16px] font-black text-wk-text">Across More Than One Chart</h3>
+                <p className="mt-1 text-[12px] text-wk-text-muted">
+                  {snapshot.native_review.multi_source_occurrences.length} songs to check across charts.
                 </p>
               </div>
               <button type="button" className={buttonSecondary}
@@ -546,24 +602,19 @@ export default function ChartsStudioPage() {
                 {showAllAppearances?"Show Fewer":"Show All Matches"}
               </button>
             </div>
-            <div className="divide-y divide-wk-border">
+            <div>
               {snapshot.native_review.multi_source_occurrences
                 .slice(0,showAllAppearances?undefined:12).map((entry,i)=>
-                <div key={entry.title+"-"+i} className="py-3">
-                  <p className="text-[13px] font-bold text-wk-text">{entry.title}</p>
-                  {entry.artist && <p className="text-[12px] text-wk-text-muted">{entry.artist}</p>}
-                  <p className="mt-1 text-[11px] text-wk-text-muted">
-                    {entry.contributions.map(c=>SOURCE_LABEL[c.source_key]+": #"+c.native_rank).join(" · ")}
-                  </p>
-                </div>)}
+                <StudioChartMusicRow key={entry.title+"-"+i} entry={entry}
+                  catalogSong={songForEntry(entry)} compact/>)}
             </div>
           </WkSurface>
-          <WkSurface className="space-y-3 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <WkSurface className="overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-wk-border px-4 py-4 sm:px-5">
               <div>
-                <h3 className="text-[14px] font-black text-wk-text">Apple Music Matches to Check</h3>
-                <p className="text-[12px] text-wk-text-muted">
-                  {snapshot.native_review.apple_title_review.length} titles also appear on other charts. No points are combined yet.
+                <h3 className="text-[16px] font-black text-wk-text">Apple Music Matches to Check</h3>
+                <p className="mt-1 text-[12px] text-wk-text-muted">
+                  {snapshot.native_review.apple_title_review.length} possible matches. Check before combining songs.
                 </p>
               </div>
               <button type="button" className={buttonSecondary}
@@ -571,55 +622,45 @@ export default function ChartsStudioPage() {
                 {showAllAppleLeads?"Show Fewer":"Show All Titles"}
               </button>
             </div>
-            <div className="divide-y divide-wk-border">
+            <div>
               {snapshot.native_review.apple_title_review
                 .slice(0,showAllAppleLeads?undefined:8).map((lead,i)=>
-                <div key={lead.apple_provider_track_id??i} className="py-3">
-                  <p className="text-[13px] font-bold text-wk-text">{lead.title}</p>
-                  <p className="text-[12px] text-wk-text-muted">
-                    Apple Music: #{lead.apple_rank} · {lead.possible_sources.map(k=>SOURCE_LABEL[k]).join(", ")}
+                <div key={lead.apple_provider_track_id??i}>
+                  <StudioChartMusicRow compact
+                    entry={{title:lead.title,artist:null,
+                      contributions:[{source_key:"apple_ke",native_rank:lead.apple_rank,
+                        provider_track_id:lead.apple_provider_track_id}]}}
+                    catalogSong={lead.apple_provider_track_id?
+                      appleSongs[lead.apple_provider_track_id]??null:null}/>
+                  <p className="-mt-2 px-4 pb-3 pl-[84px] text-[11px] text-wk-text-muted sm:pl-[102px]">
+                    Also on {lead.possible_sources.map(k=>SOURCE_LABEL[k].split(" ")[0]).join(", ")}
                   </p>
-                  {lead.possible_artists.length>0 &&
-                    <p className="mt-1 text-[11px] text-wk-text-muted">{lead.possible_artists.join(", ")}</p>}
                 </div>)}
             </div>
           </WkSurface>
         </section>}
-      {tab==="preview" && <section aria-label="Private Top 100 scoring" className="space-y-4">
-        <WkSurface className="space-y-2 p-4">
-          <h2 className="text-[15px] font-black text-wk-text">Private ordinal preview</h2>
-          <p className="text-[12px] text-wk-text-muted">
-            Methodology 30 / 25 / 20 / 15 / 10, exact integer credits per genuine native rank.
-            Scores are a composition of provider positions, not aggregate streams or synchronized weeks.
-            No freeze or publication action is enabled in Take 2.
-          </p>
-          <span className={"inline-block rounded-full px-3 py-1 text-[11px] font-black "+
-            chip(preview?.review_status==="eligible_for_private_review"?"good":"warn")}>
-            {preview?.review_status?.replaceAll("_"," ")??"Waiting for complete evidence"}
-          </span>
-        </WkSurface>
-        <WkSurface className="overflow-hidden">
-          <div className="border-b border-wk-border px-4 py-3 text-[12px] font-bold text-wk-text-muted">
-            {preview?.candidates.length??0} Registry-authorized recordings · private only
-          </div>
-          <div className="divide-y divide-wk-border">
-            {(preview?.candidates??[]).slice(0,100).map((c,i)=>
-              <div key={c.track_id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                <strong className="w-7 text-[13px] text-wk-text">{i+1}</strong>
-                <div className="min-w-0 flex-1">
-                  <p className="break-all font-mono text-[11px] text-wk-text">{c.track_id}</p>
-                  <p className="text-[11px] text-wk-text-muted">
-                    {c.source_count} verified sources · {c.source_contributions.map(x=>x.source_key+": "+x.credit_points).join(" · ")}
-                  </p>
-                </div>
-                <strong className="text-[17px] tabular-nums text-wk-text">{c.score_points}</strong>
+      {tab==="preview" && (preview?.candidates.length??0)>0 &&
+        <section aria-label="Reviewed Registry recordings" className="space-y-4">
+          <WkSurface className="overflow-hidden">
+            <div className="border-b border-wk-border p-4">
+              <h2 className="text-[15px] font-black text-wk-text">Confirmed Recordings</h2>
+              <p className="mt-1 text-[12px] text-wk-text-muted">
+                These songs have reviewed Registry links.
+              </p>
+            </div>
+            {(preview?.candidates??[]).slice(0,100).map((candidate,i)=>
+              <div key={candidate.track_id}
+                className="flex items-center gap-3 border-b border-wk-border px-4 py-3 last:border-0">
+                <strong className="w-7 text-[13px] tabular-nums text-wk-text">{i+1}</strong>
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-wk-text">
+                  {candidate.track_id}
+                </span>
+                <strong className="text-[14px] tabular-nums text-wk-text">
+                  {candidate.score_points}
+                </strong>
               </div>)}
-            {(!preview?.candidates.length) && <p className="p-5 text-[13px] text-wk-text-muted">
-              No canonical recording is sufficiently identified to receive a score. Resolve Registry identity rather than guessing.
-            </p>}
-          </div>
-        </WkSurface>
-      </section>}
+          </WkSurface>
+        </section>}
       {tab==="history" && <section aria-label="Immutable capture receipt history" className="space-y-3">
         <WkSurface className="p-4 text-[12px] text-wk-text-muted">
           The latest 35 immutable original-receipt records, without exposing raw Storage objects.
