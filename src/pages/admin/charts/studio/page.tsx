@@ -386,6 +386,12 @@ export default function ChartsStudioPage() {
     const apple=entry.contributions.find(c=>c.source_key==="apple_ke");
     return apple?.provider_track_id?appleSongs[apple.provider_track_id]??null:null;
   };
+  const sourceArtistDisplay=(row:{source_key:string;artist:string|null;provider_track_id:string|null})=>{
+    if(row.artist)return row.artist;
+    const verified=row.source_key==="apple_ke"&&row.provider_track_id
+      ?appleSongs[row.provider_track_id]?.artist:null;
+    return verified?"Verified Apple catalogue: "+verified:"Artist not supplied in original";
+  };
 
   const duplicateGroups=useMemo(()=>suggestRecordingReviewGroups(
     preview?.unresolved??[],artistAliases,registryArtists,
@@ -575,7 +581,7 @@ export default function ChartsStudioPage() {
                   <p className="text-[11px] text-wk-text-muted">{group.reason}</p>
                   <p className="mt-1 text-[11px] text-wk-text-muted">
                     {group.observations.map(row=>SOURCE_LABEL[row.source_key as SourceKey].split(" ")[0]+
-                      " #"+row.rank+" ("+(row.artist??"Artist not supplied in original")+")").join(" · ")}
+                      " #"+row.rank+" ("+sourceArtistDisplay(row)+")").join(" · ")}
                   </p>
                 </div>
                 <button type="button" className={buttonSecondary}
@@ -678,7 +684,7 @@ export default function ChartsStudioPage() {
                         [...old.filter(item=>item.source_key!==row.source_key),row as EvidenceRow]:
                         old.filter(item=>!(item.receipt_id===row.receipt_id&&item.rank===row.rank)))}>
                       {SOURCE_LABEL[row.source_key as SourceKey].split(" ")[0]} #{row.rank}
-                      {" "}· {row.title} · {row.artist??"Artist not given"}
+                      {" "}· {row.title} · {sourceArtistDisplay(row)}
                       {!row.provider_track_id?" (No provider ID)":""}
                     </WkCheckbox>;
                   })}
