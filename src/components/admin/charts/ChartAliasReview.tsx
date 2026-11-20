@@ -49,6 +49,8 @@ export function ChartAliasReview() {
     return ()=>{active=false;};
   },[reference]);
   if(!reference)return null;
+  const combinedCredit=Boolean(source?.artist&&
+    /(feat[.]|ft[.]|featuring|[,] | & | x | and | \+ )/i.test(source.artist));
 
   const findArtist=async()=>{
     if(query.trim().length<2)return;
@@ -66,7 +68,7 @@ export function ChartAliasReview() {
     }finally{setBusy("");}
   };
   const admitAlias=async()=>{
-    if(!source?.artist||!selected||reason.trim().length<40||!consent){
+    if(!source?.artist||combinedCredit||!selected||reason.trim().length<40||!consent){
       setError("Select an existing Registry Artist and document independent identity evidence.");
       return;
     }
@@ -98,6 +100,11 @@ export function ChartAliasReview() {
         <p className="text-[12px] text-wk-text">
           Original credit: <strong>{source.artist}</strong> · {source.title} · #{source.rank}
         </p>
+        {combinedCredit &&
+          <p role="alert" className="text-[12px] text-wk-danger">
+            This original contains multiple Artist credits. Resolve the primary,
+            featured or co-primary roles in governed Track Intake before assigning an Alias.
+          </p>}
         <p className="text-[12px] text-wk-warning">
           Verify the Artist separately from the recording. This approved Alias operation
           can correct Artist references in existing PUBLIC chart editions, not just this
@@ -141,7 +148,7 @@ export function ChartAliasReview() {
           {DECLARATION}
         </WkCheckbox>
         <div className="flex justify-end">
-          <button type="button" disabled={!selected||reason.trim().length<40||!consent||!!busy||!!notice}
+          <button type="button" disabled={combinedCredit||!selected||reason.trim().length<40||!consent||!!busy||!!notice}
             onClick={()=>void admitAlias()}
             className="min-h-11 rounded-xl bg-wk-brand px-4 py-3 text-xs font-bold text-white disabled:opacity-40">
             {busy==="save"?"Reviewing Alias…":"Approve Exact Artist Alias"}
