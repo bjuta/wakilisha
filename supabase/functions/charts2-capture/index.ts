@@ -376,6 +376,45 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
       idempotent_replay:reviewed.data.idempotent_replay===true,
       can_publish:false};
   }
+  if(mode==="studio_stage_artist_intake") {
+    await requireRegistryReviewer(authClient);
+    const permission=await authClient.rpc("current_user_has_capability",{
+      required_capability:"manage_charts",
+    });
+    if(permission.error||permission.data!==true)
+      throw new Reject(403,"charts2_manage_charts_required");
+    const supplied=await req.json().catch(()=>null);
+    const acknowledgement="I request governed Artist Intake using this exact original chart credit. No Artist identity is approved.";
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "source_key","receipt_id","original_sha256","rank","acknowledgement",
+       ].includes(k))||
+       !TRACK_UUID.test(supplied.receipt_id??"")||
+       !/^[a-f0-9]{64}$/.test(supplied.original_sha256??"")||
+       !Number.isSafeInteger(supplied.rank)||supplied.rank<1||
+       supplied.acknowledgement!==acknowledgement)
+      throw new Reject(400,"charts2_artist_intake_request_invalid");
+    const source=sourceKey(supplied.source_key);
+    const snapshot=await studioSnapshot(server);
+    const receipt=(snapshot.receipts??[]).find((r:any)=>
+      r.source_key===source&&r.id===supplied.receipt_id&&
+      r.original_sha256===supplied.original_sha256);
+    const observation=receipt?.observations?.find((o:any)=>o.rank===supplied.rank);
+    if(!observation||typeof observation.artist!=="string"||
+       observation.artist.trim().length<2)
+      throw new Reject(409,"charts2_artist_source_credit_missing");
+    await verifyPrivateOriginal(server,receipt);
+    const staged=await authClient.rpc("admin_stage_charts2_artist_intake_v1",{
+      p_source_key:source,p_receipt_id:receipt.id,
+      p_original_sha256:receipt.original_sha256,p_rank:observation.rank,
+    });
+    if(staged.error||!staged.data?.run_id||!staged.data?.staging_id)
+      throw new Reject(409,"charts2_artist_intake_staging_rejected");
+    return {state:"governed_artist_intake_staged",
+      run_id:staged.data.run_id,staging_id:staged.data.staging_id,
+      idempotent_replay:staged.data.idempotent_replay===true,
+      can_publish:false};
+  }
   if(mode==="studio_stage_intake") {
     await requireRegistryReviewer(authClient);
     const permission=await authClient.rpc("current_user_has_capability",{
@@ -613,7 +652,7 @@ async function handle(req:Request) {
   const {user,server,authClient}=await session(req);
   const url=new URL(req.url);
   const mode=url.searchParams.get("mode")??"upload";
-  if(["studio_preview","studio_track_search","studio_review_context","studio_stage_intake","studio_review_no_id","studio_review_link","studio_freeze"].includes(mode))
+  if(["studio_preview","studio_track_search","studio_review_context","studio_stage_artist_intake","studio_stage_intake","studio_review_no_id","studio_review_link","studio_freeze"].includes(mode))
     return studioAction(mode,req,server,authClient);
   let key:string, endpoint:string, target_period_key:string|null=null;
   let contentType:string, bytes:Uint8Array, methodRevision:number|null=null;
