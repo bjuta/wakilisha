@@ -67,6 +67,14 @@ const FREEZE_SQL=readFileSync("supabase/migrations/20261119111655_charts2_privat
 const ORIGIN_SQL=readFileSync("supabase/migrations/20261119180542_charts2_top100_origin_neutral_integrity_v1.sql","utf8");
 const STUDIO_WORKER=readFileSync("supabase/functions/charts2-capture/index.ts","utf8");
 const STUDIO_PAGE=readFileSync("src/pages/admin/charts/studio/page.tsx","utf8");
+const MUSIC_ROW=readFileSync("src/components/admin/charts/StudioChartMusicRow.tsx","utf8");
+const APPLE_META=readFileSync("src/services/chartsPrivate/appleCatalogReview.ts","utf8");
+const PUBLIC_CHART_ROW=readFileSync("src/components/design-system/music/ChartRow.tsx","utf8");
+const PUBLIC_CHART_DIRECTORY=readFileSync("src/pages/charts/directory/page.tsx","utf8");
+const PUBLIC_CHART_MODELS=readFileSync("src/services/chartsPublic/viewModels.ts","utf8");
+const PUBLIC_CHART_EDITION=readFileSync("src/pages/charts/edition/page.tsx","utf8");
+const PLAYLIST_ROW=readFileSync("src/pages/playlists/detail/page.tsx","utf8");
+
 const ROUTER=readFileSync("src/router/config.tsx","utf8");
 const SHELL=readFileSync("src/pages/admin/AdminShell.tsx","utf8");
 
@@ -83,10 +91,34 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).toContain('Apple Music Matches to Check');
     expect(STUDIO_PAGE).toContain('Show All Matches');
     expect(STUDIO_PAGE).toContain('Show All Titles');
-    expect(STUDIO_PAGE).toContain('entry.contributions.map');
     expect(STUDIO_PAGE).toContain('snapshot.native_review.multi_source_occurrences');
     expect(STUDIO_PAGE).toContain('snapshot.native_review.apple_title_review');
-    expect(STUDIO_PAGE).toContain('No points are combined yet.');
+    expect(STUDIO_PAGE).toContain('StudioChartMusicRow');
+    expect(STUDIO_PAGE).toContain('Find a song or artist');
+    expect(STUDIO_PAGE).toContain('Multiple Charts');
+    expect(STUDIO_PAGE).toContain('Check before combining songs.');
+    expect(STUDIO_PAGE).toContain('loadVerifiedAppleChartSongs');
+    expect(MUSIC_ROW).toContain('entry.contributions.map');
+    expect(MUSIC_ROW).toContain('object-contain');
+    expect(MUSIC_ROW).toContain('catalogSong?.durationMs');
+    expect(MUSIC_ROW).toContain('catalogSong?.artist');
+    expect(MUSIC_ROW).toContain('Chart Appearances');
+    expect(MUSIC_ROW).not.toContain('playTrack(');
+    expect(APPLE_META).toContain('/v1/catalog/ke/songs');
+    expect(APPLE_META).toContain('normalizeTitle(attributes.name) !== normalizeTitle(wantedTitle)');
+    expect(APPLE_META).toContain('validateWkArtworkUrl(');
+    expect(APPLE_META).not.toContain('/search?term=');
+    expect(APPLE_META).not.toContain('title.ilike');
+    expect(APPLE_META).toContain('batch.map(([id]) => id).join(",")');
+    expect(PUBLIC_CHART_ROW).toContain('object-contain');
+    expect(PUBLIC_CHART_ROW).toContain('visibleDuration');
+    expect(PUBLIC_CHART_DIRECTORY).toContain('object-contain');
+    expect(PUBLIC_CHART_EDITION).toContain('chart-podium-v2-img object-contain');
+    expect(PUBLIC_CHART_MODELS).toContain('duration: rich.duration,');
+    expect(PUBLIC_CHART_MODELS).not.toContain('180 + ((entry.trackTitle.length * 7) % 120)');
+    expect(STUDIO_PAGE).not.toContain('consumption_led_cultural_presence_v1 ·');
+    expect(STUDIO_PAGE).toContain('Private review only. Nothing is published from this page.');
+    expect(PLAYLIST_ROW).toContain('h-full w-full object-contain');
   });
 
   it("locks five weights, exact 200-unit scale and never publishes",()=>{

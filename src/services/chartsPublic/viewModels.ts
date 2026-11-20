@@ -277,7 +277,7 @@ export function toChartEntryRowViewModel(
     isPlayable: rich.isPlayable ?? Boolean(rich.previewUrl || rich.appleMusicCatalogId || rich.appleMusicId),
     source: rich.source ?? "WAKILISHA chart data",
     score: entry.score,
-    duration: rich.duration ?? 180 + ((entry.trackTitle.length * 7) % 120),
+    duration: rich.duration,
     previewUrl: rich.previewUrl,
     appleMusicId: rich.appleMusicId ?? rich.appleMusicCatalogId ?? null,
     appleMusicCatalogId: rich.appleMusicCatalogId ?? rich.appleMusicId ?? null,
