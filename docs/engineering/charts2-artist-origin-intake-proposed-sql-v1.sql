@@ -439,5 +439,115 @@ begin
 end
 $function$
 
+-- Creation Evidence provenance is source-family correct. A Chart-origin
+-- identity must NEVER be labeled as if it came from a CSV manual upload.
+-- The accepted Registry materialization actor, review fingerprint, and
+-- deterministic artist ID remain exactly the same.
+CREATE OR REPLACE FUNCTION platform_private.record_registry_artist_intake_creation_evidence_v1(p_staging_id uuid, p_future_artist_id uuid, p_display_name text, p_normalized_name text, p_slug text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'platform_private', 'auth', 'extensions'
+AS $function$
+declare
+  v_user_id uuid;
+  v_provider text;
+  v_review jsonb;
+  v_claim jsonb;
+  v_source_fingerprint text;
+  v_assertion_fingerprint text;
+  v_assertion_id uuid;
+  v_observed_at timestamptz;
+begin
+  v_user_id:=platform_private.registry_artist_intake_current_admin_v1();
+  v_review:=platform_private.registry_artist_intake_review_snapshot_v1(p_staging_id);
+  select run.provider into v_provider
+  from public.provider_intake_runs run
+  where run.id=(v_review->>'intake_run_id')::uuid
+    and run.mode='artist_intake' and run.provider_entity_type='artist'
+    and run.provider in ('csv_manual_upload','charts2_chart_observation');
+  if not found then
+    raise exception using errcode='42501',
+      message='Reviewed Artist Intake source identity unavailable.';
+  end if;
+  if v_provider='charts2_chart_observation' then
+    perform platform_private.assert_charts2_artist_intake_receipt_v1(p_staging_id);
+  end if;
+
+  if v_review->>'target_registry_artist_id' is not null
+     or v_review->>'match_status'<>'no_match'
+  then
+    raise exception using errcode='42501', message='Only reviewed no-match intake rows may create an Artist shell.';
+  end if;
+
+  v_source_fingerprint:=v_review->>'review_fingerprint';
+  v_observed_at:=(v_review->>'reviewed_at')::timestamptz;
+  v_claim:=jsonb_build_object(
+    'staging_id',p_staging_id,
+    'future_artist_id',p_future_artist_id,
+    'display_name',p_display_name,
+    'normalized_name',p_normalized_name,
+    'slug',p_slug
+  );
+
+  v_assertion_fingerprint:=encode(
+    extensions.digest(
+      jsonb_build_object(
+        'subject_type','artist',
+        'subject_id',p_future_artist_id::text,
+        'claim_key','registry.artist.identity.create',
+        'claim_payload',v_claim,
+        'trust_class','EXTERNAL_EVIDENCE',
+        'source_kind',v_provider,
+        'source_ref','artist-intake-staging:'||p_staging_id::text,
+        'source_payload_fingerprint',v_source_fingerprint,
+        'observed_at',v_observed_at,
+        'recorded_by_principal_key','user:'||v_user_id::text
+      )::text,
+      'sha256'
+    ),
+    'hex'
+  );
+
+  insert into platform_private.registry_evidence_assertions (
+    subject_type,
+    subject_id,
+    claim_key,
+    claim_payload,
+    trust_class,
+    source_kind,
+    source_ref,
+    source_payload_fingerprint,
+    observed_at,
+    recorded_by_principal_key,
+    assertion_fingerprint
+  ) values (
+    'artist',
+    p_future_artist_id,
+    'registry.artist.identity.create',
+    v_claim,
+    'EXTERNAL_EVIDENCE',
+    v_provider,
+    'artist-intake-staging:'||p_staging_id::text,
+    v_source_fingerprint,
+    v_observed_at,
+    'user:'||v_user_id::text,
+    v_assertion_fingerprint
+  )
+  on conflict (assertion_fingerprint) do nothing
+  returning id into v_assertion_id;
+
+  if v_assertion_id is null then
+    select assertion.id
+    into v_assertion_id
+    from platform_private.registry_evidence_assertions assertion
+    where assertion.assertion_fingerprint=v_assertion_fingerprint;
+  end if;
+
+  return v_assertion_id;
+end
+$function$
+
+
 -- END EXACT GOVERNED ARTIST FUNCTION REPLACEMENTS
 commit;
