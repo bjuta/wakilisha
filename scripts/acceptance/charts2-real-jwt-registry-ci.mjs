@@ -94,7 +94,7 @@ export async function verifyCharts2RealJwtRegistryV1({
    replay.idempotent_replay===true,"STOP_CHARTS2_REAL_JWT_TRACK_REPLAY_NOT_IDEMPOTENT");
  const rawCredit=sql("select credit_role||'|'||resolution_mode||'|'||"+
    "observed_name from public.registry_provider_track_suggestion_artists "+
-   "where suggestion_id='${staged.suggestion_id}'::uuid and credit_order=1;");
+   "where suggestion_id='"+staged.suggestion_id+"'::uuid and credit_order=1;");
  fail(rawCredit==="unresolved|unresolved|CI Original Artist",
    "STOP_CHARTS2_REAL_JWT_RAW_CREDIT_REWRITTEN");
  const credit=await accept(first.user,
@@ -114,7 +114,7 @@ export async function verifyCharts2RealJwtRegistryV1({
    "(source_origin_iso2 is null)::text||'|'||"+
    "(source_spotify_id is null)::text||'|'||"+
    "(source_metadata->>'chart_artist_claim_only')::text "+
-   "from public.provider_intake_artist_staging where id='${artist.staging_id}'::uuid;");
+   "from public.provider_intake_artist_staging where id='"+artist.staging_id+"'::uuid;");
  fail(artistState==="true|true|true",
    "STOP_CHARTS2_REAL_JWT_ARTIST_INTAKE_INVENTED_METADATA");
  console.log("WK_AUTH_CHARTS2_JWT_TRACK_ARTIST_CREDIT_INTAKE_AND_DENIAL=PASS");
