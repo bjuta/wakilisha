@@ -1,6 +1,7 @@
 import {describe,expect,it} from "vitest";
 import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
 import {buildCharts2PrivateNativeReviewV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
+import {suggestRecordingReviewGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
 import { readFileSync } from "node:fs";
 import {
   CHARTS2_PRIVATE_METHODOLOGY_V1,
@@ -168,6 +169,45 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(review.can_publish).toBe(false);
     expect(review.freeze_ready).toBe(false);
     expect(review.review_required).toBe(true);
+  });
+
+  it("suggests alias-aware duplicates for governed bulk review without claiming identity",()=>{
+    const rows=[
+      {source_key:"youtube_ke",receipt_id:UUID(1),rank:14,
+        title:"Mboka",artist:"Mejja Genge",provider_track_id:"youtube:mboka"},
+      {source_key:"audiomack_ke",receipt_id:UUID(2),rank:25,
+        title:"Mboka",artist:"Mejja",provider_track_id:"audiomack:mboka"},
+      {source_key:"youtube_ke",receipt_id:UUID(1),rank:1,
+        title:"I'll Be Okay",artist:"Bien",provider_track_id:"youtube:bien"},
+      {source_key:"apple_ke",receipt_id:UUID(3),rank:1,
+        title:"I’ll Be Okay",artist:null,provider_track_id:"apple:bien"},
+      {source_key:"mdundo_ke",receipt_id:UUID(4),rank:38,
+        title:"I’ll Be Okey",artist:"Bien",provider_track_id:"mdundo:bien"},
+      {source_key:"mdundo_ke",receipt_id:UUID(4),rank:26,
+        title:"Mboka",artist:"Unrelated Artist",provider_track_id:"mdundo:unrelated"},
+      {source_key:"mdundo_ke",receipt_id:UUID(4),rank:10,
+        title:"Mboka (Live)",artist:"Mejja",provider_track_id:"mdundo:live"},
+    ];
+    const proposed=suggestRecordingReviewGroups(rows);
+    expect(proposed).toHaveLength(2);
+    const mboka=proposed.find(group=>group.title==="Mboka");
+    expect(mboka?.observations).toHaveLength(2);
+    expect(mboka?.reason).toContain("Check Artist Alias");
+    expect(mboka?.observations.some(row=>row.artist==="Unrelated Artist")).toBe(false);
+    expect(mboka?.observations.some(row=>row.title==="Mboka (Live)")).toBe(false);
+    const bien=proposed.find(group=>group.title==="I'll Be Okay");
+    expect(bien?.observations).toHaveLength(3);
+    expect(bien?.reason).toContain("Check Similar Titles");
+    const alias=suggestRecordingReviewGroups(rows,
+      [{alias_slug:"mejja-genge",alias_display_name:"Mejja Genge",canonical_artist_id:UUID(99)}],
+      [{id:UUID(99),display_name:"Mejja"}]);
+    expect(alias.find(group=>group.title==="Mboka")?.reason).toContain("Known Artist Alias");
+    // These are leads only. Source receipts and Registry scoring remain unchanged.
+    expect(score(fullReceipts()).candidates).toHaveLength(0);
+    expect(STUDIO_PAGE).toContain("Review Together");
+    expect(STUDIO_PAGE).toContain('await invokeStudio("studio_review_link"');
+    expect(STUDIO_PAGE).toContain("Choose only one source position per recording");
+    expect(STUDIO_PAGE).not.toContain('studio_bulk_publish');
   });
 
   it("quarantines duplicate native IDs, incomplete receipts, and repeated same-source labels",()=>{
