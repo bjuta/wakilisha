@@ -122,6 +122,21 @@ export function suggestRecordingReviewGroups(
     else { parent[y] = x; rank[x]++; }
   };
   const reasons = new Map<string, Set<string>>();
+  // Connected components alone are unsafe: a title-and-prefix chain can
+  // accidentally combine two recording versions or two positions from one
+  // source. Require every candidate to be compatible with the whole group.
+  const membersOf = (root: number): number[] => rows.flatMap((_, i) =>
+    find(i) === root ? [i] : []
+  );
+  const compatibleMerge = (a: number, b: number): boolean => {
+    const left = membersOf(find(a)), right = membersOf(find(b));
+    const sources = new Set([...left,...right].map(i=>rows[i].source_key));
+    if(sources.size !== left.length + right.length)return false;
+    return left.every(i=>right.every(j=>{
+      const reason=pairReason(rows[i],rows[j],identities);
+      return Boolean(reason) && reason !== "Check Missing Artist Credit";
+    }));
+  };
   // First form groups only through positive artist evidence. A missing artist
   // must never become a bridge joining two otherwise separate Artists.
   for (let i = 0; i < rows.length; i++) {
@@ -129,8 +144,8 @@ export function suggestRecordingReviewGroups(
     for (let j = i + 1; j < rows.length; j++) {
       if (!normalize(rows[j].artist)) continue;
       const reason = pairReason(rows[i], rows[j], identities);
-      if (!reason) continue;
-      unite(i, j);
+      if (!reason || !compatibleMerge(i,j)) continue;
+      unite(i,j);
       reasons.set(String(i) + ":" + String(j), new Set([reason]));
     }
   }
