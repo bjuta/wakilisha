@@ -510,15 +510,23 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     const [trackRows,artistRows,providerRows]=await Promise.all([
       server.from("registry_tracks").select("id,title,isrc,status,slug,duration_ms,release_id")
         .eq("status","active").in("id",ids),
-      server.from("registry_track_artists").select("track_id,artist_name_text,is_primary")
+      server.from("registry_track_artists").select("track_id,artist_id,artist_name_text,is_primary")
         .eq("status","active").in("track_id",ids).limit(120),
       server.from("registry_track_provider_links").select("track_id,provider_key,match_method,match_status")
         .eq("match_status","matched").in("track_id",ids).limit(120),
     ]);
     if(trackRows.error||artistRows.error||providerRows.error)
       throw new Reject(503,"charts2_studio_registry_search_failed");
+    const artistIds=[...new Set((artistRows.data??[]).map((r:any)=>r.artist_id).filter(Boolean))];
+    const artistDetails=artistIds.length?await server.from("registry_artists")
+      .select("id,display_name,origin_iso2,status")
+      .in("id",artistIds).limit(120):{data:[],error:null};
+    if(artistDetails.error)throw new Reject(503,"charts2_studio_registry_search_failed");
+    const byArtistId=new Map((artistDetails.data??[]).map((a:any)=>[a.id,a]));
     const artists=new Map<string,string[]>();
-    const artistCredits=new Map<string,Array<{name:string;is_primary:boolean}>>();
+    const artistCredits=new Map<string,Array<{
+      name:string;is_primary:boolean;origin_iso2:string|null;artist_status:string|null;
+    }>>();
     for(const row of artistRows.data??[]){
       const name=String(row.artist_name_text??"").trim();
       if(!name)continue;
@@ -526,8 +534,13 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
       if(!names.includes(name))names.push(name);
       artists.set(row.track_id,names);
       const credits=artistCredits.get(row.track_id)??[];
-      if(!credits.some(x=>x.name===name && x.is_primary===Boolean(row.is_primary)))
-        credits.push({name,is_primary:Boolean(row.is_primary)});
+      if(!credits.some(x=>x.name===name && x.is_primary===Boolean(row.is_primary))){
+        const artist=byArtistId.get(row.artist_id) as
+          {origin_iso2?:string|null;status?:string|null}|undefined;
+        credits.push({name,is_primary:Boolean(row.is_primary),
+          origin_iso2:artist?.origin_iso2??null,
+          artist_status:artist?.status??null});
+      }
       artistCredits.set(row.track_id,credits);
     }
     const providers=new Map<string,string[]>();
