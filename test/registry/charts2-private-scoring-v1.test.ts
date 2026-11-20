@@ -204,7 +204,9 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(alias.find(group=>group.title==="Mboka")?.reason).toContain("Known Artist Alias");
     // These are leads only. Source receipts and Registry scoring remain unchanged.
     expect(score(fullReceipts()).candidates).toHaveLength(0);
-    expect(STUDIO_PAGE).toContain("Review Together");
+    expect(STUDIO_PAGE).toContain("Review Matches");
+    expect(STUDIO_PAGE).toContain("Before You Approve");
+    expect(STUDIO_PAGE).toContain("Manage Artist Aliases");
     expect(STUDIO_PAGE).toContain('await invokeStudio("studio_review_link"');
     expect(STUDIO_PAGE).toContain("Choose only one source position per recording");
     expect(STUDIO_PAGE).not.toContain('studio_bulk_publish');
