@@ -150,7 +150,8 @@ export function suggestRecordingReviewGroups(
       }
       return {
         key: observations.map(x => x.source_key + ":" + x.receipt_id + ":" + x.rank).join("|"),
-        title: observations.find(x => x.artist)?.title ?? observations[0].title,
+        title: observations.find(x => x.source_key === "youtube_ke")?.title ??
+          observations.find(x => x.artist)?.title ?? observations[0].title,
         reason: [...kinds].sort().join("; ") || "Check Matching Recordings",
         observations,
       };
