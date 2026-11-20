@@ -1,3 +1,4 @@
+import { ChartReviewReturnContext } from "@/components/admin/charts/ChartReviewReturnContext";
 import {
   useCallback,
   useEffect,
@@ -1523,6 +1524,7 @@ export default function TrackIntakePage() {
   return (
     <div className="min-h-screen bg-wk-bg px-5 py-6 text-wk-text">
       <div className="mx-auto max-w-7xl">
+      <ChartReviewReturnContext />
         <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-wk-brand">
