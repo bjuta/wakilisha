@@ -318,18 +318,17 @@ export default function ChartsStudioPage() {
     <main className="mx-auto max-w-[1440px] space-y-5 p-4 pb-16 sm:p-6" aria-label="Private Charts Studio">
       <AdminChartsPageHeader eyebrow="WAKILISHA / Charts 2.0"
         title="Charts Studio"
-        description="Five first-party sources · private evidence and recording review. Scoring is not publication.">
+        description="Review the songs behind the chart and check their sources.">
         <button type="button" onClick={()=>void refresh()} disabled={loading||!!busy} className={buttonSecondary}>
           {loading?"Checking originals…":"Refresh verified evidence"}
         </button>
       </AdminChartsPageHeader>
       <div className="flex flex-wrap items-center gap-2" role="status" aria-live="polite">
         <span className={"rounded-full px-3 py-1 text-[11px] font-black "+chip(preview?"good":"warn")}>
-          {loading?"Verifying private originals":preview?"Private evidence verified":"No qualified snapshot"}
+          {loading?"Checking sources":preview?"Sources ready":"Sources unavailable"}
         </span>
         <span className="text-[12px] text-wk-text-muted">
-          {preview?.methodology_version??"Private methodology not yet available"} ·
-          {" "}Frozen: NO · Publication: DISABLED
+          Private review only. Nothing is published from this page.
         </span>
       </div>
       {error && <WkSurface role="alert" className="border border-wk-danger p-4 text-[13px] text-wk-danger">{error}</WkSurface>}
@@ -340,10 +339,10 @@ export default function ChartsStudioPage() {
         </WkSurface>}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          ["First-party receipts",coverage.length+" / 5"],
-          ["Rank observations",String(coverage.reduce((n,x)=>n+x.observed_depth,0))],
-          ["Registry-qualified recordings",String(preview?.candidates.length??0)],
-          ["Review needed",String((preview?.unresolved.length??0)+(preview?.conflicts.length??0))],
+          ["Music Sources",coverage.length+" / 5"],
+          ["Chart Positions",String(coverage.reduce((n,x)=>n+x.observed_depth,0))],
+          ["Confirmed Recordings",String(preview?.candidates.length??0)],
+          ["Songs to Check",String((preview?.unresolved.length??0)+(preview?.conflicts.length??0))],
         ].map(([label,value])=>
           <WkSurface key={label} className="p-4">
             <p className="text-[11px] font-black uppercase tracking-wider text-wk-text-muted">{label}</p>
@@ -353,8 +352,8 @@ export default function ChartsStudioPage() {
       </div>
       <nav aria-label="Charts Studio work areas" className="flex flex-wrap gap-2">
         {([
-          ["sources","Source Health and Collect"],["review","Identity Review"],
-          ["preview","Top 100 Private Preview"],["history","Receipt History"],
+          ["sources","Sources"],["review","Song Review"],
+          ["preview","Top 100"],["history","Source History"],
           ["freeze","Private Freeze"],
         ] as Array<[Tab,string]>).map(([id,label])=>
           <button type="button" key={id} onClick={()=>setTab(id)} aria-current={tab===id?"page":undefined}
