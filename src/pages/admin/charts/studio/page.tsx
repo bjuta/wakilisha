@@ -94,7 +94,9 @@ type RegistryTrack = {
   id: string; title: string; isrc: string | null; status: string;
   slug: string | null; duration_ms: number | null;
   artist_names: string[];
-  artist_credits: Array<{name:string;is_primary:boolean}>;
+  artist_credits: Array<{
+    name:string;is_primary:boolean;origin_iso2:string|null;artist_status:string|null
+  }>;
   provider_keys: string[];
 };
 type Probe = {
@@ -912,13 +914,16 @@ export default function ChartsStudioPage() {
                         "border-wk-border bg-wk-surface text-wk-text")}>
                     <span className="block font-black">{track.title}</span>
                     <span className="mt-1 block text-[11px] text-wk-text-muted">
-                      Primary: {track.artist_credits?.filter(c=>c.is_primary).map(c=>c.name).join(", ")||"Not recorded"}
+                      Primary: {track.artist_credits?.filter(c=>c.is_primary)
+                        .map(c=>c.name+(c.origin_iso2?" · "+c.origin_iso2:" · origin unrecorded")).join(", ")||"Not recorded"}
                     </span>
                     <span className="block text-[11px] text-wk-text-muted">
-                      Other credited Artists: {track.artist_credits?.filter(c=>!c.is_primary).map(c=>c.name).join(", ")||"None recorded"}
+                      Other credited Artists: {track.artist_credits?.filter(c=>!c.is_primary)
+                        .map(c=>c.name+(c.origin_iso2?" · "+c.origin_iso2:" · origin unrecorded")).join(", ")||"None recorded"}
                     </span>
                     <span className="block text-[11px] text-wk-text-muted">
-                      ISRC: {track.isrc??"Not recorded"}
+                      ISRC: {track.isrc??"Not recorded"} · Duration: {track.duration_ms?
+                        Math.round(track.duration_ms/1000)+" seconds":"Not recorded"}
                     </span>
                     <span className="block text-[11px] text-wk-text-muted">
                       Existing provider links (method, not proof): {track.provider_keys?.join(", ")||"None"}
