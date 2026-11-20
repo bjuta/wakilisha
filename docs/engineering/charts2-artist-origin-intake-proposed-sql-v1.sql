@@ -242,7 +242,7 @@ begin
     'hex'
   );
 end
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION platform_private.registry_artist_intake_review_snapshot_v1(p_staging_id uuid)
@@ -335,7 +335,7 @@ begin
     'applying_user_id',v_user_id
   );
 end
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_review_registry_artist_intake_v1(p_intake_run_id uuid, p_staging_id uuid, p_decision text, p_notes text DEFAULT NULL::text, p_target_registry_artist_id uuid DEFAULT NULL::uuid)
@@ -437,7 +437,7 @@ begin
     'reviewed_by',v_user_id
   );
 end
-$function$
+$function$;
 
 -- Creation Evidence provenance is source-family correct. A Chart-origin
 -- identity must NEVER be labeled as if it came from a CSV manual upload.
@@ -546,7 +546,7 @@ begin
 
   return v_assertion_id;
 end
-$function$
+$function$;
 
 
 -- END EXACT GOVERNED ARTIST FUNCTION REPLACEMENTS
