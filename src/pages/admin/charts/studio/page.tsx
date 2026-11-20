@@ -492,12 +492,11 @@ export default function ChartsStudioPage() {
       }
       {tab==="review" && <section aria-label="Recording identity review" className="space-y-4">
         <WkSurface className="p-4">
-          <h2 className="text-[15px] font-black text-wk-text">Recording authority, not title similarity</h2>
+          <h2 className="text-[15px] font-black text-wk-text">Review Recordings</h2>
           <p className="mt-1 text-[12px] text-wk-text-muted">
-            Every unresolved observation retains its exact receipt and native rank.
-            Strong canonical links require separately corroborated recording evidence and the
-            existing Registry's governed provider-link approval.
-            Shazam records with no provider ID cannot be assigned an invented one.
+            Find songs that may be the same recording. Compare the versions, then choose
+            which Registry recording they belong to. Your approval preserves each chart position.
+            Entries without a source ID remain on the review list.
           </p>
           <p className="mt-2 text-[12px] font-semibold text-wk-text">
             {admin.can("manage_registry")?"Registry review capability available":
@@ -510,20 +509,20 @@ export default function ChartsStudioPage() {
         <WkSurface className="space-y-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-[15px] font-black text-wk-text">Possible Duplicate Recordings</h3>
+              <h3 className="text-[15px] font-black text-wk-text">Songs That Might Match</h3>
               <p className="mt-1 text-[12px] text-wk-text-muted">
-                {duplicateGroups.length} groups suggested by titles and artist credits. Nothing merges automatically.
+                {duplicateGroups.length} possible groups. Song titles and known artist names help us find them.
               </p>
             </div>
             {duplicateGroups.length>12 &&
               <button type="button" className={buttonSecondary}
                 onClick={()=>setShowAllDuplicateGroups(value=>!value)}>
-                {showAllDuplicateGroups?"Show Fewer":"Show All Groups"}
+                {showAllDuplicateGroups?"Show Fewer":"Show All"}
               </button>}
           </div>
           {aliasLookupWarning &&
             <p className="text-[12px] text-wk-warning" role="status">
-              Registry aliases could not be fully checked. Suggestions still need review.
+              We couldn’t check every artist alias. Please review the names carefully.
             </p>}
           <div className="divide-y divide-wk-border">
             {duplicateGroups.slice(0,showAllDuplicateGroups?undefined:12).map(group=>
@@ -540,14 +539,14 @@ export default function ChartsStudioPage() {
                   disabled={!!busy||!admin.can("manage_registry")||
                     !group.observations.some(row=>row.provider_track_id)}
                   onClick={()=>openDuplicateGroup(group.observations as EvidenceRow[])}>
-                  Review Together
+                  Review Matches
                 </button>
               </div>)}
             {!duplicateGroups.length &&
-              <p className="py-3 text-[12px] text-wk-text-muted">No cross-source matches found.</p>}
+              <p className="py-3 text-[12px] text-wk-text-muted">No matching songs to review right now.</p>}
           </div>
           <Link to="/admin/registry/artist-aliases" className="text-[12px] font-bold text-wk-brand underline">
-            Review Artist Aliases In Registry
+            Manage Artist Aliases
           </Link>
         </WkSurface>
         <div className="flex flex-wrap gap-2">
@@ -599,16 +598,16 @@ export default function ChartsStudioPage() {
             </div>
           </WkSurface>
           <WkSurface className="space-y-3 p-4">
-            <h2 className="text-[15px] font-black text-wk-text">Governed Registry review</h2>
+            <h2 className="text-[15px] font-black text-wk-text">Choose The Recording</h2>
             {!selected?<p className="text-[12px] text-wk-text-muted">
-              Select a provider observation to review its exact recording. No automatic title match is made.
+              Choose a song from the list to compare it with a Registry recording.
             </p>:<>
               {batchMode && <div className="space-y-2 rounded-lg border border-wk-border p-3">
                 <p className="text-[12px] font-black text-wk-text">
-                  Select Source Positions For One Recording ({batchRows.length} Selected)
+                  Choose The Songs To Link ({batchRows.length} Selected)
                 </p>
                 <p className="text-[11px] text-wk-text-muted">
-                  Check each version and source. Only selected positions will receive a reviewed Registry link.
+                  Tick only the versions you have confirmed are the same recording.
                 </p>
                 {duplicateGroups.find(group=>group.observations.some(row=>
                   row.receipt_id===selected.receipt_id&&row.rank===selected.rank))
@@ -631,7 +630,7 @@ export default function ChartsStudioPage() {
                 <p className="text-[12px] text-wk-text-muted">{selected.artist} · {SOURCE_LABEL[selected.source_key]} · #{selected.rank}</p>
                 <p className="mt-1 break-all font-mono text-[11px] text-wk-text-muted">{selected.provider_track_id}</p>
               </div>
-              <label htmlFor="studio-registry-query" className="text-[12px] font-bold text-wk-text">Find an existing Registry recording</label>
+              <label htmlFor="studio-registry-query" className="text-[12px] font-bold text-wk-text">Find The Recording To Keep</label>
               <div className="flex gap-2">
                 <input id="studio-registry-query" value={registryQuery}
                   onChange={e=>setRegistryQuery(e.target.value)} className={fieldClass}/>
@@ -650,20 +649,26 @@ export default function ChartsStudioPage() {
                     <span className="block text-[11px] text-wk-text-muted">ISRC: {track.isrc??"Not recorded"}</span>
                   </button>)}
               </div>
-              <label htmlFor="studio-evidence" className="text-[12px] font-bold text-wk-text">Independent HTTPS recording evidence</label>
+              <label htmlFor="studio-evidence" className="text-[12px] font-bold text-wk-text">Link To Recording Evidence</label>
               <input id="studio-evidence" type="url" className={fieldClass}
                 placeholder="https://… specific recording / release evidence"
                 value={evidenceUrl} onChange={e=>setEvidenceUrl(e.target.value)}/>
-              <label htmlFor="studio-note" className="text-[12px] font-bold text-wk-text">Recording identity rationale</label>
+              <label htmlFor="studio-note" className="text-[12px] font-bold text-wk-text">Why Do These Songs Match?</label>
               <textarea id="studio-note" rows={4} className={fieldClass}
-                placeholder="Document corroborated performer, version, release or ISRC. Name similarity alone is insufficient."
+                placeholder="Add the matching ISRC, release details, or other evidence that confirms the recording."
                 value={reviewNote} onChange={e=>setReviewNote(e.target.value)}/>
               {batchMode &&
-                <p className="text-[12px] text-wk-text-muted">
-                  The same independent recording evidence and rationale will be recorded against every
-                  selected provider ID. Choose the canonical Registry recording, not a source to delete.
-                  Any rejected row stops the remaining submissions; earlier approvals stay recorded.
-                </p>}
+                <div className="space-y-2 rounded-xl border border-wk-border bg-wk-surface-raised p-3">
+                  <h3 className="text-[12px] font-black text-wk-text">Before You Approve</h3>
+                  <p className="text-[12px] text-wk-text">
+                    {batchRows.length} chart positions will link to
+                    {" "}<strong>{selectedTrack?.title??"the Registry recording you choose"}</strong>.
+                  </p>
+                  <p className="text-[11px] text-wk-text-muted">
+                    We’ll keep every original chart position. We won’t delete tracks, change
+                    artist aliases, or publish a chart. If one link fails, accepted links stay recorded.
+                  </p>
+                </div>}
               <WkCheckbox checked={reviewConsent} onChange={setReviewConsent}>
                 {DECLARATION}
               </WkCheckbox>
@@ -671,9 +676,9 @@ export default function ChartsStudioPage() {
                 (batchMode&&!batchRows.length)||!reviewConsent||
                 reviewNote.trim().length<40||!evidenceUrl.startsWith("https://")}
                 onClick={()=>void commitReview()}>
-                {batchMode?"Approve Selected Source Links":"Submit Reviewed Provider Link"}
+                {batchMode?"Confirm Selected Matches":"Confirm Recording Match"}
               </button>
-              <p className="text-[11px] text-wk-text-muted">The Registry broker checks its own actor permission, exact evidence and audit. Charts Studio never directly writes canonical Track identities.</p>
+              <p className="text-[11px] text-wk-text-muted">Every approved match is recorded in the Registry. This won’t change the public chart.</p>
             </>}
           </WkSurface>
         </div>
