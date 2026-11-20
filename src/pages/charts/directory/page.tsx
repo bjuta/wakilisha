@@ -157,7 +157,7 @@ function LeaderboardRow({
           className="h-10 w-10 rounded-lg bg-[var(--wk-surface-raised)] md:h-12 md:w-12"
         >
           {entry.artworkUrl ? (
-            <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
+            <img src={entry.artworkUrl} alt="" className="h-full w-full object-contain" loading="lazy" />
           ) : (
             <Ch19GradientImage slug={entry.slug} name={entry.title} />
           )}
@@ -311,7 +311,7 @@ function MiniEntryRow({
       </div>
       <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-[var(--wk-surface-raised)]">
         {entry.artworkUrl ? (
-          <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
+          <img src={entry.artworkUrl} alt="" className="h-full w-full object-contain" loading="lazy" />
         ) : (
           <Ch19GradientImage slug={entry.slug} name={entry.title} />
         )}
@@ -993,7 +993,7 @@ export default function ChartsDirectory() {
                             <span className="text-[14px] font-bold text-[var(--wk-text-muted)] tabular-nums">{entry.rank}</span>
                           </div>
                           <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[var(--wk-surface-raised)]">
-                            {entry.artworkUrl && <img src={entry.artworkUrl} alt="" className="h-full w-full object-cover object-top" />}
+                            {entry.artworkUrl && <img src={entry.artworkUrl} alt="" className="h-full w-full object-contain" />}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-[14px] font-bold text-[var(--wk-text)]">{entry.title}</div>
