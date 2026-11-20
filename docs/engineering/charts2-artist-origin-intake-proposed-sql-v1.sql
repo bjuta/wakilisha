@@ -115,6 +115,11 @@ begin
  if v_name is null or length(v_name)<2 then
    raise exception using errcode='22023',
      message='This original does not provide an Artist credit. Independently verify the Artist through another governed evidence source.';end if;
+ -- A chart's combined credit is not permission to create a combined
+ -- canonical Artist identity. Resolve each primary/featured role separately.
+ if v_name ~* '(feat[.]|ft[.]|featuring|[,]|[[:space:]]&[[:space:]]|[[:space:]]x[[:space:]]|[[:space:]]and[[:space:]])'
+ then raise exception using errcode='42501',
+   message='Source Artist credit names multiple people. Use the governed credit-role review instead of admitting a combined Artist.';end if;
 
  v_key:='charts2-artist-observation:'||p_receipt_id||':'||p_rank;
  select * into v_run from public.provider_intake_runs
