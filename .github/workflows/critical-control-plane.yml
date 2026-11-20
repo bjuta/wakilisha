@@ -226,6 +226,18 @@ jobs:
       - name: Build application
         run: npm run performance:audit && npm run performance:audit:routes && npm run performance:audit:public-routes && npm run build:app
 
+      # TEMPORARY: mint filenames with the existing pinned CLI in this
+      # ephemeral job workspace. Remove this step before final PR review.
+      - name: Mint Charts 2.0 migration filenames (temporary local only)
+        run: |
+          set -eu
+          supabase --version
+          supabase migration new charts2_governed_track_intake_origin_v1
+          supabase migration new charts2_governed_artist_intake_origin_v1
+          supabase migration new charts2_shazam_no_id_observation_review_v1
+          echo "=== CLI-GENERATED CHARTS MIGRATION PATHS ==="
+          find supabase/migrations -maxdepth 1 -type f -name '*charts2_*origin_v1.sql' -o -name '*charts2_shazam_no_id_observation_review_v1.sql' | sort
+
   critical-browser:
     name: critical-browser
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
