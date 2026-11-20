@@ -22,7 +22,11 @@ const LABELS:Record<string,string>={
 
 /** Revalidates the exact Chart evidence before showing a return path.
  * This does not create a Track, Artist, alias or identity assertion. */
-export function ChartReviewReturnContext() {
+export function ChartReviewReturnContext({
+  consequence="none",
+}:{
+  consequence?:"none"|"artist_alias"|"track_duplicate";
+}) {
   const [params]=useSearchParams();
   const key=params.toString();
   const reference=useMemo(()=>parseChartReviewReference(new URLSearchParams(key)),[key]);
@@ -81,6 +85,16 @@ export function ChartReviewReturnContext() {
         This original observation is verified. Any Artist, credit, alias or Track decision
         still needs its own Registry review and proof.
       </p>
+      {consequence==="artist_alias" &&
+        <p role="status" className="rounded-lg border border-wk-warning p-3 text-[12px] text-wk-warning">
+          Artist Alias approval here may also update existing public chart artist references.
+          It is not a private Charts Studio approval. Review the full impact separately.
+        </p>}
+      {consequence==="track_duplicate" &&
+        <p role="status" className="rounded-lg border border-wk-warning p-3 text-[12px] text-wk-warning">
+          A Registry duplicate repair can move public chart rows, provider links and credits.
+          Do not apply a repair merely to resolve this private chart position.
+        </p>}
       <Link to={chartStudioReturnHref(reference)} className="inline-flex min-h-11 items-center
         text-[12px] font-bold text-wk-brand underline underline-offset-4">
         Return to this chart position
