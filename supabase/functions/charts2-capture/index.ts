@@ -357,7 +357,7 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
       if(!names.includes(row.provider_key))names.push(row.provider_key);
       providers.set(row.track_id,names);
     }
-    const order=new Map(ids.map((id:string,i:number)=>[id,i]));
+    const order=new Map<string,number>(ids.map((id:string,i:number):[string,number]=>[id,i]));
     return {state:"registry_candidates",tracks:(trackRows.data??[])
       .sort((a:any,b:any)=>(order.get(a.id)??99)-(order.get(b.id)??99))
       .map((track:any)=>({...track,
