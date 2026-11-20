@@ -426,6 +426,18 @@ serve(async (req) => {
       const runId = typeof body.runId === "string" ? body.runId : "";
       if (!runId) throw new HttpError(400, "runId is required");
 
+      const { data: intakeRun, error: runError } = await admin
+        .from("provider_intake_runs")
+        .select("id,provider,provider_entity_type,mode")
+        .eq("id", runId)
+        .maybeSingle();
+      if(runError||!intakeRun||
+         intakeRun.provider_entity_type!=="artist"||
+         intakeRun.mode!=="artist_intake"||
+         !["csv_manual_upload","charts2_chart_observation"].includes(intakeRun.provider))
+        throw new HttpError(403,"Artist Intake run is outside accepted review authority.");
+      const fromChart=intakeRun.provider==="charts2_chart_observation";
+
       const { data: approved, error: fetchError } = await admin
         .from("provider_intake_artist_staging")
         .select("id")
@@ -460,6 +472,16 @@ serve(async (req) => {
           const review = reviewData as ReviewedArtistIntake;
           if (review.intake_run_id !== runId) {
             throw new Error("Reviewed intake row belongs to a different run.");
+          }
+          if(fromChart && (
+             review.source_spotify_id || review.source_spotify_uri ||
+             review.source_origin_iso2 || review.source_popularity != null ||
+             review.source_followers != null ||
+             (Array.isArray(review.source_genres) && review.source_genres.length>0) ||
+             review.source_images ||
+             (review.source_metadata?.chart_artist_claim_only!==true)
+          )) {
+            throw new Error("Chart Artist Intake may create reviewed identity only; provider facts and origin require separate independent evidence.");
           }
 
           let artistId = review.target_registry_artist_id;
