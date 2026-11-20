@@ -26,6 +26,8 @@ export function ChartAliasReview() {
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   useEffect(()=>{
+    setSource(null);setArtists([]);setSelected(null);setConsent(false);
+    setReason("");setNotice("");setError("");setQuery("");
     if(!reference)return;
     let active=true;
     void supabase.functions.invoke("charts2-capture?mode=studio_review_context",{
