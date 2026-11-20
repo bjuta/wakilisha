@@ -329,7 +329,7 @@ select pg_catalog.jsonb_build_object(
     )
   ),'[]'::jsonb)
 );
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION platform_private.charts2_compute_private_freeze_v1()
@@ -574,7 +574,7 @@ begin
     'freeze_ready',eligible>=100 and conflicts=0,
     'can_publish',false);
 end
-$function$
+$function$;
 
 -- END EXACT DEFINITION REPLACEMENTS
 commit;
