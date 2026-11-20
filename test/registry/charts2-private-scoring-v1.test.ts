@@ -183,6 +183,8 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
         title:"I’ll Be Okay",artist:null,provider_track_id:"apple:bien"},
       {source_key:"mdundo_ke",receipt_id:UUID(4),rank:38,
         title:"I’ll Be Okey",artist:"Bien",provider_track_id:"mdundo:bien"},
+      {source_key:"shazam_ke",receipt_id:UUID(5),rank:5,
+        title:"I'll Be Okay",artist:"Bien",provider_track_id:null},
       {source_key:"mdundo_ke",receipt_id:UUID(4),rank:26,
         title:"Mboka",artist:"Unrelated Artist",provider_track_id:"mdundo:unrelated"},
       {source_key:"mdundo_ke",receipt_id:UUID(4),rank:10,
@@ -196,7 +198,8 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(mboka?.observations.some(row=>row.artist==="Unrelated Artist")).toBe(false);
     expect(mboka?.observations.some(row=>row.title==="Mboka (Live)")).toBe(false);
     const bien=proposed.find(group=>group.title==="I'll Be Okay");
-    expect(bien?.observations).toHaveLength(3);
+    expect(bien?.observations).toHaveLength(4);
+    expect(bien?.observations.find(row=>row.source_key==="shazam_ke")?.provider_track_id).toBeNull();
     expect(bien?.reason).toContain("Check Similar Titles");
     const alias=suggestRecordingReviewGroups(rows,
       [{alias_slug:"mejja-genge",alias_display_name:"Mejja Genge",canonical_artist_id:UUID(99)}],
@@ -211,6 +214,9 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).toContain("Choose only one source position per recording");
     expect(STUDIO_PAGE).toContain("setBatchMode(true);setBatchRows([]);");
     expect(STUDIO_PAGE).toContain("old.filter(item=>item.source_key!==row.source_key)");
+    expect(STUDIO_PAGE).toContain("if(accepted>0)");
+    expect(STUDIO_PAGE).toContain("setBatchMode(false);setBatchRows([]);setSelected(null);");
+    expect(STUDIO_PAGE).toContain("Artist not supplied");
     expect(STUDIO_PAGE).not.toContain('studio_bulk_publish');
   });
 
