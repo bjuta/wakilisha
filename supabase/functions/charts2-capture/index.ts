@@ -313,6 +313,48 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
       provider_track_id:observation.provider_track_id??null,
       observed_at:receipt.observed_at,can_publish:false};
   }
+  if(mode==="studio_stage_intake") {
+    await requireRegistryReviewer(authClient);
+    const permission=await authClient.rpc("current_user_has_capability",{
+      required_capability:"manage_charts",
+    });
+    if(permission.error||permission.data!==true)
+      throw new Reject(403,"charts2_manage_charts_required");
+    const supplied=await req.json().catch(()=>null);
+    const acknowledgement="I request governed Track Intake for this exact chart position. No identity is approved.";
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "source_key","receipt_id","original_sha256","rank","acknowledgement",
+       ].includes(k))||
+       !TRACK_UUID.test(supplied.receipt_id??"")||
+       !/^[a-f0-9]{64}$/.test(supplied.original_sha256??"")||
+       !Number.isSafeInteger(supplied.rank)||supplied.rank<1||
+       supplied.acknowledgement!==acknowledgement)
+      throw new Reject(400,"charts2_intake_request_invalid");
+    const source=sourceKey(supplied.source_key);
+    const snapshot=await studioSnapshot(server);
+    const receipt=(snapshot.receipts??[]).find((r:any)=>
+      r.source_key===source&&r.id===supplied.receipt_id&&
+      r.original_sha256===supplied.original_sha256);
+    const observation=receipt?.observations?.find((o:any)=>o.rank===supplied.rank);
+    if(!observation||typeof observation.title!=="string"||!observation.title.trim())
+      throw new Reject(409,"charts2_intake_observation_changed");
+    await verifyPrivateOriginal(server,receipt);
+    // Only the accepted, caller-JWT-bound Registry Intake RPC may stage a
+    // review item. No canonical Track, credit or Chart write occurs here.
+    const staged=await authClient.rpc("admin_stage_charts2_track_intake_v1",{
+      p_source_key:source,
+      p_receipt_id:receipt.id,
+      p_original_sha256:receipt.original_sha256,
+      p_rank:observation.rank,
+    });
+    if(staged.error||!staged.data?.suggestion_id)
+      throw new Reject(409,"charts2_intake_staging_rejected");
+    return {state:"governed_track_intake_staged",
+      suggestion_id:staged.data.suggestion_id,
+      idempotent_replay:staged.data.idempotent_replay===true,
+      can_publish:false};
+  }
   if(mode==="studio_track_search") {
     await requireRegistryReviewer(authClient);
     const supplied=await req.json().catch(()=>null);
@@ -508,7 +550,7 @@ async function handle(req:Request) {
   const {user,server,authClient}=await session(req);
   const url=new URL(req.url);
   const mode=url.searchParams.get("mode")??"upload";
-  if(["studio_preview","studio_track_search","studio_review_context","studio_review_link","studio_freeze"].includes(mode))
+  if(["studio_preview","studio_track_search","studio_review_context","studio_stage_intake","studio_review_link","studio_freeze"].includes(mode))
     return studioAction(mode,req,server,authClient);
   let key:string, endpoint:string, target_period_key:string|null=null;
   let contentType:string, bytes:Uint8Array, methodRevision:number|null=null;
