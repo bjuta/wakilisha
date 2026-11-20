@@ -108,8 +108,15 @@ begin
      or nullif(btrim(p_review_note),'') is null
      or length(btrim(p_review_note))<40
      or p_evidence_url not like 'https://%'
-     or p_acknowledgement is distinct from
-      'I independently verified this exact Shazam position and authorize its private Registry recording resolution.'
+     or p_acknowledgement is distinct from (
+       case p_action
+         when 'approve' then
+           'I independently verified this exact Shazam position and authorize its private Registry recording resolution.'
+         when 'revoke' then
+           'I revoke this exact private Shazam recording resolution after independent re-review.'
+         else ''
+       end
+     )
   then raise exception using errcode='22023',
     message='Exact source, independent evidence and explicit review approval required.';
   end if;
