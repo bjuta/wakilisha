@@ -362,6 +362,57 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(original).toHaveLength(5);
   });
 
+  it("scores exact reviewed Shazam positions with genuine missing provider IDs",()=>{
+    const receipts=fullReceipts();
+    const shazam=receipts.find(r=>r.source_key==="shazam_ke")!;
+    shazam.observations.forEach(o=>{o.provider_track_id=null as any;});
+    const review={
+      id:UUID(501),source_key:"shazam_ke",receipt_id:shazam.id,
+      original_sha256:shazam.original_sha256,rank:3,
+      title:shazam.observations[2].title,artist:shazam.observations[2].artist,
+      provider_track_id:null,track_id:UUID(900),track_status:"active",
+      action:"approve",
+      review_note:"I independently verified the same Shazam chart position against canonical recording and release evidence.",
+      evidence_url:"https://example.com/canonical-release-evidence",
+      event_fingerprint:"a".repeat(64),
+    };
+    const only=scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[review]});
+    expect(only.candidates).toHaveLength(1);
+    expect(only.candidates[0].track_id).toBe(UUID(900));
+    expect(only.candidates[0].source_count).toBe(1);
+    expect(only.candidates[0].score_points).toBe("9.90");
+    expect(only.candidates[0].source_contributions[0].registry_observation_resolution_id)
+      .toBe(review.id);
+    expect(only.candidates[0].source_contributions[0].registry_provider_link_id)
+      .toBeUndefined();
+    expect(only.unresolved).toHaveLength(599);
+    const withProvider=scoreCharts2PrivatePreviewV1({
+      receipts,registry_links:[link("youtube_ke",1,900)],observation_reviews:[review],
+    });
+    expect(withProvider.candidates.find(c=>c.track_id===UUID(900))?.score_points)
+      .toBe("39.90");
+    for(const [key, value] of [
+      ["original_sha256","f".repeat(64)],
+      ["title","Wrong title"],["artist","Unrelated Artist"],
+      ["track_status","archived"],["review_note","Not independently verified"],
+      ["evidence_url","http://untrusted.example"],["event_fingerprint","invalid"],
+    ] as const){
+      const invalid=scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[
+        {...review,[key]:value},
+      ]});
+      expect(invalid.candidates).toHaveLength(0);
+    }
+    const revoked=scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[
+      {...review,action:"revoke",track_id:null},
+    ]});
+    expect(revoked.candidates).toHaveLength(0);
+    expect(()=>scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[review,review]}))
+      .toThrow("charts2_scoring_observation_review_conflict");
+    expect(()=>scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[
+      {...review,provider_track_id:"invented"},
+    ]})).toThrow("charts2_scoring_observation_review_unqualified");
+  });
+
   it("never merges based on existing weak title/artist Registry links",()=>{
     const weak={...link("apple_ke",1,67),match_method:"exact_title_artist"};
     const result=score(fullReceipts(),[weak]);
@@ -479,6 +530,17 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_WORKER).toContain('crypto.subtle.digest("SHA-256",bytes)');
     expect(STUDIO_WORKER).toContain('authClient.rpc("admin_admit_registry_track_provider_link_v1"');
     expect(STUDIO_WORKER).not.toContain('server.rpc("admin_admit_registry_track_provider_link_v1"');
+    expect(STUDIO_WORKER).toContain('mode==="studio_review_no_id"');
+    expect(STUDIO_WORKER).toContain('authClient.rpc("admin_review_charts2_no_id_observation_v1"');
+    expect(STUDIO_WORKER).not.toContain('server.rpc("admin_review_charts2_no_id_observation_v1"');
+    expect(STUDIO_WORKER).toContain("observation_reviews:snapshot.observation_reviews??[]");
+    expect(STUDIO_PAGE).toContain('SHAZAM_DECLARATION');
+    expect(STUDIO_PAGE).toContain('noId?"studio_review_no_id":"studio_review_link"');
+    expect(STUDIO_PAGE).toContain('"Review Shazam Position"');
+    expect(PUBLIC_CHART_MODELS).not.toContain('registry_observation_resolution_id');
+    const offlineBridge=readFileSync("supabase/functions/_shared/charts2-publication-bridge-v1.mjs","utf8");
+    expect(offlineBridge).toContain("registry_observation_resolution_id");
+    expect(offlineBridge).toContain("c.registry_provider_link_id == null");
     expect(STUDIO_WORKER).toContain('p_match_method:"manual",p_match_confidence:1');
     expect(STUDIO_WORKER).toContain('storedWeights[name]!==policy.weight_points');
     expect(ROUTER).toContain('path: "studio", element: <AdminGuard capabilities={["manage_charts"]}><AdminChartsStudioPage /></AdminGuard>');
