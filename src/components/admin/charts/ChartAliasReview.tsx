@@ -158,3 +158,4 @@ export function ChartAliasReview() {
     {error&&<p role="alert" className="text-[12px] text-wk-danger">{error}</p>}
     {notice&&<p role="status" className="text-[12px] text-wk-success">{notice}</p>}
   </section>;
+}
