@@ -194,18 +194,23 @@ export default function ChartsStudioPage() {
   useEffect(()=>{
     if(!snapshot?.preview)return;
     let active=true;
-    void Promise.all([
-      supabase.from("registry_artist_aliases")
-        .select("alias_slug,alias_display_name,canonical_artist_id")
-        .eq("status","active").limit(500),
-      supabase.from("registry_artists")
-        .select("id,display_name").eq("status","active").limit(1500),
-    ]).then(([aliases,artists])=>{
-      if(!active)return;
-      setArtistAliases((aliases.data??[]) as ReviewedArtistAlias[]);
-      setRegistryArtists((artists.data??[]) as ReviewedArtist[]);
-      setAliasLookupWarning(Boolean(aliases.error||artists.error));
-    }).catch(()=>{if(active)setAliasLookupWarning(true);});
+    void supabase.from("registry_artist_aliases")
+      .select("alias_slug,alias_display_name,canonical_artist_id,registry_artists!inner(id,display_name)")
+      .eq("status","active").limit(1000).then(result=>{
+        if(!active)return;
+        if(result.error){
+          setArtistAliases([]);setRegistryArtists([]);setAliasLookupWarning(true);
+          return;
+        }
+        type AliasResult = ReviewedArtistAlias & {registry_artists:ReviewedArtist | null};
+        const reviewed=(result.data??[]) as AliasResult[];
+        setArtistAliases(reviewed.map(({alias_slug,alias_display_name,canonical_artist_id})=>({
+          alias_slug,alias_display_name,canonical_artist_id,
+        })));
+        setRegistryArtists(reviewed.map(row=>row.registry_artists)
+          .filter((artist):artist is ReviewedArtist=>Boolean(artist)));
+        setAliasLookupWarning(false);
+      }).catch(()=>{if(active)setAliasLookupWarning(true);});
     return ()=>{active=false;};
   },[snapshot?.preview]);
 
