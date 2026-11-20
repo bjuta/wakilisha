@@ -373,6 +373,7 @@ export default function ChartsStudioPage() {
           receipt_id:source.receipt_id,original_sha256:source.original_sha256,
           track_id:selectedTrack.id,review_note:reviewNote.trim(),
           evidence_url:evidenceUrl.trim(),
+          ...(noId?{action:"approve" as const}:{}),
           acknowledgement:noId?SHAZAM_DECLARATION:DECLARATION,
         });
         accepted++;
