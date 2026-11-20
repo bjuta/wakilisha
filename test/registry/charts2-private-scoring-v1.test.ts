@@ -225,7 +225,7 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).toContain("Review Matches");
     expect(STUDIO_PAGE).toContain("Before You Approve");
     expect(STUDIO_PAGE).toContain("Manage Artist Aliases");
-    expect(STUDIO_PAGE).toContain('await invokeStudio("studio_review_link"');
+    expect(STUDIO_PAGE).toContain('noId?"studio_review_no_id":"studio_review_link"');
     expect(STUDIO_PAGE).toContain("Choose only one source position per recording");
     expect(STUDIO_PAGE).toContain("setBatchMode(true);setBatchRows([]);");
     expect(STUDIO_PAGE).toContain("old.filter(item=>item.source_key!==row.source_key)");
@@ -508,7 +508,7 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_WORKER).toContain('await verifyPrivateOriginal(server,receipt)');
     expect(STUDIO_WORKER).toContain('"charts2_review_context_receipt_changed"');
     expect(STUDIO_WORKER).toContain('"charts2_review_context_position_changed"');
-    expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/registry/tracks/intake"');
+    expect(STUDIO_PAGE).toContain('"/admin/registry/tracks/intake?suggestion="+id');
     expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/registry/artist-aliases"');
     expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/relationships/duplicates"');
     expect(STUDIO_PAGE).toContain('startGovernedArtistIntake');
