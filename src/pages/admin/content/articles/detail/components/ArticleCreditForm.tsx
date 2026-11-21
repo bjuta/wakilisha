@@ -227,7 +227,7 @@ export function ArticleCreditForm({
   async function requestClose() {
     if (
       (createdContributorId || createdCreditId) &&
-      !(await wakilishaDialog.confirm({ title: "Close Credit", message: "A contributor or Credit has already been created. Closing now will leave it unattached. Continue?", confirmLabel: "Close anyway", destructive: true }))
+      !(await wakilishaDialog.confirm({ title: "Close Credit", message: "A Credit has been resolved but is not attached to this Article. Close anyway?", confirmLabel: "Close anyway", destructive: true }))
     ) {
       return;
     }
@@ -503,9 +503,9 @@ export function ArticleCreditForm({
                   Partial progress is preserved
                 </div>
                 <p className="mt-1 text-[10px] leading-4 text-wk-text-muted">
-                  The form will reuse the contributor and Credit
-                  already created. Retry attachment instead of
-                  creating duplicate records.
+                  The form keeps the resolved Credit and any new
+                  contributor. Retry attachment without creating
+                  duplicate records.
                 </p>
               </div>
             ) : null}
