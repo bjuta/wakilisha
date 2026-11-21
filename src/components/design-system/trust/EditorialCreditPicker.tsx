@@ -56,6 +56,7 @@ export function EditorialCreditPicker({
   actionLabel = "Add Credit",
   onSearch,
   onAttach,
+  onSelectionCleared,
 }: {
   roles: EditorialCreditRoleOption[];
   canCreateCredit: boolean;
@@ -65,6 +66,7 @@ export function EditorialCreditPicker({
     query: string,
   ) => Promise<EditorialCreditPartyOption[]>;
   onAttach: (selection: EditorialCreditSelection) => void;
+  onSelectionCleared?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<EditorialCreditPartyOption[]>([]);
@@ -175,6 +177,7 @@ export function EditorialCreditPicker({
             setQuery(event.target.value);
             setSelectedParty(null);
             setCreditRole("");
+            onSelectionCleared?.();
             setShowResults(true);
           }}
           onFocus={() => {
