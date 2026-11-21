@@ -92,6 +92,7 @@ describe("Article trust Credit form contract", () => {
     expect(form).toContain("onSelectionCleared={() => {");
     expect(form).toContain("setSelectedExistingCredit(null)");
     expect(picker).toContain("onSelectionCleared?.()");
+    expect(picker).toContain("setCreditRole(value);");
     expect(form).toContain("resolveEditorialCredit(");
     expect(form).toContain("{ publicSafe: publicPresentation }");
     expect(form).toContain("creditId = resolved.creditId");
