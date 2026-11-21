@@ -84,6 +84,12 @@ function statusForError(message: string): number {
     message.includes("idempotency") ||
     message.includes("budget")
   ) return 409;
+  if (
+    message.startsWith("Discography Track identity needs review:") ||
+    message.startsWith("Reviewed Discography Track identity requires resolution:") ||
+    message.startsWith("Strong Track identity") ||
+    message.startsWith("Strong Apple Music Track identity")
+  ) return 409;
   return 500;
 }
 
