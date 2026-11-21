@@ -908,6 +908,8 @@ declare
   v_new_finale uuid;
   v_plan uuid;
   v_sentry jsonb;
+  v_bad_observation jsonb;
+  v_bad_evidence uuid;
 begin
   insert into auth.users(id,is_sso_user,is_anonymous) values(u,false,false);
   insert into public.user_role_assignments(user_id,role_key,status,notes)
@@ -1067,6 +1069,42 @@ begin
      or v_sentry->>'accepted'<>'1'
      or v_sentry->>'left'<>'0'
   then raise exception 'IFPI/DDEX terminal sentry failed: %',v_sentry;end if;
+
+  -- No ISRC and no strong provider match: title is not recording identity.
+  v_bad_observation:=jsonb_set(
+    jsonb_set(v_observation,
+      '{albums,0,tracks,0,isrc}','null'::jsonb),
+    '{albums,0,tracks,0,apple_music_id}','"9901416195"'::jsonb
+  );
+  v_bad_evidence:=public.admin_prepare_registry_discography_evidence_v1(
+    a,v_bad_observation,
+    encode(extensions.digest(v_bad_observation::text,'sha256'),'hex')
+  );
+  begin
+    perform public.admin_execute_registry_discography_evidence_v1(
+      a,v_bad_evidence,
+      '[{"apple_music_id":"9901416111","action":"canonicalize"}]'::jsonb
+    );
+    raise exception 'Unidentified same-title recording was silently admitted';
+  exception when sqlstate 'PT409' then null;
+  end;
+
+  -- Strong Apple ID with contradictory ISRC must never merge.
+  v_bad_observation:=jsonb_set(
+    v_observation,'{albums,0,tracks,2,isrc}','"KEWAK2614999"'::jsonb
+  );
+  v_bad_evidence:=public.admin_prepare_registry_discography_evidence_v1(
+    a,v_bad_observation,
+    encode(extensions.digest(v_bad_observation::text,'sha256'),'hex')
+  );
+  begin
+    perform public.admin_execute_registry_discography_evidence_v1(
+      a,v_bad_evidence,
+      '[{"apple_music_id":"9901416111","action":"canonicalize"}]'::jsonb
+    );
+    raise exception 'Contradictory strong Track identity was silently merged';
+  exception when sqlstate 'PT409' then null;
+  end;
 end
 $ifpi_ddex_release_membership$;
 
