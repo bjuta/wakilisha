@@ -694,6 +694,13 @@ export function ArtistDiscographyIntakeDrawer({
 
   const handleAction = useCallback((albumId: string, action: AlbumAction) => {
     setApplyError(null);
+    if (action === "ignore") {
+      setAdditionalPrimaryArtists((prev) => {
+        const next = { ...prev };
+        delete next[albumId];
+        return next;
+      });
+    }
     setActions((prev) => {
       if (prev[albumId] === action) {
         return prev;
@@ -733,19 +740,19 @@ export function ArtistDiscographyIntakeDrawer({
   }, [artistId]);
 
   const handleApply = async () => {
-    const missingDecisions = albums.filter((album) => !actions[album.apple_music_id]);
-    if (missingDecisions.length > 0) {
-      setApplyError(
-        `Review every release before applying. ${missingDecisions.length} decision${missingDecisions.length === 1 ? "" : "s"} remaining.`
-      );
+    const selectedAlbums = albums.flatMap((album) => {
+      const action = actions[album.apple_music_id];
+      if (action !== "merge" && action !== "canonicalize") return [];
+      return [{
+        apple_music_id: album.apple_music_id,
+        action,
+        additional_primary_artists: additionalPrimaryArtists[album.apple_music_id] || [],
+      }];
+    });
+    if (!selectedAlbums.length) {
+      setApplyError("Select at least one album to apply.");
       return;
     }
-
-    const selectedAlbums = albums.map((album) => ({
-      apple_music_id: album.apple_music_id,
-      action: actions[album.apple_music_id],
-      additional_primary_artists: additionalPrimaryArtists[album.apple_music_id] || [],
-    }));
 
     if (!evidenceAssertionId) {
       setApplyError("Immutable preview evidence is unavailable. Close and reopen the intake drawer before applying.");
@@ -795,12 +802,7 @@ export function ArtistDiscographyIntakeDrawer({
           {mergeCount + canonCount} album{mergeCount + canonCount !== 1 ? "s" : ""} selected
         </p>
         <p className="text-[11px] text-[#697062]">
-          {ignoreCount} left out
-          {unsetCount > 0 ? (
-            <span className="ml-1 font-bold text-amber-700">· {unsetCount} decision{unsetCount === 1 ? "" : "s"} required</span>
-          ) : (
-            <span className="ml-1 font-bold text-emerald-700">· review complete</span>
-          )}
+          {ignoreCount + unsetCount} not selected. Only selected albums will change.
         </p>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -808,6 +810,8 @@ export function ArtistDiscographyIntakeDrawer({
           onClick={() => {
             setApplyError(null);
             setActions({});
+            setAdditionalPrimaryArtists({});
+            setShowConfirm(false);
           }}
           disabled={applying}
           className="wk-button wk-button-ghost wk-button-sm"
@@ -816,7 +820,7 @@ export function ArtistDiscographyIntakeDrawer({
         </button>
         <button
           onClick={() => setShowConfirm(true)}
-          disabled={applying || unsetCount > 0}
+          disabled={applying || mergeCount + canonCount === 0}
           className="wk-button wk-button-primary wk-button-sm"
         >
           {applying ? (
@@ -982,8 +986,8 @@ export function ArtistDiscographyIntakeDrawer({
                 <div>
                   <p className="text-[15px] font-black text-amber-800">Confirm Discography review</p>
                   <p className="text-[11px] text-amber-700">
-                    Apply this complete review: {mergeCount} merge, {canonCount} add, {ignoreCount} leave.
-                    Accepted releases will be admitted to active Registry truth; left releases will remain evidence only.
+                    Apply {mergeCount + canonCount} selected album{mergeCount + canonCount === 1 ? "" : "s"}: {mergeCount} merge, {canonCount} add.
+                    All other albums will remain untouched.
                   </p>
                 </div>
               </div>
@@ -1058,7 +1062,7 @@ export function ArtistDiscographyIntakeDrawer({
                 {unsetCount > 0 && (
                   <>
                     <span className="h-1.5 w-1.5 rounded-full bg-[#b8bfb2]" />
-                    {unsetCount} to review
+                    {unsetCount} not selected
                   </>
                 )}
               </div>

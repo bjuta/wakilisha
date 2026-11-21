@@ -92,7 +92,9 @@ begin
         'genre_names',jsonb_build_array('African'),
         'record_label','WAKILISHA Acceptance',
         'album_artist_name','Review Spine Artist',
-        'related_artists','[]'::jsonb,
+        'related_artists',jsonb_build_array(jsonb_build_object(
+          'name','Review Spine Artist','apple_music_artist_id','9901416098'
+        )),
         'tracks',jsonb_build_array(
           jsonb_build_object(
             'apple_music_id','9901416011',
@@ -152,27 +154,20 @@ begin
       v_artist_id,v_observation,v_fingerprint
     );
 
+  -- A real selected subset is valid; invented IDs and duplicates remain invalid.
+  if jsonb_array_length(platform_private.registry_discography_normalize_reviewed_selections_v1(
+    v_artist_id,v_observation,jsonb_build_array(jsonb_build_object(
+      'apple_music_id','9901416007','action','canonicalize'
+    ))
+  ))<>1 then raise exception 'Selected-only normalization changed the selected set'; end if;
   begin
     perform platform_private.registry_discography_normalize_reviewed_selections_v1(
-      v_artist_id,
-      v_observation,
-      jsonb_build_array(
-        jsonb_build_object(
-          'apple_music_id','9901416007',
-          'action','canonicalize'
-        )
-      )
+      v_artist_id,v_observation,jsonb_build_array(jsonb_build_object(
+        'apple_music_id','9901416996','action','canonicalize'
+      ))
     );
-    raise exception 'incomplete reviewed set unexpectedly succeeded';
-  exception
-    when sqlstate '22023' then
-      get stacked diagnostics v_error=message_text;
-      if position(
-        'Every observed Release requires one explicit Discography review decision.'
-        in v_error
-      )=0 then
-        raise;
-      end if;
+    raise exception 'Invented album unexpectedly accepted';
+  exception when sqlstate '22023' then null;
   end;
 
   v_result:=
@@ -183,10 +178,6 @@ begin
         jsonb_build_object(
           'apple_music_id','9901416007',
           'action','canonicalize'
-        ),
-        jsonb_build_object(
-          'apple_music_id','9901416008',
-          'action','ignore'
         )
       )
     );
@@ -225,8 +216,40 @@ begin
     where release.metadata->>'apple_music_album_id'='9901416008'
        or release.upc='9990000000002'
   ) then
-    raise exception 'Leave decision escaped into canonical Release truth';
+    raise exception 'Unselected album escaped into canonical Release truth';
   end if;
+
+  if not exists (
+    select 1 from public.registry_release_artists credit
+    where credit.release_id=v_release_id and credit.artist_id=v_artist_id
+      and credit.status='active' and credit.is_primary
+  ) or (select count(*) from public.registry_release_artists credit
+        where credit.release_id=v_release_id and credit.status='active')<>1
+  or exists (select 1 from public.registry_artists artist
+             where artist.id=v_artist_id and artist.metadata ? 'apple_music_id')
+  or exists (select 1 from public.registry_external_identifier_assertions assertion
+             where assertion.artist_id=v_artist_id and assertion.scheme_key='apple_music')
+  then
+    raise exception 'Release-scoped Artist review failed or leaked global provider identity authority';
+  end if;
+
+  -- Same-named provider ID already bound to another current Artist MUST block.
+  insert into public.registry_artists (id,slug,display_name,normalized_name,status,metadata,living_memory_status)
+  values ('33333333-4444-4555-8666-777777777777','review-spine-other-artist','Review Spine Other Artist',
+    platform_private.registry_identity_normalize_text_v1('Review Spine Other Artist'),'active',
+    jsonb_build_object('apple_music_id','9901416097'),'draft');
+  begin
+    perform platform_private.registry_discography_release_artist_desired_v1(
+      v_release_id,v_artist_id,
+      jsonb_set(v_observation->'albums'->0,'{related_artists}',jsonb_build_array(jsonb_build_object(
+        'name','Review Spine Artist','apple_music_artist_id','9901416097'
+      ))),'[]'::jsonb
+    );
+    raise exception 'Contradictory global provider binding unexpectedly accepted';
+  exception when sqlstate 'PT409' then
+    get stacked diagnostics v_error=message_text;
+    if position('linked to a different Registry Artist' in v_error)=0 then raise; end if;
+  end;
 
   select track.id
   into v_track_one_id
@@ -267,7 +290,7 @@ begin
     where track.metadata->>'apple_music_track_id'='9901416013'
        or track.isrc='KEWAK2600099'
   ) then
-    raise exception 'Leave decision escaped into canonical Track truth';
+    raise exception 'Unselected album escaped into canonical Track truth';
   end if;
 
   if (
@@ -322,7 +345,9 @@ begin
 
   if v_sentry->>'status'<>'pass'
      or v_sentry->>'accepted'<>'1'
-     or v_sentry->>'left'<>'1'
+     or v_sentry->>'left'<>'0'
+     or v_sentry->>'observed'<>'2'
+     or v_sentry->>'reviewed'<>'1'
      or v_sentry->>'active_releases'<>'1'
      or v_sentry->>'active_tracks'<>'2'
   then

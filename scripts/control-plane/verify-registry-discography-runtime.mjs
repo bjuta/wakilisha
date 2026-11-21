@@ -224,7 +224,8 @@ for (const fragment of [
 requireText(governedPlan, 'exact_artist_id', governedPlanPath);
 requireText(governedPlan, 'provider_source_payload_fingerprint', governedPlanPath);
 requireText(governedPlan, 'reviewed_decisions', governedPlanPath);
-requireText(governedPlan, 'Every observed release must be explicitly reviewed before Apply.', governedPlanPath);
+requireText(governedPlan, 'At least one reviewed selection is required.', governedPlanPath);
+forbidText(governedPlan, 'Every observed release must be explicitly reviewed before Apply.', governedPlanPath);
 requireText(governedBroker, 'admin_execute_registry_discography_evidence_v1', governedBrokerPath);
 requireText(governedHandler, 'invalid_review_action:', governedHandlerPath);
 forbidText(governedHandler, 'row.action ?? "ignore"', governedHandlerPath);
@@ -260,8 +261,11 @@ requireText(intakeDrawer, 'previewGovernedArtistDiscography(artistId)', intakeDr
 requireText(intakeDrawer, 'currentArtistId: artistId', intakeDrawerPath);
 requireText(intakeDrawer, 'evidenceAssertionId', intakeDrawerPath);
 requireText(intakeDrawer, 'applyReviewedArtistDiscography({', intakeDrawerPath);
-requireText(intakeDrawer, 'Review every release before applying.', intakeDrawerPath);
-requireText(intakeDrawer, 'disabled={applying || unsetCount > 0}', intakeDrawerPath);
+requireText(intakeDrawer, 'Select at least one album to apply.', intakeDrawerPath);
+requireText(intakeDrawer, 'action !== "merge" && action !== "canonicalize"', intakeDrawerPath);
+forbidText(intakeDrawer, 'Review every release before applying.', intakeDrawerPath);
+requireText(intakeDrawer, 'disabled={applying || mergeCount + canonCount === 0}', intakeDrawerPath);
+requireText(intakeDrawer, 'setAdditionalPrimaryArtists({});', intakeDrawerPath);
 requireText(intakeDrawer, 'Apply review', intakeDrawerPath);
 requireText(intakeDrawer, 'Confirm Discography review', intakeDrawerPath);
 requireText(intakeDrawer, 'Yes, apply review', intakeDrawerPath);
@@ -278,7 +282,11 @@ requireText(discographyPanel, 'artistId: string', discographyPanelPath);
 requireText(discographyPanel, 'artistId={artistId}', discographyPanelPath);
 requireText(artistDetail, 'artistId={artist.id}', artistDetailPath);
 
-// Reviewed Registry Admission Spine must remain exhaustive, active-ingest,
+const selectedReleaseAuthorityMigration = read("supabase/migrations/20261121170827_registry_discography_selected_release_authority_v1.sql");
+for (const fragment of ["review_decision_set_not_observed_subset", "release_operations_not_exact_selected_set", "v_reviewed_artist_rows", "linked to a different Registry Artist", "At least one reviewed selection is required"]) {
+  requireText(selectedReleaseAuthorityMigration, fragment, "selected-release authority migration");
+}
+// Historical Reviewed Registry Admission Spine remains active-ingest,
 // artist-scoped, and MIZIZI-sentry guarded.
 for (const fragment of [
   "Every observed Release requires one explicit Discography review decision.",
