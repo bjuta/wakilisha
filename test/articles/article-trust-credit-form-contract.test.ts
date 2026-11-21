@@ -74,6 +74,31 @@ describe("Article trust Credit form contract", () => {
     );
   });
 
+  it("selects an existing writer through canonical Credit authority", () => {
+    const form = read(
+      "src/pages/admin/content/articles/detail/components/ArticleCreditForm.tsx",
+    );
+    const service = read("src/services/trust/editorialCreditService.ts");
+    const picker = read(
+      "src/components/design-system/trust/EditorialCreditPicker.tsx",
+    );
+
+    expect(form).toContain('"existing_person"');
+    expect(form).toContain("searchEditorialCreditParties(query)");
+    expect(form).toContain('candidate.partyKind === "person"');
+    expect(form).toContain("<EditorialCreditPicker");
+    expect(form).toContain('actionLabel="Use This Person"');
+    expect(form).toContain("setSelectedExistingCredit(selection)");
+    expect(form).toContain("resolveEditorialCredit(");
+    expect(form).toContain("{ publicSafe: publicPresentation }");
+    expect(form).toContain("creditId = resolved.creditId");
+    expect(form).toContain("p_article_version_id: articleVersionId");
+    expect(form).toContain("p_expected_credit_revision:");
+    expect(form).toContain("!selectedExistingCredit || !creditAuthority");
+    expect(service).toContain("options?.publicSafe ?? true");
+    expect(picker).toContain("{actionLabel}");
+  });
+
   it("locks the credited party after partial progress", () => {
     const form = read(
       "src/pages/admin/content/articles/detail/components/ArticleCreditForm.tsx",
