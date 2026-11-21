@@ -99,12 +99,29 @@ export interface DiscographyArtistShellResponse {
   detail?: string;
 }
 
-function extractInvokeError(error: unknown): string {
+async function extractInvokeError(error: unknown): Promise<string> {
   if (!error || typeof error !== "object") return "Discography request failed.";
   const record = error as Record<string, unknown>;
   let message = String(record.message ?? "Discography request failed.");
   const context = record.context;
   if (!context || typeof context !== "object") return message;
+  if (typeof Response !== "undefined" && context instanceof Response) {
+    try {
+      const parsed = await context.clone().json() as {
+        detail?: unknown;
+        error?: unknown;
+        stage?: unknown;
+      };
+      if (typeof parsed?.detail === "string" && parsed.detail.trim()) return parsed.detail;
+      if (typeof parsed?.error === "string" && parsed.error.trim()) {
+        return typeof parsed.stage === "string"
+          ? `[${parsed.stage}] ${parsed.error}`
+          : parsed.error;
+      }
+    } catch {
+      // The response may be empty or non-JSON. Keep the original error.
+    }
+  }
   const body = (context as Record<string, unknown>).body;
   if (typeof body !== "string" || !body.trim()) return message;
   try {
@@ -122,7 +139,7 @@ async function invokeDiscography<T>(body: Record<string, unknown>): Promise<T> {
     "ingest-artist-discography",
     { body, timeout: 15000 },
   );
-  if (error) throw new Error(extractInvokeError(error));
+  if (error) throw new Error(await extractInvokeError(error));
   return data as T;
 }
 
