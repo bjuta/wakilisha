@@ -522,7 +522,11 @@ export function ArticleCreditForm({
 
               <WkRadioGroup
                 value={partyKind}
-                onChange={(value) => setPartyKind(value as CreditedPartyKind)}
+                onChange={(value) => {
+                  setPartyKind(value as CreditedPartyKind);
+                  setSelectedExistingCredit(null);
+                  setIsPrimary(false);
+                }}
                 disabled={partyLocked || submitting}
                 name="credited-party"
                 ariaLabel="Credited party"
@@ -606,6 +610,10 @@ export function ArticleCreditForm({
                     canCreateCredit={creditAuthority.canCreateCredit}
                     disabled={partyLocked || submitting}
                     onSearch={searchArticleCreditPersons}
+                    onSelectionCleared={() => {
+                      setSelectedExistingCredit(null);
+                      setIsPrimary(false);
+                    }}
                     onAttach={(selection) => {
                       setSelectedExistingCredit(selection);
                       setCreditRole(selection.creditRole);
