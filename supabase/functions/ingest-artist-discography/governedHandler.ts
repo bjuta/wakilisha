@@ -1,5 +1,6 @@
 import {
   authorizeDiscographyCaller,
+  DiscographyRpcError,
   createReviewedDiscographyArtistShell,
   executeReviewedDiscographyEvidence,
   fetchDiscographyProviderObservation,
@@ -227,6 +228,8 @@ export async function handleGovernedDiscographyRequest(req: Request): Promise<Re
       ok: false,
       error: message,
       duration_ms: Date.now() - startedAt,
-    }, statusForError(message));
+    }, error instanceof DiscographyRpcError && error.pgCode === "PT409"
+      ? 409
+      : statusForError(message));
   }
 }

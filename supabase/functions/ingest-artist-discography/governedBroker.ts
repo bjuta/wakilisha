@@ -9,6 +9,17 @@ import {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+// Retain PostgreSQL's typed application status across the Edge boundary.
+export class DiscographyRpcError extends Error {
+  readonly pgCode: string;
+
+  constructor(message: string, pgCode: string) {
+    super(message);
+    this.name = "DiscographyRpcError";
+    this.pgCode = pgCode;
+  }
+}
+
 export type CallerAuthority = {
   authorization: string;
   userId: string;
@@ -180,7 +191,7 @@ export async function executeReviewedDiscographyEvidence(input: {
       p_reviewed_selections: input.selections,
     },
   );
-  if (error) throw new Error(error.message);
+  if (error) throw new DiscographyRpcError(error.message, error.code);
 
   const value = Array.isArray(data) ? data[0] : data;
   if (!value || typeof value !== "object") {
