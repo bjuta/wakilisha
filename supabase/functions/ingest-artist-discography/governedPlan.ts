@@ -210,13 +210,8 @@ export function freezeReviewedDiscographyPlan(input: {
     }
   }
 
-  if (reviewedByAlbum.size !== albumById.size) {
-    const missing = [...albumById.keys()]
-      .filter((albumId) => !reviewedByAlbum.has(albumId))
-      .sort();
-    throw new Error(
-      `Every observed release must be explicitly reviewed before Apply. Missing: ${missing.join(", ")}`,
-    );
+  if (!reviewedByAlbum.size) {
+    throw new Error("At least one reviewed selection is required.");
   }
 
   return {

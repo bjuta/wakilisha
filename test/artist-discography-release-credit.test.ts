@@ -140,6 +140,7 @@ describe("artist discography release credits", () => {
 describe("reviewed discography plan freezing", () => {
   it("binds the exact Artist and immutable provider album snapshot", () => {
     const observation = providerObservation();
+    observation.albums.push({ ...observation.albums[0], apple_music_id: "apple-album-unselected", title: "Unselected album" });
     const plan = freezeReviewedDiscographyPlan({
       exact_artist_id: CURRENT_ARTIST_ID,
       provider_source_payload_fingerprint: "a".repeat(64),
@@ -235,13 +236,13 @@ describe("reviewed discography plan freezing", () => {
     expect(plan.selected_albums).toEqual([]);
   });
 
-  it("rejects an incomplete review decision set", () => {
+  it("rejects a request with no reviewed selections", () => {
     expect(() => freezeReviewedDiscographyPlan({
       exact_artist_id: CURRENT_ARTIST_ID,
       provider_source_payload_fingerprint: "f".repeat(64),
       observation: providerObservation(),
       selections: [],
-    })).toThrow("Every observed release must be explicitly reviewed before Apply");
+    })).toThrow("At least one reviewed selection is required.");
   });
 
   it("rejects inconsistent canonical identity for the same co-primary Artist", () => {

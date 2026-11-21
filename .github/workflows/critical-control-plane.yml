@@ -262,6 +262,13 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Prove selected-only Discography drawer in real Chromium
+        env:
+          WK_DISCOGRAPHY_UI_FIXTURE: "1"
+          VITE_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
+          VITE_PUBLIC_SUPABASE_ANON_KEY: "wk-synthetic-browser-only-no-credentials"
+        run: npm run test:ui-browser -- test/ui-browser/interaction-primitives.spec.ts --grep "Discography selected-only drawer"
+
       - name: Exercise shared authoring editor in isolated real Chromium
         env:
           WK_EDITORIAL_FIXTURE: "1"

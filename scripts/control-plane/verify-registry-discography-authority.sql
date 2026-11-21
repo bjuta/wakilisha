@@ -507,7 +507,7 @@ begin
     raise exception 'Discography canonical Track provider-profile ambiguity guard drifted';
   end if;
 
-  -- Reviewed admission must require an exhaustive decision set, allow Leave-all,
+  -- Reviewed admission requires an exact observed subset, allows explicit Leave-all,
   -- compose draft identity reconciliation + active lifecycle, and bind parent
   -- finalization to the MIZIZI sentry.
   select pg_get_functiondef(
@@ -516,12 +516,13 @@ begin
     )
   ) into v_definition;
   if position(
-       'Every observed Release requires one explicit Discography review decision.'
+       'At least one reviewed selection is required'
        in v_definition
      )=0
+     or position('Every observed Release requires one explicit Discography review decision.' in v_definition)>0
      or position('plan cannot ignore every Album' in v_definition)>0
   then
-    raise exception 'Discography exhaustive explicit-review authority drifted';
+    raise exception 'Discography selected-release authority drifted';
   end if;
 
   select pg_get_functiondef(
@@ -709,7 +710,7 @@ begin
   ) into v_definition;
   if position('accepted_release_not_active' in v_definition)=0
      or position('accepted_track_not_active' in v_definition)=0
-     or position('left_release_escaped_into_canonical_plan' in v_definition)=0
+     or position('release_operations_not_exact_selected_set' in v_definition)=0
   then
     raise exception 'MIZIZI reviewed-admission terminal sentry drifted';
   end if;
@@ -973,8 +974,27 @@ begin
     raise exception 'Discography review-conflict function is missing';
   end if;
   v_count:=(length(v_definition)-length(replace(v_definition,'errcode=''PT409''','')))/length('errcode=''PT409''');
-  if v_count<>2 or position('errcode=''40001''' in v_definition)>0 then
+  if v_count<>4 or position('errcode=''40001''' in v_definition)>0
+     or position('v_reviewed_artist_rows' in v_definition)=0 then
     raise exception 'Discography reviewed identity conflict may be retried as serialization failure';
   end if;
 end
 $review_conflict_retry_guard$;
+
+-- Selected-only terminal authority and nonretryable strong-provider conflicts.
+do $selected_scope_guard$
+declare v_definition text;
+begin
+  v_definition:=pg_get_functiondef(to_regprocedure('mizizi_private.registry_reviewed_admission_sentry_v1(uuid)'));
+  if position('review_decision_set_not_observed_subset' in v_definition)=0
+     or position('release_operations_not_exact_selected_set' in v_definition)=0
+     or position('review_decision_set_not_exhaustive' in v_definition)>0 then
+    raise exception 'Discography selected-only terminal authority drifted';
+  end if;
+  v_definition:=pg_get_functiondef(to_regprocedure('platform_private.registry_discography_resolve_artist_provider_credit_v1(text,text,text)'));
+  if position('errcode=''40001''' in v_definition)>0
+     or position('errcode=''PT409''' in v_definition)=0 then
+    raise exception 'Discography strong identity review is retryable';
+  end if;
+end
+$selected_scope_guard$;
