@@ -1019,12 +1019,12 @@ export function ArtistDiscographyIntakeDrawer({
                   <p className="text-[13px] font-bold text-red-800">Apply failed</p>
                   <p className="text-[12px] text-red-700 mt-0.5">{applyError}</p>
                   <button
-                    onClick={() => setShowConfirm(true)}
+                    onClick={() => setApplyError(null)}
                     disabled={applying}
                     className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-[11px] font-bold text-red-700 hover:bg-red-100 disabled:opacity-50 cursor-pointer"
                   >
                     <WkIcon name="RefreshCw" size={12} />
-                    Retry apply
+                    Review selections
                   </button>
                 </div>
               </div>

@@ -37,6 +37,7 @@ const governedHandler = read(governedHandlerPath);
 const governedPlan = read(governedPlanPath);
 const brokerEntrypoint = read(brokerEntrypointPath);
 const adminClient = read(adminClientPath);
+const reviewConflictMigration = read("supabase/migrations/20261121061234_registry_discography_review_conflict_nonretryable_v1.sql");
 const publicRead = read(publicReadPath);
 const publicClient = read(publicClientPath);
 const intakeDrawer = read(intakeDrawerPath);
@@ -235,6 +236,15 @@ requireText(adminClient, 'artist_id: artistId', adminClientPath);
 requireText(adminClient, 'evidence_assertion_id: input.evidenceAssertionId', adminClientPath);
 requireText(adminClient, 'selected_albums: input.selections', adminClientPath);
 requireText(adminClient, 'approved: true', adminClientPath);
+requireText(adminClient, 'await context.clone().json()', adminClientPath);
+requireText(adminClient, 'await extractInvokeError(error)', adminClientPath);
+requireText(intakeDrawer, 'Review selections', intakeDrawerPath);
+requireText(intakeDrawer.slice(intakeDrawer.indexOf('{/* Apply error */}'), intakeDrawer.indexOf('{/* Stats summary bar */}')), 'onClick={() => setApplyError(null)}', intakeDrawerPath);
+requireText(reviewConflictMigration, 'Unresolved provider Artist identity collides with an existing credited-name identity; review is required.', 'review-conflict migration');
+if ((reviewConflictMigration.match(/errcode='PT409'/g) ?? []).length !== 2) {
+  throw new Error('review-conflict migration: two non-retryable SQL states are required');
+}
+forbidText(reviewConflictMigration, "errcode='40001'", 'review-conflict migration');
 for (const fragment of [
   'provider_album: input.',
   'observation: input.',

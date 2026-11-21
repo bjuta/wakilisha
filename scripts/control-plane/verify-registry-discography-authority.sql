@@ -959,3 +959,22 @@ end
 $verify$;
 
 select 'REGISTRY_DISCOGRAPHY_AUTHORITY_V1_PASS' as status;
+
+-- Nonretryable reviewed Discography identity conflict SQL authority.
+-- Read-only permanent verification. 40001 must never represent this review gate.
+do $review_conflict_retry_guard$
+declare v_definition text;
+  v_count integer;
+begin
+  v_definition:=pg_get_functiondef(to_regprocedure(
+    'platform_private.registry_discography_release_artist_desired_v1(uuid,uuid,jsonb,jsonb)'
+  ));
+  if v_definition is null then
+    raise exception 'Discography review-conflict function is missing';
+  end if;
+  v_count:=(length(v_definition)-length(replace(v_definition,'errcode=''PT409''','')))/length('errcode=''PT409''');
+  if v_count<>2 or position('errcode=''40001''' in v_definition)>0 then
+    raise exception 'Discography reviewed identity conflict may be retried as serialization failure';
+  end if;
+end
+$review_conflict_retry_guard$;

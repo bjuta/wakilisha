@@ -84,7 +84,7 @@ begin
     'failed_album_ids','[]'::jsonb,
     'albums',jsonb_build_array(
       jsonb_build_object(
-        'apple_music_id','wk-review-album-add-001',
+        'apple_music_id','9901416007',
         'upc','9990000000001',
         'title','Ten Year Test - EP',
         'release_type','ep',
@@ -95,7 +95,7 @@ begin
         'related_artists','[]'::jsonb,
         'tracks',jsonb_build_array(
           jsonb_build_object(
-            'apple_music_id','wk-review-track-001',
+            'apple_music_id','9901416011',
             'title','One Minute',
             'isrc','KEWAK2600001',
             'explicit',false,
@@ -106,7 +106,7 @@ begin
             'genre_names',jsonb_build_array('African')
           ),
           jsonb_build_object(
-            'apple_music_id','wk-review-track-002',
+            'apple_music_id','9901416012',
             'title','Second Cut',
             'isrc','KEWAK2600002',
             'explicit',false,
@@ -119,7 +119,7 @@ begin
         )
       ),
       jsonb_build_object(
-        'apple_music_id','wk-review-album-leave-001',
+        'apple_music_id','9901416008',
         'upc','9990000000002',
         'title','Leave This Out - Single',
         'release_type','single',
@@ -130,7 +130,7 @@ begin
         'related_artists','[]'::jsonb,
         'tracks',jsonb_build_array(
           jsonb_build_object(
-            'apple_music_id','wk-review-track-leave-001',
+            'apple_music_id','9901416013',
             'title','Leave This Track',
             'isrc','KEWAK2600099',
             'explicit',false,
@@ -158,7 +158,7 @@ begin
       v_observation,
       jsonb_build_array(
         jsonb_build_object(
-          'apple_music_id','wk-review-album-add-001',
+          'apple_music_id','9901416007',
           'action','canonicalize'
         )
       )
@@ -181,11 +181,11 @@ begin
       v_evidence_id,
       jsonb_build_array(
         jsonb_build_object(
-          'apple_music_id','wk-review-album-add-001',
+          'apple_music_id','9901416007',
           'action','canonicalize'
         ),
         jsonb_build_object(
-          'apple_music_id','wk-review-album-leave-001',
+          'apple_music_id','9901416008',
           'action','ignore'
         )
       )
@@ -201,7 +201,7 @@ begin
   select release.id
   into v_release_id
   from public.registry_releases release
-  where release.metadata->>'apple_music_album_id'='wk-review-album-add-001';
+  where release.metadata->>'apple_music_album_id'='9901416007';
 
   if v_release_id is null
      or not exists (
@@ -222,7 +222,7 @@ begin
   if exists (
     select 1
     from public.registry_releases release
-    where release.metadata->>'apple_music_album_id'='wk-review-album-leave-001'
+    where release.metadata->>'apple_music_album_id'='9901416008'
        or release.upc='9990000000002'
   ) then
     raise exception 'Leave decision escaped into canonical Release truth';
@@ -231,12 +231,12 @@ begin
   select track.id
   into v_track_one_id
   from public.registry_tracks track
-  where track.metadata->>'apple_music_track_id'='wk-review-track-001';
+  where track.metadata->>'apple_music_track_id'='9901416011';
 
   select track.id
   into v_track_two_id
   from public.registry_tracks track
-  where track.metadata->>'apple_music_track_id'='wk-review-track-002';
+  where track.metadata->>'apple_music_track_id'='9901416012';
 
   if v_track_one_id is null
      or v_track_two_id is null
@@ -264,7 +264,7 @@ begin
   if exists (
     select 1
     from public.registry_tracks track
-    where track.metadata->>'apple_music_track_id'='wk-review-track-leave-001'
+    where track.metadata->>'apple_music_track_id'='9901416013'
        or track.isrc='KEWAK2600099'
   ) then
     raise exception 'Leave decision escaped into canonical Track truth';
@@ -343,7 +343,7 @@ begin
     'failed_album_ids','[]'::jsonb,
     'albums',jsonb_build_array(
       jsonb_build_object(
-        'apple_music_id','wk-review-leave-all-001',
+        'apple_music_id','9901416009',
         'upc','9990000000003',
         'title','Nothing Admitted - Single',
         'release_type','single',
@@ -353,7 +353,7 @@ begin
         'related_artists','[]'::jsonb,
         'tracks',jsonb_build_array(
           jsonb_build_object(
-            'apple_music_id','wk-review-leave-all-track-001',
+            'apple_music_id','9901416010',
             'title','Nothing Admitted',
             'isrc','KEWAK2600100',
             'explicit',false,
@@ -384,7 +384,7 @@ begin
       v_leave_evidence_id,
       jsonb_build_array(
         jsonb_build_object(
-          'apple_music_id','wk-review-leave-all-001',
+          'apple_music_id','9901416009',
           'action','ignore'
         )
       )
@@ -456,7 +456,7 @@ begin
     'failed_album_ids','[]'::jsonb,
     'albums',jsonb_build_array(
       jsonb_build_object(
-        'apple_music_id','wk-collision-album-001',
+        'apple_music_id','9901416003',
         'upc','9990000000011',
         'title','Sibling Identity',
         'release_type','album',
@@ -467,7 +467,7 @@ begin
         'related_artists','[]'::jsonb,
         'tracks',jsonb_build_array(
           jsonb_build_object(
-            'apple_music_id','wk-collision-track-album-001',
+            'apple_music_id','9901416005',
             'title','Sibling Album Cut',
             'isrc','KEWAK2600111',
             'explicit',false,
@@ -480,7 +480,7 @@ begin
         )
       ),
       jsonb_build_object(
-        'apple_music_id','wk-collision-single-001',
+        'apple_music_id','9901416004',
         'upc','9990000000012',
         'title','Sibling Identity - Single',
         'release_type','single',
@@ -491,7 +491,7 @@ begin
         'related_artists','[]'::jsonb,
         'tracks',jsonb_build_array(
           jsonb_build_object(
-            'apple_music_id','wk-collision-track-single-001',
+            'apple_music_id','9901416006',
             'title','Sibling Single Cut',
             'isrc','KEWAK2600112',
             'explicit',false,
@@ -522,11 +522,11 @@ begin
       v_collision_evidence_id,
       jsonb_build_array(
         jsonb_build_object(
-          'apple_music_id','wk-collision-album-001',
+          'apple_music_id','9901416003',
           'action','canonicalize'
         ),
         jsonb_build_object(
-          'apple_music_id','wk-collision-single-001',
+          'apple_music_id','9901416004',
           'action','canonicalize'
         )
       )
@@ -544,14 +544,14 @@ begin
   if not exists (
        select 1
        from public.registry_releases release
-       where release.metadata->>'apple_music_album_id'='wk-collision-album-001'
+       where release.metadata->>'apple_music_album_id'='9901416003'
          and release.status='active'
          and release.slug='sibling-identity'
      )
      or not exists (
        select 1
        from public.registry_releases release
-       where release.metadata->>'apple_music_album_id'='wk-collision-single-001'
+       where release.metadata->>'apple_music_album_id'='9901416004'
          and release.status='active'
          and release.slug='sibling-identity-single'
      )
@@ -566,11 +566,11 @@ begin
   -- structural disambiguator without changing either lifecycle state.
   update public.registry_releases
   set slug='sibling-identity-review-spine-artist',updated_at=now()
-  where metadata->>'apple_music_album_id'='wk-collision-album-001';
+  where metadata->>'apple_music_album_id'='9901416003';
 
   update public.registry_releases
   set slug='sibling-identity',updated_at=now()
-  where metadata->>'apple_music_album_id'='wk-collision-single-001';
+  where metadata->>'apple_music_album_id'='9901416004';
 
   v_recovery_observation:=
     jsonb_set(
@@ -596,11 +596,11 @@ begin
       v_recovery_evidence_id,
       jsonb_build_array(
         jsonb_build_object(
-          'apple_music_id','wk-collision-album-001',
+          'apple_music_id','9901416003',
           'action','canonicalize'
         ),
         jsonb_build_object(
-          'apple_music_id','wk-collision-single-001',
+          'apple_music_id','9901416004',
           'action','canonicalize'
         )
       )
@@ -634,11 +634,11 @@ begin
       v_recovery_evidence_id,
       jsonb_build_array(
         jsonb_build_object(
-          'apple_music_id','wk-collision-album-001',
+          'apple_music_id','9901416003',
           'action','canonicalize'
         ),
         jsonb_build_object(
-          'apple_music_id','wk-collision-single-001',
+          'apple_music_id','9901416004',
           'action','canonicalize'
         )
       )
@@ -650,14 +650,14 @@ begin
      or not exists (
        select 1
        from public.registry_releases release
-       where release.metadata->>'apple_music_album_id'='wk-collision-album-001'
+       where release.metadata->>'apple_music_album_id'='9901416003'
          and release.status='active'
          and release.slug='sibling-identity-album'
      )
      or not exists (
        select 1
        from public.registry_releases release
-       where release.metadata->>'apple_music_album_id'='wk-collision-single-001'
+       where release.metadata->>'apple_music_album_id'='9901416004'
          and release.status='active'
          and release.slug='sibling-identity'
      )
@@ -693,7 +693,7 @@ begin
     'failed_album_ids','[]'::jsonb,
     'albums',jsonb_build_array(
       jsonb_build_object(
-        'apple_music_id','wk-atomic-album-001',
+        'apple_music_id','9901416001',
         'upc','9990000000021',
         'title','Atomic Boundary - EP',
         'release_type','ep',
@@ -704,7 +704,7 @@ begin
         'related_artists','[]'::jsonb,
         'tracks',jsonb_build_array(
           jsonb_build_object(
-            'apple_music_id','wk-atomic-track-001',
+            'apple_music_id','9901416002',
             'title','Atomic Child',
             'isrc','KEWAK2600121',
             'explicit',false,
@@ -735,7 +735,7 @@ begin
       v_atomic_evidence_id,
       jsonb_build_array(
         jsonb_build_object(
-          'apple_music_id','wk-atomic-album-001',
+          'apple_music_id','9901416001',
           'action','canonicalize'
         )
       )
@@ -746,7 +746,7 @@ begin
   from platform_private.registry_discography_review_plans review
   where review.id=v_atomic_plan_id;
 
-  if v_atomic_plan->>'plan_version'<>'3'
+  if v_atomic_plan->>'plan_version'<>'4'
      or v_atomic_plan->>'terminal_policy'<>'active_ingest_v2'
      or not exists (
        select 1
@@ -803,7 +803,7 @@ begin
       v_atomic_evidence_id,
       jsonb_build_array(
         jsonb_build_object(
-          'apple_music_id','wk-atomic-album-001',
+          'apple_music_id','9901416001',
           'action','canonicalize'
         )
       )
@@ -821,13 +821,13 @@ begin
   if exists (
        select 1
        from public.registry_releases release
-       where release.metadata->>'apple_music_album_id'='wk-atomic-album-001'
+       where release.metadata->>'apple_music_album_id'='9901416001'
           or release.upc='9990000000021'
      )
      or exists (
        select 1
        from public.registry_tracks track
-       where track.metadata->>'apple_music_track_id'='wk-atomic-track-001'
+       where track.metadata->>'apple_music_track_id'='9901416002'
           or track.isrc='KEWAK2600121'
      )
   then
