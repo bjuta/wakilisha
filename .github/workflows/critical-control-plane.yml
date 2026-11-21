@@ -251,13 +251,6 @@ jobs:
       - name: Run WAKILISHA real-browser interaction acceptance
         run: npm run test:ui-browser
 
-      - name: Prove selected-only Discography drawer in real Chromium
-        env:
-          WK_DISCOGRAPHY_UI_FIXTURE: "1"
-          VITE_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
-          VITE_PUBLIC_SUPABASE_ANON_KEY: "wk-synthetic-browser-only-no-credentials"
-        run: npm run test:ui-browser -- test/ui-browser/interaction-primitives.spec.ts --grep "Discography selected-only drawer"
-
       # A second Playwright invocation clears test-results. Preserve the actual
       # public route captures before launching the isolated authoring fixture.
       - name: Preserve actual public-route visual evidence
@@ -268,6 +261,13 @@ jobs:
           path: test-results/**/workbook-v4-*.png
           if-no-files-found: error
           retention-days: 7
+
+      - name: Prove selected-only Discography drawer in real Chromium
+        env:
+          WK_DISCOGRAPHY_UI_FIXTURE: "1"
+          VITE_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
+          VITE_PUBLIC_SUPABASE_ANON_KEY: "wk-synthetic-browser-only-no-credentials"
+        run: npm run test:ui-browser -- test/ui-browser/interaction-primitives.spec.ts --grep "Discography selected-only drawer"
 
       - name: Exercise shared authoring editor in isolated real Chromium
         env:
