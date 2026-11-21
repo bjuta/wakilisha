@@ -241,3 +241,121 @@ test("Workbook v4 loads authentic font faces and keeps controls and theme legibl
     expect(control.size).toBeGreaterThanOrEqual(16);
   }
 });
+
+
+/**
+ * A real Chromium interaction with the actual Discography drawer. The Edge
+ * response is fixture data, not a Production or hosted Preview mutation.
+ * The governed authenticated hosted Apply is proved separately.
+ */
+test("Discography selected-only drawer Clear all and Apply omits every unselected album", async ({ page }) => {
+  test.skip(process.env.WK_DISCOGRAPHY_UI_FIXTURE !== "1", "Run in the isolated Discography browser acceptance step");
+
+  const artistId = "10b940ff-3382-42b3-a81b-a30e4028297d";
+  const albumId = "9901416999";
+  const unselectedAlbumId = "9901416996";
+  const evidence = "acf1b963-9e3e-4dbb-9c61-3fd85e6af339";
+  const applied: Array<Record<string, unknown>> = [];
+  const cors = {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "POST, OPTIONS",
+    "access-control-allow-headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
+  };
+  const album = (id: string, title: string) => ({
+    apple_music_id: id,
+    title,
+    slug: title.toLowerCase().replaceAll(" ", "-"),
+    release_type: "single",
+    release_date: "2026-10-04",
+    upc: null,
+    record_label: null,
+    genre_names: [],
+    artwork_url: null,
+    apple_music_url: null,
+    track_count: 0,
+    tracks: [],
+    match_status: "new",
+    existing_release: null,
+    album_artist_name: "WK Selected Preview Artist",
+  });
+  await page.route("https://example.supabase.co/functions/v1/ingest-artist-discography", async (route) => {
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: cors });
+      return;
+    }
+    const request = route.request().postDataJSON() as Record<string, unknown>;
+    if (request.mode === "preview") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: cors,
+        body: JSON.stringify({
+          ok: true,
+          mode: "preview",
+          artist: { id: artistId, slug: "wk-selected-preview-artist", name: "WK Selected Preview Artist" },
+          storefront: "ke",
+          albums_searched: 2,
+          albums_fetched: 2,
+          albums_failed: [],
+          albums: [album(albumId, "Selected Preview Single"), album(unselectedAlbumId, "Untouched Preview Single")],
+          evidence_assertion_id: evidence,
+          provider_source_payload_fingerprint: "a".repeat(64),
+          duration_ms: 12,
+        }),
+      });
+      return;
+    }
+    if (request.mode === "apply") {
+      applied.push(request);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: cors,
+        body: JSON.stringify({
+          ok: true,
+          mode: "apply",
+          summary: { merged: 0, canonicalized: 1, ignored: 0, tracks_created: 1, errors: [] },
+          duration_ms: 30,
+        }),
+      });
+      return;
+    }
+    throw new Error("Unexpected Discography fixture mode");
+  });
+
+  await page.goto("/test/ui-browser/fixtures/interaction.html");
+  await page.getByRole("button", { name: "Open Discography acceptance" }).click();
+  const dialog = page.getByRole("dialog", { name: "Apple Music Discography" });
+  await expect(dialog.getByText("Selected Preview Single")).toBeVisible();
+  await expect(dialog.getByText("Untouched Preview Single")).toBeVisible();
+  const apply = dialog.getByRole("button", { name: "Apply review" });
+  await expect(apply).toBeDisabled();
+  const add = dialog.getByRole("button", { name: "Add to Registry" });
+  await expect(add).toHaveCount(2);
+  await add.first().click();
+  await expect(apply).toBeEnabled();
+
+  await dialog.getByRole("button", { name: "Clear all" }).click();
+  await expect(apply).toBeDisabled();
+  await expect(dialog.getByText("0 albums selected")).toBeVisible();
+
+  // An administrator does not click Leave on either discovered album.
+  await dialog.getByRole("button", { name: "Add to Registry" }).first().click();
+  await expect(apply).toBeEnabled();
+  await expect(dialog.getByText("1 not selected. Only selected albums will change.")).toBeVisible();
+  await apply.click();
+  await expect(dialog.getByText("All other albums will remain untouched.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Yes, apply review" }).click();
+  await expect(dialog.getByText("Applied successfully")).toBeVisible();
+  expect(applied).toHaveLength(1);
+  expect(applied[0]).toMatchObject({
+    artist_id: artistId,
+    mode: "apply",
+    approved: true,
+    evidence_assertion_id: evidence,
+    selected_albums: [
+      { apple_music_id: albumId, action: "canonicalize", additional_primary_artists: [] },
+    ],
+  });
+  expect(JSON.stringify(applied[0])).not.toContain(unselectedAlbumId);
+});

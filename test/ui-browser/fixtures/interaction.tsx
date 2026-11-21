@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "@/index.css";
 import "@/design-system/wakilisha.tokens.css";
@@ -14,8 +14,15 @@ import { WkDatePicker } from "@/components/design-system/primitives/DateTimePick
 import { WkIcon } from "@/components/design-system/Icon";
 import { initializeViewportIntegrityObserver } from "@/lib/viewport/viewportIntegrity";
 
+// Render the actual Registry drawer only in the isolated browser acceptance.
+const ArtistDiscographyDrawer = lazy(() =>
+  import("@/components/admin/registry/artist-discography/ArtistDiscographyIntakeDrawer")
+    .then(({ ArtistDiscographyIntakeDrawer }) => ({ default: ArtistDiscographyIntakeDrawer }))
+);
+
 function InteractionFixture() {
   const [open, setOpen] = useState(false);
+  const [discographyOpen, setDiscographyOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [fixtureDate, setFixtureDate] = useState("2026-09-28");
   const [value, setValue] = useState("alpha");
@@ -88,6 +95,26 @@ function InteractionFixture() {
           </div>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setDiscographyOpen(true)}
+        className="wk-button wk-button-secondary mb-2"
+      >
+        Open Discography acceptance
+      </button>
+
+      {discographyOpen && (
+        <Suspense fallback={<p>Loading Discography acceptance…</p>}>
+          <ArtistDiscographyDrawer
+            artistId="10b940ff-3382-42b3-a81b-a30e4028297d"
+            artistSlug="wk-selected-preview-artist"
+            artistName="WK Selected Preview Artist"
+            onClose={() => setDiscographyOpen(false)}
+            onComplete={() => setDiscographyOpen(false)}
+          />
+        </Suspense>
+      )}
 
       <button
         type="button"
