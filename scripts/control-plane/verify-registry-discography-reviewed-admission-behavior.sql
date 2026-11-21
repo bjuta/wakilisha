@@ -889,6 +889,187 @@ begin
 end
 $collision_and_atomic$;
 
+
+-- IFPI/DDEX: one recording can appear in multiple Releases, while distinct
+-- valid ISRC masters retain independent Track identities and stable slugs.
+do $ifpi_ddex_release_membership$
+declare
+  u uuid:='44444444-2222-4333-8444-555555555555';
+  a uuid:='44444444-3333-4444-8555-666666666666';
+  original_release uuid:='44444444-5555-4666-8777-888888888881';
+  earlier_master uuid:='44444444-5555-4666-8777-888888888882';
+  earlier_finale uuid:='44444444-5555-4666-8777-888888888883';
+  shared_recording uuid:='44444444-5555-4666-8777-888888888884';
+  v_observation jsonb;
+  v_evidence uuid;
+  v_result jsonb;
+  v_album_release uuid;
+  v_new_master uuid;
+  v_new_finale uuid;
+  v_plan uuid;
+  v_sentry jsonb;
+begin
+  insert into auth.users(id,is_sso_user,is_anonymous) values(u,false,false);
+  insert into public.user_role_assignments(user_id,role_key,status,notes)
+  values(u,'registry_editor','active','Rollback-only IFPI/DDEX Release membership proof');
+  insert into platform_private.system_actor_executor_bindings(
+    actor_key,executor_kind,executor_key,status)
+  values('registry_discography_admin','database_role',session_user,'active')
+  on conflict do nothing;
+  perform set_config('request.jwt.claim.sub',u::text,true);
+  perform set_config('request.jwt.claims',
+    jsonb_build_object('sub',u::text,'role','authenticated')::text,true);
+  if auth.uid() is distinct from u
+     or not public.current_user_has_capability('manage_registry')
+  then raise exception 'IFPI/DDEX fixture caller denied';end if;
+
+  insert into public.registry_artists(
+    id,slug,display_name,normalized_name,status,metadata,living_memory_status)
+  values(a,'ifpi-ddex-fixture-artist','IFPI DDEX Fixture Artist',
+    platform_private.registry_identity_normalize_text_v1('IFPI DDEX Fixture Artist'),
+    'active','{}'::jsonb,'draft');
+
+  insert into public.registry_releases(
+    id,slug,title,normalized_title,release_type,status,metadata)
+  values(original_release,'ifpi-ddex-advance-single','Advance Singles - EP',
+    platform_private.registry_identity_normalize_text_v1('Advance Singles - EP'),
+    'ep','active','{"apple_music_album_id":"9901416101"}'::jsonb);
+  insert into public.registry_release_artists(
+    release_id,artist_id,artist_slug,artist_name_text,role,
+    is_primary,is_featured,credit_order,source,confidence,status,metadata)
+  values(original_release,a,'ifpi-ddex-fixture-artist','IFPI DDEX Fixture Artist',
+    'primary',true,false,1,'fixture',100,'active','{}'::jsonb);
+
+  insert into public.registry_tracks(
+    id,slug,title,normalized_title,isrc,status,metadata)
+  values
+    (earlier_master,'all-my-enemies-are-suffering','All My Enemies Are Suffering',
+     platform_private.registry_identity_normalize_text_v1('All My Enemies Are Suffering'),
+     'KEWAK2614170','active',
+     '{"apple_music_track_id":"9901416121","apple_music_album_id":"9901416101"}'::jsonb),
+    (earlier_finale,'finale','Finale',
+     platform_private.registry_identity_normalize_text_v1('Finale'),
+     'KEWAK2614172','active',
+     '{"apple_music_track_id":"9901416122","apple_music_album_id":"9901416101"}'::jsonb),
+    (shared_recording,'stable-single','Stable Single',
+     platform_private.registry_identity_normalize_text_v1('Stable Single'),
+     'KEWAK2614174','active',
+     '{"apple_music_track_id":"9901416123","apple_music_album_id":"9901416101"}'::jsonb);
+  insert into public.registry_track_artists(
+    track_id,artist_id,artist_slug,artist_name_text,role,is_primary,
+    is_featured,credit_order,source,confidence,status,metadata)
+  select id,a,'ifpi-ddex-fixture-artist','IFPI DDEX Fixture Artist',
+    'primary',true,false,1,'fixture',100,'active','{}'::jsonb
+  from public.registry_tracks where id in (earlier_master,earlier_finale,shared_recording);
+  insert into public.registry_release_tracks(
+    release_id,track_id,disc_number,track_number,source,confidence,status,metadata)
+  values
+    (original_release,earlier_master,1,1,'fixture',100,'active','{}'::jsonb),
+    (original_release,earlier_finale,1,2,'fixture',100,'active','{}'::jsonb),
+    (original_release,shared_recording,1,3,'fixture',100,'active','{}'::jsonb);
+
+  v_observation:=jsonb_build_object(
+    'provider','apple_music','storefront','ke','acquired_at',now(),
+    'artist',jsonb_build_object('id',a,'slug','ifpi-ddex-fixture-artist',
+      'display_name','IFPI DDEX Fixture Artist'),
+    'failed_album_ids','[]'::jsonb,
+    'albums',jsonb_build_array(
+      jsonb_build_object(
+        'apple_music_id','9901416111','upc','9990000008888',
+        'title','Alusa Continua','release_type','album','release_date','2026-11-10',
+        'genre_names',jsonb_build_array('African'),
+        'record_label','Rollback-only IFPI DDEX Acceptance',
+        'album_artist_name','IFPI DDEX Fixture Artist',
+        'related_artists','[]'::jsonb,
+        'tracks',jsonb_build_array(
+          jsonb_build_object(
+            'apple_music_id','9901416131',
+            'title','All My Enemies Are Suffering','isrc','KEWAK2614171',
+            'artist_name','IFPI DDEX Fixture Artist',
+            'disc_number',1,'track_number',1,'duration_ms',60000,'explicit',false,
+            'genre_names',jsonb_build_array('African')),
+          jsonb_build_object(
+            'apple_music_id','9901416132','title','Finale','isrc','KEWAK2614173',
+            'artist_name','IFPI DDEX Fixture Artist',
+            'disc_number',1,'track_number',2,'duration_ms',61000,'explicit',false,
+            'genre_names',jsonb_build_array('African')),
+          jsonb_build_object(
+            'apple_music_id','9901416123','title','Stable Single','isrc','KEWAK2614174',
+            'artist_name','IFPI DDEX Fixture Artist',
+            'disc_number',1,'track_number',3,'duration_ms',62000,'explicit',false,
+            'genre_names',jsonb_build_array('African')),
+          jsonb_build_object(
+            'apple_music_id','9901416134','title','New Album Cut','isrc','KEWAK2614175',
+            'artist_name','IFPI DDEX Fixture Artist',
+            'disc_number',1,'track_number',4,'duration_ms',63000,'explicit',false,
+            'genre_names',jsonb_build_array('African'))
+        )),
+      jsonb_build_object(
+        'apple_music_id','9901416199','title','Untouched Other Album',
+        'release_type','single','release_date','2026-11-11',
+        'genre_names','[]'::jsonb,'related_artists','[]'::jsonb,
+        'album_artist_name','IFPI DDEX Fixture Artist',
+        'tracks','[]'::jsonb)
+    )
+  );
+  v_evidence:=public.admin_prepare_registry_discography_evidence_v1(
+    a,v_observation,
+    encode(extensions.digest(v_observation::text,'sha256'),'hex')
+  );
+  v_result:=public.admin_execute_registry_discography_evidence_v1(
+    a,v_evidence,
+    '[{"apple_music_id":"9901416111","action":"canonicalize"}]'::jsonb
+  );
+  if jsonb_array_length(coalesce(v_result#>'{summary,errors}','[]'::jsonb))<>0
+  then
+    raise exception 'IFPI/DDEX admitted operations failed: %',
+      v_result#>'{summary,errors}';
+  end if;
+
+  select id into v_album_release from public.registry_releases
+  where metadata->>'apple_music_album_id'='9901416111';
+  select id into v_new_master from public.registry_tracks where isrc='KEWAK2614171';
+  select id into v_new_finale from public.registry_tracks where isrc='KEWAK2614173';
+  if v_album_release is null or v_new_master is null or v_new_finale is null
+     or v_new_master=earlier_master or v_new_finale=earlier_finale
+  then raise exception 'Alusa Continua variants did not remain distinct';end if;
+  if (select slug from public.registry_tracks where id=v_new_master)
+         <>'all-my-enemies-are-suffering-kewak2614171'
+     or (select slug from public.registry_tracks where id=v_new_finale)
+         <>'finale-kewak2614173'
+  then raise exception 'Distinct master route was not stable';end if;
+  if (select count(*) from public.registry_release_tracks
+      where release_id=v_album_release and status='active')<>4
+     or not exists(
+       select 1 from public.registry_release_tracks
+       where release_id=v_album_release and track_id=shared_recording and status='active')
+     or (select count(*) from public.registry_release_tracks
+      where release_id=original_release and status='active')<>3
+  then raise exception 'IFPI/DDEX multi-Release recording membership drifted';end if;
+  if (select metadata->>'apple_music_album_id'
+      from public.registry_tracks where id=shared_recording)<>'9901416101'
+     or (select isrc from public.registry_tracks where id=earlier_master)<>'KEWAK2614170'
+  then raise exception 'Original Single recording was overwritten';end if;
+  if exists(select 1 from public.registry_releases
+      where metadata->>'apple_music_album_id'='9901416199')
+  then raise exception 'Unselected Album unexpectedly admitted';end if;
+
+  select id into v_plan from platform_private.registry_discography_review_plans
+  where artist_id=a and evidence_assertion_id=v_evidence;
+  select op.result_payload->'mizizi_terminal_sentry' into v_sentry
+  from platform_private.registry_mutation_operations op
+  where op.operation_key='registry.discography.apply'
+    and op.result_payload#>>'{mizizi_terminal_sentry,review_plan_id}'=v_plan::text
+  order by op.created_at desc limit 1;
+  if v_sentry->>'status'<>'pass'
+     or v_sentry->>'observed'<>'2'
+     or v_sentry->>'reviewed'<>'1'
+     or v_sentry->>'accepted'<>'1'
+     or v_sentry->>'left'<>'0'
+  then raise exception 'IFPI/DDEX terminal sentry failed: %',v_sentry;end if;
+end
+$ifpi_ddex_release_membership$;
+
 rollback;
 
 select
