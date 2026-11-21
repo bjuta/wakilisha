@@ -53,12 +53,14 @@ export function EditorialCreditPicker({
   roles,
   canCreateCredit,
   disabled = false,
+  actionLabel = "Add Credit",
   onSearch,
   onAttach,
 }: {
   roles: EditorialCreditRoleOption[];
   canCreateCredit: boolean;
   disabled?: boolean;
+  actionLabel?: string;
   onSearch: (
     query: string,
   ) => Promise<EditorialCreditPartyOption[]>;
@@ -294,7 +296,7 @@ export function EditorialCreditPicker({
         }}
         className="wk-button wk-button-ghost wk-button-sm disabled:opacity-50"
       >
-        Add Credit
+        {actionLabel}
       </button>
     </div>
   );
