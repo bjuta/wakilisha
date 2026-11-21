@@ -262,7 +262,10 @@ export function EditorialCreditPicker({
         Credit role
         <WkSelect
           value={resolvedRole}
-          onChange={(value) => setCreditRole(value)}
+          onChange={(value) => {
+            setCreditRole(value);
+            onSelectionCleared?.();
+          }}
           disabled={disabled || !selectedParty || availableRoles.length === 0}
           triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-xs text-wk-text disabled:opacity-60"
         >
