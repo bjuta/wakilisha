@@ -33,7 +33,7 @@ begin
   end if;
   return v_base||'-'||lower(v_isrc);
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION platform_private.registry_discography_variant_creation_collision_state_v1(p_future_track_id uuid, p_title text, p_artist_id uuid, p_isrc text, p_slug text)
  RETURNS jsonb
@@ -86,7 +86,7 @@ begin
     );
   return v_state;
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION platform_private.registry_discography_resolve_track_v1(p_artist_id uuid, p_track jsonb)
  RETURNS uuid
@@ -255,7 +255,7 @@ begin
 
   return v_current_ids[1];
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION platform_private.registry_discography_build_frozen_plan_core_v1(p_artist_id uuid, p_evidence_assertion_id uuid, p_snapshot_id uuid, p_reviewed_selections jsonb)
  RETURNS jsonb
@@ -825,7 +825,7 @@ begin
     )
   );
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION platform_private.registry_discography_build_frozen_plan_pre_selective_v1(p_artist_id uuid, p_evidence_assertion_id uuid, p_snapshot_id uuid, p_reviewed_selections jsonb)
  RETURNS jsonb
@@ -1174,7 +1174,7 @@ begin
         )
     );
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION platform_private.registry_discography_build_frozen_plan_v1(p_artist_id uuid, p_evidence_assertion_id uuid, p_snapshot_id uuid, p_reviewed_selections jsonb)
  RETURNS jsonb
@@ -1439,7 +1439,7 @@ begin
         )
     );
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION platform_private.execute_registry_materialization_core_v1(p_actor_key text, p_execution_grant_id uuid)
  RETURNS TABLE(operation_id uuid, operation_status text, verifier_status text, idempotent_replay boolean)
@@ -1909,7 +1909,7 @@ begin
   idempotent_replay:=v_begin.idempotent_replay;
   return next;
 end
-$function$
+$function$;
 
 -- These helpers have no direct client execution authority.
 revoke all on function platform_private.registry_discography_track_variant_slug_v1(text,uuid,text) from public,anon,authenticated;
