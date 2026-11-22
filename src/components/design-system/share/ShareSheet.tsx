@@ -4,6 +4,7 @@ import { incrementShareCount, getShareCounts, getTotalShareCount } from "@/servi
 import { trackEvent } from "@/services/analytics";
 import { buildUtmUrl, getUtmContextForUrl } from "@/services/attribution";
 import { Portal } from "@/components/base/Portal";
+import { shareTextForItem } from "./sharePresentation";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  WAKILISHA SHARE — Unified share infrastructure across all surfaces
@@ -84,14 +85,6 @@ export const SHARE_PLATFORMS: SharePlatform[] = [
     brandBg: "#BD081C",
     brandText: "#ffffff",
     buildUrl: (u, t) => `https://pinterest.com/pin/create/button/?url=${u}&description=${t}`,
-  },
-  {
-    key: "messenger",
-    name: "Messenger",
-    icon: "ri-messenger-line",
-    brandBg: "#00B2FF",
-    brandText: "#ffffff",
-    buildUrl: (u) => `https://www.facebook.com/dialog/send?link=${u}&app_id=0`,
   },
   {
     key: "email",
@@ -461,7 +454,7 @@ export function SharePopover({
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
   const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
   const shareTarget = useMemo(() => parseShareTarget(finalUrl, item.type), [finalUrl, item.type]);
-  const shareText = item.description || item.subtitle || item.title;
+  const shareText = shareTextForItem(item);
   const shareContent = item.type ?? "page";
   const getTrackedShareUrl = useCallback((platformKey: string) => buildUtmUrl(finalUrl, {
     source: platformKey,
@@ -837,7 +830,7 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
   const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
   const shareTarget = useMemo(() => parseShareTarget(finalUrl, item.type), [finalUrl, item.type]);
-  const shareText = item.description || item.subtitle || item.title;
+  const shareText = shareTextForItem(item);
   const shareContent = item.type ?? "page";
   const getTrackedShareUrl = useCallback((platformKey: string) => buildUtmUrl(finalUrl, {
     source: platformKey,
