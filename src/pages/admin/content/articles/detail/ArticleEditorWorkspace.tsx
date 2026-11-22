@@ -1235,7 +1235,7 @@ export function ArticleEditorWorkspace({
     addToast("error", `Unsupported lifecycle status: ${newStatus}`);
   }
 
-  async function handleSubmitForReview() {
+  async function handleSubmitForReview(note: string | null = null) {
     if (!article || !canSubmitCurrentArticleForReview || isSaving) {
       addToast("error", "This Article has no unreviewed working changes eligible for submission.");
       return;
@@ -1247,7 +1247,7 @@ export function ArticleEditorWorkspace({
       if (!saved) return;
 
       const expectedDraftVersion = articleDraftVersionRef.current ?? article.draftVersion;
-      const result = await submitArticleForReview(article.id, expectedDraftVersion);
+      const result = await submitArticleForReview(article.id, expectedDraftVersion, note);
 
       if (!result.ok) {
         addToast("error", result.error ?? "Failed to submit for review.");
@@ -2275,7 +2275,7 @@ export function ArticleEditorWorkspace({
       onStatusChange={
         isInstituteMode ? undefined : handleStatusChange
       }
-      onSubmitForReview={handleSubmitForReview}
+      onSubmitForReview={() => void handleSubmitForReview()}
       onRequestChanges={openRequestChanges}
       onApproveVersion={openApproveVersion}
       canSubmitForReview={canSubmitCurrentArticleForReview}
@@ -2336,7 +2336,7 @@ export function ArticleEditorWorkspace({
         onToggleFocusMode={() =>
           setFocusMode((current) => !current)
         }
-        onSubmitForReview={handleSubmitForReview}
+        onSubmitForReview={() => void handleSubmitForReview()}
         allowSubmitForReview={allowSubmitForReview}
         canSubmitForReview={canSubmitCurrentArticleForReview}
         canRequestChanges={activeWorkbenchMode !== "review" && canRequestArticleChanges}
@@ -3248,7 +3248,7 @@ export function ArticleEditorWorkspace({
               workingVersionNumber={currentVersionProof?.latestVersionNumber ?? null}
               latestApprovedVersionNumber={latestApprovedLifecycleEvent?.versionNumber ?? null}
               canResubmitWorkingVersion={canSubmitCurrentArticleForReview}
-              onResubmitWorkingVersion={handleSubmitForReview}
+              onResubmitWorkingVersion={(note) => void handleSubmitForReview(note)}
               note={reviewActionNote}
               onNoteChange={setReviewActionNote}
               canRequestChanges={canRequestArticleChanges}
