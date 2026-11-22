@@ -306,6 +306,33 @@ describe("permanent Article editorial lifecycle authority", () => {
     expect(sql).toContain("STOP: request_article_changes definition drift");
   });
 
+  it("qualifies the live published Version number without changing the submission RPC authority", () => {
+    const migrations = path.join(process.cwd(), "supabase/migrations");
+    const original = fs.readFileSync(path.join(migrations,
+      "20261122120000_article_published_revision_preserve_live_v1.sql"), "utf8");
+    const forwardFix = fs.readFileSync(path.join(migrations,
+      "20261122190013_article_published_revision_qualify_version_number_v1.sql"), "utf8");
+    const functionName = "CREATE OR REPLACE FUNCTION public.submit_article_for_review(";
+    const extract = (sql: string) => {
+      const start = sql.indexOf(functionName);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const end = sql.indexOf("\n$function$;", start);
+      expect(end).toBeGreaterThan(start);
+      return sql.slice(start, end + "\n$function$;".length);
+    };
+    const ambiguous = "select version_number from editorial.article_versions where id = v_resource.current_published_version_id";
+    const qualified = "select published_version.version_number from editorial.article_versions as published_version where published_version.id = v_resource.current_published_version_id";
+    expect(extract(original).split(ambiguous)).toHaveLength(2);
+    expect(extract(forwardFix)).toBe(extract(original).replace(ambiguous, qualified));
+    expect(extract(forwardFix)).not.toContain(ambiguous);
+    expect(forwardFix).toContain("476e81ba62ef40f866728380e6a4027b");
+    expect(forwardFix).toContain("STOP: published revision submit RPC definition drift");
+    expect(forwardFix).toContain("STOP: published revision submit qualification not installed");
+    expect(forwardFix.match(/CREATE OR REPLACE FUNCTION /g)).toHaveLength(1);
+    expect(forwardFix).not.toMatch(/(?:UPDATE|DELETE FROM|INSERT INTO)\s+(?:public\.wk_articles|editorial\.resources|public\.wk_article_publication_snapshots)\b/i);
+    expect(forwardFix).not.toMatch(/\b(?:GRANT|REVOKE|DROP FUNCTION)\b/i);
+  });
+
   it("wires the same state machine to editor, meta review, review screen and publish guard", () => {
     const src = fs.readFileSync(path.join(process.cwd(),
       "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx"), "utf8");
