@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 const SITE_NAME = "WAKILISHA";
 const SITE_URL = "https://wakilisha.africa";
@@ -341,11 +343,11 @@ function publicArticleImage(article) {
   const meta = article.metadata && typeof article.metadata === "object" ? article.metadata : {};
 
   return firstNonEmpty(
-    article.image,
-    article.imageUrl,
     article.heroUrl,
     article.heroImageUrl,
     article.hero_image_url,
+    article.image,
+    article.imageUrl,
     article.featuredImageUrl,
     article.featured_image_url,
     article.coverImageUrl,
@@ -396,34 +398,9 @@ async function fetchArticleManifests() {
       payload?.data ||
       [];
 
-    const imageByPath = new Map();
-    const metadataByPath = new Map();
-
-    for (const story of Array.isArray(stories) ? stories : []) {
-      const slug = firstNonEmpty(story.slug, story.path, story.url);
-      const pagePath = articlePathFromSlug(slug);
-      if (!pagePath) continue;
-
-      const cleanPagePath = cleanPath(pagePath);
-      const image = publicArticleImage(story);
-
-      if (image) {
-        imageByPath.set(cleanPagePath, image);
-      }
-
-      metadataByPath.set(cleanPagePath, {
-        id: firstNonEmpty(story.id),
-        slug: firstNonEmpty(story.slug),
-        title: firstNonEmpty(story.title),
-        description: firstNonEmpty(story.dek, story.description, story.excerpt),
-        author: firstNonEmpty(story.author, story.authorName, story.byline),
-        authorPersonPath: firstNonEmpty(story.authorPersonPath, story.author_person_path),
-        authorOrganizationPath: firstNonEmpty(story.authorOrganizationPath, story.author_organization_path),
-        date: firstNonEmpty(story.date, story.publishedAt, story.datePublished),
-        modifiedAt: firstNonEmpty(story.modifiedAt, story.updatedAt, story.dateModified),
-        image,
-      });
-    }
+    const {imageByPath, metadataByPath} = articleManifestsFromRows(
+      Array.isArray(stories) ? stories : [],
+    );
 
     console.log(`Article image manifest loaded: ${imageByPath.size.toLocaleString()} article images.`);
     console.log(`Article metadata manifest loaded: ${metadataByPath.size.toLocaleString()} article rows.`);
@@ -441,6 +418,125 @@ async function fetchArticleManifests() {
     }
   }
   throw new Error(`Article prerender manifest unavailable after ${PRERENDER_MANIFEST_RETRY_COUNT} attempt(s); refusing partial SEO output: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+}
+
+
+/**
+ * Governing rule: offline publication inputs are separately acquired and
+ * pinned. Loading them never grants publication/activation authority.
+ * A source scan ALONE is not a complete route publication receipt.
+ */
+function readGovernedOfflineProjection(options = process.env) {
+  const filename = options.WAKILISHA_GOVERNED_SEO_PROJECTION;
+  const expectedSha = String(options.WAKILISHA_GOVERNED_SEO_PROJECTION_SHA256 || "").toLowerCase();
+  const acceptedSourceEpoch = String(options.WAKILISHA_APPROVED_SOURCE_EPOCH || "").toLowerCase();
+  const acceptedScanSha = String(options.WAKILISHA_APPROVED_SOURCE_SCAN_SHA256 || "").toLowerCase();
+  const isDigest = (value) => /^[a-f0-9]{64}$/.test(value);
+
+  if (typeof filename !== "string" || !path.isAbsolute(filename)) {
+    throw new Error("Governed SEO input requires an absolute projection file path");
+  }
+  if (![expectedSha, acceptedSourceEpoch, acceptedScanSha].every(isDigest)) {
+    throw new Error("Governed SEO projection, epoch and source scan require independent SHA-256 pins");
+  }
+  const stat = fs.lstatSync(filename, { throwIfNoEntry: false });
+  if (!stat || !stat.isFile() || stat.isSymbolicLink() || stat.size > 32 * 1024 * 1024) {
+    throw new Error("Missing, unsafe or oversized governed SEO input");
+  }
+  const bytes = fs.readFileSync(filename);
+  if (crypto.createHash("sha256").update(bytes).digest("hex") !== expectedSha) {
+    throw new Error("Governed SEO input checksum mismatch");
+  }
+  const projection = JSON.parse(bytes.toString("utf8"));
+  if (!projection || typeof projection !== "object" || Array.isArray(projection) ||
+      projection.format !== 1 || projection.origin !== SITE_URL || projection.complete !== true ||
+      projection.sourceEpoch !== acceptedSourceEpoch ||
+      projection.sourceScanSha256 !== acceptedScanSha) {
+    throw new Error("Incomplete or unapproved governed SEO source epoch");
+  }
+  for (const name of ["metadata", "artists", "releases", "tracks", "charts"]) {
+    if (!projection[name] || typeof projection[name] !== "object" || Array.isArray(projection[name])) {
+      throw new Error("Incomplete governed SEO projection surface: " + name);
+    }
+  }
+  if (!Array.isArray(projection.articles) || !Array.isArray(projection.nonCanonicalPaths)) {
+    throw new Error("Incomplete governed SEO Article or canonical route projection");
+  }
+  const allRoutes = [
+    ...Object.keys(projection.metadata),
+    ...Object.keys(projection.artists),
+    ...Object.keys(projection.releases),
+    ...Object.keys(projection.tracks),
+    ...Object.keys(projection.charts),
+    ...projection.nonCanonicalPaths,
+  ];
+  for (const route of allRoutes) {
+    if (typeof route !== "string" || !/^\/[a-zA-Z0-9/_-]{1,320}$/.test(route) ||
+        route.includes("//") || route.includes("..") || route.endsWith("/")) {
+      throw new Error("Unsafe or noncanonical governed SEO route: " + String(route));
+    }
+  }
+  const articlePaths = new Set();
+  for (const article of projection.articles) {
+    const articlePath = articlePathFromSlug(article?.slug);
+    if (!articlePath || articlePaths.has(articlePath) ||
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(article?.slug || ""))) {
+      throw new Error("Duplicate or unsafe governed Article identity");
+    }
+    articlePaths.add(articlePath);
+    const selectedImage = firstNonEmpty(article.heroUrl, article.hero_image_url, article.heroImageUrl);
+    if (selectedImage) {
+      let url;
+      try {url = new URL(selectedImage);} catch {throw new Error("Invalid Article selected Media URL: " + articlePath);}
+      if (url.protocol !== "https:" || url.username || url.password) {
+        throw new Error("Nonpublic Article selected Media URL: " + articlePath);
+      }
+    }
+    if (!projection.metadata[articlePath]) {
+      throw new Error("Governed Article missing authoritative metadata route: " + articlePath);
+    }
+  }
+  return projection;
+}
+
+function articleManifestsFromRows(stories) {
+  const imageByPath = new Map();
+  const metadataByPath = new Map();
+  for (const story of stories) {
+    const slug = firstNonEmpty(story.slug, story.path, story.url);
+    const pagePath = articlePathFromSlug(slug);
+    if (!pagePath) continue;
+    const cleanPagePath = cleanPath(pagePath);
+    const image = publicArticleImage(story);
+    if (image) imageByPath.set(cleanPagePath, image);
+    metadataByPath.set(cleanPagePath, {
+      id: firstNonEmpty(story.id),
+      slug: firstNonEmpty(story.slug),
+      title: firstNonEmpty(story.title),
+      description: firstNonEmpty(story.dek, story.description, story.excerpt),
+      author: firstNonEmpty(story.author, story.authorName, story.byline),
+      authorPersonPath: firstNonEmpty(story.authorPersonPath, story.author_person_path),
+      authorOrganizationPath: firstNonEmpty(story.authorOrganizationPath, story.author_organization_path),
+      date: firstNonEmpty(story.date, story.publishedAt, story.datePublished),
+      modifiedAt: firstNonEmpty(story.modifiedAt, story.updatedAt, story.dateModified),
+      image,
+    });
+  }
+  return {imageByPath, metadataByPath};
+}
+
+function activateGovernedOfflineProjection(projection) {
+  DB_METADATA_BY_PATH = mapFromDbMetadata(projection.metadata);
+  const articleManifests = articleManifestsFromRows(projection.articles);
+  ARTICLE_IMAGE_BY_PATH = articleManifests.imageByPath;
+  ARTICLE_METADATA_BY_PATH = articleManifests.metadataByPath;
+  ARTIST_METADATA_BY_PATH = mapFromDbMetadata(projection.artists);
+  RELEASE_METADATA_BY_PATH = mapFromDbMetadata(projection.releases);
+  TRACK_METADATA_BY_PATH = mapFromDbMetadata(projection.tracks);
+  CHART_METADATA_BY_PATH = mapFromDbMetadata(projection.charts);
+  NON_CANONICAL_PUBLIC_PATHS.clear();
+  for (const p of projection.nonCanonicalPaths) NON_CANONICAL_PUBLIC_PATHS.add(cleanPath(p));
+  return articleManifests.imageByPath.size;
 }
 
 function mergeDbMetadata(model, pagePath) {
@@ -1880,6 +1976,15 @@ async function main() {
     throw new Error("dist/index.html was not found. Run vite build first.");
   }
 
+  const offlineMode = Boolean(process.env.WAKILISHA_GOVERNED_SEO_PROJECTION);
+  if (offlineMode) {
+    const projection = readGovernedOfflineProjection();
+    activateGovernedOfflineProjection(projection);
+    writeDbMetadataManifest(projection.metadata);
+    console.log("GOVERNED_SEO_OFFLINE_SOURCE_EPOCH=" + projection.sourceEpoch);
+    console.log("GOVERNED_SEO_NETWORK_READS=0");
+    console.log("PUBLICATION_ACTIVATION_AUTHORITY=NONE");
+  } else {
   DB_METADATA_BY_PATH = await fetchDbMetadataManifest();
 
   const playlistMetadataCount =
@@ -1928,6 +2033,7 @@ async function main() {
   RELEASE_METADATA_BY_PATH = await fetchReleaseMetadataManifest();
   TRACK_METADATA_BY_PATH = await fetchTrackMetadataManifest();
   CHART_METADATA_BY_PATH = await fetchChartMetadataManifest();
+  }
 
   const baseHtml = fs.readFileSync(INDEX_PATH, "utf8");
   const candidatePaths = [
@@ -1963,7 +2069,11 @@ async function main() {
   console.log(`SEO prerender complete: ${written.toLocaleString()} HTML files written.`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+export {readGovernedOfflineProjection, activateGovernedOfflineProjection, articleManifestsFromRows, seoBlockForPath, htmlForPath};
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
