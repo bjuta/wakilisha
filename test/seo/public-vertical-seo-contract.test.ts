@@ -303,6 +303,16 @@ describe("governed offline SEO projection and selected Article image authority",
     expect(block).toContain('"author":{"@type":"Person","name":"Hafare Segelan"}');
     expect(block).toContain("2026-11-22");
     expect(block).toContain('"@type":"Article"');
+    const model = input.metadata[articlePath];
+    model.socialTitle = "A Special Published Social Headline";
+    model.socialDescription = "This is the deliberately approved social summary.";
+    activateGovernedOfflineProjection(input);
+    const social = seoBlockForPath(articlePath);
+    expect(social).toContain('property="og:title" content="A Special Published Social Headline | WAKILISHA"');
+    expect(social).toContain('name="twitter:description" content="This is the deliberately approved social summary."');
+    expect(social).toContain('<title>Album Review: Alusa Continua | WAKILISHA</title>');
+    expect(social).toContain('property="og:image" content="https://media.wakilisha.africa/uploads/selected.webp"');
+
     const html = htmlForPath("<html><head></head><body><main></main></body></html>", articlePath);
     expect(html).toContain("selected.webp");
     expect(html).not.toContain('content="https://wakilisha.africa/"');
