@@ -5,6 +5,7 @@ import { SURFACES, verifyReceipt, differences, extractSeo, auditArtifact } from 
 import { readGovernedOfflineProjection, assertFreshGovernedViteShell, activateGovernedOfflineProjection, seoBlockForPath, htmlForPath } from "../../scripts/seo/prerender-metadata.mjs";
 import { assemble as assembleGovernedProjection, stableJson as stableManagedJson, managedMagazineSql, verifyManagedMagazineEvidence } from "../../scripts/seo/assemble-governed-publication-projection.mjs";
 import { sql as magazinePublicationSql, validateCapture as validateMagazinePublicationCapture, verifySourcePair as verifyMagazinePublicationReplay, makeArticleMetadata as makeMagazinePublicationMetadata } from "../../scripts/seo/publish-magazine-snapshots.mjs";
+import { canonicalArticleShareUrl, publishedArticleCardUrl } from "../../src/components/design-system/share/sharePresentation";
 
 import {
   readFileSync,
@@ -418,6 +419,33 @@ describe("incident-safe offline SEO build", () => {
     expect(seoEdge).toContain("Published Article sitemap authority unavailable");
     expect(seoEdge).toContain("SEO metadata lookup failed closed");
     expect(seoEdge).not.toContain('db.from("wk_articles").select("id, slug, modified_at, published_at").eq("wp_status", "publish")');
+    // Social crawlers cache by shared URL: a newly published immutable Article
+    // version must get a fresh URL without changing canonical SEO or UTM.
+    const canonical = canonicalArticleShareUrl("album-review-alusa-continua");
+    const first = "cfbcb1a2-f9e7-4d6c-8db9-aa0b2ffed343";
+    const next = "11bcb1a2-f9e7-4d6c-8db9-aa0b2ffed343";
+    const tracked = canonical + "?utm_source=x&utm_medium=share&utm_campaign=wakilisha_share&utm_content=article";
+    expect(publishedArticleCardUrl(tracked, first)).toBe(tracked + "&wk_card_v=" + first);
+    expect(publishedArticleCardUrl(tracked, next)).not.toBe(publishedArticleCardUrl(tracked, first));
+    expect(publishedArticleCardUrl(tracked, first)).toBe(publishedArticleCardUrl(tracked, first));
+    expect(publishedArticleCardUrl(canonical + "?preview=nonce", first))
+      .toBe(canonical + "?preview=nonce");
+    expect(publishedArticleCardUrl("https://wakilisha.africa/artists/bien", first))
+      .toBe("https://wakilisha.africa/artists/bien");
+    expect(publishedArticleCardUrl(canonical, "draft-id")).toBe(canonical);
+    const share = readFileSync("src/components/design-system/share/ShareSheet.tsx","utf8");
+    expect(share.match(/publishedArticleCardUrl\\(/g)).toHaveLength(2);
+    const action = readFileSync("src/components/feature/community/CommunityActionSheet.tsx","utf8");
+    expect(action).toContain('publishedSnapshotId: entity.type === "article" ? entity.publishedSnapshotId : undefined');
+    for (const page of [
+      "src/pages/magazine/article/page.tsx",
+      "src/pages/mobile/magazine/article/page.tsx",
+    ]) {
+      expect(readFileSync(page,"utf8")).toContain(
+        "publishedSnapshotId: previewNonce ? undefined : article.id",
+      );
+    }
+
   });
 
 
