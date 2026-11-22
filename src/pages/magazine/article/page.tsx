@@ -33,6 +33,7 @@ import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { CommunitySection } from "./components/CommunitySection";
 import { CommunityActionSheet } from "@/components/feature/community/CommunityActionSheet";
+import { canonicalArticleShareUrl } from "@/components/design-system/share/sharePresentation";
 import { ArticleEndCredits } from "./components/ArticleEndCredits";
 import { ArticlePreviewModeBanner } from "./components/ArticlePreviewModeBanner";
 
@@ -268,7 +269,7 @@ export default function ArticlePage() {
       type: "article" as const,
       slug: article.slug,
       id: article.id,
-      url: typeof window !== "undefined" ? window.location.href : "",
+      url: canonicalArticleShareUrl(article.slug),
       title: article.title,
     };
   }, [article?.slug, article?.id, article?.title]);
@@ -279,7 +280,7 @@ export default function ArticlePage() {
       type: "article" as const,
       slug: article.slug,
       id: article.id,
-      url: typeof window !== "undefined" ? window.location.href : "",
+      url: canonicalArticleShareUrl(article.slug),
       title: article.title,
       subtitle: article.dek,
       imageUrl: article.heroUrl,
@@ -384,7 +385,7 @@ export default function ArticlePage() {
 
       {previewNonce ? <ArticlePreviewModeBanner /> : null}
 
-      <MetaTags title={article.title} description={article.dek || `Read ${article.title} on WAKILISHA Magazine.`} imageUrl={article.heroUrl} url={typeof window !== "undefined" ? window.location.href : undefined} type="article" />
+      <MetaTags title={article.title} description={article.dek || `Read ${article.title} on WAKILISHA Magazine.`} imageUrl={article.heroUrl} url={canonicalArticleShareUrl(article.slug)} type="article" />
       <SchemaOrg
         data={{
           "@type": "Article",
@@ -397,7 +398,7 @@ export default function ArticlePage() {
               ? { "@type": "Organization", name: article.author, url: article.authorOrganizationPath }
               : undefined,
           publisher: { "@type": "Organization", name: "WAKILISHA" },
-          url: typeof window !== "undefined" ? window.location.href : undefined,
+          url: canonicalArticleShareUrl(article.slug),
         }}
       />
       {publishedVerdict && article.author && !previewNonce ? (
