@@ -1091,9 +1091,9 @@ export function RichTextEditor({
   }, [editor, conversionCandidate]);
 
   const handleInsertReleaseShortcode = useCallback(
-    (slug: string) => {
+    (id: string) => {
       if (!editor) return;
-      const shortcode = `\n\n[wk-release slug="${slug}"]\n\n`;
+      const shortcode = `\n\n[wk-release id="${id}"]\n\n`;
       editor.chain().focus().insertContent(shortcode).run();
       setReleasePickerOpen(false);
       setReleaseSearch("");
@@ -1113,9 +1113,9 @@ export function RichTextEditor({
   );
 
   const handleInsertTrackShortcode = useCallback(
-    (slug: string) => {
+    (id: string) => {
       if (!editor) return;
-      const shortcode = `\n\n[wk-track slug="${slug}"]\n\n`;
+      const shortcode = `\n\n[wk-track id="${id}"]\n\n`;
       editor.chain().focus().insertContent(shortcode).run();
       setTrackPickerOpen(false);
       setTrackSearch("");
@@ -2159,7 +2159,7 @@ export function RichTextEditor({
                         }
 
                         if (release.status === "active") {
-                          handleInsertReleaseShortcode(release.slug);
+                          handleInsertReleaseShortcode(release.id);
                         }
                       }}
                       disabled={release.status !== "active" || (
@@ -2336,7 +2336,7 @@ export function RichTextEditor({
                         }
 
                         handleInsertTrackShortcode(
-                          track.slug,
+                          track.id,
                         );
                       }}
                       className="flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-bg-subtle)] p-2.5 text-left transition-all cursor-pointer hover:border-[var(--wk-brand)] hover:bg-[var(--wk-surface-raised)] sm:gap-3 sm:p-3"

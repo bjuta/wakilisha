@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 import { supabase } from "@/lib/supabase";
 import { slugify } from "@/utils/releaseUrl";
+import { resolveRegistryEmbedIdentity, unresolvedRegistryEmbed } from "@/utils/registryEmbedIdentity";
 import { Ch19GradientImage } from "@/components/media/Ch19GradientImage";
 import { PlayableArtwork } from "@/components/design-system/music/PlayableArtwork";
 import { AddToPlaylistButton } from "@/components/playlists/AddToPlaylistButton";
@@ -32,8 +33,6 @@ export interface TrackEmbedData {
 /* ------------------------------------------------------------------ */
 
 export const TRACK_MARKER_PREFIX = "WK_TRACK_";
-
-const REGISTRY_MARKER_RE = /<!--WK_REGISTRY_TRACK:([^:>]+)-->/g;
 
 function firstString(...values: unknown[]): string | null {
   for (const value of values) {
@@ -82,36 +81,47 @@ function readAppleMusicCatalogId(row: { metadata?: unknown }): string | null {
 export async function resolveTrackMarkers(
   markedHtml: string,
 ): Promise<{ markedHtml: string; tracks: TrackEmbedData[] }> {
-  const markers: Array<{ fullMatch: string; slug: string }> = [];
-
+  const markers: Array<{ fullMatch: string; id: string | null; slug: string | null }> = [];
+  const re = /<!--WK_REGISTRY_TRACK(?:_(ID))?:([^:>]+)-->/g;
   let m: RegExpExecArray | null;
-  const re = new RegExp(REGISTRY_MARKER_RE.source, "g");
   while ((m = re.exec(markedHtml)) !== null) {
-    markers.push({ fullMatch: m[0], slug: m[1] });
+    markers.push({ fullMatch: m[0], id: m[1] ? m[2] : null, slug: m[1] ? null : m[2] });
   }
+  if (!markers.length) return { markedHtml, tracks: [] };
 
-  if (!markers.length) {
-    return { markedHtml, tracks: [] };
+  const ids = [...new Set(markers.flatMap((mk) => mk.id ? [mk.id] : []))];
+  const slugs = [...new Set(markers.flatMap((mk) => mk.slug ? [mk.slug] : []))];
+  const [exactResult, legacyResult] = await Promise.all([
+    ids.length
+      ? supabase.from("registry_tracks")
+        .select("id, slug, title, duration_ms, preview_url, artwork_url, metadata")
+        .eq("status", "active").in("id", ids)
+      : Promise.resolve({ data: [], error: null }),
+    slugs.length
+      ? supabase.from("registry_tracks")
+        .select("id, slug, title, duration_ms, preview_url, artwork_url, metadata")
+        .eq("status", "active").in("slug", slugs)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  const exactRows = exactResult.error ? [] : exactResult.data || [];
+  const legacyRows = legacyResult.error ? [] : legacyResult.data || [];
+  const resolvedRows = markers.map((mk) =>
+    resolveRegistryEmbedIdentity(mk, exactRows, legacyRows));
+  const trackRows = resolvedRows.filter((row): row is NonNullable<typeof row> => Boolean(row));
+  const trackIds = [...new Set(trackRows.map((row) => row.id))];
+
+  const unresolved = (mk: typeof markers[number]) => {
+    const count = mk.slug ? legacyRows.filter((row) => row.slug === mk.slug).length : 0;
+    return unresolvedRegistryEmbed(
+      "track",
+      mk.id ? "missing-id" : count > 1 ? "ambiguous-legacy-slug" : "missing-legacy-slug",
+    );
+  };
+  if (!trackIds.length) {
+    let resultHtml = markedHtml;
+    for (const mk of markers) resultHtml = resultHtml.replace(mk.fullMatch, unresolved(mk));
+    return { markedHtml: resultHtml, tracks: [] };
   }
-
-  // Fetch track data for each marker
-  const slugs = markers.map((mk) => mk.slug);
-  const { data: trackRows } = await supabase
-    .from("registry_tracks")
-    .select("id, slug, title, duration_ms, preview_url, artwork_url, metadata")
-    .eq("status", "active")
-    .in("slug", slugs);
-
-  if (!trackRows?.length) {
-    let stripped = markedHtml;
-    for (const mk of markers) {
-      stripped = stripped.replace(mk.fullMatch, "");
-    }
-    return { markedHtml: stripped, tracks: [] };
-  }
-
-  const tracksBySlug = new Map(trackRows.map((t) => [t.slug, t]));
-  const trackIds = trackRows.map((t) => t.id);
 
   // Fetch primary artists
   const { data: trackArtists } = await supabase
@@ -187,20 +197,20 @@ export async function resolveTrackMarkers(
     });
   }
 
+
   const newTracks: TrackEmbedData[] = [];
   let resultHtml = markedHtml;
 
-  for (const mk of markers) {
-    const row = tracksBySlug.get(mk.slug);
+  for (const [index, mk] of markers.entries()) {
+    const row = resolvedRows[index];
     if (!row) {
-      resultHtml = resultHtml.replace(mk.fullMatch, "");
+      resultHtml = resultHtml.replace(mk.fullMatch, unresolved(mk));
       continue;
     }
 
     const artistInfo = artistByTrackId[row.id];
     const artistSlug = artistInfo?.slug || "";
     const primaryGenre = artistGenreMap[artistSlug] || "";
-
     const appleMusicCatalogId = readAppleMusicCatalogId(row);
 
     const trackData: TrackEmbedData = {
@@ -219,13 +229,10 @@ export async function resolveTrackMarkers(
         ? (releaseLabelMap[releaseIdByTrackId.get(row.id)!] || undefined)
         : undefined,
     };
-
     const trackIdx = newTracks.length;
-    const markerComment = `<!--${TRACK_MARKER_PREFIX}${trackIdx}-->`;
-    resultHtml = resultHtml.replace(mk.fullMatch, markerComment);
+    resultHtml = resultHtml.replace(mk.fullMatch, `<!--${TRACK_MARKER_PREFIX}${trackIdx}-->`);
     newTracks.push(trackData);
   }
-
   return { markedHtml: resultHtml, tracks: newTracks };
 }
 
@@ -255,12 +262,12 @@ export function TrackEmbedCard({ track, articleSlug }: { track: TrackEmbedData; 
   const hasPlayableSource = Boolean(
     track.previewUrl || track.appleMusicCatalogId || track.appleMusicId,
   );
-  const active = currentTrack?.id === track.slug;
+  const active = currentTrack?.registryTrackId === track.id || currentTrack?.id === track.id;
 
   const handlePlayTrack = () => {
     if (!hasPlayableSource) return;
     const playerTrack = {
-      id: track.slug,
+      id: track.id,
       registryTrackId: track.id,
       title: track.title,
       artist: track.artistName,

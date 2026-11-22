@@ -186,3 +186,67 @@ test("media-bound captions remain attached after a real browser edit and save", 
     }
   }
 });
+
+test("Article insertion preserves selected Registry UUID across same-slug Tracks and Releases", async ({ page }) => {
+  const first = "11111111-1111-4111-8111-111111111111";
+  const second = "22222222-2222-4222-8222-222222222222";
+  const trackRows = [
+    { id: first, slug: "intro", title: "Intro", status: "active", artwork_url: null, preview_url: null, release_id: null },
+    { id: second, slug: "intro", title: "Intro", status: "active", artwork_url: null, preview_url: null, release_id: null },
+  ];
+  const releaseRows = [
+    { id: first, slug: "balance", title: "Balance - Single", status: "active", release_type: "single",
+      release_date: null, artwork_url: null, created_at: "2026-11-01T00:00:00Z" },
+    { id: second, slug: "balance", title: "Balance - Single", status: "active", release_type: "single",
+      release_date: null, artwork_url: null, created_at: "2026-11-02T00:00:00Z" },
+  ];
+  const cors = {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, OPTIONS",
+    "access-control-allow-headers": "apikey, authorization, content-type, x-client-info, prefer",
+  };
+  await page.route("https://example.supabase.co/rest/v1/**", async (route) => {
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: cors });
+      return;
+    }
+    const url = new URL(route.request().url());
+    const table = url.pathname.split("/").pop();
+    const select = url.searchParams.get("select") || "";
+    let data: unknown[] = [];
+    if (table === "registry_tracks") {
+      data = trackRows;
+    } else if (table === "registry_track_artists") {
+      data = select === "track_id,artist_name_text,is_primary" ? [] :
+        [{ track_id: first, artist_name_text: "Artist A", artist_slug: "artist-a", is_primary: true },
+         { track_id: second, artist_name_text: "Artist B", artist_slug: "artist-b", is_primary: true }];
+    } else if (table === "registry_releases") {
+      data = select === "id" ? releaseRows.map((r) => ({ id: r.id })) : releaseRows;
+    } else if (table === "registry_release_artists") {
+      data = select === "release_id" ? [] :
+        [{ release_id: first, artist_name_text: "Artist A", artist_slug: "artist-a", is_primary: true },
+         { release_id: second, artist_name_text: "Artist B", artist_slug: "artist-b", is_primary: true }];
+    }
+    await route.fulfill({
+      status: 200, contentType: "application/json",
+      headers: cors, body: JSON.stringify(data),
+    });
+  });
+
+  await page.goto(PAGE);
+  await openInsert(page, "Track");
+  const trackDialog = page.getByRole("dialog", { name: "Insert Track Shortcode" });
+  await trackDialog.getByPlaceholder("Search tracks by title or artist...").fill("Intro");
+  await expect(trackDialog.getByRole("button", { name: /Artist B/ })).toBeVisible();
+  await trackDialog.getByRole("button", { name: /Artist B/ }).click();
+  await expect(page.locator(".ProseMirror")).toContainText('[wk-track id="' + second + '"]');
+  await expect(page.locator(".ProseMirror")).not.toContainText('[wk-track slug="intro"]');
+
+  await openInsert(page, "Release");
+  const releaseDialog = page.getByRole("dialog", { name: "Insert Release from Registry" });
+  await releaseDialog.getByPlaceholder("Search releases by title or artist...").fill("Balance");
+  await expect(releaseDialog.getByRole("button", { name: /Artist B/ })).toBeVisible();
+  await releaseDialog.getByRole("button", { name: /Artist B/ }).click();
+  await expect(page.locator(".ProseMirror")).toContainText('[wk-release id="' + second + '"]');
+  await expect(page.locator(".ProseMirror")).not.toContainText('[wk-release slug="balance"]');
+});

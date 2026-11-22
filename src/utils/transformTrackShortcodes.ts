@@ -1,3 +1,5 @@
+import { REGISTRY_UUID_RE } from "@/utils/registryEmbedIdentity";
+
 /**
  * Track Shortcode Transformer
  *
@@ -15,8 +17,8 @@
 
 const SHORTCODE_RE = /\[wk-track\s+([^\]]+)\]/gi;
 
-function parseShortcodeArgs(argsRaw: string): { slug: string | null } {
-  const result: { slug: string | null } = { slug: null };
+function parseShortcodeArgs(argsRaw: string): { id: string | null; slug: string | null } {
+  const result: { id: string | null; slug: string | null } = { id: null, slug: null };
 
   // Tokenize: split by spaces, but respect quoted values
   const tokens: string[] = [];
@@ -52,6 +54,7 @@ function parseShortcodeArgs(argsRaw: string): { slug: string | null } {
     if (eqMatch) {
       const key = eqMatch[1].toLowerCase();
       const value = eqMatch[2].trim();
+      if (key === "id" || key === "track_id") result.id = value;
       if (key === "slug" || key === "track") result.slug = value;
       continue;
     }
@@ -73,7 +76,11 @@ export function transformTrackShortcodes(html: string): string {
 
   return html.replace(SHORTCODE_RE, (match, argsRaw) => {
     const args = parseShortcodeArgs(argsRaw.trim());
-    if (!args.slug) return match;
+    if (args.id) {
+      if (!REGISTRY_UUID_RE.test(args.id)) return match; // Invalid explicit ID never falls back to slug.
+      return `<!--WK_REGISTRY_TRACK_ID:${args.id.toLowerCase()}-->`;
+    }
+    if (!args.slug || !/^[a-z0-9_-]+$/i.test(args.slug)) return match;
 
     return `<!--WK_REGISTRY_TRACK:${args.slug}-->`;
   });
