@@ -64,8 +64,6 @@ export function MetaTags({
 
     if (imageUrl) {
       setMetaTag("og:image", imageUrl);
-      setMetaTag("og:image:width", "1200");
-      setMetaTag("og:image:height", "630");
       setMetaTag("og:image:alt", title);
       setMetaTag("twitter:image", imageUrl);
       setMetaTag("twitter:image:alt", title);
