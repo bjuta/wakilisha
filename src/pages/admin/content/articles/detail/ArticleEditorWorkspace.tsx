@@ -41,9 +41,14 @@ import {
   type AdminArticleDetail,
   type ArticleSavePayload,
   type ArticleLifecycleEvent,
+  type ArticleVersionFingerprintStatus,
 } from "@/services/articles/articleAdminService";
 import { processArticleContent } from "@/services/articles/contentPipeline";
-import { deriveArticleEditorialGate } from "@/services/articles/articleEditorialGate";
+import {
+  deriveArticleEditorialGate,
+  currentArticleReviewProof,
+  type ArticleReviewProofLease,
+} from "@/services/articles/articleEditorialGate";
 import { syncInstituteArticlePublicationState } from "@/services/institute/institutePublicationSyncService";
 import {
   acceptArticleSuggestion,
@@ -284,12 +289,7 @@ export function ArticleEditorWorkspace({
   const [showPublishChecklist, setShowPublishChecklist] = useState(false);
   const [lifecycleEvents, setLifecycleEvents] = useState<ArticleLifecycleEvent[]>([]);
   const [approvedVersionFingerprintStatus, setApprovedVersionFingerprintStatus] =
-    useState<{
-      latestVersionNumber: number | null;
-      latestContentFingerprint: string | null;
-      approvedVersionNumber: number | null;
-      approvedContentFingerprint: string | null;
-    } | null>(null);
+    useState<ArticleReviewProofLease | null>(null);
   const [reviewActionModal, setReviewActionModal] = useState<null | "request_changes" | "approve">(null);
   const [reviewActionNote, setReviewActionNote] = useState("");
   const [isReviewActionBusy, setIsReviewActionBusy] = useState(false);
@@ -357,7 +357,15 @@ export function ArticleEditorWorkspace({
         latestApprovedLifecycleEvent?.versionNumber ?? null,
         latestSubmittedLifecycleEvent?.versionNumber ?? null,
       );
-      if (alive) setApprovedVersionFingerprintStatus(status);
+      if (alive) {
+        setApprovedVersionFingerprintStatus({
+          articleId: article.id,
+          draftVersion: article.draftVersion,
+          approvedVersionNumber: latestApprovedLifecycleEvent?.versionNumber ?? null,
+          submittedVersionNumber: latestSubmittedLifecycleEvent?.versionNumber ?? null,
+          proof: status,
+        });
+      }
     })();
 
     return () => { alive = false; };
@@ -464,6 +472,13 @@ export function ArticleEditorWorkspace({
     documentModeState.mode,
     submittedDocument?.id,
   ]);
+  const currentVersionProof: ArticleVersionFingerprintStatus | null =
+    currentArticleReviewProof({
+      articleId: article?.id ?? null,
+      draftVersion: article?.draftVersion ?? null,
+      approvedVersionNumber: latestApprovedLifecycleEvent?.versionNumber ?? null,
+      submittedVersionNumber: latestSubmittedLifecycleEvent?.versionNumber ?? null,
+    }, approvedVersionFingerprintStatus);
   const reviewGate = deriveArticleEditorialGate({
     wpStatus: article?.wpStatus ?? null,
     latestReviewAction,
@@ -475,7 +490,7 @@ export function ArticleEditorWorkspace({
     allowSubmitForReview,
     canReview: isAdmin || userCanManageReviewQueue,
     canPublish: articlePermissions.canPublish,
-    proof: approvedVersionFingerprintStatus,
+    proof: currentVersionProof,
   });
   const hasChangesAfterLatestApproval = reviewGate.hasChangesAfterApproval;
   const canSubmitCurrentArticleForReview = reviewGate.canSubmitWorkingVersion;
@@ -3229,7 +3244,7 @@ export function ArticleEditorWorkspace({
               title={documentTitle}
               status={editorialStatusLabel}
               submittedVersionNumber={submittedDocument?.versionNumber ?? null}
-              workingVersionNumber={approvedVersionFingerprintStatus?.latestVersionNumber ?? null}
+              workingVersionNumber={currentVersionProof?.latestVersionNumber ?? null}
               latestApprovedVersionNumber={latestApprovedLifecycleEvent?.versionNumber ?? null}
               canResubmitWorkingVersion={canSubmitCurrentArticleForReview}
               onResubmitWorkingVersion={handleSubmitForReview}
