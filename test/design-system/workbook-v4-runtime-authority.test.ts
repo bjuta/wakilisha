@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { canonicalArticleShareUrl, shareTextForItem } from "../../src/components/design-system/share/sharePresentation";
+import { canonicalArticleShareUrl, shareImageUrl, shareTextForItem } from "../../src/components/design-system/share/sharePresentation";
 
 const read = (name: string) => readFileSync(name, "utf8");
 
@@ -206,6 +206,10 @@ describe("Workbook v4 is the only active product design authority", () => {
 
     expect(canonicalArticleShareUrl("album-review-alusa-continua"))
       .toBe("https://wakilisha.africa/magazine/album-review-alusa-continua");
+    expect(shareImageUrl("https://media.wakilisha.africa/uploads/published.webp"))
+      .toBe("https://media.wakilisha.africa/uploads/published.webp");
+    expect(shareImageUrl("javascript:alert(1)")).toBeUndefined();
+    expect(share).toContain("&media=\${image}");
     for (const page of [desktop, mobile]) {
       expect(page).toContain("url: canonicalArticleShareUrl(article.slug)");
       expect(page).toContain("imageUrl: article.heroUrl");
