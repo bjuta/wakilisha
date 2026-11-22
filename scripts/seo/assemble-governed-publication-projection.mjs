@@ -157,14 +157,14 @@ function assemble({first,second,metaCapture,articleCapture,acceptedManifest,seco
       stableJson(first.surfaces) !== stableJson(second.surfaces)) {
     fail("Source epoch changed, replay was reversed or source capture window exceeded 15 minutes");
   }
+  const article=verifyManagedMagazineEvidence(articleCapture);
   const metatime=time(metaCapture.capturedAt,"metadata");
-  const articletime=time(articleCapture.capturedAt,"magazine");
+  const articletime=time(article.capturedAt,"magazine");
   for (const t of [metatime,articletime]) {
     if (t < time(first.capturedAt,"first") || t > time(second.capturedAt,"second"))
       fail("Public API capture outside two trusted managed source reads");
   }
   const meta=captureWrapper(metaCapture,"metadata");
-  const article=verifyManagedMagazineEvidence(articleCapture);
   if (meta.ok !== true || !meta.data || typeof meta.data.metadata !== "object" ||
       !meta.data.metadata || Array.isArray(meta.data.metadata) ||
       !Number.isSafeInteger(meta.data.count) || meta.data.count !== Object.keys(meta.data.metadata).length) {
