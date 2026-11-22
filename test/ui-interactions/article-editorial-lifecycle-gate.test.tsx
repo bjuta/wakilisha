@@ -87,6 +87,22 @@ describe("permanent Article editorial lifecycle authority", () => {
     expect(gate({ latestReviewAction: "submitted", proof: null }).canApproveSubmittedVersion).toBe(false);
   });
 
+  it("review-only and publisher-only roles retain immutable version authority", () => {
+    const nonEditor = gate({
+      canEdit: false, latestReviewAction: "submitted", latestApprovedVersionNumber: null,
+      latestSubmittedVersionId: newSubmission, reviewTargetVersionId: newSubmission,
+      proof: null, canReview: true, canPublish: false,
+    });
+    expect(nonEditor.canApproveSubmittedVersion).toBe(true);
+    expect(nonEditor.canRequestChanges).toBe(true);
+    expect(nonEditor.canSubmitWorkingVersion).toBe(false);
+    const publisher = gate({ canEdit: false, proof: null });
+    expect(publisher.canPublishApprovedVersion).toBe(true);
+    expect(publisher.canSubmitWorkingVersion).toBe(false);
+    expect(gate({ canEdit: false, proof: null, latestApprovedVersionNumber: null })
+      .canPublishApprovedVersion).toBe(false);
+  });
+
   it("preserves review and publish permissions and hides submission for live Articles", () => {
     expect(gate({ canEdit: false }).canSubmitWorkingVersion).toBe(false);
     expect(gate({ canPublish: false }).canPublishApprovedVersion).toBe(false);
