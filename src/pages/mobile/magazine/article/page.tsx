@@ -20,6 +20,7 @@ import { resolveTrackMarkers } from "@/pages/magazine/article/components/Article
 import { buildContentSegments } from "@/pages/magazine/article/components/ArticleEmbedUtils";
 import { injectMediaCaptions, buildAssetCaptionMap } from "@/utils/injectMediaCaptions";
 import { CommunityActionSheet } from "@/components/feature/community/CommunityActionSheet";
+import { canonicalArticleShareUrl } from "@/components/design-system/share/sharePresentation";
 import { CommunitySection } from "@/pages/magazine/article/components/CommunitySection";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import { useScrollDepthTracking } from "@/hooks/useScrollDepthTracking";
@@ -202,7 +203,7 @@ export default function MobileArticle() {
       type: "article" as const,
       slug: article.slug,
       id: article.id,
-      url: typeof window !== "undefined" ? window.location.href : "",
+      url: canonicalArticleShareUrl(article.slug),
       title: article.title,
     };
   }, [article?.slug, article?.id, article?.title]);
@@ -213,7 +214,7 @@ export default function MobileArticle() {
       type: "article" as const,
       slug: article.slug,
       id: article.id,
-      url: typeof window !== "undefined" ? window.location.href : "",
+      url: canonicalArticleShareUrl(article.slug),
       title: article.title,
       subtitle: article.author,
       imageUrl: article.heroUrl,
@@ -338,7 +339,7 @@ export default function MobileArticle() {
               ? { "@type": "Organization", name: article.author, url: article.authorOrganizationPath }
               : undefined,
           publisher: { "@type": "Organization", name: "WAKILISHA" },
-          url: typeof window !== "undefined" ? window.location.href : undefined,
+          url: canonicalArticleShareUrl(article.slug),
         }}
       />
 
