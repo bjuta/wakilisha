@@ -35,6 +35,6 @@ The control page `/magazine/top-10-kenyan-albums-2025` returned an Article-speci
 
 ## Present implementation status
 
-- PR #1428 updates client sharing presentation, canonical Article share URLs, explicit Pinterest media, retires invalid Messenger, and removes fabricated image dimensions from code that produces future metadata. It does **not** implement publication snapshot regeneration.
+- PR #1428 updates client sharing presentation, canonical Article share URLs, explicit Pinterest media, retires invalid Messenger, and removes fabricated image dimensions from code that produces future metadata. The Article editor also preserves the exact registered Media ID with a newly selected featured-image URL through the existing authorized versioned save. It does **not** rewrite historical publication versions or implement publication snapshot regeneration.
 - #1377 is the authoritative open publisher lifecycle. The unmerged #1379 source scan is evidence gathering, not approved publication authority.
 - **Production remains affected.** No feature rollback, editorial mutation, SQL migration, Edge deployment, frontend activation, or Cloudflare rewrite has been performed under this record.
