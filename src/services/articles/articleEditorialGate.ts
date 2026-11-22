@@ -6,6 +6,20 @@
  * All transitions fail closed when review/version evidence is not yet loaded.
  * This model drives both the inline editor controls and the Review workspace.
  */
+/**
+ * Publish authority is global capability-based at the database boundary:
+ * editorial.current_user_can_publish_article() permits an administrator OR
+ * publish_articles capability. Article ownership is not part of that check.
+ * Keep the UI aligned with the canonical SQL permission contract.
+ */
+export function canPublishArticleWithCapability(input: {
+  isInstituteMode: boolean;
+  isAdmin: boolean;
+  userCanPublish: boolean;
+}): boolean {
+  return !input.isInstituteMode && (input.isAdmin || input.userCanPublish);
+}
+
 export interface ArticleReviewVersionProof {
   latestVersionNumber: number | null;
   latestContentFingerprint: string | null;
@@ -166,7 +180,11 @@ export function deriveArticleEditorialGate(input: ArticleEditorialGateInput): Ar
 
   let publishDisabledReason: string | null = null;
   if (!canPublishApprovedVersion) {
-    if (workingChangesNeedReview) {
+    if (!canPublish) {
+      publishDisabledReason = "Your account does not have permission to publish Articles.";
+    } else if (isDirty) {
+      publishDisabledReason = "Save your current changes before publishing the approved Article version.";
+    } else if (workingChangesNeedReview) {
       publishDisabledReason =
         "The working Article changed since its last reviewed version. Resubmit the current version for approval.";
     } else if (awaitingReview) {
