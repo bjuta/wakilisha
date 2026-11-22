@@ -398,6 +398,7 @@ export function ArticleEditorWorkspace({
     useArticleDocumentModeState({
       articleId: article?.id ?? null,
       wpStatus: article?.wpStatus ?? null,
+      latestReviewAction,
       draftVersion:
         article?.draftVersion ?? null,
     });
