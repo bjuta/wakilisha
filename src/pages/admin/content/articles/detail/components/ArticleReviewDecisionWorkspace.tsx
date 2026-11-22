@@ -18,6 +18,10 @@ export function ArticleReviewDecisionWorkspace({
   title,
   status,
   submittedVersionNumber,
+  workingVersionNumber,
+  latestApprovedVersionNumber,
+  canResubmitWorkingVersion,
+  onResubmitWorkingVersion,
   note,
   onNoteChange,
   canRequestChanges,
@@ -30,6 +34,10 @@ export function ArticleReviewDecisionWorkspace({
   title: string;
   status: string | null;
   submittedVersionNumber: number | null;
+  workingVersionNumber: number | null;
+  latestApprovedVersionNumber: number | null;
+  canResubmitWorkingVersion: boolean;
+  onResubmitWorkingVersion: () => void | Promise<void>;
   note: string;
   onNoteChange: (value: string) => void;
   canRequestChanges: boolean;
@@ -40,6 +48,18 @@ export function ArticleReviewDecisionWorkspace({
   onApprove: () => void | Promise<void>;
 }) {
   const actions: EditorialDecisionDescriptor[] = [];
+
+  if (canResubmitWorkingVersion) {
+    actions.push({
+      key: "resubmit-working",
+      label: "Resubmit Current Version for Review",
+      icon: "Send",
+      tone: "primary",
+      disabled: busy,
+      title: "Create a new immutable submission from the current working Article without changing prior decisions.",
+      onClick: () => void onResubmitWorkingVersion(),
+    });
+  }
 
   if (canRequestChanges) {
     actions.push({
@@ -84,17 +104,32 @@ export function ArticleReviewDecisionWorkspace({
       notePlaceholder="Record the reason for this exact-version decision."
       statusLabel={status || "draft"}
       targetLabel={
-        submittedVersionNumber
-          ? `${title || "Untitled Article"} · submitted v${submittedVersionNumber}`
-          : title || "Article lifecycle"
+        canResubmitWorkingVersion && workingVersionNumber
+          ? `${title || "Untitled Article"} · working v${workingVersionNumber} needs review`
+          : submittedVersionNumber
+            ? `${title || "Untitled Article"} · submitted v${submittedVersionNumber}`
+            : title || "Article lifecycle"
       }
       actions={actions}
       busy={busy}
       events={decisionEvents}
     >
       <div className="rounded-xl border border-wk-border bg-wk-bg px-4 py-3 text-xs leading-5 text-wk-text-muted">
-        Review decisions target the immutable submitted Article version. Suggestions
-        and writing changes remain separate until they are accepted back into Draft.
+        {canResubmitWorkingVersion ? (
+          <p data-wk-article-review-cycle="resubmit-working">
+            {latestApprovedVersionNumber
+              ? `Approved v${latestApprovedVersionNumber} remains preserved. `
+              : ""}
+            The working Article has unreviewed changes. Resubmit the current
+            version to create a new immutable review target before publishing.
+          </p>
+        ) : (
+          <p>
+            Review decisions target the immutable submitted Article version.
+            Suggestions and writing changes remain separate until they are
+            accepted back into Draft.
+          </p>
+        )}
       </div>
     </EditorialDecisionWorkspace>
   );

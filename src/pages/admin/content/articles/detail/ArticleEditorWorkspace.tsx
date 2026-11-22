@@ -43,6 +43,7 @@ import {
   type ArticleLifecycleEvent,
 } from "@/services/articles/articleAdminService";
 import { processArticleContent } from "@/services/articles/contentPipeline";
+import { deriveArticleEditorialGate } from "@/services/articles/articleEditorialGate";
 import { syncInstituteArticlePublicationState } from "@/services/institute/institutePublicationSyncService";
 import {
   acceptArticleSuggestion,
@@ -337,47 +338,33 @@ export function ArticleEditorWorkspace({
     return lifecycleEvents.find((event) => event.action === "approved") ?? null;
   }, [lifecycleEvents]);
 
+  const latestSubmittedLifecycleEvent = useMemo(() => {
+    return lifecycleEvents.find((event) => event.action === "submitted") ?? null;
+  }, [lifecycleEvents]);
+
   useEffect(() => {
-    if (!article?.id || !latestApprovedLifecycleEvent?.versionNumber) {
+    if (!article?.id || !latestReviewAction) {
       setApprovedVersionFingerprintStatus(null);
       return;
     }
 
     let alive = true;
-
+    // Both the current immutable approval and submission are version-bound.
+    // A pending wp_status does not mean that the current submission is unreviewed.
     void (async () => {
       const status = await fetchArticleVersionFingerprintStatus(
         article.id,
-        latestApprovedLifecycleEvent.versionNumber,
+        latestApprovedLifecycleEvent?.versionNumber ?? null,
+        latestSubmittedLifecycleEvent?.versionNumber ?? null,
       );
-
-      if (alive) {
-        setApprovedVersionFingerprintStatus(status);
-      }
+      if (alive) setApprovedVersionFingerprintStatus(status);
     })();
 
-    return () => {
-      alive = false;
-    };
-  }, [article?.draftVersion, article?.id, latestApprovedLifecycleEvent?.versionNumber]);
-
-  const hasChangesAfterLatestApproval = useMemo(() => {
-    if (!latestApprovedLifecycleEvent) return false;
-    if (isDirty) return true;
-
-    const approvedVersionNumber = latestApprovedLifecycleEvent.versionNumber;
-    const latestVersionNumber =
-      approvedVersionFingerprintStatus?.latestVersionNumber ?? null;
-
-    if (approvedVersionNumber && latestVersionNumber) {
-      return latestVersionNumber !== approvedVersionNumber;
-    }
-
-    return true;
+    return () => { alive = false; };
   }, [
-    approvedVersionFingerprintStatus,
-    isDirty,
-    latestApprovedLifecycleEvent,
+    article?.draftVersion, article?.id, latestReviewAction,
+    latestApprovedLifecycleEvent?.versionNumber,
+    latestSubmittedLifecycleEvent?.versionNumber,
   ]);
 
   const articleWpStatus =
@@ -477,95 +464,27 @@ export function ArticleEditorWorkspace({
     documentModeState.mode,
     submittedDocument?.id,
   ]);
-  const canSubmitCurrentArticleForReview = Boolean(
-    article &&
-      allowSubmitForReview &&
-      articlePermissions.canEdit &&
-      !isPendingReview &&
-      !isLiveOrScheduled &&
-      (
-        hasChangesAfterLatestApproval ||
-        latestReviewAction !== "approved"
-      ) &&
-      (
-        articleWpStatus === "draft" ||
-        articleWpStatus === "" ||
-        latestReviewAction === "changes_requested" ||
-        hasChangesAfterLatestApproval
-      ),
-  );
-  const canManageArticleReview = Boolean(article && (isAdmin || userCanManageReviewQueue));
-  const canRequestArticleChanges = Boolean(
-    article &&
-      canManageArticleReview &&
-      isPendingReview &&
-      (latestReviewAction === "submitted" || latestReviewAction === null),
-  );
-  const canApproveCurrentArticleVersion = Boolean(
-    article &&
-      canManageArticleReview &&
-      isPendingReview &&
-      (latestReviewAction === "submitted" || latestReviewAction === null),
-  );
-  const canPublishApprovedArticleVersion = Boolean(
-    article &&
-      articlePermissions.canPublish &&
-      latestReviewAction === "approved" &&
-      !hasChangesAfterLatestApproval,
-  );
-  const submittedReviewLabel =
-    submittedDocument?.versionNumber
-      ? `submitted version ${submittedDocument.versionNumber}`
-      : "the submitted version";
-
-  const publishDisabledReason =
-    article &&
-    articlePermissions.canPublish &&
-    isPendingReview
-      ? `Review ${submittedReviewLabel} before approving it or requesting changes.`
-      : article &&
-          articlePermissions.canPublish &&
-          hasChangesAfterLatestApproval
-        ? "Submit this draft for review before publishing."
-        : article &&
-            articlePermissions.canPublish &&
-            !canPublishApprovedArticleVersion
-          ? "Approve the submitted version before publishing."
-          : null;
-
-  const editorialStatusLabel =
-    articleWpStatus === "publish"
-      ? "Published"
-      : articleWpStatus === "future"
-        ? "Scheduled"
-        : articleWpStatus === "trash"
-          ? "Archived"
-          : hasChangesAfterLatestApproval
-            ? "Changes Need Review"
-            : latestReviewAction === "approved"
-              ? "Approved for Publication"
-              : latestReviewAction === "changes_requested"
-              ? "Changes Requested"
-              : latestReviewAction === "submitted" || articleWpStatus === "pending"
-                ? "Pending Review"
-                : "Draft";
-
-  const editorialStatusColorKey =
-    articleWpStatus === "publish"
-      ? "publish"
-      : articleWpStatus === "future"
-        ? "future"
-        : articleWpStatus === "trash"
-          ? "trash"
-          : hasChangesAfterLatestApproval
-            ? "changes_requested"
-            : latestReviewAction === "approved"
-              ? "approved"
-              : latestReviewAction === "changes_requested"
-              ? "changes_requested"
-              : latestReviewAction === "submitted" || articleWpStatus === "pending"
-                ? "pending"
-                : "draft";
+  const reviewGate = deriveArticleEditorialGate({
+    wpStatus: article?.wpStatus ?? null,
+    latestReviewAction,
+    latestApprovedVersionNumber: latestApprovedLifecycleEvent?.versionNumber ?? null,
+    latestSubmittedVersionId: latestSubmittedLifecycleEvent?.versionId ?? null,
+    reviewTargetVersionId: submittedDocument?.id ?? null,
+    isDirty,
+    canEdit: articlePermissions.canEdit,
+    allowSubmitForReview,
+    canReview: isAdmin || userCanManageReviewQueue,
+    canPublish: articlePermissions.canPublish,
+    proof: approvedVersionFingerprintStatus,
+  });
+  const hasChangesAfterLatestApproval = reviewGate.hasChangesAfterApproval;
+  const canSubmitCurrentArticleForReview = reviewGate.canSubmitWorkingVersion;
+  const canRequestArticleChanges = reviewGate.canRequestChanges;
+  const canApproveCurrentArticleVersion = reviewGate.canApproveSubmittedVersion;
+  const canPublishApprovedArticleVersion = reviewGate.canPublishApprovedVersion;
+  const publishDisabledReason = reviewGate.publishDisabledReason;
+  const editorialStatusLabel = reviewGate.editorialStatusLabel;
+  const editorialStatusColorKey = reviewGate.editorialStatusColorKey;
 
   // Refs for optimistic locking
   const articleUpdatedAtRef = useRef<string | null>(null);
@@ -1301,8 +1220,8 @@ export function ArticleEditorWorkspace({
   }
 
   async function handleSubmitForReview() {
-    if (!article || !articlePermissions.canEdit) {
-      addToast("error", articlePermissions.reason ?? "Permission denied.");
+    if (!article || !canSubmitCurrentArticleForReview || isSaving) {
+      addToast("error", "This Article has no unreviewed working changes eligible for submission.");
       return;
     }
 
@@ -2297,7 +2216,7 @@ export function ArticleEditorWorkspace({
   const articleMetaPanel = (
     <ArticleMetaPanel
       activeMode={activeWorkbenchMode}
-      hasChangesAfterApproval={hasChangesAfterLatestApproval}
+      hasChangesAfterApproval={reviewGate.workingChangesNeedReview}
       author={draft.author}
       categories={draft.categories}
       tags={draft.tags}
@@ -3308,13 +3227,17 @@ export function ArticleEditorWorkspace({
           <div className="w-full max-w-6xl">
             <ArticleReviewDecisionWorkspace
               title={documentTitle}
-              status={article.wpStatus}
+              status={editorialStatusLabel}
               submittedVersionNumber={submittedDocument?.versionNumber ?? null}
+              workingVersionNumber={approvedVersionFingerprintStatus?.latestVersionNumber ?? null}
+              latestApprovedVersionNumber={latestApprovedLifecycleEvent?.versionNumber ?? null}
+              canResubmitWorkingVersion={canSubmitCurrentArticleForReview}
+              onResubmitWorkingVersion={handleSubmitForReview}
               note={reviewActionNote}
               onNoteChange={setReviewActionNote}
               canRequestChanges={canRequestArticleChanges}
               canApprove={canApproveCurrentArticleVersion}
-              busy={isReviewActionBusy}
+              busy={isReviewActionBusy || isSaving}
               events={lifecycleEvents}
               onRequestChanges={async () => {
                 if (!article) return;

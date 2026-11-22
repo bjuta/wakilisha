@@ -726,24 +726,29 @@ export interface ArticleVersionFingerprintStatus {
   latestContentFingerprint: string | null;
   approvedVersionNumber: number | null;
   approvedContentFingerprint: string | null;
+  submittedVersionNumber: number | null;
+  submittedContentFingerprint: string | null;
 }
 
 export async function fetchArticleVersionFingerprintStatus(
   articleId: string,
   approvedVersionNumber: number | null,
+  submittedVersionNumber: number | null = null,
 ): Promise<ArticleVersionFingerprintStatus> {
   const empty: ArticleVersionFingerprintStatus = {
     latestVersionNumber: null,
     latestContentFingerprint: null,
     approvedVersionNumber,
     approvedContentFingerprint: null,
+    submittedVersionNumber,
+    submittedContentFingerprint: null,
   };
 
-  if (!approvedVersionNumber) return empty;
+  if (!approvedVersionNumber && !submittedVersionNumber) return empty;
 
   const { data, error } = await (supabase as any).rpc("list_article_versions", {
     p_article_id: articleId,
-    p_limit: 50,
+    p_limit: 100,
   });
 
   if (error) {
@@ -774,12 +779,16 @@ export async function fetchArticleVersionFingerprintStatus(
 
   const approved =
     versions.find((row) => row.versionNumber === approvedVersionNumber) ?? null;
+  const submitted =
+    versions.find((row) => row.versionNumber === submittedVersionNumber) ?? null;
 
   return {
     latestVersionNumber: latest?.versionNumber ?? null,
     latestContentFingerprint: latest?.contentFingerprint ?? null,
     approvedVersionNumber,
     approvedContentFingerprint: approved?.contentFingerprint ?? null,
+    submittedVersionNumber,
+    submittedContentFingerprint: submitted?.contentFingerprint ?? null,
   };
 }
 
