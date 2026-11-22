@@ -70,3 +70,51 @@ This PR is only the receipt and pure comparison foundation. The following remain
 - Bounded restartable materialization, replay/idempotent publication lineage, and immutable artifact pinning.
 - Real withdrawal/redirect origin HTTP semantics and rollback behavior.
 - Independent current-source acceptance, staging/preview verification, end-to-end browser and load acceptance.
+
+## Gate B: bounded out-of-band source evidence scan
+
+The next stage is scripts/seo/collect-governed-publication-source.mjs. This is a **pre-publication source evidence collector**, not a complete v1 receipt generator, static HTML renderer, approval mechanism, or Production deployment. Its output explicitly records publicationReceipt=false and publicationActivationAuthority=false. The scan does not satisfy the v1 route and SEO receipt contract on its own.
+
+**Scope.** The existing package.json already pins pg 8.11.5. This command must run only out of band from the frontend build, in an explicitly authorized maintenance environment. Its --inventory mode requires no credentials or network. Its --collect mode needs an explicit *private* environment configuration and a new, absolute evidence file path. Never put database credentials in PRs, logs, command transcripts or chat.
+
+Connection environment:
+
+- WAKILISHA_SEO_SOURCE_PROJECT_REF: pgzizndxdyhqmtyywjmt
+- WAKILISHA_SEO_SOURCE_DB_HOST: db.pgzizndxdyhqmtyywjmt.supabase.co
+- WAKILISHA_SEO_SOURCE_DB_ROLE: supabase_read_only_user
+- WAKILISHA_SEO_SOURCE_DATABASE_URL: exact TLS PostgreSQL URI for that host and approved role, with password supplied by the accepted private secret process; no connection string overrides
+- WAKILISHA_SEO_SOURCE_DB_CA_FILE: absolute path to the project's verified PEM **database root CA**, downloaded through the authenticated Supabase Dashboard → Database Settings → SSL Configuration → Download Certificate. Never retrieve CA trust from the unverified TCP endpoint or use TLS verification bypasses.
+
+**TLS trust (verified after the network incident):** The collector now fails closed without a valid, non-symlink project CA PEM, checks that its X.509 certificate is a current CA, and configures the direct PostgreSQL driver with `ssl: { rejectUnauthorized: true, ca: <approved certificate>, servername: db.pgzizndxdyhqmtyywjmt.supabase.co }`. Transport may use the already approved Lightsail SSH forward, but TLS must continue to validate the *original database hostname*, not `127.0.0.1`. Supabase documentation explicitly requires the Dashboard certificate for verified PostgreSQL TLS. A private reader URI remains a separate requirement. No permission change, SQL mutation, or paid IPv4 add-on is part of this work.
+
+**Read-only role evidence.** On November 14, the database role catalog established that supabase_read_only_user is login-enabled, BYPASSRLS, non-superuser, not CREATEROLE/CREATEDB, with SELECT on all 229 Public and 92 Editorial tables and no table-level write grants. That is a metadata check, not proof that the credential, direct-host connectivity, or a live collector run is available. The collector independently verifies transaction mode, role, BYPASSRLS, selected table privileges and zero DML grants at runtime. No role creation or SQL migration is proposed here.
+
+**Operator syntax after connection authority approval:**
+
+    node scripts/seo/collect-governed-publication-source.mjs --inventory
+    node scripts/seo/collect-governed-publication-source.mjs --collect /absolute/private/unique-source-evidence.json
+
+The approved role connects over TLS with peer validation. A single PostgreSQL REPEATABLE READ READ ONLY transaction covers the complete allowlisted scan. The fixed inventory contains **40 existing source tables and 383 selected columns**, plus three static route/code authority files. It includes Registry relationships and credits, SEO overrides, Magazine publication and featured guides, public Resource Index, People/Organization identity links, Playlist publication versions and lifecycle, Chart editions/entries/aliases, and image references. Both public and nonpublic source states are fingerprinted conservatively so withdrawals and status changes are not concealed by published-only filters.
+
+Each source query pages 250 rows with fixed ordering. Limits: 20,000 rows per table, 100,000 total rows, 600 source queries, 90-second wall-clock budget, query/lock/connection timeouts. A missing/invalid table, unexpected role, RLS-filtered read, write grant, incomplete page, content tamper, or transaction identity change **fails closed**. The scan commits only a read-only transaction and writes a new mode-0600 output JSON exclusively after success. Individual source rows, content bodies and credentials are never written to this evidence file. Source surfaces are deterministically hashed and a sourceEpoch digest changes when relevant scanned source content changes or disappears.
+
+**No false authority:** The result is kind=wakilisha-governed-source-scan, not a source-signed publication receipt. The separate governed publisher must still establish independent executor provenance, exact publication route inclusion/exclusion and retirement events, renderer digest binding, accepted immutable snapshot, redirect/410/308 behavior, and a complete preview/Production release gate. Hashes and database role declarations alone cannot authenticate an arbitrary uploaded receipt. Overinclusive draft changes may intentionally invalidate a scan until a narrower canonical projection has been reviewed.
+
+**Acceptance so far:** local Node mock harness 13/13 PASS; JavaScript syntax PASS; exact GitHub source blob matches local tested bytes. Independent read-only schema audit: 40/40 tables and 383/383 selected columns present, the existing role can SELECT every one, and has zero table DML grants. Two consolidated permanent contract cases extend the existing test/seo/public-vertical-seo-contract.test.ts; no new workflow or permanent standalone test file. Live Production SQL transaction acceptance, real client connectivity, and end-to-end publication are **not yet accepted**.
+
+**What must not change in this stage:** the full frontend build, accepted SEO snapshot validator, Lightsail runner, Supabase SQL, Supabase Edge, Registry writers, and current deployed #1376 frontend release. Issue #1377 stays open until the complete publication/withdrawal lifecycle is proven and released.
+
+**Governed source correction (14 November 2026):** The initial inventory mistakenly listed two filtered API views as physical source tables: public.wk_guides and public.wk_resource_index. Both views filter or assemble the underlying publication state, so they cannot independently prove withdrawal/correction coverage. They have been replaced by the actual physical authorities: public.guides and editorial.resources, editorial.resource_aliases, editorial.article_resources, and editorial.registry_artist_resources. The updated inventory consists of **40/40 physical tables, 383/383 selected columns and 40/40 declared unique keys**. Independent read-only Production catalog checks confirmed all selected columns, SELECT access for the exact reader role, and **zero table-level write privileges**. No indexes, view definitions, migrations, SQL mutations or Production frontend changes were made. The former two-view count/distinct compatibility exemption is no longer required; future sources without declared unique keys remain subject to an explicit reviewed cardinality gate. Current source authority is still marked `review-required` until an approved direct client scan is accepted.
+
+## 22 November source-authority expansion: immutable Article publication state
+
+The original 14 November **40-table/383-column** managed source scan is historical evidence. It predates the Alusa Continua publication and does not include the public Article publication snapshots or their immutable Editorial versions. Those omissions are material: `wk_articles` is an editable working record, not the canonical public Article version. A read-only Production reconciliation found **one** of 208 active Article publication snapshots already differs from its working Article's excerpt.
+
+The reviewed source scanner therefore now fingerprints **42 physical tables**, adding:
+
+- `public.wk_article_publication_snapshots`: published Article ID, Resource/version pointers, visibility via active snapshot, exact published headline, excerpt, SEO, hero asset URL and lifecycle timestamps, including retired `is_active=false` records.
+- `editorial.article_versions`: all immutable Article versions, publication/correction fingerprints, content, hero media and version lifecycle state.
+
+Both additions have been independently verified on 22 Nov as physical tables with declared unique `id`, SELECT privilege for `supabase_read_only_user` and **no INSERT/UPDATE/DELETE/TRUNCATE** grants. Together they contain 533 rows at this checkpoint (210 snapshots + 323 versions), within the scanner's existing budget. The expansion changes the managed SQL query SHA, table/surface digests and source epoch. No 14 November capture or old 40-table wrapper may be reused or relabeled as the new 42-table source epoch.
+
+The native managed read-only query path remains separate from database-admin `execute_sql`. The managed adapter still returns only counts/digests in one statement and requires independently pinned two-capture replay. The scanner is **not** a signer, route materializer, immutable release or Production activation authority; #1377 remains open. No SQL, Edge or Production frontend mutation is authorized by this expansion.
