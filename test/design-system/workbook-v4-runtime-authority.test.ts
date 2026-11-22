@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { canonicalArticleShareUrl, publishedArticleCardUrl, shareImageUrl, shareTextForItem } from "../../src/components/design-system/share/sharePresentation";
+import { ARTICLE_STORY_WIDTH, ARTICLE_STORY_HEIGHT, articleStoryCoverCrop } from "../../src/components/design-system/share/articleStoryImage";
 
 const read = (name: string) => readFileSync(name, "utf8");
 
@@ -269,6 +270,51 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(share.match(/shareTextForItem\(item\)/g)).toHaveLength(2);
     expect(share).not.toContain('key: "messenger"');
     expect(share).not.toContain("app_id=0");
+  });
+
+  it("exports published Articles as full-bleed WAKILISHA Stories with truthful handoffs", () => {
+    const exportSource = read("src/components/design-system/share/articleStoryImage.ts");
+    const share = read("src/components/design-system/share/ShareSheet.tsx");
+    const actions = read("src/components/feature/community/CommunityActionSheet.tsx");
+    const desktop = read("src/pages/magazine/article/page.tsx");
+    const mobile = read("src/pages/mobile/magazine/article/page.tsx");
+
+    expect([ARTICLE_STORY_WIDTH, ARTICLE_STORY_HEIGHT]).toEqual([1080, 1920]);
+    expect(articleStoryCoverCrop(2000, 2000)).toEqual({
+      sx: 437.5, sy: 0, sw: 1125, sh: 2000,
+    });
+    expect(articleStoryCoverCrop(1080, 1920)).toEqual({
+      sx: 0, sy: 0, sw: 1080, sh: 1920,
+    });
+    expect(() => articleStoryCoverCrop(0, 2000)).toThrow();
+
+    expect(exportSource).toContain('getPropertyValue("--wk-font-display")');
+    expect(exportSource).toContain('getPropertyValue("--wk-font-body")');
+    expect(exportSource).toContain('getPropertyValue("--wk-brand")');
+    expect(exportSource).toContain('document.fonts.load');
+    expect(exportSource).toContain('image.crossOrigin = "anonymous"');
+    expect(exportSource).toContain('ctx.drawImage(image, crop.sx, crop.sy, crop.sw, crop.sh');
+    expect(exportSource).toContain('drawTrackedText(ctx, "WAKILISHA"');
+    expect(exportSource).toContain('ctx.fillText(source.author.trim()');
+    expect(exportSource).toContain('String(source.readingTime) + " min read"');
+    expect(exportSource).toContain('source.section.trim().toUpperCase()');
+    expect(exportSource).toContain('"image/jpeg"');
+
+    expect(share.match(/<ArticleStoryShare item=/g)).toHaveLength(2);
+    expect(share).toContain('item.type === "article"');
+    expect(share).toContain('!!item.publishedSnapshotId');
+    expect(share).toContain('Share the image, then add the article link using Instagram’s Link sticker.');
+    expect(share).toContain("navigator.share({ files: [rendered.file], title: item.title })");
+    expect(share).toContain('await navigator.clipboard.writeText(trackedUrl)');
+    expect(share).not.toContain("instagram.com/stories/create");
+    expect(actions).toContain('articleStory: entity.type === "article" ? storyMetadata : undefined');
+
+    for (const page of [desktop, mobile]) {
+      expect(page).toContain('storyMetadata={previewNonce ? undefined : {');
+      expect(page).toContain("author: article.author");
+      expect(page).toContain("readingTime: article.readingTime");
+      expect(page).toContain("section: article.section");
+    }
   });
 
   it("presents one share affordance on each article route without rounded paper", () => {
