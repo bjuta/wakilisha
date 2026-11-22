@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { deriveArticleEditorialGate, canPublishArticleWithCapability, currentArticleReviewProof, type ArticleEditorialGateInput } from "@/services/articles/articleEditorialGate";
 import { ArticleReviewDecisionWorkspace } from "@/pages/admin/content/articles/detail/components/ArticleReviewDecisionWorkspace";
+import { hasActiveArticleReviewRound } from "@/pages/admin/content/articles/detail/hooks/useArticleDocumentModeState";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -186,6 +187,18 @@ describe("permanent Article editorial lifecycle authority", () => {
     const scheduled = gate({ wpStatus: "future", latestReviewAction: "published",
       latestPublishedVersionNumber: 37 });
     expect(scheduled.canSubmitWorkingVersion).toBe(false);
+  });
+
+  it("loads only the exact new published revision for review and never the old submitted Article", () => {
+    expect(hasActiveArticleReviewRound("publish","published")).toBe(false);
+    expect(hasActiveArticleReviewRound("publish","submitted")).toBe(true);
+    expect(hasActiveArticleReviewRound("publish","approved")).toBe(false);
+    expect(hasActiveArticleReviewRound("publish","changes_requested")).toBe(false);
+    expect(hasActiveArticleReviewRound("pending","submitted")).toBe(true);
+    expect(hasActiveArticleReviewRound("future","submitted")).toBe(false);
+    const editor=fs.readFileSync(path.join(process.cwd(),
+      "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx"),"utf8");
+    expect(editor).toContain("latestReviewAction,\n      draftVersion:");
   });
 
   it("reviews a new published correction while retaining live status, then allows explicit publication", () => {
