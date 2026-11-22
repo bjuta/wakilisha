@@ -41,6 +41,37 @@ export interface ArticleEditorialGate {
   publishDisabledReason: string | null;
 }
 
+export interface ArticleReviewProofLease {
+  articleId: string;
+  draftVersion: number;
+  approvedVersionNumber: number | null;
+  submittedVersionNumber: number | null;
+  proof: ArticleReviewVersionProof;
+}
+
+/**
+ * A previous async version-list result must never authorize publication of a
+ * newer save, a different Article or a newly submitted/approved lifecycle.
+ */
+export function currentArticleReviewProof(
+  current: {
+    articleId: string | null;
+    draftVersion: number | null;
+    approvedVersionNumber: number | null;
+    submittedVersionNumber: number | null;
+  },
+  lease: ArticleReviewProofLease | null,
+): ArticleReviewVersionProof | null {
+  if (!lease || !current.articleId || current.draftVersion == null ||
+      current.articleId !== lease.articleId ||
+      current.draftVersion !== lease.draftVersion ||
+      current.approvedVersionNumber !== lease.approvedVersionNumber ||
+      current.submittedVersionNumber !== lease.submittedVersionNumber) {
+    return null;
+  }
+  return lease.proof;
+}
+
 function sameFingerprint(a: string | null | undefined, b: string | null | undefined): boolean | null {
   if (!a || !b) return null; // No authority to assume equivalence.
   return a === b;
