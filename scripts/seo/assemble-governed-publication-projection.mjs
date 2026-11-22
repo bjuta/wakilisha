@@ -79,6 +79,68 @@ function captureWrapper(raw,label) {
   time(raw.capturedAt,label);
   return raw.response;
 }
+// The public /magazine listing can call publish_due_article_publications.
+// It is NOT a read-only publication-capture source. Instead, the approved
+// managed reader executes this one SELECT against immutable active snapshots.
+function managedMagazineSql() {
+  return \`/* WAKILISHA governed magazine source: single read-only statement.
+     Run only through Supabase managed --read-only --remote=pgzizndxdyhqmtyywjmt.
+     No publish_due_article_publications, no calls to public-content-read. */
+WITH published AS (
+  SELECT id::text AS id, slug, title, author,
+         coalesce(nullif(btrim(seo->>'description'), ''), excerpt, '') AS dek,
+         to_char(published_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+         coalesce(hero_image_url, '') AS hero_url
+  FROM public.wk_article_publication_snapshots
+  WHERE is_active = true AND wp_status = 'publish'
+  ORDER BY slug, id LIMIT 501
+)
+SELECT jsonb_build_object(
+  'protocol','wk-governed-magazine-managed-read-v1',
+  'projectRef','pgzizndxdyhqmtyywjmt',
+  'role',current_user,
+  'transactionReadOnly',current_setting('transaction_read_only'),
+  'capturedAt',to_char(statement_timestamp() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+  'count',(SELECT count(*)::int FROM published),
+  'stories',coalesce((SELECT jsonb_agg(jsonb_build_object(
+    'id',id,'slug',slug,'title',title,'author',author,
+    'dek',dek,'date',date,'heroUrl',hero_url) ORDER BY slug, id) FROM published),'[]'::jsonb)
+) AS evidence;\`;
+}
+function verifyManagedMagazineEvidence(raw) {
+  let record = raw;
+  if (record && typeof record === "object" && !Array.isArray(record) &&
+      Array.isArray(record.result)) record = record.result;
+  if (Array.isArray(record)) {
+    if (record.length !== 1) fail("Managed Magazine SQL must return exactly one row");
+    record = record[0];
+  }
+  if (record?.evidence) record = record.evidence;
+  if (typeof record === "string") {
+    try {record=JSON.parse(record);} catch {fail("Invalid managed Magazine JSON");}
+  }
+  if (!record || typeof record !== "object" ||
+      record.protocol !== "wk-governed-magazine-managed-read-v1" ||
+      record.projectRef !== "pgzizndxdyhqmtyywjmt" ||
+      record.role !== EXPECTED_ROLE || record.transactionReadOnly !== "on" ||
+      !Number.isSafeInteger(record.count) || record.count < 1 || record.count > ARTICLE_MAX ||
+      !Array.isArray(record.stories) || record.stories.length !== record.count) {
+    fail("Managed Magazine capture is incomplete, oversized or not from approved read-only role");
+  }
+  time(record.capturedAt,"managed-magazine");
+  const seen = new Set();
+  for (const row of record.stories) {
+    const slug=String(row?.slug||"");
+    if (!/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/.test(slug) || seen.has(slug) ||
+        !/^[a-f0-9-]{36}$/.test(String(row?.id||"")) ||
+        !String(row?.title||"").trim() || !String(row?.author||"").trim()) {
+      fail("Managed Magazine capture contains duplicate, invalid or unpublished Article identity");
+    }
+    seen.add(slug);
+  }
+  return record;
+}
+
 function validPublicPath(p) {
   return typeof p === "string" && /^\/[a-zA-Z0-9/._-]{0,319}$/.test(p) &&
     !p.includes("//") && (p === "/" || !p.endsWith("/")) &&
@@ -102,7 +164,7 @@ function assemble({first,second,metaCapture,articleCapture,acceptedManifest,seco
       fail("Public API capture outside two trusted managed source reads");
   }
   const meta=captureWrapper(metaCapture,"metadata");
-  const article=captureWrapper(articleCapture,"magazine");
+  const article=verifyManagedMagazineEvidence(articleCapture);
   if (meta.ok !== true || !meta.data || typeof meta.data.metadata !== "object" ||
       !meta.data.metadata || Array.isArray(meta.data.metadata) ||
       !Number.isSafeInteger(meta.data.count) || meta.data.count !== Object.keys(meta.data.metadata).length) {
@@ -126,7 +188,7 @@ function assemble({first,second,metaCapture,articleCapture,acceptedManifest,seco
   if (missing.length) {
     fail("Public route retirement needs independently accepted 410/308 publication authority; first missing route: "+missing[0]+" (total="+missing.length+")");
   }
-  const stories=article?.data?.stories || article?.stories;
+  const stories=article.stories;
   if (!Array.isArray(stories) || stories.length < 1 || stories.length > ARTICLE_MAX)
     fail("Incomplete current published Magazine list");
   const published=new Set();
@@ -139,7 +201,7 @@ function assemble({first,second,metaCapture,articleCapture,acceptedManifest,seco
         !entry || entry.sourceTable !== "wk_article_publication_snapshots" ||
         String(entry.sourceId||"") !== String(row.id||"") ||
         String(row.title||"").trim() === "" ||
-        String(entry.image||"") !== selected) {
+        (selected && String(entry.image||"") !== selected)) {
       fail("Published Article/source snapshot/selected image divergence: "+slug);
     }
     published.add(slug);
@@ -158,18 +220,29 @@ function assemble({first,second,metaCapture,articleCapture,acceptedManifest,seco
     artists:{},releases:{},tracks:{},charts:{},
     nonCanonicalPaths:[],
     publicationActivationAuthority:false,
-    generatedFrom:"managed-42-source-replay-and-bounded-public-projections",
+    generatedFrom:"managed-42-source-replay-and-readonly-publication-projections",
   };
 }
 function main() {
+  if (process.argv[2] === "--emit-magazine-sql" && process.argv.length === 4) {
+    const filename = process.argv[3];
+    if (!path.isAbsolute(filename) || path.extname(filename) !== ".sql" ||
+        fs.existsSync(filename)) fail("SQL output must be a new absolute .sql file");
+    const sql=managedMagazineSql();
+    fs.writeFileSync(filename,sql,{flag:"wx",mode:0o600});
+    console.log("MANAGED_MAGAZINE_SQL_SHA256="+sha(sql));
+    console.log("MANAGED_MAGAZINE_SQL_STATEMENTS=1");
+    console.log("MANAGED_MAGAZINE_MUTATIONS=0");
+    return;
+  }
   if (process.argv.length !== 9 || process.argv[2] !== "--assemble")
-    fail("Use --assemble FIRST_SCAN SECOND_SCAN SEO_CAPTURE MAGAZINE_CAPTURE ACCEPTED_METADATA OUTPUT");
+    fail("Use --emit-magazine-sql OUTPUT.sql or --assemble FIRST_SCAN SECOND_SCAN SEO_CAPTURE MANAGED_MAGAZINE_CAPTURE ACCEPTED_METADATA OUTPUT");
   const [firstPath,secondPath,metaPath,articlesPath,baselinePath,outPath]=process.argv.slice(3);
   const keys=[
     "WAKILISHA_FIRST_MANAGED_SCAN_SHA256",
     "WAKILISHA_SECOND_MANAGED_SCAN_SHA256",
     "WAKILISHA_SEO_METADATA_CAPTURE_SHA256",
-    "WAKILISHA_MAGAZINE_CAPTURE_SHA256",
+    "WAKILISHA_MANAGED_MAGAZINE_CAPTURE_SHA256",
     "WAKILISHA_ACCEPTED_METADATA_SHA256",
   ];
   const [first,second,metaCapture,articleCapture,acceptedManifest] =
@@ -188,7 +261,7 @@ function main() {
   console.log("GOVERNED_SEO_EXTERNAL_READS=0");
   console.log("PUBLICATION_ACTIVATION_AUTHORITY=NONE");
 }
-export {assemble,scanReceipt,captureWrapper,validPublicPath,stableJson};
+export {assemble,scanReceipt,captureWrapper,managedMagazineSql,verifyManagedMagazineEvidence,validPublicPath,stableJson};
 if (process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   try {main();} catch(err) {console.error(err instanceof Error?err.message:String(err)); process.exitCode=1;}
 }
