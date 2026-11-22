@@ -6,6 +6,7 @@ import { buildUtmUrl, getUtmContextForUrl } from "@/services/attribution";
 import { Portal } from "@/components/base/Portal";
 import { publishedArticleCardUrl, shareImageUrl, shareTextForItem } from "./sharePresentation";
 import { renderArticleStoryImage, type ArticleStoryMetadata } from "./articleStoryImage";
+import { SharePlatformIcon } from "./sharePlatformIcons";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  WAKILISHA SHARE — Unified share infrastructure across all surfaces
@@ -408,7 +409,7 @@ function SharePlatformGrid({
   onCopy: () => void;
   size?: "sm" | "md";
 }) {
-  const iconSize = size === "sm" ? "text-[16px]" : "text-[18px]";
+  const iconSize = size === "sm" ? 16 : 18;
   const squareSize = size === "sm" ? "w-10 h-10" : "w-11 h-11";
   const labelSize = size === "sm" ? "text-[9px]" : "text-[10px]";
 
@@ -424,6 +425,7 @@ function SharePlatformGrid({
             key={p.key}
             type="button"
             className="share-grid-item"
+            aria-label={p.key === "instagram_story" ? "Instagram Story" : p.name}
             onClick={() => {
               if (isCopy) onCopy();
               else onShare(p);
@@ -433,7 +435,7 @@ function SharePlatformGrid({
               className={`${squareSize} rounded-xl flex items-center justify-center transition-transform share-grid-icon`}
               style={{ background: p.brandBg, color: p.brandText }}
             >
-              <i className={`${p.icon} ${iconSize}`} />
+              <SharePlatformIcon icon={p.icon} size={iconSize} />
             </div>
             <span className={`${labelSize} font-semibold text-[var(--wk-text-muted)]`}>
               {p.name}
