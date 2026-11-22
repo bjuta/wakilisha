@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { SURFACES, verifyReceipt, differences, extractSeo, auditArtifact } from "../../scripts/seo/verify-governed-publication.mjs";
+import { readGovernedOfflineProjection, activateGovernedOfflineProjection, seoBlockForPath, htmlForPath } from "../../scripts/seo/prerender-metadata.mjs";
 
 import {
   readFileSync,
@@ -60,6 +61,94 @@ const adminSeo =
     "src/pages/admin/settings/seo/page.tsx",
     "utf8",
   );
+
+describe("governed offline SEO projection and selected Article image authority", () => {
+  const fixture = () => ({
+    format: 1,
+    origin: "https://wakilisha.africa",
+    complete: true,
+    sourceEpoch: "a".repeat(64),
+    sourceScanSha256: "b".repeat(64),
+    metadata: {
+      "/magazine/album-review-alusa-continua": {
+        sourceTable: "wk_articles",
+        sourceId: "review-record",
+        title: "Album Review: Alusa Continua",
+        description: "A complete editorial review of Bien's Alusa Continua.",
+        image: "https://media.wakilisha.africa/uploads/wrong.jpg",
+        kind: "article",
+        ogType: "article",
+      },
+    },
+    articles: [{
+      id: "review-record",
+      slug: "album-review-alusa-continua",
+      title: "Album Review: Alusa Continua",
+      author: "Hafare Segelan",
+      dek: "A complete editorial review of Bien's Alusa Continua.",
+      date: "2026-11-22",
+      heroUrl: "https://media.wakilisha.africa/uploads/selected.webp",
+    }],
+    artists: {},
+    releases: {},
+    tracks: {},
+    charts: {},
+    nonCanonicalPaths: [],
+  });
+
+  it("requires independent projection, scan and source-epoch SHA pins", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "wk-offline-projection-"));
+    try {
+      const filename = path.join(root, "projection.json");
+      const source = fixture();
+      const data = JSON.stringify(source);
+      writeFileSync(filename, data);
+      const inputs = {
+        WAKILISHA_GOVERNED_SEO_PROJECTION: filename,
+        WAKILISHA_GOVERNED_SEO_PROJECTION_SHA256: crypto.createHash("sha256").update(data).digest("hex"),
+        WAKILISHA_APPROVED_SOURCE_EPOCH: source.sourceEpoch,
+        WAKILISHA_APPROVED_SOURCE_SCAN_SHA256: source.sourceScanSha256,
+      };
+      const accepted = readGovernedOfflineProjection(inputs);
+      expect(accepted.articles).toHaveLength(1);
+      expect(() => readGovernedOfflineProjection({
+        ...inputs, WAKILISHA_APPROVED_SOURCE_EPOCH: "c".repeat(64),
+      })).toThrow("unapproved");
+      expect(() => readGovernedOfflineProjection({
+        ...inputs, WAKILISHA_GOVERNED_SEO_PROJECTION_SHA256: "0".repeat(64),
+      })).toThrow("checksum mismatch");
+      const spoofed = { ...source, complete: false };
+      const payload = JSON.stringify(spoofed);
+      writeFileSync(filename, payload);
+      expect(() => readGovernedOfflineProjection({
+        ...inputs,
+        WAKILISHA_GOVERNED_SEO_PROJECTION_SHA256: crypto.createHash("sha256").update(payload).digest("hex"),
+      })).toThrow("Incomplete or unapproved");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("renders a new Article's exact editor-selected image in initial HTTP SEO and Article JSON-LD without network fetches", () => {
+    const input = fixture();
+    activateGovernedOfflineProjection(input);
+    const articlePath = "/magazine/album-review-alusa-continua";
+    const block = seoBlockForPath(articlePath);
+    expect(block).toContain("Album Review: Alusa Continua | WAKILISHA");
+    expect(block).toContain('property="og:type" content="article"');
+    expect(block).toContain('property="og:url" content="https://wakilisha.africa/magazine/album-review-alusa-continua"');
+    expect(block).toContain('property="og:image" content="https://media.wakilisha.africa/uploads/selected.webp"');
+    expect(block).toContain('name="twitter:image" content="https://media.wakilisha.africa/uploads/selected.webp"');
+    expect(block).not.toContain("wrong.jpg");
+    expect(block).not.toContain('property="og:image:width"');
+    expect(block).toContain("Hafare Segelan");
+    expect(block).toContain("2026-11-22");
+    expect(block).toContain('"@type":"Article"');
+    const html = htmlForPath("<html><head></head><body><main></main></body></html>", articlePath);
+    expect(html).toContain("selected.webp");
+    expect(html).not.toContain('content="https://wakilisha.africa/"');
+  });
+});
 
 describe("incident-safe offline SEO build", () => {
   it("preserves the exact library-selected media identity in Article versions", () => {
