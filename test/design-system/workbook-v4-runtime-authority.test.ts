@@ -294,7 +294,12 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(exportSource).toContain('document.fonts.load');
     expect(exportSource).toContain('image.crossOrigin = "anonymous"');
     expect(exportSource).toContain('ctx.drawImage(image, crop.sx, crop.sy, crop.sw, crop.sh');
-    expect(exportSource).toContain('drawTrackedText(ctx, "WAKILISHA"');
+    expect(exportSource).toContain('logo.src = "/assets/logos/wakilisha-logo-dark.svg"');
+    expect(exportSource).toContain('ctx.drawImage(logo, 88, 260, 286, 43)');
+    expect(exportSource).not.toContain('drawTrackedText(ctx, "WAKILISHA"');
+    const logo = read("public/assets/logos/wakilisha-logo-dark.svg");
+    expect(logo).toContain('viewBox="0 0 199.05 29.87"');
+    expect(logo).toContain("#85C441");
     expect(exportSource).toContain('ctx.fillText(source.author.trim()');
     expect(exportSource).toContain('String(source.readingTime) + " min read"');
     expect(exportSource).toContain('source.section.trim().toUpperCase()');
