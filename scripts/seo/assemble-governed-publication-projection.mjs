@@ -83,7 +83,7 @@ function captureWrapper(raw,label) {
 // It is NOT a read-only publication-capture source. Instead, the approved
 // managed reader executes this one SELECT against immutable active snapshots.
 function managedMagazineSql() {
-  return \`/* WAKILISHA governed magazine source: single read-only statement.
+  return `/* WAKILISHA governed magazine source: single read-only statement.
      Run only through Supabase managed --read-only --remote=pgzizndxdyhqmtyywjmt.
      No publish_due_article_publications, no calls to public-content-read. */
 WITH published AS (
@@ -105,7 +105,7 @@ SELECT jsonb_build_object(
   'stories',coalesce((SELECT jsonb_agg(jsonb_build_object(
     'id',id,'slug',slug,'title',title,'author',author,
     'dek',dek,'date',date,'heroUrl',hero_url) ORDER BY slug, id) FROM published),'[]'::jsonb)
-) AS evidence;\`;
+) AS evidence;`;
 }
 function verifyManagedMagazineEvidence(raw) {
   let record = raw;
