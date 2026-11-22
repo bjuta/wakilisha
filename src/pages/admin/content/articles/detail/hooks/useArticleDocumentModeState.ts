@@ -16,6 +16,7 @@ import {
 export interface UseArticleDocumentModeStateInput {
   articleId: string | null;
   wpStatus: string | null;
+  latestReviewAction?: string | null;
   draftVersion: number | null;
 }
 
@@ -36,9 +37,20 @@ export interface ArticleDocumentModeState {
   canViewSubmitted: boolean;
 }
 
+/** Published Articles may have a new private review round while staying public.
+ * Never offer Suggest/View against an old pre-publication submitted target. */
+export function hasActiveArticleReviewRound(
+  wpStatus: string | null,
+  latestReviewAction: string | null | undefined,
+): boolean {
+  return wpStatus === "pending" ||
+    (wpStatus === "publish" && latestReviewAction === "submitted");
+}
+
 export function useArticleDocumentModeState({
   articleId,
   wpStatus,
+  latestReviewAction,
   draftVersion,
 }: UseArticleDocumentModeStateInput): ArticleDocumentModeState {
   const [mode, setModeState] =
@@ -59,7 +71,7 @@ export function useArticleDocumentModeState({
   const [refreshRevision, setRefreshRevision] =
     useState(0);
 
-  const pendingReview = wpStatus === "pending";
+  const pendingReview = hasActiveArticleReviewRound(wpStatus, latestReviewAction);
 
   useEffect(() => {
     let active = true;
