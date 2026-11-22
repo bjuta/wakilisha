@@ -99,7 +99,6 @@ export function deriveArticleEditorialGate(input: ArticleEditorialGateInput): Ar
     isDirty, canEdit, allowSubmitForReview, canReview, canPublish, proof,
   } = input;
   const published = wpStatus === "publish";
-  const live = published || wpStatus === "future";
   const approvalMatchesWorking = sameFingerprint(
     proof?.latestContentFingerprint, proof?.approvedContentFingerprint,
   );
