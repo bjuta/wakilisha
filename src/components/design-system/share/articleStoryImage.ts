@@ -101,14 +101,25 @@ async function loadPublicArtwork(rawUrl: string): Promise<HTMLImageElement> {
   });
 }
 
+/** Reuse the public site's actual dark-background SVG wordmark, not typed text. */
+async function loadArticleStoryLogo(): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const logo = new Image();
+    logo.onload = () => resolve(logo);
+    logo.onerror = () => reject(new Error("The WAKILISHA logo could not be loaded for this Story."));
+    logo.src = "/assets/logos/wakilisha-logo-dark.svg";
+  });
+}
+
 export async function renderArticleStoryImage(source: ArticleStorySource): Promise<Blob> {
   if (!source.title.trim() || !source.author.trim() || !source.section.trim()
     || !Number.isFinite(source.readingTime) || source.readingTime <= 0) {
     throw new Error("This article is missing published Story details.");
   }
 
-  const [image] = await Promise.all([
+  const [image, logo] = await Promise.all([
     loadPublicArtwork(source.imageUrl),
+    loadArticleStoryLogo(),
     document.fonts.ready,
   ]);
   // The same canonical token drives the website headline. Wait for the actual
@@ -142,9 +153,9 @@ export async function renderArticleStoryImage(source: ArticleStorySource): Promi
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.textBaseline = "top";
-  ctx.fillStyle = "#F5F5F4";
-  ctx.font = "800 48px " + displayFont;
-  drawTrackedText(ctx, "WAKILISHA", 88, 260, -2.1);
+  // The site's canonical white/green SVG lockup, sized to the existing
+  // top-left header footprint. Keep "MAGAZINE" as a distinct editorial label.
+  ctx.drawImage(logo, 88, 260, 286, 43);
   ctx.font = "800 22px " + bodyFont;
   ctx.fillStyle = brand;
   drawTrackedText(ctx, "MAGAZINE", 90, 324, 3.5);
