@@ -177,7 +177,7 @@ describe("governed offline SEO projection and selected Article image authority",
     expect(block).toContain('name="twitter:image" content="https://media.wakilisha.africa/uploads/selected.webp"');
     expect(block).not.toContain("wrong.jpg");
     expect(block).not.toContain('property="og:image:width"');
-    expect(block).toContain("Hafare Segelan");
+    expect(block).toContain('"author":{"@type":"Person","name":"Hafare Segelan"}');
     expect(block).toContain("2026-11-22");
     expect(block).toContain('"@type":"Article"');
     const html = htmlForPath("<html><head></head><body><main></main></body></html>", articlePath);
