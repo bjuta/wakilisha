@@ -2,7 +2,7 @@
 
 **Scope:** public published WAKILISHA Magazine Articles, shared desktop/mobile UI.
 **Branch:** feat/article-instagram-story-fullbleed.
-**Status:** implementation candidate, not Production accepted.
+**Status:** Original full-bleed Story renderer deployed 22 November 2026. Share destination integration is a subsequent frontend-only correction until separately released.
 
 ## Design authority
 
@@ -22,6 +22,14 @@ A domain printed on an image is not a clickable link; tell the reader to add the
 ## Authority, security, and scope
 
 The existing immutable published Article read model supplies headline, selected artwork, section, author, reading time, public route, and published snapshot ID. Story export does not load private media, use a draft-preview nonce, query the editor state, mutate Article content, or depend on a database write. The Story option is hidden when the public published snapshot or required metadata is missing. It uses the existing Community Action Sheet -> Share Sheet route on desktop and mobile. Unrelated media sharing platforms remain unchanged.
+
+### Unified share destinations
+
+Instagram is registered as one destination in the existing four-column `SHARE_PLATFORMS` grid, displayed next to Copy, X, WhatsApp, and the other destinations. It is **not** a standalone full-width button or a second share infrastructure. Its visual tile uses the platform's brand gradient and the existing Remixicon Instagram glyph. Share destinations use native inline SVG paths extracted from WAKILISHA's already bundled and licensed icon asset so their symbols remain visible on mobile WebKit, rather than depending on the mask-based `ri-*` compatibility sprite. No global icon infrastructure is replaced.
+
+Only a published Article with selected artwork, published snapshot identity, author, section, and positive reading time can display the Instagram destination. Choosing it opens a second view **inside the same desktop popover or mobile bottom sheet**, with Back to Share Options, the exact exported-image preview, Share Image, Save Image, and Copy Article Link. Back, closing the host sheet, and unmounting must revoke the generated object URL and reset the destination. No eager canvas rendering occurs before selecting Instagram.
+
+Choosing Instagram opens the preparation view, **not** an external Instagram URL. The share count increments only after a successful native OS file handoff, not when tapping the tile, cancelling the OS chooser, downloading the JPEG or copying a link. This is an OS handoff count, not proof of Instagram publication. The human instructions explicitly require adding the Link sticker in Instagram.
 
 This is independent of the ongoing #1377 SEO publication snapshot lifecycle and #1428 external social metadata acceptance. Passing the Story image renderer must not be treated as evidence that social crawlers see current Open Graph metadata. Do not deploy during that unresolved production gate without separate approval.
 
