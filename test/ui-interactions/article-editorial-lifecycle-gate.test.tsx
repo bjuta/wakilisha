@@ -270,6 +270,29 @@ describe("permanent Article editorial lifecycle authority", () => {
     expect(screen.queryByText(/submitted v30/)).toBeNull();
   });
 
+  it("preserves the public Article and published pointer in all three review lifecycle SQL commands", () => {
+    const sql = fs.readFileSync(path.join(process.cwd(),
+      "supabase/migrations/20261122120000_article_published_revision_preserve_live_v1.sql"), "utf8");
+    expect(sql.match(/CREATE OR REPLACE FUNCTION public\./gi)).toHaveLength(3);
+    expect(sql).toContain("public.submit_article_for_review");
+    expect(sql).toContain("public.request_article_changes");
+    expect(sql).toContain("public.approve_article_version");
+    expect(sql.match(/v_preserve_live := v_article.wp_status = 'publish'/g)).toHaveLength(3);
+    expect(sql.match(/snap\.version_id = v_resource\.current_published_version_id/g)).toHaveLength(3);
+    expect(sql).toContain("Save a newer working Article version before submitting a published revision");
+    expect(sql).toContain("Published Article revision is not the current submitted version");
+    expect(sql.match(/visibility = case when v_preserve_live then 'public' else 'private' end/g))
+      .toHaveLength(3);
+    expect(sql).toContain("wp_status = case when v_preserve_live then 'publish' else 'pending' end");
+    expect(sql).toContain("wp_status = case when v_preserve_live then 'publish' else 'draft' end");
+    expect(sql).not.toMatch(/update public\.wk_article_publication_snapshots/i);
+    expect(sql).not.toMatch(/delete from public\.wk_article_publication_snapshots/i);
+    expect(sql).not.toMatch(/current_published_version_id\s*=/i);
+    expect(sql).toContain("STOP: submit_article_for_review definition drift");
+    expect(sql).toContain("STOP: approve_article_version definition drift");
+    expect(sql).toContain("STOP: request_article_changes definition drift");
+  });
+
   it("wires the same state machine to editor, meta review, review screen and publish guard", () => {
     const src = fs.readFileSync(path.join(process.cwd(),
       "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx"), "utf8");
