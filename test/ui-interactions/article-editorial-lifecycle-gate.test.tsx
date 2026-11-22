@@ -12,7 +12,7 @@ const newSubmission = "00000000-0000-4000-8000-000000000033";
 function gate(overrides: Partial<ArticleEditorialGateInput> = {}) {
   const base: ArticleEditorialGateInput = {
     wpStatus: "pending", latestReviewAction: "approved",
-    latestApprovedVersionNumber: 31, latestSubmittedVersionId: oldSubmission,
+    latestApprovedVersionNumber: 31, latestPublishedVersionNumber: null, latestSubmittedVersionId: oldSubmission,
     reviewTargetVersionId: oldSubmission, isDirty: false,
     canEdit: true, canReview: true, canPublish: true, allowSubmitForReview: true,
     proof: { latestVersionNumber: 32, latestContentFingerprint: changed,
@@ -159,8 +159,90 @@ describe("permanent Article editorial lifecycle authority", () => {
   it("preserves review and publish permissions and hides submission for live Articles", () => {
     expect(gate({ canEdit: false }).canSubmitWorkingVersion).toBe(false);
     expect(gate({ canPublish: false }).canPublishApprovedVersion).toBe(false);
-    expect(gate({ wpStatus: "publish" }).canSubmitWorkingVersion).toBe(false);
+    expect(gate({ wpStatus: "publish", latestReviewAction: "published", latestPublishedVersionNumber: 37,
+      proof: { latestVersionNumber: 37, latestContentFingerprint: approved,
+        approvedVersionNumber: 31, approvedContentFingerprint: approved,
+        submittedVersionNumber: 30, submittedContentFingerprint: approved },
+    }).canSubmitWorkingVersion).toBe(false);
     expect(gate({ allowSubmitForReview: false }).canSubmitWorkingVersion).toBe(false);
+  });
+
+  it("allows a newer saved working version of a published Article to be reviewed without withdrawing the live snapshot", () => {
+    const live = gate({
+      wpStatus: "publish", latestReviewAction: "published",
+      latestApprovedVersionNumber: 35, latestPublishedVersionNumber: 37,
+      proof: { latestVersionNumber: 39, latestContentFingerprint: changed,
+        approvedVersionNumber: 35, approvedContentFingerprint: approved,
+        submittedVersionNumber: 34, submittedContentFingerprint: approved },
+    });
+    expect(live.canSubmitWorkingVersion).toBe(true);
+    expect(live.canApproveSubmittedVersion).toBe(false);
+    expect(live.canPublishApprovedVersion).toBe(false);
+    expect(live.editorialStatusLabel).toBe("Published · Changes Need Review");
+    expect(live.publishDisabledReason).toContain("remains live");
+    const absent = gate({ wpStatus: "publish", latestReviewAction: "published",
+      latestPublishedVersionNumber: 37, proof: null });
+    expect(absent.canSubmitWorkingVersion).toBe(false);
+    const scheduled = gate({ wpStatus: "future", latestReviewAction: "published",
+      latestPublishedVersionNumber: 37 });
+    expect(scheduled.canSubmitWorkingVersion).toBe(false);
+  });
+
+  it("reviews a new published correction while retaining live status, then allows explicit publication", () => {
+    const reviewed = "00000000-0000-4000-8000-000000000041";
+    const proof = { latestVersionNumber: 41, latestContentFingerprint: changed,
+      approvedVersionNumber: 35, approvedContentFingerprint: approved,
+      submittedVersionNumber: 41, submittedContentFingerprint: changed };
+    const pending = gate({
+      wpStatus: "publish", latestReviewAction: "submitted",
+      latestPublishedVersionNumber: 37,
+      latestApprovedVersionNumber: 35, latestSubmittedVersionId: reviewed,
+      reviewTargetVersionId: reviewed, proof,
+    });
+    expect(pending.canApproveSubmittedVersion).toBe(true);
+    expect(pending.canRequestChanges).toBe(true);
+    expect(pending.canPublishApprovedVersion).toBe(false);
+    expect(pending.editorialStatusLabel).toBe("Published · In Review");
+    expect(gate({wpStatus:"publish",latestReviewAction:"submitted",
+      latestPublishedVersionNumber:37,latestSubmittedVersionId:reviewed,
+      reviewTargetVersionId:oldSubmission,proof}).canApproveSubmittedVersion).toBe(false);
+    const approvedRevision=gate({
+      wpStatus:"publish",latestReviewAction:"approved",
+      latestPublishedVersionNumber:37,latestApprovedVersionNumber:42,
+      proof:{...proof,approvedVersionNumber:42,approvedContentFingerprint:changed},
+    });
+    expect(approvedRevision.canPublishApprovedVersion).toBe(true);
+    expect(approvedRevision.editorialStatusLabel).toBe("Published · Update Approved");
+  });
+
+  it("shows a direct Edit Article action in published Review, without an unsavable decision note", () => {
+    const edit = vi.fn();
+    render(<ArticleReviewDecisionWorkspace title="Album Review: Alusa Continua"
+      status="Published" submittedVersionNumber={34} workingVersionNumber={39}
+      latestApprovedVersionNumber={35} latestPublishedVersionNumber={37}
+      isPublished canEditArticle onEditArticle={edit}
+      canResubmitWorkingVersion={false} onResubmitWorkingVersion={()=>{}}
+      note="" onNoteChange={()=>{}} canRequestChanges={false} canApprove={false}
+      busy={false} events={[]} onRequestChanges={()=>{}} onApprove={()=>{}} />);
+    expect(screen.getByText(/published v37/)).toBeTruthy();
+    expect(screen.getByText(/stays published while you edit/)).toBeTruthy();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button",{name:"Edit Article"}));
+    expect(edit).toHaveBeenCalledOnce();
+  });
+
+  it("allows submitting updated live text without reapproving the prior published version", () => {
+    const submitted=vi.fn();
+    render(<ArticleReviewDecisionWorkspace title="Album Review: Alusa Continua"
+      status="Published · Changes Need Review" submittedVersionNumber={34} workingVersionNumber={39}
+      latestApprovedVersionNumber={35} latestPublishedVersionNumber={37}
+      isPublished canEditArticle onEditArticle={()=>{}}
+      canResubmitWorkingVersion onResubmitWorkingVersion={submitted}
+      note="Corrected the text" onNoteChange={()=>{}} canRequestChanges={false} canApprove={false}
+      busy={false} events={[]} onRequestChanges={()=>{}} onApprove={()=>{}} />);
+    fireEvent.click(screen.getByRole("button",{name:"Submit Updated Article for Review"}));
+    expect(submitted).toHaveBeenCalledWith("Corrected the text");
+    expect(screen.queryByRole("button",{name:"Approve Version"})).toBeNull();
   });
 
   it("offers a working-version submission in the actual review decision component", () => {
