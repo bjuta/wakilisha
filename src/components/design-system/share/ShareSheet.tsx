@@ -5,6 +5,7 @@ import { trackEvent } from "@/services/analytics";
 import { buildUtmUrl, getUtmContextForUrl } from "@/services/attribution";
 import { Portal } from "@/components/base/Portal";
 import { publishedArticleCardUrl, shareImageUrl, shareTextForItem } from "./sharePresentation";
+import { renderArticleStoryImage, type ArticleStoryMetadata } from "./articleStoryImage";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  WAKILISHA SHARE — Unified share infrastructure across all surfaces
@@ -105,6 +106,7 @@ export type ShareObject = {
   imageUrl?: string | null;
   url?: string;
   publishedSnapshotId?: string | null;
+  articleStory?: ArticleStoryMetadata | null;
   type?: "track" | "album" | "article" | "chart" | "artist" | "artist_update" | "post" | "playlist" | "page";
 };
 
@@ -421,6 +423,145 @@ function SharePlatformGrid({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+
+/**
+ * A website cannot place an Instagram Link sticker or guarantee that the
+ * Instagram app appears in the OS share chooser. The image and article link
+ * are separate, honest handoffs.
+ */
+function ArticleStoryShare({ item, trackedUrl }: { item: ShareObject; trackedUrl: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [rendered, setRendered] = useState<{ file: File; url: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
+  const story = item.articleStory;
+  const ready = item.type === "article"
+    && !!item.publishedSnapshotId
+    && !!item.imageUrl
+    && !!story?.author
+    && !!story?.section
+    && Number.isFinite(story?.readingTime)
+    && Number(story?.readingTime) > 0;
+
+  useEffect(() => {
+    if (!expanded || !ready || !story || !item.imageUrl) return;
+    let active = true;
+    let objectUrl: string | null = null;
+    setLoading(true);
+    setRendered(null);
+    setMessage("");
+    renderArticleStoryImage({
+      title: item.title,
+      imageUrl: item.imageUrl,
+      author: story.author,
+      readingTime: story.readingTime,
+      section: story.section,
+    }).then((blob) => {
+      if (!active) return;
+      const file = new File([blob], "wakilisha-" + (new URL(item.url || trackedUrl)).pathname.split("/").pop() + "-story.jpg", { type: "image/jpeg" });
+      objectUrl = URL.createObjectURL(blob);
+      setRendered({ file, url: objectUrl });
+    }).catch((error: unknown) => {
+      if (active) setMessage(error instanceof Error ? error.message : "Could not prepare the Story image.");
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [expanded, ready, item.title, item.imageUrl, item.url, trackedUrl, story?.author, story?.readingTime, story?.section]);
+
+  if (!ready) return null;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(trackedUrl);
+      setLinkCopied(true);
+      setMessage("");
+      trackEvent("share_copy", { pageType: "article", context: { action: "copy", platform: "instagram_story", target_url: trackedUrl } });
+    } catch {
+      setMessage("Could not copy the link. Open the article and copy its address instead.");
+    }
+  };
+
+  const saveImage = () => {
+    if (!rendered) return;
+    const anchor = document.createElement("a");
+    anchor.href = rendered.url;
+    anchor.download = rendered.file.name;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    trackEvent("share_click", { pageType: "article", context: { action: "save_image", platform: "instagram_story" } });
+  };
+
+  const shareImage = async () => {
+    if (!rendered) return;
+    if (!navigator.share || (navigator.canShare && !navigator.canShare({ files: [rendered.file] }))) {
+      setMessage("Save the image, then add it to a Story in Instagram.");
+      return;
+    }
+    try {
+      await navigator.share({ files: [rendered.file], title: item.title });
+      // An OS handoff is not proof that Instagram published a Story.
+      trackEvent("share_click", { pageType: "article", context: { action: "native_image_handoff", platform: "instagram_story" } });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setMessage("Your browser could not share the image. Save it instead.");
+    }
+  };
+
+  return (
+    <div data-wk-article-story-share className="mx-4 mb-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
+      <button
+        type="button"
+        className="flex min-h-12 w-full items-center gap-3 px-4 py-3 text-left text-[var(--wk-text)]"
+        onClick={() => setExpanded((current) => !current)}
+        aria-expanded={expanded}
+      >
+        <i className="ri-instagram-line text-[22px] text-[var(--wk-brand)]" aria-hidden="true" />
+        <span className="flex-1 text-[13px] font-semibold">Instagram Story</span>
+        <i className={expanded ? "ri-arrow-up-s-line" : "ri-arrow-down-s-line"} aria-hidden="true" />
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4">
+          <p className="mb-3 text-[12px] leading-[1.5] text-[var(--wk-text-muted)]">
+            Share the image, then add the article link using Instagram’s Link sticker.
+          </p>
+          {loading && (
+            <p role="status" className="py-5 text-center text-[12px] text-[var(--wk-text-muted)]">Preparing Story image…</p>
+          )}
+          {rendered && (
+            <>
+              <img
+                data-wk-article-story-preview
+                src={rendered.url}
+                alt={"Instagram Story preview for " + item.title}
+                className="mx-auto mb-4 block aspect-[9/16] max-h-[420px] w-auto max-w-full bg-black object-contain"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={shareImage} className="min-h-11 rounded-xl bg-[var(--wk-brand)] px-3 text-[12px] font-bold text-[var(--wk-brand-on)]">
+                  Share Image
+                </button>
+                <button type="button" onClick={saveImage} className="min-h-11 rounded-xl border border-[var(--wk-border-strong)] px-3 text-[12px] font-semibold text-[var(--wk-text)]">
+                  Save Image
+                </button>
+              </div>
+            </>
+          )}
+          <button type="button" onClick={copyLink} className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--wk-border-strong)] px-3 text-[12px] font-semibold text-[var(--wk-text)]">
+            <i className={linkCopied ? "ri-check-line" : "ri-link"} aria-hidden="true" />
+            {linkCopied ? "Link Copied" : "Copy Article Link"}
+          </button>
+          {message && <p role="status" className="mt-2 text-[12px] text-[var(--wk-text-muted)]">{message}</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -797,6 +938,8 @@ export function SharePopover({
         {/* Divider */}
         <div className="h-px bg-[var(--wk-border)]" />
 
+        <ArticleStoryShare item={item} trackedUrl={getTrackedShareUrl("instagram_story")} />
+
         {/* Platform grid */}
         <div className="px-5 py-4">
           <SharePlatformGrid
@@ -1009,6 +1152,8 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
                 </button>
               </div>
             )}
+
+            <ArticleStoryShare item={item} trackedUrl={getTrackedShareUrl("instagram_story")} />
 
             {/* Platform grid — solid brand colors, same as popover */}
             <div className="share-sheet-grid-wrap">
