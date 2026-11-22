@@ -447,7 +447,7 @@ test("Article Credit selects other existing writers and Registry Authors without
     await page.getByRole("button", { name: "Open Article Credit acceptance" }).click();
     const dialog = page.getByRole("dialog", { name: "Add a Governed Credit" });
     await expect(dialog.getByRole("radio", { name: /Existing writer or Author/ })).toBeVisible();
-    await dialog.getByRole("radio", { name: /Existing writer or Author/ }).click();
+    await dialog.getByText("Existing writer or Author", { exact: true }).click();
 
     const search = dialog.getByRole("textbox", { name: "Find Person or Organization" });
     await search.fill(person.name);
