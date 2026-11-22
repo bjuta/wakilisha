@@ -46,6 +46,7 @@ import {
 import { processArticleContent } from "@/services/articles/contentPipeline";
 import {
   deriveArticleEditorialGate,
+  canPublishArticleWithCapability,
   currentArticleReviewProof,
   type ArticleReviewProofLease,
 } from "@/services/articles/articleEditorialGate";
@@ -235,9 +236,13 @@ export function ArticleEditorWorkspace({
     const canDelete =
       !isInstituteMode &&
       (isAdmin || (isOwner && userCanEditOthers));
-    const canPublish =
-      !isInstituteMode &&
-      (isAdmin || (isOwner && userCanPublish));
+    // Match editorial.current_user_can_publish_article(): capability is global.
+    // Article ownership limits editing, not governed publication.
+    const canPublish = canPublishArticleWithCapability({
+      isInstituteMode,
+      isAdmin,
+      userCanPublish,
+    });
     const canAutosave = canEdit;
     const reason = !canEdit
       ? "You do not have permission to edit this Article."

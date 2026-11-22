@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
-import { deriveArticleEditorialGate, currentArticleReviewProof, type ArticleEditorialGateInput } from "@/services/articles/articleEditorialGate";
+import { deriveArticleEditorialGate, canPublishArticleWithCapability, currentArticleReviewProof, type ArticleEditorialGateInput } from "@/services/articles/articleEditorialGate";
 import { ArticleReviewDecisionWorkspace } from "@/pages/admin/content/articles/detail/components/ArticleReviewDecisionWorkspace";
 import fs from "node:fs";
 import path from "node:path";
@@ -120,6 +120,40 @@ describe("permanent Article editorial lifecycle authority", () => {
     expect(publisher.canSubmitWorkingVersion).toBe(false);
     expect(gate({ canEdit: false, proof: null, latestApprovedVersionNumber: null })
       .canPublishApprovedVersion).toBe(false);
+  });
+
+  it("matches SQL publish_articles global capability even for a non-owner Article", () => {
+    expect(canPublishArticleWithCapability({
+      isInstituteMode: false, isAdmin: false, userCanPublish: true,
+    })).toBe(true);
+    expect(canPublishArticleWithCapability({
+      isInstituteMode: false, isAdmin: true, userCanPublish: false,
+    })).toBe(true);
+    expect(canPublishArticleWithCapability({
+      isInstituteMode: false, isAdmin: false, userCanPublish: false,
+    })).toBe(false);
+    expect(canPublishArticleWithCapability({
+      isInstituteMode: true, isAdmin: true, userCanPublish: true,
+    })).toBe(false);
+    const src = fs.readFileSync(path.join(process.cwd(),
+      "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx"), "utf8");
+    expect(src).toContain("canPublishArticleWithCapability({");
+    expect(src).not.toContain("(isOwner && userCanPublish)");
+  });
+
+  it("reports actual capability denial rather than a fake approved-version verification error", () => {
+    const proof = {
+      latestVersionNumber: 36, latestContentFingerprint: changed,
+      approvedVersionNumber: 35, approvedContentFingerprint: changed,
+      submittedVersionNumber: 34, submittedContentFingerprint: changed,
+    };
+    const decision = gate({ latestApprovedVersionNumber: 35, proof, canPublish: false });
+    expect(decision.editorialStatusLabel).toBe("Approved for Publication");
+    expect(decision.canPublishApprovedVersion).toBe(false);
+    expect(decision.publishDisabledReason).toMatch(/does not have permission/);
+    const eligible = gate({ latestApprovedVersionNumber: 35, proof, canPublish: true });
+    expect(eligible.canPublishApprovedVersion).toBe(true);
+    expect(eligible.publishDisabledReason).toBeNull();
   });
 
   it("preserves review and publish permissions and hides submission for live Articles", () => {
