@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import vm from "node:vm";
+import { transformSync } from "esbuild";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { SURFACES, verifyReceipt, differences, extractSeo, auditArtifact } from "../../scripts/seo/verify-governed-publication.mjs";
@@ -60,6 +62,96 @@ const adminSeo =
     "src/pages/admin/settings/seo/page.tsx",
     "utf8",
   );
+
+describe("isolated published Article HTML SEO, without Registry fanout", () => {
+  async function runRenderer(options: { slug?: string; error?: boolean; absent?: boolean; image?: string; title?: string } = {}) {
+    const slug=options.slug || "album-review-alusa-continua";
+    const source=readFileSync("supabase/functions/seo-article-html/index.ts","utf8");
+    const js=transformSync(source.replace(/^import \{ createClient \} from .*;\n/m,
+      "const createClient = globalThis.__mockClient;"),{
+      loader:"ts",format:"iife",target:"es2022"
+    }).code;
+    const requests: string[] = [];
+    let handler: (req: Request)=>Promise<Response> = async()=>{throw new Error("Handler missing")};
+    const shell='<html><head><title>Home | WAKILISHA</title>' +
+      '<meta name="description" content="Homepage description">' +
+      '<link rel="canonical" href="https://wakilisha.africa/">' +
+      '<meta property="og:title" content="Homepage title">' +
+      '<meta property="og:image" content="https://wakilisha.africa/logo.svg">' +
+      '<script id="wk-jsonld-primary" type="application/ld+json">{"@type":"WebSite"}</script>' +
+      '<script type="module" src="/assets/index-FIXTURE.js"></script>' +
+      '</head><body><div id="root"></div></body></html>' + ' '.repeat(600);
+    const article={
+      id:"published-snapshot",slug,title:options.title || "Album Review: Alusa Continua",
+      excerpt:"A description",author:"Hafare Segelan",seo:{description:"Published <SEO> review"},
+      hero_image_url: options.image ?? "https://media.wakilisha.africa/uploads/selected.webp",
+      published_at:"2026-11-22T07:59:32.784Z",modified_at:"2026-11-22T08:00:00.000Z",
+      is_active:true,wp_status:"publish",
+    };
+    const context={
+      Deno:{env:{get:(k:string)=>k==="SUPABASE_URL"?"https://example.supabase.co":k==="SUPABASE_SERVICE_ROLE_KEY"?"fake-server-secret":""},
+        serve:(fn:(req:Request)=>Promise<Response>)=>{handler=fn;}},
+      __mockClient:()=>({from:(table:string)=>{
+        requests.push(table);
+        if(table!=="wk_article_publication_snapshots") throw new Error("Unexpected Registry fanout");
+        const query:any={select:()=>query,eq:()=>query,limit:async()=>({
+          data:options.absent?[]:[article],error:options.error?{code:"TEMP_UNAVAILABLE"}:null,
+        })};
+        return query;
+      }}),
+      fetch:async(url:string)=>{requests.push("shell:"+url);return new Response(shell,{headers:{"content-type":"text/html"}});},
+      Request,Response,URL,AbortController,console,
+      setTimeout,clearTimeout,
+    };
+    vm.runInNewContext(js,context);
+    const response=await handler(new Request(
+      "https://pgzizndxdyhqmtyywjmt.supabase.co/functions/v1/seo-article-html/magazine/"+slug));
+    return {response,body:await response.text(),requests};
+  }
+  it("renders initial crawled HTML with exact selected published image, metadata and live React shell", async()=>{
+    const {response,body,requests}=await runRenderer();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(requests).toEqual(["wk_article_publication_snapshots","shell:https://wakilisha.africa/"]);
+    expect(body).toContain('property="og:type" content="article"');
+    expect(body).toContain('property="og:image" content="https://media.wakilisha.africa/uploads/selected.webp"');
+    expect(body).toContain('name="twitter:image" content="https://media.wakilisha.africa/uploads/selected.webp"');
+    expect(body).toContain('rel="canonical" href="https://wakilisha.africa/magazine/album-review-alusa-continua"');
+    expect(body).toContain('name="description" content="Published &lt;SEO&gt; review"');
+    expect(body).toContain('"author":{"@type":"Person","name":"Hafare Segelan"}');
+    expect(body).toContain('/assets/index-FIXTURE.js');
+    expect(body).toContain('<div id="root"></div>');
+    expect(body).not.toContain('content="Homepage title"');
+    expect(body).not.toContain('content="https://wakilisha.africa/logo.svg"');
+  });
+  it("fails closed on source errors without unrelated reads or fallback homepage SEO", async()=>{
+    const {response,requests}=await runRenderer({error:true});
+    expect(response.status).toBe(503);
+    expect(requests).toEqual(["wk_article_publication_snapshots"]);
+  });
+  it("returns 404 for unpublished or withdrawn URLs", async()=>{
+    const {response,requests}=await runRenderer({absent:true});
+    expect(response.status).toBe(404);
+    expect(requests).toEqual(["wk_article_publication_snapshots"]);
+  });
+  it("escapes source HTML and never fabricates a missing selected hero", async()=>{
+    const {response,body}=await runRenderer({image:"",title:'Review <script>alert("x")</script>'});
+    expect(response.status).toBe(200);
+    expect(body).not.toContain("<script>alert");
+    expect(body).toContain("Review &lt;script&gt;");
+    expect(body).not.toContain('property="og:image"');
+  });
+  it("never runs bulk artist, track or release metadata reads",()=>{
+    const code=readFileSync("supabase/functions/seo-article-html/index.ts","utf8");
+    expect(code).toContain('.from("wk_article_publication_snapshots")');
+    expect(code).not.toContain('buildSeoMetadataManifest');
+    expect(code).not.toContain('registry_artists');
+    expect(code).not.toContain('registry_releases');
+    expect(code).not.toContain('registry_tracks');
+    expect(code).not.toContain('publish_due_article_publications');
+    expect(code).not.toContain('.rpc(');
+  });
+});
 
 describe("incident-safe offline SEO build", () => {
   it("uses exact active publication snapshots for Article social metadata and excludes drafts", () => {
