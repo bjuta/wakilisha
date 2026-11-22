@@ -6,6 +6,7 @@ import { buildUtmUrl, getUtmContextForUrl } from "@/services/attribution";
 import { Portal } from "@/components/base/Portal";
 import { publishedArticleCardUrl, shareImageUrl, shareTextForItem } from "./sharePresentation";
 import { renderArticleStoryImage, type ArticleStoryMetadata } from "./articleStoryImage";
+import { SharePlatformIcon } from "./sharePlatformIcons";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  WAKILISHA SHARE — Unified share infrastructure across all surfaces
@@ -29,6 +30,15 @@ export const SHARE_PLATFORMS: SharePlatform[] = [
     icon: "ri-link",
     brandBg: "#888888",
     brandText: "#ffffff",
+    buildUrl: () => "",
+  },
+  {
+    key: "instagram_story",
+    name: "Instagram",
+    icon: "ri-instagram-line",
+    brandBg: "linear-gradient(135deg, #833AB4, #C13584 45%, #E1306C 68%, #F77737)",
+    brandText: "#ffffff",
+    // A Story image requires a user-driven native file handoff, not a share URL.
     buildUrl: () => "",
   },
   {
@@ -109,6 +119,24 @@ export type ShareObject = {
   articleStory?: ArticleStoryMetadata | null;
   type?: "track" | "album" | "article" | "chart" | "artist" | "artist_update" | "post" | "playlist" | "page";
 };
+
+/** A Story destination is available only for a real published Article snapshot. */
+export function canShareArticleStory(item: ShareObject): boolean {
+  const story = item.articleStory;
+  return item.type === "article"
+    && !!item.publishedSnapshotId
+    && !!item.imageUrl
+    && !!story?.author?.trim()
+    && !!story?.section?.trim()
+    && Number.isFinite(story?.readingTime)
+    && Number(story?.readingTime) > 0;
+}
+
+/** Keep platform order and rendering consistent across desktop and mobile. */
+export function sharePlatformsForItem(item: ShareObject): SharePlatform[] {
+  return SHARE_PLATFORMS.filter((platform) =>
+    platform.key !== "instagram_story" || canShareArticleStory(item));
+}
 
 const objectTypeLabel: Record<NonNullable<ShareObject["type"]>, string> = {
   track: "track",
@@ -381,7 +409,7 @@ function SharePlatformGrid({
   onCopy: () => void;
   size?: "sm" | "md";
 }) {
-  const iconSize = size === "sm" ? "text-[16px]" : "text-[18px]";
+  const iconSize = size === "sm" ? 16 : 18;
   const squareSize = size === "sm" ? "w-10 h-10" : "w-11 h-11";
   const labelSize = size === "sm" ? "text-[9px]" : "text-[10px]";
 
@@ -395,7 +423,9 @@ function SharePlatformGrid({
         return (
           <button
             key={p.key}
+            type="button"
             className="share-grid-item"
+            aria-label={p.key === "instagram_story" ? "Instagram Story" : p.name}
             onClick={() => {
               if (isCopy) onCopy();
               else onShare(p);
@@ -405,7 +435,7 @@ function SharePlatformGrid({
               className={`${squareSize} rounded-xl flex items-center justify-center transition-transform share-grid-icon`}
               style={{ background: p.brandBg, color: p.brandText }}
             >
-              <i className={`${p.icon} ${iconSize}`} />
+              <SharePlatformIcon icon={p.icon} size={iconSize} />
             </div>
             <span className={`${labelSize} font-semibold text-[var(--wk-text-muted)]`}>
               {p.name}
@@ -431,25 +461,29 @@ function SharePlatformGrid({
 /**
  * A website cannot place an Instagram Link sticker or guarantee that the
  * Instagram app appears in the OS share chooser. The image and article link
- * are separate, honest handoffs.
+ * are separate, honest handoffs. This is the second view of the normal
+ * share destinations grid, not a competing top-level share action.
  */
-function ArticleStoryShare({ item, trackedUrl }: { item: ShareObject; trackedUrl: string }) {
-  const [expanded, setExpanded] = useState(false);
+function ArticleStoryShare({
+  item,
+  trackedUrl,
+  onBack,
+  onShareComplete,
+}: {
+  item: ShareObject;
+  trackedUrl: string;
+  onBack: () => void;
+  onShareComplete: () => void;
+}) {
   const [rendered, setRendered] = useState<{ file: File; url: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
   const story = item.articleStory;
-  const ready = item.type === "article"
-    && !!item.publishedSnapshotId
-    && !!item.imageUrl
-    && !!story?.author
-    && !!story?.section
-    && Number.isFinite(story?.readingTime)
-    && Number(story?.readingTime) > 0;
+  const ready = canShareArticleStory(item);
 
   useEffect(() => {
-    if (!expanded || !ready || !story || !item.imageUrl) return;
+    if (!ready || !story || !item.imageUrl) return;
     let active = true;
     let objectUrl: string | null = null;
     setLoading(true);
@@ -475,7 +509,7 @@ function ArticleStoryShare({ item, trackedUrl }: { item: ShareObject; trackedUrl
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [expanded, ready, item.title, item.imageUrl, item.url, trackedUrl, story?.author, story?.readingTime, story?.section]);
+  }, [ready, item.title, item.imageUrl, item.url, trackedUrl, story?.author, story?.readingTime, story?.section]);
 
   if (!ready) return null;
 
@@ -511,6 +545,7 @@ function ArticleStoryShare({ item, trackedUrl }: { item: ShareObject; trackedUrl
       await navigator.share({ files: [rendered.file], title: item.title });
       // An OS handoff is not proof that Instagram published a Story.
       trackEvent("share_click", { pageType: "article", context: { action: "native_image_handoff", platform: "instagram_story" } });
+      onShareComplete();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setMessage("Your browser could not share the image. Save it instead.");
@@ -518,50 +553,51 @@ function ArticleStoryShare({ item, trackedUrl }: { item: ShareObject; trackedUrl
   };
 
   return (
-    <div data-wk-article-story-share className="mx-4 mb-3 rounded-xl border border-[var(--wk-border)] bg-[var(--wk-surface)]">
-      <button
-        type="button"
-        className="flex min-h-12 w-full items-center gap-3 px-4 py-3 text-left text-[var(--wk-text)]"
-        onClick={() => setExpanded((current) => !current)}
-        aria-expanded={expanded}
-      >
-        <i className="ri-instagram-line text-[22px] text-[var(--wk-brand)]" aria-hidden="true" />
-        <span className="flex-1 text-[13px] font-semibold">Instagram Story</span>
-        <i className={expanded ? "ri-arrow-up-s-line" : "ri-arrow-down-s-line"} aria-hidden="true" />
-      </button>
-      {expanded && (
-        <div className="px-4 pb-4">
-          <p className="mb-3 text-[12px] leading-[1.5] text-[var(--wk-text-muted)]">
-            Share the image, then add the article link using Instagram’s Link sticker.
-          </p>
-          {loading && (
-            <p role="status" className="py-5 text-center text-[12px] text-[var(--wk-text-muted)]">Preparing Story image…</p>
-          )}
-          {rendered && (
-            <>
-              <img
-                data-wk-article-story-preview
-                src={rendered.url}
-                alt={"Instagram Story preview for " + item.title}
-                className="mx-auto mb-4 block aspect-[9/16] max-h-[420px] w-auto max-w-full bg-black object-contain"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={shareImage} className="min-h-11 rounded-xl bg-[var(--wk-brand)] px-3 text-[12px] font-bold text-[var(--wk-brand-on)]">
-                  Share Image
-                </button>
-                <button type="button" onClick={saveImage} className="min-h-11 rounded-xl border border-[var(--wk-border-strong)] px-3 text-[12px] font-semibold text-[var(--wk-text)]">
-                  Save Image
-                </button>
-              </div>
-            </>
-          )}
-          <button type="button" onClick={copyLink} className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--wk-border-strong)] px-3 text-[12px] font-semibold text-[var(--wk-text)]">
-            <i className={linkCopied ? "ri-check-line" : "ri-link"} aria-hidden="true" />
-            {linkCopied ? "Link Copied" : "Copy Article Link"}
-          </button>
-          {message && <p role="status" className="mt-2 text-[12px] text-[var(--wk-text-muted)]">{message}</p>}
+    <div data-wk-article-story-share className="px-4 pb-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Back to share options"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[var(--wk-text)]"
+        >
+          <i className="ri-arrow-left-line" aria-hidden="true" />
+          <span>Share Options</span>
+        </button>
+        <div className="inline-flex items-center gap-2 text-[12px] font-bold text-[var(--wk-text)]">
+          <i className="ri-instagram-line text-[18px]" aria-hidden="true" />
+          <span>Instagram Story</span>
         </div>
+      </div>
+      <p className="mb-3 text-[12px] leading-[1.5] text-[var(--wk-text-muted)]">
+        Share the image, then add the article link using Instagram’s Link sticker.
+      </p>
+      {loading && (
+        <p role="status" className="py-5 text-center text-[12px] text-[var(--wk-text-muted)]">Preparing Story image…</p>
       )}
+      {rendered && (
+        <>
+          <img
+            data-wk-article-story-preview
+            src={rendered.url}
+            alt={"Instagram Story preview for " + item.title}
+            className="mx-auto mb-4 block aspect-[9/16] max-h-[420px] w-auto max-w-full bg-black object-contain"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={shareImage} className="min-h-11 rounded-xl bg-[var(--wk-brand)] px-3 text-[12px] font-bold text-[var(--wk-brand-on)]">
+              Share Image
+            </button>
+            <button type="button" onClick={saveImage} className="min-h-11 rounded-xl border border-[var(--wk-border-strong)] px-3 text-[12px] font-semibold text-[var(--wk-text)]">
+              Save Image
+            </button>
+          </div>
+        </>
+      )}
+      <button type="button" onClick={copyLink} className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--wk-border-strong)] px-3 text-[12px] font-semibold text-[var(--wk-text)]">
+        <i className={linkCopied ? "ri-check-line" : "ri-link"} aria-hidden="true" />
+        {linkCopied ? "Link Copied" : "Copy Article Link"}
+      </button>
+      {message && <p role="status" className="mt-2 text-[12px] text-[var(--wk-text-muted)]">{message}</p>}
     </div>
   );
 }
@@ -591,6 +627,7 @@ export function SharePopover({
   const [copied, setCopied] = useState(false);
   const [shareCounts, setShareCounts] = useState<Record<string, number>>();
   const [pendingPlatforms, setPendingPlatforms] = useState<Set<string>>(new Set());
+  const [storySelected, setStorySelected] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
@@ -610,6 +647,10 @@ export function SharePopover({
     campaign: "wakilisha_share",
     content: shareContent,
   }), [finalUrl, shareContent]);
+
+  useEffect(() => {
+    if (!open) setStorySelected(false);
+  }, [open]);
 
   // Load counts
   useEffect(() => {
@@ -856,6 +897,11 @@ export function SharePopover({
       action: "click",
     }));
 
+    if (platform.key === "instagram_story") {
+      setStorySelected(true);
+      return;
+    }
+
     setPendingPlatforms((prev) => new Set(prev).add(platform.key));
     incrementShareCount(baseUrl, platform.key, shareTarget.entitySlug || undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, [platform.key]: count }));
@@ -938,19 +984,30 @@ export function SharePopover({
         {/* Divider */}
         <div className="h-px bg-[var(--wk-border)]" />
 
-        <ArticleStoryShare item={item} trackedUrl={getTrackedShareUrl("instagram_story")} />
-
-        {/* Platform grid */}
-        <div className="px-5 py-4">
-          <SharePlatformGrid
-            platforms={SHARE_PLATFORMS}
-            shareCounts={shareCounts ?? {}}
-            pendingPlatforms={pendingPlatforms}
-            onShare={handleShare}
-            onCopy={handleCopy}
-            size="sm"
+        {/* Instagram is a regular share destination. Its image handoff opens here. */}
+        {storySelected && canShareArticleStory(item) ? (
+          <ArticleStoryShare
+            item={item}
+            trackedUrl={getTrackedShareUrl("instagram_story")}
+            onBack={() => setStorySelected(false)}
+            onShareComplete={() => {
+              incrementShareCount(baseUrl, "instagram_story", shareTarget.entitySlug || undefined, item.title)
+                .then((count) => setShareCounts((prev) => ({ ...prev, instagram_story: count })))
+                .catch(() => {});
+            }}
           />
-        </div>
+        ) : (
+          <div className="px-5 py-4">
+            <SharePlatformGrid
+              platforms={sharePlatformsForItem(item)}
+              shareCounts={shareCounts ?? {}}
+              pendingPlatforms={pendingPlatforms}
+              onShare={handleShare}
+              onCopy={handleCopy}
+              size="sm"
+            />
+          </div>
+        )}
         </div>
       </>
     </Portal>
@@ -972,6 +1029,7 @@ interface ShareSheetProps {
 export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareSheetProps) {
   const [shareCounts, setShareCounts] = useState<Record<string, number>>();
   const [pendingPlatforms, setPendingPlatforms] = useState<Set<string>>(new Set());
+  const [storySelected, setStorySelected] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
@@ -995,6 +1053,10 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
     campaign: "wakilisha_share",
     content: shareContent,
   }), [finalUrl, shareContent]);
+
+  useEffect(() => {
+    if (!open) setStorySelected(false);
+  }, [open]);
 
   useScrollLock(open);
 
@@ -1076,6 +1138,11 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
       action: "click",
     }));
 
+    if (platform.key === "instagram_story") {
+      setStorySelected(true);
+      return;
+    }
+
     setPendingPlatforms((prev) => new Set(prev).add(platform.key));
     incrementShareCount(baseUrl, platform.key, shareTarget.entitySlug || undefined, item.title).then((count) => {
       setShareCounts((prev) => ({ ...prev, [platform.key]: count }));
@@ -1153,19 +1220,30 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
               </div>
             )}
 
-            <ArticleStoryShare item={item} trackedUrl={getTrackedShareUrl("instagram_story")} />
-
-            {/* Platform grid — solid brand colors, same as popover */}
-            <div className="share-sheet-grid-wrap">
-              <SharePlatformGrid
-                platforms={SHARE_PLATFORMS}
-                shareCounts={shareCounts ?? {}}
-                pendingPlatforms={pendingPlatforms}
-                onShare={handleShare}
-                onCopy={handleCopy}
-                size="md"
+            {/* The same share destination grid and Story detail as desktop. */}
+            {storySelected && canShareArticleStory(item) ? (
+              <ArticleStoryShare
+                item={item}
+                trackedUrl={getTrackedShareUrl("instagram_story")}
+                onBack={() => setStorySelected(false)}
+                onShareComplete={() => {
+                  incrementShareCount(baseUrl, "instagram_story", shareTarget.entitySlug || undefined, item.title)
+                    .then((count) => setShareCounts((prev) => ({ ...prev, instagram_story: count })))
+                    .catch(() => {});
+                }}
               />
-            </div>
+            ) : (
+              <div className="share-sheet-grid-wrap">
+                <SharePlatformGrid
+                  platforms={sharePlatformsForItem(item)}
+                  shareCounts={shareCounts ?? {}}
+                  pendingPlatforms={pendingPlatforms}
+                  onShare={handleShare}
+                  onCopy={handleCopy}
+                  size="md"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

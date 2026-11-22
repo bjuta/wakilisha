@@ -246,6 +246,11 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.share-grid-item:focus-visible {
+  outline: 2px solid var(--wk-brand);
+  outline-offset: 2px;
+}
+
 .share-grid-item:hover {
   transform: translateY(-2px);
   color: var(--wk-text);
