@@ -209,7 +209,7 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(shareImageUrl("https://media.wakilisha.africa/uploads/published.webp"))
       .toBe("https://media.wakilisha.africa/uploads/published.webp");
     expect(shareImageUrl("javascript:alert(1)")).toBeUndefined();
-    expect(share).toContain("&media=\${image}");
+    expect(share).toContain('&media=${image}');
     for (const page of [desktop, mobile]) {
       expect(page).toContain("url: canonicalArticleShareUrl(article.slug)");
       expect(page).toContain("imageUrl: article.heroUrl");
