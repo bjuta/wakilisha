@@ -244,6 +244,12 @@ test("Workbook v4 loads authentic font faces and keeps controls and theme legibl
 
 
 test("Article Story renderer exports full-bleed branded JPEGs in an actual browser", async ({ page }) => {
+  // The export must load the real same-origin SVG wordmark from /public/assets.
+  let logoRequests = 0;
+  await page.route("**/assets/logos/wakilisha-logo-dark.svg", async (route) => {
+    logoRequests += 1;
+    await route.continue();
+  });
   // The fixture is same-origin. Cross-origin production CDN access is an
   // independent live acceptance gate, not something a synthetic image proves.
   await page.route("**/__wk_article_story_fixture.svg", async (route) => {
@@ -315,6 +321,7 @@ test("Article Story renderer exports full-bleed branded JPEGs in an actual brows
     };
   });
 
+  expect(logoRequests).toBeGreaterThan(0);
   expect(exported.figtreeReady).toBe(true);
   expect(exported.displayFont).toContain("Figtree");
   expect(exported.brand.toLowerCase()).toBe("#85c441");
