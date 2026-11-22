@@ -141,6 +141,38 @@ function verifyManagedEvidence(raw, repositoryRoot) {
   };
 }
 
+function validateReplay(first, second) {
+  if (!first || !second || first.protocol !== FORMAT || second.protocol !== FORMAT ||
+      first.publicationActivationAuthority !== false || second.publicationActivationAuthority !== false ||
+      first.completeAllowlistScan !== true || second.completeAllowlistScan !== true ||
+      first.databaseRole !== EXPECTED_ROLE || second.databaseRole !== EXPECTED_ROLE ||
+      first.projectRef !== PROJECT || second.projectRef !== PROJECT ||
+      first.querySha256 !== sha(managedSourceSql()) ||
+      second.querySha256 !== sha(managedSourceSql())) {
+    fail("Untrusted replay provenance or source query");
+  }
+  for (const item of [first, second]) {
+    if (!Number.isSafeInteger(item.rowCount) || item.rowCount < 0 || item.rowCount > MAX_TOTAL ||
+        !item.readOnly || item.isolation !== "single-managed-readonly-statement" ||
+        typeof item.capturedAt !== "string" || !Number.isFinite(Date.parse(item.capturedAt)) ||
+        !item.tables || Object.keys(item.tables).length !== DEFINITIONS.length ||
+        !item.surfaces || Object.keys(item.surfaces).length !== SURFACES.length ||
+        !HEX.test(item.sourceEpoch || "")) {
+      fail("Incomplete managed replay evidence");
+    }
+  }
+  const elapsed = Date.parse(second.capturedAt) - Date.parse(first.capturedAt);
+  if (elapsed < 0 || elapsed > 15 * 60 * 1000)
+    fail("Managed source replays are reversed or too far apart");
+  if (first.sourceEpoch !== second.sourceEpoch ||
+      stableJson(first.tables) !== stableJson(second.tables) ||
+      stableJson(first.surfaces) !== stableJson(second.surfaces) ||
+      stableJson(first.static) !== stableJson(second.static)) {
+    fail("Managed source state changed during replay");
+  }
+  return {sourceEpoch:second.sourceEpoch,rows:second.rowCount,replayIntervalMs:elapsed,publicationActivationAuthority:false};
+}
+
 function writeExclusive(file, value) {
   if (!path.isAbsolute(file) || path.extname(file) !== ".json" && path.extname(file) !== ".sql")
     fail("Evidence output requires absolute .json or .sql path");
@@ -182,9 +214,29 @@ function main() {
     console.log("PUBLICATION_ACTIVATION_AUTHORITY=NONE");
     return;
   }
-  fail("Use --emit-sql /absolute/query.sql or --verify-result /absolute/query.sql /absolute/result.json /absolute/scan.json");
+  if (action === "--verify-replay" && process.argv.length === 5) {
+    const files = process.argv.slice(3);
+    const expected = [
+      process.env.WAKILISHA_MANAGED_SOURCE_FIRST_SHA256,
+      process.env.WAKILISHA_MANAGED_SOURCE_SECOND_SHA256,
+    ];
+    const scans = files.map((file, idx) => {
+      if (!path.isAbsolute(file) || !HEX.test(expected[idx] || ""))
+        fail("Replay requires absolute filenames and two independently pinned SHA-256 values");
+      const data = fs.readFileSync(file);
+      if (sha(data) !== expected[idx]) fail("Managed source replay SHA-256 mismatch");
+      try {return JSON.parse(data.toString("utf8"));} catch {fail("Unparseable managed source replay");}
+    });
+    const evidence = validateReplay(scans[0], scans[1]);
+    console.log("MANAGED_SOURCE_EPOCH_REPLAY=PASS");
+    console.log("MANAGED_SOURCE_EPOCH="+evidence.sourceEpoch);
+    console.log("MANAGED_SOURCE_ROWS="+evidence.rows);
+    console.log("PUBLICATION_ACTIVATION_AUTHORITY=NONE");
+    return;
+  }
+  fail("Use --emit-sql /absolute/query.sql or --verify-replay FIRST.json SECOND.json or --verify-result /absolute/query.sql /absolute/result.json /absolute/scan.json");
 }
-export {FORMAT,managedSourceSql,verifyManagedEvidence};
+export {FORMAT,managedSourceSql,verifyManagedEvidence,validateReplay};
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {main();} catch(error) {console.error(error instanceof Error?error.message:String(error)); process.exitCode=1;}
 }
