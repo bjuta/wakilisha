@@ -243,6 +243,99 @@ test("Workbook v4 loads authentic font faces and keeps controls and theme legibl
 });
 
 
+test("Article Story renderer exports full-bleed branded JPEGs in an actual browser", async ({ page }) => {
+  // The export must load the real same-origin SVG wordmark from /public/assets.
+  let logoRequests = 0;
+  await page.route("**/assets/logos/wakilisha-logo-dark.svg", async (route) => {
+    logoRequests += 1;
+    await route.continue();
+  });
+  // The fixture is same-origin. Cross-origin production CDN access is an
+  // independent live acceptance gate, not something a synthetic image proves.
+  await page.route("**/__wk_article_story_fixture.svg", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200"><rect width="1200" height="1200" fill="#c7a06d"/><circle cx="600" cy="580" r="360" fill="#85c441"/></svg>',
+    });
+  });
+  await page.goto("/test/ui-browser/fixtures/interaction.html");
+
+  const exported = await page.evaluate(async () => {
+    const modulePath = "/src/components/design-system/share/articleStoryImage.ts";
+    const { renderArticleStoryImage } = await import(/* @vite-ignore */ modulePath);
+    const imageUrl = new URL("/__wk_article_story_fixture.svg", window.location.origin).href;
+    const titles = [
+      "Album Review: Alusa Continua",
+      "Inside the Album That Changed the Sound of Nairobi and the Artists Who Carried Its Stories Beyond Kenya",
+    ];
+    const outputs = [];
+
+    for (const title of titles) {
+      const blob = await renderArticleStoryImage({
+        imageUrl,
+        title,
+        author: "Hafare Segelan",
+        readingTime: 5,
+        section: "Album Review",
+      });
+      const bytes = Array.from(new Uint8Array(await blob.slice(0, 3).arrayBuffer()));
+      const bitmap = await createImageBitmap(blob);
+      const probe = document.createElement("canvas");
+      probe.width = 1;
+      probe.height = 1;
+      const ctx = probe.getContext("2d")!;
+      ctx.drawImage(bitmap, 540, 1880, 1, 1, 0, 0, 1, 1);
+      const pixel = Array.from(ctx.getImageData(0, 0, 1, 1).data);
+      outputs.push({
+        type: blob.type,
+        size: blob.size,
+        width: bitmap.width,
+        height: bitmap.height,
+        jpegSignature: bytes,
+        bottomDark: pixel[0] < 80 && pixel[1] < 80 && pixel[2] < 80,
+      });
+      bitmap.close();
+    }
+
+    let blockedUnsafeScheme = false;
+    try {
+      await renderArticleStoryImage({
+        imageUrl: "javascript:alert(1)",
+        title: titles[0],
+        author: "Hafare Segelan",
+        readingTime: 5,
+        section: "Album Review",
+      });
+    } catch {
+      blockedUnsafeScheme = true;
+    }
+    return {
+      outputs,
+      blockedUnsafeScheme,
+      displayFont: getComputedStyle(document.documentElement)
+        .getPropertyValue("--wk-font-display").trim(),
+      brand: getComputedStyle(document.documentElement)
+        .getPropertyValue("--wk-brand").trim(),
+      figtreeReady: document.fonts.check('800 96px "Figtree"'),
+    };
+  });
+
+  expect(logoRequests).toBeGreaterThan(0);
+  expect(exported.figtreeReady).toBe(true);
+  expect(exported.displayFont).toContain("Figtree");
+  expect(exported.brand.toLowerCase()).toBe("#85c441");
+  expect(exported.blockedUnsafeScheme).toBe(true);
+  expect(exported.outputs).toHaveLength(2);
+  for (const output of exported.outputs) {
+    expect(output.type).toBe("image/jpeg");
+    expect(output.size).toBeGreaterThan(20_000);
+    expect([output.width, output.height]).toEqual([1080, 1920]);
+    expect(output.jpegSignature).toEqual([255, 216, 255]);
+    expect(output.bottomDark).toBe(true);
+  }
+});
+
 /**
  * A real Chromium interaction with the actual Discography drawer. The Edge
  * response is fixture data, not a Production or hosted Preview mutation.

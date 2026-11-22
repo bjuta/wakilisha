@@ -4,6 +4,7 @@ import { trackEvent } from "@/services/analytics";
 import type { CommunityEntity, ReportReason } from "@/services/community";
 import { followTarget, saveEntity, reportComment } from "@/services/community";
 import { ShareSheet } from "@/components/design-system/share/ShareSheet";
+import type { ArticleStoryMetadata } from "@/components/design-system/share/articleStoryImage";
 import { ContributionSheet } from "@/components/feature/community/ContributionSheet";
 import { buildCommunityAuthUrl, stashPendingCommunityAction } from "@/services/community/authIntent";
 import { buildVerifyEmailUrl } from "@/services/auth/accountVerification";
@@ -24,6 +25,7 @@ interface CommunityActionSheetProps {
   userId?: string;
   actionState?: CommunityActionState;
   onComment?: () => void;
+  storyMetadata?: ArticleStoryMetadata;
 }
 
 const REPORT_REASONS: { value: ReportReason; label: string; icon: string }[] = [
@@ -97,6 +99,7 @@ export function CommunityActionSheet({
   userId,
   actionState = { saved: false, following: false },
   onComment,
+  storyMetadata,
 }: CommunityActionSheetProps) {
   const authUser = useAuthUser();
   const [saved, setSaved] = useState(actionState.saved);
@@ -463,6 +466,7 @@ export function CommunityActionSheet({
           url: entity.url,
           // Only explicit active published snapshot authority may version the card.
           publishedSnapshotId: entity.type === "article" ? entity.publishedSnapshotId : undefined,
+          articleStory: entity.type === "article" ? storyMetadata : undefined,
           type: entity.type === "article" ? "article" : "page",
         }}
         open={shareOpen}
