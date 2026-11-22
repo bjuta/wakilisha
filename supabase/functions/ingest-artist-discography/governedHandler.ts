@@ -1,5 +1,6 @@
 import {
   authorizeDiscographyCaller,
+  DiscographyRpcError,
   createReviewedDiscographyArtistShell,
   executeReviewedDiscographyEvidence,
   fetchDiscographyProviderObservation,
@@ -83,6 +84,12 @@ function statusForError(message: string): number {
     message.includes("fingerprint") ||
     message.includes("idempotency") ||
     message.includes("budget")
+  ) return 409;
+  if (
+    message.startsWith("Discography Track identity needs review:") ||
+    message.startsWith("Reviewed Discography Track identity requires resolution:") ||
+    message.startsWith("Strong Track identity") ||
+    message.startsWith("Strong Apple Music Track identity")
   ) return 409;
   return 500;
 }
@@ -221,6 +228,8 @@ export async function handleGovernedDiscographyRequest(req: Request): Promise<Re
       ok: false,
       error: message,
       duration_ms: Date.now() - startedAt,
-    }, statusForError(message));
+    }, error instanceof DiscographyRpcError && error.pgCode === "PT409"
+      ? 409
+      : statusForError(message));
   }
 }

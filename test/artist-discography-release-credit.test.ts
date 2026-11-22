@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   describe,
   expect,
@@ -269,5 +270,20 @@ describe("reviewed discography plan freezing", () => {
         },
       ],
     })).toThrow("identity is inconsistent inside one reviewed plan");
+  });
+});
+
+describe("discography nonretryable governed SQL conflict transport", () => {
+  it("retains PT409 SQLSTATE in an explicit broker error class and returns HTTP 409", () => {
+    const broker = readFileSync(
+      "supabase/functions/ingest-artist-discography/governedBroker.ts", "utf8",
+    );
+    const handler = readFileSync(
+      "supabase/functions/ingest-artist-discography/governedHandler.ts", "utf8",
+    );
+    expect(broker).toContain("class DiscographyRpcError extends Error");
+    expect(broker).toContain("new DiscographyRpcError(error.message, error.code)");
+    expect(handler).toContain('error.pgCode === "PT409"');
+    expect(handler).toContain("? 409");
   });
 });
