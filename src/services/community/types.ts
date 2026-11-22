@@ -20,6 +20,8 @@ export type CommunityEntityType =
 export interface CommunityEntity {
   type: CommunityEntityType;
   id?: string;
+  /** Explicit immutable published Article version, never a working/draft ID. */
+  publishedSnapshotId?: string | null;
   slug?: string;
   url: string;
   title: string;
