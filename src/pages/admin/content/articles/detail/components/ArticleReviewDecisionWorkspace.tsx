@@ -37,7 +37,7 @@ export function ArticleReviewDecisionWorkspace({
   workingVersionNumber: number | null;
   latestApprovedVersionNumber: number | null;
   canResubmitWorkingVersion: boolean;
-  onResubmitWorkingVersion: () => void | Promise<void>;
+  onResubmitWorkingVersion: (note: string | null) => void | Promise<void>;
   note: string;
   onNoteChange: (value: string) => void;
   canRequestChanges: boolean;
@@ -57,7 +57,7 @@ export function ArticleReviewDecisionWorkspace({
       tone: "primary",
       disabled: busy,
       title: "Create a new immutable submission from the current working Article without changing prior decisions.",
-      onClick: () => void onResubmitWorkingVersion(),
+      onClick: () => void onResubmitWorkingVersion(note.trim() || null),
     });
   }
 
@@ -100,7 +100,7 @@ export function ArticleReviewDecisionWorkspace({
       title="Article editorial decision"
       note={note}
       onNoteChange={onNoteChange}
-      noteLabel="Review note"
+      noteLabel={canResubmitWorkingVersion ? "Optional resubmission note" : "Review note"}
       notePlaceholder="Record the reason for this exact-version decision."
       statusLabel={status || "draft"}
       targetLabel={
