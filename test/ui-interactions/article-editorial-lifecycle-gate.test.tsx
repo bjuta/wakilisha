@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
-import { deriveArticleEditorialGate, type ArticleEditorialGateInput } from "@/services/articles/articleEditorialGate";
+import { deriveArticleEditorialGate, currentArticleReviewProof, type ArticleEditorialGateInput } from "@/services/articles/articleEditorialGate";
 import { ArticleReviewDecisionWorkspace } from "@/pages/admin/content/articles/detail/components/ArticleReviewDecisionWorkspace";
 import fs from "node:fs";
 import path from "node:path";
@@ -59,6 +59,25 @@ describe("permanent Article editorial lifecycle authority", () => {
     expect(accepted.canPublishApprovedVersion).toBe(true);
     expect(accepted.publishDisabledReason).toBeNull();
     expect(accepted.canSubmitWorkingVersion).toBe(false);
+  });
+
+  it("never reuses an async approval proof after a save, Article switch or new decision", () => {
+    const lease = {
+      articleId: "article-one", draftVersion: 31,
+      approvedVersionNumber: 31, submittedVersionNumber: 30,
+      proof: { latestVersionNumber: 31, latestContentFingerprint: approved,
+        approvedVersionNumber: 31, approvedContentFingerprint: approved,
+        submittedVersionNumber: 30, submittedContentFingerprint: approved },
+    };
+    const current = {
+      articleId: "article-one", draftVersion: 31,
+      approvedVersionNumber: 31, submittedVersionNumber: 30,
+    };
+    expect(currentArticleReviewProof(current, lease)).toEqual(lease.proof);
+    expect(currentArticleReviewProof({ ...current, draftVersion: 32 }, lease)).toBeNull();
+    expect(currentArticleReviewProof({ ...current, articleId: "article-two" }, lease)).toBeNull();
+    expect(currentArticleReviewProof({ ...current, approvedVersionNumber: 34 }, lease)).toBeNull();
+    expect(currentArticleReviewProof({ ...current, submittedVersionNumber: 33 }, lease)).toBeNull();
   });
 
   it("does not revoke an unchanged approved snapshot merely because a no-op save made a new version", () => {
@@ -128,6 +147,7 @@ describe("permanent Article editorial lifecycle authority", () => {
     const src = fs.readFileSync(path.join(process.cwd(),
       "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx"), "utf8");
     expect(src).toContain("deriveArticleEditorialGate({");
+    expect(src).toContain("currentArticleReviewProof({");
     expect(src).toContain("canSubmitCurrentArticleForReview = reviewGate.canSubmitWorkingVersion");
     expect(src).toContain("canPublishApprovedArticleVersion = reviewGate.canPublishApprovedVersion");
     expect(src).toContain("hasChangesAfterApproval={reviewGate.workingChangesNeedReview}");
