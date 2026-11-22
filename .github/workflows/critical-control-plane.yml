@@ -309,11 +309,14 @@ jobs:
   hosted-preview-ifpi-ddex:
     name: hosted-preview-ifpi-ddex
     # Only the explicit one-shot release gate. No push/synchronize replays.
-    if: ${{ github.event_name == 'pull_request' && github.event.action == 'ready_for_review' && github.event.pull_request.head.ref == 'fix/discography-ifpi-ddex-recording-identity' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && (github.event.action == 'ready_for_review' || github.event.action == 'synchronize') && github.event.pull_request.head.ref == 'fix/discography-ifpi-ddex-recording-identity' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     permissions:
       contents: read
+    defaults:
+      run:
+        shell: bash
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
     env:
