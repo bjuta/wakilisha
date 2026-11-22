@@ -73,8 +73,10 @@ export function deriveArticleEditorialGate(input: ArticleEditorialGateInput): Ar
   const submittedTargetCurrent = Boolean(
     latestSubmittedVersionId &&
     reviewTargetVersionId === latestSubmittedVersionId &&
-    submissionMatchesWorking === true &&
-    !isDirty,
+    !isDirty &&
+    // Review-only roles cannot call the editor-only version listing RPC;
+    // their exact immutable submitted target remains reviewable.
+    (submissionMatchesWorking === true || !canEdit),
   );
   const awaitingReview = latestReviewAction === "submitted";
   const canSubmitWorkingVersion = Boolean(
@@ -93,7 +95,7 @@ export function deriveArticleEditorialGate(input: ArticleEditorialGateInput): Ar
   );
   const canPublishApprovedVersion = Boolean(
     canPublish && !isDirty && latestReviewAction === "approved" &&
-    approvedProofCurrent,
+    (approvedProofCurrent || (!canEdit && Boolean(latestApprovedVersionNumber))),
   );
   const workingChangesNeedReview = Boolean(
     (latestReviewAction === "approved" && approvalChanged) ||
@@ -113,13 +115,14 @@ export function deriveArticleEditorialGate(input: ArticleEditorialGateInput): Ar
   } else if (workingChangesNeedReview) {
     editorialStatusLabel = "Changes Need Review";
     editorialStatusColorKey = "changes_requested";
-  } else if (latestReviewAction === "approved" && approvedProofCurrent) {
+  } else if (latestReviewAction === "approved" &&
+    (approvedProofCurrent || (!canEdit && Boolean(latestApprovedVersionNumber)))) {
     editorialStatusLabel = "Approved for Publication";
     editorialStatusColorKey = "approved";
   } else if (latestReviewAction === "changes_requested") {
     editorialStatusLabel = "Changes Requested";
     editorialStatusColorKey = "changes_requested";
-  } else if (awaitingReview && submissionMatchesWorking === true) {
+  } else if (awaitingReview && submittedTargetCurrent) {
     editorialStatusLabel = "Pending Review";
     editorialStatusColorKey = "pending";
   } else if (latestReviewAction === "approved" || awaitingReview || wpStatus === "pending") {
