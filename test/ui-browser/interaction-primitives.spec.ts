@@ -366,6 +366,7 @@ test("Discography selected-only drawer Clear all and Apply omits every unselecte
  * client. Only RPC responses are mocked; no Profile/Registry tables are read.
  */
 test("Article Credit selects other existing writers and Registry Authors without creating new identities", async ({ page }) => {
+  test.skip(process.env.WK_ARTICLE_CREDIT_UI_FIXTURE !== "1", "Run with isolated Article Credit browser fixture credentials");
   const versionId = "acf1b963-9e3e-4dbb-9c61-3fd85e6af339";
   const people = [
     {
