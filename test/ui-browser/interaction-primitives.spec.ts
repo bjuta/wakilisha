@@ -359,3 +359,122 @@ test("Discography selected-only drawer Clear all and Apply omits every unselecte
   });
   expect(JSON.stringify(applied[0])).not.toContain(unselectedAlbumId);
 });
+
+
+/**
+ * Exercise the actual Article Credit modal with a browser-shaped Data API
+ * client. Only RPC responses are mocked; no Profile/Registry tables are read.
+ */
+test("Article Credit selects other existing writers and Registry Authors without creating new identities", async ({ page }) => {
+  test.skip(process.env.WK_ARTICLE_CREDIT_UI_FIXTURE !== "1", "Run with isolated Article Credit browser fixture credentials");
+  const versionId = "acf1b963-9e3e-4dbb-9c61-3fd85e6af339";
+  const people = [
+    {
+      name: "WK Existing Writer",
+      kind: "user",
+      id: "18dd935d-d4f1-4a0a-a08f-c7b5d31943cf",
+      path: "/people/wk-existing-writer",
+      width: 1440,
+    },
+    {
+      name: "WK Registry Author",
+      kind: "registry_author",
+      id: "721d8d0a-c0d7-4e2e-9f48-4a9976432ee1",
+      path: "/people/wk-registry-author",
+      width: 390,
+    },
+  ];
+  const cors = {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "POST, OPTIONS",
+    "access-control-allow-headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
+  };
+
+  for (const person of people) {
+    const requests: Array<{ name: string; body: Record<string, unknown> }> = [];
+    await page.setViewportSize({ width: person.width, height: 850 });
+    await page.route("https://example.supabase.co/rest/v1/rpc/**", async (route) => {
+      if (route.request().method() === "OPTIONS") {
+        await route.fulfill({ status: 204, headers: cors });
+        return;
+      }
+      const name = new URL(route.request().url()).pathname.split("/").at(-1)!;
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      requests.push({ name, body });
+      let response: Record<string, unknown>;
+      if (name === "list_editorial_credit_picker_options") {
+        response = {
+          can_create_credit: true,
+          roles: [
+            { credit_role: "author", label: "Author" },
+            { credit_role: "editor", label: "Editor" },
+          ],
+          parties: body.p_query ? [
+            {
+              party_kind: "person",
+              resource_id: person.id,
+              display_name: person.name,
+              canonical_path: person.path,
+              identity_kind: person.kind,
+              available_credit_roles: [],
+            },
+          ] : [],
+        };
+      } else if (name === "resolve_editorial_credit") {
+        response = {
+          credit_id: "94123398-48e1-4a64-af11-c825e01ac050",
+          party_kind: "person",
+          party_resource_id: person.id,
+          credit_role: "author",
+          display_name: person.name,
+          public_safe: false,
+          created: false,
+        };
+      } else if (name === "attach_article_version_credit") {
+        response = { attachment_id: "130351f1-78a5-4240-9f5f-3375cb961751" };
+      } else {
+        throw new Error("Unexpected Article Credit RPC: " + name);
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: cors,
+        body: JSON.stringify(response),
+      });
+    });
+
+    await page.goto("/test/ui-browser/fixtures/interaction.html");
+    await page.getByRole("button", { name: "Open Article Credit acceptance" }).click();
+    const dialog = page.getByRole("dialog", { name: "Add a Governed Credit" });
+    await expect(dialog.getByRole("radio", { name: /Existing writer or Author/ })).toBeVisible();
+    await dialog.getByText("Existing writer or Author", { exact: true }).click();
+
+    const search = dialog.getByRole("textbox", { name: "Find Person or Organization" });
+    await search.fill(person.name);
+    await dialog.getByRole("option", { name: new RegExp(person.name) }).click();
+    await dialog.getByRole("button", { name: "Use This Person" }).click();
+    await expect(dialog.getByText("Person and role selected.")).toBeVisible();
+    await dialog.getByRole("button", { name: "Create and Attach Credit" }).click();
+    await expect(page.getByText("Article Credit fixture attached")).toBeVisible();
+
+    const resolved = requests.filter((r) => r.name === "resolve_editorial_credit");
+    const attached = requests.filter((r) => r.name === "attach_article_version_credit");
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0].body).toMatchObject({
+      p_party_kind: "person",
+      p_party_resource_id: person.id,
+      p_credit_role: "author",
+      p_public_safe: false,
+    });
+    expect(attached).toHaveLength(1);
+    expect(attached[0].body).toMatchObject({
+      p_article_version_id: versionId,
+      p_credit_id: "94123398-48e1-4a64-af11-c825e01ac050",
+      p_expected_credit_revision: 4,
+      p_is_primary: false,
+    });
+    expect(requests.some((r) => r.name === "create_credit" ||
+      r.name === "create_external_contributor")).toBe(false);
+    await page.unroute("https://example.supabase.co/rest/v1/rpc/**");
+  }
+});

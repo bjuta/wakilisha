@@ -53,16 +53,20 @@ export function EditorialCreditPicker({
   roles,
   canCreateCredit,
   disabled = false,
+  actionLabel = "Add Credit",
   onSearch,
   onAttach,
+  onSelectionCleared,
 }: {
   roles: EditorialCreditRoleOption[];
   canCreateCredit: boolean;
   disabled?: boolean;
+  actionLabel?: string;
   onSearch: (
     query: string,
   ) => Promise<EditorialCreditPartyOption[]>;
   onAttach: (selection: EditorialCreditSelection) => void;
+  onSelectionCleared?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<EditorialCreditPartyOption[]>([]);
@@ -173,6 +177,7 @@ export function EditorialCreditPicker({
             setQuery(event.target.value);
             setSelectedParty(null);
             setCreditRole("");
+            onSelectionCleared?.();
             setShowResults(true);
           }}
           onFocus={() => {
@@ -257,7 +262,10 @@ export function EditorialCreditPicker({
         Credit role
         <WkSelect
           value={resolvedRole}
-          onChange={(value) => setCreditRole(value)}
+          onChange={(value) => {
+            setCreditRole(value);
+            onSelectionCleared?.();
+          }}
           disabled={disabled || !selectedParty || availableRoles.length === 0}
           triggerClassName="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-xs text-wk-text disabled:opacity-60"
         >
@@ -294,7 +302,7 @@ export function EditorialCreditPicker({
         }}
         className="wk-button wk-button-ghost wk-button-sm disabled:opacity-50"
       >
-        Add Credit
+        {actionLabel}
       </button>
     </div>
   );

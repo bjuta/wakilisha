@@ -16,6 +16,16 @@ import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 import { WkRadio, WkRadioGroup } from "@/components/design-system/primitives/Radio";
 import { wakilishaDialog } from "@/components/design-system/primitives/DialogProvider";
+import {
+  EditorialCreditPicker,
+  type EditorialCreditSelection,
+} from "@/components/design-system/trust/EditorialCreditPicker";
+import {
+  fetchEditorialCreditPickerAuthority,
+  resolveEditorialCredit,
+  searchEditorialCreditParties,
+  type EditorialCreditPickerAuthority,
+} from "@/services/trust/editorialCreditService";
 
 
 
@@ -50,7 +60,13 @@ const CONSENT_STATUSES = [
 
 type CreditedPartyKind =
   | "current_user"
+  | "existing_person"
   | "external_contributor";
+
+async function searchArticleCreditPersons(query: string) {
+  const matches = await searchEditorialCreditParties(query);
+  return matches.filter((candidate) => candidate.partyKind === "person");
+}
 
 interface Props {
   articleVersionId: string;
@@ -116,6 +132,12 @@ export function ArticleCreditForm({
   const adminUser = useAdminUser();
   const [partyKind, setPartyKind] =
     useState<CreditedPartyKind>("current_user");
+  const [selectedExistingCredit, setSelectedExistingCredit] =
+    useState<EditorialCreditSelection | null>(null);
+  const [creditAuthority, setCreditAuthority] =
+    useState<EditorialCreditPickerAuthority | null>(null);
+  const [creditAuthorityError, setCreditAuthorityError] =
+    useState<string | null>(null);
   const [displayName, setDisplayName] =
     useState("");
   const [publicRole, setPublicRole] =
@@ -151,6 +173,7 @@ export function ArticleCreditForm({
   const [errorMessage, setErrorMessage] =
     useState<string | null>(null);
 
+  const existingParty = partyKind === "existing_person";
   const externalParty =
     partyKind === "external_contributor";
   const contributorLocked =
@@ -173,6 +196,29 @@ export function ArticleCreditForm({
   }, [publicConsentAllowed]);
 
   useEffect(() => {
+    if (!existingParty) return;
+    let active = true;
+    setCreditAuthority(null);
+    setCreditAuthorityError(null);
+    void fetchEditorialCreditPickerAuthority()
+      .then((authority) => {
+        if (active) setCreditAuthority(authority);
+      })
+      .catch((reason: unknown) => {
+        if (active) {
+          setCreditAuthorityError(
+            reason instanceof Error
+              ? reason.message
+              : "Existing writer search is unavailable.",
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [existingParty]);
+
+  useEffect(() => {
     if (creditRole !== "author") {
       setIsPrimary(false);
     }
@@ -181,7 +227,7 @@ export function ArticleCreditForm({
   async function requestClose() {
     if (
       (createdContributorId || createdCreditId) &&
-      !(await wakilishaDialog.confirm({ title: "Close Credit", message: "A contributor or Credit has already been created. Closing now will leave it unattached. Continue?", confirmLabel: "Close anyway", destructive: true }))
+      !(await wakilishaDialog.confirm({ title: "Close Credit", message: "A Credit has been resolved but is not attached to this Article. Close anyway?", confirmLabel: "Close anyway", destructive: true }))
     ) {
       return;
     }
@@ -216,6 +262,11 @@ export function ArticleCreditForm({
         );
         return;
       }
+    }
+
+    if (existingParty && (!selectedExistingCredit || !creditAuthority)) {
+      setErrorMessage("Choose an existing Person and their Credit role first.");
+      return;
     }
 
     if (
@@ -322,37 +373,32 @@ export function ArticleCreditForm({
       let creditId = createdCreditId;
 
       if (!creditId) {
-        const creditResult = await createCredit({
-          p_credit_role: creditRole,
-          p_public_safe: publicPresentation,
-          ...(partyKind === "current_user"
-            ? {
-                p_user_id: adminUser.id,
-              }
-            : {
-                p_external_contributor_id:
-                  contributorId as string,
-              }),
-          ...(roleLabelOverride.trim()
-            ? {
-                p_role_label_override:
-                  roleLabelOverride.trim(),
-              }
-            : {}),
-          ...(creditNote.trim()
-            ? {
-                p_credit_note:
-                  creditNote.trim(),
-              }
-            : {}),
-        });
-
-        creditId = requiredId(
-          creditResult,
-          "credit_id",
-          "Credit creation returned no identity.",
-        );
-
+        if (existingParty && selectedExistingCredit) {
+          const resolved = await resolveEditorialCredit(
+            selectedExistingCredit,
+            { publicSafe: publicPresentation },
+          );
+          creditId = resolved.creditId;
+        } else {
+          const creditResult = await createCredit({
+            p_credit_role: creditRole,
+            p_public_safe: publicPresentation,
+            ...(partyKind === "current_user"
+              ? { p_user_id: adminUser.id }
+              : { p_external_contributor_id: contributorId as string }),
+            ...(roleLabelOverride.trim()
+              ? { p_role_label_override: roleLabelOverride.trim() }
+              : {}),
+            ...(creditNote.trim()
+              ? { p_credit_note: creditNote.trim() }
+              : {}),
+          });
+          creditId = requiredId(
+            creditResult,
+            "credit_id",
+            "Credit creation returned no identity.",
+          );
+        }
         setCreatedCreditId(creditId);
       }
 
@@ -410,7 +456,8 @@ export function ArticleCreditForm({
         form="article-credit-form"
         disabled={
           submitting ||
-          (partyKind === "current_user" && adminUser.loading)
+          (partyKind === "current_user" && adminUser.loading) ||
+          (existingParty && (!selectedExistingCredit || !creditAuthority))
         }
         className="wk-button wk-button-primary"
       >
@@ -438,7 +485,7 @@ export function ArticleCreditForm({
       <div className="mb-5">
         <div className="text-[10px] font-black uppercase tracking-[0.14em] text-wk-brand">Governed Credit</div>
         <p className="mt-1 max-w-2xl text-[11px] leading-5 text-wk-text-muted">
-          Credit the signed-in WAKILISHA user or create an external contributor, then attach one immutable Credit to the current working Article version.
+          Choose an existing writer, use your own account, or create a new contributor. The Credit attaches to this Article version.
         </p>
       </div>
       <form id="article-credit-form" onSubmit={handleSubmit} className="space-y-6">
@@ -456,9 +503,9 @@ export function ArticleCreditForm({
                   Partial progress is preserved
                 </div>
                 <p className="mt-1 text-[10px] leading-4 text-wk-text-muted">
-                  The form will reuse the contributor and Credit
-                  already created. Retry attachment instead of
-                  creating duplicate records.
+                  The form keeps the resolved Credit and any new
+                  contributor. Retry attachment without creating
+                  duplicate records.
                 </p>
               </div>
             ) : null}
@@ -475,11 +522,15 @@ export function ArticleCreditForm({
 
               <WkRadioGroup
                 value={partyKind}
-                onChange={(value) => setPartyKind(value as CreditedPartyKind)}
+                onChange={(value) => {
+                  setPartyKind(value as CreditedPartyKind);
+                  setSelectedExistingCredit(null);
+                  setIsPrimary(false);
+                }}
                 disabled={partyLocked || submitting}
                 name="credited-party"
                 ariaLabel="Credited party"
-                className="mt-3 grid gap-3 sm:grid-cols-2"
+                className="mt-3 grid gap-3 sm:grid-cols-3"
               >
                 <WkRadio
                   value="current_user"
@@ -493,6 +544,20 @@ export function ArticleCreditForm({
                       {currentUserDisplayName ||
                         adminUser.name ||
                         "Signed-in user"}
+                    </span>
+                  </span>
+                </WkRadio>
+
+                <WkRadio
+                  value="existing_person"
+                  className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4"
+                >
+                  <span>
+                    <span className="block text-[11px] font-bold text-wk-text">
+                      Existing writer or Author
+                    </span>
+                    <span className="mt-1 block text-[10px] leading-4 text-wk-text-muted">
+                      Find a credited Person already in WAKILISHA.
                     </span>
                   </span>
                 </WkRadio>
@@ -536,6 +601,36 @@ export function ArticleCreditForm({
                         "Display name missing"}
                   </div>
                 </div>
+              </section>
+            ) : existingParty ? (
+              <section>
+                {creditAuthority ? (
+                  <EditorialCreditPicker
+                    roles={creditAuthority.roles}
+                    canCreateCredit={creditAuthority.canCreateCredit}
+                    disabled={partyLocked || submitting}
+                    onSearch={searchArticleCreditPersons}
+                    onSelectionCleared={() => {
+                      setSelectedExistingCredit(null);
+                      setIsPrimary(false);
+                    }}
+                    onAttach={(selection) => {
+                      setSelectedExistingCredit(selection);
+                      setCreditRole(selection.creditRole);
+                      setIsPrimary(false);
+                    }}
+                    actionLabel="Use This Person"
+                  />
+                ) : (
+                  <p className="rounded-xl border border-wk-border bg-wk-bg-subtle p-4 text-xs text-wk-text-muted">
+                    {creditAuthorityError || "Loading existing writers and Authors."}
+                  </p>
+                )}
+                {selectedExistingCredit ? (
+                  <p className="mt-2 text-xs text-wk-text-muted">
+                    Person and role selected. Confirm the Credit settings below, then attach it.
+                  </p>
+                ) : null}
               </section>
             ) : (
               <section>
@@ -740,6 +835,11 @@ export function ArticleCreditForm({
                 </p>
               </div>
 
+              {existingParty ? (
+                <p className="text-xs text-wk-text-muted">
+                  The Credit role comes from the selected Person above.
+                </p>
+              ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 <label>
                   <span className="wk-label">
@@ -812,6 +912,7 @@ export function ArticleCreditForm({
                   />
                 </label>
               </div>
+              )}
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <WkCheckbox checked={publicPresentation} disabled={
@@ -832,7 +933,9 @@ export function ArticleCreditForm({
                     <span className="mt-1 block text-[10px] leading-4 text-wk-text-muted">
                       {externalParty
                         ? "Requires granted or not-required consent. The choice locks after contributor creation."
-                        : "Uses the signed-in WAKILISHA profile identity."}
+                        : existingParty
+                          ? "Uses the selected canonical Person identity."
+                          : "Uses the signed-in WAKILISHA profile identity."}
                       {" "}
                       This does not create payment rights.
                     </span>

@@ -245,6 +245,7 @@
       "concept": "canonical credited-party selection plus semantic Credit role",
       "authorityOwner": "consumer",
       "consumers": [
+        "admin:articles",
         "admin:audio",
         "admin:video"
       ]

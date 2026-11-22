@@ -166,6 +166,7 @@ export async function searchEditorialCreditParties(
 
 export async function resolveEditorialCredit(
   selection: EditorialCreditSelection,
+  options?: { publicSafe?: boolean },
 ): Promise<EditorialCreditResolution> {
   const { data, error } = await rpc()(
     "resolve_editorial_credit",
@@ -173,7 +174,7 @@ export async function resolveEditorialCredit(
       p_party_kind: selection.partyKind,
       p_party_resource_id: selection.partyResourceId,
       p_credit_role: selection.creditRole,
-      p_public_safe: true,
+      p_public_safe: options?.publicSafe ?? true,
     },
   );
 
