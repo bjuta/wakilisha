@@ -473,6 +473,11 @@ export default function ArticlePage() {
             onClose={() => setCommunitySheetOpen(false)}
             userId={isLoggedIn ? authUser.id : undefined}
             onComment={scrollToCommunity}
+            storyMetadata={previewNonce ? undefined : {
+              author: article.author,
+              readingTime: article.readingTime,
+              section: article.section,
+            }}
           />
         )}
       </div>
