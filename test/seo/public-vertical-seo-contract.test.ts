@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { SURFACES, verifyReceipt, differences, extractSeo, auditArtifact } from "../../scripts/seo/verify-governed-publication.mjs";
 import { readGovernedOfflineProjection, assertFreshGovernedViteShell, activateGovernedOfflineProjection, seoBlockForPath, htmlForPath } from "../../scripts/seo/prerender-metadata.mjs";
+import { assemble as assembleGovernedProjection, stableJson as stableManagedJson } from "../../scripts/seo/assemble-governed-publication-projection.mjs";
 
 import {
   readFileSync,
@@ -63,6 +64,66 @@ const adminSeo =
   );
 
 describe("governed offline SEO projection and selected Article image authority", () => {
+  it("assembles public route membership only between identical managed source epochs", () => {
+    const metadata: Record<string, Record<string, unknown>> = {};
+    for (let i=0; i<3000; i+=1) metadata["/genres/fixture-"+i] = {
+      title: "Genre "+i,sourceTable:"registry_genres",sourceId:"genre-"+i,
+    };
+    const baseline={...metadata};
+    const slug="album-review-alusa-continua";
+    const route="/magazine/"+slug;
+    const hero="https://media.wakilisha.africa/uploads/selected.webp";
+    metadata[route]={title:"Album Review: Alusa Continua",sourceTable:"wk_article_publication_snapshots",
+      sourceId:"published-snapshot-id",image:hero};
+    const surfaces=Object.fromEntries([
+      "static","magazine","artists","releases","tracks","genres","labels","guides",
+      "briefings","charts","playlists","people","organizations","taxonomy","authors",
+    ].map(name=>[name,{digest:"a".repeat(64),rowCount:1}]));
+    const sourceEpoch=crypto.createHash("sha256").update(stableManagedJson({
+      protocol:"pg-jsonb-row-sha256-v2",project:"pgzizndxdyhqmtyywjmt",surfaces,
+    })).digest("hex");
+    const tables=Object.fromEntries(Array.from({length:40},(_,i)=>["table-"+i,{rowCount:0,digest:"a".repeat(64)}]));
+    tables.published_articles={rowCount:210,digest:"b".repeat(64)};
+    tables.article_versions={rowCount:323,digest:"c".repeat(64)};
+    const scan={
+      format:1,kind:"wakilisha-governed-source-scan",origin:"https://wakilisha.africa",
+      projectRef:"pgzizndxdyhqmtyywjmt",protocol:"pg-jsonb-row-sha256-v2",
+      databaseRole:"supabase_read_only_user",readOnly:true,
+      isolation:"single-managed-readonly-statement",completeAllowlistScan:true,
+      publicationReceipt:false,publicationActivationAuthority:false,
+      queryCount:1,querySha256:"f".repeat(64),sourceEpoch,surfaces,tables,
+      capturedAt:"2026-11-22T09:00:00.000Z",
+    };
+    const metaCapture={capturedAt:"2026-11-22T09:02:00.000Z",httpStatus:200,
+      projectRef:"pgzizndxdyhqmtyywjmt",response:{ok:true,data:{
+        count:Object.keys(metadata).length,metadata,
+      }}};
+    const articleCapture={capturedAt:"2026-11-22T09:03:00.000Z",httpStatus:200,
+      projectRef:"pgzizndxdyhqmtyywjmt",response:{data:{stories:[{
+        id:"published-snapshot-id",slug,title:"Album Review: Alusa Continua",heroUrl:hero,
+        dek:"Public editorial description",author:"Hafare Segelan",date:"2026-11-22",
+      }]}}};
+    const opts={first:scan,second:{...scan,capturedAt:"2026-11-22T09:05:00.000Z"},
+      metaCapture,articleCapture,acceptedManifest:baseline,secondSha:"e".repeat(64)};
+    const assembled=assembleGovernedProjection(opts);
+    expect(assembled.articles).toHaveLength(1);
+    expect(assembled.metadata[route].image).toBe(hero);
+    expect(assembled.sourceEpoch).toBe(sourceEpoch);
+    expect(assembled.publicationActivationAuthority).toBe(false);
+    expect(() => assembleGovernedProjection({
+      ...opts,
+      metaCapture:{...metaCapture,response:{ok:true,data:{count:Object.keys(metadata).length,
+        metadata:{...metadata,[route]:{...metadata[route],image:"https://media.wakilisha.africa/uploads/wrong.jpg"}}}}},
+    })).toThrow("selected image divergence");
+    expect(() => assembleGovernedProjection({
+      ...opts,acceptedManifest:{...baseline,"/people/withdrawn":{title:"Withdrawn"}},
+    })).toThrow("route retirement");
+    expect(() => assembleGovernedProjection({
+      ...opts,second:{...opts.second,sourceEpoch:"0".repeat(64)},
+    })).toThrow("source epoch");
+  });
+
+
   const fixture = () => ({
     format: 1,
     origin: "https://wakilisha.africa",
