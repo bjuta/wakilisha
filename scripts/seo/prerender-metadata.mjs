@@ -459,7 +459,7 @@ function readGovernedOfflineProjection(options = process.env) {
       throw new Error("Incomplete governed SEO projection surface: " + name);
     }
   }
-  if (!Array.isArray(projection.articles) || !Array.isArray(projection.nonCanonicalPaths)) {
+  if (!Array.isArray(projection.articles) || !projection.articles.length || !Array.isArray(projection.nonCanonicalPaths)) {
     throw new Error("Incomplete governed SEO Article or canonical route projection");
   }
   const allRoutes = [
@@ -1976,7 +1976,11 @@ async function main() {
     throw new Error("dist/index.html was not found. Run vite build first.");
   }
 
-  const offlineMode = Boolean(process.env.WAKILISHA_GOVERNED_SEO_PROJECTION);
+  if (process.argv.length > 3 ||
+      (process.argv.length === 3 && process.argv[2] !== "--governed-offline")) {
+    throw new Error("Use --governed-offline for source-pinned out-of-band publication, or no argument for legacy maintenance");
+  }
+  const offlineMode = process.argv[2] === "--governed-offline";
   if (offlineMode) {
     const projection = readGovernedOfflineProjection();
     activateGovernedOfflineProjection(projection);
@@ -2067,6 +2071,7 @@ async function main() {
   }
 
   console.log(`SEO prerender complete: ${written.toLocaleString()} HTML files written.`);
+  if (offlineMode) console.log("PUBLICATION_ACTIVATION_AUTHORITY=NONE");
 }
 
 export {readGovernedOfflineProjection, activateGovernedOfflineProjection, articleManifestsFromRows, seoBlockForPath, htmlForPath};
