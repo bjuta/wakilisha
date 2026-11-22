@@ -62,6 +62,15 @@ const adminSeo =
   );
 
 describe("incident-safe offline SEO build", () => {
+  it("does not invent social-image dimensions for editorial media", () => {
+    const client = readFileSync("src/components/seo/MetaTags.tsx", "utf8");
+    expect(client).not.toContain('setMetaTag("og:image:width", "1200")');
+    expect(client).not.toContain('setMetaTag("og:image:height", "630")');
+    expect(prerender).not.toContain('<meta property="og:image:width" content="1200" />');
+    expect(prerender).not.toContain('<meta property="og:image:height" content="630" />');
+    expect(prerender).toContain('<meta property="og:image" content="${escapeAttr(image)}" />');
+  });
+
   it("keeps the default build entirely off live SEO and public-content functions", () => {
     const build = JSON.parse(readFileSync("package.json", "utf8")).scripts.build as string;
     const restore = readFileSync("scripts/seo/restore-accepted-prerender.mjs", "utf8");
