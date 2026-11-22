@@ -245,7 +245,7 @@ describe("Workbook v4 is the only active product design authority", () => {
       .toBe("https://wakilisha.africa/artists/bien");
     expect(share.match(/publishedArticleCardUrl\(/g)).toHaveLength(2);
     const actions = read("src/components/feature/community/CommunityActionSheet.tsx");
-    expect(actions).toContain('publishedSnapshotId: entity.type === "article" ? entity.id : undefined');
+    expect(actions).toContain('publishedSnapshotId: entity.type === "article" ? entity.publishedSnapshotId : undefined');
     const api = read("supabase/functions/public-content-read/index.ts");
     expect(api).toContain("id: String(a.id)");
     expect(api).toContain('from("wk_article_publication_snapshots")');
@@ -261,6 +261,10 @@ describe("Workbook v4 is the only active product design authority", () => {
       expect(page).not.toContain('url: typeof window !== "undefined" ? window.location.href : ""');
     }
     expect(mobile).toContain("subtitle: article.author");
+    for (const page of [desktop, mobile]) {
+      expect(page).toContain("publishedSnapshotId: previewNonce ? undefined : article.id");
+    }
+    expect(read("src/services/community/types.ts")).toContain("publishedSnapshotId?: string | null");
     expect(desktop).toContain("subtitle: article.dek");
     expect(share.match(/shareTextForItem\(item\)/g)).toHaveLength(2);
     expect(share).not.toContain('key: "messenger"');
