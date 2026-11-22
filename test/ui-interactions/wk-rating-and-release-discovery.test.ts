@@ -7,6 +7,9 @@ import { EDITOR_MENU_REGISTRY } from "@/components/design-system/editorial/edito
 import { readFileSync } from "node:fs";
 import { canonicalRating, ratingHtml, ratingParts } from "@/components/admin/editor/RatingNode";
 import { extractPublishedReviewVerdict } from "@/utils/editorialRating";
+import { transformTrackShortcodes } from "@/utils/transformTrackShortcodes";
+import { transformReleaseShortcodes } from "@/utils/transformReleaseShortcodes";
+import { resolveRegistryEmbedIdentity, unresolvedRegistryEmbed } from "@/utils/registryEmbedIdentity";
 
 const read = (path: string) => readFileSync(path, "utf8");
 const editor = read("src/components/design-system/editorial/RichTextEditor.tsx");
@@ -125,5 +128,70 @@ describe("Live Registry Insert authority", () => {
     expect(editor).toContain('release.status !== "active"');
     expect(editor).toContain("Draft · available after Registry activation");
     expect(editor).toContain('if (release.status === "active")');
+  });
+});
+
+describe("Article Registry embed identity across duplicate titles", () => {
+  const first = { id: "34fa7899-3bfd-5286-8ae2-df22f326fe09", slug: "how-can-i-forget", artist: "Artist A" };
+  const second = { id: "11a11111-2222-4333-8444-555555555555", slug: "how-can-i-forget", artist: "Artist B" };
+  const rows = [first, second];
+
+  it("always selects the exact canonical Track or Release UUID", () => {
+    for (const id of [first.id, second.id]) {
+      const row = resolveRegistryEmbedIdentity({ id }, rows, rows);
+      expect(row?.id).toBe(id);
+    }
+    expect(resolveRegistryEmbedIdentity({ id: "00000000-0000-4000-8000-000000000000", slug: first.slug }, rows, rows)).toBeNull();
+  });
+
+  it("never guesses for legacy same-slug Tracks or Releases", () => {
+    expect(resolveRegistryEmbedIdentity({ slug: first.slug }, rows, rows)).toBeNull();
+    expect(resolveRegistryEmbedIdentity({ slug: first.slug }, [], [first])).toEqual(first);
+    expect(resolveRegistryEmbedIdentity({ slug: "not-present" }, rows, rows)).toBeNull();
+    const warning = unresolvedRegistryEmbed("track", "ambiguous-legacy-slug");
+    expect(warning).toContain('data-wk-registry-reason="ambiguous-legacy-slug"');
+    expect(warning).not.toContain(first.slug);
+  });
+
+  it("parses canonical IDs and keeps old unique-slug syntax backward compatible", () => {
+    expect(transformTrackShortcodes(`[wk-track id="${first.id}"]`))
+      .toBe(`<!--WK_REGISTRY_TRACK_ID:${first.id}-->`);
+    expect(transformReleaseShortcodes(`[wk-release id="${second.id}"]`))
+      .toBe(`<!--WK_REGISTRY_RELEASE_ID:${second.id}-->`);
+    expect(transformTrackShortcodes('[wk-track slug="how-can-i-forget"]'))
+      .toBe('<!--WK_REGISTRY_TRACK:how-can-i-forget-->');
+    expect(transformReleaseShortcodes('[wk-release slug="balance" artist="one-artist"]'))
+      .toBe('<!--WK_REGISTRY_RELEASE:balance:one-artist:-->');
+  });
+
+  it("never falls back to slug when an explicit identity is invalid", () => {
+    for (const shortcode of [
+      '[wk-track id="bad-id" slug="how-can-i-forget"]',
+      '[wk-release id="bad-id" slug="balance"]',
+    ]) {
+      const transformed = shortcode.startsWith("[wk-track")
+        ? transformTrackShortcodes(shortcode)
+        : transformReleaseShortcodes(shortcode);
+      expect(transformed).toBe(shortcode);
+    }
+  });
+
+  it("binds editor selection and public resolution to IDs, not slugs", () => {
+    const trackSource = read("src/pages/magazine/article/components/ArticleTrackEmbeds.tsx");
+    const releaseSource = read("src/pages/magazine/article/components/ArticleReleaseEmbeds.tsx");
+    expect(editor).toContain('handleInsertTrackShortcode(\n                          track.id,');
+    expect(editor).toContain('handleInsertReleaseShortcode(release.id)');
+    expect(editor).toContain('[wk-track id="${id}"]');
+    expect(editor).toContain('[wk-release id="${id}"]');
+    for (const source of [trackSource, releaseSource]) {
+      expect(source).toContain('resolveRegistryEmbedIdentity(mk, exactRows, legacyRows)');
+      expect(source).toContain('.in("id", ids)');
+      expect(source).toContain('.in("slug", slugs)');
+      expect(source).toContain('"ambiguous-legacy-slug"');
+      expect(source).not.toContain("new Map(releaseRows.map((r) => [r.slug, r]))");
+      expect(source).not.toContain("new Map(trackRows.map((t) => [t.slug, t]))");
+    }
+    expect(trackSource).toContain("id: track.id,\n      registryTrackId: track.id");
+    expect(releaseSource).toContain("id: t.registryTrackId || t.isrc");
   });
 });

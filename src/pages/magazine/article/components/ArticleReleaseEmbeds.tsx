@@ -5,6 +5,7 @@ import { WkIcon } from "@/components/design-system/Icon";
 import { usePlayer } from "@/context/PlayerContext";
 import { releaseUrl, slugify } from "@/utils/releaseUrl";
 import { supabase } from "@/lib/supabase";
+import { resolveRegistryEmbedIdentity, unresolvedRegistryEmbed } from "@/utils/registryEmbedIdentity";
 import { RELEASE_MARKER_PREFIX } from "./ArticleEmbedUtils";
 
 /* ------------------------------------------------------------------ */
@@ -18,6 +19,7 @@ export interface TrackEmbedData {
   trackNumber: number;
   previewUrl?: string;
   isrc?: string;
+  registryTrackId?: string;
 }
 
 export interface ReleaseEmbedData {
@@ -280,6 +282,7 @@ async function enrichReleaseFromRegistry(
             duration: `${mins}:${String(secs).padStart(2, "0")}`,
             trackNumber: rt.track_number || idx + 1,
             previewUrl: t.preview_url || undefined,
+            registryTrackId: t.id,
             isrc: undefined,
           };
         }).filter(Boolean) as TrackEmbedData[];
@@ -345,65 +348,72 @@ export async function enrichAllReleasesFromRegistry(
 /*  Registry marker resolver  —  embeds placed from the admin editor   */
 /* ------------------------------------------------------------------ */
 
-const REGISTRY_MARKER_RE = /<!--WK_REGISTRY_RELEASE:([^:]+):([^:]*):([^>]*)-->/g;
+const REGISTRY_MARKER_RE =
+  /<!--WK_REGISTRY_RELEASE_ID:([0-9a-f-]+)-->|<!--WK_REGISTRY_RELEASE:([^:>]+):([^:]*):([^>]*)-->/gi;
 
 /**
- * Scans HTML for registry-release markers inserted by the admin editor,
- * fetches release data from Supabase, and merges them into the existing
- * releases array with proper segment markers.
+ * ID-bound new shortcodes bypass title/slug ambiguity. Legacy slugs render
+ * only when precisely one active Release matches, otherwise fail closed.
  */
 export async function resolveRegistryReleaseMarkers(
   markedHtml: string,
   existingReleases: ReleaseEmbedData[],
 ): Promise<{ markedHtml: string; releases: ReleaseEmbedData[] }> {
-  const markers: Array<{ fullMatch: string; slug: string; artistSlug: string; artistName: string }> = [];
-
+  const markers: Array<{
+    fullMatch: string; id: string | null; slug: string | null;
+    artistSlug: string; artistName: string;
+  }> = [];
+  const re = new RegExp(REGISTRY_MARKER_RE.source, "gi");
   let m: RegExpExecArray | null;
-  const re = new RegExp(REGISTRY_MARKER_RE.source, "g");
   while ((m = re.exec(markedHtml)) !== null) {
     markers.push({
       fullMatch: m[0],
-      slug: m[1],
-      artistSlug: m[2] || "",
-      artistName: decodeURIComponent(m[3] || ""),
+      id: m[1] || null,
+      slug: m[2] || null,
+      artistSlug: m[3] || "",
+      artistName: decodeURIComponent(m[4] || ""),
     });
   }
+  if (!markers.length) return { markedHtml, releases: existingReleases };
 
-  if (!markers.length) {
-    return { markedHtml, releases: existingReleases };
-  }
-
-  // Fetch release data for each marker
-  const slugs = markers.map((mk) => mk.slug);
-  const { data: releaseRows } = await supabase
-    .from("registry_releases")
-    .select("id, slug, title, release_type, release_date, artwork_url, label_id, description, metadata")
-    .eq("status", "active")
-    .in("slug", slugs);
-
-  if (!releaseRows?.length) {
-    // No registry data — strip markers, return unchanged
-    let stripped = markedHtml;
-    for (const mk of markers) {
-      stripped = stripped.replace(mk.fullMatch, "");
-    }
-    return { markedHtml: stripped, releases: existingReleases };
-  }
-
-  const releasesById = new Map(releaseRows.map((r) => [r.slug, r]));
+  const ids = [...new Set(markers.flatMap((mk) => mk.id ? [mk.id] : []))];
+  const slugs = [...new Set(markers.flatMap((mk) => mk.slug ? [mk.slug] : []))];
+  const [exactResult, legacyResult] = await Promise.all([
+    ids.length
+      ? supabase.from("registry_releases")
+        .select("id, slug, title, release_type, release_date, artwork_url, label_id, description, metadata")
+        .eq("status", "active").in("id", ids)
+      : Promise.resolve({ data: [], error: null }),
+    slugs.length
+      ? supabase.from("registry_releases")
+        .select("id, slug, title, release_type, release_date, artwork_url, label_id, description, metadata")
+        .eq("status", "active").in("slug", slugs)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  const exactRows = exactResult.error ? [] : exactResult.data || [];
+  const legacyRows = legacyResult.error ? [] : legacyResult.data || [];
+  const resolvedRows = markers.map((mk) =>
+    resolveRegistryEmbedIdentity(mk, exactRows, legacyRows));
   const newReleases: ReleaseEmbedData[] = [...existingReleases];
   let resultHtml = markedHtml;
 
-  for (const mk of markers) {
-    const row = releasesById.get(mk.slug);
+  for (const [index, mk] of markers.entries()) {
+    const row = resolvedRows[index];
     if (!row) {
-      resultHtml = resultHtml.replace(mk.fullMatch, "");
+      const count = mk.slug ? legacyRows.filter((candidate) => candidate.slug === mk.slug).length : 0;
+      resultHtml = resultHtml.replace(
+        mk.fullMatch,
+        unresolvedRegistryEmbed(
+          "release",
+          mk.id ? "missing-id" : count > 1 ? "ambiguous-legacy-slug" : "missing-legacy-slug",
+        ),
+      );
       continue;
     }
 
     // Fetch primary artist if not already provided in the marker
-    let artistName = mk.artistName;
-    let artistSlug = mk.artistSlug;
+    let artistName = mk.id ? "" : mk.artistName;
+    let artistSlug = mk.id ? "" : mk.artistSlug;
 
     if (!artistName || !artistSlug) {
       const { data: artistLinks } = await supabase
@@ -421,7 +431,7 @@ export async function resolveRegistryReleaseMarkers(
     }
 
     if (!artistName) {
-      resultHtml = resultHtml.replace(mk.fullMatch, "");
+      resultHtml = resultHtml.replace(mk.fullMatch, unresolvedRegistryEmbed("release", "missing-id"));
       continue;
     }
 
@@ -472,6 +482,7 @@ export async function resolveRegistryReleaseMarkers(
           duration: `${mins}:${String(secs).padStart(2, "0")}`,
           trackNumber: rt.track_number || idx + 1,
           previewUrl: t.preview_url || undefined,
+          registryTrackId: t.id,
           isrc: undefined,
         };
       }).filter(Boolean) as TrackEmbedData[];
@@ -550,7 +561,8 @@ export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmb
     release.tracks
       .filter((t) => t.previewUrl)
       .map((t) => ({
-        id: t.isrc || `${release.title}-${t.title}`,
+        id: t.registryTrackId || t.isrc || `${release.title}-${t.title}`,
+        registryTrackId: t.registryTrackId,
         title: t.title,
         artist: t.artist,
         artworkUrl: release.artworkUrl,
@@ -563,7 +575,8 @@ export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmb
     if (!track.previewUrl) return;
 
     const playerTrack = {
-      id: track.isrc || `${release.title}-${track.title}`,
+      id: track.registryTrackId || track.isrc || `${release.title}-${track.title}`,
+      registryTrackId: track.registryTrackId,
       title: track.title,
       artist: track.artist,
       artworkUrl: release.artworkUrl,
@@ -615,7 +628,7 @@ export function ReleaseEmbedCard({ release, articleSlug }: { release: ReleaseEmb
           onPlay={(event) => { event.stopPropagation(); handlePlayReleasePreview(); }}
           disabled={!hasPreview}
           isPlaying={Boolean(currentTrack && release.tracks.some((track) =>
-            currentTrack.id === (track.isrc || `${release.title}-${track.title}`))) && isPlaying}
+            currentTrack.id === (track.registryTrackId || track.isrc || `${release.title}-${track.title}`))) && isPlaying}
           className="h-[76px] w-[76px] shrink-0 rounded-xl bg-[var(--wk-surface-raised)] sm:h-[96px] sm:w-[96px]">
           {release.artworkUrl ? (
             <img src={release.artworkUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />

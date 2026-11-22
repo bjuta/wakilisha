@@ -1,3 +1,5 @@
+import { REGISTRY_UUID_RE } from "@/utils/registryEmbedIdentity";
+
 /**
  * Release Shortcode Transformer
  *
@@ -17,6 +19,7 @@
 const SHORTCODE_RE = /\[wk-release\s+([^\]]+)\]/gi;
 
 function parseShortcodeArgs(argsRaw: string): {
+  id: string | null;
   slug: string | null;
   artistSlug: string | null;
   artistName: string | null;
@@ -25,7 +28,8 @@ function parseShortcodeArgs(argsRaw: string): {
   const artistSlug: string | null = null;
   const artistName: string | null = null;
 
-  const result: { slug: string | null; artistSlug: string | null; artistName: string | null } = {
+  const result: { id: string | null; slug: string | null; artistSlug: string | null; artistName: string | null } = {
+    id: null,
     slug,
     artistSlug,
     artistName,
@@ -65,6 +69,7 @@ function parseShortcodeArgs(argsRaw: string): {
     if (eqMatch) {
       const key = eqMatch[1].toLowerCase();
       const value = eqMatch[2].trim();
+      if (key === "id" || key === "release_id") result.id = value;
       if (key === "slug" || key === "release") result.slug = value;
       if (key === "artist" || key === "artist_slug") result.artistSlug = value;
       if (key === "artist_name" || key === "name") result.artistName = value;
@@ -94,7 +99,11 @@ export function transformReleaseShortcodes(html: string): string {
 
   return html.replace(SHORTCODE_RE, (match, argsRaw) => {
     const args = parseShortcodeArgs(argsRaw.trim());
-    if (!args.slug) return match; // Can't parse — leave as-is
+    if (args.id) {
+      if (!REGISTRY_UUID_RE.test(args.id)) return match; // No slug fallback for invalid exact identity.
+      return `<!--WK_REGISTRY_RELEASE_ID:${args.id.toLowerCase()}-->`;
+    }
+    if (!args.slug || !/^[a-z0-9_-]+$/i.test(args.slug)) return match;
 
     const artistSlug = args.artistSlug || "";
     const artistName = encodeURIComponent(args.artistName || "");
