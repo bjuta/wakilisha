@@ -142,7 +142,7 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(drawer).toContain("visibleWakilishaNavigation");
     const menu = read("src/components/navigation/wakilishaNavigation.ts");
     expect(menu).not.toContain('{ label: "Settings", to: "/settings"');
-    expect(read("src/components/mobile/MobileAccountDrawer.tsx")).toContain('to="/settings"');
+    expect(drawer).toContain('{ to: "/settings", icon: "Settings" as const, label: "Settings", available: signedIn }');
     expect(drawer).toContain('startInYou');
 
 
@@ -442,7 +442,8 @@ describe("Workbook v4 is the only active product design authority", () => {
 
     expect(video).toContain('getPublicVideoIndex()');
     expect(video).toContain('aria-label="Video formats"');
-    expect(video).toContain('const latestItems = query.trim() || format !== "all" ? items : items.slice(1)');
+    expect(video).toContain('const featured = query.trim() || format !== "all" ? null : items[0] ?? null;');
+    expect(video).toContain('const remaining = featured ? items.slice(1) : items;');
     expect(audio).toContain('getPublicAudioIndex(24)');
     expect(audio).toContain('publicAudioPlayerItem(publication)');
     expect(shows).toContain('getPublicShowIndex(48)');
