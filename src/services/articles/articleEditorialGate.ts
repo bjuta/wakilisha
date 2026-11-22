@@ -208,8 +208,9 @@ export function deriveArticleEditorialGate(input: ArticleEditorialGateInput): Ar
     } else if (isDirty) {
       publishDisabledReason = "Save your current changes before publishing the approved Article version.";
     } else if (workingChangesNeedReview) {
-      publishDisabledReason =
-        "The working Article changed since its last reviewed version. Submit the updated version for approval; the current publication remains live.";
+      publishDisabledReason = published
+        ? "The working Article changed since its last reviewed version. Submit the updated version for approval; the current publication remains live."
+        : "The working Article changed since its last reviewed version. Resubmit the current version for approval.";
     } else if (awaitingReview) {
       publishDisabledReason = "The submitted Article version is awaiting a new review decision.";
     } else if (latestReviewAction === "approved") {
