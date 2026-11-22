@@ -62,6 +62,21 @@ const adminSeo =
   );
 
 describe("incident-safe offline SEO build", () => {
+  it("uses exact active publication snapshots for Article social metadata and excludes drafts", () => {
+    expect(seoEdge).toContain('db.from("wk_article_publication_snapshots").select(');
+    expect(seoEdge).toContain('.eq("is_active", true).limit(5000)');
+    expect(seoEdge).toContain('source_table: "wk_article_publication_snapshots"');
+    expect(seoEdge).toContain('sourceTable === "wk_article_publication_snapshots"');
+    expect(seoEdge).toContain('wk_article_publication_snapshots: "id, article_id, resource_id, version_id, slug, title, excerpt, seo');
+    expect(seoEdge).toContain('const publishedSeoDescription');
+    expect(seoEdge).toContain('const publishedSeoTitle');
+    expect(seoEdge).toContain('"hero_image_url"');
+    expect(seoEdge).toContain("Published Article sitemap authority unavailable");
+    expect(seoEdge).toContain("SEO metadata lookup failed closed");
+    expect(seoEdge).not.toContain('db.from("wk_articles").select("id, slug, modified_at, published_at").eq("wp_status", "publish")');
+  });
+
+
   it("preserves the exact library-selected media identity in Article versions", () => {
     const panel = readFileSync(
       "src/pages/admin/content/articles/detail/components/ArticleMetaPanel.tsx", "utf8",
