@@ -526,6 +526,29 @@ function articleManifestsFromRows(stories) {
   return {imageByPath, metadataByPath};
 }
 
+function assertFreshGovernedViteShell(root = DIST_DIR) {
+  const stack = [root];
+  const forbidden = new Set([
+    "seo-metadata-manifest.json",
+    "public-magazine-fallback.json",
+    "sitemap.xml",
+    "wakilisha-accepted-prerender-index.json",
+  ]);
+  while (stack.length) {
+    const directory = stack.pop();
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isSymbolicLink()) throw new Error("Governed source shell contains a symlink");
+      if (entry.isDirectory()) {stack.push(absolute); continue;}
+      const relative = path.relative(root, absolute).replaceAll(path.sep, "/");
+      if ((entry.name === "index.html" && relative !== "index.html") ||
+          forbidden.has(relative)) {
+        throw new Error("Governed candidate requires a fresh Vite shell, not a prior SEO snapshot: " + relative);
+      }
+    }
+  }
+}
+
 function activateGovernedOfflineProjection(projection) {
   DB_METADATA_BY_PATH = mapFromDbMetadata(projection.metadata);
   const articleManifests = articleManifestsFromRows(projection.articles);
@@ -1983,6 +2006,7 @@ async function main() {
   }
   const offlineMode = process.argv[2] === "--governed-offline";
   if (offlineMode) {
+    assertFreshGovernedViteShell();
     const projection = readGovernedOfflineProjection();
     activateGovernedOfflineProjection(projection);
     writeDbMetadataManifest(projection.metadata);
@@ -2075,7 +2099,7 @@ async function main() {
   if (offlineMode) console.log("PUBLICATION_ACTIVATION_AUTHORITY=NONE");
 }
 
-export {readGovernedOfflineProjection, activateGovernedOfflineProjection, articleManifestsFromRows, seoBlockForPath, htmlForPath};
+export {readGovernedOfflineProjection, assertFreshGovernedViteShell, activateGovernedOfflineProjection, articleManifestsFromRows, seoBlockForPath, htmlForPath};
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
