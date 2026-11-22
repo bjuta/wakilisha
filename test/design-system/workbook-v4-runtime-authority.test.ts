@@ -202,7 +202,23 @@ describe("Workbook v4 is the only active product design authority", () => {
       type: "track",
       title: "A Track",
       subtitle: "Its Artist",
-    })).toBe("Its Artist");
+      description: "Ignore an unrelated description",
+    })).toBe("A Track by Its Artist");
+    expect(shareTextForItem({
+      type: "album",
+      title: "An Album",
+      subtitle: "Its Artist",
+    })).toBe("An Album by Its Artist");
+    expect(shareTextForItem({
+      type: "post",
+      title: "Post from Artist",
+      description: "The artist's actual message",
+    })).toBe("The artist's actual message");
+    expect(shareTextForItem({
+      type: "playlist",
+      title: "Best of the Year",
+      subtitle: "A Curator",
+    })).toBe("Best of the Year");
 
     expect(canonicalArticleShareUrl("album-review-alusa-continua"))
       .toBe("https://wakilisha.africa/magazine/album-review-alusa-continua");
