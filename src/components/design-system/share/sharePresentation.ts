@@ -43,6 +43,40 @@ export function canonicalArticleShareUrl(slug: string): string {
   return `${PUBLIC_ORIGIN}/magazine/${encodeURIComponent(slug.trim())}`;
 }
 
+/**
+ * X and other social crawlers cache card metadata by shared URL. Different
+ * immutable *published snapshot* IDs must produce different share URLs while
+ * the Article canonical URL and on-site SEO identity remain unchanged.
+ *
+ * This key is stable for a published version (no random cache-busting or
+ * per-share churn). The snapshot UUID already appears in the public Article
+ * response. Never version draft/preview URLs or an unrelated route.
+ */
+export function publishedArticleCardUrl(
+  baseUrl: string,
+  publishedSnapshotId: string | null | undefined,
+): string {
+  const id = (publishedSnapshotId ?? "").trim();
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id)) {
+    return baseUrl;
+  }
+
+  try {
+    const parsed = new URL(baseUrl);
+    if (
+      parsed.origin !== PUBLIC_ORIGIN ||
+      !/^\/magazine\/[a-z0-9]+(?:[-_][a-z0-9]+)*$/i.test(parsed.pathname) ||
+      parsed.searchParams.has("preview")
+    ) {
+      return baseUrl;
+    }
+    parsed.searchParams.set("wk_card_v", id.toLowerCase());
+    return parsed.toString();
+  } catch {
+    return baseUrl;
+  }
+}
+
 /** Only public HTTP(S) image URLs may be handed to third-party share services. */
 export function shareImageUrl(raw: string | null | undefined): string | undefined {
   if (!raw?.trim()) return undefined;
