@@ -764,7 +764,7 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     authors,
     chartPrograms,
   ] = await Promise.all([
-    db.from("wk_articles").select("id, slug, modified_at, published_at").eq("wp_status", "publish").limit(5000),
+    db.from("wk_article_publication_snapshots").select("id, article_id, version_id, slug, modified_at, published_at").eq("is_active", true).limit(5000),
     fetchPublishedPlaylists(db),
     fetchPublicPeople(db),
     fetchPublicOrganizations(db),
@@ -844,12 +844,13 @@ async function buildInternalItems(db: ReturnType<typeof createClient>): Promise<
     db.from("wk_chart_programs_v2").select("id, public_slug, market_slug, updated_at").limit(500),
   ]);
 
+  if (articles.error) throw new Error("Published Article sitemap authority unavailable: " + articles.error.message);
   for (const row of articles.data ?? []) {
     items.push({
       loc: makeUrl(`/magazine/${row.slug}`),
       lastmod: dateOnly(row.modified_at || row.published_at),
       url_type: "article",
-      source_table: "wk_articles",
+      source_table: "wk_article_publication_snapshots",
       source_id: String(row.id),
     });
   }
@@ -1336,6 +1337,7 @@ function imageValue(row: Record<string, unknown> | null | undefined) {
   const direct = absoluteImageUrl(firstText(
     row,
     [
+      "hero_image_url",
       "hero_url",
       "heroUrl",
       "featured_image_url",
@@ -1357,6 +1359,7 @@ function imageValue(row: Record<string, unknown> | null | undefined) {
       "spotify_album_image_url"
     ],
     [
+      "hero_image_url",
       "hero_url",
       "heroUrl",
       "featured_image_url",
@@ -1451,12 +1454,17 @@ function buildSeoMetadataEntry(
     };
   }
 
-  if (sourceTable === "wk_articles") {
+  if (sourceTable === "wk_article_publication_snapshots") {
+    // Publication authority is the immutable active snapshot, never the editable Article row.
     const title = firstText(row, ["title", "post_title", "wp_title", "headline", "seo_title"], ["title", "headline", "seo_title"], last);
+    const seo = row?.seo && typeof row.seo === "object" && !Array.isArray(row.seo) ? row.seo as Record<string, unknown> : {};
+    const publishedSeoDescription = String(seo.description || "").trim();
+    const publishedSeoTitle = String(seo.title || "").trim();
     return {
       title,
       entityName: title,
-      description: descriptionValue(row, `Read ${title} on WAKILISHA, with context from African music, charts, artists, and culture.`),
+      description: publishedSeoDescription || descriptionValue(row, `Read ${title} on WAKILISHA, with context from African music, charts, artists, and culture.`),
+      ...(publishedSeoTitle ? { socialTitle: publishedSeoTitle } : {}),
       robots: "index, follow",
       ogType: "article",
       kind: "article",
@@ -1909,6 +1917,7 @@ async function buildProviderImageMap(db: ReturnType<typeof createClient>, entity
 }
 
 const SEO_METADATA_DETAIL_PROJECTIONS: Record<string, string> = {
+  wk_article_publication_snapshots: "id, article_id, resource_id, version_id, slug, title, excerpt, seo, author, published_at, modified_at, hero_image_url, hero_image_id, is_active, wp_status, updated_at",
   registry_tracks: "id, slug, title, normalized_title, artwork_url, metadata, created_at, updated_at",
   registry_releases: "id, slug, title, normalized_title, release_date, artwork_url, description, metadata, created_at, updated_at",
 };
@@ -1929,8 +1938,7 @@ async function fetchRowsById(db: ReturnType<typeof createClient>, table: string,
       .limit(batch.length);
 
     if (error) {
-      console.warn(`SEO metadata lookup failed for ${table}: ${error.message}`);
-      return new Map<string, Record<string, unknown>>();
+      throw new Error(`SEO metadata lookup failed closed for ${table}: ${error.message}`);
     }
 
     rows.push(...(data || []));
