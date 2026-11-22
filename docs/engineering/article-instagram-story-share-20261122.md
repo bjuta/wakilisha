@@ -6,7 +6,7 @@
 
 ## Design authority
 
-The current Article hero is the reference. Use the exact editor-selected featured image, full-bleed at 1080 × 1920 with object-fit: cover and a dark photographic text scrim. Use the existing CSS variables for Figtree display/body fonts and brand green (#85C441), and match the Article hero's heavy white, tight-spaced editorial headline. Keep the category, credited author, and stored reading time over the artwork. The export has no white frame, separate card, watermark substitution, or fabricated text. Preserve safe room near the top and bottom for Instagram interface controls.
+The current Article hero is the reference. Use the exact editor-selected featured image, full-bleed at 1080 × 1920 with object-fit: cover and a dark photographic text scrim. Use the existing CSS variables for Figtree display/body fonts and brand green (#85C441), and match the Article hero's heavy white, tight-spaced editorial headline. The header must draw the site's existing `public/assets/logos/wakilisha-logo-dark.svg` directly onto the canvas, not recreate the brand in Figtree text or invent a standalone symbol. Keep the green `MAGAZINE` descriptor beneath the actual SVG logo, and keep the category, credited author, and stored reading time over the artwork. The export has no white frame, separate card, watermark substitution, or fabricated text. Preserve safe room near the top and bottom for Instagram interface controls.
 
 The rendered JPEG is both the in-app preview and the outgoing file, so the preview cannot diverge from the actual saved/shareable image. Source image read access must pass cross-origin canvas rules; never replace a selected published image with an unrelated fallback or export a tainted canvas.
 
@@ -27,7 +27,7 @@ This is independent of the ongoing #1377 SEO publication snapshot lifecycle and 
 
 ## Acceptance and release
 
-1. Extend existing Workbook share contract. Check full-bleed crop geometry, output dimensions, brand font/color usage, published-only gating, metadata propagation, image/URL handling, and honest Instagram behavior. Avoid adding a separate permanent CI suite.
+1. Extend existing Workbook share contract. Check full-bleed crop geometry, output dimensions, real public SVG logo loading and drawing, brand font/color usage, published-only gating, metadata propagation, image/URL handling, and honest Instagram behavior. Avoid adding a separate permanent CI suite.
 2. Verify rendered 1080 × 1920 JPEG from a real published Article with square, portrait, and landscape hero images and both short and long titles. Compare each preview pixel-for-pixel with the downloaded image.
 3. On real iOS Safari and Android Chrome, verify download, OS share availability/fallback, clipboard access, Link sticker workflow, and no false claims of publishing.
 4. On desktop, verify preview, download, and copied link. Confirm keyboard support, close/reopen behavior, image load failures, and no object URL leaks.
