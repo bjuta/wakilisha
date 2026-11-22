@@ -1280,6 +1280,7 @@ export function ArticleEditorWorkspace({
         }
       }
 
+      setReviewActionNote("");
       addToast("success", "Submitted for review.");
     } finally {
       setIsSaving(false);
