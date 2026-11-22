@@ -62,6 +62,32 @@ const adminSeo =
   );
 
 describe("incident-safe offline SEO build", () => {
+  it("preserves the exact library-selected media identity in Article versions", () => {
+    const panel = readFileSync(
+      "src/pages/admin/content/articles/detail/components/ArticleMetaPanel.tsx", "utf8",
+    );
+    const editor = readFileSync(
+      "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx", "utf8",
+    );
+    const service = readFileSync(
+      "src/services/articles/articleAdminService.ts", "utf8",
+    );
+    expect(panel).toContain("onHeroImageSave?.(url, assetId)");
+    expect(panel).toContain("onHeroImageSave?.(heroUrlInput, null)");
+    expect(panel).toContain('onHeroImageSave?.("", null)');
+    expect(editor).toContain("hero_image_url: url || null, hero_image_id: assetId");
+    expect(service).toContain("hero_image_id?: string | null");
+  });
+
+  it("does not invent social-image dimensions for editorial media", () => {
+    const client = readFileSync("src/components/seo/MetaTags.tsx", "utf8");
+    expect(client).not.toContain('setMetaTag("og:image:width", "1200")');
+    expect(client).not.toContain('setMetaTag("og:image:height", "630")');
+    expect(prerender).not.toContain('<meta property="og:image:width" content="1200" />');
+    expect(prerender).not.toContain('<meta property="og:image:height" content="630" />');
+    expect(prerender).toContain('<meta property="og:image" content="${escapeAttr(image)}" />');
+  });
+
   it("keeps the default build entirely off live SEO and public-content functions", () => {
     const build = JSON.parse(readFileSync("package.json", "utf8")).scripts.build as string;
     const restore = readFileSync("scripts/seo/restore-accepted-prerender.mjs", "utf8");

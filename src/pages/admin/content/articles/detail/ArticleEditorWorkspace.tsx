@@ -1309,7 +1309,7 @@ export function ArticleEditorWorkspace({
     setTimeout(() => navigate(returnPath), 1000);
   }
 
-  async function handleSaveHeroImage(url: string) {
+  async function handleSaveHeroImage(url: string, assetId: string | null = null) {
     if (!articlePermissions.canEdit) {
       addToast("error", articlePermissions.reason ?? "Permission denied.");
       return;
@@ -1322,7 +1322,7 @@ export function ArticleEditorWorkspace({
     try {
       const result = await saveArticle(
         article.id,
-        { hero_image_url: url || null },
+        { hero_image_url: url || null, hero_image_id: assetId },
         articleDraftVersionRef.current ?? article.draftVersion,
       );
 

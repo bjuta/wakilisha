@@ -1803,8 +1803,6 @@ function seoBlockForPath(pagePath) {
     <meta property="og:url" content="${escapeAttr(url)}" />
     <meta property="og:image" content="${escapeAttr(image)}" />
     <meta property="og:image:secure_url" content="${escapeAttr(image)}" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="${escapeAttr(schemaEntityName(model))}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@wakilisha" />

@@ -58,7 +58,7 @@ interface Props {
   lastAutosavedAt?: string | null;
   heroImageUrl?: string;
   isSavingHero?: boolean;
-  onHeroImageSave?: (url: string) => void;
+  onHeroImageSave?: (url: string, assetId?: string | null) => void;
   onAuthorChange: (v: string) => void;
   onCategoriesChange: (v: string[]) => void;
   onTagsChange: (v: string[]) => void;
@@ -935,7 +935,7 @@ export function ArticleMetaPanel({
               onError={() => setHeroPreviewError(true)}
             />
             <button
-              onClick={() => { setHeroUrlInput(""); setHeroPreviewError(false); onHeroImageSave?.(""); }}
+              onClick={() => { setHeroUrlInput(""); setHeroPreviewError(false); onHeroImageSave?.("", null); }}
               className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-black/60 text-white hover:bg-black/80 transition-colors"
               title="Remove hero image"
             >
@@ -963,10 +963,10 @@ export function ArticleMetaPanel({
               label="Browse Library"
               title="Select Hero Image"
               className="flex-1 justify-center py-2 text-[12px] hover:bg-[var(--wk-surface-raised)]"
-              onSelect={(assetId, url) => { setHeroUrlInput(url); setHeroPreviewError(false); onHeroImageSave?.(url); }}
+              onSelect={(assetId, url) => { setHeroUrlInput(url); setHeroPreviewError(false); onHeroImageSave?.(url, assetId); }}
             />
             <button
-              onClick={() => onHeroImageSave?.(heroUrlInput)}
+              onClick={() => onHeroImageSave?.(heroUrlInput, null)}
               disabled={isSavingHero || heroUrlInput === heroImageUrl}
               className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-wk-brand bg-wk-brand-soft py-2 text-[12px] font-semibold text-wk-brand hover:bg-wk-brand hover:text-wk-brand-on disabled:opacity-40 transition-colors"
             >

@@ -108,6 +108,7 @@ export interface ArticleSavePayload {
   seo?: Record<string, unknown>;
   wp_status?: string;
   hero_image_url?: string | null;
+  hero_image_id?: string | null;
   slug?: string;
 }
 
