@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { SURFACES, verifyReceipt, differences, extractSeo, auditArtifact } from "../../scripts/seo/verify-governed-publication.mjs";
-import { readGovernedOfflineProjection, activateGovernedOfflineProjection, seoBlockForPath, htmlForPath } from "../../scripts/seo/prerender-metadata.mjs";
+import { readGovernedOfflineProjection, assertFreshGovernedViteShell, activateGovernedOfflineProjection, seoBlockForPath, htmlForPath } from "../../scripts/seo/prerender-metadata.mjs";
 
 import {
   readFileSync,
@@ -142,6 +142,24 @@ describe("governed offline SEO projection and selected Article image authority",
         ...inputs,
         WAKILISHA_GOVERNED_SEO_PROJECTION_SHA256: crypto.createHash("sha256").update(payload).digest("hex"),
       })).toThrow("Incomplete or unapproved");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses to carry retired or stale route HTML into a new governed candidate", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "wk-fresh-vite-seo-"));
+    try {
+      writeFileSync(path.join(root, "index.html"), "<html><head></head></html>");
+      mkdirSync(path.join(root, "assets"));
+      writeFileSync(path.join(root, "assets", "index-hash.js"), "/* fixture */");
+      expect(() => assertFreshGovernedViteShell(root)).not.toThrow();
+      mkdirSync(path.join(root, "magazine", "retired"), { recursive: true });
+      writeFileSync(path.join(root, "magazine", "retired", "index.html"), "stale");
+      expect(() => assertFreshGovernedViteShell(root)).toThrow("fresh Vite shell");
+      rmSync(path.join(root, "magazine"), { recursive: true, force: true });
+      writeFileSync(path.join(root, "seo-metadata-manifest.json"), "{}");
+      expect(() => assertFreshGovernedViteShell(root)).toThrow("fresh Vite shell");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
