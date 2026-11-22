@@ -29,3 +29,16 @@ export function shareTextForItem(item: SharePresentationSource): string {
 export function canonicalArticleShareUrl(slug: string): string {
   return `${PUBLIC_ORIGIN}/magazine/${encodeURIComponent(slug.trim())}`;
 }
+
+/** Only public HTTP(S) image URLs may be handed to third-party share services. */
+export function shareImageUrl(raw: string | null | undefined): string | undefined {
+  if (!raw?.trim()) return undefined;
+  try {
+    const url = new URL(raw, PUBLIC_ORIGIN);
+    if (!["https:", "http:"].includes(url.protocol)) return undefined;
+    if (url.username || url.password) return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
