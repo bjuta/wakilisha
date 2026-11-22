@@ -1,5 +1,5 @@
 import { collectWithClient, DEFINITIONS as SOURCE_SCAN_TABLES, stableJson as stableSourceJson, exactEnvironment as exactSourceEnvironment } from "../../scripts/seo/collect-governed-publication-source.mjs";
-import { FORMAT as MANAGED_SCAN_FORMAT, managedSourceSql, verifyManagedEvidence } from "../../scripts/seo/collect-governed-managed-sql.mjs";
+import { FORMAT as MANAGED_SCAN_FORMAT, managedSourceSql, verifyManagedEvidence, validateReplay } from "../../scripts/seo/collect-governed-managed-sql.mjs";
 
 import crypto from "node:crypto";
 import tls from "node:tls";
@@ -740,6 +740,17 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
       expect(JSON.stringify(accepted)).not.toContain("secret");
       expect(verifyManagedEvidence({ evidence: make() }, root).sourceEpoch)
         .toBe(accepted.sourceEpoch);
+      const replay = {
+        ...verifyManagedEvidence({ evidence: make() }, root),
+        capturedAt: "2026-11-22T12:01:00.000Z",
+      };
+      expect(validateReplay(accepted,replay).sourceEpoch).toBe(accepted.sourceEpoch);
+      expect(validateReplay(accepted,replay).publicationActivationAuthority).toBe(false);
+      expect(() => validateReplay(accepted,{...replay,sourceEpoch:"b".repeat(64)}))
+        .toThrow("state changed");
+      expect(() => validateReplay(accepted,{...replay,capturedAt:"2026-11-22T12:20:00.000Z"}))
+        .toThrow("too far apart");
+
 
       const denied = make();
       denied.role = "postgres";
