@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { canonicalArticleShareUrl, shareTextForItem } from "../../src/components/design-system/share/sharePresentation";
 
 const read = (name: string) => readFileSync(name, "utf8");
 
@@ -184,6 +185,38 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(card).not.toContain('ri-bookmark-line');
     expect(card).toContain('const why = story.dek || ""');
     expect(card.match(/data-wk-magazine-story/g)).toHaveLength(4);
+  });
+
+  it("keeps Magazine sharing headline-first, canonical and image-bound across devices", () => {
+    const mobile = read("src/pages/mobile/magazine/article/page.tsx");
+    const desktop = read("src/pages/magazine/article/page.tsx");
+    const share = read("src/components/design-system/share/ShareSheet.tsx");
+
+    expect(shareTextForItem({
+      type: "article",
+      title: "Album Review: Alusa Continua",
+      subtitle: "Hafare Segelan",
+      description: "An editorial teaser, not the headline",
+    })).toBe("Album Review: Alusa Continua");
+    expect(shareTextForItem({
+      type: "track",
+      title: "A Track",
+      subtitle: "Its Artist",
+    })).toBe("Its Artist");
+
+    expect(canonicalArticleShareUrl("album-review-alusa-continua"))
+      .toBe("https://wakilisha.africa/magazine/album-review-alusa-continua");
+    for (const page of [desktop, mobile]) {
+      expect(page).toContain("url: canonicalArticleShareUrl(article.slug)");
+      expect(page).toContain("imageUrl: article.heroUrl");
+      expect(page).toContain("url: canonicalArticleShareUrl(article.slug),");
+      expect(page).not.toContain('url: typeof window !== "undefined" ? window.location.href : ""');
+    }
+    expect(mobile).toContain("subtitle: article.author");
+    expect(desktop).toContain("subtitle: article.dek");
+    expect(share.match(/shareTextForItem\(item\)/g)).toHaveLength(2);
+    expect(share).not.toContain('key: "messenger"');
+    expect(share).not.toContain("app_id=0");
   });
 
   it("presents one share affordance on each article route without rounded paper", () => {
