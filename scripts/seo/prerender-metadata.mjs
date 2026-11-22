@@ -493,9 +493,16 @@ function readGovernedOfflineProjection(options = process.env) {
         throw new Error("Nonpublic Article selected Media URL: " + articlePath);
       }
     }
-    if (!projection.metadata[articlePath]) {
-      throw new Error("Governed Article missing authoritative metadata route: " + articlePath);
+    const published = projection.metadata[articlePath];
+    if (!published || published.sourceTable !== "wk_article_publication_snapshots" ||
+        String(published.sourceId || "") !== String(article.id || "")) {
+      throw new Error("Governed Article source must match the active immutable publication snapshot: " + articlePath);
     }
+  }
+  const publishedRouteCount = Object.values(projection.metadata)
+    .filter(row => row?.sourceTable === "wk_article_publication_snapshots").length;
+  if (publishedRouteCount !== projection.articles.length) {
+    throw new Error("Governed Article metadata/list membership divergence");
   }
   return projection;
 }
