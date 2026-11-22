@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import { SURFACES, verifyReceipt, differences, extractSeo, auditArtifact } from "../../scripts/seo/verify-governed-publication.mjs";
 import { readGovernedOfflineProjection, assertFreshGovernedViteShell, activateGovernedOfflineProjection, seoBlockForPath, htmlForPath } from "../../scripts/seo/prerender-metadata.mjs";
 import { assemble as assembleGovernedProjection, stableJson as stableManagedJson, managedMagazineSql, verifyManagedMagazineEvidence } from "../../scripts/seo/assemble-governed-publication-projection.mjs";
+import { sql as magazinePublicationSql, validateCapture as validateMagazinePublicationCapture, verifySourcePair as verifyMagazinePublicationReplay, makeArticleMetadata as makeMagazinePublicationMetadata } from "../../scripts/seo/publish-magazine-snapshots.mjs";
 
 import {
   readFileSync,
@@ -62,6 +63,74 @@ const adminSeo =
     "src/pages/admin/settings/seo/page.tsx",
     "utf8",
   );
+
+describe("bounded, immutable Magazine publication onto accepted static HTML", () => {
+  const article={
+    id:"cfbcb1a2-f9e7-4d6c-8db9-aa0b2ffed343",
+    slug:"album-review-alusa-continua",title:"Album Review: Alusa Continua",
+    author:"Hafare Segelan",excerpt:"Published description",
+    seo:{title:"Social review",description:"Published review"},
+    heroUrl:"https://media.wakilisha.africa/uploads/selected.webp",
+    publishedAt:"2026-11-22T07:59:32.784Z",modifiedAt:"2026-11-22T08:05:00.000Z",
+  };
+  const capture=(time="2026-11-22T09:00:00.000Z")=>({
+    evidence:{protocol:"wakilisha-public-article-read-v1",
+      projectRef:"pgzizndxdyhqmtyywjmt",role:"supabase_read_only_user",
+      transactionReadOnly:"on",capturedAt:time,
+      count:1,articles:[structuredClone(article)],overrides:[]},
+  });
+  it("emits exactly a bounded SELECT on published snapshots and approved overrides",()=>{
+    const sql=magazinePublicationSql();
+    expect(sql).toContain("FROM public.wk_article_publication_snapshots");
+    expect(sql).toContain("WHERE is_active = true AND wp_status = 'publish'");
+    expect(sql).toContain("FROM public.seo_content_overrides");
+    expect(sql).toContain("LIMIT 501");
+    expect(sql).not.toMatch(/\\b(?:INSERT|UPDATE|DELETE|TRUNCATE|CALL|PERFORM)\\b/i);
+    expect(sql).not.toMatch(/registry_artists|registry_releases|registry_tracks|publish_due_article_publications/);
+  });
+  it("replays identical entire published Magazine source under managed read-only role",()=>{
+    const evidence=verifyMagazinePublicationReplay(
+      capture(),capture("2026-11-22T09:02:00.000Z"));
+    expect(evidence.capture.articles).toHaveLength(1);
+    expect(evidence.sourceEpoch).toMatch(/^[a-f0-9]{64}$/);
+  });
+  it("rejects writer privilege, incomplete rowset and changed source epoch",()=>{
+    const writer=capture();writer.evidence.role="postgres";
+    expect(()=>validateMagazinePublicationCapture(writer)).toThrow("unauthorised");
+    const torn=capture();torn.evidence.count=2;
+    expect(()=>validateMagazinePublicationCapture(torn)).toThrow("Incomplete");
+    const revised=capture("2026-11-22T09:02:00.000Z");
+    revised.evidence.articles[0].heroUrl="https://media.wakilisha.africa/uploads/other.webp";
+    expect(()=>verifyMagazinePublicationReplay(capture(),revised)).toThrow("changed during");
+  });
+  it("keeps unrelated Registry metadata intact and detects retired Article routes",()=>{
+    const live=capture().evidence;
+    live.overrides=[{
+      targetUrl:"https://wakilisha.africa/magazine/album-review-alusa-continua",
+      title:"Approved SEO title",description:"Approved description",
+      socialTitle:"Approved social",socialDescription:"Approved social copy",
+    }];
+    const baseline={
+      "/artists/unchanged":{title:"Keep this Artist unchanged"},
+      "/magazine/old-removed":{sourceTable:"wk_articles",kind:"article",title:"Prior"},
+    };
+    const result=makeMagazinePublicationMetadata(live,baseline);
+    expect(result.retired).toEqual(["/magazine/old-removed"]);
+    expect(result.metadata["/artists/unchanged"]).toEqual(baseline["/artists/unchanged"]);
+    const updated=result.metadata["/magazine/album-review-alusa-continua"];
+    expect(updated.sourceTable).toBe("wk_article_publication_snapshots");
+    expect(updated.sourceId).toBe(article.id);
+    expect(updated.image).toBe(article.heroUrl);
+    expect(updated.description).toBe("Approved description");
+    expect(updated.socialTitle).toBe("Approved social");
+  });
+  it("rejects an unsafe selected image without inventing one where none exists",()=>{
+    const absent=capture();absent.evidence.articles[0].heroUrl="";
+    expect(validateMagazinePublicationCapture(absent).articles).toHaveLength(1);
+    const invalid=capture();invalid.evidence.articles[0].heroUrl="http://unsafe.example/image.jpg";
+    expect(()=>validateMagazinePublicationCapture(invalid)).toThrow("Invalid");
+  });
+});
 
 describe("governed offline SEO projection and selected Article image authority", () => {
   it("assembles public route membership only between identical managed source epochs", () => {
