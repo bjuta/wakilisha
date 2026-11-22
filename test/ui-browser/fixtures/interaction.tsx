@@ -14,6 +14,12 @@ import { WkDatePicker } from "@/components/design-system/primitives/DateTimePick
 import { WkIcon } from "@/components/design-system/Icon";
 import { initializeViewportIntegrityObserver } from "@/lib/viewport/viewportIntegrity";
 
+// Render genuine production components in the isolated browser acceptance.
+const ArticleCreditForm = lazy(() =>
+  import("@/pages/admin/content/articles/detail/components/ArticleCreditForm")
+    .then(({ ArticleCreditForm }) => ({ default: ArticleCreditForm }))
+);
+
 // Render the actual Registry drawer only in the isolated browser acceptance.
 const ArtistDiscographyDrawer = lazy(() =>
   import("@/components/admin/registry/artist-discography/ArtistDiscographyIntakeDrawer")
@@ -23,6 +29,8 @@ const ArtistDiscographyDrawer = lazy(() =>
 function InteractionFixture() {
   const [open, setOpen] = useState(false);
   const [discographyOpen, setDiscographyOpen] = useState(false);
+  const [articleCreditOpen, setArticleCreditOpen] = useState(false);
+  const [articleCreditAccepted, setArticleCreditAccepted] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [fixtureDate, setFixtureDate] = useState("2026-09-28");
   const [value, setValue] = useState("alpha");
@@ -95,6 +103,38 @@ function InteractionFixture() {
           </div>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          setArticleCreditAccepted(false);
+          setArticleCreditOpen(true);
+        }}
+        className="wk-button wk-button-secondary mb-2"
+      >
+        Open Article Credit acceptance
+      </button>
+
+      {articleCreditAccepted ? (
+        <p role="status">Article Credit fixture attached</p>
+      ) : null}
+
+      {articleCreditOpen ? (
+        <Suspense fallback={<p>Loading Article Credit acceptance</p>}>
+          <ArticleCreditForm
+            articleVersionId="acf1b963-9e3e-4dbb-9c61-3fd85e6af339"
+            expectedCreditRevision={4}
+            nextDisplayOrder={2}
+            hasPrimaryAuthor={false}
+            onClose={() => setArticleCreditOpen(false)}
+            onAttached={() => {
+              setArticleCreditAccepted(true);
+              setArticleCreditOpen(false);
+            }}
+            onConcurrency={() => {}}
+          />
+        </Suspense>
+      ) : null}
 
       <button
         type="button"
