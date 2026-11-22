@@ -111,6 +111,24 @@ describe("governed offline SEO projection and selected Article image authority",
       };
       const accepted = readGovernedOfflineProjection(inputs);
       expect(accepted.articles).toHaveLength(1);
+      const legacy = fixture();
+      legacy.metadata["/"] = { title: "WAKILISHA" };
+      legacy.articles.push({
+        ...legacy.articles[0],
+        id: "legacy-id",
+        slug: "album-review-time2023-by-h_art-the-band",
+      });
+      legacy.metadata["/magazine/album-review-time2023-by-h_art-the-band"] = {
+        ...legacy.metadata["/magazine/album-review-alusa-continua"],
+        sourceId: "legacy-id",
+      };
+      const legacyData = JSON.stringify(legacy);
+      writeFileSync(filename, legacyData);
+      expect(readGovernedOfflineProjection({
+        ...inputs,
+        WAKILISHA_GOVERNED_SEO_PROJECTION_SHA256: crypto.createHash("sha256").update(legacyData).digest("hex"),
+      }).articles).toHaveLength(2);
+      writeFileSync(filename, data);
       expect(() => readGovernedOfflineProjection({
         ...inputs, WAKILISHA_APPROVED_SOURCE_EPOCH: "c".repeat(64),
       })).toThrow("unapproved");
