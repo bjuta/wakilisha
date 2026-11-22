@@ -26,6 +26,14 @@ function pinned(filename, pin, label, maxBytes = 24*1024*1024) {
   if (sha(bytes) !== pin) fail("SHA-256 pin mismatch: " + label);
   try {return JSON.parse(bytes.toString("utf8"));} catch {fail("Invalid JSON input: " + label);}
 }
+function stableJson(value) {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    return JSON.stringify(value);
+  if (Array.isArray(value)) return "[" + value.map(stableJson).join(",") + "]";
+  if (value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype)
+    return "{" + Object.keys(value).sort().map(k=>JSON.stringify(k)+":"+stableJson(value[k])).join(",") + "}";
+  fail("Noncanonical source scan value");
+}
 function time(value,label) {
   if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value))
     fail("Invalid source capture timestamp: "+label);
@@ -48,6 +56,16 @@ function scanReceipt(scan,label) {
       !scan.tables.published_articles || !scan.tables.article_versions ||
       !scan.surfaces || Object.keys(scan.surfaces).length !== 15) {
     fail("Incomplete or unauthorized managed source receipt: "+label);
+  }
+  if (scan.sourceEpoch !== sha(stableJson({
+    protocol:SCAN_PROTOCOL,project:"pgzizndxdyhqmtyywjmt",surfaces:scan.surfaces,
+  }))) fail("Managed source epoch does not match scanned surfaces: "+label);
+  for (const [table,receipt] of Object.entries(scan.tables)) {
+    if (typeof table !== "string" || !receipt ||
+        !Number.isSafeInteger(receipt.rowCount) || receipt.rowCount < 0 ||
+        receipt.rowCount > 20000 || !HEX.test(receipt.digest || "")) {
+      fail("Malformed managed source table digest: "+label+"/"+table);
+    }
   }
   time(scan.capturedAt,label);
   return scan;
@@ -72,7 +90,9 @@ function assemble({first,second,metaCapture,articleCapture,acceptedManifest,seco
   scanReceipt(first,"first"); scanReceipt(second,"second");
   const elapsed=time(second.capturedAt,"second") - time(first.capturedAt,"first");
   if (elapsed < 0 || elapsed > 15*60*1000 ||
-      first.sourceEpoch !== second.sourceEpoch || first.querySha256 !== second.querySha256) {
+      first.sourceEpoch !== second.sourceEpoch || first.querySha256 !== second.querySha256 ||
+      stableJson(first.tables) !== stableJson(second.tables) ||
+      stableJson(first.surfaces) !== stableJson(second.surfaces)) {
     fail("Source epoch changed, replay was reversed or source capture window exceeded 15 minutes");
   }
   const metatime=time(metaCapture.capturedAt,"metadata");
@@ -168,7 +188,7 @@ function main() {
   console.log("GOVERNED_SEO_EXTERNAL_READS=0");
   console.log("PUBLICATION_ACTIVATION_AUTHORITY=NONE");
 }
-export {assemble,scanReceipt,captureWrapper,validPublicPath};
+export {assemble,scanReceipt,captureWrapper,validPublicPath,stableJson};
 if (process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   try {main();} catch(err) {console.error(err instanceof Error?err.message:String(err)); process.exitCode=1;}
 }
