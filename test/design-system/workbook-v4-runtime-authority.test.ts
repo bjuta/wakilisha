@@ -305,7 +305,18 @@ describe("Workbook v4 is the only active product design authority", () => {
     expect(exportSource).toContain('source.section.trim().toUpperCase()');
     expect(exportSource).toContain('"image/jpeg"');
 
-    expect(share.match(/<ArticleStoryShare item=/g)).toHaveLength(2);
+    // One Instagram destination lives alongside Copy, X, WhatsApp, and the
+    // other platforms. It is not a separate, full-width share entry point.
+    expect(share).toContain('key: "instagram_story"');
+    expect(share).toContain('name: "Instagram"');
+    expect(share).toContain('icon: "ri-instagram-line"');
+    expect(share.match(/<ArticleStoryShare\s/g)).toHaveLength(2);
+    expect(share.match(/platforms=\{sharePlatformsForItem\(item\)\}/g)).toHaveLength(2);
+    expect(share.match(/if \(platform\.key === "instagram_story"\)/g)).toHaveLength(2);
+    expect(share.match(/storySelected && canShareArticleStory\(item\)/g)).toHaveLength(2);
+    expect(share).toContain('platform.key !== "instagram_story" || canShareArticleStory(item)');
+    expect(share).toContain('aria-label="Back to share options"');
+    expect(share).not.toContain('setExpanded((current)');
     expect(share).toContain('item.type === "article"');
     expect(share).toContain('!!item.publishedSnapshotId');
     expect(share).toContain('Share the image, then add the article link using Instagram’s Link sticker.');
