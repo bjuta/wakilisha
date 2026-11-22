@@ -463,7 +463,7 @@ function ArticleStoryShare({ item, trackedUrl }: { item: ShareObject; trackedUrl
       section: story.section,
     }).then((blob) => {
       if (!active) return;
-      const file = new File([blob], "wakilisha-" + (new URL(item.url || trackedUrl)).pathname.split("/").pop() + "-story.jpg", { type: "image/jpeg" });
+      const file = new File([blob], "wakilisha-" + (new URL(item.url || trackedUrl, window.location.origin)).pathname.split("/").pop() + "-story.jpg", { type: "image/jpeg" });
       objectUrl = URL.createObjectURL(blob);
       setRendered({ file, url: objectUrl });
     }).catch((error: unknown) => {
