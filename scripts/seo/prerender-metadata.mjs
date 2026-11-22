@@ -1356,6 +1356,9 @@ function pageSchema(model, url) {
         "@type": "Organization",
         name: authorName,
         url: canonicalUrl(authorOrganizationPath),
+      } : authorName ? {
+        "@type": "Person",
+        name: authorName,
       } : undefined,
       datePublished: publishedAt || undefined,
       dateModified: modifiedAt || undefined,
