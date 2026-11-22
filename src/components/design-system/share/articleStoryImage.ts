@@ -119,7 +119,7 @@ export async function renderArticleStoryImage(source: ArticleStorySource): Promi
     || "'Figtree', system-ui, sans-serif";
   const bodyFont = computed.getPropertyValue("--wk-font-body").trim()
     || "'Figtree', system-ui, sans-serif";
-  const brand = computed.getPropertyValue("--wk-brand").trim() || "#85C441";
+  const brand = computed.getPropertyValue("--wk-brand-dot").trim() || "#85C441";
 
   const canvas = document.createElement("canvas");
   canvas.width = ARTICLE_STORY_WIDTH;
