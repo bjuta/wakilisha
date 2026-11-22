@@ -71,7 +71,7 @@ describe("governed offline SEO projection and selected Article image authority",
     sourceScanSha256: "b".repeat(64),
     metadata: {
       "/magazine/album-review-alusa-continua": {
-        sourceTable: "wk_articles",
+        sourceTable: "wk_article_publication_snapshots",
         sourceId: "review-record",
         title: "Album Review: Alusa Continua",
         description: "A complete editorial review of Bien's Alusa Continua.",
@@ -129,6 +129,15 @@ describe("governed offline SEO projection and selected Article image authority",
         WAKILISHA_GOVERNED_SEO_PROJECTION_SHA256: crypto.createHash("sha256").update(legacyData).digest("hex"),
       }).articles).toHaveLength(2);
       writeFileSync(filename, data);
+      const untrustedSource = fixture();
+      untrustedSource.metadata["/magazine/album-review-alusa-continua"].sourceId = "wrong-working-copy";
+      const badBytes = JSON.stringify(untrustedSource);
+      writeFileSync(filename,badBytes);
+      expect(() => readGovernedOfflineProjection({
+        ...inputs,
+        WAKILISHA_GOVERNED_SEO_PROJECTION_SHA256: crypto.createHash("sha256").update(badBytes).digest("hex"),
+      })).toThrow("active immutable publication snapshot");
+      writeFileSync(filename,data);
       expect(() => readGovernedOfflineProjection({
         ...inputs, WAKILISHA_APPROVED_SOURCE_EPOCH: "c".repeat(64),
       })).toThrow("unapproved");
@@ -178,7 +187,7 @@ describe("governed offline SEO projection and selected Article image authority",
         sourceEpoch: "a".repeat(64), sourceScanSha256: "b".repeat(64),
         capturedAt: "2026-11-22T09:01:00.000Z",
         metadata: { "/magazine/album-review-alusa-continua": {
-          title: "Album Review: Alusa Continua", sourceTable: "wk_articles", sourceId: "article-1",
+          title: "Album Review: Alusa Continua", sourceTable: "wk_article_publication_snapshots", sourceId: "article-1",
         }},
         articles: [{
           id: "article-1", slug: "album-review-alusa-continua", title: "Album Review: Alusa Continua",
