@@ -434,7 +434,7 @@ describe("incident-safe offline SEO build", () => {
       .toBe("https://wakilisha.africa/artists/bien");
     expect(publishedArticleCardUrl(canonical, "draft-id")).toBe(canonical);
     const share = readFileSync("src/components/design-system/share/ShareSheet.tsx","utf8");
-    expect(share.match(/publishedArticleCardUrl\\(/g)).toHaveLength(2);
+    expect(share.match(/publishedArticleCardUrl\(/g)).toHaveLength(2);
     const action = readFileSync("src/components/feature/community/CommunityActionSheet.tsx","utf8");
     expect(action).toContain('publishedSnapshotId: entity.type === "article" ? entity.publishedSnapshotId : undefined');
     for (const page of [
