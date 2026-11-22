@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { SURFACES, verifyReceipt, differences, extractSeo, auditArtifact } from "../../scripts/seo/verify-governed-publication.mjs";
 import { readGovernedOfflineProjection, assertFreshGovernedViteShell, activateGovernedOfflineProjection, seoBlockForPath, htmlForPath } from "../../scripts/seo/prerender-metadata.mjs";
-import { assemble as assembleGovernedProjection, stableJson as stableManagedJson } from "../../scripts/seo/assemble-governed-publication-projection.mjs";
+import { assemble as assembleGovernedProjection, stableJson as stableManagedJson, managedMagazineSql, verifyManagedMagazineEvidence } from "../../scripts/seo/assemble-governed-publication-projection.mjs";
 
 import {
   readFileSync,
@@ -70,11 +70,12 @@ describe("governed offline SEO projection and selected Article image authority",
       title: "Genre "+i,sourceTable:"registry_genres",sourceId:"genre-"+i,
     };
     const baseline={...metadata};
+    const snapshotId="cfbcb1a2-f9e7-4d6c-8db9-aa0b2ffed343";
     const slug="album-review-alusa-continua";
     const route="/magazine/"+slug;
     const hero="https://media.wakilisha.africa/uploads/selected.webp";
     metadata[route]={title:"Album Review: Alusa Continua",sourceTable:"wk_article_publication_snapshots",
-      sourceId:"published-snapshot-id",image:hero};
+      sourceId:snapshotId,image:hero};
     const surfaces=Object.fromEntries([
       "static","magazine","artists","releases","tracks","genres","labels","guides",
       "briefings","charts","playlists","people","organizations","taxonomy","authors",
@@ -98,13 +99,29 @@ describe("governed offline SEO projection and selected Article image authority",
       projectRef:"pgzizndxdyhqmtyywjmt",response:{ok:true,data:{
         count:Object.keys(metadata).length,metadata,
       }}};
-    const articleCapture={capturedAt:"2026-11-22T09:03:00.000Z",httpStatus:200,
-      projectRef:"pgzizndxdyhqmtyywjmt",response:{data:{stories:[{
-        id:"published-snapshot-id",slug,title:"Album Review: Alusa Continua",heroUrl:hero,
+    const articleCapture={evidence:{
+      protocol:"wk-governed-magazine-managed-read-v1",projectRef:"pgzizndxdyhqmtyywjmt",
+      role:"supabase_read_only_user",transactionReadOnly:"on",
+      capturedAt:"2026-11-22T09:03:00.000Z",count:1,stories:[{
+        id:snapshotId,slug,title:"Album Review: Alusa Continua",heroUrl:hero,
         dek:"Public editorial description",author:"Hafare Segelan",date:"2026-11-22",
-      }]}}};
+      }],
+    }};
     const opts={first:scan,second:{...scan,capturedAt:"2026-11-22T09:05:00.000Z"},
       metaCapture,articleCapture,acceptedManifest:baseline,secondSha:"e".repeat(64)};
+    const readOnlySql=managedMagazineSql();
+    expect(readOnlySql).toContain("FROM public.wk_article_publication_snapshots");
+    expect(readOnlySql).toContain("WHERE is_active = true AND wp_status = 'publish'");
+    expect(readOnlySql).toContain("LIMIT 501");
+    expect(readOnlySql).not.toMatch(/\\b(?:INSERT|UPDATE|DELETE|TRUNCATE|CALL)\\b/);
+    expect(readOnlySql).not.toContain("public-content-read/magazine");
+    expect(readOnlySql).not.toContain("publish_due_article_publications(");
+    expect(verifyManagedMagazineEvidence(articleCapture).count).toBe(1);
+    const wrongRole={evidence:{...articleCapture.evidence,role:"postgres"}};
+    expect(() => verifyManagedMagazineEvidence(wrongRole)).toThrow("approved read-only role");
+    expect(() => verifyManagedMagazineEvidence({
+      evidence:{...articleCapture.evidence,count:2},
+    })).toThrow("incomplete");
     const assembled=assembleGovernedProjection(opts);
     expect(assembled.articles).toHaveLength(1);
     expect(assembled.metadata[route].image).toBe(hero);
