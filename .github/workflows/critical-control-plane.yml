@@ -304,3 +304,68 @@ jobs:
           echo "critical-browser=$BROWSER_RESULT"
           test "$CORE_RESULT" = "success"
           test "$BROWSER_RESULT" = "success"
+
+
+  hosted-preview-ifpi-ddex:
+    name: hosted-preview-ifpi-ddex
+    # Only the explicit one-shot release gate. No push/synchronize replays.
+    if: ${{ github.event_name == 'pull_request' && github.event.action == 'ready_for_review' && github.event.pull_request.head.ref == 'fix/discography-ifpi-ddex-recording-identity' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+    env:
+      SUPABASE_PROJECT_REF: psycfvdphmvcwdhjjggf
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      WK_SUPABASE_KEYS_FILE: /tmp/wk-preview-api-keys.json
+    steps:
+      - name: Check out exact acceptance PR head
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Restore exact locked browser dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install existing pinned Supabase management CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+
+      - name: Prove only the disposable Preview is reachable for this job
+        run: |
+          set -euo pipefail
+          test "$SUPABASE_PROJECT_REF" = psycfvdphmvcwdhjjggf
+          test "$GITHUB_HEAD_REF" = fix/discography-ifpi-ddex-recording-identity
+          test "$GITHUB_REPOSITORY" = bjuta/wakilisha
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test ! -e supabase/.temp/project-ref
+          node --check scripts/acceptance/ifpi-ddex-hosted-preview-ci.mjs
+          umask 077
+          supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF" -o json > "$WK_SUPABASE_KEYS_FILE"
+          test -s "$WK_SUPABASE_KEYS_FILE"
+          echo "WK_HOSTED_PREVIEW_EXACT_TARGET=PASS"
+
+      - name: Exercise genuine GoTrue session and real Chromium selected-only Edge admission
+        run: node scripts/acceptance/ifpi-ddex-hosted-preview-ci.mjs
+
+      - name: Destroy ephemeral API key file
+        if: always()
+        run: rm -f "$WK_SUPABASE_KEYS_FILE"
+
+      - name: Preserve non-secret acceptance ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ifpi-ddex-hosted-preview-one-shot
+          path: wk-ifpi-ddex-hosted-preview-ci-receipt.json
+          if-no-files-found: ignore
+          retention-days: 7
