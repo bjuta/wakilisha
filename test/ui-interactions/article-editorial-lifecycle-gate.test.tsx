@@ -162,7 +162,7 @@ describe("permanent Article editorial lifecycle authority", () => {
     expect(src).toContain("canSubmitCurrentArticleForReview = reviewGate.canSubmitWorkingVersion");
     expect(src).toContain("canPublishApprovedArticleVersion = reviewGate.canPublishApprovedVersion");
     expect(src).toContain("hasChangesAfterApproval={reviewGate.workingChangesNeedReview}");
-    expect(src).toContain("onResubmitWorkingVersion={handleSubmitForReview}");
+    expect(src).toContain("onResubmitWorkingVersion={(note) => void handleSubmitForReview(note)}");
     expect(src).not.toContain("!isPendingReview &&");
   });
 });
