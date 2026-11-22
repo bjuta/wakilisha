@@ -134,12 +134,13 @@ describe("permanent Article editorial lifecycle authority", () => {
     render(<ArticleReviewDecisionWorkspace title="Album Review: Alusa Continua"
       status="Changes Need Review" submittedVersionNumber={30} workingVersionNumber={32}
       latestApprovedVersionNumber={31} canResubmitWorkingVersion
-      onResubmitWorkingVersion={callback} note="" onNoteChange={() => {}}
+      onResubmitWorkingVersion={callback} note="Edited body after approval" onNoteChange={() => {}}
       canRequestChanges={false} canApprove={false} busy={false} events={[]} />);
     expect(screen.getByText(/Approved v31 remains preserved/)).toBeTruthy();
     expect(screen.getByText(/working v32 needs review/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Resubmit Current Version for Review" }));
     expect(callback).toHaveBeenCalledOnce();
+    expect(callback).toHaveBeenCalledWith("Edited body after approval");
     expect(screen.queryByRole("button", { name: "Approve Version" })).toBeNull();
   });
 
