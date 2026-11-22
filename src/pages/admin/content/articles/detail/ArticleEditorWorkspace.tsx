@@ -1282,7 +1282,7 @@ export function ArticleEditorWorkspace({
             categories: draft.categories,
             tags: draft.tags,
             seo: draft.seo,
-            wpStatus: "pending",
+            wpStatus: article.wpStatus === "publish" ? "publish" : "pending",
           });
         } catch (error) {
           addToast("error", error instanceof Error ? error.message : "Failed to submit for review.");
