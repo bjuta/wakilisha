@@ -343,6 +343,10 @@ export function ArticleEditorWorkspace({
     return lifecycleEvents.find((event) => event.action === "approved") ?? null;
   }, [lifecycleEvents]);
 
+  const latestPublishedLifecycleEvent = useMemo(() => {
+    return lifecycleEvents.find((event) => event.action === "published") ?? null;
+  }, [lifecycleEvents]);
+
   const latestSubmittedLifecycleEvent = useMemo(() => {
     return lifecycleEvents.find((event) => event.action === "submitted") ?? null;
   }, [lifecycleEvents]);
@@ -489,6 +493,7 @@ export function ArticleEditorWorkspace({
     wpStatus: article?.wpStatus ?? null,
     latestReviewAction,
     latestApprovedVersionNumber: latestApprovedLifecycleEvent?.versionNumber ?? null,
+    latestPublishedVersionNumber: latestPublishedLifecycleEvent?.versionNumber ?? null,
     latestSubmittedVersionId: latestSubmittedLifecycleEvent?.versionId ?? null,
     reviewTargetVersionId: submittedDocument?.id ?? null,
     isDirty,
@@ -3253,6 +3258,10 @@ export function ArticleEditorWorkspace({
               submittedVersionNumber={submittedDocument?.versionNumber ?? null}
               workingVersionNumber={currentVersionProof?.latestVersionNumber ?? null}
               latestApprovedVersionNumber={latestApprovedLifecycleEvent?.versionNumber ?? null}
+              latestPublishedVersionNumber={latestPublishedLifecycleEvent?.versionNumber ?? null}
+              isPublished={article?.wpStatus === "publish"}
+              canEditArticle={articlePermissions.canEdit}
+              onEditArticle={() => setActiveWorkbenchMode("write")}
               canResubmitWorkingVersion={canSubmitCurrentArticleForReview}
               onResubmitWorkingVersion={(note) => void handleSubmitForReview(note)}
               note={reviewActionNote}
