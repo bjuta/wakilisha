@@ -1915,6 +1915,8 @@ function seoBlockForPath(pagePath) {
   const model = mergeDbMetadata(modelFromPath(pagePath), pagePath);
   const url = canonicalUrl(model.canonicalPath);
   const title = formatPageTitle(model.title);
+  const socialTitle = formatPageTitle(firstNonEmpty(model.socialTitle, model.title));
+  const socialDescription = firstNonEmpty(model.socialDescription, model.description);
   const image = socialImageForModel(model);
   const jsonLd = JSON.stringify(buildJsonLd(model)).replace(/</g, "\\u003c");
   const lcpPreload = lcpPreloadForPath(
@@ -1927,8 +1929,8 @@ function seoBlockForPath(pagePath) {
     <meta name="robots" content="${escapeAttr(model.robots)}" />
     <link rel="canonical" href="${escapeAttr(url)}" />
     <meta property="og:site_name" content="${SITE_NAME}" />
-    <meta property="og:title" content="${escapeAttr(title)}" />
-    <meta property="og:description" content="${escapeAttr(model.description)}" />
+    <meta property="og:title" content="${escapeAttr(socialTitle)}" />
+    <meta property="og:description" content="${escapeAttr(socialDescription)}" />
     <meta property="og:type" content="${escapeAttr(model.ogType)}" />
     <meta property="og:url" content="${escapeAttr(url)}" />
     <meta property="og:image" content="${escapeAttr(image)}" />
@@ -1936,8 +1938,8 @@ function seoBlockForPath(pagePath) {
     <meta property="og:image:alt" content="${escapeAttr(schemaEntityName(model))}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@wakilisha" />
-    <meta name="twitter:title" content="${escapeAttr(title)}" />
-    <meta name="twitter:description" content="${escapeAttr(model.description)}" />
+    <meta name="twitter:title" content="${escapeAttr(socialTitle)}" />
+    <meta name="twitter:description" content="${escapeAttr(socialDescription)}" />
     <meta name="twitter:image" content="${escapeAttr(image)}" />
     <meta name="twitter:image:alt" content="${escapeAttr(schemaEntityName(model))}" />
 ${lcpPreload ? `${lcpPreload}\n` : ""}    <script id="wk-jsonld-primary" type="application/ld+json">${jsonLd}</script>`;
