@@ -1,4 +1,5 @@
 import { collectWithClient, DEFINITIONS as SOURCE_SCAN_TABLES, stableJson as stableSourceJson, exactEnvironment as exactSourceEnvironment } from "../../scripts/seo/collect-governed-publication-source.mjs";
+import { FORMAT as MANAGED_SCAN_FORMAT, managedSourceSql, verifyManagedEvidence } from "../../scripts/seo/collect-governed-managed-sql.mjs";
 
 import crypto from "node:crypto";
 import tls from "node:tls";
@@ -686,6 +687,80 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
     }
     return root;
   };
+
+  it("constructs one deterministic, credential-free managed SQL snapshot for the entire reviewed allowlist", () => {
+    const sql = managedSourceSql();
+    expect(sql.startsWith("/* WAKILISHA governed SEO")).toBe(true);
+    expect(sql).toContain("transaction_read_only");
+    expect(sql).toContain("extensions.digest");
+    expect(sql).toContain("LIMIT 20001");
+    expect(sql).toContain('FROM "public"."wk_articles"');
+    expect(sql).toContain('FROM "editorial"."resources"');
+    expect(sql).toContain("pg-jsonb-row-sha256-v2");
+    expect(sql).not.toContain("service_role");
+    expect(sql).not.toMatch(/\\b(?:INSERT INTO|UPDATE .* SET|DELETE FROM|DROP TABLE|TRUNCATE TABLE)\\b/i);
+    expect(managedSourceSql()).toBe(sql);
+    expect(SOURCE_SCAN_TABLES).toHaveLength(40);
+  });
+
+  it("rejects forged, incomplete, writable, over-budget and duplicate managed fingerprints", () => {
+    const root = fixture();
+    try {
+      const make = () => ({
+        protocol: MANAGED_SCAN_FORMAT,
+        projectRef: "pgzizndxdyhqmtyywjmt",
+        role: "supabase_read_only_user",
+        transactionReadOnly: "on",
+        isolation: "read committed",
+        capturedAt: "2026-11-22T12:00:00.000Z",
+        transactionSnapshot: "11:11:",
+        roleFlags: {
+          superuser: false, bypassRls: true, createRole: false,
+          createDb: false, replication: false,
+        },
+        tables: SOURCE_SCAN_TABLES.map(d => ({
+          name: d.name, table: d.schema + "." + d.table,
+          rowCount: d.name === "articles" ? 1 : 0,
+          uniqueCount: d.name === "articles" ? 1 : 0,
+          digest: "a".repeat(64),
+          privileges: {
+            select: true, insert: false, update: false,
+            delete: false, truncate: false,
+          },
+        })),
+      });
+      const accepted = verifyManagedEvidence({ evidence: make() }, root);
+      expect(accepted.queryCount).toBe(1);
+      expect(accepted.protocol).toBe("pg-jsonb-row-sha256-v2");
+      expect(accepted.tables.articles.rowCount).toBe(1);
+      expect(accepted.rowCount).toBe(1);
+      expect(accepted.sourceEpoch).toMatch(/^[a-f0-9]{64}$/);
+      expect(accepted.publicationReceipt).toBe(false);
+      expect(accepted.publicationActivationAuthority).toBe(false);
+      expect(JSON.stringify(accepted)).not.toContain("secret");
+      expect(verifyManagedEvidence({ evidence: make() }, root).sourceEpoch)
+        .toBe(accepted.sourceEpoch);
+
+      const denied = make();
+      denied.role = "postgres";
+      expect(() => verifyManagedEvidence(denied, root)).toThrow("role");
+      const writeGrant = make();
+      writeGrant.tables[0].privileges.update = true;
+      expect(() => verifyManagedEvidence(writeGrant, root)).toThrow("writable");
+      const duplicate = make();
+      duplicate.tables[0].uniqueCount = 0;
+      expect(() => verifyManagedEvidence(duplicate, root)).toThrow("nonunique");
+      const tooMany = make();
+      tooMany.tables[0].rowCount = 20001;
+      tooMany.tables[0].uniqueCount = 20001;
+      expect(() => verifyManagedEvidence(tooMany, root)).toThrow("over-budget");
+      const missing = make();
+      missing.tables.pop();
+      expect(() => verifyManagedEvidence(missing, root)).toThrow("Incomplete");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 
   const mockDb = (options: { writeGrant?: boolean; drift?: boolean; bypassRls?: boolean; badKey?: boolean; mutateStatic?: () => void } = {}) => {
     const commands: string[] = [];
