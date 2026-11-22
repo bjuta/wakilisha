@@ -461,8 +461,8 @@ export function CommunityActionSheet({
           description: entity.description,
           imageUrl: entity.imageUrl,
           url: entity.url,
-          // Public Article entity.id is the immutable publication snapshot ID.
-          publishedSnapshotId: entity.type === "article" ? entity.id : undefined,
+          // Only explicit active published snapshot authority may version the card.
+          publishedSnapshotId: entity.type === "article" ? entity.publishedSnapshotId : undefined,
           type: entity.type === "article" ? "article" : "page",
         }}
         open={shareOpen}
