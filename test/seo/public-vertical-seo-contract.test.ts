@@ -700,7 +700,7 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
     expect(sql).not.toContain("service_role");
     expect(sql).not.toMatch(/\\b(?:INSERT INTO|UPDATE .* SET|DELETE FROM|DROP TABLE|TRUNCATE TABLE)\\b/i);
     expect(managedSourceSql()).toBe(sql);
-    expect(SOURCE_SCAN_TABLES).toHaveLength(40);
+    expect(SOURCE_SCAN_TABLES).toHaveLength(42);
   });
 
   it("rejects forged, incomplete, writable, over-budget and duplicate managed fingerprints", () => {
@@ -824,10 +824,12 @@ describe("governed source scanning is an out-of-band read-only transaction", () 
       db.change();
       const corrected = await collectWithClient(db.client, { role: "supabase_read_only_user", repositoryRoot: root });
       expect(corrected.sourceEpoch).not.toBe(first.sourceEpoch);
-      expect(SOURCE_SCAN_TABLES.length).toBe(40);
+      expect(SOURCE_SCAN_TABLES.length).toBe(42);
       expect(SOURCE_SCAN_TABLES.some(d => d.table === "wk_guides" || d.table === "wk_resource_index")).toBe(false);
       expect(SOURCE_SCAN_TABLES.some(d => d.schema === "public" && d.table === "guides")).toBe(true);
       expect(SOURCE_SCAN_TABLES.some(d => d.schema === "editorial" && d.table === "resource_aliases")).toBe(true);
+      expect(SOURCE_SCAN_TABLES.some(d => d.schema === "public" && d.table === "wk_article_publication_snapshots")).toBe(true);
+      expect(SOURCE_SCAN_TABLES.some(d => d.schema === "editorial" && d.table === "article_versions")).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
