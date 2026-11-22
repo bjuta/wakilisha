@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import { readGovernedOfflineProjection } from "./prerender-metadata.mjs";
+
 
 const distDir = path.resolve("dist");
 const indexPath = path.join(distDir, "index.html");
@@ -95,6 +97,26 @@ if (!fs.existsSync(indexPath)) {
   fail(`Missing homepage HTML: ${indexPath}`);
 }
 
+const governedOffline = process.argv[2] === "--governed-offline";
+if (process.argv.length > (governedOffline ? 3 : 2)) {
+  fail("Use --governed-offline for source-pinned publisher or no arguments for maintenance");
+}
+let stories;
+let generatedAt = new Date().toISOString();
+
+if (governedOffline) {
+  const projection = readGovernedOfflineProjection();
+  if (typeof projection.capturedAt !== "string" || !Number.isFinite(Date.parse(projection.capturedAt))) {
+    fail("Governed fallback requires exact source epoch capture time");
+  }
+  generatedAt = projection.capturedAt;
+  stories = [...projection.articles]
+    .sort((a,b) => String(b.date || b.publishedAt || "").localeCompare(String(a.date || a.publishedAt || "")) || String(a.slug).localeCompare(String(b.slug)))
+    .slice(0,24)
+    .map(cleanStory)
+    .filter(story => story.id && story.slug && story.title);
+  console.log("GOVERNED_MAGAZINE_FALLBACK_NETWORK_READS=0");
+} else {
 const supabaseUrl = envValue("VITE_PUBLIC_SUPABASE_URL").replace(/\/+$/, "");
 const anonKey = envValue("VITE_PUBLIC_SUPABASE_ANON_KEY");
 
@@ -159,16 +181,19 @@ if (!response?.ok) {
 }
 
 const payload = await response.json();
-const stories = (payload?.data?.stories || payload?.stories || [])
+stories = (payload?.data?.stories || payload?.stories || [])
   .map(cleanStory)
   .filter((story) => story.id && story.slug && story.title);
+
+
+}
 
 if (stories.length === 0) {
   fail("Magazine fallback API returned zero stories.");
 }
 
 const fallback = {
-  generatedAt: new Date().toISOString(),
+  generatedAt,
   stories,
 };
 
