@@ -472,6 +472,7 @@ export function ArticleEditorWorkspace({
     documentModeState.mode,
     submittedDocument?.id,
   ]);
+  const canManageArticleReview = Boolean(article && (isAdmin || userCanManageReviewQueue));
   const currentVersionProof: ArticleVersionFingerprintStatus | null =
     currentArticleReviewProof({
       articleId: article?.id ?? null,
