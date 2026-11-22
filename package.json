@@ -89,6 +89,7 @@
     "registry:phase8b:provider-enrichment": "tsx scripts/registry/phase8b-provider-enrichment-write-test.ts",
     "build:app": "vite build",
     "seo:prerender": "node scripts/seo/prerender-metadata.mjs",
+    "seo:governed:candidate": "node scripts/seo/prerender-metadata.mjs --governed-offline",
     "seo:audit": "node scripts/seo/audit-prerender-output.mjs",
     "audit:media-storage": "node scripts/audits/audit-media-storage.mjs",
     "seo:public-sitemap": "node scripts/seo/build-public-sitemap-html.mjs",
