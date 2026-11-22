@@ -106,9 +106,11 @@ export function ArticleReviewDecisionWorkspace({
       targetLabel={
         canResubmitWorkingVersion && workingVersionNumber
           ? `${title || "Untitled Article"} · working v${workingVersionNumber} needs review`
-          : submittedVersionNumber
-            ? `${title || "Untitled Article"} · submitted v${submittedVersionNumber}`
-            : title || "Article lifecycle"
+          : status === "Approved for Publication" && latestApprovedVersionNumber
+            ? `${title || "Untitled Article"} · approved v${latestApprovedVersionNumber}`
+            : status === "Pending Review" && submittedVersionNumber
+              ? `${title || "Untitled Article"} · submitted v${submittedVersionNumber}`
+              : `${title || "Untitled Article"} · review authority unavailable`
       }
       actions={actions}
       busy={busy}
