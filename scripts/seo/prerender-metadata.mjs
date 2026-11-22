@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 const SITE_NAME = "WAKILISHA";
 const SITE_URL = "https://wakilisha.africa";
@@ -341,11 +343,11 @@ function publicArticleImage(article) {
   const meta = article.metadata && typeof article.metadata === "object" ? article.metadata : {};
 
   return firstNonEmpty(
-    article.image,
-    article.imageUrl,
     article.heroUrl,
     article.heroImageUrl,
     article.hero_image_url,
+    article.image,
+    article.imageUrl,
     article.featuredImageUrl,
     article.featured_image_url,
     article.coverImageUrl,
@@ -396,34 +398,9 @@ async function fetchArticleManifests() {
       payload?.data ||
       [];
 
-    const imageByPath = new Map();
-    const metadataByPath = new Map();
-
-    for (const story of Array.isArray(stories) ? stories : []) {
-      const slug = firstNonEmpty(story.slug, story.path, story.url);
-      const pagePath = articlePathFromSlug(slug);
-      if (!pagePath) continue;
-
-      const cleanPagePath = cleanPath(pagePath);
-      const image = publicArticleImage(story);
-
-      if (image) {
-        imageByPath.set(cleanPagePath, image);
-      }
-
-      metadataByPath.set(cleanPagePath, {
-        id: firstNonEmpty(story.id),
-        slug: firstNonEmpty(story.slug),
-        title: firstNonEmpty(story.title),
-        description: firstNonEmpty(story.dek, story.description, story.excerpt),
-        author: firstNonEmpty(story.author, story.authorName, story.byline),
-        authorPersonPath: firstNonEmpty(story.authorPersonPath, story.author_person_path),
-        authorOrganizationPath: firstNonEmpty(story.authorOrganizationPath, story.author_organization_path),
-        date: firstNonEmpty(story.date, story.publishedAt, story.datePublished),
-        modifiedAt: firstNonEmpty(story.modifiedAt, story.updatedAt, story.dateModified),
-        image,
-      });
-    }
+    const {imageByPath, metadataByPath} = articleManifestsFromRows(
+      Array.isArray(stories) ? stories : [],
+    );
 
     console.log(`Article image manifest loaded: ${imageByPath.size.toLocaleString()} article images.`);
     console.log(`Article metadata manifest loaded: ${metadataByPath.size.toLocaleString()} article rows.`);
@@ -441,6 +418,156 @@ async function fetchArticleManifests() {
     }
   }
   throw new Error(`Article prerender manifest unavailable after ${PRERENDER_MANIFEST_RETRY_COUNT} attempt(s); refusing partial SEO output: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+}
+
+
+/**
+ * Governing rule: offline publication inputs are separately acquired and
+ * pinned. Loading them never grants publication/activation authority.
+ * A source scan ALONE is not a complete route publication receipt.
+ */
+function readGovernedOfflineProjection(options = process.env) {
+  const filename = options.WAKILISHA_GOVERNED_SEO_PROJECTION;
+  const expectedSha = String(options.WAKILISHA_GOVERNED_SEO_PROJECTION_SHA256 || "").toLowerCase();
+  const acceptedSourceEpoch = String(options.WAKILISHA_APPROVED_SOURCE_EPOCH || "").toLowerCase();
+  const acceptedScanSha = String(options.WAKILISHA_APPROVED_SOURCE_SCAN_SHA256 || "").toLowerCase();
+  const isDigest = (value) => /^[a-f0-9]{64}$/.test(value);
+
+  if (typeof filename !== "string" || !path.isAbsolute(filename)) {
+    throw new Error("Governed SEO input requires an absolute projection file path");
+  }
+  if (![expectedSha, acceptedSourceEpoch, acceptedScanSha].every(isDigest)) {
+    throw new Error("Governed SEO projection, epoch and source scan require independent SHA-256 pins");
+  }
+  const stat = fs.lstatSync(filename, { throwIfNoEntry: false });
+  if (!stat || !stat.isFile() || stat.isSymbolicLink() || stat.size > 32 * 1024 * 1024) {
+    throw new Error("Missing, unsafe or oversized governed SEO input");
+  }
+  const bytes = fs.readFileSync(filename);
+  if (crypto.createHash("sha256").update(bytes).digest("hex") !== expectedSha) {
+    throw new Error("Governed SEO input checksum mismatch");
+  }
+  const projection = JSON.parse(bytes.toString("utf8"));
+  if (!projection || typeof projection !== "object" || Array.isArray(projection) ||
+      projection.format !== 1 || projection.origin !== SITE_URL || projection.complete !== true ||
+      projection.sourceEpoch !== acceptedSourceEpoch ||
+      projection.sourceScanSha256 !== acceptedScanSha) {
+    throw new Error("Incomplete or unapproved governed SEO source epoch");
+  }
+  for (const name of ["metadata", "artists", "releases", "tracks", "charts"]) {
+    if (!projection[name] || typeof projection[name] !== "object" || Array.isArray(projection[name])) {
+      throw new Error("Incomplete governed SEO projection surface: " + name);
+    }
+  }
+  if (!Array.isArray(projection.articles) || !projection.articles.length || !Array.isArray(projection.nonCanonicalPaths)) {
+    throw new Error("Incomplete governed SEO Article or canonical route projection");
+  }
+  const allRoutes = [
+    ...Object.keys(projection.metadata),
+    ...Object.keys(projection.artists),
+    ...Object.keys(projection.releases),
+    ...Object.keys(projection.tracks),
+    ...Object.keys(projection.charts),
+    ...projection.nonCanonicalPaths,
+  ];
+  for (const route of allRoutes) {
+    if (typeof route !== "string" || !/^\/[a-zA-Z0-9/._-]{0,319}$/.test(route) ||
+        route.includes("//") || (route !== "/" && route.endsWith("/")) ||
+        route.split("/").some(part => part === "." || part === "..")) {
+      throw new Error("Unsafe or noncanonical governed SEO route: " + String(route));
+    }
+  }
+  const articlePaths = new Set();
+  for (const article of projection.articles) {
+    const articlePath = articlePathFromSlug(article?.slug);
+    if (!articlePath || articlePaths.has(articlePath) ||
+        !/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/.test(String(article?.slug || ""))) {
+      throw new Error("Duplicate or unsafe governed Article identity");
+    }
+    articlePaths.add(articlePath);
+    const selectedImage = firstNonEmpty(article.heroUrl, article.hero_image_url, article.heroImageUrl);
+    if (selectedImage) {
+      let url;
+      try {url = new URL(selectedImage);} catch {throw new Error("Invalid Article selected Media URL: " + articlePath);}
+      if (url.protocol !== "https:" || url.username || url.password) {
+        throw new Error("Nonpublic Article selected Media URL: " + articlePath);
+      }
+    }
+    const published = projection.metadata[articlePath];
+    if (!published || published.sourceTable !== "wk_article_publication_snapshots" ||
+        String(published.sourceId || "") !== String(article.id || "")) {
+      throw new Error("Governed Article source must match the active immutable publication snapshot: " + articlePath);
+    }
+  }
+  const publishedRouteCount = Object.values(projection.metadata)
+    .filter(row => row?.sourceTable === "wk_article_publication_snapshots").length;
+  if (publishedRouteCount !== projection.articles.length) {
+    throw new Error("Governed Article metadata/list membership divergence");
+  }
+  return projection;
+}
+
+function articleManifestsFromRows(stories) {
+  const imageByPath = new Map();
+  const metadataByPath = new Map();
+  for (const story of stories) {
+    const slug = firstNonEmpty(story.slug, story.path, story.url);
+    const pagePath = articlePathFromSlug(slug);
+    if (!pagePath) continue;
+    const cleanPagePath = cleanPath(pagePath);
+    const image = publicArticleImage(story);
+    if (image) imageByPath.set(cleanPagePath, image);
+    metadataByPath.set(cleanPagePath, {
+      id: firstNonEmpty(story.id),
+      slug: firstNonEmpty(story.slug),
+      title: firstNonEmpty(story.title),
+      description: firstNonEmpty(story.dek, story.description, story.excerpt),
+      author: firstNonEmpty(story.author, story.authorName, story.byline),
+      authorPersonPath: firstNonEmpty(story.authorPersonPath, story.author_person_path),
+      authorOrganizationPath: firstNonEmpty(story.authorOrganizationPath, story.author_organization_path),
+      date: firstNonEmpty(story.date, story.publishedAt, story.datePublished),
+      modifiedAt: firstNonEmpty(story.modifiedAt, story.updatedAt, story.dateModified),
+      image,
+    });
+  }
+  return {imageByPath, metadataByPath};
+}
+
+function assertFreshGovernedViteShell(root = DIST_DIR) {
+  const stack = [root];
+  const forbidden = new Set([
+    "seo-metadata-manifest.json",
+    "public-magazine-fallback.json",
+    "sitemap.xml",
+    "wakilisha-accepted-prerender-index.json",
+  ]);
+  while (stack.length) {
+    const directory = stack.pop();
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isSymbolicLink()) throw new Error("Governed source shell contains a symlink");
+      if (entry.isDirectory()) {stack.push(absolute); continue;}
+      const relative = path.relative(root, absolute).replaceAll(path.sep, "/");
+      if ((entry.name === "index.html" && relative !== "index.html") ||
+          forbidden.has(relative)) {
+        throw new Error("Governed candidate requires a fresh Vite shell, not a prior SEO snapshot: " + relative);
+      }
+    }
+  }
+}
+
+function activateGovernedOfflineProjection(projection) {
+  DB_METADATA_BY_PATH = mapFromDbMetadata(projection.metadata);
+  const articleManifests = articleManifestsFromRows(projection.articles);
+  ARTICLE_IMAGE_BY_PATH = articleManifests.imageByPath;
+  ARTICLE_METADATA_BY_PATH = articleManifests.metadataByPath;
+  ARTIST_METADATA_BY_PATH = mapFromDbMetadata(projection.artists);
+  RELEASE_METADATA_BY_PATH = mapFromDbMetadata(projection.releases);
+  TRACK_METADATA_BY_PATH = mapFromDbMetadata(projection.tracks);
+  CHART_METADATA_BY_PATH = mapFromDbMetadata(projection.charts);
+  NON_CANONICAL_PUBLIC_PATHS.clear();
+  for (const p of projection.nonCanonicalPaths) NON_CANONICAL_PUBLIC_PATHS.add(cleanPath(p));
+  return articleManifests.imageByPath.size;
 }
 
 function mergeDbMetadata(model, pagePath) {
@@ -1236,6 +1363,9 @@ function pageSchema(model, url) {
         "@type": "Organization",
         name: authorName,
         url: canonicalUrl(authorOrganizationPath),
+      } : authorName ? {
+        "@type": "Person",
+        name: authorName,
       } : undefined,
       datePublished: publishedAt || undefined,
       dateModified: modifiedAt || undefined,
@@ -1785,6 +1915,8 @@ function seoBlockForPath(pagePath) {
   const model = mergeDbMetadata(modelFromPath(pagePath), pagePath);
   const url = canonicalUrl(model.canonicalPath);
   const title = formatPageTitle(model.title);
+  const socialTitle = formatPageTitle(firstNonEmpty(model.socialTitle, model.title));
+  const socialDescription = firstNonEmpty(model.socialDescription, model.description);
   const image = socialImageForModel(model);
   const jsonLd = JSON.stringify(buildJsonLd(model)).replace(/</g, "\\u003c");
   const lcpPreload = lcpPreloadForPath(
@@ -1797,8 +1929,8 @@ function seoBlockForPath(pagePath) {
     <meta name="robots" content="${escapeAttr(model.robots)}" />
     <link rel="canonical" href="${escapeAttr(url)}" />
     <meta property="og:site_name" content="${SITE_NAME}" />
-    <meta property="og:title" content="${escapeAttr(title)}" />
-    <meta property="og:description" content="${escapeAttr(model.description)}" />
+    <meta property="og:title" content="${escapeAttr(socialTitle)}" />
+    <meta property="og:description" content="${escapeAttr(socialDescription)}" />
     <meta property="og:type" content="${escapeAttr(model.ogType)}" />
     <meta property="og:url" content="${escapeAttr(url)}" />
     <meta property="og:image" content="${escapeAttr(image)}" />
@@ -1806,8 +1938,8 @@ function seoBlockForPath(pagePath) {
     <meta property="og:image:alt" content="${escapeAttr(schemaEntityName(model))}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@wakilisha" />
-    <meta name="twitter:title" content="${escapeAttr(title)}" />
-    <meta name="twitter:description" content="${escapeAttr(model.description)}" />
+    <meta name="twitter:title" content="${escapeAttr(socialTitle)}" />
+    <meta name="twitter:description" content="${escapeAttr(socialDescription)}" />
     <meta name="twitter:image" content="${escapeAttr(image)}" />
     <meta name="twitter:image:alt" content="${escapeAttr(schemaEntityName(model))}" />
 ${lcpPreload ? `${lcpPreload}\n` : ""}    <script id="wk-jsonld-primary" type="application/ld+json">${jsonLd}</script>`;
@@ -1880,6 +2012,20 @@ async function main() {
     throw new Error("dist/index.html was not found. Run vite build first.");
   }
 
+  if (process.argv.length > 3 ||
+      (process.argv.length === 3 && process.argv[2] !== "--governed-offline")) {
+    throw new Error("Use --governed-offline for source-pinned out-of-band publication, or no argument for legacy maintenance");
+  }
+  const offlineMode = process.argv[2] === "--governed-offline";
+  if (offlineMode) {
+    assertFreshGovernedViteShell();
+    const projection = readGovernedOfflineProjection();
+    activateGovernedOfflineProjection(projection);
+    writeDbMetadataManifest(projection.metadata);
+    console.log("GOVERNED_SEO_OFFLINE_SOURCE_EPOCH=" + projection.sourceEpoch);
+    console.log("GOVERNED_SEO_NETWORK_READS=0");
+    console.log("PUBLICATION_ACTIVATION_AUTHORITY=NONE");
+  } else {
   DB_METADATA_BY_PATH = await fetchDbMetadataManifest();
 
   const playlistMetadataCount =
@@ -1928,6 +2074,7 @@ async function main() {
   RELEASE_METADATA_BY_PATH = await fetchReleaseMetadataManifest();
   TRACK_METADATA_BY_PATH = await fetchTrackMetadataManifest();
   CHART_METADATA_BY_PATH = await fetchChartMetadataManifest();
+  }
 
   const baseHtml = fs.readFileSync(INDEX_PATH, "utf8");
   const candidatePaths = [
@@ -1961,9 +2108,14 @@ async function main() {
   }
 
   console.log(`SEO prerender complete: ${written.toLocaleString()} HTML files written.`);
+  if (offlineMode) console.log("PUBLICATION_ACTIVATION_AUTHORITY=NONE");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+export {readGovernedOfflineProjection, assertFreshGovernedViteShell, activateGovernedOfflineProjection, articleManifestsFromRows, seoBlockForPath, htmlForPath};
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
