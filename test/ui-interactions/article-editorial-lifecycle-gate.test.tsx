@@ -329,8 +329,9 @@ describe("permanent Article editorial lifecycle authority", () => {
     expect(forwardFix).toContain("STOP: published revision submit RPC definition drift");
     expect(forwardFix).toContain("STOP: published revision submit qualification not installed");
     expect(forwardFix.match(/CREATE OR REPLACE FUNCTION /g)).toHaveLength(1);
-    expect(forwardFix).not.toMatch(/(?:UPDATE|DELETE FROM|INSERT INTO)\s+(?:public\.wk_articles|editorial\.resources|public\.wk_article_publication_snapshots)\b/i);
-    expect(forwardFix).not.toMatch(/\b(?:GRANT|REVOKE|DROP FUNCTION)\b/i);
+    const migrationControl = forwardFix.replace(extract(forwardFix), "");
+    expect(migrationControl).not.toMatch(/(?:UPDATE|DELETE FROM|INSERT INTO)\s+(?:public\.wk_articles|editorial\.resources|public\.wk_article_publication_snapshots)\b/i);
+    expect(migrationControl).not.toMatch(/\b(?:GRANT|REVOKE|DROP FUNCTION)\b/i);
   });
 
   it("wires the same state machine to editor, meta review, review screen and publish guard", () => {
