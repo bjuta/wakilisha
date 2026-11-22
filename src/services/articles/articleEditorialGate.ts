@@ -33,6 +33,7 @@ export interface ArticleEditorialGateInput {
   wpStatus: string | null;
   latestReviewAction: string | null;
   latestApprovedVersionNumber: number | null;
+  latestPublishedVersionNumber: number | null;
   latestSubmittedVersionId: string | null;
   reviewTargetVersionId: string | null;
   isDirty: boolean;
@@ -93,11 +94,12 @@ function sameFingerprint(a: string | null | undefined, b: string | null | undefi
 
 export function deriveArticleEditorialGate(input: ArticleEditorialGateInput): ArticleEditorialGate {
   const {
-    wpStatus, latestReviewAction, latestApprovedVersionNumber,
+    wpStatus, latestReviewAction, latestApprovedVersionNumber, latestPublishedVersionNumber,
     latestSubmittedVersionId, reviewTargetVersionId,
     isDirty, canEdit, allowSubmitForReview, canReview, canPublish, proof,
   } = input;
-  const live = wpStatus === "publish" || wpStatus === "future";
+  const published = wpStatus === "publish";
+  const live = published || wpStatus === "future";
   const approvalMatchesWorking = sameFingerprint(
     proof?.latestContentFingerprint, proof?.approvedContentFingerprint,
   );
@@ -124,18 +126,33 @@ export function deriveArticleEditorialGate(input: ArticleEditorialGateInput): Ar
     (submissionMatchesWorking === true || !canEdit),
   );
   const awaitingReview = latestReviewAction === "submitted";
+  // A live Article retains its active public snapshot while a new working
+  // version is prepared. Require loaded, immutable version evidence.
+  const workingAfterPublication = Boolean(
+    published && proof && latestPublishedVersionNumber != null &&
+    proof.latestVersionNumber != null &&
+    (proof.latestVersionNumber > latestPublishedVersionNumber || isDirty)
+  );
   const canSubmitWorkingVersion = Boolean(
-    canEdit && allowSubmitForReview && !live &&
-    (
-      (latestReviewAction === "approved" && approvalChanged) ||
-      (awaitingReview && submissionChanged) ||
-      latestReviewAction === "changes_requested" ||
-      ((!latestReviewAction || latestReviewAction === "draft") &&
-        (wpStatus === "draft" || !wpStatus))
+    canEdit && allowSubmitForReview && wpStatus !== "future" &&
+    (published
+      ? (
+        (latestReviewAction === "published" && workingAfterPublication) ||
+        (latestReviewAction === "approved" && approvalChanged) ||
+        (awaitingReview && submissionChanged) ||
+        latestReviewAction === "changes_requested"
+      )
+      : (
+        (latestReviewAction === "approved" && approvalChanged) ||
+        (awaitingReview && submissionChanged) ||
+        latestReviewAction === "changes_requested" ||
+        ((!latestReviewAction || latestReviewAction === "draft") &&
+          (wpStatus === "draft" || !wpStatus))
+      )
     ),
   );
   const canDecideSubmittedVersion = Boolean(
-    canReview && wpStatus === "pending" && awaitingReview &&
+    canReview && (wpStatus === "pending" || published) && awaitingReview &&
     submittedTargetCurrent,
   );
   const canPublishApprovedVersion = Boolean(
@@ -144,12 +161,19 @@ export function deriveArticleEditorialGate(input: ArticleEditorialGateInput): Ar
   );
   const workingChangesNeedReview = Boolean(
     (latestReviewAction === "approved" && approvalChanged) ||
-    (awaitingReview && submissionChanged),
+    (awaitingReview && submissionChanged) ||
+    (latestReviewAction === "published" && workingAfterPublication) ||
+    (published && latestReviewAction === "changes_requested"),
   );
   let editorialStatusLabel: string;
   let editorialStatusColorKey: string;
-  if (wpStatus === "publish") {
-    editorialStatusLabel = "Published";
+  if (published) {
+    editorialStatusLabel = workingChangesNeedReview
+      ? "Published · Changes Need Review"
+      : awaitingReview ? "Published · In Review"
+      : latestReviewAction === "approved" && canPublishApprovedVersion
+        ? "Published · Update Approved"
+        : "Published";
     editorialStatusColorKey = "publish";
   } else if (wpStatus === "future") {
     editorialStatusLabel = "Scheduled";
@@ -186,7 +210,7 @@ export function deriveArticleEditorialGate(input: ArticleEditorialGateInput): Ar
       publishDisabledReason = "Save your current changes before publishing the approved Article version.";
     } else if (workingChangesNeedReview) {
       publishDisabledReason =
-        "The working Article changed since its last reviewed version. Resubmit the current version for approval.";
+        "The working Article changed since its last reviewed version. Submit the updated version for approval; the current publication remains live.";
     } else if (awaitingReview) {
       publishDisabledReason = "The submitted Article version is awaiting a new review decision.";
     } else if (latestReviewAction === "approved") {
