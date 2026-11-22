@@ -343,6 +343,10 @@ export function ArticleEditorWorkspace({
     return lifecycleEvents.find((event) => event.action === "approved") ?? null;
   }, [lifecycleEvents]);
 
+  const latestPublishedLifecycleEvent = useMemo(() => {
+    return lifecycleEvents.find((event) => event.action === "published") ?? null;
+  }, [lifecycleEvents]);
+
   const latestSubmittedLifecycleEvent = useMemo(() => {
     return lifecycleEvents.find((event) => event.action === "submitted") ?? null;
   }, [lifecycleEvents]);
@@ -394,6 +398,7 @@ export function ArticleEditorWorkspace({
     useArticleDocumentModeState({
       articleId: article?.id ?? null,
       wpStatus: article?.wpStatus ?? null,
+      latestReviewAction,
       draftVersion:
         article?.draftVersion ?? null,
     });
@@ -489,6 +494,7 @@ export function ArticleEditorWorkspace({
     wpStatus: article?.wpStatus ?? null,
     latestReviewAction,
     latestApprovedVersionNumber: latestApprovedLifecycleEvent?.versionNumber ?? null,
+    latestPublishedVersionNumber: latestPublishedLifecycleEvent?.versionNumber ?? null,
     latestSubmittedVersionId: latestSubmittedLifecycleEvent?.versionId ?? null,
     reviewTargetVersionId: submittedDocument?.id ?? null,
     isDirty,
@@ -1277,7 +1283,7 @@ export function ArticleEditorWorkspace({
             categories: draft.categories,
             tags: draft.tags,
             seo: draft.seo,
-            wpStatus: "pending",
+            wpStatus: article.wpStatus === "publish" ? "publish" : "pending",
           });
         } catch (error) {
           addToast("error", error instanceof Error ? error.message : "Failed to submit for review.");
@@ -3253,6 +3259,10 @@ export function ArticleEditorWorkspace({
               submittedVersionNumber={submittedDocument?.versionNumber ?? null}
               workingVersionNumber={currentVersionProof?.latestVersionNumber ?? null}
               latestApprovedVersionNumber={latestApprovedLifecycleEvent?.versionNumber ?? null}
+              latestPublishedVersionNumber={latestPublishedLifecycleEvent?.versionNumber ?? null}
+              isPublished={article?.wpStatus === "publish"}
+              canEditArticle={articlePermissions.canEdit}
+              onEditArticle={() => setActiveWorkbenchMode("write")}
               canResubmitWorkingVersion={canSubmitCurrentArticleForReview}
               onResubmitWorkingVersion={(note) => void handleSubmitForReview(note)}
               note={reviewActionNote}

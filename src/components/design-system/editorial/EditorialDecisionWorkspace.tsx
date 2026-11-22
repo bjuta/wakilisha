@@ -65,6 +65,7 @@ export function EditorialDecisionWorkspace({
   onNoteChange,
   noteLabel = "Decision note",
   notePlaceholder = "Add context for this editorial decision.",
+  showNote = true,
   statusLabel,
   targetLabel,
   actions,
@@ -78,6 +79,7 @@ export function EditorialDecisionWorkspace({
   onNoteChange: (value: string) => void;
   noteLabel?: string;
   notePlaceholder?: string;
+  showNote?: boolean;
   statusLabel?: string | null;
   targetLabel?: string | null;
   actions: EditorialDecisionDescriptor[];
@@ -137,7 +139,7 @@ export function EditorialDecisionWorkspace({
           </div>
         ) : null}
 
-        <label className="block text-xs font-bold text-wk-text-muted">
+        {showNote ? <label className="block text-xs font-bold text-wk-text-muted">
           {noteLabel}
           <textarea
             value={note}
@@ -149,7 +151,7 @@ export function EditorialDecisionWorkspace({
             placeholder={notePlaceholder}
             className="mt-1 w-full rounded-lg border border-wk-border bg-wk-bg px-3 py-2 text-sm text-wk-text outline-none focus:border-wk-brand"
           />
-        </label>
+        </label> : null}
 
         {validationMessage ? (
           <p role="alert" className="mt-2 text-xs font-bold text-wk-warning">

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { deriveArticleEditorialGate, canPublishArticleWithCapability, currentArticleReviewProof, type ArticleEditorialGateInput } from "@/services/articles/articleEditorialGate";
 import { ArticleReviewDecisionWorkspace } from "@/pages/admin/content/articles/detail/components/ArticleReviewDecisionWorkspace";
+import { hasActiveArticleReviewRound } from "@/pages/admin/content/articles/detail/hooks/useArticleDocumentModeState";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -12,7 +13,7 @@ const newSubmission = "00000000-0000-4000-8000-000000000033";
 function gate(overrides: Partial<ArticleEditorialGateInput> = {}) {
   const base: ArticleEditorialGateInput = {
     wpStatus: "pending", latestReviewAction: "approved",
-    latestApprovedVersionNumber: 31, latestSubmittedVersionId: oldSubmission,
+    latestApprovedVersionNumber: 31, latestPublishedVersionNumber: null, latestSubmittedVersionId: oldSubmission,
     reviewTargetVersionId: oldSubmission, isDirty: false,
     canEdit: true, canReview: true, canPublish: true, allowSubmitForReview: true,
     proof: { latestVersionNumber: 32, latestContentFingerprint: changed,
@@ -159,8 +160,102 @@ describe("permanent Article editorial lifecycle authority", () => {
   it("preserves review and publish permissions and hides submission for live Articles", () => {
     expect(gate({ canEdit: false }).canSubmitWorkingVersion).toBe(false);
     expect(gate({ canPublish: false }).canPublishApprovedVersion).toBe(false);
-    expect(gate({ wpStatus: "publish" }).canSubmitWorkingVersion).toBe(false);
+    expect(gate({ wpStatus: "publish", latestReviewAction: "published", latestPublishedVersionNumber: 37,
+      proof: { latestVersionNumber: 37, latestContentFingerprint: approved,
+        approvedVersionNumber: 31, approvedContentFingerprint: approved,
+        submittedVersionNumber: 30, submittedContentFingerprint: approved },
+    }).canSubmitWorkingVersion).toBe(false);
     expect(gate({ allowSubmitForReview: false }).canSubmitWorkingVersion).toBe(false);
+  });
+
+  it("allows a newer saved working version of a published Article to be reviewed without withdrawing the live snapshot", () => {
+    const live = gate({
+      wpStatus: "publish", latestReviewAction: "published",
+      latestApprovedVersionNumber: 35, latestPublishedVersionNumber: 37,
+      proof: { latestVersionNumber: 39, latestContentFingerprint: changed,
+        approvedVersionNumber: 35, approvedContentFingerprint: approved,
+        submittedVersionNumber: 34, submittedContentFingerprint: approved },
+    });
+    expect(live.canSubmitWorkingVersion).toBe(true);
+    expect(live.canApproveSubmittedVersion).toBe(false);
+    expect(live.canPublishApprovedVersion).toBe(false);
+    expect(live.editorialStatusLabel).toBe("Published · Changes Need Review");
+    expect(live.publishDisabledReason).toContain("remains live");
+    const absent = gate({ wpStatus: "publish", latestReviewAction: "published",
+      latestPublishedVersionNumber: 37, proof: null });
+    expect(absent.canSubmitWorkingVersion).toBe(false);
+    const scheduled = gate({ wpStatus: "future", latestReviewAction: "published",
+      latestPublishedVersionNumber: 37 });
+    expect(scheduled.canSubmitWorkingVersion).toBe(false);
+  });
+
+  it("loads only the exact new published revision for review and never the old submitted Article", () => {
+    expect(hasActiveArticleReviewRound("publish","published")).toBe(false);
+    expect(hasActiveArticleReviewRound("publish","submitted")).toBe(true);
+    expect(hasActiveArticleReviewRound("publish","approved")).toBe(false);
+    expect(hasActiveArticleReviewRound("publish","changes_requested")).toBe(false);
+    expect(hasActiveArticleReviewRound("pending","submitted")).toBe(true);
+    expect(hasActiveArticleReviewRound("future","submitted")).toBe(false);
+    const editor=fs.readFileSync(path.join(process.cwd(),
+      "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx"),"utf8");
+    expect(editor).toContain("latestReviewAction,\n      draftVersion:");
+  });
+
+  it("reviews a new published correction while retaining live status, then allows explicit publication", () => {
+    const reviewed = "00000000-0000-4000-8000-000000000041";
+    const proof = { latestVersionNumber: 41, latestContentFingerprint: changed,
+      approvedVersionNumber: 35, approvedContentFingerprint: approved,
+      submittedVersionNumber: 41, submittedContentFingerprint: changed };
+    const pending = gate({
+      wpStatus: "publish", latestReviewAction: "submitted",
+      latestPublishedVersionNumber: 37,
+      latestApprovedVersionNumber: 35, latestSubmittedVersionId: reviewed,
+      reviewTargetVersionId: reviewed, proof,
+    });
+    expect(pending.canApproveSubmittedVersion).toBe(true);
+    expect(pending.canRequestChanges).toBe(true);
+    expect(pending.canPublishApprovedVersion).toBe(false);
+    expect(pending.editorialStatusLabel).toBe("Published · In Review");
+    expect(gate({wpStatus:"publish",latestReviewAction:"submitted",
+      latestPublishedVersionNumber:37,latestSubmittedVersionId:reviewed,
+      reviewTargetVersionId:oldSubmission,proof}).canApproveSubmittedVersion).toBe(false);
+    const approvedRevision=gate({
+      wpStatus:"publish",latestReviewAction:"approved",
+      latestPublishedVersionNumber:37,latestApprovedVersionNumber:42,
+      proof:{...proof,approvedVersionNumber:42,approvedContentFingerprint:changed},
+    });
+    expect(approvedRevision.canPublishApprovedVersion).toBe(true);
+    expect(approvedRevision.editorialStatusLabel).toBe("Published · Update Approved");
+  });
+
+  it("shows a direct Edit Article action in published Review, without an unsavable decision note", () => {
+    const edit = vi.fn();
+    render(<ArticleReviewDecisionWorkspace title="Album Review: Alusa Continua"
+      status="Published" submittedVersionNumber={34} workingVersionNumber={39}
+      latestApprovedVersionNumber={35} latestPublishedVersionNumber={37}
+      isPublished canEditArticle onEditArticle={edit}
+      canResubmitWorkingVersion={false} onResubmitWorkingVersion={()=>{}}
+      note="" onNoteChange={()=>{}} canRequestChanges={false} canApprove={false}
+      busy={false} events={[]} onRequestChanges={()=>{}} onApprove={()=>{}} />);
+    expect(screen.getByText(/published v37/)).toBeTruthy();
+    expect(screen.getByText(/stays published while you edit/)).toBeTruthy();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button",{name:"Edit Article"}));
+    expect(edit).toHaveBeenCalledOnce();
+  });
+
+  it("allows submitting updated live text without reapproving the prior published version", () => {
+    const submitted=vi.fn();
+    render(<ArticleReviewDecisionWorkspace title="Album Review: Alusa Continua"
+      status="Published · Changes Need Review" submittedVersionNumber={34} workingVersionNumber={39}
+      latestApprovedVersionNumber={35} latestPublishedVersionNumber={37}
+      isPublished canEditArticle onEditArticle={()=>{}}
+      canResubmitWorkingVersion onResubmitWorkingVersion={submitted}
+      note="Corrected the text" onNoteChange={()=>{}} canRequestChanges={false} canApprove={false}
+      busy={false} events={[]} onRequestChanges={()=>{}} onApprove={()=>{}} />);
+    fireEvent.click(screen.getByRole("button",{name:"Submit Updated Article for Review"}));
+    expect(submitted).toHaveBeenCalledWith("Corrected the text");
+    expect(screen.queryByRole("button",{name:"Approve Version"})).toBeNull();
   });
 
   it("offers a working-version submission in the actual review decision component", () => {
@@ -186,6 +281,29 @@ describe("permanent Article editorial lifecycle authority", () => {
       canRequestChanges={false} canApprove={false} busy={false} events={[]} />);
     expect(screen.getByText(/approved v31/)).toBeTruthy();
     expect(screen.queryByText(/submitted v30/)).toBeNull();
+  });
+
+  it("preserves the public Article and published pointer in all three review lifecycle SQL commands", () => {
+    const sql = fs.readFileSync(path.join(process.cwd(),
+      "supabase/migrations/20261122120000_article_published_revision_preserve_live_v1.sql"), "utf8");
+    expect(sql.match(/CREATE OR REPLACE FUNCTION public\./gi)).toHaveLength(3);
+    expect(sql).toContain("public.submit_article_for_review");
+    expect(sql).toContain("public.request_article_changes");
+    expect(sql).toContain("public.approve_article_version");
+    expect(sql.match(/v_preserve_live := v_article.wp_status = 'publish'/g)).toHaveLength(3);
+    expect(sql.match(/snap\.version_id = v_resource\.current_published_version_id/g)).toHaveLength(3);
+    expect(sql).toContain("Save a newer working Article version before submitting a published revision");
+    expect(sql).toContain("Published Article revision is not the current submitted version");
+    expect(sql.match(/visibility = case when v_preserve_live then 'public' else 'private' end/g))
+      .toHaveLength(3);
+    expect(sql).toContain("wp_status = case when v_preserve_live then 'publish' else 'pending' end");
+    expect(sql).toContain("wp_status = case when v_preserve_live then 'publish' else 'draft' end");
+    expect(sql).not.toMatch(/update public\.wk_article_publication_snapshots/i);
+    expect(sql).not.toMatch(/delete from public\.wk_article_publication_snapshots/i);
+    expect(sql).not.toMatch(/current_published_version_id\s*=/i);
+    expect(sql).toContain("STOP: submit_article_for_review definition drift");
+    expect(sql).toContain("STOP: approve_article_version definition drift");
+    expect(sql).toContain("STOP: request_article_changes definition drift");
   });
 
   it("wires the same state machine to editor, meta review, review screen and publish guard", () => {
