@@ -165,6 +165,59 @@ describe("governed offline SEO projection and selected Article image authority",
     }
   });
 
+  it("materializes the exact selected image in zero-network Magazine fallback and homepage from one pinned source epoch", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "wk-offline-fallback-"));
+    try {
+      const dist = path.join(root, "dist");
+      mkdirSync(path.join(dist, "magazine"), { recursive: true });
+      const shell = "<!doctype html><html><head></head><body><div id=\"root\"></div></body></html>";
+      writeFileSync(path.join(dist, "index.html"), shell);
+      writeFileSync(path.join(dist, "magazine", "index.html"), shell);
+      const projection = {
+        format: 1, origin: "https://wakilisha.africa", complete: true,
+        sourceEpoch: "a".repeat(64), sourceScanSha256: "b".repeat(64),
+        capturedAt: "2026-11-22T09:01:00.000Z",
+        metadata: { "/magazine/album-review-alusa-continua": {
+          title: "Album Review: Alusa Continua", sourceTable: "wk_articles", sourceId: "article-1",
+        }},
+        articles: [{
+          id: "article-1", slug: "album-review-alusa-continua", title: "Album Review: Alusa Continua",
+          author: "Hafare Segelan", heroUrl: "https://media.wakilisha.africa/uploads/selected.webp",
+          date: "2026-11-22", dek: "Editorial review", section: "Review",
+        }],
+        artists: {}, releases: {}, tracks: {}, charts: {}, nonCanonicalPaths: [],
+      };
+      const bytes = JSON.stringify(projection);
+      const input = path.join(root, "source.json");
+      writeFileSync(input, bytes);
+      const result = spawnSync("node", [
+        path.resolve("scripts/seo/build-public-magazine-fallback.mjs"), "--governed-offline",
+      ], {
+        cwd: root, encoding: "utf8", env: {
+          ...process.env,
+          WAKILISHA_GOVERNED_SEO_PROJECTION: input,
+          WAKILISHA_GOVERNED_SEO_PROJECTION_SHA256: crypto.createHash("sha256").update(bytes).digest("hex"),
+          WAKILISHA_APPROVED_SOURCE_EPOCH: projection.sourceEpoch,
+          WAKILISHA_APPROVED_SOURCE_SCAN_SHA256: projection.sourceScanSha256,
+          VITE_PUBLIC_SUPABASE_URL: "",
+          VITE_PUBLIC_SUPABASE_ANON_KEY: "",
+        },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("GOVERNED_MAGAZINE_FALLBACK_NETWORK_READS=0");
+      const fallback = JSON.parse(readFileSync(path.join(dist,"public-magazine-fallback.json"),"utf8"));
+      expect(fallback.generatedAt).toBe("2026-11-22T09:01:00.000Z");
+      expect(fallback.stories[0].title).toBe("Album Review: Alusa Continua");
+      expect(fallback.stories[0].heroUrl).toBe("https://media.wakilisha.africa/uploads/selected.webp");
+      const magazine = readFileSync(path.join(dist,"magazine","index.html"),"utf8");
+      expect(magazine).toContain('data-wakilisha-lcp-preload="magazine"');
+      expect(magazine).toContain("selected.webp");
+      expect(readFileSync(path.join(dist,"index.html"),"utf8")).toContain('id="wk-magazine-fallback"');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("renders a new Article's exact editor-selected image in initial HTTP SEO and Article JSON-LD without network fetches", () => {
     const input = fixture();
     activateGovernedOfflineProjection(input);
