@@ -55,12 +55,13 @@ describe("unified sharing destination grid for Instagram Story", () => {
 
   it("opens a native Story detail from the same mobile share grid and returns without a separate banner", async () => {
     const { rerender } = render(<ShareSheet item={article} open onClose={vi.fn()} />);
-    expect(screen.getAllByRole("button", { name: "Instagram" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Instagram Story" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Instagram Story" }).querySelector("svg path")).toBeTruthy();
     expect(screen.queryByText("Share Image")).toBeNull();
     expect(renderArticleStoryImage).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Instagram" }));
-    expect(screen.queryByRole("button", { name: "Instagram" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
+    expect(screen.queryByRole("button", { name: "Instagram Story" })).toBeNull();
     expect(screen.getByRole("button", { name: "Back to share options" })).toBeTruthy();
     expect(incrementShareCount).not.toHaveBeenCalled();
 
@@ -71,12 +72,12 @@ describe("unified sharing destination grid for Instagram Story", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Back to share options" }));
     await waitFor(() => expect(revokeUrl).toHaveBeenCalledWith("blob:wakilisha-story-test"));
-    expect(screen.getByRole("button", { name: "Instagram" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Instagram Story" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Instagram" }));
+    fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
     rerender(<ShareSheet item={article} open={false} onClose={vi.fn()} />);
     rerender(<ShareSheet item={article} open onClose={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Instagram" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Instagram Story" })).toBeTruthy();
   });
 
   it("counts only a completed native image handoff, never simply opening Instagram", async () => {
@@ -84,7 +85,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
     Object.defineProperty(navigator, "share", { configurable: true, value: share });
     Object.defineProperty(navigator, "canShare", { configurable: true, value: vi.fn(() => true) });
     render(<ShareSheet item={article} open onClose={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Instagram" }));
+    fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
     expect(incrementShareCount).not.toHaveBeenCalled();
     fireEvent.click(await screen.findByRole("button", { name: "Share Image" }));
     await waitFor(() => expect(share).toHaveBeenCalledOnce());
@@ -96,9 +97,9 @@ describe("unified sharing destination grid for Instagram Story", () => {
   it("uses the same grid destination and reversible detail in the desktop popover", async () => {
     const triggerRef = { current: document.createElement("button") };
     render(<SharePopover item={article} open onClose={vi.fn()} triggerRef={triggerRef} />);
-    fireEvent.click(screen.getByRole("button", { name: "Instagram" }));
+    fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
     await screen.findByRole("button", { name: "Share Image" });
     fireEvent.click(screen.getByRole("button", { name: "Back to share options" }));
-    expect(screen.getByRole("button", { name: "Instagram" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Instagram Story" })).toBeTruthy();
   });
 });
