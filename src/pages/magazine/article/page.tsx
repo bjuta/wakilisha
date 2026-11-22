@@ -280,12 +280,13 @@ export default function ArticlePage() {
       type: "article" as const,
       slug: article.slug,
       id: article.id,
+      publishedSnapshotId: previewNonce ? undefined : article.id,
       url: canonicalArticleShareUrl(article.slug),
       title: article.title,
       subtitle: article.dek,
       imageUrl: article.heroUrl,
     };
-  }, [article?.slug, article?.id, article?.title, article?.dek, article?.heroUrl]);
+  }, [article?.slug, article?.id, article?.title, article?.dek, article?.heroUrl, previewNonce]);
 
   if (articleLoading) {
     return (

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { canonicalArticleShareUrl, shareImageUrl, shareTextForItem } from "../../src/components/design-system/share/sharePresentation";
+import { canonicalArticleShareUrl, publishedArticleCardUrl, shareImageUrl, shareTextForItem } from "../../src/components/design-system/share/sharePresentation";
 
 const read = (name: string) => readFileSync(name, "utf8");
 
@@ -222,6 +222,34 @@ describe("Workbook v4 is the only active product design authority", () => {
 
     expect(canonicalArticleShareUrl("album-review-alusa-continua"))
       .toBe("https://wakilisha.africa/magazine/album-review-alusa-continua");
+    const canonical = canonicalArticleShareUrl("album-review-alusa-continua");
+    const snapshotA = "cfbcb1a2-f9e7-4d6c-8db9-aa0b2ffed343";
+    const snapshotB = "11bcb1a2-f9e7-4d6c-8db9-aa0b2ffed343";
+    expect(publishedArticleCardUrl(canonical, snapshotA))
+      .toBe(canonical + "?wk_card_v=" + snapshotA);
+    expect(publishedArticleCardUrl(canonical, snapshotA))
+      .toBe(publishedArticleCardUrl(canonical, snapshotA));
+    expect(publishedArticleCardUrl(canonical, snapshotA))
+      .not.toBe(publishedArticleCardUrl(canonical, snapshotB));
+    expect(publishedArticleCardUrl(
+      canonical + "?utm_source=x&utm_medium=share&utm_campaign=wakilisha_share&utm_content=article",
+      snapshotA,
+    )).toContain("&wk_card_v=" + snapshotA);
+    expect(publishedArticleCardUrl(canonical, "")).toBe(canonical);
+    expect(publishedArticleCardUrl(canonical, "working-article-id")).toBe(canonical);
+    expect(publishedArticleCardUrl("https://evil.example/magazine/album-review-alusa-continua", snapshotA))
+      .toBe("https://evil.example/magazine/album-review-alusa-continua");
+    expect(publishedArticleCardUrl(canonical + "?preview=private-nonce", snapshotA))
+      .toBe(canonical + "?preview=private-nonce");
+    expect(publishedArticleCardUrl("https://wakilisha.africa/artists/bien", snapshotA))
+      .toBe("https://wakilisha.africa/artists/bien");
+    expect(share.match(/publishedArticleCardUrl\(/g)).toHaveLength(2);
+    const actions = read("src/components/feature/community/CommunityActionSheet.tsx");
+    expect(actions).toContain('publishedSnapshotId: entity.type === "article" ? entity.publishedSnapshotId : undefined');
+    const api = read("supabase/functions/public-content-read/index.ts");
+    expect(api).toContain("id: String(a.id)");
+    expect(api).toContain('from("wk_article_publication_snapshots")');
+
     expect(shareImageUrl("https://media.wakilisha.africa/uploads/published.webp"))
       .toBe("https://media.wakilisha.africa/uploads/published.webp");
     expect(shareImageUrl("javascript:alert(1)")).toBeUndefined();
@@ -233,6 +261,10 @@ describe("Workbook v4 is the only active product design authority", () => {
       expect(page).not.toContain('url: typeof window !== "undefined" ? window.location.href : ""');
     }
     expect(mobile).toContain("subtitle: article.author");
+    for (const page of [desktop, mobile]) {
+      expect(page).toContain("publishedSnapshotId: previewNonce ? undefined : article.id");
+    }
+    expect(read("src/services/community/types.ts")).toContain("publishedSnapshotId?: string | null");
     expect(desktop).toContain("subtitle: article.dek");
     expect(share.match(/shareTextForItem\(item\)/g)).toHaveLength(2);
     expect(share).not.toContain('key: "messenger"');

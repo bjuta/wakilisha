@@ -4,7 +4,7 @@ import { incrementShareCount, getShareCounts, getTotalShareCount } from "@/servi
 import { trackEvent } from "@/services/analytics";
 import { buildUtmUrl, getUtmContextForUrl } from "@/services/attribution";
 import { Portal } from "@/components/base/Portal";
-import { shareImageUrl, shareTextForItem } from "./sharePresentation";
+import { publishedArticleCardUrl, shareImageUrl, shareTextForItem } from "./sharePresentation";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  WAKILISHA SHARE — Unified share infrastructure across all surfaces
@@ -104,6 +104,7 @@ export type ShareObject = {
   description?: string;
   imageUrl?: string | null;
   url?: string;
+  publishedSnapshotId?: string | null;
   type?: "track" | "album" | "article" | "chart" | "artist" | "artist_update" | "post" | "playlist" | "page";
 };
 
@@ -452,7 +453,13 @@ export function SharePopover({
   const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
-  const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
+  const finalUrl = useMemo(
+    () => publishedArticleCardUrl(
+      getFinalUrl(baseUrl, timestamp),
+      item.type === "article" ? item.publishedSnapshotId : undefined,
+    ),
+    [baseUrl, timestamp, item.type, item.publishedSnapshotId],
+  );
   const shareTarget = useMemo(() => parseShareTarget(finalUrl, item.type), [finalUrl, item.type]);
   const shareText = shareTextForItem(item);
   const shareContent = item.type ?? "page";
@@ -829,7 +836,13 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   const isDragging = useRef(false);
 
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
-  const finalUrl = useMemo(() => getFinalUrl(baseUrl, timestamp), [baseUrl, timestamp]);
+  const finalUrl = useMemo(
+    () => publishedArticleCardUrl(
+      getFinalUrl(baseUrl, timestamp),
+      item.type === "article" ? item.publishedSnapshotId : undefined,
+    ),
+    [baseUrl, timestamp, item.type, item.publishedSnapshotId],
+  );
   const shareTarget = useMemo(() => parseShareTarget(finalUrl, item.type), [finalUrl, item.type]);
   const shareText = shareTextForItem(item);
   const shareContent = item.type ?? "page";

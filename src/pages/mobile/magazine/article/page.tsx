@@ -214,12 +214,13 @@ export default function MobileArticle() {
       type: "article" as const,
       slug: article.slug,
       id: article.id,
+      publishedSnapshotId: previewNonce ? undefined : article.id,
       url: canonicalArticleShareUrl(article.slug),
       title: article.title,
       subtitle: article.author,
       imageUrl: article.heroUrl,
     };
-  }, [article?.slug, article?.id, article?.title, article?.author, article?.heroUrl]);
+  }, [article?.slug, article?.id, article?.title, article?.author, article?.heroUrl, previewNonce]);
 
   if (loading) {
     return (
