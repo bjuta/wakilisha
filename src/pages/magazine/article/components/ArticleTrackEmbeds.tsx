@@ -34,8 +34,6 @@ export interface TrackEmbedData {
 
 export const TRACK_MARKER_PREFIX = "WK_TRACK_";
 
-const REGISTRY_MARKER_RE = /<!--WK_REGISTRY_TRACK:([^:>]+)-->/g;
-
 function firstString(...values: unknown[]): string | null {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
