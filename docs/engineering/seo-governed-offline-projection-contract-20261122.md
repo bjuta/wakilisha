@@ -21,6 +21,14 @@ Projection format: `format=1`, `origin=https://wakilisha.africa`, `complete=true
 
 The originating capture must be from a separately authenticated, consistent and bounded read-only Production source epoch. **These fields and checksums are necessary input-integrity checks, not authentication of source provenance.** A self-asserted `complete=true` or locally generated SHA is insufficient. The managed scan adapter in draft PR #1379 is still scan evidence, not the complete route/source-binding receipt or a publisher.
 
+## Critical read-only Magazine source boundary
+
+The public `public-content-read/magazine` GET handler invokes `publish_due_article_publications` before returning stories. **It must never be used for a governed supposedly read-only source capture.** The source assembler instead emits an explicit single-statement `SELECT` against `public.wk_article_publication_snapshots WHERE is_active=true AND wp_status='publish'`, capped at 501 rows and admitting at most 500 active published Article records. It returns only public identity, title, author, published description/date and the exact selected `hero_image_url` (no content HTML or unpublished versions).
+
+Emit the SQL through `node scripts/seo/assemble-governed-publication-projection.mjs --emit-magazine-sql /absolute/newfile.sql`. An authenticated operator must execute this via the independently accepted Supabase CLI v3 managed `--read-only --remote=pgzizndxdyhqmtyywjmt` path, not the connected `execute_sql` action (which previously ran as `postgres` and `transaction_read_only=off`). The result includes the server role, read-only status, server timestamp, row count and the exact source snapshot IDs. The assembler rejects any other role or execution class, stale capture outside the first/second managed source epochs, duplicate/invalid identities, wrong images and missing authoritative route metadata.
+
+The SQL has passed read-only **EXPLAIN without ANALYZE** on Production (project `pgzizndxdyhqmtyywjmt`), without executing its full source read or attempting to establish managed-reader provenance. This is a syntax/plan preflight only, **not** the accepted live capture or publication receipt.
+
 ## Candidate-generation invocation after independent source approval
 
 From an isolated clean exact-main build worktree:
