@@ -101,7 +101,9 @@ try {
   const rpc=(name,body)=>request('/rest/v1/rpc/'+name,{method:'POST',body});
   const sel=(table,params)=>request('/rest/v1/'+table+'?'+params);
   const cors=await request('/functions/v1/ingest-artist-discography',{method:'OPTIONS',auth:false});
-  assert(cors.ok&&cors.allowOrigin===origin,'Chromium Preview CORS preflight denied.');
+  // Access-Control-Allow-Origin is not a CORS-safelisted *response* header exposed to JS.
+  // A real Chromium cross-origin fetch resolving with HTTP 200 proves ingress CORS.
+  assert(cors.ok&&cors.status===200,'Chromium Preview CORS preflight denied: '+cors.status);
   const role=await rpc('current_user_has_capability',{required_capability:'manage_registry'});
   assert(role.ok&&role.data===true,'Real JWT lacks governed manage_registry capability.');
   const original=await sel('registry_tracks','select=id,title,slug,isrc,metadata&isrc=eq.'+ORIGINAL_ISRC);
