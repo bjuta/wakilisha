@@ -471,8 +471,9 @@ function readGovernedOfflineProjection(options = process.env) {
     ...projection.nonCanonicalPaths,
   ];
   for (const route of allRoutes) {
-    if (typeof route !== "string" || !/^\/[a-zA-Z0-9/_-]{1,320}$/.test(route) ||
-        route.includes("//") || route.includes("..") || route.endsWith("/")) {
+    if (typeof route !== "string" || !/^\/[a-zA-Z0-9/._-]{0,319}$/.test(route) ||
+        route.includes("//") || (route !== "/" && route.endsWith("/")) ||
+        route.split("/").some(part => part === "." || part === "..")) {
       throw new Error("Unsafe or noncanonical governed SEO route: " + String(route));
     }
   }
@@ -480,7 +481,7 @@ function readGovernedOfflineProjection(options = process.env) {
   for (const article of projection.articles) {
     const articlePath = articlePathFromSlug(article?.slug);
     if (!articlePath || articlePaths.has(articlePath) ||
-        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(article?.slug || ""))) {
+        !/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/.test(String(article?.slug || ""))) {
       throw new Error("Duplicate or unsafe governed Article identity");
     }
     articlePaths.add(articlePath);
