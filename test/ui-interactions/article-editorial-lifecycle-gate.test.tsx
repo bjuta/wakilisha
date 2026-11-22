@@ -143,6 +143,16 @@ describe("permanent Article editorial lifecycle authority", () => {
     expect(screen.queryByRole("button", { name: "Approve Version" })).toBeNull();
   });
 
+  it("displays the active approved identity, never the historical submitted version as current", () => {
+    render(<ArticleReviewDecisionWorkspace title="Album Review: Alusa Continua"
+      status="Approved for Publication" submittedVersionNumber={30} workingVersionNumber={31}
+      latestApprovedVersionNumber={31} canResubmitWorkingVersion={false}
+      onResubmitWorkingVersion={() => {}} note="" onNoteChange={() => {}}
+      canRequestChanges={false} canApprove={false} busy={false} events={[]} />);
+    expect(screen.getByText(/approved v31/)).toBeTruthy();
+    expect(screen.queryByText(/submitted v30/)).toBeNull();
+  });
+
   it("wires the same state machine to editor, meta review, review screen and publish guard", () => {
     const src = fs.readFileSync(path.join(process.cwd(),
       "src/pages/admin/content/articles/detail/ArticleEditorWorkspace.tsx"), "utf8");
