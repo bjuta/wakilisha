@@ -290,7 +290,7 @@ describe("Workbook v4 is the only active product design authority", () => {
 
     expect(exportSource).toContain('getPropertyValue("--wk-font-display")');
     expect(exportSource).toContain('getPropertyValue("--wk-font-body")');
-    expect(exportSource).toContain('getPropertyValue("--wk-brand")');
+    expect(exportSource).toContain('getPropertyValue("--wk-brand-dot")');
     expect(exportSource).toContain('document.fonts.load');
     expect(exportSource).toContain('image.crossOrigin = "anonymous"');
     expect(exportSource).toContain('ctx.drawImage(image, crop.sx, crop.sy, crop.sw, crop.sh');
