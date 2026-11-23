@@ -429,6 +429,7 @@ function SharePlatformGrid({
   pendingPlatforms,
   onShare,
   onCopy,
+  copyStatus = "idle",
   size = "md",
 }: {
   platforms: SharePlatform[];
@@ -436,6 +437,7 @@ function SharePlatformGrid({
   pendingPlatforms: Set<string>;
   onShare: (p: SharePlatform) => void;
   onCopy: () => void;
+  copyStatus?: ShareCopyStatus;
   size?: "sm" | "md";
 }) {
   const iconSize = size === "sm" ? 16 : 18;
@@ -455,6 +457,7 @@ function SharePlatformGrid({
             type="button"
             className="share-grid-item"
             aria-label={p.key === "instagram_story" ? "Instagram Story" : p.name}
+            aria-busy={isCopy && copyStatus === "copying"}
             onClick={() => {
               if (isCopy) onCopy();
               else onShare(p);
@@ -467,7 +470,11 @@ function SharePlatformGrid({
               <SharePlatformIcon icon={p.icon} size={iconSize} />
             </div>
             <span className={`${labelSize} font-semibold text-[var(--wk-text-muted)]`}>
-              {p.name}
+              {isCopy && (copyStatus === "copied" || copyStatus === "count_error")
+                ? "Copied"
+                : isCopy && copyStatus === "copying"
+                  ? "Copying"
+                  : p.name}
             </span>
             {count > 0 && (
               <span className="share-grid-badge">
@@ -1067,6 +1074,7 @@ export function SharePopover({
               pendingPlatforms={pendingPlatforms}
               onShare={handleShare}
               onCopy={handleCopy}
+              copyStatus={copyStatus}
               size="sm"
             />
             <ShareCopyFeedback status={copyStatus} url={getTrackedShareUrl("copy")} />
@@ -1332,6 +1340,7 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
                   pendingPlatforms={pendingPlatforms}
                   onShare={handleShare}
                   onCopy={handleCopy}
+                  copyStatus={copyStatus}
                   size="md"
                 />
                 <ShareCopyFeedback status={copyStatus} url={getTrackedShareUrl("copy")} />
