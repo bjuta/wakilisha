@@ -1,4 +1,6 @@
+import { ChartReviewReturnContext } from "@/components/admin/charts/ChartReviewReturnContext";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { WkIcon } from "@/components/design-system/Icon";
 import { supabase } from "@/lib/supabase";
 import { WkSelect } from "@/components/design-system/primitives/Select";
@@ -187,10 +189,15 @@ function recommendedCanonicalTrack(candidate: TrackDuplicateCandidate): TrackAud
 }
 
 export default function AdminDuplicateMergePage() {
+  const [urlParams]=useSearchParams();
+  const targetedTrack=urlParams.get("chart_track");
+  const validTrack=targetedTrack&&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetedTrack)
+      ?targetedTrack:null;
   const [audit, setAudit] = useState<TrackDuplicateAuditResponse>(emptyAudit);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(validTrack??"");
   const [auditType, setAuditType] = useState<AuditType>("all");
   const [includeLowConfidence, setIncludeLowConfidence] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -248,6 +255,7 @@ export default function AdminDuplicateMergePage() {
         candidate.recommendedAction,
         candidate.auditType,
         ...candidate.tracks.flatMap((track) => [
+          track.id,
           track.slug,
           track.title,
           track.isrc,
@@ -474,6 +482,7 @@ export default function AdminDuplicateMergePage() {
 
   return (
     <div className="space-y-6">
+      <ChartReviewReturnContext consequence="track_duplicate" />
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 rounded-xl border px-4 py-3 text-[13px] font-semibold shadow-lg ${
           toast.type === "success"
