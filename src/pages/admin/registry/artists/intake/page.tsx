@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ChartReviewReturnContext } from "@/components/admin/charts/ChartReviewReturnContext";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
@@ -223,11 +224,18 @@ function LinkedTarget({ artist }: { artist: RegistryArtistHit }) {
 
 export default function ArtistIntakePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const chartRun=searchParams.has("chart_source");
+  const candidateRun=searchParams.get("run");
+  const chartRunId=candidateRun &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateRun)
+      ?candidateRun:null;
+  const initialChartRun=useRef(chartRunId);
   const [csvText, setCsvText] = useState("");
-  const [runId, setRunId] = useState<string | null>(null);
+  const [runId, setRunId] = useState<string | null>(initialChartRun.current);
   const [summary, setSummary] = useState<MatchSummary | null>(null);
   const [records, setRecords] = useState<StagingRecord[]>([]);
-  const [activeTab, setActiveTab] = useState<string>("exact_match");
+  const [activeTab, setActiveTab] = useState<string>(initialChartRun.current?"no_match":"exact_match");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -314,6 +322,12 @@ export default function ArtistIntakePage() {
     const result = await invokeIntakeApi("get_run_summary", { runId: id });
     if (result.ok) setSummary(result.summary);
   }
+
+  useEffect(()=>{
+    if(!initialChartRun.current)return;
+    void loadSummary(initialChartRun.current);
+    void loadResults(initialChartRun.current,"no_match");
+  },[]);
 
   async function handleTabChange(tab: string) {
     setActiveTab(tab);
@@ -440,6 +454,11 @@ export default function ArtistIntakePage() {
       )}
 
       <div className="mx-auto max-w-7xl">
+        <ChartReviewReturnContext />
+        {chartRun && !chartRunId &&
+          <p role="alert" className="mb-4 rounded-xl border border-red-200 p-4 text-sm text-red-700">
+            The chart Artist Intake reference is invalid. Reopen the original song in Charts Studio.
+          </p>}
         {/* Header */}
         <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -448,7 +467,9 @@ export default function ArtistIntakePage() {
             </p>
             <h1 className="text-3xl font-black tracking-tight">Artist Intake</h1>
             <p className="mt-2 max-w-2xl text-sm text-[#697062]">
-              Import artists from CSV or TSV. The Registry owns canonical truth and prevents duplicate identities.
+              {chartRun?
+                "Review the original chart Artist credit. Choose an existing Registry Artist or approve creating a draft identity. No origin or provider metadata is inferred.":
+                "Import artists from CSV or TSV. The Registry owns canonical truth and prevents duplicate identities."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
