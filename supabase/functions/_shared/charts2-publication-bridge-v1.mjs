@@ -131,13 +131,18 @@ export function inspectCharts2FrozenEditionProjectionV1({freeze,preflight,progra
          c.rank > s.depth || c.source_weight_points !== s.weight ||
          c.receipt_id !== receipt.receipt_id ||
          c.original_sha256 !== receipt.original_sha256 ||
-         !UUID.test(c.registry_provider_link_id ?? '') ||
+         !(c.source_key === 'shazam_ke'
+           ? (UUID.test(c.registry_observation_resolution_id ?? '') &&
+              c.registry_provider_link_id == null)
+           : (UUID.test(c.registry_provider_link_id ?? '') &&
+              c.registry_observation_resolution_id == null)) ||
          c.credit_units !== s.weight * (200/s.depth) * (s.depth-c.rank+1))
         fail('source_credit_invalid');
       const same = current.source_contributions.find(x=>x.source_key===c.source_key);
       if(!same || same.receipt_id !== c.receipt_id ||
          same.original_sha256 !== c.original_sha256 ||
          same.registry_provider_link_id !== c.registry_provider_link_id ||
+         same.registry_observation_resolution_id !== c.registry_observation_resolution_id ||
          same.rank !== c.rank || same.credit_units !== c.credit_units)
         fail('current_source_credit_changed');
       used.add(c.source_key);sum += c.credit_units;
