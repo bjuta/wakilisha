@@ -136,7 +136,7 @@ begin
     where newest.source_key=r.source_key
     order by newest.created_at desc,newest.id desc limit 1
   ) then
-    raise exception using errcode='40001',
+    raise exception using errcode='PT409',
       message='Original Chart receipt no longer matches the accepted source.';
   end if;
   select observed.value into o from jsonb_array_elements(r.observations) observed(value)
@@ -146,7 +146,7 @@ begin
     or nullif(o->>'artist','') is distinct from
        nullif(v.validation_snapshot->>'chart_artist_original','')
     or nullif(o->>'provider_track_id','') is distinct from v.provider_object_id
-  then raise exception using errcode='40001',
+  then raise exception using errcode='23514',
     message='Original Chart observation disagrees with the Intake evidence.';
   end if;
 end
@@ -197,7 +197,7 @@ begin
     select newest.id from platform_private.charts2_capture_receipts_v1 newest
     where newest.source_key=p_source_key
     order by newest.created_at desc,newest.id desc limit 1
-  ) then raise exception using errcode='40001',
+  ) then raise exception using errcode='PT409',
     message='Original Chart receipt no longer current or verified.';
   end if;
   select observation.value into o
@@ -214,7 +214,7 @@ begin
   if found then
     if v_item.validation_snapshot->>'chart_original_sha256'
         is distinct from p_original_sha256
-    then raise exception using errcode='40001',
+    then raise exception using errcode='PT409',
       message='Prior Track Intake case conflicts with original receipt.';
     end if;
     return jsonb_build_object('suggestion_id',v_item.id,

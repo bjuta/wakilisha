@@ -767,7 +767,7 @@ begin
     perform public.admin_stage_charts2_artist_intake_v1(
       'youtube_ke',youtube_receipt,repeat('f',64),1);
     raise exception 'charts2_stale_artist_source_allowed';
-  exception when serialization_failure then null;end;
+  exception when sqlstate 'PT409' then null;end;
 
   insert into public.registry_tracks(slug,title,normalized_title,status)
   values('ci-chart-'||substr(actor_id::text,1,8),
@@ -802,7 +802,7 @@ begin
       gen_random_uuid(),
       'I independently verified this exact Shazam position and authorize its private Registry recording resolution.');
     raise exception 'charts2_shazam_stale_approval_allowed';
-  exception when serialization_failure then null;end;
+  exception when sqlstate 'PT409' then null;end;
   revoked:=public.admin_review_charts2_no_id_observation_v1(
     shazam_receipt,shazam_sha,1,'revoke',null,
     independent_note,'https://example.org/ci-correction-evidence',

@@ -142,7 +142,7 @@ export async function verifyCharts2RealJwtRegistryV1({
    "STOP_CHARTS2_REAL_JWT_SHZAM_EXACT_REPLAY");
  denied(await second.user.rpc(
    "admin_review_charts2_no_id_observation_v1",decisionArgs),
-   "40001","STOP_CHARTS2_TWO_GENUINE_JWT_STALE_SHZAM_REVIEW");
+   "PT409","STOP_CHARTS2_TWO_GENUINE_JWT_STALE_SHZAM_REVIEW");
  const revoked=await accept(first.user,
    "admin_review_charts2_no_id_observation_v1",{
      ...decisionArgs,p_action:"revoke",p_track_id:null,

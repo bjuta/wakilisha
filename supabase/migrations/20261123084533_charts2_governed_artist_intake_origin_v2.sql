@@ -72,7 +72,7 @@ begin
     select newest.id from platform_private.charts2_capture_receipts_v1 newest
     where newest.source_key=r.source_key
     order by newest.created_at desc,newest.id desc limit 1
-  ) then raise exception using errcode='40001',
+  ) then raise exception using errcode='PT409',
     message='Chart Artist observation no longer current or verified.';end if;
   select row.value into o from jsonb_array_elements(r.observations) row(value)
     where row.value->>'rank'=s.source_metadata->>'chart_rank';
@@ -80,7 +80,7 @@ begin
     lower(btrim(s.source_artist_name)) is distinct from s.source_normalized_name or
     nullif(o->>'provider_track_id','') is distinct from
       nullif(s.source_metadata->>'chart_provider_track_id','')
-  then raise exception using errcode='40001',
+  then raise exception using errcode='23514',
     message='Chart Artist source claim disagrees with the immutable original.';end if;
 end
 $assert$;
@@ -124,7 +124,7 @@ begin
    select newest.id from platform_private.charts2_capture_receipts_v1 newest
    where newest.source_key=p_source_key
    order by newest.created_at desc,newest.id desc limit 1
- ) then raise exception using errcode='40001',
+ ) then raise exception using errcode='PT409',
    message='Chart original is no longer the current verified source.';end if;
  select row.value into o from jsonb_array_elements(r.observations) row(value)
    where row.value->>'rank'=p_rank::text;
@@ -147,7 +147,7 @@ begin
      where intake_run_id=v_run.id order by created_at limit 1;
    if not found or
       v_staging.source_metadata->>'chart_original_sha256' is distinct from p_original_sha256
-   then raise exception using errcode='40001',
+   then raise exception using errcode='PT409',
      message='Reviewed Artist Intake source state changed.';end if;
    return jsonb_build_object('run_id',v_run.id,'staging_id',v_staging.id,
      'idempotent_replay',true,'can_publish',false);
@@ -316,6 +316,9 @@ begin
 
   v_fingerprint:=platform_private.registry_artist_intake_review_fingerprint_v1(v_row.id);
   if v_fingerprint<>v_row.review_fingerprint then
+    if v_run.provider='charts2_chart_observation' then
+      raise exception using errcode='PT409', message='Artist intake reviewed facts changed after approval.';
+    end if;
     raise exception using errcode='40001', message='Artist intake reviewed facts changed after approval.';
   end if;
 

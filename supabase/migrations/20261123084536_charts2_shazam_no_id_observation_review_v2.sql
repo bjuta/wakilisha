@@ -149,7 +149,7 @@ begin
     select latest.id from platform_private.charts2_capture_receipts_v1 latest
     where latest.source_key='shazam_ke'
     order by latest.created_at desc,latest.id desc limit 1
-  ) then raise exception using errcode='40001',
+  ) then raise exception using errcode='PT409',
     message='Shazam original is no longer the exact current verified receipt.';
   end if;
   select item.value into o from jsonb_array_elements(r.observations) item(value)
@@ -182,7 +182,7 @@ begin
       return jsonb_build_object('event_id',v_prev.id,'action',v_prev.action,
         'revision',v_prev.revision,'idempotent_replay',true,'can_publish',false);
     end if;
-    raise exception using errcode='40001',
+    raise exception using errcode='PT409',
       message='Shazam review revision changed; reload before another decision.';
   end if;
   if v_current_id is not null then v_revision:=v_prev.revision+1;end if;
