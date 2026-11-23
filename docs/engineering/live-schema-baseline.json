@@ -1,17 +1,17 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-23T06:37:34Z",
+  "generatedAt": "2026-11-23T08:57:14Z",
   "typesSha256": "d3f8200df45b4669119ed4f7a60d6fc1c8d68afa2ab3c798755678b995ddfdf8",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 275,
-  "latestMigration": "20261123062500_share_instagram_story_platform_v1.sql",
+  "migrationCount": 278,
+  "latestMigration": "20261123084536_charts2_shazam_no_id_observation_review_v2.sql",
   "schemaSeal": {
     "mode": "disposable_ci",
     "sourceProjectRef": "unlinked-local-ci",
-    "baseMainSha": "6ef30a13919cd05dfa52b20088fb270e7ab53a60",
-    "replayCandidateHeadSha": "6f98ec9aa19fc0f7525444e29b6096afe3af1fea",
-    "workflowRunId": 45124718656,
-    "migrationHead": "20261123062500"
+    "baseMainSha": "9847216a6946ae89f0eb52684a27231ce6e4b15d",
+    "replayCandidateHeadSha": "053f9026c664917c1943a5c75d9b6986d26efb6f",
+    "workflowRunId": 45142301793,
+    "migrationHead": "20261123084536"
   }
 }
