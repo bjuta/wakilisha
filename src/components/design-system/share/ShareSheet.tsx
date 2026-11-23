@@ -468,12 +468,12 @@ function ArticleStoryShare({
   item,
   trackedUrl,
   onBack,
-  onShareComplete,
+  countError,
 }: {
   item: ShareObject;
   trackedUrl: string;
   onBack: () => void;
-  onShareComplete: () => void;
+  countError?: boolean;
 }) {
   const [rendered, setRendered] = useState<{ file: File; url: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -532,11 +532,9 @@ function ArticleStoryShare({
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-    // Saving the export is the supported Instagram handoff on devices without
-    // native file sharing. Count this deliberate user action via the same
-    // persisted platform counter as all other share destinations.
+    // The grid tap already records one share intent before iOS can suspend
+    // the page for a download or operating-system handoff.
     trackEvent("share_click", { pageType: "article", context: { action: "save_image", platform: "instagram_story" } });
-    onShareComplete();
   };
 
   const shareImage = async () => {
@@ -547,9 +545,9 @@ function ArticleStoryShare({
     }
     try {
       await navigator.share({ files: [rendered.file], title: item.title });
-      // An OS handoff is not proof that Instagram published a Story.
+      // The grid tap recorded the intent. The OS handoff is not a second
+      // share count, nor proof that Instagram published the Story.
       trackEvent("share_click", { pageType: "article", context: { action: "native_image_handoff", platform: "instagram_story" } });
-      onShareComplete();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setMessage("Your browser could not share the image. Save it instead.");
@@ -601,6 +599,11 @@ function ArticleStoryShare({
         <i className={linkCopied ? "ri-check-line" : "ri-link"} aria-hidden="true" />
         {linkCopied ? "Link Copied" : "Copy Article Link"}
       </button>
+      {countError && (
+        <p role="status" className="mt-2 text-[12px] text-[var(--wk-text-muted)]">
+          We couldn't update the share count. You can still share the image.
+        </p>
+      )}
       {message && <p role="status" className="mt-2 text-[12px] text-[var(--wk-text-muted)]">{message}</p>}
     </div>
   );
@@ -632,6 +635,7 @@ export function SharePopover({
   const [shareCounts, setShareCounts] = useState<Record<string, number>>();
   const [pendingPlatforms, setPendingPlatforms] = useState<Set<string>>(new Set());
   const [storySelected, setStorySelected] = useState(false);
+  const [storyCountError, setStoryCountError] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const baseUrl = item.url || (typeof window !== "undefined" ? window.location.href : "");
@@ -901,9 +905,13 @@ export function SharePopover({
       action: "click",
     }));
 
-    if (platform.key === "instagram_story") {
+    // The common share-intent counter must start before an iOS handoff.
+    // Gateway logs exposed an OPTIONS preflight with no subsequent POST
+    // when the old implementation waited until after the OS share dialog.
+    const isInstagramStory = platform.key === "instagram_story";
+    if (isInstagramStory) {
+      setStoryCountError(false);
       setStorySelected(true);
-      return;
     }
 
     setPendingPlatforms((prev) => new Set(prev).add(platform.key));
@@ -911,8 +919,11 @@ export function SharePopover({
       setShareCounts((prev) => ({ ...prev, [platform.key]: count }));
       setPendingPlatforms((prev) => { const next = new Set(prev); next.delete(platform.key); return next; });
     }).catch(() => {
+      if (isInstagramStory) setStoryCountError(true);
       setPendingPlatforms((prev) => { const next = new Set(prev); next.delete(platform.key); return next; });
     });
+
+    if (isInstagramStory) return;
 
     const imageUrl = shareImageUrl(item.imageUrl);
     const shareUrl = platform.buildUrl(encodedUrl, encodedText, imageUrl ? encodeURIComponent(imageUrl) : undefined);
@@ -994,11 +1005,7 @@ export function SharePopover({
             item={item}
             trackedUrl={getTrackedShareUrl("instagram_story")}
             onBack={() => setStorySelected(false)}
-            onShareComplete={() => {
-              incrementShareCount(baseUrl, "instagram_story", shareTarget.entitySlug || undefined, item.title)
-                .then((count) => setShareCounts((prev) => ({ ...prev, instagram_story: count })))
-                .catch(() => {});
-            }}
+            countError={storyCountError}
           />
         ) : (
           <div className="px-5 py-4">
@@ -1034,6 +1041,7 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   const [shareCounts, setShareCounts] = useState<Record<string, number>>();
   const [pendingPlatforms, setPendingPlatforms] = useState<Set<string>>(new Set());
   const [storySelected, setStorySelected] = useState(false);
+  const [storyCountError, setStoryCountError] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
@@ -1142,9 +1150,13 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
       action: "click",
     }));
 
-    if (platform.key === "instagram_story") {
+    // The common share-intent counter must start before an iOS handoff.
+    // Gateway logs exposed an OPTIONS preflight with no subsequent POST
+    // when the old implementation waited until after the OS share dialog.
+    const isInstagramStory = platform.key === "instagram_story";
+    if (isInstagramStory) {
+      setStoryCountError(false);
       setStorySelected(true);
-      return;
     }
 
     setPendingPlatforms((prev) => new Set(prev).add(platform.key));
@@ -1152,8 +1164,11 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
       setShareCounts((prev) => ({ ...prev, [platform.key]: count }));
       setPendingPlatforms((prev) => { const next = new Set(prev); next.delete(platform.key); return next; });
     }).catch(() => {
+      if (isInstagramStory) setStoryCountError(true);
       setPendingPlatforms((prev) => { const next = new Set(prev); next.delete(platform.key); return next; });
     });
+
+    if (isInstagramStory) return;
 
     const imageUrl = shareImageUrl(item.imageUrl);
     const shareUrl = platform.buildUrl(encodedUrl, encodedText, imageUrl ? encodeURIComponent(imageUrl) : undefined);
@@ -1230,11 +1245,7 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
                 item={item}
                 trackedUrl={getTrackedShareUrl("instagram_story")}
                 onBack={() => setStorySelected(false)}
-                onShareComplete={() => {
-                  incrementShareCount(baseUrl, "instagram_story", shareTarget.entitySlug || undefined, item.title)
-                    .then((count) => setShareCounts((prev) => ({ ...prev, instagram_story: count })))
-                    .catch(() => {});
-                }}
+                countError={storyCountError}
               />
             ) : (
               <div className="share-sheet-grid-wrap">

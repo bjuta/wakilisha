@@ -2,7 +2,7 @@
 
 **Scope:** public published WAKILISHA Magazine Articles, shared desktop/mobile UI.
 **Branch:** feat/article-instagram-story-fullbleed.
-**Status:** Original full-bleed Story renderer deployed 22 November 2026. Share destination integration is a subsequent frontend-only correction until separately released.
+**Status:** Original Story renderer and unified share destination are deployed. Backend allowlist and image-handoff counting shipped in #1437. iOS post-handoff counting is a documented outstanding defect and this follow-up candidate changes the frontend only; real-device acceptance is not yet complete.
 
 ## Design authority
 
@@ -29,7 +29,15 @@ Instagram is registered as one destination in the existing four-column `SHARE_PL
 
 Only a published Article with selected artwork, published snapshot identity, author, section, and positive reading time can display the Instagram destination. Choosing it opens a second view **inside the same desktop popover or mobile bottom sheet**, with Back to Share Options, the exact exported-image preview, Share Image, Save Image, and Copy Article Link. Back, closing the host sheet, and unmounting must revoke the generated object URL and reset the destination. No eager canvas rendering occurs before selecting Instagram.
 
-Choosing Instagram opens the preparation view, **not** an external Instagram URL. The share count increments only after a successful native OS file handoff, not when tapping the tile, cancelling the OS chooser, downloading the JPEG or copying a link. This is an OS handoff count, not proof of Instagram publication. The human instructions explicitly require adding the Link sticker in Instagram.
+Choosing Instagram opens the preparation view, **not** an external Instagram URL. The share count uses the **same share-intent definition as X, WhatsApp, and the other grid destinations**: selecting a destination initiates exactly one persisted counter request while the browser is still in the foreground. Saving the JPEG, invoking the native file chooser, returning from the OS chooser, or copying a link inside the preparation view does not issue a second count. A counter failure must not be disguised by an optimistic badge; the Instagram detail shows a nonblocking warning. One destination selection is one recorded intent, **not** independent proof of a completed Instagram Story, and a cancelled downstream chooser does not retroactively withdraw that intent. The human instructions explicitly require adding the Link sticker in Instagram.
+
+### iOS observed production failure and correction (23 November 2026)
+
+Following protected #1437 and successful canonical frontend activation, the operator reported repeated physical-iPhone shares without any increment. Independent read-only production records confirmed **zero** `instagram_story` rows in both `public.share_counts` and `public.share_events`. The Supabase gateway showed a real iPhone Chrome `OPTIONS /rest/v1/rpc/increment_share_count` response (HTTP 200, `2026-11-23T07:01:32Z`) **with no following POST**, while earlier X clicks had complete POST 200 and durable rows. Installed four-argument RPC and its `anon`/`authenticated` EXECUTE privileges were verified correct, with the one-platform migration applied exactly once.
+
+The previous frontend deferred the Instagram `incrementShareCount` call until after `navigator.share` resolved or after the browser clicked an image download anchor, allowing the OS handoff to interrupt request delivery. A mocked test that resolved `navigator.share` before incrementing did not represent the observed mobile lifecycle. The correction starts the **existing** RPC at the first Instagram destination tap, when the webpage is active and before local Story image generation or native sharing begins. It does not add a new API, change the DB schema or replay user actions. The permanent interaction tests now require the call to start before the native chooser, no extra Save Image/native post-handoff call, visible error state, and desktop/mobile parity.
+
+**Production acceptance remains open until a genuine iPhone destination selection creates a `POST` with a persisted matching `share_counts` + `share_events` record and the count survives closing/reopening the sheet.** A passing unit test or HTTP site-health smoke alone does not prove this mobile-network path.
 
 This is independent of the ongoing #1377 SEO publication snapshot lifecycle and #1428 external social metadata acceptance. Passing the Story image renderer must not be treated as evidence that social crawlers see current Open Graph metadata. Do not deploy during that unresolved production gate without separate approval.
 
@@ -41,4 +49,4 @@ This is independent of the ongoing #1377 SEO publication snapshot lifecycle and 
 4. On desktop, verify preview, download, and copied link. Confirm keyboard support, close/reopen behavior, image load failures, and no object URL leaks.
 5. Run focused existing tests, app build, applicable protected Core/Browser CI, and changed-file copy checks. Accept and document any real-device limitations rather than simulating them.
 
-**Deployment:** SQL NO. Supabase Edge NO. Frontend YES only after accepted PR and Production release gates. Production Finish update YES when the frontend is activated. PR now for CI/preview only; no production changes. Rollback: revert the feature PR and redeploy the accepted frontend. Do not touch Registry or publication snapshot infrastructure.
+**Current follow-up deployment boundary:** No new SQL or Supabase Edge changes. Frontend-only promotion after accepted protected PR gates using the current sealed Article SEO snapshot and canonical release runner. The existing 275-migration production database and dirty Discography worktree are preserved. Rollback: deploy the immediately previous accepted frontend build. Do not treat rollout as real-device share-count acceptance until live gateway and read-only event evidence pass.
