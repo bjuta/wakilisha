@@ -217,6 +217,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
       expect(actualCopy).toContain("https://wakilisha.africa/magazine/album-review-alusa-continua");
       expect(actualCopy).toContain("utm_source=copy");
       expect(await screen.findByText("Link copied")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Copy" }).textContent).toContain("Copied");
       await waitFor(() => expect(incrementShareCount).toHaveBeenCalledExactlyOnceWith(
         article.url, "copy", "album-review-alusa-continua", article.title,
       ));
@@ -273,6 +274,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
       fireEvent.click(copy);
       fireEvent.click(copy);
       expect(screen.getByText("Copying link…")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Copy" }).textContent).toContain("Copying");
       expect(writeText).toHaveBeenCalledOnce();
       expect(incrementShareCount).not.toHaveBeenCalled();
       approve();
