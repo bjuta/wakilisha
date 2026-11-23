@@ -602,6 +602,15 @@ async function main(){
  console.log("WK_AUTH_C18_GENUINE_CONCURRENT_REVIEWERS_SINGLE_CAS_JOURNAL=PASS");
  console.log("WK_AUTH_O25_STALE_BROWSER_INDEPENDENT_DB_EVENT_NONINTERFERENCE=PASS");
 
+ // Charts 2.0 uses the same actual GoTrue/JWT and locally replayed
+ // Registry schema. Synthetic source fixtures are NOT signed-in Charts Studio
+ // browser acceptance for real songs.
+ const {verifyCharts2RealJwtRegistryV1}=await import(
+  "./charts2-real-jwt-registry-ci.mjs");
+ await verifyCharts2RealJwtRegistryV1({
+  api,sql:(query)=>localSql(query,db),first,second,subscriber,
+ });
+
  // Capability re-evaluation with an unchanged genuine JWT.
  localSql("UPDATE public.user_role_assignments SET expires_at="+
   "clock_timestamp()-interval '1 second' WHERE user_id='"+
