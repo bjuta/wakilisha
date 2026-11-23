@@ -101,24 +101,20 @@ export async function incrementShareCount(
       p_article_title: articleTitle ?? null,
     });
 
-    if (error) {
-      console.warn("[shareTracking] increment failed:", error.message);
-      // Fall back to optimistic local count so the UI still updates
-      const current = cachedCounts.get(key) || 0;
-      const optimist = current + 1;
-      cachedCounts.set(key, optimist);
-      return optimist;
-    }
+    // A share count is authoritative only after the existing RPC confirms it.
+    // Never display a fabricated local success if a platform is rejected or
+    // the request fails: this masked the missing Instagram allowlist on iOS.
+    if (error) throw new Error(error.message);
 
-    const newCount = Number(data ?? 0);
+    const newCount = Number(data);
+    if (!Number.isSafeInteger(newCount) || newCount < 1) {
+      throw new Error("Share count response was invalid.");
+    }
     cachedCounts.set(key, newCount);
     return newCount;
   } catch (err) {
-    console.warn("[shareTracking] increment error:", err);
-    const current = cachedCounts.get(key) || 0;
-    const optimist = current + 1;
-    cachedCounts.set(key, optimist);
-    return optimist;
+    console.warn("[shareTracking] increment failed:", err);
+    throw err;
   }
 }
 
