@@ -223,7 +223,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
       await waitFor(() => expect(screen.getByRole("button", { name: "Copy" }).querySelector(".share-grid-badge")?.textContent).toBe("1"));
       expect(trackEvent).toHaveBeenCalledWith("share_copy", expect.any(Object));
     } finally {
-      delete (document as Document & { execCommand?: unknown }).execCommand;
+      Reflect.deleteProperty(document, "execCommand");
     }
   });
 
@@ -238,7 +238,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
       expect(await screen.findByText("Link copied")).toBeTruthy();
       await waitFor(() => expect(incrementShareCount).toHaveBeenCalledTimes(1));
     } finally {
-      delete (document as Document & { execCommand?: unknown }).execCommand;
+      Reflect.deleteProperty(document, "execCommand");
     }
   });
 
@@ -258,7 +258,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
       expect(incrementShareCount).not.toHaveBeenCalled();
       expect(trackEvent).not.toHaveBeenCalledWith("share_copy", expect.anything());
     } finally {
-      delete (document as Document & { execCommand?: unknown }).execCommand;
+      Reflect.deleteProperty(document, "execCommand");
     }
   });
 
@@ -279,7 +279,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
       expect(await screen.findByText("Link copied")).toBeTruthy();
       await waitFor(() => expect(incrementShareCount).toHaveBeenCalledTimes(1));
     } finally {
-      delete (document as Document & { execCommand?: unknown }).execCommand;
+      Reflect.deleteProperty(document, "execCommand");
     }
   });
 
@@ -292,7 +292,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
       expect(await screen.findByText("Link copied, but the share count could not be updated.")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Copy" }).querySelector(".share-grid-badge")).toBeNull();
     } finally {
-      delete (document as Document & { execCommand?: unknown }).execCommand;
+      Reflect.deleteProperty(document, "execCommand");
     }
   });
 
@@ -307,7 +307,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
         article.url, "copy", "album-review-alusa-continua", article.title,
       ));
     } finally {
-      delete (document as Document & { execCommand?: unknown }).execCommand;
+      Reflect.deleteProperty(document, "execCommand");
     }
   });
 
@@ -332,7 +332,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
       rerender(<ShareSheet item={article} open onClose={onClose} />);
       await waitFor(() => expect(screen.getByRole("button", { name: "Copy" }).querySelector(".share-grid-badge")?.textContent).toBe("4"));
     } finally {
-      delete (document as Document & { execCommand?: unknown }).execCommand;
+      Reflect.deleteProperty(document, "execCommand");
     }
   });
 
