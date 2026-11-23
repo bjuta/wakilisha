@@ -532,7 +532,11 @@ function ArticleStoryShare({
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
+    // Saving the export is the supported Instagram handoff on devices without
+    // native file sharing. Count this deliberate user action via the same
+    // persisted platform counter as all other share destinations.
     trackEvent("share_click", { pageType: "article", context: { action: "save_image", platform: "instagram_story" } });
+    onShareComplete();
   };
 
   const shareImage = async () => {
