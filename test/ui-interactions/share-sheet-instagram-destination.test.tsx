@@ -64,7 +64,11 @@ describe("unified sharing destination grid for Instagram Story", () => {
     fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
     expect(screen.queryByRole("button", { name: "Instagram Story" })).toBeNull();
     expect(screen.getByRole("button", { name: "Back to share options" })).toBeTruthy();
-    expect(incrementShareCount).not.toHaveBeenCalled();
+    // Exactly as for X/WhatsApp, choosing a destination starts the count
+    // while the browser is still foregrounded, before any OS handoff.
+    expect(incrementShareCount).toHaveBeenCalledExactlyOnceWith(
+      article.url, "instagram_story", "album-review-alusa-continua", article.title,
+    );
 
     await screen.findByRole("button", { name: "Share Image" });
     expect(renderArticleStoryImage).toHaveBeenCalledOnce();
@@ -81,18 +85,20 @@ describe("unified sharing destination grid for Instagram Story", () => {
     expect(screen.getByRole("button", { name: "Instagram Story" })).toBeTruthy();
   });
 
-  it("counts only a completed native image handoff, never simply opening Instagram", async () => {
+  it("sends the persisted count BEFORE iOS native sharing can suspend the page, without counting twice", async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "share", { configurable: true, value: share });
     Object.defineProperty(navigator, "canShare", { configurable: true, value: vi.fn(() => true) });
     render(<ShareSheet item={article} open onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
-    expect(incrementShareCount).not.toHaveBeenCalled();
+    expect(incrementShareCount).toHaveBeenCalledExactlyOnceWith(
+      article.url, "instagram_story", "album-review-alusa-continua", article.title,
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Share Image" }));
     await waitFor(() => expect(share).toHaveBeenCalledOnce());
-    await waitFor(() => expect(incrementShareCount).toHaveBeenCalledWith(
-      article.url, "instagram_story", "album-review-alusa-continua", article.title,
-    ));
+    expect(vi.mocked(incrementShareCount).mock.invocationCallOrder[0])
+      .toBeLessThan(share.mock.invocationCallOrder[0]);
+    expect(incrementShareCount).toHaveBeenCalledTimes(1);
   });
 
 
@@ -101,12 +107,14 @@ describe("unified sharing destination grid for Instagram Story", () => {
     try {
       render(<ShareSheet item={article} open onClose={vi.fn()} />);
       fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
-      expect(incrementShareCount).not.toHaveBeenCalled();
+      expect(incrementShareCount).toHaveBeenCalledExactlyOnceWith(
+        article.url, "instagram_story", "album-review-alusa-continua", article.title,
+      );
       fireEvent.click(await screen.findByRole("button", { name: "Save Image" }));
       expect(save).toHaveBeenCalledOnce();
-      await waitFor(() => expect(incrementShareCount).toHaveBeenCalledWith(
-        article.url, "instagram_story", "album-review-alusa-continua", article.title,
-      ));
+      // The Save Image action must not double-count the already recorded
+      // share intent or depend on a request after iOS starts downloading.
+      expect(incrementShareCount).toHaveBeenCalledTimes(1);
       fireEvent.click(screen.getByRole("button", { name: "Back to share options" }));
       const destination = screen.getByRole("button", { name: "Instagram Story" });
       await waitFor(() => expect(destination.querySelector(".share-grid-badge")?.textContent).toBe("1"));
@@ -115,7 +123,7 @@ describe("unified sharing destination grid for Instagram Story", () => {
     }
   });
 
-  it("does not increment Instagram for opening the detail, copying the link, or a cancelled native share", async () => {
+  it("counts once on selecting Instagram, not again on link copy or cancelling the OS chooser", async () => {
     const share = vi.fn().mockRejectedValue(new DOMException("User cancelled", "AbortError"));
     Object.defineProperty(navigator, "share", { configurable: true, value: share });
     Object.defineProperty(navigator, "canShare", { configurable: true, value: vi.fn(() => true) });
@@ -124,13 +132,37 @@ describe("unified sharing destination grid for Instagram Story", () => {
 
     render(<ShareSheet item={article} open onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
-    expect(incrementShareCount).not.toHaveBeenCalled();
+    expect(incrementShareCount).toHaveBeenCalledTimes(1);
     fireEvent.click(await screen.findByRole("button", { name: "Copy Article Link" }));
     await waitFor(() => expect(clipboardWrite).toHaveBeenCalledOnce());
-    expect(incrementShareCount).not.toHaveBeenCalled();
+    expect(incrementShareCount).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Share Image" }));
     await waitFor(() => expect(share).toHaveBeenCalledOnce());
-    expect(incrementShareCount).not.toHaveBeenCalled();
+    expect(incrementShareCount).toHaveBeenCalledTimes(1);
+  });
+
+
+  it("shows a visible count error rather than masking a failed RPC on the Instagram detail", async () => {
+    vi.mocked(incrementShareCount).mockRejectedValueOnce(new Error("Network interrupted"));
+    render(<ShareSheet item={article} open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
+    expect(incrementShareCount).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("We couldn't update the share count. You can still share the image.")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Save Image" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back to share options" }));
+    expect(screen.queryByText("We couldn't update the share count. You can still share the image.")).toBeNull();
+  });
+
+  it("keeps the same early Instagram count in the desktop popover", async () => {
+    const triggerRef = { current: document.createElement("button") };
+    render(<SharePopover item={article} open onClose={vi.fn()} triggerRef={triggerRef} />);
+    fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
+    expect(incrementShareCount).toHaveBeenCalledExactlyOnceWith(
+      article.url, "instagram_story", "album-review-alusa-continua", article.title,
+    );
+    await screen.findByRole("button", { name: "Save Image" });
+    fireEvent.click(screen.getByRole("button", { name: "Back to share options" }));
+    expect(incrementShareCount).toHaveBeenCalledTimes(1);
   });
 
   it("covers the exact original database allowlist and never weakens other share validation", () => {
