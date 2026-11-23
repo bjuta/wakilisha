@@ -49,10 +49,10 @@ DO $postflight$
 DECLARE
   definition text := pg_get_functiondef('public.increment_share_count(text,text,text,text)'::regprocedure);
 BEGIN
-  IF position('p_platform NOT IN ('copy','instagram_story','x','whatsapp','facebook','telegram','linkedin','reddit','pinterest','messenger','email')' in definition) = 0 THEN
+  IF position($allowed$p_platform NOT IN ('copy','instagram_story','x','whatsapp','facebook','telegram','linkedin','reddit','pinterest','messenger','email')$allowed$ in definition) = 0 THEN
     RAISE EXCEPTION 'STOP: Instagram share counter platform not installed';
   END IF;
-  IF position('p_platform NOT IN ('copy','x','whatsapp','facebook','telegram','linkedin','reddit','pinterest','messenger','email')' in definition) > 0 THEN
+  IF position($old$p_platform NOT IN ('copy','x','whatsapp','facebook','telegram','linkedin','reddit','pinterest','messenger','email')$old$ in definition) > 0 THEN
     RAISE EXCEPTION 'STOP: old share counter allowlist still installed';
   END IF;
   IF NOT (
