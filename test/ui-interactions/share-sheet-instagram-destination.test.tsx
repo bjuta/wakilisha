@@ -6,6 +6,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { SharePopover, ShareSheet, canShareArticleStory, sharePlatformsForItem, type ShareObject } from "@/components/design-system/share/ShareSheet";
 import { renderArticleStoryImage } from "@/components/design-system/share/articleStoryImage";
 import { incrementShareCount } from "@/services/shareTracking";
+import { copyShareLink } from "@/components/design-system/share/copyShareLink";
+import { trackEvent } from "@/services/analytics";
+import { getShareCounts } from "@/services/shareTracking";
 
 vi.mock("@/components/base/Portal", () => ({
   Portal: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -197,4 +200,142 @@ describe("unified sharing destination grid for Instagram Story", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back to share options" }));
     expect(screen.getByRole("button", { name: "Instagram Story" })).toBeTruthy();
   });
+
+  it("copies a tracked Article link synchronously on iPhone-style legacy clipboard and persists one Copy count", async () => {
+    let actualCopy = "";
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: vi.fn(() => {
+        actualCopy = document.querySelector("textarea")?.value ?? "";
+        return true;
+      }),
+    });
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    try {
+      render(<ShareSheet item={article} open onClose={vi.fn()} />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      expect(actualCopy).toContain("https://wakilisha.africa/magazine/album-review-alusa-continua");
+      expect(actualCopy).toContain("utm_source=copy");
+      expect(await screen.findByText("Link copied")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Copy" }).textContent).toContain("Copied");
+      await waitFor(() => expect(incrementShareCount).toHaveBeenCalledExactlyOnceWith(
+        article.url, "copy", "album-review-alusa-continua", article.title,
+      ));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Copy" }).querySelector(".share-grid-badge")?.textContent).toBe("1"));
+      expect(trackEvent).toHaveBeenCalledWith("share_copy", expect.any(Object));
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
+  it("uses the modern clipboard when the synchronous legacy copy is unavailable", async () => {
+    Object.defineProperty(document, "execCommand", { configurable: true, value: vi.fn(() => false) });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    try {
+      render(<ShareSheet item={article} open onClose={vi.fn()} />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+      expect(await screen.findByText("Link copied")).toBeTruthy();
+      await waitFor(() => expect(incrementShareCount).toHaveBeenCalledTimes(1));
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
+  it("shows a manual-select fallback and never increments on an actually blocked clipboard", async () => {
+    Object.defineProperty(document, "execCommand", { configurable: true, value: vi.fn(() => false) });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new DOMException("Denied", "NotAllowedError")) },
+    });
+    try {
+      render(<ShareSheet item={article} open onClose={vi.fn()} />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      expect(await screen.findByText("Your browser blocked copying. Select the link below and choose Copy.")).toBeTruthy();
+      const input = screen.getByRole("textbox", { name: "Article link for manual copying" }) as HTMLInputElement;
+      expect(input.readOnly).toBe(true);
+      expect(input.value).toContain("utm_source=copy");
+      expect(incrementShareCount).not.toHaveBeenCalled();
+      expect(trackEvent).not.toHaveBeenCalledWith("share_copy", expect.anything());
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
+  it("keeps Copy visibly pending until clipboard resolves; rapid double taps cannot increment twice", async () => {
+    Object.defineProperty(document, "execCommand", { configurable: true, value: vi.fn(() => false) });
+    let approve!: () => void;
+    const writeText = vi.fn(() => new Promise<void>((resolve) => { approve = resolve; }));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    try {
+      render(<ShareSheet item={article} open onClose={vi.fn()} />);
+      const copy = screen.getByRole("button", { name: "Copy" });
+      fireEvent.click(copy);
+      fireEvent.click(copy);
+      expect(screen.getByText("Copying link…")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Copy" }).textContent).toContain("Copying");
+      expect(writeText).toHaveBeenCalledOnce();
+      expect(incrementShareCount).not.toHaveBeenCalled();
+      approve();
+      expect(await screen.findByText("Link copied")).toBeTruthy();
+      await waitFor(() => expect(incrementShareCount).toHaveBeenCalledTimes(1));
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
+  it("preserves success feedback if the shared counter rejects the confirmed copy", async () => {
+    Object.defineProperty(document, "execCommand", { configurable: true, value: vi.fn(() => true) });
+    vi.mocked(incrementShareCount).mockRejectedValueOnce(new Error("RPC failed"));
+    try {
+      render(<ShareSheet item={article} open onClose={vi.fn()} />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      expect(await screen.findByText("Link copied, but the share count could not be updated.")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Copy" }).querySelector(".share-grid-badge")).toBeNull();
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
+  it("shares the same successful Copy feedback in the desktop popover", async () => {
+    Object.defineProperty(document, "execCommand", { configurable: true, value: vi.fn(() => true) });
+    const triggerRef = { current: document.createElement("button") };
+    try {
+      render(<SharePopover item={article} open onClose={vi.fn()} triggerRef={triggerRef} />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      expect(await screen.findByText("Link copied")).toBeTruthy();
+      await waitFor(() => expect(incrementShareCount).toHaveBeenCalledWith(
+        article.url, "copy", "album-review-alusa-continua", article.title,
+      ));
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
+  it("refuses to claim clipboard success if neither browser copy API is available", async () => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    const copied = await copyShareLink(article.url);
+    expect(copied).toBe(false);
+    expect(incrementShareCount).not.toHaveBeenCalled();
+  });
+
+  it("uses a fresh server read after reopening, not an optimistic Copy badge", async () => {
+    Object.defineProperty(document, "execCommand", { configurable: true, value: vi.fn(() => true) });
+    try {
+      vi.mocked(getShareCounts)
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ copy: 4 });
+      const onClose = vi.fn();
+      const { rerender } = render(<ShareSheet item={article} open onClose={onClose} />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      await waitFor(() => expect(incrementShareCount).toHaveBeenCalledTimes(1));
+      rerender(<ShareSheet item={article} open={false} onClose={onClose} />);
+      rerender(<ShareSheet item={article} open onClose={onClose} />);
+      await waitFor(() => expect(screen.getByRole("button", { name: "Copy" }).querySelector(".share-grid-badge")?.textContent).toBe("4"));
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
 });

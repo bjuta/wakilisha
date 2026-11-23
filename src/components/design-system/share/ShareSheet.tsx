@@ -7,6 +7,7 @@ import { Portal } from "@/components/base/Portal";
 import { publishedArticleCardUrl, shareImageUrl, shareTextForItem } from "./sharePresentation";
 import { renderArticleStoryImage, type ArticleStoryMetadata } from "./articleStoryImage";
 import { SharePlatformIcon } from "./sharePlatformIcons";
+import { copyShareLink } from "./copyShareLink";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  WAKILISHA SHARE — Unified share infrastructure across all surfaces
@@ -392,6 +393,34 @@ function SharePreview({ item }: { item: ShareObject }) {
   );
 }
 
+type ShareCopyStatus = "idle" | "copying" | "copied" | "manual" | "count_error";
+
+/** Feedback is shared by the desktop popover and mobile bottom sheet. */
+function ShareCopyFeedback({ status, url }: { status: ShareCopyStatus; url: string }) {
+  if (status === "idle") return null;
+  return (
+    <div role="status" aria-live="polite" className="mt-3 rounded-xl border border-[var(--wk-border)] px-3 py-2 text-[12px] text-[var(--wk-text-muted)]">
+      {status === "copying" && <span>Copying link…</span>}
+      {status === "copied" && <span>Link copied</span>}
+      {status === "count_error" && <span>Link copied, but the share count could not be updated.</span>}
+      {status === "manual" && (
+        <>
+          <p className="mb-2">Your browser blocked copying. Select the link below and choose Copy.</p>
+          <input
+            type="text"
+            readOnly
+            value={url}
+            aria-label="Article link for manual copying"
+            onFocus={(event) => event.currentTarget.select()}
+            onClick={(event) => event.currentTarget.select()}
+            className="w-full rounded-lg border border-[var(--wk-border-strong)] bg-[var(--wk-surface)] px-2 py-2 text-[13px] text-[var(--wk-text)]"
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Platform grid — shared rendering logic ─────────────────────────────────
 
 function SharePlatformGrid({
@@ -400,6 +429,7 @@ function SharePlatformGrid({
   pendingPlatforms,
   onShare,
   onCopy,
+  copyStatus = "idle",
   size = "md",
 }: {
   platforms: SharePlatform[];
@@ -407,6 +437,7 @@ function SharePlatformGrid({
   pendingPlatforms: Set<string>;
   onShare: (p: SharePlatform) => void;
   onCopy: () => void;
+  copyStatus?: ShareCopyStatus;
   size?: "sm" | "md";
 }) {
   const iconSize = size === "sm" ? 16 : 18;
@@ -426,6 +457,7 @@ function SharePlatformGrid({
             type="button"
             className="share-grid-item"
             aria-label={p.key === "instagram_story" ? "Instagram Story" : p.name}
+            aria-busy={isCopy && copyStatus === "copying"}
             onClick={() => {
               if (isCopy) onCopy();
               else onShare(p);
@@ -438,7 +470,11 @@ function SharePlatformGrid({
               <SharePlatformIcon icon={p.icon} size={iconSize} />
             </div>
             <span className={`${labelSize} font-semibold text-[var(--wk-text-muted)]`}>
-              {p.name}
+              {isCopy && (copyStatus === "copied" || copyStatus === "count_error")
+                ? "Copied"
+                : isCopy && copyStatus === "copying"
+                  ? "Copying"
+                  : p.name}
             </span>
             {count > 0 && (
               <span className="share-grid-badge">
@@ -631,7 +667,9 @@ export function SharePopover({
   onComment,
 }: SharePopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<ShareCopyStatus>("idle");
+  const copyBusyRef = useRef(false);
+  const copyEpochRef = useRef(0);
   const [shareCounts, setShareCounts] = useState<Record<string, number>>();
   const [pendingPlatforms, setPendingPlatforms] = useState<Set<string>>(new Set());
   const [storySelected, setStorySelected] = useState(false);
@@ -659,6 +697,11 @@ export function SharePopover({
   useEffect(() => {
     if (!open) setStorySelected(false);
   }, [open]);
+
+  useEffect(() => {
+    copyEpochRef.current += 1;
+    setCopyStatus("idle");
+  }, [open, baseUrl]);
 
   // Load counts
   useEffect(() => {
@@ -876,20 +919,36 @@ export function SharePopover({
   }, [open, onClose, triggerRef]);
 
   const handleCopy = useCallback(async () => {
+    if (copyBusyRef.current) return;
+    copyBusyRef.current = true;
+    const epoch = copyEpochRef.current;
+    const updateStatus = (status: ShareCopyStatus) => {
+      if (copyEpochRef.current === epoch) setCopyStatus(status);
+    };
     const trackedUrl = getTrackedShareUrl("copy");
-    try { await navigator.clipboard.writeText(trackedUrl); } catch { /* no-op */ }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    trackEvent("share_copy", buildShareAnalyticsPayload({
-      item,
-      target: shareTarget,
-      platformKey: "copy",
-      trackedUrl,
-      action: "copy",
-    }));
-    incrementShareCount(baseUrl, "copy", shareTarget.entitySlug || undefined, item.title).then((count) => {
-      setShareCounts((prev) => ({ ...prev, copy: count }));
-    }).catch(() => {});
+    updateStatus("copying");
+    setPendingPlatforms((prev) => new Set(prev).add("copy"));
+    try {
+      // Count a verified clipboard write, never a blocked clipboard attempt.
+      // The synchronous fallback executes inside the user's original iOS tap.
+      if (!(await copyShareLink(trackedUrl))) {
+        updateStatus("manual");
+        return;
+      }
+      updateStatus("copied");
+      trackEvent("share_copy", buildShareAnalyticsPayload({
+        item, target: shareTarget, platformKey: "copy", trackedUrl, action: "copy",
+      }));
+      try {
+        const count = await incrementShareCount(baseUrl, "copy", shareTarget.entitySlug || undefined, item.title);
+        setShareCounts((prev) => ({ ...prev, copy: count }));
+      } catch {
+        updateStatus("count_error");
+      }
+    } finally {
+      copyBusyRef.current = false;
+      setPendingPlatforms((prev) => { const next = new Set(prev); next.delete("copy"); return next; });
+    }
   }, [getTrackedShareUrl, baseUrl, item, shareTarget]);
 
   const handleShare = useCallback(async (platform: SharePlatform) => {
@@ -1015,8 +1074,10 @@ export function SharePopover({
               pendingPlatforms={pendingPlatforms}
               onShare={handleShare}
               onCopy={handleCopy}
+              copyStatus={copyStatus}
               size="sm"
             />
+            <ShareCopyFeedback status={copyStatus} url={getTrackedShareUrl("copy")} />
           </div>
         )}
         </div>
@@ -1042,6 +1103,9 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   const [pendingPlatforms, setPendingPlatforms] = useState<Set<string>>(new Set());
   const [storySelected, setStorySelected] = useState(false);
   const [storyCountError, setStoryCountError] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<ShareCopyStatus>("idle");
+  const copyBusyRef = useRef(false);
+  const copyEpochRef = useRef(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
@@ -1069,6 +1133,11 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   useEffect(() => {
     if (!open) setStorySelected(false);
   }, [open]);
+
+  useEffect(() => {
+    copyEpochRef.current += 1;
+    setCopyStatus("idle");
+  }, [open, baseUrl]);
 
   useScrollLock(open);
 
@@ -1123,18 +1192,34 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
   if (!open) return null;
 
   const handleCopy = async () => {
+    if (copyBusyRef.current) return;
+    copyBusyRef.current = true;
+    const epoch = copyEpochRef.current;
+    const updateStatus = (status: ShareCopyStatus) => {
+      if (copyEpochRef.current === epoch) setCopyStatus(status);
+    };
     const trackedUrl = getTrackedShareUrl("copy");
-    try { await navigator.clipboard.writeText(trackedUrl); } catch { /* no-op */ }
-    trackEvent("share_copy", buildShareAnalyticsPayload({
-      item,
-      target: shareTarget,
-      platformKey: "copy",
-      trackedUrl,
-      action: "copy",
-    }));
-    incrementShareCount(baseUrl, "copy", shareTarget.entitySlug || undefined, item.title).then((count) => {
-      setShareCounts((prev) => ({ ...prev, copy: count }));
-    }).catch(() => {});
+    updateStatus("copying");
+    setPendingPlatforms((prev) => new Set(prev).add("copy"));
+    try {
+      if (!(await copyShareLink(trackedUrl))) {
+        updateStatus("manual");
+        return;
+      }
+      updateStatus("copied");
+      trackEvent("share_copy", buildShareAnalyticsPayload({
+        item, target: shareTarget, platformKey: "copy", trackedUrl, action: "copy",
+      }));
+      try {
+        const count = await incrementShareCount(baseUrl, "copy", shareTarget.entitySlug || undefined, item.title);
+        setShareCounts((prev) => ({ ...prev, copy: count }));
+      } catch {
+        updateStatus("count_error");
+      }
+    } finally {
+      copyBusyRef.current = false;
+      setPendingPlatforms((prev) => { const next = new Set(prev); next.delete("copy"); return next; });
+    }
   };
 
   const handleShare = async (platform: SharePlatform) => {
@@ -1255,8 +1340,10 @@ export function ShareSheet({ item, open, onClose, timestamp, onComment }: ShareS
                   pendingPlatforms={pendingPlatforms}
                   onShare={handleShare}
                   onCopy={handleCopy}
+                  copyStatus={copyStatus}
                   size="md"
                 />
+                <ShareCopyFeedback status={copyStatus} url={getTrackedShareUrl("copy")} />
               </div>
             )}
           </div>
