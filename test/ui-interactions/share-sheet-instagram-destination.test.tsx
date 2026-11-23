@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SharePopover, ShareSheet, canShareArticleStory, sharePlatformsForItem, type ShareObject } from "@/components/design-system/share/ShareSheet";
@@ -92,6 +93,68 @@ describe("unified sharing destination grid for Instagram Story", () => {
     await waitFor(() => expect(incrementShareCount).toHaveBeenCalledWith(
       article.url, "instagram_story", "album-review-alusa-continua", article.title,
     ));
+  });
+
+
+  it("records a Story image save in the same persisted Instagram counter and shows it back in the grid", async () => {
+    const save = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    try {
+      render(<ShareSheet item={article} open onClose={vi.fn()} />);
+      fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
+      expect(incrementShareCount).not.toHaveBeenCalled();
+      fireEvent.click(await screen.findByRole("button", { name: "Save Image" }));
+      expect(save).toHaveBeenCalledOnce();
+      await waitFor(() => expect(incrementShareCount).toHaveBeenCalledWith(
+        article.url, "instagram_story", "album-review-alusa-continua", article.title,
+      ));
+      fireEvent.click(screen.getByRole("button", { name: "Back to share options" }));
+      const destination = screen.getByRole("button", { name: "Instagram Story" });
+      await waitFor(() => expect(destination.querySelector(".share-grid-badge")?.textContent).toBe("1"));
+    } finally {
+      save.mockRestore();
+    }
+  });
+
+  it("does not increment Instagram for opening the detail, copying the link, or a cancelled native share", async () => {
+    const share = vi.fn().mockRejectedValue(new DOMException("User cancelled", "AbortError"));
+    Object.defineProperty(navigator, "share", { configurable: true, value: share });
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: vi.fn(() => true) });
+    const clipboardWrite = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: clipboardWrite } });
+
+    render(<ShareSheet item={article} open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Instagram Story" }));
+    expect(incrementShareCount).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button", { name: "Copy Article Link" }));
+    await waitFor(() => expect(clipboardWrite).toHaveBeenCalledOnce());
+    expect(incrementShareCount).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Share Image" }));
+    await waitFor(() => expect(share).toHaveBeenCalledOnce());
+    expect(incrementShareCount).not.toHaveBeenCalled();
+  });
+
+  it("covers the exact original database allowlist and never weakens other share validation", () => {
+    const original = readFileSync("supabase/migrations/20261113203121_public_registry_rpc_community_write_security_20261113.sql", "utf8");
+    const repair = readFileSync("supabase/migrations/20261123062500_share_instagram_story_platform_v1.sql", "utf8");
+    const name = "CREATE OR REPLACE FUNCTION public.increment_share_count(p_page_url text, p_platform text, p_article_slug text DEFAULT NULL::text, p_article_title text DEFAULT NULL::text)";
+    const def = (sql: string) => {
+      const start = sql.indexOf(name);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const end = sql.indexOf("\n$function$;", start);
+      expect(end).toBeGreaterThan(start);
+      return sql.slice(start, end + "\n$function$;".length);
+    };
+    const oldAllow = "p_platform NOT IN ('copy','x','whatsapp','facebook','telegram','linkedin','reddit','pinterest','messenger','email')";
+    const newAllow = "p_platform NOT IN ('copy','instagram_story','x','whatsapp','facebook','telegram','linkedin','reddit','pinterest','messenger','email')";
+    expect(def(original).split(oldAllow)).toHaveLength(2);
+    expect(def(repair)).toBe(def(original).replace(oldAllow, newAllow));
+    expect(repair).toContain("b4224a4d955f79a41f3be148f81be669");
+    expect(repair).toContain("STOP: share counter authority drift");
+    expect(repair).toContain("STOP: share counter security definer or search path changed");
+    expect(repair.match(/CREATE OR REPLACE FUNCTION /g)).toHaveLength(1);
+    expect(repair).not.toContain("DROP FUNCTION");
+    expect(repair).not.toContain("GRANT EXECUTE");
+    expect(repair).not.toContain("UPDATE public.share_counts");
   });
 
   it("uses the same grid destination and reversible detail in the desktop popover", async () => {
