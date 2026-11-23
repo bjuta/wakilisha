@@ -2,6 +2,12 @@ import {describe,expect,it} from "vitest";
 import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
 import {buildCharts2PrivateNativeReviewV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import {suggestRecordingReviewGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
+import {
+  appendChartReviewReference,
+  chartStudioReturnHref,
+  parseChartReviewReference,
+  isChartReviewReference,
+} from "../../src/services/chartsPrivate/chartReviewContext";
 import { readFileSync } from "node:fs";
 import {
   CHARTS2_PRIVATE_METHODOLOGY_V1,
@@ -67,6 +73,15 @@ const STUDIO_SQL=readFileSync("supabase/migrations/20261119101415_charts2_studio
 const FREEZE_SQL=readFileSync("supabase/migrations/20261119111655_charts2_private_freeze_authority_v1.sql","utf8");
 const ORIGIN_SQL=readFileSync("supabase/migrations/20261119180542_charts2_top100_origin_neutral_integrity_v1.sql","utf8");
 const STUDIO_WORKER=readFileSync("supabase/functions/charts2-capture/index.ts","utf8");
+const CHART_REVIEW_REF=readFileSync("src/services/chartsPrivate/chartReviewContext.ts","utf8");
+const CHART_RETURN=readFileSync("src/components/admin/charts/ChartReviewReturnContext.tsx","utf8");
+const CHART_ALIAS_REVIEW=readFileSync("src/components/admin/charts/ChartAliasReview.tsx","utf8");
+const CHART_ARTIST_INTAKE_SQL=readFileSync("docs/engineering/charts2-artist-origin-intake-proposed-sql-v1.sql","utf8");
+const CHART_ARTIST_INTAKE_PAGE=readFileSync("src/pages/admin/registry/artists/intake/page.tsx","utf8");
+const CHART_ARTIST_INTAKE_EDGE=readFileSync("supabase/functions/artist-registry-intake/index.ts","utf8");
+const TRACK_INTAKE_PAGE=readFileSync("src/pages/admin/registry/tracks/intake/page.tsx","utf8");
+const ALIAS_PAGE=readFileSync("src/pages/admin/registry/artist-aliases/page.tsx","utf8");
+const DUPLICATE_PAGE=readFileSync("src/pages/admin/relationships/duplicates/page.tsx","utf8");
 const STUDIO_PAGE=readFileSync("src/pages/admin/charts/studio/page.tsx","utf8");
 const MUSIC_ROW=readFileSync("src/components/admin/charts/StudioChartMusicRow.tsx","utf8");
 const APPLE_META=readFileSync("src/services/chartsPrivate/appleCatalogReview.ts","utf8");
@@ -210,14 +225,72 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).toContain("Review Matches");
     expect(STUDIO_PAGE).toContain("Before You Approve");
     expect(STUDIO_PAGE).toContain("Manage Artist Aliases");
-    expect(STUDIO_PAGE).toContain('await invokeStudio("studio_review_link"');
+    expect(STUDIO_PAGE).toContain('noId?"studio_review_no_id":"studio_review_link"');
     expect(STUDIO_PAGE).toContain("Choose only one source position per recording");
     expect(STUDIO_PAGE).toContain("setBatchMode(true);setBatchRows([]);");
     expect(STUDIO_PAGE).toContain("old.filter(item=>item.source_key!==row.source_key)");
     expect(STUDIO_PAGE).toContain("if(accepted>0)");
     expect(STUDIO_PAGE).toContain("setBatchMode(false);setBatchRows([]);setSelected(null);");
     expect(STUDIO_PAGE).toContain("Artist not supplied");
-    expect(STUDIO_PAGE).not.toContain('studio_bulk_publish');
+    expect(STUDIO_PAGE).toContain('<Modal open={Boolean(selected)}');
+    expect(STUDIO_PAGE).toContain("Official Apple catalogue artist:");
+    expect(STUDIO_PAGE).toContain("Artist not supplied in original");
+    expect(STUDIO_PAGE).toContain("No active Registry recording matches this search.");
+    expect(STUDIO_PAGE).toContain("setRegistrySearchAttempted(true)");
+    expect(STUDIO_PAGE).not.toContain("Open existing Registry track authority");
+    expect(STUDIO_PAGE).not.toContain("xl:grid-cols-[minmax(0,1fr)_420px]");
+    expect(STUDIO_WORKER).toContain('server.from("registry_track_artists").select("track_id")');
+    expect(STUDIO_WORKER).toContain('server.from("registry_track_provider_links").select("track_id")');
+    expect(STUDIO_WORKER).toContain('server.from("registry_artist_aliases").select("canonical_artist_id")');
+    expect(STUDIO_WORKER).toContain('server.from("registry_tracks").select("id").eq("status","active")');
+    expect(STUDIO_WORKER).toContain('artist_names:artists.get(track.id)??[]');
+    expect(STUDIO_WORKER).toContain('artist_credits:artistCredits.get(track.id)??[]');
+    expect(STUDIO_WORKER).toContain('String(row.match_method??"unknown")');
+    expect(STUDIO_PAGE).toContain('Other credited Artists:');
+    expect(STUDIO_PAGE).toContain('Existing provider links (method, not proof):');
+    expect(STUDIO_WORKER).not.toContain('mode==="studio_auto_admit"');
+  });
+
+  it("keeps artistless title observations from merging unrelated recording identities",()=>{
+    const rows=[
+      {source_key:"youtube_ke",receipt_id:UUID(1),rank:1,
+        title:"Homebound",artist:"Artist A",provider_track_id:"youtube:a"},
+      {source_key:"mdundo_ke",receipt_id:UUID(2),rank:2,
+        title:"Homebound",artist:"Artist A",provider_track_id:"mdundo:a"},
+      {source_key:"audiomack_ke",receipt_id:UUID(3),rank:3,
+        title:"Homebound",artist:"Artist B",provider_track_id:"audiomack:b"},
+      {source_key:"shazam_ke",receipt_id:UUID(4),rank:4,
+        title:"Homebound",artist:"Artist B",provider_track_id:null},
+      {source_key:"apple_ke",receipt_id:UUID(5),rank:5,
+        title:"Homebound",artist:null,provider_track_id:"apple:unknown"},
+    ];
+    const leads=suggestRecordingReviewGroups(rows);
+    expect(leads).toHaveLength(2);
+    expect(leads.every(g=>g.observations.length===2)).toBe(true);
+    expect(leads.every(g=>g.observations.every(row=>row.artist!==null))).toBe(true);
+    expect(leads.flatMap(g=>g.observations).some(row=>row.source_key==="apple_ke")).toBe(false);
+    // An unidentified artist cannot form a group from title alone.
+    expect(suggestRecordingReviewGroups(rows.filter(row=>row.artist===null)))
+      .toHaveLength(0);
+  });
+
+  it("does not chain two same-source positions through a third chart",()=>{
+    const rows=[
+      {source_key:"youtube_ke",receipt_id:UUID(1),rank:8,
+        title:"Mboka",artist:"Mejja",provider_track_id:"yt:one"},
+      {source_key:"youtube_ke",receipt_id:UUID(1),rank:42,
+        title:"Mboka",artist:"Mejja Genge",provider_track_id:"yt:two"},
+      {source_key:"audiomack_ke",receipt_id:UUID(2),rank:11,
+        title:"Mboka",artist:"Mejja",provider_track_id:"am:one"},
+      {source_key:"apple_ke",receipt_id:UUID(3),rank:18,
+        title:"Mboka",artist:null,provider_track_id:"apple:one"},
+    ];
+    const groups=suggestRecordingReviewGroups(rows);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].observations.filter(row=>row.source_key==="youtube_ke")).toHaveLength(1);
+    expect(groups[0].observations.map(row=>row.source_key).sort())
+      .toEqual(["apple_ke","audiomack_ke","youtube_ke"]);
+    expect(groups[0].observations.find(row=>row.source_key==="youtube_ke")?.rank).toBe(8);
   });
 
   it("quarantines duplicate native IDs, incomplete receipts, and repeated same-source labels",()=>{
@@ -293,6 +366,57 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(original).toHaveLength(5);
   });
 
+  it("scores exact reviewed Shazam positions with genuine missing provider IDs",()=>{
+    const receipts=fullReceipts();
+    const shazam=receipts.find(r=>r.source_key==="shazam_ke")!;
+    shazam.observations.forEach(o=>{o.provider_track_id=null as any;});
+    const review={
+      id:UUID(501),source_key:"shazam_ke",receipt_id:shazam.id,
+      original_sha256:shazam.original_sha256,rank:3,
+      title:shazam.observations[2].title,artist:shazam.observations[2].artist,
+      provider_track_id:null,track_id:UUID(900),track_status:"active",
+      action:"approve",
+      review_note:"I independently verified the same Shazam chart position against canonical recording and release evidence.",
+      evidence_url:"https://example.com/canonical-release-evidence",
+      event_fingerprint:"a".repeat(64),
+    };
+    const only=scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[review]});
+    expect(only.candidates).toHaveLength(1);
+    expect(only.candidates[0].track_id).toBe(UUID(900));
+    expect(only.candidates[0].source_count).toBe(1);
+    expect(only.candidates[0].score_points).toBe("9.90");
+    expect(only.candidates[0].source_contributions[0].registry_observation_resolution_id)
+      .toBe(review.id);
+    expect(only.candidates[0].source_contributions[0].registry_provider_link_id)
+      .toBeUndefined();
+    expect(only.unresolved).toHaveLength(599);
+    const withProvider=scoreCharts2PrivatePreviewV1({
+      receipts,registry_links:[link("youtube_ke",1,900)],observation_reviews:[review],
+    });
+    expect(withProvider.candidates.find(c=>c.track_id===UUID(900))?.score_points)
+      .toBe("39.90");
+    for(const [key, value] of [
+      ["original_sha256","f".repeat(64)],
+      ["title","Wrong title"],["artist","Unrelated Artist"],
+      ["track_status","archived"],["review_note","Not independently verified"],
+      ["evidence_url","http://untrusted.example"],["event_fingerprint","invalid"],
+    ] as const){
+      const invalid=scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[
+        {...review,[key]:value},
+      ]});
+      expect(invalid.candidates).toHaveLength(0);
+    }
+    const revoked=scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[
+      {...review,action:"revoke",track_id:null},
+    ]});
+    expect(revoked.candidates).toHaveLength(0);
+    expect(()=>scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[review,review]}))
+      .toThrow("charts2_scoring_observation_review_conflict");
+    expect(()=>scoreCharts2PrivatePreviewV1({receipts,observation_reviews:[
+      {...review,provider_track_id:"invented"},
+    ]})).toThrow("charts2_scoring_observation_review_unqualified");
+  });
+
   it("never merges based on existing weak title/artist Registry links",()=>{
     const weak={...link("apple_ke",1,67),match_method:"exact_title_artist"};
     const result=score(fullReceipts(),[weak]);
@@ -360,6 +484,61 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     }}]).candidates).toHaveLength(0);
   });
 
+  it("passes only exact immutable chart observation coordinates to Registry workspaces",()=>{
+    const item={
+      source_key:"youtube_ke" as const,
+      receipt_id:UUID(1),original_sha256:"a".repeat(64),rank:14,
+    };
+    expect(isChartReviewReference(item)).toBe(true);
+    const href=appendChartReviewReference("/admin/registry/tracks/intake",item);
+    const params=new URLSearchParams(href.split("?")[1]);
+    expect(parseChartReviewReference(params)).toEqual(item);
+    expect(chartStudioReturnHref(item)).toContain("tab=review");
+    expect(chartStudioReturnHref(item)).toContain("chart_rank=14");
+    expect(()=>appendChartReviewReference("https://example.com",item)).toThrow();
+    expect(()=>appendChartReviewReference("/admin/evil",{
+      ...item,original_sha256:"not-a-sha",
+    })).toThrow();
+    expect(parseChartReviewReference(new URLSearchParams("chart_source=shazam_ke&chart_rank=201"+
+      "&chart_receipt="+UUID(1)+"&chart_sha="+"a".repeat(64)))).toBeNull();
+    expect(CHART_REVIEW_REF).not.toContain("service_role");
+    expect(CHART_RETURN).toContain("studio_review_context");
+    expect(CHART_RETURN).toContain("item.original_sha256!==reference.original_sha256");
+    expect(STUDIO_WORKER).toContain('mode==="studio_review_context"');
+    expect(STUDIO_WORKER).toContain('await verifyPrivateOriginal(server,receipt)');
+    expect(STUDIO_WORKER).toContain('"charts2_review_context_receipt_changed"');
+    expect(STUDIO_WORKER).toContain('"charts2_review_context_position_changed"');
+    expect(STUDIO_PAGE).toContain('"/admin/registry/tracks/intake?suggestion="+id');
+    expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/registry/artist-aliases"');
+    expect(STUDIO_PAGE).toContain('appendChartReviewReference("/admin/relationships/duplicates"');
+    expect(STUDIO_PAGE).toContain('startGovernedArtistIntake');
+    expect(STUDIO_PAGE).toContain('studio_stage_artist_intake');
+    expect(CHART_ARTIST_INTAKE_PAGE).toContain('chartRunId');
+    expect(CHART_ARTIST_INTAKE_PAGE).toContain('<ChartReviewReturnContext />');
+    expect(CHART_ARTIST_INTAKE_PAGE).toContain('loadResults(initialChartRun.current,"no_match")');
+    expect(CHART_ARTIST_INTAKE_EDGE).toContain('charts2_chart_observation');
+    expect(CHART_ARTIST_INTAKE_EDGE).toContain('chart_artist_claim_only!==true');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain('admin_stage_charts2_artist_intake_v1');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain('registry_artist_intake_review_snapshot_v1');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain('registry_artist_intake_review_fingerprint_v1');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain('admin_review_registry_artist_intake_v1');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain('platform_private.assert_charts2_artist_intake_receipt_v1');
+    expect(CHART_ARTIST_INTAKE_SQL).toContain("source_origin_iso2");
+    expect(CHART_ARTIST_INTAKE_SQL).toContain("'charts2_chart_observation'");
+    expect(CHART_ALIAS_REVIEW).toContain('admin_set_registry_artist_alias_v1');
+    expect(CHART_ALIAS_REVIEW).toContain('may also correct existing public chart Artist references');
+    expect(DUPLICATE_PAGE).toContain('track.id,');
+    expect(DUPLICATE_PAGE).toContain('urlParams.get("chart_track")');
+    expect(STUDIO_PAGE).toContain('source.original_sha256===returnContext.original_sha256');
+    expect(TRACK_INTAKE_PAGE).toContain("<ChartReviewReturnContext />");
+    expect(ALIAS_PAGE).toContain('<ChartReviewReturnContext consequence="artist_alias" />');
+    expect(DUPLICATE_PAGE).toContain('<ChartReviewReturnContext consequence="track_duplicate" />');
+    expect(CHART_RETURN).toContain("may also update existing public chart artist references");
+    expect(CHART_RETURN).toContain("can move public chart rows");
+    // This handoff does not claim to create intake records or auto-approve.
+    expect(CHART_RETURN).not.toContain('admin_create_registry_track_intake_identity_v1');
+  });
+
   it("protects private Studio snapshot, real JWT broker and no-publication route",()=>{
     expect(STUDIO_SQL).toContain("charts2_studio_private_snapshot_v1");
     expect(STUDIO_SQL).toContain("to service_role;");
@@ -373,6 +552,24 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_WORKER).toContain('crypto.subtle.digest("SHA-256",bytes)');
     expect(STUDIO_WORKER).toContain('authClient.rpc("admin_admit_registry_track_provider_link_v1"');
     expect(STUDIO_WORKER).not.toContain('server.rpc("admin_admit_registry_track_provider_link_v1"');
+    expect(STUDIO_WORKER).toContain('mode==="studio_review_no_id"');
+    expect(STUDIO_WORKER).toContain('authClient.rpc("admin_review_charts2_no_id_observation_v1"');
+    expect(STUDIO_WORKER).toContain('p_expected_previous_event_id:previous?.id??null');
+    expect(STUDIO_WORKER).toContain('observation_reviews:snapshot.observation_reviews??[]');
+    expect(STUDIO_WORKER).toContain('p_action:action');
+    expect(STUDIO_WORKER).toContain('p_track_id:action==="revoke"?null:supplied.track_id');
+    expect(STUDIO_PAGE).toContain('currentShazamReviews');
+    expect(STUDIO_PAGE).toContain('Revoke This Shazam Resolution');
+    expect(STUDIO_PAGE).toContain('SHAZAM_REVOKE_DECLARATION');
+    expect(STUDIO_WORKER).not.toContain('server.rpc("admin_review_charts2_no_id_observation_v1"');
+    expect(STUDIO_WORKER).toContain("observation_reviews:snapshot.observation_reviews??[]");
+    expect(STUDIO_PAGE).toContain('SHAZAM_DECLARATION');
+    expect(STUDIO_PAGE).toContain('noId?"studio_review_no_id":"studio_review_link"');
+    expect(STUDIO_PAGE).toContain('"Review Shazam Position"');
+    expect(PUBLIC_CHART_MODELS).not.toContain('registry_observation_resolution_id');
+    const offlineBridge=readFileSync("supabase/functions/_shared/charts2-publication-bridge-v1.mjs","utf8");
+    expect(offlineBridge).toContain("registry_observation_resolution_id");
+    expect(offlineBridge).toContain("c.registry_provider_link_id == null");
     expect(STUDIO_WORKER).toContain('p_match_method:"manual",p_match_confidence:1');
     expect(STUDIO_WORKER).toContain('storedWeights[name]!==policy.weight_points');
     expect(ROUTER).toContain('path: "studio", element: <AdminGuard capabilities={["manage_charts"]}><AdminChartsStudioPage /></AdminGuard>');
@@ -382,6 +579,39 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     }
     expect(STUDIO_PAGE).toContain("Collect / retry");
     expect(STUDIO_PAGE).not.toContain("publish_edition");
+  });
+
+  it("keeps Shazam no-ID SQL review decisions append-only and independently audited",()=>{
+    const proposed=readFileSync("docs/engineering/charts2-no-id-observation-resolution-proposed-sql-v1.sql","utf8");
+    const intake=readFileSync("docs/engineering/charts2-chart-origin-intake-proposed-sql-v1.sql","utf8");
+    expect(proposed).toContain("platform_private.charts2_observation_review_events_v1");
+    expect(proposed).toContain("before update or delete");
+    expect(proposed).toContain("admin_review_charts2_no_id_observation_v1");
+    expect(proposed).toContain("reviewer_id uuid not null");
+    expect(proposed).toContain("p_expected_previous_event_id");
+    expect(proposed).toContain("v_prev.action=p_action");
+    expect(proposed).toContain("default 'shazam_ke'");
+    expect(proposed).toContain("registry_observation_resolution_id");
+    expect(proposed).toContain("review_policy','exact_manual_receipt_plus_shazam_v1'");
+    expect(proposed).toContain("I revoke this exact private Shazam recording resolution");
+    expect(intake).toContain("registry_provider_track_suggestions_chart_origin_evidence_check");
+    expect(intake).toContain("public.admin_stage_charts2_track_intake_v1");
+    expect(intake).toContain("insert into public.registry_provider_track_suggestion_artists(");
+    expect(intake).toContain("v_item.id,1,'unresolved','unresolved',null,v_artist");
+    expect(intake).toContain("admin_append_charts2_track_intake_credit_v1");
+    expect(intake).toContain("chart_review_evidence");
+    expect(intake).toContain("perform platform_private.assert_charts2_intake_receipt_v1(p_suggestion_id)");
+    expect(TRACK_INTAKE_PAGE).toContain('row.intake_origin==="chart_studio"');
+    expect(TRACK_INTAKE_PAGE).toContain('"admin_append_charts2_track_intake_credit_v1"');
+    expect(TRACK_INTAKE_PAGE).toContain("Add Unresolved Credit");
+    expect(TRACK_INTAKE_PAGE).toContain("Choose whether this artist is Primary or Featured.");
+    expect(intake).toContain("platform_private.assert_charts2_intake_receipt_v1");
+    expect(intake).toContain("order by newest.created_at desc,newest.id desc");
+    expect(intake).toContain("'public_contribution','artist_submission','chart_studio'");
+    expect(intake).not.toContain("insert into public.registry_tracks");
+    expect(intake).not.toContain("insert into public.wk_chart_entries_v2");
+    expect(proposed).not.toContain("insert into public.registry_track_provider_links");
+    expect(proposed).not.toContain("insert into public.wk_chart_entries_v2");
   });
 
   it("allows 100 separately reviewed canonical recordings while preserving 500 unresolved observations",()=>{
