@@ -148,3 +148,20 @@ export async function prepareChartTrackIntakes(
   }
   return results;
 }
+
+// Exact chart-catalogue evidence is only a review lead. Check the provider's
+// raw returned song, not merely the requested ID echoed by the broker.
+export function matchesOriginalAppleChartSong(
+  expectedId:string,expectedTitle:string,raw:unknown,
+):boolean {
+  if(!/^[0-9]{6,20}$/.test(expectedId)||!expectedTitle.trim()||
+     !raw||typeof raw!=="object")return false;
+  const data=(raw as {data?:unknown}).data;
+  if(!Array.isArray(data)||data.length!==1)return false;
+  const song=data[0] as {id?:unknown;type?:unknown;attributes?:{name?:unknown}}|null;
+  const title=song?.attributes?.name;
+  const normalize=(value:string)=>value.normalize("NFKC").toLocaleLowerCase("en")
+    .replace(/[^\p{L}\p{N}]+/gu,"");
+  return song?.id===expectedId&&song.type==="songs"&&typeof title==="string"&&
+    normalize(expectedTitle).length>0&&normalize(title)===normalize(expectedTitle);
+}

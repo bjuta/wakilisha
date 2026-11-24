@@ -1,4 +1,5 @@
 import { ChartReviewReturnContext } from "@/components/admin/charts/ChartReviewReturnContext";
+import { matchesOriginalAppleChartSong } from "@/services/chartsPrivate/chartReviewContext";
 import {
   useCallback,
   useEffect,
@@ -241,6 +242,8 @@ export default function TrackIntakePage() {
   const [trackSearching, setTrackSearching] =
     useState<Record<string, boolean>>({});
   const [trackSearchAttempted, setTrackSearchAttempted] =
+    useState<Record<string, boolean>>({});
+  const [trackSearchFailed, setTrackSearchFailed] =
     useState<Record<string, boolean>>({});
   const trackSearchSequence = useRef<Record<string, number>>({});
   const [selectedTrack, setSelectedTrack] =
@@ -520,6 +523,8 @@ export default function TrackIntakePage() {
     const requestId =
       (trackSearchSequence.current[suggestionId] ?? 0) + 1;
     trackSearchSequence.current[suggestionId] = requestId;
+    setTrackHits((current) => ({ ...current, [suggestionId]: [] }));
+    setTrackSearchFailed((current) => ({ ...current, [suggestionId]: false }));
 
     const trimmed = value.trim();
     if (trimmed.length < 2) {
@@ -650,7 +655,12 @@ export default function TrackIntakePage() {
         ...current,
         [suggestionId]: [],
       }));
+      // Transport failure is not a successful zero-result duplicate check.
       setTrackSearchAttempted((current) => ({
+        ...current,
+        [suggestionId]: false,
+      }));
+      setTrackSearchFailed((current) => ({
         ...current,
         [suggestionId]: true,
       }));
@@ -1043,12 +1053,13 @@ export default function TrackIntakePage() {
 
   async function inspectProvider(
     row: IntakeRow,
-    hit: ProviderSearchHit,
+    hit: Pick<ProviderSearchHit, "provider" | "providerEntityId">,
   ) {
     const suggestionId = row.suggestion_id;
 
     setBusy(`provider-inspect:${suggestionId}`);
     setError(null);
+    setProviderInspection((current) => ({ ...current, [suggestionId]: null }));
 
     try {
       const { data, error: invokeError } =
@@ -1071,8 +1082,21 @@ export default function TrackIntakePage() {
       const inspection =
         (data?.result ?? null) as ProviderInspection | null;
 
-      if (!inspection) {
-        throw new Error("Provider returned no track evidence.");
+      if (!inspection || inspection.provider !== hit.provider ||
+          inspection.providerEntityId !== hit.providerEntityId) {
+        throw new Error("Provider did not return the requested track evidence.");
+      }
+
+      const exactAppleChartSong = row.intake_origin === "chart_studio" &&
+        row.provider_key === "apple_music" &&
+        hit.provider === "apple_music" &&
+        hit.providerEntityId === row.provider_object_id;
+      if (exactAppleChartSong && (
+          !matchesOriginalAppleChartSong(hit.providerEntityId, row.provider_title ?? "", data?.raw) ||
+          inspection.source?.storefrontOrMarket !== "ke" ||
+          !inspection.title?.trim()
+      )) {
+        throw new Error("Apple catalogue evidence does not match the original chart song. Nothing was staged.");
       }
 
       const inspectionFields = {
@@ -1351,6 +1375,12 @@ export default function TrackIntakePage() {
 
     if (!title) {
       setError("Confirm the canonical track title first.");
+      return;
+    }
+
+    if (trackSearching[suggestionId] || !trackSearchAttempted[suggestionId] ||
+        trackSearchFailed[suggestionId] || (trackHits[suggestionId] ?? []).length > 0) {
+      setError("Complete a successful Registry search before creating a new track.");
       return;
     }
 
@@ -1987,6 +2017,24 @@ export default function TrackIntakePage() {
                           </button>
                         </div>
 
+                        {row.intake_origin === "chart_studio" &&
+                          row.provider_key === "apple_music" &&
+                          row.provider_object_id && /^[0-9]{6,20}$/.test(row.provider_object_id) &&
+                          row.provider_title?.trim() && (
+                          <div className="mt-3 space-y-2 rounded-lg border border-wk-border bg-wk-bg p-3">
+                            <p className="text-xs font-bold text-wk-text">Original Apple Music song</p>
+                            <p className="break-words text-xs text-wk-text-muted">
+                              Inspect the exact song ID from the chart. Catalogue evidence is separate from the original chart credit.
+                            </p>
+                            <button type="button" disabled={busy !== null}
+                              onClick={() => void inspectProvider(row, {
+                                provider: "apple_music", providerEntityId: row.provider_object_id!,
+                              })}
+                              className="wk-button wk-button-ghost wk-button-sm disabled:opacity-40">
+                              Inspect Original Apple Song
+                            </button>
+                          </div>
+                        )}
                         <div className="mt-4 grid gap-2 sm:grid-cols-[150px_1fr_auto]">
                           <WkSelect
                             value={chosenProvider}
@@ -2053,7 +2101,8 @@ export default function TrackIntakePage() {
                                   onClick={() =>
                                     void inspectProvider(row, hit)
                                   }
-                                  className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-wk-surface-raised"
+                                  disabled={busy !== null}
+                                  className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-wk-surface-raised disabled:opacity-40"
                                 >
                                   {hit.artworkUrl ? (
                                     <img
@@ -2093,6 +2142,13 @@ export default function TrackIntakePage() {
                               </span>
                             </div>
 
+                            {row.intake_origin === "chart_studio" && (
+                              <div className="mb-3 space-y-1 rounded-lg border border-wk-border p-3 text-xs">
+                                <p className="break-words font-bold text-wk-text">{inspection.title || "Title not supplied"}</p>
+                                <p className="break-words text-wk-text-muted">Catalogue Artist: {inspection.artistDisplayName || "Not supplied"}</p>
+                                <p className="text-wk-text-muted">This is provider evidence, not a reviewed Artist identity or credit role.</p>
+                              </div>
+                            )}
                             <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-wk-border bg-wk-bg p-3">
                               <div>
                                 <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
@@ -2836,10 +2892,21 @@ export default function TrackIntakePage() {
                                 )
                               }
                               placeholder="Search by track, artist, or ISRC"
-                              className="h-10 w-full bg-transparent text-sm outline-none"
+                              className="h-10 min-w-0 w-full bg-transparent text-sm outline-none"
                             />
+                            <button type="button" disabled={busy !== null || !!trackSearching[suggestionId]}
+                              onClick={() => void searchTracks(suggestionId,
+                                trackQuery[suggestionId] ?? row.submitted_track_title ?? row.provider_title ?? "")}
+                              className="wk-button wk-button-ghost wk-button-sm shrink-0 disabled:opacity-40">
+                              Search
+                            </button>
                           </div>
 
+                          {trackSearchFailed[suggestionId] && (
+                            <p role="alert" className="mt-2 text-xs text-wk-danger">
+                              Registry search failed. Retry before creating a track.
+                            </p>
+                          )}
                           {trackSearching[suggestionId] ? (
                             <div className="mt-2 flex items-center gap-2 text-xs text-wk-text-muted">
                               <WkIcon name="Loader2" size={13} className="animate-spin" />
@@ -2903,13 +2970,14 @@ export default function TrackIntakePage() {
 
                           {!trackSearching[suggestionId] &&
                           trackSearchAttempted[suggestionId] &&
+                          !trackSearchFailed[suggestionId] &&
                           (trackHits[suggestionId] ?? []).length === 0 ? (
                             <div className="mt-2 rounded-lg border border-wk-border bg-wk-surface-raised p-3">
                               <div className="text-xs font-bold text-wk-text">
-                                No active Registry track matches this search.
+                                No active Registry tracks returned for this search.
                               </div>
                               <p className="mt-1 text-xs leading-5 text-wk-text-muted">
-                                Search by track title, artist, or ISRC. If this is genuinely new, create its canonical track from the reviewed intake evidence.
+                                Check title, artist, and ISRC where available. The Registry checks for identity conflicts before creating a track.
                               </p>
 
                               {allArtistCreditsResolved ? (

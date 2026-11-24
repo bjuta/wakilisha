@@ -11,6 +11,7 @@ import {
   appendChartIntakeBatch,
   parseChartIntakeBatch,
   writeChartIntakeBatch,
+  matchesOriginalAppleChartSong,
 } from "../../src/services/chartsPrivate/chartReviewContext";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -536,6 +537,28 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(parseChartIntakeBatch(oversized)).toEqual([]);
     expect(STUDIO_PAGE).toContain("startGovernedArtistIntake(ref,row.artist)");
     expect(STUDIO_PAGE).toContain("currentIntakeRow(ref)");
+  });
+  it("requires exact returned Apple song evidence and separates search failure from zero results",()=>{
+    const song={id:"1234567890",type:"songs",attributes:{name:"I'll Be Okay"}};
+    expect(matchesOriginalAppleChartSong(song.id,"I’ll Be Okay",{data:[song]})).toBe(true);
+    expect(matchesOriginalAppleChartSong(song.id,"Different title",{data:[song]})).toBe(false);
+    expect(matchesOriginalAppleChartSong(song.id,"I'll Be Okay",{data:[{...song,id:"1234567891"}]})).toBe(false);
+    expect(matchesOriginalAppleChartSong(song.id,"I'll Be Okay",{data:[{...song,type:"albums"}]})).toBe(false);
+    expect(matchesOriginalAppleChartSong(song.id,"I'll Be Okay",{data:[song,song]})).toBe(false);
+    expect(matchesOriginalAppleChartSong(song.id,"I'll Be Okay",{data:[]})).toBe(false);
+    expect(matchesOriginalAppleChartSong(song.id,"I'll Be Okay",null)).toBe(false);
+    expect(matchesOriginalAppleChartSong("bad/id","I'll Be Okay",{data:[song]})).toBe(false);
+    expect(matchesOriginalAppleChartSong(song.id,"!",{data:[{...song,attributes:{name:"!"}}]})).toBe(false);
+    const search=TRACK_INTAKE_PAGE.slice(TRACK_INTAKE_PAGE.indexOf("async function searchTracks("),
+      TRACK_INTAKE_PAGE.indexOf("function artistCreditKey("));
+    const failure=search.slice(search.indexOf("} catch (reason)"));
+    expect(failure).toContain("setTrackSearchAttempted");
+    expect(failure).toContain("[suggestionId]: false");
+    expect(failure).toContain("setTrackSearchFailed");
+    expect(TRACK_INTAKE_PAGE).toContain("!trackSearchFailed[suggestionId] &&");
+    expect(TRACK_INTAKE_PAGE).toContain("!trackSearchAttempted[suggestionId] ||");
+    expect(TRACK_INTAKE_PAGE).toContain("matchesOriginalAppleChartSong(hit.providerEntityId, row.provider_title");
+    expect(TRACK_INTAKE_PAGE).toContain("Inspect Original Apple Song");
   });
   it("passes only exact immutable chart observation coordinates to Registry workspaces",()=>{
     const item={
