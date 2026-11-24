@@ -119,6 +119,74 @@ export async function verifyCharts2RealJwtRegistryV1({
    "STOP_CHARTS2_REAL_JWT_ARTIST_INTAKE_INVENTED_METADATA");
  console.log("WK_AUTH_CHARTS2_JWT_TRACK_ARTIST_CREDIT_INTAKE_AND_DENIAL=PASS");
 
+ // Genuine caller-bound recovery: no fabricated operation/grant/verifier
+ // receipts. Only the two pre-existing Artist identities are local fixtures.
+ const recoveryArgs={p_status:"all",p_limit:1,p_offset:0,
+   p_suggestion_id:staged.suggestion_id,p_playlist_item_id:null};
+ const readRecovery=async (user)=>{
+   const envelope=await accept(user,"admin_get_registry_track_intake_queue",recoveryArgs,
+     "STOP_CHARTS2_JWT_RECOVERY_QUEUE");
+   fail(envelope?.rows?.length===1 && envelope.rows[0].suggestion_id===staged.suggestion_id,
+     "STOP_CHARTS2_JWT_RECOVERY_ROW");
+   return envelope.rows[0];
+ };
+ denied(await subscriber.rpc("admin_get_registry_track_intake_queue",recoveryArgs),
+   "42501","STOP_CHARTS2_JWT_UNPRIVILEGED_RECOVERY");
+ fail((await readRecovery(first.user)).recovery===null,"STOP_CHARTS2_JWT_FRESH_RECOVERY_NOT_NULL");
+ const artistIds=[randomUUID(),randomUUID()];
+ sql(`insert into public.registry_artists(id,slug,display_name,normalized_name,status) values
+   ('${artistIds[0]}','ci-original-${artistIds[0].slice(0,8)}','CI Original Artist','ci original artist','active'),
+   ('${artistIds[1]}','ci-collab-${artistIds[1].slice(0,8)}','CI Collaborating Artist','ci collaborating artist','active');`);
+ for(let i=0;i<2;i++){
+   await accept(first.user,"admin_update_registry_track_intake_artist_credit",{
+     p_suggestion_id:staged.suggestion_id,p_credit_order:i+1,
+     p_credit_role:i===0?"primary":"featured",p_resolution_mode:"existing_artist",
+     p_registry_artist_id:artistIds[i],p_observed_name:i===0?"CI Original Artist":"CI Collaborating Artist",
+   },"STOP_CHARTS2_JWT_REVIEWED_RECOVERY_CREDIT");
+ }
+ const createArgs={p_suggestion_id:staged.suggestion_id,p_title:"CI Genuine JWT Recovery Song"};
+ const created=await accept(first.user,"admin_create_registry_track_intake_identity_v1",
+   createArgs,"STOP_CHARTS2_JWT_CREATE_RECOVERY_DRAFT");
+ const recoveryId=created?.track?.track_id;
+ fail(UUID.test(recoveryId??"")&&created.verifier_status==="passed"&&
+   created.track.status==="draft","STOP_CHARTS2_JWT_DRAFT_VERIFIER");
+ const draft=await readRecovery(first.user);
+ fail(draft.recovery?.state==="draft"&&draft.recovery.track_id===recoveryId&&
+   draft.recovery.title===createArgs.p_title&&draft.canonical_track_id===null,
+   "STOP_CHARTS2_JWT_VERIFIED_DRAFT_RECOVERY");
+ fail((await readRecovery(second.user)).recovery?.state==="blocked",
+   "STOP_CHARTS2_JWT_OTHER_CALLER_DRAFT_RECOVERY");
+ const resumed=await accept(first.user,"admin_create_registry_track_intake_identity_v1",
+   createArgs,"STOP_CHARTS2_JWT_REPLAY_RECOVERY_DRAFT");
+ fail(resumed.idempotent_replay===true&&resumed.track.track_id===recoveryId,
+   "STOP_CHARTS2_JWT_DRAFT_REPLAY_CHANGED_ID");
+ for(const reviewed of draft.artist_credits){
+   await accept(first.user,"admin_reconcile_registry_track_intake_credit_v1",{
+     p_suggestion_id:staged.suggestion_id,p_source_credit_id:reviewed.credit_id,
+     p_registry_track_id:recoveryId,
+   },"STOP_CHARTS2_JWT_RECOVERY_CREDIT_RECONCILIATION");
+ }
+ // No selected enrichment or confirmed provider links have been introduced.
+ await accept(first.user,"admin_admit_registry_track_intake_track_profile_v1",{
+   p_suggestion_id:staged.suggestion_id,p_registry_track_id:recoveryId,p_allow_overwrite:false,
+ },"STOP_CHARTS2_JWT_RECOVERY_PROFILE");
+ const activated=await accept(first.user,"admin_activate_registry_track_intake_v1",{
+   p_suggestion_id:staged.suggestion_id,
+ },"STOP_CHARTS2_JWT_RECOVERY_ACTIVATION");
+ fail(activated?.verifier_status==="passed"&&activated?.track?.track_id===recoveryId,
+   "STOP_CHARTS2_JWT_RECOVERY_ACTIVATION_VERIFIER");
+ const active=await readRecovery(first.user);
+ fail(active.recovery?.state==="active"&&active.recovery.track_id===recoveryId&&
+   active.canonical_track_id===null,"STOP_CHARTS2_JWT_ACTIVE_RECOVERY");
+ const finalized=await accept(first.user,"admin_finalize_registry_track_intake_v1",{
+   p_suggestion_id:staged.suggestion_id,p_registry_track_id:recoveryId,p_review_note:note,
+ },"STOP_CHARTS2_JWT_RECOVERY_FINALIZE");
+ const finished=await readRecovery(first.user);
+ fail(finalized?.status==="canonicalized"&&finished.status==="canonicalized"&&
+   finished.recovery===null&&finished.canonicalized_track_id===recoveryId,
+   "STOP_CHARTS2_JWT_RECOVERY_FINAL_STATE");
+ console.log("WK_AUTH_CHARTS2_VERIFIED_DRAFT_AND_ACTIVATION_RECOVERY=PASS");
+
  const decisionArgs={
    p_receipt_id:shazamId,p_original_sha256:shazamSha,p_rank:1,
    p_action:"approve",p_track_id:trackId,p_review_note:note,

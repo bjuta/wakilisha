@@ -35,6 +35,10 @@ interface RegistryArtistHit {
   status: string;
 }
 
+type IntakeRecovery =
+  | { state: "draft" | "active"; track_id: string; title: string }
+  | { state: "blocked" };
+
 interface IntakeRow {
   suggestion_id: string;
   status: string;
@@ -68,6 +72,7 @@ interface IntakeRow {
   canonical_track_title: string | null;
   canonicalized_track_id: string | null;
   canonicalized_track_title: string | null;
+  recovery?: IntakeRecovery | null;
   artist_credits: ArtistCredit[];
 }
 
@@ -374,6 +379,8 @@ export default function TrackIntakePage() {
           ? reason.message
           : "Track Intake could not be loaded.",
       );
+      // A failed refresh must not leave an old mutation target actionable.
+      setQueue((current) => ({ ...current, rows: [], total: 0 }));
     } finally {
       setLoading(false);
     }
@@ -1360,6 +1367,10 @@ export default function TrackIntakePage() {
 
   async function createCanonicalTrack(row: IntakeRow) {
     const suggestionId = row.suggestion_id;
+    if (row.recovery !== null) {
+      setError("Refresh the Intake recovery state before creating a track.");
+      return;
+    }
     const observedTitle =
       preferredObservedTrackTitle(
         suggestionId,
@@ -1421,44 +1432,81 @@ export default function TrackIntakePage() {
         );
       }
 
-      await reconcileReviewedArtistCredits(
-        row,
-        registryTrackId,
-      );
-      await applyReviewedProfiles(
-        row,
-        registryTrackId,
-      );
-      await admitConfirmedProviderLinks(
-        suggestionId,
-        registryTrackId,
-      );
-
-      await untypedRpc(
-        "admin_activate_registry_track_intake_v1",
-        {
-          p_suggestion_id: suggestionId,
-        },
-      );
-
-      await finalizeCanonicalization(
-        row,
-        registryTrackId,
-      );
-
+      await completeDraftTrack(row, registryTrackId);
       await loadQueue();
     } catch (reason) {
+      await loadQueue();
       setError(
         reason instanceof Error
           ? reason.message
-          : "Canonical Registry track could not be created.",
+          : "Canonical Registry track could not be created. Review the refreshed Intake state before retrying.",
       );
     } finally {
       setBusy(null);
     }
   }
 
+  async function completeDraftTrack(row: IntakeRow, registryTrackId: string) {
+    await reconcileReviewedArtistCredits(row, registryTrackId);
+    await applyReviewedProfiles(row, registryTrackId);
+    await admitConfirmedProviderLinks(row.suggestion_id, registryTrackId);
+    await untypedRpc("admin_activate_registry_track_intake_v1", {
+      p_suggestion_id: row.suggestion_id,
+    });
+    await finalizeCanonicalization(row, registryTrackId);
+  }
+
+  async function resumeCanonicalTrack(row: IntakeRow) {
+    const prior = row.recovery;
+    if (!prior || prior.state === "blocked") return;
+    setBusy("canonical-resume:" + row.suggestion_id);
+    setError(null);
+    try {
+      // Reread the existing authority after interruption, never a cached ID.
+      const envelope = await untypedRpc("admin_get_registry_track_intake_queue", {
+        p_status: "all", p_limit: 1, p_offset: 0,
+        p_suggestion_id: row.suggestion_id, p_playlist_item_id: null,
+      }) as QueueEnvelope;
+      const fresh = envelope?.rows?.[0];
+      const recovery = fresh?.recovery;
+      if (!fresh || fresh.suggestion_id !== row.suggestion_id ||
+          fresh.status !== "needs_review" || !recovery ||
+          recovery.state === "blocked" || recovery.state !== prior.state ||
+          recovery.track_id !== prior.track_id || recovery.title !== prior.title) {
+        throw new Error("Intake recovery state changed. Review the refreshed item.");
+      }
+      if (recovery.state === "draft") {
+        // Replay the exact reviewed create grant, with its original title.
+        // The existing broker verifies the same caller and review fingerprint.
+        const identity = await untypedRpc("admin_create_registry_track_intake_identity_v1", {
+          p_suggestion_id: fresh.suggestion_id, p_title: recovery.title,
+        });
+        if (identity?.track?.track_id !== recovery.track_id ||
+            identity?.track?.status !== "draft" || identity?.verifier_status !== "passed" ||
+            identity?.idempotent_replay !== true) {
+          throw new Error("The existing draft identity could not be verified.");
+        }
+        await completeDraftTrack(fresh, recovery.track_id);
+      } else {
+        // Activation already passed. Do not repeat creation or child writes.
+        // The finalizer independently revalidates every current child receipt.
+        await finalizeCanonicalization(fresh, recovery.track_id);
+      }
+      await loadQueue();
+    } catch (reason) {
+      await loadQueue();
+      setError(reason instanceof Error ? reason.message :
+        "Intake recovery did not complete. Review the refreshed state before retrying.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function resolve(row: IntakeRow) {
+    if (row.recovery !== null) {
+      setError("Review the existing Track Intake recovery state first.");
+      return;
+    }
     const registryTrackId =
       row.canonical_track_id ??
       selectedTrack[row.suggestion_id]?.id ??
@@ -1500,6 +1548,10 @@ export default function TrackIntakePage() {
   }
 
   async function reject(row: IntakeRow) {
+    if (row.recovery !== null) {
+      setError("Resolve the existing Track Intake recovery state before rejecting.");
+      return;
+    }
     const note =
       (reviewNotes[row.suggestion_id] ?? "").trim();
 
@@ -2846,7 +2898,33 @@ export default function TrackIntakePage() {
                             enrichment evidence are reviewed.
                           </p>
 
-                          {row.canonical_track_id ? (
+                          {row.recovery !== null ? (
+                            <div className="mt-3 space-y-2 rounded-lg border border-wk-border bg-wk-bg p-3">
+                              <p className="text-sm font-bold text-wk-text">Intake recovery</p>
+                              {row.recovery && row.recovery.state !== "blocked" ? (
+                                <>
+                                  <p className="break-words text-xs font-semibold text-wk-text">{row.recovery.title}</p>
+                                  <p className="break-all text-xs text-wk-text-muted">{row.recovery.track_id}</p>
+                                  <p className="text-xs text-wk-text-muted">
+                                    {row.recovery.state === "draft"
+                                      ? "The existing draft has a verified creation receipt. Resume the same reviewed identity."
+                                      : "The Track has a verified activation receipt. Complete Intake finalization without creating another Track."}
+                                  </p>
+                                  <button type="button"
+                                    disabled={busy !== null || hasUnsavedEnrichment}
+                                    onClick={() => void resumeCanonicalTrack(row)}
+                                    className="wk-button wk-button-primary wk-button-sm disabled:opacity-40">
+                                    {busy === "canonical-resume:" + suggestionId ? "Resuming..." :
+                                      row.recovery.state === "draft" ? "Resume verified draft" : "Complete Intake finalization"}
+                                  </button>
+                                </>
+                              ) : (
+                                <p role="alert" className="text-xs text-wk-warning">
+                                  Recovery authority is unavailable or incomplete. Reload and review the existing Registry receipts before proceeding.
+                                </p>
+                              )}
+                            </div>
+                          ) : row.canonical_track_id ? (
                             <div className="mt-3 rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-3">
                               <div className="flex items-center gap-2">
                                 <WkIcon
@@ -3109,6 +3187,7 @@ export default function TrackIntakePage() {
                               onClick={() => void resolve(row)}
                               disabled={
                                 busy !== null ||
+                                row.recovery !== null ||
                                 (
                                   !row.canonical_track_id &&
                                   !selectedTrack[suggestionId]
@@ -3124,7 +3203,7 @@ export default function TrackIntakePage() {
 
                             <button
                               onClick={() => void reject(row)}
-                              disabled={busy !== null}
+                              disabled={busy !== null || row.recovery !== null}
                               className="wk-button wk-button-ghost disabled:opacity-40"
                             >
                               <WkIcon name="X" size={14} />
