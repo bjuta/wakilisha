@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import {appendChartReviewReference,parseChartReviewReference,type ChartReviewReference} from "@/services/chartsPrivate/chartReviewContext";
+import {appendChartReviewReference,parseChartReviewReference,type ChartReviewReference,prepareChartTrackIntakes,TRACK_INTAKE_BATCH_LIMIT,type TrackIntakeBatchResult} from "@/services/chartsPrivate/chartReviewContext";
 import { supabase } from "@/lib/supabase";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
@@ -195,6 +195,10 @@ export default function ChartsStudioPage() {
   const [showAllDuplicateGroups,setShowAllDuplicateGroups]=useState(false);
   const [batchMode,setBatchMode]=useState(false);
   const [batchRows,setBatchRows]=useState<EvidenceRow[]>([]);
+  const [intakeSelection,setIntakeSelection]=useState<ChartReviewReference[]>([]);
+  const [intakeResults,setIntakeResults]=useState<TrackIntakeBatchResult[]>([]);
+  const [intakeConsent,setIntakeConsent]=useState(false);
+  const intakeRunning=useRef(false);
 
   useEffect(()=>{
     if(tab!=="preview" && tab!=="review")return;
@@ -580,6 +584,32 @@ export default function ChartsStudioPage() {
       (!q||(x.title+" "+(x.artist??"")+" "+(x.provider_track_id??"")).toLocaleLowerCase("en").includes(q)));
   },[preview,search,reviewFilter]);
   const displayed=unresolved.slice(page*20,(page+1)*20);
+  const intakeKey=(ref:ChartReviewReference)=>ref.source_key+":"+ref.receipt_id+":"+ref.rank+":"+ref.original_sha256;
+  const intakeReference=(row:EvidenceRow):ChartReviewReference|null=>{
+    const receipt=preview?.source_coverage.find(c=>c.source_key===row.source_key&&c.receipt_id===row.receipt_id);
+    return receipt?{source_key:row.source_key,receipt_id:row.receipt_id,rank:row.rank,original_sha256:receipt.original_sha256}:null;
+  };
+  const pendingIntakes=intakeSelection.filter(ref=>!intakeResults.some(r=>r.suggestionId&&intakeKey(r.reference)===intakeKey(ref)));
+  const prepareIntakes=()=>operate("prepare-intakes",async()=>{
+    if(intakeRunning.current)return;
+    if(!admin.can("manage_charts")||!admin.can("manage_registry")||!intakeConsent)
+      throw new Error("Charts and Registry review permission and confirmation are required.");
+    intakeRunning.current=true;
+    try {
+      const current=await invokeStudio("studio_preview") as StudioResponse;
+      setSnapshot(current);
+      if(!current.preview||pendingIntakes.some(ref=>
+        !current.preview?.source_coverage.some(c=>c.source_key===ref.source_key&&c.receipt_id===ref.receipt_id&&c.original_sha256===ref.original_sha256)||
+        !current.preview?.unresolved.some(row=>row.source_key===ref.source_key&&row.receipt_id===ref.receipt_id&&row.rank===ref.rank)))
+        throw new Error("A selected source position changed. Clear the selection and review current evidence.");
+      const results=await prepareChartTrackIntakes(pendingIntakes,ref=>invokeStudio("studio_stage_intake",{
+        ...ref,acknowledgement:"I request governed Track Intake for this exact chart position. No identity is approved.",
+      }),result=>setIntakeResults(old=>[...old.filter(r=>intakeKey(r.reference)!==intakeKey(result.reference)),result]));
+      const failed=results.find(r=>r.error);
+      setNotice(results.filter(r=>r.suggestionId).length+" intake items prepared. No recording identity approved."+
+        (failed?" Preparation stopped. Review the failed item before retrying.":""));
+    } finally {intakeRunning.current=false;setIntakeConsent(false);}
+  });
   const activeCount=methods.filter(x=>x.review_state==="collector_admitted"&&
     x.authorization_expires_at&&Date.parse(x.authorization_expires_at)>Date.now()).length;
 
@@ -836,6 +866,33 @@ export default function ChartsStudioPage() {
             </button>
           )}
         </div>
+        <WkSurface className="space-y-3 p-4">
+          <h3 className="text-[15px] font-black text-wk-text">Prepare Track Intake</h3>
+          <p className="text-[12px] text-wk-text-muted">
+            Choose up to ten source positions below. Prepare their existing Registry review items together.
+            This does not approve identities, credits or source links.
+          </p>
+          <p role="status" className="text-[12px] text-wk-text">{intakeSelection.length} selected · {pendingIntakes.length} remaining</p>
+          {intakeSelection.map(ref=>{
+            const result=intakeResults.find(r=>intakeKey(r.reference)===intakeKey(ref));
+            const row=preview?.unresolved.find(r=>r.receipt_id===ref.receipt_id&&r.source_key===ref.source_key&&r.rank===ref.rank);
+            return <div key={intakeKey(ref)} className="flex flex-wrap items-center justify-between gap-2 border-t border-wk-border py-2">
+              <span className="min-w-0 text-[12px] text-wk-text">{SOURCE_LABEL[ref.source_key]} #{ref.rank} · {row?.title??"Source position"}</span>
+              {result?.suggestionId?<Link className={buttonSecondary}
+                to={appendChartReviewReference("/admin/registry/tracks/intake?suggestion="+result.suggestionId,ref)}>Open Track Intake</Link>:
+                <span className="break-all text-[11px] text-wk-text-muted">{result?.error??"Not prepared"}</span>}
+            </div>;
+          })}
+          <WkCheckbox checked={intakeConsent} disabled={!!busy||!pendingIntakes.length}
+            onChange={setIntakeConsent}>Prepare these review items only. No recording identity is approved.</WkCheckbox>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={buttonPrimary} disabled={!!busy||!pendingIntakes.length||!intakeConsent||!admin.can("manage_charts")||!admin.can("manage_registry")}
+              onClick={()=>void prepareIntakes()}>{busy==="prepare-intakes"?"Preparing…":"Prepare Selected Intake Items"}</button>
+            <button type="button" className={buttonSecondary} disabled={!!busy||!intakeSelection.length}
+              onClick={()=>{setIntakeSelection([]);setIntakeResults([]);setIntakeConsent(false);}}>Clear Selection</button>
+          </div>
+          <p className="text-[11px] text-wk-text-muted">Accepted items remain in Registry after interruption. Select the same exact positions again to recover their existing review references.</p>
+        </WkSurface>
         <div className="grid gap-4">
           <WkSurface className="overflow-hidden">
             <div className="border-b border-wk-border px-4 py-3 text-[12px] font-semibold text-wk-text-muted">
@@ -855,8 +912,18 @@ export default function ChartsStudioPage() {
                       </p>}
                     <p className="mt-1 text-[11px] text-wk-warning">{row.reason.replaceAll("_"," ")}</p>
                   </div>
+                  {(()=>{
+                    const ref=intakeReference(row);
+                    if(!ref)return null;
+                    const checked=intakeSelection.some(x=>intakeKey(x)===intakeKey(ref));
+                    return <WkCheckbox checked={checked} disabled={!!busy||!admin.can("manage_registry")||!admin.can("manage_charts")||(!checked&&intakeSelection.length>=TRACK_INTAKE_BATCH_LIMIT)}
+                      onChange={value=>{setIntakeConsent(false);setIntakeSelection(old=>value?
+                        [...old.filter(x=>intakeKey(x)!==intakeKey(ref)),ref]:old.filter(x=>intakeKey(x)!==intakeKey(ref)));}}>
+                      Prepare intake
+                    </WkCheckbox>;
+                  })()}
                   <button type="button" className={buttonSecondary}
-                    disabled={(!row.provider_track_id&&row.source_key!=="shazam_ke")||
+                    disabled={!!busy||(!row.provider_track_id&&row.source_key!=="shazam_ke")||
                       !admin.can("manage_registry")||!admin.can("manage_charts")}
                     onClick={()=>{
                       setBatchMode(false);setBatchRows([]);

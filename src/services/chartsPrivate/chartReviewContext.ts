@@ -63,3 +63,40 @@ export function appendChartReviewReference(
 export function chartStudioReturnHref(reference:ChartReviewReference):string {
   return appendChartReviewReference("/admin/charts/studio?tab=review",reference);
 }
+
+export const TRACK_INTAKE_BATCH_LIMIT = 10;
+export type TrackIntakeBatchResult = {
+  reference: ChartReviewReference;
+  suggestionId: string | null;
+  error: string | null;
+};
+
+// Stage only, through the existing caller-bound broker. Stop on uncertainty;
+// the existing idempotency contract permits explicit recovery of a lost reply.
+export async function prepareChartTrackIntakes(
+  references: ChartReviewReference[],
+  stage: (reference: ChartReviewReference) => Promise<unknown>,
+  onResult: (result: TrackIntakeBatchResult) => void,
+): Promise<TrackIntakeBatchResult[]> {
+  if (!references.length || references.length > TRACK_INTAKE_BATCH_LIMIT ||
+      references.some(ref => !isChartReviewReference(ref)))
+    throw new Error("Select one to ten valid source positions.");
+  const keys = references.map(ref => ref.source_key+":"+ref.receipt_id+":"+ref.rank);
+  if (new Set(keys).size !== keys.length) throw new Error("Duplicate source position.");
+  const results: TrackIntakeBatchResult[] = [];
+  for (const reference of references) {
+    let result: TrackIntakeBatchResult;
+    try {
+      const value = await stage(reference) as { suggestion_id?: unknown } | null;
+      if (typeof value?.suggestion_id !== "string" || !UUID.test(value.suggestion_id))
+        throw new Error("Registry did not return a valid review reference.");
+      result = {reference,suggestionId:value.suggestion_id,error:null};
+    } catch (error) {
+      result = {reference,suggestionId:null,error:error instanceof Error?error.message:"Intake request failed"};
+    }
+    results.push(result);
+    onResult(result);
+    if (result.error) break;
+  }
+  return results;
+}

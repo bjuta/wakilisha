@@ -7,6 +7,7 @@ import {
   chartStudioReturnHref,
   parseChartReviewReference,
   isChartReviewReference,
+  prepareChartTrackIntakes,
 } from "../../src/services/chartsPrivate/chartReviewContext";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -490,6 +491,25 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     }}]).candidates).toHaveLength(0);
   });
 
+  it("stages exact selected intake references independently and stops on uncertain failure",async()=>{
+    const first={source_key:"youtube_ke" as const,receipt_id:UUID(1),original_sha256:"a".repeat(64),rank:1};
+    const second={...first,rank:2}, third={...first,rank:3};
+    const calls:number[]=[];
+    const stage=async(ref:{rank:number})=>{
+      calls.push(ref.rank);
+      if(ref.rank===2)throw Error("denied");
+      return {suggestion_id:UUID(ref.rank+10)};
+    };
+    const results=await prepareChartTrackIntakes([first,second,third],stage,()=>{});
+    expect(calls).toEqual([1,2]);
+    expect(results.map(r=>[r.suggestionId,r.error])).toEqual([[UUID(11),null],[null,"denied"]]);
+    await expect(prepareChartTrackIntakes([first,first],stage,()=>{})).rejects.toThrow("Duplicate");
+    await expect(prepareChartTrackIntakes([{...first,rank:101}],stage,()=>{})).rejects.toThrow();
+    expect(calls).toEqual([1,2]);
+    const retry=await prepareChartTrackIntakes([second,third],async ref=>({suggestion_id:UUID(ref.rank+10)}),()=>{});
+    expect(retry.map(r=>r.suggestionId)).toEqual([UUID(12),UUID(13)]);
+    expect(STUDIO_PAGE).toContain('invokeStudio("studio_stage_intake"');
+  });
   it("passes only exact immutable chart observation coordinates to Registry workspaces",()=>{
     const item={
       source_key:"youtube_ke" as const,
