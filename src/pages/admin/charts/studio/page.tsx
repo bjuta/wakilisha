@@ -88,7 +88,7 @@ type StudioResponse = {
   server_verified_originals?: number; source_methods?: SourceMethod[];
   history?: ReceiptHistory[]; read_at?: string;
   observation_reviews?:ShazamReviewEvent[];
-  receipt_count?: number; error?: string;
+  receipt_count?: number; source_coverage?:Coverage[]; error?: string;
 };
 type RegistryTrack = {
   id: string; title: string; isrc: string | null; status: string;
@@ -113,6 +113,9 @@ const SOURCES: Array<{key: SourceKey; label: string; weight: number; method: str
   {key:"shazam_ke",label:"Shazam Kenya Top 200",weight:10,method:"GET"},
 ];
 const SOURCE_LABEL = Object.fromEntries(SOURCES.map(s=>[s.key,s.label])) as Record<SourceKey,string>;
+const YOUTUBE_EXPORT_ENDPOINT = "https://charts.youtube.com/charts/TopSongs/ke";
+const YOUTUBE_EXPORT_ACK = "I confirm this unmodified YouTube Charts CSV is Kenya Weekly Top Songs for the selected week.";
+const YOUTUBE_EXPORT_PERIOD_AUTHORITY = "operator_confirmed_official_export";
 const DECLARATION = "I have independently verified this exact recording and authorize its Registry provider link.";
 const SHAZAM_DECLARATION = "I independently verified this exact Shazam position and authorize its private Registry recording resolution.";
 const SHAZAM_REVOKE_DECLARATION = "I revoke this exact private Shazam recording resolution after independent re-review.";
@@ -129,15 +132,19 @@ const buttonPrimary = "rounded-xl bg-wk-brand px-4 py-2.5 text-[12px] font-black
 const buttonSecondary = "rounded-xl border border-wk-border bg-wk-surface-raised px-3 py-2.5 text-[12px] font-bold text-wk-text hover:bg-wk-surface-raised/70 disabled:cursor-not-allowed disabled:opacity-40";
 const fieldClass = "w-full min-w-0 rounded-xl border border-wk-border bg-wk-surface px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand";
 
-async function invokeStudio(mode:string,body:Record<string,unknown> = {}) {
+async function invokeStudio(mode:string,body:Record<string,unknown>|FormData = {}) {
   const {data,error}=await supabase.functions.invoke("charts2-capture?mode="+mode,{
     body,
   });
   if(error || !data?.ok) {
-    throw new Error(
-      (data && typeof data.error==="string" ? data.error : error?.message)
-      ?? "charts2_studio_operation_failed"
-    );
+    let detail=data&&typeof data.error==="string"?data.error:undefined;
+    if(error&&typeof error==="object"&&"context" in error&&error.context instanceof Response){
+      try {
+        const responseBody=await error.context.clone().json();
+        if(typeof responseBody?.error==="string")detail=responseBody.error;
+      } catch { /* The transport error remains available. */ }
+    }
+    throw new Error(detail??error?.message??"charts2_studio_operation_failed");
   }
   return data;
 }
@@ -156,6 +163,11 @@ export default function ChartsStudioPage() {
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [week,setWeek]=useState("");
+  const [youtubeExport,setYoutubeExport]=useState<{file:File;sha:string}|null>(null);
+  const [exportConsent,setExportConsent]=useState(false);
+  const [exportHashing,setExportHashing]=useState(false);
+  const exportInput=useRef<HTMLInputElement|null>(null);
+  const exportSelection=useRef(0);
   const [probes,setProbes]=useState<Partial<Record<SourceKey,Probe>>>({});
   const [sourceConsent,setSourceConsent]=useState<SourceKey|null>(null);
   const [holdReason,setHoldReason]=useState("");
@@ -257,6 +269,46 @@ export default function ChartsStudioPage() {
     catch(e){setError(e instanceof Error?e.message:"charts2_operation_failed");}
     finally{setBusy("");}
   };
+  const chooseYouTubeExport=async(file:File|null)=>{
+    const selection=++exportSelection.current;
+    setYoutubeExport(null);setExportConsent(false);setExportHashing(false);
+    if(!file)return;
+    setError("");setNotice("");
+    if(!/\.csv$/i.test(file.name)||file.size<1||file.size>4000000){
+      setError("Choose the original YouTube CSV, up to 4 MB.");return;
+    }
+    setExportHashing(true);
+    try{
+      const digest=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());
+      const sha=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,"0")).join("");
+      if(selection===exportSelection.current)setYoutubeExport({file,sha});
+    }catch{
+      if(selection===exportSelection.current)setError("Could not verify the selected file.");
+    }finally{
+      if(selection===exportSelection.current)setExportHashing(false);
+    }
+  };
+  const importYouTubeExport=async()=>operate("youtube-export",async()=>{
+    if(!youtubeExport||!exportConsent||!/^weekly:\d{8}:\d{8}:ke$/.test(week.trim()))
+      throw new Error("Select the original file, enter its week, and confirm the source.");
+    const selected=youtubeExport;
+    const form=new FormData();
+    form.append("source_key","youtube_ke");
+    form.append("source_endpoint",YOUTUBE_EXPORT_ENDPOINT);
+    form.append("target_period_key",week.trim());
+    form.append("original_sha256",selected.sha);
+    form.append("acknowledgement",YOUTUBE_EXPORT_ACK);
+    form.append("original",new Blob([selected.file],{type:"text/csv"}),selected.file.name);
+    const result=await invokeStudio("upload_official_youtube_export",form);
+    if(result.original_sha256!==selected.sha||result.observed_depth!==100||
+       typeof result.receipt_id!=="string"||result.status!=="succeeded"||
+       result.source_method_state!=="official_export_not_collector_admitted"||
+       result.can_score!==false||result.can_publish!==false)
+      throw new Error("The receipt response could not be verified. Refresh Source History before retrying.");
+    setYoutubeExport(null);setExportConsent(false);
+    setNotice("YouTube: official CSV verified. Evidence receipt recorded. Automatic collection remains on hold.");
+    await refresh();
+  });
   const sourceAction=async(source:SourceKey,mode:"verify_method"|"collect")=>
     operate(mode+source,async()=>{
       const payload:Record<string,unknown>={source_key:source};
@@ -519,7 +571,7 @@ export default function ChartsStudioPage() {
     setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
     setTab("review");
   };
-  const coverage=preview?.source_coverage??[];
+  const coverage=preview?.source_coverage??snapshot?.source_coverage??[];
   const methods=snapshot?.source_methods??[];
   const unresolved=useMemo(()=>{
     const q=search.trim().toLocaleLowerCase("en");
@@ -542,7 +594,7 @@ export default function ChartsStudioPage() {
       </AdminChartsPageHeader>
       <div className="flex flex-wrap items-center gap-2" role="status" aria-live="polite">
         <span className={"rounded-full px-3 py-1 text-[11px] font-black "+chip(preview?"good":"warn")}>
-          {loading?"Checking sources":preview?"Sources ready":"Sources unavailable"}
+          {loading?"Checking sources":preview?"Sources ready":coverage.length?"Sources incomplete":snapshot?"No verified sources":"Sources unavailable"}
         </span>
         <span className="text-[12px] text-wk-text-muted">
           Private review only. Nothing is published from this page.
@@ -597,11 +649,13 @@ export default function ChartsStudioPage() {
                 <div>
                   <h2 className="text-[15px] font-black text-wk-text">{source.label}</h2>
                   <p className="mt-1 text-[12px] text-wk-text-muted">
-                    {source.weight}% · Native {source.method} ·
+                    {source.weight}% · {cov?.native_period_authority===YOUTUBE_EXPORT_PERIOD_AUTHORITY
+                      ?"Official CSV export":"Native "+source.method} ·
                     {" "}{cov?cov.observed_depth+" / "+cov.expected_depth+" ranks":"No accepted receipt"}
                   </p>
                   <p className="mt-1 text-[11px] text-wk-text-muted">
-                    Observed {DATE(cov?.observed_at)} · Provider week {DATE(cov?.provider_week_ending_date)}
+                    Observed {DATE(cov?.observed_at)} · {cov?.native_period_authority===YOUTUBE_EXPORT_PERIOD_AUTHORITY
+                      ?"Confirmed export week":"Provider week"} {cov?.provider_week_ending_date??"Not declared"}
                     {cov?.provider_updated_at?" · Provider updated "+DATE(cov.provider_updated_at):""}
                   </p>
                 </div>
@@ -610,10 +664,40 @@ export default function ChartsStudioPage() {
                 </span>
               </div>
               {source.key==="youtube_ke" &&
-                <div className="max-w-sm space-y-1">
-                  <label htmlFor="charts2-week" className="text-[11px] font-bold text-wk-text">Native YouTube provider week</label>
-                  <input id="charts2-week" value={week} onChange={e=>setWeek(e.target.value)}
-                    placeholder="weekly:YYYYMMDD:YYYYMMDD:ke" className={fieldClass}/>
+                <div className="space-y-3 rounded-xl border border-wk-border bg-wk-surface-raised p-3">
+                  <h3 className="text-[13px] font-black text-wk-text">Import YouTube’s Official CSV</h3>
+                  <p className="text-[12px] text-wk-text-muted">
+                    Open <a href={YOUTUBE_EXPORT_ENDPOINT} target="_blank" rel="noopener noreferrer"
+                      className="font-bold text-wk-text underline underline-offset-4">YouTube Charts</a>,
+                    select Kenya Weekly Top Songs and download its CSV. Keep the file unchanged.
+                  </p>
+                  <p className="text-[12px] text-wk-text-muted">
+                    The CSV does not include dates. Confirm the week shown on YouTube before importing.
+                    This import does not approve automatic collection.
+                  </p>
+                  <div className="max-w-sm space-y-1">
+                    <label htmlFor="charts2-week" className="text-[12px] font-bold text-wk-text">YouTube Chart Week</label>
+                    <input id="charts2-week" value={week} disabled={!!busy}
+                      onChange={e=>{setWeek(e.target.value);setExportConsent(false);}}
+                      placeholder="weekly:YYYYMMDD:YYYYMMDD:ke" className={fieldClass}/>
+                    <p className="text-[11px] text-wk-text-muted">Enter the Friday start and Thursday end dates.</p>
+                  </div>
+                  <input ref={exportInput} type="file" accept=".csv,text/csv" hidden
+                    aria-label="Choose the official YouTube CSV"
+                    disabled={!!busy||loading||exportHashing}
+                    onChange={e=>{const file=e.currentTarget.files?.[0]??null;e.currentTarget.value="";void chooseYouTubeExport(file);}}/>
+                  <button type="button" className={buttonSecondary} disabled={!!busy||loading||exportHashing}
+                    onClick={()=>exportInput.current?.click()}>{exportHashing?"Checking File…":"Choose Official CSV"}</button>
+                  {youtubeExport&&<div className="space-y-2">
+                    <p className="break-all text-[12px] font-semibold text-wk-text">{youtubeExport.file.name}</p>
+                    <p className="break-all font-mono text-[11px] text-wk-text-muted">SHA-256: {youtubeExport.sha}</p>
+                    <WkCheckbox checked={exportConsent} onChange={setExportConsent}>
+                      {YOUTUBE_EXPORT_ACK}
+                    </WkCheckbox>
+                    <button type="button" className={buttonPrimary}
+                      disabled={!exportConsent||!!busy||loading||!/^weekly:\d{8}:\d{8}:ke$/.test(week.trim())}
+                      onClick={()=>void importYouTubeExport()}>Import Verified Original</button>
+                  </div>}
                 </div>}
               <div className="flex flex-wrap gap-2">
                 <button type="button" className={buttonSecondary} disabled={!!busy||loading}
@@ -1109,7 +1193,7 @@ export default function ChartsStudioPage() {
       {tab==="history" && <section aria-label="Immutable capture receipt history" className="space-y-3">
         <WkSurface className="p-4 text-[12px] text-wk-text-muted">
           The latest 35 immutable original-receipt records, without exposing raw Storage objects.
-          The Edge worker independently rehashed the five selected originals for this Studio snapshot.
+          The Edge worker independently rehashed the selected originals for this Studio snapshot.
         </WkSurface>
         {(snapshot?.history??[]).map(row=>
           <WkSurface key={row.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -1119,7 +1203,8 @@ export default function ChartsStudioPage() {
               <p className="mt-1 font-mono text-[11px] text-wk-text-muted">SHA {shorthand(row.original_sha256)} · Receipt {shorthand(row.id)}</p>
             </div>
             <span className={"rounded-full px-3 py-1 text-[11px] font-bold "+chip(row.observed_status==="succeeded"?"good":"warn")}>
-              {row.native_period_authority.replaceAll("_"," ")}
+              {row.native_period_authority===YOUTUBE_EXPORT_PERIOD_AUTHORITY
+                ?"Operator-confirmed export":row.native_period_authority.replaceAll("_"," ")}
             </span>
           </WkSurface>)}
       </section>}

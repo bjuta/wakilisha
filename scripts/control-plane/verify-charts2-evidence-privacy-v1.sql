@@ -417,6 +417,111 @@ begin
 end
 $charts2_four_get_review$;
 
+-- Official export authority, local-only synthetic Storage metadata and rows.
+-- The actual CSV bytes are tested separately; no provider success is invented.
+do $charts2_official_export$
+declare
+  actor uuid:='00000000-0000-4000-8000-000000009991'::uuid;
+  sha text:=repeat('7',64);
+  keyname text:='youtube_ke/77/'||repeat('7',64)||'.csv';
+  positions jsonb;
+  p jsonb;
+  rid uuid;
+  before_method jsonb;
+begin
+  select to_jsonb(m) into before_method from platform_private.charts2_source_methods_v1 m
+    where source_key='youtube_ke';
+  if before_method->>'review_state' is distinct from 'held' then
+    raise exception 'charts2_export_fixture_native_method_not_held';
+  end if;
+  select jsonb_agg(jsonb_build_object(
+    'rank',n,'title','Synthetic Track '||n,'artist','Synthetic Artist',
+    'provider_track_id',lpad(n::text,11,'0'),
+    'provider_url','https://www.youtube.com/watch?v='||lpad(n::text,11,'0'),
+    'view_count',1000-n) order by n) into positions
+    from generate_series(1,100) n;
+  insert into storage.objects(bucket_id,name,metadata)
+  values ('charts2-evidence-private-v1',keyname,
+    jsonb_build_object('size',700,'mimetype','text/csv'));
+  p:=jsonb_build_object(
+    'source_key','youtube_ke','source_endpoint','https://charts.youtube.com/charts/TopSongs/ke',
+    'capture_mode','official_export_upload','observed_at','2026-11-24T15:00:00Z',
+    'original_object_key',keyname,'original_sha256',sha,'original_byte_length',700,
+    'original_verified_at','2026-11-24T15:01:00Z','original_content_type','text/csv',
+    'expected_depth',100,'observations',positions,
+    'parser_version','charts2-youtube-official-export-v1','provider_updated_at',null,
+    'provider_week_ending_date','2026-11-19',
+    'native_period_authority','operator_confirmed_official_export',
+    'method_revision',null,'captured_by',actor,'verification_state','server_sha256_storage_readback',
+    'operator_export_acknowledgement',
+    'I confirm this unmodified YouTube Charts CSV is Kenya Weekly Top Songs for the selected week.');
+  begin
+    perform public.charts2_commit_verified_original_v1(p-'operator_export_acknowledgement');
+    raise exception 'charts2_export_missing_attestation_allowed';
+  exception when check_violation then
+    if sqlerrm<>'charts2_youtube_export_receipt_unqualified' then raise;end if;
+  end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      p||jsonb_build_object('captured_by',gen_random_uuid()));
+    raise exception 'charts2_export_unprivileged_actor_allowed';
+  exception when insufficient_privilege then null;end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      p||jsonb_build_object('provider_week_ending_date','2026-11-18'));
+    raise exception 'charts2_export_wrong_week_allowed';
+  exception when check_violation then null;end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      jsonb_set(p,'{observations,0,view_count}','-1'::jsonb));
+    raise exception 'charts2_export_invalid_count_allowed';
+  exception when check_violation then
+    if sqlerrm<>'charts2_youtube_export_rows_unqualified' then raise;end if;
+  end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      jsonb_set(p,'{observations,1,view_count}','999999'::jsonb));
+    raise exception 'charts2_export_inverted_view_order_allowed';
+  exception when check_violation then
+    if sqlerrm<>'charts2_youtube_export_view_order_invalid' then raise;end if;
+  end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      p||jsonb_build_object('original_byte_length',701));
+    raise exception 'charts2_export_unverified_storage_metadata_allowed';
+  exception when check_violation then
+    if sqlerrm<>'charts2_youtube_export_storage_metadata_mismatch' then raise;end if;
+  end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      (p-'operator_export_acknowledgement')||jsonb_build_object('capture_mode','service_original','method_revision',1));
+    raise exception 'charts2_export_collector_method_bypass_allowed';
+  exception when others then
+    if sqlerrm<>'charts2_source_method_not_admitted' then raise;end if;
+  end;
+  rid:=public.charts2_commit_verified_original_v1(p);
+  if rid is null or public.charts2_commit_verified_original_v1(p) is distinct from rid
+    or not exists (select 1 from platform_private.charts2_capture_receipts_v1
+      where id=rid and captured_by=actor and original_sha256=sha
+        and observed_depth=100 and original_content_type='text/csv'
+        and capture_mode='official_export_upload'
+        and native_period_authority='operator_confirmed_official_export'
+        and provider_week_ending_date='2026-11-19'::date
+        and method_revision is null and candidate_only and not can_score and not can_publish)
+  then raise exception 'charts2_export_immutable_receipt_or_idempotency_failed';end if;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      p||jsonb_build_object('provider_week_ending_date','2026-11-12'));
+    raise exception 'charts2_export_same_bytes_different_period_allowed';
+  exception when sqlstate 'PT409' then null;end;
+  if (select to_jsonb(m) from platform_private.charts2_source_methods_v1 m
+      where source_key='youtube_ke') is distinct from before_method
+    or exists(select 1 from public.charts2_get_collector_method_v1('youtube_ke'))
+  then raise exception 'charts2_export_changed_native_method_authority';end if;
+  raise notice 'WK_CHARTS2_LOCAL_OFFICIAL_YOUTUBE_EXPORT_RECEIPT=PASS';
+end
+$charts2_official_export$;
+
 -- Charts 2.0 Studio service-only read contract and versioned, private-only weights.
 do $charts2_studio_snapshot$
 declare
@@ -523,6 +628,7 @@ declare
   native_period text;
   ending text;
   ext text;
+  export_mode boolean:=coalesce(current_setting('wk.charts2_ci_official_export',true),'no') in ('yes','bad_week');
 begin
   select jsonb_build_object(
     'version','consumption_led_cultural_presence_v1',
@@ -559,17 +665,32 @@ begin
       then 'provider_declared_end_date' else 'unknown' end;
     ending:=case when spec.source_key='youtube_ke' then '2026-11-12'
       else null end;
+    if spec.source_key='youtube_ke' and export_mode then
+      native_period:='operator_confirmed_official_export';
+      if current_setting('wk.charts2_ci_official_export',true)='bad_week' then ending:='2026-11-11';end if;
+      select jsonb_agg(jsonb_build_object(
+        'rank',num,'title','Fixture Track '||num,'artist','Fixture Artist',
+        'provider_track_id',lpad(num::text,11,'0'),
+        'provider_url','https://www.youtube.com/watch?v='||lpad(num::text,11,'0'),
+        'view_count',1000-num) order by num)
+      into observations from generate_series(1,100) num;
+    end if;
     receipts:=receipts||jsonb_build_array(jsonb_build_object(
       'id',rid,
       'receipt_schema','charts2-original-receipt/v1',
       'source_key',spec.source_key,'market','KE',
-      'source_endpoint',spec.endpoint,'method_revision',1,
-      'capture_mode','service_original',
+      'source_endpoint',case when export_mode and spec.source_key='youtube_ke'
+        then 'https://charts.youtube.com/charts/TopSongs/ke' else spec.endpoint end,
+      'method_revision',case when export_mode and spec.source_key='youtube_ke' then null else 1 end,
+      'capture_mode',case when export_mode and spec.source_key='youtube_ke'
+        then 'official_export_upload' else 'service_original' end,
+      'parser_version',case when export_mode and spec.source_key='youtube_ke'
+        then 'charts2-youtube-official-export-v1' else 'charts2-ci-1' end,
       'original_bucket','charts2-evidence-private-v1',
       'original_object_key',spec.source_key||'/'||
-        left(sha,2)||'/'||sha||spec.extension,
+        left(sha,2)||'/'||sha||case when export_mode and spec.source_key='youtube_ke' then '.csv' else spec.extension end,
       'original_sha256',sha,'original_byte_length',1024,
-      'original_content_type',spec.mime,
+      'original_content_type',case when export_mode and spec.source_key='youtube_ke' then 'text/csv' else spec.mime end,
       'observed_at','2026-11-19T10:00:00Z',
       'original_verified_at','2026-11-19T10:01:00Z',
       'native_period_authority',native_period,
@@ -609,7 +730,9 @@ do $charts2_freeze_actual_100$
 declare
   a jsonb;
   b jsonb;
+  c jsonb;
 begin
+  perform set_config('wk.charts2_ci_official_export','no',true);
   a:=public.charts2_private_freeze_preflight_v1();
   b:=public.charts2_private_freeze_preflight_v1();
   if a->>'contract' is distinct from 'charts2-private-freeze-preflight/v1'
@@ -629,6 +752,28 @@ begin
      or length(a->>'ranking_sha256')<>64
   then raise exception 'charts2_private_freeze_100_rank_replay_failed';end if;
   raise notice 'WK_CHARTS2_LOCAL_PRIVATE_FREEZE_100_EXACT_REPLAY=PASS';
+  perform set_config('wk.charts2_ci_official_export','yes',true);
+  c:=public.charts2_private_freeze_preflight_v1();
+  if (c->>'freeze_ready')::boolean is distinct from true
+     or (c->>'eligible_count')::integer is distinct from 100
+     or (c->>'unresolved_count')::integer is distinct from 500
+     or (c->>'conflict_count')::integer is distinct from 0
+     or c->>'ranking_sha256' is distinct from a->>'ranking_sha256'
+     or c->>'input_sha256' is not distinct from a->>'input_sha256'
+     or not exists(select 1 from jsonb_array_elements(c->'source_receipts') r
+       where r->>'source_key'='youtube_ke'
+         and r->>'native_period_authority'='operator_confirmed_official_export'
+         and r->>'provider_week_ending_date'='2026-11-12')
+  then raise exception 'charts2_export_freeze_parity_failed';end if;
+  perform set_config('wk.charts2_ci_official_export','bad_week',true);
+  begin
+    perform public.charts2_private_freeze_preflight_v1();
+    raise exception 'charts2_export_freeze_wrong_week_allowed';
+  exception when others then
+    if sqlerrm<>'charts2_freeze_youtube_export_unqualified' then raise;end if;
+  end;
+  perform set_config('wk.charts2_ci_official_export','no',true);
+  raise notice 'WK_CHARTS2_LOCAL_OFFICIAL_YOUTUBE_EXPORT_FREEZE_PARITY=PASS';
 end
 $charts2_freeze_actual_100$;
 

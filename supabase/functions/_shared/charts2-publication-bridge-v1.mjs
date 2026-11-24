@@ -3,6 +3,7 @@
 // preflight, methodology, programme and Registry tracks from trusted DB reads;
 // passing client-controlled objects here would NOT establish authority.
 // No database calls, mutation, actor impersonation or publication is possible.
+import {YOUTUBE_EXPORT_PERIOD_AUTHORITY} from './charts2-youtube-official-export.mjs';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA = /^[0-9a-f]{64}$/;
 const SOURCES = Object.freeze({
@@ -79,10 +80,18 @@ export function inspectCharts2FrozenEditionProjectionV1({freeze,preflight,progra
        current.provider_week_ending_date !== row.provider_week_ending_date ||
        current.provider_updated_at !== row.provider_updated_at)
       fail('source_original_changed');
-    if(row.source_key === 'youtube_ke' &&
-       (row.native_period_authority !== 'provider_declared_end_date' ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(row.provider_week_ending_date ?? '')))
-      fail('native_youtube_period_missing');
+    if(row.source_key === 'youtube_ke') {
+      if(!['provider_declared_end_date',YOUTUBE_EXPORT_PERIOD_AUTHORITY].includes(row.native_period_authority)||
+         !/^\d{4}-\d{2}-\d{2}$/.test(row.provider_week_ending_date ?? ''))
+        fail('native_youtube_period_missing');
+      if(row.native_period_authority===YOUTUBE_EXPORT_PERIOD_AUTHORITY){
+        const end=Date.parse(row.provider_week_ending_date+'T00:00:00Z');
+        if(!Number.isFinite(end)||new Date(end).toISOString().slice(0,10)!==row.provider_week_ending_date||
+           new Date(end).getUTCDay()!==4||Date.parse(row.observed_at)<end+86400000)
+          fail('native_youtube_period_missing');
+      }
+    }else if(row.native_period_authority===YOUTUBE_EXPORT_PERIOD_AUTHORITY)
+      fail('unqualified_receipt');
     receipts.set(row.source_key,row);
   }
   if(SOURCE_NAMES.some(s => !receipts.has(s)))fail('five_receipts_required');

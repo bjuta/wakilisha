@@ -9,9 +9,15 @@ import {
   isChartReviewReference,
 } from "../../src/services/chartsPrivate/chartReviewContext";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { decodeCharts2Original } from "../../supabase/functions/_shared/charts2-original-candidate.mjs";
+import {
+  parseYouTubeKenyaOfficialExport, YOUTUBE_EXPORT_ENDPOINT, YOUTUBE_EXPORT_MODE,
+  YOUTUBE_EXPORT_PERIOD_AUTHORITY, YOUTUBE_EXPORT_PARSER_VERSION, YOUTUBE_EXPORT_ACK,
+} from "../../supabase/functions/_shared/charts2-youtube-official-export.mjs";
 import {
   CHARTS2_PRIVATE_METHODOLOGY_V1,
-  scoreCharts2PrivatePreviewV1,
+  scoreCharts2PrivatePreviewV1, summarizeCharts2SourceCoverageV1,
 } from "../../supabase/functions/_shared/charts2-private-scoring-v1.mjs";
 
 const SOURCE = [
@@ -764,6 +770,16 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     // Missing, unknown or non-KE origins must never reject a Chart 2.0 track.
     expect(projection).not.toHaveProperty("edition_id");
     expect(projection).not.toHaveProperty("publish");
+    const official=clone();
+    for(const sourceReceipts of [official.freeze.source_receipts,official.preflight.source_receipts]){
+      sourceReceipts[0].native_period_authority=YOUTUBE_EXPORT_PERIOD_AUTHORITY;
+    }
+    const officialProjection=inspectCharts2FrozenEditionProjectionV1(official);
+    expect(officialProjection.can_stage).toBe(false);
+    expect(officialProjection.can_publish).toBe(false);
+    official.freeze.source_receipts[0].provider_week_ending_date="2026-11-11";
+    official.preflight.source_receipts[0].provider_week_ending_date="2026-11-11";
+    expect(()=>inspectCharts2FrozenEditionProjectionV1(official)).toThrow("charts2_bridge_native_youtube_period_missing");
     const deny=(mutate:(x:any)=>void,reason:string)=>{
       const candidate=clone(); mutate(candidate);
       expect(()=>inspectCharts2FrozenEditionProjectionV1(candidate))
@@ -791,4 +807,114 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(contract).not.toContain("supabase.functions.invoke");
   });
 
+});
+
+
+describe("Charts2 official YouTube CSV and partial source health",()=>{
+  // Synthetic format fixture only. Never commit an actual provider export.
+  const header="Rank,Previous Rank,Track Name,Artist Names,Periods on Chart,Views,Growth,YouTube URL";
+  const records=Array.from({length:100},(_,i)=>{
+    const n=i+1,id=String(n).padStart(11,"0");
+    return [n,n,"Synthetic Track "+n,"Synthetic Artist",1,1000-n,"0%", "https://www.youtube.com/watch?v="+id].join(",");
+  });
+  const csv=[header,...records].join("\n")+"\n";
+  const period="weekly:20261113:20261119:ke";
+  const observed_at="2026-11-24T15:00:00.000Z";
+  const access={endpoint:YOUTUBE_EXPORT_ENDPOINT,observed_at,acknowledgement:YOUTUBE_EXPORT_ACK};
+  const parse=(raw=csv,target=period,ctx=access)=>parseYouTubeKenyaOfficialExport(raw,target,ctx);
+  const input={
+    source_key:"youtube_ke",endpoint:YOUTUBE_EXPORT_ENDPOINT,observed_at,
+    target_period_key:period,original_bytes:new TextEncoder().encode(csv),
+    capture_mode:YOUTUBE_EXPORT_MODE,operator_export_acknowledgement:YOUTUBE_EXPORT_ACK,
+  };
+  it("retains exact bytes and distinguishes operator-confirmed dates from embedded native dates",async()=>{
+    const result=await decodeCharts2Original(input);
+    expect(result.rows).toHaveLength(100);
+    expect(result.rows[0]).toMatchObject({rank:1,provider_track_id:"00000000001",view_count:999});
+    expect(result.provider_week_ending_date).toBe("2026-11-19");
+    expect(result.native_period_authority).toBe(YOUTUBE_EXPORT_PERIOD_AUTHORITY);
+    expect(result.payload_sha256).toBe(createHash("sha256").update(input.original_bytes).digest("hex"));
+    expect(result.can_score).toBe(false);
+    expect(result.can_publish).toBe(false);
+    expect(result.source_access_authorized).toBe(false);
+    expect(parse("\ufeff"+csv.replaceAll("\n","\r\n")).rows).toHaveLength(100);
+    expect(parse(csv.replace("Synthetic Track 1,","\"Track, \"\"Mix\"\"\",")).rows[0].title).toBe('Track, "Mix"');
+    await expect(decodeCharts2Original({...input,capture_mode:null,operator_export_acknowledgement:null}))
+      .rejects.toThrow("charts2_source_endpoint_unreviewed");
+    await expect(decodeCharts2Original({...input,source_key:"shazam_ke"}))
+      .rejects.toThrow("charts2_source_endpoint_unreviewed");
+  });
+  it("rejects incomplete, malformed, contradictory, cross-market and unattested exports",()=>{
+    for(const bad of [
+      [header,...records.slice(0,99)].join("\n"),
+      [header,...records,records[99]].join("\n"),
+      csv.replace(/^2,2,/m,"1,2,"),
+      csv.replace("00000000002","00000000001"),
+      csv.replace(",999,",",-1,"),
+      csv.replace(",998,",",999999,"),
+      csv.replace("www.youtube.com","www.example.com"),
+      csv.replace("00000000001\n","00000000001&x=1\n"),
+      csv.replace("Track Name","Song"),
+      csv.replace("Synthetic Track 1,","\"unclosed,"),
+    ])expect(()=>parse(bad)).toThrow("charts2_youtube_export_");
+    for(const bad of ["weekly:20261113:20261119:us","weekly:20261112:20261119:ke",
+      "weekly:20261120:20261126:ke","weekly:20261131:20261207:ke"])
+      expect(()=>parse(csv,bad)).toThrow("charts2_youtube_export_period_invalid");
+    expect(()=>parse(csv,period,{...access,acknowledgement:""})).toThrow("charts2_youtube_export_attestation_required");
+    expect(()=>parse(csv,period,{...access,endpoint:"https://example.com"})).toThrow("charts2_youtube_export_attestation_required");
+  });
+  it("uses the same receipt coverage for 0, 1, 4 and 5 originals without partial scoring",()=>{
+    const receipts:any[]=fullReceipts();
+    for(const size of [0,1,4,5]){
+      const coverage=summarizeCharts2SourceCoverageV1(receipts.slice(0,size));
+      expect(coverage).toHaveLength(size);
+      expect(coverage.reduce((n,row)=>n+row.observed_depth,0))
+        .toBe(receipts.slice(0,size).reduce((n,row)=>n+row.observed_depth,0));
+      if(size<5)expect(()=>score(receipts.slice(0,size))).toThrow("charts2_scoring_receipt_set_incomplete");
+    }
+    expect(()=>summarizeCharts2SourceCoverageV1([receipts[0],receipts[0]]))
+      .toThrow("charts2_scoring_duplicate_source_receipt");
+    expect(STUDIO_WORKER).toContain("summarizeCharts2SourceCoverageV1(receipts)");
+    expect(STUDIO_PAGE).toContain("preview?.source_coverage??snapshot?.source_coverage??[]");
+  });
+  it("accepts only the bounded official export mode into private identity review, not generic research uploads",()=>{
+    const receipts:any[]=fullReceipts();
+    const y=receipts[0];
+    Object.assign(y,{
+      capture_mode:YOUTUBE_EXPORT_MODE,source_endpoint:YOUTUBE_EXPORT_ENDPOINT,
+      method_revision:null,original_content_type:"text/csv",
+      parser_version:YOUTUBE_EXPORT_PARSER_VERSION,
+      original_object_key:y.original_object_key.replace(/\.json$/,".csv"),
+      native_period_authority:YOUTUBE_EXPORT_PERIOD_AUTHORITY,
+      provider_week_ending_date:"2026-11-19",observed_at,
+      original_verified_at:"2026-11-24T15:01:00.000Z",provider_updated_at:null,
+      observations:parse().rows,
+    });
+    const result=score(receipts);
+    expect(result.source_coverage).toHaveLength(5);
+    expect(result.source_coverage.reduce((n,row)=>n+row.observed_depth,0)).toBe(600);
+    expect(result.unresolved).toHaveLength(600);
+    expect(result.candidates).toHaveLength(0);
+    expect(result.can_publish).toBe(false);
+    expect(result.source_coverage.find(row=>row.source_key==="youtube_ke")?.native_period_authority)
+      .toBe(YOUTUBE_EXPORT_PERIOD_AUTHORITY);
+    for(const changes of [
+      {capture_mode:"research_original_upload"},
+      {source_endpoint:"https://charts.youtube.com/youtubei/v1/browse?alt=json"},
+      {method_revision:1},{original_content_type:"application/json"},
+      {parser_version:"charts2-source-parsers-v1"},
+      {native_period_authority:"provider_declared_end_date"},
+      {provider_week_ending_date:"2026-11-18"},
+      {provider_week_ending_date:"2026-11-26"},
+      {original_object_key:y.original_object_key.replace(/\.csv$/,".json")},
+      {observations:y.observations.slice(0,99),observed_depth:99,observed_status:"partial_depth"},
+    ])expect(()=>score([{...y,...changes},...receipts.slice(1)])).toThrow();
+    const wrong=structuredClone(receipts);
+    wrong[0].observations[0].provider_track_id="unverified";
+    expect(()=>score(wrong)).toThrow("charts2_scoring_youtube_export_rows_unqualified");
+    expect(STUDIO_WORKER).toContain("charts2_youtube_export_digest_mismatch");
+    expect(STUDIO_WORKER).toContain("official_export_not_collector_admitted");
+    expect(STUDIO_PAGE).toContain('invokeStudio("upload_official_youtube_export",form)');
+    expect(STUDIO_PAGE).toContain('YOUTUBE_EXPORT_ACK');
+  });
 });

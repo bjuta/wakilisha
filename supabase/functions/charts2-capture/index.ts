@@ -4,7 +4,9 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { decodeCharts2Original, listCharts2SourceContracts, charts2YouTubeNativeWeeklyPost } from "../_shared/charts2-original-candidate.mjs";
-import {scoreCharts2PrivatePreviewV1,CHARTS2_PRIVATE_METHODOLOGY_V1} from "../_shared/charts2-private-scoring-v1.mjs";
+import {scoreCharts2PrivatePreviewV1,CHARTS2_PRIVATE_METHODOLOGY_V1,summarizeCharts2SourceCoverageV1} from "../_shared/charts2-private-scoring-v1.mjs";
+import {YOUTUBE_EXPORT_ENDPOINT,YOUTUBE_EXPORT_MODE,YOUTUBE_EXPORT_ACK,
+  YOUTUBE_EXPORT_PARSER_VERSION} from "../_shared/charts2-youtube-official-export.mjs";
 import {buildCharts2PrivateNativeReviewV1} from "../_shared/charts2-private-native-review-v1.mjs";
 
 const MAX_BYTES = 4_000_000;
@@ -91,10 +93,10 @@ async function readCappedStream(body:ReadableStream<Uint8Array>|null,limit:numbe
   return merged;
 }
 
-async function bodyBytes(source_key:string, blob:Blob) {
+async function bodyBytes(source_key:string, blob:Blob, expectedMime=MIME[source_key]) {
   if(blob.size < 1 || blob.size > MAX_BYTES)
     throw new Reject(413,"charts2_original_size_invalid");
-  if(decodeContentType(blob.type) && decodeContentType(blob.type)!==MIME[source_key])
+  if(decodeContentType(blob.type) && decodeContentType(blob.type)!==expectedMime)
     throw new Reject(415,"charts2_original_type_invalid");
   return new Uint8Array(await blob.arrayBuffer());
 }
@@ -185,12 +187,19 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
   if(mode==="studio_preview") {
     const snapshot=await studioSnapshot(server);
     const receipts=snapshot.receipts??[];
-    if(!Array.isArray(receipts)||receipts.length!==5) {
+    if(!Array.isArray(receipts)||receipts.length>5)
+      throw new Reject(409,"charts2_studio_unqualified_snapshot");
+    await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)));
+    if(receipts.length!==5) {
+      let source_coverage;
+      try {source_coverage=summarizeCharts2SourceCoverageV1(receipts);}
+      catch {throw new Reject(409,"charts2_studio_unqualified_snapshot");}
       return {state:"incomplete_source_set",can_publish:false,
         source_methods:snapshot.source_methods,methodology:snapshot.methodology,
-        receipt_count:receipts.length};
+        source_coverage,receipt_count:source_coverage.length,
+        server_verified_originals:source_coverage.length,
+        history:snapshot.history??[],read_at:snapshot.read_at};
     }
-    await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)));
     let preview;
     try {
       preview=scoreCharts2PrivatePreviewV1({
@@ -669,7 +678,8 @@ async function handle(req:Request) {
     return studioAction(mode,req,server,authClient);
   let key:string, endpoint:string, target_period_key:string|null=null;
   let contentType:string, bytes:Uint8Array, methodRevision:number|null=null;
-  let captureMode:"research_original_upload"|"service_original";
+  let captureMode:"research_original_upload"|"service_original"|typeof YOUTUBE_EXPORT_MODE;
+  let exportAcknowledgement:string|null=null,declaredExportSha:string|null=null;
 
   if(mode==="verify_method") {
     // Signed-in, capability-gated first-party probe; never auto-admits any
@@ -785,7 +795,7 @@ async function handle(req:Request) {
     return outcome.data;
   }
 
-  if(mode==="upload") {
+  if(mode==="upload"||mode==="upload_official_youtube_export") {
     const declared=Number(req.headers.get("content-length")??0);
     if(Number.isFinite(declared)&&declared>MAX_REQUEST_BYTES)
       throw new Reject(413,"charts2_request_too_large");
@@ -797,15 +807,32 @@ async function handle(req:Request) {
     });
     key=sourceKey(form.get("source_key"));
     endpoint=String(form.get("source_endpoint")??"");
-    expectedUrl(key,endpoint);
     const file=form.get("original");
     if(!(file instanceof File))
       throw new Reject(400,"charts2_original_required");
-    contentType=MIME[key];
-    bytes=await bodyBytes(key,file);
     const period=form.get("target_period_key");
     target_period_key=period===null?null:String(period);
-    captureMode="research_original_upload";
+    if(mode==="upload_official_youtube_export"){
+      const names=Array.from(form.keys());
+      const allowed=["source_key","source_endpoint","original","target_period_key","original_sha256","acknowledgement"];
+      const ack=form.get("acknowledgement"),sha=form.get("original_sha256");
+      if(names.length!==allowed.length||new Set(names).size!==names.length||
+         !allowed.every(name=>names.includes(name))||
+         key!=="youtube_ke"||endpoint!==YOUTUBE_EXPORT_ENDPOINT||
+         typeof period!=="string"||ack!==YOUTUBE_EXPORT_ACK||
+         typeof sha!=="string"||!/^[a-f0-9]{64}$/.test(sha))
+        throw new Reject(422,"charts2_youtube_export_attestation_required");
+      exportAcknowledgement=ack;
+      declaredExportSha=sha;
+      contentType="text/csv";
+      bytes=await bodyBytes(key,file,contentType);
+      captureMode=YOUTUBE_EXPORT_MODE;
+    }else{
+      expectedUrl(key,endpoint);
+      contentType=MIME[key];
+      bytes=await bodyBytes(key,file);
+      captureMode="research_original_upload";
+    }
   } else if(mode==="collect") {
     const supplied=await req.json().catch(()=>null);
     key=sourceKey(supplied?.source_key);
@@ -843,10 +870,21 @@ async function handle(req:Request) {
   }
 
   const observedAt=new Date().toISOString();
-  const candidate=await decodeCharts2Original({
-    source_key:key,original_bytes:bytes,endpoint,observed_at:observedAt,
-    target_period_key,
-  });
+  let candidate;
+  try {
+    candidate=await decodeCharts2Original({
+      source_key:key,original_bytes:bytes,endpoint,observed_at:observedAt,
+      target_period_key,capture_mode:captureMode,
+      operator_export_acknowledgement:exportAcknowledgement,
+    });
+  } catch(error) {
+    if(captureMode===YOUTUBE_EXPORT_MODE&&error instanceof Error&&
+       /^charts2_(youtube_export_|original_|youtube_target_period_missing)/.test(error.message))
+      throw new Reject(422,error.message);
+    throw error;
+  }
+  if(captureMode===YOUTUBE_EXPORT_MODE&&candidate.payload_sha256!==declaredExportSha)
+    throw new Reject(409,"charts2_youtube_export_digest_mismatch");
   // This is evidence-only, never a score admission.
   if(candidate.can_score!==false||candidate.can_publish!==false||
      candidate.evidence_only!==true||candidate.source_access_authorized!==false)
@@ -861,27 +899,39 @@ async function handle(req:Request) {
     original_content_type:contentType,
     expected_depth:candidate.declared_depth,
     observations:candidate.rows,
-    parser_version:"charts2-source-parsers-v1",
+    parser_version:captureMode===YOUTUBE_EXPORT_MODE
+      ?YOUTUBE_EXPORT_PARSER_VERSION:"charts2-source-parsers-v1",
     provider_updated_at:candidate.provider_updated_at,
     provider_week_ending_date:candidate.provider_week_ending_date,
-    native_period_authority:candidate.provider_week_ending_date
-      ?"provider_declared_end_date":"unknown",
+    native_period_authority:captureMode===YOUTUBE_EXPORT_MODE
+      ?candidate.native_period_authority
+      :candidate.provider_week_ending_date?"provider_declared_end_date":"unknown",
+    ...(captureMode===YOUTUBE_EXPORT_MODE
+      ?{operator_export_acknowledgement:exportAcknowledgement}:{}),
     method_revision:methodRevision,captured_by:user.id,
     verification_state:"server_sha256_storage_readback",
   };
   const write=await server.rpc("charts2_commit_verified_original_v1",{
     p_capture:payload,
   });
-  if(write.error||!write.data)
+  if(write.error||!write.data){
+    if(captureMode===YOUTUBE_EXPORT_MODE&&write.error?.code==="PT409")
+      throw new Reject(409,"charts2_youtube_export_original_period_conflict");
+    if(captureMode===YOUTUBE_EXPORT_MODE&&write.error?.code==="42501")
+      throw new Reject(403,"charts2_youtube_export_actor_not_authorized");
+    if(captureMode===YOUTUBE_EXPORT_MODE&&write.error?.code==="23514")
+      throw new Reject(422,"charts2_youtube_export_receipt_unqualified");
     throw new Reject(503,"charts2_verified_receipt_commit_failed");
+  }
   return {
     status:candidate.status,source_key:key,market:"KE",
     receipt_id:write.data,observed_depth:candidate.observed_depth,
     declared_depth:candidate.declared_depth,
     original_sha256:candidate.payload_sha256,
     unresolved_identity_count:candidate.unresolved_identity_count,
-    source_method_state:captureMode==="research_original_upload"
-      ?"research_not_admitted":"collector_admitted",
+    source_method_state:captureMode===YOUTUBE_EXPORT_MODE
+      ?"official_export_not_collector_admitted"
+      :captureMode==="research_original_upload"?"research_not_admitted":"collector_admitted",
     can_score:false,can_publish:false,
   };
 }
