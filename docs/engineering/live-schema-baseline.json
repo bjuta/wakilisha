@@ -1,17 +1,17 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-23T10:57:47Z",
+  "generatedAt": "2026-11-24T16:05:27Z",
   "typesSha256": "d3f8200df45b4669119ed4f7a60d6fc1c8d68afa2ab3c798755678b995ddfdf8",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 278,
-  "latestMigration": "20261123084536_charts2_shazam_no_id_observation_review_v2.sql",
+  "migrationCount": 279,
+  "latestMigration": "20261124154755_charts2_youtube_official_export_v1.sql",
   "schemaSeal": {
     "mode": "disposable_ci",
     "sourceProjectRef": "unlinked-local-ci",
     "baseMainSha": "9847216a6946ae89f0eb52684a27231ce6e4b15d",
-    "replayCandidateHeadSha": "1e6b79eecc100d6c05f5906164f91259ed8777e5",
-    "workflowRunId": 45160328532,
-    "migrationHead": "20261123084536"
+    "replayCandidateHeadSha": "3d9207c6cf51c7b89fcb2f71c20c77ee004f60a3",
+    "workflowRunId": 45432239570,
+    "migrationHead": "20261124154755"
   }
 }
