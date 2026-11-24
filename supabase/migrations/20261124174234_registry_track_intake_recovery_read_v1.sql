@@ -1,6 +1,7 @@
 -- Forward-only extension of the exact Production Track Intake queue reader.
 -- CLI-minted path: GitHub run 45451513807, Supabase CLI 2.107.0.
--- Read only. Never infer canonical identity from a deterministic UUID alone.
+-- Queue recovery is read-only; Chart staging seeds candidate evidence only.
+-- Never infer canonical identity from a deterministic UUID alone.
 -- The existing caller-bound create, child, activation and finalizer RPCs remain sole write authority.
 begin;
 CREATE OR REPLACE FUNCTION public.admin_get_registry_track_intake_queue(p_status text DEFAULT 'needs_review'::text, p_limit integer DEFAULT 100, p_offset integer DEFAULT 0, p_suggestion_id uuid DEFAULT NULL::uuid, p_playlist_item_id uuid DEFAULT NULL::uuid)
@@ -227,5 +228,228 @@ begin
     'rows',v_rows
   );
 end
+$function$;
+-- The inherited seed trigger used Playlist validation semantics for Chart
+-- observations. Never silently reinterpret an already-staged human decision.
+do $chart_seed_preimage$
+begin
+  if md5(pg_get_functiondef(
+    'editorial.seed_registry_track_intake_provider_observations(uuid)'::regprocedure
+  )) <> '716ef2ad254c217c7ef0e9c8d69688a3'
+  then raise exception 'STOP: Track Intake evidence seed authority drifted'; end if;
+  if exists (
+    select 1 from public.registry_provider_track_suggestions
+    where intake_origin='chart_studio'
+  ) then raise exception 'STOP: existing Chart Intake evidence requires explicit review before seed correction'; end if;
+end
+$chart_seed_preimage$;
+
+CREATE OR REPLACE FUNCTION editorial.seed_registry_track_intake_provider_observations(p_suggestion_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+declare
+  v_suggestion public.registry_provider_track_suggestions%rowtype;
+  v_metadata jsonb;
+begin
+  select suggestion.*
+  into v_suggestion
+  from public.registry_provider_track_suggestions suggestion
+  where suggestion.id = p_suggestion_id;
+
+  if not found then
+    return;
+  end if;
+
+  -- Chart evidence is an observation, not a recording match.
+  -- The non-Chart path below retains its existing validation semantics.
+  if v_suggestion.intake_origin='chart_studio' then
+    insert into public.provider_field_observations (
+      provider_item_id,entity_type,field_name,field_value,provider,
+      confidence_score,source_path,raw_payload,created_at
+    )
+    select v_suggestion.id::text,'track','title',v_suggestion.provider_title,
+      v_suggestion.provider_key,0.85,'chart_receipt.original.title',
+      v_suggestion.validation_snapshot,now()
+    where nullif(btrim(v_suggestion.provider_title),'') is not null
+      and not exists (
+        select 1 from public.provider_field_observations existing
+        where existing.provider_item_id=v_suggestion.id::text
+          and existing.entity_type='track'
+          and existing.provider=v_suggestion.provider_key
+          and existing.field_name='title'
+          and existing.field_value=v_suggestion.provider_title
+          and existing.source_path='chart_receipt.original.title'
+      );
+    -- No inferred ID, URL, confidence of identity, or approved match.
+    -- Reseeding cannot overwrite a subsequent explicit selection.
+    if nullif(btrim(v_suggestion.provider_object_id),'') is not null
+       and not exists (
+         select 1 from public.provider_entity_links link
+         where link.registry_entity_type='track'
+           and link.registry_entity_id=v_suggestion.id::text
+           and link.provider=v_suggestion.provider_key
+           and link.provider_entity_id=v_suggestion.provider_object_id
+       )
+    then
+      insert into public.provider_entity_links (
+        registry_entity_type,registry_entity_id,provider,provider_entity_id,
+        provider_url,match_status,confidence_score,created_at,updated_at
+      ) values (
+        'track',v_suggestion.id::text,v_suggestion.provider_key,
+        v_suggestion.provider_object_id,null,'candidate',0,now(),now()
+      );
+    end if;
+    return;
+  end if;
+
+  v_metadata :=
+    coalesce(
+      v_suggestion.validation_snapshot -> 'provider_metadata',
+      '{}'::jsonb
+    );
+
+  insert into public.provider_field_observations (
+    provider_item_id,
+    entity_type,
+    field_name,
+    field_value,
+    provider,
+    confidence_score,
+    source_path,
+    raw_payload,
+    created_at
+  )
+  select
+    v_suggestion.id::text,
+    'track',
+    observed.field_name,
+    observed.field_value,
+    v_suggestion.provider_key,
+    observed.confidence_score,
+    observed.source_path,
+    v_suggestion.validation_snapshot,
+    now()
+  from (
+    values
+      (
+        'title'::text,
+        nullif(btrim(v_suggestion.provider_title), ''),
+        0.85::numeric,
+        'playlist_validation.provider_title'::text
+      ),
+      (
+        'release_title',
+        nullif(btrim(v_suggestion.provider_release_title), ''),
+        0.80::numeric,
+        'playlist_validation.provider_release_title'
+      ),
+      (
+        'track_artwork_url',
+        nullif(
+          btrim(v_suggestion.validation_snapshot ->> 'artwork_url'),
+          ''
+        ),
+        0.85::numeric,
+        'playlist_validation.artwork_url'
+      ),
+      (
+        'preview_url',
+        nullif(
+          btrim(v_suggestion.validation_snapshot ->> 'preview_url'),
+          ''
+        ),
+        0.85::numeric,
+        'playlist_validation.preview_url'
+      ),
+      (
+        'duration_ms',
+        nullif(btrim(v_metadata ->> 'track_time_millis'), ''),
+        0.90::numeric,
+        'playlist_validation.provider_metadata.track_time_millis'
+      ),
+      (
+        'release_date',
+        nullif(btrim(v_metadata ->> 'release_date'), ''),
+        0.80::numeric,
+        'playlist_validation.provider_metadata.release_date'
+      ),
+      (
+        'genre',
+        nullif(btrim(v_metadata ->> 'primary_genre_name'), ''),
+        0.65::numeric,
+        'playlist_validation.provider_metadata.primary_genre_name'
+      ),
+      (
+        'provider_url',
+        nullif(btrim(v_suggestion.provider_url), ''),
+        1.00::numeric,
+        'playlist_validation.provider_url'
+      ),
+      (
+        'video_published_at',
+        case
+          when v_suggestion.provider_key = 'youtube'
+          then nullif(btrim(v_metadata ->> 'published_at'), '')
+          else null
+        end,
+        0.65::numeric,
+        'playlist_validation.provider_metadata.published_at'
+      )
+  ) observed(
+    field_name,
+    field_value,
+    confidence_score,
+    source_path
+  )
+  where observed.field_value is not null
+    and not exists (
+      select 1
+      from public.provider_field_observations existing
+      where existing.provider_item_id = v_suggestion.id::text
+        and existing.entity_type = 'track'
+        and existing.provider = v_suggestion.provider_key
+        and existing.field_name = observed.field_name
+        and existing.field_value = observed.field_value
+        and existing.source_path = observed.source_path
+    );
+
+  if nullif(btrim(v_suggestion.provider_object_id), '') is not null
+     and not exists (
+       select 1
+       from public.provider_entity_links link
+       where link.registry_entity_type = 'track'
+         and link.registry_entity_id = v_suggestion.id::text
+         and link.provider = v_suggestion.provider_key
+         and link.provider_entity_id =
+           v_suggestion.provider_object_id
+     )
+  then
+    insert into public.provider_entity_links (
+      registry_entity_type,
+      registry_entity_id,
+      provider,
+      provider_entity_id,
+      provider_url,
+      match_status,
+      confidence_score,
+      created_at,
+      updated_at
+    )
+    values (
+      'track',
+      v_suggestion.id::text,
+      v_suggestion.provider_key,
+      v_suggestion.provider_object_id,
+      v_suggestion.provider_url,
+      'confirmed',
+      1.0000,
+      now(),
+      now()
+    );
+  end if;
+end;
 $function$;
 commit;

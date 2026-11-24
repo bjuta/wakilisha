@@ -892,6 +892,25 @@ begin
     'youtube_ke',youtube_receipt,youtube_sha,1
   )->>'idempotent_replay')::boolean is not true
   then raise exception 'charts2_track_intake_idempotent_replay_failed';end if;
+  if (select count(*) from public.provider_entity_links
+      where registry_entity_type='track'
+        and registry_entity_id=intake->>'suggestion_id')<>1
+     or not exists(select 1 from public.provider_entity_links
+       where registry_entity_id=intake->>'suggestion_id'
+         and provider='youtube' and provider_entity_id='youtube-ci-1'
+         and match_status='candidate' and confidence_score=0 and provider_url is null)
+     or not exists(select 1 from public.provider_field_observations
+       where provider_item_id=intake->>'suggestion_id'
+         and source_path='chart_receipt.original.title'
+         and field_name='title' and field_value='CI Original Recording')
+     or exists(select 1 from public.provider_field_observations
+       where provider_item_id=intake->>'suggestion_id'
+         and source_path like 'playlist_validation.%')
+  then raise exception 'charts2_raw_source_prematurely_confirmed_or_mislabelled';end if;
+  perform editorial.seed_registry_track_intake_provider_observations((intake->>'suggestion_id')::uuid);
+  if (select count(*) from public.provider_entity_links
+       where registry_entity_id=intake->>'suggestion_id')<>1
+  then raise exception 'charts2_candidate_seed_not_idempotent';end if;
   credit:=public.admin_append_charts2_track_intake_credit_v1(
     (intake->>'suggestion_id')::uuid,'CI Second Artist',
     independent_note,'https://example.org/ci-artist-evidence');
@@ -934,6 +953,28 @@ begin
     512,shazam_sha,now(),'application/json',200,200,
     positions,'ci-original-v1',now()+interval '1 second'
   );
+  declare no_id_intake jsonb; legacy_id uuid;
+  begin
+    no_id_intake:=public.admin_stage_charts2_track_intake_v1(
+      'shazam_ke',shazam_receipt,shazam_sha,2);
+    if exists(select 1 from public.provider_entity_links
+      where registry_entity_id=no_id_intake->>'suggestion_id')
+    then raise exception 'charts2_no_id_intake_fabricated_provider_link';end if;
+    insert into public.registry_provider_track_suggestions(
+      requested_by,intake_origin,provider_key,provider_object_id,
+      provider_url,provider_title,submitted_track_title,playback_kind,
+      validation_snapshot,artist_resolution_mode,status
+    ) values(actor_id,'public_contribution','youtube','ci-legacy-provider',
+      'https://example.org/ci-legacy','CI Legacy Recording','CI Legacy Recording',
+      'video','{}','unresolved','needs_review') returning id into legacy_id;
+    if not exists(select 1 from public.provider_entity_links
+      where registry_entity_id=legacy_id::text and provider_entity_id='ci-legacy-provider'
+        and match_status='confirmed' and confidence_score=1)
+       or not exists(select 1 from public.provider_field_observations
+      where provider_item_id=legacy_id::text and source_path='playlist_validation.provider_title')
+    then raise exception 'charts2_legacy_provider_seed_changed';end if;
+    raise notice 'WK_CHARTS2_CANDIDATE_ONLY_NO_ID_AND_LEGACY_SEED=PASS';
+  end;
   approved:=public.admin_review_charts2_no_id_observation_v1(
     shazam_receipt,shazam_sha,1,'approve',canonical_track,
     independent_note,'https://example.org/ci-track-evidence',null,

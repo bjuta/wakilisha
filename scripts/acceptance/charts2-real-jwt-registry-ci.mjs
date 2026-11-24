@@ -92,6 +92,19 @@ export async function verifyCharts2RealJwtRegistryV1({
    sourceArgs,"STOP_CHARTS2_REAL_JWT_REPLAY");
  fail(replay.suggestion_id===staged.suggestion_id &&
    replay.idempotent_replay===true,"STOP_CHARTS2_REAL_JWT_TRACK_REPLAY_NOT_IDEMPOTENT");
+ const sourceEvidence=await accept(first.user,"admin_get_registry_track_intake_enrichment",{
+   p_suggestion_id:staged.suggestion_id,
+ },"STOP_CHARTS2_JWT_ORIGINAL_EVIDENCE");
+ fail(sourceEvidence.provider_links?.length===1 &&
+   sourceEvidence.provider_links[0].provider_entity_id==="youtube-jwt-1" &&
+   sourceEvidence.provider_links[0].match_status==="candidate" &&
+   Number(sourceEvidence.provider_links[0].confidence_score)===0 &&
+   sourceEvidence.observations?.some(o=>o.field_name==="title"&&
+     o.field_value==="CI Genuine JWT Song"&&o.source_path==="chart_receipt.original.title") &&
+   !sourceEvidence.observations?.some(o=>o.source_path?.startsWith("playlist_validation.")) &&
+   Object.keys(sourceEvidence.accepted??{}).length===0,
+   "STOP_CHARTS2_JWT_SOURCE_AUTO_CONFIRMED_OR_MISLABELLED");
+ console.log("WK_AUTH_CHARTS2_ORIGINAL_SOURCE_CANDIDATE_ONLY=PASS");
  const rawCredit=sql("select credit_role||'|'||resolution_mode||'|'||"+
    "observed_name from public.registry_provider_track_suggestion_artists "+
    "where suggestion_id='"+staged.suggestion_id+"'::uuid and credit_order=1;");
@@ -206,9 +219,37 @@ export async function verifyCharts2RealJwtRegistryV1({
  const finalized=finalResponse.data;
  const finished=await readRecovery(first.user);
  fail(finalized?.status==="canonicalized"&&finished.status==="canonicalized"&&
-   finished.recovery===null&&finished.canonicalized_track_id===recoveryId,
+   finalized.finalization_state?.ready===true &&
+   finalized.finalization_state.provider_expected===0 &&
+   finalized.finalization_state.provider_verified===0 &&
+   finished.recovery===null&&finished.canonicalized_track_id===recoveryId &&
+   sql("select count(*) from public.registry_track_provider_links where track_id='"+
+     recoveryId+"'::uuid;")==="0",
    "STOP_CHARTS2_JWT_RECOVERY_FINAL_STATE");
  console.log("WK_AUTH_CHARTS2_VERIFIED_DRAFT_AND_ACTIVATION_RECOVERY=PASS");
+
+ const secondStage=await accept(first.user,"admin_stage_charts2_track_intake_v1",
+   {...sourceArgs,p_rank:2},"STOP_CHARTS2_JWT_SECOND_PROVIDER_CANDIDATE");
+ const secondId=secondStage.suggestion_id;
+ const selectionArgs={p_suggestion_id:secondId,p_provider:"youtube",
+   p_provider_entity_id:"youtube-jwt-2",p_reason:note};
+ denied(await subscriber.rpc("admin_select_registry_track_intake_provider_evidence",selectionArgs),
+   "42501","STOP_CHARTS2_JWT_UNPRIVILEGED_PROVIDER_SELECTION");
+ await accept(first.user,"admin_record_registry_track_intake_provider_evidence",{
+   p_suggestion_id:secondId,p_provider:"youtube",p_provider_entity_id:"youtube-jwt-2",
+   p_provider_url:"https://www.youtube.com/watch?v=ci-local-only",
+   p_fields:{title:"CI Genuine JWT Song",artist_names:["CI Original Artist"]},
+   p_raw_payload:{fixture:"disposable-local-only"},p_confidence:0.95,
+ },"STOP_CHARTS2_JWT_INSPECTED_PROVIDER_EVIDENCE");
+ const selected=await accept(first.user,"admin_select_registry_track_intake_provider_evidence",
+   selectionArgs,"STOP_CHARTS2_JWT_EXPLICIT_PROVIDER_SELECTION");
+ fail(selected.match_status==="confirmed"&&selected.changed===true &&
+   sql("select count(*) from public.registry_track_provider_links where provider_track_id='youtube-jwt-2';")==="0",
+   "STOP_CHARTS2_JWT_PROVIDER_SELECTION_BYPASSED_ADMISSION");
+ const selectedReplay=await accept(first.user,"admin_select_registry_track_intake_provider_evidence",
+   selectionArgs,"STOP_CHARTS2_JWT_PROVIDER_SELECTION_REPLAY");
+ fail(selectedReplay.changed===false,"STOP_CHARTS2_JWT_PROVIDER_SELECTION_NOT_IDEMPOTENT");
+ console.log("WK_AUTH_CHARTS2_PROVIDER_SELECTION_EXPLICIT_NO_CANONICAL_WRITE=PASS");
 
  const decisionArgs={
    p_receipt_id:shazamId,p_original_sha256:shazamSha,p_rank:1,

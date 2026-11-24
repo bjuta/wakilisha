@@ -1372,11 +1372,10 @@ export default function TrackIntakePage() {
       return;
     }
     const observedTitle =
-      preferredObservedTrackTitle(
-        suggestionId,
-      ) ??
-      row.submitted_track_title ??
-      row.provider_title;
+      row.intake_origin === "chart_studio"
+        ? row.submitted_track_title ?? row.provider_title
+        : preferredObservedTrackTitle(suggestionId) ??
+          row.submitted_track_title ?? row.provider_title;
     const title =
       (
         newCanonicalTitle[suggestionId] ??
@@ -1799,11 +1798,10 @@ export default function TrackIntakePage() {
                     Boolean(credit.registry_artist_id),
                 );
               const observedCanonicalTitle =
-                preferredObservedTrackTitle(
-                  suggestionId,
-                ) ??
-                row.submitted_track_title ??
-                row.provider_title;
+                row.intake_origin === "chart_studio"
+                  ? row.submitted_track_title ?? row.provider_title
+                  : preferredObservedTrackTitle(suggestionId) ??
+                    row.submitted_track_title ?? row.provider_title;
               const canonicalTitle =
                 newCanonicalTitle[suggestionId] ??
                 observedCanonicalTitle ??
