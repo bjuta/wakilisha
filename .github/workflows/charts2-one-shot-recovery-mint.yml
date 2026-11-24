@@ -1,0 +1,38 @@
+name: Charts2 One-Shot Track Intake Recovery Migration Filename Mint
+on:
+  push:
+    branches:
+      - "work/charts2-registry-convergence-current-main-20261123"
+    paths:
+      - ".github/workflows/charts2-one-shot-recovery-mint.yml"
+permissions:
+  contents: read
+jobs:
+  mint:
+    name: cli-mint-track-intake-recovery-path
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+      - name: Generate one forward-only filename without database access
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --version
+          test "$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')" -eq 279
+          test ! -e supabase/.temp/project-ref
+          name=registry_track_intake_recovery_read_v1
+          test "$(find supabase/migrations -maxdepth 1 -type f -name "*_${name}.sql" | wc -l | tr -d ' ')" -eq 0
+          supabase migration new "$name"
+          path="$(find supabase/migrations -maxdepth 1 -type f -name "*_${name}.sql" -print)"
+          test -n "$path"
+          test "$(printf '%s\n' "$path" | wc -l | tr -d ' ')" -eq 1
+          version="$(basename "$path" | cut -d_ -f1)"
+          test "${#version}" -eq 14
+          test "$version" -gt 20261124154755
+          printf 'TRACK_INTAKE_RECOVERY_MIGRATION=%s\n' "$path"
+          printf 'CHARTS2_FORWARD_CLI_MINT=PASS\n'
+          printf 'NO_REMOTE_DATABASE_CONNECTION_OR_WRITE=TRUE\n'
