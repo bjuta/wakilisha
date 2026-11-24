@@ -865,6 +865,8 @@ begin
      or not public.current_user_has_capability('manage_registry')
   then raise exception 'charts2_steward_capabilities_missing';end if;
 
+  -- All fixtures share this transaction's now(). Explicitly order the new
+  -- receipt after earlier fixtures instead of relying on random UUID ties.
   select jsonb_agg(jsonb_build_object('rank',n,'title','CI Original Recording',
     'artist','CI First Artist','provider_track_id','youtube-ci-'||n)
     order by n) into positions from generate_series(1,100) n;
@@ -872,12 +874,12 @@ begin
     id,source_key,source_endpoint,method_revision,capture_mode,observed_at,
     original_object_key,original_byte_length,original_sha256,
     original_verified_at,original_content_type,expected_depth,observed_depth,
-    observations,parser_version
+    observations,parser_version,created_at
   ) values (
     youtube_receipt,'youtube_ke','https://youtube.example.org/source',
     1,'research_original_upload',now(),'ci-youtube-'||youtube_receipt,
     512,youtube_sha,now(),'application/json',100,100,
-    positions,'ci-original-v1'
+    positions,'ci-original-v1',now()+interval '1 second'
   );
   intake:=public.admin_stage_charts2_track_intake_v1(
     'youtube_ke',youtube_receipt,youtube_sha,1);
@@ -925,12 +927,12 @@ begin
     id,source_key,source_endpoint,method_revision,capture_mode,observed_at,
     original_object_key,original_byte_length,original_sha256,
     original_verified_at,original_content_type,expected_depth,observed_depth,
-    observations,parser_version
+    observations,parser_version,created_at
   ) values (
     shazam_receipt,'shazam_ke','https://shazam.example.org/source',
     1,'research_original_upload',now(),'ci-shazam-'||shazam_receipt,
     512,shazam_sha,now(),'application/json',200,200,
-    positions,'ci-original-v1'
+    positions,'ci-original-v1',now()+interval '1 second'
   );
   approved:=public.admin_review_charts2_no_id_observation_v1(
     shazam_receipt,shazam_sha,1,'approve',canonical_track,
