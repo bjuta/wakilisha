@@ -178,9 +178,32 @@ export async function verifyCharts2RealJwtRegistryV1({
  const active=await readRecovery(first.user);
  fail(active.recovery?.state==="active"&&active.recovery.track_id===recoveryId&&
    active.canonical_track_id===null,"STOP_CHARTS2_JWT_ACTIVE_RECOVERY");
- const finalized=await accept(first.user,"admin_finalize_registry_track_intake_v1",{
+ // Preserve structured verifier rejection evidence in this disposable-only
+ // harness. Do not modify operations, grants, receipts or verifier results.
+ const finalArgs={
    p_suggestion_id:staged.suggestion_id,p_registry_track_id:recoveryId,p_review_note:note,
- },"STOP_CHARTS2_JWT_RECOVERY_FINALIZE");
+ };
+ const finalResponse=await first.user.rpc("admin_finalize_registry_track_intake_v1",finalArgs);
+ if(finalResponse.error){
+   const err=finalResponse.error;
+   console.log("WK_AUTH_CHARTS2_FINALIZATION_DENIAL="+JSON.stringify({
+     code:err.code,message:err.message,details:err.details,hint:err.hint,
+   }));
+   const diagnostic=sql(`select jsonb_agg(jsonb_build_object(
+     'operation',o.operation_key,'status',o.status,'verifier',o.verifier_status,
+     'grant_track_matches',g.plan_payload->>'track_id'='${recoveryId}',
+     'grant_suggestion_matches',g.plan_payload->>'suggestion_id'='${staged.suggestion_id}',
+     'credit_fingerprint_matches',case when o.operation_key='registry.track_artist_credit.reviewed_reconcile'
+       then platform_private.registry_subject_state_fingerprint('track_artist_credit',
+         nullif(o.result_payload->>'relation_id','')::uuid)=o.result_payload->>'relation_state_fingerprint'
+       else null end
+   ) order by o.created_at,o.id) from platform_private.registry_mutation_operations o
+   join platform_private.registry_execution_grants g on g.id=o.execution_grant_id
+   where g.plan_payload->>'track_id'='${recoveryId}';`);
+   console.log("WK_AUTH_CHARTS2_CHILD_RECEIPT_DIAGNOSTIC="+diagnostic);
+ }
+ fail(!finalResponse.error,"STOP_CHARTS2_JWT_RECOVERY_FINALIZE_"+String(finalResponse.error?.code??"NO_CODE"));
+ const finalized=finalResponse.data;
  const finished=await readRecovery(first.user);
  fail(finalized?.status==="canonicalized"&&finished.status==="canonicalized"&&
    finished.recovery===null&&finished.canonicalized_track_id===recoveryId,
