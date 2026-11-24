@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import {
   chartStudioReturnHref,
   parseChartReviewReference,
+  parseChartIntakeBatch,
 } from "@/services/chartsPrivate/chartReviewContext";
 
 type VerifiedContext = {
@@ -30,6 +31,7 @@ export function ChartReviewReturnContext({
   const [params]=useSearchParams();
   const key=params.toString();
   const reference=useMemo(()=>parseChartReviewReference(new URLSearchParams(key)),[key]);
+  const batch=useMemo(()=>parseChartIntakeBatch(new URLSearchParams(key)),[key]);
   const requested=params.has("chart_source");
   const [state,setState]=useState<{
     loading:boolean;error:string;result:VerifiedContext|null;
@@ -95,7 +97,7 @@ export function ChartReviewReturnContext({
           A Registry duplicate repair can move public chart rows, provider links and credits.
           Do not apply a repair merely to resolve this private chart position.
         </p>}
-      <Link to={chartStudioReturnHref(reference)} className="inline-flex min-h-11 items-center
+      <Link to={chartStudioReturnHref(reference,batch)} className="inline-flex min-h-11 items-center
         text-[12px] font-bold text-wk-brand underline underline-offset-4">
         Return to this chart position
       </Link>

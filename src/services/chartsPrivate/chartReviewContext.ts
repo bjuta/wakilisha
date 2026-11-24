@@ -60,11 +60,60 @@ export function appendChartReviewReference(
   return pathname+"?"+params.toString();
 }
 
-export function chartStudioReturnHref(reference:ChartReviewReference):string {
-  return appendChartReviewReference("/admin/charts/studio?tab=review",reference);
+export const TRACK_INTAKE_BATCH_LIMIT = 10;
+
+const BATCH_PARAM = "chart_batch";
+const positionKey = (ref:ChartReviewReference) =>
+  ref.source_key+":"+ref.receipt_id+":"+ref.rank;
+
+function validBatch(references:ChartReviewReference[]):boolean {
+  return references.length<=TRACK_INTAKE_BATCH_LIMIT &&
+    references.every(isChartReviewReference) &&
+    new Set(references.map(positionKey)).size===references.length;
 }
 
-export const TRACK_INTAKE_BATCH_LIMIT = 10;
+// Navigation only: immutable observation coordinates, never decisions,
+// provider data, review IDs, credentials, or consent. Every mutation still
+// requires a fresh preview and the caller-bound Registry broker.
+export function parseChartIntakeBatch(params:URLSearchParams):ChartReviewReference[] {
+  const entries=params.getAll(BATCH_PARAM);
+  if(entries.length>TRACK_INTAKE_BATCH_LIMIT)return [];
+  const references:ChartReviewReference[]=[];
+  for(const entry of entries){
+    const parts=entry.split(":");
+    if(parts.length!==4 || !/^[1-9][0-9]*$/.test(parts[2]))return [];
+    const reference={
+      source_key:parts[0],receipt_id:parts[1],rank:Number(parts[2]),original_sha256:parts[3],
+    };
+    if(!isChartReviewReference(reference))return [];
+    references.push(reference);
+  }
+  return validBatch(references)?references:[];
+}
+
+export function writeChartIntakeBatch(params:URLSearchParams,references:ChartReviewReference[]):URLSearchParams {
+  if(!validBatch(references))throw new Error("Invalid chart intake selection.");
+  const next=new URLSearchParams(params);
+  next.delete(BATCH_PARAM);
+  for(const reference of references)
+    next.append(BATCH_PARAM,positionKey(reference)+":"+reference.original_sha256);
+  return next;
+}
+
+export function appendChartIntakeBatch(href:string,references:ChartReviewReference[]):string {
+  const [pathname,existing=""]=href.split("?");
+  if(!pathname.startsWith("/admin/")||pathname.startsWith("//"))
+    throw new Error("Chart intake destinations must be WAKILISHA Admin routes.");
+  const query=writeChartIntakeBatch(new URLSearchParams(existing),references).toString();
+  return pathname+(query?"?"+query:"");
+}
+
+export function chartStudioReturnHref(reference:ChartReviewReference,batch:ChartReviewReference[]=[]):string {
+  return appendChartIntakeBatch(
+    appendChartReviewReference("/admin/charts/studio?tab=review",reference),batch,
+  );
+}
+
 export type TrackIntakeBatchResult = {
   reference: ChartReviewReference;
   suggestionId: string | null;
@@ -81,8 +130,7 @@ export async function prepareChartTrackIntakes(
   if (!references.length || references.length > TRACK_INTAKE_BATCH_LIMIT ||
       references.some(ref => !isChartReviewReference(ref)))
     throw new Error("Select one to ten valid source positions.");
-  const keys = references.map(ref => ref.source_key+":"+ref.receipt_id+":"+ref.rank);
-  if (new Set(keys).size !== keys.length) throw new Error("Duplicate source position.");
+  if (!validBatch(references)) throw new Error("Duplicate source position.");
   const results: TrackIntakeBatchResult[] = [];
   for (const reference of references) {
     let result: TrackIntakeBatchResult;

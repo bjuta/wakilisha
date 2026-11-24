@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import {appendChartReviewReference,parseChartReviewReference,type ChartReviewReference,prepareChartTrackIntakes,TRACK_INTAKE_BATCH_LIMIT,type TrackIntakeBatchResult} from "@/services/chartsPrivate/chartReviewContext";
+import {appendChartReviewReference,parseChartReviewReference,appendChartIntakeBatch,parseChartIntakeBatch,writeChartIntakeBatch,type ChartReviewReference,prepareChartTrackIntakes,TRACK_INTAKE_BATCH_LIMIT,type TrackIntakeBatchResult} from "@/services/chartsPrivate/chartReviewContext";
 import { supabase } from "@/lib/supabase";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
@@ -153,11 +153,13 @@ async function invokeStudio(mode:string,body:Record<string,unknown>|FormData = {
 export default function ChartsStudioPage() {
   const admin=useAdminUser();
   const navigate=useNavigate();
-  const [urlParams]=useSearchParams();
+  const [urlParams,setUrlParams]=useSearchParams();
+  const intakeSelection=useMemo(()=>parseChartIntakeBatch(urlParams),[urlParams]);
+  const withIntakeBatch=(href:string)=>appendChartIntakeBatch(href,intakeSelection);
   const returnContext=parseChartReviewReference(urlParams);
   const returnContextKey=returnContext?JSON.stringify(returnContext):"";
   const returnLoaded=useRef("");
-  const [tab,setTab]=useState<Tab>("sources");
+  const [tab,setTab]=useState<Tab>(intakeSelection.length?"review":"sources");
   const [snapshot,setSnapshot]=useState<StudioResponse|null>(null);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState("");
@@ -195,7 +197,6 @@ export default function ChartsStudioPage() {
   const [showAllDuplicateGroups,setShowAllDuplicateGroups]=useState(false);
   const [batchMode,setBatchMode]=useState(false);
   const [batchRows,setBatchRows]=useState<EvidenceRow[]>([]);
-  const [intakeSelection,setIntakeSelection]=useState<ChartReviewReference[]>([]);
   const [intakeResults,setIntakeResults]=useState<TrackIntakeBatchResult[]>([]);
   const [intakeConsent,setIntakeConsent]=useState(false);
   const intakeRunning=useRef(false);
@@ -514,20 +515,20 @@ export default function ChartsStudioPage() {
     };
     return reference;
   })();
-  const startGovernedArtistIntake=async()=>operate("stage-artist-intake",async()=>{
-    if(!selectedReference||!selected?.artist||
+  const startGovernedArtistIntake=async(reference=selectedReference,observedArtist=selected?.artist)=>operate("stage-artist-intake",async()=>{
+    if(!reference||!observedArtist?.trim()||
        !admin.can("manage_charts")||!admin.can("manage_registry"))
       throw new Error("Exact original Artist credit and authorized review are required.");
     const staged=await invokeStudio("studio_stage_artist_intake",{
-      ...selectedReference,
+      ...reference,
       acknowledgement:"I request governed Artist Intake using this exact original chart credit. No Artist identity is approved.",
     });
     const id=String(staged.run_id??"");
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
       throw new Error("Registry Artist Intake did not provide a valid reviewed run.");
-    navigate(appendChartReviewReference(
-      "/admin/registry/artists/intake?run="+id,selectedReference,
-    ));
+    navigate(withIntakeBatch(appendChartReviewReference(
+      "/admin/registry/artists/intake?run="+id,reference,
+    )));
   });
   const startGovernedTrackIntake=async()=>operate("stage-track-intake",async()=>{
     if(!selectedReference||!admin.can("manage_registry")||!admin.can("manage_charts"))
@@ -539,9 +540,9 @@ export default function ChartsStudioPage() {
     const id=String(staged.suggestion_id??"");
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
       throw new Error("Registry did not return an exact Track Intake review reference.");
-    navigate(appendChartReviewReference(
+    navigate(withIntakeBatch(appendChartReviewReference(
       "/admin/registry/tracks/intake?suggestion="+id,selectedReference,
-    ));
+    )));
   });
   const filteredReviewSongs=useMemo(()=>{
     const q=reviewSongQuery.trim().toLocaleLowerCase("en");
@@ -585,6 +586,15 @@ export default function ChartsStudioPage() {
   },[preview,search,reviewFilter]);
   const displayed=unresolved.slice(page*20,(page+1)*20);
   const intakeKey=(ref:ChartReviewReference)=>ref.source_key+":"+ref.receipt_id+":"+ref.rank+":"+ref.original_sha256;
+  const updateIntakeSelection=(next:ChartReviewReference[])=>{
+    setIntakeConsent(false);
+    setIntakeResults(old=>old.filter(result=>next.some(ref=>intakeKey(ref)===intakeKey(result.reference))));
+    setUrlParams(params=>writeChartIntakeBatch(params,next),{replace:true});
+  };
+  const currentIntakeRow=(ref:ChartReviewReference)=>{
+    if(!preview?.source_coverage.some(c=>c.source_key===ref.source_key&&c.receipt_id===ref.receipt_id&&c.original_sha256===ref.original_sha256))return undefined;
+    return preview.unresolved.find(row=>row.receipt_id===ref.receipt_id&&row.source_key===ref.source_key&&row.rank===ref.rank);
+  };
   const intakeReference=(row:EvidenceRow):ChartReviewReference|null=>{
     const receipt=preview?.source_coverage.find(c=>c.source_key===row.source_key&&c.receipt_id===row.receipt_id);
     return receipt?{source_key:row.source_key,receipt_id:row.receipt_id,rank:row.rank,original_sha256:receipt.original_sha256}:null;
@@ -870,17 +880,29 @@ export default function ChartsStudioPage() {
           <h3 className="text-[15px] font-black text-wk-text">Prepare Track Intake</h3>
           <p className="text-[12px] text-wk-text-muted">
             Choose up to ten source positions below. Prepare their existing Registry review items together.
-            This does not approve identities, credits or source links.
+            Review source Artists separately where needed. This does not approve identities, credits, or source links.
           </p>
           <p role="status" className="text-[12px] text-wk-text">{intakeSelection.length} selected · {pendingIntakes.length} remaining</p>
           {intakeSelection.map(ref=>{
             const result=intakeResults.find(r=>intakeKey(r.reference)===intakeKey(ref));
-            const row=preview?.unresolved.find(r=>r.receipt_id===ref.receipt_id&&r.source_key===ref.source_key&&r.rank===ref.rank);
-            return <div key={intakeKey(ref)} className="flex flex-wrap items-center justify-between gap-2 border-t border-wk-border py-2">
-              <span className="min-w-0 text-[12px] text-wk-text">{SOURCE_LABEL[ref.source_key]} #{ref.rank} · {row?.title??"Source position"}</span>
-              {result?.suggestionId?<Link className={buttonSecondary}
-                to={appendChartReviewReference("/admin/registry/tracks/intake?suggestion="+result.suggestionId,ref)}>Open Track Intake</Link>:
-                <span className="break-all text-[11px] text-wk-text-muted">{result?.error??"Not prepared"}</span>}
+            const row=currentIntakeRow(ref);
+            const canReview=Boolean(row)&&!busy&&admin.can("manage_registry")&&admin.can("manage_charts");
+            return <div key={intakeKey(ref)} className="space-y-2 border-t border-wk-border py-2">
+              <div className="min-w-0 text-[12px] text-wk-text">
+                <p className="break-words">{SOURCE_LABEL[ref.source_key]} #{ref.rank} · {row?.title??"Source position"}</p>
+                {row&&<p className="break-words text-wk-text-muted">{sourceArtistDisplay(row)}</p>}
+                {!row&&<p className="text-wk-warning">Position changed or resolved. Remove it before preparing the remaining items.</p>}
+                {row&&!row.artist&&<p className="text-wk-text-muted">The original has no Artist credit. Review separate catalogue evidence in Track Intake.</p>}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {row&&result?.suggestionId&&canReview?<Link className={buttonSecondary}
+                  to={withIntakeBatch(appendChartReviewReference("/admin/registry/tracks/intake?suggestion="+result.suggestionId,ref))}>Open Track Intake</Link>:
+                  <span className="break-words text-[11px] text-wk-text-muted">{result?.error??(result?.suggestionId?"Prepared":"Not prepared")}</span>}
+                {row?.artist?.trim()&&<button type="button" className={buttonSecondary} disabled={!canReview}
+                  onClick={()=>void startGovernedArtistIntake(ref,row.artist)}>Review Source Artist</button>}
+                <button type="button" className={buttonSecondary} disabled={!!busy}
+                  onClick={()=>updateIntakeSelection(intakeSelection.filter(item=>intakeKey(item)!==intakeKey(ref)))}>Remove Position</button>
+              </div>
             </div>;
           })}
           <WkCheckbox checked={intakeConsent} disabled={!!busy||!pendingIntakes.length}
@@ -889,9 +911,9 @@ export default function ChartsStudioPage() {
             <button type="button" className={buttonPrimary} disabled={!!busy||!pendingIntakes.length||!intakeConsent||!admin.can("manage_charts")||!admin.can("manage_registry")}
               onClick={()=>void prepareIntakes()}>{busy==="prepare-intakes"?"Preparing…":"Prepare Selected Intake Items"}</button>
             <button type="button" className={buttonSecondary} disabled={!!busy||!intakeSelection.length}
-              onClick={()=>{setIntakeSelection([]);setIntakeResults([]);setIntakeConsent(false);}}>Clear Selection</button>
+              onClick={()=>updateIntakeSelection([])}>Clear Selection</button>
           </div>
-          <p className="text-[11px] text-wk-text-muted">Accepted items remain in Registry after interruption. Select the same exact positions again to recover their existing review references.</p>
+          <p className="text-[11px] text-wk-text-muted">The selection stays with this review link. After returning or reloading, confirm preparation again to recover existing Registry items. No decisions or consent travel with the link.</p>
         </WkSurface>
         <div className="grid gap-4">
           <WkSurface className="overflow-hidden">
@@ -917,8 +939,8 @@ export default function ChartsStudioPage() {
                     if(!ref)return null;
                     const checked=intakeSelection.some(x=>intakeKey(x)===intakeKey(ref));
                     return <WkCheckbox checked={checked} disabled={!!busy||!admin.can("manage_registry")||!admin.can("manage_charts")||(!checked&&intakeSelection.length>=TRACK_INTAKE_BATCH_LIMIT)}
-                      onChange={value=>{setIntakeConsent(false);setIntakeSelection(old=>value?
-                        [...old.filter(x=>intakeKey(x)!==intakeKey(ref)),ref]:old.filter(x=>intakeKey(x)!==intakeKey(ref)));}}>
+                      onChange={value=>updateIntakeSelection(value?
+                        [...intakeSelection.filter(x=>intakeKey(x)!==intakeKey(ref)),ref]:intakeSelection.filter(x=>intakeKey(x)!==intakeKey(ref)))}>
                       Prepare intake
                     </WkCheckbox>;
                   })()}
@@ -1012,12 +1034,12 @@ export default function ChartsStudioPage() {
                       {busy==="stage-artist-intake"?"Opening Artist Intake…":"Start Governed Artist Intake"}
                     </button>
                     <Link className={buttonSecondary}
-                      to={appendChartReviewReference("/admin/registry/artist-aliases",selectedReference)}>
+                      to={withIntakeBatch(appendChartReviewReference("/admin/registry/artist-aliases",selectedReference))}>
                       Review Artist Aliases
                     </Link>
                     {selectedTrack?
                       <Link className={buttonSecondary}
-                        to={appendChartReviewReference("/admin/relationships/duplicates",selectedReference,selectedTrack.id)}>
+                        to={withIntakeBatch(appendChartReviewReference("/admin/relationships/duplicates",selectedReference,selectedTrack.id))}>
                         Check Duplicate Risk for {selectedTrack.title}
                       </Link>:
                       <span className="self-center text-[11px] text-wk-text-muted">

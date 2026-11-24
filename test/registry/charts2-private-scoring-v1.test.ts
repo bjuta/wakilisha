@@ -8,6 +8,9 @@ import {
   parseChartReviewReference,
   isChartReviewReference,
   prepareChartTrackIntakes,
+  appendChartIntakeBatch,
+  parseChartIntakeBatch,
+  writeChartIntakeBatch,
 } from "../../src/services/chartsPrivate/chartReviewContext";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -509,6 +512,30 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     const retry=await prepareChartTrackIntakes([second,third],async ref=>({suggestion_id:UUID(ref.rank+10)}),()=>{});
     expect(retry.map(r=>r.suggestionId)).toEqual([UUID(12),UUID(13)]);
     expect(STUDIO_PAGE).toContain('invokeStudio("studio_stage_intake"');
+
+    // Navigation is a bounded selection, not a stored review decision.
+    const batch=[first,second,third];
+    const destination=appendChartIntakeBatch(
+      appendChartReviewReference("/admin/registry/tracks/intake?suggestion="+UUID(11),first),batch,
+    );
+    const params=new URLSearchParams(destination.split("?")[1]);
+    expect(parseChartIntakeBatch(params)).toEqual(batch);
+    expect(parseChartReviewReference(params)).toEqual(first);
+    const back=chartStudioReturnHref(first,parseChartIntakeBatch(params));
+    expect(parseChartIntakeBatch(new URLSearchParams(back.split("?")[1]))).toEqual(batch);
+    expect(back).not.toContain("suggestion");
+    expect(back).not.toContain("consent");
+    expect(parseChartIntakeBatch(writeChartIntakeBatch(params,[]))).toEqual([]);
+    expect(()=>writeChartIntakeBatch(params,[first,first])).toThrow();
+    expect(()=>writeChartIntakeBatch(params,[first,{...first,original_sha256:"b".repeat(64)}])).toThrow();
+    const malformed=new URLSearchParams(params);
+    malformed.append("chart_batch","fake:invalid:1:"+"a".repeat(64));
+    expect(parseChartIntakeBatch(malformed)).toEqual([]);
+    const oversized=new URLSearchParams();
+    for(let i=0;i<11;i++)oversized.append("chart_batch","youtube_ke:"+UUID(1)+":"+(i+1)+":"+"a".repeat(64));
+    expect(parseChartIntakeBatch(oversized)).toEqual([]);
+    expect(STUDIO_PAGE).toContain("startGovernedArtistIntake(ref,row.artist)");
+    expect(STUDIO_PAGE).toContain("currentIntakeRow(ref)");
   });
   it("passes only exact immutable chart observation coordinates to Registry workspaces",()=>{
     const item={
