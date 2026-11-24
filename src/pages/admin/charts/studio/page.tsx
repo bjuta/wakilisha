@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkUploadField } from "@/components/design-system/primitives/UploadField";
 import { Modal } from "@/components/design-system/primitives/Modal";
 import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { AdminChartsPageHeader } from "@/pages/admin/charts/components/AdminChartsPageHeader";
@@ -166,7 +167,6 @@ export default function ChartsStudioPage() {
   const [youtubeExport,setYoutubeExport]=useState<{file:File;sha:string}|null>(null);
   const [exportConsent,setExportConsent]=useState(false);
   const [exportHashing,setExportHashing]=useState(false);
-  const exportInput=useRef<HTMLInputElement|null>(null);
   const exportSelection=useRef(0);
   const [probes,setProbes]=useState<Partial<Record<SourceKey,Probe>>>({});
   const [sourceConsent,setSourceConsent]=useState<SourceKey|null>(null);
@@ -682,12 +682,12 @@ export default function ChartsStudioPage() {
                       placeholder="weekly:YYYYMMDD:YYYYMMDD:ke" className={fieldClass}/>
                     <p className="text-[11px] text-wk-text-muted">Enter the Friday start and Thursday end dates.</p>
                   </div>
-                  <input ref={exportInput} type="file" accept=".csv,text/csv" hidden
-                    aria-label="Choose the official YouTube CSV"
+                  <WkUploadField accept=".csv,text/csv"
+                    ariaLabel="Choose the official YouTube CSV"
+                    label={exportHashing?"Checking File…":"Choose Official CSV"}
+                    description="Original YouTube Charts file, up to 4 MB."
                     disabled={!!busy||loading||exportHashing}
-                    onChange={e=>{const file=e.currentTarget.files?.[0]??null;e.currentTarget.value="";void chooseYouTubeExport(file);}}/>
-                  <button type="button" className={buttonSecondary} disabled={!!busy||loading||exportHashing}
-                    onClick={()=>exportInput.current?.click()}>{exportHashing?"Checking File…":"Choose Official CSV"}</button>
+                    onSelect={files=>void chooseYouTubeExport(files?.[0]??null)}/>
                   {youtubeExport&&<div className="space-y-2">
                     <p className="break-all text-[12px] font-semibold text-wk-text">{youtubeExport.file.name}</p>
                     <p className="break-all font-mono text-[11px] text-wk-text-muted">SHA-256: {youtubeExport.sha}</p>
