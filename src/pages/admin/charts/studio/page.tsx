@@ -100,6 +100,17 @@ type RegistryTrack = {
   }>;
   provider_keys: string[];
 };
+type RegistryDiscoveryPosition = EvidenceRow & {
+  candidate_count:number;
+  credit_evidence:"artist_not_supplied"|"artist_credit_agrees"|"artist_credit_unconfirmed";
+};
+type RegistryDiscoveryGroup = {track:RegistryTrack;positions:RegistryDiscoveryPosition[]};
+type RegistryDiscovery = {
+  contract:"charts2-registry-discovery/v1";candidate_only:true;can_publish:false;
+  source_coverage:Coverage[];unresolved_count:number;catalogue_scanned:number;
+  unique_positions:number;ambiguous_positions:number;unmatched_positions:number;
+  groups:RegistryDiscoveryGroup[];
+};
 type Probe = {
   source_key: SourceKey; probe_id: string; expected_revision: number;
   original_sha256: string; observed_depth: number; expected_depth: number;
@@ -182,6 +193,12 @@ export default function ChartsStudioPage() {
   const [registrySearchAttempted,setRegistrySearchAttempted]=useState(false);
   const registrySearchSequence=useRef(0);
   const [selectedTrack,setSelectedTrack]=useState<RegistryTrack|null>(null);
+  const [registryDiscovery,setRegistryDiscovery]=useState<{preview:Preview;result:RegistryDiscovery}|null>(null);
+  const [registryDiscoveryError,setRegistryDiscoveryError]=useState("");
+  const [registryDiscoveryLoading,setRegistryDiscoveryLoading]=useState(false);
+  const [registryDiscoveryRetry,setRegistryDiscoveryRetry]=useState(0);
+  const [showAllRegistryGroups,setShowAllRegistryGroups]=useState(false);
+  const [reviewGroupRows,setReviewGroupRows]=useState<Array<EvidenceRow|RegistryDiscoveryPosition>>([]);
   const [reviewNote,setReviewNote]=useState("");
   const [evidenceUrl,setEvidenceUrl]=useState("");
   const [reviewConsent,setReviewConsent]=useState(false);
@@ -419,8 +436,11 @@ export default function ChartsStudioPage() {
       throw new Error("Provide an independent HTTPS recording evidence URL.");
     let accepted=0;
     for(const row of rows){
-      const source=snapshot?.preview?.source_coverage.find(x=>x.source_key===row.source_key);
-      if(!source)throw new Error("The source receipt is no longer available. Reload the Studio.");
+      const source=snapshot?.preview?.source_coverage.find(x=>x.source_key===row.source_key&&x.receipt_id===row.receipt_id);
+      const original=snapshot?.preview?.unresolved.find(x=>
+        x.source_key===row.source_key&&x.receipt_id===row.receipt_id&&x.rank===row.rank&&
+        x.title===row.title&&x.artist===row.artist&&x.provider_track_id===row.provider_track_id);
+      if(!source||!original)throw new Error("The source position has changed or already been resolved. Reload the Studio.");
       try {
         // No-ID Shazam is NOT a Registry provider link. Each source decision
         // has its own accepted caller-authorized broker and durable receipt.
@@ -479,6 +499,38 @@ export default function ChartsStudioPage() {
     await refresh();
   });
   const preview=snapshot?.preview;
+  const canDiscoverRegistry=admin.can("manage_registry")&&admin.can("manage_charts");
+  useEffect(()=>{
+    if(tab!=="review"||!preview||!canDiscoverRegistry)return;
+    let current=true;
+    setRegistryDiscovery(null);
+    setRegistryDiscoveryError("");
+    setRegistryDiscoveryLoading(true);
+    const sourceKey=(c:Coverage)=>c.source_key+":"+c.receipt_id+":"+c.original_sha256;
+    void invokeStudio("studio_registry_discovery").then(raw=>{
+      if(!current)return;
+      const result=raw as RegistryDiscovery;
+      if(result.contract!=="charts2-registry-discovery/v1"||
+        result.candidate_only!==true||result.can_publish!==false||
+        !Array.isArray(result.source_coverage)||!Array.isArray(result.groups)||
+        result.unresolved_count!==preview.unresolved.length||
+        result.source_coverage.map(sourceKey).sort().join("|")!==preview.source_coverage.map(sourceKey).sort().join("|"))
+        throw new Error("Registry discovery and chart evidence changed. Refresh the Studio.");
+      const byPosition=new Map(preview.unresolved.map(row=>[row.receipt_id+":"+row.rank,row]));
+      if(result.groups.some(group=>group.track.status!=="active"||!group.positions.length||
+        group.positions.some(row=>{
+          const original=byPosition.get(row.receipt_id+":"+row.rank);
+          return !original||original.source_key!==row.source_key||original.title!==row.title||
+            original.artist!==row.artist||original.provider_track_id!==row.provider_track_id;
+        })))
+        throw new Error("Registry discovery returned a changed source position. Refresh the Studio.");
+      setRegistryDiscovery({preview,result});
+    }).catch(e=>{
+      if(current)setRegistryDiscoveryError(e instanceof Error?e.message:"Registry discovery could not be completed.");
+    }).finally(()=>{if(current)setRegistryDiscoveryLoading(false);});
+    return ()=>{current=false;};
+  },[tab,preview,canDiscoverRegistry,registryDiscoveryRetry]);
+  const currentDiscovery=registryDiscovery?.preview===preview?registryDiscovery?.result:null;
   // Restoration revalidates the receipt and SHA against the current Studio
   // preview, never URL-supplied song titles, artist or provider identifiers.
   useEffect(()=>{
@@ -565,14 +617,14 @@ export default function ChartsStudioPage() {
   const duplicateGroups=useMemo(()=>suggestRecordingReviewGroups(
     preview?.unresolved??[],artistAliases,registryArtists,
   ),[preview?.unresolved,artistAliases,registryArtists]);
-  const openDuplicateGroup=(rows: EvidenceRow[])=>{
+  const openDuplicateGroup=(rows: Array<EvidenceRow|RegistryDiscoveryPosition>,candidate?:RegistryTrack)=>{
     const selectable=rows.filter(row=>Boolean(row.provider_track_id)||row.source_key==="shazam_ke");
     if(!selectable.length)return;
-    setBatchMode(true);setBatchRows([]);
+    setBatchMode(true);setBatchRows([]);setReviewGroupRows(selectable);
     const anchor=selectable.find(row=>Boolean(row.artist))??selectable[0];
     setSelected(anchor);setRegistryQuery(anchor.title);
     registrySearchSequence.current++;
-    setRegistryMatches([]);setRegistrySearchAttempted(false);setSelectedTrack(null);
+    setRegistryMatches(candidate?[candidate]:[]);setRegistrySearchAttempted(false);setSelectedTrack(null);
     setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
     setTab("review");
   };
@@ -821,6 +873,53 @@ export default function ChartsStudioPage() {
                 </button>
               </div>)}
           </WkSurface>}
+        {canDiscoverRegistry&&<WkSurface className="space-y-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-[15px] font-black text-wk-text">Existing Registry Recordings</h3>
+              <p className="mt-1 text-[12px] text-wk-text-muted">
+                Unresolved source positions are checked automatically for active title candidates.
+                These are review leads, not approved recordings.
+              </p>
+            </div>
+            <button type="button" className={buttonSecondary} disabled={!!busy||registryDiscoveryLoading}
+              onClick={()=>setRegistryDiscoveryRetry(n=>n+1)}>Check Registry Again</button>
+          </div>
+          {registryDiscoveryLoading&&<p role="status" className="text-[12px] text-wk-text-muted">Checking active Registry recordings…</p>}
+          {registryDiscoveryError&&<p role="alert" className="text-[12px] text-wk-warning">
+            Automatic candidate discovery could not finish: {registryDiscoveryError}. Manual search remains available.
+          </p>}
+          {currentDiscovery&&<>
+            <p role="status" className="text-[12px] text-wk-text">
+              {currentDiscovery.unique_positions} positions with one title candidate · {currentDiscovery.ambiguous_positions} with multiple · {currentDiscovery.unmatched_positions} with no exact title candidate
+            </p>
+            <p className="text-[11px] text-wk-text-muted">
+              A unique title does not prove recording identity. Provider evidence, Artist credits and source versions still need review.
+            </p>
+            <div className="divide-y divide-wk-border">
+              {currentDiscovery.groups.slice(0,showAllRegistryGroups?undefined:12).map(group=>
+                <div key={group.track.id} className="space-y-2 py-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-[13px] font-black text-wk-text">{group.track.title}</p>
+                      <p className="text-[11px] text-wk-text-muted">{group.track.artist_names.join(", ")||"No recorded credits"} · ISRC: {group.track.isrc??"Not recorded"}</p>
+                      <p className="break-all text-[10px] text-wk-text-muted">{group.track.id}</p>
+                    </div>
+                    <button type="button" className={buttonSecondary}
+                      disabled={!!busy||!group.positions.some(row=>row.provider_track_id||row.source_key==="shazam_ke")}
+                      onClick={()=>openDuplicateGroup(group.positions,group.track)}>Review Existing Recording</button>
+                  </div>
+                  {group.positions.map(row=><p key={row.receipt_id+":"+row.rank} className="break-words text-[11px] text-wk-text-muted">
+                    {SOURCE_LABEL[row.source_key]} #{row.rank} · {sourceArtistDisplay(row)} · {row.credit_evidence==="artist_credit_agrees"?"Recorded Artist credit agrees":row.credit_evidence==="artist_not_supplied"?"Original Artist not supplied":"Artist credit unconfirmed"}
+                    {row.candidate_count>1?" · Multiple active title candidates":""}
+                  </p>)}
+                </div>)}
+              {!currentDiscovery.groups.length&&<p className="py-3 text-[12px] text-wk-text-muted">No exact active title candidates found. Continue with evidence-based search and governed Intake.</p>}
+            </div>
+            {currentDiscovery.groups.length>12&&<button type="button" className={buttonSecondary}
+              onClick={()=>setShowAllRegistryGroups(value=>!value)}>{showAllRegistryGroups?"Show Fewer":"Show All Existing Candidates"}</button>}
+          </>}
+        </WkSurface>}
         <WkSurface className="space-y-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -990,9 +1089,7 @@ export default function ChartsStudioPage() {
                 <p className="text-[11px] text-wk-text-muted">
                   Select the verified matches. Choose only one position per source.
                 </p>
-                {duplicateGroups.find(group=>group.observations.some(row=>
-                  row.receipt_id===selected.receipt_id&&row.rank===selected.rank))
-                  ?.observations.map(row=>{
+                {reviewGroupRows.map(row=>{
                     const checked=batchRows.some(item=>item.receipt_id===row.receipt_id&&
                       item.rank===row.rank);
                     return <WkCheckbox key={row.receipt_id+":"+row.rank}
@@ -1003,6 +1100,7 @@ export default function ChartsStudioPage() {
                       {SOURCE_LABEL[row.source_key as SourceKey].split(" ")[0]} #{row.rank}
                       {" "}· {row.title} · {sourceArtistDisplay(row)}
                       {!row.provider_track_id?" (no native ID, review chart position)":""}
+                      {"candidate_count" in row&&row.candidate_count>1?" · Multiple title candidates":""}
                     </WkCheckbox>;
                   })}
               </div>}

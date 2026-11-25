@@ -1747,7 +1747,7 @@ export default function TrackIntakePage() {
               Nothing waiting here
             </h2>
             <p className="mt-1 text-sm text-wk-text-muted">
-              Track Intake items appear when Playlist editors, Artist teams,
+              Track Intake items appear when Charts Studio, Playlist editors, Artist teams,
               or Community suggestions send music to the Registry for review.
             </p>
           </div>
@@ -1807,6 +1807,7 @@ export default function TrackIntakePage() {
                 observedCanonicalTitle ??
                 "";
 
+              const isChartOrigin = row.intake_origin === "chart_studio";
               const isPublicContribution =
                 row.intake_origin ===
                 "public_contribution";
@@ -1881,6 +1882,12 @@ export default function TrackIntakePage() {
                                 Artist submission
                               </span>
                             ) : null}
+
+                            {isChartOrigin && (
+                              <span className="rounded-full bg-wk-brand-soft px-2 py-1 text-[9px] font-black uppercase text-wk-brand">
+                                Charts Studio
+                              </span>
+                            )}
 
                             {row.provider_key ? (
                               <span className="rounded-full bg-wk-surface-raised px-2 py-1 text-[9px] font-bold uppercase text-wk-text-muted">
@@ -2011,6 +2018,22 @@ export default function TrackIntakePage() {
                                 "No additional context supplied."}
                             </div>
                           </div>
+                        </div>
+                      ) : isChartOrigin ? (
+                        <div className="rounded-xl bg-wk-surface-raised p-3">
+                          <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
+                            Chart source observation
+                          </div>
+                          <p className="mt-1 font-bold text-wk-text">
+                            {row.provider_title ?? row.submitted_track_title ?? "Title not supplied"}
+                          </p>
+                          <p className="mt-2 break-words text-xs text-wk-text-muted">
+                            Native source ID: {row.provider_object_id ?? "Not supplied"}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-wk-text-muted">
+                            This intake is bound to an original chart observation, not a Playlist.
+                            Provider evidence and Artist credits require separate review.
+                          </p>
                         </div>
                       ) : (
                         <div className="grid gap-3 md:grid-cols-2">

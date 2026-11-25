@@ -1,6 +1,6 @@
 import {describe,expect,it} from "vitest";
 import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
-import {buildCharts2PrivateNativeReviewV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
+import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import {suggestRecordingReviewGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
 import {
   appendChartReviewReference,
@@ -986,5 +986,82 @@ describe("Charts2 official YouTube CSV and partial source health",()=>{
     expect(STUDIO_WORKER).toContain("official_export_not_collector_admitted");
     expect(STUDIO_PAGE).toContain('invokeStudio("upload_official_youtube_export",form)');
     expect(STUDIO_PAGE).toContain('YOUTUBE_EXPORT_ACK');
+  });
+});
+
+// Keep chart-origin intake distinct from legacy Playlist provenance.
+describe("Chart-origin Track Intake presentation",()=>{
+  it("renders a distinct chart observation branch before the Playlist fallback",()=>{
+    expect(TRACK_INTAKE_PAGE).toContain('const isChartOrigin = row.intake_origin === "chart_studio"');
+    const origin=TRACK_INTAKE_PAGE.match(/\) : isChartOrigin \? \(([\s\S]*?)\) : \(\s*<div className="grid gap-3 md:grid-cols-2">[\s\S]*?Originating Playlist/);
+    expect(origin?.[1]).toContain("Chart source observation");
+    expect(origin?.[1]).toContain("row.provider_object_id");
+    expect(origin?.[1]).not.toContain("row.playlist_id");
+    expect(origin?.[1]).not.toContain("/admin/content/playlists/");
+  });
+});
+
+
+describe("Charts 2 existing Registry candidate discovery",()=>{
+  const position=(source_key:string,rank:number,title:string,artist:string|null,provider_track_id:string|null)=>({
+    source_key,receipt_id:UUID(rank),rank,title,artist,provider_track_id,reason:"registry_authoritative_link_missing",
+  });
+  const track=(i:number,title:string,status="active",name="Ywaya Tajiri",alias_names:string[]=[])=>({
+    id:UUID(i),title,status,artist_credits:[{canonical_name:name,artist_status:"active",alias_names}],
+  });
+  it("groups real source coordinates for one active candidate, excludes archived duplicate and preserves no-ID/null originals",()=>{
+    const rows=[
+      position("youtube_ke",9,"Chai ya saa kumi","Ywaya Tajiri","video"),
+      position("apple_ke",15,"Chai ya saa kumi",null,"6796900642"),
+      position("audiomack_ke",16,"Chai ya saa kumi","Ywaya Tajiri","101662128"),
+      position("shazam_ke",52,"Chai ya saa kumi","Ywaya Tajiri",null),
+    ];
+    const result=buildCharts2RegistryDiscoveryV1({unresolved:rows,tracks:[
+      track(100,"Chai ya saa kumi","archived"),track(101,"Chai ya saa kumi"),
+    ]});
+    expect(result).toMatchObject({candidate_only:true,can_publish:false,unique_positions:4,ambiguous_positions:0,unmatched_positions:0});
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].track.id).toBe(UUID(101));
+    expect(result.groups[0].positions).toEqual(rows.map((row,i)=>({...row,candidate_count:1,
+      credit_evidence:i===1?"artist_not_supplied":"artist_credit_agrees"})));
+  });
+  it("retains separate ambiguous identities and never promotes title-only or inactive credit evidence",()=>{
+    const rows=[position("youtube_ke",1,"Finale","Bien","video"),
+      position("apple_ke",2,"Not in Registry",null,"123")];
+    const second=track(102,"Finale","active","Bien");
+    second.artist_credits[0].artist_status="draft";
+    const result=buildCharts2RegistryDiscoveryV1({unresolved:rows,tracks:[track(101,"Finale","active","Other Artist"),second]});
+    expect(result).toMatchObject({unique_positions:0,ambiguous_positions:1,unmatched_positions:1,candidate_only:true});
+    expect(result.groups).toHaveLength(2);
+    expect(result.groups.every(group=>group.positions[0].candidate_count===2&&
+      group.positions[0].credit_evidence==="artist_credit_unconfirmed")).toBe(true);
+  });
+  it("uses accepted active aliases as credit corroboration, not approval",()=>{
+    const row=position("youtube_ke",14,"Mboka","Mejja Genge","VZ1b6gF8DsU");
+    const result=buildCharts2RegistryDiscoveryV1({unresolved:[row],tracks:[track(100,"Mboka","active","Mejja",["Mejja Genge"])]});
+    expect(result.groups[0].positions[0]).toMatchObject({credit_evidence:"artist_credit_agrees",provider_track_id:row.provider_track_id,candidate_count:1});
+    expect(result.candidate_only).toBe(true);
+    expect(result.can_publish).toBe(false);
+  });
+  it("does not return positions outside the unresolved input and fails on candidate bounds",()=>{
+    const result=buildCharts2RegistryDiscoveryV1({unresolved:[],tracks:[track(100,"Mboka")]});
+    expect(result.groups).toEqual([]);
+    expect(()=>buildCharts2RegistryDiscoveryV1({unresolved:[],tracks:Array.from({length:301},(_,i)=>track(i,"Mboka"))})).toThrow("charts2_registry_discovery_input_bounds");
+  });
+  it("keeps the discovery transport read-only, receipt-verified, capability-gated and explicit in the modal",()=>{
+    const start=STUDIO_WORKER.indexOf('if(mode==="studio_registry_discovery")');
+    const end=STUDIO_WORKER.indexOf('if(mode==="studio_preview")',start);
+    const lane=STUDIO_WORKER.slice(start,end);
+    expect(lane).toContain("await requireRegistryReviewer(authClient)");
+    expect(lane).toContain("verifyPrivateOriginal(server,r)");
+    expect(lane).toContain("preview.unresolved");
+    expect(lane).toContain('charts2_registry_discovery_catalogue_bound');
+    expect(lane).not.toMatch(/\.(insert|upsert|update|delete)\(/);
+    expect(lane).not.toContain("admin_admit_registry_track_provider_link_v1");
+    expect(STUDIO_PAGE).toContain('invokeStudio("studio_registry_discovery")');
+    expect(STUDIO_PAGE).toContain("registryDiscovery?.preview===preview");
+    expect(STUDIO_PAGE).toContain("x.receipt_id===row.receipt_id");
+    expect(STUDIO_PAGE).toContain("setRegistryMatches(candidate?[candidate]:[]);setRegistrySearchAttempted(false);setSelectedTrack(null)");
+    expect(STUDIO_PAGE).toContain("setBatchMode(true);setBatchRows([]);setReviewGroupRows(selectable)");
   });
 });
