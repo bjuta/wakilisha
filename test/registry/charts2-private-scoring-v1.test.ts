@@ -107,7 +107,7 @@ const SHELL=readFileSync("src/pages/admin/AdminShell.tsx","utf8");
 
 describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
   it("keeps the native Top 100 preview private and visible only through Studio",()=>{
-    expect(STUDIO_WORKER).toContain('import {buildCharts2PrivateNativeReviewV1}');
+    expect(STUDIO_WORKER).toMatch(/import\s*\{[^}]*\bbuildCharts2PrivateNativeReviewV1\b[^}]*\}\s*from\s*["']\.\.\/_shared\/charts2-private-native-review-v1\.mjs["']/);
     expect(STUDIO_WORKER).toContain('native_review=buildCharts2PrivateNativeReviewV1({receipts})');
     expect(STUDIO_WORKER).toContain('return {state:"private_review",preview,native_review');
     expect(STUDIO_WORKER).toContain('await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)))');
