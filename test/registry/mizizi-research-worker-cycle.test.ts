@@ -1,7 +1,7 @@
 import {guardDeskResearchPassStoreV1} from "../../scripts/registry/agents/mizizi/runtime/leased-research-pass-store-v1";
 import {createDeskResearchDispatcherV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-dispatcher-v1";
 import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/runtime/desk-resource-budget-v1";
-import {createCostRoutedDeskAnthropicPassV1,selectCostEffectiveDeskModelV1,type DeskModelCandidateV1,type DeskAnthropicOptionsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
+import {createDurableDeskModelAuthorityV1,createCostRoutedDeskAnthropicPassV1,selectCostEffectiveDeskModelV1,type DeskModelCandidateV1,type DeskAnthropicOptionsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-source-interpreter-v1.mjs";
 import {createDeskNativeReaderV1,isPublicDeskIpv4V1} from "../../scripts/registry/agents/mizizi/runtime/desk-native-reader-v1";
@@ -1651,6 +1651,34 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
    findings:[{interpretation:"hypothesis",independentlyVerified:false}]});
   expect(h.recordModelEvent.mock.calls.map(c=>(c[0] as {state:string}).state))
    .toEqual(["send_pending","response_metered","send_pending","response_metered","send_pending","response_metered"]);
+ });
+ it("requires both durable and host grants and rechecks exact envelope before transport",async()=>{
+  const h=fixture();
+  let allowModel=false,allowTool=false,modelChecks=0;
+  const rpc:WorkerRpc=vi.fn(async(fn,args)=>{
+   expect(fn).toBe("mizizi_authorize_desk_model_operation_v1");
+   const body=String(args.p_binding_text),descriptor=JSON.parse(body),operation=String(args.p_operation);
+   expect(createHash("sha256").update(body).digest("hex")).toBe(args.p_binding_sha256);
+   if(operation==="model_disclose"){
+    expect(descriptor.questionSha256).toBe(createHash("sha256").update(question).digest("hex"));
+    expect(descriptor.question).toBeUndefined();
+    modelChecks++;
+   }
+   const allowed=operation==="model_disclose"?allowModel:allowTool;
+   return {data:allowed?{operation,bindingSha256:args.p_binding_sha256,policyRef:"fixture:durable-model:1",validUntil:expiry,allowed:true}:null,error:null};
+  });
+  const authority=createDurableDeskModelAuthorityV1({rpc,scope,authorizeEnvelope:h.authorizeEnvelope,authorizeTool:h.authorizeTool,now:()=>NOW});
+  await expect(createCostRoutedDeskAnthropicPassV1({...h.config,...authority})(identity,question,[])).rejects.toThrow("ENVELOPE_DISCLOSURE_DENIED");
+  expect(h.send).not.toHaveBeenCalled();
+  allowModel=true;
+  await expect(createCostRoutedDeskAnthropicPassV1({...h.config,...authority})(identity,question,[])).rejects.toThrow("TOOL_AUTHORITY_DENIED");
+  expect(h.send).toHaveBeenCalledTimes(1);expect(h.executeTool).not.toHaveBeenCalled();
+  expect(modelChecks).toBeGreaterThanOrEqual(5);
+  const revoked=fixture();
+  const approved=revoked.authorizeEnvelope.getMockImplementation()!;
+  revoked.authorizeEnvelope.mockImplementation(async(b,body)=>revoked.authorizeEnvelope.mock.calls.length===3?null as never:approved(b,body));
+  await expect(createCostRoutedDeskAnthropicPassV1(revoked.config)(identity,question,[])).rejects.toThrow("ENVELOPE_AUTHORITY_CHANGED");
+  expect(revoked.send).not.toHaveBeenCalled();expect(revoked.consume).toHaveBeenCalledTimes(1);
  });
  it("denies envelope authority, underquoted prices, cumulative pass overspend and unaffordable selection before the next call",async()=>{
   const denied=fixture();denied.authorizeEnvelope.mockResolvedValueOnce(null as never);

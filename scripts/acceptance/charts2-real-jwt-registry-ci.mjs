@@ -895,6 +895,35 @@ export async function verifyCharts2RealJwtRegistryV1({
  fail(resolved.url===url&&resolved.receiptId===searchId&&
   await call(resolveName,{p_scope:{...scope,caseId:staleId},p_lead_id:leadId})===null,
   "STOP_CUSTODY_LEAD_SCOPE");
+ const modelAuthorityName="mizizi_authorize_desk_model_operation_v1";
+ const modelArgs=(operation,descriptor)=>{
+  const body=JSON.stringify(descriptor);
+  return {p_scope:scope,p_operation:operation,p_binding_text:body,p_binding_sha256:hash(body)};
+ };
+ const modelDescriptor=(round,sourceIds,toolReceipts)=>{
+  const bodySha256=hash("fixture envelope "+round),credentialSha256=hash("fixture credential");
+  return {scope,model:"fixture-haiku",round,requestSha256:hash(JSON.stringify({scope,round,credentialSha256,bodySha256})),
+   bodySha256,credentialSha256,requestBytes:128,maxOutputTokens:2500,sourceIds,toolReceipts,questionSha256:hash("fixture question")};
+ };
+ const firstModel=modelArgs("model_disclose",modelDescriptor(1,[],[]));
+ const firstTool=modelArgs("tool_execute",{scope,call:{name:"search_web",input:{query:context.positions[0].title}}});
+ const allowModelOperation=(args,revision=1,enabled=true)=>{
+  sql(`insert into mizizi_private.desk_model_authority_versions_v1
+  (workspace_id,case_id,operation,binding_sha256,revision,enabled,authority_ref,valid_until)
+  values ('${ws}','${pairedId}','${args.p_operation}','${args.p_binding_sha256}',${revision},${enabled},'fixture:independent-model-review',now()+interval '5 minutes');`);
+ };
+ fail(await call(modelAuthorityName,firstModel)===null&&await call(modelAuthorityName,firstTool)===null,"STOP_MODEL_DEFAULT_DENY");
+ for(const actor of [first.user,subscriber])denied(await actor.rpc(modelAuthorityName,firstModel),"42501","STOP_MODEL_AUTHORITY_ACL");
+ await deny(modelAuthorityName,{...firstModel,p_binding_sha256:hash("wrong")},"22023");
+ allowModelOperation(firstModel);
+ fail((await call(modelAuthorityName,firstModel))?.allowed===true&&await call(modelAuthorityName,firstTool)===null,
+  "STOP_MODEL_TOOL_PERMISSION_INDEPENDENCE");
+ allowModelOperation(firstTool);
+ fail((await call(modelAuthorityName,firstTool))?.allowed===true,"STOP_MODEL_TOOL_EXACT_GRANT");
+ const changedModel=modelArgs("model_disclose",{...modelDescriptor(1,[],[]),bodySha256:hash("changed body")});
+ fail(await call(modelAuthorityName,changedModel)===null,"STOP_MODEL_CHANGED_BODY");
+ allowModelOperation(firstModel,2,false);
+ fail(await call(modelAuthorityName,firstModel)===null&&(await call(modelAuthorityName,firstTool))?.allowed===true,"STOP_MODEL_GRANT_REVOCATION");
  const retrievedAt=new Date().toISOString(),sourceSha256=hash("synthetic source bytes");
  const nativeHop=hash("fixture-hop");
  const source={sourceId:pageId,caseId:pairedId,workspaceId:ws,originKey:p.originKey,lineageKey:p.lineageKey,
@@ -917,6 +946,15 @@ export async function verifyCharts2RealJwtRegistryV1({
  fail(admitted.receiptId===pageId&&admitted.outcome==="created","STOP_CUSTODY_SOURCE_ADMISSION");
  fail((await call(readName,{p_scope:scope,p_receipt_id:pageId})).resultText===pageArgs.p_result_text,
   "STOP_CUSTODY_EXACT_SOURCE_READBACK");
+ const receiptBinding=(id,args)=>({receiptId:id,callSha256:args.p_call_sha256,resultSha256:args.p_result_sha256});
+ const exactModel=modelArgs("model_disclose",modelDescriptor(3,[pageId],[receiptBinding(searchId,searchArgs),receiptBinding(pageId,pageArgs)]));
+ const omittedSource=modelArgs("model_disclose",{...JSON.parse(exactModel.p_binding_text),sourceIds:[]});
+ const forgedReceipt=modelArgs("model_disclose",{...JSON.parse(exactModel.p_binding_text),toolReceipts:[receiptBinding(searchId,searchArgs),{...receiptBinding(pageId,pageArgs),resultSha256:hash("forged")}]});
+ const readTool=modelArgs("tool_execute",{scope,call:{name:"read_page",input:{lead_id:leadId}}});
+ for(const args of [exactModel,omittedSource,forgedReceipt,readTool])allowModelOperation(args);
+ fail((await call(modelAuthorityName,exactModel))?.allowed===true&&(await call(modelAuthorityName,readTool))?.allowed===true&&
+  await call(modelAuthorityName,omittedSource)===null&&await call(modelAuthorityName,forgedReceipt)===null,
+  "STOP_MODEL_CUSTODY_EXACT_BINDING");
  // Same original PDF, no new network allocation. Follow-up is an exact
  // same-lease derivative, never a second independent origin.
  const docId=randomUUID(),visualId=randomUUID();
@@ -1070,6 +1108,9 @@ export async function verifyCharts2RealJwtRegistryV1({
   await call(readName,{p_scope:scope,p_receipt_id:screenshotId})===null&&
   await call(resolveName,{p_scope:scope,p_lead_id:nextLead})===null,
   "STOP_CUSTODY_DERIVATIVE_ANCESTRY_REVOCATION");
+ fail(await call(modelAuthorityName,exactModel)===null&&await call(modelAuthorityName,readTool)===null,
+  "STOP_MODEL_ANCESTRY_REVOCATION");
+ console.log("WK_AUTH_MIZIZI_DESK_EXACT_MODEL_TOOL_AUTHORITY=PASS");
  console.log("WK_AUTH_MIZIZI_DESK_DERIVATIVE_DOCUMENT_VISUAL_ANCESTRY=PASS");
  sql(`insert into mizizi_private.desk_custody_policy_versions_v1(
  workspace_id,host,revision,enabled,source_family,authority_ref,origin_key,lineage_key,use_basis,

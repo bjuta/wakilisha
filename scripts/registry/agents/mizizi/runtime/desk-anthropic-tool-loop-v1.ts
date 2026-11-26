@@ -10,6 +10,7 @@ import {verifyInvestigationSourceV1,type DeskPassResearcherV1,type SourceExcerpt
 import {ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1,type AnthropicInvestigationOptionsV1}
  from "./anthropic-investigation-analyst-v1.ts";
 import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
+import type {WorkerRpc} from "./research-worker-cycle-v1.ts";
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const SHA=/^[a-f0-9]{64}$/;
 const TOOL_ID=/^[A-Za-z0-9_-]{1,128}$/;
@@ -164,6 +165,51 @@ export type DeskAnthropicOptionsV1=Readonly<{
  verifyToolReceipt:(scope:DeskSearchScopeV1,binding:ToolReceiptBinding,result:DeskToolResultV1)=>Promise<boolean>;
  now?:()=>number;
 }>;
+/** Exact owner approval is additive to independent host inspection of
+ * actual bytes. The policy stores no prompt, image, question or credential. */
+export function createDurableDeskModelAuthorityV1(options:Readonly<{
+ rpc:WorkerRpc;scope:DeskSearchScopeV1;
+ authorizeEnvelope:DeskAnthropicOptionsV1["authorizeEnvelope"];
+ authorizeTool:DeskAnthropicOptionsV1["authorizeTool"];now?:()=>number;
+}>):Pick<DeskAnthropicOptionsV1,"authorizeEnvelope"|"authorizeTool">{
+ const now=options.now??Date.now,scope=options.scope;
+ const sameScope=(s:DeskSearchScopeV1)=>JSON.stringify(s)===JSON.stringify(scope);
+ const revisions=new Map<string,string>();
+ const grant=async(operation:string,bindingText:string)=>{
+  const bindingSha256=hash(bindingText);
+  const reply=await options.rpc("mizizi_authorize_desk_model_operation_v1",{p_scope:scope,p_operation:operation,
+   p_binding_text:bindingText,p_binding_sha256:bindingSha256});
+  if(!reply||reply.error||!reply.data)return null;
+  const g=reply.data as {operation:string;bindingSha256:string;policyRef:string;validUntil:string;allowed:boolean};
+  if(g.allowed!==true||g.operation!==operation||g.bindingSha256!==bindingSha256||
+   !text(g.policyRef,200,8)||!Number.isFinite(Date.parse(g.validUntil))||Date.parse(g.validUntil)<=now()||
+   Date.parse(g.validUntil)>Date.parse(scope.leaseExpiresAt))return null;
+  const key=operation+":"+bindingSha256,prior=revisions.get(key);
+  if(prior!==undefined&&prior!==g.policyRef)return null;
+  if(prior===undefined&&revisions.size>=256)return null;
+  revisions.set(key,g.policyRef);return g;
+ };
+ return {
+  authorizeEnvelope:async(binding,body)=>{
+   if(!sameScope(binding.scope)||hash(body)!==binding.bodySha256||Buffer.byteLength(body,"utf8")!==binding.requestBytes||
+    hash(JSON.stringify({scope:binding.scope,round:binding.round,credentialSha256:binding.credentialSha256,bodySha256:binding.bodySha256}))!==binding.requestSha256)return null;
+   const external=await options.authorizeEnvelope(binding,body);
+   if(!external||external.requestSha256!==binding.requestSha256||external.modelDisclosureAllowed!==true||
+    !text(external.policyRef,200,8)||!Number.isFinite(Date.parse(external.validUntil))||Date.parse(external.validUntil)<=now()||
+    Date.parse(external.validUntil)>Date.parse(scope.leaseExpiresAt))return null;
+   const {question,...rest}=binding;
+   const durable=await grant("model_disclose",JSON.stringify({...rest,questionSha256:hash(question)}));
+   if(!durable)return null;
+   return {...external,policyRef:"desk-model:"+hash(durable.policyRef+"|"+external.policyRef),
+    validUntil:new Date(Math.min(Date.parse(external.validUntil),Date.parse(durable.validUntil))).toISOString()};
+  },
+  authorizeTool:async(candidate,call,callSha256)=>{
+   const bindingText=JSON.stringify({scope:candidate,call});
+   if(!sameScope(candidate)||hash(bindingText)!==callSha256)return false;
+   return await options.authorizeTool(candidate,call,callSha256)===true&&!!await grant("tool_execute",bindingText);
+  }
+ };
+}
 function canonicalTool(name:unknown,input:unknown,enabled:Set<string>,leads:Map<string,DeskToolLeadV1>):DeskToolCallV1{
  if(typeof name!=="string"||!enabled.has(name))fail("UNKNOWN_TOOL");
  const spec=TOOL_SPECS.find(t=>t[0]===name)!;
@@ -291,6 +337,12 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    const event={reservationId:reservation.reservationId,requestSha256:binding.requestSha256};
    await options.recordModelEvent({...event,state:"send_pending"});live();
    if(!approved(fresh)||!expires(quote.validUntil)||!expires(reservation.validUntil))fail("RESERVATION_EXPIRED");
+   // Recheck after consuming the reservation and recording send_pending.
+   const sendGrant=await options.authorizeEnvelope(binding,body);live();
+   if(!approved(sendGrant)||sendGrant.policyRef!==grant.policyRef){
+    await options.recordModelEvent({...event,state:"response_unconfirmed"});
+    fail("ENVELOPE_AUTHORITY_CHANGED");
+   }
    let payload:Record<string,unknown>,usage:Usage;
    try{
     const response=await send("https://api.anthropic.com/v1/messages",{method:"POST",redirect:"error",

@@ -12,7 +12,7 @@ import {runResearchWorkerCycleV1, type WorkerRpc, type ResearchSourceVerifierV1,
 import {createLeasedResearchPassStoreV1,guardDeskResearchPassStoreV1} from "./leased-research-pass-store-v1.ts";
 import {createAnthropicInvestigationAnalystV1, type AnthropicInvestigationOptionsV1}
  from "./anthropic-investigation-analyst-v1.ts";
-import {createCostRoutedDeskAnthropicPassV1} from "./desk-anthropic-tool-loop-v1.ts";
+import {createCostRoutedDeskAnthropicPassV1,createDurableDeskModelAuthorityV1} from "./desk-anthropic-tool-loop-v1.ts";
 import {createDeskResearchDispatcherV1} from "./desk-research-dispatcher-v1.ts";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 export type AdaptiveWorkerDependenciesV1=Readonly<{
@@ -209,10 +209,11 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     browser:config.browser,now:input.now});
    const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
    const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
+   const modelAuthority=createDurableDeskModelAuthorityV1({rpc:input.rpc,scope,
+    authorizeEnvelope:config.authorizeEnvelope,authorizeTool:config.authorizeTool,now:input.now});
    const deskPass=createCostRoutedDeskAnthropicPassV1({
     scope,anthropic,enabledTools:dispatcher.enabledTools,readModelInventory:config.readModelInventory,
-    assessRequirement:config.assessRequirement,authorizeEnvelope:config.authorizeEnvelope,
-    authorizeTool:config.authorizeTool,...finance,executeTool:dispatcher.executeTool,
+    assessRequirement:config.assessRequirement,...modelAuthority,...finance,executeTool:dispatcher.executeTool,
     verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,now:input.now});
    const prepareDeskPass:DeskPassResearcherV1=async(id,question,history)=>{
     for(const pass of history)if(await dispatcher.verifyJournalPass(pass)!==true)
