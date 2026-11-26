@@ -55,9 +55,9 @@ begin
  foreach v in array new.tool_names loop
   if coalesce(v,'') not in ('search_web','search_news','read_page','read_document') then raise exception 'Unsupported operational tool' using errcode='22023';end if;
  end loop;
- if (select count(distinct v) from unnest(new.model_ids) v)<>cardinality(new.model_ids)
- or (select count(distinct v) from unnest(new.question_sha256s) v)<>cardinality(new.question_sha256s)
- or (select count(distinct v) from unnest(new.tool_names) v)<>cardinality(new.tool_names)
+ if (select count(distinct entries.item) from unnest(new.model_ids) as entries(item))<>cardinality(new.model_ids)
+ or (select count(distinct entries.item) from unnest(new.question_sha256s) as entries(item))<>cardinality(new.question_sha256s)
+ or (select count(distinct entries.item) from unnest(new.tool_names) as entries(item))<>cardinality(new.tool_names)
  then raise exception 'Duplicate policy entries' using errcode='22023';end if;
  for rule in select value from jsonb_array_elements(new.access_rules) loop
   if jsonb_typeof(rule) is distinct from 'object' then raise exception 'Invalid source rule' using errcode='22023';end if;
