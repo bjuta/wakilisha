@@ -983,6 +983,51 @@ export async function verifyCharts2RealJwtRegistryV1({
   (await call(readName,{p_scope:scope,p_receipt_id:screenshotId})).resultText===shotArgs.p_result_text,
   "STOP_CUSTODY_BROWSER_SCREENSHOT");
  console.log("WK_AUTH_MIZIZI_DESK_BROWSER_DERIVATIVE_CLOSED_RESERVATION=PASS");
+ // Exercise the existing RPCs against a real admitted source. A rollback-only
+ // local transaction preserves the independent subsequent lease-recovery fixture.
+ const journalRef={sourceId:pageId,originKey:source.originKey,lineageKey:source.lineageKey,
+  payloadFingerprint:source.fingerprint,useBasis:source.useBasis,authorityRef:source.authorityRef,
+  observedAt:source.observedAt,citation:excerpt.citation,excerpt:excerpt.excerpt,modelDisclosed:true};
+ const journalBody=(ref)=>JSON.stringify({contract:"mizizi.adaptive_investigation.v1",caseId:pairedId,
+  workspaceId:ws,ordinal:1,question:"Read-only journal authority fixture.",predecessorFingerprint:null,
+  sourceReceipts:[ref],findings:[],proposedLeads:[],decision:{action:"pause",nextQuestion:null},
+  passFinding:"Synthetic local evidence only."});
+ const journalArgs=(ref)=>{const body=journalBody(ref);return {...activeContext,p_body_text:body,
+  p_fingerprint:hash(body),p_predecessor:null};};
+ const journalAppend="mizizi_append_research_pass_v1",journalRead="mizizi_read_research_passes_v1";
+ await deny(journalAppend,journalArgs({...journalRef,excerpt:"forged excerpt"}),"42501");
+ await deny(journalAppend,journalArgs({...journalRef,sourceId:randomUUID()}),"42501");
+ await deny(journalAppend,journalArgs({...journalRef,modelDisclosed:false}),"42501");
+ const valid=journalArgs(journalRef);
+ const quoted=(v)=>"'"+String(v).replaceAll("'","''")+"'";
+ const appendSql="public."+journalAppend+"("+quoted(job.job_id)+"::uuid,"+quoted(activeWorker)+","+
+  quoted(valid.p_body_text)+","+quoted(valid.p_fingerprint)+",null)";
+ const readSql="public."+journalRead+"("+quoted(job.job_id)+"::uuid,"+quoted(activeWorker)+")";
+ fail(sql(`begin;
+ set local role service_role;
+ set local request.jwt.claim.role='service_role';
+ do $test$ begin
+ if (select outcome from ${appendSql})<>'created' or (select body_text from ${readSql}) is distinct from ${quoted(valid.p_body_text)}
+ or (select outcome from ${appendSql})<>'replayed' then raise exception 'STOP_JOURNAL_VALID';end if;
+ end $test$;
+ reset role;
+ insert into mizizi_private.desk_custody_policy_versions_v1(
+ workspace_id,host,revision,enabled,source_family,authority_ref,origin_key,lineage_key,use_basis,
+ private_research_allowed,metadata_retention_allowed,excerpt_retention_allowed,external_model_processing_allowed,valid_until)
+ select workspace_id,host,2,false,source_family,authority_ref,origin_key,lineage_key,use_basis,
+ private_research_allowed,metadata_retention_allowed,excerpt_retention_allowed,external_model_processing_allowed,valid_until
+ from mizizi_private.desk_custody_policy_versions_v1 where revision=1 and host='archive.org' and workspace_id='${ws}';
+ set local role service_role;
+ do $test$ begin
+ begin perform * from ${readSql};raise exception 'STOP_JOURNAL_REVOKED_READ';exception when SQLSTATE '42501' then null;end;
+ begin perform * from ${appendSql};raise exception 'STOP_JOURNAL_REVOKED_REPLAY';exception when SQLSTATE '42501' then null;end;
+ begin perform public.mizizi_complete_case_research_job_v1('${job.job_id}','${activeWorker}','{}');raise exception 'STOP_JOURNAL_REVOKED_COMPLETE';exception when SQLSTATE '42501' then null;end;
+ end $test$;
+ rollback;
+ select 'PASS';`)==="PASS","STOP_JOURNAL_ROLLBACK_ACCEPTANCE");
+ fail(sql("select count(*) from mizizi_private.research_passes where case_id='"+pairedId+"';")==="0",
+  "STOP_JOURNAL_FIXTURE_NOT_ROLLED_BACK");
+ console.log("WK_AUTH_MIZIZI_DESK_JOURNAL_CURRENT_CUSTODY=PASS");
  // Revoking discovery ancestry denies descendants even while source-family
  // rights are still current. Historical immutable bytes remain private.
  sql(`insert into mizizi_private.desk_custody_policy_versions_v1(
@@ -1011,6 +1056,7 @@ export async function verifyCharts2RealJwtRegistryV1({
   "and not has_table_privilege('service_role','mizizi_private.desk_tool_receipts_v1','UPDATE') "+
   "and not has_table_privilege('authenticated','mizizi_private.desk_reference_leads_v1','SELECT'))::text;")==="true",
   "STOP_CUSTODY_PRIVATE_ACL");
+ await deny(journalAppend,valid,"42501");
  console.log("WK_AUTH_MIZIZI_DESK_PRIVATE_CUSTODY_OPAQUE_LEAD_SOURCE_REPLAY_REVOCATION=PASS");
  }
  const passBody=JSON.stringify({contract:"mizizi.adaptive_investigation.v1",caseId:pairedId,
