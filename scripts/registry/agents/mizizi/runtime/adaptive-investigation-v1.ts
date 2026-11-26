@@ -52,6 +52,7 @@ export type InvestigationPassV1=Readonly<{
   /** Optional original custodian digest for human-only material. */
   custodyFingerprint?:string;
  }>[];
+ deskToolReceipts?:readonly Readonly<{receiptId:string;callSha256:string;resultSha256:string}>[];
  findings:readonly VerifiedClaimV1[];
  passFinding:string;proposedLeads:readonly ResearchLeadV1[];
  decision:PassDecisionV1;
@@ -75,6 +76,7 @@ export type InvestigationAnalystV1=(
  * verifies source rights, citations, findings and journal CAS. */
 export type PreparedDeskPassV1=Readonly<{
  sources:readonly SourceExcerptV1[];analysis:ResearchAnalysisV1;costUnits:number;
+ deskToolReceipts?:InvestigationPassV1["deskToolReceipts"];
 }>;
 export type DeskPassResearcherV1=(identity:InvestigationIdentityV1,question:string,
  history:readonly InvestigationPassV1[])=>Promise<PreparedDeskPassV1>;
@@ -378,6 +380,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     citation:restrictedReceipt(a)?"custodian:source-held":citation,
     excerpt:restrictedReceipt(a)?REDACTED:excerpt,
     modelDisclosed:modelVisibleIds.has(a.sourceId.toLowerCase())&&(!noModel||!!prepared)})),
+   ...(prepared?.deskToolReceipts!==undefined?{deskToolReceipts:prepared.deskToolReceipts}:{}),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
    promptFingerprint:analysis.promptFingerprint,

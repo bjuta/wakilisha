@@ -184,6 +184,9 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
   typeof input.configurationForJob!=="function"||typeof input.verifyFinding!=="function"||
   typeof input.openingQuestion!=="function")
    throw Error("MIZIZI_DURABLE_DESK_TRUSTED_CONFIGURATION_REQUIRED");
+ // One bounded pass per lease gives the database an exact, complete
+ // dependency set. A later adaptive pass needs a new authorized lease.
+ if(input.maxNewPasses!==1)throw Error("MIZIZI_DURABLE_DESK_SINGLE_PASS_LEASE_REQUIRED");
  let active:{job:ResearchJobV1;dispatcher:ReturnType<typeof createDeskResearchDispatcherV1>}|null=null;
  return runResearchWorkerCycleV1({
   rpc:input.rpc,workerId:input.workerId,chartScope:input.chartScope,

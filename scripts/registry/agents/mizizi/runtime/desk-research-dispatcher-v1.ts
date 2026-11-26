@@ -121,9 +121,11 @@ export function createDeskResearchDispatcherV1(options:Options){
  // Owner-issued, exact URL/operation permission is additive to host checks.
  // Descriptors are hashed and checked by the RPC, not persisted.
  const accessRevisions=new Map<string,string>();
- async function accessGrant(operation:string,url:string,descriptor:Readonly<Record<string,unknown>>){
+ let activeCallSha256:string|null=null;
+ async function accessGrant(operation:string,url:string,descriptor:Readonly<Record<string,unknown>>,hopSha256?:string){
   const canonical=urlOf(url).href;
-  const bindingText=JSON.stringify({url:canonical,descriptor}),bindingSha256=hash(bindingText);
+  const bindingText=JSON.stringify({url:canonical,descriptor,...(activeCallSha256?{callSha256:activeCallSha256}:{}),
+   ...(hopSha256?{hopSha256}:{})}),bindingSha256=hash(bindingText);
   const result=await rpc("mizizi_authorize_desk_access_v1",{p_scope:scope,p_operation:operation,
    p_binding_text:bindingText,p_binding_sha256:bindingSha256});
   if(result===null)return null;
@@ -173,7 +175,11 @@ export function createDeskResearchDispatcherV1(options:Options){
  }):null;
  const native=createDeskNativeReaderV1({
   ...options.nativeTestSeams,now,
-  precharge:budget.nativePrecharge(options.nativeAccountFingerprint),
+  precharge:async(candidate,target,authority)=>{
+   assertScope(candidate);
+   if(!await accessGrant("native_acquire",target.url,{},hash(JSON.stringify({scope:candidate,target}))))return false;
+   return budget.nativePrecharge(options.nativeAccountFingerprint)(candidate,target,authority);
+  },
   authorize:async(candidate,url)=>{
    assertScope(candidate);
    const p=await policy(urlOf(url).hostname);
@@ -256,6 +262,9 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(!SHA.test(callSha256)||hash(callText)!==callSha256||!TOOLS.some(t=>t===call.name)||
    !call.input||Object.keys(call.input).length!==(call.name==="read_document"?3:call.name==="inspect_visual"?2:1))
    fail("TOOL_CALL_DENIED");
+  if(activeCallSha256!==null)fail("CONCURRENT_TOOL_CALL_DENIED");
+  activeCallSha256=callSha256;
+  try{
   if(call.name==="search_web"||call.name==="search_news"){
    const query=call.input.query;
    if(!text(query,300,3))fail("QUERY_DENIED");
@@ -404,6 +413,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   const result=await append(callText,callSha256,{receiptId,leads,sources},p,meta,bindings);
   if(leads.some(l=>l.kind==="document"||l.kind==="render"))remember(receiptId,receipt,meta);
   return result;
+  }finally{activeCallSha256=null;}
  };
  const verifyToolReceipt:DeskAnthropicOptionsV1["verifyToolReceipt"]=async(candidate,binding,result)=>{
   assertScope(candidate);
@@ -443,6 +453,18 @@ export function createDeskResearchDispatcherV1(options:Options){
     ref.payloadFingerprint!==a.fingerprint||ref.useBasis!==a.useBasis||
     ref.authorityRef!==a.authorityRef||ref.observedAt!==a.observedAt||
     ref.citation!==entry.citation||ref.excerpt!==entry.excerpt)return false;
+  }
+  if(pass.deskToolReceipts!==undefined){
+   if(!Array.isArray(pass.deskToolReceipts)||pass.deskToolReceipts.length>4)return false;
+   const deps=new Set<string>(),depSources=new Set<string>();
+   for(const ref of pass.deskToolReceipts){
+    if(!ref||!UUID.test(ref.receiptId)||deps.has(ref.receiptId))return false;
+    const read=await readReceipt(ref.receiptId);
+    if(!read||read.row.callSha256!==ref.callSha256||read.row.resultSha256!==ref.resultSha256)return false;
+    deps.add(ref.receiptId);
+    for(const s of read.result.sources)depSources.add(s.source.sourceId);
+   }
+   if(depSources.size!==seen.size||[...depSources].some(id=>!seen.has(id)))return false;
   }
   return true;
  };

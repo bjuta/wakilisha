@@ -165,6 +165,70 @@ export type DeskAnthropicOptionsV1=Readonly<{
  verifyToolReceipt:(scope:DeskSearchScopeV1,binding:ToolReceiptBinding,result:DeskToolResultV1)=>Promise<boolean>;
  now?:()=>number;
 }>;
+/** Independently reconstruct the allowed serialized transcript from durable
+ * custody readback. The model cannot introduce arbitrary free text, image
+ * bytes, schemas, source claims or prior private analysis into the envelope. */
+async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,body:string):Promise<boolean>{
+ try{
+  const parsed=record(JSON.parse(body));
+  if(JSON.stringify(parsed)!==body||Object.keys(parsed).length!==7||parsed.model!==b.model||
+   parsed.max_tokens!==MAX_OUTPUT||parsed.system!==PROMPT||
+   JSON.stringify(parsed.tool_choice)!==JSON.stringify({type:"auto",disable_parallel_tool_use:true})||
+   JSON.stringify(parsed.output_config)!==JSON.stringify({format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}})||
+   !Array.isArray(parsed.tools)||!Array.isArray(parsed.messages))return false;
+  const names=parsed.tools.map(t=>record(t).name),enabled=new Set(names as string[]);
+  const specs=TOOL_SPECS.filter(t=>enabled.has(t[0])).map(([name,description,properties])=>({name,description,strict:true,input_schema:schema(properties)}));
+  if(names.length<1||names.length!==enabled.size||JSON.stringify(specs)!==JSON.stringify(parsed.tools)||
+   parsed.messages.length!==1+2*b.toolReceipts.length||b.round!==b.toolReceipts.length+1)return false;
+  const first=record(parsed.messages[0]);
+  if(Object.keys(first).length!==2||first.role!=="user"||typeof first.content!=="string")return false;
+  const question=record(JSON.parse(first.content));
+  if(Object.keys(question).length!==2||question.question!==b.question||!Array.isArray(question.history)||question.history.length>12||
+   JSON.stringify(question)!==first.content||question.history.some(h=>{
+    const v=record(h);return Object.keys(v).length!==2||!Number.isSafeInteger(v.ordinal)||Number(v.ordinal)<1||
+     !["continue","pause","conclude"].includes(String(v.decision));
+   }))return false;
+  const leads=new Map<string,DeskToolLeadV1>(),sourceIds:string[]=[],ids=new Set<string>(),receiptIds=new Set<string>();
+  for(let i=0;i<b.toolReceipts.length;i++){
+   const binding=b.toolReceipts[i];
+   if(receiptIds.has(binding.receiptId)||!UUID.test(binding.receiptId))return false;
+   receiptIds.add(binding.receiptId);
+   const read=await rpc("mizizi_read_desk_tool_receipt_v1",{p_scope:b.scope,p_receipt_id:binding.receiptId});
+   if(read.error||!read.data)return false;
+   const row=record(read.data);
+   if(row.receiptId!==binding.receiptId||row.callSha256!==binding.callSha256||row.resultSha256!==binding.resultSha256||
+    typeof row.resultText!=="string"||hash(row.resultText)!==binding.resultSha256)return false;
+   const result=record(JSON.parse(row.resultText));
+   if(result.receiptId!==binding.receiptId||!Array.isArray(result.leads)||!Array.isArray(result.sources))return false;
+   const assistant=record(parsed.messages[1+2*i]),user=record(parsed.messages[2+2*i]);
+   if(assistant.role!=="assistant"||!Array.isArray(assistant.content)||assistant.content.length!==1||
+    user.role!=="user"||!Array.isArray(user.content)||user.content.length!==1)return false;
+   const block=record(assistant.content[0]),call=canonicalTool(block.name,block.input,enabled,leads);
+   if(block.type!=="tool_use"||typeof block.id!=="string"||!TOOL_ID.test(block.id)||ids.has(block.id)||
+    hash(JSON.stringify({scope:b.scope,call}))!==binding.callSha256||
+    JSON.stringify(assistant)!==JSON.stringify({role:"assistant",content:[{type:"tool_use",id:block.id,name:call.name,input:call.input}]}))return false;
+   ids.add(block.id);
+   const typedLeads=result.leads as DeskToolLeadV1[],sources=result.sources as SourceExcerptV1[];
+   const visual=result.visual as {sourceId:string;sha256:string;contentType:string}|null;
+   for(const lead of typedLeads){if(!UUID.test(lead.id)||leads.has(lead.id))return false;leads.set(lead.id,lead);}
+   for(const s of sources){if(!UUID.test(s.source.sourceId)||sourceIds.includes(s.source.sourceId))return false;sourceIds.push(s.source.sourceId);}
+   const expected:Array<Record<string,unknown>>=[{type:"text",text:JSON.stringify({leads:typedLeads,sources:sources.map(s=>({
+    sourceId:s.source.sourceId,citation:s.citation,origin:s.source.originKey,lineage:s.source.lineageKey,excerpt:s.excerpt
+   })),...(visual?{visualSourceId:visual.sourceId,visualSha256:visual.sha256}:{})})}];
+   const resultBlock=record(user.content[0]);
+   if(visual){
+    if(!Array.isArray(resultBlock.content)||resultBlock.content.length!==2)return false;
+    const image=record(resultBlock.content[1]),data=record(image.source);
+    if(typeof data.data!=="string"||data.data.length>2700000)return false;
+    const bytes=Buffer.from(data.data,"base64");
+    if(bytes.length>2000000||bytes.toString("base64")!==data.data||hash(bytes)!==visual.sha256||visual.contentType!=="image/png")return false;
+    expected.push({type:"image",source:{type:"base64",media_type:"image/png",data:data.data}});
+   }
+   if(JSON.stringify(user)!==JSON.stringify({role:"user",content:[{type:"tool_result",tool_use_id:block.id,content:expected}]}))return false;
+  }
+  return JSON.stringify(sourceIds)===JSON.stringify(b.sourceIds);
+ }catch{return false;}
+}
 /** Exact owner approval is additive to independent host inspection of
  * actual bytes. The policy stores no prompt, image, question or credential. */
 export function createDurableDeskModelAuthorityV1(options:Readonly<{
@@ -193,6 +257,7 @@ export function createDurableDeskModelAuthorityV1(options:Readonly<{
   authorizeEnvelope:async(binding,body)=>{
    if(!sameScope(binding.scope)||hash(body)!==binding.bodySha256||Buffer.byteLength(body,"utf8")!==binding.requestBytes||
     hash(JSON.stringify({scope:binding.scope,round:binding.round,credentialSha256:binding.credentialSha256,bodySha256:binding.bodySha256}))!==binding.requestSha256)return null;
+   if(!await verifySerializedDeskEnvelopeV1(options.rpc,binding,body))return null;
    const external=await options.authorizeEnvelope(binding,body);
    if(!external||external.requestSha256!==binding.requestSha256||external.modelDisclosureAllowed!==true||
     !text(external.policyRef,200,8)||!Number.isFinite(Date.parse(external.validUntil))||Date.parse(external.validUntil)<=now()||
@@ -389,7 +454,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     // The existing engine independently checks every source citation and
     // claim/lead bound before immutable pass persistence.
     await checkSources();live();
-    return {sources:Object.freeze([...sources.values()]),analysis:{...parsed,modelVersion:model,promptFingerprint} as unknown as ResearchAnalysisV1,costUnits:totalUnits};
+    return {sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),analysis:{...parsed,modelVersion:model,promptFingerprint} as unknown as ResearchAnalysisV1,costUnits:totalUnits};
    }
    if(payload.stop_reason!=="tool_use"||round===MAX_CALLS)fail("TOOL_ROUND_BOUND_OR_REFUSAL");
    // No hidden thinking replay, provider-server tools or parallel execution.
