@@ -276,12 +276,22 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   if(prepared&&humanOnly)throw new Error("MIZIZI_DESK_MODEL_AUTHORITY_REVOKED");
   const noEvidence=sources.length===0;
   const noModel=humanOnly||evidenceExhausted||noEvidence;
+  // Discovery may legitimately run without admitted evidence. Persist
+  // the model's next questions (not unsupported cultural conclusions).
+  // Repeated evidence can stop continuation, but cannot erase metering
+  // or pretend the already executed model call was withheld.
   const method=humanOnly?"human_review_required":
    noEvidence?"no_authorized_evidence":"evidence_exhausted";
   const methodFingerprintSeed=humanOnly?"mizizi.human_only_method.v1":
    noEvidence?"mizizi.no_authorized_evidence_method.v1":
    "mizizi.exhausted_evidence_method.v1";
-  const analysis:ResearchAnalysisV1=noModel?{
+  const analysis:ResearchAnalysisV1=prepared?{
+   ...prepared.analysis,
+   ...(noEvidence?{hypotheses:[],passFinding:"No authorized evidence was located; absence cannot establish that a cultural claim is false.",
+    requestedDisposition:"pause" as const}:{}),
+   ...(evidenceExhausted?{hypotheses:[],leads:[],passFinding:"No new independent source evidence; further interpretation paused.",
+    requestedDisposition:"pause" as const}:{})
+  }:noModel?{
    hypotheses:[],leads:[],
    passFinding:humanOnly?
     "Authorized evidence retained solely for private human review; no model received it.":
@@ -291,7 +301,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    requestedDisposition:"pause",
    modelVersion:"mizizi."+method+".v1",
    promptFingerprint:digest(methodFingerprintSeed)
-  }:prepared?prepared.analysis:await analyze(question,Object.freeze(modelSources),
+  }:await analyze(question,Object.freeze(modelSources),
    Object.freeze(analystHistory));
   requireText(analysis.passFinding,"PASS_FINDING",3000);
   requireText(analysis.modelVersion,"MODEL_VERSION",150);

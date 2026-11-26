@@ -120,15 +120,25 @@ export function createCostRoutedDeskAnthropicPassV1(options:Omit<DeskAnthropicOp
   if(options.enabledTools.includes("inspect_visual")&&requirement.needsVision!==true)
    fail("VISION_REQUIREMENT_DENIED");
   const selected=selectCostEffectiveDeskModelV1(await options.readModelInventory(),requirement,(options.now??Date.now)());
+  let reservedMicrousd=0;
   return createDeskAnthropicPassV1({...options,anthropic:{...options.anthropic,model:selected.model},
    quote:async(binding,body)=>{
     if(Date.parse(selected.validUntil)<=(options.now??Date.now)())return null;
     const q=await options.quote(binding,body);
     if(!q||q.pricingRef!==selected.pricingRef||q.maxInputTokens>requirement.inputTokenCeiling||
-      q.maximumCostMicrousd>requirement.maximumCostMicrousd)return null;
+      !Number.isSafeInteger(q.maxInputTokens)||q.maxInputTokens<1||
+      !Number.isSafeInteger(q.maxOutputTokens)||q.maxOutputTokens!==MAX_OUTPUT||
+      !Number.isSafeInteger(q.maximumCostMicrousd)||q.maximumCostMicrousd<1||
+      q.maximumCostMicrousd>requirement.maximumCostMicrousd-reservedMicrousd)return null;
     const min=(BigInt(q.maxInputTokens)*BigInt(selected.worstCaseInputMicrousdPerMillion)+
       BigInt(q.maxOutputTokens)*BigInt(selected.worstCaseOutputMicrousdPerMillion)+999999n)/1000000n;
     return BigInt(q.maximumCostMicrousd)>=min?q:null;
+   },
+   reserve:async(binding,quote,grant)=>{
+    if(quote.maximumCostMicrousd>requirement.maximumCostMicrousd-reservedMicrousd)return null;
+    // Precharge even if the durable reservation outcome is indeterminate.
+    reservedMicrousd+=quote.maximumCostMicrousd;
+    return options.reserve(binding,quote,grant);
    }})(identity,question,history);
  };
 }
@@ -300,6 +310,25 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     if(Object.keys(parsed).length!==4||!Array.isArray(parsed.hypotheses)||!Array.isArray(parsed.leads)||
      parsed.hypotheses.length>20||parsed.leads.length>20||typeof parsed.passFinding!=="string"||
      !["continue","pause","conclude"].includes(String(parsed.requestedDisposition)))fail("FINAL_RESULT_INVALID");
+    // Validate the nested structured output too: provider output format is
+    // not authority. The engine independently adjudicates the cited sources.
+    for(const raw of parsed.hypotheses){
+     const c=record(raw);
+     if(Object.keys(c).length!==5||!text(c.statement,1800,8)||!text(c.reasoningSummary,2000,8)||
+      !Array.isArray(c.sourceIds)||c.sourceIds.length<1||c.sourceIds.length>20||
+      c.sourceIds.some(id=>typeof id!=="string"||!sources.has(id))||
+      !["hypothesis","supported","contradicted","unknown"].includes(String(c.interpretation))||
+      typeof c.uncertainty!=="number"||!Number.isFinite(c.uncertainty)||c.uncertainty<0||c.uncertainty>1)
+       fail("FINAL_CLAIM_INVALID");
+    }
+    for(const raw of parsed.leads){
+     const l=record(raw);
+     if(Object.keys(l).length!==5||!text(l.question,500,8)||!text(l.rationale,1000,8)||
+      [l.expectedInformationGain,l.importance].some(n=>typeof n!=="number"||!Number.isFinite(n)||n<0||n>1)||
+      typeof l.estimatedCostUnits!=="number"||!Number.isFinite(l.estimatedCostUnits)||l.estimatedCostUnits<0||l.estimatedCostUnits>100000)
+       fail("FINAL_LEAD_INVALID");
+    }
+    if(!text(parsed.passFinding,3000,8))fail("FINAL_RESULT_INVALID");
     // The existing engine independently checks every source citation and
     // claim/lead bound before immutable pass persistence.
     await checkSources();live();

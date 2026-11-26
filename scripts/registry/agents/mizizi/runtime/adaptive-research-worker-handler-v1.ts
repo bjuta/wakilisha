@@ -12,6 +12,7 @@ import {runResearchWorkerCycleV1, type WorkerRpc, type ResearchSourceVerifierV1,
 import {createLeasedResearchPassStoreV1} from "./leased-research-pass-store-v1.ts";
 import {createAnthropicInvestigationAnalystV1, type AnthropicInvestigationOptionsV1}
  from "./anthropic-investigation-analyst-v1.ts";
+import {createCostRoutedDeskAnthropicPassV1} from "./desk-anthropic-tool-loop-v1.ts";
 export type AdaptiveWorkerDependenciesV1=Readonly<{
  store:InvestigationStoreV1;
  openingQuestion:(job:ResearchJobV1)=>Promise<string>;
@@ -67,6 +68,9 @@ export async function runAdaptiveResearchWorkerCycleV1(input:Readonly<{
  measureCostUnits?:()=>number;
  authorizeModelProcessing?:AdaptiveWorkerDependenciesV1["authorizeModelProcessing"];
  chartScope?:ChartResearchScopeV1;
+ /** Separate desk composition factory, invoked only after exact lease and
+  * original/Registry verification by the existing worker. */
+ prepareDeskPassForJob?:(job:ResearchJobV1)=>DeskPassResearcherV1;
  leaseSeconds?:number;limit?:number;now?:()=>number;
 }>){
  if(!input||typeof input.verifySources!=="function")
@@ -78,7 +82,7 @@ export async function runAdaptiveResearchWorkerCycleV1(input:Readonly<{
    const store=createLeasedResearchPassStoreV1(input.rpc,job,input.workerId);
    const handler=createAdaptiveResearchWorkerHandlerV1({store,
     openingQuestion:input.openingQuestion,readSources:input.readSources,
-    analyze:input.analyze,verifyFinding:input.verifyFinding,
+    analyze:input.analyze,prepareDeskPass:input.prepareDeskPassForJob?.(job),verifyFinding:input.verifyFinding,
     maxNewPasses:input.maxNewPasses,maxTotalPasses:input.maxTotalPasses,
     costBudgetUnits:input.costBudgetUnits,measureCostUnits:input.measureCostUnits,
     authorizeModelProcessing:input.authorizeModelProcessing});
@@ -94,7 +98,7 @@ export async function runAdaptiveResearchWorkerCycleV1(input:Readonly<{
  * independently trusted components, not the model.
  */
 export function runAnthropicAdaptiveResearchWorkerCycleV1(input:Readonly<
- Omit<Parameters<typeof runAdaptiveResearchWorkerCycleV1>[0],"analyze"|"measureCostUnits">&{
+ Omit<Parameters<typeof runAdaptiveResearchWorkerCycleV1>[0],"analyze"|"measureCostUnits"|"prepareDeskPassForJob">&{
   anthropic:AnthropicInvestigationOptionsV1
  }
 >){
@@ -124,5 +128,30 @@ export function runAnthropicAdaptiveResearchWorkerCycleV1(input:Readonly<
     throw new Error("MIZIZI_ANALYST_UNMETERED_PASS_DENIED");
    return used;
   }
+ });
+}
+
+
+/** Desk-specific service composition. Keep the previous generic chart-model
+ * denial in force. Every job gets its own scope, cost router and independent
+ * source/case/envelope authority; no global unscoped analyst or queue.
+ * This remains disabled until all trusted callbacks have live, durable
+ * implementations and independently proven provider entitlement.
+ */
+export function runCostRoutedDeskResearchWorkerCycleV1(input:Readonly<
+ Omit<Parameters<typeof runAdaptiveResearchWorkerCycleV1>[0],
+  "analyze"|"readSources"|"measureCostUnits"|"prepareDeskPassForJob">&{
+  deskForJob:(job:ResearchJobV1)=>Omit<Parameters<typeof createCostRoutedDeskAnthropicPassV1>[0],"scope">;
+ }
+>){
+ if(typeof input?.deskForJob!=="function"||typeof input.authorizeModelProcessing!=="function")
+  throw new Error("MIZIZI_DESK_INDEPENDENT_MODEL_AUTHORITY_REQUIRED");
+ const {deskForJob,...worker}=input;
+ return runAdaptiveResearchWorkerCycleV1({...worker,
+  readSources:async()=>{throw Error("MIZIZI_DESK_LEGACY_READER_DENIED");},
+  analyze:async()=>{throw Error("MIZIZI_DESK_LEGACY_ANALYST_DENIED");},
+  prepareDeskPassForJob:job=>createCostRoutedDeskAnthropicPassV1({...deskForJob(job),
+   scope:{jobId:job.jobId,caseId:job.caseId,workspaceId:job.workspaceId,
+    expectedRevision:job.expectedRevision,workerId:input.workerId,leaseExpiresAt:job.leaseExpiresAt}})
  });
 }
