@@ -1,4 +1,4 @@
-import {createDeskSearchGatewayV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-gateway-v1";
+import {createDeskSearchGatewayV1,createDurableDeskSearchGatewayV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-gateway-v1";
 import { describe, expect, it, vi } from "vitest";
 import {createHash} from "node:crypto";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
@@ -1233,6 +1233,36 @@ describe("MIZIZI zero-cost-first desk discovery gateway",()=>{
   expect(new URL(url).searchParams.get("q")).toBe(request.query);
   expect(init.redirect).toBe("error");expect(url).not.toContain(CASE);
   expect(JSON.stringify(receipt)).not.toContain("Untrusted instructions");
+ });
+ it("binds the configured credential digest and exact request bytes to service-only RPCs",async()=>{
+  const h=fixture();
+  const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
+  const rpc:WorkerRpc=async(fn,args)=>{
+   calls.push({fn,args});
+   expect(args.p_account_fingerprint).toBe(createHash("sha256")
+    .update("mizizi:brave:credential:v1:"+h.config.apiKey).digest("hex"));
+   if(fn==="mizizi_authorize_desk_search_v1"||fn==="mizizi_reserve_desk_search_v1"){
+    const body=String(args.p_request_text),digest=String(args.p_request_sha256);
+    expect(createHash("sha256").update(body).digest("hex")).toBe(digest);
+    expect(JSON.parse(body)).toEqual(request);
+    return {data:fn==="mizizi_authorize_desk_search_v1"
+     ?await h.auth(request,digest):await h.reserve(request,digest),error:null};
+   }
+   if(fn==="mizizi_consume_desk_search_v1")return {data:true,error:null};
+   throw Error("unexpected RPC");
+  };
+  await expect(createDurableDeskSearchGatewayV1({apiKey:h.config.apiKey,rpc,
+   transport:h.config.transport,now:h.config.now})(request)).resolves.toMatchObject({provider:"brave"});
+  expect(calls.map(c=>c.fn)).toEqual(["mizizi_authorize_desk_search_v1",
+   "mizizi_reserve_desk_search_v1","mizizi_authorize_desk_search_v1",
+   "mizizi_consume_desk_search_v1","mizizi_authorize_desk_search_v1"]);
+  expect(JSON.stringify(calls)).not.toContain(h.config.apiKey);
+  const denied=fixture();
+  await expect(createDurableDeskSearchGatewayV1({apiKey:denied.config.apiKey,
+   rpc:async()=>({data:null,error:{message:"unavailable"}}),
+   transport:denied.config.transport,now:denied.config.now})(request))
+   .rejects.toThrow("DURABLE_AUTHORITY_UNCONFIRMED");
+  expect(denied.transport).not.toHaveBeenCalled();
  });
  it("denies missing policy, unavailable or nonzero budget, and replayed reservations before any network call",async()=>{
   for(const override of [
