@@ -63,6 +63,75 @@ type Quote=Readonly<{requestSha256:string;pricingRef:string;maxInputTokens:numbe
 type Reservation=Readonly<{reservationId:string;requestSha256:string;pricingRef:string;
  maximumCostMicrousd:number;validUntil:string}>;
 type Usage=Readonly<{inputTokens:number;outputTokens:number;cacheCreationTokens:number;cacheReadTokens:number}>;
+/** Source-free, independently evaluated model inventory. Pricing is a
+ * conservative upper bound for the complete eligible context/tier, not a
+ * guessed per-token price or model's own assessment of its capability. */
+export type DeskModelCandidateV1=Readonly<{
+ model:string;family:"haiku"|"sonnet"|"opus"|"fable";
+ active:boolean;toolUse:boolean;structuredOutput:boolean;vision:boolean;
+ ordinaryToolTranscript:boolean;qualityGateRef:string;pricingRef:string;
+ maxInputTokens:number;maxOutputTokens:number;
+ worstCaseInputMicrousdPerMillion:number;worstCaseOutputMicrousdPerMillion:number;
+ validUntil:string;
+}>;
+export type DeskModelRequirementV1=Readonly<{
+ tier:"routine"|"complex"|"exceptional";needsVision:boolean;
+ inputTokenCeiling:number;maximumCostMicrousd:number;assessmentRef:string;
+}>;
+export function selectCostEffectiveDeskModelV1(candidates:readonly DeskModelCandidateV1[],
+ requirement:DeskModelRequirementV1,now:number):DeskModelCandidateV1{
+ if(!Array.isArray(candidates)||candidates.length<1||candidates.length>100||
+  !requirement||!["routine","complex","exceptional"].includes(requirement.tier)||
+  typeof requirement.needsVision!=="boolean"||!text(requirement.assessmentRef,200,8)||
+  !Number.isSafeInteger(requirement.inputTokenCeiling)||requirement.inputTokenCeiling<1||
+  !Number.isSafeInteger(requirement.maximumCostMicrousd)||requirement.maximumCostMicrousd<1)
+  fail("MODEL_SELECTION_AUTHORITY_REQUIRED");
+ const allowed=requirement.tier==="routine"?["haiku","sonnet"]:requirement.tier==="complex"?["sonnet","opus"]:["opus","fable"];
+ const rows=candidates.flatMap(c=>{
+  if(!c||!allowed.includes(c.family)||!text(c.model,100,3)||!/^[A-Za-z0-9._:-]+$/.test(c.model)||
+   c.active!==true||c.toolUse!==true||c.structuredOutput!==true||c.ordinaryToolTranscript!==true||
+   (requirement.needsVision&&c.vision!==true)||!text(c.qualityGateRef,200,8)||!text(c.pricingRef,200,8)||
+   !Number.isFinite(Date.parse(c.validUntil))||Date.parse(c.validUntil)<=now||
+   !Number.isSafeInteger(c.maxInputTokens)||c.maxInputTokens<requirement.inputTokenCeiling||
+   !Number.isSafeInteger(c.maxOutputTokens)||c.maxOutputTokens<MAX_OUTPUT||
+   ![c.worstCaseInputMicrousdPerMillion,c.worstCaseOutputMicrousdPerMillion].every(n=>Number.isSafeInteger(n)&&n>0))return [];
+  const cost=(BigInt(requirement.inputTokenCeiling)*BigInt(c.worstCaseInputMicrousdPerMillion)+
+   BigInt(MAX_OUTPUT)*BigInt(c.worstCaseOutputMicrousdPerMillion)+999999n)/1000000n;
+  return cost<=BigInt(requirement.maximumCostMicrousd)?[{c,cost}]:[];
+ });
+ rows.sort((a,b)=>a.cost<b.cost?-1:a.cost>b.cost?1:a.c.model.localeCompare(b.c.model));
+ if(!rows.length)fail("NO_AFFORDABLE_CAPABLE_MODEL");
+ return Object.freeze({...rows[0].c});
+}
+/** Select per pass, keep one model for its tool transcript. No automatic
+ * upgrade on errors, no paid model call just to choose another model.
+ * An independently reviewed capability/quality requirement can change
+ * on a later pass, subject to the same explicit monetary ceiling. */
+export function createCostRoutedDeskAnthropicPassV1(options:Omit<DeskAnthropicOptionsV1,"anthropic">&{
+ anthropic:Omit<DeskAnthropicOptionsV1["anthropic"],"model">;
+ readModelInventory:()=>Promise<readonly DeskModelCandidateV1[]>;
+ assessRequirement:(identity:InvestigationIdentityV1,question:string,
+  history:Parameters<DeskPassResearcherV1>[2])=>Promise<DeskModelRequirementV1>;
+}):DeskPassResearcherV1{
+ if(typeof options?.readModelInventory!=="function"||typeof options.assessRequirement!=="function")
+  fail("MODEL_SELECTION_AUTHORITY_REQUIRED");
+ return async(identity,question,history)=>{
+  const requirement=await options.assessRequirement(identity,question,history);
+  if(options.enabledTools.includes("inspect_visual")&&requirement.needsVision!==true)
+   fail("VISION_REQUIREMENT_DENIED");
+  const selected=selectCostEffectiveDeskModelV1(await options.readModelInventory(),requirement,(options.now??Date.now)());
+  return createDeskAnthropicPassV1({...options,anthropic:{...options.anthropic,model:selected.model},
+   quote:async(binding,body)=>{
+    if(Date.parse(selected.validUntil)<=(options.now??Date.now)())return null;
+    const q=await options.quote(binding,body);
+    if(!q||q.pricingRef!==selected.pricingRef||q.maxInputTokens>requirement.inputTokenCeiling||
+      q.maximumCostMicrousd>requirement.maximumCostMicrousd)return null;
+    const min=(BigInt(q.maxInputTokens)*BigInt(selected.worstCaseInputMicrousdPerMillion)+
+      BigInt(q.maxOutputTokens)*BigInt(selected.worstCaseOutputMicrousdPerMillion)+999999n)/1000000n;
+    return BigInt(q.maximumCostMicrousd)>=min?q:null;
+   }})(identity,question,history);
+ };
+}
 export type DeskAnthropicOptionsV1=Readonly<{
  scope:DeskSearchScopeV1;
  anthropic:Pick<AnthropicInvestigationOptionsV1,"apiKey"|"model"|"workspaceId"|"transport">;
