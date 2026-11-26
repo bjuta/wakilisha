@@ -203,7 +203,14 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  }
  let question=(latest?.decision.action==="pause"?input.reopen?.question:null)||
      latest?.decision.nextQuestion||identity.openingQuestion;
- let remainingCost=input.costBudgetUnits,added=0;
+ // Desk token units are a cumulative investigation budget across leases.
+ // The monetary ledger independently precharges actual and uncertain calls.
+ const historicCost=input.prepareDeskPass?history.reduce((total,pass)=>{
+  if(!Number.isSafeInteger(pass.costUnits)||pass.costUnits<0||pass.costUnits>1000000)
+   throw Error("MIZIZI_DESK_HISTORY_COST_UNCONFIRMED");
+  return total+pass.costUnits;
+ },0):0;
+ let remainingCost=Math.max(0,input.costBudgetUnits-historicCost),added=0;
  let disposition:InvestigationResultV1["disposition"]="continue";
  while(added<input.maxNewPasses&&history.length<input.maxTotalPasses){
   // Do not enter an externally metered desk pass with an exhausted budget.
@@ -333,7 +340,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   }
   const supported=findings.some(f=>f.interpretation==="supported"&&
     f.independentlyVerified&&f.uncertainty<=.2);
-  const next=selectLead(analysis.leads,history,question,remainingCost);
+  const nextBudget=prepared?Math.max(0,remainingCost-prepared.costUnits):remainingCost;
+  const next=prepared&&nextBudget<=0?null:selectLead(analysis.leads,history,question,nextBudget);
   let decision:PassDecisionV1;
   if(analysis.requestedDisposition==="conclude"&&supported){
    decision={action:"conclude",nextQuestion:null,

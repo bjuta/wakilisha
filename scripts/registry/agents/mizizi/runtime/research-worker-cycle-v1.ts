@@ -50,6 +50,8 @@ export type ReadOnlyResearchResultV1=Readonly<{
  contract:"mizizi.read_only_research_result.v1";caseId:string;
  status:"insufficient_evidence"|"evidence_recorded";
  sourceReferences:readonly string[];
+ investigation?:Readonly<{disposition:"continue"|"deferred"|"paused"|"concluded";
+  totalPasses:number;lastFingerprint:string|null;sourceReferenceCount:number}>;
 }>;
 export type ResearchJobHandlerV1=(job:ResearchJobV1)=>Promise<ReadOnlyResearchResultV1>;
 /** Original source and permission facts returned by an independently trusted,
@@ -68,7 +70,7 @@ export type ResearchSourceVerifierV1=(
 )=>Promise<readonly VerifiedResearchSourceV1[]>;
 export type WorkerCycleResultV1=Readonly<{
  contract:typeof RESEARCH_WORKER_CYCLE_CONTRACT;
- recovered:number;claimed:number;succeeded:number;failed:number;
+ recovered:number;claimed:number;succeeded:number;failed:number;continued?:number;
 }>;
 function record(value:unknown):Record<string,unknown>{
  if(!value||typeof value!=="object"||Array.isArray(value))
@@ -252,7 +254,7 @@ async function assertVerifiedSourceAuthority(
 }
 async function validatedResult(
  value:unknown,job:ResearchJobV1,verifySources:ResearchSourceVerifierV1|undefined,
- nowMs:number,
+ nowMs:number,allowDeskContinuation=false,
 ):Promise<Readonly<Record<string,unknown>>>{
  const result=record(value);
  if(result.contract!=="mizizi.read_only_research_result.v1"||
@@ -268,8 +270,23 @@ async function validatedResult(
  if(new Set(sourceReferences).size!==sourceReferences.length||
     (result.status==="insufficient_evidence"&&sourceReferences.length!==0))
    throw new TypeError("MIZIZI_WORKER_UNVERIFIED_RESEARCH_RESULT");
+ let investigation:ReadOnlyResearchResultV1["investigation"];
+ if(result.investigation!==undefined){
+  const i=record(result.investigation);
+  if(!allowDeskContinuation||!job.chartContext||
+   !["continue","deferred","paused","concluded"].includes(String(i.disposition))||
+   !Number.isSafeInteger(i.totalPasses)||Number(i.totalPasses)<0||Number(i.totalPasses)>10000||
+   !Number.isSafeInteger(i.sourceReferenceCount)||Number(i.sourceReferenceCount)<sourceReferences.length||
+   Number(i.sourceReferenceCount)>300000||sourceReferences.length!==Math.min(20,Number(i.sourceReferenceCount))||
+   (i.totalPasses===0?i.lastFingerprint!==null:typeof i.lastFingerprint!=="string"||!CHART_SHA.test(i.lastFingerprint))||
+   (i.disposition==="continue"&&(job.attempt>=job.maxAttempts||i.totalPasses===0)))
+   throw new TypeError("MIZIZI_WORKER_UNVERIFIED_INVESTIGATION_POINTER");
+  investigation={disposition:i.disposition as NonNullable<ReadOnlyResearchResultV1["investigation"]>["disposition"],
+   totalPasses:Number(i.totalPasses),lastFingerprint:i.lastFingerprint as string|null,
+   sourceReferenceCount:Number(i.sourceReferenceCount)};
+ }
  const safe={contract:result.contract,caseId:job.caseId,status:result.status,
-   sourceReferences};
+   sourceReferences,...(investigation?{investigation}:{})};
  if(new TextEncoder().encode(JSON.stringify(safe)).length>8192)
    throw new TypeError("MIZIZI_WORKER_RESULT_TOO_LARGE");
  if(result.status==="evidence_recorded"){
@@ -309,6 +326,7 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
  rpc:WorkerRpc;research:ResearchJobHandlerV1;workerId:string;
  verifySources?:ResearchSourceVerifierV1;
  chartScope?:ChartResearchScopeV1;
+ allowDeskContinuation?:boolean;
  limit?:number;leaseSeconds?:number;retryDelaySeconds?:number;now?:()=>number;
 }>):Promise<WorkerCycleResultV1>{
  const {rpc,research,workerId}=input||{} as typeof input;
@@ -358,7 +376,7 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
  });
  if(new Set(jobs.map(j=>j.jobId)).size!==jobs.length)
    throw new TypeError("MIZIZI_WORKER_DUPLICATE_LEASE");
- let succeeded=0,failed=0;
+ let succeeded=0,failed=0,continued=0;
  for(const leased of jobs){
    // Context failures are outside the handler's failure-receipt path: a
    // mismatched or stale lease is not authority to mutate another job.
@@ -395,7 +413,7 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
    }
    let researchResult:Readonly<Record<string,unknown>>;
    try{
-     researchResult=await validatedResult(await research(job),job,input.verifySources,now());
+     researchResult=await validatedResult(await research(job),job,input.verifySources,now(),input.allowDeskContinuation===true);
    }catch(error){
      // Server logs only: bounded internal error codes, never source excerpts,
      // credentials, untrusted model text or full exception messages.
@@ -422,6 +440,21 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
      if(JSON.stringify(fresh)!==JSON.stringify(job.chartContext))
       throw new Error("MIZIZI_CHART_WORKER_CONTEXT_CHANGED_BEFORE_COMPLETION");
    }
+   // Ambiguous yield is never followed by a contradictory fail/completion.
+   const pointer=researchResult.investigation as ReadOnlyResearchResultV1["investigation"];
+   if(pointer?.disposition==="continue"){
+     const scope={jobId:job.jobId,caseId:job.caseId,workspaceId:job.workspaceId,
+      expectedRevision:job.expectedRevision,workerId,leaseExpiresAt:job.leaseExpiresAt};
+     const receipt=record(confirmed(await rpc("mizizi_continue_desk_research_job_v1",{
+      p_scope:scope,p_fingerprint:pointer.lastFingerprint
+     }),"CONTINUATION"));
+     if(uuid(receipt.job_id)!==job.jobId||uuid(receipt.case_id)!==job.caseId||
+      uuid(receipt.command_receipt_id)!==job.receiptId||receipt.job_status!=="retry_wait"||
+      receipt.pass_fingerprint!==pointer.lastFingerprint||receipt.ordinal!==pointer.totalPasses)
+       throw new TypeError("MIZIZI_WORKER_UNTRUSTED_CONTINUATION_RECEIPT");
+     continued++;
+     continue;
+   }
    // Never call fail if completion may already have committed.
    const receipt=record(confirmed(await rpc("mizizi_complete_case_research_job_v1",{
      p_job_id:job.jobId,p_worker_id:workerId,p_result:researchResult,
@@ -433,5 +466,5 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
    succeeded++;
  }
  return Object.freeze({contract:RESEARCH_WORKER_CYCLE_CONTRACT,
-   recovered,claimed:jobs.length,succeeded,failed});
+   recovered,claimed:jobs.length,succeeded,failed,...(input.allowDeskContinuation===true?{continued}:{})});
 }

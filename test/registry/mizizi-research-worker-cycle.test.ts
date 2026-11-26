@@ -333,7 +333,8 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   expectedRevision:2,leaseExpiresAt:row.lease_expires_at,
   membershipSha256:sha,observationSha256:"b".repeat(64),
   positions:[position],publicSourceSearchApproved:false,externalModelProcessingAllowed:false};
- function scoped(overrides:{claim?:unknown;contexts?:unknown[];recovery?:unknown}={}){
+ function scoped(overrides:{claim?:unknown;contexts?:unknown[];recovery?:unknown;
+  continuation?:unknown;continuationError?:boolean}={}){
   const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
   let reads=0;
   const rpc:WorkerRpc=vi.fn(async(fn,args)=>{
@@ -344,13 +345,17 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
     return {data:overrides.claim??[exactRow],error:null};
    if(fn==="mizizi_read_leased_chart_research_context_v1")
     return {data:overrides.contexts?overrides.contexts[reads++]:context,error:null};
+   if(fn==="mizizi_continue_desk_research_job_v1")return overrides.continuationError?
+    {data:null,error:{message:"indeterminate continuation"}}:{data:overrides.continuation??{
+     job_id:JOB,case_id:CASE,command_receipt_id:RECEIPT,job_status:"retry_wait",
+     pass_fingerprint:"a".repeat(64),ordinal:1},error:null};
    if(fn==="mizizi_complete_case_research_job_v1")return {data:done,error:null};
    if(fn==="mizizi_fail_case_research_job_v1")return {data:{...failed,
     job_status:"dead_letter",command_receipt_status:"failed"},error:null};
    throw new Error("UNEXPECTED_CHART_RPC");
   });
   const run=(research:Parameters<typeof runResearchWorkerCycleV1>[0]["research"],
-    chartScope=scope)=>runResearchWorkerCycleV1({rpc,research,workerId,chartScope,now:()=>NOW});
+    chartScope=scope,allowDeskContinuation=false)=>runResearchWorkerCycleV1({rpc,research,workerId,chartScope,now:()=>NOW,allowDeskContinuation});
   return {calls,run};
  }
  it("preflights before exact recovery/claim, checks original bytes and reads current context before research and completion, and uses the existing completion receipt",async()=>{
@@ -372,6 +377,29 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   expect(h.calls[1].args).toMatchObject({p_job_id:JOB,p_case_id:CASE,p_workspace_id:WORKSPACE,
    p_expected_revision:2,p_worker_id:workerId});
   expect(h.calls[6].args.p_result).toEqual(finding);
+ });
+ it("yields the exact productive lease without completing or failing its command",async()=>{
+  const pointer={...finding,investigation:{disposition:"continue" as const,totalPasses:1,
+   lastFingerprint:"a".repeat(64),sourceReferenceCount:0}};
+  const h=scoped();
+  expect(await h.run(async()=>pointer,scope,true)).toMatchObject({claimed:1,succeeded:0,failed:0,continued:1});
+  expect(h.calls.at(-1)).toEqual({fn:"mizizi_continue_desk_research_job_v1",args:{
+   p_scope:{jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,workerId,leaseExpiresAt:context.leaseExpiresAt},
+   p_fingerprint:"a".repeat(64)}});
+  expect(h.calls.some(c=>c.fn==="mizizi_complete_case_research_job_v1"||c.fn==="mizizi_fail_case_research_job_v1")).toBe(false);
+  const uncertain=scoped({continuationError:true});
+  await expect(uncertain.run(async()=>pointer,scope,true)).rejects.toThrow("CONTINUATION_RPC_UNCONFIRMED");
+  expect(uncertain.calls.at(-1)?.fn).toBe("mizizi_continue_desk_research_job_v1");
+  const bad=scoped({continuation:{job_id:EVENT,case_id:CASE,command_receipt_id:RECEIPT,job_status:"retry_wait",
+   pass_fingerprint:"a".repeat(64),ordinal:1}});
+  await expect(bad.run(async()=>pointer,scope,true)).rejects.toThrow("UNTRUSTED_CONTINUATION_RECEIPT");
+  const disabled=scoped();
+  expect(await disabled.run(async()=>pointer)).toMatchObject({failed:1,succeeded:0});
+  expect(disabled.calls.some(c=>c.fn==="mizizi_continue_desk_research_job_v1")).toBe(false);
+  const terminal=scoped({claim:[{...exactRow,attempt_count:3}]});
+  const deferred={...pointer,investigation:{...pointer.investigation,disposition:"deferred" as const}};
+  expect(await terminal.run(async()=>deferred,scope,true)).toMatchObject({succeeded:1,continued:0});
+  expect(terminal.calls.at(-1)?.args.p_result).toEqual(deferred);
  });
  it("stops before any RPC when trusted preflight is absent or denied",async()=>{
   for(const preflight of [async()=>false,async()=>{throw Error("PROVIDER_UNAVAILABLE");}]){
@@ -527,6 +555,22 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    citation:source.citation,excerpt:source.excerpt,
    lineageKey:'session-record-family'
   });
+ });
+ it("does not reset the desk token budget across leases or schedule a lead beyond the post-pass balance",async()=>{
+  const store=memory(),q2="Where are the independently documented original session credits?";
+  const q3="Which original release lists the complete personnel?";
+  const prepareDeskPass=vi.fn(async(_id:unknown,question:string)=>({
+   sources:[source],analysis:question===identity.openingQuestion?answer([lead(q2)],"continue"):answer([lead(q3)],"continue"),
+   costUnits:2,deskToolReceipts:[]}));
+  const deps={identity,store,prepareDeskPass,maxNewPasses:1,maxTotalPasses:20,costBudgetUnits:4,
+   now:()=>NOW,readSources:async()=>{throw Error("LEGACY_READER");},
+   analyze:async()=>{throw Error("LEGACY_ANALYST");},authorizeModelProcessing:async()=>true,
+   verifyFinding:async()=>({verified:false,verificationRef:null})};
+  expect(await runAdaptiveInvestigationV1(deps)).toMatchObject({passesAdded:1,disposition:"continue",nextQuestion:q2});
+  expect(await runAdaptiveInvestigationV1(deps)).toMatchObject({passesAdded:1,totalPasses:2,disposition:"paused",nextQuestion:null});
+  expect(prepareDeskPass).toHaveBeenCalledTimes(2);
+  expect(await runAdaptiveInvestigationV1(deps)).toMatchObject({passesAdded:0,disposition:"paused"});
+  expect(prepareDeskPass).toHaveBeenCalledTimes(2);
  });
  it("records an evidence-absent method without a model call or invented verdict",async()=>{
   const store=memory(),reader=vi.fn(async()=>[]),

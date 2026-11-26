@@ -871,6 +871,11 @@ export async function verifyCharts2RealJwtRegistryV1({
   q(args.p_host),args.p_policy_revision,j(args.p_provenance),j(args.p_lead_bindings)].join(",")+")";
  const read=id=>"public.mizizi_read_desk_tool_receipt_v1("+j(scope)+","+q(id)+"::uuid)";
  const question="Fixture exact public research question",questionHash=hash(question),credential=hash("standing credential");
+ const nextQuestion="Which original release establishes the recording credits?",nextQuestionHash=hash(nextQuestion);
+ const continuationName="mizizi_continue_desk_research_job_v1";
+ const continuationArgs={p_scope:scope,p_fingerprint:"f".repeat(64)};
+ for(const actor of [first.user,subscriber])denied(await actor.rpc(continuationName,continuationArgs),"42501","STOP_CONTINUATION_BROWSER_ACL");
+ fail(await call(continuationName,continuationArgs)===null,"STOP_CONTINUATION_DEFAULT_DENY");
  const envelope=(round,sourceIds,toolReceipts,patch={})=>{
   const bodySha256=hash("standing fixture envelope "+round);
   return {scope,model:"fixture-haiku",round,requestSha256:hash(JSON.stringify({scope,round,credentialSha256:credential,bodySha256})),
@@ -893,21 +898,35 @@ export async function verifyCharts2RealJwtRegistryV1({
  const journalRef={sourceId:standingPageId,originKey:standingSource.originKey,lineageKey:standingSource.lineageKey,
   payloadFingerprint:sourceHash,useBasis:standingSource.useBasis,authorityRef:standingSource.authorityRef,observedAt,
   citation:standingExcerpt.citation,excerpt:standingExcerpt.excerpt,modelDisclosed:true};
- const journal=toolDeps=>{
-  const body=JSON.stringify({contract:"mizizi.adaptive_investigation.v1",caseId:pairedId,workspaceId:ws,ordinal:1,
+ const journalBodyFor=toolDeps=>JSON.stringify({contract:"mizizi.adaptive_investigation.v1",caseId:pairedId,workspaceId:ws,ordinal:1,
    question,predecessorFingerprint:null,sourceReceipts:[journalRef],deskToolReceipts:toolDeps,findings:[],proposedLeads:[],
-   decision:{action:"pause",nextQuestion:null},passFinding:"Synthetic native operational evidence."});
+   decision:{action:"continue",nextQuestion},passFinding:"Synthetic native operational evidence.",costUnits:1});
+ const journal=toolDeps=>{
+  const body=journalBodyFor(toolDeps);
   return "public.mizizi_append_research_pass_v1("+q(job.job_id)+"::uuid,"+q(activeWorker)+","+q(body)+","+q(hash(body))+",null)";
  };
+ const continuationFingerprint=hash(journalBodyFor(deps)),continuationSql=(scopeSql,fingerprint)=>
+  "public."+continuationName+"("+scopeSql+","+q(fingerprint)+")";
  const journalRead="public.mizizi_read_research_passes_v1("+q(job.job_id)+"::uuid,"+q(activeWorker)+")";
  const rules=[{host,pathPrefix:"/details/",custodyRevision:1,operations:["native_acquire","native_text"]}];
+ const refinedQuery=context.positions[0].title+" recording credits";
+ const searchGrant=query=>{
+  const body=JSON.stringify({scope,operation:"search_web",query,count:3,provider:"wikimedia",providerHost:"en.wikipedia.org"});
+  return "public.mizizi_authorize_desk_search_v1("+q(body)+","+q(hash(body))+","+q(hash("standing wiki allocation"))+")";
+ };
  fail(sql(`begin;
  insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
  membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
- max_rounds,max_request_bytes,access_rules,valid_until)
+ max_rounds,max_request_bytes,access_rules,valid_until,adaptive_followups_allowed,public_query_terms)
  values (${q(ws)},${q(pairedId)},1,2,${q(context.membershipSha256)},${q(context.observationSha256)},true,
  'fixture:standing-owner-review',${q(credential)},array['fixture-haiku'],array[${q(questionHash)}],
- array['search_web','read_page'],5,10000,${j(rules)},now()+interval '5 minutes');
+ array['search_web','read_page'],5,10000,${j(rules)},now()+interval '5 minutes',true,array['recording credits']);
+ insert into mizizi_private.desk_search_policy_versions_v1(
+ revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,disclosure_policy_ref,
+ commercial_search_allowed,zero_cost_hard_cap_verified,exclusive_allocated_usage_verified,public_chart_labels_allowed,
+ allowance_start,allowance_end,valid_until,account_limit,daily_limit,case_limit,provider,provider_host,min_interval_ms)
+ values(3,true,${q(ws)},${q(hash("standing wiki allocation"))},'fixture:public-api-terms','fixture:cost-cap','fixture:public-labels',
+ true,true,true,true,now()-interval '1 hour',now()+interval '1 hour',now()+interval '5 minutes',10,10,10,'wikimedia','en.wikipedia.org',1000);
  set local role service_role;
  set local request.jwt.claim.role='service_role';
  do $standing$ begin
@@ -915,6 +934,10 @@ export async function verifyCharts2RealJwtRegistryV1({
  or (${authority("model_disclose",envelope(1,[],[]))}->>'allowed') is distinct from 'true'
  or ${authority("model_disclose",envelope(1,[],[],{model:"fixture-opus"}))} is not null
  or ${authority("model_disclose",envelope(1,[],[],{questionSha256:hash("unapproved question")}))} is not null
+ or ${authority("model_disclose",envelope(1,[],[],{questionSha256:nextQuestionHash}))} is not null
+ or (${authority("tool_execute",{scope,call:{name:"search_web",input:{query:refinedQuery}}})}->>'allowed') is distinct from 'true'
+ or (${searchGrant(refinedQuery)}->>'publicQueryAllowed') is distinct from 'true'
+ or ${searchGrant(context.positions[0].title+" private notes")} is not null
  or ${authority("tool_execute",{scope,call:{name:"search_web",input:{query:"unapproved private question"}}})} is not null
  or ${authority("tool_execute",{scope,call:{name:"search_news",input:{query:context.positions[0].title}}})} is not null
  then raise exception 'STOP_STANDING_MODEL_OR_TOOL_SCOPE';end if;
@@ -935,6 +958,35 @@ export async function verifyCharts2RealJwtRegistryV1({
  exception when sqlstate '42501' then null;end;
  if (select outcome from ${journal(deps)}) is distinct from 'created' then raise exception 'STOP_STANDING_JOURNAL';end if;
  if (select count(*) from ${journalRead})<>1 then raise exception 'STOP_STANDING_JOURNAL_READ';end if;
+ if (${authority("model_disclose",envelope(1,[],[],{questionSha256:nextQuestionHash}))}->>'allowed') is distinct from 'true'
+ or ${continuationSql(j(scope),"f".repeat(64))} is not null then raise exception 'STOP_CONTINUATION_QUESTION_OR_STALE_PASS';end if;
+ -- Roll back the successful yield/reclaim only, preserving the subsequent
+ -- existing independent revocation fixture.
+ declare yielded jsonb; resumed record; fresh_context jsonb; fresh_scope jsonb; bound jsonb; raw text;
+ begin
+  yielded:=${continuationSql(j(scope),continuationFingerprint)};
+  if yielded->>'job_status' is distinct from 'retry_wait' or yielded->>'pass_fingerprint' is distinct from ${q(continuationFingerprint)}
+   or yielded->>'command_receipt_id' is distinct from ${q(job.command_receipt_id)} then raise exception 'STOP_CONTINUATION_YIELD';end if;
+  begin perform public.mizizi_read_leased_chart_research_context_v1(${q(job.job_id)}::uuid,${q(activeWorker)});
+   raise exception 'STOP_CONTINUATION_OLD_LEASE';exception when sqlstate '55000' then null;end;
+  select * into strict resumed from public.mizizi_claim_exact_chart_research_job_v1(
+   ${q(job.job_id)}::uuid,${q(pairedId)}::uuid,${q(ws)}::uuid,2,${q(losingWorker)},300);
+  if resumed.command_receipt_id::text is distinct from ${q(job.command_receipt_id)}
+   or resumed.attempt_count<>2 then raise exception 'STOP_CONTINUATION_RECLAIM';end if;
+  fresh_context:=public.mizizi_read_leased_chart_research_context_v1(${q(job.job_id)}::uuid,${q(losingWorker)});
+  fresh_scope:=${j(scope)}||jsonb_build_object('workerId',${q(losingWorker)},'leaseExpiresAt',fresh_context->'leaseExpiresAt');
+  if (select count(*) from public.mizizi_read_research_passes_v1(${q(job.job_id)}::uuid,${q(losingWorker)}))<>1
+   or public.mizizi_continue_desk_research_job_v1(fresh_scope,${q(continuationFingerprint)}) is not null
+   then raise exception 'STOP_CONTINUATION_REPLAY_OR_HISTORY';end if;
+  bound:=${j(envelope(1,[],[],{questionSha256:nextQuestionHash}))}||jsonb_build_object('scope',fresh_scope);
+  raw:=bound::text;
+  if (public.mizizi_authorize_desk_model_operation_v1(fresh_scope,'model_disclose',raw,
+   encode(sha256(convert_to(raw,'UTF8')),'hex'))->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_CONTINUATION_FOLLOWUP_AUTHORITY';end if;
+  raise exception 'ROLLBACK_CONTINUATION_FIXTURE' using errcode='P0002';
+ exception when sqlstate 'P0002' then
+  if sqlerrm<>'ROLLBACK_CONTINUATION_FIXTURE' then raise;end if;
+ end;
  end $standing$;
  reset role;
  insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
@@ -953,6 +1005,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  rollback;
  select 'PASS';`)==="PASS","STOP_OPERATIONAL_CONVERGENCE_ROLLBACK");
  console.log("WK_AUTH_MIZIZI_DESK_OPERATIONAL_CONVERGENCE=PASS");
+ console.log("WK_AUTH_MIZIZI_DESK_PRODUCTIVE_LEASE_CONTINUATION=PASS");
  }
  const accessName="mizizi_authorize_desk_access_v1";
  const accessArgs=(operation,target=url,descriptor={})=>{

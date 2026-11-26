@@ -24,6 +24,8 @@ export type AdaptiveWorkerDependenciesV1=Readonly<{
  readSources:InvestigationReaderV1;
  analyze:InvestigationAnalystV1;
  prepareDeskPass?:DeskPassResearcherV1;
+ /** Only the exact durable standing-policy worker enables this. */
+ continuationEnabled?:boolean;
  verifyFinding:IndependentFindingVerifierV1;
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
  measureCostUnits?:()=>number;
@@ -40,7 +42,7 @@ export function createAdaptiveResearchWorkerHandlerV1(
   const identity:InvestigationIdentityV1={
    caseId:job.caseId,workspaceId:job.workspaceId,openingQuestion
   };
-  await runAdaptiveInvestigationV1({
+  const investigation=await runAdaptiveInvestigationV1({
    identity,store:deps.store,readSources:deps.readSources,
    analyze:deps.analyze,prepareDeskPass:deps.prepareDeskPass,verifyFinding:deps.verifyFinding,
    maxNewPasses:deps.maxNewPasses,maxTotalPasses:deps.maxTotalPasses,
@@ -51,9 +53,22 @@ export function createAdaptiveResearchWorkerHandlerV1(
   // of success after the append transport potentially timed out.
   const passes=await deps.store.read(identity);
   const ids=[...new Set(passes.flatMap(p=>p.sourceReceipts.map(s=>s.sourceId)))];
-  if(ids.length>20)throw new Error("MIZIZI_WORKER_EVIDENCE_REFERENCE_BUDGET");
-  // Existing research-worker-cycle independently rechecks each of these
-  // source IDs and their source-use permissions before job completion.
+  if(!deps.continuationEnabled&&ids.length>20)throw new Error("MIZIZI_WORKER_EVIDENCE_REFERENCE_BUDGET");
+  // Bounded completion summary; the full checked journal remains private.
+  const summary=ids.slice(-20);
+  if(deps.continuationEnabled){
+   if(!deps.prepareDeskPass||!job.chartContext||investigation.totalPasses!==passes.length||
+    investigation.lastFingerprint!==(passes.at(-1)?.fingerprint??null))
+    throw Error("MIZIZI_DESK_CONTINUATION_HISTORY_UNCONFIRMED");
+   const remaining=Math.max(0,deps.costBudgetUnits-passes.reduce((sum,p)=>sum+p.costUnits,0));
+   const canContinue=investigation.disposition==="continue"&&investigation.passesAdded===1&&
+    !!investigation.lastFingerprint&&!!investigation.nextQuestion&&remaining>0&&
+    passes.length<deps.maxTotalPasses&&job.attempt<job.maxAttempts;
+   return {contract:"mizizi.read_only_research_result.v1",caseId:job.caseId,
+    status:ids.length?"evidence_recorded":"insufficient_evidence",sourceReferences:summary,
+    investigation:{disposition:canContinue?"continue":investigation.disposition==="continue"?"deferred":investigation.disposition,
+     totalPasses:passes.length,lastFingerprint:investigation.lastFingerprint,sourceReferenceCount:ids.length}};
+  }
   return {contract:"mizizi.read_only_research_result.v1",caseId:job.caseId,
    status:ids.length?"evidence_recorded":"insufficient_evidence",
    sourceReferences:ids};
@@ -195,6 +210,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
  let active:{job:ResearchJobV1;dispatcher:ReturnType<typeof createDeskResearchDispatcherV1>}|null=null;
  return runResearchWorkerCycleV1({
   rpc:input.rpc,workerId:input.workerId,chartScope:input.chartScope,
+  allowDeskContinuation:input.operationalNativeOnly===true,
   leaseSeconds:input.leaseSeconds,limit:1,now:input.now,
   verifySources:async(job,refs)=>{
    if(!active||active.job.jobId!==job.jobId||active.job.caseId!==job.caseId||
@@ -241,6 +257,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     openingQuestion:input.openingQuestion,readSources:async()=>{throw Error("MIZIZI_DESK_LEGACY_READER_DENIED");},
     analyze:async()=>{throw Error("MIZIZI_DESK_LEGACY_ANALYST_DENIED");},prepareDeskPass,
     verifyFinding:input.verifyFinding,authorizeModelProcessing:dispatcher.authorizeModelProcessing,
+    continuationEnabled:operational?.adaptiveFollowupsAllowed===true,
     maxNewPasses:input.maxNewPasses,maxTotalPasses:input.maxTotalPasses,costBudgetUnits:input.costBudgetUnits})(job);
   }
  });
@@ -254,6 +271,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
 type OperationalNativeDeskPolicyV1=Readonly<{
  revision:number;scope:DeskSearchScopeV1;credentialSha256:string;modelIds:readonly string[];
  questionSha256s:readonly string[];toolNames:readonly string[];maxRounds:number;maxRequestBytes:number;
+ adaptiveFollowupsAllowed:boolean;publicQueryTerms:readonly string[];
  accessRules:readonly Readonly<{host:string;pathPrefix:string;custodyRevision:number;operations:readonly string[]}>[];
  validUntil:string;
 }>;
@@ -267,6 +285,10 @@ async function readOperationalNativeDeskPolicyV1(rpc:WorkerRpc,scope:DeskSearchS
   !Number.isSafeInteger(p.revision)||p.revision<1||!sha.test(p.credentialSha256)||
   !Array.isArray(p.modelIds)||p.modelIds.length<1||p.modelIds.length>5||p.modelIds.some(m=>! /^[A-Za-z0-9._:-]{3,100}$/.test(m))||
   !Array.isArray(p.questionSha256s)||p.questionSha256s.length<1||p.questionSha256s.length>8||p.questionSha256s.some(q=>!sha.test(q))||
+  typeof p.adaptiveFollowupsAllowed!=="boolean"||!Array.isArray(p.publicQueryTerms)||
+  p.publicQueryTerms.length>32||new Set(p.publicQueryTerms).size!==p.publicQueryTerms.length||
+  p.publicQueryTerms.some(t=>typeof t!=="string"||t.length<1||t.length>80||t.trim()!==t||/[\p{Cc}\p{Cf}]/u.test(t))||
+  (!p.adaptiveFollowupsAllowed&&p.publicQueryTerms.length>0)||
   !Array.isArray(p.toolNames)||p.toolNames.length<1||p.toolNames.some(t=>!["search_web","search_news","read_page","read_document"].includes(t))||
   !Number.isSafeInteger(p.maxRounds)||p.maxRounds<1||p.maxRounds>5||
   !Number.isSafeInteger(p.maxRequestBytes)||p.maxRequestBytes<1||p.maxRequestBytes>3200000||
@@ -312,7 +334,20 @@ export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
       p.accessRules.some(x=>x.host===u.hostname&&u.pathname.startsWith(x.pathPrefix)&&x.operations.includes(operation));
     }catch{return false;}
    };
-   const publicQueries=new Set(job.chartContext.positions.flatMap(x=>[x.title,...(x.artist?[x.title+" "+x.artist]:[])]));
+   const publicLabels=[...new Set(job.chartContext.positions.flatMap(x=>[x.title,...(x.artist?[x.title+" "+x.artist]:[])]))];
+   const queryAllowed=(p:OperationalNativeDeskPolicyV1,q:string)=>q.length>=3&&q.length<=300&&q.trim()===q&&
+    !/[\p{Cc}\p{Cf}]/u.test(q)&&publicLabels.some(label=>q===label||
+     p.adaptiveFollowupsAllowed&&p.publicQueryTerms.some(term=>q===label+" "+term));
+   const questionAllowed=async(p:OperationalNativeDeskPolicyV1,question:string)=>{
+    if(p.questionSha256s.includes(operationalHash(question)))return true;
+    if(!p.adaptiveFollowupsAllowed||question.length<8||question.length>500||question.trim()!==question||
+      /[\p{Cc}\p{Cf}]/u.test(question))return false;
+    const identity={caseId:job.caseId,workspaceId:job.workspaceId,openingQuestion:question};
+    const history=await createLeasedResearchPassStoreV1(input.rpc,job,input.workerId).read(identity);
+    const latest=history.at(-1);
+    return !!latest&&latest.decision.action==="continue"&&latest.decision.nextQuestion===question&&
+     Array.isArray(latest.deskToolReceipts);
+   };
    return {...credentials,readModelInventory,assessRequirement,
     authorizeAcquisition:async(candidate,url)=>{
      const p=await fresh(candidate);
@@ -328,7 +363,7 @@ export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
     authorizeEnvelope:async(binding,body)=>{
      const p=await fresh(binding.scope);
      return p&&binding.credentialSha256===credentialSha256&&p.modelIds.includes(binding.model)&&
-      p.questionSha256s.includes(operationalHash(binding.question))&&binding.round<=p.maxRounds&&
+      await questionAllowed(p,binding.question)&&binding.round<=p.maxRounds&&
       binding.requestBytes<=p.maxRequestBytes&&Buffer.byteLength(body,"utf8")===binding.requestBytes&&
       operationalHash(body)===binding.bodySha256?
       {requestSha256:binding.requestSha256,policyRef:"desk-operational:"+p.revision,
@@ -337,7 +372,7 @@ export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
     authorizeTool:async(candidate,call,callSha256)=>{
      const p=await fresh(candidate);
      return !!p&&p.toolNames.includes(call.name)&&operationalHash(JSON.stringify({scope:candidate,call}))===callSha256&&
-      (!["search_web","search_news"].includes(call.name)||typeof call.input.query==="string"&&publicQueries.has(call.input.query));
+      (!["search_web","search_news"].includes(call.name)||typeof call.input.query==="string"&&queryAllowed(p,call.input.query));
     }
    };
   }
@@ -363,12 +398,12 @@ export async function runDurableDeskResearchWorkerCohortV1(input:Readonly<
   new Set(chartScopes.map(s=>s.caseId)).size!==chartScopes.length)
    throw Error("MIZIZI_DESK_COHORT_SCOPE_DENIED");
  const catalogue=createCharts2RegistryCatalogueCohortV1(chartScopes[0].registryClient,{now:input.now??Date.now});
- const totals={recovered:0,claimed:0,succeeded:0,failed:0};
+ const totals={recovered:0,claimed:0,succeeded:0,failed:0,continued:0};
  for(const scope of chartScopes){
   const result=await runDurableDeskResearchWorkerCycleV1({...worker,
     chartScope:{...scope,registryCatalogueCohort:catalogue}});
   totals.recovered+=result.recovered;totals.claimed+=result.claimed;
-  totals.succeeded+=result.succeeded;totals.failed+=result.failed;
+  totals.succeeded+=result.succeeded;totals.failed+=result.failed;totals.continued+=result.continued??0;
  }
  return Object.freeze({contract:"mizizi.durable_desk_cohort.v1" as const,
   requested:chartScopes.length,...totals});
