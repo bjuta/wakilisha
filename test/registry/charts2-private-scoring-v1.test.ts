@@ -1106,3 +1106,17 @@ describe("Charts Studio recording-review draft and scroll safety",()=>{
     expect(STUDIO_PAGE).toContain("disabled={!!selected||!!busy}");
   });
 });
+
+
+describe("Chart-origin Artist Intake presentation", () => {
+  it("inherits WAKILISHA theme and keeps review actions near the identity", () => {
+    expect(CHART_ARTIST_INTAKE_PAGE).not.toMatch(/(?:bg|text|border|ring)-\\[#|\\bbg-white\\b|\\btext-white\\b/);
+    for (const primitive of ["WkSurface", "WkButton", "WkCheckbox", "WkSearchField", "AdminStatusBadge"]) {
+      expect(CHART_ARTIST_INTAKE_PAGE).toContain("<" + primitive);
+    }
+    expect(CHART_ARTIST_INTAKE_PAGE).toContain('data-wk-artist-intake-actions className="flex flex-wrap items-start gap-2"');
+    expect(CHART_ARTIST_INTAKE_PAGE).toContain('onClick={() => handleDecision(record.id, "accepted")}');
+    expect(CHART_ARTIST_INTAKE_PAGE).toContain('onClick={handleApplyAll}');
+    expect(CHART_ARTIST_INTAKE_PAGE).toContain('<ChartReviewReturnContext />');
+  });
+});
