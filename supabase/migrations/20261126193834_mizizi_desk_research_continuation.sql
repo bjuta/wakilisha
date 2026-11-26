@@ -351,7 +351,7 @@ begin
  if j.attempt_count>=j.max_attempts then return null;end if;
  select * into p from mizizi_private.research_passes
  where case_id=o.case_id and workspace_id=o.workspace_id order by ordinal desc limit 1;
- if not found or p.job_id<>j.id or p.recorded_at<j.locked_at or p.fingerprint<>p_fingerprint
+ if not found or p.job_id<>j.id or p.recorded_at<=j.locked_at or p.fingerprint<>p_fingerprint
   or p.body_text::jsonb->'decision'->>'action' is distinct from 'continue'
   or jsonb_typeof(p.body_text::jsonb->'deskToolReceipts') is distinct from 'array'
   or jsonb_typeof(p.body_text::jsonb->'costUnits') is distinct from 'number'
@@ -360,7 +360,7 @@ begin
  question:=p.body_text::jsonb->'decision'->>'nextQuestion';
  if question is null or length(question) not between 8 and 500 or btrim(question)<>question
   or question ~ '[[:cntrl:]]' then return null;end if;
- perform mizizi_private.assert_desk_journal_current_v1(j.id,j.locked_by,o.case_id,null);
+ perform mizizi_private.assert_desk_journal_current_v1(j.id,j.locked_by,o.case_id,p.body_text::jsonb);
  if clock_timestamp()>=j.lease_expires_at then return null;end if;
  -- No stale process can yield a newly claimed lease using an old fingerprint:
  -- p_scope includes lease expiry, pass timestamp must belong to this lease.
