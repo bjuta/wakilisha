@@ -63,7 +63,9 @@ export function createCloudflareBrowserTransportV1({accountId,apiToken,transport
   typeof apiToken!=="string"||apiToken.length<20||apiToken.trim()!==apiToken)fail("SERVER_CREDENTIALS_REQUIRED");
  const base=HOST+"/client/v4/accounts/"+accountId+"/browser-run/devtools/browser";
  const headers={Authorization:"Bearer "+apiToken,"Content-Type":"application/json"};
+ const connected=new Map();
  const open=async({hostname},signal)=>{
+  if(typeof hostname!=="string"||safeUrl("https://"+hostname+"/").hostname!==hostname)fail("HOST_DENIED");
   // Do not use a wildcard, domain set, recording, outbound Worker or
   // keep-alive extension. Documented 60s idle timeout remains a backstop.
   const response=await transport(base,{method:"POST",headers,redirect:"error",
@@ -76,9 +78,14 @@ export function createCloudflareBrowserTransportV1({accountId,apiToken,transport
  };
  const close=async(sessionId,signal)=>{
   if(!UUID.test(sessionId))fail("SESSION_ID_UNCONFIRMED");
-  const p=await smallJson(await transport(base+"/"+sessionId,{method:"DELETE",headers,redirect:"error",signal}));
-  if(p?.status!=="closing"&&p?.status!=="closed")fail("CLOSE_UNCONFIRMED");
-  return true; // Provider close acknowledgement, not measured final billing.
+  try{
+   const p=await smallJson(await transport(base+"/"+sessionId,{method:"DELETE",headers,redirect:"error",signal}));
+   if(p?.status!=="closing"&&p?.status!=="closed")fail("CLOSE_UNCONFIRMED");
+   return true; // Provider close acknowledgement, not measured final billing.
+  }finally{
+   const browser=connected.get(sessionId);connected.delete(sessionId);
+   if(browser)await within(browser.close(),1000).catch(()=>{});
+  }
  };
  const capture=async(sessionId,{url,hostname,visual,authorizeRequest,remaining})=>{
   const endpoint=base.replace("https:","wss:")+"/"+sessionId;
@@ -88,6 +95,8 @@ export function createCloudflareBrowserTransportV1({accountId,apiToken,transport
   });
   const timeout=()=>{const ms=remaining();if(ms<=0)fail("DEADLINE");return ms;};
   const browser=await connector(endpoint,{headers:{Authorization:"Bearer "+apiToken},timeout:timeout()});
+  if(remaining()<=0){await within(browser.close(),1000).catch(()=>{});fail("DEADLINE");}
+  connected.set(sessionId,browser);
   let context;
   try{
    context=await browser.newContext({acceptDownloads:false,serviceWorkers:"block",
@@ -104,7 +113,7 @@ export function createCloudflareBrowserTransportV1({accountId,apiToken,transport
      if(++requestCount>40||remaining()<=0||target.hostname!==hostname||
        req.method()!=="GET"||(main&&target.href!==url)||
        ["media","font","websocket","eventsource","manifest","ping"].includes(req.resourceType())||
-       await authorizeRequest(target.href,req.resourceType())!==true){
+       await authorizeRequest(target.href,req.resourceType())!==true||remaining()<=0){
       denied=true;await route.abort();return;
      }
      await route.continue();
@@ -131,11 +140,8 @@ export function createCloudflareBrowserTransportV1({accountId,apiToken,transport
    // Close the context to stop its requests, but leave the account-scoped
    // session termination to the independently acknowledged DELETE.
    if(context)await context.close().catch(()=>{});
-   // Disconnecting CDP can close a session depending on provider/client.
-   // Do not expose the browser or the endpoint. Caller always calls DELETE.
-   // Playwright disconnect may close the managed session. Explicit DELETE
-   // is still mandatory; unconfirmed closure conservatively remains charged.
-   await browser.close().catch(()=>{});
+   // Caller closes the account-scoped session before disconnecting the
+   // Playwright client, avoiding ambiguity about which operation closed it.
   }
  };
  return Object.freeze({accountFingerprint:hash("mizizi:cloudflare:credential:v1:"+accountId+":"+apiToken),open,close,capture});
