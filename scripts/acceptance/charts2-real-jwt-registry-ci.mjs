@@ -25,7 +25,7 @@ function denied(response,code,label){
 }
 
 export async function verifyCharts2RealJwtRegistryV1({
- api,sql,first,second,subscriber,reviewer,
+ api,sql,first,second,subscriber,reviewer,service,
 }){
  fail(process.env.GITHUB_ACTIONS==="true" &&
    process.env.GITHUB_EVENT_NAME==="pull_request" &&
@@ -568,6 +568,107 @@ export async function verifyCharts2RealJwtRegistryV1({
  fail(sql("select count(*) from platform_private.jobs where resource_id='"+staleId+"';")==="0",
    "STOP_CHART_DISPATCH_STALE_MEMBER_JOB_CREATED");
  console.log("WK_AUTH_MIZIZI_CHART_RESEARCH_STEWARD_CAS_JIT_REPLAY_STALE_AND_LEGACY_CLAIM_FENCE=PASS");
+
+ // Actual disposable service JWT/PostgREST, not real Storage bytes or providers.
+ {
+ const workerBaseline=JSON.parse(proof());
+ fail(typeof service?.rpc==="function","STOP_CHART_SCOPED_SERVICE_CLIENT");
+ const claimName="mizizi_claim_exact_chart_research_job_v1",
+  recoverName="mizizi_recover_expired_chart_research_job_v1",
+  contextName="mizizi_read_leased_chart_research_context_v1";
+ const workerA="mizizi-chart:"+randomUUID(),workerB="mizizi-chart:"+randomUUID();
+ const scope={p_job_id:job.job_id,p_case_id:pairedId,p_workspace_id:ws,p_expected_revision:2};
+ const claimArgs={...scope,p_worker_id:workerA,p_lease_seconds:300};
+ const contextArgs={p_job_id:job.job_id,p_worker_id:workerA};
+ const call=(name,args)=>accept(service,name,args,"STOP_CHART_SCOPED_"+name);
+ const deny=async(name,args,code)=>denied(await service.rpc(name,args),code,"STOP_CHART_SCOPED_"+name);
+ for(const [name,args] of [[claimName,claimArgs],[recoverName,{...scope,p_retry_delay_seconds:1}],
+   [contextName,contextArgs]])
+  denied(await first.user.rpc(name,args),"42501","STOP_CHART_SCOPED_BROWSER_"+name);
+ await deny(claimName,{...claimArgs,p_worker_id:"legacy-worker"},"22023");
+ await deny(contextName,contextArgs,"55000");
+ for(const patch of [{p_case_id:staleId},{p_workspace_id:randomUUID()},{p_expected_revision:1},{p_job_id:randomUUID()}])
+  fail((await call(claimName,{...claimArgs,...patch})).length===0,"STOP_CHART_SCOPED_CROSS_JOB_CLAIM");
+ fail(sql("select attempt_count::text from platform_private.jobs where id='"+job.job_id+"';")==="0",
+  "STOP_CHART_SCOPED_WRONG_SCOPE_INCREMENT");
+ const race=await Promise.all([service.rpc(claimName,claimArgs),
+   service.rpc(claimName,{...claimArgs,p_worker_id:workerB})]);
+ fail(race.every(x=>!x.error&&Array.isArray(x.data))&&
+   race[0].data.length+race[1].data.length===1,"STOP_CHART_SCOPED_CLAIM_RACE");
+ const activeWorker=race[0].data.length===1?workerA:workerB;
+ const losingWorker=activeWorker===workerA?workerB:workerA;
+ const leased=race.find(x=>x.data.length===1).data[0];
+ fail(leased.job_id===job.job_id&&leased.command_receipt_id===job.command_receipt_id&&
+   leased.resource_id===pairedId&&leased.attempt_count===1&&leased.max_attempts===25,
+   "STOP_CHART_SCOPED_LEASE_RECEIPT");
+ const activeContext={p_job_id:job.job_id,p_worker_id:activeWorker};
+ await deny(contextName,{...activeContext,p_worker_id:losingWorker},"55000");
+ const context=await call(contextName,activeContext);
+ fail(context.contract==="mizizi.charts.research_context.v1"&&context.jobId===job.job_id&&
+   context.receiptId===job.command_receipt_id&&context.caseId===pairedId&&context.workspaceId===ws&&
+   context.expectedRevision===2&&Date.parse(context.leaseExpiresAt)===Date.parse(leased.lease_expires_at)&&
+   context.positions.length===2&&context.publicSourceSearchApproved===false&&
+   context.externalModelProcessingAllowed===false,"STOP_CHART_SCOPED_CONTEXT_AUTHORITY");
+ const binding=JSON.parse(sql("select jsonb_build_object('membership',membership_sha256,'observation',observation_sha256)::text "+
+   "from mizizi_private.chart_candidate_subjects_v1 where case_id='"+pairedId+"';"));
+ fail(context.membershipSha256===binding.membership&&context.observationSha256===binding.observation&&
+  context.positions.every(p=>{
+   const observed=material.investigation_positions.find(o=>o.receipt_id===p.receipt_id&&o.rank===p.rank);
+   const extension=p.original_content_type==="application/json"?".json":".html";
+   return observed&&p.title===observed.title&&p.artist===observed.artist&&
+     p.provider_track_id===observed.provider_track_id&&p.original_sha256===observed.original_sha256&&
+     p.original_bucket==="charts2-evidence-private-v1"&&p.original_byte_length===1024&&
+     p.original_object_key===p.source_key+"/"+p.original_sha256.slice(0,2)+"/"+p.original_sha256+extension;
+  }),"STOP_CHART_SCOPED_ORIGINAL_CONTEXT");
+ const passBody=JSON.stringify({contract:"mizizi.adaptive_investigation.v1",caseId:pairedId,
+  workspaceId:ws,ordinal:1,question:"Read-only local test of the exact chart lease.",
+  predecessorFingerprint:null,sourceReceipts:[],findings:[],proposedLeads:[],
+  decision:{action:"pause",nextQuestion:null},passFinding:"Synthetic local lease test, no evidence claimed."});
+ const fingerprint=createHash("sha256").update(passBody).digest("hex");
+ const passArgs={...activeContext,p_body_text:passBody,p_fingerprint:fingerprint,p_predecessor:null};
+ const appendName="mizizi_append_research_pass_v1",readName="mizizi_read_research_passes_v1",
+  completeName="mizizi_complete_case_research_job_v1";
+ const result={contract:"mizizi.read_only_research_result.v1",caseId:pairedId,
+  status:"insufficient_evidence",sourceReferences:[]};
+ await deny(appendName,{...passArgs,p_worker_id:losingWorker},"55000");
+ const appended=await call(appendName,passArgs);
+ fail(appended.length===1&&appended[0].case_id===pairedId&&appended[0].fingerprint===fingerprint&&
+  appended[0].outcome==="created","STOP_CHART_SCOPED_APPEND_RECEIPT");
+ const stored=await call(readName,activeContext);
+ fail(stored.length===1&&stored[0].body_text===passBody&&stored[0].fingerprint===fingerprint,"STOP_CHART_SCOPED_PASS_BYTES");
+ // Expire only the disposable fixture. Legacy recovery must leave it alone.
+ sql("update platform_private.jobs set locked_at=now()-interval '2 minutes',lease_expires_at=now()-interval '1 minute' where id='"+job.job_id+"';");
+ await deny(contextName,activeContext,"55000");
+ await deny(completeName,{...activeContext,p_result:result},"55000");
+ await call("mizizi_recover_expired_case_research_jobs_v1",{p_limit:100,p_retry_delay_seconds:1});
+ fail(sql("select status from platform_private.jobs where id='"+job.job_id+"';")==="running","STOP_CHART_SCOPED_LEGACY_RECOVERED");
+ fail(await call(recoverName,{...scope,p_case_id:staleId,p_retry_delay_seconds:1})===0,"STOP_CHART_SCOPED_WRONG_RECOVER_MUTATION");
+ fail(await call(recoverName,{...scope,p_retry_delay_seconds:1})===1,"STOP_CHART_SCOPED_RECOVERY_COUNT");
+ fail(await call(recoverName,{...scope,p_retry_delay_seconds:1})===0,"STOP_CHART_SCOPED_DOUBLE_RECOVERY");
+ sql("update platform_private.jobs set available_at=now()-interval '1 second' where id='"+job.job_id+"';");
+ const resumed=await call(claimName,{...claimArgs,p_worker_id:losingWorker});
+ fail(resumed.length===1&&resumed[0].attempt_count===2,"STOP_CHART_SCOPED_RESUME_RECEIPT");
+ const resumedContext={p_job_id:job.job_id,p_worker_id:losingWorker};
+ await deny(contextName,activeContext,"55000");
+ const history=await call(readName,resumedContext);
+ fail(history.length===1&&history[0].fingerprint===fingerprint,"STOP_CHART_SCOPED_HISTORY_LOST");
+ sql("update public.user_role_assignments set expires_at=now()-interval '1 second' where user_id='"+winner.id+"' and role_key='administrator';");
+ await deny(contextName,resumedContext,"42501");
+ await deny(readName,resumedContext,"42501");
+ await deny(appendName,{...passArgs,p_worker_id:losingWorker},"42501");
+ await deny(completeName,{...resumedContext,p_result:result},"42501");
+ sql("update public.user_role_assignments set expires_at=now()+interval '10 minutes' where user_id='"+winner.id+"' and role_key='administrator';");
+ const completed=await call(completeName,{...resumedContext,p_result:result});
+ fail(completed.job_id===job.job_id&&completed.case_id===pairedId&&
+  completed.command_receipt_id===job.command_receipt_id&&completed.job_status==="succeeded",
+  "STOP_CHART_SCOPED_COMPLETE_RECEIPT");
+ await deny(contextName,resumedContext,"55000");
+ const afterWorker=JSON.parse(proof());
+ for(const key of ["subjects","positions","artists","tracks","links","grants","reviews","freezes","receipts"])
+  fail(afterWorker[key]===workerBaseline[key],"STOP_CHART_SCOPED_SIDE_EFFECT_"+key);
+ console.log("WK_AUTH_MIZIZI_CHART_EXACT_LEASE_CONTEXT_RECOVERY_PERSISTENCE_NO_DISCLOSURE=PASS");
+ }
+
 
 
 }
