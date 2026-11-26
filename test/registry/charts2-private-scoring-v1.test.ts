@@ -1146,7 +1146,10 @@ describe("Charts 2 existing Registry candidate discovery",()=>{
     expect(lane).toContain("preview.unresolved");
     expect(lane).toContain('readCharts2RegistryDiscoveryV1(server,preview.unresolved)');
     expect(REGISTRY_DISCOVERY_SHARED).toContain('charts2_registry_discovery_catalogue_bound');
-    expect(REGISTRY_DISCOVERY_SHARED).not.toMatch(/\.(insert|upsert|update|delete)\(/);
+    const sharedRead=REGISTRY_DISCOVERY_SHARED.slice(
+      REGISTRY_DISCOVERY_SHARED.indexOf("export async function readCharts2RegistryTracksV1("),
+      REGISTRY_DISCOVERY_SHARED.indexOf("// Server-side read-only admission input."));
+    expect(sharedRead).not.toMatch(/\.(insert|upsert|update|delete)\(/);
     expect(lane).not.toMatch(/\.(insert|upsert|update|delete)\(/);
     expect(lane).not.toContain("admin_admit_registry_track_provider_link_v1");
     expect(STUDIO_PAGE).toContain('invokeStudio("studio_registry_discovery")');
@@ -1297,4 +1300,70 @@ describe("Shared exact private original byte authority",()=>{
   await expect(verifyCharts2OriginalBytesV1(receipt,wrong)).rejects.toThrow("bytes_mismatch");
   await expect(verifyCharts2OriginalBytesV1({...receipt,original_bucket:"public"},bytes)).rejects.toThrow("receipt_invalid");
  });
+});
+
+describe("Shared Registry-first catalogue transport",()=>{
+  const trackId=UUID(501),otherId=UUID(502),artistId=UUID(800);
+  const catalogue=Array.from({length:502},(_,i)=>({
+    id:UUID(i+1),title:i>=500?"Home Bound":"Unrelated "+i,status:"active",
+    isrc:null,slug:"track-"+i,duration_ms:null,release_id:null,
+  }));
+  const unresolved=[{source_key:"youtube_ke",receipt_id:UUID(900),rank:1,
+    original_sha256:"a".repeat(64),title:"Home-bound",artist:"Alias A",provider_track_id:"video:one"}];
+  function client(options:{duplicatePage?:boolean;missingDetail?:boolean;unavailable?:boolean;aliasOverflow?:boolean}={}){
+    const calls:Array<{table:string;fields:string;cursor:string|null;limit:number|null}>= [];
+    const server={from:(table:string)=>{
+      let fields="",cursor:string|null=null,limit:number|null=null,ids:string[]|null=null;
+      const q={
+        select:(v:string)=>{fields=v;return q;},
+        eq:()=>q,order:()=>q,
+        gt:(_field:string,v:string)=>{cursor=v;return q;},
+        limit:(v:number)=>{limit=v;return q;},
+        in:(_field:string,v:string[])=>{ids=v;return q;},
+        then(resolve:(v:unknown)=>unknown){
+          calls.push({table,fields,cursor,limit});
+          let data:unknown[]=[];
+          if(options.unavailable)return Promise.resolve({data:null,error:{message:"offline"}}).then(resolve);
+          if(table==="registry_tracks"&&fields==="id,title"){
+            data=catalogue.filter(t=>!cursor||options.duplicatePage||t.id>cursor).slice(0,limit??500);
+          }else if(table==="registry_tracks"){
+            data=catalogue.filter(t=>ids?.includes(t.id)&&!(options.missingDetail&&t.id===otherId));
+          }else if(table==="registry_track_artists"){
+            data=[{track_id:trackId,artist_id:artistId,artist_name_text:"Artist A",is_primary:true}];
+          }else if(table==="registry_track_provider_links"){
+            data=[{track_id:trackId,provider_key:"youtube",match_method:"manual"}];
+          }else if(table==="registry_artists"){
+            data=[{id:artistId,display_name:"Artist A",origin_iso2:"KE",status:"active"}];
+          }else if(table==="registry_artist_aliases"){
+            const alias={canonical_artist_id:artistId,alias_display_name:"Alias A",alias_slug:"alias-a"};
+            data=options.aliasOverflow?Array(501).fill(alias):[alias];
+          }else throw Error("unexpected table");
+          return Promise.resolve({data,error:null}).then(resolve);
+        }
+      };
+      return q;
+    }};
+    return {server,calls};
+  }
+  it("scans past the first 500 tracks, keeps both same-title candidates, and reads canonical artist aliases",async()=>{
+    const {server,calls}=client();
+    const result=await readCharts2RegistryDiscoveryV1(server,unresolved);
+    expect(result).toMatchObject({candidate_only:true,can_publish:false,catalogue_scanned:502,
+      unique_positions:0,ambiguous_positions:1,unmatched_positions:0});
+    expect(result.groups.map(g=>g.track.id).sort()).toEqual([trackId,otherId]);
+    expect(result.groups.find(g=>g.track.id===trackId)?.positions[0]).toMatchObject({
+      candidate_count:2,credit_evidence:"artist_credit_agrees",receipt_id:UUID(900)});
+    expect(result.groups.find(g=>g.track.id===otherId)?.positions[0].credit_evidence).toBe("artist_credit_unconfirmed");
+    expect(calls.filter(c=>c.table==="registry_tracks"&&c.fields==="id,title").map(c=>c.cursor))
+      .toEqual([null,UUID(500)]);
+    expect(calls.some(c=>c.table==="registry_artist_aliases")).toBe(true);
+  });
+  it("rejects cursor repeats, missing candidate details, unavailable catalogue and truncated alias reads",async()=>{
+    for(const [options,code] of [
+      [{duplicatePage:true},"cursor_invalid"],[{missingDetail:true},"catalogue_changed"],
+      [{unavailable:true},"catalogue_unavailable"],[{aliasOverflow:true},"alias_bound"],
+    ] as const){
+      await expect(readCharts2RegistryDiscoveryV1(client(options).server,unresolved)).rejects.toThrow(code);
+    }
+  });
 });
