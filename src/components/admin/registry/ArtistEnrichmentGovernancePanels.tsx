@@ -77,7 +77,7 @@ export function ArtistEnrichPanel({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div className="rounded-2xl border border-wk-border bg-wk-surface p-4">
+    <div data-wk-registry-artist-panel="enrichment" className="rounded-2xl border border-wk-border bg-wk-surface p-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-wk-surface-raised">
@@ -271,7 +271,7 @@ export function ArtistTypePanel({ onDone }: { onDone: () => void }) {
   const heuristic = typeRows.filter((row) => row.typeChange?.new && row.typeChange.source !== "musicbrainz").length;
 
   return (
-    <div className="rounded-2xl border border-wk-border bg-wk-surface p-4">
+    <div data-wk-registry-artist-panel="type" className="rounded-2xl border border-wk-border bg-wk-surface p-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50">

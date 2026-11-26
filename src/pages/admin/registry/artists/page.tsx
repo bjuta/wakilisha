@@ -298,6 +298,8 @@ function ArtistCard({
       {/* Checkbox */}
       <div className="absolute left-3 top-3 z-20">
         <button
+          aria-label={`Select ${artist._displayName}`}
+          aria-pressed={selected}
           onClick={(e) => {
             e.stopPropagation();
             onToggleSelect(String(artist.id));
@@ -609,7 +611,7 @@ function ArtistOriginPanel({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div className="rounded-2xl border border-wk-border bg-wk-surface p-4">
+    <div data-wk-registry-artist-panel="origin" className="rounded-2xl border border-wk-border bg-wk-surface p-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-wk-warning-soft">

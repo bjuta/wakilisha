@@ -571,3 +571,102 @@ test("Article Credit selects other existing writers and Registry Authors without
     await page.unroute("https://example.supabase.co/rest/v1/rpc/**");
   }
 });
+
+
+/** Render the actual Artists page with read-only local fixture responses. */
+test("Registry Artists theme follows shared tokens across list, panels and publish confirmation", async ({ page }) => {
+  test.skip(process.env.WK_REGISTRY_ARTISTS_UI_FIXTURE !== "1", "Run with isolated Registry Artists browser fixture credentials");
+  const artist = {
+    id: "10b940ff-3382-42b3-a81b-30e4028297d",
+    display_name: "WK Draft Artist Theme Fixture",
+    slug: "wk-draft-artist-theme-fixture",
+    normalized_name: "wk draft artist theme fixture",
+    status: "draft",
+    origin_iso2: null,
+    public_image_url: null,
+    updated_at: "2026-11-26T08:14:03Z",
+  };
+  const unexpected: string[] = [];
+  let listReads = 0;
+  await page.route("https://example.supabase.co/**", async (route) => {
+    const request = route.request();
+    const method = request.method();
+    const path = new URL(request.url()).pathname;
+    const cors = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, HEAD, OPTIONS",
+      "access-control-allow-headers": request.headers()["access-control-request-headers"] ?? "*",
+      "access-control-expose-headers": "content-range",
+    };
+    if (method === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: cors });
+    } else if (method === "GET" && path === "/functions/v1/admin-router/registry/entities") {
+      listReads++;
+      await route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify({ ok: true, data: [artist] }) });
+    } else if (method === "HEAD" && path === "/rest/v1/registry_artists") {
+      await route.fulfill({ status: 200, headers: { ...cors, "content-range": "0-0/1" } });
+    } else {
+      unexpected.push(method + " " + path);
+      await route.abort();
+    }
+  });
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await page.goto("/test/ui-browser/fixtures/interaction.html?fixture=registry-artists");
+  const root = page.locator("[data-wk-registry-artists]");
+  const card = root.locator("[data-wk-registry-artist-card]");
+  await expect(card).toHaveCount(1);
+  await expect(card.getByText(artist.display_name, { exact: true })).toBeVisible();
+  await expect(root.locator("[data-wk-registry-artist-panel]")).toHaveCount(3);
+  const backgrounds: Record<string, string> = {};
+  for (const theme of ["dark", "light"]) {
+    await page.evaluate(theme => document.documentElement.setAttribute("data-wk-theme", theme), theme);
+    for (const width of [1200, 768, 390]) {
+      await page.setViewportSize({ width, height: 800 });
+      const metrics = await root.evaluate(el => {
+        const probe = document.createElement("span");
+        document.body.appendChild(probe);
+        const color = (token: string) => {
+          probe.style.backgroundColor = "var(--wk-" + token + ")";
+          return getComputedStyle(probe).backgroundColor;
+        };
+        const expectedBg = color("bg");
+        const expectedSurface = color("surface");
+        probe.style.color = "var(--wk-text)";
+        const expectedText = getComputedStyle(probe).color;
+        probe.remove();
+        const surfaces = Array.from(el.querySelectorAll("[data-wk-registry-artist-card], [data-wk-registry-artist-filters], [data-wk-registry-artist-panel]"));
+        return {
+          background: getComputedStyle(el).backgroundColor,
+          text: getComputedStyle(el).color,
+          expectedBg, expectedSurface, expectedText,
+          surfaces: surfaces.map(node => getComputedStyle(node).backgroundColor),
+        };
+      });
+      expect(metrics.background).toBe(metrics.expectedBg);
+      expect(metrics.text).toBe(metrics.expectedText);
+      expect(metrics.surfaces).toEqual(Array(5).fill(metrics.expectedSurface));
+      backgrounds[theme] = metrics.background;
+    }
+    await page.setViewportSize({ width: 1200, height: 800 });
+    await card.getByRole("button", { name: "Select " + artist.display_name }).click();
+    await root.getByRole("button", { name: "Publish (1)", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Publish 1 artist?" });
+    await expect(dialog.getByText(artist.display_name, { exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Yes, publish 1" })).toBeVisible();
+    const modalPalette = await page.locator("[data-wk-modal-panel]").evaluate(el => {
+      const probe = document.createElement("span");
+      probe.style.backgroundColor = "var(--wk-surface)";
+      document.body.appendChild(probe);
+      const expected = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { actual: getComputedStyle(el).backgroundColor, expected };
+    });
+    expect(modalPalette.actual).toBe(modalPalette.expected);
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await root.getByRole("button", { name: "Clear selection" }).click();
+  }
+  expect(backgrounds.dark).not.toBe(backgrounds.light);
+  expect(listReads).toBeGreaterThan(0);
+  expect(unexpected).toEqual([]);
+});

@@ -1,5 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
+import type { Session } from "@supabase/supabase-js";
 import "@/index.css";
 import "@/design-system/wakilisha.tokens.css";
 import "@/design-system/wakilisha.elements.foundation.css";
@@ -25,6 +27,21 @@ const ArtistDiscographyDrawer = lazy(() =>
   import("@/components/admin/registry/artist-discography/ArtistDiscographyIntakeDrawer")
     .then(({ ArtistDiscographyIntakeDrawer }) => ({ default: ArtistDiscographyIntakeDrawer }))
 );
+
+// Isolated presentation fixture: no genuine identity or remote authority is
+// claimed. The Playwright test intercepts the synthetic endpoint and denies
+// every write. Do not mount this fixture against a real Supabase project.
+const RegistryArtistsThemeFixture = lazy(async () => {
+  if (import.meta.env.VITE_PUBLIC_SUPABASE_URL !== "https://example.supabase.co") {
+    throw new Error("Registry Artists presentation fixture requires synthetic endpoint");
+  }
+  const { supabase } = await import("@/lib/supabase");
+  supabase.auth.getSession = async () => ({
+    data: { session: { access_token: "wk-isolated-presentation-fixture" } as Session },
+    error: null,
+  });
+  return import("@/pages/admin/registry/artists/page");
+});
 
 function InteractionFixture() {
   const [open, setOpen] = useState(false);
@@ -290,5 +307,11 @@ function InteractionFixture() {
 initializeViewportIntegrityObserver();
 
 createRoot(document.getElementById("root")!).render(
-  <InteractionFixture />,
+  new URLSearchParams(window.location.search).get("fixture") === "registry-artists" ? (
+    <MemoryRouter>
+      <Suspense fallback={<p>Loading Registry Artists acceptance</p>}>
+        <RegistryArtistsThemeFixture />
+      </Suspense>
+    </MemoryRouter>
+  ) : <InteractionFixture />,
 );
