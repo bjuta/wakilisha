@@ -43,13 +43,14 @@ const TOOL_SPECS=[
  ["search_news","Discover public reporting leads using an authorized research query.",QUERY],
  ["read_page","Acquire and interpret a previously returned public source lead.",LEAD],
  ["render_page","Render a previously examined source whose native reading is insufficient.",LEAD],
+ ["browse_page","Open a returned reference in the browser or use a returned browser action. Set query to an empty string except for a Search action.",{...LEAD,query:{type:"string"}}],
  ["read_document","Read a selected page range of a previously acquired PDF.",{...LEAD,page_start:{type:"integer"},page_end:{type:"integer"}}],
  ["inspect_visual","Examine one authorized visual page or browser screenshot.",{...LEAD,page:{type:"integer"}}],
  ["query_provider","Consult an authorized specialist provider using a research query.",QUERY],
 ] as const;
 export type DeskToolNameV1=typeof TOOL_SPECS[number][0];
 export type DeskToolCallV1=Readonly<{name:DeskToolNameV1;input:Readonly<Record<string,string|number>>}>;
-export type DeskToolLeadV1=Readonly<{id:string;kind:"reference"|"document"|"render"|"visual";label:string}>;
+export type DeskToolLeadV1=Readonly<{id:string;kind:"reference"|"document"|"render"|"visual"|"browser_action";label:string}>;
 export type DeskToolResultV1=Readonly<{
  receiptId:string;leads:readonly DeskToolLeadV1[];sources:readonly SourceExcerptV1[];
  visual?:Readonly<{sourceId:string;body:Uint8Array;sha256:string;contentType:"image/png"}>;
@@ -281,7 +282,14 @@ function canonicalTool(name:unknown,input:unknown,enabled:Set<string>,leads:Map<
  const obj=record(input),keys=Object.keys(spec[2]);
  if(Object.keys(obj).length!==keys.length||keys.some(k=>!Object.hasOwn(obj,k)))fail("INVALID_ARGUMENTS");
  const value:Record<string,string|number>={};
- if(keys.includes("query")){
+ if(name==="browse_page"){
+  if(typeof obj.lead_id!=="string"||!UUID.test(obj.lead_id)||!leads.has(obj.lead_id))fail("UNOBSERVED_LEAD");
+  const lead=leads.get(obj.lead_id)!;
+  if(!["reference","browser_action"].includes(lead.kind))fail("LEAD_KIND_DENIED");
+  if(typeof obj.query!=="string"||(obj.query!==""&&!text(obj.query,300,3))||
+   (lead.kind==="reference"&&obj.query!==""))fail("INVALID_QUERY");
+  value.lead_id=obj.lead_id;value.query=obj.query;
+ }else if(keys.includes("query")){
   if(!text(obj.query,300,3))fail("INVALID_QUERY");value.query=obj.query;
  }else{
   if(typeof obj.lead_id!=="string"||!UUID.test(obj.lead_id)||!leads.has(obj.lead_id))fail("UNOBSERVED_LEAD");
@@ -475,7 +483,8 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
      !Array.isArray(raw.leads)||!Array.isArray(raw.sources)||raw.leads.length>20||
      raw.sources.length>MAX_SOURCES)fail("TOOL_RESULT_INVALID");
    const newLeads=raw.leads.map(l=>{
-    if(!l||!UUID.test(l.id)||!["reference","document","render","visual"].includes(l.kind)||
+    if(!l||!UUID.test(l.id)||!["reference","document","render","visual","browser_action"].includes(l.kind)||
+     (l.kind==="browser_action"&&call.name!=="browse_page")||
      !text(l.label,500)||leads.has(l.id))fail("LEAD_RECEIPT_INVALID");
     return Object.freeze({id:l.id,kind:l.kind,label:l.label});
    });

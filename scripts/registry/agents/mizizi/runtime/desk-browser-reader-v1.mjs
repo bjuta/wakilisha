@@ -6,7 +6,7 @@
  * exact disclosure/access authority and durable zero-cost account allocation.
  * No enabled implementation of those authorities is provided here.
  */
-import {createHash} from "node:crypto";
+import {createHash,randomUUID} from "node:crypto";
 import {isIP} from "node:net";
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const SHA=/^[0-9a-f]{64}$/;
@@ -541,4 +541,149 @@ export async function withDeskInteractiveBrowserV1(options,work){
    catch{fail("INTERACTIVE_CLEANUP_UNCONFIRMED");}
   }
  }
+}
+
+
+/** Model-facing navigation bridge, inside ONE live interactive session.
+ * A model sees only admitted source excerpts and opaque action IDs. It
+ * cannot supply a URL, selector, code, or fake observation. All capabilities,
+ * resource access, finance, and custody must be supplied by the trusted host.
+ * Do not enable this via the production dispatcher until its durable action
+ * and observation admission contract is installed. No default grants.
+ */
+export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveReference,
+ authorizeCall,authorizeQuery,admitObservation,visualAllowed=false,now=Date.now}={}){
+ const scope=scopeOf(rawScope,now());
+ if(!session||["navigate","follow","expand","scroll","search","observe","capture"].some(k=>typeof session[k]!=="function")||
+  [resolveReference,authorizeCall,authorizeQuery,admitObservation,now].some(f=>typeof f!=="function")||
+  typeof visualAllowed!=="boolean")fail("ACTION_ROUTER_CONFIGURATION");
+ const sameScope=s=>s&&JSON.stringify(scope)===JSON.stringify(s);
+ const cleanLabel=s=>typeof s==="string"?s.replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().slice(0,300).trim():"";
+ let actions=new Map(),issued=new Set(),calls=new Set(),current=null,busy=false,poisoned=false;
+ function live(){if(poisoned||now()>=Date.parse(scope.leaseExpiresAt))fail("ACTION_ROUTER_CLOSED");}
+ const observeShape=o=>o&&Number.isSafeInteger(o.generation)&&o.generation>0&&
+  typeof o.url==="string"&&safeUrl(o.url).href===o.url&&SHA.test(o.observationSha256)&&
+  typeof o.visibleText==="string"&&typeof o.accessibility==="string"&&Array.isArray(o.elements)&&o.elements.length<=80;
+ function freshId(){const id=randomUUID();if(issued.has(id))fail("ACTION_ID_COLLISION");issued.add(id);return id;}
+ // A bounded set of actionable controls, followed by page links. Reserve
+ // room for each capability rather than let a page's navigation menu
+ // crowd the research controls out of the model context.
+ function actionLeads(observation){
+  const entries=[];
+  const add=(kind,label,action,element=null)=>{
+   if(!label||entries.length>=8)return;
+   const lead=Object.freeze({id:freshId(),kind,label});
+   const target=Object.freeze({lead,action,element,generation:observation.generation,
+    url:observation.url,observationSha256:observation.observationSha256});
+   entries.push(target);
+  };
+  for(const type of ["expand","search","link"]){
+   const limit=type==="expand"?3:type==="search"?1:2;
+   let count=0;
+   for(const e of observation.elements){
+    if(e?.kind!==type||typeof e.ref!=="string"||e.ref.length>40||
+     type==="expand"&&e.expanded===true||count>=limit)continue;
+    const label=cleanLabel(e.label);if(!label)continue;
+    add("browser_action",type==="expand"?"Expand: "+label:type==="search"?"Search: "+label:"Follow: "+label,
+     type==="link"?"follow":type,e.ref);count++;
+   }
+  }
+  // Keep the action set small; a model can ask for the viewport explicitly.
+  add("browser_action","Scroll down","scroll_down");
+  if(visualAllowed)add("visual","Examine the current browser viewport","visual");
+  return entries;
+ }
+ async function execute(candidate,call,callSha256){
+  live();
+  if(busy||!sameScope(candidate)||!call||!SHA.test(callSha256)||
+   hash(JSON.stringify({scope:candidate,call}))!==callSha256||
+   !["browse_page","inspect_visual"].includes(call.name)||
+   !call.input||typeof call.input!=="object"||
+   typeof call.input.lead_id!=="string"||!UUID.test(call.input.lead_id)||
+   Object.keys(call.input).sort().join(",")!==(call.name==="browse_page"?"lead_id,query":"lead_id,page")||
+   calls.has(callSha256)||calls.size>=4)fail("ACTION_ROUTER_CALL_DENIED");
+  busy=true;
+  try{
+   if(await authorizeCall(scope,call,callSha256)!==true)fail("ACTION_ROUTER_AUTHORITY_DENIED");
+   live();
+   const id=call.input.lead_id,entry=actions.get(id);
+   if(issued.has(id)&&!entry)fail("ACTION_ROUTER_STALE_LEAD");
+   let selected;
+   if(entry){
+    if(!current||entry.generation!==current.generation||entry.observationSha256!==current.observationSha256||
+     entry.url!==current.url)fail("ACTION_ROUTER_STALE_LEAD");
+    selected=entry;
+   }else{
+    if(call.name!=="browse_page"||call.input.query!=="")fail("ACTION_ROUTER_LEAD_DENIED");
+    const reference=await resolveReference(scope,id);
+    if(!reference||reference.id!==id||reference.kind!=="reference"||!UUID.test(reference.receiptId??"")||
+     typeof reference.url!=="string"||safeUrl(reference.url).href!==reference.url)
+     fail("ACTION_ROUTER_LEAD_DENIED");
+    selected={action:"navigate",url:reference.url,receiptId:reference.receiptId};
+   }
+   const action=selected.action;
+   if(call.name==="inspect_visual"){
+    if(action!=="visual"||!visualAllowed||call.input.page!==1)fail("ACTION_ROUTER_VISUAL_DENIED");
+   }else if(action==="visual")fail("ACTION_ROUTER_VISUAL_DENIED");
+   if(call.name==="browse_page"){
+    const q=call.input.query;
+    if(typeof q!=="string"||q.length>300||q.trim()!==q||/[\p{Cc}\p{Cf}]/u.test(q)||
+     (action==="search"?q.length<3:q!==""))fail("ACTION_ROUTER_QUERY_DENIED");
+    if(action==="search"&&await authorizeQuery(scope,q,selected.url,callSha256)!==true)
+     fail("ACTION_ROUTER_QUERY_DENIED");
+   }
+   live();
+   if(await authorizeCall(scope,call,callSha256)!==true)fail("ACTION_ROUTER_AUTHORITY_DENIED");
+   // After a real action, every old control is invalid, including on error.
+   // The original discovery reference may be re-resolved by the host.
+   calls.add(callSha256);actions=new Map();
+   let observation;
+   try{
+    if(action==="navigate")observation=await session.navigate(selected.url);
+    else if(action==="follow")observation=await session.follow(selected.element,selected.generation);
+    else if(action==="expand")observation=await session.expand(selected.element,selected.generation);
+    else if(action==="search")observation=await session.search(selected.element,selected.generation,call.input.query);
+    else if(action==="scroll_down")observation=await session.scroll("down");
+    else if(action==="visual")observation=await session.observe();
+    else fail("ACTION_ROUTER_ACTION_DENIED");
+    live();
+    if(!observeShape(observation))fail("ACTION_ROUTER_OBSERVATION_INVALID");
+    const capture=await session.capture({visual:action==="visual"});
+    live();
+    if(capture?.contract!=="mizizi.desk_interactive_capture.v1"||
+     !sameScope(capture.scope)||capture.finalUrl!==observation.url||
+     capture.representation!=="rendered_dom_not_original_response"||
+     !(capture.body instanceof Uint8Array)||capture.body.length<1||capture.body.length>MAX_DOM||
+     hash(capture.body)!==capture.sha256||capture.identityVerified!==false||
+     capture.sourceRetentionAuthorized!==false||capture.externalModelProcessingAuthorized!==false||
+     (action==="visual"?(!validPng(capture.visual?.body)||hash(capture.visual.body)!==capture.visual.sha256):capture.visual!==null))
+     fail("ACTION_ROUTER_CAPTURE_INVALID");
+    // Capture and observation have different fingerprints: asynchronous DOM
+    // changes are possible. A trusted admitter must derive actual evidence
+    // from captured bytes, not claim the observation is the captured DOM.
+    const entries=action==="visual"?[]:actionLeads(observation);
+    const leads=entries.map(e=>e.lead);
+    const receiptId=freshId();
+    const result=await admitObservation(Object.freeze({scope,call,callSha256,receiptId,
+     parentLeadId:id,action,observation,capture,leads:Object.freeze(leads),
+     actionBindings:Object.freeze(entries.map(e=>Object.freeze({id:e.lead.id,url:e.url,action:e.action,
+      generation:e.generation,observationSha256:e.observationSha256})))}));
+    live();
+    if(!result||result.receiptId!==receiptId||JSON.stringify(result.leads)!==JSON.stringify(leads)||
+     !Array.isArray(result.sources)||result.sources.length>1||
+     result.sources.some(s=>s?.source?.sourceId!==receiptId||s.source.fingerprint!==capture.sha256||
+      s.source.caseId!==scope.caseId||s.source.workspaceId!==scope.workspaceId)||
+     (action==="visual"?(!result.visual||result.visual.sourceId!==receiptId||
+       result.visual.sha256!==capture.visual.sha256||hash(result.visual.body)!==capture.visual.sha256||
+       result.sources.length!==1):result.visual!==undefined))
+     fail("ACTION_ROUTER_CUSTODY_DENIED");
+    if(await authorizeCall(scope,call,callSha256)!==true)fail("ACTION_ROUTER_AUTHORITY_DENIED");
+    live();
+    current=Object.freeze({generation:observation.generation,url:observation.url,observationSha256:observation.observationSha256});
+    actions=new Map(entries.map(e=>[e.lead.id,e]));
+    return result;
+   }catch(error){poisoned=true;actions.clear();current=null;throw error;}
+  }finally{busy=false;}
+ }
+ return Object.freeze({execute,ownsLead:id=>issued.has(id)});
 }
