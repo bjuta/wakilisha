@@ -726,6 +726,92 @@ export async function verifyCharts2RealJwtRegistryV1({
   "STOP_DESK_PRIVATE_LEDGER_ACL");
  console.log("WK_AUTH_MIZIZI_DESK_ZERO_COST_POLICY_RESERVATION_CONSUME_RACES_REVOCATION=PASS");
  }
+ // Shared paid inference and zero-cost acquisition capacity. Disposable
+ // owner-issued fixture only; this is budget proof, not disclosure authority.
+ {
+ const quoteName="mizizi_quote_desk_resource_v1",reserveName="mizizi_reserve_desk_resource_v1",
+  consumeName="mizizi_consume_desk_resource_v1",eventName="mizizi_record_desk_resource_event_v1";
+ const account="d".repeat(64);
+ const descriptor=(resource,label,patch={})=>({p_binding_text:JSON.stringify({
+  scope:{jobId:job.job_id,caseId:pairedId,workspaceId:ws,expectedRevision:2,
+   workerId:activeWorker,leaseExpiresAt:context.leaseExpiresAt},
+  resource,requestSha256:createHash("sha256").update(label).digest("hex"),
+  accountFingerprint:account,model:resource==="anthropic"?"fixture-haiku":null,...patch})});
+ const firstReq=descriptor("anthropic","fixture-model-1");
+ fail(await call(quoteName,firstReq)===null,"STOP_RESOURCE_DEFAULT_ENABLED");
+ for(const [name,args] of [[quoteName,firstReq],[reserveName,{...firstReq,p_policy_revision:1,p_expected_units:1750}],
+  [consumeName,{p_reservation_id:randomUUID(),p_request_sha256:"a".repeat(64),p_account_fingerprint:account}],
+  [eventName,{p_reservation_id:randomUUID(),p_request_sha256:"a".repeat(64),p_account_fingerprint:account,p_state:"send_pending",p_detail:{}}]]){
+  denied(await first.user.rpc(name,args),"42501","STOP_RESOURCE_BROWSER_"+name);
+  denied(await subscriber.rpc(name,args),"42501","STOP_RESOURCE_SUBSCRIBER_"+name);
+ }
+ sql(`insert into mizizi_private.desk_resource_policy_versions_v1(
+  resource,revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+  exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,
+  allowance_start,allowance_end,valid_until,account_limit,daily_limit,case_limit,model_tariffs)
+ select v.resource,1,true,'${ws}','${account}','fixture:entitlement','fixture:capacity',
+  true,true,v.resource='anthropic',v.resource<>'anthropic',now()-interval '1 hour',now()+interval '1 hour',
+  now()+interval '10 minutes',v.cap,v.cap,v.cap,v.tariffs
+ from (values ('anthropic',3500,'{"fixture-haiku":{"pricingRef":"pricing:fixture-haiku","maxInputTokens":5000,"maxOutputTokens":2500,"inputRate":100000,"outputRate":500000}}'::jsonb),
+ ('native_https',2000000,'{}'::jsonb),('cloudflare_browser_run',240,'{}'::jsonb)) v(resource,cap,tariffs);`);
+ const q=await call(quoteName,firstReq);
+ fail(q.units===1750&&q.maximumCostMicrousd===1750&&q.maxInputTokens===5000&&q.maxOutputTokens===2500&&
+  q.pricingRef==="pricing:fixture-haiku"&&q.bindingSha256===createHash("sha256").update(firstReq.p_binding_text).digest("hex")&&
+  !Object.hasOwn(q,"modelDisclosureAllowed"),"STOP_RESOURCE_QUOTE_OR_DISCLOSURE");
+ fail(await call(quoteName,descriptor("anthropic","wrong-model",{model:"fixture-opus"}))===null&&
+  await call(quoteName,descriptor("anthropic","wrong-key",{accountFingerprint:"e".repeat(64)}))===null&&
+  await call(reserveName,{...firstReq,p_policy_revision:1,p_expected_units:1})===null,"STOP_RESOURCE_UNDERQUOTE_OR_CREDENTIAL");
+ const reserve=(req,units)=>({...req,p_policy_revision:1,p_expected_units:units});
+ const firstRace=await Promise.all([service.rpc(reserveName,reserve(firstReq,1750)),service.rpc(reserveName,reserve(firstReq,1750))]);
+ fail(firstRace.every(x=>!x.error)&&firstRace.filter(x=>x.data!==null).length===1,"STOP_RESOURCE_DUPLICATE_RACE");
+ const paid=firstRace.find(x=>x.data!==null).data;
+ const finalRace=await Promise.all([service.rpc(reserveName,reserve(descriptor("anthropic","fixture-model-2"),1750)),
+  service.rpc(reserveName,reserve(descriptor("anthropic","fixture-model-3"),1750))]);
+ fail(finalRace.every(x=>!x.error)&&finalRace.filter(x=>x.data!==null).length===1,"STOP_RESOURCE_LAST_SLOT");
+ const paid2=finalRace.find(x=>x.data!==null).data;
+ const args=r=>({p_reservation_id:r.reservationId,p_request_sha256:r.requestSha256,p_account_fingerprint:account});
+ const event=(r,state,detail={})=>call(eventName,{...args(r),p_state:state,p_detail:detail});
+ fail(await event(paid,"send_pending")===false,"STOP_RESOURCE_EVENT_BEFORE_CONSUME");
+ const consumeRace=await Promise.all([service.rpc(consumeName,args(paid)),service.rpc(consumeName,args(paid))]);
+ fail(consumeRace.every(x=>!x.error)&&consumeRace.filter(x=>x.data===true).length===1&&
+  consumeRace.filter(x=>x.data===false).length===1,"STOP_RESOURCE_CONSUME_RACE");
+ fail(await event(paid,"send_pending")===true&&await event(paid,"send_pending")===true&&
+  await event(paid,"response_metered",{inputTokens:5001,outputTokens:1,cacheCreationTokens:0,cacheReadTokens:0})===false&&
+  await event(paid,"response_unconfirmed")===true&&
+  await event(paid,"response_metered",{inputTokens:1,outputTokens:1,cacheCreationTokens:0,cacheReadTokens:0})===false&&
+  await call(reserveName,reserve(descriptor("anthropic","fixture-model-4"),1750))===null,
+  "STOP_RESOURCE_UNKNOWN_CHARGE_OR_EVENT");
+ const nativeReq=descriptor("native_https","fixture-hop");
+ const native=await call(reserveName,reserve(nativeReq,2000000));
+ fail(native.units===2000000&&native.maximumCostMicrousd===0&&await call(consumeName,args(native))===true&&
+  await call(reserveName,reserve(descriptor("native_https","fixture-hop-2"),2000000))===null,"STOP_RESOURCE_NATIVE_CAP");
+ const browser=await call(reserveName,reserve(descriptor("cloudflare_browser_run","fixture-browser"),120));
+ const browser2=await call(reserveName,reserve(descriptor("cloudflare_browser_run","fixture-browser-2"),120));
+ fail(browser.units===120&&browser.maximumCostMicrousd===0&&await call(consumeName,args(browser))===true&&
+  await event(browser,"open_pending")===true&&await event(browser,"opened",{sessionId:pairedId})===true&&
+  await event(browser,"close_acknowledged",{sessionId:staleId})===false&&
+  await event(browser,"cleanup_unconfirmed",{sessionId:pairedId})===true&&
+  await call(reserveName,reserve(descriptor("cloudflare_browser_run","fixture-browser-3"),120))===null,
+  "STOP_RESOURCE_BROWSER_LIFECYCLE");
+ sql(`insert into mizizi_private.desk_resource_policy_versions_v1(
+ resource,revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+ exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,
+ allowance_start,allowance_end,valid_until,account_limit,daily_limit,case_limit,model_tariffs)
+ select resource,2,false,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+ exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,
+ allowance_start,allowance_end,valid_until,account_limit,daily_limit,case_limit,model_tariffs
+ from mizizi_private.desk_resource_policy_versions_v1 where revision=1;`);
+ fail(await call(consumeName,args(paid2))===false&&await call(consumeName,args(browser2))===false&&
+  await call(quoteName,firstReq)===null&&
+  sql("select count(*) from mizizi_private.desk_resource_reservations_v1;")==="5"&&
+  sql("select count(*) from mizizi_private.desk_resource_events_v1;")==="5",
+  "STOP_RESOURCE_REVOCATION_OR_HISTORY");
+ fail(sql("select (not has_table_privilege('service_role','mizizi_private.desk_resource_policy_versions_v1','INSERT') "+
+  "and not has_table_privilege('service_role','mizizi_private.desk_resource_reservations_v1','UPDATE') "+
+  "and not has_table_privilege('authenticated','mizizi_private.desk_resource_events_v1','SELECT'))::text;")==="true",
+  "STOP_RESOURCE_ACL");
+ console.log("WK_AUTH_MIZIZI_DESK_SHARED_RESOURCE_PRECHARGE_MODEL_BROWSER_NATIVE=PASS");
+ }
  const passBody=JSON.stringify({contract:"mizizi.adaptive_investigation.v1",caseId:pairedId,
   workspaceId:ws,ordinal:1,question:"Read-only local test of the exact chart lease.",
   predecessorFingerprint:null,sourceReceipts:[],findings:[],proposedLeads:[],
