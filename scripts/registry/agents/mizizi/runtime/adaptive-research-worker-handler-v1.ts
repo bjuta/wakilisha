@@ -97,6 +97,12 @@ export function runAnthropicAdaptiveResearchWorkerCycleV1(input:Readonly<
   anthropic:AnthropicInvestigationOptionsV1
  }
 >){
+ // The scoped chart context expressly denies external model processing.
+ // An open-licence excerpt is not permission to disclose the private question.
+ // The future separately authorized chart provider/model composition must
+ // establish that authority; never use this generic external-model shortcut.
+ if(input?.chartScope!==undefined)
+  throw new Error("MIZIZI_CHART_EXTERNAL_MODEL_PERMISSION_REQUIRED");
  const {anthropic,...worker}=input;
  let unconsumedTokenUnits=0;
  const analyze=createAnthropicInvestigationAnalystV1({

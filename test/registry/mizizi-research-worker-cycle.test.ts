@@ -7,6 +7,7 @@ import {createMusicBrainzWorkReaderV1} from "../../scripts/registry/agents/miziz
 import {createAdaptiveResearchWorkerHandlerV1,runAdaptiveResearchWorkerCycleV1,runAnthropicAdaptiveResearchWorkerCycleV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
 import {
   runResearchWorkerCycleV1,
+  createChartOriginalStorageReaderV1,
   researchRetryDecisionV1,
   type WorkerRpc,
   type ResearchJobV1,
@@ -373,6 +374,28 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   const h=scoped({contexts:[context,context,{...context,observationSha256:"c".repeat(64)}]});
   await expect(h.run(async()=>finding)).rejects.toThrow("CONTEXT_CHANGED_BEFORE_COMPLETION");
   expect(h.calls).toHaveLength(5);
+ });
+ it("uses only the exact private content-addressed Storage object",async()=>{
+  const download=vi.fn(async()=>({data:new Blob([bytes]),error:null}));
+  const from=vi.fn(()=>({download}));
+  const read=createChartOriginalStorageReaderV1({from});
+  await expect(read(position as never)).resolves.toEqual(bytes);
+  expect(from).toHaveBeenCalledWith("charts2-evidence-private-v1");
+  expect(download).toHaveBeenCalledWith(position.original_object_key);
+  for(const patch of [{original_bucket:"public"},{original_object_key:"../secret"},
+   {source_key:"unknown"},{original_byte_length:4000001}]){
+   await expect(read({...position,...patch} as never)).rejects.toThrow("COORDINATE_DENIED");
+  }
+  expect(from).toHaveBeenCalledTimes(1);
+  const missing=createChartOriginalStorageReaderV1({from:()=>({download:async()=>({
+   data:null,error:{message:"not found"}})})});
+  await expect(missing(position as never)).rejects.toThrow("ORIGINAL_UNAVAILABLE");
+ });
+ it("does not route chart cases through the generic hosted-model shortcut",()=>{
+  const h=scoped();
+  expect(()=>runAnthropicAdaptiveResearchWorkerCycleV1({chartScope:scope} as never))
+   .toThrow("MIZIZI_CHART_EXTERNAL_MODEL_PERMISSION_REQUIRED");
+  expect(h.calls).toHaveLength(0);
  });
  it("requires private Storage bytes before any research handler or completion",async()=>{
   for(const readOriginal of [

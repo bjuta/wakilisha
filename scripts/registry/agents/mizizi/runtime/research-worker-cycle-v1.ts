@@ -119,6 +119,35 @@ const CHART_MIME:Readonly<Record<string,readonly string[]>>=Object.freeze({
 const CHART_EXT:Readonly<Record<string,string>>={
  "text/html":"html","text/csv":"csv","application/json":"json",
 };
+/** Construct a private Storage-only reader from a trusted server client.
+ * It accepts no URL, user-supplied bucket or arbitrary object path; the
+ * leased coordinate is content addressed. A successful download is not
+ * evidence until the worker verifies the actual bytes against the receipt.
+ */
+export function createChartOriginalStorageReaderV1(storage:Readonly<{
+ from:(bucket:string)=>Readonly<{download:(key:string)=>PromiseLike<{
+  data:Blob|null;error:unknown;
+ }>}>
+}>):ChartResearchScopeV1["readOriginal"]{
+ if(typeof storage?.from!=="function")throw new TypeError("MIZIZI_CHART_STORAGE_REQUIRED");
+ return async(position)=>{
+  const p=position;
+  if(!p||typeof p.source_key!=="string"||!Object.hasOwn(CHART_MIME,p.source_key)||
+     typeof p.original_sha256!=="string"||!CHART_SHA.test(p.original_sha256)||
+     !CHART_MIME[p.source_key].includes(p.original_content_type)||
+     p.original_bucket!=="charts2-evidence-private-v1"||
+     p.original_object_key!==p.source_key+"/"+p.original_sha256.slice(0,2)+"/"+
+      p.original_sha256+"."+CHART_EXT[p.original_content_type]||
+     !Number.isSafeInteger(p.original_byte_length)||p.original_byte_length<1||
+     p.original_byte_length>4000000)
+   throw new TypeError("MIZIZI_CHART_STORAGE_COORDINATE_DENIED");
+  const response=await storage.from("charts2-evidence-private-v1").download(p.original_object_key);
+  if(!response||response.error||!response.data||
+     response.data.size!==p.original_byte_length||typeof response.data.arrayBuffer!=="function")
+   throw new Error("MIZIZI_CHART_ORIGINAL_UNAVAILABLE");
+  return new Uint8Array(await response.data.arrayBuffer());
+ };
+}
 function boundedChartText(value:unknown,nullable:boolean):string|null{
  if(value===null&&nullable)return null;
  if(typeof value!=="string"||value.length<1||value.length>1000||
