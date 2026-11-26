@@ -843,9 +843,9 @@ export async function verifyCharts2RealJwtRegistryV1({
  }
  sql(`insert into mizizi_private.desk_custody_policy_versions_v1(
   workspace_id,host,revision,enabled,source_family,authority_ref,origin_key,lineage_key,use_basis,
-  private_research_allowed,metadata_retention_allowed,excerpt_retention_allowed,external_model_processing_allowed,valid_until)
+  private_research_allowed,metadata_retention_allowed,excerpt_retention_allowed,external_model_processing_allowed,browser_render_allowed,visual_processing_allowed,valid_until)
  select '${ws}',v.host,1,true,v.family,'fixture:reviewed-rights','fixture:original-origin',
-  'fixture:common-lineage','documented_contract',true,true,v.family='public_web',true,now()+interval '10 minutes'
+  'fixture:common-lineage','documented_contract',true,true,v.family='public_web',true,v.family='public_web',v.family='public_web',now()+interval '10 minutes'
  from (values ('api.search.brave.com','brave_discovery'),('archive.org','public_web')) v(host,family);`);
  const p=await call(policyName,{p_scope:scope,p_host:host});
  fail(p.host===host&&p.revision===1&&p.excerptRetentionAllowed===true&&p.externalModelProcessingAllowed===true,
@@ -870,12 +870,11 @@ export async function verifyCharts2RealJwtRegistryV1({
   fingerprint:sourceSha256,authorityRef:p.authorityRef,useBasis:p.useBasis,observedAt:retrievedAt,
   expiresAt:p.validUntil,revokedAt:null,privateResearchAllowed:true,
   externalModelProcessingAllowed:true,privateEvidenceRetentionAllowed:true};
- const excerpt={source,excerpt:"Synthetic original evidence for disposable acceptance.",citation:url+"#plain_text"};
- const pageResult={receiptId:pageId,leads:[{id:nextLead,kind:"reference",label:"Further reference"}],sources:[excerpt],visual:null};
+ const excerpt={source,excerpt:"Synthetic original evidence for disposable acceptance.",citation:url+"#pdf_page:1"};
+ const pageResult={receiptId:pageId,leads:[{id:nextLead,kind:"document",label:"PDF document — 4 pages"}],sources:[excerpt],visual:null};
  const pageProvenance={requestedUrl:url,finalUrl:url,sourceSha256,projectionSha256:hash("synthetic projection"),
-  contentType:"text/plain",retrievedAt,byteLength:22,hopSha256:[nativeHop],locator:"plain_text"};
- const pageArgs=binding("read_page",{lead_id:leadId},pageResult,host,pageProvenance,
-  [{id:nextLead,url:"https://archive.org/details/another"}]);
+  contentType:"application/pdf",retrievedAt,byteLength:22,hopSha256:[nativeHop],locator:"pdf_page:1",documentPages:4,renderRequired:false};
+ const pageArgs=binding("read_page",{lead_id:leadId},pageResult,host,pageProvenance,[{id:nextLead,url}]);
  const forged=binding("read_page",{lead_id:randomUUID()},pageResult,host,pageProvenance,pageArgs.p_lead_bindings);
  fail(await call(appendName,forged)===null&&
   await call(appendName,{...pageArgs,p_provenance:{...pageProvenance,hopSha256:["e".repeat(64)]}})===null,
@@ -887,6 +886,50 @@ export async function verifyCharts2RealJwtRegistryV1({
  fail(admitted.receiptId===pageId&&admitted.outcome==="created","STOP_CUSTODY_SOURCE_ADMISSION");
  fail((await call(readName,{p_scope:scope,p_receipt_id:pageId})).resultText===pageArgs.p_result_text,
   "STOP_CUSTODY_EXACT_SOURCE_READBACK");
+ // Same original PDF, no new network allocation. Follow-up is an exact
+ // same-lease derivative, never a second independent origin.
+ const docId=randomUUID(),visualId=randomUUID();
+ const derivative={parentReceiptId:pageId,finalUrl:url,sourceSha256,
+  contentType:"application/pdf",retrievedAt,byteLength:22};
+ const docResult={receiptId:docId,leads:[],sources:[{source:{...source,sourceId:docId},
+  excerpt:"Page 2: synthetic archival source.",citation:url+"#pdf_pages:2-3"}],visual:null};
+ const docMeta={...derivative,projectionSha256:hash("pages two and three"),locator:"pdf_pages:2-3",detail:{pageStart:2,pageEnd:3}};
+ const docArgs=binding("read_document",{lead_id:nextLead,page_start:2,page_end:3},docResult,host,docMeta,[]);
+ fail(await call(appendName,{...docArgs,p_provenance:{...docMeta,sourceSha256:"e".repeat(64)}})===null&&
+  await call(appendName,{...docArgs,p_provenance:{...docMeta,parentReceiptId:searchId}})===null,
+  "STOP_CUSTODY_DERIVATIVE_FORGED_PARENT_OR_PAYLOAD");
+ const outside=binding("read_document",{lead_id:nextLead,page_start:2,page_end:5},docResult,host,
+  {...docMeta,detail:{pageStart:2,pageEnd:5}},[]);
+ fail(await call(appendName,outside)===null,"STOP_CUSTODY_DERIVATIVE_PAGE_BOUND");
+ fail((await call(appendName,docArgs)).outcome==="created"&&(await call(appendName,docArgs)).outcome==="replayed",
+  "STOP_CUSTODY_DOCUMENT_APPEND");
+ const image={sha256:hash("synthetic raster"),width:300,height:200,byteLength:55};
+ const visualResult={receiptId:visualId,leads:[],sources:[{source:{...source,sourceId:visualId},
+  excerpt:"Visual derivative for examination; no textual claim is verified.",citation:url+"#pdf_visual:2"}],
+  visual:{sourceId:visualId,sha256:image.sha256,contentType:"image/png"}};
+ const visualMeta={...derivative,projectionSha256:image.sha256,locator:"pdf_visual:2",detail:{page:2,visual:image}};
+ const visualArgs=binding("inspect_visual",{lead_id:nextLead,page:2},visualResult,host,visualMeta,[]);
+ fail(await call(appendName,{...visualArgs,p_provenance:{...visualMeta,detail:{page:2,visual:{...image,width:9999}}}})===null,
+  "STOP_CUSTODY_RASTER_BOUND");
+ fail((await call(appendName,visualArgs)).outcome==="created"&&
+  (await call(readName,{p_scope:scope,p_receipt_id:visualId})).resultText===visualArgs.p_result_text&&
+  (await call(readName,{p_scope:scope,p_receipt_id:docId})).resultText===docArgs.p_result_text,
+  "STOP_CUSTODY_DERIVATIVE_READBACK");
+ fail(sql("select count(*) from mizizi_private.desk_tool_receipts_v1 where parent_receipt_id='"+pageId+"';")==="2",
+  "STOP_CUSTODY_DERIVATIVE_PARENT_LINK");
+ // Revoking discovery ancestry denies descendants even while source-family
+ // rights are still current. Historical immutable bytes remain private.
+ sql(`insert into mizizi_private.desk_custody_policy_versions_v1(
+ workspace_id,host,revision,enabled,source_family,authority_ref,origin_key,lineage_key,use_basis,
+ private_research_allowed,metadata_retention_allowed,excerpt_retention_allowed,external_model_processing_allowed,valid_until)
+ select workspace_id,host,2,false,source_family,authority_ref,origin_key,lineage_key,use_basis,
+ private_research_allowed,metadata_retention_allowed,excerpt_retention_allowed,external_model_processing_allowed,valid_until
+ from mizizi_private.desk_custody_policy_versions_v1 where revision=1 and host='api.search.brave.com';`);
+ fail(await call(readName,{p_scope:scope,p_receipt_id:visualId})===null&&
+  await call(readName,{p_scope:scope,p_receipt_id:docId})===null&&
+  await call(resolveName,{p_scope:scope,p_lead_id:nextLead})===null,
+  "STOP_CUSTODY_DERIVATIVE_ANCESTRY_REVOCATION");
+ console.log("WK_AUTH_MIZIZI_DESK_DERIVATIVE_DOCUMENT_VISUAL_ANCESTRY=PASS");
  sql(`insert into mizizi_private.desk_custody_policy_versions_v1(
  workspace_id,host,revision,enabled,source_family,authority_ref,origin_key,lineage_key,use_basis,
  private_research_allowed,metadata_retention_allowed,excerpt_retention_allowed,external_model_processing_allowed,valid_until)
@@ -895,7 +938,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  from mizizi_private.desk_custody_policy_versions_v1 where revision=1 and host='archive.org';`);
  fail(await call(readName,{p_scope:scope,p_receipt_id:pageId})===null&&
   await call(resolveName,{p_scope:scope,p_lead_id:nextLead})===null&&await call(appendName,pageArgs)===null&&
-  sql("select count(*) from mizizi_private.desk_tool_receipts_v1;")==="2"&&
+  sql("select count(*) from mizizi_private.desk_tool_receipts_v1;")==="4"&&
   sql("select count(*) from mizizi_private.desk_reference_leads_v1;")==="2","STOP_CUSTODY_REVOCATION");
  fail(sql("select (not has_table_privilege('service_role','mizizi_private.desk_custody_policy_versions_v1','INSERT') "+
   "and not has_table_privilege('service_role','mizizi_private.desk_tool_receipts_v1','UPDATE') "+
