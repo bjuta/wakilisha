@@ -68,6 +68,8 @@ type Options=Readonly<{
  searchTransport?:typeof fetch;
  discoveryTestSeams?:Parameters<typeof createDurableDeskPublicDiscoveryGatewayV1>[0]["resourceTestSeams"];
  nativeTestSeams?:Pick<NativeOptions,"resolve4"|"readPinned">;
+ /** Only operational composition enables lookup of separately authorized shared native fields. */
+ sharedNativeReuse?:boolean;
  now?:()=>number;
 }>;
 function urlOf(value:unknown):URL{
@@ -548,6 +550,40 @@ export function createDeskResearchDispatcherV1(options:Options){
    fail("TOOL_CALL_DENIED");
   }
   if(raw.kind!=="reference")fail("LEAD_KIND_DENIED");
+  if(options.sharedNativeReuse===true){
+   const receiptId=randomUUID(),binding={p_call_text:callText,p_call_sha256:callSha256,p_receipt_id:receiptId};
+   const offer=await rpc("mizizi_offer_desk_shared_source_v1",binding) as Record<string,unknown>|null;
+   if(offer!==null){
+    const o=offer as {contract:string;sourceReceiptId:string;sourceResultSha256:string;fieldKey:string;
+     attributionRevision:number;spanSha256:string;finalUrl:string;parentReceiptId:string;result:Omit<DeskToolResultV1,"visual">&{visual:null}};
+    const p=o?.result,entry=p?.sources?.[0],source=entry?.source;
+    if(o.contract!=="mizizi.desk_shared_source_offer.v1"||!UUID.test(o.sourceReceiptId)||o.sourceReceiptId===receiptId||
+     !SHA.test(o.sourceResultSha256)||!["recording_title","artist_credit","isrc","release_title","release_date","label","duration"].includes(o.fieldKey)||
+     !Number.isSafeInteger(o.attributionRevision)||o.attributionRevision<1||!SHA.test(o.spanSha256)||
+     o.finalUrl!==url||o.parentReceiptId!==raw.receiptId||p?.receiptId!==receiptId||
+     !Array.isArray(p.leads)||p.leads.length!==0||!Array.isArray(p.sources)||p.sources.length!==1||p.visual!==null||
+     !source||source.sourceId!==receiptId||source.externalModelProcessingAllowed!==true||!SHA.test(source.fingerprint)||
+     typeof entry.excerpt!=="string"||!entry.excerpt.length||Array.from(entry.excerpt).length>1000||
+     hash(entry.excerpt)!==o.spanSha256||![url+"#article_text",url+"#plain_text"].includes(entry.citation))
+     fail("SHARED_SOURCE_OFFER_DENIED");
+    verifyInvestigationSourceV1(source,identity,now());
+    // This is examination of a retained native derivative, not acquisition
+    // of new bytes. Bind the original fingerprint and exact attribution.
+    if(await examination(scope,{finalUrl:url,sha256:source.fingerprint,representation:"native_response_bytes",
+     pageStart:1,pageEnd:10,sharedSourceReceiptId:o.sourceReceiptId,sharedAttributionRevision:o.attributionRevision,
+     spanSha256:o.spanSha256})!==true)fail("SHARED_SOURCE_EXAMINATION_DENIED");
+    const result:DeskToolResultV1={receiptId,leads:[],sources:[{source,excerpt:entry.excerpt,citation:entry.citation}]};
+    const resultText=bodyOf(result),resultSha256=hash(resultText);
+    const admitted=await rpc("mizizi_admit_desk_shared_source_v1",{...binding,p_offer:offer,
+     p_result_text:resultText,p_result_sha256:resultSha256}) as {receiptId?:string;resultSha256?:string;outcome?:string}|null;
+    if(!admitted||admitted.receiptId!==receiptId||admitted.resultSha256!==resultSha256||
+     !["created","replayed"].includes(admitted.outcome??""))fail("SHARED_SOURCE_ADMISSION_DENIED");
+    const stored=await readReceipt(receiptId);
+    if(!stored||stored.row.callSha256!==callSha256||stored.row.resultSha256!==resultSha256||stored.row.resultText!==resultText)
+     fail("CUSTODY_READBACK_UNCONFIRMED");
+    return result;
+   }
+  }
   const receipt=await native({scope,url});
   const p=await policy(urlOf(receipt.finalUrl).hostname);
   if(!p||p.sourceFamily!=="public_web")fail("SOURCE_CUSTODY_DENIED");

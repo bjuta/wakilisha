@@ -238,7 +238,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     nativeAccountFingerprint:config.nativeAccountFingerprint,
     authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,
     browser:config.browser,localBrowser:config.localBrowser,
-    authorizeInteractiveCall:modelAuthority.authorizeTool,now:input.now});
+    authorizeInteractiveCall:modelAuthority.authorizeTool,sharedNativeReuse:operational?.toolNames.includes("read_page")===true,now:input.now});
    const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
    const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
    const deskPass=createCostRoutedDeskAnthropicPassV1({

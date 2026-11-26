@@ -895,14 +895,21 @@ export async function verifyCharts2RealJwtRegistryV1({
  const sharedArgs={p_scope:scope,p_source_receipt_id:standingPageId,p_field_key:"recording_title"};
  for(const actor of [first.user,subscriber])denied(await actor.rpc(sharedName,sharedArgs),"42501","STOP_SHARED_BROWSER_ACL");
  fail(await call(sharedName,sharedArgs)===null,"STOP_SHARED_DEFAULT_DENY");
- const sharedSpan="Synthetic standing source";
+ const sharedSpan="Synthetic standing source",sharedLeadId=randomUUID(),sharedSearchId=randomUUID(),sharedResultId=randomUUID();
+ const sharedOfferName="mizizi_offer_desk_shared_source_v1",sharedAdmitName="mizizi_admit_desk_shared_source_v1";
+ const aclArgs={p_call_text:JSON.stringify({scope,call:{name:"read_page",input:{lead_id:sharedLeadId}}}),
+  p_call_sha256:hash(JSON.stringify({scope,call:{name:"read_page",input:{lead_id:sharedLeadId}}})),p_receipt_id:sharedResultId};
+ for(const actor of [first.user,subscriber]){
+  denied(await actor.rpc(sharedOfferName,aclArgs),"42501","STOP_SHARED_OFFER_BROWSER_ACL");
+  denied(await actor.rpc(sharedAdmitName,{...aclArgs,p_offer:{},p_result_text:"{}",p_result_sha256:hash("{}")}),"42501","STOP_SHARED_ADMIT_BROWSER_ACL");
+ }
  const sharedScopeSql="current_setting('wk.shared_scope')::jsonb";
  const sharedRead=(field="recording_title",scopeSql=sharedScopeSql,source=standingPageId)=>
   "public."+sharedName+"("+scopeSql+","+q(source)+"::uuid,"+q(field)+")";
- const sharedColumns="workspace_id,target_case_id,source_receipt_id,field_key,revision,enabled,expected_revision,target_operational_revision,membership_sha256,observation_sha256,source_result_sha256,span_start,span_length,span_sha256,authority_ref,valid_until";
- const sharedInsert=(revision,enabled,sha=hash(sharedSpan))=>"insert into mizizi_private.desk_shared_attribution_versions_v1("+sharedColumns+") "+
+ const sharedColumns="workspace_id,target_case_id,source_receipt_id,field_key,revision,enabled,expected_revision,target_operational_revision,membership_sha256,observation_sha256,source_result_sha256,span_start,span_length,span_sha256,authority_ref,valid_until,model_disclosure_allowed";
+ const sharedInsert=(revision,enabled,sha=hash(sharedSpan),disclosure=false)=>"insert into mizizi_private.desk_shared_attribution_versions_v1("+sharedColumns+") "+
   "select workspace_id,case_id,"+q(standingPageId)+"::uuid,'recording_title',"+revision+","+enabled+",2,1,membership_sha256,observation_sha256,"+
-  q(hash(JSON.stringify({receiptId:standingPageId,leads:[],sources:[standingExcerpt],visual:null})))+",1,"+sharedSpan.length+","+q(sha)+",'fixture:independent-shared-field-review',now()+interval '2 minutes' "+
+  q(hash(JSON.stringify({receiptId:standingPageId,leads:[],sources:[standingExcerpt],visual:null})))+",1,"+sharedSpan.length+","+q(sha)+",'fixture:independent-shared-field-review',now()+interval '2 minutes',"+disclosure+" "+
   "from mizizi_private.chart_candidate_subjects_v1 where case_id="+q(sharedTarget)+"::uuid";
 
  const standingPage=binding("read_page",{lead_id:leadId},{receiptId:standingPageId,leads:[],sources:[standingExcerpt],visual:null},host,
@@ -983,7 +990,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
  max_rounds,max_request_bytes,access_rules,valid_until)
  select workspace_id,case_id,1,2,membership_sha256,observation_sha256,true,'fixture:receiving-owner-review',
- ${q(credential)},array['fixture-haiku'],array[${q(questionHash)}],array['read_page'],5,10000,${j(rules)},now()+interval '5 minutes'
+ ${q(credential)},array['fixture-haiku'],array[${q(questionHash)}],array['search_web','read_page'],5,10000,${j(rules)},now()+interval '5 minutes'
  from mizizi_private.chart_candidate_subjects_v1 where case_id=${q(sharedTarget)}::uuid;
  insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
  membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
@@ -1178,6 +1185,96 @@ export async function verifyCharts2RealJwtRegistryV1({
  reset role;
  rollback to savepoint receiver_policy_revocation;
  release savepoint receiver_policy_revocation;
+ -- One real receiving search/tool receipt, then an independently authorized
+ -- reuse of the exact discovered URL without a receiving native reservation.
+ insert into mizizi_private.desk_custody_policy_versions_v1(workspace_id,host,revision,enabled,source_family,
+ authority_ref,origin_key,lineage_key,use_basis,private_research_allowed,metadata_retention_allowed,excerpt_retention_allowed,
+ external_model_processing_allowed,valid_until)
+ values(${q(ws)},'en.wikipedia.org',1,true,'public_web','fixture:search-rights','fixture:wiki-origin','fixture:wiki-lineage',
+ 'open_license',true,true,false,true,now()+interval '5 minutes');
+ set local role service_role;
+ do $shared_search$ declare s jsonb:=${sharedScopeSql};c jsonb; label text; req text;reqhash text; account text:=${q(hash("standing wiki allocation"))};
+  calltext text;callhash text;resulttext text;resulthash text;slot jsonb;grant_value jsonb;
+ begin
+  c:=public.mizizi_read_leased_chart_research_context_v1((s->>'jobId')::uuid,s->>'workerId');
+  label:=c->'positions'->0->>'title';
+  calltext:=jsonb_build_object('scope',s,'call',jsonb_build_object('name','search_web','input',jsonb_build_object('query',label)))::text;
+  callhash:=encode(sha256(convert_to(calltext,'UTF8')),'hex');
+  if public.mizizi_authorize_desk_model_operation_v1(s,'tool_execute',calltext,callhash) is null then raise exception 'STOP_SHARED_SEARCH_TOOL';end if;
+  req:=jsonb_build_object('scope',s,'operation','search_web','query',label,'count',3,'provider','wikimedia','providerHost','en.wikipedia.org')::text;
+  reqhash:=encode(sha256(convert_to(req,'UTF8')),'hex');
+  grant_value:=public.mizizi_authorize_desk_search_v1(req,reqhash,account);
+  if grant_value is null then raise exception 'STOP_SHARED_SEARCH_GRANT';end if;
+  slot:=public.mizizi_reserve_desk_search_v1(req,reqhash,grant_value->>'policyRef',account);
+  if slot is null or not public.mizizi_consume_desk_search_v1((slot->>'reservationId')::uuid,reqhash,account)
+   then raise exception 'STOP_SHARED_SEARCH_RESERVATION';end if;
+  resulttext:=jsonb_build_object('receiptId',${q(sharedSearchId)},'leads',jsonb_build_array(jsonb_build_object(
+   'id',${q(sharedLeadId)},'kind','reference','label','Shared fixture archive')),'sources','[]'::jsonb,'visual',null)::text;
+  resulthash:=encode(sha256(convert_to(resulttext,'UTF8')),'hex');
+  if (public.mizizi_record_desk_tool_receipt_v1(calltext,callhash,resulttext,resulthash,'en.wikipedia.org',1,
+   jsonb_build_object('reservationId',slot->>'reservationId','requestSha256',reqhash,'requestText',req),
+   jsonb_build_array(jsonb_build_object('id',${q(sharedLeadId)},'url',${q(url)})))->>'outcome') is distinct from 'created'
+   then raise exception 'STOP_SHARED_SEARCH_RECEIPT';end if;
+  perform set_config('wk.shared_search_dep',jsonb_build_object('receiptId',${q(sharedSearchId)},'callSha256',callhash,'resultSha256',resulthash)::text,true);
+  calltext:=jsonb_build_object('scope',s,'call',jsonb_build_object('name','read_page','input',jsonb_build_object('lead_id',${q(sharedLeadId)})))::text;
+  callhash:=encode(sha256(convert_to(calltext,'UTF8')),'hex');
+  if public.mizizi_authorize_desk_model_operation_v1(s,'tool_execute',calltext,callhash) is null then raise exception 'STOP_SHARED_READ_TOOL';end if;
+  if public.mizizi_offer_desk_shared_source_v1(calltext,callhash,${q(sharedResultId)}::uuid) is not null
+   then raise exception 'STOP_SHARED_CANDIDATE_ONLY_DISCLOSURE';end if;
+  perform set_config('wk.shared_read_call',calltext,true);
+  perform set_config('wk.shared_read_hash',callhash,true);
+ end $shared_search$;
+ reset role;
+ ${sharedInsert(4,true,hash(sharedSpan),true)};
+ set local role service_role;
+ do $shared_admission$ declare s jsonb:=${sharedScopeSql};calltext text:=current_setting('wk.shared_read_call');
+  callhash text:=current_setting('wk.shared_read_hash');rid uuid:=${q(sharedResultId)}::uuid;offer jsonb;rt text;rh text;
+  forged text;access_text text;a jsonb;src jsonb;deps jsonb;env text;journal_body text;outcome_value jsonb;
+ begin
+  offer:=public.mizizi_offer_desk_shared_source_v1(calltext,callhash,rid);
+  if offer->>'sourceReceiptId' is distinct from ${q(standingPageId)}
+   or offer->>'fieldKey' is distinct from 'recording_title' or offer->>'attributionRevision' is distinct from '4'
+   then raise exception 'STOP_SHARED_OFFER';end if;
+  rt:=(offer->'result')::text;rh:=encode(sha256(convert_to(rt,'UTF8')),'hex');
+  if public.mizizi_admit_desk_shared_source_v1(calltext,callhash,rid,offer,rt,rh) is not null
+   then raise exception 'STOP_SHARED_MISSING_EXAMINATION';end if;
+  access_text:=jsonb_build_object('url',${q(url)},'descriptor',jsonb_build_object('finalUrl',${q(url)},'sha256',${q(sourceHash)},
+   'representation','native_response_bytes','pageStart',1,'pageEnd',10),'callSha256',callhash)::text;
+  if public.mizizi_authorize_desk_access_v1(s,'native_text',access_text,encode(sha256(convert_to(access_text,'UTF8')),'hex')) is null
+   then raise exception 'STOP_SHARED_RECEIVER_EXAMINATION';end if;
+  forged:=jsonb_set(rt::jsonb,'{sources,0,excerpt}','"forged"'::jsonb)::text;
+  if public.mizizi_admit_desk_shared_source_v1(calltext,callhash,rid,offer,forged,encode(sha256(convert_to(forged,'UTF8')),'hex')) is not null
+   then raise exception 'STOP_SHARED_FORGED_RESULT';end if;
+  outcome_value:=public.mizizi_admit_desk_shared_source_v1(calltext,callhash,rid,offer,rt,rh);
+  if outcome_value->>'outcome' is distinct from 'created'
+   or (public.mizizi_admit_desk_shared_source_v1(calltext,callhash,rid,offer,rt,rh)->>'outcome') is distinct from 'replayed'
+   or (public.mizizi_read_desk_tool_receipt_v1(s,rid)->>'resultText') is distinct from rt
+   or public.mizizi_read_desk_tool_receipt_v1(s,${q(standingPageId)}::uuid) is not null
+   then raise exception 'STOP_SHARED_ADMISSION_READBACK';end if;
+  src:=rt::jsonb->'sources'->0;a:=src->'source';
+  if a->>'caseId' is distinct from ${q(sharedTarget)} or a->>'sourceId' is distinct from rid::text
+   or a->>'lineageKey' is distinct from ${q(standingSource.lineageKey)} or a->>'fingerprint' is distinct from ${q(sourceHash)}
+   or src->>'excerpt' is distinct from ${q(sharedSpan)} then raise exception 'STOP_SHARED_LINEAGE';end if;
+  deps:=jsonb_build_array(current_setting('wk.shared_search_dep')::jsonb,jsonb_build_object('receiptId',rid,'callSha256',callhash,'resultSha256',rh));
+  env:=(${j(envelope(3,[],[]))}||jsonb_build_object('scope',s,'sourceIds',jsonb_build_array(rid),'toolReceipts',deps))::text;
+  if (public.mizizi_authorize_desk_model_operation_v1(s,'model_disclose',env,encode(sha256(convert_to(env,'UTF8')),'hex'))->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_SHARED_MODEL_DISCLOSURE';end if;
+  journal_body:=jsonb_build_object('contract','mizizi.adaptive_investigation.v1','caseId',${q(sharedTarget)},'workspaceId',${q(ws)},
+   'ordinal',1,'question',${q(question)},'predecessorFingerprint',null,'sourceReceipts',jsonb_build_array(jsonb_build_object(
+    'sourceId',rid,'originKey',a->'originKey','lineageKey',a->'lineageKey','payloadFingerprint',a->'fingerprint',
+    'useBasis',a->'useBasis','authorityRef',a->'authorityRef','observedAt',a->'observedAt','citation',src->'citation',
+    'excerpt',src->'excerpt','modelDisclosed',true)),'deskToolReceipts',deps,'findings','[]'::jsonb,'proposedLeads','[]'::jsonb,
+    'decision',jsonb_build_object('action','continue','nextQuestion',${q(nextQuestion)}),'passFinding','Synthetic receiving source evidence.','costUnits',1)::text;
+  if (select outcome from public.mizizi_append_research_pass_v1((s->>'jobId')::uuid,s->>'workerId',journal_body,
+    encode(sha256(convert_to(journal_body,'UTF8')),'hex'),null)) is distinct from 'created'
+   then raise exception 'STOP_SHARED_JOURNAL_ADMISSION';end if;
+  perform set_config('wk.shared_model_envelope',env,true);
+ end $shared_admission$;
+ reset role;
+ do $shared_cost$ begin
+ if exists(select 1 from mizizi_private.desk_resource_reservations_v1 where case_id=${q(sharedTarget)}::uuid and resource='native_https')
+  then raise exception 'STOP_SHARED_DUPLICATE_ACQUISITION';end if;
+ end $shared_cost$;
  insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
  membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
  max_rounds,max_request_bytes,access_rules,valid_until)
@@ -1189,6 +1286,12 @@ export async function verifyCharts2RealJwtRegistryV1({
  if ${read(searchId)} is not null or ${read(standingPageId)} is not null
  or ${authority("model_disclose",envelope(1,[],[]))} is not null then raise exception 'STOP_STANDING_REVOKED_USE';end if;
  if ${sharedRead()} is not null then raise exception 'STOP_SHARED_ORIGIN_REVOKED';end if;
+ if public.mizizi_read_desk_tool_receipt_v1(${sharedScopeSql},${q(sharedResultId)}::uuid) is not null
+ or public.mizizi_authorize_desk_model_operation_v1(${sharedScopeSql},'model_disclose',current_setting('wk.shared_model_envelope'),
+  encode(sha256(convert_to(current_setting('wk.shared_model_envelope'),'UTF8')),'hex')) is not null
+ then raise exception 'STOP_SHARED_REVOKED_MODEL';end if;
+ begin perform * from public.mizizi_read_research_passes_v1((${sharedScopeSql}->>'jobId')::uuid,${sharedScopeSql}->>'workerId');
+  raise exception 'STOP_SHARED_REVOKED_JOURNAL';exception when sqlstate '42501' then null;end;
  begin perform * from ${journalRead};raise exception 'STOP_STANDING_REVOKED_JOURNAL';
  exception when sqlstate '42501' then null;end;
  end $standing$;
@@ -1198,6 +1301,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  console.log("WK_AUTH_MIZIZI_DESK_PRODUCTIVE_LEASE_CONTINUATION=PASS");
  console.log("WK_AUTH_MIZIZI_LOCAL_BROWSER_CAPACITY_RECEIPT_CLEANUP=PASS");
  console.log("WK_AUTH_MIZIZI_SHARED_NATIVE_ATTRIBUTION_SCOPE_REVOCATION=PASS");
+ console.log("WK_AUTH_MIZIZI_SHARED_NATIVE_ADMISSION_MODEL_JOURNAL_NO_ACQUISITION=PASS");
  }
  const accessName="mizizi_authorize_desk_access_v1";
  const accessArgs=(operation,target=url,descriptor={})=>{

@@ -1908,7 +1908,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   return new TextEncoder().encode(pdf);
  }
  const call=(name:"search_web"|"read_page"|"read_document"|"inspect_visual"|"render_page",input:Record<string,string|number>)=>({name,input});
- function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams">={}){
+ function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse">={}){
   const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
   const receipts=new Map<string,Record<string,unknown>>(),leadRows=new Map<string,Record<string,unknown>>();
   const disabled=new Set<string>();
@@ -1947,6 +1947,25 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
      maximumCostMicrousd:0,...(fn==="mizizi_reserve_desk_resource_v1"?{reservationId:RECEIPT}:{})});
    }
    if(fn==="mizizi_record_desk_resource_event_v1")return ok(true);
+   if(fn==="mizizi_offer_desk_shared_source_v1"){
+    if(disabled.has("shared_miss"))return ok(null);
+    const bound=JSON.parse(String(args.p_call_text)),id=String(args.p_receipt_id),parent=leadRows.get(bound.call.input.lead_id);
+    const excerpt="Shared archival recording title.";
+    return ok({contract:"mizizi.desk_shared_source_offer.v1",sourceReceiptId:RECEIPT,sourceResultSha256:hash("original"),
+     fieldKey:"recording_title",attributionRevision:2,spanSha256:hash(disabled.has("shared_forged")?"forged":excerpt),
+     finalUrl:url,parentReceiptId:parent?.receiptId,result:{receiptId:id,leads:[],visual:null,sources:[{
+      source:{sourceId:id,caseId:CASE,workspaceId:WORKSPACE,originKey:"archive:original-origin",lineageKey:"archive:common-lineage",
+       fingerprint:hash(textBytes),authorityRef:"contract:reviewed-rights",useBasis:"documented_contract",
+       observedAt:new Date(NOW-1000).toISOString(),expiresAt:expiry,revokedAt:null,privateResearchAllowed:true,
+       externalModelProcessingAllowed:true,privateEvidenceRetentionAllowed:true},excerpt,citation:url+"#plain_text"}]}});
+   }
+   if(fn==="mizizi_admit_desk_shared_source_v1"){
+    if(disabled.has("shared_revoked"))return ok(null);
+    const id=String(args.p_receipt_id);
+    receipts.set(id,{receiptId:id,callSha256:args.p_call_sha256,resultSha256:args.p_result_sha256,
+     resultText:args.p_result_text,host:"archive.org",provenance:{sharedNative:true}});
+    return ok({receiptId:id,resultSha256:args.p_result_sha256,outcome:"created"});
+   }
    if(fn==="mizizi_record_desk_tool_receipt_v1"){
     const parsed=JSON.parse(String(args.p_result_text)),provenance={...(args.p_provenance as Record<string,unknown>)};
     delete provenance.requestText;
@@ -2018,6 +2037,31 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   await expect(guarded.read(identity)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
   await expect(guarded.append(identity,1,null,pass)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
   expect(base.append).toHaveBeenCalledTimes(1);
+ },20000);
+ it("reuses a separately authorized native field without a second acquisition and never falls back after a revoked or forged offer",async()=>{
+  const h=fixture(textBytes,"text/plain",{sharedNativeReuse:true});
+  const first=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
+  const read=call("read_page",{lead_id:first.leads[0].id});
+  const result=await h.execute(read),entry=result.sources[0];
+  expect(entry).toMatchObject({excerpt:"Shared archival recording title.",source:{sourceId:result.receiptId,
+   caseId:CASE,fingerprint:hash(textBytes),lineageKey:"archive:common-lineage"}});
+  expect(h.native).not.toHaveBeenCalled();
+  expect(h.access).not.toHaveBeenCalled();
+  expect(h.examination).toHaveBeenCalledTimes(1);
+  expect(h.calls.some(c=>c.fn==="mizizi_reserve_desk_resource_v1")).toBe(false);
+  expect(await h.dispatch.verifyToolReceipt(scope,{receiptId:result.receiptId,callSha256:hash(JSON.stringify({scope,call:read})),
+   resultSha256:hash(JSON.stringify({receiptId:result.receiptId,leads:[],sources:result.sources,visual:null}))},result)).toBe(true);
+  for(const mode of ["shared_forged","shared_revoked","native_text"]){
+   const denied=fixture(textBytes,"text/plain",{sharedNativeReuse:true});
+   const lead=await denied.execute(call("search_web",{query:"Nairobi recording archive"}));denied.disabled.add(mode);
+   await expect(denied.execute(call("read_page",{lead_id:lead.leads[0].id}))).rejects.toThrow(/SHARED_SOURCE_/);
+   expect(denied.native).not.toHaveBeenCalled();
+  }
+  const miss=fixture(textBytes,"text/plain",{sharedNativeReuse:true});
+  miss.disabled.add("shared_miss");
+  const lead=await miss.execute(call("search_web",{query:"Nairobi recording archive"}));
+  await miss.execute(call("read_page",{lead_id:lead.leads[0].id}));
+  expect(miss.native).toHaveBeenCalledTimes(1);
  },20000);
  it("reads additional PDF pages and rasterizes the same leased original without another native request or raw-byte persistence",async()=>{
   const pdf=pdfFixture(),h=fixture(pdf,"application/pdf");
