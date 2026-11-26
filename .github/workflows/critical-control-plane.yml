@@ -262,13 +262,14 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Prove Discography selection and Article Credits in real Chromium
+      - name: Prove Discography selection, Article Credits and Registry Artists themes in real Chromium
         env:
           WK_DISCOGRAPHY_UI_FIXTURE: "1"
           WK_ARTICLE_CREDIT_UI_FIXTURE: "1"
+          WK_REGISTRY_ARTISTS_UI_FIXTURE: "1"
           VITE_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
           VITE_PUBLIC_SUPABASE_ANON_KEY: "wk-synthetic-browser-only-no-credentials"
-        run: npm run test:ui-browser -- test/ui-browser/interaction-primitives.spec.ts --grep "Discography selected-only drawer|Article Credit selects"
+        run: npm run test:ui-browser -- test/ui-browser/interaction-primitives.spec.ts --grep "Discography selected-only drawer|Article Credit selects|Registry Artists theme"
 
       - name: Exercise shared authoring editor in isolated real Chromium
         env:

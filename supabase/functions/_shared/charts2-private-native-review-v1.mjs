@@ -133,3 +133,49 @@ export function buildCharts2PrivateNativeReviewV1({receipts}={}) {
     review_required:true,freeze_ready:false,can_publish:false,
   };
 }
+
+// Normalized title equality only discovers candidates. Punctuation/case
+// normalization never authorizes a recording identity or a credit.
+export const charts2RegistryDiscoveryKeyV1 = value => typeof value==="string"
+  ? value.normalize("NFKC").toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]/gu,"") : "";
+
+// Inputs are the server's unresolved positions and active Registry readback.
+// Each position retains its exact source coordinates; no transitive grouping,
+// fabricated provider ID, automatic selection, or identity mutation.
+export function buildCharts2RegistryDiscoveryV1({unresolved,tracks}){
+  if(!Array.isArray(unresolved)||unresolved.length>600||
+     !Array.isArray(tracks)||tracks.length>300)
+    fail("charts2_registry_discovery_input_bounds");
+  const index=new Map();
+  for(const track of tracks){
+    const key=charts2RegistryDiscoveryKeyV1(track.title);
+    if(track.status!=="active"||!key)continue;
+    const matches=index.get(key)??[];
+    if(!matches.some(item=>item.id===track.id))matches.push(track);
+    index.set(key,matches);
+  }
+  const groups=new Map();
+  let unique_positions=0,ambiguous_positions=0,unmatched_positions=0;
+  for(const row of unresolved){
+    const matches=index.get(charts2RegistryDiscoveryKeyV1(row.title))??[];
+    if(matches.length===1)unique_positions++;
+    else if(matches.length>1)ambiguous_positions++;
+    else unmatched_positions++;
+    for(const track of matches){
+      const observed=charts2RegistryDiscoveryKeyV1(row.artist);
+      const activeCredits=(track.artist_credits??[]).filter(c=>c.artist_status==="active");
+      const agrees=!!observed&&activeCredits.some(c=>
+        [c.canonical_name,...(c.alias_names??[])].some(name=>charts2RegistryDiscoveryKeyV1(name)===observed));
+      const group=groups.get(track.id)??{track,positions:[]};
+      group.positions.push({
+        ...row,candidate_count:matches.length,
+        credit_evidence:!observed?"artist_not_supplied":agrees?"artist_credit_agrees":"artist_credit_unconfirmed",
+      });
+      groups.set(track.id,group);
+    }
+  }
+  return {contract:"charts2-registry-discovery/v1",candidate_only:true,can_publish:false,
+    unique_positions,ambiguous_positions,unmatched_positions,
+    groups:[...groups.values()].sort((a,b)=>b.positions.length-a.positions.length||
+      a.track.title.localeCompare(b.track.title)||a.track.id.localeCompare(b.track.id))};
+}

@@ -48,9 +48,9 @@ export function hasMeaningfulValue(value: unknown): boolean {
 }
 
 export function completenessTone(value: number): string {
-  if (value >= 85) return "bg-emerald-100 text-emerald-700";
-  if (value >= 50) return "bg-amber-100 text-amber-700";
-  return "bg-red-100 text-red-700";
+  if (value >= 85) return "bg-wk-success-soft text-wk-success";
+  if (value >= 50) return "bg-wk-warning-soft text-wk-warning";
+  return "bg-wk-danger-soft text-wk-danger";
 }
 
 export function completenessLabel(state: RegistryQualityState): string {

@@ -166,12 +166,37 @@ test("tall shared Modal stays viewport-bound with its action footer visible", as
     geometry.viewportHeight + 1,
   );
 
-  await body.evaluate((element) => {
-    element.scrollTop = element.scrollHeight;
-  });
-  await expect(action).toBeVisible();
+  const heading = dialog.getByRole("heading", {name:"Tall interaction acceptance"});
+  const close = dialog.getByRole("button", {name:"Close",exact:true});
+  const headerBefore = await heading.boundingBox();
+  const scrollBodyBefore = await body.boundingBox();
+  expect(headerBefore).not.toBeNull();
+  expect(scrollBodyBefore).not.toBeNull();
+  // Playwright's wheel input is not supported on mobile WebKit. Keep the
+  // real wheel path in Chromium and verify the same scroll/geometry
+  // contract in WebKit with the browser's own scroll container.
+  if(testInfo.project.name==="chromium"){
+    await body.hover();
+    await page.mouse.wheel(0, 4000);
+  }else{
+    await body.evaluate(el=>{el.scrollTop=Math.min(400,el.scrollHeight-el.clientHeight);});
+  }
+  await expect.poll(()=>body.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+  await body.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+  await expect(dialog.getByText("Modal row 24",{exact:true})).toBeInViewport();
+  await expect(heading).toBeInViewport();
+  await expect(close).toBeInViewport();
+  await expect(action).toBeInViewport();
   await expect(footer).toBeVisible();
   await expect(panel).toBeVisible();
+  const headerAfter=await heading.boundingBox();
+  const scrollBodyAfter=await body.boundingBox();
+  expect(Math.abs(headerAfter!.y-headerBefore!.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(scrollBodyAfter!.y-scrollBodyBefore!.y)).toBeLessThanOrEqual(1);
+  expect(await dialog.evaluate(el=>el.scrollTop)).toBe(0);
+  await body.evaluate(el=>{el.scrollTop=0;});
+  await expect(dialog.getByText("Modal row 1",{exact:true})).toBeInViewport();
+  await expect(heading).toBeInViewport();
 });
 
 test("anchored WAKILISHA date picker opens beside the current scrolled trigger", async ({

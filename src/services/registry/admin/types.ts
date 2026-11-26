@@ -20,6 +20,9 @@ export interface RegistryFieldSchema {
   access: RegistryFieldAccess;
   required?: boolean;
   options?: string[];
+  optionLabels?: Record<string, string>;
+  searchable?: boolean;
+  allowUnset?: boolean;
   helpText?: string;
   aliases?: string[];
   normalizer?: "trim" | "uppercase" | "slug" | "tags";

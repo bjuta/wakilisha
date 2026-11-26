@@ -417,6 +417,111 @@ begin
 end
 $charts2_four_get_review$;
 
+-- Official export authority, local-only synthetic Storage metadata and rows.
+-- The actual CSV bytes are tested separately; no provider success is invented.
+do $charts2_official_export$
+declare
+  actor uuid:='00000000-0000-4000-8000-000000009991'::uuid;
+  sha text:=repeat('7',64);
+  keyname text:='youtube_ke/77/'||repeat('7',64)||'.csv';
+  positions jsonb;
+  p jsonb;
+  rid uuid;
+  before_method jsonb;
+begin
+  select to_jsonb(m) into before_method from platform_private.charts2_source_methods_v1 m
+    where source_key='youtube_ke';
+  if before_method->>'review_state' is distinct from 'held' then
+    raise exception 'charts2_export_fixture_native_method_not_held';
+  end if;
+  select jsonb_agg(jsonb_build_object(
+    'rank',n,'title','Synthetic Track '||n,'artist','Synthetic Artist',
+    'provider_track_id',lpad(n::text,11,'0'),
+    'provider_url','https://www.youtube.com/watch?v='||lpad(n::text,11,'0'),
+    'view_count',1000-n) order by n) into positions
+    from generate_series(1,100) n;
+  insert into storage.objects(bucket_id,name,metadata)
+  values ('charts2-evidence-private-v1',keyname,
+    jsonb_build_object('size',700,'mimetype','text/csv'));
+  p:=jsonb_build_object(
+    'source_key','youtube_ke','source_endpoint','https://charts.youtube.com/charts/TopSongs/ke',
+    'capture_mode','official_export_upload','observed_at','2026-11-24T15:00:00Z',
+    'original_object_key',keyname,'original_sha256',sha,'original_byte_length',700,
+    'original_verified_at','2026-11-24T15:01:00Z','original_content_type','text/csv',
+    'expected_depth',100,'observations',positions,
+    'parser_version','charts2-youtube-official-export-v1','provider_updated_at',null,
+    'provider_week_ending_date','2026-11-19',
+    'native_period_authority','operator_confirmed_official_export',
+    'method_revision',null,'captured_by',actor,'verification_state','server_sha256_storage_readback',
+    'operator_export_acknowledgement',
+    'I confirm this unmodified YouTube Charts CSV is Kenya Weekly Top Songs for the selected week.');
+  begin
+    perform public.charts2_commit_verified_original_v1(p-'operator_export_acknowledgement');
+    raise exception 'charts2_export_missing_attestation_allowed';
+  exception when check_violation then
+    if sqlerrm<>'charts2_youtube_export_receipt_unqualified' then raise;end if;
+  end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      p||jsonb_build_object('captured_by',gen_random_uuid()));
+    raise exception 'charts2_export_unprivileged_actor_allowed';
+  exception when insufficient_privilege then null;end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      p||jsonb_build_object('provider_week_ending_date','2026-11-18'));
+    raise exception 'charts2_export_wrong_week_allowed';
+  exception when check_violation then null;end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      jsonb_set(p,'{observations,0,view_count}','-1'::jsonb));
+    raise exception 'charts2_export_invalid_count_allowed';
+  exception when check_violation then
+    if sqlerrm<>'charts2_youtube_export_rows_unqualified' then raise;end if;
+  end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      jsonb_set(p,'{observations,1,view_count}','999999'::jsonb));
+    raise exception 'charts2_export_inverted_view_order_allowed';
+  exception when check_violation then
+    if sqlerrm<>'charts2_youtube_export_view_order_invalid' then raise;end if;
+  end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      p||jsonb_build_object('original_byte_length',701));
+    raise exception 'charts2_export_unverified_storage_metadata_allowed';
+  exception when check_violation then
+    if sqlerrm<>'charts2_youtube_export_storage_metadata_mismatch' then raise;end if;
+  end;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      (p-'operator_export_acknowledgement')||jsonb_build_object('capture_mode','service_original','method_revision',1));
+    raise exception 'charts2_export_collector_method_bypass_allowed';
+  exception when others then
+    if sqlerrm<>'charts2_source_method_not_admitted' then raise;end if;
+  end;
+  rid:=public.charts2_commit_verified_original_v1(p);
+  if rid is null or public.charts2_commit_verified_original_v1(p) is distinct from rid
+    or not exists (select 1 from platform_private.charts2_capture_receipts_v1
+      where id=rid and captured_by=actor and original_sha256=sha
+        and observed_depth=100 and original_content_type='text/csv'
+        and capture_mode='official_export_upload'
+        and native_period_authority='operator_confirmed_official_export'
+        and provider_week_ending_date='2026-11-19'::date
+        and method_revision is null and candidate_only and not can_score and not can_publish)
+  then raise exception 'charts2_export_immutable_receipt_or_idempotency_failed';end if;
+  begin
+    perform public.charts2_commit_verified_original_v1(
+      p||jsonb_build_object('provider_week_ending_date','2026-11-12'));
+    raise exception 'charts2_export_same_bytes_different_period_allowed';
+  exception when sqlstate 'PT409' then null;end;
+  if (select to_jsonb(m) from platform_private.charts2_source_methods_v1 m
+      where source_key='youtube_ke') is distinct from before_method
+    or exists(select 1 from public.charts2_get_collector_method_v1('youtube_ke'))
+  then raise exception 'charts2_export_changed_native_method_authority';end if;
+  raise notice 'WK_CHARTS2_LOCAL_OFFICIAL_YOUTUBE_EXPORT_RECEIPT=PASS';
+end
+$charts2_official_export$;
+
 -- Charts 2.0 Studio service-only read contract and versioned, private-only weights.
 do $charts2_studio_snapshot$
 declare
@@ -523,6 +628,7 @@ declare
   native_period text;
   ending text;
   ext text;
+  export_mode boolean:=coalesce(current_setting('wk.charts2_ci_official_export',true),'no') in ('yes','bad_week');
 begin
   select jsonb_build_object(
     'version','consumption_led_cultural_presence_v1',
@@ -559,17 +665,32 @@ begin
       then 'provider_declared_end_date' else 'unknown' end;
     ending:=case when spec.source_key='youtube_ke' then '2026-11-12'
       else null end;
+    if spec.source_key='youtube_ke' and export_mode then
+      native_period:='operator_confirmed_official_export';
+      if current_setting('wk.charts2_ci_official_export',true)='bad_week' then ending:='2026-11-11';end if;
+      select jsonb_agg(jsonb_build_object(
+        'rank',num,'title','Fixture Track '||num,'artist','Fixture Artist',
+        'provider_track_id',lpad(num::text,11,'0'),
+        'provider_url','https://www.youtube.com/watch?v='||lpad(num::text,11,'0'),
+        'view_count',1000-num) order by num)
+      into observations from generate_series(1,100) num;
+    end if;
     receipts:=receipts||jsonb_build_array(jsonb_build_object(
       'id',rid,
       'receipt_schema','charts2-original-receipt/v1',
       'source_key',spec.source_key,'market','KE',
-      'source_endpoint',spec.endpoint,'method_revision',1,
-      'capture_mode','service_original',
+      'source_endpoint',case when export_mode and spec.source_key='youtube_ke'
+        then 'https://charts.youtube.com/charts/TopSongs/ke' else spec.endpoint end,
+      'method_revision',case when export_mode and spec.source_key='youtube_ke' then null else 1 end,
+      'capture_mode',case when export_mode and spec.source_key='youtube_ke'
+        then 'official_export_upload' else 'service_original' end,
+      'parser_version',case when export_mode and spec.source_key='youtube_ke'
+        then 'charts2-youtube-official-export-v1' else 'charts2-ci-1' end,
       'original_bucket','charts2-evidence-private-v1',
       'original_object_key',spec.source_key||'/'||
-        left(sha,2)||'/'||sha||spec.extension,
+        left(sha,2)||'/'||sha||case when export_mode and spec.source_key='youtube_ke' then '.csv' else spec.extension end,
       'original_sha256',sha,'original_byte_length',1024,
-      'original_content_type',spec.mime,
+      'original_content_type',case when export_mode and spec.source_key='youtube_ke' then 'text/csv' else spec.mime end,
       'observed_at','2026-11-19T10:00:00Z',
       'original_verified_at','2026-11-19T10:01:00Z',
       'native_period_authority',native_period,
@@ -609,7 +730,9 @@ do $charts2_freeze_actual_100$
 declare
   a jsonb;
   b jsonb;
+  c jsonb;
 begin
+  perform set_config('wk.charts2_ci_official_export','no',true);
   a:=public.charts2_private_freeze_preflight_v1();
   b:=public.charts2_private_freeze_preflight_v1();
   if a->>'contract' is distinct from 'charts2-private-freeze-preflight/v1'
@@ -629,6 +752,28 @@ begin
      or length(a->>'ranking_sha256')<>64
   then raise exception 'charts2_private_freeze_100_rank_replay_failed';end if;
   raise notice 'WK_CHARTS2_LOCAL_PRIVATE_FREEZE_100_EXACT_REPLAY=PASS';
+  perform set_config('wk.charts2_ci_official_export','yes',true);
+  c:=public.charts2_private_freeze_preflight_v1();
+  if (c->>'freeze_ready')::boolean is distinct from true
+     or (c->>'eligible_count')::integer is distinct from 100
+     or (c->>'unresolved_count')::integer is distinct from 500
+     or (c->>'conflict_count')::integer is distinct from 0
+     or c->>'ranking_sha256' is distinct from a->>'ranking_sha256'
+     or c->>'input_sha256' is not distinct from a->>'input_sha256'
+     or not exists(select 1 from jsonb_array_elements(c->'source_receipts') r
+       where r->>'source_key'='youtube_ke'
+         and r->>'native_period_authority'='operator_confirmed_official_export'
+         and r->>'provider_week_ending_date'='2026-11-12')
+  then raise exception 'charts2_export_freeze_parity_failed';end if;
+  perform set_config('wk.charts2_ci_official_export','bad_week',true);
+  begin
+    perform public.charts2_private_freeze_preflight_v1();
+    raise exception 'charts2_export_freeze_wrong_week_allowed';
+  exception when others then
+    if sqlerrm<>'charts2_freeze_youtube_export_unqualified' then raise;end if;
+  end;
+  perform set_config('wk.charts2_ci_official_export','no',true);
+  raise notice 'WK_CHARTS2_LOCAL_OFFICIAL_YOUTUBE_EXPORT_FREEZE_PARITY=PASS';
 end
 $charts2_freeze_actual_100$;
 
@@ -684,6 +829,188 @@ begin
   raise notice 'WK_CHARTS2_ORIGIN_NEUTRAL_LEGACY_AND_RNB_PRESERVED=PASS';
 end
 $charts2_origin_neutral_acceptance$;
+
+-- Chart→Registry convergence is accepted only through existing governed
+-- operations. All fixtures below are entirely rolled back and never use a
+-- hosted or Production database. This SQL role simulation is not a genuine
+-- signed-in browser/JWT runtime acceptance.
+do $charts2_registry_convergence_v1$
+declare
+  actor_id uuid:=gen_random_uuid();
+  youtube_receipt uuid:=gen_random_uuid();
+  shazam_receipt uuid:=gen_random_uuid();
+  youtube_sha text:=repeat('a',64);
+  shazam_sha text:=repeat('b',64);
+  positions jsonb;
+  intake jsonb;
+  artist_intake jsonb;
+  credit jsonb;
+  canonical_track uuid;
+  approved jsonb;
+  revoked jsonb;
+  independent_note text:=
+    'Independent review verified this exact recording and each distinct Artist credit against a reliable release and provider source.';
+begin
+  insert into auth.users(id) values(actor_id);
+  perform set_config('request.jwt.claim.sub',actor_id::text,true);
+  -- Signed-in alone must not grant Registry or Charts authority.
+  begin
+    perform public.admin_stage_charts2_track_intake_v1(
+      'youtube_ke',youtube_receipt,youtube_sha,1);
+    raise exception 'charts2_track_intake_unprivileged_allowed';
+  exception when insufficient_privilege then null;end;
+  insert into public.user_role_assignments(user_id,role_key,status)
+    values(actor_id,'super_admin','active');
+  if not public.current_user_has_capability('manage_charts')
+     or not public.current_user_has_capability('manage_registry')
+  then raise exception 'charts2_steward_capabilities_missing';end if;
+
+  -- All fixtures share this transaction's now(). Explicitly order the new
+  -- receipt after earlier fixtures instead of relying on random UUID ties.
+  select jsonb_agg(jsonb_build_object('rank',n,'title','CI Original Recording',
+    'artist','CI First Artist','provider_track_id','youtube-ci-'||n)
+    order by n) into positions from generate_series(1,100) n;
+  insert into platform_private.charts2_capture_receipts_v1(
+    id,source_key,source_endpoint,method_revision,capture_mode,observed_at,
+    original_object_key,original_byte_length,original_sha256,
+    original_verified_at,original_content_type,expected_depth,observed_depth,
+    observations,parser_version,created_at
+  ) values (
+    youtube_receipt,'youtube_ke','https://youtube.example.org/source',
+    1,'research_original_upload',now(),'ci-youtube-'||youtube_receipt,
+    512,youtube_sha,now(),'application/json',100,100,
+    positions,'ci-original-v1',now()+interval '1 second'
+  );
+  intake:=public.admin_stage_charts2_track_intake_v1(
+    'youtube_ke',youtube_receipt,youtube_sha,1);
+  if intake->>'status' is distinct from 'needs_review'
+     or (select count(*) from public.registry_provider_track_suggestion_artists
+       where suggestion_id=(intake->>'suggestion_id')::uuid
+         and credit_role='unresolved' and resolution_mode='unresolved')<>1
+  then raise exception 'charts2_track_intake_original_credit_not_preserved';end if;
+  if (public.admin_stage_charts2_track_intake_v1(
+    'youtube_ke',youtube_receipt,youtube_sha,1
+  )->>'idempotent_replay')::boolean is not true
+  then raise exception 'charts2_track_intake_idempotent_replay_failed';end if;
+  if (select count(*) from public.provider_entity_links
+      where registry_entity_type='track'
+        and registry_entity_id=intake->>'suggestion_id')<>1
+     or not exists(select 1 from public.provider_entity_links
+       where registry_entity_id=intake->>'suggestion_id'
+         and provider='youtube' and provider_entity_id='youtube-ci-1'
+         and match_status='candidate' and confidence_score=0 and provider_url is null)
+     or not exists(select 1 from public.provider_field_observations
+       where provider_item_id=intake->>'suggestion_id'
+         and source_path='chart_receipt.original.title'
+         and field_name='title' and field_value='CI Original Recording')
+     or exists(select 1 from public.provider_field_observations
+       where provider_item_id=intake->>'suggestion_id'
+         and source_path like 'playlist_validation.%')
+  then raise exception 'charts2_raw_source_prematurely_confirmed_or_mislabelled';end if;
+  perform editorial.seed_registry_track_intake_provider_observations((intake->>'suggestion_id')::uuid);
+  if (select count(*) from public.provider_entity_links
+       where registry_entity_id=intake->>'suggestion_id')<>1
+  then raise exception 'charts2_candidate_seed_not_idempotent';end if;
+  credit:=public.admin_append_charts2_track_intake_credit_v1(
+    (intake->>'suggestion_id')::uuid,'CI Second Artist',
+    independent_note,'https://example.org/ci-artist-evidence');
+  if (credit->>'credit_order')::integer<>2
+     or credit->>'credit_role' is distinct from 'unresolved'
+  then raise exception 'charts2_additional_credit_prematurely_approved';end if;
+  artist_intake:=public.admin_stage_charts2_artist_intake_v1(
+    'youtube_ke',youtube_receipt,youtube_sha,1);
+  if (artist_intake->>'staging_id') is null
+     or not exists (
+       select 1 from public.provider_intake_artist_staging a
+       where a.id=(artist_intake->>'staging_id')::uuid
+         and a.source_artist_name='CI First Artist'
+         and a.source_origin_iso2 is null and a.source_spotify_id is null
+         and a.source_metadata->>'chart_artist_claim_only'='true'
+     )
+  then raise exception 'charts2_artist_intake_invented_metadata';end if;
+  -- A bad original cannot stage another governing identity.
+  begin
+    perform public.admin_stage_charts2_artist_intake_v1(
+      'youtube_ke',youtube_receipt,repeat('f',64),1);
+    raise exception 'charts2_stale_artist_source_allowed';
+  exception when sqlstate 'PT409' then null;end;
+
+  insert into public.registry_tracks(slug,title,normalized_title,status)
+  values('ci-chart-'||substr(actor_id::text,1,8),
+    'CI Original Recording','ci original recording','active')
+  returning id into canonical_track;
+  select jsonb_agg(jsonb_build_object('rank',n,'title','CI Original Recording',
+    'artist','CI First Artist','provider_track_id',null)
+    order by n) into positions from generate_series(1,200) n;
+  insert into platform_private.charts2_capture_receipts_v1(
+    id,source_key,source_endpoint,method_revision,capture_mode,observed_at,
+    original_object_key,original_byte_length,original_sha256,
+    original_verified_at,original_content_type,expected_depth,observed_depth,
+    observations,parser_version,created_at
+  ) values (
+    shazam_receipt,'shazam_ke','https://shazam.example.org/source',
+    1,'research_original_upload',now(),'ci-shazam-'||shazam_receipt,
+    512,shazam_sha,now(),'application/json',200,200,
+    positions,'ci-original-v1',now()+interval '1 second'
+  );
+  declare no_id_intake jsonb; legacy_id uuid;
+  begin
+    no_id_intake:=public.admin_stage_charts2_track_intake_v1(
+      'shazam_ke',shazam_receipt,shazam_sha,2);
+    if exists(select 1 from public.provider_entity_links
+      where registry_entity_id=no_id_intake->>'suggestion_id')
+    then raise exception 'charts2_no_id_intake_fabricated_provider_link';end if;
+    insert into public.registry_provider_track_suggestions(
+      requested_by,intake_origin,provider_key,provider_object_id,
+      provider_url,provider_title,submitted_track_title,playback_kind,
+      validation_snapshot,artist_resolution_mode,status
+    ) values(actor_id,'public_contribution','youtube','ci-legacy-provider',
+      'https://example.org/ci-legacy','CI Legacy Recording','CI Legacy Recording',
+      'video','{}','unresolved','needs_review') returning id into legacy_id;
+    if not exists(select 1 from public.provider_entity_links
+      where registry_entity_id=legacy_id::text and provider_entity_id='ci-legacy-provider'
+        and match_status='confirmed' and confidence_score=1)
+       or not exists(select 1 from public.provider_field_observations
+      where provider_item_id=legacy_id::text and source_path='playlist_validation.provider_title')
+    then raise exception 'charts2_legacy_provider_seed_changed';end if;
+    raise notice 'WK_CHARTS2_CANDIDATE_ONLY_NO_ID_AND_LEGACY_SEED=PASS';
+  end;
+  approved:=public.admin_review_charts2_no_id_observation_v1(
+    shazam_receipt,shazam_sha,1,'approve',canonical_track,
+    independent_note,'https://example.org/ci-track-evidence',null,
+    'I independently verified this exact Shazam position and authorize its private Registry recording resolution.');
+  if approved->>'event_id' is null
+     or (select count(*) from platform_private.charts2_observation_review_events_v1
+        where receipt_id=shazam_receipt and rank=1 and action='approve')<>1
+  then raise exception 'charts2_shazam_approval_receipt_missing';end if;
+  begin
+    perform public.admin_review_charts2_no_id_observation_v1(
+      shazam_receipt,shazam_sha,1,'approve',canonical_track,
+      independent_note,'https://example.org/ci-track-evidence',
+      gen_random_uuid(),
+      'I independently verified this exact Shazam position and authorize its private Registry recording resolution.');
+    raise exception 'charts2_shazam_stale_approval_allowed';
+  exception when sqlstate 'PT409' then null;end;
+  revoked:=public.admin_review_charts2_no_id_observation_v1(
+    shazam_receipt,shazam_sha,1,'revoke',null,
+    independent_note,'https://example.org/ci-correction-evidence',
+    (approved->>'event_id')::uuid,
+    'I revoke this exact private Shazam recording resolution after independent re-review.');
+  if revoked->>'event_id' is null
+     or (select count(*) from platform_private.charts2_observation_review_events_v1
+         where receipt_id=shazam_receipt and rank=1)<>2
+  then raise exception 'charts2_shazam_revocation_not_append_only';end if;
+  begin
+    update platform_private.charts2_observation_review_events_v1
+    set action='approve' where id=(revoked->>'event_id')::uuid;
+    raise exception 'charts2_shazam_review_ledger_mutable';
+  exception when insufficient_privilege then null;end;
+  if exists(select 1 from public.registry_track_provider_links
+    where track_id=canonical_track)
+  then raise exception 'charts2_shazam_fabricated_provider_link';end if;
+  raise notice 'WK_CHARTS2_LOCAL_GOVERNED_REGISTRY_INTAKE_SHZAM_REVIEW=PASS';
+end
+$charts2_registry_convergence_v1$;
 
 rollback;
 \echo WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS

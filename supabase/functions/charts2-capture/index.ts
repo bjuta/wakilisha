@@ -4,8 +4,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { decodeCharts2Original, listCharts2SourceContracts, charts2YouTubeNativeWeeklyPost } from "../_shared/charts2-original-candidate.mjs";
-import {scoreCharts2PrivatePreviewV1,CHARTS2_PRIVATE_METHODOLOGY_V1} from "../_shared/charts2-private-scoring-v1.mjs";
-import {buildCharts2PrivateNativeReviewV1} from "../_shared/charts2-private-native-review-v1.mjs";
+import {scoreCharts2PrivatePreviewV1,CHARTS2_PRIVATE_METHODOLOGY_V1,summarizeCharts2SourceCoverageV1} from "../_shared/charts2-private-scoring-v1.mjs";
+import {YOUTUBE_EXPORT_ENDPOINT,YOUTUBE_EXPORT_MODE,YOUTUBE_EXPORT_ACK,
+  YOUTUBE_EXPORT_PARSER_VERSION} from "../_shared/charts2-youtube-official-export.mjs";
+import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,charts2RegistryDiscoveryKeyV1} from "../_shared/charts2-private-native-review-v1.mjs";
 
 const MAX_BYTES = 4_000_000;
 const MAX_REQUEST_BYTES = 6_000_000;
@@ -91,10 +93,10 @@ async function readCappedStream(body:ReadableStream<Uint8Array>|null,limit:numbe
   return merged;
 }
 
-async function bodyBytes(source_key:string, blob:Blob) {
+async function bodyBytes(source_key:string, blob:Blob, expectedMime=MIME[source_key]) {
   if(blob.size < 1 || blob.size > MAX_BYTES)
     throw new Reject(413,"charts2_original_size_invalid");
-  if(decodeContentType(blob.type) && decodeContentType(blob.type)!==MIME[source_key])
+  if(decodeContentType(blob.type) && decodeContentType(blob.type)!==expectedMime)
     throw new Reject(415,"charts2_original_type_invalid");
   return new Uint8Array(await blob.arrayBuffer());
 }
@@ -181,20 +183,141 @@ async function requireRegistryReviewer(authClient:any) {
     throw new Reject(403,"charts2_manage_registry_required");
 }
 const TRACK_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// One shared Registry projection for manual search and automatic candidate discovery.
+async function readStudioRegistryTracks(server:any,ids:string[],strict=false) {
+    const [trackRows,artistRows,providerRows]=await Promise.all([
+      server.from("registry_tracks").select("id,title,isrc,status,slug,duration_ms,release_id")
+        .eq("status","active").in("id",ids),
+      server.from("registry_track_artists").select("track_id,artist_id,artist_name_text,is_primary")
+        .eq("status","active").in("track_id",ids).limit(120),
+      server.from("registry_track_provider_links").select("track_id,provider_key,match_method,match_status")
+        .eq("match_status","matched").in("track_id",ids).limit(120),
+    ]);
+    if(trackRows.error||artistRows.error||providerRows.error)
+      throw new Reject(503,"charts2_studio_registry_search_failed");
+    if(strict&&((artistRows.data??[]).length>=120||(providerRows.data??[]).length>=120))
+      throw new Reject(503,"charts2_registry_discovery_detail_bound");
+    const artistIds=[...new Set((artistRows.data??[]).map((r:any)=>r.artist_id).filter(Boolean))];
+    const artistDetails=artistIds.length?await server.from("registry_artists")
+      .select("id,display_name,origin_iso2,status")
+      .in("id",artistIds).limit(120):{data:[],error:null};
+    if(artistDetails.error)throw new Reject(503,"charts2_studio_registry_search_failed");
+    const aliasRows=strict&&artistIds.length?await server.from("registry_artist_aliases")
+      .select("canonical_artist_id,alias_display_name,alias_slug").eq("status","active")
+      .in("canonical_artist_id",artistIds).limit(501):{data:[],error:null};
+    if(aliasRows.error||(aliasRows.data??[]).length>=501)
+      throw new Reject(503,"charts2_registry_discovery_alias_bound");
+    const aliasNames=new Map<string,string[]>();
+    for(const alias of aliasRows.data??[]){
+      const names=aliasNames.get(alias.canonical_artist_id)??[];
+      names.push(alias.alias_display_name??alias.alias_slug,alias.alias_slug);
+      aliasNames.set(alias.canonical_artist_id,names);
+    }
+    const byArtistId=new Map((artistDetails.data??[]).map((a:any)=>[a.id,a]));
+    const artists=new Map<string,string[]>();
+    const artistCredits=new Map<string,Array<{
+      name:string;is_primary:boolean;origin_iso2:string|null;artist_status:string|null;canonical_name:string|null;alias_names:string[];
+    }>>();
+    for(const row of artistRows.data??[]){
+      const name=String(row.artist_name_text??"").trim();
+      if(!name)continue;
+      const names=artists.get(row.track_id)??[];
+      if(!names.includes(name))names.push(name);
+      artists.set(row.track_id,names);
+      const credits=artistCredits.get(row.track_id)??[];
+      if(!credits.some(x=>x.name===name && x.is_primary===Boolean(row.is_primary))){
+        const artist=byArtistId.get(row.artist_id) as
+          {origin_iso2?:string|null;status?:string|null;display_name?:string|null}|undefined;
+        credits.push({name,is_primary:Boolean(row.is_primary),
+          origin_iso2:artist?.origin_iso2??null,
+          artist_status:artist?.status??null,canonical_name:artist?.display_name??null,
+          alias_names:aliasNames.get(row.artist_id)??[]});
+      }
+      artistCredits.set(row.track_id,credits);
+    }
+    const providers=new Map<string,string[]>();
+    for(const row of providerRows.data??[]){
+      const names=providers.get(row.track_id)??[];
+      const label=String(row.provider_key)+" ("+String(row.match_method??"unknown")+")";
+      if(!names.includes(label))names.push(label);
+      providers.set(row.track_id,names);
+    }
+    const order=new Map<string,number>(ids.map((id:string,i:number):[string,number]=>[id,i]));
+    return (trackRows.data??[])
+      .sort((a:any,b:any)=>(order.get(a.id)??99)-(order.get(b.id)??99))
+      .map((track:any)=>({...track,
+        artist_names:artists.get(track.id)??[],
+        artist_credits:artistCredits.get(track.id)??[],
+        provider_keys:providers.get(track.id)??[],
+      }));
+}
+
 async function studioAction(mode:string,req:Request,server:any,authClient:any) {
+  if(mode==="studio_registry_discovery") {
+    await requireRegistryReviewer(authClient);
+    const supplied=await req.json().catch(()=>null);
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||Object.keys(supplied).length)
+      throw new Reject(400,"charts2_registry_discovery_invalid");
+    const snapshot=await studioSnapshot(server);
+    const receipts=snapshot.receipts??[];
+    if(!Array.isArray(receipts)||receipts.length!==5)
+      throw new Reject(409,"charts2_registry_discovery_requires_five_receipts");
+    await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)));
+    const preview=scoreCharts2PrivatePreviewV1({receipts,registry_links:snapshot.registry_links,
+      observation_reviews:snapshot.observation_reviews??[]});
+    const keys=new Set(preview.unresolved.map((row:any)=>charts2RegistryDiscoveryKeyV1(row.title)).filter(Boolean));
+    // Bounded keyset scan of active public catalogue; never silently truncate.
+    // Candidate discovery does not authorize any identity or write.
+    const ids:string[]=[];
+    let lastId:string|null=null;
+    let scanned=0;
+    while(keys.size){
+      let query=server.from("registry_tracks").select("id,title").eq("status","active").order("id",{ascending:true}).limit(500);
+      if(lastId)query=query.gt("id",lastId);
+      const result=await query;
+      if(result.error||!Array.isArray(result.data))
+        throw new Reject(503,"charts2_registry_discovery_catalogue_unavailable");
+      scanned+=result.data.length;
+      if(scanned>10000)throw new Reject(503,"charts2_registry_discovery_catalogue_bound");
+      for(const track of result.data){
+        if(keys.has(charts2RegistryDiscoveryKeyV1(track.title)))ids.push(track.id);
+      }
+      if(ids.length>300)throw new Reject(503,"charts2_registry_discovery_candidate_bound");
+      if(result.data.length<500)break;
+      const next=result.data[result.data.length-1]?.id;
+      if(!next||next===lastId)throw new Reject(503,"charts2_registry_discovery_cursor_invalid");
+      lastId=next;
+    }
+    const tracks=[];
+    for(let i=0;i<ids.length;i+=30)
+      tracks.push(...await readStudioRegistryTracks(server,ids.slice(i,i+30),true));
+    if(tracks.length!==ids.length)
+      throw new Reject(409,"charts2_registry_discovery_catalogue_changed");
+    const result=buildCharts2RegistryDiscoveryV1({unresolved:preview.unresolved,tracks});
+    return {...result,state:"registry_discovery",source_coverage:preview.source_coverage,
+      unresolved_count:preview.unresolved.length,catalogue_scanned:scanned};
+  }
   if(mode==="studio_preview") {
     const snapshot=await studioSnapshot(server);
     const receipts=snapshot.receipts??[];
-    if(!Array.isArray(receipts)||receipts.length!==5) {
+    if(!Array.isArray(receipts)||receipts.length>5)
+      throw new Reject(409,"charts2_studio_unqualified_snapshot");
+    await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)));
+    if(receipts.length!==5) {
+      let source_coverage;
+      try {source_coverage=summarizeCharts2SourceCoverageV1(receipts);}
+      catch {throw new Reject(409,"charts2_studio_unqualified_snapshot");}
       return {state:"incomplete_source_set",can_publish:false,
         source_methods:snapshot.source_methods,methodology:snapshot.methodology,
-        receipt_count:receipts.length};
+        source_coverage,receipt_count:source_coverage.length,
+        server_verified_originals:source_coverage.length,
+        history:snapshot.history??[],read_at:snapshot.read_at};
     }
-    await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)));
     let preview;
     try {
       preview=scoreCharts2PrivatePreviewV1({
         receipts,registry_links:snapshot.registry_links,
+        observation_reviews:snapshot.observation_reviews??[],
       });
     } catch {throw new Reject(409,"charts2_studio_unqualified_snapshot");}
     const locked=CHARTS2_PRIVATE_METHODOLOGY_V1;
@@ -231,6 +354,7 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     return {state:"private_review",preview,native_review,source_methods:snapshot.source_methods,
       history:snapshot.history??[],read_at:snapshot.read_at,
       server_verified_originals:receipts.length,
+      observation_reviews:snapshot.observation_reviews??[],
       freeze_gate:{
         input_sha256:preflight.input_sha256,
         ranking_sha256:preflight.ranking_sha256,
@@ -283,6 +407,178 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     }
     return {state:"private_frozen",...outcome.data,can_publish:false};
   }
+  if(mode==="studio_review_context") {
+    await requireRegistryReviewer(authClient);
+    const supplied=await req.json().catch(()=>null);
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "source_key","receipt_id","original_sha256","rank",
+       ].includes(k))||
+       !TRACK_UUID.test(supplied.receipt_id??"")||
+       !/^[a-f0-9]{64}$/.test(supplied.original_sha256??"")||
+       !Number.isSafeInteger(supplied.rank)||supplied.rank<1)
+      throw new Reject(400,"charts2_review_context_invalid");
+    const source=sourceKey(supplied.source_key);
+    const snapshot=await studioSnapshot(server);
+    const receipt=(snapshot.receipts??[]).find((r:any)=>
+      r.source_key===source&&r.id===supplied.receipt_id&&
+      r.original_sha256===supplied.original_sha256);
+    if(!receipt)throw new Reject(409,"charts2_review_context_receipt_changed");
+    const observation=receipt.observations?.find((o:any)=>
+      o.rank===supplied.rank);
+    if(!observation||typeof observation.title!=="string"||
+       !observation.title.trim())
+      throw new Reject(409,"charts2_review_context_position_changed");
+    await verifyPrivateOriginal(server,receipt);
+    return {state:"verified_chart_review_context",
+      source_key:source,receipt_id:receipt.id,
+      original_sha256:receipt.original_sha256,rank:observation.rank,
+      title:observation.title,artist:observation.artist??null,
+      provider_track_id:observation.provider_track_id??null,
+      observed_at:receipt.observed_at,can_publish:false};
+  }
+  if(mode==="studio_review_no_id") {
+    await requireRegistryReviewer(authClient);
+    const charts=await authClient.rpc("current_user_has_capability",{
+      required_capability:"manage_charts",
+    });
+    if(charts.error||charts.data!==true)
+      throw new Reject(403,"charts2_manage_charts_required");
+    const supplied=await req.json().catch(()=>null);
+    const action=supplied?.action==="revoke"?"revoke":"approve";
+    const acknowledgement=action==="revoke"
+      ?"I revoke this exact private Shazam recording resolution after independent re-review."
+      :"I independently verified this exact Shazam position and authorize its private Registry recording resolution.";
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "source_key","receipt_id","original_sha256","rank",
+         "track_id","review_note","evidence_url","action","acknowledgement",
+       ].includes(k))||
+       supplied.source_key!=="shazam_ke" ||
+       !TRACK_UUID.test(supplied.receipt_id??"")||
+       !/^[a-f0-9]{64}$/.test(supplied.original_sha256??"")||
+       !Number.isSafeInteger(supplied.rank)||supplied.rank<1||supplied.rank>200||
+       !["approve","revoke"].includes(supplied.action)||
+       (action==="approve"?!TRACK_UUID.test(supplied.track_id??""):
+          supplied.track_id!==null)||
+       typeof supplied.review_note!=="string"||
+       supplied.review_note.trim().length<40||
+       typeof supplied.evidence_url!=="string"||
+       !/^https:\/\//.test(supplied.evidence_url)||
+       supplied.acknowledgement!==acknowledgement)
+      throw new Reject(400,"charts2_shazam_review_invalid");
+    const snapshot=await studioSnapshot(server);
+    const receipt=(snapshot.receipts??[]).find((r:any)=>
+      r.source_key==="shazam_ke"&&r.id===supplied.receipt_id&&
+      r.original_sha256===supplied.original_sha256);
+    const observation=receipt?.observations?.find((o:any)=>o.rank===supplied.rank);
+    if(!observation||observation.provider_track_id!=null)
+      throw new Reject(409,"charts2_shazam_original_position_changed");
+    await verifyPrivateOriginal(server,receipt);
+    const previous=(snapshot.observation_reviews??[]).find((row:any)=>
+      row.source_key==="shazam_ke"&&row.receipt_id===receipt.id&&
+      row.original_sha256===receipt.original_sha256&&
+      row.rank===supplied.rank);
+    const reviewed=await authClient.rpc("admin_review_charts2_no_id_observation_v1",{
+      p_receipt_id:receipt.id,
+      p_original_sha256:receipt.original_sha256,
+      p_rank:observation.rank,
+      p_action:action,
+      p_track_id:action==="revoke"?null:supplied.track_id,
+      p_review_note:supplied.review_note.trim(),
+      p_evidence_url:supplied.evidence_url.trim(),
+      p_expected_previous_event_id:previous?.id??null,
+      p_acknowledgement:acknowledgement,
+    });
+    if(reviewed.error||!reviewed.data?.event_id)
+      throw new Reject(409,"charts2_shazam_governed_review_rejected");
+    return {state:"shazam_recording_review_recorded",action,source_key:"shazam_ke",
+      rank:supplied.rank,receipt_id:receipt.id,
+      event_id:reviewed.data.event_id,
+      idempotent_replay:reviewed.data.idempotent_replay===true,
+      can_publish:false};
+  }
+  if(mode==="studio_stage_artist_intake") {
+    await requireRegistryReviewer(authClient);
+    const permission=await authClient.rpc("current_user_has_capability",{
+      required_capability:"manage_charts",
+    });
+    if(permission.error||permission.data!==true)
+      throw new Reject(403,"charts2_manage_charts_required");
+    const supplied=await req.json().catch(()=>null);
+    const acknowledgement="I request governed Artist Intake using this exact original chart credit. No Artist identity is approved.";
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "source_key","receipt_id","original_sha256","rank","acknowledgement",
+       ].includes(k))||
+       !TRACK_UUID.test(supplied.receipt_id??"")||
+       !/^[a-f0-9]{64}$/.test(supplied.original_sha256??"")||
+       !Number.isSafeInteger(supplied.rank)||supplied.rank<1||
+       supplied.acknowledgement!==acknowledgement)
+      throw new Reject(400,"charts2_artist_intake_request_invalid");
+    const source=sourceKey(supplied.source_key);
+    const snapshot=await studioSnapshot(server);
+    const receipt=(snapshot.receipts??[]).find((r:any)=>
+      r.source_key===source&&r.id===supplied.receipt_id&&
+      r.original_sha256===supplied.original_sha256);
+    const observation=receipt?.observations?.find((o:any)=>o.rank===supplied.rank);
+    if(!observation||typeof observation.artist!=="string"||
+       observation.artist.trim().length<2)
+      throw new Reject(409,"charts2_artist_source_credit_missing");
+    await verifyPrivateOriginal(server,receipt);
+    const staged=await authClient.rpc("admin_stage_charts2_artist_intake_v1",{
+      p_source_key:source,p_receipt_id:receipt.id,
+      p_original_sha256:receipt.original_sha256,p_rank:observation.rank,
+    });
+    if(staged.error||!staged.data?.run_id||!staged.data?.staging_id)
+      throw new Reject(409,"charts2_artist_intake_staging_rejected");
+    return {state:"governed_artist_intake_staged",
+      run_id:staged.data.run_id,staging_id:staged.data.staging_id,
+      idempotent_replay:staged.data.idempotent_replay===true,
+      can_publish:false};
+  }
+  if(mode==="studio_stage_intake") {
+    await requireRegistryReviewer(authClient);
+    const permission=await authClient.rpc("current_user_has_capability",{
+      required_capability:"manage_charts",
+    });
+    if(permission.error||permission.data!==true)
+      throw new Reject(403,"charts2_manage_charts_required");
+    const supplied=await req.json().catch(()=>null);
+    const acknowledgement="I request governed Track Intake for this exact chart position. No identity is approved.";
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied)||
+       Object.keys(supplied).some(k=>![
+         "source_key","receipt_id","original_sha256","rank","acknowledgement",
+       ].includes(k))||
+       !TRACK_UUID.test(supplied.receipt_id??"")||
+       !/^[a-f0-9]{64}$/.test(supplied.original_sha256??"")||
+       !Number.isSafeInteger(supplied.rank)||supplied.rank<1||
+       supplied.acknowledgement!==acknowledgement)
+      throw new Reject(400,"charts2_intake_request_invalid");
+    const source=sourceKey(supplied.source_key);
+    const snapshot=await studioSnapshot(server);
+    const receipt=(snapshot.receipts??[]).find((r:any)=>
+      r.source_key===source&&r.id===supplied.receipt_id&&
+      r.original_sha256===supplied.original_sha256);
+    const observation=receipt?.observations?.find((o:any)=>o.rank===supplied.rank);
+    if(!observation||typeof observation.title!=="string"||!observation.title.trim())
+      throw new Reject(409,"charts2_intake_observation_changed");
+    await verifyPrivateOriginal(server,receipt);
+    // Only the accepted, caller-JWT-bound Registry Intake RPC may stage a
+    // review item. No canonical Track, credit or Chart write occurs here.
+    const staged=await authClient.rpc("admin_stage_charts2_track_intake_v1",{
+      p_source_key:source,
+      p_receipt_id:receipt.id,
+      p_original_sha256:receipt.original_sha256,
+      p_rank:observation.rank,
+    });
+    if(staged.error||!staged.data?.suggestion_id)
+      throw new Reject(409,"charts2_intake_staging_rejected");
+    return {state:"governed_track_intake_staged",
+      suggestion_id:staged.data.suggestion_id,
+      idempotent_replay:staged.data.idempotent_replay===true,
+      can_publish:false};
+  }
   if(mode==="studio_track_search") {
     await requireRegistryReviewer(authClient);
     const supplied=await req.json().catch(()=>null);
@@ -293,15 +589,47 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     if(q.length<2||q.length>80)
       throw new Reject(400,"charts2_studio_track_search_invalid");
     const safe=q.replace(/[\\%_]/g,"\\$&");
-    const result=TRACK_UUID.test(q)
-      ? await server.from("registry_tracks")
-          .select("id,title,isrc,status,release_id").eq("id",q).limit(10)
-      : await server.from("registry_tracks")
-          .select("id,title,isrc,status,release_id")
-          .ilike("title","%"+safe+"%").limit(10);
-    if(result.error)throw new Reject(503,"charts2_studio_registry_search_failed");
-    return {state:"registry_candidates",tracks:(result.data??[])
-      .filter((r:any)=>r.status==="active"),can_publish:false};
+    const pattern="%"+safe+"%";
+    // The existing Track Intake searches titles, ISRC and reviewed Artist
+    // credits. Charts uses the same Registry read surfaces, adding accepted
+    // alias and provider-link evidence; only the existing broker can write.
+    const [titles,isrcs,credits,links,aliasesByName,aliasesBySlug]=
+      await Promise.all([
+        server.from("registry_tracks").select("id").eq("status","active")
+          .ilike("title",pattern).limit(20),
+        server.from("registry_tracks").select("id").eq("status","active")
+          .ilike("isrc",pattern).limit(20),
+        server.from("registry_track_artists").select("track_id")
+          .eq("status","active").ilike("artist_name_text",pattern).limit(30),
+        server.from("registry_track_provider_links").select("track_id")
+          .ilike("provider_track_id",pattern).limit(30),
+        server.from("registry_artist_aliases").select("canonical_artist_id")
+          .eq("status","active").ilike("alias_display_name",pattern).limit(15),
+        server.from("registry_artist_aliases").select("canonical_artist_id")
+          .eq("status","active").ilike("alias_slug",pattern).limit(15),
+      ]);
+    if([titles,isrcs,credits,links,aliasesByName,aliasesBySlug].some(x=>x.error))
+      throw new Reject(503,"charts2_studio_registry_search_failed");
+    const aliasIds=[...new Set([
+      ...(aliasesByName.data??[]).map((r:any)=>r.canonical_artist_id),
+      ...(aliasesBySlug.data??[]).map((r:any)=>r.canonical_artist_id),
+    ].filter(Boolean))];
+    const aliasCredits=aliasIds.length
+      ? await server.from("registry_track_artists").select("track_id")
+          .eq("status","active").in("artist_id",aliasIds).limit(30)
+      : {data:[],error:null};
+    if(aliasCredits.error)
+      throw new Reject(503,"charts2_studio_registry_search_failed");
+    const ids=[...new Set([
+      ...(TRACK_UUID.test(q)?[q]:[]),
+      ...(titles.data??[]).map((r:any)=>r.id),
+      ...(isrcs.data??[]).map((r:any)=>r.id),
+      ...(credits.data??[]).map((r:any)=>r.track_id),
+      ...(links.data??[]).map((r:any)=>r.track_id),
+      ...(aliasCredits.data??[]).map((r:any)=>r.track_id),
+    ])].slice(0,30);
+    if(!ids.length)return {state:"registry_candidates",tracks:[],can_publish:false};
+    return {state:"registry_candidates",tracks:await readStudioRegistryTracks(server,ids),can_publish:false};
   }
   if(mode==="studio_review_link") {
     await requireRegistryReviewer(authClient);
@@ -409,11 +737,12 @@ async function handle(req:Request) {
   const {user,server,authClient}=await session(req);
   const url=new URL(req.url);
   const mode=url.searchParams.get("mode")??"upload";
-  if(["studio_preview","studio_track_search","studio_review_link","studio_freeze"].includes(mode))
+  if(["studio_preview","studio_registry_discovery","studio_track_search","studio_review_context","studio_stage_artist_intake","studio_stage_intake","studio_review_no_id","studio_review_link","studio_freeze"].includes(mode))
     return studioAction(mode,req,server,authClient);
   let key:string, endpoint:string, target_period_key:string|null=null;
   let contentType:string, bytes:Uint8Array, methodRevision:number|null=null;
-  let captureMode:"research_original_upload"|"service_original";
+  let captureMode:"research_original_upload"|"service_original"|typeof YOUTUBE_EXPORT_MODE;
+  let exportAcknowledgement:string|null=null,declaredExportSha:string|null=null;
 
   if(mode==="verify_method") {
     // Signed-in, capability-gated first-party probe; never auto-admits any
@@ -529,7 +858,7 @@ async function handle(req:Request) {
     return outcome.data;
   }
 
-  if(mode==="upload") {
+  if(mode==="upload"||mode==="upload_official_youtube_export") {
     const declared=Number(req.headers.get("content-length")??0);
     if(Number.isFinite(declared)&&declared>MAX_REQUEST_BYTES)
       throw new Reject(413,"charts2_request_too_large");
@@ -541,15 +870,32 @@ async function handle(req:Request) {
     });
     key=sourceKey(form.get("source_key"));
     endpoint=String(form.get("source_endpoint")??"");
-    expectedUrl(key,endpoint);
     const file=form.get("original");
     if(!(file instanceof File))
       throw new Reject(400,"charts2_original_required");
-    contentType=MIME[key];
-    bytes=await bodyBytes(key,file);
     const period=form.get("target_period_key");
     target_period_key=period===null?null:String(period);
-    captureMode="research_original_upload";
+    if(mode==="upload_official_youtube_export"){
+      const names=Array.from(form.keys());
+      const allowed=["source_key","source_endpoint","original","target_period_key","original_sha256","acknowledgement"];
+      const ack=form.get("acknowledgement"),sha=form.get("original_sha256");
+      if(names.length!==allowed.length||new Set(names).size!==names.length||
+         !allowed.every(name=>names.includes(name))||
+         key!=="youtube_ke"||endpoint!==YOUTUBE_EXPORT_ENDPOINT||
+         typeof period!=="string"||ack!==YOUTUBE_EXPORT_ACK||
+         typeof sha!=="string"||!/^[a-f0-9]{64}$/.test(sha))
+        throw new Reject(422,"charts2_youtube_export_attestation_required");
+      exportAcknowledgement=ack;
+      declaredExportSha=sha;
+      contentType="text/csv";
+      bytes=await bodyBytes(key,file,contentType);
+      captureMode=YOUTUBE_EXPORT_MODE;
+    }else{
+      expectedUrl(key,endpoint);
+      contentType=MIME[key];
+      bytes=await bodyBytes(key,file);
+      captureMode="research_original_upload";
+    }
   } else if(mode==="collect") {
     const supplied=await req.json().catch(()=>null);
     key=sourceKey(supplied?.source_key);
@@ -587,10 +933,21 @@ async function handle(req:Request) {
   }
 
   const observedAt=new Date().toISOString();
-  const candidate=await decodeCharts2Original({
-    source_key:key,original_bytes:bytes,endpoint,observed_at:observedAt,
-    target_period_key,
-  });
+  let candidate;
+  try {
+    candidate=await decodeCharts2Original({
+      source_key:key,original_bytes:bytes,endpoint,observed_at:observedAt,
+      target_period_key,capture_mode:captureMode,
+      operator_export_acknowledgement:exportAcknowledgement,
+    });
+  } catch(error) {
+    if(captureMode===YOUTUBE_EXPORT_MODE&&error instanceof Error&&
+       /^charts2_(youtube_export_|original_|youtube_target_period_missing)/.test(error.message))
+      throw new Reject(422,error.message);
+    throw error;
+  }
+  if(captureMode===YOUTUBE_EXPORT_MODE&&candidate.payload_sha256!==declaredExportSha)
+    throw new Reject(409,"charts2_youtube_export_digest_mismatch");
   // This is evidence-only, never a score admission.
   if(candidate.can_score!==false||candidate.can_publish!==false||
      candidate.evidence_only!==true||candidate.source_access_authorized!==false)
@@ -605,27 +962,39 @@ async function handle(req:Request) {
     original_content_type:contentType,
     expected_depth:candidate.declared_depth,
     observations:candidate.rows,
-    parser_version:"charts2-source-parsers-v1",
+    parser_version:captureMode===YOUTUBE_EXPORT_MODE
+      ?YOUTUBE_EXPORT_PARSER_VERSION:"charts2-source-parsers-v1",
     provider_updated_at:candidate.provider_updated_at,
     provider_week_ending_date:candidate.provider_week_ending_date,
-    native_period_authority:candidate.provider_week_ending_date
-      ?"provider_declared_end_date":"unknown",
+    native_period_authority:captureMode===YOUTUBE_EXPORT_MODE
+      ?candidate.native_period_authority
+      :candidate.provider_week_ending_date?"provider_declared_end_date":"unknown",
+    ...(captureMode===YOUTUBE_EXPORT_MODE
+      ?{operator_export_acknowledgement:exportAcknowledgement}:{}),
     method_revision:methodRevision,captured_by:user.id,
     verification_state:"server_sha256_storage_readback",
   };
   const write=await server.rpc("charts2_commit_verified_original_v1",{
     p_capture:payload,
   });
-  if(write.error||!write.data)
+  if(write.error||!write.data){
+    if(captureMode===YOUTUBE_EXPORT_MODE&&write.error?.code==="PT409")
+      throw new Reject(409,"charts2_youtube_export_original_period_conflict");
+    if(captureMode===YOUTUBE_EXPORT_MODE&&write.error?.code==="42501")
+      throw new Reject(403,"charts2_youtube_export_actor_not_authorized");
+    if(captureMode===YOUTUBE_EXPORT_MODE&&write.error?.code==="23514")
+      throw new Reject(422,"charts2_youtube_export_receipt_unqualified");
     throw new Reject(503,"charts2_verified_receipt_commit_failed");
+  }
   return {
     status:candidate.status,source_key:key,market:"KE",
     receipt_id:write.data,observed_depth:candidate.observed_depth,
     declared_depth:candidate.declared_depth,
     original_sha256:candidate.payload_sha256,
     unresolved_identity_count:candidate.unresolved_identity_count,
-    source_method_state:captureMode==="research_original_upload"
-      ?"research_not_admitted":"collector_admitted",
+    source_method_state:captureMode===YOUTUBE_EXPORT_MODE
+      ?"official_export_not_collector_admitted"
+      :captureMode==="research_original_upload"?"research_not_admitted":"collector_admitted",
     can_score:false,can_publish:false,
   };
 }

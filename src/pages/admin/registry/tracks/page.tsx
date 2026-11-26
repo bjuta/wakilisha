@@ -8,6 +8,7 @@ import { getRegistryEntityList } from "@/services/registry/admin/client";
 import RegistryEntityEditorDrawer from "@/components/admin/registry/RegistryEntityEditorDrawer";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
 
 
 const schema = getEntitySchema("track");
@@ -77,23 +78,23 @@ function Pagination({
   };
 
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3">
-      <span className="text-[12px] text-[#858c7e]">
-        Showing <strong className="text-[#171712]">{start}</strong>
-        –<strong className="text-[#171712]">{end}</strong> of{" "}
-        <strong className="text-[#171712]">{totalItems}</strong>
+    <div className="flex items-center justify-between rounded-2xl border border-wk-border bg-wk-surface px-4 py-3">
+      <span className="text-[12px] text-wk-text-muted">
+        Showing <strong className="text-wk-text">{start}</strong>
+        –<strong className="text-wk-text">{end}</strong> of{" "}
+        <strong className="text-wk-text">{totalItems}</strong>
       </span>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] disabled:opacity-40 hover:border-[#85c441] hover:text-[#5f8f2f]"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-wk-border text-wk-text-muted disabled:opacity-40 hover:border-wk-brand hover:text-wk-brand"
         >
           <WkIcon name="ChevronLeft" size={16} />
         </button>
         {getVisiblePages().map((page, i) =>
           typeof page === "string" ? (
-            <span key={`dots-${i}`} className="px-2 text-[11px] text-[#858c7e]">
+            <span key={`dots-${i}`} className="px-2 text-[11px] text-wk-text-muted">
               …
             </span>
           ) : (
@@ -102,8 +103,8 @@ function Pagination({
               onClick={() => onPageChange(page)}
               className={`flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-bold transition ${
                 page === currentPage
-                  ? "bg-[#5f8f2f] text-white"
-                  : "border border-[#dfe4d8] text-[#71796b] hover:border-[#85c441] hover:text-[#5f8f2f]"
+                  ? "bg-wk-brand text-wk-brand-on"
+                  : "border border-wk-border text-wk-text-muted hover:border-wk-brand hover:text-wk-brand"
               }`}
             >
               {page}
@@ -113,7 +114,7 @@ function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] disabled:opacity-40 hover:border-[#85c441] hover:text-[#5f8f2f]"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-wk-border text-wk-text-muted disabled:opacity-40 hover:border-wk-brand hover:text-wk-brand"
         >
           <WkIcon name="ChevronRight" size={16} />
         </button>
@@ -138,12 +139,12 @@ function TrackCard({
 
   return (
     <div
-      className="group relative overflow-hidden rounded-2xl border border-[#dfe4d8] bg-white transition-all hover:border-[#85c441] hover:shadow-sm"
+      className="group relative overflow-hidden rounded-2xl border border-wk-border bg-wk-surface transition-all hover:border-wk-brand hover:shadow-sm"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       {/* Artwork area */}
-      <div className="relative aspect-square bg-[#f0f3ec]">
+      <div className="relative aspect-square bg-wk-surface-raised">
         {track.artwork_url ? (
           <img
             src={String(track.artwork_url)}
@@ -153,25 +154,25 @@ function TrackCard({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <WkIcon name="Music" size={40} className="text-[#c8d0be]" />
+            <WkIcon name="Music" size={40} className="text-wk-text-faint" />
           </div>
         )}
         {/* Hover overlay */}
         <div
-          className={`absolute inset-0 flex items-center justify-center bg-black/50 transition-opacity ${
+          className={`absolute inset-0 flex items-center justify-center bg-[var(--wk-overlay)] transition-opacity ${
             hovered ? "opacity-100" : "opacity-0"
           }`}
         >
           <div className="flex gap-2">
             <button
               onClick={() => onOpen(track)}
-              className="rounded-xl bg-white px-4 py-2 text-[12px] font-bold text-[#171712] hover:bg-[#f0f3ec]"
+              className="rounded-xl bg-wk-surface px-4 py-2 text-[12px] font-bold text-wk-text hover:bg-wk-surface-raised"
             >
               Edit
             </button>
             <button
               onClick={() => onNavigate(track.slug)}
-              className="rounded-xl border border-white/50 px-4 py-2 text-[12px] font-bold text-white hover:bg-white/20"
+              className="rounded-xl border border-wk-border-strong px-4 py-2 text-[12px] font-bold text-wk-text hover:bg-wk-surface-raised"
             >
               Details
             </button>
@@ -180,7 +181,7 @@ function TrackCard({
         {/* Duration badge */}
         {track._displayDuration !== "—" && (
           <div className="absolute right-3 top-3">
-            <span className="rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
+            <span className="rounded-full bg-wk-surface-strong px-2.5 py-1 text-[10px] font-bold text-wk-text backdrop-blur-sm">
               {track._displayDuration}
             </span>
           </div>
@@ -193,15 +194,15 @@ function TrackCard({
           <div className="min-w-0 flex-1">
             <button
               onClick={() => onNavigate(track.slug)}
-              className="text-left text-[14px] font-bold text-[#171712] hover:text-[#5f8f2f] transition-colors truncate block"
+              className="text-left text-[14px] font-bold text-wk-text hover:text-wk-brand transition-colors truncate block"
             >
               {track._displayTitle}
             </button>
-            <p className="mt-0.5 text-[11px] text-[#858c7e] truncate">{track.slug}</p>
+            <p className="mt-0.5 text-[11px] text-wk-text-muted truncate">{track.slug}</p>
           </div>
           <button
             onClick={() => onOpen(track)}
-            className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] hover:border-[#85c441] hover:text-[#5f8f2f]"
+            className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg border border-wk-border text-wk-text-muted hover:border-wk-brand hover:text-wk-brand"
             title="Quick edit"
           >
             <WkIcon name="Pencil" size={14} />
@@ -210,11 +211,11 @@ function TrackCard({
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {track.isrc && (
-            <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#71796b] uppercase tracking-wide font-mono">
+            <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold text-wk-text-muted uppercase tracking-wide font-mono">
               {String(track.isrc)}
             </span>
           )}
-          <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#71796b] uppercase tracking-wide">
+          <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold text-wk-text-muted uppercase tracking-wide">
             {String(track.status || "—")}
           </span>
         </div>
@@ -222,19 +223,19 @@ function TrackCard({
         {/* Completeness bar */}
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold text-[#858c7e] uppercase tracking-wide">Completeness</span>
+            <span className="text-[10px] font-bold text-wk-text-muted uppercase tracking-wide">Completeness</span>
             <span className={`text-[11px] font-black ${completenessTone(q.completeness)}`}>
               {q.completeness}%
             </span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-[#eef1e8]">
+          <div className="h-1.5 overflow-hidden rounded-full bg-wk-surface-strong">
             <div
-              className="h-full rounded-full bg-[#85c441] transition-all"
+              className="h-full rounded-full bg-wk-brand transition-all"
               style={{ width: `${q.completeness}%` }}
             />
           </div>
           {q.missingFields.length > 0 && (
-            <p className="mt-1 text-[10px] text-[#a8ad9e] truncate">
+            <p className="mt-1 text-[10px] text-wk-text-muted truncate">
               Missing: {q.missingFields.join(", ")}
             </p>
           )}
@@ -398,9 +399,9 @@ export default function TracksPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f7f2] px-5 py-6 text-[#171712]">
+    <div data-wk-registry-entity-list="tracks" className="min-w-0 bg-wk-bg px-5 py-6 text-wk-text">
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-bold text-[#171712] shadow-xl">
+        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-wk-border bg-wk-surface px-4 py-3 text-sm font-bold text-wk-text shadow-xl">
           {toast}
         </div>
       )}
@@ -409,18 +410,18 @@ export default function TracksPage() {
         {/* Header */}
         <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#5f8f2f]">
+            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-wk-brand">
               Registry
             </p>
             <h1 className="text-3xl font-black tracking-tight">Tracks</h1>
-            <p className="mt-2 max-w-2xl text-sm text-[#697062]">
+            <p className="mt-2 max-w-2xl text-sm text-wk-text-muted">
               {filteredTracks.length.toLocaleString()} track{filteredTracks.length !== 1 ? "s" : ""} in registry
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={fetchTracks}
-              className="rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-black text-[#171712] shadow-sm transition hover:border-[#85c441] flex items-center gap-2"
+              className="rounded-2xl border border-wk-border bg-wk-surface px-4 py-3 text-sm font-black text-wk-text shadow-sm transition hover:border-wk-brand flex items-center gap-2"
             >
               <WkIcon name="RefreshCcw" size={14} />
               Refresh
@@ -438,29 +439,21 @@ export default function TracksPage() {
             ["Missing artwork", summary.missingArtwork],
             ["Blocked", summary.blocked],
           ].map(([label, value]) => (
-            <div key={label as string} className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
-              <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">{label}</p>
-              <p className="mt-2 text-2xl font-black text-[#171712]">{value as number}</p>
+            <div key={label as string} className="rounded-2xl border border-wk-border bg-wk-surface p-4">
+              <p className="text-[11px] font-black uppercase tracking-wide text-wk-text-muted">{label}</p>
+              <p className="mt-2 text-2xl font-black text-wk-text">{value as number}</p>
             </div>
           ))}
         </section>
 
         {/* Filter bar */}
-        <section className="mb-5 rounded-2xl border border-[#dfe4d8] bg-white p-3">
-          <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px]">
-            <div className="relative">
-              <WkIcon name="Search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#a8ad9e]" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search tracks by title, ISRC, slug, id, status…"
-                className="h-11 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] pl-10 pr-4 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
-              />
-            </div>
+        <section className="mb-5 rounded-2xl border border-wk-border bg-wk-surface p-3">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))]">
+            <WkSearchField value={query} onChange={setQuery} ariaLabel="Search tracks" placeholder="Search tracks by title, ISRC, slug, id, status…" />
             <WkSelect
               value={qualityFilter}
               onChange={(value) => setQualityFilter(value as QualityFilter)}
-              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              triggerClassName="h-11 rounded-xl border border-wk-border bg-wk-surface-raised px-3 text-sm outline-none transition focus:border-wk-brand focus:bg-wk-surface"
             >
               <option value="all">All quality states</option>
               <option value="complete">Near complete</option>
@@ -475,7 +468,7 @@ export default function TracksPage() {
             <WkSelect
               value={sortMode}
               onChange={(value) => setSortMode(value as SortMode)}
-              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              triggerClassName="h-11 rounded-xl border border-wk-border bg-wk-surface-raised px-3 text-sm outline-none transition focus:border-wk-brand focus:bg-wk-surface"
             >
               <option value="recent">Recently updated</option>
               <option value="title">Title A-Z</option>
@@ -487,10 +480,10 @@ export default function TracksPage() {
 
         {/* Error */}
         {error && (
-          <section className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          <section className="mb-4 rounded-2xl border border-wk-danger bg-wk-danger-soft p-4 text-sm font-semibold text-wk-danger">
             <p className="font-bold">Could not load registry tracks</p>
             <p className="mt-1 text-xs">{error}</p>
-            <button onClick={fetchTracks} className="mt-2 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">
+            <button onClick={fetchTracks} className="mt-2 rounded-xl border border-wk-danger bg-wk-surface px-3 py-1.5 text-xs font-bold text-wk-danger hover:bg-wk-danger-soft">
               Retry
             </button>
           </section>
@@ -498,10 +491,10 @@ export default function TracksPage() {
 
         {/* Loading */}
         {loading && (
-          <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-[#dfe4d8] bg-white">
+          <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-wk-border bg-wk-surface">
             <div className="flex flex-col items-center gap-3">
-              <WkIcon name="Loader2" size={28} className="animate-spin text-[#5f8f2f]" />
-              <p className="text-[13px] font-bold text-[#697062]">Loading tracks…</p>
+              <WkIcon name="Loader2" size={28} className="animate-spin text-wk-brand" />
+              <p className="text-[13px] font-bold text-wk-text-muted">Loading tracks…</p>
             </div>
           </div>
         )}
@@ -510,12 +503,12 @@ export default function TracksPage() {
         {!loading && (
           <div className="space-y-4">
             {filteredTracks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-[#dfe4d8] bg-white px-6 py-16 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f0f3ec]">
-                  <WkIcon name="SearchX" size={28} className="text-[#858c7e]" />
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-wk-border bg-wk-surface px-6 py-16 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-wk-surface-raised">
+                  <WkIcon name="SearchX" size={28} className="text-wk-text-muted" />
                 </div>
-                <p className="text-[16px] font-black text-[#171712]">No tracks found</p>
-                <p className="max-w-md text-[13px] text-[#697062]">
+                <p className="text-[16px] font-black text-wk-text">No tracks found</p>
+                <p className="max-w-md text-[13px] text-wk-text-muted">
                   {query || qualityFilter !== "all"
                     ? "No tracks match your current filters. Try adjusting your search or filters."
                     : "No live registry tracks found."}
