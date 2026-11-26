@@ -822,6 +822,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  const hash=s=>createHash("sha256").update(s).digest("hex");
  const searchHost="api.search.brave.com",host="archive.org",url="https://archive.org/details/fixture";
  const searchId=randomUUID(),leadId=randomUUID(),pageId=randomUUID(),nextLead=randomUUID();
+ const htmlLead=randomUUID(),htmlUrl="https://archive.org/details/dynamic-fixture";
  const searchRequest=JSON.stringify({scope,operation:"search_web",query:context.positions[0].title,count:3});
  const requestSha256=hash(searchRequest);
  const reservationId=sql("select id from mizizi_private.desk_search_reservations_v1 where consumed_at is not null and request_sha256='"+requestSha256+"';");
@@ -831,9 +832,10 @@ export async function verifyCharts2RealJwtRegistryV1({
   return {p_call_text:callText,p_call_sha256:hash(callText),p_result_text:resultText,
    p_result_sha256:hash(resultText),p_host:host,p_policy_revision:revision,p_provenance:provenance,p_lead_bindings:leads};
  };
- const searchResult={receiptId:searchId,leads:[{id:leadId,kind:"reference",label:"Fixture archive"}],sources:[],visual:null};
+ const searchResult={receiptId:searchId,leads:[{id:leadId,kind:"reference",label:"Fixture archive"},
+  {id:htmlLead,kind:"reference",label:"Dynamic archive"}],sources:[],visual:null};
  const searchArgs=binding("search_web",{query:context.positions[0].title},searchResult,searchHost,
-  {reservationId,requestSha256,requestText:searchRequest},[{id:leadId,url}]);
+  {reservationId,requestSha256,requestText:searchRequest},[{id:leadId,url},{id:htmlLead,url:htmlUrl}]);
  fail(await call(policyName,{p_scope:scope,p_host:searchHost})===null&&await call(appendName,searchArgs)===null,
   "STOP_CUSTODY_DEFAULT_ENABLED");
  for(const [name,args] of [[policyName,{p_scope:scope,p_host:host}],[appendName,searchArgs],
@@ -851,7 +853,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  fail(p.host===host&&p.revision===1&&p.excerptRetentionAllowed===true&&p.externalModelProcessingAllowed===true,
   "STOP_CUSTODY_POLICY_RECEIPT");
  fail(await call(appendName,{...searchArgs,p_provenance:{...searchArgs.p_provenance,reservationId:randomUUID()}})===null&&
-  await call(appendName,{...searchArgs,p_lead_bindings:[{id:leadId,url:"https://127.0.0.1/private"}]})===null,
+  await call(appendName,{...searchArgs,p_lead_bindings:[{id:leadId,url:"https://127.0.0.1/private"},{id:htmlLead,url:htmlUrl}]})===null,
   "STOP_CUSTODY_FORGED_RESERVATION_OR_LEAD");
  await deny(appendName,{...searchArgs,p_result_sha256:"f".repeat(64)},"22023");
  const race=await Promise.all([service.rpc(appendName,searchArgs),service.rpc(appendName,searchArgs)]);
@@ -917,6 +919,70 @@ export async function verifyCharts2RealJwtRegistryV1({
   "STOP_CUSTODY_DERIVATIVE_READBACK");
  fail(sql("select count(*) from mizizi_private.desk_tool_receipts_v1 where parent_receipt_id='"+pageId+"';")==="2",
   "STOP_CUSTODY_DERIVATIVE_PARENT_LINK");
+ // Separate fresh owner policy revisions in the same allocation window.
+ // No refunds; raise only disposable fixture ceilings. The real provider
+ // remains unused; the DB verifies the exact consumed request/close journal.
+ sql(`insert into mizizi_private.desk_resource_policy_versions_v1(
+ resource,revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+ exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,
+ allowance_start,allowance_end,valid_until,account_limit,daily_limit,case_limit,model_tariffs)
+ select resource,3,true,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+ exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,
+ allowance_start,allowance_end,valid_until,account_limit+case when resource='native_https' then 2000000 else 120 end,
+ daily_limit+case when resource='native_https' then 2000000 else 120 end,
+ case_limit+case when resource='native_https' then 2000000 else 120 end,model_tariffs
+ from mizizi_private.desk_resource_policy_versions_v1 where revision=2 and resource in ('native_https','cloudflare_browser_run');`);
+ const resourceAccount="d".repeat(64),resourceQuote="mizizi_quote_desk_resource_v1",
+  resourceReserve="mizizi_reserve_desk_resource_v1",resourceConsume="mizizi_consume_desk_resource_v1";
+ async function charge(resource,digest){
+  const descriptor={p_binding_text:JSON.stringify({scope,resource,requestSha256:digest,accountFingerprint:resourceAccount,model:null})};
+  const q=await call(resourceQuote,descriptor);
+  fail(q?.policyRevision===3,"STOP_DERIVATIVE_RESOURCE_QUOTE");
+  const receipt=await call(resourceReserve,{...descriptor,p_policy_revision:q.policyRevision,p_expected_units:q.units});
+  fail(!!receipt,"STOP_DERIVATIVE_RESOURCE_RESERVE");
+  const args={p_reservation_id:receipt.reservationId,p_request_sha256:receipt.requestSha256,p_account_fingerprint:resourceAccount};
+  fail(await call(resourceConsume,args)===true,"STOP_DERIVATIVE_RESOURCE_CONSUME");
+  return {receipt,args};
+ }
+ const htmlId=randomUUID(),renderLead=randomUUID(),renderId=randomUUID(),screenshotLead=randomUUID(),screenshotId=randomUUID();
+ const htmlHash=hash("native shell bytes"),htmlProjection=hash("native shell projection"),htmlHop=hash("second native hop");
+ await charge("native_https",htmlHop);
+ const htmlMeta={requestedUrl:htmlUrl,finalUrl:htmlUrl,sourceSha256:htmlHash,projectionSha256:htmlProjection,
+  contentType:"text/html",retrievedAt,byteLength:22,hopSha256:[htmlHop],locator:"no_text",
+  documentPages:null,renderRequired:true};
+ const htmlResult={receiptId:htmlId,leads:[{id:renderLead,kind:"render",label:"Native extraction insufficient"}],sources:[],visual:null};
+ const htmlArgs=binding("read_page",{lead_id:htmlLead},htmlResult,host,htmlMeta,[{id:renderLead,url:htmlUrl}]);
+ fail((await call(appendName,htmlArgs)).outcome==="created","STOP_CUSTODY_RENDER_LEAD");
+ const browserText=JSON.stringify({scope,url:htmlUrl,hostname:host,visual:true,sourceSha256:htmlHash,
+  projectionSha256:htmlProjection,accountFingerprint:resourceAccount,reserveSeconds:120});
+ const browserHash=hash(browserText),browserCharge=await charge("cloudflare_browser_run",browserHash);
+ const browserEvent=(state,detail={})=>call("mizizi_record_desk_resource_event_v1",{...browserCharge.args,p_state:state,p_detail:detail});
+ const sessionId=randomUUID();
+ fail(await browserEvent("open_pending")===true&&await browserEvent("opened",{sessionId})===true,"STOP_CUSTODY_BROWSER_OPEN");
+ const renderedHash=hash("rendered DOM fixture"),renderedProjection=hash("rendered projection"),shot={sha256:hash("viewport fixture"),width:1280,height:900,byteLength:55};
+ const browserSource={...source,sourceId:renderId,fingerprint:renderedHash};
+ const renderMeta={parentReceiptId:htmlId,finalUrl:htmlUrl,sourceSha256:renderedHash,projectionSha256:renderedProjection,
+  contentType:"text/html",retrievedAt,byteLength:22,locator:"article_text",
+  detail:{reservationId:browserCharge.receipt.reservationId,requestSha256:browserHash,requestText:browserText,visual:shot}};
+ const renderResult={receiptId:renderId,leads:[{id:screenshotLead,kind:"visual",label:"Rendered viewport"}],
+  sources:[{source:browserSource,excerpt:"Rendered archival material, not original response.",citation:htmlUrl+"#article_text"}],visual:null};
+ const renderArgs=binding("render_page",{lead_id:renderLead},renderResult,host,renderMeta,[{id:screenshotLead,url:htmlUrl}]);
+ fail(await call(appendName,renderArgs)===null,"STOP_CUSTODY_UNCLOSED_BROWSER");
+ fail(await browserEvent("close_acknowledged",{sessionId})===true,"STOP_CUSTODY_BROWSER_CLOSE");
+ fail((await call(appendName,renderArgs)).outcome==="created","STOP_CUSTODY_BROWSER_ADMISSION");
+ const browserRead=await call(readName,{p_scope:scope,p_receipt_id:renderId});
+ fail(!Object.hasOwn(browserRead.provenance.detail,"requestText")&&browserRead.provenance.sourceSha256===renderedHash,
+  "STOP_CUSTODY_BROWSER_DERIVATIVE_DIGEST");
+ const shotMeta={parentReceiptId:renderId,finalUrl:htmlUrl,sourceSha256:renderedHash,projectionSha256:shot.sha256,
+  contentType:"text/html",retrievedAt,byteLength:22,locator:"browser_viewport:1",detail:{page:1,visual:shot}};
+ const shotResult={receiptId:screenshotId,leads:[],sources:[{source:{...browserSource,sourceId:screenshotId},
+  excerpt:"Visual derivative for examination; no textual claim is verified.",citation:htmlUrl+"#browser_viewport:1"}],
+  visual:{sourceId:screenshotId,sha256:shot.sha256,contentType:"image/png"}};
+ const shotArgs=binding("inspect_visual",{lead_id:screenshotLead,page:1},shotResult,host,shotMeta,[]);
+ fail((await call(appendName,shotArgs)).outcome==="created"&&
+  (await call(readName,{p_scope:scope,p_receipt_id:screenshotId})).resultText===shotArgs.p_result_text,
+  "STOP_CUSTODY_BROWSER_SCREENSHOT");
+ console.log("WK_AUTH_MIZIZI_DESK_BROWSER_DERIVATIVE_CLOSED_RESERVATION=PASS");
  // Revoking discovery ancestry denies descendants even while source-family
  // rights are still current. Historical immutable bytes remain private.
  sql(`insert into mizizi_private.desk_custody_policy_versions_v1(
@@ -927,6 +993,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  from mizizi_private.desk_custody_policy_versions_v1 where revision=1 and host='api.search.brave.com';`);
  fail(await call(readName,{p_scope:scope,p_receipt_id:visualId})===null&&
   await call(readName,{p_scope:scope,p_receipt_id:docId})===null&&
+  await call(readName,{p_scope:scope,p_receipt_id:screenshotId})===null&&
   await call(resolveName,{p_scope:scope,p_lead_id:nextLead})===null,
   "STOP_CUSTODY_DERIVATIVE_ANCESTRY_REVOCATION");
  console.log("WK_AUTH_MIZIZI_DESK_DERIVATIVE_DOCUMENT_VISUAL_ANCESTRY=PASS");
@@ -938,8 +1005,8 @@ export async function verifyCharts2RealJwtRegistryV1({
  from mizizi_private.desk_custody_policy_versions_v1 where revision=1 and host='archive.org';`);
  fail(await call(readName,{p_scope:scope,p_receipt_id:pageId})===null&&
   await call(resolveName,{p_scope:scope,p_lead_id:nextLead})===null&&await call(appendName,pageArgs)===null&&
-  sql("select count(*) from mizizi_private.desk_tool_receipts_v1;")==="4"&&
-  sql("select count(*) from mizizi_private.desk_reference_leads_v1;")==="2","STOP_CUSTODY_REVOCATION");
+  sql("select count(*) from mizizi_private.desk_tool_receipts_v1;")==="7"&&
+  sql("select count(*) from mizizi_private.desk_reference_leads_v1;")==="5","STOP_CUSTODY_REVOCATION");
  fail(sql("select (not has_table_privilege('service_role','mizizi_private.desk_custody_policy_versions_v1','INSERT') "+
   "and not has_table_privilege('service_role','mizizi_private.desk_tool_receipts_v1','UPDATE') "+
   "and not has_table_privilege('authenticated','mizizi_private.desk_reference_leads_v1','SELECT'))::text;")==="true",
