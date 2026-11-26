@@ -1,3 +1,4 @@
+import {discoverMusicBrainzCoreCohortV1} from "../../scripts/registry/agents/mizizi/runtime/musicbrainz-core-cohort-v1.mjs";
 import {guardDeskResearchPassStoreV1} from "../../scripts/registry/agents/mizizi/runtime/leased-research-pass-store-v1";
 import {createDeskResearchDispatcherV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-dispatcher-v1";
 import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/runtime/desk-resource-budget-v1";
@@ -2059,5 +2060,71 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   h.disabled.add("archive.org");
   await expect(h.execute(call("read_page",{lead_id:first.leads[0].id}))).rejects.toThrow("ACQUISITION_DENIED");
   expect(h.native).not.toHaveBeenCalled();
+ });
+});
+
+
+describe("MusicBrainz core CC0 offline cohort discovery",()=>{
+ const mbidA="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+ const mbidB="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+ const mbidC="cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+ const code="KEABC2600001";
+ const cohortId=(i:number)=>"00000000-0000-4000-8000-"+i.toString(16).padStart(12,"0");
+ async function fixture(run:(directory:string,manifest:any)=>Promise<void>,patch:Record<string,string>={}){
+  const {mkdtemp,writeFile,rm}=await import("node:fs/promises");
+  const {tmpdir}=await import("node:os");const {join}=await import("node:path");
+  const directory=await mkdtemp(join(tmpdir(),"mizizi-core-cohort-"));
+  const stamp="2026-11-26 00:00:00+00";
+  const row=(...fields:string[])=>fields.join("\t")+"\n";
+  const tables={
+   isrc:row("1","101",code,"0",stamp)+row("2","102","KEABC2600002","0",stamp),
+   artist_credit:row("1","Artist A","1","1",stamp,"0",mbidA)+row("2","Other artist","1","1",stamp,"0",mbidB),
+   recording:row("101",mbidA,"Home Bound","1","120000","","0",stamp,"f")+
+    row("102",mbidB,"Home-Bound","1","130000","live","0",stamp,"f")+
+    row("103",mbidC,"Different","2","\\N","","0",stamp,"f"),...patch
+  };
+  const manifest={dataset:"musicbrainz-core-cc0",snapshot:"20261126-000000",
+   archiveSha256:"a".repeat(64),tables:Object.fromEntries(Object.entries(tables).map(([k,v])=>[k,createHash("sha256").update(v).digest("hex")]))};
+  try{
+   for(const [k,v] of Object.entries(tables))await writeFile(join(directory,k),v);
+   await run(directory,manifest);
+  }finally{await rm(directory,{recursive:true,force:true});}
+ }
+ it("reads each core table once for 1,000 cases, preserves each subject and shares source projections, without claiming identity",async()=>{
+  await fixture(async(directory,manifest)=>{
+   const recordings=Array.from({length:1000},(_,i)=>({recordingId:cohortId(i+1),title:"Home Bound",artist:"Artist A",isrc:code}));
+   const result=await discoverMusicBrainzCoreCohortV1({directory,manifest,recordings});
+   expect(result).toMatchObject({candidateOnly:true,identityVerified:false,canPublish:false,
+    source:{license:"CC0-1.0",archiveSignatureVerifiedByReader:false,tableDigestsVerified:true},
+    summary:{requested:1000,uniqueSourceRecordings:2,ambiguous:1000}});
+   expect(result.scans.map(s=>s.table)).toEqual(["isrc","artist_credit","recording"]);
+   expect(result.sources).toHaveLength(2);
+   expect(result.recordings).toHaveLength(1000);
+   expect(new Set(result.recordings.map(s=>s.recordingId)).size).toBe(1000);
+   expect(result.recordings[0].matches).toEqual([
+    {mbid:mbidA,exactIsrc:true,titleArtistMatch:true,titleAgrees:true,artistAgrees:true},
+    {mbid:mbidB,exactIsrc:false,titleArtistMatch:true,titleAgrees:true,artistAgrees:true}]);
+   expect(result.sources[0].recordingRowSha256).toMatch(/^[a-f0-9]{64}$/);
+   expect(result.sources[0].matchedIsrcRows).toEqual([{isrc:code,rowSha256:expect.stringMatching(/^[a-f0-9]{64}$/)}]);
+  });
+ });
+ it("distinguishes identifier metadata conflict, missing candidates, and duplicate subject or tampered snapshot",async()=>{
+  await fixture(async(directory,manifest)=>{
+   const recordings=[{recordingId:cohortId(1),title:"Different label",artist:"Unknown",isrc:"KE-ABC-26-00001"},
+    {recordingId:cohortId(2),title:"Absent",artist:null,isrc:null}];
+   const result=await discoverMusicBrainzCoreCohortV1({directory,manifest,recordings});
+   expect(result.recordings.map(s=>s.disposition)).toEqual(["identifier_metadata_conflict","unmatched"]);
+   expect(result.sources[0].artistCredit).toBe("Artist A");
+   expect(result.scans.map(s=>s.table)).toEqual(["isrc","artist_credit","recording","artist_credit"]);
+   await expect(discoverMusicBrainzCoreCohortV1({directory,manifest,recordings:[recordings[0],recordings[0]]})).rejects.toThrow("INPUT_INVALID");
+   await expect(discoverMusicBrainzCoreCohortV1({directory,manifest:{...manifest,tables:{...manifest.tables,recording:"0".repeat(64)}},recordings})).rejects.toThrow("TABLE_DIGEST_MISMATCH");
+  });
+ });
+ it("rejects a non-core manifest and a dangling ISRC join instead of reporting a negative match",async()=>{
+  await fixture(async(directory,manifest)=>{
+   const recordings=[{recordingId:cohortId(1),title:"Home Bound",artist:"Artist A",isrc:code}];
+   await expect(discoverMusicBrainzCoreCohortV1({directory,manifest:{...manifest,dataset:"musicbrainz-derived"},recordings})).rejects.toThrow("MANIFEST_INVALID");
+   await expect(discoverMusicBrainzCoreCohortV1({directory,manifest,recordings})).rejects.toThrow("ISRC_RECORDING_JOIN_INCOMPLETE");
+  },{isrc:"1\t999\t"+code+"\t0\t2026-11-26 00:00:00+00\n"});
  });
 });
