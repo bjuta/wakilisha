@@ -66,3 +66,6 @@ Filename 20261126105032_mizizi_charts_candidate_admission.sql provided by pinned
 
 ### Admission acceptance candidate
 Extended existing real-JWT Charts/Registry suite with full five-source disposable SQL fixture, one resolved Shazam observation, 599 nonresolved coordinates partitioned into 598 cases, denied subscriber/reviewer/stale/tampered/duplicate/incomplete/overlap/resolved admission, concurrent two-owner replay, actor journal/membership and no canonical/grant/job/review/freeze/source side effects. Existing SQL evidence verifier checks old ranking parity and private projection ACL. No new workflow. Runtime proof pending. No hosted apply.
+
+### Admission replay proof
+Exact ae43e9921938517805c79df56a3f26e4e9eee47b disposable PostgreSQL run 45806564802 succeeded (both SQL and real JWT jobs). Projection parity and full concurrent admission marker passed. Critical Control Plane run 45806564925 browser success, core stopped only at missing replay proof/count. This checkpoint adds authenticated existing-format replay receipt and baseline for 282 migrations. Current committed type blob unchanged (not a fresh generated public/editorial schema); new RPCs not yet consumed by the client. No hosted Preview migration, research dispatch, canonical write or release. Full critical rerun required.

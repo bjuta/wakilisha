@@ -1,17 +1,17 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-26T07:44:52.1045333Z",
+  "generatedAt": "2026-11-26T11:06:58Z",
   "typesSha256": "d3f8200df45b4669119ed4f7a60d6fc1c8d68afa2ab3c798755678b995ddfdf8",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 281,
-  "latestMigration": "20261126073912_charts2_artist_intake_grant_origin.sql",
+  "migrationCount": 282,
+  "latestMigration": "20261126105032_mizizi_charts_candidate_admission.sql",
   "schemaSeal": {
     "mode": "disposable_ci",
     "sourceProjectRef": "unlinked-local-ci",
     "baseMainSha": "9847216a6946ae89f0eb52684a27231ce6e4b15d",
-    "replayCandidateHeadSha": "61bbb9123e0dcadf03c756d85fac724b97f97372",
-    "workflowRunId": 45777269404,
-    "migrationHead": "20261126073912"
+    "replayCandidateHeadSha": "ae43e9921938517805c79df56a3f26e4e9eee47b",
+    "workflowRunId": 45806564802,
+    "migrationHead": "20261126105032"
   }
 }
