@@ -117,11 +117,10 @@ export function createCostRoutedDeskAnthropicPassV1(options:Omit<DeskAnthropicOp
   fail("MODEL_SELECTION_AUTHORITY_REQUIRED");
  return async(identity,question,history)=>{
   const requirement=await options.assessRequirement(identity,question,history);
-  if(options.enabledTools.includes("inspect_visual")&&requirement.needsVision!==true)
-   fail("VISION_REQUIREMENT_DENIED");
+  const enabledTools=requirement.needsVision?options.enabledTools:options.enabledTools.filter(n=>n!=="inspect_visual");
   const selected=selectCostEffectiveDeskModelV1(await options.readModelInventory(),requirement,(options.now??Date.now)());
   let reservedMicrousd=0;
-  return createDeskAnthropicPassV1({...options,anthropic:{...options.anthropic,model:selected.model},
+  return createDeskAnthropicPassV1({...options,enabledTools,anthropic:{...options.anthropic,model:selected.model},
    quote:async(binding,body)=>{
     if(Date.parse(selected.validUntil)<=(options.now??Date.now)())return null;
     const q=await options.quote(binding,body);
@@ -243,7 +242,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
   const live=()=>{if(now()>=deadline)fail("DEADLINE");};
   const expires=(v:unknown)=>typeof v==="string"&&Date.parse(v)>now()&&Date.parse(v)<=lease;
   const sources=new Map<string,SourceExcerptV1>(),leads=new Map<string,DeskToolLeadV1>();
-  const receipts:ToolReceiptBinding[]=[],callHashes=new Set<string>(),toolIds=new Set<string>();
+  const receipts:ToolReceiptBinding[]=[],toolResults:DeskToolResultV1[]=[],callHashes=new Set<string>(),toolIds=new Set<string>();
   let totalUnits=0,visualCount=0;
   // Never transfer private prior narratives or findings. The current
   // question itself is subject to exact independent disclosure authority.
@@ -251,6 +250,9 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    question,history:history.slice(-12).map(p=>({ordinal:p.ordinal,decision:p.decision.action}))
   })}];
   async function checkSources(){
+   for(let i=0;i<receipts.length;i++){
+    if(await options.verifyToolReceipt(boundScope,receipts[i],toolResults[i])!==true)fail("TOOL_CUSTODY_REVOKED");
+   }
    for(const s of sources.values()){
     verifyInvestigationSourceV1(s.source,identity,now());
     if(s.source.externalModelProcessingAllowed!==true||await options.authorizeSource(identity,question,s)!==true)
@@ -380,7 +382,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    if(await options.authorizeTool(boundScope,call,callSha256)!==true)fail("TOOL_AUTHORITY_CHANGED");
    for(const s of newSources)if(await options.authorizeSource(identity,question,s)!==true)fail("SOURCE_DISCLOSURE_DENIED");
    live();
-   newLeads.forEach(l=>leads.set(l.id,l));newSources.forEach(s=>sources.set(s.source.sourceId,s));receipts.push(receipt);
+   newLeads.forEach(l=>leads.set(l.id,l));newSources.forEach(s=>sources.set(s.source.sourceId,s));receipts.push(receipt);toolResults.push(result);
    const resultContent:Array<Record<string,unknown>>=[{type:"text",text:JSON.stringify({
     leads:newLeads,sources:newSources.map(s=>({sourceId:s.source.sourceId,citation:s.citation,
      origin:s.source.originKey,lineage:s.source.lineageKey,excerpt:s.excerpt})),

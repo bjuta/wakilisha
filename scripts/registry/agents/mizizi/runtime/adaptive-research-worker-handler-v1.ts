@@ -161,7 +161,7 @@ export function runCostRoutedDeskResearchWorkerCycleV1(input:Readonly<
 
 type DurableDeskConfigurationV1=Readonly<
  Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],
- "braveApiKey"|"nativeAccountFingerprint"|"authorizeAcquisition"|"authorizeExamination">&
+ "braveApiKey"|"nativeAccountFingerprint"|"authorizeAcquisition"|"authorizeExamination"|"browser">&
  Pick<Parameters<typeof createCostRoutedDeskAnthropicPassV1>[0],
  "anthropic"|"readModelInventory"|"assessRequirement"|"authorizeEnvelope"|"authorizeTool">
 >;
@@ -205,7 +205,8 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    const dispatcher=createDeskResearchDispatcherV1({
     rpc:input.rpc,scope,braveApiKey:config.braveApiKey,
     nativeAccountFingerprint:config.nativeAccountFingerprint,
-    authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,now:input.now});
+    authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,
+    browser:config.browser,now:input.now});
    const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
    const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
    const prepareDeskPass=createCostRoutedDeskAnthropicPassV1({
