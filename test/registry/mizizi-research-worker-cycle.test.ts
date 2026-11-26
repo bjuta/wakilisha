@@ -1,3 +1,4 @@
+import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/runtime/desk-resource-budget-v1";
 import {createCostRoutedDeskAnthropicPassV1,selectCostEffectiveDeskModelV1,type DeskModelCandidateV1,type DeskAnthropicOptionsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-source-interpreter-v1.mjs";
@@ -1686,5 +1687,70 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   await expect(createCostRoutedDeskAnthropicPassV1(h.config)(identity,question,[])).rejects.toThrow("MODEL_RESPONSE_UNCONFIRMED");
   expect(h.send).toHaveBeenCalledTimes(1);expect(h.consume).toHaveBeenCalledTimes(1);
   expect(h.recordModelEvent.mock.calls.at(-1)?.[0]).toMatchObject({state:"response_unconfirmed"});
+ });
+});
+
+
+describe("MIZIZI durable resource finance adapters",()=>{
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+60000).toISOString()};
+ const key="fixture-only-model-key";
+ const hash=(s:string)=>createHash("sha256").update(s).digest("hex");
+ const account=hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,key]));
+ function fixture(){
+  const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
+  const rpc:WorkerRpc=vi.fn(async(fn,args)=>{
+   calls.push({fn,args});
+   if(fn==="mizizi_quote_desk_resource_v1"||fn==="mizizi_reserve_desk_resource_v1"){
+    const b=JSON.parse(String(args.p_binding_text)),model=b.resource==="anthropic";
+    const units=model?1750:b.resource==="native_https"?2000000:120;
+    return {data:{resource:b.resource,requestSha256:b.requestSha256,bindingSha256:hash(String(args.p_binding_text)),
+     policyRevision:1,units,validUntil:new Date(NOW+30000).toISOString(),model:b.model,
+     pricingRef:model?"pricing:fixture-haiku":null,maxInputTokens:model?5000:null,maxOutputTokens:model?2500:null,
+     maximumCostMicrousd:model?units:0,...(fn==="mizizi_reserve_desk_resource_v1"?{reservationId:EVENT}:{})},error:null};
+   }
+   return {data:true,error:null};
+  });
+  return {calls,budget:createDeskResourceBudgetV1({rpc,now:()=>NOW})};
+ }
+ it("binds model cost to exact credential and envelope without sending content or a secret to the ledger",async()=>{
+  const h=fixture(),finance=h.budget.modelFinance({apiKey:key});
+  const body=JSON.stringify({model:"fixture-haiku",messages:[{role:"user",content:"Private test question"}]});
+  const bodySha256=hash(body),round=1;
+  const binding={scope,round,credentialSha256:account,bodySha256,
+   requestSha256:hash(JSON.stringify({scope,round,credentialSha256:account,bodySha256})),
+   requestBytes:Buffer.byteLength(body),question:"Private test question",model:"fixture-haiku",
+   maxOutputTokens:2500,sourceIds:[],toolReceipts:[]};
+  const quote=await finance.quote(binding,body);
+  expect(quote).toMatchObject({maximumCostMicrousd:1750,maxInputTokens:5000});
+  const reservation=await finance.reserve(binding,quote!,{requestSha256:binding.requestSha256,
+   policyRef:"policy:fixture",validUntil:new Date(NOW+30000).toISOString(),modelDisclosureAllowed:true});
+  expect(reservation).toMatchObject({reservationId:EVENT,maximumCostMicrousd:1750});
+  await expect(finance.consume(reservation!)).resolves.toBe(true);
+  await finance.recordModelEvent({reservationId:EVENT,requestSha256:binding.requestSha256,state:"response_unconfirmed"});
+  expect(h.calls.map(c=>c.fn)).toEqual(["mizizi_quote_desk_resource_v1","mizizi_reserve_desk_resource_v1",
+   "mizizi_consume_desk_resource_v1","mizizi_record_desk_resource_event_v1"]);
+  expect(JSON.stringify(h.calls)).not.toContain(key);
+  expect(JSON.stringify(h.calls)).not.toContain("Private test question");
+  await expect(finance.quote(binding,body+" ")).rejects.toThrow("MODEL_ENVELOPE_BINDING_DENIED");
+  expect(h.calls).toHaveLength(4);
+ });
+ it("precharges native hops and browser reservations in their own units, not monetary inference",async()=>{
+  const h=fixture();
+  await expect(h.budget.nativePrecharge(account)(scope,{url:"https://archive.org/item",hostname:"archive.org",address:"8.8.8.8"},{}))
+   .resolves.toBe(true);
+  const b={scope,accountFingerprint:account,reserveSeconds:120,url:"https://archive.org/item"};
+  const browser=h.budget.browserFinance(account),digest=hash(JSON.stringify(b));
+  const reservation=await browser.reserve(b,digest,{});
+  expect(reservation).toMatchObject({provider:"cloudflare_browser_run",seconds:120,maximumCostMicrousd:0});
+  await expect(browser.consume(reservation!)).resolves.toBe(true);
+  await browser.recordLifecycle({reservationId:EVENT,requestSha256:digest,state:"open_pending"});
+  expect(h.calls.filter(c=>c.fn==="mizizi_reserve_desk_resource_v1").map(c=>c.args.p_expected_units)).toEqual([2000000,120]);
+  expect(JSON.stringify(h.calls)).not.toContain("https://archive.org/item");
+ });
+ it("fails closed when durable budget authority cannot be confirmed",async()=>{
+  const budget=createDeskResourceBudgetV1({rpc:async()=>({data:null,error:{message:"unknown"}}),now:()=>NOW});
+  await expect(budget.nativePrecharge(account)(scope,{url:"https://archive.org/item",hostname:"archive.org",address:"8.8.8.8"},{}))
+   .rejects.toThrow("RPC_UNCONFIRMED");
  });
 });
