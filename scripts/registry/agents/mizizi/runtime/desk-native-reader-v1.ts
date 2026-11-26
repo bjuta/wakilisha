@@ -159,7 +159,7 @@ export function createDeskNativeReaderV1(options:NativeReadOptions){
    typeof a.policyRef==="string"&&/^[A-Za-z0-9._:/-]{8,200}$/.test(a.policyRef)&&
    typeof a.validUntil==="string"&&Date.parse(a.validUntil)>now()&&Date.parse(a.validUntil)<=lease;
   let url=publicUrl(input.url),first=url.href;
-  const seen=new Set<string>(),redirects:string[]=[];
+  const seen=new Set<string>(),redirects:string[]=[],hopSha256:string[]=[];
   for(let hop=0;hop<=MAX_REDIRECTS;hop++){
    live();
    if(seen.has(url.href))fail("REDIRECT_LOOP");
@@ -172,6 +172,9 @@ export function createDeskNativeReaderV1(options:NativeReadOptions){
     addresses.some(address=>!isPublicDeskIpv4V1(address)))fail("DNS_ADDRESS_DENIED");
    const target=Object.freeze({url:url.href,hostname:url.hostname,address:addresses[0]});
    if(await options.precharge(scope,target,authority)!==true)fail("ZERO_COST_BUDGET_UNAVAILABLE");
+   // Exact descriptor digest used by the durable native resource adapter.
+   // It is not a grant or a claim that billing/response bytes are verified.
+   hopSha256.push(createHash("sha256").update(JSON.stringify({scope,target})).digest("hex"));
    live();
    const fresh=await options.authorize(scope,url.href);
    live();if(!approved(fresh)||fresh.policyRef!==authority.policyRef||!approved(authority))
@@ -193,7 +196,8 @@ export function createDeskNativeReaderV1(options:NativeReadOptions){
    if(body.length===0||(type==="application/pdf"&&new TextDecoder().decode(body.subarray(0,5))!=="%PDF-"))
     fail("BODY_UNCONFIRMED");
    return Object.freeze({contract:"mizizi.desk_native_read.v1" as const,scope,requestedUrl:first,
-    finalUrl:url.href,redirects:Object.freeze(redirects),retrievedAt:new Date(now()).toISOString(),
+    finalUrl:url.href,redirects:Object.freeze(redirects),hopSha256:Object.freeze(hopSha256),
+    retrievedAt:new Date(now()).toISOString(),
     contentType:type,byteLength:body.length,sha256:createHash("sha256").update(body).digest("hex"),
     body,sourceRetentionAuthorized:false as const,externalModelProcessingAuthorized:false as const,
     identityVerified:false as const});

@@ -64,6 +64,8 @@ create table mizizi_private.desk_tool_receipts_v1(
  check(source_id is null or source_id=id)
 );
 create index mz_desk_tool_receipts_case on mizizi_private.desk_tool_receipts_v1(case_id,recorded_at);
+create unique index mz_desk_tool_search_reservation_once on mizizi_private.desk_tool_receipts_v1((provenance->>'reservationId'))
+ where operation in ('search_web','search_news');
 create table mizizi_private.desk_reference_leads_v1(
  id uuid primary key,
  receipt_id uuid not null references mizizi_private.desk_tool_receipts_v1(id),
@@ -274,6 +276,7 @@ begin
    or coalesce(p_provenance->>'locator','') !~ '^(article_text|plain_text|pdf_page:[1-9][0-9]{0,4}|no_text)$'
    or jsonb_typeof(p_provenance->'hopSha256') is distinct from 'array'
    or jsonb_array_length(p_provenance->'hopSha256') not between 1 and 4
+   or (select count(distinct v) from jsonb_array_elements_text(p_provenance->'hopSha256') v)<>jsonb_array_length(p_provenance->'hopSha256')
   then return null;end if;
   observed:=(p_provenance->>'retrievedAt')::timestamptz;
   if observed is null or observed>clock_timestamp() then return null;end if;
@@ -282,7 +285,9 @@ begin
   select * into parent_receipt from mizizi_private.desk_tool_receipts_v1 where id=parent_lead.receipt_id;
   if not mizizi_private.desk_custody_receipt_current_v1(parent_receipt,c) then return null;end if;
   for hop in select jsonb_array_elements_text(p_provenance->'hopSha256') loop
-   if hop !~ '^[0-9a-f]{64}$' then return null;end if;
+   if hop !~ '^[0-9a-f]{64}$' or exists(select 1 from mizizi_private.desk_tool_receipts_v1 q
+    where q.operation='read_page' and q.provenance->'hopSha256' ? hop)
+   then return null;end if;
    select * into native_r from mizizi_private.desk_resource_reservations_v1
    where resource='native_https' and request_sha256=hop and job_id=(s->>'jobId')::uuid
    and case_id=(s->>'caseId')::uuid and workspace_id=(s->>'workspaceId')::uuid
@@ -297,7 +302,7 @@ begin
    if jsonb_typeof(src) is distinct from 'object' or (select count(*) from jsonb_object_keys(src))<>3
    or jsonb_typeof(authsrc) is distinct from 'object' or (select count(*) from jsonb_object_keys(authsrc))<>14
    or jsonb_typeof(src->'excerpt') is distinct from 'string' or length(btrim(src->>'excerpt')) not between 1 and 4000
-   or src->>'citation' is distinct from (p_provenance->>'finalUrl')||'#'||(p_provenance->>'locator')
+   or src->>'citation' is distinct from ((p_provenance->>'finalUrl')||'#'||(p_provenance->>'locator'))
    or authsrc->>'sourceId' is distinct from rid::text
    or authsrc->>'caseId' is distinct from s->>'caseId' or authsrc->>'workspaceId' is distinct from s->>'workspaceId'
    or authsrc->>'originKey' is distinct from p.origin_key or authsrc->>'lineageKey' is distinct from p.lineage_key
