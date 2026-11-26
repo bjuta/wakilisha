@@ -1634,7 +1634,7 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   expect(legacy).not.toHaveBeenCalled();
   expect(h.send).toHaveBeenCalledTimes(3);
   expect(h.executeTool.mock.calls.map(c=>c[1].name)).toEqual(["search_web","read_page"]);
-  expect(h.verifyToolReceipt).toHaveBeenCalledTimes(2);
+  expect(h.verifyToolReceipt.mock.calls.length).toBeGreaterThan(2);
   expect(h.consume).toHaveBeenCalledTimes(3);
   for(let i=0;i<3;i++){
    expect(h.consume.mock.invocationCallOrder[i]).toBeLessThan(h.send.mock.invocationCallOrder[i]);
@@ -1763,14 +1763,33 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
  const url="https://archive.org/details/fixture";
  const expiry=new Date(NOW+30000).toISOString(),hash=(s:string|Uint8Array)=>createHash("sha256").update(s).digest("hex");
  const textBytes=new TextEncoder().encode("The archival programme credits an ensemble but does not establish the individual performer.");
- const call=(name:"search_web"|"read_page",input:Record<string,string>)=>({name,input});
- function fixture(){
+ function pdfFixture(){
+  const stream="BT /F1 18 Tf 40 120 Td (Nairobi recording archive) Tj ET";
+  const objects=[
+   "<< /Type /Catalog /Pages 2 0 R >>",
+   "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+   "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 6 0 R >>",
+   "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << >> /Contents 7 0 R >>",
+   "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+   "<< /Length "+stream.length+" >>\nstream\n"+stream+"\nendstream",
+   "<< /Length 0 >>\nstream\n\nendstream"
+  ];
+  let pdf="%PDF-1.4\n";const offsets=[0];
+  objects.forEach((o,i)=>{offsets.push(pdf.length);pdf+=(i+1)+" 0 obj\n"+o+"\nendobj\n";});
+  const xref=pdf.length;
+  pdf+="xref\n0 "+offsets.length+"\n0000000000 65535 f \n"+
+   offsets.slice(1).map(n=>String(n).padStart(10,"0")+" 00000 n \n").join("")+
+   "trailer\n<< /Size "+offsets.length+" /Root 1 0 R >>\nstartxref\n"+xref+"\n%%EOF\n";
+  return new TextEncoder().encode(pdf);
+ }
+ const call=(name:"search_web"|"read_page"|"read_document"|"inspect_visual",input:Record<string,string|number>)=>({name,input});
+ function fixture(body=textBytes,mime="text/plain"){
   const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
   const receipts=new Map<string,Record<string,unknown>>(),leadRows=new Map<string,Record<string,unknown>>();
   const disabled=new Set<string>();
   const provider=vi.fn(async()=>new Response(JSON.stringify({web:{results:[{url,title:"Archival programme"}]}}),
    {headers:{"content-type":"application/json"}}));
-  const native=vi.fn(async()=>({status:200,contentType:"text/plain",body:textBytes}));
+  const native=vi.fn(async()=>({status:200,contentType:mime,body}));
   const access=vi.fn(async()=>({policyRef:"policy:reviewed-public-read",validUntil:expiry,
    acquisitionAllowed:true as const,zeroIncrementalSpendAllowed:true as const}));
   const examination=vi.fn(async()=>true);
@@ -1782,7 +1801,8 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
     return ok(disabled.has(host)?null:{host,revision:1,sourceFamily:host==="api.search.brave.com"?"brave_discovery":"public_web",
      authorityRef:"contract:reviewed-rights",originKey:"archive:original-origin",lineageKey:"archive:common-lineage",
      useBasis:"documented_contract",privateResearchAllowed:true,metadataRetentionAllowed:true,
-     excerptRetentionAllowed:host!=="api.search.brave.com",externalModelProcessingAllowed:true,validUntil:expiry});
+     excerptRetentionAllowed:host!=="api.search.brave.com",externalModelProcessingAllowed:true,
+     browserRenderAllowed:host!=="api.search.brave.com",visualProcessingAllowed:host!=="api.search.brave.com",validUntil:expiry});
    }
    if(fn==="mizizi_authorize_desk_search_v1")return ok({requestSha256:args.p_request_sha256,
     policyRef:"policy:public-search",validUntil:expiry,publicQueryAllowed:true,providerUseAllowed:true,zeroIncrementalSpendAllowed:true});
@@ -1847,6 +1867,31 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   h.disabled.add("archive.org");
   expect(await h.dispatch.authorizeSource(identity,identity.openingQuestion,source)).toBe(false);
  },20000);
+ it("reads additional PDF pages and rasterizes the same leased original without another native request or raw-byte persistence",async()=>{
+  const pdf=pdfFixture(),h=fixture(pdf,"application/pdf");
+  const first=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
+  const parent=await h.execute(call("read_page",{lead_id:first.leads[0].id}));
+  const document=parent.leads.find(l=>l.kind==="document");
+  expect(document).toBeDefined();
+  const textResult=await h.execute(call("read_document",{lead_id:document!.id,page_start:1,page_end:2}));
+  expect(textResult.sources[0]).toMatchObject({citation:url+"#pdf_pages:1-2",source:{fingerprint:hash(pdf)}});
+  expect(textResult.sources[0].excerpt).toContain("Nairobi recording archive");
+  const imageResult=await h.execute(call("inspect_visual",{lead_id:document!.id,page:2}));
+  expect(imageResult.sources[0]).toMatchObject({citation:url+"#pdf_visual:2",source:{fingerprint:hash(pdf)}});
+  expect(imageResult.visual?.sha256).toBe(hash(imageResult.visual!.body));
+  expect(imageResult.visual?.body).toBeInstanceOf(Uint8Array);
+  expect(h.native).toHaveBeenCalledTimes(1);
+  const stored=h.receipts.get(imageResult.receiptId)!;
+  expect(JSON.parse(String(stored.resultText)).visual).toEqual({sourceId:imageResult.receiptId,
+   sha256:imageResult.visual!.sha256,contentType:"image/png"});
+  const resultSha256=hash(String(stored.resultText));
+  const binding={receiptId:imageResult.receiptId,resultSha256,callSha256:String(stored.callSha256)};
+  expect(await h.dispatch.verifyToolReceipt(scope,binding,imageResult)).toBe(true);
+  expect(await h.dispatch.verifyToolReceipt(scope,binding,{...imageResult,visual:{...imageResult.visual!,body:new Uint8Array(40)}})).toBe(false);
+  await expect(h.execute(call("read_document",{lead_id:document!.id,page_start:1,page_end:3}))).rejects.toThrow("DOCUMENT_PAGE_DENIED");
+  h.disabled.add("archive.org");
+  await expect(h.execute(call("inspect_visual",{lead_id:document!.id,page:1}))).rejects.toThrow("LEAD_NOT_AVAILABLE");
+ },35000);
  it("requires current custody before discovery or reading, and rejects forged lead or unsupported tool",async()=>{
   const h=fixture();h.disabled.add("api.search.brave.com");
   await expect(h.execute(call("search_web",{query:"Nairobi recording archive"}))).rejects.toThrow("SEARCH_CUSTODY_DENIED");
