@@ -23,6 +23,8 @@ begin
        is distinct from '68db13d02ff4b8cb964bd17bb197cd19345287cee20b327aaaba6a9171532dfb'
     or encode(sha256(convert_to(pg_get_functiondef(to_regprocedure('mizizi_private.claim_case_research_jobs_v1(text,integer,integer)')),'UTF8')),'hex')
        is distinct from '7b364c66dc560ff66629f40fbb844e0a8d2f433b0e7a54d61fd0bfe3308009b3'
+    or encode(sha256(convert_to(pg_get_functiondef(to_regprocedure('platform_private.claim_jobs(text,integer,integer)')),'UTF8')),'hex')
+       is distinct from '8300110f46775f46c60ef4f7e3b612fc4ddc98ffe11fa9a5c9de2763ea82750f'
  then raise exception 'STOP_CHART_RESEARCH_DISPATCH_BROKER_PREIMAGE';end if;
 end $preflight$;
 
@@ -465,6 +467,125 @@ begin
          x.job_type,x.attempt_count,x.max_attempts,x.input_payload,x.lease_expires_at
     from claimed x;
 end;
+$function$;
+
+-- Preserve the general platform claim contract for every other job; also
+-- exclude chart research from this broader legacy claim path.
+CREATE OR REPLACE FUNCTION platform_private.claim_jobs(p_worker_id text, p_limit integer DEFAULT 1, p_lease_seconds integer DEFAULT 300)
+ RETURNS TABLE(job_id uuid, command_receipt_id uuid, resource_id uuid, command_type text, job_type text, attempt_count integer, max_attempts integer, input_payload jsonb, lease_expires_at timestamp with time zone)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'auth', 'platform_private'
+AS $function$
+begin
+  if coalesce(auth.role(), '') <>
+    'service_role'
+  then
+    raise exception
+      using
+        errcode = '42501',
+        message = 'Service-role access is required.';
+  end if;
+
+  if p_worker_id is null
+    or p_worker_id !~
+      '^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}begin
+ if not has_function_privilege('authenticated','public.admin_mizizi_begin_chart_case_research_v1(uuid,integer,text,text)','EXECUTE')
+   or has_function_privilege('anon','public.admin_mizizi_begin_chart_case_research_v1(uuid,integer,text,text)','EXECUTE')
+   or has_function_privilege('service_role','public.admin_mizizi_begin_chart_case_research_v1(uuid,integer,text,text)','EXECUTE')
+   or has_function_privilege('mizizi_executor','public.admin_mizizi_begin_chart_case_research_v1(uuid,integer,text,text)','EXECUTE')
+   or has_function_privilege('authenticated','mizizi_private.assert_chart_candidate_current_v1(uuid,uuid,text)','EXECUTE')
+   or has_function_privilege('service_role','mizizi_private.assert_chart_candidate_current_v1(uuid,uuid,text)','EXECUTE')
+   or not has_function_privilege('mizizi_executor','mizizi_private.admit_case_research_job_v1(uuid,uuid,integer,text,text,text,text)','EXECUTE')
+   or has_function_privilege('service_role','mizizi_private.admit_case_research_job_v1(uuid,uuid,integer,text,text,text,text)','EXECUTE')
+   or has_function_privilege('authenticated','mizizi_private.admit_case_research_job_v1(uuid,uuid,integer,text,text,text,text)','EXECUTE')
+ then raise exception 'STOP_CHART_RESEARCH_DISPATCH_ACL_DRIFT';end if;
+end $acl$;
+commit;
+
+  then
+    raise exception
+      using
+        errcode = '22023',
+        message = 'worker_id is invalid.';
+  end if;
+
+  if p_limit not between 1 and 100 then
+    raise exception
+      using
+        errcode = '22023',
+        message = 'limit must be between 1 and 100.';
+  end if;
+
+  if p_lease_seconds not between 30 and 3600 then
+    raise exception
+      using
+        errcode = '22023',
+        message =
+          'lease_seconds must be between 30 and 3600.';
+  end if;
+
+  return query
+  with candidates as (
+    select jobs.id
+    from platform_private.jobs
+    where jobs.status in (
+        'queued',
+        'retry_wait'
+      )
+      and jobs.available_at <= now()
+      and jobs.attempt_count <
+        jobs.max_attempts
+      and jobs.locked_by is null
+      -- Chart research requires an independently accepted, scoped runner.
+      and not (jobs.job_type='mizizi.case_research_v1' and exists (
+        select 1 from mizizi_private.cases c
+        where c.id=jobs.resource_id and
+          (c.claim_family_key='charts2_recording_investigation_v1' or exists (
+            select 1 from mizizi_private.chart_candidate_subjects_v1 s where s.case_id=c.id
+          ))
+      ))
+    order by
+      jobs.priority,
+      jobs.available_at,
+      jobs.created_at
+    for update skip locked
+    limit p_limit
+  ),
+  claimed as (
+    update platform_private.jobs
+    set
+      status = 'running',
+      attempt_count =
+        platform_private.jobs.attempt_count + 1,
+      locked_by = p_worker_id,
+      locked_at = now(),
+      lease_expires_at =
+        now() +
+        make_interval(
+          secs => p_lease_seconds
+        ),
+      started_at = coalesce(
+        platform_private.jobs.started_at,
+        now()
+      )
+    from candidates
+    where platform_private.jobs.id =
+      candidates.id
+    returning platform_private.jobs.*
+  )
+  select
+    claimed.id,
+    claimed.command_receipt_id,
+    claimed.resource_id,
+    claimed.command_type,
+    claimed.job_type,
+    claimed.attempt_count,
+    claimed.max_attempts,
+    claimed.input_payload,
+    claimed.lease_expires_at
+  from claimed;
+end
 $function$;
 
 do $acl$
