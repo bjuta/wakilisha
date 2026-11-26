@@ -622,7 +622,10 @@ test("Registry Artists theme follows shared tokens across list, panels and publi
     await page.evaluate(theme => document.documentElement.setAttribute("data-wk-theme", theme), theme);
     for (const width of [1200, 768, 390]) {
       await page.setViewportSize({ width, height: 800 });
-      const metrics = await root.evaluate(el => {
+      // The Artist card transitions its background on a theme switch. Poll
+      // actual computed styles to exact token equality, never accept a stale
+      // palette or skip the card. Bound the settling time to one second.
+      const readPalette = () => root.evaluate(el => {
         const probe = document.createElement("span");
         document.body.appendChild(probe);
         const color = (token: string) => {
@@ -639,12 +642,27 @@ test("Registry Artists theme follows shared tokens across list, panels and publi
           background: getComputedStyle(el).backgroundColor,
           text: getComputedStyle(el).color,
           expectedBg, expectedSurface, expectedText,
-          surfaces: surfaces.map(node => getComputedStyle(node).backgroundColor),
+          surfaces: surfaces.map(node => ({
+            name: node.getAttribute("data-wk-registry-artist-panel") ??
+              (node.hasAttribute("data-wk-registry-artist-card") ? "artist-card" : "filters"),
+            actual: getComputedStyle(node).backgroundColor,
+          })),
         };
       });
+      await expect.poll(async () => {
+        const palette = await readPalette();
+        return [
+          ...(palette.background === palette.expectedBg ? [] : [`root background ${palette.background} != ${palette.expectedBg}`]),
+          ...(palette.text === palette.expectedText ? [] : [`root text ${palette.text} != ${palette.expectedText}`]),
+          ...(palette.surfaces.length === 5 ? [] : [`surface count ${palette.surfaces.length} != 5`]),
+          ...palette.surfaces.filter(s => s.actual !== palette.expectedSurface)
+            .map(s => `${s.name}: ${s.actual} != ${palette.expectedSurface}`),
+        ];
+      }, { timeout: 1000, intervals: [50, 100, 150], message: `${theme} palette at ${width}px` }).toEqual([]);
+      const metrics = await readPalette();
       expect(metrics.background).toBe(metrics.expectedBg);
       expect(metrics.text).toBe(metrics.expectedText);
-      expect(metrics.surfaces).toEqual(Array(5).fill(metrics.expectedSurface));
+      expect(metrics.surfaces.map(s => s.actual)).toEqual(Array(5).fill(metrics.expectedSurface));
       backgrounds[theme] = metrics.background;
     }
     await page.setViewportSize({ width: 1200, height: 800 });
