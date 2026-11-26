@@ -264,3 +264,75 @@ export function buildRecordingInvestigationGroups(
     Math.min(...a.observations.map(row => row.rank)) -
     Math.min(...b.observations.map(row => row.rank)) || a.key.localeCompare(b.key));
 }
+
+// Bind the existing grouping to the server-derived immutable receipt manifest.
+// This is an investigation proposal, not a durable subject ID or a grant.
+export type ChartInvestigationObservation = ReviewObservation & {
+  original_sha256: string;
+  disposition: "research" | "blocked";
+  reason: string;
+};
+export type ChartInvestigationInput = {
+  contract: "charts2-investigation-input/v1";
+  sources: {source_key: string; receipt_id: string; original_sha256: string; observed_depth: number}[];
+  total_positions: number;
+  resolved_positions: number;
+  unresolved: ChartInvestigationObservation[];
+  conflicts: ChartInvestigationObservation[];
+};
+export function bindRecordingInvestigationGroups(
+  input: ChartInvestigationInput,
+  aliases: ReviewedArtistAlias[] = [],
+  artists: ReviewedArtist[] = [],
+) {
+  if (input.contract !== "charts2-investigation-input/v1" ||
+      input.sources.length !== 5 ||
+      input.total_positions !== 600 ||
+      !Number.isSafeInteger(input.resolved_positions) || input.resolved_positions < 0 ||
+      input.resolved_positions + input.unresolved.length + input.conflicts.length !== input.total_positions) {
+    throw new Error("Invalid chart investigation input");
+  }
+  const depths: Record<string, number> = {
+    apple_ke: 100, audiomack_ke: 100, mdundo_ke: 100, shazam_ke: 200, youtube_ke: 100,
+  };
+  const manifest = new Map(input.sources.map(source => [source.source_key, source]));
+  if (manifest.size !== 5 || new Set(input.sources.map(source => source.receipt_id)).size !== 5 ||
+      input.sources.some(source =>
+        !Object.prototype.hasOwnProperty.call(depths, source.source_key) ||
+        source.observed_depth !== depths[source.source_key] ||
+        !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(source.receipt_id) ||
+        !/^[0-9a-f]{64}$/.test(source.original_sha256))) {
+    throw new Error("Invalid chart investigation receipt manifest");
+  }
+  const coordinate = (row: ReviewObservation) =>
+    JSON.stringify([row.source_key, row.receipt_id, row.rank]);
+  const rowsByKey = new Map<string, ChartInvestigationObservation>();
+  for (const [rows, disposition] of [[input.unresolved, "research"], [input.conflicts, "blocked"]] as const) {
+    for (const row of rows) {
+      const source = manifest.get(row.source_key);
+      const key = coordinate(row);
+      if (!source || source.receipt_id !== row.receipt_id ||
+          source.original_sha256 !== row.original_sha256 ||
+          row.disposition !== disposition || !Number.isSafeInteger(row.rank) ||
+          row.rank < 1 || row.rank > source.observed_depth || rowsByKey.has(key)) {
+        throw new Error("Invalid chart investigation receipt binding");
+      }
+      rowsByKey.set(key, row);
+    }
+  }
+  const groups = buildRecordingInvestigationGroups(input.unresolved, aliases, artists);
+  return [
+    ...groups.map(group => ({
+      ...group,
+      disposition: "research" as const,
+      observations: group.observations.map(row => ({...rowsByKey.get(coordinate(row))!})),
+    })),
+    ...[...input.conflicts].sort((a,b) => coordinate(a).localeCompare(coordinate(b))).map(row => ({
+      key: row.source_key + ":" + row.receipt_id + ":" + row.rank,
+      title: row.title,
+      reason: row.reason,
+      disposition: "blocked" as const,
+      observations: [{...row}],
+    })),
+  ];
+}

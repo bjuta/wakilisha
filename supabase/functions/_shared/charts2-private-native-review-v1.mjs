@@ -179,3 +179,68 @@ export function buildCharts2RegistryDiscoveryV1({unresolved,tracks}){
     groups:[...groups.values()].sort((a,b)=>b.positions.length-a.positions.length||
       a.track.title.localeCompare(b.track.title)||a.track.id.localeCompare(b.track.id))};
 }
+
+// Server-side read-only admission input. The caller must first verify the
+// original Storage bytes using the existing Charts Studio verifier. The
+// snapshot must come from the service-only Studio SQL reader, never a browser.
+// This projection does not admit a case, issue a grant or authorize research.
+export function buildCharts2InvestigationInputV1(snapshot) {
+  if (snapshot?.contract !== "charts2-private-studio/v1" ||
+      !Array.isArray(snapshot.receipts) ||
+      !Array.isArray(snapshot.registry_links) ||
+      !Array.isArray(snapshot.observation_reviews)) {
+    fail("charts2_investigation_snapshot_invalid");
+  }
+  const scored = scoreCharts2PrivatePreviewV1(snapshot);
+  if (scored.source_coverage.some(row => row.observed_status !== "succeeded" ||
+      row.observed_depth !== row.expected_depth)) {
+    fail("charts2_investigation_requires_full_receipts");
+  }
+  const sources = scored.source_coverage.map(row => ({
+    source_key: row.source_key,
+    receipt_id: row.receipt_id,
+    original_sha256: row.original_sha256,
+    observed_depth: row.observed_depth,
+  }));
+  if (new Set(sources.map(row => row.receipt_id)).size !== sources.length) {
+    fail("charts2_investigation_duplicate_receipt_id");
+  }
+  const sourceByKey = new Map(sources.map(row => [row.source_key, row]));
+  const seen = new Set();
+  const bind = (row, disposition) => {
+    const receipt = sourceByKey.get(row.source_key);
+    if (!receipt || row.receipt_id !== receipt.receipt_id ||
+        !Number.isSafeInteger(row.rank) || row.rank < 1 || row.rank > receipt.observed_depth) {
+      fail("charts2_investigation_coordinate_invalid");
+    }
+    const coordinate = JSON.stringify([row.source_key, row.receipt_id, row.rank]);
+    if (seen.has(coordinate)) fail("charts2_investigation_duplicate_position");
+    seen.add(coordinate);
+    return {
+      ...row,
+      original_sha256: receipt.original_sha256,
+      disposition,
+    };
+  };
+  const unresolved = scored.unresolved.map(row => bind(row, "research"));
+  // Existing conflicts remain explicit blocked decisions; they must not enter
+  // a high-confidence grouping merely because title/Artist labels agree.
+  const conflicts = scored.conflicts.map(row => bind(row, "blocked"));
+  const resolved = scored.candidates.flatMap(row => row.source_contributions);
+  for (const row of resolved) bind(row, "resolved");
+  const total = sources.reduce((sum, row) => sum + row.observed_depth, 0);
+  if (seen.size !== total) fail("charts2_investigation_incomplete_partition");
+  return {
+    contract: "charts2-investigation-input/v1",
+    methodology_version: scored.methodology_version,
+    scoring_policy_version: scored.scoring_policy_version,
+    sources,
+    total_positions: total,
+    resolved_positions: resolved.length,
+    eligible_recordings: scored.candidates.length,
+    unresolved,
+    conflicts,
+    candidate_only: true,
+    can_publish: false,
+  };
+}

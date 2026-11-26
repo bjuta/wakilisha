@@ -1,7 +1,7 @@
 import {describe,expect,it} from "vitest";
 import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
-import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
-import {suggestRecordingReviewGroups,buildRecordingInvestigationGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
+import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,buildCharts2InvestigationInputV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
+import {suggestRecordingReviewGroups,buildRecordingInvestigationGroups,bindRecordingInvestigationGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
 import {
   appendChartReviewReference,
   chartStudioReturnHref,
@@ -108,6 +108,39 @@ const ROUTER=readFileSync("src/router/config.tsx","utf8");
 const SHELL=readFileSync("src/pages/admin/AdminShell.tsx","utf8");
 
 describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
+  it("binds every unresolved position and blocks conflicts against the immutable source manifest",()=>{
+    const receipts=fullReceipts();
+    const snapshot={contract:"charts2-private-studio/v1",receipts,
+      registry_links:[link("apple_ke",1,200),link("apple_ke",2,201),link("apple_ke",2,202,2)],
+      observation_reviews:[]};
+    const input=buildCharts2InvestigationInputV1(snapshot);
+    expect(input.total_positions).toBe(600);
+    expect(input.resolved_positions).toBe(1);
+    expect(input.unresolved).toHaveLength(598);
+    expect(input.conflicts).toHaveLength(1);
+    expect(input.conflicts[0]).toMatchObject({source_key:"apple_ke",rank:2,disposition:"blocked"});
+    const groups=bindRecordingInvestigationGroups(input);
+    const all=groups.flatMap(group=>group.observations);
+    expect(all).toHaveLength(599);
+    expect(new Set(all.map(row=>[row.source_key,row.receipt_id,row.rank].join(":"))).size).toBe(599);
+    expect(groups.filter(group=>group.disposition==="blocked")).toHaveLength(1);
+    expect(groups.filter(group=>group.disposition==="blocked")[0].observations).toEqual(input.conflicts);
+    expect(all.every(row=>row.original_sha256===receipts.find(r=>r.id===row.receipt_id)?.original_sha256)).toBe(true);
+    expect(all.some(row=>row.source_key==="apple_ke"&&row.rank===1)).toBe(false);
+    const changed=structuredClone(input);
+    changed.unresolved[0].original_sha256="f".repeat(64);
+    expect(()=>bindRecordingInvestigationGroups(changed)).toThrow("Invalid chart investigation receipt binding");
+    const duplicated=structuredClone(input);
+    duplicated.unresolved[0]={...duplicated.conflicts[0],disposition:"research"};
+    expect(()=>bindRecordingInvestigationGroups(duplicated)).toThrow("Invalid chart investigation receipt binding");
+    expect(()=>buildCharts2InvestigationInputV1({...snapshot,receipts:receipts.slice(0,4)})).toThrow();
+    const partial=structuredClone(receipts);
+    partial[0].observations.pop();partial[0].observed_depth--;partial[0].observed_status="partial_depth";
+    expect(()=>buildCharts2InvestigationInputV1({...snapshot,receipts:partial}))
+      .toThrow("charts2_investigation_requires_full_receipts");
+    expect(input.can_publish).toBe(false);
+  });
+
   it("keeps the native Top 100 preview private and visible only through Studio",()=>{
     expect(STUDIO_WORKER).toMatch(/import\s*\{[^}]*\bbuildCharts2PrivateNativeReviewV1\b[^}]*\}\s*from\s*["']\.\.\/_shared\/charts2-private-native-review-v1\.mjs["']/);
     expect(STUDIO_WORKER).toContain('native_review=buildCharts2PrivateNativeReviewV1({receipts})');
