@@ -14,6 +14,12 @@ const MAX_DOM=2_000_000,MAX_PNG=2_000_000,MAX_DURATION=30_000,RESERVE_SECONDS=12
 const HOST="https://api.cloudflare.com";
 const fail=code=>{throw Error("MIZIZI_DESK_BROWSER_"+code);};
 const hash=value=>createHash("sha256").update(value).digest("hex");
+function within(promise,ms){
+ return new Promise((resolve,reject)=>{
+  const timer=setTimeout(()=>reject(Error("MIZIZI_DESK_BROWSER_DEADLINE")),Math.max(1,ms));
+  Promise.resolve(promise).then(v=>{clearTimeout(timer);resolve(v);},e=>{clearTimeout(timer);reject(e);});
+ });
+}
 function safeUrl(value){
  if(typeof value!=="string"||value.length>2048||/[\p{Cc}\p{Cf}\\]/u.test(value))fail("URL_DENIED");
  let u;try{u=new URL(value);}catch{fail("URL_DENIED");}
@@ -108,7 +114,7 @@ export function createCloudflareBrowserTransportV1({accountId,apiToken,transport
    page.on("popup",p=>{denied=true;void p.close().catch(()=>{});});
    page.on("download",d=>{denied=true;void d.cancel().catch(()=>{});});
    const response=await page.goto(url,{waitUntil:"domcontentloaded",timeout:timeout()});
-   if(!response||response.status()!==200||page.url()!==url||denied)fail("NAVIGATION_UNCONFIRMED");
+   if(!response||response.status()!==200||response.request().redirectedFrom()!==null||page.url()!==url||denied)fail("NAVIGATION_UNCONFIRMED");
    const contentType=(await response.headerValue("content-type")??"").split(";")[0].trim().toLowerCase();
    if(!["text/html","application/xhtml+xml"].includes(contentType))fail("CONTENT_TYPE_DENIED");
    // Fixed extraction only; no model supplied JavaScript. Capture bounded
@@ -127,6 +133,8 @@ export function createCloudflareBrowserTransportV1({accountId,apiToken,transport
    if(context)await context.close().catch(()=>{});
    // Disconnecting CDP can close a session depending on provider/client.
    // Do not expose the browser or the endpoint. Caller always calls DELETE.
+   // Playwright disconnect may close the managed session. Explicit DELETE
+   // is still mandatory; unconfirmed closure conservatively remains charged.
    await browser.close().catch(()=>{});
   }
  };
@@ -157,7 +165,7 @@ export function createDeskBrowserReaderV1({provider,authorize,reserve,consume,au
   const approved=a=>a?.requestSha256===requestSha256&&
    typeof a.policyRef==="string"&&/^[A-Za-z0-9._:/-]{8,200}$/.test(a.policyRef)&&
    a.publicAcquisitionAllowed===true&&a.nativeFallbackVerified===true&&
-   a.remoteEgressIsolationVerified===true&&a.providerUseAllowed===true&&
+   a.remoteEgressIsolationVerified===true&&a.remoteRequestPolicyVerified===true&&a.providerUseAllowed===true&&
    a.zeroIncrementalSpendAllowed===true&&a.visualAllowed===visual&&
    Date.parse(a.validUntil)>now()&&Date.parse(a.validUntil)<=lease;
   const policy=await authorize(binding,requestSha256);live();
@@ -184,12 +192,12 @@ export function createDeskBrowserReaderV1({provider,authorize,reserve,consume,au
    if(typeof sessionId!=="string"||!UUID.test(sessionId))fail("SESSION_ID_UNCONFIRMED");
    await recordLifecycle({reservationId:reservation.reservationId,requestSha256,sessionId,state:"opened"});
    live();
-   capture=await provider.capture(sessionId,{url,hostname:binding.hostname,visual,remaining,
+   capture=await within(provider.capture(sessionId,{url,hostname:binding.hostname,visual,remaining,
     authorizeRequest:async(u,resourceType)=>{
      if(remaining()<=0||!approved(fresh))return false;
      let candidate;try{candidate=safeUrl(u);}catch{return false;}
      return candidate.hostname===binding.hostname&&await authorizeRequest(binding,u,resourceType,policy)===true;
-    }});
+    }}),remaining());
    live();
    if(capture?.finalUrl!==url||typeof capture.html!=="string"||
     Buffer.byteLength(capture.html,"utf8")<1||Buffer.byteLength(capture.html,"utf8")>MAX_DOM||
@@ -197,7 +205,7 @@ export function createDeskBrowserReaderV1({provider,authorize,reserve,consume,au
   }finally{
    // Separate cleanup window even if research deadline/lease was revoked.
    if(sessionId&&UUID.test(sessionId)){
-    try{closeAcknowledged=await provider.close(sessionId,AbortSignal.timeout(5000))===true;}catch{}
+    try{closeAcknowledged=await within(provider.close(sessionId,AbortSignal.timeout(5000)),5000)===true;}catch{}
    }
    await recordLifecycle({reservationId:reservation.reservationId,requestSha256,
     ...(sessionId&&UUID.test(sessionId)?{sessionId}:{}),state:closeAcknowledged?"close_acknowledged":"cleanup_unconfirmed"});

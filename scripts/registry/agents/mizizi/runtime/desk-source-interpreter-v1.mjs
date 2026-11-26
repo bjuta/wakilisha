@@ -109,7 +109,35 @@ async function parsePdf(body,pageStart,pageEnd){
    sourceTextAbsent:false};
  }finally{await task.destroy();}
 }
-async function interpret({body,contentType,finalUrl,pageStart,pageEnd}){
+async function renderPdfPage(body,pageNumber){
+ const [{getDocument},{createCanvas}]=await Promise.all([
+  import("pdfjs-dist/legacy/build/pdf.mjs"),import("@napi-rs/canvas")]);
+ const task=getDocument({data:Uint8Array.from(body),stopAtErrors:true,
+  disableFontFace:true,useSystemFonts:false,useWorkerFetch:false,enableXfa:false,
+  disableAutoFetch:true,disableStream:true,disableRange:true,isEvalSupported:false,
+  isOffscreenCanvasSupported:false,isImageDecoderSupported:false,maxImageSize:1_500_000});
+ try{
+  const pdf=await task.promise;
+  if(!Number.isSafeInteger(pdf.numPages)||pdf.numPages<1||pdf.numPages>10000||pageNumber>pdf.numPages)fail("PDF_PAGE_BOUND");
+  const page=await pdf.getPage(pageNumber);
+  try{
+   const natural=page.getViewport({scale:1});
+   if(!Number.isFinite(natural.width)||!Number.isFinite(natural.height)||natural.width<1||natural.height<1||
+     natural.width>100000||natural.height>100000)fail("PDF_VISUAL_DIMENSION_BOUND");
+   const scale=Math.min(2,1400/natural.width,1400/natural.height,Math.sqrt(1_500_000/(natural.width*natural.height)));
+   const viewport=page.getViewport({scale});
+   const width=Math.max(1,Math.floor(viewport.width)),height=Math.max(1,Math.floor(viewport.height));
+   if(width>1400||height>1400||width*height>1_500_000)fail("PDF_VISUAL_DIMENSION_BOUND");
+   const canvas=createCanvas(width,height),canvasContext=canvas.getContext("2d");
+   await page.render({canvas,canvasContext,viewport,annotationMode:0,background:"#ffffff"}).promise;
+   const png=canvas.toBuffer("image/png");
+   if(png.length<33||png.length>2_000_000)fail("PDF_VISUAL_BYTE_BOUND");
+   return {pageNumber,documentPages:pdf.numPages,width,height,body:Uint8Array.from(png)};
+  }finally{page.cleanup();}
+ }finally{await task.destroy();}
+}
+async function interpret({body,contentType,finalUrl,pageStart,pageEnd,mode}){
+ if(mode==="pdf_visual")return renderPdfPage(body,pageStart);
  if(contentType==="application/pdf")return parsePdf(body,pageStart,pageEnd);
  if(contentType==="text/html"||contentType==="application/xhtml+xml")return parseHtml(body,finalUrl);
  const value=bounded(new TextDecoder("utf-8",{fatal:true}).decode(body),MAX_TEXT);
@@ -158,7 +186,10 @@ export function createDeskSourceInterpreterV1({authorize,now=Date.now}={}){
  return async({scope,receipt,pageStart=1,pageEnd=MAX_PAGES})=>{
   const started=now(),s=boundScope(scope,started);
   const lease=Date.parse(s.leaseExpiresAt);
-  if(!receipt||receipt.contract!=="mizizi.desk_native_read.v1"||
+  if(!receipt||!["mizizi.desk_native_read.v1","mizizi.desk_browser_read.v1"].includes(receipt.contract)||
+    (receipt.contract==="mizizi.desk_browser_read.v1"&&
+      (receipt.representation!=="rendered_dom_not_original_response"||receipt.contentType!=="text/html"||
+       !SHA.test(receipt.nativeSourceSha256)||!SHA.test(receipt.nativeProjectionSha256)))||
     scopeKeys.some(k=>receipt.scope?.[k]!==s[k])||
     !MIME.has(receipt.contentType)||!(receipt.body instanceof Uint8Array)||
     !Number.isSafeInteger(receipt.byteLength)||receipt.byteLength!==receipt.body.byteLength||
@@ -174,7 +205,10 @@ export function createDeskSourceInterpreterV1({authorize,now=Date.now}={}){
     (receipt.contentType!=="application/pdf"&&(pageStart!==1||pageEnd!==MAX_PAGES)))fail("PAGE_BOUND");
   if(receipt.contentType==="application/pdf"&&new TextDecoder().decode(body.subarray(0,5))!=="%PDF-")fail("ACQUISITION_RECEIPT_DENIED");
   const binding=Object.freeze({finalUrl:receipt.finalUrl,sha256:receipt.sha256,byteLength:body.length,
-   contentType:receipt.contentType,retrievedAt:receipt.retrievedAt,pageStart,pageEnd});
+   contentType:receipt.contentType,retrievedAt:receipt.retrievedAt,pageStart,pageEnd,
+   representation:receipt.contract==="mizizi.desk_browser_read.v1"?"rendered_dom_not_original_response":"native_response_bytes",
+   ...(receipt.contract==="mizizi.desk_browser_read.v1"?{nativeSourceSha256:receipt.nativeSourceSha256,
+    nativeProjectionSha256:receipt.nativeProjectionSha256}:{})});
   const deadline=Math.min(lease,started+MAX_MS);
   const live=()=>{if(now()>=deadline)fail("DEADLINE");};
   if(await authorize(s,binding)!==true)fail("EXAMINATION_DENIED");
@@ -190,5 +224,56 @@ export function createDeskSourceInterpreterV1({authorize,now=Date.now}={}){
    projectionSha256:digest(projectionText),interpretedAt:new Date(now()).toISOString(),
    identityVerified:false,sourceRetentionAuthorized:false,externalModelProcessingAuthorized:false,
    sourceContentIsUntrusted:true});
+ };
+}
+
+
+/** Rasterize exactly one authorized local PDF page. This is a derivative
+ * image, not OCR, not model analysis and never a source or disclosure grant.
+ * No remote URLs or page actions. Use the same bounded parser worker.
+ */
+export function createDeskPdfVisualReaderV1({authorize,now=Date.now}={}){
+ if(typeof authorize!=="function")fail("TRUSTED_AUTHORITY_REQUIRED");
+ return async({scope,receipt,pageNumber})=>{
+  const started=now(),s=boundScope(scope,started),lease=Date.parse(s.leaseExpiresAt);
+  if(!receipt||receipt.contract!=="mizizi.desk_native_read.v1"||
+   scopeKeys.some(k=>receipt.scope?.[k]!==s[k])||receipt.contentType!=="application/pdf"||
+   !(receipt.body instanceof Uint8Array)||receipt.byteLength!==receipt.body.byteLength||
+   receipt.byteLength<5||receipt.byteLength>MAX_BYTES||!SHA.test(receipt.sha256)||
+   receipt.identityVerified!==false||receipt.sourceRetentionAuthorized!==false||
+   receipt.externalModelProcessingAuthorized!==false||typeof receipt.retrievedAt!=="string"||
+   !Number.isFinite(Date.parse(receipt.retrievedAt))||Date.parse(receipt.retrievedAt)>started||
+   safeLead(receipt.finalUrl,receipt.finalUrl)!==receipt.finalUrl||
+   !Number.isSafeInteger(pageNumber)||pageNumber<1||pageNumber>10000)
+   fail("VISUAL_RECEIPT_DENIED");
+  const body=Uint8Array.from(receipt.body);
+  if(digest(body)!==receipt.sha256||new TextDecoder().decode(body.subarray(0,5))!=="%PDF-")fail("ACQUISITION_DIGEST_MISMATCH");
+  const binding=Object.freeze({mode:"pdf_visual",finalUrl:receipt.finalUrl,sha256:receipt.sha256,
+   byteLength:body.length,contentType:receipt.contentType,retrievedAt:receipt.retrievedAt,pageNumber});
+  const deadline=Math.min(lease,started+MAX_MS);
+  const live=()=>{if(now()>=deadline)fail("DEADLINE");};
+  if(await authorize(s,binding)!==true)fail("VISUAL_EXAMINATION_DENIED");
+  live();
+  const result=await runWorker({mode:"pdf_visual",body,contentType:receipt.contentType,
+   finalUrl:receipt.finalUrl,pageStart:pageNumber,pageEnd:pageNumber},Math.max(1,deadline-now()));
+  live();
+  if(result?.pageNumber!==pageNumber||!Number.isSafeInteger(result.documentPages)||result.documentPages<pageNumber||
+    !Number.isSafeInteger(result.width)||!Number.isSafeInteger(result.height)||result.width<1||result.height<1||
+    result.width>1400||result.height>1400||result.width*result.height>1_500_000||
+    !(result.body instanceof Uint8Array)||result.body.length<33||result.body.length>2_000_000)
+   fail("VISUAL_PROJECTION_DENIED");
+  const png=Buffer.from(result.body);
+  if(!png.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||
+    png.subarray(12,16).toString("ascii")!=="IHDR"||
+    png.readUInt32BE(16)!==result.width||png.readUInt32BE(20)!==result.height)
+   fail("VISUAL_PROJECTION_DENIED");
+  if(await authorize(s,binding)!==true)fail("VISUAL_EXAMINATION_REVOKED");
+  live();
+  return Object.freeze({contract:"mizizi.desk_pdf_visual.v1",scope:s,source:binding,
+   locator:"pdf_page:"+pageNumber,pageNumber,documentPages:result.documentPages,
+   contentType:"image/png",width:result.width,height:result.height,
+   byteLength:png.length,sha256:digest(png),body:Uint8Array.from(png),
+   interpretedAt:new Date(now()).toISOString(),identityVerified:false,
+   sourceRetentionAuthorized:false,externalModelProcessingAuthorized:false,sourceContentIsUntrusted:true});
  };
 }

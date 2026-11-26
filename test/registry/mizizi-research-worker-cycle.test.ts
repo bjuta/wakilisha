@@ -1,4 +1,5 @@
-import {createDeskSourceInterpreterV1} from "../../scripts/registry/agents/mizizi/runtime/desk-source-interpreter-v1.mjs";
+import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
+import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-source-interpreter-v1.mjs";
 import {createDeskNativeReaderV1,isPublicDeskIpv4V1} from "../../scripts/registry/agents/mizizi/runtime/desk-native-reader-v1";
 import {createDeskSearchGatewayV1,createDurableDeskSearchGatewayV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-gateway-v1";
 import { describe, expect, it, vi } from "vitest";
@@ -1434,6 +1435,20 @@ describe("MIZIZI bounded local source interpretation",()=>{
   expect(second.projection.segments.map((p:{page:number})=>p.page)).toEqual([2]);
   expect(second.projection.partial).toBe(true);
  },35000);
+ it("renders an exact authorized PDF page locally as bounded PNG, with no disclosure grant",async()=>{
+  const receipt=source(pdfFixture(),"application/pdf");
+  const authorize=vi.fn(async()=>true),run=createDeskPdfVisualReaderV1({authorize,now:()=>NOW});
+  const result=await run({scope,receipt,pageNumber:1});
+  expect(result).toMatchObject({locator:"pdf_page:1",pageNumber:1,documentPages:2,
+   contentType:"image/png",identityVerified:false,sourceRetentionAuthorized:false,externalModelProcessingAuthorized:false});
+  expect(result.width*result.height).toBeLessThanOrEqual(1500000);
+  expect(Buffer.from(result.body).subarray(0,8)).toEqual(Buffer.from([137,80,78,71,13,10,26,10]));
+  expect(result.sha256).toBe(createHash("sha256").update(result.body).digest("hex"));
+  expect(authorize).toHaveBeenCalledTimes(2);
+  await expect(run({scope,receipt:{...receipt,sha256:"f".repeat(64)},pageNumber:1})).rejects.toThrow("DIGEST_MISMATCH");
+  await expect(createDeskPdfVisualReaderV1({authorize:async()=>false,now:()=>NOW})({scope,receipt,pageNumber:1}))
+   .rejects.toThrow("VISUAL_EXAMINATION_DENIED");
+ },20000);
  it("denies mutated bytes, wrong lease, unapproved examination and oversized page ranges",async()=>{
   const receipt=source(new TextEncoder().encode("archive"),"text/plain");
   const auth=vi.fn(async()=>true),run=createDeskSourceInterpreterV1({authorize:auth,now:()=>NOW});
@@ -1451,5 +1466,75 @@ describe("MIZIZI bounded local source interpretation",()=>{
   expect(result.projection.partial).toBe(true);
   const authorize=vi.fn(async()=>true).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
   await expect(createDeskSourceInterpreterV1({authorize,now:()=>NOW})({scope,receipt})).rejects.toThrow("EXAMINATION_REVOKED");
+ });
+});
+
+
+describe("MIZIZI guarded browser fallback",()=>{
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+60000).toISOString()};
+ const url="https://archive.org/details/kenyan-music";
+ const request={scope,url,nativeOutcome:{disposition:"render_required",finalUrl:url,
+  sourceSha256:"a".repeat(64),projectionSha256:"b".repeat(64)}};
+ function fixture(){
+  const provider={accountFingerprint:"c".repeat(64),open:vi.fn(async()=>EVENT),
+   capture:vi.fn(async()=>({finalUrl:url,html:"<html><body>Rendered archive</body></html>",png:null})),
+   close:vi.fn(async()=>true)};
+  const authorize=vi.fn(async(_b:unknown,d:string)=>({requestSha256:d,policyRef:"policy:browser",
+   publicAcquisitionAllowed:true,nativeFallbackVerified:true,remoteEgressIsolationVerified:true,
+   remoteRequestPolicyVerified:true,providerUseAllowed:true,zeroIncrementalSpendAllowed:true,
+   visualAllowed:false,validUntil:new Date(NOW+30000).toISOString()}));
+  const reserve=vi.fn(async(_b:unknown,d:string)=>({reservationId:RECEIPT,requestSha256:d,
+   provider:"cloudflare_browser_run",seconds:120,maximumIncrementalCostMicrousd:0,
+   validUntil:new Date(NOW+30000).toISOString()}));
+  const consume=vi.fn(async()=>true),authorizeRequest=vi.fn(async()=>true),recordLifecycle=vi.fn(async()=>{});
+  return {provider,authorize,reserve,consume,authorizeRequest,recordLifecycle,now:()=>NOW};
+ }
+ it("precharges and journals one session, closes before returning rendered DOM and no rights",async()=>{
+  const h=fixture(),result=await createDeskBrowserReaderV1(h)(request);
+  expect(h.provider.open).toHaveBeenCalledWith({hostname:"archive.org"},expect.anything());
+  expect(h.consume.mock.invocationCallOrder[0]).toBeLessThan(h.provider.open.mock.invocationCallOrder[0]);
+  expect(h.provider.close).toHaveBeenCalledWith(EVENT,expect.anything());
+  expect(h.recordLifecycle.mock.calls.map(c=>(c[0] as {state:string}).state)).toEqual(["open_pending","opened","close_acknowledged"]);
+  expect(result).toMatchObject({representation:"rendered_dom_not_original_response",nativeSourceSha256:"a".repeat(64),
+   identityVerified:false,sourceRetentionAuthorized:false,externalModelProcessingAuthorized:false});
+  expect(result.sha256).toBe(createHash("sha256").update(result.body).digest("hex"));
+ });
+ it("never starts without native fallback, remote request policy, account quota or consumable reservation",async()=>{
+  const denied=fixture();
+  await expect(createDeskBrowserReaderV1(denied)({...request,nativeOutcome:{...request.nativeOutcome,disposition:"access_denied"}})).rejects.toThrow("FALLBACK_REQUIRED");
+  const h=fixture();h.authorize.mockImplementationOnce(async(_b,d)=>({...await fixture().authorize(_b,d),remoteRequestPolicyVerified:false}));
+  await expect(createDeskBrowserReaderV1(h)(request)).rejects.toThrow("AUTHORITY_DENIED");
+  const q=fixture();q.reserve.mockResolvedValueOnce(null as never);
+  await expect(createDeskBrowserReaderV1(q)(request)).rejects.toThrow("BUDGET_UNAVAILABLE");
+  const used=fixture();used.consume.mockResolvedValueOnce(false);
+  await expect(createDeskBrowserReaderV1(used)(request)).rejects.toThrow("NOT_CONSUMABLE");
+  for(const f of [denied,h,q,used])expect(f.provider.open).not.toHaveBeenCalled();
+ });
+ it("closes after capture failure and withholds data if close acknowledgement is missing",async()=>{
+  const h=fixture();h.provider.capture.mockRejectedValueOnce(Error("capture failed"));
+  await expect(createDeskBrowserReaderV1(h)(request)).rejects.toThrow("capture failed");
+  expect(h.provider.close).toHaveBeenCalledTimes(1);
+  const bad=fixture();bad.provider.close.mockResolvedValueOnce(false);
+  await expect(createDeskBrowserReaderV1(bad)(request)).rejects.toThrow("CLEANUP_UNCONFIRMED");
+  expect(bad.recordLifecycle.mock.calls.at(-1)?.[0]).toMatchObject({state:"cleanup_unconfirmed"});
+  const lost=fixture();lost.provider.open.mockRejectedValueOnce(Error("unknown open"));
+  await expect(createDeskBrowserReaderV1(lost)(request)).rejects.toThrow("CLEANUP_UNCONFIRMED");
+  expect(lost.recordLifecycle.mock.calls.at(-1)?.[0]).toMatchObject({state:"cleanup_unconfirmed"});
+ });
+ it("uses a fixed Cloudflare session endpoint with exact host guardrails, never provider-returned URLs",async()=>{
+  const token="fixture-only-cloudflare-token",accountId="a".repeat(32);
+  const transport=vi.fn(async(_url:string,init:RequestInit)=>new Response(JSON.stringify(init.method==="POST"?
+   {sessionId:EVENT,webSocketDebuggerUrl:"wss://attacker.invalid/"}:{status:"closing"}),{headers:{"content-type":"application/json"}}));
+  const provider=createCloudflareBrowserTransportV1({accountId,apiToken:token,transport:transport as never});
+  const id=await provider.open({hostname:"archive.org"},AbortSignal.timeout(1000));
+  expect(id).toBe(EVENT);
+  await expect(provider.close(id,AbortSignal.timeout(1000))).resolves.toBe(true);
+  const endpoint="https://api.cloudflare.com/client/v4/accounts/"+accountId+"/browser-run/devtools/browser";
+  expect(transport.mock.calls[0][0]).toBe(endpoint);
+  expect(JSON.parse(String(transport.mock.calls[0][1].body))).toEqual({guardrails:{allowedDomains:["archive.org"]}});
+  expect(transport.mock.calls[0][1].redirect).toBe("error");
+  expect(transport.mock.calls[1][0]).toBe(endpoint+"/"+EVENT);
+  expect(provider.accountFingerprint).not.toContain(token);
  });
 });
