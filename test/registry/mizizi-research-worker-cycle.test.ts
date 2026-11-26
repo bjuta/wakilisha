@@ -1,3 +1,4 @@
+import {createDeskResearchDispatcherV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-dispatcher-v1";
 import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/runtime/desk-resource-budget-v1";
 import {createCostRoutedDeskAnthropicPassV1,selectCostEffectiveDeskModelV1,type DeskModelCandidateV1,type DeskAnthropicOptionsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
@@ -1752,5 +1753,109 @@ describe("MIZIZI durable resource finance adapters",()=>{
   const budget=createDeskResourceBudgetV1({rpc:async()=>({data:null,error:{message:"unknown"}}),now:()=>NOW});
   await expect(budget.nativePrecharge(account)(scope,{url:"https://archive.org/item",hostname:"archive.org",address:"8.8.8.8"},{}))
    .rejects.toThrow("RPC_UNCONFIRMED");
+ });
+});
+
+
+describe("MIZIZI composed durable search and native-source dispatcher",()=>{
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+60000).toISOString()};
+ const url="https://archive.org/details/fixture";
+ const expiry=new Date(NOW+30000).toISOString(),hash=(s:string|Uint8Array)=>createHash("sha256").update(s).digest("hex");
+ const textBytes=new TextEncoder().encode("The archival programme credits an ensemble but does not establish the individual performer.");
+ const call=(name:"search_web"|"read_page",input:Record<string,string>)=>({name,input});
+ function fixture(){
+  const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
+  const receipts=new Map<string,Record<string,unknown>>(),leadRows=new Map<string,Record<string,unknown>>();
+  const disabled=new Set<string>();
+  const provider=vi.fn(async()=>new Response(JSON.stringify({web:{results:[{url,title:"Archival programme"}]}}),
+   {headers:{"content-type":"application/json"}}));
+  const native=vi.fn(async()=>({status:200,contentType:"text/plain",body:textBytes}));
+  const access=vi.fn(async()=>({policyRef:"policy:reviewed-public-read",validUntil:expiry,
+   acquisitionAllowed:true as const,zeroIncrementalSpendAllowed:true as const}));
+  const examination=vi.fn(async()=>true);
+  const rpc:WorkerRpc=async(fn,args)=>{
+   calls.push({fn,args});
+   const ok=(data:unknown)=>({data,error:null});
+   if(fn==="mizizi_read_desk_custody_policy_v1"){
+    const host=String(args.p_host);
+    return ok(disabled.has(host)?null:{host,revision:1,sourceFamily:host==="api.search.brave.com"?"brave_discovery":"public_web",
+     authorityRef:"contract:reviewed-rights",originKey:"archive:original-origin",lineageKey:"archive:common-lineage",
+     useBasis:"documented_contract",privateResearchAllowed:true,metadataRetentionAllowed:true,
+     excerptRetentionAllowed:host!=="api.search.brave.com",externalModelProcessingAllowed:true,validUntil:expiry});
+   }
+   if(fn==="mizizi_authorize_desk_search_v1")return ok({requestSha256:args.p_request_sha256,
+    policyRef:"policy:public-search",validUntil:expiry,publicQueryAllowed:true,providerUseAllowed:true,zeroIncrementalSpendAllowed:true});
+   if(fn==="mizizi_reserve_desk_search_v1")return ok({reservationId:EVENT,requestSha256:args.p_request_sha256,
+    provider:"brave",units:1,maximumIncrementalCostMicrousd:0,validUntil:expiry});
+   if(fn==="mizizi_consume_desk_search_v1"||fn==="mizizi_consume_desk_resource_v1")return ok(true);
+   if(fn==="mizizi_quote_desk_resource_v1"||fn==="mizizi_reserve_desk_resource_v1"){
+    const b=JSON.parse(String(args.p_binding_text));
+    return ok({resource:b.resource,requestSha256:b.requestSha256,bindingSha256:hash(String(args.p_binding_text)),
+     policyRevision:1,units:2000000,validUntil:expiry,model:null,pricingRef:null,maxInputTokens:null,maxOutputTokens:null,
+     maximumCostMicrousd:0,...(fn==="mizizi_reserve_desk_resource_v1"?{reservationId:RECEIPT}:{})});
+   }
+   if(fn==="mizizi_record_desk_tool_receipt_v1"){
+    const parsed=JSON.parse(String(args.p_result_text)),provenance={...(args.p_provenance as Record<string,unknown>)};
+    delete provenance.requestText;
+    receipts.set(parsed.receiptId,{receiptId:parsed.receiptId,callSha256:args.p_call_sha256,
+     resultSha256:args.p_result_sha256,resultText:args.p_result_text,provenance,host:args.p_host});
+    for(const b of args.p_lead_bindings as {id:string;url:string}[]){
+     const l=parsed.leads.find((x:{id:string})=>x.id===b.id);
+     leadRows.set(b.id,{...l,url:b.url,receiptId:parsed.receiptId});
+    }
+    return ok({receiptId:parsed.receiptId,resultSha256:args.p_result_sha256,outcome:"created"});
+   }
+   if(fn==="mizizi_read_desk_tool_receipt_v1"){
+    const stored=receipts.get(String(args.p_receipt_id));
+    return ok(stored&&!disabled.has(String(stored.host))?stored:null);
+   }
+   if(fn==="mizizi_resolve_desk_reference_lead_v1"){
+    const stored=leadRows.get(String(args.p_lead_id));
+    return ok(stored&&!disabled.has(String(receipts.get(String(stored.receiptId))?.host))?stored:null);
+   }
+   throw Error("unexpected RPC: "+fn);
+  };
+  const dispatch=createDeskResearchDispatcherV1({scope,rpc,braveApiKey:"fixture-only-brave-key",
+   nativeAccountFingerprint:"a".repeat(64),authorizeAcquisition:access,authorizeExamination:examination,
+   searchTransport:provider as unknown as typeof fetch,nativeTestSeams:{resolve4:async()=>["93.184.216.34"],readPinned:native},
+   now:()=>NOW});
+  const execute=(c:ReturnType<typeof call>)=>dispatch.executeTool(scope,c,hash(JSON.stringify({scope,call:c})));
+  return {dispatch,execute,calls,receipts,leadRows,disabled,provider,native,access,examination};
+ }
+ it("connects actual search, budget, native reader and parser to private opaque custody and source readback",async()=>{
+  const h=fixture(),search=call("search_web",{query:"Nairobi recording archive"});
+  const first=await h.execute(search);
+  expect(first.sources).toEqual([]);expect(first.leads).toHaveLength(1);
+  expect(JSON.stringify(first)).not.toContain(url);
+  const read=call("read_page",{lead_id:first.leads[0].id}),second=await h.execute(read);
+  expect(h.provider).toHaveBeenCalledTimes(1);expect(h.native).toHaveBeenCalledTimes(1);
+  expect(h.examination).toHaveBeenCalledTimes(2);
+  const source=second.sources[0];
+  expect(source).toMatchObject({excerpt:new TextDecoder().decode(textBytes),citation:url+"#plain_text",
+   source:{sourceId:second.receiptId,fingerprint:hash(textBytes),lineageKey:"archive:common-lineage"}});
+  const resultSha256=hash(JSON.stringify({receiptId:second.receiptId,leads:second.leads,sources:second.sources,visual:null}));
+  expect(await h.dispatch.verifyToolReceipt(scope,{receiptId:second.receiptId,
+   callSha256:hash(JSON.stringify({scope,call:read})),resultSha256},second)).toBe(true);
+  const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:"Investigate the archival programme."};
+  expect(await h.dispatch.authorizeSource(identity,identity.openingQuestion,source)).toBe(true);
+  expect(await h.dispatch.authorizeSource(identity,identity.openingQuestion,{...source,excerpt:"altered excerpt"})).toBe(false);
+  const hop=(h.receipts.get(second.receiptId)?.provenance as {hopSha256:string[]}).hopSha256[0];
+  const nativeReserve=h.calls.find(c=>c.fn==="mizizi_reserve_desk_resource_v1")!;
+  expect(JSON.parse(String(nativeReserve.args.p_binding_text)).requestSha256).toBe(hop);
+  expect(JSON.stringify([...h.receipts.values()])).not.toContain("fixture-only-brave-key");
+  h.disabled.add("archive.org");
+  expect(await h.dispatch.authorizeSource(identity,identity.openingQuestion,source)).toBe(false);
+ },20000);
+ it("requires current custody before discovery or reading, and rejects forged lead or unsupported tool",async()=>{
+  const h=fixture();h.disabled.add("api.search.brave.com");
+  await expect(h.execute(call("search_web",{query:"Nairobi recording archive"}))).rejects.toThrow("SEARCH_CUSTODY_DENIED");
+  expect(h.provider).not.toHaveBeenCalled();h.disabled.clear();
+  await expect(h.execute(call("read_page",{lead_id:EVENT}))).rejects.toThrow("LEAD_NOT_AVAILABLE");
+  expect(h.native).not.toHaveBeenCalled();
+  const first=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
+  h.disabled.add("archive.org");
+  await expect(h.execute(call("read_page",{lead_id:first.leads[0].id}))).rejects.toThrow("ACQUISITION_DENIED");
+  expect(h.native).not.toHaveBeenCalled();
  });
 });
