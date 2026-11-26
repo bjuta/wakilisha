@@ -1,6 +1,6 @@
 import {describe,expect,it} from "vitest";
 import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
-import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,buildCharts2InvestigationInputV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
+import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,buildCharts2InvestigationInputV1,verifyCharts2InvestigationParityV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import {suggestRecordingReviewGroups,buildRecordingInvestigationGroups,bindRecordingInvestigationGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
 import {
   appendChartReviewReference,
@@ -139,6 +139,41 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(()=>buildCharts2InvestigationInputV1({...snapshot,receipts:partial}))
       .toThrow("charts2_investigation_requires_full_receipts");
     expect(input.can_publish).toBe(false);
+    const db={contract:"charts2-private-freeze-preflight/v1",methodology_version:input.methodology_version,
+      scoring_policy_version:input.scoring_policy_version,can_publish:false,input_sha256:"a".repeat(64),
+      eligible_count:input.eligible_recordings,unresolved_count:input.unresolved.length,conflict_count:input.conflicts.length,
+      source_receipts:input.sources,investigation_positions:[...input.unresolved,...input.conflicts].reverse()};
+    expect(verifyCharts2InvestigationParityV1(input,db)).toBe(db.input_sha256);
+    const changedPosition=structuredClone(db);
+    changedPosition.investigation_positions[0].artist="Unverified Artist";
+    expect(()=>verifyCharts2InvestigationParityV1(input,changedPosition)).toThrow("charts2_investigation_position_disagreement");
+    const wrongDisposition=structuredClone(db);
+    wrongDisposition.investigation_positions[0].disposition="research";
+    expect(()=>verifyCharts2InvestigationParityV1(input,wrongDisposition)).toThrow("charts2_investigation_position_disagreement");
+    const repeated=structuredClone(db);
+    repeated.investigation_positions[0]=repeated.investigation_positions[1];
+    expect(()=>verifyCharts2InvestigationParityV1(input,repeated)).toThrow("charts2_investigation_position_disagreement");
+    const wrongReceipt=structuredClone(db);
+    wrongReceipt.source_receipts[0].original_sha256="f".repeat(64);
+    expect(()=>verifyCharts2InvestigationParityV1(input,wrongReceipt)).toThrow("charts2_investigation_receipt_disagreement");
+    expect(()=>verifyCharts2InvestigationParityV1(input,{...db,eligible_count:2})).toThrow("charts2_investigation_score_disagreement");
+  });
+
+  it("routes exact admission through existing original verification and actor authority, not browser grouping",()=>{
+    const prepare=STUDIO_WORKER.slice(STUDIO_WORKER.indexOf("async function prepareMiziziChartCandidates("),
+      STUDIO_WORKER.indexOf("async function studioAction("));
+    expect(prepare.indexOf("verifyPrivateOriginal(server,r)")).toBeLessThan(prepare.indexOf("buildCharts2InvestigationInputV1(snapshot)"));
+    expect(prepare).toContain('server.rpc("mizizi_charts_candidate_input_v1")');
+    expect(prepare).toContain("verifyCharts2InvestigationParityV1(input,gate.data)");
+    expect(prepare).toContain("bindRecordingInvestigationGroups(input)");
+    const action=STUDIO_WORKER.slice(STUDIO_WORKER.indexOf('if(mode==="studio_mizizi_prepare"||mode==="studio_mizizi_admit")'),
+      STUDIO_WORKER.indexOf('if(mode==="studio_registry_discovery")'));
+    expect(action).toContain('authClient.rpc("admin_mizizi_admit_chart_candidates_v1"');
+    expect(action).toContain("p_groups:prepared.positions");
+    expect(action).not.toContain("p_groups:supplied");
+    expect(action).not.toContain('server.rpc("admin_mizizi_admit_chart_candidates_v1"');
+    expect(action).toContain('supplied.expected_input_sha256!==prepared.summary.input_sha256');
+    expect(action).toContain("receipt.jobs_dispatched!==0");
   });
 
   it("keeps the native Top 100 preview private and visible only through Studio",()=>{

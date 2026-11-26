@@ -7,7 +7,8 @@ import { decodeCharts2Original, listCharts2SourceContracts, charts2YouTubeNative
 import {scoreCharts2PrivatePreviewV1,CHARTS2_PRIVATE_METHODOLOGY_V1,summarizeCharts2SourceCoverageV1} from "../_shared/charts2-private-scoring-v1.mjs";
 import {YOUTUBE_EXPORT_ENDPOINT,YOUTUBE_EXPORT_MODE,YOUTUBE_EXPORT_ACK,
   YOUTUBE_EXPORT_PARSER_VERSION} from "../_shared/charts2-youtube-official-export.mjs";
-import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,charts2RegistryDiscoveryKeyV1} from "../_shared/charts2-private-native-review-v1.mjs";
+import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,charts2RegistryDiscoveryKeyV1,buildCharts2InvestigationInputV1,verifyCharts2InvestigationParityV1} from "../_shared/charts2-private-native-review-v1.mjs";
+import {bindRecordingInvestigationGroups,type ChartInvestigationInput} from "../../../src/services/chartsPrivate/recordingReviewSuggestions.ts";
 
 const MAX_BYTES = 4_000_000;
 const MAX_REQUEST_BYTES = 6_000_000;
@@ -252,7 +253,84 @@ async function readStudioRegistryTracks(server:any,ids:string[],strict=false) {
       }));
 }
 
+async function prepareMiziziChartCandidates(server:any) {
+  const snapshot=await studioSnapshot(server);
+  const receipts=snapshot.receipts;
+  if(!Array.isArray(receipts)||receipts.length!==5)
+    throw new Reject(409,"charts2_investigation_requires_full_receipts");
+  await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)));
+  let input:ChartInvestigationInput;
+  try {input=buildCharts2InvestigationInputV1(snapshot) as ChartInvestigationInput;}
+  catch {throw new Reject(409,"charts2_investigation_unqualified_snapshot");}
+  const gate=await server.rpc("mizizi_charts_candidate_input_v1");
+  if(gate.error||!gate.data)
+    throw new Reject(503,"charts2_investigation_projection_unavailable");
+  let inputSha:string,groups:ReturnType<typeof bindRecordingInvestigationGroups>;
+  try {
+    inputSha=verifyCharts2InvestigationParityV1(input,gate.data);
+    // First partition is receipt-only and deterministic. Registry aliases are
+    // investigated later; changing membership needs explicit reconciliation.
+    groups=bindRecordingInvestigationGroups(input);
+  }catch{throw new Reject(409,"charts2_investigation_projection_disagreement");}
+  const positions=groups.map(group=>({
+    disposition:group.disposition,
+    positions:group.observations.map(row=>({
+      source_key:row.source_key,receipt_id:row.receipt_id,
+      original_sha256:row.original_sha256,rank:row.rank,
+    })),
+  }));
+  return {
+    summary:{contract:"charts2-mizizi-admission-preparation/v1",input_sha256:inputSha,
+      sources:input.sources,total_positions:input.total_positions,resolved_positions:input.resolved_positions,
+      unresolved_positions:input.unresolved.length,conflict_positions:input.conflicts.length,
+      group_count:groups.length,blocked_group_count:groups.filter(g=>g.disposition==="blocked").length,
+      server_verified_originals:receipts.length,research_dispatched:false,can_publish:false},
+    positions,
+  };
+}
+
 async function studioAction(mode:string,req:Request,server:any,authClient:any) {
+  if(mode==="studio_mizizi_prepare"||mode==="studio_mizizi_admit") {
+    await requireRegistryReviewer(authClient);
+    // Existing actor-scoped Headquarters read checks valid membership. Final
+    // admission independently requires steward and both capabilities in SQL.
+    const member=await authClient.rpc("admin_mizizi_cases_v1",{p_limit:1});
+    if(member.error)throw new Reject(403,"charts2_mizizi_membership_required");
+    const supplied=await req.json().catch(()=>null);
+    if(!supplied||typeof supplied!=="object"||Array.isArray(supplied))
+      throw new Reject(400,"charts2_investigation_arguments_invalid");
+    const ack="I approve preparing these exact chart candidates for private MIZIZI investigation. No canonical records will be created.";
+    if(mode==="studio_mizizi_prepare" ? Object.keys(supplied).length!==0 :
+       (Object.keys(supplied).length!==2||typeof supplied.expected_input_sha256!=="string"||
+        !/^[a-f0-9]{64}$/.test(supplied.expected_input_sha256)||supplied.acknowledgement!==ack))
+      throw new Reject(400,"charts2_investigation_arguments_invalid");
+    const prepared=await prepareMiziziChartCandidates(server);
+    if(mode==="studio_mizizi_prepare")return prepared.summary;
+    if(supplied.expected_input_sha256!==prepared.summary.input_sha256)
+      throw new Reject(409,"charts2_investigation_stale_snapshot");
+    // Browser never supplies grouping, subject identity, original labels or
+    // actor ID. The human JWT remains the sole admission actor; no service
+    // role invocation and no job dispatch in this increment.
+    const admitted=await authClient.rpc("admin_mizizi_admit_chart_candidates_v1",{
+      p_expected_input_sha256:prepared.summary.input_sha256,p_groups:prepared.positions,
+    });
+    if(admitted.error){
+      const code=admitted.error.code;
+      throw new Reject(code==="42501"?403:code==="PT409"?409:code==="22023"?400:503,
+        "charts2_investigation_admission_unconfirmed");
+    }
+    const receipt=admitted.data;
+    if(receipt?.contract!=="mizizi-charts-candidate-admission/v1"||
+       receipt.input_sha256!==prepared.summary.input_sha256||
+       receipt.position_count!==prepared.summary.unresolved_positions+prepared.summary.conflict_positions||
+       !Number.isSafeInteger(receipt.created)||receipt.created<0||
+       !Number.isSafeInteger(receipt.replayed)||receipt.replayed<0||
+       receipt.created+receipt.replayed!==prepared.summary.group_count||
+       !Array.isArray(receipt.cases)||receipt.cases.length!==prepared.summary.group_count||
+       receipt.jobs_dispatched!==0||receipt.can_publish!==false)
+      throw new Reject(503,"charts2_investigation_admission_receipt_invalid");
+    return {...prepared.summary,admission:receipt};
+  }
   if(mode==="studio_registry_discovery") {
     await requireRegistryReviewer(authClient);
     const supplied=await req.json().catch(()=>null);
@@ -737,7 +815,7 @@ async function handle(req:Request) {
   const {user,server,authClient}=await session(req);
   const url=new URL(req.url);
   const mode=url.searchParams.get("mode")??"upload";
-  if(["studio_preview","studio_registry_discovery","studio_track_search","studio_review_context","studio_stage_artist_intake","studio_stage_intake","studio_review_no_id","studio_review_link","studio_freeze"].includes(mode))
+  if(["studio_mizizi_prepare","studio_mizizi_admit","studio_preview","studio_registry_discovery","studio_track_search","studio_review_context","studio_stage_artist_intake","studio_stage_intake","studio_review_no_id","studio_review_link","studio_freeze"].includes(mode))
     return studioAction(mode,req,server,authClient);
   let key:string, endpoint:string, target_period_key:string|null=null;
   let contentType:string, bytes:Uint8Array, methodRevision:number|null=null;

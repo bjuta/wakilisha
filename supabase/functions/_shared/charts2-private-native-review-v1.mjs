@@ -244,3 +244,42 @@ export function buildCharts2InvestigationInputV1(snapshot) {
     can_publish: false,
   };
 }
+
+// Compare the independently computed JS partition with the private SQL
+// projection, including position dispositions and original labels. The caller
+// must verify Storage bytes first; this comparison never authorizes a write.
+export function verifyCharts2InvestigationParityV1(input, database) {
+  if(input?.contract!=="charts2-investigation-input/v1" ||
+     database?.contract!=="charts2-private-freeze-preflight/v1" ||
+     database.methodology_version!==input.methodology_version ||
+     database.scoring_policy_version!==input.scoring_policy_version ||
+     database.can_publish!==false ||
+     !/^[a-f0-9]{64}$/.test(database.input_sha256??"") ||
+     !Array.isArray(database.source_receipts) ||
+     !Array.isArray(database.investigation_positions) ||
+     database.eligible_count!==input.eligible_recordings ||
+     database.unresolved_count!==input.unresolved.length ||
+     database.conflict_count!==input.conflicts.length ||
+     database.investigation_positions.length!==input.unresolved.length+input.conflicts.length ||
+     input.sources.length!==5 || database.source_receipts.length!==5)
+    fail("charts2_investigation_score_disagreement");
+  const manifestKey = r=>JSON.stringify([r.source_key,r.receipt_id,r.original_sha256]);
+  const sources=new Set(input.sources.map(manifestKey));
+  if(sources.size!==5 ||
+     new Set(database.source_receipts.map(manifestKey)).size!==5 ||
+     database.source_receipts.some(r=>!sources.has(manifestKey(r))))
+    fail("charts2_investigation_receipt_disagreement");
+  const coordinate = r=>JSON.stringify([r.source_key,r.receipt_id,r.rank]);
+  const positions=new Map([...input.unresolved,...input.conflicts].map(r=>[coordinate(r),r]));
+  if(positions.size!==database.investigation_positions.length)
+    fail("charts2_investigation_position_disagreement");
+  for(const row of database.investigation_positions){
+    const key=coordinate(row), expected=positions.get(key);
+    if(!expected || ["original_sha256","disposition","title","artist","provider_track_id"]
+      .some(field=>row[field]!==expected[field]))
+      fail("charts2_investigation_position_disagreement");
+    positions.delete(key);
+  }
+  if(positions.size!==0)fail("charts2_investigation_position_disagreement");
+  return database.input_sha256;
+}
