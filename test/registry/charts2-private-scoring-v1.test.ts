@@ -1110,7 +1110,9 @@ describe("Charts Studio recording-review draft and scroll safety",()=>{
 
 describe("Chart-origin Artist Intake presentation", () => {
   it("inherits WAKILISHA theme and keeps review actions near the identity", () => {
-    expect(CHART_ARTIST_INTAKE_PAGE).not.toMatch(/(?:bg|text|border|ring)-\\[#|\\bbg-white\\b|\\btext-white\\b/);
+    for (const forbidden of ["bg-[#", "text-[#", "border-[#", "ring-[#", "bg-white", "text-white"]) {
+      expect(CHART_ARTIST_INTAKE_PAGE).not.toContain(forbidden);
+    }
     for (const primitive of ["WkSurface", "WkButton", "WkCheckbox", "WkSearchField", "AdminStatusBadge"]) {
       expect(CHART_ARTIST_INTAKE_PAGE).toContain("<" + primitive);
     }
