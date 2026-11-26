@@ -4,7 +4,7 @@
  */
 import {runAdaptiveInvestigationV1, type InvestigationIdentityV1,
  type InvestigationStoreV1,type InvestigationReaderV1,
- type InvestigationAnalystV1,type IndependentFindingVerifierV1}
+ type InvestigationAnalystV1,type IndependentFindingVerifierV1,type DeskPassResearcherV1}
  from "./adaptive-investigation-v1.ts";
 import type {ResearchJobHandlerV1,ResearchJobV1}
  from "./research-worker-cycle-v1.ts";
@@ -17,6 +17,7 @@ export type AdaptiveWorkerDependenciesV1=Readonly<{
  openingQuestion:(job:ResearchJobV1)=>Promise<string>;
  readSources:InvestigationReaderV1;
  analyze:InvestigationAnalystV1;
+ prepareDeskPass?:DeskPassResearcherV1;
  verifyFinding:IndependentFindingVerifierV1;
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
  measureCostUnits?:()=>number;
@@ -35,7 +36,7 @@ export function createAdaptiveResearchWorkerHandlerV1(
   };
   await runAdaptiveInvestigationV1({
    identity,store:deps.store,readSources:deps.readSources,
-   analyze:deps.analyze,verifyFinding:deps.verifyFinding,
+   analyze:deps.analyze,prepareDeskPass:deps.prepareDeskPass,verifyFinding:deps.verifyFinding,
    maxNewPasses:deps.maxNewPasses,maxTotalPasses:deps.maxTotalPasses,
    costBudgetUnits:deps.costBudgetUnits,measureCostUnits:deps.measureCostUnits,
    authorizeModelProcessing:deps.authorizeModelProcessing

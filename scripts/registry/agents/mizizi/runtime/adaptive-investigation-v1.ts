@@ -70,6 +70,14 @@ export type InvestigationReaderV1=(
 export type InvestigationAnalystV1=(
  question:string,sources:readonly SourceExcerptV1[],history:readonly InvestigationPassV1[],
 )=>Promise<ResearchAnalysisV1>;
+/** Trusted desk pass executes independently authorized model/tool calls and
+ * returns only current, independently admitted evidence. The engine still
+ * verifies source rights, citations, findings and journal CAS. */
+export type PreparedDeskPassV1=Readonly<{
+ sources:readonly SourceExcerptV1[];analysis:ResearchAnalysisV1;costUnits:number;
+}>;
+export type DeskPassResearcherV1=(identity:InvestigationIdentityV1,question:string,
+ history:readonly InvestigationPassV1[])=>Promise<PreparedDeskPassV1>;
 export type IndependentFindingVerifierV1=(
  claim:ResearchClaimV1,sources:readonly SourceAuthorityV1[],
 )=>Promise<{verified:boolean;verificationRef:string|null}>;
@@ -104,7 +112,7 @@ function verifyHistory(id:InvestigationIdentityV1,history:readonly Investigation
   prior=pass.fingerprint;
  }
 }
-function verifySource(source:SourceAuthorityV1,id:InvestigationIdentityV1,nowMs:number){
+export function verifyInvestigationSourceV1(source:SourceAuthorityV1,id:InvestigationIdentityV1,nowMs:number){
  if(!UUID.test(source.sourceId)||source.caseId.toLowerCase()!==id.caseId||
     source.workspaceId.toLowerCase()!==id.workspaceId||
     !USE.has(source.useBasis)||source.privateResearchAllowed!==true||
@@ -143,6 +151,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  identity:InvestigationIdentityV1;store:InvestigationStoreV1;
  readSources:InvestigationReaderV1;analyze:InvestigationAnalystV1;
  verifyFinding:IndependentFindingVerifierV1;
+ prepareDeskPass?:DeskPassResearcherV1;
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
  reopen?:Readonly<{sourceEventRef:string;question:string}>;
  verifyReopen?:(sourceEventRef:string,identity:InvestigationIdentityV1,
@@ -168,6 +177,9 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  bounded(input.costBudgetUnits,"COST_BUDGET",0,1000000);
  if(!Number.isInteger(input.maxNewPasses)||!Number.isInteger(input.maxTotalPasses))
   throw new TypeError("MIZIZI_RESEARCH_INVALID_PASS_LIMIT");
+ if(input.prepareDeskPass!==undefined&&(typeof input.prepareDeskPass!=="function"||
+    typeof input.authorizeModelProcessing!=="function"))
+  throw new Error("MIZIZI_DESK_INDEPENDENT_MODEL_AUTHORITY_REQUIRED");
  const now=input.now??Date.now;
  const history=[...await store.read(identity)];
  verifyHistory(identity,history);
@@ -192,12 +204,17 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  let remainingCost=input.costBudgetUnits,added=0;
  let disposition:InvestigationResultV1["disposition"]="continue";
  while(added<input.maxNewPasses&&history.length<input.maxTotalPasses){
-  const sources=[...await readSources(identity,question,Object.freeze([...history]))];
+  // Do not enter an externally metered desk pass with an exhausted budget.
+  if(input.prepareDeskPass&&remainingCost<=0)break;
+  const prepared=input.prepareDeskPass?
+   await input.prepareDeskPass(identity,question,Object.freeze([...history])):null;
+  if(prepared)bounded(prepared.costUnits,"DESK_MEASURED_COST",1,1000000);
+  const sources=prepared?[...prepared.sources]:[...await readSources(identity,question,Object.freeze([...history]))];
   if(sources.length>30)throw new Error("MIZIZI_RESEARCH_SOURCE_BUDGET_EXCEEDED");
   const known=new Set<string>();
   const authorities:SourceAuthorityV1[]=[];
   for(const entry of sources){
-   verifySource(entry.source,identity,now());
+   verifyInvestigationSourceV1(entry.source,identity,now());
    if(known.has(entry.source.sourceId.toLowerCase()))
     throw new Error("MIZIZI_RESEARCH_DUPLICATE_SOURCE");
    known.add(entry.source.sourceId.toLowerCase());
@@ -214,7 +231,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    // An attestation's sharing flags do not grant hosted-LLM disclosure.
    // Only a reviewed open-license reader uses the established default path.
    // All other sources require a distinct trusted current-use decision.
-   const permitted=source.useBasis==="open_license"||
+   const permitted=(!prepared&&source.useBasis==="open_license")||
     (typeof input.authorizeModelProcessing==="function"&&
      await input.authorizeModelProcessing(identity,question,source)===true);
    if(permitted)modelVisibleIds.add(source.sourceId.toLowerCase());
@@ -253,6 +270,10 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    !modelVisibleIds.has(s.source.sourceId.toLowerCase()));
   // A lawful reader returning no evidence is a method result, not a prompt
   // for a source-free model answer. Absence never establishes nonexistence.
+  // A desk pass already disclosed only independently authorized material.
+  // If rights changed before journal append, fail closed; never relabel it
+  // human-only and falsely claim no model received the evidence.
+  if(prepared&&humanOnly)throw new Error("MIZIZI_DESK_MODEL_AUTHORITY_REVOKED");
   const noEvidence=sources.length===0;
   const noModel=humanOnly||evidenceExhausted||noEvidence;
   const method=humanOnly?"human_review_required":
@@ -270,7 +291,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    requestedDisposition:"pause",
    modelVersion:"mizizi."+method+".v1",
    promptFingerprint:digest(methodFingerprintSeed)
-  }:await analyze(question,Object.freeze(modelSources),
+  }:prepared?prepared.analysis:await analyze(question,Object.freeze(modelSources),
    Object.freeze(analystHistory));
   requireText(analysis.passFinding,"PASS_FINDING",3000);
   requireText(analysis.modelVersion,"MODEL_VERSION",150);
@@ -315,7 +336,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     revisitTrigger:"Independent new source, permission, or contradictory evidence"};
    disposition="paused";
   }
-  const costUnits=noModel?0:(input.measureCostUnits?.()??0);
+  const costUnits=prepared?prepared.costUnits:noModel?0:(input.measureCostUnits?.()??0);
   bounded(costUnits,"MEASURED_COST",0,1000000);
   remainingCost=Math.max(0,remainingCost-costUnits);
   const previous=history.at(-1)?.fingerprint??null;
@@ -346,7 +367,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     observedAt:a.observedAt,
     citation:restrictedReceipt(a)?"custodian:source-held":citation,
     excerpt:restrictedReceipt(a)?REDACTED:excerpt,
-    modelDisclosed:modelVisibleIds.has(a.sourceId.toLowerCase())&&!noModel})),
+    modelDisclosed:modelVisibleIds.has(a.sourceId.toLowerCase())&&(!noModel||!!prepared)})),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
    promptFingerprint:analysis.promptFingerprint,

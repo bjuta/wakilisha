@@ -37,7 +37,7 @@ const LEAD={
   estimatedCostUnits:{type:"number"}},
  required:["question","rationale","expectedInformationGain","importance","estimatedCostUnits"]
 } as const;
-const SCHEMA={
+export const ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1={
  type:"object",additionalProperties:false,
  properties:{
   hypotheses:{type:"array",items:CLAIM},leads:{type:"array",items:LEAD},
@@ -197,7 +197,7 @@ export function createAnthropicInvestigationAnalystV1(
   throw new TypeError("MIZIZI_ANALYST_INVALID_DEADLINE");
  const send=options.transport??fetch;
  const promptFingerprint=createHash("sha256")
-  .update(VERSION+"\n"+PROMPT+"\n"+JSON.stringify(SCHEMA)).digest("hex");
+  .update(VERSION+"\n"+PROMPT+"\n"+JSON.stringify(ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1)).digest("hex");
  return async(question:string,sources:readonly SourceExcerptV1[],
   history:readonly InvestigationPassV1[]):Promise<ResearchAnalysisV1>=>{
   if(sources.some(s=>s.source.externalModelProcessingAllowed!==true))
@@ -223,7 +223,7 @@ export function createAnthropicInvestigationAnalystV1(
     body:JSON.stringify({
      model:options.model,max_tokens:2500,thinking:{type:"adaptive"},
      system:PROMPT,
-     output_config:{format:{type:"json_schema",schema:SCHEMA}},
+     output_config:{format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}},
      messages:[{role:"user",content:JSON.stringify(packet)}]
     }),
     signal:AbortSignal.timeout(timeout)
