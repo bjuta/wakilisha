@@ -1,3 +1,4 @@
+import {createDeskNativeReaderV1,isPublicDeskIpv4V1} from "../../scripts/registry/agents/mizizi/runtime/desk-native-reader-v1";
 import {createDeskSearchGatewayV1,createDurableDeskSearchGatewayV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-gateway-v1";
 import { describe, expect, it, vi } from "vitest";
 import {createHash} from "node:crypto";
@@ -1285,5 +1286,87 @@ describe("MIZIZI zero-cost-first desk discovery gateway",()=>{
   const failed=fixture();failed.transport.mockRejectedValueOnce(Error("timeout"));
   await expect(createDeskSearchGatewayV1(failed.config)(request)).rejects.toThrow("TRANSPORT_UNCONFIRMED");
   expect(failed.transport).toHaveBeenCalledTimes(1);expect(failed.consume).toHaveBeenCalledTimes(1);
+ });
+});
+
+describe("MIZIZI native public HTTPS acquisition boundary",()=>{
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+60000).toISOString()};
+ const input={scope,url:"https://archive.org/details/music"};
+ const bytes=new TextEncoder().encode("<html><body>Untrusted archive content</body></html>");
+ const authority={policyRef:"policy:public-archive",validUntil:new Date(NOW+30000).toISOString(),
+  acquisitionAllowed:true as const,zeroIncrementalSpendAllowed:true as const};
+ function fixture(){
+  const authorize=vi.fn(async()=>authority);
+  const precharge=vi.fn(async()=>true);
+  const resolve4=vi.fn(async()=>["93.184.216.34"]);
+  const readPinned=vi.fn(async()=>({status:200,contentType:"text/html",body:bytes}));
+  const config={authorize,precharge,resolve4,readPinned,now:()=>NOW};
+  return {config,authorize,precharge,resolve4,readPinned};
+ }
+ it("pins public IPv4 only and denies local, mapped, documentation and special-use destinations",()=>{
+  for(const addr of ["0.0.0.0","10.0.0.1","100.64.0.1","127.0.0.1","169.254.169.254",
+   "172.31.0.1","192.0.0.9","192.0.2.1","192.168.1.1","192.88.99.1","198.18.0.1",
+   "198.51.100.1","203.0.113.1","224.0.0.1","255.255.255.255","::1","::ffff:127.0.0.1","8.8.8.8.8"])
+   expect(isPublicDeskIpv4V1(addr)).toBe(false);
+  expect(isPublicDeskIpv4V1("93.184.216.34")).toBe(true);
+ });
+ it("returns exact bytes and digest but no model, retention or identity authority",async()=>{
+  const h=fixture(),result=await createDeskNativeReaderV1(h.config)(input);
+  expect(result).toMatchObject({requestedUrl:input.url,finalUrl:input.url,redirects:[],
+   byteLength:bytes.length,sha256:createHash("sha256").update(bytes).digest("hex"),
+   identityVerified:false,sourceRetentionAuthorized:false,externalModelProcessingAuthorized:false});
+  expect(h.resolve4).toHaveBeenCalledTimes(1);
+  expect(h.readPinned).toHaveBeenCalledWith({url:input.url,hostname:"archive.org",address:"93.184.216.34"},expect.anything());
+  expect(h.precharge.mock.invocationCallOrder[0]).toBeLessThan(h.readPinned.mock.invocationCallOrder[0]);
+  expect(result.body).toEqual(bytes);
+ });
+ it("reauthorizes and precharges each redirected origin with a new validated DNS pin",async()=>{
+  const h=fixture();
+  h.resolve4.mockResolvedValueOnce(["93.184.216.34"]).mockResolvedValueOnce(["8.8.8.8"]);
+  h.readPinned.mockResolvedValueOnce({status:302,location:"https://library.example.org/catalogue",body:new Uint8Array()} as never);
+  const result=await createDeskNativeReaderV1(h.config)(input);
+  expect(result.redirects).toEqual([input.url]);expect(result.finalUrl).toBe("https://library.example.org/catalogue");
+  expect(h.precharge).toHaveBeenCalledTimes(2);
+  expect(h.readPinned).toHaveBeenLastCalledWith({url:result.finalUrl,hostname:"library.example.org",address:"8.8.8.8"},expect.anything());
+ });
+ it("denies unsafe URLs before DNS, and mixed private DNS results before acquisition",async()=>{
+  for(const url of ["http://archive.org/","https://127.0.0.1/","https://2130706433/","https://[::1]/",
+   "https://user:pass@archive.org/","https://archive.org:8443/","https://archive.org/?token=secret",
+   "https://host.internal/","https://archive.org./"]){
+   const h=fixture();
+   await expect(createDeskNativeReaderV1(h.config)({...input,url})).rejects.toThrow("DENIED");
+   expect(h.resolve4).not.toHaveBeenCalled();expect(h.readPinned).not.toHaveBeenCalled();
+  }
+  const h=fixture();h.resolve4.mockResolvedValueOnce(["93.184.216.34","10.0.0.1"]);
+  await expect(createDeskNativeReaderV1(h.config)(input)).rejects.toThrow("DNS_ADDRESS_DENIED");
+  expect(h.precharge).not.toHaveBeenCalled();expect(h.readPinned).not.toHaveBeenCalled();
+ });
+ it("does not follow unsafe redirects, loop or exceed the hop budget",async()=>{
+  for(const location of ["https://169.254.169.254/","http://archive.org/","/details/music"]){
+   const h=fixture();h.readPinned.mockResolvedValueOnce({status:302,location,body:new Uint8Array()} as never);
+   await expect(createDeskNativeReaderV1(h.config)(input)).rejects.toThrow();
+   expect(h.readPinned).toHaveBeenCalledTimes(1);
+  }
+  const h=fixture();
+  for(let i=0;i<4;i++)h.readPinned.mockResolvedValueOnce({status:302,location:"/hop"+i,body:new Uint8Array()} as never);
+  await expect(createDeskNativeReaderV1(h.config)(input)).rejects.toThrow("REDIRECT_DENIED");
+  expect(h.readPinned).toHaveBeenCalledTimes(4);
+ });
+ it("fails closed on denied policy, quota, revocation, oversized data and mismatched PDF",async()=>{
+  const denied=fixture();denied.authorize.mockResolvedValueOnce(null as never);
+  await expect(createDeskNativeReaderV1(denied.config)(input)).rejects.toThrow("ACQUISITION_DENIED");
+  expect(denied.resolve4).not.toHaveBeenCalled();
+  const quota=fixture();quota.precharge.mockResolvedValueOnce(false);
+  await expect(createDeskNativeReaderV1(quota.config)(input)).rejects.toThrow("BUDGET_UNAVAILABLE");
+  expect(quota.readPinned).not.toHaveBeenCalled();
+  const revoked=fixture();revoked.authorize.mockResolvedValueOnce(authority).mockResolvedValueOnce(null as never);
+  await expect(createDeskNativeReaderV1(revoked.config)(input)).rejects.toThrow("AUTHORITY_CHANGED");
+  expect(revoked.readPinned).not.toHaveBeenCalled();
+  for(const response of [{status:200,contentType:"text/html",body:new Uint8Array(2_000_001)},
+   {status:200,contentType:"application/pdf",body:bytes},{status:200,contentType:"application/octet-stream",body:bytes}]){
+   const h=fixture();h.readPinned.mockResolvedValueOnce(response);
+   await expect(createDeskNativeReaderV1(h.config)(input)).rejects.toThrow();
+  }
  });
 });
