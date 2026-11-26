@@ -97,23 +97,23 @@ function Pagination({
   };
 
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3">
-      <span className="text-[12px] text-[#858c7e]">
-        Showing <strong className="text-[#171712]">{start}</strong>
-        –<strong className="text-[#171712]">{end}</strong> of{" "}
-        <strong className="text-[#171712]">{totalItems}</strong>
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-wk-border bg-wk-surface px-4 py-3">
+      <span className="text-[12px] text-wk-text-muted">
+        Showing <strong className="text-wk-text">{start}</strong>
+        –<strong className="text-wk-text">{end}</strong> of{" "}
+        <strong className="text-wk-text">{totalItems}</strong>
       </span>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] disabled:opacity-40 hover:border-[#85c441] hover:text-[#5f8f2f]"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-wk-border text-wk-text-muted disabled:opacity-40 hover:border-wk-brand hover:text-wk-brand"
         >
           <WkIcon name="ChevronLeft" size={16} />
         </button>
         {getVisiblePages().map((page, i) =>
           typeof page === "string" ? (
-            <span key={`dots-${i}`} className="px-2 text-[11px] text-[#858c7e]">
+            <span key={`dots-${i}`} className="px-2 text-[11px] text-wk-text-muted">
               …
             </span>
           ) : (
@@ -122,8 +122,8 @@ function Pagination({
               onClick={() => onPageChange(page)}
               className={`flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-bold transition ${
                 page === currentPage
-                  ? "bg-[#5f8f2f] text-white"
-                  : "border border-[#dfe4d8] text-[#71796b] hover:border-[#85c441] hover:text-[#5f8f2f]"
+                  ? "bg-wk-brand text-wk-brand-on"
+                  : "border border-wk-border text-wk-text-muted hover:border-wk-brand hover:text-wk-brand"
               }`}
             >
               {page}
@@ -133,7 +133,7 @@ function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] disabled:opacity-40 hover:border-[#85c441] hover:text-[#5f8f2f]"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-wk-border text-wk-text-muted disabled:opacity-40 hover:border-wk-brand hover:text-wk-brand"
         >
           <WkIcon name="ChevronRight" size={16} />
         </button>
@@ -180,22 +180,22 @@ function BulkToolbar({
   const showArchive = onArchive && archiveCount && archiveCount > 0;
 
   return (
-    <div className="sticky top-0 z-30 mb-3 flex items-center justify-between rounded-2xl border border-[#dfe4d8] bg-white px-4 py-2.5 shadow-sm">
+    <div className="sticky top-0 z-30 mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-wk-border bg-wk-surface px-4 py-2.5 shadow-sm">
       <div className="flex items-center gap-3">
-        <span className="text-[13px] font-bold text-[#171712]">
+        <span className="text-[13px] font-bold text-wk-text">
           {selectedCount} artist{selectedCount !== 1 ? "s" : ""} selected
         </span>
         {selectedCount < totalInView && (
           <button
             onClick={onSelectAll}
-            className="text-[12px] font-bold text-[#5f8f2f] hover:underline"
+            className="text-[12px] font-bold text-wk-brand hover:underline"
           >
             Select all {totalInView} on this page
           </button>
         )}
         <button
           onClick={onDeselectAll}
-          className="text-[12px] font-bold text-[#858c7e] hover:text-[#171712]"
+          className="text-[12px] font-bold text-wk-text-muted hover:text-wk-text"
         >
           Clear selection
         </button>
@@ -205,7 +205,7 @@ function BulkToolbar({
           <button
             onClick={onPublish}
             disabled={publishing}
-            className="rounded-xl bg-[#5f8f2f] px-4 py-2 text-[12px] font-black text-white transition hover:bg-[#4d7a26] disabled:opacity-50 flex items-center gap-2"
+            className="rounded-xl bg-wk-brand px-4 py-2 text-[12px] font-black text-wk-brand-on transition hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
           >
             {publishing ? (
               <>
@@ -224,7 +224,7 @@ function BulkToolbar({
           <button
             onClick={onUnpublish}
             disabled={unpublishing}
-            className="rounded-xl bg-[#f0a020] px-4 py-2 text-[12px] font-black text-white transition hover:bg-[#d4880d] disabled:opacity-50 flex items-center gap-2"
+            className="rounded-xl bg-wk-warning-soft px-4 py-2 text-[12px] font-black text-wk-warning transition hover:bg-wk-surface-strong disabled:opacity-50 flex items-center gap-2"
           >
             {unpublishing ? (
               <>
@@ -243,7 +243,7 @@ function BulkToolbar({
           <button
             onClick={onArchive}
             disabled={archiving}
-            className="rounded-xl bg-red-600 px-4 py-2 text-[12px] font-black text-white transition hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+            className="rounded-xl bg-wk-danger-soft px-4 py-2 text-[12px] font-black text-wk-danger transition hover:bg-wk-surface-strong disabled:opacity-50 flex items-center gap-2"
           >
             {archiving ? (
               <>
@@ -289,8 +289,8 @@ function ArtistCard({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border bg-white transition-all ${
-        selected ? "border-[#5f8f2f] ring-2 ring-[#85c441]/30" : "border-[#dfe4d8] hover:border-[#85c441]"
+      data-wk-registry-artist-card className={`group relative overflow-hidden rounded-2xl border bg-wk-surface transition-all ${
+        selected ? "border-wk-brand ring-2 ring-wk-brand" : "border-wk-border hover:border-wk-brand"
       }`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -304,8 +304,8 @@ function ArtistCard({
           }}
           className={`flex h-6 w-6 items-center justify-center rounded-md border-2 transition ${
             selected
-              ? "border-[#5f8f2f] bg-[#5f8f2f] text-white"
-              : "border-[#c8d0be] bg-white/80 hover:border-[#85c441]"
+              ? "border-wk-brand bg-wk-brand text-wk-brand-on"
+              : "border-wk-border-strong bg-wk-surface hover:border-wk-brand"
           }`}
         >
           {selected && <WkIcon name="Check" size={12} />}
@@ -313,7 +313,7 @@ function ArtistCard({
       </div>
 
       {/* Image area */}
-      <div className="relative aspect-square bg-[#f0f3ec]">
+      <div className="relative aspect-square bg-wk-surface-raised">
         {artist._displayImage ? (
           <img
             src={artist._displayImage}
@@ -323,25 +323,25 @@ function ArtistCard({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <WkIcon name="Mic2" size={40} className="text-[#c8d0be]" />
+            <WkIcon name="Mic2" size={40} className="text-wk-text-faint" />
           </div>
         )}
         {/* Hover overlay with actions */}
         <div
-          className={`absolute inset-0 flex items-center justify-center bg-black/50 transition-opacity ${
+          className={`absolute inset-0 flex items-center justify-center bg-[var(--wk-overlay)] transition-opacity ${
             hovered ? "opacity-100" : "opacity-0"
           }`}
         >
           <div className="flex gap-2 flex-wrap justify-center px-2">
             <button
               onClick={() => onOpen(artist)}
-              className="rounded-xl bg-white px-4 py-2 text-[12px] font-bold text-[#171712] hover:bg-[#f0f3ec]"
+              className="rounded-xl bg-wk-surface px-4 py-2 text-[12px] font-bold text-wk-text hover:bg-wk-surface-raised"
             >
               Edit
             </button>
             <button
               onClick={() => onNavigate(artist.slug)}
-              className="rounded-xl border border-white/50 px-4 py-2 text-[12px] font-bold text-white hover:bg-white/20"
+              className="rounded-xl border border-wk-border-strong px-4 py-2 text-[12px] font-bold text-wk-text hover:bg-wk-surface-raised"
             >
               Details
             </button>
@@ -349,7 +349,7 @@ function ArtistCard({
               <button
                 onClick={() => onEnrich(artist)}
                 disabled={enriching}
-                className="rounded-xl bg-[#5f8f2f] px-4 py-2 text-[12px] font-bold text-white hover:bg-[#4d7a26] disabled:opacity-50 flex items-center gap-1.5"
+                className="rounded-xl bg-wk-brand px-4 py-2 text-[12px] font-bold text-wk-brand-on hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
               >
                 {enriching ? (
                   <WkIcon name="Loader2" size={13} className="animate-spin" />
@@ -362,7 +362,7 @@ function ArtistCard({
             {String(artist.status) === "draft" && onArchive && (
               <button
                 onClick={() => onArchive(artist)}
-                className="rounded-xl bg-red-600/90 px-4 py-2 text-[12px] font-bold text-white hover:bg-red-700"
+                className="rounded-xl bg-wk-danger-soft px-4 py-2 text-[12px] font-bold text-wk-danger hover:bg-wk-surface-strong"
               >
                 Archive
               </button>
@@ -374,8 +374,8 @@ function ArtistCard({
           <span
             className={`rounded-full px-2.5 py-1 text-[10px] font-bold backdrop-blur-sm ${
               String(artist.status) === "active"
-                ? "bg-[#5f8f2f]/80 text-white"
-                : "bg-black/50 text-white"
+                ? "bg-wk-success-soft text-wk-success"
+                : "bg-wk-surface-strong text-wk-text-muted"
             }`}
           >
             {String(artist.status || "unknown")}
@@ -389,15 +389,15 @@ function ArtistCard({
           <div className="min-w-0 flex-1">
             <button
               onClick={() => onNavigate(artist.slug)}
-              className="text-left text-[14px] font-bold text-[#171712] hover:text-[#5f8f2f] transition-colors truncate block"
+              className="text-left text-[14px] font-bold text-wk-text hover:text-wk-brand transition-colors truncate block"
             >
               {artist._displayName}
             </button>
-            <p className="mt-0.5 text-[11px] text-[#858c7e] truncate">{artist.slug}</p>
+            <p className="mt-0.5 text-[11px] text-wk-text-muted truncate">{artist.slug}</p>
           </div>
           <button
             onClick={() => onOpen(artist)}
-            className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] hover:border-[#85c441] hover:text-[#5f8f2f]"
+            className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg border border-wk-border text-wk-text-muted hover:border-wk-brand hover:text-wk-brand"
             title="Quick edit"
           >
             <WkIcon name="Pencil" size={14} />
@@ -406,12 +406,12 @@ function ArtistCard({
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {artist.artist_type && (
-            <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#71796b] uppercase tracking-wide">
+            <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold text-wk-text-muted uppercase tracking-wide">
               {artist.artist_type}
             </span>
           )}
           {artist._displayCountry && (
-            <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#71796b] uppercase tracking-wide">
+            <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold text-wk-text-muted uppercase tracking-wide">
               {artist._displayCountry}
             </span>
           )}
@@ -420,19 +420,19 @@ function ArtistCard({
         {/* Completeness bar */}
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold text-[#858c7e] uppercase tracking-wide">Completeness</span>
+            <span className="text-[10px] font-bold text-wk-text-muted uppercase tracking-wide">Completeness</span>
             <span className={`text-[11px] font-black ${completenessTone(q.completeness)}`}>
               {q.completeness}%
             </span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-[#eef1e8]">
+          <div className="h-1.5 overflow-hidden rounded-full bg-wk-surface-strong">
             <div
-              className="h-full rounded-full bg-[#85c441] transition-all"
+              className="h-full rounded-full bg-wk-brand transition-all"
               style={{ width: `${q.completeness}%` }}
             />
           </div>
           {q.missingFields.length > 0 && (
-            <p className="mt-1 text-[10px] text-[#a8ad9e] truncate">
+            <p className="mt-1 text-[10px] text-wk-text-muted truncate">
               Missing: {q.missingFields.join(", ")}
             </p>
           )}
@@ -482,7 +482,7 @@ function ConfirmModal({
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg bg-wk-warning px-4 py-2 text-[12px] font-black text-white hover:opacity-90 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-wk-warning-soft px-4 py-2 text-[12px] font-black text-wk-warning hover:opacity-90 disabled:opacity-50"
           >
             {loading ? <WkIcon name="Loader2" size={14} className="animate-spin" /> : null}
             {confirmLabel}
@@ -609,21 +609,21 @@ function ArtistOriginPanel({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
+    <div className="rounded-2xl border border-wk-border bg-wk-surface p-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50">
-            <i className="ri-earth-line text-[18px] text-amber-600" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-wk-warning-soft">
+            <i className="ri-earth-line text-[18px] text-wk-warning" />
           </div>
           <div>
-            <p className="text-[13px] font-black text-[#171712]">Enrich Origin</p>
-            <p className="text-[11px] text-[#858c7e]">Normalize country metadata &amp; look up ISO origin via MusicBrainz</p>
+            <p className="text-[13px] font-black text-wk-text">Enrich Origin</p>
+            <p className="text-[11px] text-wk-text-muted">Normalize country metadata &amp; look up ISO origin via MusicBrainz</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setUseMusicBrainz((v) => !v)}
-            className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition ${useMusicBrainz ? "border-[#5f8f2f] bg-[#e8f5dc] text-[#5f8f2f]" : "border-[#dfe4d8] bg-[#f8f9f4] text-[#a8ad9e]"}`}
+            className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition ${useMusicBrainz ? "border-wk-brand bg-wk-brand-soft text-wk-brand" : "border-wk-border bg-wk-surface-raised text-wk-text-muted"}`}
             title="Use MusicBrainz to look up artists without country metadata"
           >
             <i className="ri-database-2-line text-[12px]" />
@@ -632,7 +632,7 @@ function ArtistOriginPanel({ onDone }: { onDone: () => void }) {
           <button
             onClick={() => runOriginBackfill(true)}
             disabled={phase === "running"}
-            className="rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 py-2 text-[12px] font-bold text-[#697062] hover:border-[#85c441] hover:text-[#5f8f2f] disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+            className="rounded-xl border border-wk-border bg-wk-surface-raised px-3 py-2 text-[12px] font-bold text-wk-text-muted hover:border-wk-brand hover:text-wk-brand disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
           >
             <WkIcon name="Eye" size={13} />
             Preview
@@ -640,7 +640,7 @@ function ArtistOriginPanel({ onDone }: { onDone: () => void }) {
           <button
             onClick={() => runOriginBackfill(false)}
             disabled={phase === "running"}
-            className="rounded-xl bg-[#5f8f2f] px-3 py-2 text-[12px] font-black text-white hover:bg-[#4d7a26] disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+            className="rounded-xl bg-wk-brand px-3 py-2 text-[12px] font-black text-wk-brand-on hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
           >
             {phase === "running" ? (
               <><WkIcon name="Loader2" size={13} className="animate-spin" /> {progress ? `Processing chunk… (${progress.current} done)` : "Running…"}</>
@@ -652,7 +652,7 @@ function ArtistOriginPanel({ onDone }: { onDone: () => void }) {
       </div>
 
       {phase === "error" && errorMsg && (
-        <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-[12px] font-bold text-red-700">
+        <div className="mt-3 rounded-xl bg-wk-danger-soft border border-wk-danger px-3 py-2 text-[12px] font-bold text-wk-danger">
           {errorMsg}
         </div>
       )}
@@ -661,19 +661,19 @@ function ArtistOriginPanel({ onDone }: { onDone: () => void }) {
         <div className="mt-3 space-y-3">
           <div className="grid grid-cols-4 gap-2">
             {[
-              ["Found", result.total_found, "text-[#697062]"],
-              ["From metadata", result.normalized_from_metadata, "text-[#5f8f2f]"],
-              ["From MusicBrainz", result.from_musicbrainz, "text-[#5f8f2f]"],
-              ["Skipped", result.skipped, "text-[#858c7e]"],
+              ["Found", result.total_found, "text-wk-text-muted"],
+              ["From metadata", result.normalized_from_metadata, "text-wk-brand"],
+              ["From MusicBrainz", result.from_musicbrainz, "text-wk-brand"],
+              ["Skipped", result.skipped, "text-wk-text-muted"],
             ].map(([label, value, cls]) => (
-              <div key={label as string} className="rounded-xl border border-[#dfe4d8] p-2.5 text-center">
+              <div key={label as string} className="rounded-xl border border-wk-border p-2.5 text-center">
                 <p className={`text-[18px] font-black ${cls}`}>{value as number}</p>
-                <p className="text-[10px] font-bold text-[#a8ad9e] uppercase tracking-wide">{label}</p>
+                <p className="text-[10px] font-bold text-wk-text-muted uppercase tracking-wide">{label}</p>
               </div>
             ))}
           </div>
           {result.dry_run && (
-            <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[12px] font-bold text-amber-700">
+            <div className="rounded-xl bg-wk-warning-soft border border-wk-warning px-3 py-2 text-[12px] font-bold text-wk-warning">
               Preview mode — no changes were written. Click "Backfill Origin" to apply.
             </div>
           )}
@@ -681,34 +681,34 @@ function ArtistOriginPanel({ onDone }: { onDone: () => void }) {
             <div>
               <button
                 onClick={() => setExpanded((v) => !v)}
-                className="text-[11px] font-bold text-[#5f8f2f] hover:underline flex items-center gap-1"
+                className="text-[11px] font-bold text-wk-brand hover:underline flex items-center gap-1"
               >
                 <WkIcon name={expanded ? "ChevronUp" : "ChevronDown"} size={12} />
                 {expanded ? "Hide" : "Show"} details ({result.results.length} artists)
               </button>
               {expanded && (
-                <div className="mt-2 max-h-[500px] overflow-y-auto rounded-xl border border-[#dfe4d8]">
+                <div className="mt-2 max-h-[500px] overflow-y-auto rounded-xl border border-wk-border">
                   {result.results.map((r, i) => (
-                    <div key={r.slug + i} className="flex items-center gap-3 border-b border-[#f0f3ec] px-3 py-2.5 last:border-b-0">
+                    <div key={r.slug + i} className="flex items-center gap-3 border-b border-wk-divider px-3 py-2.5 last:border-b-0">
                       <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black ${
-                        r.source === "musicbrainz" ? "bg-[#e8f5dc] text-[#5f8f2f]" :
-                        r.source === "metadata_normalization" ? "bg-amber-50 text-amber-600" :
-                        "bg-[#f0f3ec] text-[#858c7e]"
+                        r.source === "musicbrainz" ? "bg-wk-brand-soft text-wk-brand" :
+                        r.source === "metadata_normalization" ? "bg-wk-warning-soft text-wk-warning" :
+                        "bg-wk-surface-raised text-wk-text-muted"
                       }`}>
                         {r.newIso2 || "—"}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[12px] font-bold text-[#171712] truncate">{r.name}</p>
-                        <p className="text-[10px] text-[#a8ad9e] truncate">
+                        <p className="text-[12px] font-bold text-wk-text truncate">{r.name}</p>
+                        <p className="text-[10px] text-wk-text-muted truncate">
                           {r.source === "metadata_normalization" ? r.debug :
                            r.source === "musicbrainz" ? `${r.countryName} (${Math.round(r.confidence * 100)}% confidence)` :
                            r.debug || "No origin found"}
                         </p>
                       </div>
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
-                        r.source === "musicbrainz" ? "bg-[#e8f5dc] text-[#5f8f2f]" :
-                        r.source === "metadata_normalization" ? "bg-amber-50 text-amber-600" :
-                        "bg-[#f0f3ec] text-[#858c7e]"
+                        r.source === "musicbrainz" ? "bg-wk-brand-soft text-wk-brand" :
+                        r.source === "metadata_normalization" ? "bg-wk-warning-soft text-wk-warning" :
+                        "bg-wk-surface-raised text-wk-text-muted"
                       }`}>{r.source === "musicbrainz" ? "MB" : r.source === "metadata_normalization" ? "norm" : "skip"}</span>
                     </div>
                   ))}
@@ -1157,9 +1157,9 @@ export default function ArtistsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f7f2] px-5 py-6 text-[#171712]">
+    <div data-wk-registry-artists className="min-w-0 bg-wk-bg px-5 py-6 text-wk-text">
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-bold text-[#171712] shadow-xl">
+        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-wk-border bg-wk-surface px-4 py-3 text-sm font-bold text-wk-text shadow-xl">
           {toast}
         </div>
       )}
@@ -1201,11 +1201,11 @@ export default function ArtistsPage() {
         {/* Header */}
         <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#5f8f2f]">
+            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-wk-brand">
               Registry
             </p>
             <h1 className="text-3xl font-black tracking-tight">Artists</h1>
-            <p className="mt-2 max-w-2xl text-sm text-[#697062]">
+            <p className="mt-2 max-w-2xl text-sm text-wk-text-muted">
               {dbTotal !== null
                 ? `${dbTotal.toLocaleString()} total · ${filteredArtists.length.toLocaleString()} showing`
                 : `${filteredArtists.length.toLocaleString()} artist${filteredArtists.length !== 1 ? "s" : ""} in registry`}
@@ -1214,14 +1214,14 @@ export default function ArtistsPage() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => navigate("/admin/registry/artists/intake")}
-              className="rounded-2xl bg-[#5f8f2f] px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#4d7a26] flex items-center gap-2"
+              className="rounded-2xl bg-wk-brand px-4 py-3 text-sm font-black text-wk-brand-on shadow-sm transition hover:opacity-90 flex items-center gap-2"
             >
               <WkIcon name="Upload" size={14} />
               Artist Intake
             </button>
             <button
               onClick={fetchArtists}
-              className="rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-black text-[#171712] shadow-sm transition hover:border-[#85c441] flex items-center gap-2"
+              className="rounded-2xl border border-wk-border bg-wk-surface px-4 py-3 text-sm font-black text-wk-text shadow-sm transition hover:border-wk-brand flex items-center gap-2"
             >
               <WkIcon name="RefreshCcw" size={14} />
               Refresh
@@ -1241,9 +1241,9 @@ export default function ArtistsPage() {
             ["Missing image", summary.missingImage],
             ["Missing type", summary.missingType],
           ].map(([label, value]) => (
-            <div key={label as string} className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
-              <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">{label}</p>
-              <p className="mt-2 text-2xl font-black text-[#171712]">{value as number}</p>
+            <div key={label as string} className="rounded-2xl border border-wk-border bg-wk-surface p-4">
+              <p className="text-[11px] font-black uppercase tracking-wide text-wk-text-muted">{label}</p>
+              <p className="mt-2 text-2xl font-black text-wk-text">{value as number}</p>
             </div>
           ))}
         </section>
@@ -1264,21 +1264,21 @@ export default function ArtistsPage() {
         </section>
 
         {/* Filter bar */}
-        <section className="mb-5 rounded-2xl border border-[#dfe4d8] bg-white p-3">
-          <div className="grid gap-3 lg:grid-cols-[1fr_160px_160px_160px_160px]">
+        <section data-wk-registry-artist-filters className="mb-5 rounded-2xl border border-wk-border bg-wk-surface p-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]">
             <div className="relative">
-              <WkIcon name="Search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#a8ad9e]" />
+              <WkIcon name="Search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-wk-text-muted" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search artists by name, country, slug, id…"
-                className="h-11 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] pl-10 pr-4 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+                className="h-11 w-full rounded-xl border border-wk-border bg-wk-surface-raised pl-10 pr-4 text-sm outline-none transition focus:border-wk-brand focus:bg-wk-surface"
               />
             </div>
             <WkSelect
               value={countryFilter}
               onChange={(value) => setCountryFilter(value)}
-              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              triggerClassName="h-11 rounded-xl border border-wk-border bg-wk-surface-raised px-3 text-sm outline-none transition focus:border-wk-brand focus:bg-wk-surface"
             >
               <option value="all">All countries</option>
               {countryOptions.map((opt) => (
@@ -1290,7 +1290,7 @@ export default function ArtistsPage() {
             <WkSelect
               value={qualityFilter}
               onChange={(value) => setQualityFilter(value as QualityFilter)}
-              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              triggerClassName="h-11 rounded-xl border border-wk-border bg-wk-surface-raised px-3 text-sm outline-none transition focus:border-wk-brand focus:bg-wk-surface"
             >
               <option value="all">All quality states</option>
               <option value="complete">Near complete</option>
@@ -1306,7 +1306,7 @@ export default function ArtistsPage() {
             <WkSelect
               value={statusFilter}
               onChange={(value) => setStatusFilter(value as StatusFilter)}
-              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              triggerClassName="h-11 rounded-xl border border-wk-border bg-wk-surface-raised px-3 text-sm outline-none transition focus:border-wk-brand focus:bg-wk-surface"
             >
               <option value="all">All statuses</option>
               <option value="active">Active</option>
@@ -1315,7 +1315,7 @@ export default function ArtistsPage() {
             <WkSelect
               value={sortMode}
               onChange={(value) => setSortMode(value as SortMode)}
-              triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white"
+              triggerClassName="h-11 rounded-xl border border-wk-border bg-wk-surface-raised px-3 text-sm outline-none transition focus:border-wk-brand focus:bg-wk-surface"
             >
               <option value="recent">Recently updated</option>
               <option value="name">Name A-Z</option>
@@ -1327,10 +1327,10 @@ export default function ArtistsPage() {
 
         {/* Error */}
         {error && (
-          <section className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          <section className="mb-4 rounded-2xl border border-wk-danger bg-wk-danger-soft p-4 text-sm font-semibold text-wk-danger">
             <p className="font-bold">Could not load registry artists</p>
             <p className="mt-1 text-xs">{error}</p>
-            <button onClick={fetchArtists} className="mt-2 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">
+            <button onClick={fetchArtists} className="mt-2 rounded-xl border border-wk-danger bg-wk-surface px-3 py-1.5 text-xs font-bold text-wk-danger hover:bg-wk-danger-soft">
               Retry
             </button>
           </section>
@@ -1338,10 +1338,10 @@ export default function ArtistsPage() {
 
         {/* Loading */}
         {loading && (
-          <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-[#dfe4d8] bg-white">
+          <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-wk-border bg-wk-surface">
             <div className="flex flex-col items-center gap-3">
-              <WkIcon name="Loader2" size={28} className="animate-spin text-[#5f8f2f]" />
-              <p className="text-[13px] font-bold text-[#697062]">Loading artists…</p>
+              <WkIcon name="Loader2" size={28} className="animate-spin text-wk-brand" />
+              <p className="text-[13px] font-bold text-wk-text-muted">Loading artists…</p>
             </div>
           </div>
         )}
@@ -1350,12 +1350,12 @@ export default function ArtistsPage() {
         {!loading && (
           <div className="space-y-4">
             {filteredArtists.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-[#dfe4d8] bg-white px-6 py-16 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f0f3ec]">
-                  <WkIcon name="SearchX" size={28} className="text-[#858c7e]" />
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-wk-border bg-wk-surface px-6 py-16 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-wk-surface-raised">
+                  <WkIcon name="SearchX" size={28} className="text-wk-text-muted" />
                 </div>
-                <p className="text-[16px] font-black text-[#171712]">No artists found</p>
-                <p className="max-w-md text-[13px] text-[#697062]">
+                <p className="text-[16px] font-black text-wk-text">No artists found</p>
+                <p className="max-w-md text-[13px] text-wk-text-muted">
                   {query || qualityFilter !== "all" || countryFilter !== "all"
                     ? "No artists match your current filters. Try adjusting your search or filters."
                     : "No live registry artists found."}

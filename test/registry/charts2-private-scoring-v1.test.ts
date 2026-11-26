@@ -1122,3 +1122,24 @@ describe("Chart-origin Artist Intake presentation", () => {
     expect(CHART_ARTIST_INTAKE_PAGE).toContain('<ChartReviewReturnContext />');
   });
 });
+
+
+describe("Registry Artists shared theme convergence", () => {
+  it("uses semantic palette across the list, filters, cards and embedded enrichment panels", () => {
+    const page = readFileSync("src/pages/admin/registry/artists/page.tsx", "utf8");
+    const panels = readFileSync("src/components/admin/registry/ArtistEnrichmentGovernancePanels.tsx", "utf8");
+    for (const source of [page, panels]) {
+      for (const forbidden of ["bg-[#", "text-[#", "border-[#", "ring-[#", "bg-white", "text-white", "bg-black", "bg-red-", "bg-amber-", "text-red-", "text-amber-"]) {
+        expect(source).not.toContain(forbidden);
+      }
+      expect(source).toContain("bg-wk-surface");
+      expect(source).toContain("text-wk-text");
+    }
+    for (const marker of ["data-wk-registry-artists", "data-wk-registry-artist-card", "data-wk-registry-artist-filters"]) expect(page).toContain(marker);
+    expect(page).toContain('data-wk-registry-artists className="min-w-0 bg-wk-bg');
+    expect(page).toContain("saveRegistryEntityPatch(");
+    expect(page).toContain('{ status: "active" }');
+    const quality = readFileSync("src/services/registry/admin/completeness.ts", "utf8");
+    for (const tone of ["success", "warning", "danger"]) expect(quality).toContain("bg-wk-" + tone + "-soft text-wk-" + tone);
+  });
+});
