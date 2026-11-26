@@ -179,6 +179,7 @@ export async function discoverMusicBrainzCoreCohortV1({directory,manifest,record
    matchedIsrcRows:c.matchedIsrcRows};
  }).sort((a,b)=>a.mbid.localeCompare(b.mbid));
  const sourceByMbid=new Map(sources.map(s=>[s.mbid,s]));
+ const candidateByMbid=new Map([...candidates].map(([rowId,c])=>[c.mbid,{rowId,c}]));
  const projected=results.map((result,i)=>{
   const input=inputs[i];
   const matches=result.overflow?[]:result.candidates.map(c=>{
@@ -192,12 +193,60 @@ export async function discoverMusicBrainzCoreCohortV1({directory,manifest,record
     matches.length>1?"ambiguous":matches[0].exactIsrc&&(!matches[0].titleAgrees||matches[0].artistAgrees===false)?
     "identifier_metadata_conflict":"single_candidate",matches};
  });
+
+ // A source row's identity must not depend on the cohort or on which ISRCs
+ // happened to be requested. Project immutable row fields once, then link
+ // individual subjects to only their own matching identifier row. These are
+ // candidate references, not permission, adjudication, or canonical facts.
+ const snapshotRef=digest(JSON.stringify(m));
+ const sourceRows=new Map();
+ function projectRow(table,rowSha256,fields){
+  const projectionId=digest(JSON.stringify(["mizizi.musicbrainz_core_row.v1",snapshotRef,table,rowSha256]));
+  const row={projectionId,table,rowSha256,fields};
+  const existing=sourceRows.get(projectionId);
+  if(existing){
+   if(JSON.stringify(existing)!==JSON.stringify(row))fail("ROW_PROJECTION_CONFLICT");
+  }else{
+   retain(row);sourceRows.set(projectionId,row);
+  }
+  return projectionId;
+ }
+ const subjects=projected.map((result,i)=>{
+  const input=inputs[i],links=[];
+  for(const match of result.matches){
+   const found=candidateByMbid.get(match.mbid);
+   if(!found)fail("ATTRIBUTION_RECORDING_MISSING");
+   const {rowId,c}=found,credit=credits.get(c.creditId);
+   if(!credit)fail("ATTRIBUTION_CREDIT_MISSING");
+   const recordingRef=projectRow("recording",c.recordingRowSha256,{
+    sourceRecordingId:rowId,mbid:c.mbid,title:c.title,artistCreditId:c.creditId,
+    durationMs:c.durationMs,video:c.video});
+   const creditRef=projectRow("artist_credit",credit.rowSha256,{
+    artistCreditId:c.creditId,artistCredit:credit.name});
+   const fieldRefs={mbid:recordingRef,title:recordingRef,artistCredit:creditRef,
+    durationMs:recordingRef,video:recordingRef};
+   if(match.exactIsrc){
+    const code=c.matchedIsrcRows.find(row=>row.isrc===input.isrc);
+    if(!code)fail("ATTRIBUTION_ISRC_MISSING");
+    fieldRefs.isrc=projectRow("isrc",code.rowSha256,{sourceRecordingId:rowId,isrc:code.isrc});
+   }
+   links.push({mbid:match.mbid,fieldRefs});
+  }
+  const subject={recordingId:input.recordingId,inputSha256:digest(JSON.stringify(input)),
+   disposition:result.disposition,candidates:links};
+  retain(subject);return subject;
+ });
+ const sharedEvidence={contract:"mizizi.musicbrainz_core_candidate_attribution.v1",
+  snapshotRef,lineage:"musicbrainz:community-core",license:"CC0-1.0",
+  candidateOnly:true,identityVerified:false,custodyAuthorized:false,modelDisclosureAuthorized:false,
+  canonicalWriteAuthorized:false,
+  rowProjections:[...sourceRows.values()].sort((a,b)=>a.projectionId.localeCompare(b.projectionId)),subjects};
  const summary={requested:inputs.length,uniqueSourceRecordings:sources.length,
   unmatched:0,single_candidate:0,ambiguous:0,identifier_metadata_conflict:0,candidate_overflow:0};
  for(const row of projected)summary[row.disposition]++;
  return {contract:"mizizi.musicbrainz_core_cohort.v1",candidateOnly:true,identityVerified:false,canPublish:false,
   source:{...m,license:"CC0-1.0",lineage:"musicbrainz:community-core",archiveSignatureVerifiedByReader:false,
-   tableDigestsVerified:true},inputSha256:digest(JSON.stringify(inputs)),scans,summary,sources,recordings:projected};
+   tableDigestsVerified:true},inputSha256:digest(JSON.stringify(inputs)),scans,summary,sources,recordings:projected,sharedEvidence};
 }
 async function smallJson(path,max){
  const info=await stat(path);

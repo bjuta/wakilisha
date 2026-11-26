@@ -2150,6 +2150,41 @@ describe("MusicBrainz core CC0 offline cohort discovery",()=>{
     {mbid:mbidB,exactIsrc:false,titleArtistMatch:true,titleAgrees:true,artistAgrees:true}]);
    expect(result.sources[0].recordingRowSha256).toMatch(/^[a-f0-9]{64}$/);
    expect(result.sources[0].matchedIsrcRows).toEqual([{isrc:code,rowSha256:expect.stringMatching(/^[a-f0-9]{64}$/)}]);
+   const evidence=result.sharedEvidence;
+   expect(evidence).toMatchObject({candidateOnly:true,identityVerified:false,custodyAuthorized:false,
+    modelDisclosureAuthorized:false,canonicalWriteAuthorized:false,lineage:"musicbrainz:community-core"});
+   expect(evidence.rowProjections).toHaveLength(4); // two recordings, one shared credit, one exact ISRC
+   expect(evidence.subjects).toHaveLength(1000);
+   const rows=new Map(evidence.rowProjections.map(r=>[r.projectionId,r]));
+   const first=evidence.subjects[0].candidates;
+   expect(first[0].fieldRefs.artistCredit).toBe(first[1].fieldRefs.artistCredit);
+   expect(first[0].fieldRefs.title).not.toBe(first[1].fieldRefs.title);
+   expect(rows.get(first[0].fieldRefs.artistCredit)).toMatchObject({table:"artist_credit",fields:{artistCredit:"Artist A"}});
+   expect(rows.get(first[0].fieldRefs.isrc)).toMatchObject({table:"isrc",fields:{sourceRecordingId:"101",isrc:code}});
+   expect(first[1].fieldRefs).not.toHaveProperty("isrc");
+   expect(evidence.subjects[999].candidates).toEqual(first);
+   expect(evidence.subjects[999].inputSha256).not.toBe(evidence.subjects[0].inputSha256);
+   // Changing other cohort members must not change a source row's reference,
+   // or grant their ISRC to a subject matched only by title/artist.
+   const mixed=await discoverMusicBrainzCoreCohortV1({directory,manifest,recordings:[
+    {...recordings[0],isrc:"KEABC2600002"},recordings[1]]});
+   const other=mixed.sharedEvidence;
+   expect(other.snapshotRef).toBe(evidence.snapshotRef);
+   expect(other.rowProjections).toHaveLength(5);
+   const [changed,unchanged]=other.subjects;
+   expect(changed.candidates[0].fieldRefs).not.toHaveProperty("isrc");
+   expect(changed.candidates[1].fieldRefs).toHaveProperty("isrc");
+   expect(unchanged.candidates).toEqual(first);
+   expect(changed.candidates[1].fieldRefs.title).toBe(first[1].fieldRefs.title);
+   expect(changed.candidates[1].fieldRefs.artistCredit).toBe(first[1].fieldRefs.artistCredit);
+   expect(other.rowProjections.find(r=>r.projectionId===changed.candidates[1].fieldRefs.isrc))
+    .toMatchObject({table:"isrc",fields:{sourceRecordingId:"102",isrc:"KEABC2600002"}});
+   expect(changed.inputSha256).not.toBe(evidence.subjects[0].inputSha256);
+   // Same row content under a different verified snapshot does not reuse the
+   // prior snapshot's projection identity.
+   const next=await discoverMusicBrainzCoreCohortV1({directory,manifest:{...manifest,snapshot:"20261127-000000"},recordings:[recordings[0]]});
+   expect(next.sharedEvidence.snapshotRef).not.toBe(evidence.snapshotRef);
+   expect(next.sharedEvidence.subjects[0].candidates[0].fieldRefs.title).not.toBe(first[0].fieldRefs.title);
   });
  });
  it("distinguishes identifier metadata conflict, missing candidates, and duplicate subject or tampered snapshot",async()=>{
@@ -2158,6 +2193,10 @@ describe("MusicBrainz core CC0 offline cohort discovery",()=>{
     {recordingId:cohortId(2),title:"Absent",artist:null,isrc:null}];
    const result=await discoverMusicBrainzCoreCohortV1({directory,manifest,recordings});
    expect(result.recordings.map(s=>s.disposition)).toEqual(["identifier_metadata_conflict","unmatched"]);
+   expect(result.sharedEvidence.subjects.map(s=>[s.disposition,s.candidates.length]))
+    .toEqual([["identifier_metadata_conflict",1],["unmatched",0]]);
+   expect(result.sharedEvidence.identityVerified).toBe(false);
+   expect(result.sharedEvidence.canonicalWriteAuthorized).toBe(false);
    expect(result.sources[0].artistCredit).toBe("Artist A");
    expect(result.scans.map(s=>s.table)).toEqual(["isrc","artist_credit","recording","artist_credit"]);
    await expect(discoverMusicBrainzCoreCohortV1({directory,manifest,recordings:[recordings[0],recordings[0]]})).rejects.toThrow("INPUT_INVALID");
