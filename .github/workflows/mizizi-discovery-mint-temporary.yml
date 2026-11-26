@@ -1,0 +1,38 @@
+name: Temporary MIZIZI Discovery Migration Mint
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/mizizi-discovery-mint-temporary.yml
+permissions:
+  contents: read
+jobs:
+  mint:
+    if: github.event.pull_request.number == 1442 && github.head_ref == 'work/mizizi-charts-candidate-resolution-20261126'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.107.0
+      - name: Mint exact migration in unlinked checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = 97a9601b965754f165764d6e2135e526dcb4d90f
+          test "$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')" = 293
+          test ! -e supabase/.temp/project-ref
+          test -z "$(find supabase/migrations -maxdepth 1 -name '*_mizizi_desk_provider_discovery.sql' -print)"
+          supabase --version
+          supabase migration new mizizi_desk_provider_discovery
+          p="$(find supabase/migrations -maxdepth 1 -type f -name '*_mizizi_desk_provider_discovery.sql' -print)"
+          test -f "$p"
+          test "$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')" = 294
+          test "$(printf '%s\n' supabase/migrations/*.sql | sort | tail -1)" = "$p"
+          echo "MIZIZI_DISCOVERY_MINTED_FILE=$p"
+          echo "MIZIZI_DISCOVERY_MINT=PASS"
