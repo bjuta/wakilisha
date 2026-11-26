@@ -25,7 +25,7 @@ function denied(response,code,label){
 }
 
 export async function verifyCharts2RealJwtRegistryV1({
- api,sql,first,second,subscriber,
+ api,sql,first,second,subscriber,reviewer,
 }){
  fail(process.env.GITHUB_ACTIONS==="true" &&
    process.env.GITHUB_EVENT_NAME==="pull_request" &&
@@ -341,4 +341,131 @@ export async function verifyCharts2RealJwtRegistryV1({
   trackId+"'::uuid)::text;");
  fail(after==="2|0","STOP_CHARTS2_REAL_JWT_SHZAM_SYNTHETIC_PROVIDER_ID");
  console.log("WK_AUTH_CHARTS2_TWO_REAL_JWT_SHZAM_REVIEW_CAS_REVOCATION_NO_FAKE_ID=PASS");
+
+ // Real JWT admission over a full local five-source receipt set. These rows
+ // are synthetic disposable SQL fixtures, not newly verified Storage bytes.
+ // Keep the preceding Intake fixture unchanged; new receipts supersede its
+ // earlier partial source set by the existing latest-reader ordering.
+ sql(`insert into platform_private.charts2_capture_receipts_v1(
+   source_key,source_endpoint,method_revision,capture_mode,observed_at,
+   original_object_key,original_byte_length,original_sha256,original_verified_at,
+   original_content_type,expected_depth,observed_depth,observations,parser_version,
+   native_period_authority,provider_week_ending_date,created_at)
+ select s.source_key,s.endpoint,1,'service_original',now(),
+   s.source_key||'/'||left(s.sha,2)||'/'||s.sha||s.ext,1024,s.sha,now(),
+   s.mime,s.depth,s.depth,
+   (select jsonb_agg(jsonb_build_object('rank',n,'title','CI Admission Song '||n,
+     'artist',case when s.source_key='apple_ke' then null else 'CI Admission Artist' end,
+     'provider_track_id',case when s.source_key='shazam_ke' then null else 'admission-'||s.source_key||'-'||n end)
+     order by n) from generate_series(1,s.depth) n),
+   'ci-admission-local-v1',
+   case when s.source_key='youtube_ke' then 'provider_declared_end_date' else 'unknown' end,
+   case when s.source_key='youtube_ke' then '2026-11-12'::date else null end,now()+interval '1 second'
+ from (values
+   ('youtube_ke','https://charts.youtube.com/youtubei/v1/browse?alt=json',repeat('1',64),100,'application/json','.json'),
+   ('mdundo_ke','https://play.mdundo.com/top-charts/ke',repeat('2',64),100,'text/html','.html'),
+   ('apple_ke','https://music.apple.com/ke/playlist/top-100-kenya/pl.0b36ea82865d4adeb9d1d62207aab172',repeat('3',64),100,'text/html','.html'),
+   ('audiomack_ke','https://audiomack.com/geo-charts/playlist/kenya',repeat('4',64),100,'text/html','.html'),
+   ('shazam_ke','https://www.shazam.com/services/charts/csv/top-200/kenya',repeat('5',64),200,'text/csv','.csv')
+ ) s(source_key,endpoint,sha,depth,mime,ext);`);
+ const readProjection=()=>JSON.parse(sql("select platform_private.charts2_compute_private_freeze_v1(true)::text;"));
+ const original=readProjection();
+ fail(original.unresolved_count===600&&original.conflict_count===0&&
+   original.investigation_positions.length===600&&original.eligible_count===0,
+   "STOP_MIZIZI_ADMISSION_FULL_SOURCE_PARTITION");
+ const shazam=original.investigation_positions.find(p=>p.source_key==="shazam_ke"&&p.rank===1);
+ const resolved=await accept(first.user,"admin_review_charts2_no_id_observation_v1",{
+   p_receipt_id:shazam.receipt_id,p_original_sha256:shazam.original_sha256,p_rank:1,
+   p_action:"approve",p_track_id:trackId,p_review_note:note,
+   p_evidence_url:"https://example.org/ci-admission-evidence",
+   p_expected_previous_event_id:null,p_acknowledgement:approval,
+ },"STOP_MIZIZI_ADMISSION_RESOLVED_FIXTURE");
+ fail(UUID.test(resolved.event_id),"STOP_MIZIZI_ADMISSION_RESOLVED_RECEIPT");
+ const material=readProjection();
+ fail(material.unresolved_count===599&&material.eligible_count===1&&
+   material.conflict_count===0&&material.input_sha256!==original.input_sha256,
+   "STOP_MIZIZI_ADMISSION_RESOLVED_EXCLUSION");
+ const coordinate=p=>({source_key:p.source_key,receipt_id:p.receipt_id,
+   original_sha256:p.original_sha256,rank:p.rank});
+ const groups=material.investigation_positions.map(p=>({
+   disposition:p.disposition,positions:[coordinate(p)],
+ }));
+ // Join two exact positions across distinct sources, not same-source duplicates.
+ const appleIndex=groups.findIndex(g=>g.positions[0].source_key==="apple_ke"&&g.positions[0].rank===1);
+ const youtubeIndex=groups.findIndex(g=>g.positions[0].source_key==="youtube_ke"&&g.positions[0].rank===1);
+ const paired={disposition:"research",positions:[groups[appleIndex].positions[0],groups[youtubeIndex].positions[0]]};
+ const workload=[paired,...groups.filter((_,i)=>i!==appleIndex&&i!==youtubeIndex)];
+ const args={p_expected_input_sha256:material.input_sha256,p_groups:workload};
+ const admission="admin_mizizi_admit_chart_candidates_v1";
+ const proof=()=>sql(`select jsonb_build_object(
+   'subjects',(select count(*) from mizizi_private.chart_candidate_subjects_v1),
+   'positions',(select count(*) from mizizi_private.chart_candidate_positions_v1),
+   'events',(select count(*) from mizizi_private.case_events),
+   'artists',(select count(*) from public.registry_artists),
+   'tracks',(select count(*) from public.registry_tracks),
+   'links',(select count(*) from public.registry_track_provider_links),
+   'grants',(select count(*) from platform_private.registry_execution_grants),
+   'jobs',(select count(*) from platform_private.jobs),
+   'reviews',(select count(*) from platform_private.charts2_observation_review_events_v1),
+   'freezes',(select count(*) from platform_private.charts2_private_freezes_v1),
+   'receipts',(select count(*) from platform_private.charts2_capture_receipts_v1))::text;`);
+ const baseline=proof();
+ fail(!!reviewer,"STOP_MIZIZI_ADMISSION_REVIEWER_FIXTURE");
+ denied(await subscriber.rpc(admission,args),"42501","STOP_MIZIZI_ADMISSION_SUBSCRIBER");
+ denied(await reviewer.rpc(admission,args),"42501","STOP_MIZIZI_ADMISSION_REVIEWER");
+ denied(await first.user.rpc(admission,{...args,p_expected_input_sha256:original.input_sha256}),
+   "PT409","STOP_MIZIZI_ADMISSION_STALE");
+ denied(await first.user.rpc(admission,{...args,p_groups:workload.slice(0,-1)}),
+   "22023","STOP_MIZIZI_ADMISSION_INCOMPLETE_ROLLBACK");
+ const changed=JSON.parse(JSON.stringify(workload));
+ changed[changed.length-1].positions[0].original_sha256="f".repeat(64);
+ denied(await first.user.rpc(admission,{...args,p_groups:changed}),
+   "PT409","STOP_MIZIZI_ADMISSION_TAMPERED_ROLLBACK");
+ denied(await first.user.rpc(admission,{...args,p_groups:[...workload.slice(0,-1),workload[0]]}),
+   "22023","STOP_MIZIZI_ADMISSION_DUPLICATE_ROLLBACK");
+ denied(await first.user.rpc(admission,{...args,p_groups:[...workload,
+   {disposition:"research",positions:[coordinate(shazam)]}]}),
+   "PT409","STOP_MIZIZI_ADMISSION_RESOLVED_POSITION");
+ fail(proof()===baseline,"STOP_MIZIZI_ADMISSION_DENIAL_CHANGED_DURABLE_STATE");
+ const race=await Promise.all([
+   first.user.rpc(admission,args),second.user.rpc(admission,args)
+ ]);
+ fail(race.every(r=>!r.error),"STOP_MIZIZI_ADMISSION_CONCURRENT_"+race.map(r=>r.error?.code??"OK").join("_"));
+ const results=race.map(r=>r.data);
+ fail(results.reduce((n,r)=>n+r.created,0)===598&&
+   results.reduce((n,r)=>n+r.replayed,0)===598&&
+   results.every(r=>r.position_count===599&&r.jobs_dispatched===0&&
+     r.can_publish===false&&r.cases.length===598&&r.cases.every(c=>c.stage==="triage"&&c.revision===1)),
+   "STOP_MIZIZI_ADMISSION_SINGLE_CREATION_RACE");
+ const sortedIds=r=>r.cases.map(c=>c.case_id).sort().join(",");
+ fail(sortedIds(results[0])===sortedIds(results[1]),"STOP_MIZIZI_ADMISSION_CONCURRENT_CASE_DIVERGENCE");
+ const replayed=await accept(first.user,admission,{...args,p_groups:[...workload].reverse().map(g=>({
+   ...g,positions:[...g.positions].reverse()
+ }))},"STOP_MIZIZI_ADMISSION_ORDER_INDEPENDENT");
+ fail(replayed.created===0&&replayed.replayed===598&&sortedIds(replayed)===sortedIds(results[0]),
+   "STOP_MIZIZI_ADMISSION_REPLAY_CHANGED_IDENTITY");
+ denied(await first.user.rpc(admission,{...args,p_groups:groups}),
+   "PT409","STOP_MIZIZI_ADMISSION_OVERLAP");
+ denied(await first.user.rpc("admin_mizizi_begin_case_research_v1",{
+   p_case_id:replayed.cases[0].case_id,p_expected_revision:1,
+   p_reason:"Do not dispatch a chart hypothesis via the old Registry review route."
+ }),"23514","STOP_MIZIZI_ADMISSION_UNWIRED_RESEARCH");
+ const afterAdmission=JSON.parse(proof()),beforeAdmission=JSON.parse(baseline);
+ fail(afterAdmission.subjects===598&&afterAdmission.positions===599&&
+   afterAdmission.events-beforeAdmission.events===598,
+   "STOP_MIZIZI_ADMISSION_DURABLE_COUNTS");
+ for(const key of ["artists","tracks","links","grants","jobs","reviews","freezes","receipts"])
+   fail(afterAdmission[key]===beforeAdmission[key],"STOP_MIZIZI_ADMISSION_SIDE_EFFECT_"+key);
+ fail(sql(`select count(*) from mizizi_private.chart_candidate_subjects_v1 s
+   join mizizi_private.cases c on c.id=s.case_id and c.workspace_id=s.workspace_id
+   join mizizi_private.case_events e on e.case_id=c.id and e.case_revision=1
+   where c.subject_id=s.case_id and c.subject_type='recording' and c.current_stage='triage'
+     and c.mutation_state='not_planned' and c.case_state='open' and c.revision=1
+     and e.actor_key='user:'||s.admitted_by::text and e.event_type='case_created'
+     and s.member_count=(select count(*) from mizizi_private.chart_candidate_positions_v1 p where p.case_id=s.case_id);`)==="598",
+   "STOP_MIZIZI_ADMISSION_JOURNAL_OR_MEMBERSHIP");
+ fail(readProjection().input_sha256===material.input_sha256,
+   "STOP_MIZIZI_ADMISSION_SCORING_CHANGED");
+ console.log("WK_AUTH_MIZIZI_CHART_CANDIDATES_FULL_PARTITION_CONCURRENT_IDEMPOTENT_NO_REGISTRY_WRITE=PASS");
+
 }

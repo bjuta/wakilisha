@@ -751,6 +751,25 @@ begin
      or length(a->>'input_sha256')<>64
      or length(a->>'ranking_sha256')<>64
   then raise exception 'charts2_private_freeze_100_rank_replay_failed';end if;
+  declare projected jsonb;
+  begin
+    projected:=platform_private.charts2_compute_private_freeze_v1(true);
+    if projected-'investigation_positions' is distinct from platform_private.charts2_compute_private_freeze_v1()
+      or jsonb_array_length(projected->'investigation_positions')<>500
+      or exists(select 1 from jsonb_array_elements(projected->'investigation_positions') v
+        where v->>'source_key'='apple_ke' or v->>'disposition'<>'research')
+      or (select count(distinct (v->>'receipt_id',v->>'rank'))
+        from jsonb_array_elements(projected->'investigation_positions') v)<>500
+    then raise exception 'MIZIZI investigation projection changed scoring or partition';end if;
+    if has_function_privilege('authenticated','public.mizizi_charts_candidate_input_v1()','EXECUTE')
+      or not has_function_privilege('service_role','public.mizizi_charts_candidate_input_v1()','EXECUTE')
+      or has_function_privilege('service_role','public.admin_mizizi_admit_chart_candidates_v1(text,jsonb)','EXECUTE')
+      or has_function_privilege('anon','public.admin_mizizi_admit_chart_candidates_v1(text,jsonb)','EXECUTE')
+      or has_table_privilege('authenticated','mizizi_private.chart_candidate_subjects_v1','SELECT')
+      or has_table_privilege('service_role','mizizi_private.chart_candidate_positions_v1','INSERT')
+    then raise exception 'MIZIZI chart candidate ACL drift';end if;
+    raise notice 'WK_CHARTS2_MIZIZI_PRIVATE_PROJECTION_PARITY=PASS';
+  end;
   raise notice 'WK_CHARTS2_LOCAL_PRIVATE_FREEZE_100_EXACT_REPLAY=PASS';
   perform set_config('wk.charts2_ci_official_export','yes',true);
   c:=public.charts2_private_freeze_preflight_v1();

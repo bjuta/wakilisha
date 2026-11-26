@@ -608,7 +608,7 @@ async function main(){
  const {verifyCharts2RealJwtRegistryV1}=await import(
   "./charts2-real-jwt-registry-ci.mjs");
  await verifyCharts2RealJwtRegistryV1({
-  api,sql:(query)=>localSql(query,db),first,second,subscriber,
+  api,sql:(query)=>localSql(query,db),first,second,subscriber,reviewer,
  });
 
  // Capability re-evaluation with an unchanged genuine JWT.
