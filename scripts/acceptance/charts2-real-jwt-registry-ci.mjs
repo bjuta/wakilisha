@@ -486,7 +486,7 @@ export async function verifyCharts2RealJwtRegistryV1({
    "22023","STOP_CHART_DISPATCH_MISSING_CONSENT");
  denied(await first.user.rpc(transition,{...transitionArgs,p_expected_input_sha256:original.input_sha256}),
    "PT409","STOP_CHART_DISPATCH_STALE_SNAPSHOT");
- fail(proof()===JSON.stringify(afterAdmission) || JSON.stringify(JSON.parse(proof()))===JSON.stringify(afterAdmission),
+ fail(JSON.stringify(JSON.parse(proof()))===JSON.stringify(afterAdmission),
    "STOP_CHART_DISPATCH_DENIAL_CHANGED_STATE");
  const jobArgs=(id,rev,reason=chartReason,key="mizizi.case_research_v1."+id+"."+rev)=>{
    const hash=createHash("sha256").update([id,ws,String(rev),"read_only_research",reason].join("\n")).digest("hex");
@@ -510,10 +510,10 @@ export async function verifyCharts2RealJwtRegistryV1({
  fail(winners.length===1&&transitionRace.filter(x=>x.error?.code==="PT409").length===1,
    "STOP_CHART_DISPATCH_TRANSITION_CAS");
  const winner=winners[0].i===0?first:second;
- const changed=winners[0].v.data;
- fail(changed.caseId===pairedId&&changed.workspaceId===ws&&changed.revision===2&&
-   changed.stage==="research"&&changed.state==="in_progress"&&changed.researchReason===chartReason&&
-   changed.jobsDispatched===0&&changed.canPublish===false,"STOP_CHART_DISPATCH_TRANSITION_RECEIPT");
+ const transitionReceipt=winners[0].v.data;
+ fail(transitionReceipt.caseId===pairedId&&transitionReceipt.workspaceId===ws&&transitionReceipt.revision===2&&
+   transitionReceipt.stage==="research"&&transitionReceipt.state==="in_progress"&&transitionReceipt.researchReason===chartReason&&
+   transitionReceipt.jobsDispatched===0&&transitionReceipt.canPublish===false,"STOP_CHART_DISPATCH_TRANSITION_RECEIPT");
  fail(sql("select count(*) from mizizi_private.case_events where case_id='"+pairedId+
    "' and case_revision=2 and actor_key='user:"+winner.id+"';")==="1",
    "STOP_CHART_DISPATCH_HUMAN_JOURNAL");
