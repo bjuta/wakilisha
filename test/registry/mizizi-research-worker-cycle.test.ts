@@ -1782,8 +1782,8 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    "trailer\n<< /Size "+offsets.length+" /Root 1 0 R >>\nstartxref\n"+xref+"\n%%EOF\n";
   return new TextEncoder().encode(pdf);
  }
- const call=(name:"search_web"|"read_page"|"read_document"|"inspect_visual",input:Record<string,string|number>)=>({name,input});
- function fixture(body=textBytes,mime="text/plain"){
+ const call=(name:"search_web"|"read_page"|"read_document"|"inspect_visual"|"render_page",input:Record<string,string|number>)=>({name,input});
+ function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams">={}){
   const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
   const receipts=new Map<string,Record<string,unknown>>(),leadRows=new Map<string,Record<string,unknown>>();
   const disabled=new Set<string>();
@@ -1812,12 +1812,16 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    if(fn==="mizizi_quote_desk_resource_v1"||fn==="mizizi_reserve_desk_resource_v1"){
     const b=JSON.parse(String(args.p_binding_text));
     return ok({resource:b.resource,requestSha256:b.requestSha256,bindingSha256:hash(String(args.p_binding_text)),
-     policyRevision:1,units:2000000,validUntil:expiry,model:null,pricingRef:null,maxInputTokens:null,maxOutputTokens:null,
+     policyRevision:1,units:b.resource==="native_https"?2000000:120,validUntil:expiry,model:null,pricingRef:null,maxInputTokens:null,maxOutputTokens:null,
      maximumCostMicrousd:0,...(fn==="mizizi_reserve_desk_resource_v1"?{reservationId:RECEIPT}:{})});
    }
+   if(fn==="mizizi_record_desk_resource_event_v1")return ok(true);
    if(fn==="mizizi_record_desk_tool_receipt_v1"){
     const parsed=JSON.parse(String(args.p_result_text)),provenance={...(args.p_provenance as Record<string,unknown>)};
     delete provenance.requestText;
+    if(provenance.detail&&typeof provenance.detail==="object"){
+     const detail={...(provenance.detail as Record<string,unknown>)};delete detail.requestText;provenance.detail=detail;
+    }
     receipts.set(parsed.receiptId,{receiptId:parsed.receiptId,callSha256:args.p_call_sha256,
      resultSha256:args.p_result_sha256,resultText:args.p_result_text,provenance,host:args.p_host});
     for(const b of args.p_lead_bindings as {id:string;url:string}[]){
@@ -1839,7 +1843,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   const dispatch=createDeskResearchDispatcherV1({scope,rpc,braveApiKey:"fixture-only-brave-key",
    nativeAccountFingerprint:"a".repeat(64),authorizeAcquisition:access,authorizeExamination:examination,
    searchTransport:provider as unknown as typeof fetch,nativeTestSeams:{resolve4:async()=>["93.184.216.34"],readPinned:native},
-   now:()=>NOW});
+   now:()=>NOW,...browserOptions});
   const execute=(c:ReturnType<typeof call>)=>dispatch.executeTool(scope,c,hash(JSON.stringify({scope,call:c})));
   return {dispatch,execute,calls,receipts,leadRows,disabled,provider,native,access,examination};
  }
@@ -1891,6 +1895,56 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   await expect(h.execute(call("read_document",{lead_id:document!.id,page_start:1,page_end:3}))).rejects.toThrow("DOCUMENT_PAGE_DENIED");
   h.disabled.add("archive.org");
   await expect(h.execute(call("inspect_visual",{lead_id:document!.id,page:1}))).rejects.toThrow("LEAD_NOT_AVAILABLE");
+ },35000);
+ it("composes guarded browser lifecycle and viewport inspection without leaking raw DOM/image or using a live provider",async()=>{
+  const {createCanvas}=await import("@napi-rs/canvas");
+  const canvas=createCanvas(1280,900);
+  const png=Uint8Array.from(canvas.toBuffer("image/png"));
+  const rendered="<html><body><article><h1>Archive programme</h1><p>"+
+   "The archival programme credits the ensemble but individual recording personnel remain uncertain. ".repeat(10)+"</p></article></body></html>";
+  const transport=vi.fn(async(_url:string,init:RequestInit)=>new Response(JSON.stringify(init.method==="POST"?
+   {sessionId:EVENT}:{status:"closing"}),{headers:{"content-type":"application/json"}}));
+  let routeHandler:(route:unknown)=>Promise<void>;
+  const req={url:()=>url,isNavigationRequest:()=>true,method:()=>"GET",resourceType:()=>"document"};
+  const continued=vi.fn(async()=>{}),aborted=vi.fn(async()=>{});
+  const page={on:vi.fn(),url:()=>url,
+   goto:async()=>{await routeHandler({request:()=>req,continue:continued,abort:aborted});
+    return {status:()=>200,request:()=>({redirectedFrom:()=>null}),headerValue:async()=>"text/html"};},
+   locator:()=>({evaluate:async()=>rendered}),screenshot:async()=>png};
+  const ctx={routeWebSocket:async()=>{},route:async(_pattern:string,handler:typeof routeHandler)=>{routeHandler=handler;},
+   newPage:async()=>page,close:async()=>{}};
+  const connect=vi.fn(async()=>({newContext:async()=>ctx,close:async()=>{}}));
+  const authorize=vi.fn(async(binding:{visual:boolean},digest:string)=>({requestSha256:digest,policyRef:"policy:guarded-browser",
+   publicAcquisitionAllowed:true,nativeFallbackVerified:true,remoteEgressIsolationVerified:true,
+   remoteRequestPolicyVerified:true,providerUseAllowed:true,zeroIncrementalSpendAllowed:true,
+   visualAllowed:binding.visual,validUntil:expiry}));
+  const authorizeRequest=vi.fn(async()=>true);
+  const h=fixture(new TextEncoder().encode("<html><body><script>document.write('shell')</script></body></html>"),"text/html",{
+   browser:{accountId:"a".repeat(32),apiToken:"fixture-only-cloudflare-token",captureVisual:true,authorize,authorizeRequest},
+   browserTestSeams:{transport:transport as never,connect:connect as never}});
+  const first=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
+  const parent=await h.execute(call("read_page",{lead_id:first.leads[0].id}));
+  const lead=parent.leads.find(l=>l.kind==="render");
+  expect(lead).toBeDefined();expect(parent.sources).toEqual([]);
+  const renderedResult=await h.execute(call("render_page",{lead_id:lead!.id}));
+  expect(renderedResult.sources[0].excerpt).toContain("archival programme");
+  expect(renderedResult.sources[0].source.fingerprint).toBe(hash(rendered));
+  const shot=renderedResult.leads.find(l=>l.kind==="visual");
+  expect(shot).toBeDefined();
+  const inspected=await h.execute(call("inspect_visual",{lead_id:shot!.id,page:1}));
+  expect(inspected.visual?.sha256).toBe(hash(png));
+  expect(inspected.sources[0].source.fingerprint).toBe(hash(rendered));
+  expect(transport.mock.calls.map(c=>c[1].method)).toEqual(["POST","DELETE"]);
+  expect(connect).toHaveBeenCalledTimes(1);
+  expect(authorizeRequest).toHaveBeenCalledTimes(1);
+  expect(continued).toHaveBeenCalledTimes(1);expect(aborted).not.toHaveBeenCalled();
+  expect(h.calls.filter(c=>c.fn==="mizizi_record_desk_resource_event_v1").map(c=>c.args.p_state))
+   .toEqual(["open_pending","opened","close_acknowledged"]);
+  const stored=h.receipts.get(inspected.receiptId)!;
+  expect(JSON.parse(String(stored.resultText)).visual).toEqual({sourceId:inspected.receiptId,
+   sha256:hash(png),contentType:"image/png"});
+  expect(JSON.stringify([...h.receipts.values()])).not.toContain("fixture-only-cloudflare-token");
+  expect(h.native).toHaveBeenCalledTimes(1);
  },35000);
  it("requires current custody before discovery or reading, and rejects forged lead or unsupported tool",async()=>{
   const h=fixture();h.disabled.add("api.search.brave.com");

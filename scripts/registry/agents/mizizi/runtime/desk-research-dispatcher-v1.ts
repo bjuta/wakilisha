@@ -43,6 +43,8 @@ type Options=Readonly<{
  authorizeExamination:(scope:DeskSearchScopeV1,binding:Readonly<Record<string,unknown>>)=>Promise<boolean>;
  /** Test seams; fixed native/provider defaults in actual server composition. */
  browser?:BrowserOptions;
+ /** Test-only provider seams; never forwarded by the leased worker factory. */
+ browserTestSeams?:Pick<NonNullable<Parameters<typeof createCloudflareBrowserTransportV1>[0]>,"transport"|"connect">;
  searchTransport?:typeof fetch;
  nativeTestSeams?:Pick<NativeOptions,"resolve4"|"readPinned">;
  now?:()=>number;
@@ -127,7 +129,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(transient.size>=5||transientBytes+bytes>12000000)fail("TRANSIENT_SOURCE_BOUND");
   transient.set(id,{receipt,provenance});transientBytes+=bytes;
  }
- const browserProvider=options.browser?createCloudflareBrowserTransportV1({accountId:options.browser.accountId,apiToken:options.browser.apiToken}):null;
+ const browserProvider=options.browser?createCloudflareBrowserTransportV1({accountId:options.browser.accountId,apiToken:options.browser.apiToken,...options.browserTestSeams}):null;
  const browser=browserProvider&&options.browser?createDeskBrowserReaderV1({
   provider:browserProvider,...budget.browserFinance(browserProvider.accountFingerprint),now,
   authorize:async(binding:{scope:DeskSearchScopeV1;url:string;visual:boolean},digest:string)=>{
