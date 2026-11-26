@@ -172,8 +172,15 @@ test("tall shared Modal stays viewport-bound with its action footer visible", as
   const scrollBodyBefore = await body.boundingBox();
   expect(headerBefore).not.toBeNull();
   expect(scrollBodyBefore).not.toBeNull();
-  await body.hover();
-  await page.mouse.wheel(0, 4000);
+  // Playwright's wheel input is not supported on mobile WebKit. Keep the
+  // real wheel path in Chromium and verify the same scroll/geometry
+  // contract in WebKit with the browser's own scroll container.
+  if(testInfo.project.name==="chromium"){
+    await body.hover();
+    await page.mouse.wheel(0, 4000);
+  }else{
+    await body.evaluate(el=>{el.scrollTop=Math.min(400,el.scrollHeight-el.clientHeight);});
+  }
   await expect.poll(()=>body.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
   await body.evaluate(el=>{el.scrollTop=el.scrollHeight;});
   await expect(dialog.getByText("Modal row 24",{exact:true})).toBeInViewport();
