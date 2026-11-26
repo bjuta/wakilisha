@@ -14,6 +14,8 @@ import {
   matchesOriginalAppleChartSong,
 } from "../../src/services/chartsPrivate/chartReviewContext";
 import { readFileSync } from "node:fs";
+import { getEntitySchema } from "../../src/services/registry/admin/entitySchemas";
+import { normalizeForSave, validateField } from "../../src/services/registry/admin/fieldNormalization";
 import { createHash } from "node:crypto";
 import { decodeCharts2Original } from "../../supabase/functions/_shared/charts2-original-candidate.mjs";
 import {
@@ -1141,5 +1143,42 @@ describe("Registry Artists shared theme convergence", () => {
     expect(page).toContain('{ status: "active" }');
     const quality = readFileSync("src/services/registry/admin/completeness.ts", "utf8");
     for (const tone of ["success", "warning", "danger"]) expect(quality).toContain("bg-wk-" + tone + "-soft text-wk-" + tone);
+  });
+});
+
+
+describe("Shared Registry editor field authority", () => {
+  it("uses exact persisted classification values and existing country catalogue", () => {
+    const artist = getEntitySchema("artist");
+    const find = (key: string) => artist.editableFields.find(field => field.key === key)!;
+    expect(find("artist_type").options).toEqual(["solo", "group", "collective", "band", "duo", "unknown"]);
+    expect(find("gender").options).toEqual(["female", "male", "mixed", "nonbinary", "unknown", "not_applicable"]);
+    for (const [key, valid, invalid] of [["artist_type", "solo", "Solo"], ["gender", "nonbinary", "non_binary"], ["origin_iso2", "NG", "QQ"]]) {
+      const field = find(key);
+      expect(field.type).toBe("select");
+      expect(field.allowUnset).toBe(true);
+      expect(validateField(valid, field)).toBeNull();
+      expect(validateField(invalid, field)).not.toBeNull();
+      expect(normalizeForSave("", field)).toBeNull();
+    }
+    expect(find("origin_iso2").searchable).toBe(true);
+    expect(find("origin_iso2").optionLabels?.NG).toBe("Nigeria (NG)");
+    expect(getEntitySchema("label").editableFields.find(field => field.key === "country_code")?.options).toEqual(find("origin_iso2").options);
+    expect(getEntitySchema("release").editableFields.find(field => field.key === "release_type")?.options).toEqual(["single", "ep", "album", "mixtape", "compilation", "video", "live", "unknown"]);
+    const number = getEntitySchema("track").editableFields.find(field => field.key === "duration_ms")!;
+    expect(normalizeForSave("", number)).toBeNull();
+    expect(normalizeForSave("0", number)).toBe(0);
+  });
+  it("composes shared fields instead of bypassing primitives or injecting fixed colours", () => {
+    const source = readFileSync("src/components/admin/registry/RegistryEntityEditorDrawer.tsx", "utf8");
+    const choice = readFileSync("src/components/admin/registry/RegistryChoiceField.tsx", "utf8");
+    const detail = readFileSync("src/pages/admin/registry/artists/detail/page.tsx", "utf8");
+    for (const forbidden of ["bg-[#", "text-[#", "border-[#", "divide-[#", "bg-white", "text-white", "<input", "<textarea", "<select", "resize-y"]) expect(source).not.toContain(forbidden);
+    for (const component of ["WkTextField", "RegistryChoiceField", "WkNumberField", "WkDatePicker", "WakilishaToggle", "WkButton"]) expect(source).toContain("<" + component);
+    expect(choice).toContain("<SearchableSelect");
+    expect(choice).toContain("<WkSelect");
+    expect(choice).toContain('next === UNSET ? "" : next');
+    expect(detail.match(/<RegistryChoiceField/g)).toHaveLength(3);
+    expect(detail).not.toContain('value="non_binary"');
   });
 });

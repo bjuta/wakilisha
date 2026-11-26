@@ -43,6 +43,38 @@ const RegistryArtistsThemeFixture = lazy(async () => {
   return import("@/pages/admin/registry/artists/page");
 });
 
+// Shared editor fixture covers the other schema consumers without navigating
+// to unrelated list pages. The browser intercepts release relationship reads.
+const RegistryEditorThemeFixture = lazy(async () => {
+  if (import.meta.env.VITE_PUBLIC_SUPABASE_URL !== "https://example.supabase.co") {
+    throw new Error("Registry editor presentation fixture requires synthetic endpoint");
+  }
+  const { default: Editor } = await import("@/components/admin/registry/RegistryEntityEditorDrawer");
+  const { getEntitySchema } = await import("@/services/registry/admin/entitySchemas");
+  const types = ["artist", "track", "release", "label", "genre"] as const;
+  const kind = types.find(type => type === new URLSearchParams(location.search).get("entity")) ?? "artist";
+  const schema = getEntitySchema(kind);
+  const entity = {
+    id: "10b940ff-3382-42b3-a81b-30e4028297d",
+    [schema.displayNameField]: "WK Registry Editor Fixture",
+    slug: "wk-registry-editor-fixture",
+    status: "draft",
+    living_memory_status: "draft",
+    updated_at: "2026-11-26T08:14:03Z",
+    duration_ms: 136594,
+    explicit: false,
+    release_type: "single",
+    release_date: "2026-11-26",
+    description: "Original fixture description",
+  };
+  return { default: function RegistryEditorFixture() {
+    const [open, setOpen] = useState(true);
+    return open ? <Editor entityType={kind} entity={entity} schema={schema}
+      onClose={() => setOpen(false)} onSaved={() => { throw new Error("Unexpected fixture mutation"); }} />
+      : <p>Registry editor closed</p>;
+  } };
+});
+
 function InteractionFixture() {
   const [open, setOpen] = useState(false);
   const [discographyOpen, setDiscographyOpen] = useState(false);
@@ -311,6 +343,12 @@ createRoot(document.getElementById("root")!).render(
     <MemoryRouter>
       <Suspense fallback={<p>Loading Registry Artists acceptance</p>}>
         <RegistryArtistsThemeFixture />
+      </Suspense>
+    </MemoryRouter>
+  ) : new URLSearchParams(window.location.search).get("fixture") === "registry-editor" ? (
+    <MemoryRouter>
+      <Suspense fallback={<p>Loading Registry editor acceptance</p>}>
+        <RegistryEditorThemeFixture />
       </Suspense>
     </MemoryRouter>
   ) : <InteractionFixture />,

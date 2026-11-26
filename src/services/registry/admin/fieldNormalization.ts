@@ -21,6 +21,7 @@ export function normalizeForSave(value: unknown, field: RegistryFieldSchema): un
     }
     default: {
       if (field.type === "number") {
+        if (!str.trim()) return null;
         const num = Number(str);
         return Number.isNaN(num) ? null : num;
       }
