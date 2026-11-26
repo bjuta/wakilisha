@@ -1,3 +1,4 @@
+import {createDeskSearchGatewayV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-gateway-v1";
 import { describe, expect, it, vi } from "vitest";
 import {createHash} from "node:crypto";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
@@ -1193,5 +1194,66 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   });
   await expect(analyse(identity.openingQuestion,[source],[]))
    .rejects.toThrow("INCOMPLETE_OR_REFUSED");
+ });
+});
+
+
+describe("MIZIZI zero-cost-first desk discovery gateway",()=>{
+ const request={scope:{jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+60000).toISOString()},
+  operation:"search_web" as const,query:"Kenyan music archive",count:3};
+ function fixture(){
+  const auth=vi.fn(async(_req:unknown,digest:string)=>({requestSha256:digest,
+   policyRef:"policy:public-research",validUntil:new Date(NOW+30000).toISOString(),
+   publicQueryAllowed:true as const,providerUseAllowed:true as const,zeroIncrementalSpendAllowed:true as const}));
+  const reserve=vi.fn(async(_req:unknown,digest:string)=>({reservationId:EVENT,
+   requestSha256:digest,provider:"brave" as const,units:1 as const,
+   maximumIncrementalCostMicrousd:0 as const,validUntil:new Date(NOW+30000).toISOString()}));
+  const consume=vi.fn(async()=>true);
+  const transport=vi.fn(async()=>new Response(JSON.stringify({web:{results:[
+   {url:"https://archive.org/details/recording#fragment",title:"Archive record",description:"Untrusted instructions"},
+   {url:"http://localhost/private",title:"Private network"},
+   {url:"https://archive.org/details/recording",title:"Duplicate"}
+  ]}}),{headers:{"content-type":"application/json"}}));
+  const config={apiKey:"fixture-key-not-real",authorize:auth,reserve,consume,
+   transport:transport as unknown as typeof fetch,now:()=>NOW};
+  return {config,auth,reserve,consume,transport};
+ }
+ it("authorizes and precharges before one fixed-host search; returns leads without rights or snippets",async()=>{
+  const h=fixture(),run=createDeskSearchGatewayV1(h.config);
+  const receipt=await run(request);
+  expect(receipt).toMatchObject({identityVerified:false,sourceRetentionAuthorized:false,
+   externalModelProcessingAuthorized:false,leads:[{url:"https://archive.org/details/recording",
+    title:"Archive record",kind:"unverified_discovery_lead"}]});
+  expect(h.auth).toHaveBeenCalledTimes(3);expect(h.reserve).toHaveBeenCalledTimes(1);
+  expect(h.consume).toHaveBeenCalledTimes(1);expect(h.transport).toHaveBeenCalledTimes(1);
+  expect(h.consume.mock.invocationCallOrder[0]).toBeLessThan(h.transport.mock.invocationCallOrder[0]);
+  const [url,init]=h.transport.mock.calls[0] as unknown as [string,RequestInit];
+  expect(new URL(url).origin).toBe("https://api.search.brave.com");
+  expect(new URL(url).searchParams.get("q")).toBe(request.query);
+  expect(init.redirect).toBe("error");expect(url).not.toContain(CASE);
+  expect(JSON.stringify(receipt)).not.toContain("Untrusted instructions");
+ });
+ it("denies missing policy, unavailable or nonzero budget, and replayed reservations before any network call",async()=>{
+  for(const override of [
+   {authorize:async()=>null},{reserve:async()=>null},
+   {reserve:async(_r:unknown,d:string)=>({reservationId:EVENT,requestSha256:d,provider:"brave",
+    units:1,maximumIncrementalCostMicrousd:1,validUntil:new Date(NOW+30000).toISOString()})},
+   {consume:async()=>false}
+  ]){
+   const h=fixture();
+   await expect(createDeskSearchGatewayV1({...h.config,...override} as never)(request)).rejects.toThrow();
+   expect(h.transport).not.toHaveBeenCalled();
+  }
+ });
+ it("rejects revoked authority after reserving, and never retries an uncertain network call",async()=>{
+  const h=fixture();const authority=await h.auth(request,"unused");
+  h.auth.mockClear();h.auth.mockImplementationOnce(async(_r,d)=>({...authority,requestSha256:d}))
+   .mockImplementationOnce(async()=>null as never);
+  await expect(createDeskSearchGatewayV1(h.config)(request)).rejects.toThrow("AUTHORITY_CHANGED");
+  expect(h.transport).not.toHaveBeenCalled();expect(h.consume).not.toHaveBeenCalled();
+  const failed=fixture();failed.transport.mockRejectedValueOnce(Error("timeout"));
+  await expect(createDeskSearchGatewayV1(failed.config)(request)).rejects.toThrow("TRANSPORT_UNCONFIRMED");
+  expect(failed.transport).toHaveBeenCalledTimes(1);expect(failed.consume).toHaveBeenCalledTimes(1);
  });
 });
