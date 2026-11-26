@@ -45,7 +45,7 @@ Hosted case constraints: cases.subject_type already permits artist/recording/cha
 ## Implementation and deployment ledger
 - [x] Preserve #1440 baseline; create #1441 and exact-base branch.
 - [x] Initial upstream PR/migration inventory and hosted schema constraints audit.
-- [ ] Candidate coverage implementation and existing test consolidation.
+- [x] Candidate coverage helper implemented in existing recordingReviewSuggestions.ts; existing two grouping tests extended (no new test files). Isolated JavaScript execution of exact grouping + wrapper after annotation stripping: ambiguous missing credit singleton, duplicate/invalid coordinate rejection, original grouping unchanged, stable reverse ordering, synthetic 592-position exact coverage and nonmutation passed. Full TypeScript/Vitest/protected CI and actual server integration remain outstanding. This is a pure workload partition, not a durable admission or live research run.
 - [ ] Typed admission and research authority reconciliation; CLI-minted forward migration paths if required.
 - [ ] Protected/disposable proof, then isolated Preview application and Edge-only deployment with provider/model secret parity.
 - [ ] Real investigation workload, then Slice 2, then Slice 3.

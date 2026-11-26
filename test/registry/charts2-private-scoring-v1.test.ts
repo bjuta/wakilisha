@@ -1,7 +1,7 @@
 import {describe,expect,it} from "vitest";
 import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
 import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
-import {suggestRecordingReviewGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
+import {suggestRecordingReviewGroups,buildRecordingInvestigationGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
 import {
   appendChartReviewReference,
   chartStudioReturnHref,
@@ -285,6 +285,19 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     // An unidentified artist cannot form a group from title alone.
     expect(suggestRecordingReviewGroups(rows.filter(row=>row.artist===null)))
       .toHaveLength(0);
+    // MIZIZI needs complete workload coverage without inventing a match.
+    const workload=buildRecordingInvestigationGroups(rows);
+    expect(workload.map(group=>group.observations.length)).toEqual([2,2,1]);
+    expect(workload.flatMap(group=>group.observations)).toHaveLength(rows.length);
+    expect(workload.find(group=>group.observations.length===1)?.observations)
+      .toEqual([rows[4]]);
+    expect(buildRecordingInvestigationGroups([...rows].reverse())).toEqual(workload);
+    expect(buildRecordingInvestigationGroups([])).toEqual([]);
+    expect(()=>buildRecordingInvestigationGroups([...rows,{...rows[0],title:"Conflicting payload"}]))
+      .toThrow("Duplicate chart investigation coordinate");
+    expect(()=>buildRecordingInvestigationGroups([{...rows[0],rank:0}]))
+      .toThrow("Invalid chart investigation coordinate");
+    expect(rows[4].artist).toBeNull();
   });
 
   it("does not chain two same-source positions through a third chart",()=>{
@@ -304,6 +317,11 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(groups[0].observations.map(row=>row.source_key).sort())
       .toEqual(["apple_ke","audiomack_ke","youtube_ke"]);
     expect(groups[0].observations.find(row=>row.source_key==="youtube_ke")?.rank).toBe(8);
+    const workload=buildRecordingInvestigationGroups(rows);
+    expect(workload.flatMap(group=>group.observations)).toHaveLength(rows.length);
+    expect(workload.every(group=>new Set(group.observations.map(row=>row.source_key)).size
+      ===group.observations.length)).toBe(true);
+    expect(buildRecordingInvestigationGroups([...rows].reverse())).toEqual(workload);
   });
 
   it("quarantines duplicate native IDs, incomplete receipts, and repeated same-source labels",()=>{

@@ -210,3 +210,57 @@ export function suggestRecordingReviewGroups(
       Math.min(...b.observations.map(x => x.rank)) ||
       a.key.localeCompare(b.key));
 }
+
+// A research workload is a partition of the supplied unresolved positions.
+// Multi-source grouping is only a hypothesis; singletons are researchable too.
+// The server must validate receipt authority and unresolved status before calling
+// this pure helper. Its key identifies a receipt-scoped group, not a Registry
+// identity or a durable case ID. No evidence, scoring, or mutation authority.
+export function buildRecordingInvestigationGroups(
+  rows: ReviewObservation[],
+  aliases: ReviewedArtistAlias[] = [],
+  artists: ReviewedArtist[] = [],
+): RecordingReviewGroup[] {
+  const coordinate = (row: ReviewObservation) =>
+    JSON.stringify([row.source_key, row.receipt_id, row.rank]);
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (!row.source_key || !row.receipt_id || !Number.isSafeInteger(row.rank) || row.rank < 1) {
+      throw new Error("Invalid chart investigation coordinate");
+    }
+    const key = coordinate(row);
+    if (seen.has(key)) throw new Error("Duplicate chart investigation coordinate");
+    seen.add(key);
+  }
+
+  // The existing grouping is deliberately conservative and can depend on input
+  // traversal. Canonicalize ordering before invoking it for repeatable workloads.
+  const ordered = [...rows].sort((a, b) =>
+    a.source_key.localeCompare(b.source_key) ||
+    a.receipt_id.localeCompare(b.receipt_id) || a.rank - b.rank);
+  const groups = suggestRecordingReviewGroups(ordered, aliases, artists);
+  const covered = new Set<string>();
+  for (const group of groups) {
+    for (const row of group.observations) {
+      const key = coordinate(row);
+      if (!seen.has(key) || covered.has(key)) {
+        throw new Error("Invalid chart investigation partition");
+      }
+      covered.add(key);
+    }
+  }
+  for (const row of ordered) {
+    const key = coordinate(row);
+    if (covered.has(key)) continue;
+    groups.push({
+      key: row.source_key + ":" + row.receipt_id + ":" + row.rank,
+      title: row.title,
+      reason: row.artist?.trim() ? "Single source investigation" : "Investigate missing Artist credit",
+      observations: [row],
+    });
+    covered.add(key);
+  }
+  return groups.sort((a, b) => b.observations.length - a.observations.length ||
+    Math.min(...a.observations.map(row => row.rank)) -
+    Math.min(...b.observations.map(row => row.rank)) || a.key.localeCompare(b.key));
+}
