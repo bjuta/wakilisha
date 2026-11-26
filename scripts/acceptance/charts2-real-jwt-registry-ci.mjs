@@ -852,6 +852,35 @@ export async function verifyCharts2RealJwtRegistryV1({
  const p=await call(policyName,{p_scope:scope,p_host:host});
  fail(p.host===host&&p.revision===1&&p.excerptRetentionAllowed===true&&p.externalModelProcessingAllowed===true,
   "STOP_CUSTODY_POLICY_RECEIPT");
+ const accessName="mizizi_authorize_desk_access_v1";
+ const accessArgs=(operation,target=url,descriptor={})=>{
+  const body=JSON.stringify({url:target,descriptor});
+  return {p_scope:scope,p_operation:operation,p_binding_text:body,p_binding_sha256:hash(body)};
+ };
+ const nativeAccess=accessArgs("native_acquire");
+ fail(await call(accessName,nativeAccess)===null,"STOP_ACCESS_DEFAULT_DENY");
+ for(const actor of [first.user,subscriber]){
+  denied(await actor.rpc(accessName,nativeAccess),"42501","STOP_ACCESS_BROWSER_ACL");
+ }
+ await deny(accessName,{...nativeAccess,p_binding_sha256:hash("wrong")},"22023");
+ sql(`insert into mizizi_private.desk_access_policy_versions_v1
+  (workspace_id,host,url_sha256,operation,revision,custody_revision,enabled,authority_ref,valid_until)
+  values ('${ws}','${host}','${hash(url)}','native_acquire',1,1,true,'fixture:independent-access-review',now()+interval '5 minutes');`);
+ const access=await call(accessName,nativeAccess);
+ fail(access?.allowed===true&&access.bindingSha256===nativeAccess.p_binding_sha256&&access.urlSha256===hash(url)&&
+  Date.parse(access.validUntil)<=Date.parse(scope.leaseExpiresAt),"STOP_ACCESS_EXACT_RECEIPT");
+ const examinationArgs=accessArgs("native_text",url,{finalUrl:url,sha256:hash("fixture"),representation:"native_response_bytes"});
+ fail(await call(accessName,examinationArgs)===null&&await call(accessName,accessArgs("native_acquire",htmlUrl))===null,
+  "STOP_ACCESS_SEPARATE_EXAMINATION_AND_URL");
+ sql(`insert into mizizi_private.desk_access_policy_versions_v1
+  (workspace_id,host,url_sha256,operation,revision,custody_revision,enabled,authority_ref,valid_until)
+  values ('${ws}','${host}','${hash(url)}','native_text',1,1,true,'fixture:independent-examination-review',now()+interval '5 minutes');`);
+ fail((await call(accessName,examinationArgs))?.allowed===true,"STOP_ACCESS_EXAMINATION_GRANT");
+ sql(`insert into mizizi_private.desk_access_policy_versions_v1
+  (workspace_id,host,url_sha256,operation,revision,custody_revision,enabled,authority_ref,valid_until)
+  values ('${ws}','${host}','${hash(url)}','native_acquire',2,1,false,'fixture:revoked-access-review',now()+interval '5 minutes');`);
+ fail(await call(accessName,nativeAccess)===null&&(await call(accessName,examinationArgs))?.allowed===true,"STOP_ACCESS_REVOCATION");
+ console.log("WK_AUTH_MIZIZI_DESK_INDEPENDENT_URL_ACCESS=PASS");
  fail(await call(appendName,{...searchArgs,p_provenance:{...searchArgs.p_provenance,reservationId:randomUUID()}})===null&&
   await call(appendName,{...searchArgs,p_lead_bindings:[{id:leadId,url:"https://127.0.0.1/private"},{id:htmlLead,url:htmlUrl}]})===null,
   "STOP_CUSTODY_FORGED_RESERVATION_OR_LEAD");

@@ -118,6 +118,27 @@ export function createDeskResearchDispatcherV1(options:Options){
    fail("CUSTODY_POLICY_UNCONFIRMED");
   return Object.freeze({...p});
  }
+ // Owner-issued, exact URL/operation permission is additive to host checks.
+ // Descriptors are hashed and checked by the RPC, not persisted.
+ const accessRevisions=new Map<string,string>();
+ async function accessGrant(operation:string,url:string,descriptor:Readonly<Record<string,unknown>>){
+  const canonical=urlOf(url).href;
+  const bindingText=JSON.stringify({url:canonical,descriptor}),bindingSha256=hash(bindingText);
+  const result=await rpc("mizizi_authorize_desk_access_v1",{p_scope:scope,p_operation:operation,
+   p_binding_text:bindingText,p_binding_sha256:bindingSha256});
+  if(result===null)return null;
+  const g=result as {operation:string;bindingSha256:string;urlSha256:string;policyRef:string;validUntil:string;allowed:boolean};
+  const expiry=Date.parse(g?.validUntil);
+  if(!g||g.allowed!==true||g.operation!==operation||g.bindingSha256!==bindingSha256||
+   g.urlSha256!==hash(canonical)||typeof g.policyRef!=="string"||
+   !/^[A-Za-z0-9._:/-]{8,200}$/.test(g.policyRef)||!Number.isFinite(expiry)||
+   expiry<=now()||expiry>Date.parse(scope.leaseExpiresAt))return null;
+  const key=operation+":"+hash(canonical),previous=accessRevisions.get(key);
+  if(previous!==undefined&&previous!==g.policyRef)return null;
+  if(previous===undefined&&accessRevisions.size>=512)return null;
+  accessRevisions.set(key,g.policyRef);
+  return g;
+ }
  const search=createDurableDeskSearchGatewayV1({apiKey:options.braveApiKey,rpc:options.rpc,
   transport:options.searchTransport,now});
  const budget=createDeskResourceBudgetV1({rpc:options.rpc,now});
@@ -136,9 +157,19 @@ export function createDeskResearchDispatcherV1(options:Options){
    assertScope(binding.scope);
    const p=await policy(urlOf(binding.url).hostname);
    if(!p||p.browserRenderAllowed!==true||(binding.visual&&(p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed)))return null;
-   return options.browser!.authorize(binding,digest);
+   const grant=await accessGrant("browser_render",binding.url,binding);
+   if(!grant)return null;
+   const external=await options.browser!.authorize(binding,digest);
+   if(!external)return null;
+   const expiry=Math.min(Date.parse(grant.validUntil),Date.parse(external.validUntil));
+   if(!Number.isFinite(expiry)||expiry<=now())return null;
+   return {...external,validUntil:new Date(expiry).toISOString()};
   },
-  authorizeRequest:options.browser.authorizeRequest
+  authorizeRequest:async(binding,u,resourceType,policy)=>{
+   assertScope(binding.scope);
+   return !!await accessGrant("browser_request",u,{url:u,resourceType,parentUrl:binding.url})&&
+    await options.browser!.authorizeRequest(binding,u,resourceType,policy)===true;
+  }
  }):null;
  const native=createDeskNativeReaderV1({
   ...options.nativeTestSeams,now,
@@ -147,7 +178,13 @@ export function createDeskResearchDispatcherV1(options:Options){
    assertScope(candidate);
    const p=await policy(urlOf(url).hostname);
    if(!p||p.sourceFamily!=="public_web")return null;
-   return options.authorizeAcquisition(candidate,url);
+   const grant=await accessGrant("native_acquire",url,{});
+   if(!grant)return null;
+   const external=await options.authorizeAcquisition(candidate,url);
+   if(!external||external.acquisitionAllowed!==true||external.zeroIncrementalSpendAllowed!==true)return null;
+   const expiry=Math.min(Date.parse(grant.validUntil),Date.parse(external.validUntil));
+   if(!Number.isFinite(expiry)||expiry<=now())return null;
+   return {...external,validUntil:new Date(expiry).toISOString()};
   }
  });
  const examination=async(candidate:DeskSearchScopeV1,binding:Readonly<Record<string,unknown>>)=>{
@@ -155,6 +192,8 @@ export function createDeskResearchDispatcherV1(options:Options){
   const p=await policy(urlOf(binding.finalUrl).hostname);
   return !!p&&p.sourceFamily==="public_web"&&
    (!["pdf_visual","browser_visual"].includes(String(binding.mode))||(p.visualProcessingAllowed===true&&p.excerptRetentionAllowed))&&
+   !!await accessGrant(binding.mode==="pdf_visual"?"pdf_visual":binding.mode==="browser_visual"?"browser_visual":
+    binding.representation==="rendered_dom_not_original_response"?"browser_text":"native_text",String(binding.finalUrl),binding)&&
    await options.authorizeExamination(candidate,binding)===true;
  };
  const interpret=createDeskSourceInterpreterV1({now,authorize:examination});

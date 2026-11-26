@@ -1797,6 +1797,12 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   const rpc:WorkerRpc=async(fn,args)=>{
    calls.push({fn,args});
    const ok=(data:unknown)=>({data,error:null});
+   if(fn==="mizizi_authorize_desk_access_v1"){
+    const binding=JSON.parse(String(args.p_binding_text)),operation=String(args.p_operation);
+    if(disabled.has(operation))return ok(null);
+    return ok({operation,bindingSha256:hash(String(args.p_binding_text)),urlSha256:hash(binding.url),
+     policyRef:"fixture:access:"+operation,validUntil:expiry,allowed:true});
+   }
    if(fn==="mizizi_read_desk_custody_policy_v1"){
     const host=String(args.p_host);
     return ok(disabled.has(host)?null:{host,revision:1,sourceFamily:host==="api.search.brave.com"?"brave_discovery":"public_web",
@@ -1855,6 +1861,8 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   expect(JSON.stringify(first)).not.toContain(url);
   const read=call("read_page",{lead_id:first.leads[0].id}),second=await h.execute(read);
   expect(h.provider).toHaveBeenCalledTimes(1);expect(h.native).toHaveBeenCalledTimes(1);
+  expect(h.calls.filter(c=>c.fn==="mizizi_authorize_desk_access_v1").map(c=>c.args.p_operation))
+   .toEqual(["native_acquire","native_acquire","native_acquire","native_text","native_text"]);
   expect(h.examination).toHaveBeenCalledTimes(2);
   const source=second.sources[0];
   expect(source).toMatchObject({excerpt:new TextDecoder().decode(textBytes),citation:url+"#plain_text",
