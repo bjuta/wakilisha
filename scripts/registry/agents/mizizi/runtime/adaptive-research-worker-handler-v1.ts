@@ -13,6 +13,8 @@ import {createLeasedResearchPassStoreV1} from "./leased-research-pass-store-v1.t
 import {createAnthropicInvestigationAnalystV1, type AnthropicInvestigationOptionsV1}
  from "./anthropic-investigation-analyst-v1.ts";
 import {createCostRoutedDeskAnthropicPassV1} from "./desk-anthropic-tool-loop-v1.ts";
+import {createDeskResearchDispatcherV1} from "./desk-research-dispatcher-v1.ts";
+import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 export type AdaptiveWorkerDependenciesV1=Readonly<{
  store:InvestigationStoreV1;
  openingQuestion:(job:ResearchJobV1)=>Promise<string>;
@@ -153,5 +155,71 @@ export function runCostRoutedDeskResearchWorkerCycleV1(input:Readonly<
   prepareDeskPassForJob:job=>createCostRoutedDeskAnthropicPassV1({...deskForJob(job),
    scope:{jobId:job.jobId,caseId:job.caseId,workspaceId:job.workspaceId,
     expectedRevision:job.expectedRevision,workerId:input.workerId,leaseExpiresAt:job.leaseExpiresAt}})
+ });
+}
+
+
+type DurableDeskConfigurationV1=Readonly<
+ Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],
+ "braveApiKey"|"nativeAccountFingerprint"|"authorizeAcquisition"|"authorizeExamination">&
+ Pick<Parameters<typeof createCostRoutedDeskAnthropicPassV1>[0],
+ "anthropic"|"readModelInventory"|"assessRequirement"|"authorizeEnvelope"|"authorizeTool">
+>;
+/** Actual first durable desk path, restricted to exact chart job. All
+ * external finance, custody and tool readback use the real service RPCs.
+ * No caller-supplied alternate transport, result receipt, cost callback
+ * or source verifier. Trusted host still must provide independent access,
+ * envelope, model inventory/quality and tool policy authority; activation
+ * additionally requires real account/egress/process acceptance.
+ */
+export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
+ rpc:WorkerRpc;workerId:string;chartScope:ChartResearchScopeV1;
+ openingQuestion:AdaptiveWorkerDependenciesV1["openingQuestion"];
+ verifyFinding:IndependentFindingVerifierV1;
+ configurationForJob:(job:ResearchJobV1)=>Promise<DurableDeskConfigurationV1>;
+ maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
+ leaseSeconds?:number;now?:()=>number;
+}>){
+ if(!input?.chartScope||typeof input.rpc!=="function"||
+  typeof input.configurationForJob!=="function"||typeof input.verifyFinding!=="function"||
+  typeof input.openingQuestion!=="function")
+   throw Error("MIZIZI_DURABLE_DESK_TRUSTED_CONFIGURATION_REQUIRED");
+ let active:{job:ResearchJobV1;dispatcher:ReturnType<typeof createDeskResearchDispatcherV1>}|null=null;
+ return runResearchWorkerCycleV1({
+  rpc:input.rpc,workerId:input.workerId,chartScope:input.chartScope,
+  leaseSeconds:input.leaseSeconds,limit:1,now:input.now,
+  verifySources:async(job,refs)=>{
+   if(!active||active.job.jobId!==job.jobId||active.job.caseId!==job.caseId||
+    active.job.workspaceId!==job.workspaceId||active.job.expectedRevision!==job.expectedRevision||
+    active.job.leaseExpiresAt!==job.leaseExpiresAt)throw Error("MIZIZI_DURABLE_DESK_SOURCE_SCOPE_DENIED");
+   return active.dispatcher.verifySources(job,refs);
+  },
+  research:async(job)=>{
+   if(!job.chartContext||!job.chartRegistryDiscovery)
+    throw Error("MIZIZI_DURABLE_DESK_CHART_PREFLIGHT_REQUIRED");
+   // Existing worker has independently verified chart originals and Registry
+   // discovery before this callback. Never allow caller transport overrides.
+   const config=await input.configurationForJob(job);
+   const scope={jobId:job.jobId,caseId:job.caseId,workspaceId:job.workspaceId,
+    expectedRevision:job.expectedRevision,workerId:input.workerId,leaseExpiresAt:job.leaseExpiresAt};
+   const dispatcher=createDeskResearchDispatcherV1({
+    rpc:input.rpc,scope,braveApiKey:config.braveApiKey,
+    nativeAccountFingerprint:config.nativeAccountFingerprint,
+    authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,now:input.now});
+   const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
+   const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
+   const prepareDeskPass=createCostRoutedDeskAnthropicPassV1({
+    scope,anthropic,enabledTools:dispatcher.enabledTools,readModelInventory:config.readModelInventory,
+    assessRequirement:config.assessRequirement,authorizeEnvelope:config.authorizeEnvelope,
+    authorizeTool:config.authorizeTool,...finance,executeTool:dispatcher.executeTool,
+    verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,now:input.now});
+   active={job,dispatcher};
+   return createAdaptiveResearchWorkerHandlerV1({
+    store:createLeasedResearchPassStoreV1(input.rpc,job,input.workerId),
+    openingQuestion:input.openingQuestion,readSources:async()=>{throw Error("MIZIZI_DESK_LEGACY_READER_DENIED");},
+    analyze:async()=>{throw Error("MIZIZI_DESK_LEGACY_ANALYST_DENIED");},prepareDeskPass,
+    verifyFinding:input.verifyFinding,authorizeModelProcessing:dispatcher.authorizeModelProcessing,
+    maxNewPasses:input.maxNewPasses,maxTotalPasses:input.maxTotalPasses,costBudgetUnits:input.costBudgetUnits})(job);
+  }
  });
 }
