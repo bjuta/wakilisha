@@ -280,6 +280,105 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
 });
 
 
+
+describe("Exact Charts research lease transport (existing worker lifecycle)",()=>{
+ const workerId="mizizi-chart:"+JOB;
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  preflight:async()=>true};
+ const exactRow={...row,input_payload:{...row.input_payload,
+  reason:"Investigate receipt-bound chart recording identity."}};
+ const sha="a".repeat(64);
+ const position={source_key:"youtube_ke",receipt_id:EVENT,original_sha256:sha,
+  rank:3,title:"Unresolved song",artist:null,provider_track_id:"provider-key",
+  original_bucket:"charts2-evidence-private-v1",
+  original_object_key:"youtube_ke/aa/"+sha+".csv",
+  original_byte_length:123,original_content_type:"text/csv"};
+ const context={contract:"mizizi.charts.research_context.v1",
+  jobId:JOB,receiptId:RECEIPT,caseId:CASE,workspaceId:WORKSPACE,
+  expectedRevision:2,leaseExpiresAt:row.lease_expires_at,
+  membershipSha256:sha,observationSha256:"b".repeat(64),
+  positions:[position],publicSourceSearchApproved:false,externalModelProcessingAllowed:false};
+ function scoped(overrides:{claim?:unknown;contexts?:unknown[];recovery?:unknown}={}){
+  const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
+  let reads=0;
+  const rpc:WorkerRpc=vi.fn(async(fn,args)=>{
+   calls.push({fn,args});
+   if(fn==="mizizi_recover_expired_chart_research_job_v1")
+    return {data:overrides.recovery??0,error:null};
+   if(fn==="mizizi_claim_exact_chart_research_job_v1")
+    return {data:overrides.claim??[exactRow],error:null};
+   if(fn==="mizizi_read_leased_chart_research_context_v1")
+    return {data:overrides.contexts?overrides.contexts[reads++]:context,error:null};
+   if(fn==="mizizi_complete_case_research_job_v1")return {data:done,error:null};
+   if(fn==="mizizi_fail_case_research_job_v1")return {data:{...failed,
+    job_status:"dead_letter",command_receipt_status:"failed"},error:null};
+   throw new Error("UNEXPECTED_CHART_RPC");
+  });
+  const run=(research:Parameters<typeof runResearchWorkerCycleV1>[0]["research"],
+    chartScope=scope)=>runResearchWorkerCycleV1({rpc,research,workerId,chartScope,now:()=>NOW});
+  return {calls,run};
+ }
+ it("preflights before exact recovery/claim, reads context twice, and uses the existing completion receipt",async()=>{
+  const h=scoped();
+  const result=await h.run(async(job)=>{
+   expect(job.chartContext).toEqual(context);
+   expect(job.publicSourceSearchApproved).toBe(false);
+   expect(job.researchQuestion).toBeNull();
+   return finding;
+  });
+  expect(result).toMatchObject({claimed:1,succeeded:1,failed:0});
+  expect(h.calls.map(c=>c.fn)).toEqual([
+   "mizizi_recover_expired_chart_research_job_v1","mizizi_claim_exact_chart_research_job_v1",
+   "mizizi_read_leased_chart_research_context_v1","mizizi_read_leased_chart_research_context_v1",
+   "mizizi_complete_case_research_job_v1"]);
+  expect(h.calls[1].args).toMatchObject({p_job_id:JOB,p_case_id:CASE,p_workspace_id:WORKSPACE,
+   p_expected_revision:2,p_worker_id:workerId});
+  expect(h.calls[4].args.p_result).toEqual(finding);
+ });
+ it("stops before any RPC when trusted preflight is absent or denied",async()=>{
+  for(const preflight of [async()=>false,async()=>{throw Error("PROVIDER_UNAVAILABLE");}]){
+   const h=scoped(),handler=vi.fn(async()=>finding);
+   await expect(h.run(handler,{...scope,preflight})).rejects.toThrow();
+   expect(h.calls).toHaveLength(0);expect(handler).not.toHaveBeenCalled();
+  }
+ });
+ it("rejects an unrelated claim or public-search reason before context access",async()=>{
+  for(const claim of [
+   {...exactRow,job_id:EVENT},
+   {...exactRow,resource_id:EVENT,input_payload:{...exactRow.input_payload,case_id:EVENT}},
+   {...exactRow,input_payload:{...exactRow.input_payload,reason:"PUBLIC_CC0_RESEARCH: An unauthorized question"}},
+  ]){
+   const h=scoped({claim:[claim]}),handler=vi.fn(async()=>finding);
+   await expect(h.run(handler)).rejects.toThrow("UNBOUND_CLAIM");
+   expect(h.calls).toHaveLength(2);expect(handler).not.toHaveBeenCalled();
+  }
+ });
+ it("rejects stale or forged context without executing research or a failure mutation",async()=>{
+  for(const damaged of [
+   {...context,caseId:EVENT},{...context,expectedRevision:3},
+   {...context,publicSourceSearchApproved:true},{...context,externalModelProcessingAllowed:true},
+   {...context,positions:[position,position]},
+   {...context,positions:[{...position,original_object_key:"../other/private-file"}]},
+   {...context,positions:[{...position,rank:101}]},
+   {...context,positions:[{...position,original_byte_length:4000001}]},
+  ]){
+   const h=scoped({contexts:[damaged]}),handler=vi.fn(async()=>finding);
+   await expect(h.run(handler)).rejects.toThrow();
+   expect(h.calls).toHaveLength(3);expect(handler).not.toHaveBeenCalled();
+  }
+ });
+ it("does not complete or fail a job whose verified context changed during research",async()=>{
+  const h=scoped({contexts:[context,{...context,observationSha256:"c".repeat(64)}]});
+  await expect(h.run(async()=>finding)).rejects.toThrow("CONTEXT_CHANGED_BEFORE_COMPLETION");
+  expect(h.calls).toHaveLength(4);
+ });
+ it("never calls generic claim/recovery or invents work when the scoped job is unavailable",async()=>{
+  const h=scoped({claim:[]}),handler=vi.fn(async()=>finding);
+  await expect(h.run(handler)).resolves.toMatchObject({claimed:0,succeeded:0});
+  expect(handler).not.toHaveBeenCalled();expect(h.calls).toHaveLength(2);
+ });
+});
+
 describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundary)",()=>{
  const identity={caseId:CASE,workspaceId:WORKSPACE,
   openingQuestion:"Who actually performed on the disputed version of this recording?"};

@@ -9,11 +9,31 @@ const WORKER=/^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/;
 const JOB_TYPE="mizizi.case_research_v1";
 export type WorkerRpcResult=Readonly<{data:unknown;error:{message:string}|null}>;
 export type WorkerRpc=(fn:string,args:Record<string,unknown>)=>Promise<WorkerRpcResult>;
+// Exact chart jobs never enter the generic claim path. The selected scope
+// is a transport constraint, not permission to disclose a question externally.
+export type ChartResearchScopeV1=Readonly<{
+ jobId:string;caseId:string;workspaceId:string;expectedRevision:number;
+ preflight:()=>Promise<boolean>;
+}>;
+export type LeasedChartPositionV1=Readonly<{
+ source_key:string;receipt_id:string;original_sha256:string;rank:number;
+ title:string;artist:string|null;provider_track_id:string|null;
+ original_bucket:"charts2-evidence-private-v1";original_object_key:string;
+ original_byte_length:number;original_content_type:string;
+}>;
+export type LeasedChartResearchContextV1=Readonly<{
+ contract:"mizizi.charts.research_context.v1";jobId:string;receiptId:string;
+ caseId:string;workspaceId:string;expectedRevision:number;leaseExpiresAt:string;
+ membershipSha256:string;observationSha256:string;
+ positions:readonly LeasedChartPositionV1[];
+ publicSourceSearchApproved:false;externalModelProcessingAllowed:false;
+}>;
 export type ResearchJobV1=Readonly<{
  jobId:string;receiptId:string;caseId:string;workspaceId:string;
  expectedRevision:number;attempt:number;maxAttempts:number;leaseExpiresAt:string;
  /** Exact original job reason, only a publicly approved question may be searched. */
  researchQuestion:string|null;publicSourceSearchApproved:boolean;
+ chartContext?:LeasedChartResearchContextV1;
 }>;
 export type ReadOnlyResearchResultV1=Readonly<{
  contract:"mizizi.read_only_research_result.v1";caseId:string;
@@ -84,6 +104,71 @@ function validateClaim(raw:unknown,nowMs:number):ResearchJobV1{
  return Object.freeze({jobId,receiptId,caseId,workspaceId,expectedRevision,
    attempt,maxAttempts,leaseExpiresAt:new Date(expires).toISOString(),
    researchQuestion,publicSourceSearchApproved});
+}
+const CHART_REASON="Investigate receipt-bound chart recording identity.";
+const CHART_WORKER=/^mizizi-chart:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+const CHART_SHA=/^[a-f0-9]{64}$/;
+const CHART_MIME:Readonly<Record<string,readonly string[]>>=Object.freeze({
+ apple_ke:["text/html"],audiomack_ke:["text/html"],mdundo_ke:["text/html"],
+ shazam_ke:["text/csv"],youtube_ke:["application/json","text/csv"],
+});
+const CHART_EXT:Readonly<Record<string,string>>={
+ "text/html":"html","text/csv":"csv","application/json":"json",
+};
+function boundedChartText(value:unknown,nullable:boolean):string|null{
+ if(value===null&&nullable)return null;
+ if(typeof value!=="string"||value.length<1||value.length>1000||
+    !value.trim()||/[\u0000-\u001f\u007f]/.test(value))
+  throw new TypeError("MIZIZI_CHART_CONTEXT_INVALID_OBSERVATION");
+ return value;
+}
+function validateChartContext(raw:unknown,job:ResearchJobV1,nowMs:number):LeasedChartResearchContextV1{
+ const c=record(raw);
+ if(c.contract!=="mizizi.charts.research_context.v1"||
+    uuid(c.jobId)!==job.jobId||uuid(c.receiptId)!==job.receiptId||
+    uuid(c.caseId)!==job.caseId||uuid(c.workspaceId)!==job.workspaceId||
+    c.expectedRevision!==job.expectedRevision||
+    Date.parse(String(c.leaseExpiresAt))!==Date.parse(job.leaseExpiresAt)||
+    Date.parse(job.leaseExpiresAt)<=nowMs||
+    typeof c.membershipSha256!=="string"||!CHART_SHA.test(c.membershipSha256)||
+    typeof c.observationSha256!=="string"||!CHART_SHA.test(c.observationSha256)||
+    c.publicSourceSearchApproved!==false||c.externalModelProcessingAllowed!==false||
+    !Array.isArray(c.positions)||c.positions.length<1||c.positions.length>5)
+  throw new TypeError("MIZIZI_CHART_CONTEXT_UNBOUND");
+ const sources=new Set<string>(),coordinates=new Set<string>();
+ const positions=c.positions.map(rawPosition=>{
+  const p=record(rawPosition);
+  const source=p.source_key,receipt=uuid(p.receipt_id),sha=p.original_sha256;
+  const rank=p.rank,mime=p.original_content_type,len=p.original_byte_length;
+  if(typeof source!=="string"||!Object.hasOwn(CHART_MIME,source)||sources.has(source)||
+     typeof sha!=="string"||!CHART_SHA.test(sha)||
+     typeof rank!=="number"||!Number.isSafeInteger(rank)||rank<1||
+     rank>(source==="shazam_ke"?200:100)||
+     typeof mime!=="string"||!CHART_MIME[source].includes(mime)||
+     typeof len!=="number"||!Number.isSafeInteger(len)||len<1||len>4000000||
+     p.original_bucket!=="charts2-evidence-private-v1"||
+     p.original_object_key!==source+"/"+sha.slice(0,2)+"/"+sha+"."+CHART_EXT[mime]||
+     coordinates.has(receipt+":"+rank))
+   throw new TypeError("MIZIZI_CHART_CONTEXT_INVALID_COORDINATE");
+  sources.add(source);coordinates.add(receipt+":"+rank);
+  return Object.freeze({source_key:source,receipt_id:receipt,original_sha256:sha,rank,
+   title:boundedChartText(p.title,false)!,artist:boundedChartText(p.artist,true),
+   provider_track_id:boundedChartText(p.provider_track_id,true),
+   original_bucket:"charts2-evidence-private-v1" as const,
+   original_object_key:p.original_object_key as string,original_byte_length:len,
+   original_content_type:mime});
+ });
+ return Object.freeze({contract:"mizizi.charts.research_context.v1",
+  jobId:job.jobId,receiptId:job.receiptId,caseId:job.caseId,workspaceId:job.workspaceId,
+  expectedRevision:job.expectedRevision,leaseExpiresAt:job.leaseExpiresAt,
+  membershipSha256:c.membershipSha256,observationSha256:c.observationSha256,
+  positions:Object.freeze(positions),publicSourceSearchApproved:false,
+  externalModelProcessingAllowed:false});
+}
+async function readChartContext(rpc:WorkerRpc,job:ResearchJobV1,workerId:string,nowMs:number){
+ return validateChartContext(confirmed(await rpc("mizizi_read_leased_chart_research_context_v1",{
+  p_job_id:job.jobId,p_worker_id:workerId
+ }),"CHART_CONTEXT"),job,nowMs);
 }
 const SOURCE_SHA256=/^[a-f0-9]{64}$/i;
 const SOURCE_USE=new Set(["first_party","documented_consent","documented_contract","open_license"]);
@@ -183,6 +268,7 @@ export function researchRetryDecisionV1(
 export async function runResearchWorkerCycleV1(input:Readonly<{
  rpc:WorkerRpc;research:ResearchJobHandlerV1;workerId:string;
  verifySources?:ResearchSourceVerifierV1;
+ chartScope?:ChartResearchScopeV1;
  limit?:number;leaseSeconds?:number;retryDelaySeconds?:number;now?:()=>number;
 }>):Promise<WorkerCycleResultV1>{
  const {rpc,research,workerId}=input||{} as typeof input;
@@ -195,21 +281,47 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
     !Number.isInteger(leaseSeconds)||leaseSeconds<30||leaseSeconds>3600||
     !Number.isInteger(retryDelay)||retryDelay<1||retryDelay>3600)
    throw new TypeError("MIZIZI_WORKER_INVALID_CONFIG");
- const recovered=confirmed(await rpc("mizizi_recover_expired_case_research_jobs_v1",{
-   p_limit:100,p_retry_delay_seconds:retryDelay,
- }),"RECOVERY");
- if(typeof recovered!=="number"||!Number.isSafeInteger(recovered)||recovered<0||recovered>100)
+ const scope=input?.chartScope;
+ let exact:Record<string,unknown>|null=null;
+ if(scope!==undefined){
+   if(!scope||typeof scope.preflight!=="function"||limit!==1||!CHART_WORKER.test(workerId))
+    throw new TypeError("MIZIZI_CHART_WORKER_INVALID_SCOPE");
+   exact={p_job_id:uuid(scope.jobId),p_case_id:uuid(scope.caseId),
+    p_workspace_id:uuid(scope.workspaceId),p_expected_revision:positive(scope.expectedRevision)};
+   // Model/credential/source preflight is supplied by the trusted runtime.
+   // An absent or false preflight must not lease or recover anything.
+   if(await scope.preflight()!==true)throw new Error("MIZIZI_CHART_WORKER_PREFLIGHT_DENIED");
+ }
+ const recovered=confirmed(await rpc(exact?"mizizi_recover_expired_chart_research_job_v1":
+   "mizizi_recover_expired_case_research_jobs_v1",exact?
+   {...exact,p_retry_delay_seconds:retryDelay}:{p_limit:100,p_retry_delay_seconds:retryDelay}
+ ),"RECOVERY");
+ if(typeof recovered!=="number"||!Number.isSafeInteger(recovered)||recovered<0||recovered>(exact?1:100))
    throw new TypeError("MIZIZI_WORKER_UNTRUSTED_RECOVERY_RECEIPT");
- const raw=confirmed(await rpc("mizizi_claim_case_research_jobs_v1",{
-   p_worker_id:workerId,p_limit:limit,p_lease_seconds:leaseSeconds,
- }),"CLAIM");
+ const raw=confirmed(await rpc(exact?"mizizi_claim_exact_chart_research_job_v1":
+   "mizizi_claim_case_research_jobs_v1",exact?
+   {...exact,p_worker_id:workerId,p_lease_seconds:leaseSeconds}:
+   {p_worker_id:workerId,p_limit:limit,p_lease_seconds:leaseSeconds}
+ ),"CLAIM");
  if(!Array.isArray(raw)||raw.length>limit)
    throw new TypeError("MIZIZI_WORKER_UNTRUSTED_CLAIM_SET");
- const jobs=raw.map(row=>validateClaim(row,now()));
+ const jobs=raw.map(row=>{
+   const job=validateClaim(row,now());
+   if(exact&&(job.jobId!==exact.p_job_id||job.caseId!==exact.p_case_id||
+     job.workspaceId!==exact.p_workspace_id||job.expectedRevision!==exact.p_expected_revision||
+     job.publicSourceSearchApproved||
+     record(record(row).input_payload).reason!==CHART_REASON))
+    throw new TypeError("MIZIZI_CHART_WORKER_UNBOUND_CLAIM");
+   return job;
+ });
  if(new Set(jobs.map(j=>j.jobId)).size!==jobs.length)
    throw new TypeError("MIZIZI_WORKER_DUPLICATE_LEASE");
  let succeeded=0,failed=0;
- for(const job of jobs){
+ for(const leased of jobs){
+   // Context failures are outside the handler's failure-receipt path: a
+   // mismatched or stale lease is not authority to mutate another job.
+   const job=exact?Object.freeze({...leased,
+     chartContext:await readChartContext(rpc,leased,workerId,now())}):leased;
    let researchResult:Readonly<Record<string,unknown>>;
    try{
      researchResult=await validatedResult(await research(job),job,input.verifySources,now());
@@ -234,6 +346,11 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
    }
    if(now()>=Date.parse(job.leaseExpiresAt))
      throw new Error("MIZIZI_WORKER_LEASE_EXPIRED_BEFORE_COMPLETION");
+   if(exact){
+     const fresh=await readChartContext(rpc,job,workerId,now());
+     if(JSON.stringify(fresh)!==JSON.stringify(job.chartContext))
+      throw new Error("MIZIZI_CHART_WORKER_CONTEXT_CHANGED_BEFORE_COMPLETION");
+   }
    // Never call fail if completion may already have committed.
    const receipt=record(confirmed(await rpc("mizizi_complete_case_research_job_v1",{
      p_job_id:job.jobId,p_worker_id:workerId,p_result:researchResult,

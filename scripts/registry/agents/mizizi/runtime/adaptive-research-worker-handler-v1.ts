@@ -8,7 +8,7 @@ import {runAdaptiveInvestigationV1, type InvestigationIdentityV1,
  from "./adaptive-investigation-v1.ts";
 import type {ResearchJobHandlerV1,ResearchJobV1}
  from "./research-worker-cycle-v1.ts";
-import {runResearchWorkerCycleV1, type WorkerRpc, type ResearchSourceVerifierV1} from "./research-worker-cycle-v1.ts";
+import {runResearchWorkerCycleV1, type WorkerRpc, type ResearchSourceVerifierV1, type ChartResearchScopeV1} from "./research-worker-cycle-v1.ts";
 import {createLeasedResearchPassStoreV1} from "./leased-research-pass-store-v1.ts";
 import {createAnthropicInvestigationAnalystV1, type AnthropicInvestigationOptionsV1}
  from "./anthropic-investigation-analyst-v1.ts";
@@ -65,13 +65,14 @@ export async function runAdaptiveResearchWorkerCycleV1(input:Readonly<{
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
  measureCostUnits?:()=>number;
  authorizeModelProcessing?:AdaptiveWorkerDependenciesV1["authorizeModelProcessing"];
+ chartScope?:ChartResearchScopeV1;
  leaseSeconds?:number;limit?:number;now?:()=>number;
 }>){
  if(!input||typeof input.verifySources!=="function")
   throw new TypeError("MIZIZI_ADAPTIVE_WORKER_SOURCE_VERIFIER_REQUIRED");
  return runResearchWorkerCycleV1({
   rpc:input.rpc,workerId:input.workerId,verifySources:input.verifySources,
-  leaseSeconds:input.leaseSeconds,limit:input.limit,now:input.now,
+  leaseSeconds:input.leaseSeconds,limit:input.limit,now:input.now,chartScope:input.chartScope,
   research:async(job)=>{
    const store=createLeasedResearchPassStoreV1(input.rpc,job,input.workerId);
    const handler=createAdaptiveResearchWorkerHandlerV1({store,
