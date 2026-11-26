@@ -620,6 +620,112 @@ export async function verifyCharts2RealJwtRegistryV1({
      p.original_bucket==="charts2-evidence-private-v1"&&p.original_byte_length===1024&&
      p.original_object_key===p.source_key+"/"+p.original_sha256.slice(0,2)+"/"+p.original_sha256+extension;
   }),"STOP_CHART_SCOPED_ORIGINAL_CONTEXT");
+ // Durable desk-search budget: actual service JWTs and concurrent SQL
+ // transactions; synthetic owner policy/credential, no external calls.
+ {
+ const authorizeName="mizizi_authorize_desk_search_v1",reserveName="mizizi_reserve_desk_search_v1",
+  consumeName="mizizi_consume_desk_search_v1";
+ const account=createHash("sha256").update("mizizi:brave:credential:v1:fixture-only-credential").digest("hex");
+ const position=context.positions[0];
+ const search=(patch={},scopePatch={})=>{
+  const body=JSON.stringify({scope:{jobId:job.job_id,caseId:pairedId,workspaceId:ws,
+   expectedRevision:2,workerId:activeWorker,leaseExpiresAt:context.leaseExpiresAt,...scopePatch},
+   operation:"search_web",query:position.title,count:3,...patch});
+  return {p_request_text:body,p_request_sha256:createHash("sha256").update(body).digest("hex"),
+   p_account_fingerprint:account};
+ };
+ const req=search(),policyRef="desk-search:brave:1";
+ const reserve=(params)=>({...params,p_policy_ref:policyRef});
+ fail(await call(authorizeName,req)===null&&await call(reserveName,reserve(req))===null,
+   "STOP_DESK_NO_DEFAULT_POLICY");
+ for(const [name,args] of [[authorizeName,req],[reserveName,reserve(req)],
+   [consumeName,{p_reservation_id:randomUUID(),p_request_sha256:req.p_request_sha256,p_account_fingerprint:account}]]){
+  denied(await first.user.rpc(name,args),"42501","STOP_DESK_BROWSER_"+name);
+  denied(await subscriber.rpc(name,args),"42501","STOP_DESK_SUBSCRIBER_"+name);
+ }
+ fail(sql("select count(*) from mizizi_private.desk_search_reservations_v1;")==="0","STOP_DESK_DEFAULT_CHARGE");
+ // Only the disposable database owner issues this fixture policy. No enabled
+ // policy or account entitlement is seeded in the migration.
+ sql(`insert into mizizi_private.desk_search_policy_versions_v1(
+  revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+  disclosure_policy_ref,commercial_search_allowed,zero_cost_hard_cap_verified,
+  exclusive_allocated_usage_verified,public_chart_labels_allowed,allowance_start,
+  allowance_end,valid_until,account_limit,daily_limit,case_limit)
+ values(1,true,'${ws}','${account}','fixture:entitlement','fixture:hard-cap',
+  'fixture:chart-labels',true,true,true,true,now()-interval '1 hour',
+  now()+interval '1 hour',now()+interval '10 minutes',2,2,2);`);
+ const auth=await call(authorizeName,req);
+ fail(auth?.requestSha256===req.p_request_sha256&&auth.policyRef===policyRef&&
+   auth.publicQueryAllowed===true&&auth.zeroIncrementalSpendAllowed===true&&
+   !Object.hasOwn(auth,"membershipSha256"),"STOP_DESK_POLICY_RECEIPT");
+ fail(await call(authorizeName,{...req,p_account_fingerprint:"f".repeat(64)})===null&&
+  await call(authorizeName,search({query:"Private case notes not in public chart labels"}))===null&&
+  await call(authorizeName,search({}, {caseId:staleId}))===null&&
+  await call(authorizeName,search({}, {expectedRevision:1}))===null&&
+  await call(reserveName,{...reserve(req),p_policy_ref:"desk-search:brave:999"})===null,
+  "STOP_DESK_POLICY_OR_SCOPE_BYPASS");
+ await deny(authorizeName,{...req,p_request_sha256:"f".repeat(64)},"22023");
+ await deny(authorizeName,search({}, {workerId:losingWorker}),"55000");
+ const duplicate=await Promise.all([service.rpc(reserveName,reserve(req)),service.rpc(reserveName,reserve(req))]);
+ fail(duplicate.every(x=>!x.error)&&duplicate.filter(x=>x.data!==null).length===1,"STOP_DESK_DUPLICATE_RESERVATION_RACE");
+ const charged=duplicate.find(x=>x.data!==null).data;
+ fail(UUID.test(charged.reservationId)&&charged.requestSha256===req.p_request_sha256&&
+  charged.units===1&&charged.maximumIncrementalCostMicrousd===0&&charged.provider==="brave",
+  "STOP_DESK_RESERVATION_RECEIPT");
+ const secondReq=search({operation:"search_news"}),thirdReq=search({count:4});
+ const lastSlot=await Promise.all([service.rpc(reserveName,reserve(secondReq)),service.rpc(reserveName,reserve(thirdReq))]);
+ fail(lastSlot.every(x=>!x.error)&&lastSlot.filter(x=>x.data!==null).length===1&&
+  sql("select count(*) from mizizi_private.desk_search_reservations_v1;")==="2","STOP_DESK_SHARED_LAST_SLOT_RACE");
+ const secondCharge=lastSlot.find(x=>x.data!==null).data;
+ const consumeArgs={p_reservation_id:charged.reservationId,p_request_sha256:charged.requestSha256,p_account_fingerprint:account};
+ fail(await call(consumeName,{...consumeArgs,p_account_fingerprint:"e".repeat(64)})===false&&
+  await call(consumeName,{...consumeArgs,p_request_sha256:"f".repeat(64)})===false,"STOP_DESK_CONSUME_SCOPE");
+ const consumeRace=await Promise.all([service.rpc(consumeName,consumeArgs),service.rpc(consumeName,consumeArgs)]);
+ fail(consumeRace.every(x=>!x.error)&&consumeRace.filter(x=>x.data===true).length===1&&
+  consumeRace.filter(x=>x.data===false).length===1,"STOP_DESK_SINGLE_USE_CONSUME_RACE");
+ fail(await call(reserveName,reserve(search({count:5})))===null&&
+  sql("select count(*) from mizizi_private.desk_search_reservations_v1 where consumed_at is null;")==="1",
+  "STOP_DESK_UNUSED_RESERVATION_REFUND_OR_CAP");
+ // Policy window shift cannot restore capacity. Revocation is append-only;
+ // the still-reserved second slot must remain charged and unusable.
+ sql(`do $desk$ begin
+  begin
+   insert into mizizi_private.desk_search_policy_versions_v1(
+    revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+    disclosure_policy_ref,commercial_search_allowed,zero_cost_hard_cap_verified,
+    exclusive_allocated_usage_verified,public_chart_labels_allowed,allowance_start,
+    allowance_end,valid_until,account_limit,daily_limit,case_limit)
+   select 2,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+    disclosure_policy_ref,commercial_search_allowed,zero_cost_hard_cap_verified,
+    exclusive_allocated_usage_verified,public_chart_labels_allowed,allowance_start+interval '1 second',
+    allowance_end,valid_until,account_limit,daily_limit,case_limit
+   from mizizi_private.desk_search_policy_versions_v1 where revision=1;
+   raise exception 'Unexpected quota window reset';
+  exception when sqlstate 'PT409' then null;end;
+  begin
+   update mizizi_private.desk_search_reservations_v1 set consumed_at=null where consumed_at is not null;
+   raise exception 'Unexpected refund';exception when sqlstate '55000' then null;end;
+ end $desk$;`);
+ sql(`insert into mizizi_private.desk_search_policy_versions_v1(
+  revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+  disclosure_policy_ref,commercial_search_allowed,zero_cost_hard_cap_verified,
+  exclusive_allocated_usage_verified,public_chart_labels_allowed,allowance_start,
+  allowance_end,valid_until,account_limit,daily_limit,case_limit)
+ select 2,false,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+  disclosure_policy_ref,commercial_search_allowed,zero_cost_hard_cap_verified,
+  exclusive_allocated_usage_verified,public_chart_labels_allowed,allowance_start,
+  allowance_end,valid_until,account_limit,daily_limit,case_limit
+ from mizizi_private.desk_search_policy_versions_v1 where revision=1;`);
+ fail(await call(authorizeName,req)===null&&await call(consumeName,{
+  p_reservation_id:secondCharge.reservationId,p_request_sha256:secondCharge.requestSha256,p_account_fingerprint:account})===false&&
+  sql("select count(*) from mizizi_private.desk_search_reservations_v1;")==="2",
+  "STOP_DESK_REVOCATION_OR_REFUND");
+ fail(sql("select (not has_table_privilege('service_role','mizizi_private.desk_search_policy_versions_v1','INSERT') "+
+  "and not has_table_privilege('service_role','mizizi_private.desk_search_reservations_v1','UPDATE') "+
+  "and not has_table_privilege('authenticated','mizizi_private.desk_search_reservations_v1','SELECT'))::text;")==="true",
+  "STOP_DESK_PRIVATE_LEDGER_ACL");
+ console.log("WK_AUTH_MIZIZI_DESK_ZERO_COST_POLICY_RESERVATION_CONSUME_RACES_REVOCATION=PASS");
+ }
  const passBody=JSON.stringify({contract:"mizizi.adaptive_investigation.v1",caseId:pairedId,
   workspaceId:ws,ordinal:1,question:"Read-only local test of the exact chart lease.",
   predecessorFingerprint:null,sourceReceipts:[],findings:[],proposedLeads:[],
