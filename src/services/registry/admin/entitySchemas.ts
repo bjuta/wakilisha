@@ -2,6 +2,12 @@ import {
   type RegistryEntitySchema,
   type RegistryEntityType,
 } from "./types";
+import { getSortedCountryCodes, getCountryNameForIso2 } from "@/utils/countries";
+
+const COUNTRY_CODES = getSortedCountryCodes();
+const COUNTRY_LABELS = Object.fromEntries(COUNTRY_CODES.map(code => [code, `${getCountryNameForIso2(code)} (${code})`]));
+const COUNTRY_CHOICE = { type: "select" as const, options: COUNTRY_CODES, optionLabels: COUNTRY_LABELS, searchable: true, allowUnset: true, normalizer: "uppercase" as const };
+
 
 const LIVING_MEMORY_EDITABLE_FIELDS: RegistryEntitySchema["editableFields"] = [
   {
@@ -81,11 +87,10 @@ export const artistSchema: RegistryEntitySchema = {
     },
     {
       key: "origin_iso2",
-      label: "Country code",
-      type: "text",
+      label: "Country",
       access: "editable",
-      normalizer: "uppercase",
-      helpText: "Two-letter ISO code, e.g. KE.",
+      ...COUNTRY_CHOICE,
+      helpText: "Select a country. The Registry stores its ISO code.",
     },
     {
       key: "bio",
@@ -96,16 +101,20 @@ export const artistSchema: RegistryEntitySchema = {
     {
       key: "artist_type",
       label: "Artist type",
-      type: "text",
+      type: "select",
       access: "editable",
-      normalizer: "trim",
+      options: ["solo","group","collective","band","duo","unknown"],
+      optionLabels: {},
+      allowUnset: true,
     },
     {
       key: "gender",
       label: "Gender",
-      type: "text",
+      type: "select",
       access: "editable",
-      normalizer: "trim",
+      options: ["female","male","mixed","nonbinary","unknown","not_applicable"],
+      optionLabels: {"nonbinary":"Non-binary","not_applicable":"Not applicable"},
+      allowUnset: true,
     },
     {
       key: "public_image_url",
@@ -248,7 +257,9 @@ export const releaseSchema: RegistryEntitySchema = {
       label: "Release type",
       type: "select",
       access: "editable",
-      options: ["single", "ep", "album", "mixtape", "compilation"],
+      options: ["single", "ep", "album", "mixtape", "compilation", "video", "live", "unknown"],
+      allowUnset: true,
+      optionLabels: { ep: "EP" },
     },
     {
       key: "release_date",
@@ -321,11 +332,10 @@ export const labelSchema: RegistryEntitySchema = {
     },
     {
       key: "country_code",
-      label: "Country code",
-      type: "text",
+      label: "Country",
       access: "editable",
-      normalizer: "uppercase",
-      helpText: "Two-letter ISO code, e.g. KE.",
+      ...COUNTRY_CHOICE,
+      helpText: "Select a country. The Registry stores its ISO code.",
     },
     {
       key: "description",

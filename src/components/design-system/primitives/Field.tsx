@@ -3,6 +3,7 @@ import {
   Button,
   Input,
   TextField,
+  TextArea,
 } from "react-aria-components";
 
 interface SharedFieldProps {
@@ -134,6 +135,31 @@ export function WkSearchField({
           <i aria-hidden="true" className="ri-close-line text-[16px]" />
         </Button>
       ) : null}
+    </TextField>
+  );
+}
+
+
+/** General text entry uses the same owned field foundation as search/password.
+ * Semantic inputs remain underneath; no native number/date/url/resize chrome.
+ */
+export function WkTextField({
+  value, onChange, ariaLabel, placeholder, className = "", inputClassName = "",
+  disabled = false, required = false, name, autoFocus = false,
+  autoComplete = "off", multiline = false, invalid = false,
+}: SharedFieldProps & { multiline?: boolean; invalid?: boolean }) {
+  const controlClass = `wk-input w-full min-w-0 bg-wk-surface text-wk-text ${inputClassName}`.trim();
+  return (
+    <TextField aria-label={ariaLabel} value={value} onChange={onChange}
+      isDisabled={disabled} isRequired={required} isInvalid={invalid}
+      validationBehavior="aria" name={name} className={`min-w-0 w-full ${className}`.trim()}>
+      {multiline ? (
+        <TextArea data-wk-text-entry rows={4} placeholder={placeholder}
+          className={`${controlClass} resize-none min-h-[88px]`} />
+      ) : (
+        <Input data-wk-text-entry type="text" autoComplete={autoComplete}
+          autoFocus={autoFocus} placeholder={placeholder} className={controlClass} />
+      )}
     </TextField>
   );
 }
