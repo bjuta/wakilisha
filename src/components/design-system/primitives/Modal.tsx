@@ -63,7 +63,7 @@ export function Modal({
       >
         <Dialog
           aria-label={title || "Dialog"}
-          className="flex min-h-0 max-h-full flex-1 flex-col overflow-clip outline-none"
+          className="flex min-h-0 flex-1 flex-col outline-none"
         >
           {title ? (
             <div className="flex shrink-0 items-center justify-between border-b border-[var(--wk-border)] px-5 py-4">

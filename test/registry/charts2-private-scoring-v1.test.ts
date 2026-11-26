@@ -243,7 +243,7 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).toContain("if(accepted>0)");
     expect(STUDIO_PAGE).toContain("setBatchMode(false);setBatchRows([]);setSelected(null);");
     expect(STUDIO_PAGE).toContain("Artist not supplied");
-    expect(STUDIO_PAGE).toContain('<Modal open={Boolean(selected)}');
+    expect(STUDIO_PAGE).toContain('{selected&&<WkSurface role="region" aria-labelledby="studio-recording-review-title"');
     expect(STUDIO_PAGE).toContain("Official Apple catalogue artist:");
     expect(STUDIO_PAGE).toContain("Artist not supplied in original");
     expect(STUDIO_PAGE).toContain("No active Registry recording matches this search.");
@@ -1048,7 +1048,7 @@ describe("Charts 2 existing Registry candidate discovery",()=>{
     expect(result.groups).toEqual([]);
     expect(()=>buildCharts2RegistryDiscoveryV1({unresolved:[],tracks:Array.from({length:301},(_,i)=>track(i,"Mboka"))})).toThrow("charts2_registry_discovery_input_bounds");
   });
-  it("keeps the discovery transport read-only, receipt-verified, capability-gated and explicit in the modal",()=>{
+  it("keeps the discovery transport read-only, receipt-verified, capability-gated and explicit in the review",()=>{
     const start=STUDIO_WORKER.indexOf('if(mode==="studio_registry_discovery")');
     const end=STUDIO_WORKER.indexOf('if(mode==="studio_preview")',start);
     const lane=STUDIO_WORKER.slice(start,end);
@@ -1089,10 +1089,20 @@ describe("Charts Studio recording-review draft and scroll safety",()=>{
     expect(STUDIO_PAGE).toContain("setReviewConsent(false);\n                        setBatchRows");
     expect(STUDIO_PAGE.match(/setSavedReviewDraft\(null\);activeReviewContext.current=null/g)?.length).toBe(3);
   });
-  it("uses one bounded shared modal body without a nested candidate scroller",()=>{
-    expect(STUDIO_PAGE).toContain('panelClassName="h-[calc(100dvh-2rem)]" bodyClassName="overscroll-contain"');
-    expect(STUDIO_PAGE).toContain("onClose={closeRecordingReview}");
-    expect(STUDIO_PAGE).toContain("dismissable={!busy} showClose={!busy}");
-    expect(STUDIO_PAGE).not.toContain('aria-live="polite" className="max-h-64 space-y-2 overflow-y-auto"');
+  it("composes the recording review in the existing page without a modal or nested scroller",()=>{
+    const start=STUDIO_PAGE.indexOf('{selected&&<WkSurface role="region" aria-labelledby="studio-recording-review-title"');
+    expect(start).toBeGreaterThan(0);
+    const review=STUDIO_PAGE.slice(start,STUDIO_PAGE.indexOf("</WkSurface>}",start)+13);
+    expect(review).toContain("Review This Recording");
+    expect(review).toContain("onClick={closeRecordingReview}");
+    expect(review).toContain("WkSearchField");
+    expect(review).toContain("WkCheckbox");
+    expect(review).toContain("WkButton");
+    expect(review).toContain("resize-none");
+    expect(review).not.toMatch(/<Modal|<Sheet|overflow-y-auto|100dvh|type="url"/);
+    expect(STUDIO_PAGE).toContain("recordingReviewHeading.current?.focus()");
+    expect(STUDIO_PAGE).toContain("recordingQueueHeading.current?.focus()");
+    expect(STUDIO_PAGE).toContain("disabled={loading||!!busy||!!selected}");
+    expect(STUDIO_PAGE).toContain("disabled={!!selected||!!busy}");
   });
 });

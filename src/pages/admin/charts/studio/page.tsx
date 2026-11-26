@@ -6,7 +6,8 @@ import { useAdminUser } from "@/hooks/useAdminUser";
 import { WkSurface } from "@/components/design-system/primitives/Surface";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
 import { WkUploadField } from "@/components/design-system/primitives/UploadField";
-import { Modal } from "@/components/design-system/primitives/Modal";
+import { WkButton } from "@/components/design-system/primitives/Button";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
 import { WkDisclosure } from "@/components/design-system/primitives/Disclosure";
 import { AdminChartsPageHeader } from "@/pages/admin/charts/components/AdminChartsPageHeader";
 import { StudioChartMusicRow } from "@/components/admin/charts/StudioChartMusicRow";
@@ -200,6 +201,19 @@ export default function ChartsStudioPage() {
   const [search,setSearch]=useState("");
   const [page,setPage]=useState(0);
   const [selected,setSelected]=useState<EvidenceRow|null>(null);
+  const recordingReviewHeading=useRef<HTMLHeadingElement>(null);
+  const recordingQueueHeading=useRef<HTMLHeadingElement>(null);
+  const reviewWasOpen=useRef(false);
+  useEffect(()=>{
+    if(tab!=="review")return;
+    if(selected){
+      recordingReviewHeading.current?.focus();
+      reviewWasOpen.current=true;
+    }else if(reviewWasOpen.current){
+      recordingQueueHeading.current?.focus();
+      reviewWasOpen.current=false;
+    }
+  },[selected,tab]);
   const [registryQuery,setRegistryQuery]=useState("");
   const [registryMatches,setRegistryMatches]=useState<RegistryTrack[]>([]);
   const [registrySearchAttempted,setRegistrySearchAttempted]=useState(false);
@@ -757,7 +771,7 @@ export default function ChartsStudioPage() {
       <AdminChartsPageHeader eyebrow="WAKILISHA / Charts 2.0"
         title="Charts Studio"
         description="Review the songs behind the chart and check their sources.">
-        <button type="button" onClick={()=>void refresh()} disabled={loading||!!busy} className={buttonSecondary}>
+        <button type="button" onClick={()=>void refresh()} disabled={loading||!!busy||!!selected} className={buttonSecondary}>
           {loading?"Checking originals…":"Refresh verified evidence"}
         </button>
       </AdminChartsPageHeader>
@@ -794,7 +808,7 @@ export default function ChartsStudioPage() {
           ["preview","Top 100"],["history","Source History"],
           ["freeze","Private Freeze"],
         ] as Array<[Tab,string]>).map(([id,label])=>
-          <button type="button" key={id} onClick={()=>setTab(id)} aria-current={tab===id?"page":undefined}
+          <button type="button" key={id} disabled={!!selected||!!busy} onClick={()=>setTab(id)} aria-current={tab===id?"page":undefined}
             className={"rounded-xl px-4 py-2.5 text-[12px] font-bold transition-colors "+
               (tab===id?"bg-wk-brand text-white":"border border-wk-border bg-wk-surface text-wk-text")}>{label}</button>
         )}
@@ -904,8 +918,9 @@ export default function ChartsStudioPage() {
         </section>
       }
       {tab==="review" && <section aria-label="Recording identity review" className="space-y-4">
+        {!selected&&<>
         <WkSurface className="p-4">
-          <h2 className="text-[15px] font-black text-wk-text">Review Recordings</h2>
+          <h2 ref={recordingQueueHeading} tabIndex={-1} className="text-[15px] font-black text-wk-text outline-none">Review Recordings</h2>
           <p className="mt-1 text-[12px] text-wk-text-muted">
             Find songs that may be the same recording. Compare the versions, then choose
             which Registry recording they belong to. Your approval preserves each chart position.
@@ -1151,10 +1166,15 @@ export default function ChartsStudioPage() {
             </div>
           </WkSurface>
         </div>
-        <Modal open={Boolean(selected)} title="Review This Recording" maxWidth="3xl"
-          panelClassName="h-[calc(100dvh-2rem)]" bodyClassName="overscroll-contain"
-          onClose={closeRecordingReview}
-          dismissable={!busy} showClose={!busy}>
+        </>}
+        {selected&&<WkSurface role="region" aria-labelledby="studio-recording-review-title"
+          className="mx-auto w-full min-w-0 max-w-3xl space-y-4 p-4 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-wk-border pb-4">
+            <h2 id="studio-recording-review-title" ref={recordingReviewHeading} tabIndex={-1}
+              className="min-w-0 break-words text-[18px] font-bold text-wk-text outline-none">Review This Recording</h2>
+            <WkButton variant="soft" disabled={!!busy} onClick={closeRecordingReview}>Close review</WkButton>
+          </div>
+          <p className="text-[12px] text-wk-text-muted">Work through the evidence on this page. Closing the review keeps your preparation, not your approval.</p>
           {error && <p role="alert" className="mb-3 rounded-lg border border-wk-danger p-3 text-[12px] text-wk-danger">{error}</p>}
           <div className="space-y-4">
             {selected && <>
@@ -1234,21 +1254,20 @@ export default function ChartsStudioPage() {
                     links receive their own separately authorized decisions.
                   </p>
                 </div>}
-              <label htmlFor="studio-registry-query" className="text-[12px] font-bold text-wk-text">Find The Recording To Keep</label>
+              <p className="text-[12px] font-bold text-wk-text">Find The Recording To Keep</p>
               <form onSubmit={e=>{e.preventDefault();void lookUpTrack();}}
                 className="flex flex-col gap-2 sm:flex-row">
-                <input id="studio-registry-query" value={registryQuery}
-                  onChange={e=>{
+                <WkSearchField ariaLabel="Find The Recording To Keep" value={registryQuery}
+                  disabled={!!busy} onChange={value=>{
                     registrySearchSequence.current++;
-                    setRegistryQuery(e.target.value);
+                    setRegistryQuery(value);
                     setRegistryMatches([]);setRegistrySearchAttempted(false);
                     setSelectedTrack(null);setReviewConsent(false);
-                  }} placeholder="Title, Artist, ISRC or ID"
-                  className={fieldClass+" sm:flex-1"}/>
-                <button type="submit" className={buttonSecondary+" min-h-11"}
+                  }} placeholder="Title, Artist, ISRC or ID" className="sm:flex-1"/>
+                <WkButton type="submit" variant="soft" className="min-h-11"
                   disabled={!!busy||registryQuery.trim().length<2}>
                   {busy==="track-search"?"Searching…":"Search Registry"}
-                </button>
+                </WkButton>
               </form>
               {registrySearchAttempted && !registryMatches.length &&
                 <p role="status" className="rounded-lg bg-wk-surface-raised p-3 text-[12px] text-wk-text-muted">
@@ -1257,7 +1276,7 @@ export default function ChartsStudioPage() {
                 </p>}
               <div aria-live="polite" className="space-y-2">
                 {registryMatches.map(track=>
-                  <button type="button" key={track.id} onClick={()=>{setSelectedTrack(track);setReviewConsent(false);}}
+                  <button type="button" key={track.id} disabled={!!busy} onClick={()=>{setSelectedTrack(track);setReviewConsent(false);}}
                     aria-pressed={selectedTrack?.id===track.id}
                     className={"w-full rounded-xl border p-3 text-left text-[12px] "+
                       (selectedTrack?.id===track.id?
@@ -1283,11 +1302,12 @@ export default function ChartsStudioPage() {
                   </button>)}
               </div>
               <label htmlFor="studio-evidence" className="text-[12px] font-bold text-wk-text">Link To Recording Evidence</label>
-              <input id="studio-evidence" type="url" className={fieldClass}
-                placeholder="https://… specific recording / release evidence"
+              <input id="studio-evidence" type="text" inputMode="url" autoComplete="off" disabled={!!busy}
+                className={"wk-input "+fieldClass+" text-[16px]"}
+                placeholder="https://… recording evidence"
                 value={evidenceUrl} onChange={e=>{setEvidenceUrl(e.target.value);setReviewConsent(false);}}/>
               <label htmlFor="studio-note" className="text-[12px] font-bold text-wk-text">Why Do These Songs Match?</label>
-              <textarea id="studio-note" rows={4} className={fieldClass}
+              <textarea id="studio-note" rows={6} disabled={!!busy} className={"wk-input "+fieldClass+" min-h-36 resize-none text-[16px]"}
                 placeholder="Add the matching ISRC, release details, or other evidence that confirms the recording."
                 value={reviewNote} onChange={e=>{setReviewNote(e.target.value);setReviewConsent(false);}}/>
               {batchMode &&
@@ -1304,7 +1324,7 @@ export default function ChartsStudioPage() {
                   </p>
                 </div>}
               <div className="space-y-3 border-t border-wk-border pt-4">
-                <WkCheckbox checked={reviewConsent} onChange={setReviewConsent}
+                <WkCheckbox checked={reviewConsent} onChange={setReviewConsent} disabled={!!busy}
                   className="w-full items-start">
                   <span className="block min-w-0 whitespace-normal leading-relaxed">
                     {selectedShazamReview?
@@ -1314,20 +1334,20 @@ export default function ChartsStudioPage() {
                 </WkCheckbox>
                 <div className="flex flex-wrap items-center justify-end gap-3">
                   {selectedShazamReview?
-                    <button type="button" className={buttonSecondary+" min-h-11 w-full sm:w-auto"}
+                    <WkButton variant="soft" className="min-h-11 w-full sm:w-auto"
                       disabled={!!busy||!reviewConsent||reviewNote.trim().length<40||
                         !evidenceUrl.startsWith("https://")}
                       onClick={()=>void reviewShazamCorrection()}>
                       {busy==="shazam-revoke"?"Recording correction…":"Revoke This Shazam Resolution"}
-                    </button>:
-                    <button type="button" className={buttonPrimary+" min-h-11 w-full sm:w-auto"}
+                    </WkButton>:
+                    <WkButton className="min-h-11 w-full sm:w-auto"
                       disabled={!!busy||!selectedTrack||(batchMode&&!batchRows.length)||
                         !reviewConsent||reviewNote.trim().length<40||
                         !evidenceUrl.startsWith("https://")}
                       onClick={()=>void commitReview()}>
                       {busy==="registry-link"?"Recording review…":
                         batchMode?"Confirm Selected Matches":"Confirm Recording Match"}
-                    </button>}
+                    </WkButton>}
                 </div>
                 <p className="text-[11px] leading-relaxed text-wk-text-muted">
                   Provider matches are recorded in the Registry. Shazam positions without IDs
@@ -1336,7 +1356,10 @@ export default function ChartsStudioPage() {
               </div>
             </>}
           </div>
-        </Modal>
+          <div className="flex justify-end border-t border-wk-border pt-4">
+            <WkButton variant="soft" disabled={!!busy} onClick={closeRecordingReview}>Close review</WkButton>
+          </div>
+        </WkSurface>}
       </section>}
 
 
