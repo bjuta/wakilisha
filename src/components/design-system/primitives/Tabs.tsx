@@ -11,6 +11,7 @@ export interface WkTabItem<T extends string = string> {
   id: T;
   label: string;
   disabled?: boolean;
+  icon?: ReactNode;
 }
 
 interface WkTabsProps<T extends string> {
@@ -58,7 +59,12 @@ export function WkTabs<T extends string>({
               }`
             }
           >
-            {item.label}
+            {item.icon ? (
+              <span className="flex min-w-0 items-center gap-3">
+                <span data-wk-tab-icon aria-hidden="true" className="inline-flex shrink-0 items-center justify-center">{item.icon}</span>
+                <span className="truncate">{item.label}</span>
+              </span>
+            ) : item.label}
           </Tab>
         ))}
       </TabList>
