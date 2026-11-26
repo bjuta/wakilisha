@@ -45,7 +45,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  declare positions jsonb;
  begin
    select jsonb_agg(jsonb_build_object('rank',n,'title','CI Genuine JWT Song',
-     'artist','CI Original Artist','provider_track_id','youtube-jwt-'||n)
+     'artist',case when n=3 then 'CI Chart Artist Draft' else 'CI Original Artist' end,'provider_track_id','youtube-jwt-'||n)
      order by n) into positions from generate_series(1,100) n;
    insert into platform_private.charts2_capture_receipts_v1(
      id,source_key,source_endpoint,method_revision,capture_mode,observed_at,
@@ -120,7 +120,7 @@ export async function verifyCharts2RealJwtRegistryV1({
    credit.identity_approved===false,
    "STOP_CHARTS2_REAL_JWT_CREDIT_PREMATURE_AUTHORITY");
  const artist=await accept(first.user,"admin_stage_charts2_artist_intake_v1",
-   sourceArgs,"STOP_CHARTS2_REAL_JWT_ARTIST_INTAKE");
+   {...sourceArgs,p_rank:3},"STOP_CHARTS2_REAL_JWT_ARTIST_INTAKE");
  fail(UUID.test(artist?.run_id??"") && UUID.test(artist?.staging_id??""),
    "STOP_CHARTS2_REAL_JWT_ARTIST_INTAKE_RECEIPT");
  const artistState=sql("select "+
@@ -130,6 +130,55 @@ export async function verifyCharts2RealJwtRegistryV1({
    "from public.provider_intake_artist_staging where id='"+artist.staging_id+"'::uuid;");
  fail(artistState==="true|true|true",
    "STOP_CHARTS2_REAL_JWT_ARTIST_INTAKE_INVENTED_METADATA");
+ // Complete the already-staged Artist contract, not a second independent fixture.
+ const shellArgs={p_staging_id:artist.staging_id};
+ denied(await subscriber.rpc("admin_create_registry_artist_intake_shell_v1",shellArgs),
+   "42501","STOP_CHARTS2_JWT_ARTIST_UNPRIVILEGED_CREATE");
+ denied(await first.user.rpc("admin_create_registry_artist_intake_shell_v1",shellArgs),
+   "42501","STOP_CHARTS2_JWT_ARTIST_PENDING_CREATE");
+ const artistReview=await accept(first.user,"admin_review_registry_artist_intake_v1",{
+   p_intake_run_id:artist.run_id,p_staging_id:artist.staging_id,p_decision:"accepted",
+   p_notes:note,p_target_registry_artist_id:null,
+ },"STOP_CHARTS2_JWT_ARTIST_REVIEW");
+ fail(artistReview.decision==="accepted"&&/^[a-f0-9]{64}$/.test(artistReview.review_fingerprint??""),
+   "STOP_CHARTS2_JWT_ARTIST_REVIEW_RECEIPT");
+ const shell=await accept(first.user,"admin_create_registry_artist_intake_shell_v1",shellArgs,
+   "STOP_CHARTS2_JWT_ARTIST_CREATE");
+ const draftArtistId=shell?.artist?.artist_id;
+ fail(UUID.test(draftArtistId??"")&&UUID.test(shell?.operation_id??"")&&
+   shell.created===true&&shell.idempotent_replay===false&&shell.verifier_status==="passed"&&
+   shell.artist.status==="draft"&&shell.artist.artist_name==="CI Chart Artist Draft",
+   "STOP_CHARTS2_JWT_ARTIST_DRAFT_VERIFIER");
+ const artistProof=sql(`select count(*) from platform_private.registry_mutation_operations o
+   join platform_private.registry_execution_grants g on g.id=o.execution_grant_id
+   join platform_private.registry_evidence_assertions e on e.id=(g.plan_payload->>'evidence_assertion_id')::uuid
+   join public.provider_intake_artist_staging s on s.id='${artist.staging_id}'::uuid
+   join public.registry_artists a on a.id='${draftArtistId}'::uuid
+   where o.id='${shell.operation_id}'::uuid and o.operation_key='registry.artist.create'
+     and o.status='succeeded' and o.verifier_status='passed' and o.affected_rows=1
+     and g.idempotency_key='artist-intake-create:'||s.id::text and g.issued_by_user_id='${first.id}'::uuid
+     and e.subject_id=a.id and e.source_kind='charts2_chart_observation'
+     and e.source_ref='artist-intake-staging:'||s.id::text
+     and e.source_payload_fingerprint=s.review_fingerprint
+     and a.status='draft' and a.origin_iso2 is null;`);
+ fail(artistProof==="1","STOP_CHARTS2_JWT_ARTIST_EXACT_SOURCE_GRANT_PROOF");
+ const sameArtist=await accept(first.user,"admin_create_registry_artist_intake_shell_v1",shellArgs,
+   "STOP_CHARTS2_JWT_ARTIST_DRAFT_REPLAY");
+ fail(sameArtist.idempotent_replay===true&&sameArtist.created===false&&
+   sameArtist.artist.artist_id===draftArtistId&&sameArtist.operation_id===shell.operation_id&&
+   sameArtist.verifier_status==="passed","STOP_CHARTS2_JWT_ARTIST_REPLAY_CHANGED_DRAFT");
+ denied(await second.user.rpc("admin_create_registry_artist_intake_shell_v1",shellArgs),
+   "40001","STOP_CHARTS2_JWT_ARTIST_OTHER_CALLER_REPLAY");
+ await accept(first.user,"admin_mark_registry_artist_intake_applied_v1",{
+   p_staging_id:artist.staging_id,p_artist_id:draftArtistId,
+ },"STOP_CHARTS2_JWT_ARTIST_SEAL");
+ fail(sql(`select count(*) from public.provider_intake_artist_staging s
+   join public.registry_artists a on a.id=s.applied_registry_artist_id
+   where s.id='${artist.staging_id}'::uuid and s.review_status='accepted'
+     and s.action_taken='processed' and a.id='${draftArtistId}'::uuid
+     and a.status='draft' and a.origin_iso2 is null;`)==="1",
+   "STOP_CHARTS2_JWT_ARTIST_SEAL_STATE");
+ console.log("WK_AUTH_CHARTS2_ARTIST_VERIFIED_CHART_ORIGIN_DRAFT_AND_SEAL=PASS");
  console.log("WK_AUTH_CHARTS2_JWT_TRACK_ARTIST_CREDIT_INTAKE_AND_DENIAL=PASS");
 
  // Genuine caller-bound recovery: no fabricated operation/grant/verifier
