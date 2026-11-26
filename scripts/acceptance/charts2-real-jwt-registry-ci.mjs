@@ -888,6 +888,23 @@ export async function verifyCharts2RealJwtRegistryV1({
   fingerprint:sourceHash,authorityRef:p.authorityRef,useBasis:p.useBasis,observedAt,expiresAt:p.validUntil,revokedAt:null,
   privateResearchAllowed:true,externalModelProcessingAllowed:true,privateEvidenceRetentionAllowed:true};
  const standingExcerpt={source:standingSource,excerpt:"Synthetic standing source, no live acquisition.",citation:url+"#plain_text"};
+ const sharedName="mizizi_read_desk_shared_attribution_v1";
+ const sharedTarget=sql("select s.case_id from mizizi_private.chart_candidate_subjects_v1 s join mizizi_private.cases c on c.id=s.case_id and c.workspace_id=s.workspace_id where s.initial_disposition='research' and c.case_state='open' and c.current_stage='triage' order by s.case_id limit 1;");
+ fail(UUID.test(sharedTarget)&&sharedTarget!==pairedId&&sharedTarget!==staleId,"STOP_SHARED_TARGET_FIXTURE");
+ const sharedWorker="mizizi-chart:"+randomUUID(),sharedInput=readProjection().input_sha256;
+ const sharedArgs={p_scope:scope,p_source_receipt_id:standingPageId,p_field_key:"recording_title"};
+ for(const actor of [first.user,subscriber])denied(await actor.rpc(sharedName,sharedArgs),"42501","STOP_SHARED_BROWSER_ACL");
+ fail(await call(sharedName,sharedArgs)===null,"STOP_SHARED_DEFAULT_DENY");
+ const sharedSpan="Synthetic standing source";
+ const sharedScopeSql="current_setting('wk.shared_scope')::jsonb";
+ const sharedRead=(field="recording_title",scopeSql=sharedScopeSql,source=standingPageId)=>
+  "public."+sharedName+"("+scopeSql+","+q(source)+"::uuid,"+q(field)+")";
+ const sharedColumns="workspace_id,target_case_id,source_receipt_id,field_key,revision,enabled,expected_revision,target_operational_revision,membership_sha256,observation_sha256,source_result_sha256,span_start,span_length,span_sha256,authority_ref,valid_until";
+ const sharedInsert=(revision,enabled,sha=hash(sharedSpan))=>"insert into mizizi_private.desk_shared_attribution_versions_v1("+sharedColumns+") "+
+  "select workspace_id,case_id,"+q(standingPageId)+"::uuid,'recording_title',"+revision+","+enabled+",2,1,membership_sha256,observation_sha256,"+
+  q(hash(JSON.stringify({receiptId:standingPageId,leads:[],sources:[standingExcerpt],visual:null})))+",1,"+sharedSpan.length+","+q(sha)+",'fixture:independent-shared-field-review',now()+interval '2 minutes' "+
+  "from mizizi_private.chart_candidate_subjects_v1 where case_id="+q(sharedTarget)+"::uuid";
+
  const standingPage=binding("read_page",{lead_id:leadId},{receiptId:standingPageId,leads:[],sources:[standingExcerpt],visual:null},host,
   {requestedUrl:url,finalUrl:url,sourceSha256:sourceHash,projectionSha256:hash("standing projection"),
    contentType:"text/plain",retrievedAt:observedAt,byteLength:22,hopSha256:[hopHash],locator:"plain_text",documentPages:null,renderRequired:false},[]);
@@ -935,6 +952,39 @@ export async function verifyCharts2RealJwtRegistryV1({
   return "public.mizizi_authorize_desk_search_v1("+q(body)+","+q(hash(body))+","+q(hash("standing wiki allocation"))+")";
  };
  fail(sql(`begin;
+ -- Create a second genuine chart job through the same human/JIT/lease
+ -- contract, inside this rollback-only local fixture. Only role simulation
+ -- is used here; the separate HTTP JWT ACL checks above use actual tokens.
+ set local role authenticated;
+ set local request.jwt.claim.role='authenticated';
+ set local request.jwt.claim.sub=${q(first.id)};
+ set local request.jwt.claims=${q(JSON.stringify({role:"authenticated",sub:first.id}))};
+ do $shared_transition$ begin
+ if (public.admin_mizizi_begin_chart_case_research_v1(${q(sharedTarget)}::uuid,1,${q(sharedInput)},${q(ack)})->>'revision') is distinct from '2'
+ then raise exception 'STOP_SHARED_TRANSITION';end if;
+ end $shared_transition$;
+ reset role;
+ set session authorization mizizi_executor;
+ do $shared_dispatch$ declare v record;begin
+ select * into strict v from mizizi_private.admit_case_research_job_v1(${jobArgs(sharedTarget,2)});
+ perform set_config('wk.shared_job',v.job_id::text,true);
+ end $shared_dispatch$;
+ reset session authorization;
+ set local role service_role;
+ set local request.jwt.claim.role='service_role';
+ set local request.jwt.claims='{"role":"service_role"}';
+ do $shared_claim$ declare v record;c jsonb;begin
+ select * into strict v from public.mizizi_claim_exact_chart_research_job_v1(current_setting('wk.shared_job')::uuid,${q(sharedTarget)}::uuid,${q(ws)}::uuid,2,${q(sharedWorker)},300);
+ c:=public.mizizi_read_leased_chart_research_context_v1(v.job_id,${q(sharedWorker)});
+ perform set_config('wk.shared_scope',jsonb_build_object('jobId',v.job_id,'caseId',${q(sharedTarget)},'workspaceId',${q(ws)},'expectedRevision',2,'workerId',${q(sharedWorker)},'leaseExpiresAt',c->'leaseExpiresAt')::text,true);
+ end $shared_claim$;
+ reset role;
+ insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
+ membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
+ max_rounds,max_request_bytes,access_rules,valid_until)
+ select workspace_id,case_id,1,2,membership_sha256,observation_sha256,true,'fixture:receiving-owner-review',
+ ${q(credential)},array['fixture-haiku'],array[${q(questionHash)}],array['read_page'],5,10000,${j(rules)},now()+interval '5 minutes'
+ from mizizi_private.chart_candidate_subjects_v1 where case_id=${q(sharedTarget)}::uuid;
  insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
  membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
  max_rounds,max_request_bytes,access_rules,valid_until,adaptive_followups_allowed,public_query_terms)
@@ -1080,7 +1130,54 @@ export async function verifyCharts2RealJwtRegistryV1({
   if sqlerrm<>'ROLLBACK_CONTINUATION_FIXTURE' then raise;end if;
  end;
  end $standing$;
+ -- A valid receiving lease does not itself grant shared evidence.
+ do $shared_default$ begin
+ if ${sharedRead()} is not null then raise exception 'STOP_SHARED_RECEIVER_DEFAULT_DENY';end if;
+ end $shared_default$;
+ -- Independently review a field pointer without copying any source payload.
  reset role;
+ do $shared_bad_span$ begin
+ begin
+ ${sharedInsert(1,true,hash("forged span"))};
+ raise exception 'STOP_SHARED_FORGED_SPAN';
+ exception when check_violation then null;end;
+ end $shared_bad_span$;
+ ${sharedInsert(1,true)};
+ set local role service_role;
+ do $shared_read$ declare v jsonb;begin
+ v:=${sharedRead()};
+ if v->>'excerpt' is distinct from ${q(sharedSpan)} or v->>'targetCaseId' is distinct from ${q(sharedTarget)}
+ or v->>'sourceCaseId' is distinct from ${q(pairedId)} or v->>'lineageKey' is distinct from ${q(standingSource.lineageKey)}
+ or v->>'sourceFingerprint' is distinct from ${q(sourceHash)} or v->>'spanSha256' is distinct from ${q(hash(sharedSpan))}
+ or v->'candidateOnly' is distinct from 'true'::jsonb or v->'modelDisclosureAuthorized' is distinct from 'false'::jsonb
+ or v->'canonicalWriteAuthorized' is distinct from 'false'::jsonb
+ or v->'revalidateEveryUse' is distinct from 'true'::jsonb
+ or ${sharedRead("artist_credit")} is not null or ${sharedRead("recording_title",j(scope))} is not null
+ or public.mizizi_read_desk_tool_receipt_v1(${sharedScopeSql},${q(standingPageId)}::uuid) is not null
+ then raise exception 'STOP_SHARED_ATTRIBUTION_SCOPE';end if;
+ end $shared_read$;
+ reset role;
+ ${sharedInsert(2,false)};
+ set local role service_role;
+ do $shared_revoked$ begin
+ if ${sharedRead()} is not null then raise exception 'STOP_SHARED_REVOKED';end if;
+ end $shared_revoked$;
+ reset role;
+ ${sharedInsert(3,true)};
+ savepoint receiver_policy_revocation;
+ insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
+ membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
+ max_rounds,max_request_bytes,access_rules,valid_until)
+ select workspace_id,case_id,2,expected_revision,membership_sha256,observation_sha256,false,authority_ref,credential_sha256,
+ model_ids,question_sha256s,tool_names,max_rounds,max_request_bytes,access_rules,valid_until
+ from mizizi_private.desk_operational_policy_versions_v1 where case_id=${q(sharedTarget)}::uuid and revision=1;
+ set local role service_role;
+ do $shared_receiver_revoked$ begin
+ if ${sharedRead()} is not null then raise exception 'STOP_SHARED_RECEIVER_REVOKED';end if;
+ end $shared_receiver_revoked$;
+ reset role;
+ rollback to savepoint receiver_policy_revocation;
+ release savepoint receiver_policy_revocation;
  insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
  membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
  max_rounds,max_request_bytes,access_rules,valid_until)
@@ -1091,6 +1188,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  do $standing$ begin
  if ${read(searchId)} is not null or ${read(standingPageId)} is not null
  or ${authority("model_disclose",envelope(1,[],[]))} is not null then raise exception 'STOP_STANDING_REVOKED_USE';end if;
+ if ${sharedRead()} is not null then raise exception 'STOP_SHARED_ORIGIN_REVOKED';end if;
  begin perform * from ${journalRead};raise exception 'STOP_STANDING_REVOKED_JOURNAL';
  exception when sqlstate '42501' then null;end;
  end $standing$;
@@ -1099,6 +1197,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  console.log("WK_AUTH_MIZIZI_DESK_OPERATIONAL_CONVERGENCE=PASS");
  console.log("WK_AUTH_MIZIZI_DESK_PRODUCTIVE_LEASE_CONTINUATION=PASS");
  console.log("WK_AUTH_MIZIZI_LOCAL_BROWSER_CAPACITY_RECEIPT_CLEANUP=PASS");
+ console.log("WK_AUTH_MIZIZI_SHARED_NATIVE_ATTRIBUTION_SCOPE_REVOCATION=PASS");
  }
  const accessName="mizizi_authorize_desk_access_v1";
  const accessArgs=(operation,target=url,descriptor={})=>{
