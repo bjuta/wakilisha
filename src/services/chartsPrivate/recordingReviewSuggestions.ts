@@ -72,13 +72,14 @@ function artistIndex(aliases: ReviewedArtistAlias[], artists: ReviewedArtist[]) 
 function pairReason(
   first: ReviewObservation, second: ReviewObservation,
   identities: Map<string, string>,
+  normalized: Map<ReviewObservation,{title:string;artist:string}>,
 ): string | null {
   if (first.source_key === second.source_key) return null;
-  const a = normalize(first.title), b = normalize(second.title);
+  const a = normalized.get(first)!.title, b = normalized.get(second)!.title;
   if (!a || !b || !nearTitle(a, b)) return null;
   const exactTitle = a === b;
-  const firstArtist = normalize(first.artist);
-  const secondArtist = normalize(second.artist);
+  const firstArtist = normalized.get(first)!.artist;
+  const secondArtist = normalized.get(second)!.artist;
   if (!firstArtist || !secondArtist) {
     return exactTitle ? "Check Missing Artist Credit" : null;
   }
@@ -105,6 +106,11 @@ export function suggestRecordingReviewGroups(
   artists: ReviewedArtist[] = [],
 ): RecordingReviewGroup[] {
   const identities = artistIndex(aliases, artists);
+  // Normalize each observation once rather than inside the quadratic pair scan.
+  // Same strings, same traversal and same conservative compatibility rules.
+  const normalized = new Map(rows.map(row=>[row,{
+    title:normalize(row.title),artist:normalize(row.artist),
+  }] as const));
   const parent = rows.map((_, i) => i);
   const rank = rows.map(() => 0);
   const find = (n: number): number => {
@@ -133,17 +139,17 @@ export function suggestRecordingReviewGroups(
     const sources = new Set([...left,...right].map(i=>rows[i].source_key));
     if(sources.size !== left.length + right.length)return false;
     return left.every(i=>right.every(j=>{
-      const reason=pairReason(rows[i],rows[j],identities);
+      const reason=pairReason(rows[i],rows[j],identities,normalized);
       return Boolean(reason) && reason !== "Check Missing Artist Credit";
     }));
   };
   // First form groups only through positive artist evidence. A missing artist
   // must never become a bridge joining two otherwise separate Artists.
   for (let i = 0; i < rows.length; i++) {
-    if (!normalize(rows[i].artist)) continue;
+    if (!normalized.get(rows[i])!.artist) continue;
     for (let j = i + 1; j < rows.length; j++) {
-      if (!normalize(rows[j].artist)) continue;
-      const reason = pairReason(rows[i], rows[j], identities);
+      if (!normalized.get(rows[j])!.artist) continue;
+      const reason = pairReason(rows[i], rows[j], identities,normalized);
       if (!reason || !compatibleMerge(i,j)) continue;
       unite(i,j);
       reasons.set(String(i) + ":" + String(j), new Set([reason]));
@@ -155,22 +161,22 @@ export function suggestRecordingReviewGroups(
   // invent a credit, or attach an ambiguous same-source second position.
   const anchored = new Map<number, number[]>();
   rows.forEach((row, i) => {
-    if (!normalize(row.artist)) return;
+    if (!normalized.get(row)!.artist) return;
     const root = find(i);
     anchored.set(root, [...(anchored.get(root) ?? []), i]);
   });
   const proposals: Array<{row: number; root: number; anchor: number}> = [];
   rows.forEach((row, i) => {
-    if (normalize(row.artist)) return;
+    if (normalized.get(row)!.artist) return;
     const eligible = [...anchored.entries()].filter(([,members]) =>
       members.length >= 2 &&
       !members.some(j => rows[j].source_key === row.source_key) &&
-      members.some(j => pairReason(rows[i], rows[j], identities) === "Check Missing Artist Credit")
+      members.some(j => pairReason(rows[i], rows[j], identities,normalized) === "Check Missing Artist Credit")
     );
     if (eligible.length !== 1) return;
     const [root, members] = eligible[0];
     proposals.push({row:i,root,anchor:members.find(j =>
-      pairReason(rows[i],rows[j],identities) === "Check Missing Artist Credit")!});
+      pairReason(rows[i],rows[j],identities,normalized) === "Check Missing Artist Credit")!});
   });
   for (const proposal of proposals) {
     if (proposals.filter(p => p.root === proposal.root &&
