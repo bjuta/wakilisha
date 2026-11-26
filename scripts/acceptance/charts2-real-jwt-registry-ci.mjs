@@ -852,6 +852,108 @@ export async function verifyCharts2RealJwtRegistryV1({
  const p=await call(policyName,{p_scope:scope,p_host:host});
  fail(p.host===host&&p.revision===1&&p.excerptRetentionAllowed===true&&p.externalModelProcessingAllowed===true,
   "STOP_CUSTODY_POLICY_RECEIPT");
+ // Full standing-policy convergence in a rollback-only local transaction.
+ // Reuse the exact case, consumed search/native reservations and real RPCs.
+ // Synthetic source rights/bytes only: no live provider entitlement asserted.
+ {
+ const q=v=>"'"+String(v).replaceAll("'","''")+"'";
+ const j=v=>q(JSON.stringify(v))+"::jsonb";
+ const authority=(operation,binding)=>{
+  const text=JSON.stringify(binding);
+  return "public.mizizi_authorize_desk_model_operation_v1("+j(scope)+","+q(operation)+","+q(text)+","+q(hash(text))+")";
+ };
+ const access=(operation,binding)=>{
+  const text=JSON.stringify(binding);
+  return "public.mizizi_authorize_desk_access_v1("+j(scope)+","+q(operation)+","+q(text)+","+q(hash(text))+")";
+ };
+ const append=args=>"public.mizizi_record_desk_tool_receipt_v1("+[
+  q(args.p_call_text),q(args.p_call_sha256),q(args.p_result_text),q(args.p_result_sha256),
+  q(args.p_host),args.p_policy_revision,j(args.p_provenance),j(args.p_lead_bindings)].join(",")+")";
+ const read=id=>"public.mizizi_read_desk_tool_receipt_v1("+j(scope)+","+q(id)+"::uuid)";
+ const question="Fixture exact public research question",questionHash=hash(question),credential=hash("standing credential");
+ const envelope=(round,sourceIds,toolReceipts,patch={})=>{
+  const bodySha256=hash("standing fixture envelope "+round);
+  return {scope,model:"fixture-haiku",round,requestSha256:hash(JSON.stringify({scope,round,credentialSha256:credential,bodySha256})),
+   bodySha256,credentialSha256:credential,requestBytes:128,maxOutputTokens:2500,sourceIds,toolReceipts,questionSha256:questionHash,...patch};
+ };
+ const searchCall=JSON.parse(searchArgs.p_call_text),readCall={scope,call:{name:"read_page",input:{lead_id:leadId}}};
+ const readHash=hash(JSON.stringify(readCall)),hopHash=hash("fixture-hop"),sourceHash=hash("standing native bytes");
+ const observedAt=new Date().toISOString(),standingPageId=randomUUID();
+ const standingSource={sourceId:standingPageId,caseId:pairedId,workspaceId:ws,originKey:p.originKey,lineageKey:p.lineageKey,
+  fingerprint:sourceHash,authorityRef:p.authorityRef,useBasis:p.useBasis,observedAt,expiresAt:p.validUntil,revokedAt:null,
+  privateResearchAllowed:true,externalModelProcessingAllowed:true,privateEvidenceRetentionAllowed:true};
+ const standingExcerpt={source:standingSource,excerpt:"Synthetic standing source, no live acquisition.",citation:url+"#plain_text"};
+ const standingPage=binding("read_page",{lead_id:leadId},{receiptId:standingPageId,leads:[],sources:[standingExcerpt],visual:null},host,
+  {requestedUrl:url,finalUrl:url,sourceSha256:sourceHash,projectionSha256:hash("standing projection"),
+   contentType:"text/plain",retrievedAt:observedAt,byteLength:22,hopSha256:[hopHash],locator:"plain_text",documentPages:null,renderRequired:false},[]);
+ const grantNative=access("native_acquire",{url,descriptor:{},callSha256:readHash,hopSha256:hopHash});
+ const grantText=access("native_text",{url,descriptor:{finalUrl:url,sha256:sourceHash,representation:"native_response_bytes",pageStart:1,pageEnd:10},callSha256:readHash});
+ const deps=[{receiptId:searchId,callSha256:searchArgs.p_call_sha256,resultSha256:searchArgs.p_result_sha256},
+  {receiptId:standingPageId,callSha256:standingPage.p_call_sha256,resultSha256:standingPage.p_result_sha256}];
+ const journalRef={sourceId:standingPageId,originKey:standingSource.originKey,lineageKey:standingSource.lineageKey,
+  payloadFingerprint:sourceHash,useBasis:standingSource.useBasis,authorityRef:standingSource.authorityRef,observedAt,
+  citation:standingExcerpt.citation,excerpt:standingExcerpt.excerpt,modelDisclosed:true};
+ const journal=toolDeps=>{
+  const body=JSON.stringify({contract:"mizizi.adaptive_investigation.v1",caseId:pairedId,workspaceId:ws,ordinal:1,
+   question,predecessorFingerprint:null,sourceReceipts:[journalRef],deskToolReceipts:toolDeps,findings:[],proposedLeads:[],
+   decision:{action:"pause",nextQuestion:null},passFinding:"Synthetic native operational evidence."});
+  return "public.mizizi_append_research_pass_v1("+q(job.job_id)+"::uuid,"+q(activeWorker)+","+q(body)+","+q(hash(body))+",null)";
+ };
+ const journalRead="public.mizizi_read_research_passes_v1("+q(job.job_id)+"::uuid,"+q(activeWorker)+")";
+ const rules=[{host,pathPrefix:"/details/",custodyRevision:1,operations:["native_acquire","native_text"]}];
+ fail(sql(`begin;
+ insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
+ membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
+ max_rounds,max_request_bytes,access_rules,valid_until)
+ values (${q(ws)},${q(pairedId)},1,2,${q(context.membershipSha256)},${q(context.observationSha256)},true,
+ 'fixture:standing-owner-review',${q(credential)},array['fixture-haiku'],array[${q(questionHash)}],
+ array['search_web','read_page'],5,10000,${j(rules)},now()+interval '5 minutes');
+ set local role service_role;
+ set local request.jwt.claim.role='service_role';
+ do $standing$ begin
+ if (public.mizizi_read_desk_operational_policy_v1(${j(scope)})->>'revision') is distinct from '1'
+ or (${authority("model_disclose",envelope(1,[],[]))}->>'allowed') is distinct from 'true'
+ or ${authority("model_disclose",envelope(1,[],[],{model:"fixture-opus"}))} is not null
+ or ${authority("model_disclose",envelope(1,[],[],{questionSha256:hash("unapproved question")}))} is not null
+ or ${authority("tool_execute",{scope,call:{name:"search_web",input:{query:"unapproved private question"}}})} is not null
+ or ${authority("tool_execute",{scope,call:{name:"search_news",input:{query:context.positions[0].title}}})} is not null
+ then raise exception 'STOP_STANDING_MODEL_OR_TOOL_SCOPE';end if;
+ if ${append(searchArgs)} is not null then raise exception 'STOP_STANDING_UNAUTHORIZED_TOOL_ADMITTED';end if;
+ if (${authority("tool_execute",searchCall)}->>'allowed') is distinct from 'true' then raise exception 'STOP_STANDING_SEARCH_GRANT';end if;
+ if (${append(searchArgs)}->>'outcome') is distinct from 'created' then raise exception 'STOP_STANDING_SEARCH_ADMISSION';end if;
+ if (${authority("tool_execute",readCall)}->>'allowed') is distinct from 'true' then raise exception 'STOP_STANDING_DYNAMIC_LEAD';end if;
+ if ${access("native_acquire",{url:"https://archive.org/unreviewed/fixture",descriptor:{},callSha256:readHash,hopSha256:hopHash})} is not null
+ or ${access("native_acquire",{url,descriptor:{},callSha256:hash("other call"),hopSha256:hopHash})} is not null
+ or ${append(standingPage)} is not null then raise exception 'STOP_STANDING_ACCESS_DEFAULT_DENY';end if;
+ if (${grantNative}->>'allowed') is distinct from 'true' then raise exception 'STOP_STANDING_NATIVE_GRANT';end if;
+ if ${append(standingPage)} is not null then raise exception 'STOP_STANDING_MISSING_EXAMINATION';end if;
+ if (${grantText}->>'allowed') is distinct from 'true' then raise exception 'STOP_STANDING_EXAMINATION_GRANT';end if;
+ if (${append(standingPage)}->>'outcome') is distinct from 'created' then raise exception 'STOP_STANDING_NATIVE_ADMISSION';end if;
+ if (${authority("model_disclose",envelope(3,[standingPageId],deps))}->>'allowed') is distinct from 'true'
+ then raise exception 'STOP_STANDING_DYNAMIC_MODEL_TRANSCRIPT';end if;
+ begin perform * from ${journal([deps[1]])};raise exception 'STOP_STANDING_OMITTED_DISCOVERY';
+ exception when sqlstate '42501' then null;end;
+ if (select outcome from ${journal(deps)}) is distinct from 'created' then raise exception 'STOP_STANDING_JOURNAL';end if;
+ if (select count(*) from ${journalRead})<>1 then raise exception 'STOP_STANDING_JOURNAL_READ';end if;
+ end $standing$;
+ reset role;
+ insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
+ membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
+ max_rounds,max_request_bytes,access_rules,valid_until)
+ select workspace_id,case_id,2,expected_revision,membership_sha256,observation_sha256,false,authority_ref,credential_sha256,
+ model_ids,question_sha256s,tool_names,max_rounds,max_request_bytes,access_rules,valid_until
+ from mizizi_private.desk_operational_policy_versions_v1 where case_id=${q(pairedId)} and revision=1;
+ set local role service_role;
+ do $standing$ begin
+ if ${read(searchId)} is not null or ${read(standingPageId)} is not null
+ or ${authority("model_disclose",envelope(1,[],[]))} is not null then raise exception 'STOP_STANDING_REVOKED_USE';end if;
+ begin perform * from ${journalRead};raise exception 'STOP_STANDING_REVOKED_JOURNAL';
+ exception when sqlstate '42501' then null;end;
+ end $standing$;
+ rollback;
+ select 'PASS';`)==="PASS","STOP_OPERATIONAL_CONVERGENCE_ROLLBACK");
+ console.log("WK_AUTH_MIZIZI_DESK_OPERATIONAL_CONVERGENCE=PASS");
+ }
  const accessName="mizizi_authorize_desk_access_v1";
  const accessArgs=(operation,target=url,descriptor={})=>{
   const body=JSON.stringify({url:target,descriptor});

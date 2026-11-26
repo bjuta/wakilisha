@@ -126,14 +126,21 @@ create function mizizi_private.desk_operational_receipt_current_v1(r mizizi_priv
 returns boolean language plpgsql security definer set search_path=pg_catalog as $f$
 declare o mizizi_private.desk_operational_policy_versions_v1;g mizizi_private.desk_operational_call_proofs_v1;
  p mizizi_private.desk_access_policy_versions_v1;cp mizizi_private.desk_custody_policy_versions_v1;
+ mp mizizi_private.desk_model_authority_versions_v1;
 begin
  o:=mizizi_private.current_desk_operational_policy_v1(c);
  if o.revision is null then return r.operational_revision is null;end if;
  if not mizizi_private.desk_operational_policy_live_v1(o,c)
  or r.operational_revision is distinct from o.revision or not(r.operation=any(o.tool_names)) then return false;end if;
- if not exists(select 1 from mizizi_private.desk_operational_call_proofs_v1 q
+ select * into g from mizizi_private.desk_operational_call_proofs_v1 q
   where q.job_id=r.job_id and q.lease_expires_at=r.lease_expires_at and q.call_sha256=r.call_sha256
-  and q.operation='tool_execute' and q.standing_revision=o.revision) then return false;end if;
+  and q.operation='tool_execute' and q.binding_sha256=r.call_sha256 and q.standing_revision=o.revision;
+ if not found then return false;end if;
+ select * into mp from mizizi_private.desk_model_authority_versions_v1
+  where workspace_id=r.workspace_id and case_id=r.case_id and operation='tool_execute' and binding_sha256=r.call_sha256
+  order by revision desc limit 1;
+ if mp.revision is distinct from g.exact_revision or (mp.revision is not null and
+  (not mp.enabled or mp.valid_until<=clock_timestamp())) then return false;end if;
  for g in select * from mizizi_private.desk_operational_call_proofs_v1 q
   where q.job_id=r.job_id and q.lease_expires_at=r.lease_expires_at and q.call_sha256=r.call_sha256
    and q.operation in ('native_acquire','native_text') loop
@@ -691,6 +698,12 @@ begin
   end if;
  end loop;
  if p.valid_until<=clock_timestamp() or (s->>'leaseExpiresAt')::timestamptz<=clock_timestamp() then return null;end if;
+ if o.revision is not null then
+  r.job_id:=(s->>'jobId')::uuid;r.case_id:=(s->>'caseId')::uuid;r.workspace_id:=(s->>'workspaceId')::uuid;
+  r.worker_id:=s->>'workerId';r.lease_expires_at:=(s->>'leaseExpiresAt')::timestamptz;
+  r.operation:=op;r.call_sha256:=p_call_sha256;r.operational_revision:=o.revision;
+  if not mizizi_private.desk_operational_receipt_current_v1(r,c) then return null;end if;
+ end if;
  insert into mizizi_private.desk_tool_receipts_v1(id,job_id,case_id,workspace_id,expected_revision,worker_id,
  lease_expires_at,membership_sha256,observation_sha256,operation,call_sha256,result_sha256,host,policy_revision,result_text,provenance,source_id,parent_receipt_id,operational_revision)
  values(rid,(s->>'jobId')::uuid,(s->>'caseId')::uuid,(s->>'workspaceId')::uuid,(s->>'expectedRevision')::integer,s->>'workerId',
@@ -791,6 +804,23 @@ begin
  if (c->>'leaseExpiresAt')::timestamptz<=clock_timestamp() then
   raise exception 'Desk journal lease expired' using errcode='55000';end if;
 end $journal$;
+create function public.mizizi_read_desk_operational_policy_v1(p_scope jsonb)
+returns jsonb language plpgsql security definer set search_path=pg_catalog as $f$
+declare c jsonb;o mizizi_private.desk_operational_policy_versions_v1;
+begin
+ if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service-role required' using errcode='42501';end if;
+ perform pg_advisory_xact_lock(214781521,61431);
+ c:=mizizi_private.desk_custody_context_v1(p_scope);
+ if c is null then return null;end if;
+ o:=mizizi_private.current_desk_operational_policy_v1(c);
+ if not mizizi_private.desk_operational_policy_live_v1(o,c) then return null;end if;
+ return jsonb_build_object('revision',o.revision,'scope',p_scope,'credentialSha256',o.credential_sha256,
+  'modelIds',to_jsonb(o.model_ids),'questionSha256s',to_jsonb(o.question_sha256s),'toolNames',to_jsonb(o.tool_names),
+  'maxRounds',o.max_rounds,'maxRequestBytes',o.max_request_bytes,'accessRules',o.access_rules,
+  'validUntil',least(o.valid_until,(c->>'leaseExpiresAt')::timestamptz));
+end $f$;
+revoke all on function public.mizizi_read_desk_operational_policy_v1(jsonb) from public,anon,authenticated,service_role,mizizi_executor;
+grant execute on function public.mizizi_read_desk_operational_policy_v1(jsonb) to service_role;
 revoke all on function mizizi_private.guard_desk_operational_policy_v1(),
  mizizi_private.current_desk_operational_policy_v1(jsonb),
  mizizi_private.desk_operational_policy_live_v1(mizizi_private.desk_operational_policy_versions_v1,jsonb),
@@ -803,6 +833,7 @@ do $acl$ begin
  or has_schema_privilege('service_role','mizizi_private','USAGE')
  or has_function_privilege('authenticated','public.mizizi_authorize_desk_model_operation_v1(jsonb,text,text,text)','EXECUTE')
  or has_function_privilege('authenticated','public.mizizi_authorize_desk_access_v1(jsonb,text,text,text)','EXECUTE')
+ or has_function_privilege('authenticated','public.mizizi_read_desk_operational_policy_v1(jsonb)','EXECUTE')
  then raise exception 'STOP_DESK_CONVERGENCE_ACL';end if;
 end $acl$;
 commit;

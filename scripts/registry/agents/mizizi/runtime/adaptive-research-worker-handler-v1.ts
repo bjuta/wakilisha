@@ -2,6 +2,8 @@
  * A successful worker receipt means a bounded pass finished, NOT that the
  * investigation or cultural question is definitively resolved.
  */
+import {createHash} from "node:crypto";
+import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
 import {runAdaptiveInvestigationV1, type InvestigationIdentityV1,
  type InvestigationStoreV1,type InvestigationReaderV1,
  type InvestigationAnalystV1,type IndependentFindingVerifierV1,type DeskPassResearcherV1}
@@ -159,7 +161,7 @@ export function runCostRoutedDeskResearchWorkerCycleV1(input:Readonly<
 }
 
 
-type DurableDeskConfigurationV1=Readonly<
+export type DurableDeskConfigurationV1=Readonly<
  Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],
  "braveApiKey"|"nativeAccountFingerprint"|"authorizeAcquisition"|"authorizeExamination"|"browser">&
  Pick<Parameters<typeof createCostRoutedDeskAnthropicPassV1>[0],
@@ -177,6 +179,8 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
  openingQuestion:AdaptiveWorkerDependenciesV1["openingQuestion"];
  verifyFinding:IndependentFindingVerifierV1;
  configurationForJob:(job:ResearchJobV1)=>Promise<DurableDeskConfigurationV1>;
+ /** Operational mode requires the current owner-issued standing policy. */
+ operationalNativeOnly?:boolean;
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
  leaseSeconds?:number;now?:()=>number;
 }>){
@@ -205,6 +209,9 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    const config=await input.configurationForJob(job);
    const scope={jobId:job.jobId,caseId:job.caseId,workspaceId:job.workspaceId,
     expectedRevision:job.expectedRevision,workerId:input.workerId,leaseExpiresAt:job.leaseExpiresAt};
+   const operational=input.operationalNativeOnly?await readOperationalNativeDeskPolicyV1(input.rpc,scope,input.now??Date.now):null;
+   if(input.operationalNativeOnly&&!operational)throw Error("MIZIZI_DESK_OPERATIONAL_POLICY_DENIED");
+   if(operational&&config.browser)throw Error("MIZIZI_DESK_OPERATIONAL_BROWSER_UNQUALIFIED");
    const dispatcher=createDeskResearchDispatcherV1({
     rpc:input.rpc,scope,braveApiKey:config.braveApiKey,
     nativeAccountFingerprint:config.nativeAccountFingerprint,
@@ -215,7 +222,11 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    const modelAuthority=createDurableDeskModelAuthorityV1({rpc:input.rpc,scope,
     authorizeEnvelope:config.authorizeEnvelope,authorizeTool:config.authorizeTool,now:input.now});
    const deskPass=createCostRoutedDeskAnthropicPassV1({
-    scope,anthropic,enabledTools:dispatcher.enabledTools,readModelInventory:config.readModelInventory,
+    scope,anthropic,enabledTools:operational?dispatcher.enabledTools.filter(t=>operational.toolNames.includes(t)):dispatcher.enabledTools,
+    readModelInventory:async()=>{
+     const models=await config.readModelInventory();
+     return operational?models.filter(m=>operational.modelIds.includes(m.model)):models;
+    },
     assessRequirement:config.assessRequirement,...modelAuthority,...finance,executeTool:dispatcher.executeTool,
     verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,now:input.now});
    const prepareDeskPass:DeskPassResearcherV1=async(id,question,history)=>{
@@ -230,6 +241,104 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     analyze:async()=>{throw Error("MIZIZI_DESK_LEGACY_ANALYST_DENIED");},prepareDeskPass,
     verifyFinding:input.verifyFinding,authorizeModelProcessing:dispatcher.authorizeModelProcessing,
     maxNewPasses:input.maxNewPasses,maxTotalPasses:input.maxTotalPasses,costBudgetUnits:input.costBudgetUnits})(job);
+  }
+ });
+}
+
+/** Server-only native operational entrypoint. Reuses the existing exact job
+ * worker. No second queue, transport override, owner credential, or default
+ * live entitlement. Its chartScope preflight must independently prove the
+ * deployed environment, provider account and constrained runtime.
+ */
+type OperationalNativeDeskPolicyV1=Readonly<{
+ revision:number;scope:DeskSearchScopeV1;credentialSha256:string;modelIds:readonly string[];
+ questionSha256s:readonly string[];toolNames:readonly string[];maxRounds:number;maxRequestBytes:number;
+ accessRules:readonly Readonly<{host:string;pathPrefix:string;custodyRevision:number;operations:readonly string[]}>[];
+ validUntil:string;
+}>;
+const operationalHash=(value:string)=>createHash("sha256").update(value).digest("hex");
+async function readOperationalNativeDeskPolicyV1(rpc:WorkerRpc,scope:DeskSearchScopeV1,now:()=>number):Promise<OperationalNativeDeskPolicyV1|null>{
+ const reply=await rpc("mizizi_read_desk_operational_policy_v1",{p_scope:scope});
+ if(!reply||reply.error||!reply.data)return null;
+ const p=reply.data as OperationalNativeDeskPolicyV1;
+ const sha=/^[0-9a-f]{64}$/;
+ if(!p.scope||Object.keys(scope).some(k=>p.scope[k as keyof DeskSearchScopeV1]!==scope[k as keyof DeskSearchScopeV1])||
+  !Number.isSafeInteger(p.revision)||p.revision<1||!sha.test(p.credentialSha256)||
+  !Array.isArray(p.modelIds)||p.modelIds.length<1||p.modelIds.length>5||p.modelIds.some(m=>! /^[A-Za-z0-9._:-]{3,100}$/.test(m))||
+  !Array.isArray(p.questionSha256s)||p.questionSha256s.length<1||p.questionSha256s.length>8||p.questionSha256s.some(q=>!sha.test(q))||
+  !Array.isArray(p.toolNames)||p.toolNames.length<1||p.toolNames.some(t=>!["search_web","search_news","read_page","read_document"].includes(t))||
+  !Number.isSafeInteger(p.maxRounds)||p.maxRounds<1||p.maxRounds>5||
+  !Number.isSafeInteger(p.maxRequestBytes)||p.maxRequestBytes<1||p.maxRequestBytes>3200000||
+  !Array.isArray(p.accessRules)||p.accessRules.length>20||p.accessRules.some(x=>!x||typeof x.host!=="string"||
+   typeof x.pathPrefix!=="string"||!/^\/[A-Za-z0-9_./~-]+\/$/.test(x.pathPrefix)||
+   !Number.isSafeInteger(x.custodyRevision)||x.custodyRevision<1||!Array.isArray(x.operations)||
+   x.operations.some(op=>!["native_acquire","native_text"].includes(op)))||
+  !Number.isFinite(Date.parse(p.validUntil))||Date.parse(p.validUntil)<=now()||
+  Date.parse(p.validUntil)>Date.parse(scope.leaseExpiresAt))return null;
+ return p;
+}
+export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
+ Omit<Parameters<typeof runDurableDeskResearchWorkerCycleV1>[0],"configurationForJob"|"operationalNativeOnly"|"maxNewPasses">&{
+  credentials:Pick<DurableDeskConfigurationV1,"anthropic"|"braveApiKey"|"nativeAccountFingerprint">;
+  readModelInventory:DurableDeskConfigurationV1["readModelInventory"];
+  assessRequirement:DurableDeskConfigurationV1["assessRequirement"];
+ }
+>){
+ const {credentials,readModelInventory,assessRequirement,...worker}=input;
+ const now=input.now??Date.now;
+ // The owner policy and existing monetary/entitlement ledgers remain
+ // independent of the worker. Do not accept self-issued grants or browser
+ // fallback in this native qualification path.
+ return runDurableDeskResearchWorkerCycleV1({...worker,operationalNativeOnly:true,maxNewPasses:1,
+  configurationForJob:async job=>{
+   const scope={jobId:job.jobId,caseId:job.caseId,workspaceId:job.workspaceId,expectedRevision:job.expectedRevision,
+    workerId:input.workerId,leaseExpiresAt:job.leaseExpiresAt};
+   const initial=await readOperationalNativeDeskPolicyV1(input.rpc,scope,now);
+   const credentialSha256=operationalHash(JSON.stringify(["mizizi:anthropic:credential:v1",
+    credentials.anthropic.workspaceId??null,credentials.anthropic.apiKey]));
+   if(!initial||initial.credentialSha256!==credentialSha256||!job.chartContext)
+    throw Error("MIZIZI_DESK_OPERATIONAL_CONFIGURATION_DENIED");
+   const fresh=async(candidate:DeskSearchScopeV1)=>{
+    if(Object.keys(scope).some(k=>candidate[k as keyof DeskSearchScopeV1]!==scope[k as keyof DeskSearchScopeV1]))return null;
+    const p=await readOperationalNativeDeskPolicyV1(input.rpc,scope,now);
+    return p&&p.revision===initial.revision&&p.credentialSha256===credentialSha256?p:null;
+   };
+   const allowedUrl=(p:OperationalNativeDeskPolicyV1,url:string,operation:string)=>{
+    try{
+     const u=new URL(url);
+     return u.href===url&&u.protocol==="https:"&&!u.username&&!u.password&&!u.port&&!u.search&&!u.hash&&
+      /^\/[A-Za-z0-9_./~-]+$/.test(u.pathname)&&!u.pathname.split("/").some(x=>x==="."||x==="..")&&
+      p.accessRules.some(x=>x.host===u.hostname&&u.pathname.startsWith(x.pathPrefix)&&x.operations.includes(operation));
+    }catch{return false;}
+   };
+   const publicQueries=new Set(job.chartContext.positions.flatMap(x=>[x.title,...(x.artist?[x.title+" "+x.artist]:[])]));
+   return {...credentials,readModelInventory,assessRequirement,
+    authorizeAcquisition:async(candidate,url)=>{
+     const p=await fresh(candidate);
+     return p&&allowedUrl(p,url,"native_acquire")?{policyRef:"desk-operational:"+p.revision,
+      validUntil:p.validUntil,acquisitionAllowed:true as const,zeroIncrementalSpendAllowed:true as const}:null;
+    },
+    authorizeExamination:async(candidate,binding)=>{
+     const p=await fresh(candidate);
+     return !!p&&binding.representation==="native_response_bytes"&&typeof binding.finalUrl==="string"&&
+      typeof binding.sha256==="string"&&/^[0-9a-f]{64}$/.test(binding.sha256)&&
+      allowedUrl(p,binding.finalUrl,"native_text");
+    },
+    authorizeEnvelope:async(binding,body)=>{
+     const p=await fresh(binding.scope);
+     return p&&binding.credentialSha256===credentialSha256&&p.modelIds.includes(binding.model)&&
+      p.questionSha256s.includes(operationalHash(binding.question))&&binding.round<=p.maxRounds&&
+      binding.requestBytes<=p.maxRequestBytes&&Buffer.byteLength(body,"utf8")===binding.requestBytes&&
+      operationalHash(body)===binding.bodySha256?
+      {requestSha256:binding.requestSha256,policyRef:"desk-operational:"+p.revision,
+       validUntil:p.validUntil,modelDisclosureAllowed:true as const}:null;
+    },
+    authorizeTool:async(candidate,call,callSha256)=>{
+     const p=await fresh(candidate);
+     return !!p&&p.toolNames.includes(call.name)&&operationalHash(JSON.stringify({scope:candidate,call}))===callSha256&&
+      (!["search_web","search_news"].includes(call.name)||typeof call.input.query==="string"&&publicQueries.has(call.input.query));
+    }
+   };
   }
  });
 }

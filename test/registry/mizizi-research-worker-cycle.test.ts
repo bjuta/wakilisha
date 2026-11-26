@@ -1646,6 +1646,7 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   }
   expect(String(h.send.mock.calls[0][1].body)).not.toContain(evidence.excerpt);
   expect(String(h.send.mock.calls[2][1].body)).toContain(evidence.excerpt);
+  expect(passes[0].deskToolReceipts?.length).toBe(2);
   expect(passes[0]).toMatchObject({modelVersion:"fixture-haiku",costUnits:3,
    sourceReceipts:[{sourceId:EVENT,modelDisclosed:true}],
    findings:[{interpretation:"hypothesis",independentlyVerified:false}]});
@@ -1679,6 +1680,36 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   revoked.authorizeEnvelope.mockImplementation(async(b,body)=>revoked.authorizeEnvelope.mock.calls.length===3?null as never:approved(b,body));
   await expect(createCostRoutedDeskAnthropicPassV1(revoked.config)(identity,question,[])).rejects.toThrow("ENVELOPE_AUTHORITY_CHANGED");
   expect(revoked.send).not.toHaveBeenCalled();expect(revoked.consume).toHaveBeenCalledTimes(1);
+ });
+ it("reconstructs every model transcript from durable custody and denies altered readback",async()=>{
+  const execute=async(tamper:boolean)=>{
+   const h=fixture();
+   const hash=(value:string)=>createHash("sha256").update(value).digest("hex");
+   const rpc:WorkerRpc=async(fn,args)=>{
+    if(fn==="mizizi_authorize_desk_model_operation_v1")return {data:{operation:args.p_operation,
+     bindingSha256:args.p_binding_sha256,policyRef:"fixture:durable-model:1",validUntil:expiry,allowed:true},error:null};
+    expect(fn).toBe("mizizi_read_desk_tool_receipt_v1");
+    for(let i=0;i<h.executeTool.mock.results.length;i++){
+     const raw=await h.executeTool.mock.results[i].value;
+     if(raw.receiptId!==args.p_receipt_id)continue;
+     const resultText=JSON.stringify({receiptId:raw.receiptId,leads:raw.leads,sources:raw.sources,visual:null});
+     return {data:{receiptId:raw.receiptId,callSha256:hash(JSON.stringify({scope,call:h.executeTool.mock.calls[i][1]})),
+      resultSha256:hash(resultText),resultText:tamper?resultText+" ":resultText},error:null};
+    }
+    return {data:null,error:null};
+   };
+   const authority=createDurableDeskModelAuthorityV1({rpc,scope,authorizeEnvelope:h.authorizeEnvelope,authorizeTool:h.authorizeTool,now:()=>NOW});
+   const pass=createCostRoutedDeskAnthropicPassV1({...h.config,...authority});
+   if(tamper){
+    await expect(pass(identity,question,[])).rejects.toThrow("ENVELOPE_DISCLOSURE_DENIED");
+    expect(h.send).toHaveBeenCalledTimes(1);
+   }else{
+    const result=await pass(identity,question,[]);
+    expect(result.deskToolReceipts?.length).toBe(2);
+    expect(h.send).toHaveBeenCalledTimes(3);
+   }
+  };
+  await execute(false);await execute(true);
  });
  it("denies envelope authority, underquoted prices, cumulative pass overspend and unaffordable selection before the next call",async()=>{
   const denied=fixture();denied.authorizeEnvelope.mockResolvedValueOnce(null as never);
