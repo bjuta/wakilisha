@@ -107,7 +107,7 @@ begin
  or jsonb_typeof(result) is distinct from 'object' or coalesce(op,'') not in ('search_web','search_news','read_page','read_document','render_page','inspect_visual')
  or jsonb_typeof(call_body->'input') is distinct from 'object'
  or (select count(*) from jsonb_object_keys(x))<>2 or (select count(*) from jsonb_object_keys(call_body))<>2
- or (select count(*) from jsonb_object_keys(call_body->'input'))<>case op when 'read_document' then 3 when 'inspect_visual' then 2 else 1 end
+ or (select count(*) from jsonb_object_keys(call_body->'input'))<>(case op when 'read_document' then 3 when 'inspect_visual' then 2 else 1 end)
  or (select count(*) from jsonb_object_keys(result))<>4
  or not(result ?& array['receiptId','leads','sources','visual'])
  or (op<>'inspect_visual' and result->'visual'<>'null'::jsonb)
