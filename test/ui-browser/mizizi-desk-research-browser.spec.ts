@@ -68,15 +68,21 @@ test("MIZIZI real Chromium reveals dynamic evidence, searches, follows reference
 });
 test("MIZIZI authorizes redirect hops independently and blocks unauthorized acquisition before the fetch",async({browser})=>{
  const h=fixture();
- await withDeskInteractiveBrowserV1({browser,scope:scope(),...h},async(session:any)=>{
+ const capture=await withDeskInteractiveBrowserV1({browser,scope:scope(),...h},async(session:any)=>{
   const result=await session.navigate(base+"/redirect");
   expect(result.visibleText).toContain("Archive ensemble, 1974.");
+  return session.capture();
  });
+ expect(capture.resourceBindings.map((x:any)=>x.url)).toEqual([base+"/recording"]);
+ expect(capture.redirectBindings).toMatchObject([{from:base+"/redirect",to:base+"/recording",status:302}]);
  expect(h.requests.map(x=>x.url)).toEqual([base+"/redirect",base+"/recording"]);
  expect(h.actions.filter(x=>x.operation==="navigate").map(x=>x.url)).toEqual([base+"/redirect",base+"/recording"]);
  const blocked=fixture();
- await expect(withDeskInteractiveBrowserV1({browser,scope:scope(),...blocked},async(session:any)=>
-  session.navigate(base+"/blocked-redirect"))).rejects.toThrow();
+ await withDeskInteractiveBrowserV1({browser,scope:scope(),...blocked},async(session:any)=>{
+  await expect(session.navigate(base+"/blocked-redirect")).rejects.toThrow();
+  await expect(session.observe()).rejects.toThrow("INTERACTIVE_NAVIGATION_UNCONFIRMED");
+  await expect(session.capture()).rejects.toThrow("INTERACTIVE_CAPTURE_DENIED");
+ });
  expect(blocked.requests.map(x=>x.url)).toEqual([base+"/blocked-redirect"]);
  const denied=fixture();
  await expect(withDeskInteractiveBrowserV1({browser,scope:scope(),...denied,

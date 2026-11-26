@@ -258,7 +258,8 @@ export async function withDeskInteractiveBrowserV1(options,work){
  let context,page,active=true,busy=false,actionCount=0,requestCount=0,receivedBytes=0,
   blockedRequests=0,documentFailure=false,unexpectedNavigation=false,expectedNavigation=null,
   redirect=null,observation=null,refs=new Map(),generation=0;
- const bindings=[];
+ const bindings=[],redirectBindings=[];
+ const sessionAbort=new AbortController();
  const cleanText=(value,max)=>typeof value==="string"?
   value.replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().slice(0,max):"";
  const actionGrant=async(operation,detail={})=>{
@@ -301,20 +302,26 @@ export async function withDeskInteractiveBrowserV1(options,work){
     topLevelUrl:expectedNavigation??currentUrl()});
    const requestSha256=hash(JSON.stringify(binding));
    if(await bounded(authorizeRequest(binding,requestSha256))!==true){await abort();return;}
-   const response=await bounded(readResource(binding,requestSha256,AbortSignal.timeout(Math.max(1,remaining()))));
+   const response=await bounded(readResource(binding,requestSha256,AbortSignal.any([sessionAbort.signal,AbortSignal.timeout(Math.max(1,remaining()))])));
    // Independently check request binding and current authorization again
    // before disclosing the acquired bytes to the untrusted webpage.
-   if(!response||response.requestSha256!==requestSha256||
-    await bounded(authorizeRequest(binding,requestSha256))!==true){await abort();return;}
+   if(!response||response.requestSha256!==requestSha256||!active||
+    await bounded(authorizeRequest(binding,requestSha256))!==true||!active){await abort();return;}
    if([301,302,303,307,308].includes(response.status)){
     // Never fulfill a 3xx: Playwright intercepts only the initial URL in
     // a redirect chain. Top-level redirects become separately authorized
     // navigation actions; unsupported subresource redirects are blocked.
-    if(isDocument&&typeof response.location==="string"){
-     const next=safeUrl(new URL(response.location,url).href).href;
-     redirect={from:url,to:next,requestSha256};
-    }
-    await abort();return;
+    if(!isDocument||typeof response.location!=="string"){await abort();return;}
+    const next=safeUrl(new URL(response.location,url).href).href;
+    // Aborting a document navigation can commit Chromium's error page
+    // asynchronously, racing the next goto. Commit an inert empty marker
+    // instead, never a browser-followed 3xx. It is NOT acquired evidence.
+    // No script, link, form, subresource or refresh is present in this marker.
+    redirect={from:url,to:next,requestSha256,status:response.status};
+    await route.fulfill({status:200,headers:{"content-type":"text/html; charset=utf-8",
+     "cache-control":"no-store","content-security-policy":"default-src 'none'; base-uri 'none'; form-action 'none'"},
+     body:"<!doctype html><html><head></head><body></body></html>"});
+    return;
    }
    const body=response.body,mime=typeof response.contentType==="string"?
     response.contentType.split(";")[0].trim().toLowerCase():"";
@@ -344,21 +351,27 @@ export async function withDeskInteractiveBrowserV1(options,work){
  async function navigateTo(raw){
   let url=safeUrl(raw).href;
   const seen=new Set();
-  for(let hop=0;hop<4;hop++){
-   if(seen.has(url))fail("INTERACTIVE_REDIRECT_LOOP");
-   seen.add(url);
-   await actionGrant("navigate",{url});
-   expectedNavigation=url;documentFailure=false;unexpectedNavigation=false;redirect=null;
-   let response=null;
-   try{response=await bounded(page.goto(url,{waitUntil:"domcontentloaded",timeout:remaining()}));}
-   catch(error){if(!redirect)throw error;}
-   if(redirect&&redirect.from===url){url=redirect.to;continue;}
-   expectedNavigation=null;
-   if(!response||response.status()!==200||documentFailure||unexpectedNavigation||currentUrl()!==url)
-    fail("INTERACTIVE_NAVIGATION_UNCONFIRMED");
-   return;
-  }
-  expectedNavigation=null;fail("INTERACTIVE_REDIRECT_BOUND");
+  // Until a real final document commits, observations/captures cannot use
+  // an old page or the synthetic redirect marker, even after caught errors.
+  documentFailure=true;
+  try{
+   for(let hop=0;hop<4;hop++){
+    if(seen.has(url))fail("INTERACTIVE_REDIRECT_LOOP");
+    seen.add(url);
+    await actionGrant("navigate",{url});
+    expectedNavigation=url;documentFailure=false;unexpectedNavigation=false;redirect=null;
+    const response=await bounded(page.goto(url,{waitUntil:"domcontentloaded",timeout:remaining()}));
+    if(!response||response.status()!==200||documentFailure||unexpectedNavigation||currentUrl()!==url)
+     fail("INTERACTIVE_NAVIGATION_UNCONFIRMED");
+    if(redirect&&redirect.from===url){
+     redirectBindings.push(Object.freeze({...redirect}));
+     documentFailure=true;
+     url=redirect.to;continue;
+    }
+    expectedNavigation=null;return;
+   }
+   fail("INTERACTIVE_REDIRECT_BOUND");
+  }catch(error){documentFailure=true;expectedNavigation=null;throw error;}
  }
  async function describe(handle){
   return bounded(handle.evaluate(node=>{
@@ -498,7 +511,7 @@ export async function withDeskInteractiveBrowserV1(options,work){
     await clearRefs();await navigateTo(destination);return observePage();
    }),
    capture:({visual=false}={})=>step(async()=>{
-    if(typeof visual!=="boolean"||documentFailure||unexpectedNavigation)fail("INTERACTIVE_CAPTURE_DENIED");
+    if(typeof visual!=="boolean"||documentFailure||unexpectedNavigation||expectedNavigation!==null)fail("INTERACTIVE_CAPTURE_DENIED");
     const url=currentUrl();await actionGrant("capture",{url,visual});
     const html=await bounded(page.locator("html").evaluate(node=>{
      const value=node.outerHTML;return value.length<=2000000?value:null;
@@ -509,20 +522,20 @@ export async function withDeskInteractiveBrowserV1(options,work){
      fail("INTERACTIVE_CAPTURE_UNCONFIRMED");
     const body=new TextEncoder().encode(html),sourceSha256=hash(body);
     const visualSha256=png?hash(png):null;
-    const dependencies=bindings.slice();
+    const dependencies=bindings.slice(),redirects=redirectBindings.slice();
     await actionGrant("capture_result",{url,sourceSha256,visualSha256,
-     resourceBindingSha256:hash(JSON.stringify(dependencies))});
+     resourceBindingSha256:hash(JSON.stringify(dependencies)),redirectBindingSha256:hash(JSON.stringify(redirects))});
     return Object.freeze({contract:"mizizi.desk_interactive_capture.v1",scope,finalUrl:url,
      representation:"rendered_dom_not_original_response",body,sha256:sourceSha256,
      visual:png?{body:Uint8Array.from(png),sha256:visualSha256,contentType:"image/png"}:null,
-     resourceBindings:dependencies,identityVerified:false,sourceRetentionAuthorized:false,externalModelProcessingAuthorized:false});
+     resourceBindings:dependencies,redirectBindings:redirects,identityVerified:false,sourceRetentionAuthorized:false,externalModelProcessingAuthorized:false});
    })
   });
   const result=await bounded(work(api));
   if(busy)fail("INTERACTIVE_CONCURRENT_WORK_UNCONFIRMED");
   return result;
  }finally{
-  active=false;
+  active=false;sessionAbort.abort();
   if(context){
    try{await within(context.close(),5000);}
    catch{fail("INTERACTIVE_CLEANUP_UNCONFIRMED");}

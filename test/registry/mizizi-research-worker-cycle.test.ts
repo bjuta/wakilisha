@@ -5,7 +5,7 @@ import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/r
 import {createDurableDeskModelAuthorityV1,createCostRoutedDeskAnthropicPassV1,selectCostEffectiveDeskModelV1,type DeskModelCandidateV1,type DeskAnthropicOptionsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-source-interpreter-v1.mjs";
-import {createDeskNativeReaderV1,isPublicDeskIpv4V1} from "../../scripts/registry/agents/mizizi/runtime/desk-native-reader-v1";
+import {createDeskNativeReaderV1,isPublicDeskIpv4V1,createDeskBrowserResourceReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-native-reader-v1";
 import {createDeskSearchGatewayV1,createDurableDeskSearchGatewayV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-gateway-v1";
 import { describe, expect, it, vi } from "vitest";
 import {createHash} from "node:crypto";
@@ -2126,5 +2126,58 @@ describe("MusicBrainz core CC0 offline cohort discovery",()=>{
    await expect(discoverMusicBrainzCoreCohortV1({directory,manifest:{...manifest,dataset:"musicbrainz-derived"},recordings})).rejects.toThrow("MANIFEST_INVALID");
    await expect(discoverMusicBrainzCoreCohortV1({directory,manifest,recordings})).rejects.toThrow("ISRC_RECORDING_JOIN_INCOMPLETE");
   },{isrc:"1\t999\t"+code+"\t0\t2026-11-26 00:00:00+00\n"});
+ });
+});
+
+
+describe("MIZIZI shared pinned browser resource acquisition",()=>{
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+60000).toISOString()};
+ const url="https://archive.org/assets/catalogue.js";
+ const binding={scope,url,resourceType:"script",topLevelUrl:"https://archive.org/catalogue"};
+ const hash=(v:Uint8Array|string)=>createHash("sha256").update(v).digest("hex");
+ const d=hash(JSON.stringify(binding)),body=new TextEncoder().encode("document.title='Archive';");
+ function fixture(){
+  const authorize=vi.fn(async()=>({policyRef:"policy:browser-acquisition",validUntil:new Date(NOW+30000).toISOString(),
+   acquisitionAllowed:true as const,zeroIncrementalSpendAllowed:true as const}));
+  const resolve4=vi.fn(async()=>["93.184.216.34"]);
+  const precharge=vi.fn(async()=>true);
+  const readPinned=vi.fn(async()=>({status:200,contentType:"application/javascript; charset=utf-8",body,
+   headers:{"content-security-policy":"default-src 'self'"} as Record<string,string>}));
+  return {authorize,resolve4,precharge,readPinned,now:()=>NOW};
+ }
+ it("uses the shared pinning boundary, precharges each resource and rechecks before/after transmission",async()=>{
+  const h=fixture(),signal=AbortSignal.timeout(5000);
+  const result=await createDeskBrowserResourceReaderV1(h)(binding,d,signal);
+  expect(result).toMatchObject({requestSha256:d,status:200,contentType:"application/javascript; charset=utf-8",
+   sha256:hash(body),headers:{"content-security-policy":"default-src 'self'"}});
+  expect(h.resolve4).toHaveBeenCalledWith("archive.org",expect.anything());
+  expect(h.precharge).toHaveBeenCalledWith(binding,{url,hostname:"archive.org",address:"93.184.216.34"},expect.anything(),d);
+  expect(h.precharge.mock.invocationCallOrder[0]).toBeLessThan(h.readPinned.mock.invocationCallOrder[0]);
+  expect(h.authorize).toHaveBeenCalledTimes(3);
+  expect(h.readPinned).toHaveBeenCalledWith({url,hostname:"archive.org",address:"93.184.216.34"},expect.anything(),"script");
+ });
+ it("rejects unbound requests, private DNS, uncharged requests, invalid MIME and revocation",async()=>{
+  const bad=fixture();
+  await expect(createDeskBrowserResourceReaderV1(bad)(binding,"0".repeat(64),AbortSignal.timeout(5000))).rejects.toThrow("BROWSER_BINDING_DENIED");
+  expect(bad.resolve4).not.toHaveBeenCalled();
+  const dns=fixture();dns.resolve4.mockResolvedValueOnce(["93.184.216.34","127.0.0.1"]);
+  await expect(createDeskBrowserResourceReaderV1(dns)(binding,d,AbortSignal.timeout(5000))).rejects.toThrow("DNS_ADDRESS_DENIED");
+  expect(dns.precharge).not.toHaveBeenCalled();expect(dns.readPinned).not.toHaveBeenCalled();
+  const cost=fixture();cost.precharge.mockResolvedValueOnce(false);
+  await expect(createDeskBrowserResourceReaderV1(cost)(binding,d,AbortSignal.timeout(5000))).rejects.toThrow("ZERO_COST_BUDGET_UNAVAILABLE");
+  expect(cost.readPinned).not.toHaveBeenCalled();
+  const mime=fixture();mime.readPinned.mockResolvedValueOnce({status:200,contentType:"text/html",body,headers:{}});
+  await expect(createDeskBrowserResourceReaderV1(mime)(binding,d,AbortSignal.timeout(5000))).rejects.toThrow("CONTENT_TYPE_DENIED");
+  const revoked=fixture();revoked.authorize.mockResolvedValueOnce(await revoked.authorize()).mockResolvedValueOnce(await revoked.authorize()).mockResolvedValueOnce(null as never);
+  await expect(createDeskBrowserResourceReaderV1(revoked)(binding,d,AbortSignal.timeout(5000))).rejects.toThrow("ACQUISITION_AUTHORITY_CHANGED");
+ });
+ it("returns only a redirect descriptor, never follows it, and blocks credential headers",async()=>{
+  const h=fixture();
+  h.readPinned.mockResolvedValueOnce({status:302,location:"/assets/replacement.js",body:new Uint8Array()} as never);
+  await expect(createDeskBrowserResourceReaderV1(h)(binding,d,AbortSignal.timeout(5000))).resolves.toEqual({requestSha256:d,status:302,location:"https://archive.org/assets/replacement.js"});
+  expect(h.readPinned).toHaveBeenCalledTimes(1);
+  const cookies=fixture();cookies.readPinned.mockResolvedValueOnce({status:200,contentType:"application/javascript",body,headers:{"set-cookie":"private=secret"}});
+  await expect(createDeskBrowserResourceReaderV1(cookies)(binding,d,AbortSignal.timeout(5000))).rejects.toThrow("RESPONSE_HEADER_DENIED");
  });
 });

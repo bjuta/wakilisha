@@ -16,7 +16,7 @@ const MAX_REDIRECTS=3;
 const MAX_DURATION_MS=20_000;
 type Target=Readonly<{url:string;hostname:string;address:string}>;
 type HopResponse=Readonly<{status:number;location?:string;contentType?:string;
- body:Uint8Array}>;
+ body:Uint8Array;headers?:Readonly<Record<string,string>>}>;
 type NativeReadRequest=Readonly<{scope:DeskSearchScopeV1;url:string}>;
 type NativeReadAuthority=Readonly<{policyRef:string;validUntil:string;
  acquisitionAllowed:true;zeroIncrementalSpendAllowed:true}>;
@@ -85,7 +85,26 @@ function contentType(value:unknown):string{
 /** Connect to the validated IP directly, retaining TLS SNI, certificate
  * hostname checking and the HTTP Host for the approved origin. No second
  * DNS lookup, pooled socket, credential forwarding or automatic redirects. */
-async function readNative(target:Target,signal:AbortSignal):Promise<HopResponse>{
+const BROWSER_MIMES:Readonly<Record<string,readonly string[]>>=Object.freeze({
+ document:["text/html","application/xhtml+xml"],
+ script:["text/javascript","application/javascript","application/ecmascript","text/ecmascript"],
+ stylesheet:["text/css"],
+ image:["image/png","image/jpeg","image/webp","image/gif","image/svg+xml","image/avif","image/x-icon"],
+ font:["font/woff","font/woff2","application/font-woff","application/octet-stream"],
+ xhr:["application/json","text/plain","text/html","application/xml","text/xml"],
+ fetch:["application/json","text/plain","text/html","application/xml","text/xml"],
+});
+const BROWSER_RESPONSE_HEADERS=["content-security-policy","content-security-policy-report-only","x-content-type-options",
+ "x-frame-options","referrer-policy","cross-origin-resource-policy","cross-origin-opener-policy",
+ "cross-origin-embedder-policy","access-control-allow-origin","access-control-allow-methods",
+ "access-control-allow-headers","access-control-expose-headers","vary","permissions-policy"] as const;
+function browserContentType(value:unknown,resourceType:string):string{
+ if(typeof value!=="string"||value.length>200||/[\r\n\0]/.test(value)||
+  !BROWSER_MIMES[resourceType]?.includes(value.split(";")[0].trim().toLowerCase()))
+  fail("CONTENT_TYPE_DENIED");
+ return value;
+}
+async function readNative(target:Target,signal:AbortSignal,browserType?:string):Promise<HopResponse>{
  const url=publicUrl(target.url);
  if(url.hostname!==target.hostname||!isPublicDeskIpv4V1(target.address))fail("PIN_DENIED");
  return new Promise((resolve,reject)=>{
@@ -101,7 +120,7 @@ async function readNative(target:Target,signal:AbortSignal):Promise<HopResponse>
    checkServerIdentity:(_name,cert)=>checkServerIdentity(target.hostname,cert),
    maxHeaderSize:16384,signal,
    headers:{Host:target.hostname,"User-Agent":"WAKILISHA-MIZIZI/1.0 (https://wakilisha.africa)",
-    Accept:"text/html,application/xhtml+xml,text/plain,application/pdf",
+    Accept:browserType?BROWSER_MIMES[browserType].join(","):"text/html,application/xhtml+xml,text/plain,application/pdf",
     "Accept-Encoding":"identity",Connection:"close"},
   },res=>{
    const stop=(code:string)=>{finish(Error("MIZIZI_DESK_NATIVE_"+code));res.destroy();req.destroy();};
@@ -121,7 +140,18 @@ async function readNative(target:Target,signal:AbortSignal):Promise<HopResponse>
     stop("RESPONSE_TOO_LARGE");return;
    }
    let type:string;
-   try{type=contentType(res.headers["content-type"]);}catch{stop("CONTENT_TYPE_DENIED");return;}
+   try{type=browserType?browserContentType(res.headers["content-type"],browserType):contentType(res.headers["content-type"]);}catch{stop("CONTENT_TYPE_DENIED");return;}
+   const headers:Record<string,string>={};
+   if(browserType)for(const name of BROWSER_RESPONSE_HEADERS){
+    const raw=res.headers[name];
+    if(raw===undefined)continue;
+    // Preserve security and CORS policy. Never forward Set-Cookie,
+    // Location on 200, authentication or arbitrary upstream headers.
+    if(typeof raw!=="string"||raw.length>16000||/[\r\n\0]/.test(raw)){
+     stop("RESPONSE_HEADER_DENIED");return;
+    }
+    headers[name]=raw;
+   }
    const chunks:Buffer[]=[];let size=0;
    res.on("data",(chunk:Buffer)=>{
     size+=chunk.length;
@@ -132,7 +162,7 @@ async function readNative(target:Target,signal:AbortSignal):Promise<HopResponse>
    res.once("error",()=>stop("BODY_UNCONFIRMED"));
    res.once("end",()=>{
     if(!res.complete||(declared!==undefined&&size!==Number(declared))){stop("BODY_UNCONFIRMED");return;}
-    finish(null,{status,contentType:type,body:Buffer.concat(chunks,size)});
+    finish(null,{status,contentType:type,body:Buffer.concat(chunks,size),...(browserType?{headers}:{} )});
    });
   });
   req.once("error",()=>finish(Error("MIZIZI_DESK_NATIVE_TRANSPORT_UNCONFIRMED")));
@@ -203,5 +233,91 @@ export function createDeskNativeReaderV1(options:NativeReadOptions){
     identityVerified:false as const});
   }
   fail("REDIRECT_DENIED");
+ };
+}
+
+
+export type DeskBrowserResourceBindingV1=Readonly<{
+ scope:DeskSearchScopeV1;url:string;resourceType:string;topLevelUrl:string;
+}>;
+type BrowserResourceReadOptionsV1=Readonly<{
+ /** Must independently bind disclosure, source access, tool and session
+  * permission to this exact request; no model-issued authority. */
+ authorize:(binding:DeskBrowserResourceBindingV1,requestSha256:string)=>Promise<NativeReadAuthority|null>;
+ /** Durable host acquisition reservation, including the selected IP and
+  * exact browser binding. No refund for unknown/failed transmission. */
+ precharge:(binding:DeskBrowserResourceBindingV1,target:Target,authority:NativeReadAuthority,
+  requestSha256:string)=>Promise<boolean>;
+ now?:()=>number;
+ /** Tests only; the real composition must use the pinned TLS implementation. */
+ resolve4?:NativeReadOptions["resolve4"];
+ readPinned?:(target:Target,signal:AbortSignal,resourceType:string)=>Promise<HopResponse>;
+}>;
+/** One authorized browser resource hop, not a generic proxy. Shared native
+ * TLS/DNS/byte boundary; no Chromium headers, credentials or direct network.
+ * Never follow redirects here. Caller must separately authorize next hop.
+ * No default policy, finance or host network-isolation claim.
+ */
+export function createDeskBrowserResourceReaderV1(options:BrowserResourceReadOptionsV1){
+ if(typeof options?.authorize!=="function"||typeof options.precharge!=="function")
+  fail("TRUSTED_AUTHORITY_REQUIRED");
+ const now=options.now??Date.now,resolve4=options.resolve4??resolveNative,
+  read=options.readPinned??readNative;
+ return async(binding:DeskBrowserResourceBindingV1,requestSha256:string,parentSignal:AbortSignal)=>{
+  const s=binding?.scope;
+  if(!s||Object.keys(s).sort().join(",")!=="caseId,expectedRevision,jobId,leaseExpiresAt,workerId,workspaceId"||
+   ![s.jobId,s.caseId,s.workspaceId].every(id=>typeof id==="string"&&UUID.test(id))||
+   !Number.isSafeInteger(s.expectedRevision)||s.expectedRevision<1||
+   typeof s.workerId!=="string"||!/^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/.test(s.workerId)||
+   typeof s.leaseExpiresAt!=="string"||!Number.isFinite(Date.parse(s.leaseExpiresAt))||
+   Date.parse(s.leaseExpiresAt)<=now())fail("SCOPE_DENIED");
+  if(Object.keys(binding).sort().join(",")!=="resourceType,scope,topLevelUrl,url"||
+   typeof binding.resourceType!=="string"||!Object.hasOwn(BROWSER_MIMES,binding.resourceType)||
+   !/^[a-f0-9]{64}$/.test(requestSha256)||createHash("sha256").update(JSON.stringify(binding)).digest("hex")!==requestSha256||
+   !(parentSignal instanceof AbortSignal))fail("BROWSER_BINDING_DENIED");
+  const url=publicUrl(binding.url),top=publicUrl(binding.topLevelUrl);
+  if(url.href!==binding.url||top.href!==binding.topLevelUrl||
+   (binding.resourceType==="document"&&url.href!==top.href))fail("BROWSER_BINDING_DENIED");
+  const exact=Object.freeze({...binding,scope:Object.freeze({...s})});
+  const lease=Date.parse(s.leaseExpiresAt),end=Math.min(lease,now()+MAX_DURATION_MS);
+  const signal=AbortSignal.any([parentSignal,AbortSignal.timeout(Math.max(1,end-now()))]);
+  const live=()=>{if(signal.aborted||now()>=end)fail("DEADLINE");};
+  const approved=(a:NativeReadAuthority|null):a is NativeReadAuthority=>
+   !!a&&a.acquisitionAllowed===true&&a.zeroIncrementalSpendAllowed===true&&
+   typeof a.policyRef==="string"&&/^[A-Za-z0-9._:/-]{8,200}$/.test(a.policyRef)&&
+   typeof a.validUntil==="string"&&Date.parse(a.validUntil)>now()&&Date.parse(a.validUntil)<=lease;
+  live();
+  const authority=await options.authorize(exact,requestSha256);
+  live();if(!approved(authority))fail("ACQUISITION_DENIED");
+  const addresses=await resolve4(url.hostname,signal);
+  live();
+  if(!Array.isArray(addresses)||addresses.length<1||addresses.length>32||
+   addresses.some(a=>!isPublicDeskIpv4V1(a)))fail("DNS_ADDRESS_DENIED");
+  const target=Object.freeze({url:url.href,hostname:url.hostname,address:addresses[0]});
+  if(await options.precharge(exact,target,authority,requestSha256)!==true)fail("ZERO_COST_BUDGET_UNAVAILABLE");
+  live();
+  const fresh=await options.authorize(exact,requestSha256);
+  live();if(!approved(fresh)||fresh.policyRef!==authority.policyRef||!approved(authority))fail("ACQUISITION_AUTHORITY_CHANGED");
+  const response=await read(target,signal,exact.resourceType);
+  live();
+  if(!response||!(response.body instanceof Uint8Array)||response.body.byteLength>MAX_BYTES)fail("RESPONSE_TOO_LARGE");
+  const after=await options.authorize(exact,requestSha256);
+  live();if(!approved(after)||after.policyRef!==authority.policyRef)fail("ACQUISITION_AUTHORITY_CHANGED");
+  if([301,302,303,307,308].includes(response.status)){
+   if(typeof response.location!=="string"||response.body.byteLength!==0)fail("REDIRECT_DENIED");
+   const location=publicUrl(response.location,url.href).href;
+   return Object.freeze({requestSha256,status:response.status,location});
+  }
+  if(response.status!==200)fail("SOURCE_UNAVAILABLE");
+  const type=browserContentType(response.contentType,exact.resourceType),body=Uint8Array.from(response.body);
+  if(body.length<1)fail("BODY_UNCONFIRMED");
+  const headers:Record<string,string>={};
+  for(const [name,value] of Object.entries(response.headers??{})){
+   if(!(BROWSER_RESPONSE_HEADERS as readonly string[]).includes(name)||
+    typeof value!=="string"||value.length>16000||/[\r\n\0]/.test(value))fail("RESPONSE_HEADER_DENIED");
+   headers[name]=value;
+  }
+  return Object.freeze({requestSha256,status:200,contentType:type,body,
+   sha256:createHash("sha256").update(body).digest("hex"),headers:Object.freeze(headers)});
  };
 }
