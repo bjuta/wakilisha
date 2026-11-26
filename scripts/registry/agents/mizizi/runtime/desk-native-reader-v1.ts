@@ -192,7 +192,7 @@ export function createDeskNativeReaderV1(options:NativeReadOptions){
    const body=Uint8Array.from(response.body);
    if(body.length===0||(type==="application/pdf"&&new TextDecoder().decode(body.subarray(0,5))!=="%PDF-"))
     fail("BODY_UNCONFIRMED");
-   return Object.freeze({contract:"mizizi.desk_native_read.v1" as const,requestedUrl:first,
+   return Object.freeze({contract:"mizizi.desk_native_read.v1" as const,scope,requestedUrl:first,
     finalUrl:url.href,redirects:Object.freeze(redirects),retrievedAt:new Date(now()).toISOString(),
     contentType:type,byteLength:body.length,sha256:createHash("sha256").update(body).digest("hex"),
     body,sourceRetentionAuthorized:false as const,externalModelProcessingAuthorized:false as const,
