@@ -286,8 +286,11 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
 describe("Exact Charts research lease transport (existing worker lifecycle)",()=>{
  const workerId="mizizi-chart:"+JOB;
  const bytes=new Uint8Array(123).fill(7);
+ const registryClient={from:vi.fn(()=>({
+  select:()=>({eq:()=>({order:()=>({limit:async()=>({data:[],error:null})})})})
+ }))};
  const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
-  preflight:async()=>true,readOriginal:async()=>bytes.slice()};
+  preflight:async()=>true,readOriginal:async()=>bytes.slice(),registryClient};
  const exactRow={...row,input_payload:{...row.input_payload,
   reason:"Investigate receipt-bound chart recording identity."}};
  const sha=createHash("sha256").update(bytes).digest("hex");
@@ -325,6 +328,8 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   const h=scoped();
   const result=await h.run(async(job)=>{
    expect(job.chartContext).toEqual(context);
+   expect(job.chartRegistryDiscovery).toMatchObject({contract:"charts2-registry-discovery/v1",
+    candidate_only:true,can_publish:false,unmatched_positions:1,groups:[],catalogue_scanned:0});
    expect(job.publicSourceSearchApproved).toBe(false);
    expect(job.researchQuestion).toBeNull();
    return finding;
@@ -333,10 +338,11 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   expect(h.calls.map(c=>c.fn)).toEqual([
    "mizizi_recover_expired_chart_research_job_v1","mizizi_claim_exact_chart_research_job_v1",
    "mizizi_read_leased_chart_research_context_v1","mizizi_read_leased_chart_research_context_v1",
-   "mizizi_read_leased_chart_research_context_v1","mizizi_complete_case_research_job_v1"]);
+   "mizizi_read_leased_chart_research_context_v1","mizizi_read_leased_chart_research_context_v1",
+   "mizizi_complete_case_research_job_v1"]);
   expect(h.calls[1].args).toMatchObject({p_job_id:JOB,p_case_id:CASE,p_workspace_id:WORKSPACE,
    p_expected_revision:2,p_worker_id:workerId});
-  expect(h.calls[5].args.p_result).toEqual(finding);
+  expect(h.calls[6].args.p_result).toEqual(finding);
  });
  it("stops before any RPC when trusted preflight is absent or denied",async()=>{
   for(const preflight of [async()=>false,async()=>{throw Error("PROVIDER_UNAVAILABLE");}]){
@@ -371,9 +377,9 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   }
  });
  it("does not complete or fail a job whose verified context changed during research",async()=>{
-  const h=scoped({contexts:[context,context,{...context,observationSha256:"c".repeat(64)}]});
+  const h=scoped({contexts:[context,context,context,{...context,observationSha256:"c".repeat(64)}]});
   await expect(h.run(async()=>finding)).rejects.toThrow("CONTEXT_CHANGED_BEFORE_COMPLETION");
-  expect(h.calls).toHaveLength(5);
+  expect(h.calls).toHaveLength(6);
  });
  it("uses only the exact private content-addressed Storage object",async()=>{
   const download=vi.fn(async()=>({data:new Blob([bytes]),error:null}));
@@ -417,6 +423,15 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   const handler=vi.fn(async()=>finding);
   await expect(h.run(handler)).rejects.toThrow("CONTEXT_CHANGED_BEFORE_RESEARCH");
   expect(h.calls).toHaveLength(4);expect(handler).not.toHaveBeenCalled();
+ });
+ it("fails closed before research on unavailable Registry or stale post-discovery context",async()=>{
+  const h=scoped(),handler=vi.fn(async()=>finding);
+  await expect(h.run(handler,{...scope,registryClient:{from:()=>{throw Error("unavailable");}}}))
+   .rejects.toThrow("REGISTRY_DISCOVERY_UNCONFIRMED");
+  expect(h.calls).toHaveLength(4);expect(handler).not.toHaveBeenCalled();
+  const stale=scoped({contexts:[context,context,{...context,observationSha256:"c".repeat(64)}]});
+  await expect(stale.run(handler)).rejects.toThrow("CONTEXT_CHANGED_AFTER_REGISTRY");
+  expect(stale.calls).toHaveLength(5);expect(handler).not.toHaveBeenCalled();
  });
  it("never calls generic claim/recovery or invents work when the scoped job is unavailable",async()=>{
   const h=scoped({claim:[]}),handler=vi.fn(async()=>finding);

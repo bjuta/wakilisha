@@ -7,7 +7,7 @@ import { decodeCharts2Original, listCharts2SourceContracts, charts2YouTubeNative
 import {scoreCharts2PrivatePreviewV1,CHARTS2_PRIVATE_METHODOLOGY_V1,summarizeCharts2SourceCoverageV1} from "../_shared/charts2-private-scoring-v1.mjs";
 import {YOUTUBE_EXPORT_ENDPOINT,YOUTUBE_EXPORT_MODE,YOUTUBE_EXPORT_ACK,
   YOUTUBE_EXPORT_PARSER_VERSION} from "../_shared/charts2-youtube-official-export.mjs";
-import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,charts2RegistryDiscoveryKeyV1,buildCharts2InvestigationInputV1,verifyCharts2InvestigationParityV1} from "../_shared/charts2-private-native-review-v1.mjs";
+import {buildCharts2PrivateNativeReviewV1,readCharts2RegistryDiscoveryV1,readCharts2RegistryTracksV1,buildCharts2InvestigationInputV1,verifyCharts2InvestigationParityV1} from "../_shared/charts2-private-native-review-v1.mjs";
 import {bindRecordingInvestigationGroups,type ChartInvestigationInput} from "../../../src/services/chartsPrivate/recordingReviewSuggestions.ts";
 
 const MAX_BYTES = 4_000_000;
@@ -182,71 +182,10 @@ async function requireRegistryReviewer(authClient:any) {
 const TRACK_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 // One shared Registry projection for manual search and automatic candidate discovery.
 async function readStudioRegistryTracks(server:any,ids:string[],strict=false) {
-    const [trackRows,artistRows,providerRows]=await Promise.all([
-      server.from("registry_tracks").select("id,title,isrc,status,slug,duration_ms,release_id")
-        .eq("status","active").in("id",ids),
-      server.from("registry_track_artists").select("track_id,artist_id,artist_name_text,is_primary")
-        .eq("status","active").in("track_id",ids).limit(120),
-      server.from("registry_track_provider_links").select("track_id,provider_key,match_method,match_status")
-        .eq("match_status","matched").in("track_id",ids).limit(120),
-    ]);
-    if(trackRows.error||artistRows.error||providerRows.error)
-      throw new Reject(503,"charts2_studio_registry_search_failed");
-    if(strict&&((artistRows.data??[]).length>=120||(providerRows.data??[]).length>=120))
-      throw new Reject(503,"charts2_registry_discovery_detail_bound");
-    const artistIds=[...new Set((artistRows.data??[]).map((r:any)=>r.artist_id).filter(Boolean))];
-    const artistDetails=artistIds.length?await server.from("registry_artists")
-      .select("id,display_name,origin_iso2,status")
-      .in("id",artistIds).limit(120):{data:[],error:null};
-    if(artistDetails.error)throw new Reject(503,"charts2_studio_registry_search_failed");
-    const aliasRows=strict&&artistIds.length?await server.from("registry_artist_aliases")
-      .select("canonical_artist_id,alias_display_name,alias_slug").eq("status","active")
-      .in("canonical_artist_id",artistIds).limit(501):{data:[],error:null};
-    if(aliasRows.error||(aliasRows.data??[]).length>=501)
-      throw new Reject(503,"charts2_registry_discovery_alias_bound");
-    const aliasNames=new Map<string,string[]>();
-    for(const alias of aliasRows.data??[]){
-      const names=aliasNames.get(alias.canonical_artist_id)??[];
-      names.push(alias.alias_display_name??alias.alias_slug,alias.alias_slug);
-      aliasNames.set(alias.canonical_artist_id,names);
-    }
-    const byArtistId=new Map((artistDetails.data??[]).map((a:any)=>[a.id,a]));
-    const artists=new Map<string,string[]>();
-    const artistCredits=new Map<string,Array<{
-      name:string;is_primary:boolean;origin_iso2:string|null;artist_status:string|null;canonical_name:string|null;alias_names:string[];
-    }>>();
-    for(const row of artistRows.data??[]){
-      const name=String(row.artist_name_text??"").trim();
-      if(!name)continue;
-      const names=artists.get(row.track_id)??[];
-      if(!names.includes(name))names.push(name);
-      artists.set(row.track_id,names);
-      const credits=artistCredits.get(row.track_id)??[];
-      if(!credits.some(x=>x.name===name && x.is_primary===Boolean(row.is_primary))){
-        const artist=byArtistId.get(row.artist_id) as
-          {origin_iso2?:string|null;status?:string|null;display_name?:string|null}|undefined;
-        credits.push({name,is_primary:Boolean(row.is_primary),
-          origin_iso2:artist?.origin_iso2??null,
-          artist_status:artist?.status??null,canonical_name:artist?.display_name??null,
-          alias_names:aliasNames.get(row.artist_id)??[]});
-      }
-      artistCredits.set(row.track_id,credits);
-    }
-    const providers=new Map<string,string[]>();
-    for(const row of providerRows.data??[]){
-      const names=providers.get(row.track_id)??[];
-      const label=String(row.provider_key)+" ("+String(row.match_method??"unknown")+")";
-      if(!names.includes(label))names.push(label);
-      providers.set(row.track_id,names);
-    }
-    const order=new Map<string,number>(ids.map((id:string,i:number):[string,number]=>[id,i]));
-    return (trackRows.data??[])
-      .sort((a:any,b:any)=>(order.get(a.id)??99)-(order.get(b.id)??99))
-      .map((track:any)=>({...track,
-        artist_names:artists.get(track.id)??[],
-        artist_credits:artistCredits.get(track.id)??[],
-        provider_keys:providers.get(track.id)??[],
-      }));
+  try{return await readCharts2RegistryTracksV1(server,ids,strict);}
+  catch(error){
+    throw new Reject(503,error instanceof Error?error.message:"charts2_studio_registry_search_failed");
+  }
 }
 
 async function prepareMiziziChartCandidates(server:any) {
@@ -339,37 +278,14 @@ async function studioAction(mode:string,req:Request,server:any,authClient:any) {
     await Promise.all(receipts.map((r:any)=>verifyPrivateOriginal(server,r)));
     const preview=scoreCharts2PrivatePreviewV1({receipts,registry_links:snapshot.registry_links,
       observation_reviews:snapshot.observation_reviews??[]});
-    const keys=new Set(preview.unresolved.map((row:any)=>charts2RegistryDiscoveryKeyV1(row.title)).filter(Boolean));
-    // Bounded keyset scan of active public catalogue; never silently truncate.
-    // Candidate discovery does not authorize any identity or write.
-    const ids:string[]=[];
-    let lastId:string|null=null;
-    let scanned=0;
-    while(keys.size){
-      let query=server.from("registry_tracks").select("id,title").eq("status","active").order("id",{ascending:true}).limit(500);
-      if(lastId)query=query.gt("id",lastId);
-      const result=await query;
-      if(result.error||!Array.isArray(result.data))
-        throw new Reject(503,"charts2_registry_discovery_catalogue_unavailable");
-      scanned+=result.data.length;
-      if(scanned>10000)throw new Reject(503,"charts2_registry_discovery_catalogue_bound");
-      for(const track of result.data){
-        if(keys.has(charts2RegistryDiscoveryKeyV1(track.title)))ids.push(track.id);
-      }
-      if(ids.length>300)throw new Reject(503,"charts2_registry_discovery_candidate_bound");
-      if(result.data.length<500)break;
-      const next=result.data[result.data.length-1]?.id;
-      if(!next||next===lastId)throw new Reject(503,"charts2_registry_discovery_cursor_invalid");
-      lastId=next;
+    let result;
+    try {result=await readCharts2RegistryDiscoveryV1(server,preview.unresolved);}
+    catch(error){
+      const code=error instanceof Error?error.message:"charts2_studio_registry_search_failed";
+      throw new Reject(code==="charts2_registry_discovery_catalogue_changed"?409:503,code);
     }
-    const tracks=[];
-    for(let i=0;i<ids.length;i+=30)
-      tracks.push(...await readStudioRegistryTracks(server,ids.slice(i,i+30),true));
-    if(tracks.length!==ids.length)
-      throw new Reject(409,"charts2_registry_discovery_catalogue_changed");
-    const result=buildCharts2RegistryDiscoveryV1({unresolved:preview.unresolved,tracks});
     return {...result,state:"registry_discovery",source_coverage:preview.source_coverage,
-      unresolved_count:preview.unresolved.length,catalogue_scanned:scanned};
+      unresolved_count:preview.unresolved.length};
   }
   if(mode==="studio_preview") {
     const snapshot=await studioSnapshot(server);

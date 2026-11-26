@@ -4,6 +4,7 @@
  * default result, new queue, Registry writer or credential handling exists.
  */
 import {verifyCharts2OriginalBytesV1} from "../../../../../supabase/functions/_shared/charts2-original-candidate.mjs";
+import {readCharts2RegistryDiscoveryV1} from "../../../../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 export const RESEARCH_WORKER_CYCLE_CONTRACT = "mizizi.research_worker_cycle.v1" as const;
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const WORKER=/^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/;
@@ -18,6 +19,8 @@ export type ChartResearchScopeV1=Readonly<{
  /** Trusted, private, Storage-only reader. Never fetch a provider URL.
   * The worker itself checks exact length and SHA-256; no boolean attestation. */
  readOriginal:(position:LeasedChartPositionV1)=>Promise<Uint8Array>;
+ /** Trusted local Registry client; not an external provider. */
+ registryClient:Readonly<{from:(table:string)=>any}>;
 }>;
 export type LeasedChartPositionV1=Readonly<{
  source_key:string;receipt_id:string;original_sha256:string;rank:number;
@@ -38,6 +41,8 @@ export type ResearchJobV1=Readonly<{
  /** Exact original job reason, only a publicly approved question may be searched. */
  researchQuestion:string|null;publicSourceSearchApproved:boolean;
  chartContext?:LeasedChartResearchContextV1;
+ /** Discovery leads, never identity proof or source permission. */
+ chartRegistryDiscovery?:Readonly<Awaited<ReturnType<typeof readCharts2RegistryDiscoveryV1>>>;
 }>;
 export type ReadOnlyResearchResultV1=Readonly<{
  contract:"mizizi.read_only_research_result.v1";caseId:string;
@@ -318,6 +323,7 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
  let exact:Record<string,unknown>|null=null;
  if(scope!==undefined){
    if(!scope||typeof scope.preflight!=="function"||typeof scope.readOriginal!=="function"||
+      typeof scope.registryClient?.from!=="function"||
       limit!==1||!CHART_WORKER.test(workerId))
     throw new TypeError("MIZIZI_CHART_WORKER_INVALID_SCOPE");
    exact={p_job_id:uuid(scope.jobId),p_case_id:uuid(scope.caseId),
@@ -354,7 +360,7 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
  for(const leased of jobs){
    // Context failures are outside the handler's failure-receipt path: a
    // mismatched or stale lease is not authority to mutate another job.
-   const job=exact?Object.freeze({...leased,
+   let job:ResearchJobV1=exact?Object.freeze({...leased,
      chartContext:await readChartContext(rpc,leased,workerId,now())}):leased;
    // Re-read each exact original before any source reader, model or pass
    // handler runs. A missing/mismatched object is an authority failure, not
@@ -372,6 +378,18 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
      const fresh=await readChartContext(rpc,job,workerId,now());
      if(JSON.stringify(fresh)!==JSON.stringify(job.chartContext))
        throw new Error("MIZIZI_CHART_WORKER_CONTEXT_CHANGED_BEFORE_RESEARCH");
+     const positions=job.chartContext.positions.map(p=>({
+       source_key:p.source_key,receipt_id:p.receipt_id,rank:p.rank,
+       original_sha256:p.original_sha256,title:p.title,artist:p.artist,
+       provider_track_id:p.provider_track_id,
+     }));
+     let discovery;
+     try{discovery=await readCharts2RegistryDiscoveryV1(scope.registryClient,positions);}
+     catch{throw new Error("MIZIZI_CHART_REGISTRY_DISCOVERY_UNCONFIRMED");}
+     const afterDiscovery=await readChartContext(rpc,job,workerId,now());
+     if(JSON.stringify(afterDiscovery)!==JSON.stringify(job.chartContext))
+       throw new Error("MIZIZI_CHART_WORKER_CONTEXT_CHANGED_AFTER_REGISTRY");
+     job=Object.freeze({...job,chartRegistryDiscovery:Object.freeze(discovery)});
    }
    let researchResult:Readonly<Record<string,unknown>>;
    try{

@@ -1,6 +1,6 @@
 import {describe,expect,it} from "vitest";
 import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
-import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,buildCharts2InvestigationInputV1,verifyCharts2InvestigationParityV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
+import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,readCharts2RegistryDiscoveryV1,buildCharts2InvestigationInputV1,verifyCharts2InvestigationParityV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import {suggestRecordingReviewGroups,buildRecordingInvestigationGroups,bindRecordingInvestigationGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
 import {
   appendChartReviewReference,
@@ -86,6 +86,7 @@ const STUDIO_SQL=readFileSync("supabase/migrations/20261119101415_charts2_studio
 const FREEZE_SQL=readFileSync("supabase/migrations/20261119111655_charts2_private_freeze_authority_v1.sql","utf8");
 const ORIGIN_SQL=readFileSync("supabase/migrations/20261119180542_charts2_top100_origin_neutral_integrity_v1.sql","utf8");
 const STUDIO_WORKER=readFileSync("supabase/functions/charts2-capture/index.ts","utf8");
+const REGISTRY_DISCOVERY_SHARED=readFileSync("supabase/functions/_shared/charts2-private-native-review-v1.mjs","utf8");
 const CHART_REVIEW_REF=readFileSync("src/services/chartsPrivate/chartReviewContext.ts","utf8");
 const CHART_RETURN=readFileSync("src/components/admin/charts/ChartReviewReturnContext.tsx","utf8");
 const CHART_ALIAS_REVIEW=readFileSync("src/components/admin/charts/ChartAliasReview.tsx","utf8");
@@ -322,11 +323,11 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).not.toContain("xl:grid-cols-[minmax(0,1fr)_420px]");
     expect(STUDIO_WORKER).toContain('server.from("registry_track_artists").select("track_id")');
     expect(STUDIO_WORKER).toContain('server.from("registry_track_provider_links").select("track_id")');
-    expect(STUDIO_WORKER).toContain('server.from("registry_artist_aliases").select("canonical_artist_id")');
+    expect(REGISTRY_DISCOVERY_SHARED).toContain('server.from("registry_artist_aliases").select("canonical_artist_id")');
     expect(STUDIO_WORKER).toContain('server.from("registry_tracks").select("id").eq("status","active")');
-    expect(STUDIO_WORKER).toContain('artist_names:artists.get(track.id)??[]');
-    expect(STUDIO_WORKER).toContain('artist_credits:artistCredits.get(track.id)??[]');
-    expect(STUDIO_WORKER).toContain('String(row.match_method??"unknown")');
+    expect(REGISTRY_DISCOVERY_SHARED).toContain('artist_names:artists.get(track.id)??[]');
+    expect(REGISTRY_DISCOVERY_SHARED).toContain('artist_credits:artistCredits.get(track.id)??[]');
+    expect(REGISTRY_DISCOVERY_SHARED).toContain('String(row.match_method??"unknown")');
     expect(STUDIO_PAGE).toContain('Other credited Artists:');
     expect(STUDIO_PAGE).toContain('Existing provider links (method, not proof):');
     expect(STUDIO_WORKER).not.toContain('mode==="studio_auto_admit"');
@@ -1143,7 +1144,9 @@ describe("Charts 2 existing Registry candidate discovery",()=>{
     expect(lane).toContain("await requireRegistryReviewer(authClient)");
     expect(lane).toContain("verifyPrivateOriginal(server,r)");
     expect(lane).toContain("preview.unresolved");
-    expect(lane).toContain('charts2_registry_discovery_catalogue_bound');
+    expect(lane).toContain('readCharts2RegistryDiscoveryV1(server,preview.unresolved)');
+    expect(REGISTRY_DISCOVERY_SHARED).toContain('charts2_registry_discovery_catalogue_bound');
+    expect(REGISTRY_DISCOVERY_SHARED).not.toMatch(/\.(insert|upsert|update|delete)\(/);
     expect(lane).not.toMatch(/\.(insert|upsert|update|delete)\(/);
     expect(lane).not.toContain("admin_admit_registry_track_provider_link_v1");
     expect(STUDIO_PAGE).toContain('invokeStudio("studio_registry_discovery")');

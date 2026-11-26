@@ -180,6 +180,114 @@ export function buildCharts2RegistryDiscoveryV1({unresolved,tracks}){
       a.track.title.localeCompare(b.track.title)||a.track.id.localeCompare(b.track.id))};
 }
 
+export async function readCharts2RegistryTracksV1(server,ids,strict=false) {
+    const [trackRows,artistRows,providerRows]=await Promise.all([
+      server.from("registry_tracks").select("id,title,isrc,status,slug,duration_ms,release_id")
+        .eq("status","active").in("id",ids),
+      server.from("registry_track_artists").select("track_id,artist_id,artist_name_text,is_primary")
+        .eq("status","active").in("track_id",ids).limit(120),
+      server.from("registry_track_provider_links").select("track_id,provider_key,match_method,match_status")
+        .eq("match_status","matched").in("track_id",ids).limit(120),
+    ]);
+    if(trackRows.error||artistRows.error||providerRows.error||
+      !Array.isArray(trackRows.data)||!Array.isArray(artistRows.data)||!Array.isArray(providerRows.data))
+      fail("charts2_studio_registry_search_failed");
+    if(strict&&((artistRows.data??[]).length>=120||(providerRows.data??[]).length>=120))
+      fail("charts2_registry_discovery_detail_bound");
+    const artistIds=[...new Set((artistRows.data??[]).map((r)=>r.artist_id).filter(Boolean))];
+    const artistDetails=artistIds.length?await server.from("registry_artists")
+      .select("id,display_name,origin_iso2,status")
+      .in("id",artistIds).limit(120):{data:[],error:null};
+    if(artistDetails.error||!Array.isArray(artistDetails.data)||
+      (strict&&artistDetails.data.length!==artistIds.length))fail("charts2_studio_registry_search_failed");
+    const aliasRows=strict&&artistIds.length?await server.from("registry_artist_aliases")
+      .select("canonical_artist_id,alias_display_name,alias_slug").eq("status","active")
+      .in("canonical_artist_id",artistIds).limit(501):{data:[],error:null};
+    if(aliasRows.error||!Array.isArray(aliasRows.data)||(aliasRows.data??[]).length>=501)
+      fail("charts2_registry_discovery_alias_bound");
+    const aliasNames=new Map();
+    for(const alias of aliasRows.data??[]){
+      const names=aliasNames.get(alias.canonical_artist_id)??[];
+      names.push(alias.alias_display_name??alias.alias_slug,alias.alias_slug);
+      aliasNames.set(alias.canonical_artist_id,names);
+    }
+    const byArtistId=new Map((artistDetails.data??[]).map((a)=>[a.id,a]));
+    const artists=new Map();
+    const artistCredits=new Map();
+    for(const row of artistRows.data??[]){
+      const name=String(row.artist_name_text??"").trim();
+      if(!name)continue;
+      const names=artists.get(row.track_id)??[];
+      if(!names.includes(name))names.push(name);
+      artists.set(row.track_id,names);
+      const credits=artistCredits.get(row.track_id)??[];
+      if(!credits.some(x=>x.name===name && x.is_primary===Boolean(row.is_primary))){
+        const artist=byArtistId.get(row.artist_id);
+        credits.push({name,is_primary:Boolean(row.is_primary),
+          origin_iso2:artist?.origin_iso2??null,
+          artist_status:artist?.status??null,canonical_name:artist?.display_name??null,
+          alias_names:aliasNames.get(row.artist_id)??[]});
+      }
+      artistCredits.set(row.track_id,credits);
+    }
+    const providers=new Map();
+    for(const row of providerRows.data??[]){
+      const names=providers.get(row.track_id)??[];
+      const label=String(row.provider_key)+" ("+String(row.match_method??"unknown")+")";
+      if(!names.includes(label))names.push(label);
+      providers.set(row.track_id,names);
+    }
+    const order=new Map(ids.map((id,i)=>[id,i]));
+    return (trackRows.data??[])
+      .sort((a,b)=>(order.get(a.id)??99)-(order.get(b.id)??99))
+      .map((track)=>({...track,
+        artist_names:artists.get(track.id)??[],
+        artist_credits:artistCredits.get(track.id)??[],
+        provider_keys:providers.get(track.id)??[],
+      }));
+}
+
+/** Shared bounded catalogue read. Caller verifies current originals and access.
+ * No identity selection, grant, outbound provider call or write.
+ */
+export async function readCharts2RegistryDiscoveryV1(server,unresolved){
+  if(!server||typeof server.from!=="function"||!Array.isArray(unresolved)||unresolved.length>600)
+    fail("charts2_registry_discovery_input_bounds");
+  const keys=new Set(unresolved.map(row=>charts2RegistryDiscoveryKeyV1(row.title)).filter(Boolean));
+  const ids=[];
+  let lastId=null,scanned=0;
+  const uuid=/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+  while(keys.size){
+    let query=server.from("registry_tracks").select("id,title").eq("status","active").order("id",{ascending:true}).limit(500);
+    if(lastId)query=query.gt("id",lastId);
+    const result=await query;
+    if(result.error||!Array.isArray(result.data)||result.data.length>500)
+      fail("charts2_registry_discovery_catalogue_unavailable");
+    scanned+=result.data.length;
+    if(scanned>10000)fail("charts2_registry_discovery_catalogue_bound");
+    for(const track of result.data){
+      if(!track||typeof track.id!=="string"||!uuid.test(track.id)||
+         typeof track.title!=="string"||(lastId!==null&&track.id<=lastId))
+        fail("charts2_registry_discovery_cursor_invalid");
+      lastId=track.id;
+      if(keys.has(charts2RegistryDiscoveryKeyV1(track.title)))ids.push(track.id);
+    }
+    if(ids.length>300)fail("charts2_registry_discovery_candidate_bound");
+    if(result.data.length<500)break;
+  }
+  const tracks=[];
+  for(let i=0;i<ids.length;i+=30){
+    const batch=ids.slice(i,i+30);
+    const found=await readCharts2RegistryTracksV1(server,batch,true);
+    if(found.length!==batch.length||new Set(found.map(t=>t.id)).size!==batch.length||
+      found.some(t=>!batch.includes(t.id)||t.status!=="active"||
+       !keys.has(charts2RegistryDiscoveryKeyV1(t.title))))
+      fail("charts2_registry_discovery_catalogue_changed");
+    tracks.push(...found);
+  }
+  return {...buildCharts2RegistryDiscoveryV1({unresolved,tracks}),catalogue_scanned:scanned};
+}
+
 // Server-side read-only admission input. The caller must first verify the
 // original Storage bytes using the existing Charts Studio verifier. The
 // snapshot must come from the service-only Studio SQL reader, never a browser.
