@@ -1,0 +1,43 @@
+name: Temporary MIZIZI Desk Parser Dependency Lock
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/mizizi-desk-parser-lock-temporary.yml
+permissions:
+  contents: read
+jobs:
+  lock:
+    if: github.event.pull_request.number == 1442 && github.head_ref == 'work/mizizi-charts-candidate-resolution-20261126'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate exact dependency lock without executing lifecycle scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = bb272e850e17aec14293328610b7c9ad023d94c2
+          cp package-lock.json /tmp/mizizi-base-lock.json
+          npm install --package-lock-only --save-dev --save-exact --ignore-scripts --no-audit --no-fund @mozilla/readability@0.6.0 pdfjs-dist@6.1.200
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import {createHash} from "node:crypto";
+          const old=JSON.parse(fs.readFileSync("/tmp/mizizi-base-lock.json","utf8"));
+          const lock=JSON.parse(fs.readFileSync("package-lock.json","utf8"));
+          const manifest=JSON.parse(fs.readFileSync("package.json","utf8"));
+          const changed=Object.entries(lock.packages).filter(([k,v])=>JSON.stringify(old.packages[k])!==JSON.stringify(v));
+          const removed=Object.keys(old.packages).filter(k=>!(k in lock.packages));
+          if(changed.length>65||removed.length>10)throw Error("Unexpected dependency churn");
+          console.log("MIZIZI_LOCK_DELTA="+JSON.stringify({changed,removed,keys:Object.keys(lock.packages)}));
+          for(const path of ["package.json","package-lock.json"])console.log("MIZIZI_FILE_SHA256="+path+":"+createHash("sha256").update(fs.readFileSync(path)).digest("hex"));
+          console.log("MIZIZI_MANIFEST_DEPS="+JSON.stringify(manifest.devDependencies));
+          console.log("MIZIZI_PARSER_LOCK=PASS");
+          NODE
