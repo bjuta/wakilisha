@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkTextField, WkSearchField } from "@/components/design-system/primitives/Field";
 
 
 
@@ -1680,19 +1681,12 @@ export default function TrackIntakePage() {
 
         {!deepSuggestion && !deepPlaylistItem ? (
           <section className="mb-5 grid gap-3 lg:grid-cols-[1fr_220px]">
-            <div className="flex items-center gap-2 rounded-xl border border-wk-border bg-wk-surface px-3">
-              <WkIcon
-                name="Search"
-                size={15}
-                className="text-wk-text-faint"
-              />
-              <input
+            <WkSearchField
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(value) => setQuery(value)}
                 placeholder="Search title, artist, provider or Playlist"
-                className="h-11 w-full bg-transparent text-sm outline-none"
+                ariaLabel="Search title, artist, provider or Playlist"
               />
-            </div>
             <WkSelect
               value={status}
               onChange={(value) => setStatus(value)}
@@ -2128,7 +2122,7 @@ export default function TrackIntakePage() {
                             </option>
                           </WkSelect>
 
-                          <input
+                          <WkSearchField
                             value={
                               providerQuery[suggestionId] ??
                               [
@@ -2141,14 +2135,14 @@ export default function TrackIntakePage() {
                                 .filter(Boolean)
                                 .join(" ")
                             }
-                            onChange={(event) =>
+                            onChange={(value) =>
                               setProviderQuery((current) => ({
                                 ...current,
                                 [suggestionId]:
-                                  event.target.value,
+                                  value,
                               }))
                             }
-                            className="h-10 rounded-lg border border-wk-border bg-wk-bg px-3 text-xs outline-none"
+                            ariaLabel="Search provider catalog"
                             placeholder="Search provider catalog"
                           />
 
@@ -2563,24 +2557,24 @@ export default function TrackIntakePage() {
                                 <label className="block text-xs font-bold" htmlFor={`chart-credit-name-${suggestionId}`}>
                                   Artist Name
                                 </label>
-                                <input id={`chart-credit-name-${suggestionId}`} value={chartCreditName[suggestionId]??""}
-                                  onChange={e=>setChartCreditName(v=>({...v,[suggestionId]:e.target.value}))}
-                                  className="w-full rounded-xl border border-wk-border bg-wk-surface p-3 text-sm"
+                                <WkTextField id={`chart-credit-name-${suggestionId}`} value={chartCreditName[suggestionId]??""}
+                                  onChange={value=>setChartCreditName(v=>({...v,[suggestionId]:value}))}
+                                  ariaLabel="Artist Name"
                                   placeholder="Independently verified Artist name"/>
                                 <label className="block text-xs font-bold" htmlFor={`chart-credit-note-${suggestionId}`}>
                                   Identity and Credit Evidence
                                 </label>
-                                <textarea id={`chart-credit-note-${suggestionId}`}
+                                <WkTextField multiline id={`chart-credit-note-${suggestionId}`}
                                   value={chartCreditNote[suggestionId]??""} rows={3}
-                                  onChange={e=>setChartCreditNote(v=>({...v,[suggestionId]:e.target.value}))}
-                                  className="w-full rounded-xl border border-wk-border bg-wk-surface p-3 text-sm"
+                                  onChange={value=>setChartCreditNote(v=>({...v,[suggestionId]:value}))}
+                                  ariaLabel="Identity and Credit Evidence"
                                   placeholder="Describe the evidence for this exact Artist credit"/>
                                 <label className="block text-xs font-bold" htmlFor={`chart-credit-url-${suggestionId}`}>
                                   Evidence URL
                                 </label>
-                                <input id={`chart-credit-url-${suggestionId}`} value={chartCreditEvidence[suggestionId]??""}
-                                  onChange={e=>setChartCreditEvidence(v=>({...v,[suggestionId]:e.target.value}))}
-                                  className="w-full rounded-xl border border-wk-border bg-wk-surface p-3 text-sm"
+                                <WkTextField id={`chart-credit-url-${suggestionId}`} value={chartCreditEvidence[suggestionId]??""}
+                                  onChange={value=>setChartCreditEvidence(v=>({...v,[suggestionId]:value}))}
+                                  ariaLabel="Evidence URL"
                                   placeholder="https://"/>
                                 <button type="button" className="wk-button wk-button-ghost wk-button-sm"
                                   disabled={busy!==null||!(chartCreditName[suggestionId]??"").trim()||
@@ -2689,14 +2683,14 @@ export default function TrackIntakePage() {
                                           </option>
                                         </WkSelect>
 
-                                        <input
+                                        <WkTextField
                                           value={queryValue}
-                                          onChange={(event) => {
+                                          onChange={(value) => {
                                             setArtistQuery(
                                               (current) => ({
                                                 ...current,
                                                 [key]:
-                                                  event.target.value,
+                                                  value,
                                               }),
                                             );
 
@@ -2722,7 +2716,7 @@ export default function TrackIntakePage() {
                                             }
                                           }}
                                           placeholder="Search Registry artist"
-                                          className="h-10 min-w-0 rounded-lg border border-wk-border bg-wk-surface px-3 text-xs outline-none focus:border-wk-brand"
+                                          ariaLabel="Search Registry artist"
                                         />
 
                                         <button
@@ -2947,59 +2941,22 @@ export default function TrackIntakePage() {
                             </div>
                           ) : row.canonical_track_id ? (
                             <div className="mt-3 rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-3">
-                              <div className="flex items-center gap-2">
-                                <WkIcon
-                                  name="CheckCircle2"
-                                  size={15}
-                                  className="text-wk-brand"
-                                />
-                                <span className="text-[10px] font-black uppercase tracking-wide text-wk-brand">
-                                  Identity already matched
-                                </span>
-                              </div>
-                              <div className="mt-2 text-sm font-bold text-wk-text">
-                                {row.canonical_track_title ||
-                                  row.submitted_track_title ||
-                                  row.provider_title ||
-                                  row.canonical_track_id}
-                              </div>
-                              <p className="mt-1 text-xs leading-5 text-wk-text-muted">
-                                This queue item still needs Registry enrichment review,
-                                but its canonical track identity is already resolved.
-                                Enrichment cannot silently remap it to another track.
-                              </p>
-                            </div>
-                          ) : (
-                            <>
-                          <div className="mt-3 flex items-center gap-2 rounded-lg border border-wk-border bg-wk-surface px-3">
-                            <WkIcon
-                              name="Search"
-                              size={14}
-                              className="text-wk-text-faint"
-                            />
-                            <input
+                              <WkSearchField
                               value={
                                 trackQuery[suggestionId] ??
                                 row.submitted_track_title ??
                                 row.provider_title ??
                                 ""
                               }
-                              onChange={(event) =>
+                              onChange={(value) =>
                                 void searchTracks(
                                   suggestionId,
-                                  event.target.value,
+                                  value,
                                 )
                               }
                               placeholder="Search by track, artist, or ISRC"
-                              className="h-10 min-w-0 w-full bg-transparent text-sm outline-none"
+                              ariaLabel="Search by track, artist, or ISRC"
                             />
-                            <button type="button" disabled={busy !== null || !!trackSearching[suggestionId]}
-                              onClick={() => void searchTracks(suggestionId,
-                                trackQuery[suggestionId] ?? row.submitted_track_title ?? row.provider_title ?? "")}
-                              className="wk-button wk-button-ghost wk-button-sm shrink-0 disabled:opacity-40">
-                              Search
-                            </button>
-                          </div>
 
                           {trackSearchFailed[suggestionId] && (
                             <p role="alert" className="mt-2 text-xs text-wk-danger">
@@ -3091,19 +3048,19 @@ export default function TrackIntakePage() {
                                     <span className="text-[10px] font-black uppercase text-wk-text-muted">
                                       Canonical track title
                                     </span>
-                                    <input
+                                    <WkTextField
                                       value={canonicalTitle}
-                                      onChange={(event) =>
+                                      onChange={(value) =>
                                         setNewCanonicalTitle(
                                           (current) => ({
                                             ...current,
                                             [suggestionId]:
-                                              event.target.value,
+                                              value,
                                           }),
                                         )
                                       }
                                       placeholder="Confirm canonical track title"
-                                      className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-sm outline-none focus:border-wk-brand"
+                                      ariaLabel="Canonical track title"
                                     />
                                   </label>
                                   <div className="mt-2 flex flex-wrap gap-1">
@@ -3168,19 +3125,19 @@ export default function TrackIntakePage() {
                             </>
                           )}
 
-                          <textarea
+                          <WkTextField multiline
                             value={
                               reviewNotes[suggestionId] ?? ""
                             }
-                            onChange={(event) =>
+                            onChange={(value) =>
                               setReviewNotes((current) => ({
                                 ...current,
                                 [suggestionId]:
-                                  event.target.value,
+                                  value,
                               }))
                             }
                             placeholder="Registry review note. Required when rejecting."
-                            className="mt-3 min-h-[90px] w-full resize-y rounded-lg border border-wk-border bg-wk-surface p-3 text-sm outline-none focus:border-wk-brand"
+                            ariaLabel="Registry review note"
                           />
 
                           <WkCheckbox checked={

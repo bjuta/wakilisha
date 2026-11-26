@@ -1182,3 +1182,15 @@ describe("Shared Registry editor field authority", () => {
     expect(detail).not.toContain('value="non_binary"');
   });
 });
+
+
+it("keeps the Registry list and next Track Intake route on owned field and theme authority", () => {
+  for (const path of ["artists", "tracks", "releases", "labels", "genres", "tracks/intake"]) {
+    const source = readFileSync("src/pages/admin/registry/" + path + "/page.tsx", "utf8");
+    for (const forbidden of ["bg-[#", "text-[#", "border-[#", "bg-white", "text-white", "<input", "<textarea", "<select", "resize-y"]) expect(source).not.toContain(forbidden);
+    expect(source).toContain("<WkSearchField");
+    expect(source).toContain("<WkSelect");
+  }
+  expect(TRACK_INTAKE_PAGE).toContain("<WkTextField multiline");
+  expect(TRACK_INTAKE_PAGE).toContain("searchRegistryArtists(");
+});

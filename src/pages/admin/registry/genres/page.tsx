@@ -8,6 +8,7 @@ import { getRegistryEntityList } from "@/services/registry/admin/client";
 import RegistryEntityEditorDrawer from "@/components/admin/registry/RegistryEntityEditorDrawer";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
 
 
 const schema = getEntitySchema("genre");
@@ -66,24 +67,24 @@ function Pagination({
     return pages;
   };
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3">
-      <span className="text-[12px] text-[#858c7e]">
-        Showing <strong className="text-[#171712]">{start}</strong>
-        –<strong className="text-[#171712]">{end}</strong> of{" "}
-        <strong className="text-[#171712]">{totalItems}</strong>
+    <div className="flex items-center justify-between rounded-2xl border border-wk-border bg-wk-surface px-4 py-3">
+      <span className="text-[12px] text-wk-text-muted">
+        Showing <strong className="text-wk-text">{start}</strong>
+        –<strong className="text-wk-text">{end}</strong> of{" "}
+        <strong className="text-wk-text">{totalItems}</strong>
       </span>
       <div className="flex items-center gap-1">
-        <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage <= 1} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] disabled:opacity-40 hover:border-[#85c441] hover:text-[#5f8f2f]">
+        <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage <= 1} className="flex h-8 w-8 items-center justify-center rounded-lg border border-wk-border text-wk-text-muted disabled:opacity-40 hover:border-wk-brand hover:text-wk-brand">
           <WkIcon name="ChevronLeft" size={16} />
         </button>
         {getVisiblePages().map((page, i) => typeof page === "string" ? (
-          <span key={`dots-${i}`} className="px-2 text-[11px] text-[#858c7e]">…</span>
+          <span key={`dots-${i}`} className="px-2 text-[11px] text-wk-text-muted">…</span>
         ) : (
-          <button key={page} onClick={() => onPageChange(page)} className={`flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-bold transition ${page === currentPage ? "bg-[#5f8f2f] text-white" : "border border-[#dfe4d8] text-[#71796b] hover:border-[#85c441] hover:text-[#5f8f2f]"}`}>
+          <button key={page} onClick={() => onPageChange(page)} className={`flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-bold transition ${page === currentPage ? "bg-wk-brand text-wk-brand-on" : "border border-wk-border text-wk-text-muted hover:border-wk-brand hover:text-wk-brand"}`}>
             {page}
           </button>
         ))}
-        <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage >= totalPages} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] disabled:opacity-40 hover:border-[#85c441] hover:text-[#5f8f2f]">
+        <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage >= totalPages} className="flex h-8 w-8 items-center justify-center rounded-lg border border-wk-border text-wk-text-muted disabled:opacity-40 hover:border-wk-brand hover:text-wk-brand">
           <WkIcon name="ChevronRight" size={16} />
         </button>
       </div>
@@ -105,52 +106,52 @@ function GenreCard({
   const [hovered, setHovered] = useState(false);
   const q = genre._quality;
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-[#dfe4d8] bg-white transition-all hover:border-[#85c441] hover:shadow-sm"
+    <div className="group relative overflow-hidden rounded-2xl border border-wk-border bg-wk-surface transition-all hover:border-wk-brand hover:shadow-sm"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <div className="flex items-center gap-4 p-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-wk-danger-soft text-wk-danger">
           <WkIcon name="Tags" size={26} />
         </div>
         <div className="min-w-0 flex-1">
-          <button onClick={() => onNavigate(genre.slug)} className="text-left text-[15px] font-bold text-[#171712] hover:text-[#5f8f2f] transition-colors truncate block">
+          <button onClick={() => onNavigate(genre.slug)} className="text-left text-[15px] font-bold text-wk-text hover:text-wk-brand transition-colors truncate block">
             {genre._displayName}
           </button>
-          <p className="text-[11px] text-[#858c7e] truncate">{genre.slug}</p>
+          <p className="text-[11px] text-wk-text-muted truncate">{genre.slug}</p>
         </div>
-        <button onClick={() => onOpen(genre)} className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe4d8] text-[#858c7e] hover:border-[#85c441] hover:text-[#5f8f2f]">
+        <button onClick={() => onOpen(genre)} className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg border border-wk-border text-wk-text-muted hover:border-wk-brand hover:text-wk-brand">
           <WkIcon name="Pencil" size={14} />
         </button>
       </div>
 
       <div className="px-4 pb-4">
         <div className="flex flex-wrap items-center gap-1.5 mb-3">
-          <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 uppercase tracking-wide">
+          <span className="rounded-full bg-wk-danger-soft px-2 py-0.5 text-[10px] font-bold text-wk-danger uppercase tracking-wide">
             {String(genre.status || "—")}
           </span>
         </div>
 
         {genre.description && (
-          <p className="mb-3 text-[12px] text-[#858c7e] leading-relaxed line-clamp-2">{String(genre.description)}</p>
+          <p className="mb-3 text-[12px] text-wk-text-muted leading-relaxed line-clamp-2">{String(genre.description)}</p>
         )}
 
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-bold text-[#858c7e] uppercase tracking-wide">Completeness</span>
+          <span className="text-[10px] font-bold text-wk-text-muted uppercase tracking-wide">Completeness</span>
           <span className={`text-[11px] font-black ${completenessTone(q.completeness)}`}>{q.completeness}%</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-[#eef1e8]">
-          <div className="h-full rounded-full bg-[#85c441] transition-all" style={{ width: `${q.completeness}%` }} />
+        <div className="h-1.5 overflow-hidden rounded-full bg-wk-surface-strong">
+          <div className="h-full rounded-full bg-wk-brand transition-all" style={{ width: `${q.completeness}%` }} />
         </div>
         {q.missingFields.length > 0 && (
-          <p className="mt-1 text-[10px] text-[#a8ad9e] truncate">Missing: {q.missingFields.join(", ")}</p>
+          <p className="mt-1 text-[10px] text-wk-text-muted truncate">Missing: {q.missingFields.join(", ")}</p>
         )}
 
-        <div className={`flex items-center gap-2 mt-3 pt-3 border-t border-[#e8ece2] transition-all ${hovered ? "opacity-100" : "opacity-0"}`}>
-          <button onClick={() => onOpen(genre)} className="flex-1 rounded-lg bg-[#5f8f2f] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#4d7526]">
+        <div className={`flex items-center gap-2 mt-3 pt-3 border-t border-wk-divider transition-all ${hovered ? "opacity-100" : "opacity-0"}`}>
+          <button onClick={() => onOpen(genre)} className="flex-1 rounded-lg bg-wk-brand px-3 py-1.5 text-[11px] font-bold text-wk-brand-on hover:opacity-90">
             Edit
           </button>
-          <button onClick={() => onNavigate(genre.slug)} className="flex-1 rounded-lg border border-[#dfe4d8] px-3 py-1.5 text-[11px] font-bold text-[#71796b] hover:border-[#85c441] hover:text-[#5f8f2f]">
+          <button onClick={() => onNavigate(genre.slug)} className="flex-1 rounded-lg border border-wk-border px-3 py-1.5 text-[11px] font-bold text-wk-text-muted hover:border-wk-brand hover:text-wk-brand">
             Details
           </button>
         </div>
@@ -280,23 +281,23 @@ export default function GenresPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f7f2] px-5 py-6 text-[#171712]">
+    <div data-wk-registry-entity-list="genres" className="min-w-0 bg-wk-bg px-5 py-6 text-wk-text">
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-bold text-[#171712] shadow-xl">
+        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-wk-border bg-wk-surface px-4 py-3 text-sm font-bold text-wk-text shadow-xl">
           {toast}
         </div>
       )}
       <div className="mx-auto max-w-7xl">
         <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#5f8f2f]">Registry</p>
+            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-wk-brand">Registry</p>
             <h1 className="text-3xl font-black tracking-tight">Genres</h1>
-            <p className="mt-2 max-w-2xl text-sm text-[#697062]">
+            <p className="mt-2 max-w-2xl text-sm text-wk-text-muted">
               {filteredGenres.length.toLocaleString()} genre{filteredGenres.length !== 1 ? "s" : ""} in registry
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={fetchGenres} className="rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-black text-[#171712] shadow-sm transition hover:border-[#85c441] flex items-center gap-2">
+            <button onClick={fetchGenres} className="rounded-2xl border border-wk-border bg-wk-surface px-4 py-3 text-sm font-black text-wk-text shadow-sm transition hover:border-wk-brand flex items-center gap-2">
               <WkIcon name="RefreshCcw" size={14} />
               Refresh
             </button>
@@ -311,20 +312,17 @@ export default function GenresPage() {
             ["Missing desc.", summary.missingDescription],
             ["Blocked", summary.blocked],
           ].map(([label, value]) => (
-            <div key={label as string} className="rounded-2xl border border-[#dfe4d8] bg-white p-4">
-              <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">{label}</p>
-              <p className="mt-2 text-2xl font-black text-[#171712]">{value as number}</p>
+            <div key={label as string} className="rounded-2xl border border-wk-border bg-wk-surface p-4">
+              <p className="text-[11px] font-black uppercase tracking-wide text-wk-text-muted">{label}</p>
+              <p className="mt-2 text-2xl font-black text-wk-text">{value as number}</p>
             </div>
           ))}
         </section>
 
-        <section className="mb-5 rounded-2xl border border-[#dfe4d8] bg-white p-3">
-          <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px]">
-            <div className="relative">
-              <WkIcon name="Search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#a8ad9e]" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search genres by name, slug, description, status..." className="h-11 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] pl-10 pr-4 text-sm outline-none transition focus:border-[#85c441] focus:bg-white" />
-            </div>
-            <WkSelect value={qualityFilter} onChange={(value) => setQualityFilter(value as QualityFilter)} triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white">
+        <section className="mb-5 rounded-2xl border border-wk-border bg-wk-surface p-3">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))]">
+            <WkSearchField value={query} onChange={setQuery} ariaLabel="Search genres" placeholder="Search genres by name, slug, description, status..." />
+            <WkSelect value={qualityFilter} onChange={(value) => setQualityFilter(value as QualityFilter)} triggerClassName="h-11 rounded-xl border border-wk-border bg-wk-surface-raised px-3 text-sm outline-none transition focus:border-wk-brand focus:bg-wk-surface">
               <option value="all">All quality states</option>
               <option value="complete">Near complete</option>
               <option value="incomplete">Incomplete</option>
@@ -332,7 +330,7 @@ export default function GenresPage() {
               <option value="missing_artist">Missing artist</option>
               <option value="blocked">Blocked</option>
             </WkSelect>
-            <WkSelect value={sortMode} onChange={(value) => setSortMode(value as SortMode)} triggerClassName="h-11 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] px-3 text-sm outline-none transition focus:border-[#85c441] focus:bg-white">
+            <WkSelect value={sortMode} onChange={(value) => setSortMode(value as SortMode)} triggerClassName="h-11 rounded-xl border border-wk-border bg-wk-surface-raised px-3 text-sm outline-none transition focus:border-wk-brand focus:bg-wk-surface">
               <option value="recent">Recently updated</option>
               <option value="name">Name A-Z</option>
               <option value="completeness_low">Completeness low to high</option>
@@ -342,18 +340,18 @@ export default function GenresPage() {
         </section>
 
         {error && (
-          <section className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          <section className="mb-4 rounded-2xl border border-wk-danger bg-wk-danger-soft p-4 text-sm font-semibold text-wk-danger">
             <p className="font-bold">Could not load registry genres</p>
             <p className="mt-1 text-xs">{error}</p>
-            <button onClick={fetchGenres} className="mt-2 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">Retry</button>
+            <button onClick={fetchGenres} className="mt-2 rounded-xl border border-wk-danger bg-wk-surface px-3 py-1.5 text-xs font-bold text-wk-danger hover:bg-wk-danger-soft">Retry</button>
           </section>
         )}
 
         {loading && (
-          <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-[#dfe4d8] bg-white">
+          <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-wk-border bg-wk-surface">
             <div className="flex flex-col items-center gap-3">
-              <WkIcon name="Loader2" size={28} className="animate-spin text-[#5f8f2f]" />
-              <p className="text-[13px] font-bold text-[#697062]">Loading genres...</p>
+              <WkIcon name="Loader2" size={28} className="animate-spin text-wk-brand" />
+              <p className="text-[13px] font-bold text-wk-text-muted">Loading genres...</p>
             </div>
           </div>
         )}
@@ -361,12 +359,12 @@ export default function GenresPage() {
         {!loading && (
           <div className="space-y-4">
             {filteredGenres.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-[#dfe4d8] bg-white px-6 py-16 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f0f3ec]">
-                  <WkIcon name="SearchX" size={28} className="text-[#858c7e]" />
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-wk-border bg-wk-surface px-6 py-16 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-wk-surface-raised">
+                  <WkIcon name="SearchX" size={28} className="text-wk-text-muted" />
                 </div>
-                <p className="text-[16px] font-black text-[#171712]">No genres found</p>
-                <p className="max-w-md text-[13px] text-[#697062]">
+                <p className="text-[16px] font-black text-wk-text">No genres found</p>
+                <p className="max-w-md text-[13px] text-wk-text-muted">
                   {query || qualityFilter !== "all" ? "No genres match your current filters." : "No live registry genres found."}
                 </p>
               </div>

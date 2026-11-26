@@ -11,6 +11,7 @@ import { ArtistEnrichPanel, ArtistTypePanel } from "@/components/admin/registry/
 import RegistryEntityEditorDrawer from "@/components/admin/registry/RegistryEntityEditorDrawer";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
 
 
 const schema = getEntitySchema("artist");
@@ -1268,15 +1269,7 @@ export default function ArtistsPage() {
         {/* Filter bar */}
         <section data-wk-registry-artist-filters className="mb-5 rounded-2xl border border-wk-border bg-wk-surface p-3">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]">
-            <div className="relative">
-              <WkIcon name="Search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-wk-text-muted" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search artists by name, country, slug, id…"
-                className="h-11 w-full rounded-xl border border-wk-border bg-wk-surface-raised pl-10 pr-4 text-sm outline-none transition focus:border-wk-brand focus:bg-wk-surface"
-              />
-            </div>
+            <WkSearchField value={query} onChange={setQuery} ariaLabel="Search artists" placeholder="Search artists by name, country, slug, id…" />
             <WkSelect
               value={countryFilter}
               onChange={(value) => setCountryFilter(value)}

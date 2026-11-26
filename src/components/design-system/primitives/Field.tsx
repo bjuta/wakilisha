@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type KeyboardEvent } from "react";
 import {
   Button,
   Input,
@@ -146,18 +146,18 @@ export function WkSearchField({
 export function WkTextField({
   value, onChange, ariaLabel, placeholder, className = "", inputClassName = "",
   disabled = false, required = false, name, autoFocus = false,
-  autoComplete = "off", multiline = false, invalid = false,
-}: SharedFieldProps & { multiline?: boolean; invalid?: boolean }) {
+  autoComplete = "off", multiline = false, invalid = false, id, rows = 4, onKeyDown,
+}: SharedFieldProps & { multiline?: boolean; invalid?: boolean; id?: string; rows?: number; onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void }) {
   const controlClass = `wk-input w-full min-w-0 bg-wk-surface text-wk-text ${inputClassName}`.trim();
   return (
     <TextField aria-label={ariaLabel} value={value} onChange={onChange}
       isDisabled={disabled} isRequired={required} isInvalid={invalid}
       validationBehavior="aria" name={name} className={`min-w-0 w-full ${className}`.trim()}>
       {multiline ? (
-        <TextArea data-wk-text-entry rows={4} placeholder={placeholder}
+        <TextArea id={id} data-wk-text-entry rows={rows} placeholder={placeholder}
           className={`${controlClass} resize-none min-h-[88px]`} />
       ) : (
-        <Input data-wk-text-entry type="text" autoComplete={autoComplete}
+        <Input id={id} data-wk-text-entry type="text" autoComplete={autoComplete} onKeyDown={onKeyDown}
           autoFocus={autoFocus} placeholder={placeholder} className={controlClass} />
       )}
     </TextField>
