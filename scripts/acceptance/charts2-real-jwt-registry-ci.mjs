@@ -7,7 +7,7 @@
  * No application-level Edge service or signed-in Charts Studio browser is
  * claimed here. That requires its own separate product acceptance.
  */
-import {randomUUID} from "node:crypto";
+import {randomUUID,createHash} from "node:crypto";
 
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const fail=(ok,code)=>{if(!ok)throw Error(code);};
@@ -467,5 +467,107 @@ export async function verifyCharts2RealJwtRegistryV1({
  fail(readProjection().input_sha256===material.input_sha256,
    "STOP_MIZIZI_ADMISSION_SCORING_CHANGED");
  console.log("WK_AUTH_MIZIZI_CHART_CANDIDATES_FULL_PARTITION_CONCURRENT_IDEMPOTENT_NO_REGISTRY_WRITE=PASS");
+
+ // Real human transition is separate from the narrow shared job broker.
+ // Queue admission below uses local SET SESSION AUTHORIZATION simulation,
+ // not a claim of genuine hosted JIT connectivity or provider research.
+ const chartReason="Investigate receipt-bound chart recording identity.";
+ const transition="admin_mizizi_begin_chart_case_research_v1";
+ const ack="I authorize read-only investigation of this chart recording hypothesis.";
+ const pairedId=sql("select case_id from mizizi_private.chart_candidate_subjects_v1 where member_count=2;");
+ const staleId=sql("select case_id from mizizi_private.chart_candidate_positions_v1 where source_key='shazam_ke' and rank=2;");
+ const ws=sql("select workspace_id from mizizi_private.chart_candidate_subjects_v1 where case_id='"+pairedId+"';");
+ fail([pairedId,staleId,ws].every(v=>UUID.test(v))&&pairedId!==staleId,"STOP_CHART_DISPATCH_FIXTURE_BINDING");
+ const transitionArgs={p_case_id:pairedId,p_expected_revision:1,
+   p_expected_input_sha256:material.input_sha256,p_acknowledgement:ack};
+ denied(await subscriber.rpc(transition,transitionArgs),"42501","STOP_CHART_DISPATCH_SUBSCRIBER");
+ denied(await reviewer.rpc(transition,transitionArgs),"42501","STOP_CHART_DISPATCH_REVIEWER");
+ denied(await first.user.rpc(transition,{...transitionArgs,p_acknowledgement:"yes"}),
+   "22023","STOP_CHART_DISPATCH_MISSING_CONSENT");
+ denied(await first.user.rpc(transition,{...transitionArgs,p_expected_input_sha256:original.input_sha256}),
+   "PT409","STOP_CHART_DISPATCH_STALE_SNAPSHOT");
+ fail(proof()===JSON.stringify(afterAdmission) || JSON.stringify(JSON.parse(proof()))===JSON.stringify(afterAdmission),
+   "STOP_CHART_DISPATCH_DENIAL_CHANGED_STATE");
+ const jobArgs=(id,rev,reason=chartReason,key="mizizi.case_research_v1."+id+"."+rev)=>{
+   const hash=createHash("sha256").update([id,ws,String(rev),"read_only_research",reason].join("\n")).digest("hex");
+   return "'"+id+"'::uuid,'"+ws+"'::uuid,"+rev+",'system:mizizi','"+key+"','"+hash+"','"+reason+"'";
+ };
+ const denyJit=(args,code,prefix="")=>sql(`begin;
+ ${prefix}
+ set session authorization mizizi_executor;
+ do $deny$ begin
+   begin
+     perform * from mizizi_private.admit_case_research_job_v1(${args});
+     raise exception 'Unexpected chart dispatch success';
+   exception when sqlstate '${code}' then null;end;
+ end $deny$;
+ rollback;`);
+ denyJit(jobArgs(pairedId,1),"55000");
+ const transitionRace=await Promise.all([
+   first.user.rpc(transition,transitionArgs),second.user.rpc(transition,transitionArgs),
+ ]);
+ const winners=transitionRace.map((v,i)=>({v,i})).filter(x=>!x.v.error);
+ fail(winners.length===1&&transitionRace.filter(x=>x.error?.code==="PT409").length===1,
+   "STOP_CHART_DISPATCH_TRANSITION_CAS");
+ const winner=winners[0].i===0?first:second;
+ const changed=winners[0].v.data;
+ fail(changed.caseId===pairedId&&changed.workspaceId===ws&&changed.revision===2&&
+   changed.stage==="research"&&changed.state==="in_progress"&&changed.researchReason===chartReason&&
+   changed.jobsDispatched===0&&changed.canPublish===false,"STOP_CHART_DISPATCH_TRANSITION_RECEIPT");
+ fail(sql("select count(*) from mizizi_private.case_events where case_id='"+pairedId+
+   "' and case_revision=2 and actor_key='user:"+winner.id+"';")==="1",
+   "STOP_CHART_DISPATCH_HUMAN_JOURNAL");
+ denyJit(jobArgs(pairedId,2,"PUBLIC_CC0_RESEARCH: Arbitrary caller supplied research question"),"42501");
+ denyJit(jobArgs(pairedId,2,chartReason,"wrong-idempotency-key"),"42501");
+ denyJit(jobArgs(pairedId,2),"42501",
+   "update public.user_role_assignments set expires_at=now()-interval '1 second' where user_id='"+winner.id+"';");
+ const admitChartJob=(id)=>JSON.parse(sql(`set session authorization mizizi_executor;
+ select row_to_json(j)::text from mizizi_private.admit_case_research_job_v1(${jobArgs(id,2)}) j;
+ reset session authorization;`));
+ const job=admitChartJob(pairedId),sameJob=admitChartJob(pairedId);
+ fail(job.case_id===pairedId&&job.workspace_id===ws&&job.resource_id===pairedId&&
+   job.case_revision===2&&job.job_status==="queued"&&job.outcome==="created"&&
+   sameJob.outcome==="replayed"&&sameJob.job_id===job.job_id&&
+   sameJob.command_receipt_id===job.command_receipt_id,"STOP_CHART_DISPATCH_EXACT_JOB_REPLAY");
+ fail(sql("select count(*) from platform_private.jobs where id='"+job.job_id+
+   "' and attempt_count=0 and max_attempts=25 and status='queued';")==="1",
+   "STOP_CHART_DISPATCH_RETRY_BUDGET");
+ sql(`begin;
+ set session authorization service_role;
+ do $claim$ begin
+   perform set_config('request.jwt.claim.role','service_role',true);
+   if exists(select 1 from public.mizizi_claim_case_research_jobs_v1('wk-chart-legacy-claim',10,300) where job_id='${job.job_id}')
+    or exists(select 1 from platform_private.claim_jobs('wk-chart-general-claim',100,300) where job_id='${job.job_id}')
+   then raise exception 'Unscoped worker consumed chart research';end if;
+ end $claim$;
+ rollback;`);
+ const afterDispatch=JSON.parse(proof());
+ fail(afterDispatch.jobs===afterAdmission.jobs+1&&afterDispatch.events===afterAdmission.events+1,
+   "STOP_CHART_DISPATCH_JOB_AND_EVENT_COUNT");
+ for(const key of ["subjects","positions","artists","tracks","links","grants","reviews","freezes","receipts"])
+   fail(afterDispatch[key]===afterAdmission[key],"STOP_CHART_DISPATCH_SIDE_EFFECT_"+key);
+
+ // A case whose exact member resolves after its human transition must never
+ // queue via the JIT broker. Changes elsewhere do not stale the paired case.
+ const staleMember=material.investigation_positions.find(p=>p.source_key==="shazam_ke"&&p.rank===2);
+ const staleTransition=await accept(first.user,transition,{...transitionArgs,p_case_id:staleId},
+   "STOP_CHART_DISPATCH_STALE_MEMBER_TRANSITION");
+ fail(staleTransition.revision===2,"STOP_CHART_DISPATCH_STALE_MEMBER_REVISION");
+ await accept(first.user,"admin_review_charts2_no_id_observation_v1",{
+   p_receipt_id:staleMember.receipt_id,p_original_sha256:staleMember.original_sha256,p_rank:2,
+   p_action:"approve",p_track_id:recoveryId,p_review_note:note,
+   p_evidence_url:"https://example.org/ci-dispatch-stale-member",
+   p_expected_previous_event_id:null,p_acknowledgement:approval,
+ },"STOP_CHART_DISPATCH_RESOLVED_MEMBER_FIXTURE");
+ fail(!readProjection().investigation_positions.some(p=>p.receipt_id===staleMember.receipt_id&&p.rank===2),
+   "STOP_CHART_DISPATCH_MEMBER_NOT_RESOLVED");
+ denyJit(jobArgs(staleId,2),"PT409");
+ const afterUnrelatedResolution=admitChartJob(pairedId);
+ fail(afterUnrelatedResolution.outcome==="replayed"&&afterUnrelatedResolution.job_id===job.job_id,
+   "STOP_CHART_DISPATCH_UNRELATED_REVIEW_INVALIDATED_JOB");
+ fail(sql("select count(*) from platform_private.jobs where resource_id='"+staleId+"';")==="0",
+   "STOP_CHART_DISPATCH_STALE_MEMBER_JOB_CREATED");
+ console.log("WK_AUTH_MIZIZI_CHART_RESEARCH_STEWARD_CAS_JIT_REPLAY_STALE_AND_LEGACY_CLAIM_FENCE=PASS");
+
 
 }
