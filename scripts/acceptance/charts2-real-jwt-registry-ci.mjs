@@ -1231,6 +1231,60 @@ export async function verifyCharts2RealJwtRegistryV1({
  await deny(journalAppend,valid,"42501");
  console.log("WK_AUTH_MIZIZI_DESK_PRIVATE_CUSTODY_OPAQUE_LEAD_SOURCE_REPLAY_REVOCATION=PASS");
  }
+ // Keyless provider uses the same real service JWT, budget and custody RPCs.
+ // Append-only owner fixtures are disposable; no live provider entitlement.
+ {
+ const scope={jobId:job.job_id,caseId:pairedId,workspaceId:ws,expectedRevision:2,
+  workerId:activeWorker,leaseExpiresAt:context.leaseExpiresAt};
+ const hash=s=>createHash("sha256").update(s).digest("hex");
+ const provider="gdelt",providerHost="api.gdeltproject.org",account=hash("fixture:gdelt-allocation");
+ const query=context.positions[0].title,requestText=JSON.stringify({scope,operation:"search_news",query,count:3,provider,providerHost});
+ const req={p_request_text:requestText,p_request_sha256:hash(requestText),p_account_fingerprint:account};
+ const authorize="mizizi_authorize_desk_search_v1",reserve="mizizi_reserve_desk_search_v1",consume="mizizi_consume_desk_search_v1";
+ fail(await call(authorize,req)===null,"STOP_KEYLESS_DEFAULT_POLICY");
+ sql(`insert into mizizi_private.desk_search_policy_versions_v1(
+  revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+  disclosure_policy_ref,commercial_search_allowed,zero_cost_hard_cap_verified,
+  exclusive_allocated_usage_verified,public_chart_labels_allowed,allowance_start,allowance_end,
+  valid_until,account_limit,daily_limit,case_limit,provider,provider_host,min_interval_ms)
+ values(3,true,'${ws}','${account}','fixture:public-api-terms','fixture:zero-cost-allocation',
+  'fixture:public-chart-labels',true,true,true,true,now()-interval '1 hour',now()+interval '1 hour',
+  now()+interval '10 minutes',3,3,3,'gdelt','api.gdeltproject.org',60000);
+ insert into mizizi_private.desk_custody_policy_versions_v1(
+  workspace_id,host,revision,enabled,source_family,authority_ref,origin_key,lineage_key,use_basis,
+  private_research_allowed,metadata_retention_allowed,excerpt_retention_allowed,external_model_processing_allowed,valid_until)
+ values('${ws}','api.gdeltproject.org',1,true,'public_web','fixture:reviewed-discovery-rights',
+  'fixture:gdelt-origin','fixture:gdelt-lineage','documented_contract',true,true,false,true,now()+interval '10 minutes'),
+ ('${ws}','en.wikipedia.org',1,true,'public_web','fixture:reviewed-discovery-rights',
+  'fixture:wiki-origin','fixture:wiki-lineage','open_license',true,true,false,true,now()+interval '10 minutes');`);
+ const grant=await call(authorize,req);
+ fail(grant?.policyRef==="desk-search:gdelt:3","STOP_KEYLESS_GRANT");
+ const charge=await call(reserve,{...req,p_policy_ref:grant.policyRef});
+ fail(charge?.provider===provider&&charge.providerHost===providerHost&&charge.requestSha256===req.p_request_sha256,
+  "STOP_KEYLESS_RESERVATION");
+ const consumeArgs={p_reservation_id:charge.reservationId,p_request_sha256:req.p_request_sha256,p_account_fingerprint:account};
+ fail(await call(consume,consumeArgs)===true&&await call(consume,consumeArgs)===false,"STOP_KEYLESS_SINGLE_SEND");
+ const secondText=JSON.stringify({scope,operation:"search_news",query,count:4,provider,providerHost});
+ const secondReq={...req,p_request_text:secondText,p_request_sha256:hash(secondText)};
+ const second=await call(reserve,{...secondReq,p_policy_ref:grant.policyRef});
+ fail(second?.provider===provider&&await call(consume,{p_reservation_id:second.reservationId,
+  p_request_sha256:second.requestSha256,p_account_fingerprint:account})===false,"STOP_KEYLESS_RATE_SLOT");
+ const receiptId=randomUUID(),leadId=randomUUID(),url="https://archive.org/details/keyless-fixture";
+ const resultText=JSON.stringify({receiptId,leads:[{id:leadId,kind:"reference",label:"Reporting lead"}],sources:[],visual:null});
+ const callText=JSON.stringify({scope,call:{name:"search_news",input:{query}}});
+ const appendArgs={p_call_text:callText,p_call_sha256:hash(callText),p_result_text:resultText,p_result_sha256:hash(resultText),
+  p_host:providerHost,p_policy_revision:1,p_provenance:{reservationId:charge.reservationId,
+   requestSha256:req.p_request_sha256,requestText},p_lead_bindings:[{id:leadId,url}]};
+ fail(await call("mizizi_record_desk_tool_receipt_v1",{...appendArgs,p_host:"en.wikipedia.org"})===null,
+  "STOP_KEYLESS_HOST_SWAP");
+ fail((await call("mizizi_record_desk_tool_receipt_v1",appendArgs))?.outcome==="created"&&
+  (await call("mizizi_read_desk_tool_receipt_v1",{p_scope:scope,p_receipt_id:receiptId}))?.resultText===resultText&&
+  (await call("mizizi_resolve_desk_reference_lead_v1",{p_scope:scope,p_lead_id:leadId}))?.url===url,
+  "STOP_KEYLESS_CUSTODY");
+ fail(await call(authorize,{...req,p_account_fingerprint:"a".repeat(64)})===null,
+  "STOP_KEYLESS_WRONG_ACCOUNT");
+ console.log("WK_AUTH_MIZIZI_KEYLESS_PROVIDER_BUDGET_RATE_CUSTODY=PASS");
+ }
  const passBody=JSON.stringify({contract:"mizizi.adaptive_investigation.v1",caseId:pairedId,
   workspaceId:ws,ordinal:1,question:"Read-only local test of the exact chart lease.",
   predecessorFingerprint:null,sourceReceipts:[],findings:[],proposedLeads:[],

@@ -164,7 +164,7 @@ export function runCostRoutedDeskResearchWorkerCycleV1(input:Readonly<
 
 export type DurableDeskConfigurationV1=Readonly<
  Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],
- "braveApiKey"|"nativeAccountFingerprint"|"authorizeAcquisition"|"authorizeExamination"|"browser">&
+ "braveApiKey"|"discovery"|"nativeAccountFingerprint"|"authorizeAcquisition"|"authorizeExamination"|"browser">&
  Pick<Parameters<typeof createCostRoutedDeskAnthropicPassV1>[0],
  "anthropic"|"readModelInventory"|"assessRequirement"|"authorizeEnvelope"|"authorizeTool">
 >;
@@ -214,7 +214,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    if(input.operationalNativeOnly&&!operational)throw Error("MIZIZI_DESK_OPERATIONAL_POLICY_DENIED");
    if(operational&&config.browser)throw Error("MIZIZI_DESK_OPERATIONAL_BROWSER_UNQUALIFIED");
    const dispatcher=createDeskResearchDispatcherV1({
-    rpc:input.rpc,scope,braveApiKey:config.braveApiKey,
+    rpc:input.rpc,scope,braveApiKey:config.braveApiKey,discovery:config.discovery,
     nativeAccountFingerprint:config.nativeAccountFingerprint,
     authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,
     browser:config.browser,now:input.now});
@@ -280,7 +280,7 @@ async function readOperationalNativeDeskPolicyV1(rpc:WorkerRpc,scope:DeskSearchS
 }
 export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
  Omit<Parameters<typeof runDurableDeskResearchWorkerCycleV1>[0],"configurationForJob"|"operationalNativeOnly"|"maxNewPasses">&{
-  credentials:Pick<DurableDeskConfigurationV1,"anthropic"|"braveApiKey"|"nativeAccountFingerprint">;
+  credentials:Pick<DurableDeskConfigurationV1,"anthropic"|"braveApiKey"|"discovery"|"nativeAccountFingerprint">;
   readModelInventory:DurableDeskConfigurationV1["readModelInventory"];
   assessRequirement:DurableDeskConfigurationV1["assessRequirement"];
  }

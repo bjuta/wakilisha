@@ -4,6 +4,7 @@
  * native model search, automatic retry, refund, or paid fallback exists.
  */
 import {createHash} from "node:crypto";
+import {createDeskBrowserResourceReaderV1} from "./desk-native-reader-v1.ts";
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const SHA=/^[0-9a-f]{64}$/;
 const MAX_BODY=256000;
@@ -207,4 +208,156 @@ export function createDurableDeskSearchGatewayV1(options:Readonly<{
    p_reservation_id:reservation.reservationId,p_request_sha256:reservation.requestSha256
   })===true,
  });
+}
+
+
+/** Keyless specialist discovery, and a configured SearXNG instance.
+ * Wikimedia covers its own index; GDELT covers monitored news. Neither
+ * supplies universal web coverage. SearXNG needs a qualified deployment
+ * and permitted upstream access. No automatic fallback or subscription. */
+export type DeskPublicDiscoveryProviderV1=Readonly<{
+ provider:"wikimedia"|"gdelt"|"searxng";host:string;allocationRef:string;
+}>;
+export type DeskDiscoveryConfigurationV1=Readonly<Partial<Record<
+ DeskSearchRequestV1["operation"],DeskPublicDiscoveryProviderV1>>>;
+type PublicDiscoveryRequestV1=DeskSearchRequestV1&Readonly<{
+ provider:DeskPublicDiscoveryProviderV1["provider"];providerHost:string;
+}>;
+type PublicDiscoveryResultV1=Readonly<Omit<DeskSearchResultV1,"provider">&{
+ provider:DeskPublicDiscoveryProviderV1["provider"];providerHost:string;requestText:string;
+}>;
+const publicDiscoveryHost=(host:string)=>typeof host==="string"&&
+ /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(host)&&
+ !/(?:^|\.)(localhost|local|internal|test|invalid|example|onion|home|lan|arpa)$/.test(host);
+export function qualifyDeskPublicDiscoveryProviderV1(config:DeskPublicDiscoveryProviderV1,
+ operation:DeskSearchRequestV1["operation"]):DeskPublicDiscoveryProviderV1{
+ if(!config||Object.keys(config).sort().join(",")!=="allocationRef,host,provider"||
+  !publicDiscoveryHost(config.host)||config.host===HOST.slice(8)||
+  typeof config.allocationRef!=="string"||!/^[A-Za-z0-9._:/-]{8,200}$/.test(config.allocationRef)||
+  !["search_web","search_news"].includes(operation)||
+  !(config.provider==="wikimedia"&&/^[a-z][a-z0-9-]{1,19}\.wikipedia\.org$/.test(config.host)&&operation==="search_web"||
+    config.provider==="gdelt"&&config.host==="api.gdeltproject.org"&&operation==="search_news"||
+    config.provider==="searxng"&&!config.host.endsWith(".wikipedia.org")&&config.host!=="api.gdeltproject.org"))
+  fail("DISCOVERY_PROVIDER_DENIED");
+ return Object.freeze({...config});
+}
+export function deskPublicDiscoveryFingerprintV1(config:DeskPublicDiscoveryProviderV1){
+ return createHash("sha256").update(JSON.stringify(["mizizi:public-discovery:allocation:v1",
+  config.provider,config.host,config.allocationRef])).digest("hex");
+}
+function publicDiscoveryEndpoint(request:PublicDiscoveryRequestV1):URL{
+ const url=new URL("https://"+request.providerHost);
+ if(request.provider==="wikimedia"){
+  url.pathname="/w/api.php";
+  url.searchParams.set("action","query");url.searchParams.set("list","search");
+  url.searchParams.set("srsearch",request.query);url.searchParams.set("srlimit",String(request.count));
+  url.searchParams.set("srnamespace","0");url.searchParams.set("srprop","");
+  url.searchParams.set("format","json");url.searchParams.set("formatversion","2");url.searchParams.set("maxlag","5");
+ }else if(request.provider==="gdelt"){
+  url.pathname="/api/v2/doc/doc";url.searchParams.set("query",request.query);
+  url.searchParams.set("mode","artlist");url.searchParams.set("format","json");
+  url.searchParams.set("maxrecords",String(request.count));
+ }else{
+  url.pathname="/search";url.searchParams.set("q",request.query);url.searchParams.set("format","json");
+  url.searchParams.set("categories",request.operation==="search_news"?"news":"general");
+ }
+ return url;
+}
+function publicDiscoveryLeads(request:PublicDiscoveryRequestV1,body:Uint8Array):readonly DeskSearchLeadV1[]{
+ if(body.byteLength<1||body.byteLength>MAX_BODY)fail("RESPONSE_TOO_LARGE");
+ let value:unknown;
+ try{value=JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(body));}catch{fail("INVALID_RESPONSE");}
+ const payload=obj(value);
+ if(Object.hasOwn(payload,"error")||Object.hasOwn(payload,"errors"))fail("SEARCH_PROVIDER_UNCONFIRMED");
+ const results=request.provider==="wikimedia"?obj(payload.query).search:
+  request.provider==="gdelt"?payload.articles:payload.results;
+ if(!Array.isArray(results)||results.length>(request.provider==="searxng"?200:request.count))
+  fail("INVALID_RESPONSE");
+ if(request.provider==="searxng"&&results.length===0&&
+  Array.isArray(payload.unresponsive_engines)&&payload.unresponsive_engines.length>0)fail("SEARCH_PROVIDER_UNCONFIRMED");
+ const seen=new Set<string>(),leads:DeskSearchLeadV1[]=[];
+ for(const raw of results){
+  if(leads.length>=request.count)break;
+  const row=obj(raw),title=row.title;
+  if(typeof title!=="string"||!title.trim()||title.length>500||/[\p{Cc}\p{Cf}]/u.test(title))continue;
+  let rawUrl:unknown=row.url;
+  if(request.provider==="wikimedia"){
+   if(!Number.isSafeInteger(row.pageid)||Number(row.pageid)<1||row.ns!==0)continue;
+   rawUrl="https://"+request.providerHost+"/wiki/"+encodeURIComponent(title.replace(/ /g,"_"));
+  }
+  const url=leadUrl(rawUrl);if(!url||seen.has(url))continue;
+  const u=new URL(url);
+  if(!publicDiscoveryHost(u.hostname)||[...u.searchParams.keys()].some(k=>
+   /token|signature|password|passwd|secret|credential|session|api[-_]?key|authorization|^sig$|^auth$|^key$|^x-amz-|^x-goog-/i.test(k)))continue;
+  seen.add(url);leads.push(Object.freeze({url,title:title.trim(),kind:"unverified_discovery_lead"}));
+ }
+ return Object.freeze(leads);
+}
+/** The reviewed provider/host are bound into the existing durable budget.
+ * The native resource reader consumes that reservation immediately before
+ * its pinned TLS request, with independent authorization and no redirects. */
+export function createDurableDeskPublicDiscoveryGatewayV1(options:Readonly<{
+ configuration:DeskPublicDiscoveryProviderV1;operation:DeskSearchRequestV1["operation"];
+ rpc:import("./research-worker-cycle-v1.ts").WorkerRpc;now?:()=>number;
+ resourceTestSeams?:Pick<Parameters<typeof createDeskBrowserResourceReaderV1>[0],"resolve4"|"readPinned">;
+}>){
+ if(typeof options?.rpc!=="function")fail("TRUSTED_CONFIGURATION_REQUIRED");
+ const config=qualifyDeskPublicDiscoveryProviderV1(options.configuration,options.operation);
+ const fingerprint=deskPublicDiscoveryFingerprintV1(config),now=options.now??Date.now;
+ async function rpc(fn:string,args:Record<string,unknown>){
+  const response=await options.rpc(fn,{...args,p_account_fingerprint:fingerprint});
+  if(!response||response.error)fail("DURABLE_AUTHORITY_UNCONFIRMED");
+  return response.data;
+ }
+ return async(input:DeskSearchRequestV1):Promise<PublicDiscoveryResultV1>=>{
+  const base=canonicalRequest(input,now()),lease=Date.parse(base.scope.leaseExpiresAt);
+  if(base.operation!==options.operation)fail("DISCOVERY_OPERATION_DENIED");
+  const request=Object.freeze({...base,provider:config.provider,providerHost:config.host});
+  const requestText=JSON.stringify(request),requestSha256=createHash("sha256").update(requestText).digest("hex");
+  const args={p_request_text:requestText,p_request_sha256:requestSha256};
+  const approved=(raw:unknown):raw is DeskSearchAuthorityV1=>{
+   const a=raw as DeskSearchAuthorityV1;
+   return !!a&&a.requestSha256===requestSha256&&typeof a.policyRef==="string"&&
+    /^[A-Za-z0-9._:/-]{8,200}$/.test(a.policyRef)&&a.publicQueryAllowed===true&&
+    a.providerUseAllowed===true&&a.zeroIncrementalSpendAllowed===true&&expiry(a.validUntil,now(),lease);
+  };
+  const authority=await rpc("mizizi_authorize_desk_search_v1",args);
+  if(!approved(authority))fail("QUERY_AUTHORITY_DENIED");
+  const raw=await rpc("mizizi_reserve_desk_search_v1",{...args,p_policy_ref:authority.policyRef});
+  const reservation=raw as Omit<DeskSearchReservationV1,"provider">&{provider:string;providerHost:string};
+  if(!reservation||!UUID.test(reservation.reservationId)||reservation.requestSha256!==requestSha256||
+   reservation.provider!==config.provider||reservation.providerHost!==config.host||
+   reservation.units!==1||reservation.maximumIncrementalCostMicrousd!==0||
+   !expiry(reservation.validUntil,now(),lease))fail("ZERO_COST_BUDGET_UNAVAILABLE");
+  const url=publicDiscoveryEndpoint(request).href;
+  const binding=Object.freeze({scope:base.scope,url,resourceType:"fetch",topLevelUrl:url});
+  const bindingSha256=createHash("sha256").update(JSON.stringify(binding)).digest("hex");
+  const sameBinding=(candidate:Parameters<ReturnType<typeof createDeskBrowserResourceReaderV1>>[0],sha:string)=>
+   sha===bindingSha256&&JSON.stringify(candidate)===JSON.stringify(binding);
+  const read=createDeskBrowserResourceReaderV1({
+   ...options.resourceTestSeams,now,
+   authorize:async(candidate,sha)=>{
+    if(!sameBinding(candidate,sha)||!expiry(reservation.validUntil,now(),lease))return null;
+    const fresh=await rpc("mizizi_authorize_desk_search_v1",args);
+    if(!approved(fresh)||fresh.policyRef!==authority.policyRef)return null;
+    return {policyRef:fresh.policyRef,validUntil:new Date(Math.min(Date.parse(fresh.validUntil),
+     Date.parse(reservation.validUntil))).toISOString(),acquisitionAllowed:true,zeroIncrementalSpendAllowed:true};
+   },
+   precharge:async(candidate,target,_grant,sha)=>sameBinding(candidate,sha)&&
+    target.url===url&&target.hostname===config.host&&expiry(reservation.validUntil,now(),lease)&&
+    await rpc("mizizi_consume_desk_search_v1",{p_reservation_id:reservation.reservationId,
+     p_request_sha256:requestSha256})===true
+  });
+  const response=await read(binding,bindingSha256,AbortSignal.timeout(Math.min(20000,Math.max(1,lease-now()))));
+  if(response.requestSha256!==bindingSha256||response.status!==200||
+   !("body" in response)||!/^application\/json\b/i.test(response.contentType??"")||
+   !response.body||createHash("sha256").update(response.body).digest("hex")!==response.sha256)
+   fail("SEARCH_PROVIDER_UNCONFIRMED");
+  const leads=publicDiscoveryLeads(request,response.body);
+  if(now()>=lease)fail("LEASE_EXPIRED");
+  return Object.freeze({contract:"mizizi.desk_search.v1",requestSha256,reservationId:reservation.reservationId,
+   provider:config.provider,providerHost:config.host,requestText,operation:base.operation,
+   retrievedAt:new Date(now()).toISOString(),leads,identityVerified:false,sourceRetentionAuthorized:false,
+   externalModelProcessingAuthorized:false});
+ };
 }

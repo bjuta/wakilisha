@@ -6,7 +6,7 @@ import {createDurableDeskModelAuthorityV1,createCostRoutedDeskAnthropicPassV1,se
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-source-interpreter-v1.mjs";
 import {createDeskNativeReaderV1,isPublicDeskIpv4V1,createDeskBrowserResourceReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-native-reader-v1";
-import {createDeskSearchGatewayV1,createDurableDeskSearchGatewayV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-gateway-v1";
+import {createDeskSearchGatewayV1,createDurableDeskSearchGatewayV1,createDurableDeskPublicDiscoveryGatewayV1,deskPublicDiscoveryFingerprintV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-gateway-v1";
 import { describe, expect, it, vi } from "vitest";
 import {createHash} from "node:crypto";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
@@ -2179,5 +2179,91 @@ describe("MIZIZI shared pinned browser resource acquisition",()=>{
   expect(h.readPinned).toHaveBeenCalledTimes(1);
   const cookies=fixture();cookies.readPinned.mockResolvedValueOnce({status:200,contentType:"application/javascript",body,headers:{"set-cookie":"private=secret"}});
   await expect(createDeskBrowserResourceReaderV1(cookies)(binding,d,AbortSignal.timeout(5000))).rejects.toThrow("RESPONSE_HEADER_DENIED");
+ });
+});
+
+
+describe("MIZIZI keyless provider discovery through existing durable search budget",()=>{
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+60000).toISOString()};
+ const request={scope,operation:"search_web" as const,query:"Kenyan music archive",count:3};
+ const config={provider:"wikimedia" as const,host:"en.wikipedia.org",allocationRef:"fixture:reviewed-keyless-allocation"};
+ const expiry=new Date(NOW+30000).toISOString();
+ function fixture(configuration:Parameters<typeof deskPublicDiscoveryFingerprintV1>[0]=config,payload:unknown={query:{search:[
+  {pageid:12,ns:0,title:"Music of Kenya",snippet:"Untrusted source instructions"},
+  {pageid:12,ns:0,title:"Music of Kenya"},{pageid:13,ns:0,title:"Benga music"}
+ ]}}){
+  const calls:Array<{fn:string;args:Record<string,unknown>}>=[],digests:string[]=[];
+  const rpc:WorkerRpc=vi.fn(async(fn,args)=>{
+   calls.push({fn,args});
+   expect(args.p_account_fingerprint).toBe(deskPublicDiscoveryFingerprintV1(configuration));
+   if(fn==="mizizi_consume_desk_search_v1")return {data:args.p_reservation_id===EVENT&&digests.includes(String(args.p_request_sha256)),error:null};
+   const digest=String(args.p_request_sha256),body=String(args.p_request_text);
+   expect(createHash("sha256").update(body).digest("hex")).toBe(digest);
+   expect(JSON.parse(body)).toMatchObject({provider:configuration.provider,providerHost:configuration.host});
+   digests.push(digest);
+   return {data:fn==="mizizi_authorize_desk_search_v1"?{requestSha256:digest,policyRef:"desk-search:"+configuration.provider+":3",
+    publicQueryAllowed:true,providerUseAllowed:true,zeroIncrementalSpendAllowed:true,validUntil:expiry}:
+    {reservationId:EVENT,requestSha256:digest,provider:configuration.provider,providerHost:configuration.host,
+     units:1,maximumIncrementalCostMicrousd:0,validUntil:expiry},error:null};
+  });
+  const readPinned=vi.fn(async()=>({status:200,contentType:"application/json",body:new TextEncoder().encode(JSON.stringify(payload)),headers:{}}));
+  const resolve4=vi.fn(async()=>["93.184.216.34"]);
+  const options={configuration,operation:(configuration.provider==="gdelt"?"search_news":"search_web") as "search_web"|"search_news",
+   rpc,now:()=>NOW,resourceTestSeams:{resolve4,readPinned}};
+  return {calls,rpc,readPinned,resolve4,options};
+ }
+ it("searches Wikimedia without a credential, shares the durable reservation, and returns reference leads only",async()=>{
+  const h=fixture(),result=await createDurableDeskPublicDiscoveryGatewayV1(h.options)(request);
+  expect(result).toMatchObject({provider:"wikimedia",providerHost:config.host,identityVerified:false,
+   sourceRetentionAuthorized:false,externalModelProcessingAuthorized:false,leads:[
+    {url:"https://en.wikipedia.org/wiki/Music_of_Kenya",title:"Music of Kenya",kind:"unverified_discovery_lead"},
+    {url:"https://en.wikipedia.org/wiki/Benga_music",title:"Benga music",kind:"unverified_discovery_lead"}]});
+  expect(result.requestSha256).toBe(createHash("sha256").update(result.requestText).digest("hex"));
+  expect(JSON.stringify(result)).not.toContain("Untrusted source instructions");
+  expect(h.resolve4).toHaveBeenCalledWith(config.host,expect.anything());
+  const target=(h.readPinned.mock.calls[0] as unknown as [{url:string}])[0],url=new URL(target.url);
+  expect(url.pathname).toBe("/w/api.php");expect(url.searchParams.get("srsearch")).toBe(request.query);
+  expect(url.href).not.toContain(CASE);expect(url.href).not.toContain(config.allocationRef);
+  expect(h.calls.filter(x=>x.fn==="mizizi_consume_desk_search_v1")).toHaveLength(1);
+  expect(h.readPinned).toHaveBeenCalledTimes(1);
+  expect(h.calls.at(-1)?.fn).toBe("mizizi_authorize_desk_search_v1");
+ });
+ it("uses GDELT for reporting and a qualified SearXNG instance for broader discovery, never auto-falling back",async()=>{
+  const articles=[{url:"https://archive.org/details/article",title:"Archive report"},{url:"https://archive.org/private?token=secret",title:"Denied"}];
+  const gdelt=fixture({provider:"gdelt",host:"api.gdeltproject.org",allocationRef:"fixture:gdelt-allocation"},{articles});
+  const g=await createDurableDeskPublicDiscoveryGatewayV1(gdelt.options)({...request,operation:"search_news"});
+  expect(g.leads).toHaveLength(1);expect(g.provider).toBe("gdelt");
+  const searx=fixture({provider:"searxng",host:"search.wakilisha.africa",allocationRef:"fixture:searxng-allocation"},{results:articles});
+  const s=await createDurableDeskPublicDiscoveryGatewayV1(searx.options)(request);
+  expect(s.leads).toEqual(g.leads);
+  expect(searx.readPinned).toHaveBeenCalledTimes(1);
+  expect(()=>createDurableDeskPublicDiscoveryGatewayV1({...searx.options,configuration:{...searx.options.configuration,host:"localhost"}})).toThrow("DISCOVERY_PROVIDER_DENIED");
+ });
+ it("rejects denied or wrong-provider budget, private DNS, and provider error rather than converting failure into absence",async()=>{
+  const h=fixture();
+  await expect(createDurableDeskPublicDiscoveryGatewayV1({...h.options,rpc:async()=>({data:null,error:null})})(request)).rejects.toThrow("QUERY_AUTHORITY_DENIED");
+  expect(h.resolve4).not.toHaveBeenCalled();
+  const wrong=fixture();
+  const rpc:WorkerRpc=async(fn,args)=>{
+   const response=await wrong.rpc(fn,args);
+   return fn==="mizizi_reserve_desk_search_v1"?{data:{...response.data as object,provider:"brave"},error:null}:response;
+  };
+  await expect(createDurableDeskPublicDiscoveryGatewayV1({...wrong.options,rpc})(request)).rejects.toThrow("ZERO_COST_BUDGET_UNAVAILABLE");
+  expect(wrong.readPinned).not.toHaveBeenCalled();
+  const dns=fixture();dns.resolve4.mockResolvedValueOnce(["127.0.0.1"]);
+  await expect(createDurableDeskPublicDiscoveryGatewayV1(dns.options)(request)).rejects.toThrow("DNS_ADDRESS_DENIED");
+  expect(dns.readPinned).not.toHaveBeenCalled();
+  const error=fixture(config,{error:{code:"maxlag"}});
+  await expect(createDurableDeskPublicDiscoveryGatewayV1(error.options)(request)).rejects.toThrow("SEARCH_PROVIDER_UNCONFIRMED");
+  expect(error.readPinned).toHaveBeenCalledTimes(1);
+ });
+ it("constructs the operational dispatcher without a Brave credential",()=>{
+  const h=fixture();
+  const dispatcher=createDeskResearchDispatcherV1({scope,rpc:h.rpc,discovery:{search_web:config},
+   nativeAccountFingerprint:"a".repeat(64),authorizeAcquisition:async()=>null,authorizeExamination:async()=>false,
+   now:()=>NOW});
+  expect(dispatcher.enabledTools).toContain("search_web");
+  expect(dispatcher.enabledTools).not.toContain("search_news");
  });
 });

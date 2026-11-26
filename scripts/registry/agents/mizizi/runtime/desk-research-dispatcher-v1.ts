@@ -6,7 +6,9 @@
  */
 import {createHash,randomUUID} from "node:crypto";
 import {isIP} from "node:net";
-import {createDurableDeskSearchGatewayV1,type DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
+import {createDurableDeskSearchGatewayV1,createDurableDeskPublicDiscoveryGatewayV1,
+ qualifyDeskPublicDiscoveryProviderV1,type DeskSearchScopeV1,type DeskDiscoveryConfigurationV1,
+ type DeskSearchRequestV1} from "./desk-research-gateway-v1.ts";
 import {createDeskNativeReaderV1} from "./desk-native-reader-v1.ts";
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "./desk-source-interpreter-v1.mjs";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "./desk-browser-reader-v1.mjs";
@@ -36,7 +38,7 @@ type BrowserOptions=Readonly<{
  authorizeRequest:NonNullable<Parameters<typeof createDeskBrowserReaderV1>[0]>["authorizeRequest"];
 }>;
 type Options=Readonly<{
- scope:DeskSearchScopeV1;rpc:WorkerRpc;braveApiKey:string;nativeAccountFingerprint:string;
+ scope:DeskSearchScopeV1;rpc:WorkerRpc;braveApiKey?:string;discovery?:DeskDiscoveryConfigurationV1;nativeAccountFingerprint:string;
  /** Separate independent current URL/egress/access/terms authority. Custody
   * approval is not access permission. These must be real trusted checks. */
  authorizeAcquisition:NativeOptions["authorize"];
@@ -46,6 +48,7 @@ type Options=Readonly<{
  /** Test-only provider seams; never forwarded by the leased worker factory. */
  browserTestSeams?:Pick<NonNullable<Parameters<typeof createCloudflareBrowserTransportV1>[0]>,"transport"|"connect">;
  searchTransport?:typeof fetch;
+ discoveryTestSeams?:Parameters<typeof createDurableDeskPublicDiscoveryGatewayV1>[0]["resourceTestSeams"];
  nativeTestSeams?:Pick<NativeOptions,"resolve4"|"readPinned">;
  now?:()=>number;
 }>;
@@ -141,10 +144,26 @@ export function createDeskResearchDispatcherV1(options:Options){
   accessRevisions.set(key,g.policyRef);
   return g;
  }
- const search=createDurableDeskSearchGatewayV1({apiKey:options.braveApiKey,rpc:options.rpc,
+ const brave=options.braveApiKey===undefined?null:createDurableDeskSearchGatewayV1({apiKey:options.braveApiKey,rpc:options.rpc,
   transport:options.searchTransport,now});
+ const discovery=new Map<DeskSearchRequestV1["operation"],{host:string;provider:string;
+  run:ReturnType<typeof createDurableDeskSearchGatewayV1>|ReturnType<typeof createDurableDeskPublicDiscoveryGatewayV1>}>();
+ if(options.discovery!==undefined&&(!options.discovery||typeof options.discovery!=="object"||
+  Array.isArray(options.discovery)||Object.keys(options.discovery).some(k=>!["search_web","search_news"].includes(k))))
+  fail("DISCOVERY_CONFIGURATION_DENIED");
+ for(const operation of ["search_web","search_news"] as const){
+  const choice=options.discovery?.[operation];
+  if(choice!==undefined){
+   const configuration=qualifyDeskPublicDiscoveryProviderV1(choice,operation);
+   discovery.set(operation,{host:configuration.host,provider:configuration.provider,
+    run:createDurableDeskPublicDiscoveryGatewayV1({configuration,operation,rpc:options.rpc,now,
+     resourceTestSeams:options.discoveryTestSeams})});
+  }else if(brave)discovery.set(operation,{host:SEARCH_HOST,provider:"brave",run:brave});
+ }
+ if(!discovery.size)fail("DISCOVERY_CONFIGURATION_REQUIRED");
  const budget=createDeskResourceBudgetV1({rpc:options.rpc,now});
- const TOOLS:readonly DeskToolCallV1["name"][]=Object.freeze([...BASE_TOOLS,...(options.browser?["render_page" as const]:[])]);
+ const TOOLS:readonly DeskToolCallV1["name"][]=Object.freeze([...BASE_TOOLS.filter(n=>
+  n!=="search_web"&&n!=="search_news"||discovery.has(n)),...(options.browser?["render_page" as const]:[])]);
  const transient=new Map<string,TransientSource>();
  let transientBytes=0;
  function remember(id:string,receipt:TransientSource["receipt"],provenance:Record<string,unknown>){
@@ -268,13 +287,19 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(call.name==="search_web"||call.name==="search_news"){
    const query=call.input.query;
    if(!text(query,300,3))fail("QUERY_DENIED");
-   const p=await policy(SEARCH_HOST);
-   if(!p)fail("SEARCH_CUSTODY_DENIED");
+   const selected=discovery.get(call.name);
+   if(!selected)fail("DISCOVERY_CONFIGURATION_DENIED");
+   const p=await policy(selected.host);
+   if(!p||p.sourceFamily!==(selected.provider==="brave"?"brave_discovery":"public_web"))fail("SEARCH_CUSTODY_DENIED");
    const request={scope:{jobId:scope.jobId,caseId:scope.caseId,workspaceId:scope.workspaceId,
     expectedRevision:scope.expectedRevision,workerId:scope.workerId,leaseExpiresAt:scope.leaseExpiresAt},
     operation:call.name,query,count:5} as const;
-   const requestText=JSON.stringify(request),reply=await search(request);
-   if(reply.requestSha256!==hash(requestText)||reply.operation!==call.name||reply.provider!=="brave"||
+   const reply=await selected.run(request);
+   const requestText=selected.provider==="brave"?JSON.stringify(request):
+    JSON.stringify({...request,provider:selected.provider,providerHost:selected.host});
+   if(reply.requestSha256!==hash(requestText)||reply.operation!==call.name||reply.provider!==selected.provider||
+    ("providerHost" in reply&&reply.providerHost!==selected.host)||
+    ("requestText" in reply&&reply.requestText!==requestText)||
     !UUID.test(reply.reservationId)||reply.identityVerified!==false)fail("SEARCH_RECEIPT_DENIED");
    const {leads,bindings}=leadsFrom(reply.leads.map(l=>({url:l.url,label:l.title})));
    return append(callText,callSha256,{receiptId:randomUUID(),leads,sources:[]},p,
