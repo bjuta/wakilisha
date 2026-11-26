@@ -12,7 +12,7 @@ import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../script
 import {createAnthropicInvestigationAnalystV1,resolveInstituteAnthropicConfigurationV1,discoverAnthropicResearchModelV1} from "../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1";
 import {createWikidataInvestigationReaderV1} from "../../scripts/registry/agents/mizizi/runtime/wikidata-investigation-reader-v1";
 import {createMusicBrainzWorkReaderV1} from "../../scripts/registry/agents/mizizi/runtime/musicbrainz-work-reader-v1";
-import {createAdaptiveResearchWorkerHandlerV1,runAdaptiveResearchWorkerCycleV1,runAnthropicAdaptiveResearchWorkerCycleV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
+import {createAdaptiveResearchWorkerHandlerV1,runAdaptiveResearchWorkerCycleV1,runAnthropicAdaptiveResearchWorkerCycleV1,runDurableDeskResearchWorkerCohortV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1";
 import {
   runResearchWorkerCycleV1,
   createChartOriginalStorageReaderV1,
@@ -290,6 +290,26 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
 });
 
 
+
+describe("Durable desk cohort execution",()=>{
+ it("reuses the existing exact worker and refuses cross-workspace, cross-client or duplicate scope before RPC",async()=>{
+  const {rpc,calls}=harness();
+  const client={from:vi.fn()};
+  const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+   preflight:async()=>false,readOriginal:async()=>new Uint8Array(),registryClient:client};
+  const args={rpc,workerId:"mizizi-chart:"+JOB,configurationForJob:async()=>{throw Error("UNEXPECTED")},
+    openingQuestion:async()=>"A bounded recording investigation.",verifyFinding:async()=>false,
+    maxNewPasses:1,maxTotalPasses:3,costBudgetUnits:5};
+  for(const chartScopes of [
+   [],[scope,scope],[scope,{...scope,jobId:EVENT,caseId:RECEIPT,workspaceId:EVENT}],
+   [scope,{...scope,jobId:EVENT,caseId:RECEIPT,registryClient:{from:vi.fn()}}]
+  ]){
+    await expect(runDurableDeskResearchWorkerCohortV1({...args,chartScopes} as never)).rejects.toThrow("COHORT_SCOPE_DENIED");
+  }
+  await expect(runDurableDeskResearchWorkerCohortV1({...args,chartScopes:[scope]} as never)).rejects.toThrow("PREFLIGHT_DENIED");
+  expect(calls).toHaveLength(0);
+ });
+});
 
 describe("Exact Charts research lease transport (existing worker lifecycle)",()=>{
  const workerId="mizizi-chart:"+JOB;

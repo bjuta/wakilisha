@@ -3,6 +3,7 @@
  * investigation or cultural question is definitively resolved.
  */
 import {createHash} from "node:crypto";
+import {createCharts2RegistryCatalogueCohortV1} from "../../../../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
 import {runAdaptiveInvestigationV1, type InvestigationIdentityV1,
  type InvestigationStoreV1,type InvestigationReaderV1,
@@ -341,4 +342,34 @@ export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
    };
   }
  });
+}
+
+/** Bounded cohort invocation of the existing durable worker. The caller
+ * supplies already authorized exact job scopes; this does not admit jobs,
+ * combine recording identities, reuse cross-case evidence, or create a queue.
+ * Sequential execution preserves existing per-case lease and finance checks.
+ * The only shared state is the active Registry title discovery index.
+ */
+export async function runDurableDeskResearchWorkerCohortV1(input:Readonly<
+ Omit<Parameters<typeof runDurableDeskResearchWorkerCycleV1>[0],"chartScope">&{
+  chartScopes:readonly ChartResearchScopeV1[];
+ }
+>){
+ const {chartScopes,...worker}=input;
+ if(!Array.isArray(chartScopes)||chartScopes.length<1||chartScopes.length>1000||
+  chartScopes.some(s=>!s||s.registryCatalogueCohort!==undefined||
+    s.workspaceId!==chartScopes[0].workspaceId||s.registryClient!==chartScopes[0].registryClient)||
+  new Set(chartScopes.map(s=>s.jobId)).size!==chartScopes.length||
+  new Set(chartScopes.map(s=>s.caseId)).size!==chartScopes.length)
+   throw Error("MIZIZI_DESK_COHORT_SCOPE_DENIED");
+ const catalogue=createCharts2RegistryCatalogueCohortV1(chartScopes[0].registryClient,{now:input.now??Date.now});
+ const totals={recovered:0,claimed:0,succeeded:0,failed:0};
+ for(const scope of chartScopes){
+  const result=await runDurableDeskResearchWorkerCycleV1({...worker,
+    chartScope:{...scope,registryCatalogueCohort:catalogue}});
+  totals.recovered+=result.recovered;totals.claimed+=result.claimed;
+  totals.succeeded+=result.succeeded;totals.failed+=result.failed;
+ }
+ return Object.freeze({contract:"mizizi.durable_desk_cohort.v1" as const,
+  requested:chartScopes.length,...totals});
 }

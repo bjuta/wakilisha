@@ -1,6 +1,6 @@
 import {describe,expect,it} from "vitest";
 import {inspectCharts2FrozenEditionProjectionV1} from "../../supabase/functions/_shared/charts2-publication-bridge-v1.mjs";
-import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,readCharts2RegistryDiscoveryV1,buildCharts2InvestigationInputV1,verifyCharts2InvestigationParityV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
+import {buildCharts2PrivateNativeReviewV1,buildCharts2RegistryDiscoveryV1,readCharts2RegistryDiscoveryV1,createCharts2RegistryCatalogueCohortV1,buildCharts2InvestigationInputV1,verifyCharts2InvestigationParityV1} from "../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import {suggestRecordingReviewGroups,buildRecordingInvestigationGroups,bindRecordingInvestigationGroups} from "../../src/services/chartsPrivate/recordingReviewSuggestions";
 import {
   appendChartReviewReference,
@@ -1357,6 +1357,40 @@ describe("Shared Registry-first catalogue transport",()=>{
     expect(calls.filter(c=>c.table==="registry_tracks"&&c.fields==="id,title").map(c=>c.cursor))
       .toEqual([null,UUID(500)]);
     expect(calls.some(c=>c.table==="registry_artist_aliases")).toBe(true);
+  });
+  it("shares a bounded catalogue scan across 1,000 discovery cases without caching matching details or assigning an identity",async()=>{
+    const {server,calls}=client();
+    const cohort=createCharts2RegistryCatalogueCohortV1(server,{now:()=>Date.parse("2026-11-26T00:00:00Z")});
+    const original=await readCharts2RegistryDiscoveryV1(server,unresolved);
+    calls.length=0;
+    for(let i=0;i<1000;i++){
+      const result=await readCharts2RegistryDiscoveryV1(server,unresolved,cohort);
+      expect(result.groups).toEqual(original.groups);
+      expect(result).toMatchObject({candidate_only:true,can_publish:false,ambiguous_positions:1,
+        catalogue_snapshot_reused:i!==0,catalogue_rows_read:i===0?502:0,catalogue_pages_read:i===0?2:0});
+    }
+    expect(calls.filter(c=>c.table==="registry_tracks"&&c.fields==="id,title")).toHaveLength(2);
+    expect(calls.filter(c=>c.table==="registry_tracks"&&c.fields!=="id,title")).toHaveLength(1000);
+    await expect(readCharts2RegistryDiscoveryV1(server,unresolved,cohort)).rejects.toThrow("cohort_denied");
+  });
+  it("refreshes expired cohort snapshots and rejects foreign clients, fabricated tokens and failed current details",async()=>{
+    const {server,calls}=client();
+    let clock=Date.parse("2026-11-26T00:00:00Z");
+    const cohort=createCharts2RegistryCatalogueCohortV1(server,{now:()=>clock});
+    await readCharts2RegistryDiscoveryV1(server,unresolved,cohort);
+    clock+=300000;
+    expect(await readCharts2RegistryDiscoveryV1(server,unresolved,cohort)).toMatchObject({catalogue_snapshot_reused:false});
+    expect(calls.filter(c=>c.table==="registry_tracks"&&c.fields==="id,title")).toHaveLength(4);
+    await expect(readCharts2RegistryDiscoveryV1(client().server,unresolved,cohort)).rejects.toThrow("cohort_denied");
+    await expect(readCharts2RegistryDiscoveryV1(server,unresolved,{})).rejects.toThrow("cohort_denied");
+    const options={missingDetail:false};
+    const other=client(options);
+    const token=createCharts2RegistryCatalogueCohortV1(other.server,{now:()=>clock});
+    await readCharts2RegistryDiscoveryV1(other.server,unresolved,token);
+    options.missingDetail=true;
+    await expect(readCharts2RegistryDiscoveryV1(other.server,unresolved,token)).rejects.toThrow("catalogue_changed");
+    options.missingDetail=false;
+    expect(await readCharts2RegistryDiscoveryV1(other.server,unresolved,token)).toMatchObject({catalogue_snapshot_reused:false});
   });
   it("rejects cursor repeats, missing candidate details, unavailable catalogue and truncated alias reads",async()=>{
     for(const [options,code] of [

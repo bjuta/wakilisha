@@ -4,7 +4,7 @@
  * default result, new queue, Registry writer or credential handling exists.
  */
 import {verifyCharts2OriginalBytesV1} from "../../../../../supabase/functions/_shared/charts2-original-candidate.mjs";
-import {readCharts2RegistryDiscoveryV1} from "../../../../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
+import {readCharts2RegistryDiscoveryV1,createCharts2RegistryCatalogueCohortV1} from "../../../../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 export const RESEARCH_WORKER_CYCLE_CONTRACT = "mizizi.research_worker_cycle.v1" as const;
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const WORKER=/^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/;
@@ -21,6 +21,8 @@ export type ChartResearchScopeV1=Readonly<{
  readOriginal:(position:LeasedChartPositionV1)=>Promise<Uint8Array>;
  /** Trusted local Registry client; not an external provider. */
  registryClient:Readonly<{from:(table:string)=>any}>;
+ /** Process-local ID/title discovery snapshot, never authoritative evidence. */
+ registryCatalogueCohort?:ReturnType<typeof createCharts2RegistryCatalogueCohortV1>;
 }>;
 export type LeasedChartPositionV1=Readonly<{
  source_key:string;receipt_id:string;original_sha256:string;rank:number;
@@ -384,7 +386,7 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
        provider_track_id:p.provider_track_id,
      }));
      let discovery;
-     try{discovery=await readCharts2RegistryDiscoveryV1(scope.registryClient,positions);}
+     try{discovery=await readCharts2RegistryDiscoveryV1(scope.registryClient,positions,scope.registryCatalogueCohort);}
      catch{throw new Error("MIZIZI_CHART_REGISTRY_DISCOVERY_UNCONFIRMED");}
      const afterDiscovery=await readChartContext(rpc,job,workerId,now());
      if(JSON.stringify(afterDiscovery)!==JSON.stringify(job.chartContext))

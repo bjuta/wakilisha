@@ -247,45 +247,126 @@ export async function readCharts2RegistryTracksV1(server,ids,strict=false) {
       }));
 }
 
-/** Shared bounded catalogue read. Caller verifies current originals and access.
- * No identity selection, grant, outbound provider call or write.
+/** Cohort reuse is discovery only: no identity, evidence, permission, or
+ * negative identity conclusion may be derived from a catalogue snapshot.
+ * Only the active ID/title index is retained, in one trusted process, tied to
+ * the original Registry client. All matching details are read back per case.
+ * No source receipts, private observations, credits or provider credentials
+ * are shared. A failed/expired snapshot is never returned as an empty match.
  */
-export async function readCharts2RegistryDiscoveryV1(server,unresolved){
-  if(!server||typeof server.from!=="function"||!Array.isArray(unresolved)||unresolved.length>600)
-    fail("charts2_registry_discovery_input_bounds");
-  const keys=new Set(unresolved.map(row=>charts2RegistryDiscoveryKeyV1(row.title)).filter(Boolean));
-  const ids=[];
-  let lastId=null,scanned=0;
+const registryCatalogueCohorts=new WeakMap();
+const COHORT_MAX_TRACKS=100000;
+const COHORT_MAX_TITLE_UNITS=16000000;
+const COHORT_MAX_AGE_MS=300000;
+const COHORT_MAX_USES=1000;
+export function createCharts2RegistryCatalogueCohortV1(server,{now=Date.now}={}){
+  if(!server||typeof server.from!=="function"||typeof now!=="function")
+    fail("charts2_registry_discovery_cohort_client_invalid");
+  const token=Object.freeze({});
+  registryCatalogueCohorts.set(token,{server,now,uses:0,snapshot:null,busy:false});
+  return token;
+}
+async function scanCharts2RegistryCatalogueV1(server,keys,maxTracks){
+  const index=new Map(),ids=[];
+  let lastId=null,scanned=0,pages=0,titleUnits=0;
   const uuid=/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
-  while(keys.size){
+  while(keys===null||keys.size){
     let query=server.from("registry_tracks").select("id,title").eq("status","active").order("id",{ascending:true}).limit(500);
     if(lastId)query=query.gt("id",lastId);
     const result=await query;
     if(result.error||!Array.isArray(result.data)||result.data.length>500)
       fail("charts2_registry_discovery_catalogue_unavailable");
+    pages++;
     scanned+=result.data.length;
-    if(scanned>10000)fail("charts2_registry_discovery_catalogue_bound");
+    if(scanned>maxTracks)fail("charts2_registry_discovery_catalogue_bound");
     for(const track of result.data){
       if(!track||typeof track.id!=="string"||!uuid.test(track.id)||
          typeof track.title!=="string"||(lastId!==null&&track.id<=lastId))
         fail("charts2_registry_discovery_cursor_invalid");
       lastId=track.id;
-      if(keys.has(charts2RegistryDiscoveryKeyV1(track.title)))ids.push(track.id);
+      if(keys===null){
+        titleUnits+=track.title.length;
+        if(titleUnits>COHORT_MAX_TITLE_UNITS)fail("charts2_registry_discovery_catalogue_memory_bound");
+      }
+      const key=charts2RegistryDiscoveryKeyV1(track.title);
+      if(keys===null){
+        if(!key)continue;
+        const matches=index.get(key)??[];
+        matches.push(track.id);index.set(key,matches);
+      }else if(keys.has(key))ids.push(track.id);
     }
     if(ids.length>300)fail("charts2_registry_discovery_candidate_bound");
     if(result.data.length<500)break;
   }
-  const tracks=[];
-  for(let i=0;i<ids.length;i+=30){
-    const batch=ids.slice(i,i+30);
-    const found=await readCharts2RegistryTracksV1(server,batch,true);
-    if(found.length!==batch.length||new Set(found.map(t=>t.id)).size!==batch.length||
-      found.some(t=>!batch.includes(t.id)||t.status!=="active"||
-       !keys.has(charts2RegistryDiscoveryKeyV1(t.title))))
-      fail("charts2_registry_discovery_catalogue_changed");
-    tracks.push(...found);
+  return {index,ids,scanned,pages};
+}
+/** Shared bounded catalogue read. The optional cohort is created by the
+ * server-side worker runner, never received from a model or public request.
+ * A single lookup keeps the existing strict fresh scan and detail checks.
+ */
+export async function readCharts2RegistryDiscoveryV1(server,unresolved,cohort){
+  if(!server||typeof server.from!=="function"||!Array.isArray(unresolved)||unresolved.length>600)
+    fail("charts2_registry_discovery_input_bounds");
+  const keys=new Set(unresolved.map(row=>charts2RegistryDiscoveryKeyV1(row.title)).filter(Boolean));
+  let state=null,scanned=0,ids=[],snapshotMeta=null;
+  if(cohort!==undefined){
+    state=registryCatalogueCohorts.get(cohort);
+    if(!state||state.server!==server||state.busy||state.uses>=COHORT_MAX_USES)
+      fail("charts2_registry_discovery_cohort_denied");
+    state.busy=true;state.uses++;
   }
-  return {...buildCharts2RegistryDiscoveryV1({unresolved,tracks}),catalogue_scanned:scanned};
+  try{
+    if(state&&keys.size){
+      const started=state.now();
+      if(!Number.isFinite(started))fail("charts2_registry_discovery_cohort_clock_invalid");
+      const reused=!!state.snapshot&&started>=state.snapshot.started&&started-state.snapshot.started<COHORT_MAX_AGE_MS;
+      if(!reused){
+        state.snapshot=null;
+        const scan=await scanCharts2RegistryCatalogueV1(server,null,COHORT_MAX_TRACKS);
+        const finished=state.now();
+        if(!Number.isFinite(finished)||finished<started||finished-started>=COHORT_MAX_AGE_MS)
+          fail("charts2_registry_discovery_cohort_expired");
+        state.snapshot={...scan,started};
+      }
+      const snapshot=state.snapshot;
+      scanned=snapshot.scanned;
+      for(const key of keys){
+        for(const id of snapshot.index.get(key)??[]){
+          ids.push(id);
+          if(ids.length>300)fail("charts2_registry_discovery_candidate_bound");
+        }
+      }
+      ids.sort();
+      snapshotMeta={catalogue_snapshot_at:new Date(snapshot.started).toISOString(),
+        catalogue_snapshot_reused:reused,catalogue_rows_read:reused?0:snapshot.scanned,
+        catalogue_pages_read:reused?0:snapshot.pages};
+    }else{
+      const scan=await scanCharts2RegistryCatalogueV1(server,keys,10000);
+      ids=scan.ids;scanned=scan.scanned;
+    }
+    const tracks=[];
+    for(let i=0;i<ids.length;i+=30){
+      const batch=ids.slice(i,i+30);
+      const found=await readCharts2RegistryTracksV1(server,batch,true);
+      if(found.length!==batch.length||new Set(found.map(t=>t.id)).size!==batch.length||
+        found.some(t=>!batch.includes(t.id)||t.status!=="active"||
+         !keys.has(charts2RegistryDiscoveryKeyV1(t.title))))
+        fail("charts2_registry_discovery_catalogue_changed");
+      tracks.push(...found);
+    }
+    if(state&&snapshotMeta){
+      const finished=state.now();
+      if(!Number.isFinite(finished)||finished<state.snapshot.started||
+        finished-state.snapshot.started>=COHORT_MAX_AGE_MS)
+        fail("charts2_registry_discovery_cohort_expired");
+    }
+    return {...buildCharts2RegistryDiscoveryV1({unresolved,tracks}),catalogue_scanned:scanned,...(snapshotMeta??{})};
+  }catch(error){
+    if(state)state.snapshot=null;
+    throw error;
+  }finally{
+    if(state)state.busy=false;
+  }
 }
 
 // Server-side read-only admission input. The caller must first verify the
