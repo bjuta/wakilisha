@@ -173,3 +173,38 @@ export function createDeskSearchGatewayV1(options:DeskSearchGatewayOptionsV1){
    identityVerified:false,sourceRetentionAuthorized:false,externalModelProcessingAuthorized:false});
  };
 }
+
+
+/** Production-facing composition of the existing service JWT RPC transport.
+ * The key stays server-side; only a domain-separated credential fingerprint
+ * reaches the private authority. No policy issuance or budget mutation outside
+ * the three RPCs. Missing/unconfirmed authority fails closed.
+ */
+export function createDurableDeskSearchGatewayV1(options:Readonly<{
+ apiKey:string;rpc:import("./research-worker-cycle-v1.ts").WorkerRpc;
+ transport?:typeof fetch;now?:()=>number;
+}>){
+ if(typeof options?.rpc!=="function"||typeof options.apiKey!=="string"||
+    options.apiKey.length<12||options.apiKey.trim()!==options.apiKey)
+   fail("TRUSTED_CONFIGURATION_REQUIRED");
+ const apiKey=options.apiKey;
+ const fingerprint=createHash("sha256").update("mizizi:brave:credential:v1:"+apiKey).digest("hex");
+ const rpc=options.rpc;
+ const call=async(fn:string,args:Record<string,unknown>)=>{
+  const result=await rpc(fn,{...args,p_account_fingerprint:fingerprint});
+  if(!result||result.error)fail("DURABLE_AUTHORITY_UNCONFIRMED");
+  return result.data;
+ };
+ return createDeskSearchGatewayV1({
+  apiKey,transport:options.transport,now:options.now,
+  authorize:async(request,digest)=>await call("mizizi_authorize_desk_search_v1",{
+   p_request_text:JSON.stringify(request),p_request_sha256:digest
+  }) as DeskSearchAuthorityV1|null,
+  reserve:async(request,digest,authority)=>await call("mizizi_reserve_desk_search_v1",{
+   p_request_text:JSON.stringify(request),p_request_sha256:digest,p_policy_ref:authority.policyRef
+  }) as DeskSearchReservationV1|null,
+  consume:async(reservation)=>await call("mizizi_consume_desk_search_v1",{
+   p_reservation_id:reservation.reservationId,p_request_sha256:reservation.requestSha256
+  })===true,
+ });
+}
