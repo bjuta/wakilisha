@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import {createHash} from "node:crypto";
 import {runAdaptiveInvestigationV1, type InvestigationPassV1} from "../../scripts/registry/agents/mizizi/runtime/adaptive-investigation-v1";
 import {createAnthropicInvestigationAnalystV1,resolveInstituteAnthropicConfigurationV1,discoverAnthropicResearchModelV1} from "../../scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1";
 import {createWikidataInvestigationReaderV1} from "../../scripts/registry/agents/mizizi/runtime/wikidata-investigation-reader-v1";
@@ -283,15 +284,16 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
 
 describe("Exact Charts research lease transport (existing worker lifecycle)",()=>{
  const workerId="mizizi-chart:"+JOB;
+ const bytes=new Uint8Array(123).fill(7);
  const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
-  preflight:async()=>true};
+  preflight:async()=>true,readOriginal:async()=>bytes.slice()};
  const exactRow={...row,input_payload:{...row.input_payload,
   reason:"Investigate receipt-bound chart recording identity."}};
- const sha="a".repeat(64);
+ const sha=createHash("sha256").update(bytes).digest("hex");
  const position={source_key:"youtube_ke",receipt_id:EVENT,original_sha256:sha,
   rank:3,title:"Unresolved song",artist:null,provider_track_id:"provider-key",
   original_bucket:"charts2-evidence-private-v1",
-  original_object_key:"youtube_ke/aa/"+sha+".csv",
+  original_object_key:"youtube_ke/"+sha.slice(0,2)+"/"+sha+".csv",
   original_byte_length:123,original_content_type:"text/csv"};
  const context={contract:"mizizi.charts.research_context.v1",
   jobId:JOB,receiptId:RECEIPT,caseId:CASE,workspaceId:WORKSPACE,
@@ -318,7 +320,7 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
     chartScope=scope)=>runResearchWorkerCycleV1({rpc,research,workerId,chartScope,now:()=>NOW});
   return {calls,run};
  }
- it("preflights before exact recovery/claim, reads context twice, and uses the existing completion receipt",async()=>{
+ it("preflights before exact recovery/claim, checks original bytes and reads current context before research and completion, and uses the existing completion receipt",async()=>{
   const h=scoped();
   const result=await h.run(async(job)=>{
    expect(job.chartContext).toEqual(context);
@@ -330,10 +332,10 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   expect(h.calls.map(c=>c.fn)).toEqual([
    "mizizi_recover_expired_chart_research_job_v1","mizizi_claim_exact_chart_research_job_v1",
    "mizizi_read_leased_chart_research_context_v1","mizizi_read_leased_chart_research_context_v1",
-   "mizizi_complete_case_research_job_v1"]);
+   "mizizi_read_leased_chart_research_context_v1","mizizi_complete_case_research_job_v1"]);
   expect(h.calls[1].args).toMatchObject({p_job_id:JOB,p_case_id:CASE,p_workspace_id:WORKSPACE,
    p_expected_revision:2,p_worker_id:workerId});
-  expect(h.calls[4].args.p_result).toEqual(finding);
+  expect(h.calls[5].args.p_result).toEqual(finding);
  });
  it("stops before any RPC when trusted preflight is absent or denied",async()=>{
   for(const preflight of [async()=>false,async()=>{throw Error("PROVIDER_UNAVAILABLE");}]){
@@ -368,9 +370,30 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   }
  });
  it("does not complete or fail a job whose verified context changed during research",async()=>{
-  const h=scoped({contexts:[context,{...context,observationSha256:"c".repeat(64)}]});
+  const h=scoped({contexts:[context,context,{...context,observationSha256:"c".repeat(64)}]});
   await expect(h.run(async()=>finding)).rejects.toThrow("CONTEXT_CHANGED_BEFORE_COMPLETION");
-  expect(h.calls).toHaveLength(4);
+  expect(h.calls).toHaveLength(5);
+ });
+ it("requires private Storage bytes before any research handler or completion",async()=>{
+  for(const readOriginal of [
+   async()=>new Uint8Array(122).fill(7),
+   async()=>new Uint8Array(123).fill(8),
+   async()=>{throw Error("private storage detail");}
+  ]){
+   const h=scoped(),handler=vi.fn(async()=>finding);
+   await expect(h.run(handler,{...scope,readOriginal})).rejects.toThrow("MIZIZI_CHART_ORIGINAL");
+   expect(handler).not.toHaveBeenCalled();
+   expect(h.calls).toHaveLength(3);
+  }
+  const h=scoped(),handler=vi.fn(async()=>finding);
+  await expect(h.run(handler,{...scope,readOriginal:undefined} as never)).rejects.toThrow("INVALID_SCOPE");
+  expect(h.calls).toHaveLength(0);
+ });
+ it("rechecks context after the Storage read and refuses changed case evidence",async()=>{
+  const h=scoped({contexts:[context,{...context,observationSha256:"c".repeat(64)}]});
+  const handler=vi.fn(async()=>finding);
+  await expect(h.run(handler)).rejects.toThrow("CONTEXT_CHANGED_BEFORE_RESEARCH");
+  expect(h.calls).toHaveLength(4);expect(handler).not.toHaveBeenCalled();
  });
  it("never calls generic claim/recovery or invents work when the scoped job is unavailable",async()=>{
   const h=scoped({claim:[]}),handler=vi.fn(async()=>finding);

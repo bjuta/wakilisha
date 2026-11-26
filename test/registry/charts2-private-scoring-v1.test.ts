@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { getEntitySchema } from "../../src/services/registry/admin/entitySchemas";
 import { normalizeForSave, validateField } from "../../src/services/registry/admin/fieldNormalization";
 import { createHash } from "node:crypto";
-import { decodeCharts2Original } from "../../supabase/functions/_shared/charts2-original-candidate.mjs";
+import { decodeCharts2Original, verifyCharts2OriginalBytesV1 } from "../../supabase/functions/_shared/charts2-original-candidate.mjs";
 import {
   parseYouTubeKenyaOfficialExport, YOUTUBE_EXPORT_ENDPOINT, YOUTUBE_EXPORT_MODE,
   YOUTUBE_EXPORT_PERIOD_AUTHORITY, YOUTUBE_EXPORT_PARSER_VERSION, YOUTUBE_EXPORT_ACK,
@@ -713,7 +713,7 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_SQL).not.toContain("insert into public.wk_chart_entries_v2");
     expect(STUDIO_WORKER).toContain('server.rpc("charts2_studio_private_snapshot_v1"');
     expect(STUDIO_WORKER).toContain('required_capability:"manage_registry"');
-    expect(STUDIO_WORKER).toContain('crypto.subtle.digest("SHA-256",bytes)');
+    expect(STUDIO_WORKER).toContain('verifyCharts2OriginalBytesV1(receipt,bytes)');
     expect(STUDIO_WORKER).toContain('authClient.rpc("admin_admit_registry_track_provider_link_v1"');
     expect(STUDIO_WORKER).not.toContain('server.rpc("admin_admit_registry_track_provider_link_v1"');
     expect(STUDIO_WORKER).toContain('mode==="studio_review_no_id"');
@@ -1279,4 +1279,19 @@ it("keeps the Registry list and next Track Intake route on owned field and theme
   }
   expect(TRACK_INTAKE_PAGE).toContain("<WkTextField multiline");
   expect(TRACK_INTAKE_PAGE).toContain("searchRegistryArtists(");
+});
+
+describe("Shared exact private original byte authority",()=>{
+ it("accepts only the exact bounded archived bytes; does not infer provider authorization",async()=>{
+  const bytes=new TextEncoder().encode("fixture original");
+  const sha=createHash("sha256").update(bytes).digest("hex");
+  const receipt={original_bucket:"charts2-evidence-private-v1",
+   original_object_key:"shazam_ke/"+sha.slice(0,2)+"/"+sha+".csv",
+   original_sha256:sha,original_byte_length:bytes.length};
+  await expect(verifyCharts2OriginalBytesV1(receipt,bytes)).resolves.toBe(true);
+  await expect(verifyCharts2OriginalBytesV1(receipt,bytes.slice(1))).rejects.toThrow("bytes_mismatch");
+  const wrong=bytes.slice();wrong[0]^=1;
+  await expect(verifyCharts2OriginalBytesV1(receipt,wrong)).rejects.toThrow("bytes_mismatch");
+  await expect(verifyCharts2OriginalBytesV1({...receipt,original_bucket:"public"},bytes)).rejects.toThrow("receipt_invalid");
+ });
 });

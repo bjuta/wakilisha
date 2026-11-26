@@ -62,6 +62,27 @@ function toBytes(value) {
     value.byteLength > MAX_ORIGINAL_BYTES) fail('charts2_original_bytes_invalid');
   return value;
 }
+/** Recheck bytes at every private research read. Receipt metadata by itself is
+ * not proof that the stored original is present and unchanged. No provider
+ * access, new source permission, or identity conclusion is implied.
+ */
+export async function verifyCharts2OriginalBytesV1(receipt,original_bytes) {
+  if (!receipt || receipt.original_bucket !== 'charts2-evidence-private-v1' ||
+      typeof receipt.original_object_key !== 'string' || !receipt.original_object_key ||
+      typeof receipt.original_sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(receipt.original_sha256) ||
+      !Number.isSafeInteger(receipt.original_byte_length) ||
+      receipt.original_byte_length < 1 || receipt.original_byte_length > MAX_ORIGINAL_BYTES)
+    fail('charts2_original_receipt_invalid');
+  if (!(original_bytes instanceof Uint8Array) ||
+      original_bytes.byteLength !== receipt.original_byte_length)
+    fail('charts2_original_bytes_mismatch');
+  const digest = await crypto.subtle.digest('SHA-256', original_bytes);
+  const hash = Array.from(new Uint8Array(digest), x =>
+    x.toString(16).padStart(2,'0')).join('');
+  if (hash !== receipt.original_sha256) fail('charts2_original_bytes_mismatch');
+  return true;
+}
 function toText(bytes) {
   try { return new TextDecoder('utf-8', {fatal: true}).decode(bytes); }
   catch { fail('charts2_original_utf8_invalid'); }

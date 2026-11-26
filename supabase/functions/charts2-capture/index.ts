@@ -3,7 +3,7 @@
 // No scoring, Registry mutation, publication, timer or key exposure.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
-import { decodeCharts2Original, listCharts2SourceContracts, charts2YouTubeNativeWeeklyPost } from "../_shared/charts2-original-candidate.mjs";
+import { decodeCharts2Original, listCharts2SourceContracts, charts2YouTubeNativeWeeklyPost, verifyCharts2OriginalBytesV1 } from "../_shared/charts2-original-candidate.mjs";
 import {scoreCharts2PrivatePreviewV1,CHARTS2_PRIVATE_METHODOLOGY_V1,summarizeCharts2SourceCoverageV1} from "../_shared/charts2-private-scoring-v1.mjs";
 import {YOUTUBE_EXPORT_ENDPOINT,YOUTUBE_EXPORT_MODE,YOUTUBE_EXPORT_ACK,
   YOUTUBE_EXPORT_PARSER_VERSION} from "../_shared/charts2-youtube-official-export.mjs";
@@ -169,12 +169,8 @@ async function verifyPrivateOriginal(server:any,receipt:any) {
   if(storage.error||!storage.data)
     throw new Reject(503,"charts2_studio_original_unavailable");
   const bytes=new Uint8Array(await storage.data.arrayBuffer());
-  if(bytes.length!==receipt.original_byte_length)
-    throw new Reject(409,"charts2_studio_original_mismatch");
-  const hash=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),
-    x=>x.toString(16).padStart(2,"0")).join("");
-  if(hash!==receipt.original_sha256)
-    throw new Reject(409,"charts2_studio_original_mismatch");
+  try { await verifyCharts2OriginalBytesV1(receipt,bytes); }
+  catch { throw new Reject(409,"charts2_studio_original_mismatch"); }
 }
 async function requireRegistryReviewer(authClient:any) {
   const result=await authClient.rpc("current_user_has_capability",{

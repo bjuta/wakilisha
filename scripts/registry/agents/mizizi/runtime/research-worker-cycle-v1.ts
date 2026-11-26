@@ -3,6 +3,7 @@
  * A caller must supply a genuine, authorized read-only researcher. No
  * default result, new queue, Registry writer or credential handling exists.
  */
+import {verifyCharts2OriginalBytesV1} from "../../../../../supabase/functions/_shared/charts2-original-candidate.mjs";
 export const RESEARCH_WORKER_CYCLE_CONTRACT = "mizizi.research_worker_cycle.v1" as const;
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const WORKER=/^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/;
@@ -14,6 +15,9 @@ export type WorkerRpc=(fn:string,args:Record<string,unknown>)=>Promise<WorkerRpc
 export type ChartResearchScopeV1=Readonly<{
  jobId:string;caseId:string;workspaceId:string;expectedRevision:number;
  preflight:()=>Promise<boolean>;
+ /** Trusted, private, Storage-only reader. Never fetch a provider URL.
+  * The worker itself checks exact length and SHA-256; no boolean attestation. */
+ readOriginal:(position:LeasedChartPositionV1)=>Promise<Uint8Array>;
 }>;
 export type LeasedChartPositionV1=Readonly<{
  source_key:string;receipt_id:string;original_sha256:string;rank:number;
@@ -284,7 +288,8 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
  const scope=input?.chartScope;
  let exact:Record<string,unknown>|null=null;
  if(scope!==undefined){
-   if(!scope||typeof scope.preflight!=="function"||limit!==1||!CHART_WORKER.test(workerId))
+   if(!scope||typeof scope.preflight!=="function"||typeof scope.readOriginal!=="function"||
+      limit!==1||!CHART_WORKER.test(workerId))
     throw new TypeError("MIZIZI_CHART_WORKER_INVALID_SCOPE");
    exact={p_job_id:uuid(scope.jobId),p_case_id:uuid(scope.caseId),
     p_workspace_id:uuid(scope.workspaceId),p_expected_revision:positive(scope.expectedRevision)};
@@ -322,6 +327,23 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
    // mismatched or stale lease is not authority to mutate another job.
    const job=exact?Object.freeze({...leased,
      chartContext:await readChartContext(rpc,leased,workerId,now())}):leased;
+   // Re-read each exact original before any source reader, model or pass
+   // handler runs. A missing/mismatched object is an authority failure, not
+   // a negative research finding. Do not expose its bytes in receipts/logs.
+   if(scope&&job.chartContext){
+     for(const position of job.chartContext.positions){
+       if(now()>=Date.parse(job.leaseExpiresAt))
+         throw new Error("MIZIZI_CHART_WORKER_LEASE_EXPIRED_BEFORE_ORIGINAL");
+       let bytes:Uint8Array;
+       try{bytes=await scope.readOriginal(position);}
+       catch{throw new Error("MIZIZI_CHART_ORIGINAL_UNAVAILABLE");}
+       try{await verifyCharts2OriginalBytesV1(position,bytes);}
+       catch{throw new Error("MIZIZI_CHART_ORIGINAL_BYTES_MISMATCH");}
+     }
+     const fresh=await readChartContext(rpc,job,workerId,now());
+     if(JSON.stringify(fresh)!==JSON.stringify(job.chartContext))
+       throw new Error("MIZIZI_CHART_WORKER_CONTEXT_CHANGED_BEFORE_RESEARCH");
+   }
    let researchResult:Readonly<Record<string,unknown>>;
    try{
      researchResult=await validatedResult(await research(job),job,input.verifySources,now());
