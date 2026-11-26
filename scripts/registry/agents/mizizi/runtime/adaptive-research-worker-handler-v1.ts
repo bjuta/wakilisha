@@ -9,7 +9,7 @@ import {runAdaptiveInvestigationV1, type InvestigationIdentityV1,
 import type {ResearchJobHandlerV1,ResearchJobV1}
  from "./research-worker-cycle-v1.ts";
 import {runResearchWorkerCycleV1, type WorkerRpc, type ResearchSourceVerifierV1, type ChartResearchScopeV1} from "./research-worker-cycle-v1.ts";
-import {createLeasedResearchPassStoreV1} from "./leased-research-pass-store-v1.ts";
+import {createLeasedResearchPassStoreV1,guardDeskResearchPassStoreV1} from "./leased-research-pass-store-v1.ts";
 import {createAnthropicInvestigationAnalystV1, type AnthropicInvestigationOptionsV1}
  from "./anthropic-investigation-analyst-v1.ts";
 import {createCostRoutedDeskAnthropicPassV1} from "./desk-anthropic-tool-loop-v1.ts";
@@ -209,14 +209,19 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     browser:config.browser,now:input.now});
    const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
    const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
-   const prepareDeskPass=createCostRoutedDeskAnthropicPassV1({
+   const deskPass=createCostRoutedDeskAnthropicPassV1({
     scope,anthropic,enabledTools:dispatcher.enabledTools,readModelInventory:config.readModelInventory,
     assessRequirement:config.assessRequirement,authorizeEnvelope:config.authorizeEnvelope,
     authorizeTool:config.authorizeTool,...finance,executeTool:dispatcher.executeTool,
     verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,now:input.now});
+   const prepareDeskPass:DeskPassResearcherV1=async(id,question,history)=>{
+    for(const pass of history)if(await dispatcher.verifyJournalPass(pass)!==true)
+     throw Error("MIZIZI_DESK_HISTORY_CUSTODY_DENIED");
+    return deskPass(id,question,history);
+   };
    active={job,dispatcher};
    return createAdaptiveResearchWorkerHandlerV1({
-    store:createLeasedResearchPassStoreV1(input.rpc,job,input.workerId),
+    store:guardDeskResearchPassStoreV1(createLeasedResearchPassStoreV1(input.rpc,job,input.workerId),dispatcher.verifyJournalPass),
     openingQuestion:input.openingQuestion,readSources:async()=>{throw Error("MIZIZI_DESK_LEGACY_READER_DENIED");},
     analyze:async()=>{throw Error("MIZIZI_DESK_LEGACY_ANALYST_DENIED");},prepareDeskPass,
     verifyFinding:input.verifyFinding,authorizeModelProcessing:dispatcher.authorizeModelProcessing,

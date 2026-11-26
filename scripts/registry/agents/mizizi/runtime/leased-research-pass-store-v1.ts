@@ -73,3 +73,26 @@ export function createLeasedResearchPassStoreV1(
   }
  };
 }
+
+/** Desk-only application fence. Preserve immutable journal bytes and fail
+ * closed when current independent source custody cannot be confirmed.
+ * The underlying database RPC still needs its own access fence. */
+export function guardDeskResearchPassStoreV1(store:InvestigationStoreV1,
+ verify:(pass:InvestigationPassV1)=>Promise<boolean>):InvestigationStoreV1{
+ if(typeof verify!=="function")throw Error("MIZIZI_DESK_HISTORY_AUTHORITY_REQUIRED");
+ const check=async(id:InvestigationIdentityV1,pass:InvestigationPassV1)=>{
+  if(pass.caseId!==id.caseId||pass.workspaceId!==id.workspaceId||await verify(pass)!==true)
+   throw Error("MIZIZI_DESK_HISTORY_CUSTODY_DENIED");
+ };
+ return {
+  read:async(id)=>{
+   const passes=await store.read(id);
+   for(const pass of passes)await check(id,pass);
+   return passes;
+  },
+  append:async(id,ordinal,previous,pass)=>{
+   await check(id,pass);
+   return store.append(id,ordinal,previous,pass);
+  }
+ };
+}

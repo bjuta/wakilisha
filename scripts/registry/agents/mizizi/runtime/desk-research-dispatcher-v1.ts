@@ -11,7 +11,7 @@ import {createDeskNativeReaderV1} from "./desk-native-reader-v1.ts";
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "./desk-source-interpreter-v1.mjs";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "./desk-browser-reader-v1.mjs";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
-import {verifyInvestigationSourceV1,type SourceAuthorityV1,type SourceExcerptV1} from "./adaptive-investigation-v1.ts";
+import {verifyInvestigationSourceV1,type SourceAuthorityV1,type SourceExcerptV1,type InvestigationPassV1} from "./adaptive-investigation-v1.ts";
 import type {DeskAnthropicOptionsV1,DeskToolCallV1,DeskToolLeadV1,DeskToolResultV1} from "./desk-anthropic-tool-loop-v1.ts";
 import type {WorkerRpc,ResearchSourceVerifierV1} from "./research-worker-cycle-v1.ts";
 const SHA=/^[a-f0-9]{64}$/;
@@ -387,6 +387,26 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(id.caseId!==scope.caseId||id.workspaceId!==scope.workspaceId)return false;
   return currentSource(source);
  };
+ // Exact stored excerpts must match the current independent custody projection.
+ const verifyJournalPass=async(pass:InvestigationPassV1):Promise<boolean>=>{
+  if(pass.caseId!==scope.caseId||pass.workspaceId!==scope.workspaceId||
+   !Array.isArray(pass.sourceReceipts)||pass.sourceReceipts.length>30)return false;
+  const seen=new Set<string>();
+  for(const ref of pass.sourceReceipts){
+   if(!ref||!UUID.test(ref.sourceId)||seen.has(ref.sourceId)||ref.modelDisclosed!==true)return false;
+   seen.add(ref.sourceId);
+   const read=await readReceipt(ref.sourceId);
+   const entry=read?.result.sources.find(s=>s.source.sourceId===ref.sourceId);
+   if(!entry)return false;
+   const a=entry.source;
+   verifyInvestigationSourceV1(a,identity,now());
+   if(ref.originKey!==a.originKey||ref.lineageKey!==a.lineageKey||
+    ref.payloadFingerprint!==a.fingerprint||ref.useBasis!==a.useBasis||
+    ref.authorityRef!==a.authorityRef||ref.observedAt!==a.observedAt||
+    ref.citation!==entry.citation||ref.excerpt!==entry.excerpt)return false;
+  }
+  return true;
+ };
  const verifySources:ResearchSourceVerifierV1=async(job,refs)=>{
   assertScope({jobId:job.jobId,caseId:job.caseId,workspaceId:job.workspaceId,
    expectedRevision:job.expectedRevision,workerId:scope.workerId,leaseExpiresAt:job.leaseExpiresAt});
@@ -403,5 +423,5 @@ export function createDeskResearchDispatcherV1(options:Options){
   }
   return verified;
  };
- return Object.freeze({enabledTools:TOOLS,executeTool,verifyToolReceipt,authorizeSource,authorizeModelProcessing,verifySources});
+ return Object.freeze({enabledTools:TOOLS,executeTool,verifyToolReceipt,authorizeSource,authorizeModelProcessing,verifySources,verifyJournalPass});
 }

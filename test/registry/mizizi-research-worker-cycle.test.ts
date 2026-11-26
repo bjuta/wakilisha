@@ -1,3 +1,4 @@
+import {guardDeskResearchPassStoreV1} from "../../scripts/registry/agents/mizizi/runtime/leased-research-pass-store-v1";
 import {createDeskResearchDispatcherV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-dispatcher-v1";
 import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/runtime/desk-resource-budget-v1";
 import {createCostRoutedDeskAnthropicPassV1,selectCostEffectiveDeskModelV1,type DeskModelCandidateV1,type DeskAnthropicOptionsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
@@ -1868,8 +1869,23 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   const nativeReserve=h.calls.find(c=>c.fn==="mizizi_reserve_desk_resource_v1")!;
   expect(JSON.parse(String(nativeReserve.args.p_binding_text)).requestSha256).toBe(hop);
   expect(JSON.stringify([...h.receipts.values()])).not.toContain("fixture-only-brave-key");
+  const a=source.source;
+  const journalRef={sourceId:a.sourceId,originKey:a.originKey,lineageKey:a.lineageKey,
+   payloadFingerprint:a.fingerprint,useBasis:a.useBasis,authorityRef:a.authorityRef,
+   observedAt:a.observedAt,citation:source.citation,excerpt:source.excerpt,modelDisclosed:true};
+  const pass={caseId:CASE,workspaceId:WORKSPACE,sourceReceipts:[journalRef]} as InvestigationPassV1;
+  const base={read:vi.fn(async()=>[pass]),append:vi.fn(async()=>{})};
+  const guarded=guardDeskResearchPassStoreV1(base,h.dispatch.verifyJournalPass);
+  expect(await guarded.read(identity)).toEqual([pass]);
+  await guarded.append(identity,1,null,pass);
+  expect(base.append).toHaveBeenCalledTimes(1);
+  await expect(guarded.append(identity,1,null,{...pass,sourceReceipts:[{...journalRef,excerpt:"forged"}]})).rejects.toThrow("HISTORY_CUSTODY_DENIED");
+  await expect(guarded.append(identity,1,null,{...pass,sourceReceipts:[{...journalRef,modelDisclosed:false}]})).rejects.toThrow("HISTORY_CUSTODY_DENIED");
   h.disabled.add("archive.org");
   expect(await h.dispatch.authorizeSource(identity,identity.openingQuestion,source)).toBe(false);
+  await expect(guarded.read(identity)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
+  await expect(guarded.append(identity,1,null,pass)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
+  expect(base.append).toHaveBeenCalledTimes(1);
  },20000);
  it("reads additional PDF pages and rasterizes the same leased original without another native request or raw-byte persistence",async()=>{
   const pdf=pdfFixture(),h=fixture(pdf,"application/pdf");
