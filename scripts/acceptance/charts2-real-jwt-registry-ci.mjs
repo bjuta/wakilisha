@@ -908,7 +908,27 @@ export async function verifyCharts2RealJwtRegistryV1({
  const continuationFingerprint=hash(journalBodyFor(deps)),continuationSql=(scopeSql,fingerprint)=>
   "public."+continuationName+"("+scopeSql+","+q(fingerprint)+")";
  const journalRead="public.mizizi_read_research_passes_v1("+q(job.job_id)+"::uuid,"+q(activeWorker)+")";
- const rules=[{host,pathPrefix:"/details/",custodyRevision:1,operations:["native_acquire","native_text"]}];
+ const rules=[{host,pathPrefix:"/details/",custodyRevision:1,operations:["native_acquire","native_text","browser_render","browser_request","browser_text","browser_visual"]}];
+ const localAccount=hash("fixture local capacity"),localSessionId=randomUUID(),localReadName="mizizi_read_desk_local_browser_session_v1";
+ const localRequestHash=hash("fixture exact local browser request"),browserHop=hash("fixture exact local browser resource");
+ const localDesc=JSON.stringify({scope,resource:"local_chromium",requestSha256:localRequestHash,accountFingerprint:localAccount,model:null});
+ const hopDesc=JSON.stringify({scope,resource:"native_https",requestSha256:browserHop,accountFingerprint:"d".repeat(64),model:null});
+ const localReadArgs={p_scope:scope,p_reservation_id:randomUUID(),p_request_sha256:localRequestHash,p_session_id:localSessionId};
+ fail(await call(localReadName,localReadArgs)===null,"STOP_LOCAL_SESSION_DEFAULT_DENY");
+ for(const actor of [first.user,subscriber])denied(await actor.rpc(localReadName,localReadArgs),"42501","STOP_LOCAL_SESSION_BROWSER_ACL");
+ const browseId=randomUUID(),actionId=randomUUID(),expandId=randomUUID(),browserSourceHash=hash("browser fixture DOM");
+ const browseCall={scope,call:{name:"browse_page",input:{lead_id:htmlLead,query:""}}};
+ const expandCall={scope,call:{name:"browse_page",input:{lead_id:actionId,query:""}}};
+ const browseHash=hash(JSON.stringify(browseCall)),expandHash=hash(JSON.stringify(expandCall));
+ const browseResult=JSON.stringify({receiptId:browseId,leads:[{id:actionId,kind:"browser_action",label:"Expand: credits"}],sources:[],visual:null});
+ const expandResult=JSON.stringify({receiptId:expandId,leads:[],sources:[],visual:null});
+ const renderGrant=access("browser_render",{url:htmlUrl,descriptor:{url:htmlUrl,visual:false},callSha256:browseHash});
+ const requestGrant=access("browser_request",{url:htmlUrl,descriptor:{url:htmlUrl,resourceType:"document",parentUrl:htmlUrl},
+  callSha256:browseHash,hopSha256:browserHop});
+ const browserTextGrant=(callSha256)=>access("browser_text",{url:htmlUrl,
+  descriptor:{finalUrl:htmlUrl,sha256:browserSourceHash,representation:"rendered_dom_not_original_response"},callSha256});
+ const localReceiptDeps=[...deps,{receiptId:browseId,callSha256:browseHash,resultSha256:hash(browseResult)},
+  {receiptId:expandId,callSha256:expandHash,resultSha256:hash(expandResult)}];
  const refinedQuery=context.positions[0].title+" recording credits";
  const searchGrant=query=>{
   const body=JSON.stringify({scope,operation:"search_web",query,count:3,provider:"wikimedia",providerHost:"en.wikipedia.org"});
@@ -920,7 +940,21 @@ export async function verifyCharts2RealJwtRegistryV1({
  max_rounds,max_request_bytes,access_rules,valid_until,adaptive_followups_allowed,public_query_terms)
  values (${q(ws)},${q(pairedId)},1,2,${q(context.membershipSha256)},${q(context.observationSha256)},true,
  'fixture:standing-owner-review',${q(credential)},array['fixture-haiku'],array[${q(questionHash)}],
- array['search_web','read_page'],5,10000,${j(rules)},now()+interval '5 minutes',true,array['recording credits']);
+ array['search_web','read_page','browse_page','inspect_visual'],5,10000,${j(rules)},now()+interval '5 minutes',true,array['recording credits']);
+ insert into mizizi_private.desk_resource_policy_versions_v1(
+ resource,revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+ exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,
+ allowance_start,allowance_end,valid_until,account_limit,daily_limit,case_limit,model_tariffs)
+ values('local_chromium',1,true,${q(ws)},${q(localAccount)},'fixture:local-allocated-capacity','fixture:bounded-local-host',
+ true,true,false,true,now()-interval '1 hour',now()+interval '1 hour',now()+interval '5 minutes',120,120,120,'{}');
+ insert into mizizi_private.desk_resource_policy_versions_v1(
+ resource,revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+ exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,
+ allowance_start,allowance_end,valid_until,account_limit,daily_limit,case_limit,model_tariffs)
+ select resource,3,true,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
+ exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,
+ allowance_start,allowance_end,valid_until,6000000,6000000,6000000,model_tariffs
+ from mizizi_private.desk_resource_policy_versions_v1 where resource='native_https' and revision=2;
  insert into mizizi_private.desk_search_policy_versions_v1(
  revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,disclosure_policy_ref,
  commercial_search_allowed,zero_cost_hard_cap_verified,exclusive_allocated_usage_verified,public_chart_labels_allowed,
@@ -954,6 +988,64 @@ export async function verifyCharts2RealJwtRegistryV1({
  if (${append(standingPage)}->>'outcome') is distinct from 'created' then raise exception 'STOP_STANDING_NATIVE_ADMISSION';end if;
  if (${authority("model_disclose",envelope(3,[standingPageId],deps))}->>'allowed') is distinct from 'true'
  then raise exception 'STOP_STANDING_DYNAMIC_MODEL_TRANSCRIPT';end if;
+ -- Test local browser receipt admission, resource proof and cleanup within
+ -- the same standing scope, then roll back the local fixture before the
+ -- independent existing continuation test. No actual browser/provider call.
+ declare local_slot jsonb;resource_slot jsonb;slot_id uuid;session_meta jsonb;provenance jsonb;readback jsonb;observed text;
+ begin
+  local_slot:=public.mizizi_reserve_desk_resource_v1(${q(localDesc)},1,120);
+  if local_slot is null then raise exception 'STOP_LOCAL_CAPACITY_RESERVATION';end if;
+  slot_id:=(local_slot->>'reservationId')::uuid;
+  if public.mizizi_reserve_desk_resource_v1(${q(localDesc)},1,120) is not null
+   or not public.mizizi_consume_desk_resource_v1(slot_id,${q(localRequestHash)},${q(localAccount)})
+   or public.mizizi_consume_desk_resource_v1(slot_id,${q(localRequestHash)},${q(localAccount)})
+   then raise exception 'STOP_LOCAL_SINGLE_CAPACITY';end if;
+  if not public.mizizi_record_desk_resource_event_v1(slot_id,${q(localRequestHash)},${q(localAccount)},'open_pending','{}')
+   or not public.mizizi_record_desk_resource_event_v1(slot_id,${q(localRequestHash)},${q(localAccount)},'opened',jsonb_build_object('sessionId',${q(localSessionId)}))
+   then raise exception 'STOP_LOCAL_OPEN';end if;
+  readback:=public.mizizi_read_desk_local_browser_session_v1(${j(scope)},slot_id,${q(localRequestHash)},${q(localSessionId)});
+  if readback->>'resource' is distinct from 'local_chromium' or readback->>'sessionId' is distinct from ${q(localSessionId)}
+   or public.mizizi_read_desk_local_browser_session_v1(${j(scope)},slot_id,${q(localRequestHash)},${q(staleId)}) is not null
+   then raise exception 'STOP_LOCAL_LIVE_SCOPE';end if;
+  if (${authority('tool_execute',browseCall)}->>'allowed') is distinct from 'true'
+   or (${renderGrant}->>'allowed') is distinct from 'true'
+   or (${requestGrant}->>'allowed') is distinct from 'true'
+   or (${browserTextGrant(browseHash)}->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_LOCAL_ACTION_GRANTS';end if;
+  observed:=clock_timestamp()::text;
+  session_meta:=jsonb_build_object('reservationId',slot_id,'requestSha256',${q(localRequestHash)},'sessionId',${q(localSessionId)},
+   'observationSha256',${q(hash('fixture observation'))},'action','navigate','generation',1);
+  provenance:=jsonb_build_object('parentReceiptId',${q(searchId)},'finalUrl',${q(htmlUrl)},
+   'sourceSha256',${q(browserSourceHash)},'projectionSha256',${q(hash('fixture projection'))},
+   'contentType','text/html','retrievedAt',observed,'byteLength',20,'locator','no_text',
+   'detail',jsonb_build_object('localBrowser',session_meta,'visual',null,'actionBindings',jsonb_build_array(jsonb_build_object('id',${q(actionId)},'action','expand'))));
+  if public.mizizi_record_desk_tool_receipt_v1(${q(JSON.stringify(browseCall))},${q(browseHash)},${q(browseResult)},${q(hash(browseResult))},
+   ${q(host)},1,provenance,${j([{id:actionId,url:htmlUrl}])}) is not null then raise exception 'STOP_LOCAL_UNCHARGED_RESOURCE';end if;
+  resource_slot:=public.mizizi_reserve_desk_resource_v1(${q(hopDesc)},3,2000000);
+  if resource_slot is null or not public.mizizi_consume_desk_resource_v1((resource_slot->>'reservationId')::uuid,${q(browserHop)},${q('d'.repeat(64))})
+   then raise exception 'STOP_LOCAL_RESOURCE_CHARGE';end if;
+  if (public.mizizi_record_desk_tool_receipt_v1(${q(JSON.stringify(browseCall))},${q(browseHash)},${q(browseResult)},${q(hash(browseResult))},
+   ${q(host)},1,provenance,${j([{id:actionId,url:htmlUrl}])})->>'outcome') is distinct from 'created'
+   or ${read(browseId)} is null then raise exception 'STOP_LOCAL_BROWSE_ADMISSION';end if;
+  if (${authority('tool_execute',expandCall)}->>'allowed') is distinct from 'true'
+   or (${browserTextGrant(expandHash)}->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_LOCAL_EXPAND_GRANT';end if;
+  provenance:=provenance||jsonb_build_object('parentReceiptId',${q(browseId)},'detail',
+   jsonb_build_object('localBrowser',session_meta||jsonb_build_object('action','expand','generation',2),
+   'visual',null,'actionBindings','[]'::jsonb));
+  if (public.mizizi_record_desk_tool_receipt_v1(${q(JSON.stringify(expandCall))},${q(expandHash)},${q(expandResult)},${q(hash(expandResult))},
+   ${q(host)},1,provenance,'[]')->>'outcome') is distinct from 'created'
+   then raise exception 'STOP_LOCAL_EXPAND_ADMISSION';end if;
+  begin perform * from ${journal(localReceiptDeps)};raise exception 'STOP_LOCAL_UNCLOSED_JOURNAL';
+   exception when sqlstate '42501' then null;end;
+  if not public.mizizi_record_desk_resource_event_v1(slot_id,${q(localRequestHash)},${q(localAccount)},'close_acknowledged',jsonb_build_object('sessionId',${q(localSessionId)}))
+   or public.mizizi_read_desk_local_browser_session_v1(${j(scope)},slot_id,${q(localRequestHash)},${q(localSessionId)}) is not null
+   or ${read(expandId)} is null then raise exception 'STOP_LOCAL_CLOSE_RECEIPT';end if;
+  if (select outcome from ${journal(localReceiptDeps)}) is distinct from 'created' then raise exception 'STOP_LOCAL_CLOSED_JOURNAL';end if;
+  raise exception 'ROLLBACK_LOCAL_BROWSER_FIXTURE' using errcode='P0002';
+ exception when sqlstate 'P0002' then
+  if sqlerrm<>'ROLLBACK_LOCAL_BROWSER_FIXTURE' then raise;end if;
+ end;
  begin perform * from ${journal([deps[1]])};raise exception 'STOP_STANDING_OMITTED_DISCOVERY';
  exception when sqlstate '42501' then null;end;
  if (select outcome from ${journal(deps)}) is distinct from 'created' then raise exception 'STOP_STANDING_JOURNAL';end if;
@@ -1006,6 +1098,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  select 'PASS';`)==="PASS","STOP_OPERATIONAL_CONVERGENCE_ROLLBACK");
  console.log("WK_AUTH_MIZIZI_DESK_OPERATIONAL_CONVERGENCE=PASS");
  console.log("WK_AUTH_MIZIZI_DESK_PRODUCTIVE_LEASE_CONTINUATION=PASS");
+ console.log("WK_AUTH_MIZIZI_LOCAL_BROWSER_CAPACITY_RECEIPT_CLEANUP=PASS");
  }
  const accessName="mizizi_authorize_desk_access_v1";
  const accessArgs=(operation,target=url,descriptor={})=>{

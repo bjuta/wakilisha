@@ -8,7 +8,7 @@ import type {DeskAnthropicOptionsV1} from "./desk-anthropic-tool-loop-v1.ts";
 const SHA=/^[a-f0-9]{64}$/;
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const hash=(value:string)=>createHash("sha256").update(value).digest("hex");
-type Resource="anthropic"|"native_https"|"cloudflare_browser_run";
+type Resource="anthropic"|"native_https"|"cloudflare_browser_run"|"local_chromium";
 type Binding=Readonly<{scope:DeskSearchScopeV1;resource:Resource;requestSha256:string;accountFingerprint:string;model:string|null}>;
 type ResourceQuote=Readonly<{resource:Resource;requestSha256:string;bindingSha256:string;policyRevision:number;units:number;
  validUntil:string;model:string|null;pricingRef:string|null;maxInputTokens:number|null;maxOutputTokens:number|null;maximumCostMicrousd:number}>;
@@ -29,7 +29,7 @@ export function createDeskResourceBudgetV1({rpc,now=Date.now}:Readonly<{rpc:Work
    !/^mizizi-chart:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(s.workerId)||
    !Number.isFinite(Date.parse(s.leaseExpiresAt))||Date.parse(s.leaseExpiresAt)<=now()||
    !SHA.test(b.requestSha256)||!SHA.test(b.accountFingerprint)||
-   !["anthropic","native_https","cloudflare_browser_run"].includes(b.resource)||
+   !["anthropic","native_https","cloudflare_browser_run","local_chromium"].includes(b.resource)||
    (b.resource==="anthropic"?!/^[A-Za-z0-9._:-]{3,100}$/.test(b.model??""):b.model!==null))
    fail("BINDING_DENIED");
   return JSON.stringify({scope:{jobId:s.jobId,caseId:s.caseId,workspaceId:s.workspaceId,
@@ -136,5 +136,49 @@ export function createDeskResourceBudgetV1({rpc,now=Date.now}:Readonly<{rpc:Work
     recordEvent(e,accountFingerprint,e.state,e.sessionId?{sessionId:e.sessionId}:{})
   };
  }
- return Object.freeze({modelFinance,nativePrecharge,browserFinance});
+ /** Local browser uses a separately reviewed fixed-capacity allocation,
+  * not a Cloudflare entitlement or an assumption that compute is free. */
+ function localBrowserFinance(accountFingerprint:string){
+  if(!SHA.test(accountFingerprint))fail("ALLOCATION_DENIED");
+  return {
+   reserve:async(b:Readonly<{scope:DeskSearchScopeV1;accountFingerprint:string;reserveSeconds:number;mode:string}>,digest:string)=>{
+    if(b.accountFingerprint!==accountFingerprint||b.reserveSeconds!==120||b.mode!=="interactive"||
+     Object.keys(b).sort().join(",")!=="accountFingerprint,mode,reserveSeconds,scope"||hash(JSON.stringify(b))!==digest)
+     fail("BROWSER_BINDING_DENIED");
+    const d:Binding={scope:b.scope,resource:"local_chromium",accountFingerprint,model:null,requestSha256:digest};
+    const q=await quote(d);if(!q)return null;
+    const r=await reserve(d,q);return r?{...r,provider:"local_chromium",seconds:120,maximumIncrementalCostMicrousd:0}:null;
+   },
+   consume:(r:ResourceReservation)=>consume(r,accountFingerprint),
+   recordLifecycle:(e:Readonly<{reservationId:string;requestSha256:string;state:string;sessionId?:string}>)=>
+    recordEvent(e,accountFingerprint,e.state,e.sessionId?{sessionId:e.sessionId}:{}),
+   readSession:async(scope:DeskSearchScopeV1,r:Readonly<{reservationId:string;requestSha256:string}>,sessionId:string)=>{
+    if(!UUID.test(r.reservationId)||!SHA.test(r.requestSha256)||!UUID.test(sessionId))fail("BROWSER_BINDING_DENIED");
+    const raw=await call("mizizi_read_desk_local_browser_session_v1",{p_scope:scope,p_reservation_id:r.reservationId,
+     p_request_sha256:r.requestSha256,p_session_id:sessionId});
+    if(raw===null)return null;
+    const v=raw as {scope:DeskSearchScopeV1;resource:string;accountFingerprint:string;reservationId:string;requestSha256:string;sessionId:string;validUntil:string};
+    if(v.resource!=="local_chromium"||v.accountFingerprint!==accountFingerprint||
+     v.reservationId!==r.reservationId||v.requestSha256!==r.requestSha256||v.sessionId!==sessionId||
+     !v.scope||Object.keys(scope).some(k=>v.scope[k as keyof DeskSearchScopeV1]!==scope[k as keyof DeskSearchScopeV1])||
+     !Number.isFinite(Date.parse(v.validUntil))||Date.parse(v.validUntil)<=now()||
+     Date.parse(v.validUntil)>Date.parse(scope.leaseExpiresAt))fail("BROWSER_SESSION_UNCONFIRMED");
+    return Object.freeze({...v,scope:Object.freeze({...scope})});
+   }
+  };
+ }
+ /** Distinct exact browser resource precharge, not interchangeable with a
+  * native page hop or another session/call. Same byte-capacity ledger. */
+ function browserResourcePrecharge(accountFingerprint:string){
+  if(!SHA.test(accountFingerprint))fail("ALLOCATION_DENIED");
+  return async(b:Readonly<{scope:DeskSearchScopeV1;target:Readonly<{url:string;hostname:string;address:string}>;
+   sessionId:string;callSha256:string;resourceRequestSha256:string}>,digest:string)=>{
+   if(!UUID.test(b.sessionId)||!SHA.test(b.callSha256)||!SHA.test(b.resourceRequestSha256)||
+    hash(JSON.stringify(b))!==digest)fail("BROWSER_RESOURCE_BINDING_DENIED");
+   const d:Binding={scope:b.scope,resource:"native_https",accountFingerprint,model:null,requestSha256:digest};
+   const q=await quote(d);if(!q)return false;
+   const r=await reserve(d,q);return r?consume(r,accountFingerprint):false;
+  };
+ }
+ return Object.freeze({modelFinance,nativePrecharge,browserFinance,localBrowserFinance,browserResourcePrecharge});
 }

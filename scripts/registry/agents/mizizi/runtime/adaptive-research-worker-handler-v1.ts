@@ -16,7 +16,7 @@ import {createLeasedResearchPassStoreV1,guardDeskResearchPassStoreV1} from "./le
 import {createAnthropicInvestigationAnalystV1, type AnthropicInvestigationOptionsV1}
  from "./anthropic-investigation-analyst-v1.ts";
 import {createCostRoutedDeskAnthropicPassV1,createDurableDeskModelAuthorityV1} from "./desk-anthropic-tool-loop-v1.ts";
-import {createDeskResearchDispatcherV1} from "./desk-research-dispatcher-v1.ts";
+import {createDeskResearchDispatcherV1,type DeskLocalBrowserHostV1} from "./desk-research-dispatcher-v1.ts";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 export type AdaptiveWorkerDependenciesV1=Readonly<{
  store:InvestigationStoreV1;
@@ -179,7 +179,7 @@ export function runCostRoutedDeskResearchWorkerCycleV1(input:Readonly<
 
 export type DurableDeskConfigurationV1=Readonly<
  Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],
- "braveApiKey"|"discovery"|"nativeAccountFingerprint"|"authorizeAcquisition"|"authorizeExamination"|"browser">&
+ "braveApiKey"|"discovery"|"nativeAccountFingerprint"|"authorizeAcquisition"|"authorizeExamination"|"browser"|"localBrowser">&
  Pick<Parameters<typeof createCostRoutedDeskAnthropicPassV1>[0],
  "anthropic"|"readModelInventory"|"assessRequirement"|"authorizeEnvelope"|"authorizeTool">
 >;
@@ -229,15 +229,18 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    const operational=input.operationalNativeOnly?await readOperationalNativeDeskPolicyV1(input.rpc,scope,input.now??Date.now):null;
    if(input.operationalNativeOnly&&!operational)throw Error("MIZIZI_DESK_OPERATIONAL_POLICY_DENIED");
    if(operational&&config.browser)throw Error("MIZIZI_DESK_OPERATIONAL_BROWSER_UNQUALIFIED");
+   if(config.localBrowser&&(!operational||!operational.toolNames.includes("browse_page")))
+    throw Error("MIZIZI_DESK_LOCAL_BROWSER_POLICY_REQUIRED");
+   const modelAuthority=createDurableDeskModelAuthorityV1({rpc:input.rpc,scope,
+    authorizeEnvelope:config.authorizeEnvelope,authorizeTool:config.authorizeTool,now:input.now});
    const dispatcher=createDeskResearchDispatcherV1({
     rpc:input.rpc,scope,braveApiKey:config.braveApiKey,discovery:config.discovery,
     nativeAccountFingerprint:config.nativeAccountFingerprint,
     authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,
-    browser:config.browser,now:input.now});
+    browser:config.browser,localBrowser:config.localBrowser,
+    authorizeInteractiveCall:modelAuthority.authorizeTool,now:input.now});
    const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
    const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
-   const modelAuthority=createDurableDeskModelAuthorityV1({rpc:input.rpc,scope,
-    authorizeEnvelope:config.authorizeEnvelope,authorizeTool:config.authorizeTool,now:input.now});
    const deskPass=createCostRoutedDeskAnthropicPassV1({
     scope,anthropic,enabledTools:operational?dispatcher.enabledTools.filter(t=>operational.toolNames.includes(t)):dispatcher.enabledTools,
     readModelInventory:async()=>{
@@ -249,7 +252,8 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    const prepareDeskPass:DeskPassResearcherV1=async(id,question,history)=>{
     for(const pass of history)if(await dispatcher.verifyJournalPass(pass)!==true)
      throw Error("MIZIZI_DESK_HISTORY_CUSTODY_DENIED");
-    return deskPass(id,question,history);
+    try{return await deskPass(id,question,history);}
+    finally{await dispatcher.closeInteractive();}
    };
    active={job,dispatcher};
    return createAdaptiveResearchWorkerHandlerV1({
@@ -263,7 +267,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
  });
 }
 
-/** Server-only native operational entrypoint. Reuses the existing exact job
+/** Server-only operational entrypoint, with optional qualified local Chromium. Reuses the existing exact job
  * worker. No second queue, transport override, owner credential, or default
  * live entitlement. Its chartScope preflight must independently prove the
  * deployed environment, provider account and constrained runtime.
@@ -289,29 +293,30 @@ async function readOperationalNativeDeskPolicyV1(rpc:WorkerRpc,scope:DeskSearchS
   p.publicQueryTerms.length>32||new Set(p.publicQueryTerms).size!==p.publicQueryTerms.length||
   p.publicQueryTerms.some(t=>typeof t!=="string"||t.length<1||t.length>80||t.trim()!==t||/[\p{Cc}\p{Cf}]/u.test(t))||
   (!p.adaptiveFollowupsAllowed&&p.publicQueryTerms.length>0)||
-  !Array.isArray(p.toolNames)||p.toolNames.length<1||p.toolNames.some(t=>!["search_web","search_news","read_page","read_document"].includes(t))||
+  !Array.isArray(p.toolNames)||p.toolNames.length<1||p.toolNames.some(t=>!["search_web","search_news","read_page","read_document","browse_page","inspect_visual"].includes(t))||
   !Number.isSafeInteger(p.maxRounds)||p.maxRounds<1||p.maxRounds>5||
   !Number.isSafeInteger(p.maxRequestBytes)||p.maxRequestBytes<1||p.maxRequestBytes>3200000||
   !Array.isArray(p.accessRules)||p.accessRules.length>20||p.accessRules.some(x=>!x||typeof x.host!=="string"||
    typeof x.pathPrefix!=="string"||!/^\/[A-Za-z0-9_./~-]+\/$/.test(x.pathPrefix)||
    !Number.isSafeInteger(x.custodyRevision)||x.custodyRevision<1||!Array.isArray(x.operations)||
-   x.operations.some(op=>!["native_acquire","native_text"].includes(op)))||
+   x.operations.some(op=>!["native_acquire","native_text","browser_render","browser_request","browser_text","browser_visual","pdf_visual"].includes(op)))||
   !Number.isFinite(Date.parse(p.validUntil))||Date.parse(p.validUntil)<=now()||
   Date.parse(p.validUntil)>Date.parse(scope.leaseExpiresAt))return null;
  return p;
 }
-export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
+export function runOperationalDeskResearchWorkerCycleV1(input:Readonly<
  Omit<Parameters<typeof runDurableDeskResearchWorkerCycleV1>[0],"configurationForJob"|"operationalNativeOnly"|"maxNewPasses">&{
   credentials:Pick<DurableDeskConfigurationV1,"anthropic"|"braveApiKey"|"discovery"|"nativeAccountFingerprint">;
   readModelInventory:DurableDeskConfigurationV1["readModelInventory"];
   assessRequirement:DurableDeskConfigurationV1["assessRequirement"];
+  localBrowser?:DeskLocalBrowserHostV1;
  }
 >){
- const {credentials,readModelInventory,assessRequirement,...worker}=input;
+ const {credentials,readModelInventory,assessRequirement,localBrowser,...worker}=input;
  const now=input.now??Date.now;
  // The owner policy and existing monetary/entitlement ledgers remain
- // independent of the worker. Do not accept self-issued grants or browser
- // fallback in this native qualification path.
+ // independent of the worker. Local browser activation additionally needs
+ // an independently qualified isolated host, not self-issued grants.
  return runDurableDeskResearchWorkerCycleV1({...worker,operationalNativeOnly:true,maxNewPasses:1,
   configurationForJob:async job=>{
    const scope={jobId:job.jobId,caseId:job.caseId,workspaceId:job.workspaceId,expectedRevision:job.expectedRevision,
@@ -329,8 +334,11 @@ export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
    const allowedUrl=(p:OperationalNativeDeskPolicyV1,url:string,operation:string)=>{
     try{
      const u=new URL(url);
-     return u.href===url&&u.protocol==="https:"&&!u.username&&!u.password&&!u.port&&!u.search&&!u.hash&&
-      /^\/[A-Za-z0-9_./~-]+$/.test(u.pathname)&&!u.pathname.split("/").some(x=>x==="."||x==="..")&&
+     const browserOperation=operation.startsWith("browser_");
+     return u.href===url&&u.protocol==="https:"&&!u.username&&!u.password&&!u.port&&!u.hash&&
+      (browserOperation?/^\/[A-Za-z0-9_./~%:-]+$/.test(u.pathname)&&!/%(?:2e|2f|5c|25)/i.test(u.pathname):
+       !u.search&&/^\/[A-Za-z0-9_./~-]+$/.test(u.pathname))&&
+      !u.pathname.split("/").some(x=>x==="."||x==="..")&&
       p.accessRules.some(x=>x.host===u.hostname&&u.pathname.startsWith(x.pathPrefix)&&x.operations.includes(operation));
     }catch{return false;}
    };
@@ -349,6 +357,14 @@ export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
      Array.isArray(latest.deskToolReceipts);
    };
    return {...credentials,readModelInventory,assessRequirement,
+    ...(localBrowser?{localBrowser:{...localBrowser,
+     authorizeAccess:async(candidate:DeskSearchScopeV1,url:string,operation:string)=>{
+      const p=await fresh(candidate);return !!p&&allowedUrl(p,url,operation);
+     },
+     authorizeQuery:async(candidate:DeskSearchScopeV1,query:string)=>{
+      const p=await fresh(candidate);return !!p&&queryAllowed(p,query);
+     }
+    }}:{}),
     authorizeAcquisition:async(candidate,url)=>{
      const p=await fresh(candidate);
      return p&&allowedUrl(p,url,"native_acquire")?{policyRef:"desk-operational:"+p.revision,
@@ -356,9 +372,12 @@ export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
     },
     authorizeExamination:async(candidate,binding)=>{
      const p=await fresh(candidate);
-     return !!p&&binding.representation==="native_response_bytes"&&typeof binding.finalUrl==="string"&&
+     const operation=binding.mode==="browser_visual"?"browser_visual":binding.mode==="pdf_visual"?"pdf_visual":
+      binding.representation==="rendered_dom_not_original_response"?"browser_text":
+      binding.representation==="native_response_bytes"?"native_text":null;
+     return !!p&&!!operation&&typeof binding.finalUrl==="string"&&
       typeof binding.sha256==="string"&&/^[0-9a-f]{64}$/.test(binding.sha256)&&
-      allowedUrl(p,binding.finalUrl,"native_text");
+      allowedUrl(p,binding.finalUrl,operation);
     },
     authorizeEnvelope:async(binding,body)=>{
      const p=await fresh(binding.scope);
@@ -372,11 +391,17 @@ export function runOperationalNativeDeskResearchWorkerCycleV1(input:Readonly<
     authorizeTool:async(candidate,call,callSha256)=>{
      const p=await fresh(candidate);
      return !!p&&p.toolNames.includes(call.name)&&operationalHash(JSON.stringify({scope:candidate,call}))===callSha256&&
-      (!["search_web","search_news"].includes(call.name)||typeof call.input.query==="string"&&queryAllowed(p,call.input.query));
+      (!["search_web","search_news"].includes(call.name)||typeof call.input.query==="string"&&queryAllowed(p,call.input.query))&&
+      (call.name!=="browse_page"||typeof call.input.query==="string"&&(call.input.query===""||queryAllowed(p,call.input.query)));
     }
    };
   }
  });
+}
+
+/** Compatibility entrypoint: no local browser is supplied. */
+export function runOperationalNativeDeskResearchWorkerCycleV1(input:Omit<Parameters<typeof runOperationalDeskResearchWorkerCycleV1>[0],"localBrowser">){
+ return runOperationalDeskResearchWorkerCycleV1(input);
 }
 
 /** Bounded cohort invocation of the existing durable worker. The caller

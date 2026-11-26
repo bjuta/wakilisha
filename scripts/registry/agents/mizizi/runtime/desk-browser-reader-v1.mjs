@@ -245,12 +245,13 @@ export function createDeskBrowserReaderV1({provider,authorize,reserve,consume,au
  * before exposing it to the operational worker.
  */
 export async function withDeskInteractiveBrowserV1(options,work){
- const {browser,scope:rawScope,authorizeAction,authorizeRequest,readResource,now=Date.now}=options??{};
+ const {browser,scope:rawScope,authorizeAction,authorizeRequest,readResource,now=Date.now,deadlineMs}=options??{};
  if(!browser||typeof browser.newContext!=="function"||
   [authorizeAction,authorizeRequest,readResource,now,work].some(f=>typeof f!=="function"))
   fail("INTERACTIVE_CONFIGURATION_REQUIRED");
  const scope=scopeOf(rawScope,now());
- const end=Math.min(Date.parse(scope.leaseExpiresAt),now()+120000);
+ if(deadlineMs!==undefined&&(!Number.isFinite(deadlineMs)||deadlineMs<=now()))fail("DEADLINE");
+ const end=Math.min(Date.parse(scope.leaseExpiresAt),now()+120000,deadlineMs??Infinity);
  const remaining=()=>Math.max(0,end-now());
  const live=()=>{if(remaining()<=0)fail("DEADLINE");};
  const bounded=async(promise)=>{live();return within(promise,remaining());};
@@ -513,20 +514,27 @@ export async function withDeskInteractiveBrowserV1(options,work){
    capture:({visual=false}={})=>step(async()=>{
     if(typeof visual!=="boolean"||documentFailure||unexpectedNavigation||expectedNavigation!==null)fail("INTERACTIVE_CAPTURE_DENIED");
     const url=currentUrl();await actionGrant("capture",{url,visual});
-    const html=await bounded(page.locator("html").evaluate(node=>{
-     const value=node.outerHTML;return value.length<=2000000?value:null;
+    // Capture DOM and visible text in one synchronous evaluation. Do not
+    // treat a preceding accessibility snapshot or hidden text as evidence.
+    const snapshot=await bounded(page.locator("html").evaluate(node=>{
+     const html=node.outerHTML;
+     if(html.length>2000000)return null;
+     const visibleText=(node.ownerDocument.body?.innerText??"").slice(0,24000);
+     return {html,visibleText};
     },undefined,{timeout:remaining()}));
-    if(typeof html!=="string"||Buffer.byteLength(html)>MAX_DOM)fail("DOM_BOUND");
+    if(!snapshot||typeof snapshot.html!=="string"||typeof snapshot.visibleText!=="string"||
+     Buffer.byteLength(snapshot.html)>MAX_DOM)fail("DOM_BOUND");
+    const html=snapshot.html,visibleText=snapshot.visibleText,visibleTextSha256=hash(visibleText);
     const png=visual?await bounded(page.screenshot({type:"png",fullPage:false,animations:"disabled",timeout:remaining()})):null;
     if((visual&&!validPng(png))||documentFailure||unexpectedNavigation||currentUrl()!==url)
      fail("INTERACTIVE_CAPTURE_UNCONFIRMED");
     const body=new TextEncoder().encode(html),sourceSha256=hash(body);
     const visualSha256=png?hash(png):null;
     const dependencies=bindings.slice(),redirects=redirectBindings.slice();
-    await actionGrant("capture_result",{url,sourceSha256,visualSha256,
+    await actionGrant("capture_result",{url,sourceSha256,visualSha256,visibleTextSha256,
      resourceBindingSha256:hash(JSON.stringify(dependencies)),redirectBindingSha256:hash(JSON.stringify(redirects))});
     return Object.freeze({contract:"mizizi.desk_interactive_capture.v1",scope,finalUrl:url,
-     representation:"rendered_dom_not_original_response",body,sha256:sourceSha256,
+     representation:"rendered_dom_not_original_response",body,sha256:sourceSha256,visibleText,visibleTextSha256,
      visual:png?{body:Uint8Array.from(png),sha256:visualSha256,contentType:"image/png"}:null,
      resourceBindings:dependencies,redirectBindings:redirects,identityVerified:false,sourceRetentionAuthorized:false,externalModelProcessingAuthorized:false});
    })
@@ -552,10 +560,11 @@ export async function withDeskInteractiveBrowserV1(options,work){
  * and observation admission contract is installed. No default grants.
  */
 export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveReference,
- authorizeCall,authorizeQuery,admitObservation,visualAllowed=false,now=Date.now}={}){
+ authorizeCall,authorizeQuery,admitObservation,visualAllowed=false,authorizeVisualLead,now=Date.now}={}){
  const scope=scopeOf(rawScope,now());
  if(!session||["navigate","follow","expand","scroll","search","observe","capture"].some(k=>typeof session[k]!=="function")||
   [resolveReference,authorizeCall,authorizeQuery,admitObservation,now].some(f=>typeof f!=="function")||
+  (authorizeVisualLead!==undefined&&typeof authorizeVisualLead!=="function")||
   typeof visualAllowed!=="boolean")fail("ACTION_ROUTER_CONFIGURATION");
  const sameScope=s=>s&&JSON.stringify(scope)===JSON.stringify(s);
  const cleanLabel=s=>typeof s==="string"?s.replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().slice(0,300).trim():"";
@@ -568,7 +577,7 @@ export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveR
  // A bounded set of actionable controls, followed by page links. Reserve
  // room for each capability rather than let a page's navigation menu
  // crowd the research controls out of the model context.
- function actionLeads(observation){
+ function actionLeads(observation,allowVisual){
   const entries=[];
   const add=(kind,label,action,element=null)=>{
    if(!label||entries.length>=8)return;
@@ -590,7 +599,7 @@ export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveR
   }
   // Keep the action set small; a model can ask for the viewport explicitly.
   add("browser_action","Scroll down","scroll_down");
-  if(visualAllowed)add("visual","Examine the current browser viewport","visual");
+  if(allowVisual)add("visual","Examine the current browser viewport","visual");
   return entries;
  }
  async function execute(candidate,call,callSha256){
@@ -654,14 +663,16 @@ export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveR
      !sameScope(capture.scope)||capture.finalUrl!==observation.url||
      capture.representation!=="rendered_dom_not_original_response"||
      !(capture.body instanceof Uint8Array)||capture.body.length<1||capture.body.length>MAX_DOM||
-     hash(capture.body)!==capture.sha256||capture.identityVerified!==false||
+     hash(capture.body)!==capture.sha256||typeof capture.visibleText!=="string"||
+     capture.visibleText.length>24000||hash(capture.visibleText)!==capture.visibleTextSha256||capture.identityVerified!==false||
      capture.sourceRetentionAuthorized!==false||capture.externalModelProcessingAuthorized!==false||
      (action==="visual"?(!validPng(capture.visual?.body)||hash(capture.visual.body)!==capture.visual.sha256):capture.visual!==null))
      fail("ACTION_ROUTER_CAPTURE_INVALID");
     // Capture and observation have different fingerprints: asynchronous DOM
     // changes are possible. A trusted admitter must derive actual evidence
     // from captured bytes, not claim the observation is the captured DOM.
-    const entries=action==="visual"?[]:actionLeads(observation);
+    const allowVisual=visualAllowed&&(!authorizeVisualLead||await authorizeVisualLead(scope,observation.url)===true);
+    const entries=action==="visual"?[]:actionLeads(observation,allowVisual);
     const leads=entries.map(e=>e.lead);
     const receiptId=freshId();
     const result=await admitObservation(Object.freeze({scope,call,callSha256,receiptId,
@@ -686,4 +697,123 @@ export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveR
   }finally{busy=false;}
  }
  return Object.freeze({execute,ownsLead:id=>issued.has(id)});
+}
+
+
+/** Lazy, exact-lease local browser lifecycle. No session exists until a
+ * browse_page call requires it. The host must independently enforce a
+ * browser process/network sandbox, deadline, abort and idempotent full
+ * process cleanup by the preassigned session ID. A context close is NOT
+ * proof of process termination. No default host or self-issued grant.
+ *
+ * The existing resource ledger consumes capacity before the host opens;
+ * every action and acquisition revalidates both host and durable capacity.
+ * The worker MUST await close() before append of the investigation pass.
+ */
+export function createDurableLocalDeskBrowserV1({scope:rawScope,host,finance,
+ authorizeAction,authorizeRequest,readResource,routerOptions,now=Date.now}={}){
+ const scope=scopeOf(rawScope,now());
+ if(!host||!SHA.test(host.accountFingerprint??"")||
+  [host.authorizeHost,host.open,host.close,finance?.reserve,finance?.consume,finance?.recordLifecycle,finance?.readSession,
+   authorizeAction,authorizeRequest,readResource,routerOptions,now].some(fn=>typeof fn!=="function"))
+  fail("LOCAL_HOST_CONFIGURATION");
+ const binding=Object.freeze({scope,accountFingerprint:host.accountFingerprint,reserveSeconds:120,mode:"interactive"});
+ const requestSha256=hash(JSON.stringify(binding)),sessionId=randomUUID();
+ let runner=null,router=null,reservation=null,closed=false,release=null,readyResolve,readyReject,initialGrant=null,deadline=0;
+ const lifetime=new AbortController();
+ const sameScope=s=>s&&JSON.stringify(scope)===JSON.stringify(s);
+ const approved=a=>a&&a.requestSha256===requestSha256&&a.egressIsolationVerified===true&&a.localCapacityVerified===true&&
+  a.zeroIncrementalSpendAllowed===true&&typeof a.policyRef==="string"&&/^[A-Za-z0-9._:/-]{8,200}$/.test(a.policyRef)&&
+  Number.isFinite(Date.parse(a.validUntil))&&Date.parse(a.validUntil)>now()&&Date.parse(a.validUntil)<=Date.parse(scope.leaseExpiresAt);
+ async function checkHost(){
+  const a=await host.authorizeHost(binding,requestSha256);
+  if(!approved(a)||initialGrant&&initialGrant.policyRef!==a.policyRef)fail("LOCAL_HOST_AUTHORITY_DENIED");
+  return a;
+ }
+ async function checkSession(){
+  if(closed||!reservation||lifetime.signal.aborted||now()>=deadline)fail("LOCAL_SESSION_EXPIRED");
+  const a=await checkHost(),p=await finance.readSession(scope,reservation,sessionId);
+  if(!p||p.resource!=="local_chromium"||p.accountFingerprint!==host.accountFingerprint||
+   p.reservationId!==reservation.reservationId||p.requestSha256!==requestSha256||
+   p.sessionId!==sessionId||!sameScope(p.scope)||!Number.isFinite(Date.parse(p.validUntil))||
+   Date.parse(p.validUntil)<=now()||Date.parse(p.validUntil)>Date.parse(scope.leaseExpiresAt))
+   fail("LOCAL_SESSION_AUTHORITY_DENIED");
+  deadline=Math.min(deadline,Date.parse(a.validUntil),Date.parse(p.validUntil));
+  if(closed||lifetime.signal.aborted||now()>=deadline)fail("LOCAL_SESSION_EXPIRED");
+  return Object.freeze({...p,validUntil:new Date(deadline).toISOString()});
+ }
+ async function run(){
+  initialGrant=await checkHost();
+  reservation=await finance.reserve(binding,requestSha256);
+  if(!reservation||!UUID.test(reservation.reservationId??"")||reservation.requestSha256!==requestSha256||
+   reservation.provider!=="local_chromium"||reservation.seconds!==120||reservation.maximumIncrementalCostMicrousd!==0||
+   !Number.isFinite(Date.parse(reservation.validUntil))||Date.parse(reservation.validUntil)<=now()||
+   Date.parse(reservation.validUntil)>Date.parse(scope.leaseExpiresAt))fail("LOCAL_CAPACITY_DENIED");
+  const a=await checkHost();
+  if(closed||Date.parse(reservation.validUntil)<=now())fail("LOCAL_CAPACITY_DENIED");
+  // Anchor the local deadline before consume, not at browser launch.
+  deadline=Math.min(Date.parse(scope.leaseExpiresAt),Date.parse(initialGrant.validUntil),Date.parse(a.validUntil),now()+120000);
+  if(await finance.consume(reservation)!==true)fail("LOCAL_CAPACITY_NOT_CONSUMED");
+  const event={reservationId:reservation.reservationId,requestSha256};
+  let pending=false,opened=false,cleanup=false;
+  try{
+   await finance.recordLifecycle({...event,state:"open_pending"});pending=true;
+   await checkHost();
+   if(closed||now()>=deadline||Date.parse(reservation.validUntil)<=now())fail("LOCAL_CAPACITY_EXPIRED");
+   const openSignal=AbortSignal.any([lifetime.signal,AbortSignal.timeout(Math.max(1,Math.min(deadline,Date.parse(reservation.validUntil))-now()))]);
+   const browser=await within(host.open(binding,sessionId,openSignal),Math.max(1,Math.min(deadline,Date.parse(reservation.validUntil))-now()));
+   if(!browser||typeof browser.newContext!=="function")fail("LOCAL_HOST_OPEN_UNCONFIRMED");
+   await finance.recordLifecycle({...event,sessionId,state:"opened"});opened=true;
+   await checkSession();
+   const getSession=checkSession;
+   await withDeskInteractiveBrowserV1({browser,scope,deadlineMs:deadline,now,
+    authorizeAction:async(b,digest)=>authorizeAction(b,digest,await getSession()),
+    authorizeRequest:async(b,digest)=>authorizeRequest(b,digest,await getSession()),
+    readResource:async(b,digest,signal)=>{
+     const p=await getSession();
+     const result=await readResource(b,digest,AbortSignal.any([signal,lifetime.signal,
+      AbortSignal.timeout(Math.max(1,Date.parse(p.validUntil)-now()))]),p);
+     await getSession();return result;
+    }},async(session)=>{
+     router=createDeskBrowserActionRouterV1({...routerOptions(getSession),scope,session,now});
+     readyResolve(router);
+     await new Promise(resolve=>{release=resolve;if(closed)resolve();});
+    });
+  }finally{
+   lifetime.abort();
+   if(pending){
+    try{cleanup=await within(host.close(sessionId,AbortSignal.timeout(5000)),5000)===true;}catch{}
+    // Unknown open/close is retained as charged and never promotes evidence.
+    await finance.recordLifecycle({...event,...(opened?{sessionId}:{}),
+     state:opened&&cleanup?"close_acknowledged":"cleanup_unconfirmed"});
+    if(!opened||!cleanup)fail("LOCAL_CLEANUP_UNCONFIRMED");
+   }
+  }
+ }
+ async function ensure(){
+  if(closed)fail("LOCAL_SESSION_CLOSED");
+  if(router)return router;
+  if(!runner){
+   const ready=new Promise((resolve,reject)=>{readyResolve=resolve;readyReject=reject;});
+   runner=run();
+   // Attach immediately to avoid an unhandled rejection during the model
+   // transcript. close() still awaits and propagates the original failure.
+   void runner.catch(error=>readyReject(error));
+   return ready;
+  }
+  fail("LOCAL_SESSION_START_IN_PROGRESS");
+ }
+ return Object.freeze({
+  ownsLead:id=>!!router&&router.ownsLead(id),
+  execute:async(candidate,call,digest)=>{
+   if(!sameScope(candidate))fail("SCOPE_DENIED");
+   const active=await ensure();
+   await checkSession();
+   return active.execute(candidate,call,digest);
+  },
+  close:async()=>{
+   closed=true;lifetime.abort();if(release)release();
+   if(runner)await runner;
+  }
+ });
 }

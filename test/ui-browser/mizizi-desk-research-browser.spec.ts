@@ -1,7 +1,7 @@
 import {test,expect} from "@playwright/test";
 import {createHash,randomUUID} from "node:crypto";
 import {createDeskAnthropicPassV1,createDurableDeskModelAuthorityV1,type DeskAnthropicOptionsV1,type DeskToolResultV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
-import {withDeskInteractiveBrowserV1,createDeskBrowserActionRouterV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
+import {withDeskInteractiveBrowserV1,createDeskBrowserActionRouterV1,createDurableLocalDeskBrowserV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
 
 // Real Chromium, fully synthetic public archive, no provider calls. The
 // trusted acquisition fixture fulfills routes without external networking.
@@ -132,8 +132,21 @@ test("MIZIZI actual tool transcript controls a single Chromium session and recei
  const payload=(name:string,input:Record<string,unknown>,n:number)=>({model,stop_reason:"tool_use",
   usage:{input_tokens:500,output_tokens:100},content:[{type:"tool_use",id:"tool_"+n,name,input}]});
  const response=(value:unknown)=>new Response(JSON.stringify(value),{headers:{"content-type":"application/json"}});
- const pass=await withDeskInteractiveBrowserV1({browser,scope:s,...h},async(session:any)=>{
-  const router=createDeskBrowserActionRouterV1({scope:s,session,visualAllowed:true,
+ const lifecycle:string[]=[];const accountFingerprint=sha("fixture local allocation");
+ let reserved:any=null,sessionId:string|null=null,opened=false;
+ const router=createDurableLocalDeskBrowserV1({scope:s,...h,
+  host:{accountFingerprint,
+   authorizeHost:async(_:unknown,digest:string)=>({requestSha256:digest,policyRef:"fixture:local-host",
+    validUntil:s.leaseExpiresAt,egressIsolationVerified:true,localCapacityVerified:true,zeroIncrementalSpendAllowed:true}),
+   open:async(_:unknown,id:string)=>{expect(lifecycle).toEqual(["reserve","consume","open_pending"]);sessionId=id;lifecycle.push("host_open");return browser;},
+   close:async(id:string)=>{expect(id).toBe(sessionId);expect(browser.contexts()).toHaveLength(0);lifecycle.push("host_close");return true;}},
+  finance:{reserve:async(b:any,digest:string)=>{expect(sha(JSON.stringify(b))).toBe(digest);lifecycle.push("reserve");
+    reserved={reservationId:randomUUID(),requestSha256:digest,provider:"local_chromium",seconds:120,maximumIncrementalCostMicrousd:0,validUntil:s.leaseExpiresAt};return reserved;},
+   consume:async(r:any)=>{expect(r).toEqual(reserved);lifecycle.push("consume");return true;},
+   recordLifecycle:async(e:any)=>{lifecycle.push(e.state);if(e.state==="opened")opened=true;if(e.state==="close_acknowledged")opened=false;},
+   readSession:async()=>opened?{scope:s,resource:"local_chromium",accountFingerprint,reservationId:reserved.reservationId,
+    requestSha256:reserved.requestSha256,sessionId,validUntil:s.leaseExpiresAt}:null},
+  routerOptions:()=>({visualAllowed:true,
    resolveReference:async(candidate:any,id:string)=>candidate.caseId===s.caseId&&id===leadId&&stored.has(searchReceiptId)?
     {id,kind:"reference",receiptId:searchReceiptId,url:start}:null,
    authorizeCall:async(candidate:any,call:any,digest:string)=>candidate.caseId===s.caseId&&sha(JSON.stringify({scope:candidate,call}))===digest,
@@ -145,6 +158,8 @@ test("MIZIZI actual tool transcript controls a single Chromium session and recei
     // from actual Chromium DOM, not from the mock model or supplied query.
     const html=new TextDecoder().decode(capture.body);
     const expanded=html.includes("aria-expanded=\"true\"");
+    expect(sha(capture.visibleText)).toBe(capture.visibleTextSha256);
+    if(expanded)expect(capture.visibleText).toContain("Nairobi studio");else expect(capture.visibleText).not.toContain("Nairobi studio");
     const excerpt=action==="visual"?"Visual derivative for examination; no textual claim is verified.":
      expanded&&html.includes("Recorded at the Nairobi studio, 1974.")?
      "Recorded at the Nairobi studio, 1974.":"Archive catalogue; credits not yet revealed.";
@@ -157,7 +172,7 @@ test("MIZIZI actual tool transcript controls a single Chromium session and recei
     return store(callSha256,{receiptId,leads,sources:[{source,excerpt,citation:capture.finalUrl+"#rendered"}],
      ...(capture.visual?{visual:{sourceId:receiptId,body:capture.visual.body,sha256:capture.visual.sha256,
       contentType:"image/png" as const}}:{})});
-   }});
+   }})});
   const authorizeEnvelope:DeskAnthropicOptionsV1["authorizeEnvelope"]=async(b,body)=>{
    expect(sha(body)).toBe(b.bodySha256);return {requestSha256:b.requestSha256,policyRef:"fixture:host-disclosure",
     validUntil:s.leaseExpiresAt,modelDisclosureAllowed:true};
@@ -189,18 +204,20 @@ test("MIZIZI actual tool transcript controls a single Chromium session and recei
      passFinding:"The archive has dynamically revealed session credits.",requestedDisposition:"pause"})}]});
   };
   const executeTool:DeskAnthropicOptionsV1["executeTool"]=async(candidate,call,digest)=>{
-   if(call.name==="search_web")return store(digest,{receiptId:searchReceiptId,leads:[{id:leadId,kind:"reference",label:"Archive catalogue"}],sources:[]});
+   if(call.name==="search_web"){expect(lifecycle).toEqual([]);return store(digest,{receiptId:searchReceiptId,leads:[{id:leadId,kind:"reference",label:"Archive catalogue"}],sources:[]});}
    return router.execute(candidate,call,digest);
   };
-  return createDeskAnthropicPassV1({scope:s,anthropic:{model,apiKey:"fixture-not-a-real-key",transport:transport as typeof fetch},
+  let pass;
+  try{pass=await createDeskAnthropicPassV1({scope:s,anthropic:{model,apiKey:"fixture-not-a-real-key",transport:transport as typeof fetch},
    enabledTools:["search_web","browse_page","inspect_visual"],...modelAuthority,
    quote:async b=>({requestSha256:b.requestSha256,pricingRef:"fixture:reviewed-rate",maxInputTokens:10000,maxOutputTokens:2500,maximumCostMicrousd:1000,validUntil:s.leaseExpiresAt}),
    reserve:async(b,q)=>({reservationId:randomUUID(),requestSha256:b.requestSha256,pricingRef:q.pricingRef,maximumCostMicrousd:q.maximumCostMicrousd,validUntil:s.leaseExpiresAt}),
    consume:async()=>true,recordModelEvent:async()=>{},executeTool,
    verifyToolReceipt:async(_scope,binding,result)=>stored.get(result.receiptId)?.callSha256===binding.callSha256&&
     stored.get(result.receiptId)?.resultSha256===binding.resultSha256,
-   authorizeSource:async()=>true})(identity,identity.openingQuestion,[]);
- });
+   authorizeSource:async()=>true})(identity,identity.openingQuestion,[]);}
+  finally{await router.close();}
+ expect(lifecycle).toEqual(["reserve","consume","open_pending","host_open","opened","host_close","close_acknowledged"]);
  expect(pass.deskToolReceipts).toHaveLength(4);
  expect(pass.sources.some(x=>x.excerpt.includes("Nairobi studio"))).toBe(true);
  expect(pass.costUnits).toBe(5);

@@ -9,9 +9,9 @@ import {isIP} from "node:net";
 import {createDurableDeskSearchGatewayV1,createDurableDeskPublicDiscoveryGatewayV1,
  qualifyDeskPublicDiscoveryProviderV1,type DeskSearchScopeV1,type DeskDiscoveryConfigurationV1,
  type DeskSearchRequestV1} from "./desk-research-gateway-v1.ts";
-import {createDeskNativeReaderV1} from "./desk-native-reader-v1.ts";
+import {createDeskNativeReaderV1,createDeskBrowserResourceReaderV1,type DeskBrowserResourceBindingV1} from "./desk-native-reader-v1.ts";
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "./desk-source-interpreter-v1.mjs";
-import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "./desk-browser-reader-v1.mjs";
+import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1,createDurableLocalDeskBrowserV1} from "./desk-browser-reader-v1.mjs";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 import {verifyInvestigationSourceV1,type SourceAuthorityV1,type SourceExcerptV1,type InvestigationPassV1} from "./adaptive-investigation-v1.ts";
 import type {DeskAnthropicOptionsV1,DeskToolCallV1,DeskToolLeadV1,DeskToolResultV1} from "./desk-anthropic-tool-loop-v1.ts";
@@ -37,6 +37,21 @@ type BrowserOptions=Readonly<{
  authorize:NonNullable<Parameters<typeof createDeskBrowserReaderV1>[0]>["authorize"];
  authorizeRequest:NonNullable<Parameters<typeof createDeskBrowserReaderV1>[0]>["authorizeRequest"];
 }>;
+type LocalHostBinding=Readonly<{scope:DeskSearchScopeV1;accountFingerprint:string;reserveSeconds:number;mode:string}>;
+type LocalBrowserAuthority=Readonly<{requestSha256:string;policyRef:string;validUntil:string;
+ egressIsolationVerified:true;localCapacityVerified:true;zeroIncrementalSpendAllowed:true}>;
+export type DeskLocalBrowserHostV1=Readonly<{
+ accountFingerprint:string;captureVisual?:boolean;
+ /** Independent host qualification, not a policy inferred from a successful
+  * browser launch. The actual isolated host must enforce abort and deadline. */
+ authorizeHost:(binding:LocalHostBinding,digest:string)=>Promise<LocalBrowserAuthority|null>;
+ open:(binding:LocalHostBinding,sessionId:string,signal:AbortSignal)=>Promise<unknown>;
+ close:(sessionId:string,signal:AbortSignal)=>Promise<boolean>;
+}>;
+type LocalBrowserOptions=DeskLocalBrowserHostV1&Readonly<{
+ authorizeAccess:(scope:DeskSearchScopeV1,url:string,operation:string)=>Promise<boolean>;
+ authorizeQuery:(scope:DeskSearchScopeV1,query:string,url:string)=>Promise<boolean>;
+}>;
 type Options=Readonly<{
  scope:DeskSearchScopeV1;rpc:WorkerRpc;braveApiKey?:string;discovery?:DeskDiscoveryConfigurationV1;nativeAccountFingerprint:string;
  /** Separate independent current URL/egress/access/terms authority. Custody
@@ -45,6 +60,9 @@ type Options=Readonly<{
  authorizeExamination:(scope:DeskSearchScopeV1,binding:Readonly<Record<string,unknown>>)=>Promise<boolean>;
  /** Test seams; fixed native/provider defaults in actual server composition. */
  browser?:BrowserOptions;
+ localBrowser?:LocalBrowserOptions;
+ authorizeInteractiveCall?:DeskAnthropicOptionsV1["authorizeTool"];
+ localBrowserResourceTestSeams?:Parameters<typeof createDeskBrowserResourceReaderV1>[0] extends infer T?Pick<NonNullable<T>,"resolve4"|"readPinned">:never;
  /** Test-only provider seams; never forwarded by the leased worker factory. */
  browserTestSeams?:Pick<NonNullable<Parameters<typeof createCloudflareBrowserTransportV1>[0]>,"transport"|"connect">;
  searchTransport?:typeof fetch;
@@ -161,9 +179,12 @@ export function createDeskResearchDispatcherV1(options:Options){
   }else if(brave)discovery.set(operation,{host:SEARCH_HOST,provider:"brave",run:brave});
  }
  if(!discovery.size)fail("DISCOVERY_CONFIGURATION_REQUIRED");
+ if(options.localBrowser&&(options.browser||typeof options.authorizeInteractiveCall!=="function"||
+  typeof options.localBrowser.authorizeAccess!=="function"||typeof options.localBrowser.authorizeQuery!=="function"))
+  fail("LOCAL_BROWSER_CONFIGURATION_DENIED");
  const budget=createDeskResourceBudgetV1({rpc:options.rpc,now});
  const TOOLS:readonly DeskToolCallV1["name"][]=Object.freeze([...BASE_TOOLS.filter(n=>
-  n!=="search_web"&&n!=="search_news"||discovery.has(n)),...(options.browser?["render_page" as const]:[])]);
+  n!=="search_web"&&n!=="search_news"||discovery.has(n)),...(options.browser?["render_page" as const]:[]),...(options.localBrowser?["browse_page" as const]:[])]);
  const transient=new Map<string,TransientSource>();
  let transientBytes=0;
  function remember(id:string,receipt:TransientSource["receipt"],provenance:Record<string,unknown>){
@@ -275,15 +296,138 @@ export function createDeskResearchDispatcherV1(options:Options){
    fail("CUSTODY_READBACK_UNCONFIRMED");
   return result;
  }
+ // The same local browser lives across the actual model transcript, not
+ // across unrelated cases. Its source receipts enter the existing ledger.
+ type LocalSessionProof=NonNullable<Awaited<ReturnType<ReturnType<typeof budget.localBrowserFinance>["readSession"]>>>;
+ const localConfig=options.localBrowser;
+ const localGrant=async(operation:string,url:string,descriptor:Readonly<Record<string,unknown>>,hopSha256?:string)=>{
+  if(!localConfig||!activeCallSha256||await localConfig.authorizeAccess(scope,url,operation)!==true)return null;
+  const p=await policy(urlOf(url).hostname);
+  if(!p||p.sourceFamily!=="public_web"||p.browserRenderAllowed!==true||
+   (operation==="browser_visual"||operation==="browser_render"&&descriptor.visual===true)&&
+    (p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed))return null;
+  return accessGrant(operation,url,descriptor,hopSha256);
+ };
+ const resolveLocalLead=async(candidate:DeskSearchScopeV1,id:string)=>{
+  assertScope(candidate);
+  if(!UUID.test(id))return null;
+  const raw=await rpc("mizizi_resolve_desk_reference_lead_v1",{p_scope:scope,p_lead_id:id}) as StoredLead|null;
+  if(!raw||raw.id!==id||!UUID.test(raw.receiptId)||!text(raw.label,500))return null;
+  const parent=await readReceipt(raw.receiptId);
+  if(!parent||!parent.result.leads.some(l=>l.id===id&&l.kind===raw.kind&&l.label===raw.label))return null;
+  return {...raw,url:urlOf(raw.url).href};
+ };
+ const local=localConfig?createDurableLocalDeskBrowserV1({
+  scope,host:localConfig,finance:budget.localBrowserFinance(localConfig.accountFingerprint),now,
+  authorizeAction:async(b:Record<string,unknown>,digest:string)=>{
+   assertScope(b.scope as DeskSearchScopeV1);
+   if(!activeCallSha256||hash(JSON.stringify(b))!==digest)return false;
+   if(b.operation==="open")return true;
+   if(typeof b.url!=="string")return false;
+   const visual=b.visual===true||typeof b.visualSha256==="string";
+   if(!await localGrant("browser_render",b.url,{url:b.url,visual}))return false;
+   if(typeof b.target==="string"&&!await localGrant("browser_render",b.target,{url:b.target,visual:false}))return false;
+   return b.operation!=="search"||typeof b.query==="string"&&
+    await localConfig.authorizeQuery(scope,b.query,b.url)===true;
+  },
+  authorizeRequest:async(b:DeskBrowserResourceBindingV1,digest:string)=>{
+   assertScope(b.scope);
+   return hash(JSON.stringify(b))===digest&&!!await localGrant("browser_request",b.url,
+    {url:b.url,resourceType:b.resourceType,parentUrl:b.topLevelUrl});
+  },
+  readResource:async(b:DeskBrowserResourceBindingV1,digest:string,signal:AbortSignal,session:LocalSessionProof)=>{
+   assertScope(b.scope);
+   const callHash=activeCallSha256;
+   if(!callHash||hash(JSON.stringify(b))!==digest)fail("LOCAL_RESOURCE_SCOPE_DENIED");
+   const descriptor={url:b.url,resourceType:b.resourceType,parentUrl:b.topLevelUrl};
+   const matches=(candidate:DeskBrowserResourceBindingV1,sha:string)=>
+    activeCallSha256===callHash&&sha===digest&&JSON.stringify(candidate)===JSON.stringify(b);
+   const read=createDeskBrowserResourceReaderV1({...options.localBrowserResourceTestSeams,now,
+    authorize:async(candidate,sha)=>{
+     if(!matches(candidate,sha))return null;
+     const g=await localGrant("browser_request",b.url,descriptor);
+     if(!g)return null;
+     const expiry=Math.min(Date.parse(g.validUntil),Date.parse(session.validUntil));
+     return expiry>now()?{policyRef:g.policyRef,validUntil:new Date(expiry).toISOString(),
+      acquisitionAllowed:true,zeroIncrementalSpendAllowed:true}:null;
+    },
+    precharge:async(candidate,target,_authority,sha)=>{
+     if(!matches(candidate,sha))return false;
+     const bound={scope,target,sessionId:session.sessionId,callSha256:callHash,resourceRequestSha256:digest};
+     const hop=hash(JSON.stringify(bound));
+     return !!await localGrant("browser_request",b.url,descriptor,hop)&&
+      await budget.browserResourcePrecharge(options.nativeAccountFingerprint)(bound,hop)===true;
+    }});
+   return read(b,digest,signal);
+  },
+  routerOptions:(getSession:()=>Promise<LocalSessionProof>)=>({
+   resolveReference:resolveLocalLead,authorizeCall:options.authorizeInteractiveCall!,
+   authorizeQuery:localConfig.authorizeQuery,visualAllowed:localConfig.captureVisual===true,
+   authorizeVisualLead:async(candidate:DeskSearchScopeV1,url:string)=>{
+    assertScope(candidate);
+    const p=await policy(urlOf(url).hostname);
+    return !!p&&p.visualProcessingAllowed===true&&p.excerptRetentionAllowed&&
+     await localConfig.authorizeAccess(scope,url,"browser_visual")===true;
+   },
+   admitObservation:async(b:{
+    scope:DeskSearchScopeV1;call:DeskToolCallV1;callSha256:string;receiptId:string;parentLeadId:string;action:string;
+    observation:{url:string;generation:number;observationSha256:string};
+    capture:{finalUrl:string;sha256:string;body:Uint8Array;visibleText:string;visibleTextSha256:string;
+     visual:null|{body:Uint8Array;sha256:string;contentType:"image/png"}};
+    leads:readonly DeskToolLeadV1[];actionBindings:readonly {id:string;url:string;action:string;generation:number;observationSha256:string}[];
+   })=>{
+    assertScope(b.scope);
+    if(activeCallSha256!==b.callSha256||hash(JSON.stringify({scope:b.scope,call:b.call}))!==b.callSha256||
+     b.parentLeadId!==b.call.input.lead_id||!UUID.test(b.receiptId)||
+     b.observation.url!==b.capture.finalUrl||hash(b.capture.body)!==b.capture.sha256||
+     hash(b.capture.visibleText)!==b.capture.visibleTextSha256)fail("LOCAL_CAPTURE_BINDING_DENIED");
+    const session=await getSession(),parent=await resolveLocalLead(scope,b.parentLeadId);
+    if(!parent)fail("LOCAL_PARENT_DENIED");
+    const url=urlOf(b.capture.finalUrl).href,p=await policy(urlOf(url).hostname);
+    if(!p||p.browserRenderAllowed!==true)fail("SOURCE_CUSTODY_DENIED");
+    const visual=b.action==="visual";
+    const descriptor=visual&&b.capture.visual?imageDescriptor({body:b.capture.visual.body,sha256:b.capture.visual.sha256,
+     width:1280,height:900,byteLength:b.capture.visual.body.length}):null;
+    if(visual!==!!descriptor)fail("VISUAL_DIGEST_DENIED");
+    const examinationBinding=visual?{mode:"browser_visual",finalUrl:url,sha256:b.capture.sha256,
+     visualSha256:descriptor!.sha256,pageNumber:1}:{representation:"rendered_dom_not_original_response",
+     finalUrl:url,sha256:b.capture.sha256,pageStart:1,pageEnd:1};
+    if(!await localGrant(visual?"browser_visual":"browser_text",url,examinationBinding)||
+     await options.authorizeExamination(scope,examinationBinding)!==true)fail("LOCAL_EXAMINATION_DENIED");
+    const excerpt=visual?"Visual derivative for examination; no textual claim is verified.":
+     b.capture.visibleText.replace(/[\p{Cf}]/gu," ").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g," ").trim().slice(0,4000).trim();
+    const locator=visual?"browser_viewport:1":excerpt?"browser_visible_text":"no_text";
+    const capturedAt=new Date(now()).toISOString();
+    const source={sha256:b.capture.sha256,retrievedAt:capturedAt,finalUrl:url};
+    const metadata={parentReceiptId:parent.receiptId,finalUrl:url,sourceSha256:b.capture.sha256,
+     projectionSha256:descriptor?.sha256??b.capture.visibleTextSha256,contentType:"text/html",retrievedAt:capturedAt,
+     byteLength:b.capture.body.length,locator,detail:{localBrowser:{reservationId:session.reservationId,
+      requestSha256:session.requestSha256,sessionId:session.sessionId,observationSha256:b.observation.observationSha256,
+      action:b.action,generation:b.observation.generation},visual:descriptor,
+      actionBindings:b.actionBindings.map(x=>({id:x.id,action:x.action}))}};
+    const result:DeskToolResultV1={receiptId:b.receiptId,leads:b.leads,
+     sources:excerpt&&p.excerptRetentionAllowed?[makeExcerpt(b.receiptId,p,source,locator,excerpt)]:[],
+     ...(descriptor&&b.capture.visual?{visual:{sourceId:b.receiptId,sha256:descriptor.sha256,
+      contentType:"image/png" as const,body:Uint8Array.from(b.capture.visual.body)}}:{})};
+    return append(JSON.stringify({scope:b.scope,call:b.call}),b.callSha256,result,p,metadata,
+     b.actionBindings.map(x=>({id:x.id,url:x.url})));
+   }
+  })
+ }):null;
  const executeTool:DeskAnthropicOptionsV1["executeTool"]=async(candidate,call,callSha256)=>{
   assertScope(candidate);
   const callText=JSON.stringify({scope:candidate,call});
   if(!SHA.test(callSha256)||hash(callText)!==callSha256||!TOOLS.some(t=>t===call.name)||
-   !call.input||Object.keys(call.input).length!==(call.name==="read_document"?3:call.name==="inspect_visual"?2:1))
+   !call.input||Object.keys(call.input).length!==(call.name==="read_document"?3:call.name==="inspect_visual"||call.name==="browse_page"?2:1))
    fail("TOOL_CALL_DENIED");
   if(activeCallSha256!==null)fail("CONCURRENT_TOOL_CALL_DENIED");
   activeCallSha256=callSha256;
   try{
+  if(call.name==="browse_page"||call.name==="inspect_visual"&&local?.ownsLead(call.input.lead_id)){
+   if(!local)fail("LOCAL_BROWSER_CONFIGURATION_DENIED");
+   if(await options.authorizeInteractiveCall!(candidate,call,callSha256)!==true)fail("LOCAL_TOOL_AUTHORITY_DENIED");
+   return await local.execute(candidate,call,callSha256);
+  }
   if(call.name==="search_web"||call.name==="search_news"){
    const query=call.input.query;
    if(!text(query,300,3))fail("QUERY_DENIED");
@@ -509,5 +653,6 @@ export function createDeskResearchDispatcherV1(options:Options){
   }
   return verified;
  };
- return Object.freeze({enabledTools:TOOLS,executeTool,verifyToolReceipt,authorizeSource,authorizeModelProcessing,verifySources,verifyJournalPass});
+ return Object.freeze({enabledTools:TOOLS,executeTool,verifyToolReceipt,authorizeSource,authorizeModelProcessing,verifySources,verifyJournalPass,
+  closeInteractive:async()=>{if(local)await local.close();}});
 }
