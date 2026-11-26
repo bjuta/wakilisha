@@ -1065,3 +1065,34 @@ describe("Charts 2 existing Registry candidate discovery",()=>{
     expect(STUDIO_PAGE).toContain("setBatchMode(true);setBatchRows([]);setReviewGroupRows(selectable)");
   });
 });
+
+
+describe("Charts Studio recording-review draft and scroll safety",()=>{
+  it("retains only preparation state in an exact current-snapshot draft and requires fresh approval",()=>{
+    const save=STUDIO_PAGE.slice(STUDIO_PAGE.indexOf("const closeRecordingReview="),STUDIO_PAGE.indexOf("const openSingleReview="));
+    expect(save).toContain("context.preview===preview");
+    expect(save).toContain("selectedTrack,batchRows,evidenceUrl,reviewNote");
+    expect(save).not.toMatch(/setSavedReviewDraft\(\{[^}]*reviewConsent/);
+    const restore=STUDIO_PAGE.slice(STUDIO_PAGE.indexOf("const restoreReviewDraft="),STUDIO_PAGE.indexOf("const resumeMatchingDraft="));
+    for(const field of ["batchRows","selectedTrack","registryMatches","registryQuery","evidenceUrl","reviewNote"])expect(restore).toContain("draft."+field);
+    expect(restore).toContain("draft.context.preview!==preview||!canDiscoverRegistry");
+    expect(restore).toContain("setReviewConsent(false)");
+    expect(STUDIO_PAGE).toContain("savedReviewDraft.context.key===context.key");
+    expect(STUDIO_PAGE).toContain("source.original_sha256,row.rank,row.title,row.artist,row.provider_track_id");
+    expect(STUDIO_PAGE).toContain("Resume Review");
+    expect(STUDIO_PAGE).toContain("Discard Draft");
+  });
+  it("clears approval when source, recording or evidence changes and drops drafts on reviewed writes",()=>{
+    expect(STUDIO_PAGE).toContain("setSelectedTrack(track);setReviewConsent(false)");
+    expect(STUDIO_PAGE).toContain("setEvidenceUrl(e.target.value);setReviewConsent(false)");
+    expect(STUDIO_PAGE).toContain("setReviewNote(e.target.value);setReviewConsent(false)");
+    expect(STUDIO_PAGE).toContain("setReviewConsent(false);\n                        setBatchRows");
+    expect(STUDIO_PAGE.match(/setSavedReviewDraft\(null\);activeReviewContext.current=null/g)?.length).toBe(3);
+  });
+  it("uses one bounded shared modal body without a nested candidate scroller",()=>{
+    expect(STUDIO_PAGE).toContain('panelClassName="h-[calc(100dvh-2rem)]" bodyClassName="overscroll-contain"');
+    expect(STUDIO_PAGE).toContain("onClose={closeRecordingReview}");
+    expect(STUDIO_PAGE).toContain("dismissable={!busy} showClose={!busy}");
+    expect(STUDIO_PAGE).not.toContain('aria-live="polite" className="max-h-64 space-y-2 overflow-y-auto"');
+  });
+});

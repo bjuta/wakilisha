@@ -111,6 +111,18 @@ type RegistryDiscovery = {
   unique_positions:number;ambiguous_positions:number;unmatched_positions:number;
   groups:RegistryDiscoveryGroup[];
 };
+// Ephemeral operator draft, never an approval or an authority receipt.
+// Exact current preview and source coordinates are required for restoration.
+type RecordingReviewDraftContext = {
+  preview:Preview; key:string; anchor:EvidenceRow; batch:boolean;
+  groupRows:Array<EvidenceRow|RegistryDiscoveryPosition>;
+};
+type RecordingReviewDraft = {
+  context:RecordingReviewDraftContext; registryQuery:string;
+  registryMatches:RegistryTrack[]; registrySearchAttempted:boolean;
+  selectedTrack:RegistryTrack|null; batchRows:EvidenceRow[];
+  evidenceUrl:string; reviewNote:string;
+};
 type Probe = {
   source_key: SourceKey; probe_id: string; expected_revision: number;
   original_sha256: string; observed_depth: number; expected_depth: number;
@@ -199,6 +211,8 @@ export default function ChartsStudioPage() {
   const [registryDiscoveryRetry,setRegistryDiscoveryRetry]=useState(0);
   const [showAllRegistryGroups,setShowAllRegistryGroups]=useState(false);
   const [reviewGroupRows,setReviewGroupRows]=useState<Array<EvidenceRow|RegistryDiscoveryPosition>>([]);
+  const activeReviewContext=useRef<RecordingReviewDraftContext|null>(null);
+  const [savedReviewDraft,setSavedReviewDraft]=useState<RecordingReviewDraft|null>(null);
   const [reviewNote,setReviewNote]=useState("");
   const [evidenceUrl,setEvidenceUrl]=useState("");
   const [reviewConsent,setReviewConsent]=useState(false);
@@ -401,6 +415,7 @@ export default function ChartsStudioPage() {
       rank:selected.rank,track_id:null,review_note:reviewNote.trim(),
       evidence_url:evidenceUrl.trim(),acknowledgement:SHAZAM_REVOKE_DECLARATION,
     });
+    setSavedReviewDraft(null);activeReviewContext.current=null;
     setSelected(null);setSelectedTrack(null);setReviewConsent(false);
     setNotice("Shazam position #"+selected.rank+" review revoked. Its private rank credit is removed.");
     await refresh();
@@ -410,7 +425,7 @@ export default function ChartsStudioPage() {
     const sequence=++registrySearchSequence.current;
     setRegistrySearchAttempted(false);
     setRegistryMatches([]);
-    setSelectedTrack(null);
+    setSelectedTrack(null);setReviewConsent(false);
     await operate("track-search",async()=>{
       if(!selected)throw new Error("Select a source observation first.");
       if(q.length<2)throw new Error("Enter at least two characters.");
@@ -457,6 +472,8 @@ export default function ChartsStudioPage() {
       }catch(e){
         // A partially accepted batch must not be blindly resubmitted. Reopen
         // from the newly recomputed queue to review only outstanding sources.
+        setSavedReviewDraft(null);activeReviewContext.current=null;
+        setReviewConsent(false);
         await refresh();
         if(accepted>0){
           setBatchMode(false);setBatchRows([]);setSelected(null);
@@ -470,6 +487,7 @@ export default function ChartsStudioPage() {
     }
     setNotice(String(accepted)+" independently reviewed chart positions recorded for "+selectedTrack.title+
       ". Private rankings are being recalculated.");
+    setSavedReviewDraft(null);activeReviewContext.current=null;
     setSelected(null);setSelectedTrack(null);setRegistryMatches([]);
     setBatchMode(false);setBatchRows([]);
     setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
@@ -531,6 +549,67 @@ export default function ChartsStudioPage() {
     return ()=>{current=false;};
   },[tab,preview,canDiscoverRegistry,registryDiscoveryRetry]);
   const currentDiscovery=registryDiscovery?.preview===preview?registryDiscovery?.result:null;
+  // A refresh or lost capability invalidates the in-page draft. Never carry
+  // consent or stale decisions into a different evidence snapshot.
+  useEffect(()=>{
+    setSavedReviewDraft(draft=>draft&&draft.context.preview===preview&&canDiscoverRegistry?draft:null);
+    setReviewConsent(false);
+  },[preview,canDiscoverRegistry]);
+  const createReviewContext=(anchor:EvidenceRow,rows:Array<EvidenceRow|RegistryDiscoveryPosition>,batch:boolean,candidateId?:string,reviewEventId?:string):RecordingReviewDraftContext|null=>{
+    if(!preview)return null;
+    const exact=rows.map(row=>{
+      const source=preview.source_coverage.find(c=>c.source_key===row.source_key&&c.receipt_id===row.receipt_id);
+      if(!source)return null;
+      return JSON.stringify([row.source_key,row.receipt_id,source.original_sha256,row.rank,row.title,row.artist,row.provider_track_id]);
+    });
+    if(exact.some(item=>item===null))return null;
+    return {preview,key:JSON.stringify([batch,candidateId??null,reviewEventId??null,exact.sort()]),anchor,batch,groupRows:rows};
+  };
+  const restoreReviewDraft=(draft:RecordingReviewDraft)=>{
+    if(draft.context.preview!==preview||!canDiscoverRegistry)return;
+    registrySearchSequence.current++;
+    activeReviewContext.current=draft.context;
+    setSelected(draft.context.anchor);
+    setBatchMode(draft.context.batch);
+    setReviewGroupRows(draft.context.groupRows);
+    setBatchRows(draft.batchRows);
+    setRegistryQuery(draft.registryQuery);
+    setRegistryMatches(draft.registryMatches);
+    setRegistrySearchAttempted(draft.registrySearchAttempted);
+    setSelectedTrack(draft.selectedTrack);
+    setEvidenceUrl(draft.evidenceUrl);setReviewNote(draft.reviewNote);
+    setReviewConsent(false);setError("");
+    setTab("review");
+  };
+  const resumeMatchingDraft=(context:RecordingReviewDraftContext|null)=>{
+    activeReviewContext.current=context;
+    if(context&&savedReviewDraft?.context.preview===context.preview&&savedReviewDraft.context.key===context.key){
+      restoreReviewDraft(savedReviewDraft);
+    }
+  };
+  const closeRecordingReview=()=>{
+    if(busy)return;
+    const context=activeReviewContext.current;
+    if(selected&&context&&context.preview===preview&&canDiscoverRegistry){
+      // Copy all preparation state, but deliberately omit reviewConsent.
+      if(batchRows.length||selectedTrack||reviewNote.trim()||evidenceUrl.trim()||registrySearchAttempted)
+        setSavedReviewDraft({context,registryQuery,registryMatches,registrySearchAttempted,
+          selectedTrack,batchRows,evidenceUrl,reviewNote});
+    }
+    activeReviewContext.current=null;
+    registrySearchSequence.current++;
+    setSelected(null);setBatchMode(false);setBatchRows([]);
+    setSelectedTrack(null);setRegistryMatches([]);setRegistrySearchAttempted(false);
+    setReviewGroupRows([]);setReviewConsent(false);setError("");
+  };
+  const openSingleReview=(row:EvidenceRow,reviewEventId?:string)=>{
+    setBatchMode(false);setBatchRows([]);setReviewGroupRows([]);
+    setSelected(row);setRegistryQuery(row.title);
+    registrySearchSequence.current++;
+    setRegistryMatches([]);setRegistrySearchAttempted(false);setSelectedTrack(null);
+    setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
+    resumeMatchingDraft(createReviewContext(row,[row],false,undefined,reviewEventId));
+  };
   // Restoration revalidates the receipt and SHA against the current Studio
   // preview, never URL-supplied song titles, artist or provider identifiers.
   useEffect(()=>{
@@ -549,10 +628,7 @@ export default function ChartsStudioPage() {
       setNotice("This chart position has changed or already been resolved. Review current evidence before making another decision.");
       return;
     }
-    setSelected(row);
-    setBatchMode(false);setBatchRows([]);setSelectedTrack(null);
-    setRegistryMatches([]);setRegistrySearchAttempted(false);
-    setRegistryQuery(row.title);setReviewConsent(false);
+    openSingleReview(row);
     setReviewFilter(row.source_key);
     setSearch(row.title);setPage(0);
   },[snapshot?.preview,returnContextKey]);
@@ -626,6 +702,7 @@ export default function ChartsStudioPage() {
     registrySearchSequence.current++;
     setRegistryMatches(candidate?[candidate]:[]);setRegistrySearchAttempted(false);setSelectedTrack(null);
     setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
+    resumeMatchingDraft(createReviewContext(anchor,selectable,true,candidate?.id));
     setTab("review");
   };
   const coverage=preview?.source_coverage??snapshot?.source_coverage??[];
@@ -861,17 +938,27 @@ export default function ChartsStudioPage() {
                 <button type="button" className={buttonSecondary}
                   disabled={!!busy||!admin.can("manage_registry")||!admin.can("manage_charts")}
                   onClick={()=>{
-                    setBatchMode(false);setBatchRows([]);
-                    setSelected({source_key:"shazam_ke",receipt_id:item.receipt_id,
+                    openSingleReview({source_key:"shazam_ke",receipt_id:item.receipt_id,
                       rank:item.rank,title:item.title,artist:item.artist,
-                      provider_track_id:null,reason:"previously_reviewed"});
-                    setRegistryQuery(item.title);setRegistryMatches([]);
-                    setSelectedTrack(null);setRegistrySearchAttempted(false);
-                    setReviewConsent(false);setReviewNote("");setEvidenceUrl("");
+                      provider_track_id:null,reason:"previously_reviewed"},item.id);
                   }}>
                   Inspect or Revoke
                 </button>
               </div>)}
+          </WkSurface>}
+        {canDiscoverRegistry&&savedReviewDraft?.context.preview===preview&&savedReviewDraft&&
+          <WkSurface className="space-y-2 p-4">
+            <p className="text-[13px] font-black text-wk-text">Review Draft Saved</p>
+            <p className="text-[12px] text-wk-text-muted">
+              {savedReviewDraft.context.anchor.title} · {savedReviewDraft.context.batch?savedReviewDraft.batchRows.length:1} selected positions.
+              Your preparation is kept on this page. Approval must be confirmed again.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={buttonPrimary} disabled={!!busy}
+                onClick={()=>restoreReviewDraft(savedReviewDraft)}>Resume Review</button>
+              <button type="button" className={buttonSecondary} disabled={!!busy}
+                onClick={()=>setSavedReviewDraft(null)}>Discard Draft</button>
+            </div>
           </WkSurface>}
         {canDiscoverRegistry&&<WkSurface className="space-y-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1046,13 +1133,7 @@ export default function ChartsStudioPage() {
                   <button type="button" className={buttonSecondary}
                     disabled={!!busy||(!row.provider_track_id&&row.source_key!=="shazam_ke")||
                       !admin.can("manage_registry")||!admin.can("manage_charts")}
-                    onClick={()=>{
-                      setBatchMode(false);setBatchRows([]);
-                      setSelected(row);setRegistryQuery(row.title);
-                      registrySearchSequence.current++;
-                      setRegistryMatches([]);setRegistrySearchAttempted(false);setSelectedTrack(null);
-                      setReviewNote("");setEvidenceUrl("");setReviewConsent(false);
-                    }}>
+                    onClick={()=>openSingleReview(row)}>
                     {row.provider_track_id?"Review exact identity":
                        row.source_key==="shazam_ke"?"Review Shazam Position":"No provider ID"}
                   </button>
@@ -1071,14 +1152,9 @@ export default function ChartsStudioPage() {
           </WkSurface>
         </div>
         <Modal open={Boolean(selected)} title="Review This Recording" maxWidth="3xl"
-          onClose={()=>{
-            if(busy)return;
-            registrySearchSequence.current++;
-            setSelected(null);setBatchMode(false);setBatchRows([]);
-            setSelectedTrack(null);setRegistryMatches([]);setRegistrySearchAttempted(false);
-            setReviewConsent(false);setError("");
-          }}
-          dismissable={!busy}>
+          panelClassName="h-[calc(100dvh-2rem)]" bodyClassName="overscroll-contain"
+          onClose={closeRecordingReview}
+          dismissable={!busy} showClose={!busy}>
           {error && <p role="alert" className="mb-3 rounded-lg border border-wk-danger p-3 text-[12px] text-wk-danger">{error}</p>}
           <div className="space-y-4">
             {selected && <>
@@ -1092,16 +1168,19 @@ export default function ChartsStudioPage() {
                 {reviewGroupRows.map(row=>{
                     const checked=batchRows.some(item=>item.receipt_id===row.receipt_id&&
                       item.rank===row.rank);
-                    return <WkCheckbox key={row.receipt_id+":"+row.rank}
-                      checked={checked} disabled={!row.provider_track_id&&row.source_key!=="shazam_ke"}
-                      onChange={value=>setBatchRows(old=>value?
-                        [...old.filter(item=>item.source_key!==row.source_key),row as EvidenceRow]:
-                        old.filter(item=>!(item.receipt_id===row.receipt_id&&item.rank===row.rank)))}>
+                    return <WkCheckbox key={row.receipt_id+":"+row.rank} className="w-full items-start"
+                      checked={checked} disabled={!!busy||(!row.provider_track_id&&row.source_key!=="shazam_ke")}
+                      onChange={value=>{
+                        setReviewConsent(false);
+                        setBatchRows(old=>value?
+                          [...old.filter(item=>item.source_key!==row.source_key),row as EvidenceRow]:
+                          old.filter(item=>!(item.receipt_id===row.receipt_id&&item.rank===row.rank)));
+                      }}><span className="block min-w-0 flex-1 whitespace-normal leading-relaxed">
                       {SOURCE_LABEL[row.source_key as SourceKey].split(" ")[0]} #{row.rank}
                       {" "}· {row.title} · {sourceArtistDisplay(row)}
                       {!row.provider_track_id?" (no native ID, review chart position)":""}
                       {"candidate_count" in row&&row.candidate_count>1?" · Multiple title candidates":""}
-                    </WkCheckbox>;
+                    </span></WkCheckbox>;
                   })}
               </div>}
               <div className="space-y-2 rounded-lg bg-wk-surface-raised p-3">
@@ -1163,8 +1242,8 @@ export default function ChartsStudioPage() {
                     registrySearchSequence.current++;
                     setRegistryQuery(e.target.value);
                     setRegistryMatches([]);setRegistrySearchAttempted(false);
-                    setSelectedTrack(null);
-                  }} placeholder="Title, Artist, ISRC or provider ID"
+                    setSelectedTrack(null);setReviewConsent(false);
+                  }} placeholder="Title, Artist, ISRC or ID"
                   className={fieldClass+" sm:flex-1"}/>
                 <button type="submit" className={buttonSecondary+" min-h-11"}
                   disabled={!!busy||registryQuery.trim().length<2}>
@@ -1176,9 +1255,9 @@ export default function ChartsStudioPage() {
                   No active Registry recording matches this search.
                   A new Track requires governed Track Intake before it can be linked.
                 </p>}
-              <div aria-live="polite" className="max-h-64 space-y-2 overflow-y-auto">
+              <div aria-live="polite" className="space-y-2">
                 {registryMatches.map(track=>
-                  <button type="button" key={track.id} onClick={()=>setSelectedTrack(track)}
+                  <button type="button" key={track.id} onClick={()=>{setSelectedTrack(track);setReviewConsent(false);}}
                     aria-pressed={selectedTrack?.id===track.id}
                     className={"w-full rounded-xl border p-3 text-left text-[12px] "+
                       (selectedTrack?.id===track.id?
@@ -1206,11 +1285,11 @@ export default function ChartsStudioPage() {
               <label htmlFor="studio-evidence" className="text-[12px] font-bold text-wk-text">Link To Recording Evidence</label>
               <input id="studio-evidence" type="url" className={fieldClass}
                 placeholder="https://… specific recording / release evidence"
-                value={evidenceUrl} onChange={e=>setEvidenceUrl(e.target.value)}/>
+                value={evidenceUrl} onChange={e=>{setEvidenceUrl(e.target.value);setReviewConsent(false);}}/>
               <label htmlFor="studio-note" className="text-[12px] font-bold text-wk-text">Why Do These Songs Match?</label>
               <textarea id="studio-note" rows={4} className={fieldClass}
                 placeholder="Add the matching ISRC, release details, or other evidence that confirms the recording."
-                value={reviewNote} onChange={e=>setReviewNote(e.target.value)}/>
+                value={reviewNote} onChange={e=>{setReviewNote(e.target.value);setReviewConsent(false);}}/>
               {batchMode &&
                 <div className="space-y-2 rounded-xl border border-wk-border bg-wk-surface-raised p-3">
                   <h3 className="text-[12px] font-black text-wk-text">Before You Approve</h3>
