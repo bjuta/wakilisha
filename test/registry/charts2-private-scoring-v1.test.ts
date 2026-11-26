@@ -323,7 +323,7 @@ describe("Charts 2.0 Phase 2 private deterministic ordinal scoring",()=>{
     expect(STUDIO_PAGE).not.toContain("xl:grid-cols-[minmax(0,1fr)_420px]");
     expect(STUDIO_WORKER).toContain('server.from("registry_track_artists").select("track_id")');
     expect(STUDIO_WORKER).toContain('server.from("registry_track_provider_links").select("track_id")');
-    expect(REGISTRY_DISCOVERY_SHARED).toContain('server.from("registry_artist_aliases").select("canonical_artist_id")');
+    expect(REGISTRY_DISCOVERY_SHARED).toMatch(/server\.from\("registry_artist_aliases"\)\s*\.select\("canonical_artist_id,alias_display_name,alias_slug"\)\.eq\("status","active"\)/);
     expect(STUDIO_WORKER).toContain('server.from("registry_tracks").select("id").eq("status","active")');
     expect(REGISTRY_DISCOVERY_SHARED).toContain('artist_names:artists.get(track.id)??[]');
     expect(REGISTRY_DISCOVERY_SHARED).toContain('artist_credits:artistCredits.get(track.id)??[]');
