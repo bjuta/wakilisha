@@ -34,6 +34,10 @@ const origin = read(originPath);
 const adminClient = read(adminClientPath);
 const governancePanels = read(governancePanelsPath);
 const detail = read(detailPath);
+const registrySchemasPath = "src/services/registry/admin/entitySchemas.ts";
+const registrySchemas = read(registrySchemasPath);
+const registryChoicePath = "src/components/admin/registry/RegistryChoiceField.tsx";
+const registryChoice = read(registryChoicePath);
 const list = read(listPath);
 const manifest = JSON.parse(read(manifestPath));
 const foundationMigration = read(foundationMigrationPath);
@@ -226,8 +230,19 @@ for (const fragment of [
 ]) {
   forbidText(detail, fragment, detailPath);
 }
-for (const canonicalType of ['value="solo"','value="group"','value="band"','value="duo"','value="collective"','value="unknown"']) {
-  requireText(detail, canonicalType, detailPath);
+// Classification options now come from the shared schema, not duplicated
+// markup. Verify both the data authority and the actual detail binding.
+requireText(detail, 'field={artistSchema.editableFields.find(field => field.key === "artist_type")!}', detailPath);
+requireText(detail, 'onChange={(value) => patchDraft({ artist_type: value })}', detailPath);
+requireText(detail, '<RegistryChoiceField', detailPath);
+requireText(registryChoice, 'field.options ?? []', registryChoicePath);
+requireText(registryChoice, '<WkSelect', registryChoicePath);
+const artistTypeDefinition = registrySchemas.match(/key: "artist_type",[\s\S]*?options: (\[[^\]]+\])/);
+if (!artistTypeDefinition) throw new Error("Registry Artist type schema missing");
+const actualArtistTypes = JSON.parse(artistTypeDefinition[1]).sort();
+const expectedArtistTypes = ["solo", "group", "band", "duo", "collective", "unknown"].sort();
+if (JSON.stringify(actualArtistTypes) !== JSON.stringify(expectedArtistTypes)) {
+  throw new Error("Registry Artist type schema differs from canonical authority");
 }
 
 // Bulk/list surface must render the governed panels, while card-level enrichment

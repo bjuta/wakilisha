@@ -756,9 +756,27 @@ test("Registry Artists theme and shared Registry editor fields remain legible an
             if (node instanceof HTMLTextAreaElement && style.resize !== "none") errors.push("native resize");
             if (node instanceof HTMLInputElement && ["number", "date", "url"].includes(node.type)) errors.push("native " + node.type);
           }
+          // React Aria keeps a native select for form/autofill semantics.
+          // Reject any painted or pointer-reachable native control; geometry
+          // alone does not establish visibility of a clipped hidden wrapper.
           for (const select of el.querySelectorAll("select")) {
             const rect = select.getBoundingClientRect();
-            if (rect.width > 4 && rect.height > 4) errors.push("visible native select");
+            let hidden = false;
+            for (let node: Element | null = select; node && node !== el; node = node.parentElement) {
+              const css = getComputedStyle(node);
+              const box = node.getBoundingClientRect();
+              if (css.display === "none" || css.visibility === "hidden" || Number(css.opacity) === 0 ||
+                  (css.clip !== "auto" && css.clip !== "") ||
+                  (css.clipPath !== "none" && css.clipPath !== "") ||
+                  ((box.width <= 1 || box.height <= 1) && /hidden|clip/.test(css.overflow))) {
+                hidden = true;
+                break;
+              }
+            }
+            const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+            if (rect.width > 4 && rect.height > 4 && (!hidden || hit === select)) {
+              errors.push("visible native select: " + select.outerHTML.slice(0, 180));
+            }
           }
           return errors;
         }), { timeout: 2000, message: kind + " " + theme + " " + width }).toEqual([]);

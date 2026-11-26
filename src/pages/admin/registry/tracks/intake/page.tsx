@@ -2941,22 +2941,49 @@ export default function TrackIntakePage() {
                             </div>
                           ) : row.canonical_track_id ? (
                             <div className="mt-3 rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-3">
-                              <WkSearchField
+                              <div className="flex items-center gap-2">
+                                <WkIcon
+                                  name="CheckCircle2"
+                                  size={15}
+                                  className="text-wk-brand"
+                                />
+                                <span className="text-[10px] font-black uppercase tracking-wide text-wk-brand">
+                                  Identity already matched
+                                </span>
+                              </div>
+                              <div className="mt-2 text-sm font-bold text-wk-text">
+                                {row.canonical_track_title ||
+                                  row.submitted_track_title ||
+                                  row.provider_title ||
+                                  row.canonical_track_id}
+                              </div>
+                              <p className="mt-1 text-xs leading-5 text-wk-text-muted">
+                                This queue item still needs Registry enrichment review,
+                                but its canonical track identity is already resolved.
+                                Enrichment cannot silently remap it to another track.
+                              </p>
+                            </div>
+                          ) : (
+                            <>
+                          <div className="mt-3 flex items-center gap-2">
+                            <WkSearchField
                               value={
                                 trackQuery[suggestionId] ??
                                 row.submitted_track_title ??
                                 row.provider_title ??
                                 ""
                               }
-                              onChange={(value) =>
-                                void searchTracks(
-                                  suggestionId,
-                                  value,
-                                )
-                              }
+                              onChange={(value) => void searchTracks(suggestionId, value)}
                               placeholder="Search by track, artist, or ISRC"
                               ariaLabel="Search by track, artist, or ISRC"
                             />
+                            <button type="button" disabled={busy !== null || !!trackSearching[suggestionId]}
+                              onClick={() => void searchTracks(suggestionId,
+                                trackQuery[suggestionId] ?? row.submitted_track_title ?? row.provider_title ?? "")}
+                              className="wk-button wk-button-ghost wk-button-sm shrink-0 disabled:opacity-40">
+                              Search
+                            </button>
+                          </div>
 
                           {trackSearchFailed[suggestionId] && (
                             <p role="alert" className="mt-2 text-xs text-wk-danger">
