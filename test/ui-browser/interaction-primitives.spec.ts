@@ -683,6 +683,14 @@ test("Registry Artists theme follows shared tokens across list, panels and publi
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(dialog).toHaveCount(0);
     await root.getByRole("button", { name: "Clear selection" }).click();
+    await card.getByTitle("Quick edit").click();
+    const editor = page.getByRole("dialog", { name: "Edit artist" });
+    await expect(editor.getByRole("textbox", { name: "Artist name", exact: true })).toHaveValue(artist.display_name);
+    await expect(editor.getByRole("combobox", { name: "Country", exact: true })).toBeVisible();
+    await expect(editor.getByRole("button", { name: "Artist type", exact: true })).toBeVisible();
+    await expect(editor.getByRole("button", { name: "Gender", exact: true })).toBeVisible();
+    await editor.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(editor).toHaveCount(0);
   }
   expect(backgrounds.dark).not.toBe(backgrounds.light);
   expect(listReads).toBeGreaterThan(0);
@@ -801,6 +809,63 @@ test("Registry Artists theme and shared Registry editor fields remain legible an
     }
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
     await expect(page.getByText("Registry editor closed")).toBeVisible();
+  }
+  expect(unexpected).toEqual([]);
+});
+
+
+test("Registry Artists theme contract applies to the other Registry lists", async ({ page }) => {
+  test.skip(process.env.WK_REGISTRY_ARTISTS_UI_FIXTURE !== "1", "Run in isolated Registry list acceptance");
+  test.setTimeout(60_000);
+  const unexpected: string[] = [];
+  await page.route("https://example.supabase.co/**", async route => {
+    const method = route.request().method();
+    const path = new URL(route.request().url()).pathname;
+    const headers = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, OPTIONS",
+      "access-control-allow-headers": route.request().headers()["access-control-request-headers"] ?? "*",
+    };
+    if (method === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (method === "GET" && path === "/functions/v1/admin-router/registry/entities") {
+      return route.fulfill({ status: 200, headers, contentType: "application/json", body: JSON.stringify({ ok: true, data: [{
+        id: "10b940ff-3382-42b3-a81b-30e4028297d",
+        name: "WK Registry List Fixture", title: "WK Registry List Fixture",
+        slug: "wk-registry-list-fixture", status: "draft", release_type: "single",
+        release_date: "2026-11-26", duration_ms: 136594, updated_at: "2026-11-26T08:14:03Z",
+      }] }) });
+    }
+    unexpected.push(method + " " + path);
+    return route.abort();
+  });
+  for (const kind of ["track", "release", "label", "genre"]) {
+    await page.goto("/test/ui-browser/fixtures/interaction.html?fixture=registry-artists&entity=" + kind);
+    const root = page.locator('[data-wk-registry-entity-list="' + kind + 's"]');
+    await expect(root.getByText("WK Registry List Fixture", { exact: true })).toBeVisible();
+    for (const theme of ["dark", "light"]) {
+      await page.evaluate(theme => document.documentElement.setAttribute("data-wk-theme", theme), theme);
+      for (const width of [1200, 390]) {
+        await page.setViewportSize({ width, height: 800 });
+        await expect.poll(async () => root.evaluate(el => {
+          const probe = document.createElement("span");
+          document.body.appendChild(probe);
+          probe.style.backgroundColor = "var(--wk-bg)";
+          const expectedBg = getComputedStyle(probe).backgroundColor;
+          probe.style.backgroundColor = "var(--wk-surface)";
+          const expectedSurface = getComputedStyle(probe).backgroundColor;
+          probe.style.color = "var(--wk-text)";
+          const expectedText = getComputedStyle(probe).color;
+          probe.remove();
+          const errors: string[] = [];
+          if (getComputedStyle(el).backgroundColor !== expectedBg || getComputedStyle(el).color !== expectedText) errors.push("list root");
+          const search = el.querySelector("[data-wk-search-input]");
+          if (!search || getComputedStyle(search).color !== expectedText || getComputedStyle(search).backgroundColor !== expectedSurface) errors.push("search");
+          const cards = el.querySelectorAll(".group.rounded-2xl");
+          if (cards.length !== 1 || Array.from(cards).some(card => getComputedStyle(card).backgroundColor !== expectedSurface)) errors.push("cards");
+          return errors;
+        }), { timeout: 2000, message: kind + " " + theme + " " + width }).toEqual([]);
+      }
+    }
   }
   expect(unexpected).toEqual([]);
 });

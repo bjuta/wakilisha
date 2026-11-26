@@ -40,7 +40,14 @@ const RegistryArtistsThemeFixture = lazy(async () => {
     data: { session: { access_token: "wk-isolated-presentation-fixture" } as Session },
     error: null,
   });
-  return import("@/pages/admin/registry/artists/page");
+  const entity = new URLSearchParams(location.search).get("entity");
+  switch (entity) {
+    case "track": return import("@/pages/admin/registry/tracks/page");
+    case "release": return import("@/pages/admin/registry/releases/page");
+    case "label": return import("@/pages/admin/registry/labels/page");
+    case "genre": return import("@/pages/admin/registry/genres/page");
+    default: return import("@/pages/admin/registry/artists/page");
+  }
 });
 
 // Shared editor fixture covers the other schema consumers without navigating
