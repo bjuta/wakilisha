@@ -10,9 +10,9 @@ begin
   or to_regprocedure('mizizi_private.read_leased_chart_research_context_v1(uuid,text)') is null
   or to_regclass('mizizi_private.desk_search_policy_versions_v1') is not null
   or to_regclass('mizizi_private.desk_search_reservations_v1') is not null
-  or to_regprocedure('public.mizizi_authorize_desk_search_v1(text,text)') is not null
-  or to_regprocedure('public.mizizi_reserve_desk_search_v1(text,text,text)') is not null
-  or to_regprocedure('public.mizizi_consume_desk_search_v1(uuid,text)') is not null
+  or to_regprocedure('public.mizizi_authorize_desk_search_v1(text,text,text)') is not null
+  or to_regprocedure('public.mizizi_reserve_desk_search_v1(text,text,text,text)') is not null
+  or to_regprocedure('public.mizizi_consume_desk_search_v1(uuid,text,text)') is not null
   or has_schema_privilege('service_role','mizizi_private','USAGE')
   or has_schema_privilege('authenticated','mizizi_private','USAGE')
  then raise exception 'STOP_MIZIZI_DESK_SEARCH_PREIMAGE';end if;
@@ -120,7 +120,7 @@ create trigger mz_desk_search_reservation_guard before update or delete
 -- case notes, model-generated free text, IDs or arbitrary follow-up questions.
 -- Site-wide/general research and model disclosure require later authority.
 -- Do not persist query text or source excerpts.
-create function mizizi_private.qualify_desk_search_request_v1(p_request_text text,p_request_sha256 text)
+create function mizizi_private.qualify_desk_search_request_v1(p_request_text text,p_request_sha256 text,p_account_fingerprint text)
 returns jsonb language plpgsql security definer set search_path=pg_catalog as $qualify$
 declare
  p mizizi_private.desk_search_policy_versions_v1%rowtype;
@@ -129,6 +129,7 @@ begin
  if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service-role required' using errcode='42501';end if;
  if p_request_text is null or octet_length(p_request_text) not between 1 and 4096
   or p_request_sha256 is null or p_request_sha256 !~ '^[a-f0-9]{64}$'
+  or p_account_fingerprint is null or p_account_fingerprint !~ '^[a-f0-9]{64}$'
   or encode(sha256(convert_to(p_request_text,'UTF8')),'hex')<>p_request_sha256
  then raise exception 'Invalid exact search digest' using errcode='22023';end if;
  req:=p_request_text::jsonb; scope:=req->'scope';
@@ -158,6 +159,7 @@ begin
  if not found or not p.enabled or not p.commercial_search_allowed
   or not p.zero_cost_hard_cap_verified or not p.exclusive_allocated_usage_verified
   or not p.public_chart_labels_allowed or p.workspace_id::text<>scope->>'workspaceId'
+  or p.account_fingerprint<>p_account_fingerprint
   or t<p.allowance_start or t>=p.allowance_end or t>=p.valid_until
  then return null;end if;
  ctx:=mizizi_private.read_leased_chart_research_context_v1((scope->>'jobId')::uuid,scope->>'workerId');
@@ -180,19 +182,19 @@ begin
   'observationSha256',ctx->>'observationSha256');
 end $qualify$;
 
-create function public.mizizi_authorize_desk_search_v1(p_request_text text,p_request_sha256 text)
+create function public.mizizi_authorize_desk_search_v1(p_request_text text,p_request_sha256 text,p_account_fingerprint text)
 returns jsonb language sql security definer set search_path=pg_catalog as $authorize$
- select mizizi_private.qualify_desk_search_request_v1(p_request_text,p_request_sha256)
+ select mizizi_private.qualify_desk_search_request_v1(p_request_text,p_request_sha256,p_account_fingerprint)
   - 'policyRevision' - 'membershipSha256' - 'observationSha256';
 $authorize$;
 
-create function public.mizizi_reserve_desk_search_v1(p_request_text text,p_request_sha256 text,p_policy_ref text)
+create function public.mizizi_reserve_desk_search_v1(p_request_text text,p_request_sha256 text,p_policy_ref text,p_account_fingerprint text)
 returns jsonb language plpgsql security definer set search_path=pg_catalog as $reserve$
 declare a jsonb; s jsonb; p mizizi_private.desk_search_policy_versions_v1%rowtype;
  reservation mizizi_private.desk_search_reservations_v1%rowtype; t timestamptz; until_at timestamptz;
 begin
  -- qualify retains the provider-wide xact lock through the insertion.
- a:=mizizi_private.qualify_desk_search_request_v1(p_request_text,p_request_sha256);
+ a:=mizizi_private.qualify_desk_search_request_v1(p_request_text,p_request_sha256,p_account_fingerprint);
  if a is null or a->>'policyRef' is distinct from p_policy_ref then return null;end if;
  s:=p_request_text::jsonb->'scope';
  select * into strict p from mizizi_private.desk_search_policy_versions_v1 where revision=(a->>'policyRevision')::integer;
@@ -213,13 +215,14 @@ begin
   'provider','brave','units',1,'maximumIncrementalCostMicrousd',0,'validUntil',reservation.valid_until);
 end $reserve$;
 
-create function public.mizizi_consume_desk_search_v1(p_reservation_id uuid,p_request_sha256 text)
+create function public.mizizi_consume_desk_search_v1(p_reservation_id uuid,p_request_sha256 text,p_account_fingerprint text)
 returns boolean language plpgsql security definer set search_path=pg_catalog as $consume$
 declare p mizizi_private.desk_search_policy_versions_v1%rowtype;
  r mizizi_private.desk_search_reservations_v1%rowtype; ctx jsonb; t timestamptz;
 begin
  if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service-role required' using errcode='42501';end if;
  if p_reservation_id is null or p_request_sha256 is null or p_request_sha256 !~ '^[a-f0-9]{64}$'
+  or p_account_fingerprint is null or p_account_fingerprint !~ '^[a-f0-9]{64}$'
  then raise exception 'Invalid search reservation' using errcode='22023';end if;
  perform pg_advisory_xact_lock(214781521,61429);
  select * into r from mizizi_private.desk_search_reservations_v1
@@ -229,7 +232,8 @@ begin
  if not found or p.revision<>r.policy_revision or not p.enabled
   or not p.commercial_search_allowed or not p.zero_cost_hard_cap_verified
   or not p.exclusive_allocated_usage_verified or not p.public_chart_labels_allowed
-  or p.workspace_id<>r.workspace_id or p.valid_until<=clock_timestamp()
+  or p.workspace_id<>r.workspace_id or p.account_fingerprint<>p_account_fingerprint
+  or p.valid_until<=clock_timestamp()
   or p.allowance_end<=clock_timestamp() then return false;end if;
  ctx:=mizizi_private.read_leased_chart_research_context_v1(r.job_id,r.worker_id);
  if ctx->>'caseId' is distinct from r.case_id::text or ctx->>'workspaceId' is distinct from r.workspace_id::text
@@ -244,11 +248,11 @@ begin
 end $consume$;
 
 revoke all on function mizizi_private.guard_desk_search_policy_v1(),mizizi_private.guard_desk_search_reservation_v1(),
- mizizi_private.qualify_desk_search_request_v1(text,text) from public,anon,authenticated,service_role,mizizi_executor;
-revoke all on function public.mizizi_authorize_desk_search_v1(text,text),
- public.mizizi_reserve_desk_search_v1(text,text,text),public.mizizi_consume_desk_search_v1(uuid,text)
+ mizizi_private.qualify_desk_search_request_v1(text,text,text) from public,anon,authenticated,service_role,mizizi_executor;
+revoke all on function public.mizizi_authorize_desk_search_v1(text,text,text),
+ public.mizizi_reserve_desk_search_v1(text,text,text,text),public.mizizi_consume_desk_search_v1(uuid,text,text)
  from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_authorize_desk_search_v1(text,text),
- public.mizizi_reserve_desk_search_v1(text,text,text),public.mizizi_consume_desk_search_v1(uuid,text) to service_role;
+grant execute on function public.mizizi_authorize_desk_search_v1(text,text,text),
+ public.mizizi_reserve_desk_search_v1(text,text,text,text),public.mizizi_consume_desk_search_v1(uuid,text,text) to service_role;
 comment on table mizizi_private.desk_search_reservations_v1 is 'Conservative precharge: all reservations count, consumed or not; no refund, query text, credentials or source grant.';
 commit;
