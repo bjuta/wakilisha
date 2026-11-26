@@ -1,3 +1,4 @@
+import {createCostRoutedDeskAnthropicPassV1,selectCostEffectiveDeskModelV1,type DeskModelCandidateV1,type DeskAnthropicOptionsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-source-interpreter-v1.mjs";
 import {createDeskNativeReaderV1,isPublicDeskIpv4V1} from "../../scripts/registry/agents/mizizi/runtime/desk-native-reader-v1";
@@ -1536,5 +1537,154 @@ describe("MIZIZI guarded browser fallback",()=>{
   expect(transport.mock.calls[0][1].redirect).toBe("error");
   expect(transport.mock.calls[1][0]).toBe(endpoint+"/"+EVENT);
   expect(provider.accountFingerprint).not.toContain(token);
+ });
+});
+
+
+describe("MIZIZI cost-routed autonomous application tool research",()=>{
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+300000).toISOString()};
+ const question="Who performed on this historical Nairobi recording?";
+ const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:question};
+ const expiry=new Date(NOW+240000).toISOString();
+ const leadId="66666666-6666-4666-8666-666666666666";
+ const candidate=(family:DeskModelCandidateV1["family"],input:number,output:number,
+  patch:Partial<DeskModelCandidateV1>={}):DeskModelCandidateV1=>({
+  model:"fixture-"+family,family,active:true,toolUse:true,structuredOutput:true,vision:true,
+  ordinaryToolTranscript:true,qualityGateRef:"eval:desk-research-v1",pricingRef:"pricing:fixture-"+family,
+  maxInputTokens:100000,maxOutputTokens:4000,worstCaseInputMicrousdPerMillion:input,
+  worstCaseOutputMicrousdPerMillion:output,validUntil:expiry,...patch});
+ const models=[candidate("opus",4000000,20000000),candidate("sonnet",2000000,10000000),
+  candidate("haiku",100000,500000),candidate("fable",8000000,40000000)];
+ const requirement={tier:"routine" as const,needsVision:false,inputTokenCeiling:5000,
+  maximumCostMicrousd:6000,assessmentRef:"policy:routine-eval"};
+ const evidence={source:{sourceId:EVENT,caseId:CASE,workspaceId:WORKSPACE,
+  originKey:"archive:original-publication",lineageKey:"archive:primary-origin",
+  fingerprint:"a".repeat(64),authorityRef:"contract:fixture-retention-disclosure",
+  useBasis:"documented_contract" as const,observedAt:new Date(NOW-60000).toISOString(),
+  expiresAt:null,revokedAt:null,privateResearchAllowed:true,
+  privateEvidenceRetentionAllowed:true,externalModelProcessingAllowed:true},
+  excerpt:"The archive credits an ensemble but the exact recording personnel are uncertain.",
+  citation:"https://archive.org/details/kenyan-music"};
+ const conclusion={hypotheses:[{statement:"The ensemble is documented but personnel remain uncertain.",
+  sourceIds:[EVENT],interpretation:"supported",uncertainty:.8,
+  reasoningSummary:"The archive gives ensemble credit, not individual confirmation."}],
+  leads:[],passFinding:"The original publication supports only a provisional ensemble credit.",
+  requestedDisposition:"conclude"};
+ const nextTool=(name:string,input:Record<string,unknown>,id:string)=>({
+  model:"fixture-haiku",stop_reason:"tool_use",content:[{type:"tool_use",id,name,input}],
+  usage:{input_tokens:500,output_tokens:100}});
+ const final=(analysis=conclusion)=>({model:"fixture-haiku",stop_reason:"end_turn",
+  content:[{type:"text",text:JSON.stringify(analysis)}],usage:{input_tokens:500,output_tokens:100}});
+ const providerResponse=(value:unknown)=>new Response(JSON.stringify(value),{headers:{"content-type":"application/json"}});
+ function fixture(){
+  const replies=[nextTool("search_web",{query:"Nairobi recording archive"},"toolu_search"),
+   nextTool("read_page",{lead_id:leadId},"toolu_read"),final()];
+  const send=vi.fn(async(_url:string,_init:RequestInit)=>providerResponse(replies.shift()));
+  const authorizeEnvelope=vi.fn(async(b:Parameters<DeskAnthropicOptionsV1["authorizeEnvelope"]>[0],body:string)=>{
+   expect(b.bodySha256).toBe(createHash("sha256").update(body).digest("hex"));
+   expect(JSON.parse(body).model).toBe(b.model);
+   return {requestSha256:b.requestSha256,policyRef:"policy:exact-envelope",validUntil:expiry,
+    modelDisclosureAllowed:true as const};
+  });
+  const quote=vi.fn(async(b:Parameters<DeskAnthropicOptionsV1["quote"]>[0])=>({
+   requestSha256:b.requestSha256,pricingRef:"pricing:fixture-haiku",maxInputTokens:5000,
+   maxOutputTokens:2500,maximumCostMicrousd:2000,validUntil:expiry}));
+  const reserve=vi.fn(async(b:Parameters<DeskAnthropicOptionsV1["reserve"]>[0],q:Parameters<DeskAnthropicOptionsV1["reserve"]>[1])=>({
+   reservationId:[JOB,CASE,RECEIPT,WORKSPACE,EVENT][b.round-1],requestSha256:b.requestSha256,
+   pricingRef:q.pricingRef,maximumCostMicrousd:q.maximumCostMicrousd,validUntil:expiry}));
+  const consume=vi.fn(async()=>true),recordModelEvent=vi.fn(async(_event:unknown)=>{});
+  const authorizeTool=vi.fn(async()=>true);
+  const executeTool=vi.fn(async(_s:unknown,c:Parameters<DeskAnthropicOptionsV1["executeTool"]>[1])=>
+   c.name==="search_web"?{receiptId:RECEIPT,leads:[{id:leadId,kind:"reference" as const,label:"Original archive"}],sources:[]}:
+   {receiptId:WORKSPACE,leads:[],sources:[evidence]});
+  const verifyToolReceipt=vi.fn(async()=>true),authorizeSource=vi.fn(async()=>true);
+  const config={scope,anthropic:{apiKey:"fixture-only-key",transport:send as unknown as typeof fetch},
+   enabledTools:["search_web","read_page"] as const,readModelInventory:async()=>models,
+   assessRequirement:async()=>requirement,authorizeEnvelope,quote,reserve,consume,
+   recordModelEvent,authorizeTool,executeTool,verifyToolReceipt,authorizeSource,now:()=>NOW};
+  return {config,send,replies,authorizeEnvelope,quote,reserve,consume,recordModelEvent,
+   authorizeTool,executeTool,verifyToolReceipt,authorizeSource};
+ }
+ it("selects the cheapest currently qualified model and never treats price as quality authority",()=>{
+  expect(selectCostEffectiveDeskModelV1(models,requirement,NOW).family).toBe("haiku");
+  const complex={...requirement,tier:"complex" as const,maximumCostMicrousd:100000};
+  expect(selectCostEffectiveDeskModelV1(models,complex,NOW).family).toBe("sonnet");
+  expect(selectCostEffectiveDeskModelV1(models,{...complex,tier:"exceptional"},NOW).family).toBe("opus");
+  const ineligible=[candidate("haiku",1,1,{qualityGateRef:""}),candidate("haiku",1,1,{vision:false}),
+   candidate("haiku",1,1,{validUntil:new Date(NOW-1).toISOString()}),models[1]];
+  expect(selectCostEffectiveDeskModelV1(ineligible,{...complex,tier:"routine",needsVision:true},NOW).family).toBe("sonnet");
+  expect(()=>selectCostEffectiveDeskModelV1(models,{...requirement,maximumCostMicrousd:1},NOW))
+   .toThrow("NO_AFFORDABLE_CAPABLE_MODEL");
+  expect(()=>selectCostEffectiveDeskModelV1([candidate("opus",1,1)],requirement,NOW))
+   .toThrow("NO_AFFORDABLE_CAPABLE_MODEL");
+ });
+ it("executes iterative search and read tools, persists a metered independently verified pass through the existing engine",async()=>{
+  const h=fixture(),prepareDeskPass=createCostRoutedDeskAnthropicPassV1(h.config);
+  const passes:InvestigationPassV1[]=[];
+  const legacy=vi.fn(async()=>{throw Error("legacy path denied");});
+  const out=await runAdaptiveInvestigationV1({identity,prepareDeskPass,
+   store:{read:async()=>[...passes],append:async(_id,_n,_p,pass)=>{passes.push(pass);}},
+   readSources:legacy,analyze:legacy,authorizeModelProcessing:async()=>true,
+   verifyFinding:async()=>({verified:false,verificationRef:null}),maxNewPasses:1,
+   maxTotalPasses:20,costBudgetUnits:20,now:()=>NOW});
+  expect(out).toMatchObject({passesAdded:1,disposition:"paused"});
+  expect(legacy).not.toHaveBeenCalled();
+  expect(h.send).toHaveBeenCalledTimes(3);
+  expect(h.executeTool.mock.calls.map(c=>c[1].name)).toEqual(["search_web","read_page"]);
+  expect(h.verifyToolReceipt).toHaveBeenCalledTimes(2);
+  expect(h.consume).toHaveBeenCalledTimes(3);
+  for(let i=0;i<3;i++){
+   expect(h.consume.mock.invocationCallOrder[i]).toBeLessThan(h.send.mock.invocationCallOrder[i]);
+   const [url,req]=h.send.mock.calls[i];const body=JSON.parse(String(req.body));
+   expect(url).toBe("https://api.anthropic.com/v1/messages");
+   expect(req.redirect).toBe("error");expect(body.model).toBe("fixture-haiku");
+   expect(String(req.body)).not.toContain("fixture-only-key");
+  }
+  expect(String(h.send.mock.calls[0][1].body)).not.toContain(evidence.excerpt);
+  expect(String(h.send.mock.calls[2][1].body)).toContain(evidence.excerpt);
+  expect(passes[0]).toMatchObject({modelVersion:"fixture-haiku",costUnits:3,
+   sourceReceipts:[{sourceId:EVENT,modelDisclosed:true}],
+   findings:[{interpretation:"hypothesis",independentlyVerified:false}]});
+  expect(h.recordModelEvent.mock.calls.map(c=>(c[0] as {state:string}).state))
+   .toEqual(["send_pending","response_metered","send_pending","response_metered","send_pending","response_metered"]);
+ });
+ it("denies envelope authority, underquoted prices, cumulative pass overspend and unaffordable selection before the next call",async()=>{
+  const denied=fixture();denied.authorizeEnvelope.mockResolvedValueOnce(null as never);
+  await expect(createCostRoutedDeskAnthropicPassV1(denied.config)(identity,question,[])).rejects.toThrow("ENVELOPE_DISCLOSURE_DENIED");
+  expect(denied.send).not.toHaveBeenCalled();
+  const under=fixture();under.quote.mockImplementationOnce(async b=>({...await fixture().quote(b),maximumCostMicrousd:1}));
+  await expect(createCostRoutedDeskAnthropicPassV1(under.config)(identity,question,[])).rejects.toThrow("COST_QUOTE_UNCONFIRMED");
+  expect(under.send).not.toHaveBeenCalled();
+  const cap=fixture();
+  await expect(createCostRoutedDeskAnthropicPassV1({...cap.config,assessRequirement:async()=>({...requirement,maximumCostMicrousd:3000})})(identity,question,[]))
+   .rejects.toThrow("COST_QUOTE_UNCONFIRMED");
+  expect(cap.send).toHaveBeenCalledTimes(1);
+  expect(cap.reserve).toHaveBeenCalledTimes(1);
+  const noModel=fixture();
+  await expect(createCostRoutedDeskAnthropicPassV1({...noModel.config,assessRequirement:async()=>({...requirement,maximumCostMicrousd:1})})(identity,question,[]))
+   .rejects.toThrow("NO_AFFORDABLE_CAPABLE_MODEL");
+  expect(noModel.send).not.toHaveBeenCalled();
+ });
+ it("rejects unknown tools, forged lead IDs, unconfirmed custody, and revoked source authority without disclosing evidence",async()=>{
+  const unknown=fixture();unknown.replies[0]=nextTool("execute_sql",{query:"unsafe"},"toolu_bad");
+  await expect(createCostRoutedDeskAnthropicPassV1(unknown.config)(identity,question,[])).rejects.toThrow("UNKNOWN_TOOL");
+  expect(unknown.executeTool).not.toHaveBeenCalled();
+  const forged=fixture();forged.replies[0]=nextTool("read_page",{lead_id:leadId},"toolu_bad");
+  await expect(createCostRoutedDeskAnthropicPassV1(forged.config)(identity,question,[])).rejects.toThrow("UNOBSERVED_LEAD");
+  expect(forged.executeTool).not.toHaveBeenCalled();
+  const custody=fixture();custody.verifyToolReceipt.mockResolvedValueOnce(false);
+  await expect(createCostRoutedDeskAnthropicPassV1(custody.config)(identity,question,[])).rejects.toThrow("DURABLE_TOOL_RECEIPT_DENIED");
+  expect(custody.send).toHaveBeenCalledTimes(1);
+  const source=fixture();source.authorizeSource.mockResolvedValueOnce(false);
+  await expect(createCostRoutedDeskAnthropicPassV1(source.config)(identity,question,[])).rejects.toThrow("SOURCE_DISCLOSURE_DENIED");
+  expect(source.send).toHaveBeenCalledTimes(2);
+  expect(JSON.stringify(source.send.mock.calls)).not.toContain(evidence.excerpt);
+ });
+ it("does not retry, change models, or erase an ambiguous paid request",async()=>{
+  const h=fixture();h.send.mockRejectedValueOnce(Error("timeout"));
+  await expect(createCostRoutedDeskAnthropicPassV1(h.config)(identity,question,[])).rejects.toThrow("MODEL_RESPONSE_UNCONFIRMED");
+  expect(h.send).toHaveBeenCalledTimes(1);expect(h.consume).toHaveBeenCalledTimes(1);
+  expect(h.recordModelEvent.mock.calls.at(-1)?.[0]).toMatchObject({state:"response_unconfirmed"});
  });
 });

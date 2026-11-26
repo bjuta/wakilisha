@@ -55,7 +55,7 @@ export type DeskToolResultV1=Readonly<{
 }>;
 type ToolReceiptBinding=Readonly<{callSha256:string;resultSha256:string;receiptId:string}>;
 type EnvelopeBinding=Readonly<{scope:DeskSearchScopeV1;question:string;model:string;round:number;
- requestSha256:string;requestBytes:number;maxOutputTokens:number;
+ requestSha256:string;bodySha256:string;credentialSha256:string;requestBytes:number;maxOutputTokens:number;
  sourceIds:readonly string[];toolReceipts:readonly ToolReceiptBinding[]}>;
 type Grant=Readonly<{requestSha256:string;policyRef:string;validUntil:string;modelDisclosureAllowed:true}>;
 type Quote=Readonly<{requestSha256:string;pricingRef:string;maxInputTokens:number;
@@ -232,6 +232,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
   fail("TRUSTED_CONFIGURATION_REQUIRED");
  const boundScope=Object.freeze({...scope}),model=config.model,apiKey=config.apiKey,
   workspace=config.workspaceId,send=config.transport??fetch,now=options.now??Date.now;
+ const credentialSha256=hash(JSON.stringify(["mizizi:anthropic:credential:v1",workspace??null,apiKey]));
  const enabled=new Set(options.enabledTools),tools=TOOL_SPECS.filter(t=>enabled.has(t[0]))
   .map(([name,description,properties])=>({name,description,strict:true,input_schema:schema(properties)}));
  const promptFingerprint=hash(JSON.stringify({system:PROMPT,tools,schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}));
@@ -263,8 +264,10 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     output_config:{format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}},messages});
    const requestBytes=Buffer.byteLength(body,"utf8");
    if(requestBytes>MAX_ENVELOPE)fail("ENVELOPE_BOUND");
+   const bodySha256=hash(body);
    const binding:EnvelopeBinding=Object.freeze({scope:boundScope,question,model,round,
-    requestSha256:hash(body),requestBytes,maxOutputTokens:MAX_OUTPUT,
+    requestSha256:hash(JSON.stringify({scope:boundScope,round,credentialSha256,bodySha256})),
+    bodySha256,credentialSha256,requestBytes,maxOutputTokens:MAX_OUTPUT,
     sourceIds:Object.freeze([...sources.keys()]),toolReceipts:Object.freeze([...receipts])});
    const approved=(g:Grant|null):g is Grant=>!!g&&g.requestSha256===binding.requestSha256&&
     text(g.policyRef,200,8)&&g.modelDisclosureAllowed===true&&expires(g.validUntil);
