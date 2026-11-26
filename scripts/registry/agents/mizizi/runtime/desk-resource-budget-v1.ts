@@ -129,7 +129,7 @@ export function createDeskResourceBudgetV1({rpc,now=Date.now}:Readonly<{rpc:Work
      fail("BROWSER_BINDING_DENIED");
     const d:Binding={scope:b.scope,resource:"cloudflare_browser_run",accountFingerprint,model:null,requestSha256:digest};
     const q=await quote(d);if(!q)return null;
-    const r=await reserve(d,q);return r?{...r,provider:"cloudflare_browser_run",seconds:120}:null;
+    const r=await reserve(d,q);return r?{...r,provider:"cloudflare_browser_run",seconds:120,maximumIncrementalCostMicrousd:0}:null;
    },
    consume:(r:ResourceReservation)=>consume(r,accountFingerprint),
    recordLifecycle:(e:Readonly<{reservationId:string;requestSha256:string;state:string;sessionId?:string}>)=>

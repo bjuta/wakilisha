@@ -1743,7 +1743,7 @@ describe("MIZIZI durable resource finance adapters",()=>{
   const b={scope,accountFingerprint:account,reserveSeconds:120,url:"https://archive.org/item"};
   const browser=h.budget.browserFinance(account),digest=hash(JSON.stringify(b));
   const reservation=await browser.reserve(b,digest,{});
-  expect(reservation).toMatchObject({provider:"cloudflare_browser_run",seconds:120,maximumCostMicrousd:0});
+  expect(reservation).toMatchObject({provider:"cloudflare_browser_run",seconds:120,maximumCostMicrousd:0,maximumIncrementalCostMicrousd:0});
   await expect(browser.consume(reservation!)).resolves.toBe(true);
   await browser.recordLifecycle({reservationId:EVENT,requestSha256:digest,state:"open_pending"});
   expect(h.calls.filter(c=>c.fn==="mizizi_reserve_desk_resource_v1").map(c=>c.args.p_expected_units)).toEqual([2000000,120]);
