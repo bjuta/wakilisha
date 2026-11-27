@@ -1,4 +1,4 @@
-name: MIZIZI Source First Focused Acceptance
+name: MIZIZI Discovery Failure Focused Acceptance
 on:
   push:
     branches:
@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 303ee72a5f7a7a89ad75690350995d34b2c4b28d
+          ref: 9355b51a7bcac2628a87c516482bb0155afbacad
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -25,7 +25,7 @@ jobs:
       - name: Exact offline runtime and worker checks
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 303ee72a5f7a7a89ad75690350995d34b2c4b28d
+          test "$(git rev-parse HEAD)" = 9355b51a7bcac2628a87c516482bb0155afbacad
           test -z "$(printenv MIZIZI_PREVIEW_OPERATOR_JWT || true)"
           test -z "$(printenv MIZIZI_PREVIEW_SERVICE_ROLE_KEY || true)"
           test -z "$(printenv MIZIZI_PREVIEW_JIT_DATABASE_URL || true)"
