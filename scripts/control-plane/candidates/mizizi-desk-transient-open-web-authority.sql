@@ -190,7 +190,7 @@ declare c jsonb;b jsonb;d jsonb;u text;h text;urlhash text;
  p mizizi_private.desk_access_policy_versions_v1;
  custody mizizi_private.desk_custody_policy_versions_v1;
  expiry timestamptz;o mizizi_private.desk_operational_policy_versions_v1;callhash text;hophash text;
- transient_access boolean:=false; custody_revision integer;
+ transient_access boolean:=false; bound_custody_revision integer;
 begin
  if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service-role required' using errcode='42501';end if;
  if p_binding_text is null or octet_length(p_binding_text) not between 1 and 8192
@@ -230,10 +230,15 @@ begin
  -- Explicit access decisions take precedence; no legacy grant is rewritten.
  transient_access:=coalesce(mizizi_private.desk_operational_policy_live_v1(o,c)
   and o.public_web_transient_allowed and p.revision is null
+  and split_part(u,'?',1) ~ '^https://[a-z0-9.-]+(/[A-Za-z0-9_./~%:-]*)?$'
+  and split_part(u,'?',1) !~* '%(2e|2f|5c|25)'
+  and split_part(u,'?',1) !~ '/[.]{1,2}(/|$)'
+  and h not in ('api.gdeltproject.org','api.tavily.com')
   and p_operation in ('native_acquire','native_text','browser_request','browser_render','browser_text')
   and not (p_operation='browser_render' and d->'visual'='true'::jsonb)
   and (custody.revision is null or (custody.enabled and custody.private_research_allowed
-   and custody.valid_until>clock_timestamp())),false);
+   and custody.valid_until>clock_timestamp()
+   and (p_operation not in ('browser_request','browser_render','browser_text') or custody.browser_render_allowed))),false);
  if not transient_access then
   if not mizizi_private.desk_custody_policy_live_v1(custody) or custody.source_family<>'public_web' then return null;end if;
   if p_operation in ('browser_text','browser_visual','browser_render','browser_request') and not custody.browser_render_allowed then return null;end if;
@@ -242,7 +247,7 @@ begin
   if (p.revision is null and o.revision is null)
    or (p.revision is not null and (not p.enabled or p.custody_revision is distinct from custody.revision)) then return null;end if;
  end if;
- custody_revision:=case when transient_access then null else custody.revision end;
+ bound_custody_revision:=case when transient_access then null else custody.revision end;
  if o.revision is not null then
   if not mizizi_private.desk_operational_policy_live_v1(o,c)
    or (not transient_access and not mizizi_private.desk_operational_url_allowed_v1(o,h,u,p_operation,custody.revision))
@@ -260,18 +265,18 @@ begin
    call_sha256,operation,binding_sha256,standing_revision,host,url_sha256,custody_revision,exact_revision,
    hop_sha256,source_sha256,page_start,page_end,valid_until)
   values((p_scope->>'jobId')::uuid,(c->>'caseId')::uuid,(c->>'workspaceId')::uuid,p_scope->>'workerId',
-   (p_scope->>'leaseExpiresAt')::timestamptz,callhash,p_operation,p_binding_sha256,o.revision,h,urlhash,custody_revision,p.revision,
+   (p_scope->>'leaseExpiresAt')::timestamptz,callhash,p_operation,p_binding_sha256,o.revision,h,urlhash,bound_custody_revision,p.revision,
    hophash,d->>'sha256',case when p_operation='native_text' then (d->>'pageStart')::integer end,
    case when p_operation='native_text' then (d->>'pageEnd')::integer end,expiry)
   on conflict do nothing;
   if not exists(select 1 from mizizi_private.desk_operational_call_proofs_v1 q where q.job_id=(p_scope->>'jobId')::uuid
    and q.lease_expires_at=(p_scope->>'leaseExpiresAt')::timestamptz and q.operation=p_operation
    and q.binding_sha256=p_binding_sha256 and q.standing_revision=o.revision and q.exact_revision is not distinct from p.revision
-   and q.custody_revision is not distinct from custody_revision
+   and q.custody_revision is not distinct from bound_custody_revision
    and q.valid_until>clock_timestamp()) then return null;end if;
  end if;
  return jsonb_build_object('operation',p_operation,'bindingSha256',p_binding_sha256,'urlSha256',urlhash,
-  'policyRef','desk-access:'||urlhash||':'||p_operation||':'||coalesce(p.revision,0)::text||':'||coalesce(custody_revision::text,'transient')||
+  'policyRef','desk-access:'||urlhash||':'||p_operation||':'||coalesce(p.revision,0)::text||':'||coalesce(bound_custody_revision::text,'transient')||
    case when o.revision is null then '' else ':standing:'||o.revision::text end,
   'validUntil',expiry,'allowed',true);
 end $function$;
@@ -310,7 +315,8 @@ begin
    if not o.public_web_transient_allowed or g.exact_revision is not null
     or g.operation not in ('native_acquire','native_text','browser_request','browser_render','browser_text')
     or (cp.revision is not null and (not cp.enabled or not cp.private_research_allowed
-      or cp.valid_until<=clock_timestamp())) then return false;end if;
+      or cp.valid_until<=clock_timestamp()
+      or (g.operation in ('browser_request','browser_render','browser_text') and not cp.browser_render_allowed))) then return false;end if;
   elsif not mizizi_private.desk_custody_policy_live_v1(cp)
    or cp.revision is distinct from g.custody_revision then return false;end if;
   select * into p from mizizi_private.desk_access_policy_versions_v1
