@@ -106,6 +106,62 @@ function imageDescriptor(v:{body:Uint8Array;sha256:string;width:number;height:nu
    fail("VISUAL_DIGEST_DENIED");
  return {sha256:v.sha256,width:v.width,height:v.height,byteLength:v.byteLength};
 }
+/** Separate original-note projection. Never relabel a note as a source excerpt
+ * or treat readback as permission to transmit it to an external model. */
+export type DeskFactualNoteV1=Readonly<{
+ noteId:string;noteSha256:string;reviewRevision:number;caseId:string;workspaceId:string;
+ expectedRevision:number;membershipSha256:string;observationSha256:string;authorId:string;reviewerId:string;
+ fieldKey:string;noteKind:string;consultationMethod:string;sourceLocator:string;noteText:string;
+ noteTextSha256:string;locatorSha256:string;observedAt:string;reviewRef:string;validUntil:string;
+ representation:"original_factual_note";verified:false;modelUseEligible:true;
+}>;
+export async function readDeskFactualNotesV1(rpc:WorkerRpc,scope:DeskSearchScopeV1,
+ subject:Readonly<{membershipSha256:string;observationSha256:string}>,now=Date.now){
+ const failNote=()=>fail("FACTUAL_NOTE_READBACK_DENIED");
+ const shape=(v:unknown,keys:readonly string[]):v is Record<string,unknown>=>!!v&&typeof v==="object"&&!Array.isArray(v)&&
+  Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
+ const live=()=>Number.isFinite(Date.parse(scope.leaseExpiresAt))&&Date.parse(scope.leaseExpiresAt)>now();
+ if(!shape(scope,scopeKeys)||![scope.jobId,scope.caseId,scope.workspaceId].every(x=>UUID.test(x))||
+  !/^mizizi-chart:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(scope.workerId)||
+  !Number.isSafeInteger(scope.expectedRevision)||scope.expectedRevision<1||!live()||
+  !subject||!SHA.test(subject.membershipSha256)||!SHA.test(subject.observationSha256))failNote();
+ const r=await rpc("mizizi_read_desk_factual_notes_v1",{p_scope:scope});
+ if(!live()||r.error||!shape(r.data,["bodyText","bodySha256"]))return failNote();
+ const packet=r.data;
+ if(typeof packet.bodyText!=="string"||Buffer.byteLength(packet.bodyText)>128000||
+  typeof packet.bodySha256!=="string"||hash(packet.bodyText)!==packet.bodySha256)return failNote();
+ let b:unknown;try{b=JSON.parse(packet.bodyText);}catch{return failNote();}
+ if(!shape(b,["contract","scope","membershipSha256","observationSha256","notes"])||
+  b.contract!=="mizizi.desk_factual_note_readback.v1"||!shape(b.scope,scopeKeys)||
+  scopeKeys.some(k=>b.scope[k]!==scope[k])||
+  b.membershipSha256!==subject.membershipSha256||b.observationSha256!==subject.observationSha256||
+  !Array.isArray(b.notes)||b.notes.length>12)return failNote();
+ const seen=new Set<string>(),notes:DeskFactualNoteV1[]=[];
+ for(const n of b.notes){
+  if(!shape(n,["noteId","noteSha256","reviewRevision","caseId","workspaceId","expectedRevision","membershipSha256",
+   "observationSha256","authorId","reviewerId","fieldKey","noteKind","consultationMethod","sourceLocator","noteText",
+   "noteTextSha256","locatorSha256","observedAt","reviewRef","validUntil","representation","verified","modelUseEligible"]))
+   return failNote();
+  const x=n as unknown as DeskFactualNoteV1;
+  if(![x.noteId,x.authorId,x.reviewerId].every(v=>typeof v==="string"&&UUID.test(v))||
+   x.authorId===x.reviewerId||seen.has(x.noteId)||typeof x.noteSha256!=="string"||!SHA.test(x.noteSha256)||
+   !Number.isSafeInteger(x.reviewRevision)||x.reviewRevision<1||x.caseId!==scope.caseId||x.workspaceId!==scope.workspaceId||
+   x.expectedRevision!==scope.expectedRevision||x.membershipSha256!==subject.membershipSha256||
+   x.observationSha256!==subject.observationSha256||
+   !["subject_version","release_date","performer","composition_credits","recording_production","label_distribution"].includes(x.fieldKey)||
+   !["direct_observation","attributed_claim","inference"].includes(x.noteKind)||
+   !["manual_public_consultation","manual_first_party_consultation"].includes(x.consultationMethod)||
+   !text(x.noteText,1200,8)||!text(x.sourceLocator,1000,12)||!/^https:\/\/[a-z0-9.-]+\/[A-Za-z0-9_./~%-]+$/.test(x.sourceLocator)||
+   /\/[.]{1,2}(\/|$)|%(2e|2f|5c|25|00)/i.test(x.sourceLocator)||
+   hash(x.noteText)!==x.noteTextSha256||hash(x.sourceLocator)!==x.locatorSha256||
+   !text(x.reviewRef,500,8)||typeof x.observedAt!=="string"||!Number.isFinite(Date.parse(x.observedAt))||
+   Date.parse(x.observedAt)>now()||typeof x.validUntil!=="string"||!Number.isFinite(Date.parse(x.validUntil))||
+   Date.parse(x.validUntil)<=now()||Date.parse(x.validUntil)>Date.parse(scope.leaseExpiresAt)||
+   x.representation!=="original_factual_note"||x.verified!==false||x.modelUseEligible!==true)return failNote();
+  seen.add(x.noteId);notes.push(Object.freeze({...x}));
+ }
+ return Object.freeze({bodySha256:packet.bodySha256,notes:Object.freeze(notes)});
+}
 export function createDeskResearchDispatcherV1(options:Options){
  const now=options?.now??Date.now,s=options?.scope;
  if(!s||![s.jobId,s.caseId,s.workspaceId].every(x=>UUID.test(x))||

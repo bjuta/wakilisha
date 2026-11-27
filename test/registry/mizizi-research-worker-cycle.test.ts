@@ -1,7 +1,7 @@
 import {discoverMusicBrainzCoreCohortV1,discoverQualifiedMusicBrainzCoreCohortV1} from "../../scripts/registry/agents/mizizi/runtime/musicbrainz-core-cohort-v1.mjs";
 import {runDeskDiscoveryOnlyPassV1} from "../../scripts/registry/agents/mizizi/runtime/desk-discovery-only-pass-v1";
 import {guardDeskResearchPassStoreV1} from "../../scripts/registry/agents/mizizi/runtime/leased-research-pass-store-v1";
-import {createDeskResearchDispatcherV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-dispatcher-v1";
+import {createDeskResearchDispatcherV1,readDeskFactualNotesV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-dispatcher-v1";
 import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/runtime/desk-resource-budget-v1";
 import {createDurableDeskModelAuthorityV1,createCostRoutedDeskAnthropicPassV1,selectCostEffectiveDeskModelV1,type DeskModelCandidateV1,type DeskAnthropicOptionsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
@@ -68,6 +68,45 @@ function harness(overrides:{claimed?:unknown;recovered?:unknown;
 const cycle=(rpc:WorkerRpc,handler:()=>Promise<any>=async()=>finding,
  extra:Record<string,unknown>={})=>
  runResearchWorkerCycleV1({rpc,research:handler,workerId:"scoped-worker",now:()=>NOW,...extra});
+
+describe("MIZIZI original factual-note readback",()=>{
+ const hash=(v:string)=>createHash("sha256").update(v).digest("hex");
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  workerId:"mizizi-chart:"+EVENT,leaseExpiresAt:new Date(NOW+300000).toISOString()};
+ const subject={membershipSha256:"a".repeat(64),observationSha256:"b".repeat(64)};
+ const noteText="The listing identifies a release year but the original recording date remains unresolved.";
+ const sourceLocator="https://example.org/fixture/release";
+ const note={noteId:RECEIPT,noteSha256:"c".repeat(64),reviewRevision:2,caseId:CASE,workspaceId:WORKSPACE,
+  expectedRevision:2,...subject,authorId:JOB,reviewerId:EVENT,fieldKey:"release_date",noteKind:"attributed_claim",
+  consultationMethod:"manual_public_consultation",sourceLocator,noteText,noteTextSha256:hash(noteText),
+  locatorSha256:hash(sourceLocator),observedAt:new Date(NOW-1000).toISOString(),reviewRef:"fixture:note-review",
+  validUntil:new Date(NOW+60000).toISOString(),representation:"original_factual_note",verified:false,modelUseEligible:true};
+ const body={contract:"mizizi.desk_factual_note_readback.v1",scope,...subject,notes:[note]};
+ const packet=(value:unknown)=>{const bodyText=JSON.stringify(value);return {bodyText,bodySha256:hash(bodyText)};};
+ it("reads only the exact independently reviewed note, distinct from an excerpt",async()=>{
+  const rpc:WorkerRpc=vi.fn(async()=>({data:packet(body),error:null}));
+  const result=await readDeskFactualNotesV1(rpc,scope,subject,()=>NOW);
+  expect(rpc).toHaveBeenCalledWith("mizizi_read_desk_factual_notes_v1",{p_scope:scope});
+  expect(result.notes).toEqual([note]);expect(result.notes[0]).not.toHaveProperty("excerpt");
+  expect(result.notes[0]).not.toHaveProperty("sourceId");
+  expect(Object.isFrozen(result.notes[0])).toBe(true);
+ });
+ it("rejects tampering, stale/foreign bindings, self-review, false verification and private or expired notes",async()=>{
+  const variants=[{...body,scope:{...scope,caseId:EVENT}},{...body,observationSha256:"d".repeat(64)},
+   ...[{noteText:"Tampered note"},{sourceLocator:"https://example.org/fixture?token=secret"},{authorId:EVENT},
+    {verified:true},{modelUseEligible:false},{validUntil:new Date(NOW-1).toISOString()},
+    {caseId:EVENT},{expectedRevision:1},{representation:"native_response_bytes"}].map(p=>({...body,notes:[{...note,...p}]})),
+   {...body,notes:[note,note]}];
+  for(const v of variants){
+   const rpc:WorkerRpc=async()=>({data:packet(v),error:null});
+   await expect(readDeskFactualNotesV1(rpc,scope,subject,()=>NOW)).rejects.toThrow("FACTUAL_NOTE_READBACK_DENIED");
+  }
+  const bad:WorkerRpc=async()=>({data:{...packet(body),bodySha256:"f".repeat(64)},error:null});
+  await expect(readDeskFactualNotesV1(bad,scope,subject,()=>NOW)).rejects.toThrow("FACTUAL_NOTE_READBACK_DENIED");
+  const withdrawn:WorkerRpc=async()=>({data:packet({...body,notes:[]}),error:null});
+  expect((await readDeskFactualNotesV1(withdrawn,scope,subject,()=>NOW)).notes).toEqual([]);
+ });
+});
 
 describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
  it("runs recover, claim and completion, forwarding only validated research fields",async()=>{
