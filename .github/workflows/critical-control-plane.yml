@@ -87,6 +87,7 @@ jobs:
         run: |
           npx vitest run \
             test/registry/mizizi-headquarters-shared-job-adapter.test.ts \
+            test/registry/mizizi-chart-calibration-flow.test.ts \
             test/registry/mizizi-research-worker-cycle.test.ts
 
       - name: Enforce MIZIZI review-to-case/research and operator Data API contracts
