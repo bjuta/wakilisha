@@ -40,6 +40,13 @@ export type InvestigationIdentityV1=Readonly<{
  caseId:string;workspaceId:string;openingQuestion:string;
 }>;
 export type DeskBatchReceiptV1=Readonly<{reservationId:string;bodySha256:string;resultSha256:string}>;
+// Only bounded availability failures from the trusted native transport.
+// Permission, custody, finance, identity and ambiguous model errors are not
+// eligible. This is a diagnostic, never a source or retry authorization.
+export type DeskAvailabilityFailureV1=`MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_${404|408|410|429|500|502|503|504}`;
+export function isDeskAvailabilityFailureV1(value:unknown):value is DeskAvailabilityFailureV1{
+ return typeof value==="string"&&/^MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_(404|408|410|429|500|502|503|504)$/.test(value);
+}
 export type InvestigationPassV1=Readonly<{
  contract:typeof ADAPTIVE_INVESTIGATION_CONTRACT;
  caseId:string;workspaceId:string;ordinal:number;question:string;
@@ -55,6 +62,8 @@ export type InvestigationPassV1=Readonly<{
  }>[];
  deskToolReceipts?:readonly Readonly<{receiptId:string;callSha256:string;resultSha256:string}>[];
  deskBatchReceipt?:DeskBatchReceiptV1;
+ /** Trustworthy runtime diagnostic, not model analysis or source evidence. */
+ interruptionCode?:DeskAvailabilityFailureV1;
  findings:readonly VerifiedClaimV1[];
  passFinding:string;proposedLeads:readonly ResearchLeadV1[];
  decision:PassDecisionV1;
@@ -79,7 +88,8 @@ export type InvestigationAnalystV1=(
 export type PreparedDeskPassV1=Readonly<{
  sources:readonly SourceExcerptV1[];analysis:ResearchAnalysisV1;costUnits:number;
  /** Explicit zero-inference discovery pass, not an unmetered model response. */
- method?:"discovery_only";
+ method?:"discovery_only"|"interrupted";
+ interruptionCode?:DeskAvailabilityFailureV1;
  deskToolReceipts?:InvestigationPassV1["deskToolReceipts"];
  deskBatchReceipt?:DeskBatchReceiptV1;
 }>;
@@ -223,6 +233,13 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   const prepared=input.prepareDeskPass?
    await input.prepareDeskPass(identity,question,Object.freeze([...history])):null;
   const discoveryOnly=prepared?.method==="discovery_only";
+  const interrupted=prepared?.method==="interrupted";
+  if(interrupted?(!prepared||!isDeskAvailabilityFailureV1(prepared.interruptionCode)||
+   !prepared.deskToolReceipts?.length||prepared.deskBatchReceipt!==undefined||
+   prepared.analysis.modelVersion!=="mizizi.interrupted_desk_method.v1"||
+   prepared.analysis.hypotheses.length!==0||prepared.analysis.leads.length!==0||
+   prepared.analysis.requestedDisposition!=="pause"):
+   prepared?.interruptionCode!==undefined)throw Error("MIZIZI_DESK_INTERRUPTION_INVALID");
   if(discoveryOnly&&(!prepared||prepared.costUnits!==0||prepared.sources.length!==0||
    prepared.deskBatchReceipt!==undefined||prepared.deskToolReceipts?.length!==1||
    prepared.analysis.modelVersion!=="mizizi.deterministic_discovery_only.v1"||
@@ -308,9 +325,9 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    "mizizi.exhausted_evidence_method.v1";
   const analysis:ResearchAnalysisV1=prepared?{
    ...prepared.analysis,
-   ...(noEvidence&&!discoveryOnly?{hypotheses:[],passFinding:"No authorized evidence was located; absence cannot establish that a cultural claim is false.",
+   ...(noEvidence&&!discoveryOnly&&!interrupted?{hypotheses:[],passFinding:"No authorized evidence was located; absence cannot establish that a cultural claim is false.",
     requestedDisposition:"pause" as const}:{}),
-   ...(evidenceExhausted?{hypotheses:[],leads:[],passFinding:"No new independent source evidence; further interpretation paused.",
+   ...(evidenceExhausted&&!interrupted?{hypotheses:[],leads:[],passFinding:"No new independent source evidence; further interpretation paused.",
     requestedDisposition:"pause" as const}:{})
   }:noModel?{
    hypotheses:[],leads:[],
@@ -355,7 +372,12 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   const nextBudget=prepared?Math.max(0,remainingCost-prepared.costUnits):remainingCost;
   const next=prepared&&nextBudget<=0?null:selectLead(analysis.leads,history,question,nextBudget);
   let decision:PassDecisionV1;
-  if(analysis.requestedDisposition==="conclude"&&supported){
+  if(interrupted){
+   decision={action:"pause",nextQuestion:null,
+    rationale:"External availability interrupted the investigation; preserve confirmed receipts without attributing claims.",
+    revisitTrigger:"Independently confirmed available authorized research avenue; never replay a consumed request automatically."};
+   disposition="paused";
+  }else if(analysis.requestedDisposition==="conclude"&&supported){
    decision={action:"conclude",nextQuestion:null,
     rationale:"Independent claim verifier confirmed the bounded outcome.",
     revisitTrigger:null}; disposition="concluded";
@@ -402,6 +424,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     modelDisclosed:modelVisibleIds.has(a.sourceId.toLowerCase())&&(!noModel||!!prepared)})),
    ...(prepared?.deskToolReceipts!==undefined?{deskToolReceipts:prepared.deskToolReceipts}:{}),
    ...(prepared?.deskBatchReceipt!==undefined?{deskBatchReceipt:prepared.deskBatchReceipt}:{}),
+   ...(interrupted?{interruptionCode:prepared!.interruptionCode}:{}),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
    promptFingerprint:analysis.promptFingerprint,
@@ -413,6 +436,10 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    fingerprint:digest({...body,fingerprint:undefined})});
   await store.append(identity,pass.ordinal,previous,pass);
   history.push(pass);added++;
+  // Do not label an interrupted worker as succeeded merely because the
+  // independently checked partial pass was safely persisted. The existing
+  // failure lifecycle retains the bounded diagnostic and consumed costs.
+  if(interrupted)throw Error(prepared!.interruptionCode);
   if(decision.action!=="continue"||remainingCost<=0)break;
   question=decision.nextQuestion!;
  }

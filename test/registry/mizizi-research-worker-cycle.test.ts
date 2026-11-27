@@ -1770,6 +1770,32 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
    findings:[{interpretation:"hypothesis",independentlyVerified:false}]});
   expect(h.recordModelEvent.mock.calls.map(c=>(c[0] as {state:string}).state))
    .toEqual(["send_pending","response_metered","send_pending","response_metered","send_pending","response_metered"]);
+  // Interrupt after two independently admitted receipts. The partial pass
+  // must be journaled before the original failure, without invented claims,
+  // invented failure receipts, retry, or loss of measured inference.
+  for(const code of ["MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_429","MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_503","MIZIZI_DESK_TOOL_AUTHORITY_DENIED"]){
+   const f=fixture(),rows:InvestigationPassV1[]=[];
+   const execute=f.executeTool.getMockImplementation()!;
+   f.replies[2]=nextTool("search_web",{query:"Different archive query"},"toolu_retry_other");
+   f.executeTool.mockImplementation(async(s,c)=>{
+    if(c.input.query==="Different archive query")throw Error(code);
+    return execute(s,c);
+   });
+   const verify=vi.fn(async()=>({verified:false,verificationRef:null}));
+   await expect(runAdaptiveInvestigationV1({identity,prepareDeskPass:createCostRoutedDeskAnthropicPassV1(f.config),
+    store:{read:async()=>rows.slice(),append:async(_id,_n,_p,pass)=>{rows.push(pass);}},
+    readSources:legacy,analyze:legacy,authorizeModelProcessing:async()=>true,
+    verifyFinding:verify,maxNewPasses:1,maxTotalPasses:20,costBudgetUnits:20,now:()=>NOW})).rejects.toThrow(code);
+   expect(f.send).toHaveBeenCalledTimes(3);expect(f.executeTool).toHaveBeenCalledTimes(3);
+   expect(f.consume).toHaveBeenCalledTimes(3);expect(verify).not.toHaveBeenCalled();
+   if(code.endsWith("DENIED"))expect(rows).toHaveLength(0);
+   else{
+    expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({interruptionCode:code,
+     modelVersion:"mizizi.interrupted_desk_method.v1",costUnits:3,findings:[],proposedLeads:[],
+     decision:{action:"pause"},sourceReceipts:[{sourceId:EVENT,modelDisclosed:true}]});
+    expect(rows[0].deskToolReceipts).toHaveLength(2);expect(rows[0].passFinding).toContain(code);
+   }
+  }
  });
  it("requires both durable and host grants and rechecks exact envelope before transport",async()=>{
   const h=fixture();

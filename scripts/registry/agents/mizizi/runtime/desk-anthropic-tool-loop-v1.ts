@@ -5,7 +5,7 @@
  * search, fetch, computer or server tools; no retry or automatic model switch.
  */
 import {createHash} from "node:crypto";
-import {verifyInvestigationSourceV1,type DeskPassResearcherV1,type SourceExcerptV1,
+import {verifyInvestigationSourceV1,isDeskAvailabilityFailureV1,type DeskPassResearcherV1,type SourceExcerptV1,
  type ResearchAnalysisV1,type InvestigationIdentityV1} from "./adaptive-investigation-v1.ts";
 import {ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1,type AnthropicInvestigationOptionsV1}
  from "./anthropic-investigation-analyst-v1.ts";
@@ -567,7 +567,26 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    callHashes.add(callSha256);toolIds.add(block.id as string);
    if(await options.authorizeTool(boundScope,call,callSha256)!==true)fail("TOOL_AUTHORITY_DENIED");
    live();
-   const raw=await options.executeTool(boundScope,call,callSha256);live();
+   let raw:DeskToolResultV1;
+   try{raw=await options.executeTool(boundScope,call,callSha256);}
+   catch(error){
+    const code=error instanceof Error?error.message:null;
+    // No synthetic tool receipt or provider response. On a first failure
+    // the existing job/resource ledger is sufficient. After prior successful
+    // tool activity, all those receipts were in the metered current envelope.
+    // Preserve their exact dependency set; the engine rechecks custody and
+    // appends before propagating the original failure to the worker.
+    if(!receipts.length||!isDeskAvailabilityFailureV1(code)||
+     !["search_web","search_news","read_page"].includes(call.name))throw error;
+    live();await checkSources();live();
+    if(await options.authorizeTool(boundScope,call,callSha256)!==true)fail("TOOL_AUTHORITY_CHANGED");
+    return {method:"interrupted",interruptionCode:code,
+     sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),
+     analysis:{hypotheses:[],leads:[],passFinding:"Research interrupted by "+code+"; prior confirmed tool and source receipts preserved. Unresolved fields remain unresolved.",
+      requestedDisposition:"pause",modelVersion:"mizizi.interrupted_desk_method.v1",promptFingerprint},
+     costUnits:totalUnits};
+   }
+   live();
    if(!raw||!UUID.test(raw.receiptId)||receipts.some(r=>r.receiptId===raw.receiptId)||
      !Array.isArray(raw.leads)||!Array.isArray(raw.sources)||raw.leads.length>20||
      raw.sources.length>MAX_SOURCES)fail("TOOL_RESULT_INVALID");
