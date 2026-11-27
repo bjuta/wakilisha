@@ -1,4 +1,4 @@
-name: MIZIZI Membership Recovery Migration Mint
+name: MIZIZI Preview Runner Input Preflight
 on:
   push:
     branches:
@@ -6,22 +6,26 @@ on:
 permissions:
   contents: read
 jobs:
-  mint:
+  preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 4c53c894454e69d1d01bff9f777aaa0a4eb96565
-          persist-credentials: false
-      - uses: supabase/setup-cli@v1
-        with:
-          version: 2.107.0
-      - name: Mint forward recovery migration filename only
+      - name: Check required repository input presence only
+        env:
+          HAS_MIZIZI_PREVIEW_ANON_KEY: ${{ secrets.MIZIZI_PREVIEW_ANON_KEY != '' }}
+          HAS_MIZIZI_PREVIEW_SERVICE_ROLE_KEY: ${{ secrets.MIZIZI_PREVIEW_SERVICE_ROLE_KEY != '' }}
+          HAS_MIZIZI_PREVIEW_OPERATOR_JWT: ${{ secrets.MIZIZI_PREVIEW_OPERATOR_JWT != '' }}
+          HAS_MIZIZI_PREVIEW_JIT_DATABASE_URL: ${{ secrets.MIZIZI_PREVIEW_JIT_DATABASE_URL != '' }}
+          HAS_MIZIZI_PREVIEW_ANTHROPIC_API_KEY: ${{ secrets.MIZIZI_PREVIEW_ANTHROPIC_API_KEY != '' }}
+        shell: bash
         run: |
           set -euo pipefail
-          test "$(supabase --version)" = 2.107.0
-          supabase migration new mizizi_ownerless_workspace_recovery
-          path="$(find supabase/migrations -maxdepth 1 -name '*_mizizi_ownerless_workspace_recovery.sql' -print)"
-          test -f "$path"
-          echo "MIZIZI_MINTED_PATH=$path"
+          for name in MIZIZI_PREVIEW_ANON_KEY MIZIZI_PREVIEW_SERVICE_ROLE_KEY MIZIZI_PREVIEW_OPERATOR_JWT MIZIZI_PREVIEW_JIT_DATABASE_URL MIZIZI_PREVIEW_ANTHROPIC_API_KEY; do
+            check="HAS_${name}"
+            if [ "${!check}" = true ]; then
+              printf "%s=PRESENT\n" "$name"
+            else
+              printf "%s=MISSING\n" "$name"
+            fi
+          done
+          echo "PRESENCE_ONLY_NO_PROVIDER_OR_DATABASE_CALLS=PASS"
