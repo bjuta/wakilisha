@@ -13,6 +13,55 @@ begin
  or to_regprocedure('mizizi_private.assert_desk_journal_current_v1(uuid,text,uuid,jsonb)') is null
  then raise exception 'STOP_MIZIZI_RECALL_PREIMAGE';end if;
 end $guard$;
+-- Use actual event time, not transaction start time, for both sides of
+-- the existing strict pass-after-claim guard. Old journal rows are untouched.
+-- Distinct lease coordinates and exact current dependencies remain required.
+alter table mizizi_private.research_passes alter column recorded_at set default clock_timestamp();
+
+create or replace function public.mizizi_claim_exact_chart_research_job_v1(
+ p_job_id uuid,p_case_id uuid,p_workspace_id uuid,p_expected_revision integer,
+ p_worker_id text,p_lease_seconds integer default 300)
+returns table(job_id uuid,command_receipt_id uuid,resource_id uuid,command_type text,
+ job_type text,attempt_count integer,max_attempts integer,input_payload jsonb,lease_expires_at timestamptz)
+language plpgsql security definer set search_path=pg_catalog as $claim$
+declare claimed platform_private.jobs%rowtype;claim_started_at timestamptz;
+begin
+ if coalesce(auth.role(),'')<>'service_role' then
+  raise exception 'Service-role chart research authority required' using errcode='42501';end if;
+ if p_job_id is null or p_case_id is null or p_workspace_id is null
+  or p_expected_revision is null or p_expected_revision<1 or p_worker_id is null
+  or p_worker_id !~ '^mizizi-chart:[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+  or p_lease_seconds is null or p_lease_seconds not between 30 and 3600
+ then raise exception 'Invalid exact chart claim' using errcode='22023';end if;
+ claim_started_at:=clock_timestamp();
+ with candidate as (
+  select j.id from platform_private.jobs j
+  join mizizi_private.chart_candidate_subjects_v1 s on s.case_id=j.resource_id
+  join mizizi_private.cases c on c.id=s.case_id and c.workspace_id=s.workspace_id
+  where j.id=p_job_id and j.resource_id=p_case_id and s.workspace_id=p_workspace_id
+   and c.revision=p_expected_revision and c.case_state='in_progress' and c.current_stage='research'
+   and j.command_type='mizizi.case_research_v1' and j.job_type='mizizi.case_research_v1'
+   and j.status in ('queued','retry_wait') and j.available_at<=now()
+   and j.attempt_count<j.max_attempts and j.locked_by is null
+   and j.input_payload->>'case_id'=p_case_id::text
+   and j.input_payload->>'workspace_id'=p_workspace_id::text
+   and j.input_payload->>'expected_case_revision'=p_expected_revision::text
+   and j.input_payload->>'operation'='read_only_research'
+   and j.input_payload->>'reason'='Investigate receipt-bound chart recording identity.'
+  for update of j skip locked
+ )
+ update platform_private.jobs j set status='running',attempt_count=j.attempt_count+1,
+  locked_by=p_worker_id,locked_at=claim_started_at,lease_expires_at=claim_started_at+make_interval(secs=>p_lease_seconds),
+  started_at=coalesce(j.started_at,claim_started_at)
+ from candidate where j.id=candidate.id returning j.* into claimed;
+ if not found then return;end if;
+ -- A context denial rolls back the lease and its attempt increment atomically.
+ perform mizizi_private.read_leased_chart_research_context_v1(claimed.id,p_worker_id);
+ return query select claimed.id,claimed.command_receipt_id,claimed.resource_id,
+  claimed.command_type,claimed.job_type,claimed.attempt_count,claimed.max_attempts,
+  claimed.input_payload,claimed.lease_expires_at;
+end $claim$;
+
 alter table mizizi_private.desk_tool_receipts_v1
  drop constraint desk_tool_receipts_v1_operation_check,
  add constraint desk_tool_receipts_v1_operation_check check(operation in ('search_web','search_news','read_page','read_document','render_page','inspect_visual','browse_page','recall_evidence'));

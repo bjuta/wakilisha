@@ -1143,7 +1143,7 @@ export async function verifyCharts2RealJwtRegistryV1({
   begin perform public.mizizi_read_leased_chart_research_context_v1(${q(job.job_id)}::uuid,${q(activeWorker)});
    raise exception 'STOP_CONTINUATION_OLD_LEASE';exception when sqlstate '55000' then null;end;
   select * into strict resumed from public.mizizi_claim_exact_chart_research_job_v1(
-   ${q(job.job_id)}::uuid,${q(pairedId)}::uuid,${q(ws)}::uuid,2,${q(losingWorker)},301);
+   ${q(job.job_id)}::uuid,${q(pairedId)}::uuid,${q(ws)}::uuid,2,${q(losingWorker)},300);
   if resumed.command_receipt_id::text is distinct from ${q(job.command_receipt_id)}
    or resumed.attempt_count<>2 then raise exception 'STOP_CONTINUATION_RECLAIM';end if;
   fresh_context:=public.mizizi_read_leased_chart_research_context_v1(${q(job.job_id)}::uuid,${q(losingWorker)});
@@ -1191,9 +1191,11 @@ export async function verifyCharts2RealJwtRegistryV1({
   if public.mizizi_continue_desk_research_job_v1(fresh_scope,second_fingerprint)->>'job_status' is distinct from 'retry_wait'
    then raise exception 'STOP_RECALL_SECOND_YIELD';end if;
   select * into strict resumed from public.mizizi_claim_exact_chart_research_job_v1(
-   ${q(job.job_id)}::uuid,${q(pairedId)}::uuid,${q(ws)}::uuid,2,${q(activeWorker)},302);
+   ${q(job.job_id)}::uuid,${q(pairedId)}::uuid,${q(ws)}::uuid,2,${q(activeWorker)},300);
   fresh_context:=public.mizizi_read_leased_chart_research_context_v1(resumed.job_id,${q(activeWorker)});
   third_scope:=${j(scope)}||jsonb_build_object('workerId',${q(activeWorker)},'leaseExpiresAt',fresh_context->'leaseExpiresAt');
+  if resumed.attempt_count<>3 or public.mizizi_continue_desk_research_job_v1(third_scope,second_fingerprint) is not null
+   then raise exception 'STOP_RECALL_THIRD_LEASE_STALE_PASS';end if;
   offered:=public.mizizi_read_desk_same_case_recall_candidate_v1(third_scope);
   if offered->>'sourceReceiptId' is distinct from ${q(searchId)} or offered->>'originLeadId' is distinct from ${q(htmlLead)}
    then raise exception 'STOP_RECALL_UNEXAMINED_LEAD';end if;
