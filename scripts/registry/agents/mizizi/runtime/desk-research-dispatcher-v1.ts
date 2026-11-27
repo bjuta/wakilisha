@@ -133,7 +133,7 @@ export async function readDeskFactualNotesV1(rpc:WorkerRpc,scope:DeskSearchScope
  let b:unknown;try{b=JSON.parse(packet.bodyText);}catch{return failNote();}
  if(!shape(b,["contract","scope","membershipSha256","observationSha256","notes"])||
   b.contract!=="mizizi.desk_factual_note_readback.v1"||!shape(b.scope,scopeKeys)||
-  scopeKeys.some(k=>b.scope[k]!==scope[k])||
+  scopeKeys.some(k=>(b.scope as Record<string,unknown>)[k]!==scope[k])||
   b.membershipSha256!==subject.membershipSha256||b.observationSha256!==subject.observationSha256||
   !Array.isArray(b.notes)||b.notes.length>12)return failNote();
  const seen=new Set<string>(),notes:DeskFactualNoteV1[]=[];
