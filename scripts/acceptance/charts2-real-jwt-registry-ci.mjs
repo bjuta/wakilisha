@@ -1156,6 +1156,7 @@ export async function verifyCharts2RealJwtRegistryV1({
   if (public.mizizi_authorize_desk_model_operation_v1(fresh_scope,'model_disclose',raw,
    encode(sha256(convert_to(raw,'UTF8')),'hex'))->>'allowed') is distinct from 'true'
    then raise exception 'STOP_CONTINUATION_FOLLOWUP_AUTHORITY';end if;
+  raise notice 'WK_AUTH_MIZIZI_RECALL_SECOND_LEASE_CURRENT=PASS';
   offered:=public.mizizi_read_desk_same_case_recall_candidate_v1(fresh_scope);
   if offered->>'sourceReceiptId' is distinct from ${q(standingPageId)} or offered->>'sourceResultSha256' is distinct from ${q(standingPage.p_result_sha256)}
    or public.mizizi_read_desk_same_case_recall_candidate_v1(current_setting('wk.shared_scope')::jsonb) is not null
@@ -1188,17 +1189,21 @@ export async function verifyCharts2RealJwtRegistryV1({
   second_fingerprint:=encode(sha256(convert_to(second_body,'UTF8')),'hex');
   if (select outcome from public.mizizi_append_research_pass_v1(resumed.job_id,${q(losingWorker)},second_body,second_fingerprint,${q(continuationFingerprint)})) is distinct from 'created'
    then raise exception 'STOP_RECALL_JOURNAL';end if;
+  raise notice 'WK_AUTH_MIZIZI_RECALL_SECOND_JOURNAL=PASS';
   if public.mizizi_continue_desk_research_job_v1(fresh_scope,second_fingerprint)->>'job_status' is distinct from 'retry_wait'
    then raise exception 'STOP_RECALL_SECOND_YIELD';end if;
+  raise notice 'WK_AUTH_MIZIZI_RECALL_SECOND_YIELD=PASS';
   select * into strict resumed from public.mizizi_claim_exact_chart_research_job_v1(
    ${q(job.job_id)}::uuid,${q(pairedId)}::uuid,${q(ws)}::uuid,2,${q(activeWorker)},300);
   fresh_context:=public.mizizi_read_leased_chart_research_context_v1(resumed.job_id,${q(activeWorker)});
   third_scope:=${j(scope)}||jsonb_build_object('workerId',${q(activeWorker)},'leaseExpiresAt',fresh_context->'leaseExpiresAt');
   if resumed.attempt_count<>3 or public.mizizi_continue_desk_research_job_v1(third_scope,second_fingerprint) is not null
    then raise exception 'STOP_RECALL_THIRD_LEASE_STALE_PASS';end if;
+  raise notice 'WK_AUTH_MIZIZI_RECALL_THIRD_LEASE_FENCE=PASS';
   offered:=public.mizizi_read_desk_same_case_recall_candidate_v1(third_scope);
   if offered->>'sourceReceiptId' is distinct from ${q(searchId)} or offered->>'originLeadId' is distinct from ${q(htmlLead)}
    then raise exception 'STOP_RECALL_UNEXAMINED_LEAD';end if;
+  raise notice 'WK_AUTH_MIZIZI_RECALL_LEAD_OFFER=PASS';
   recall_call:=jsonb_build_object('scope',third_scope,'call',jsonb_build_object('name','recall_evidence','input',jsonb_build_object('query','case evidence')))::text;
   recall_hash:=encode(sha256(convert_to(recall_call,'UTF8')),'hex');
   recall_text:=jsonb_build_object('receiptId',lead_receipt,'leads',jsonb_build_array(jsonb_build_object('id',new_lead,'kind','reference','label','Dynamic archive')),
@@ -1207,10 +1212,12 @@ export async function verifyCharts2RealJwtRegistryV1({
   forged:=jsonb_set(recall_text::jsonb,'{leads,0,label}','"Forged label"'::jsonb)::text;
   if public.mizizi_admit_desk_same_case_recall_v1(recall_call,recall_hash,lead_receipt,${q(searchId)}::uuid,forged,encode(sha256(convert_to(forged,'UTF8')),'hex')) is not null
    then raise exception 'STOP_RECALL_LEAD_FORGED';end if;
+  raise notice 'WK_AUTH_MIZIZI_RECALL_LEAD_FORGERY_DENIED=PASS';
   if public.mizizi_admit_desk_same_case_recall_v1(recall_call,recall_hash,lead_receipt,${q(searchId)}::uuid,recall_text,recall_hash_result)->>'outcome' is distinct from 'created'
    or public.mizizi_resolve_desk_reference_lead_v1(third_scope,new_lead)->>'url' is distinct from ${q(htmlUrl)}
    or public.mizizi_read_desk_same_case_recall_candidate_v1(third_scope) is not null
    then raise exception 'STOP_RECALL_LEAD_ADMISSION';end if;
+  raise notice 'WK_AUTH_MIZIZI_RECALL_LEAD_ADMISSION=PASS';
   raw:=jsonb_build_object('scope',third_scope,'call',jsonb_build_object('name','read_page','input',jsonb_build_object('lead_id',new_lead)))::text;
   if public.mizizi_authorize_desk_model_operation_v1(third_scope,'tool_execute',raw,encode(sha256(convert_to(raw,'UTF8')),'hex'))->>'allowed' is distinct from 'true'
    then raise exception 'STOP_RECALL_LEAD_READ_AUTHORITY';end if;
