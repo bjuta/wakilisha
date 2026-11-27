@@ -202,6 +202,34 @@ export function scoreFrozenRecordingCohortV1(input:Readonly<{
   inferenceTargetMet:complete&&averageInferenceMicrousd!==null&&averageInferenceMicrousd<=1000});
 }
 
+/** Prepare the private review surface from verified journal bytes. The
+ * evaluator selects a finding and exact evidence span; no field is assigned,
+ * judged, signed, or accepted by the investigator or by this helper.
+ */
+export function prepareRecordingFieldReviewV1(input:Readonly<{
+ identity:InvestigationIdentityV1;history:readonly InvestigationPassV1[];
+ subjectVersionSha256:string;rubricSha256:string;
+}>){
+ const {identity,history}=input;
+ if(!UUID.test(identity.caseId)||!UUID.test(identity.workspaceId)||!SHA.test(input.subjectVersionSha256)||
+  !SHA.test(input.rubricSha256)||!Array.isArray(history)||history.length>100)fail("PREPARATION_SCOPE");
+ verifyInvestigationHistoryV1(identity,history);
+ const candidates=history.flatMap(pass=>pass.findings.map((claim,claimIndex)=>{
+  const evidence=claim.sourceIds.map(id=>{
+   const source=pass.sourceReceipts.find(s=>s.sourceId===id);
+   if(!source||source.modelDisclosed!==true||!source.excerpt.length)fail("PREPARATION_CITATION");
+   return {citation:source.citation,excerpt:source.excerpt,binding:{sourceId:source.sourceId,
+    payloadFingerprint:source.payloadFingerprint,lineageKey:source.lineageKey,excerptSha256:hash(source.excerpt),
+    spanStart:0,spanLength:source.excerpt.length,spanSha256:hash(source.excerpt)}};
+  });
+  return {finding:{passFingerprint:pass.fingerprint,claimIndex,statementSha256:hash(claim.statement)},
+   statement:claim.statement,interpretation:claim.interpretation,evidence};
+ }));
+ return {contract:"mizizi.recording_field_review_preparation.v1" as const,caseId:identity.caseId,workspaceId:identity.workspaceId,
+  subjectVersionSha256:input.subjectVersionSha256,rubricSha256:input.rubricSha256,lastFingerprint:history.at(-1)?.fingerprint??null,
+  fields:RECORDING_RESEARCH_FIELDS_V1.map(field=>({field,disposition:null})),candidates};
+}
+
 /** Separately run evaluator executable. Never invoked by the research
  * runner; no credentials, network or model. The caller supplies independently
  * authorized private journal export and independently reviewed packet digests.

@@ -3167,7 +3167,7 @@ describe("MIZIZI source-first discovery-only pass",()=>{
 
 describe("MIZIZI independent recording-field adjudication",()=>{
  it("binds evaluator-only decisions to exact journal claims and source spans, without counting partial coverage as resolution",async()=>{
-  const {adjudicateRecordingFieldsV1,RECORDING_RESEARCH_FIELDS_V1}=await import("../../scripts/registry/agents/mizizi/runtime/research-field-adjudication-v1");
+  const {adjudicateRecordingFieldsV1,prepareRecordingFieldReviewV1,RECORDING_RESEARCH_FIELDS_V1}=await import("../../scripts/registry/agents/mizizi/runtime/research-field-adjudication-v1");
   const h=(value:string)=>createHash("sha256").update(value,"utf8").digest("hex");
   const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:"Investigate the exact recording version."};
   const excerpt="A fixture archive identifies the performer.",statement="The performer is identified by the fixture archive.";
@@ -3183,6 +3183,12 @@ describe("MIZIZI independent recording-field adjudication",()=>{
   const pass={...body,fingerprint:h(JSON.stringify(body))};
   const source=body.sourceReceipts[0],span={sourceId:RECEIPT,payloadFingerprint:source.payloadFingerprint,lineageKey:source.lineageKey,
    excerptSha256:h(excerpt),spanStart:0,spanLength:excerpt.length,spanSha256:h(excerpt)};
+  const prepared=prepareRecordingFieldReviewV1({identity,history:[pass],subjectVersionSha256:h("version"),rubricSha256:h("rubric")});
+  expect(prepared.lastFingerprint).toBe(pass.fingerprint);
+  expect(prepared.fields).toEqual(RECORDING_RESEARCH_FIELDS_V1.map(field=>({field,disposition:null})));
+  expect(prepared.candidates).toEqual([{finding:{passFingerprint:pass.fingerprint,claimIndex:0,statementSha256:h(statement)},
+   statement,interpretation:"hypothesis",evidence:[{citation:source.citation,excerpt,binding:span}]}]);
+  expect(()=>prepareRecordingFieldReviewV1({identity,history:[{...pass,fingerprint:h("forged")}],subjectVersionSha256:h("version"),rubricSha256:h("rubric")})).toThrow();
   const fields=RECORDING_RESEARCH_FIELDS_V1.map(field=>field==="performer"?{field,disposition:"correct",reviewRef:"review:performer",
    rationale:"Evaluator checked the original recording credit.",finding:{passFingerprint:pass.fingerprint,claimIndex:0,statementSha256:h(statement)},evidence:[span]}:
    {field,disposition:"unresolved",reviewRef:"review:unresolved",rationale:"No independently reviewed field evidence.",evidence:[]});
