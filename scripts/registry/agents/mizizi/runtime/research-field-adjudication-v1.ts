@@ -237,9 +237,11 @@ export function prepareRecordingFieldReviewV1(input:Readonly<{
  * continued legal right to retain the exported bytes.
  */
 export async function runPrivateFieldAdjudicationV1(args:readonly string[]){
- const [journalPath,journalSha256,reviewPath,reviewSha256,outputPath]=args;
- if(args.length!==5||![journalSha256,reviewSha256].every(x=>SHA.test(x))||
-  ![journalPath,reviewPath,outputPath].every(x=>typeof x==="string"&&x.length>0))fail("CLI_ARGS");
+ const prepare=args[0]==="--prepare";
+ const [journalPath,journalSha256,reviewPath,reviewSha256,outputPath]=prepare?[args[1],args[2],undefined,undefined,args[3]]:args;
+ if(prepare?(args.length!==4||!SHA.test(journalSha256??"")||!journalPath||!outputPath):
+  (args.length!==5||![journalSha256,reviewSha256].every(x=>SHA.test(x??""))||
+  ![journalPath,reviewPath,outputPath].every(x=>typeof x==="string"&&x.length>0)))fail("CLI_ARGS");
  const exactPrivate=async(path:string,digest:string,max:number)=>{
   const file=await lstat(path),parent=await lstat(dirname(resolve(path)));
   if(!file.isFile()||!parent.isDirectory()||(file.mode&0o077)!==0||(parent.mode&0o077)!==0||file.size<2||file.size>max)
@@ -249,19 +251,22 @@ export async function runPrivateFieldAdjudicationV1(args:readonly string[]){
   const raw=bytes.toString("utf8");if(!Buffer.from(raw,"utf8").equals(bytes))fail("FILE_ENCODING");
   return raw;
  };
- const raw=await exactPrivate(journalPath,journalSha256,4_000_000);
+ const raw=await exactPrivate(journalPath!,journalSha256!,4_000_000);
  const journal=JSON.parse(raw);
  if(!shape(journal,["contract","identity","subjectVersionSha256","rubricSha256","history"])||
   journal.contract!=="mizizi.private_recording_journal_export.v1"||!Array.isArray(journal.history)||journal.history.length>100)
   fail("JOURNAL_EXPORT");
- const reviewText=await exactPrivate(reviewPath,reviewSha256,128000);
- const score=adjudicateRecordingFieldsV1({identity:journal.identity,history:journal.history,
-  subjectVersionSha256:journal.subjectVersionSha256,rubricSha256:journal.rubricSha256,reviewText,reviewSha256});
- const parent=await lstat(dirname(resolve(outputPath)));
+ const input={identity:journal.identity,history:journal.history,
+  subjectVersionSha256:journal.subjectVersionSha256,rubricSha256:journal.rubricSha256};
+ const result=prepare?prepareRecordingFieldReviewV1(input):adjudicateRecordingFieldsV1({...input,
+  reviewText:await exactPrivate(reviewPath!,reviewSha256!,128000),reviewSha256:reviewSha256!});
+ const parent=await lstat(dirname(resolve(outputPath!)));
  if(!parent.isDirectory()||(parent.mode&0o077)!==0)fail("PRIVATE_OUTPUT");
- const output=await open(outputPath,"wx",0o600);
- try{await output.writeFile(JSON.stringify(score)+"\n");await output.sync();}finally{await output.close();}
- return {contract:score.contract,correct:score.correct,incorrect:score.incorrect,unresolved:score.unresolved,unreviewable:score.unreviewable};
+ const output=await open(outputPath!,"wx",0o600);
+ try{await output.writeFile(JSON.stringify(result)+"\n");await output.sync();}finally{await output.close();}
+ if(result.contract==="mizizi.recording_field_review_preparation.v1")
+  return {contract:result.contract,candidates:result.candidates.length,fields:result.fields.length};
+ return {contract:result.contract,correct:result.correct,incorrect:result.incorrect,unresolved:result.unresolved,unreviewable:result.unreviewable};
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  runPrivateFieldAdjudicationV1(process.argv.slice(2)).then(result=>console.log(JSON.stringify(result))).catch(error=>{
