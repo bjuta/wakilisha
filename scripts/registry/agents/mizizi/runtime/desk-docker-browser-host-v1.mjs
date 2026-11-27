@@ -15,10 +15,27 @@ const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const SHA=/^[a-f0-9]{64}$/;
 const IMAGE=/^sha256:[a-f0-9]{64}$/;
 const SERVER=String.raw`
-import {chromium} from "/deps/playwright/index.mjs";
 import os from "node:os";
-if (process.getuid()===0 || Object.keys(os.networkInterfaces()).some(n=>n!=="lo")) process.exit(41);
-const server=await chromium.launchServer({host:"127.0.0.1",port:0,headless:true});
+let stage="ISOLATION",server;
+try {
+ if (process.getuid()===0 || Object.keys(os.networkInterfaces()).some(n=>n!=="lo")) throw Error("isolation");
+ stage="IMPORT";
+ const {chromium}=await import("/deps/playwright/index.mjs");
+ stage="LAUNCH";
+ server=await chromium.launchServer({host:"127.0.0.1",port:0,headless:true});
+} catch(error) {
+ const msg=String(error?.message??"");
+ const category=/Cannot find (package|module)|ERR_MODULE_NOT_FOUND/i.test(msg)?"MODULE":
+  /Executable doesn't exist|browser executable/i.test(msg)?"EXECUTABLE":
+  /EACCES|EPERM|permission denied/i.test(msg)?"PERMISSION":
+  /sandbox/i.test(msg)?"SANDBOX":
+  /profile|read.only|EROFS/i.test(msg)?"PROFILE":
+  /resource temporarily unavailable|pthread|out of memory/i.test(msg)?"RESOURCE":
+  /ENOTFOUND|EADDR|listen/i.test(msg)?"LISTEN":"OTHER";
+ process.stdout.write("MIZIZI_BROWSER_START_FAILURE "+stage+"_"+category+"\n");
+ process.exitCode=41;
+ process.exit(41);
+}
 process.stdout.write("MIZIZI_BROWSER_READY "+server.wsEndpoint()+"\n");
 let stopping=false;
 const stop=async()=>{if(stopping)return;stopping=true;try{await server.close();}finally{process.exit(0);}};
@@ -86,6 +103,7 @@ export async function createDockerDeskBrowserHostV1({accountFingerprint,imageId,
     binding?.accountFingerprint!==accountFingerprint||binding?.reserveSeconds!==120||binding?.mode!=="interactive"||
     !Number.isFinite(Date.parse(binding?.scope?.leaseExpiresAt))||Date.parse(binding.scope.leaseExpiresAt)<=Date.now())fail("SCOPE");
   const s={name:nameOf(id),signal,closing:false};active.set(id,s);
+  let stage="CREATE";
   s.onAbort=()=>{void close(id,AbortSignal.timeout(5000));};
   signal.addEventListener("abort",s.onAbort,{once:true});
   const live=()=>{if(signal.aborted||s.closing)fail("ABORTED");};
@@ -97,13 +115,18 @@ export async function createDockerDeskBrowserHostV1({accountFingerprint,imageId,
     "-e","HOME=/tmp","--mount","type=bind,source="+dependencies+",target=/deps,readonly",
     imageId,"node","--input-type=module","-e",SERVER],15000);
    await s.create;live();
+   stage="ISOLATION";
    const isolation=await docker(["inspect","--format","{{.HostConfig.NetworkMode}}|{{.HostConfig.ReadonlyRootfs}}|{{.HostConfig.Privileged}}",s.name]);
    if(isolation!=="none|true|false")fail("ISOLATION_UNCONFIRMED");
-   live();s.start=docker(["start",s.name]);await s.start;live();
-   let endpoint=null;
+   live();stage="START";s.start=docker(["start",s.name]);await s.start;live();
+   stage="READY";let endpoint=null;
    const expires=Math.min(Date.now()+20000,Date.parse(binding.scope.leaseExpiresAt));
    while(Date.now()<expires){
     live();const log=await docker(["logs",s.name],2500);
+    const failure=log.split("\n").find(line=>/^MIZIZI_BROWSER_START_FAILURE [A-Z_]+$/.test(line));
+    if(failure)fail("SERVER_"+failure.split(" ")[1]);
+    const state=await docker(["inspect","--format","{{.State.Running}}|{{.State.ExitCode}}",s.name],2500);
+    if(/^false\|[0-9]+$/.test(state))fail("SERVER_EXIT_"+state.split("|")[1]);
     const match=log.split("\n").find(line=>line.startsWith("MIZIZI_BROWSER_READY "));
     if(match){
      const u=new URL(match.slice("MIZIZI_BROWSER_READY ".length));
@@ -115,7 +138,7 @@ export async function createDockerDeskBrowserHostV1({accountFingerprint,imageId,
     await delay(100,signal);
    }
    if(!endpoint)fail("START_UNCONFIRMED");
-   let connected=false;
+   stage="RELAY";let connected=false;
    s.server=createServer(socket=>{
     if(s.closing||signal.aborted||connected){socket.destroy();return;}
     connected=true;s.socket=socket;
@@ -135,11 +158,13 @@ export async function createDockerDeskBrowserHostV1({accountFingerprint,imageId,
    live();
    const address=s.server.address();
    if(!address||typeof address==="string")fail("RELAY_UNCONFIRMED");
-   const browser=await chromium.connect("ws://127.0.0.1:"+address.port+endpoint.pathname,{timeout:Math.max(1,Math.min(10000,expires-Date.now()))});
+   stage="CONNECT";const browser=await chromium.connect("ws://127.0.0.1:"+address.port+endpoint.pathname,{timeout:Math.max(1,Math.min(10000,expires-Date.now()))});
    live();return browser;
-  }catch{
+  }catch(error){
    await close(id,AbortSignal.timeout(5000));
-   fail("OPEN_UNCONFIRMED");
+   const known=String(error?.message??"");
+   if(/^MIZIZI_DOCKER_BROWSER_[A-Z_0-9]+$/.test(known))throw Error(known);
+   fail("OPEN_"+stage+"_UNCONFIRMED");
   }
  }
  return Object.freeze({accountFingerprint,captureVisual:captureVisual===true,authorizeHost,open,close});
