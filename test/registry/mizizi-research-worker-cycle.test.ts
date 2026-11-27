@@ -2265,7 +2265,10 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    if(fn==="mizizi_authorize_desk_model_operation_v1")return ok({operation:args.p_operation,bindingSha256:args.p_binding_sha256,policyRef:"fixture:durable-model:1",validUntil:expiry,allowed:true});
    if(fn==="mizizi_authorize_desk_access_v1"){
     const binding=JSON.parse(String(args.p_binding_text)),operation=String(args.p_operation);
-    if(disabled.has(operation))return ok(null);
+    // The access authority is independent of the worker's custody read.
+    // Simulate the current server's denial unless a fixture explicitly
+    // exercises a separately authorized transient consultation.
+    if(disabled.has(operation)||(disabled.has(new URL(binding.url).hostname)&&!disabled.has("fixture_transient_access")))return ok(null);
     return ok({operation,bindingSha256:hash(String(args.p_binding_text)),urlSha256:hash(binding.url),
      policyRef:"fixture:access:"+operation,validUntil:expiry,allowed:true});
    }
@@ -2706,6 +2709,14 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   h.disabled.add("archive.org");
   await expect(h.execute(call("read_page",{lead_id:first.leads[0].id}))).rejects.toThrow("ACQUISITION_DENIED");
   expect(h.native).not.toHaveBeenCalled();
+  // A separately authorized transient fetch does not create retention,
+  // disclosure, evidence or a source receipt for an unknown/revoked host.
+  h.disabled.add("fixture_transient_access");
+  const before=h.receipts.size;
+  await expect(h.execute(call("read_page",{lead_id:first.leads[0].id}))).rejects.toThrow("SOURCE_CUSTODY_DENIED");
+  expect(h.native).toHaveBeenCalledTimes(1);
+  expect(h.receipts.size).toBe(before);
+  expect(JSON.stringify([...h.receipts.values()])).not.toContain(new TextDecoder().decode(textBytes));
  });
 });
 

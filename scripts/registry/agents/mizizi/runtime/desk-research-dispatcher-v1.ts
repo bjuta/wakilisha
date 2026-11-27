@@ -143,7 +143,9 @@ export function createDeskResearchDispatcherV1(options:Options){
    fail("CUSTODY_POLICY_UNCONFIRMED");
   return Object.freeze({...p});
  }
- // Owner-issued, exact URL/operation permission is additive to host checks.
+ // The independent access RPC governs transient acquisition. Do not use
+ // permission to retain or disclose source content as a second transport gate.
+ // Custody remains mandatory when admitting any durable/disclosed result.
  // Descriptors are hashed and checked by the RPC, not persisted.
  const accessRevisions=new Map<string,string>();
  let activeCallSha256:string|null=null;
@@ -205,8 +207,11 @@ export function createDeskResearchDispatcherV1(options:Options){
   provider:browserProvider,...budget.browserFinance(browserProvider.accountFingerprint),now,
   authorize:async(binding:{scope:DeskSearchScopeV1;url:string;visual:boolean},digest:string)=>{
    assertScope(binding.scope);
-   const p=await policy(urlOf(binding.url).hostname);
-   if(!p||p.browserRenderAllowed!==true||(binding.visual&&(p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed)))return null;
+   // Visual disclosure is not ordinary transient navigation.
+   if(binding.visual){
+    const p=await policy(urlOf(binding.url).hostname);
+    if(!p||p.browserRenderAllowed!==true||p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed)return null;
+   }
    const grant=await accessGrant("browser_render",binding.url,binding);
    if(!grant)return null;
    const external=await options.browser!.authorize(binding,digest);
@@ -230,8 +235,8 @@ export function createDeskResearchDispatcherV1(options:Options){
   },
   authorize:async(candidate,url)=>{
    assertScope(candidate);
-   const p=await policy(urlOf(url).hostname);
-   if(!p||p.sourceFamily!=="public_web")return null;
+   // Acquisition is independently authorized per hop by the access RPC.
+   // A source-content custody read is not an acquisition permission.
    const grant=await accessGrant("native_acquire",url,{});
    if(!grant)return null;
    const external=await options.authorizeAcquisition(candidate,url);
@@ -243,10 +248,12 @@ export function createDeskResearchDispatcherV1(options:Options){
  });
  const examination=async(candidate:DeskSearchScopeV1,binding:Readonly<Record<string,unknown>>)=>{
   assertScope(candidate);
-  const p=await policy(urlOf(binding.finalUrl).hostname);
-  return !!p&&p.sourceFamily==="public_web"&&
-   (!["pdf_visual","browser_visual"].includes(String(binding.mode))||(p.visualProcessingAllowed===true&&p.excerptRetentionAllowed))&&
-   !!await accessGrant(binding.mode==="pdf_visual"?"pdf_visual":binding.mode==="browser_visual"?"browser_visual":
+  if(["pdf_visual","browser_visual"].includes(String(binding.mode))){
+   const p=await policy(urlOf(binding.finalUrl).hostname);
+   if(!p||p.sourceFamily!=="public_web"||p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed)return false;
+  }
+  // Local text examination and protected evidence disclosure are distinct.
+  return !!await accessGrant(binding.mode==="pdf_visual"?"pdf_visual":binding.mode==="browser_visual"?"browser_visual":
     binding.representation==="rendered_dom_not_original_response"?"browser_text":"native_text",String(binding.finalUrl),binding)&&
    await options.authorizeExamination(candidate,binding)===true;
  };
@@ -311,10 +318,11 @@ export function createDeskResearchDispatcherV1(options:Options){
  const localConfig=options.localBrowser;
  const localGrant=async(operation:string,url:string,descriptor:Readonly<Record<string,unknown>>,hopSha256?:string)=>{
   if(!localConfig||!activeCallSha256||await localConfig.authorizeAccess(scope,url,operation)!==true)return null;
-  const p=await policy(urlOf(url).hostname);
-  if(!p||p.sourceFamily!=="public_web"||p.browserRenderAllowed!==true||
-   (operation==="browser_visual"||operation==="browser_render"&&descriptor.visual===true)&&
-    (p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed))return null;
+  if(operation==="browser_visual"||operation==="browser_render"&&descriptor.visual===true){
+   const p=await policy(urlOf(url).hostname);
+   if(!p||p.sourceFamily!=="public_web"||p.browserRenderAllowed!==true||
+    p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed)return null;
+  }
   return accessGrant(operation,url,descriptor,hopSha256);
  };
  const resolveLocalLead=async(candidate:DeskSearchScopeV1,id:string)=>{
