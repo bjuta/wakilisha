@@ -1,27 +1,65 @@
-name: MIZIZI Finance Migration Filename Mint
+name: MIZIZI Metered Sync Finance Focused Acceptance
 on:
   push:
     branches:
       - ops/mizizi-preview-qualification-preflight-20261127
 permissions:
   contents: read
+concurrency:
+  group: mizizi-preview-schema-qualification
+  cancel-in-progress: false
 jobs:
-  mint:
+  worker:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 7d64c01844db2e2f2fc57e418635dd27ffa84f7d
+          ref: 496db3e11b7ffbe9316edb84b1dfd8be19b39dc1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Exact worker and calibration contract checks
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 496db3e11b7ffbe9316edb84b1dfd8be19b39dc1
+          npx --no-install vitest run test/registry/mizizi-chart-calibration-flow.test.ts test/registry/mizizi-research-worker-cycle.test.ts
+  migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 496db3e11b7ffbe9316edb84b1dfd8be19b39dc1
           persist-credentials: false
       - uses: supabase/setup-cli@v1
         with:
-          version: 2.107.0
-      - name: Mint exact forward migration filename only
+          version: 2.121.0
+      - name: Exact isolated migration replay and settlement proof
+        shell: bash
         run: |
           set -euo pipefail
-          test "$(supabase --version)" = 2.107.0
-          supabase migration new mizizi_desk_metered_sync_reconciliation
-          path="$(find supabase/migrations -maxdepth 1 -name '*_mizizi_desk_metered_sync_reconciliation.sql' -print)"
-          test -f "$path"
-          echo "MIZIZI_MINTED_PATH=$path"
+          test "$(git rev-parse HEAD)" = 496db3e11b7ffbe9316edb84b1dfd8be19b39dc1
+          test ! -e supabase/.temp/project-ref
+          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
+          test -z "$(printenv SUPABASE_PROJECT_REF || true)"
+          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          test "$(printf '%s\n' "$DB" | wc -l | tr -d ' ')" = 1
+          test "$(docker exec -i "$DB" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c 'select count(*) from supabase_migrations.schema_migrations')" = 301
+          test "$(docker exec -i "$DB" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c 'select max(version) from supabase_migrations.schema_migrations')" = 20261127073652
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres < scripts/acceptance/mizizi-slice1-metered-sync-disposable-ci.sql
+          test "$(docker exec -i "$DB" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c 'select (select count(*) from mizizi_private.desk_resource_policy_versions_v1)+(select count(*) from mizizi_private.desk_resource_reservations_v1)+(select count(*) from mizizi_private.desk_resource_events_v1)')" = 0
+          echo MIZIZI_SYNC_METER_FIXTURE_ROLLBACK=PASS
+          echo MIZIZI_301_CLEAN_REPLAY=PASS
+      - name: Destroy local database containers and volumes
+        if: always()
+        run: |
+          supabase stop --no-backup
+          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
+          echo MIZIZI_LOCAL_METER_FIXTURE_DESTROYED=PASS
