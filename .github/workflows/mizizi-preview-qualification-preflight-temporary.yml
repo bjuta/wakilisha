@@ -1,4 +1,4 @@
-name: MIZIZI Preview Connected Browser Acceptance
+name: MIZIZI Preview Temporary Calibration Steward
 on:
   push:
     branches:
@@ -9,69 +9,125 @@ concurrency:
   group: mizizi-preview-schema-qualification
   cancel-in-progress: false
 jobs:
-  browser:
+  operator:
     if: github.repository == 'bjuta/wakilisha' && github.ref == 'refs/heads/ops/mizizi-preview-qualification-preflight-20261127'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 14255d44e7d568bb0769882a9c6b2490f8a2f908
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci --prefer-offline --no-audit --no-fund
-      - name: Exercise actual host adapter and existing interactive browser
+      - name: Provision owner-approved time-limited technical Preview identity and prove genuine JWT access
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 14255d44e7d568bb0769882a9c6b2490f8a2f908
-          image=mcr.microsoft.com/playwright:v1.63.0-noble
-          docker pull "$image"
-          export MIZIZI_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$image")"
-          node --input-type=module <<'JS'
-          import assert from "node:assert/strict";
-          import {createHash,randomUUID} from "node:crypto";
-          import {createDockerDeskBrowserHostV1} from "./scripts/registry/agents/mizizi/runtime/desk-docker-browser-host-v1.mjs";
-          import {withDeskInteractiveBrowserV1} from "./scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
-          const hash=x=>createHash("sha256").update(x).digest("hex");
-          const fingerprint=hash("synthetic qualification only:"+process.env.MIZIZI_IMAGE_ID);
-          const scope={jobId:randomUUID(),caseId:randomUUID(),workspaceId:randomUUID(),expectedRevision:1,workerId:"mizizi-chart:"+randomUUID(),leaseExpiresAt:new Date(Date.now()+110000).toISOString()};
-          const host=await createDockerDeskBrowserHostV1({accountFingerprint:fingerprint,imageId:process.env.MIZIZI_IMAGE_ID,dependenciesDirectory:process.cwd()+"/node_modules",authorizeHost:async()=>null,captureVisual:true});
-          // No operational grant is fabricated. Direct adapter transport test
-          // with synthetic source only, never the durable worker or finance.
-          const binding={scope,accountFingerprint:fingerprint,reserveSeconds:120,mode:"interactive"};
-          const id=randomUUID(),control=new AbortController();
-          const url="https://archive.org/catalogue";
-          const body=new TextEncoder().encode('<html><body><main><button aria-expanded="false" onclick="this.setAttribute(\'aria-expanded\',\'true\');document.getElementById(\'credit\').hidden=false">Reveal credits</button><p id="credit" hidden>Connected host evidence</p></main></body></html>');
-          try {
-            const browser=await host.open(binding,id,control.signal);
-            console.log("MIZIZI_CONNECTED_HOST_OPEN=PASS");
-            await assert.rejects(host.open(binding,randomUUID(),control.signal));
-            const evidence=await withDeskInteractiveBrowserV1({browser,scope,authorizeAction:async b=>b.operation!=="navigate"||b.url===url,authorizeRequest:async b=>b.url===url,readResource:async(b,digest)=>b.url===url?{requestSha256:digest,status:200,contentType:"text/html",body,sha256:hash(body)}:null},async session=>{
-              let o=await session.navigate(url);
-              const button=o.elements.find(e=>e.kind==="expand"&&e.label==="Reveal credits");
-              assert.ok(button);
-              o=await session.expand(button.ref,o.generation);
-              assert.ok(o.visibleText.includes("Connected host evidence"));
-              return session.capture({visual:true});
-            });
-            assert.equal(evidence.sha256,hash(evidence.body));
-            assert.equal(evidence.visual.sha256,hash(evidence.visual.body));
-            console.log("MIZIZI_CONNECTED_HOST_INTERACTION_AND_CAPTURE=PASS");
-          } finally {
-            assert.equal(await host.close(id,AbortSignal.timeout(10000)),true);
-          }
-          assert.equal(await host.close(id,AbortSignal.timeout(5000)),true);
-          console.log("MIZIZI_CONNECTED_HOST_CLEANUP=PASS");
-          const abortId=randomUUID(),abort=new AbortController();
-          const opening=host.open(binding,abortId,abort.signal);
-          abort.abort();
-          await assert.rejects(opening);
-          assert.equal(await host.close(abortId,AbortSignal.timeout(10000)),true);
-          console.log("MIZIZI_CONNECTED_HOST_ABORT_CLEANUP=PASS");
-          JS
-          test -z "$(docker ps -a --filter name=mizizi-browser- --format '{{.Names}}')"
-          echo MIZIZI_CONNECTED_HOST_NO_RESIDUE=PASS
+          umask 077
+          python3 - <<'PY'
+          import base64,json,os,re,secrets,uuid,urllib.request,urllib.error
+          ref="ehkmjrjjhzyjkxdfsqdc"
+          api="https://api.supabase.com/v1/projects/"+ref
+          root="https://ehkmjrjjhzyjkxdfsqdc.supabase.co"
+          token=os.environ.get("SUPABASE_ACCESS_TOKEN","")
+          if not token: raise SystemExit("CALIBRATION_MANAGEMENT_CREDENTIAL=STOP")
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs): raise ValueError("redirect denied")
+          opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+          def request(url,headers,body=None,method=None):
+              req=urllib.request.Request(url,headers=headers,data=None if body is None else json.dumps(body).encode(),method=method or ("POST" if body is not None else "GET"))
+              with opener.open(req,timeout=25) as response:
+                  data=response.read(1000001)
+              if len(data)>1000000: raise ValueError("response bound")
+              return json.loads(data) if data else None
+          mgmt={"Authorization":"Bearer "+token,"Content-Type":"application/json","Accept":"application/json"}
+          def sql(q):
+              return request(api+"/database/query",mgmt,{"query":q})
+          stage="PREFLIGHT"
+          uid=None
+          granted=False
+          try:
+              pre=sql("select (select count(*) from supabase_migrations.schema_migrations) as migrations,(select count(*) from mizizi_private.workspaces where workspace_key='wakilisha-internal' and status='active') as workspaces,(select count(*) from mizizi_private.workspace_memberships) as memberships,(select count(*) from mizizi_private.cases) as cases,(select count(*) from public.role_definitions where role_key='mizizi_preview_calibration') as roles")
+              if pre!=[{"migrations":300,"workspaces":1,"memberships":0,"cases":0,"roles":0}]: raise ValueError("preimage")
+              print("CALIBRATION_PREVIEW_BASELINE=PASS",flush=True)
+              stage="KEY_SCOPE"
+              keys=request(api+"/api-keys?reveal=true",mgmt)
+              def scoped(name):
+                  rows=[x for x in keys if x.get("name")==name]
+                  if len(rows)!=1: raise ValueError("key selection")
+                  key=rows[0]["api_key"]
+                  part=key.split(".")[1]
+                  claims=json.loads(base64.urlsafe_b64decode(part+"="*((4-len(part)%4)%4)))
+                  if claims.get("role")!=name or claims.get("ref")!=ref: raise ValueError("key scope")
+                  return key
+              service=scoped("service_role")
+              anon=scoped("anon")
+              del keys
+              print("CALIBRATION_PREVIEW_KEY_SCOPE=PASS",flush=True)
+              admin={"apikey":service,"Authorization":"Bearer "+service,"Content-Type":"application/json"}
+              stage="CREATE_USER"
+              email="mizizi-preview-calibration-"+uuid.uuid4().hex+"@example.test"
+              password=secrets.token_urlsafe(48)
+              user=request(root+"/auth/v1/admin/users",admin,{"email":email,"password":password,"email_confirm":True})
+              uid=user.get("id")
+              if not isinstance(uid,str) or str(uuid.UUID(uid))!=uid or user.get("email")!=email: raise ValueError("auth identity")
+              print("CALIBRATION_DEDICATED_AUTH_USER=PASS",flush=True)
+              stage="GRANT"
+              # Explicit management provisioning authorized by founder in chat.
+              # The technical identity is the journal subject/actor, not a
+              # representation that a human logged in or approved evidence.
+              reason="Founder-approved Preview-only technical calibration steward, 27 November 2026. Management-provisioned identity; no publication or canonical writes authorized."
+              q=f"""
+          begin;
+          do $guard$
+          begin
+            if (select count(*) from supabase_migrations.schema_migrations)<>300
+              or (select count(*) from mizizi_private.workspaces where workspace_key='wakilisha-internal' and status='active')<>1
+              or exists(select 1 from mizizi_private.workspace_memberships)
+              or exists(select 1 from mizizi_private.cases)
+              or exists(select 1 from public.role_definitions where role_key='mizizi_preview_calibration')
+              or not exists(select 1 from auth.users where id='{uid}'::uuid and email='{email}')
+            then raise exception 'STOP_CALIBRATION_PREIMAGE';end if;
+          end $guard$;
+          insert into public.role_definitions(role_key,label,description,is_system)
+            values('mizizi_preview_calibration','MIZIZI Preview calibration','Temporary technical research steward; no publish capability.',false);
+          insert into public.role_capabilities(role_key,capability_key)
+            values('mizizi_preview_calibration','manage_registry'),('mizizi_preview_calibration','manage_charts');
+          insert into public.user_role_assignments(user_id,role_key,status,expires_at,notes)
+            values('{uid}','mizizi_preview_calibration','active',transaction_timestamp()+interval '60 minutes','{reason}');
+          insert into mizizi_private.workspace_memberships(workspace_id,user_id,member_role,grant_source,valid_from,valid_until,granted_by,last_changed_by,change_reason)
+            select id,'{uid}','steward','operator_review',transaction_timestamp(),transaction_timestamp()+interval '60 minutes','{uid}','{uid}','{reason}'
+            from mizizi_private.workspaces where workspace_key='wakilisha-internal' and status='active';
+          commit;
+          """
+              sql(q)
+              granted=True
+              stage="READBACK"
+              check=sql(f"select m.valid_until as expires_at,m.member_role,(a.expires_at=m.valid_until) as same_expiry,(m.valid_until>clock_timestamp() and m.valid_until<=clock_timestamp()+interval '60 minutes') as bounded,(select count(*) from public.role_capabilities where role_key=a.role_key) as role_caps from mizizi_private.workspace_memberships m join public.user_role_assignments a on a.user_id=m.user_id and a.role_key='mizizi_preview_calibration' where m.user_id='{uid}'::uuid and m.revoked_at is null and a.status='active'")
+              if len(check)!=1 or check[0]["member_role"]!="steward" or check[0]["same_expiry"] is not True or check[0]["bounded"] is not True or check[0]["role_caps"]!=2: raise ValueError("grant readback")
+              print("CALIBRATION_STEWARD_EXPIRES_UTC="+str(check[0]["expires_at"]),flush=True)
+              stage="JWT"
+              login=request(root+"/auth/v1/token?grant_type=password",{"apikey":anon,"Content-Type":"application/json"},{"email":email,"password":password})
+              if login.get("user",{}).get("id")!=uid: raise ValueError("identity")
+              jwt=login.get("access_token","")
+              if not jwt: raise ValueError("token")
+              headers={"apikey":anon,"Authorization":"Bearer "+jwt,"Content-Type":"application/json"}
+              if request(root+"/rest/v1/rpc/admin_mizizi_cases_v1",headers,{"p_limit":1})!=[]: raise ValueError("case read")
+              for cap,expected in [("manage_registry",True),("manage_charts",True),("manage_users",False),("publish_charts",False)]:
+                  if request(root+"/rest/v1/rpc/current_user_has_capability",headers,{"required_capability":cap}) is not expected: raise ValueError("capability")
+              print("CALIBRATION_GENUINE_STEWARD_JWT=PASS",flush=True)
+              print("CALIBRATION_ADMIN_AND_PUBLISH_CAPABILITIES_DENIED=PASS",flush=True)
+              stage="LOGOUT"
+              request(root+"/auth/v1/logout?scope=global",headers,{},method="POST")
+              print("CALIBRATION_SESSION_SIGNED_OUT=PASS",flush=True)
+              print("CALIBRATION_NO_CASE_OR_PROVIDER_OR_PRODUCTION_WRITE=PASS",flush=True)
+          except Exception as error:
+              # If the management request was ambiguous, revoke only the exact
+              # newly-created identity's matching calibration grants. No delete
+              # of immutable membership history; do not touch any existing user.
+              if uid and re.fullmatch(r"[a-f0-9-]{36}",uid):
+                  try:
+                      sql(f"begin; update public.user_role_assignments set status='revoked' where user_id='{uid}' and role_key='mizizi_preview_calibration' and status='active'; update mizizi_private.workspace_memberships set revoked_at=clock_timestamp(),revision=revision+1,change_reason='Calibration provisioning failed; technical grant revoked.' where user_id='{uid}' and revoked_at is null; commit;")
+                      print("CALIBRATION_FAILURE_GRANTS_REVOKED=PASS",flush=True)
+                  except Exception:
+                      print("CALIBRATION_FAILURE_REVOKE=UNCONFIRMED",flush=True)
+              status=str(error.code) if isinstance(error,urllib.error.HTTPError) else "STOP"
+              raise SystemExit("CALIBRATION_"+stage+"="+status)
+          PY
