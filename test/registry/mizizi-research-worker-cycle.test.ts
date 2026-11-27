@@ -2039,12 +2039,13 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   return new TextEncoder().encode(pdf);
  }
  const call=(name:"search_web"|"read_page"|"read_document"|"inspect_visual"|"render_page",input:Record<string,string|number>)=>({name,input});
- function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse"|"sharedNativeSearch">={}){
+ function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse"|"sharedNativeSearch">={},useTavily=false){
   const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
   const receipts=new Map<string,Record<string,unknown>>(),leadRows=new Map<string,Record<string,unknown>>();
   const disabled=new Set<string>();
   const provider=vi.fn(async()=>new Response(JSON.stringify({web:{results:[{url,title:"Archival programme"}]}}),
    {headers:{"content-type":"application/json"}}));
+  const tavily=vi.fn(async()=>({status:200,contentType:"application/json",body:new TextEncoder().encode(JSON.stringify({results:[{url,title:"Archival programme"}]})),headers:{}}));
   const native=vi.fn(async()=>({status:200,contentType:mime,body}));
   const access=vi.fn(async()=>({policyRef:"policy:reviewed-public-read",validUntil:expiry,
    acquisitionAllowed:true as const,zeroIncrementalSpendAllowed:true as const}));
@@ -2064,13 +2065,13 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
     return ok(disabled.has(host)?null:{host,revision:1,sourceFamily:host==="api.search.brave.com"?"brave_discovery":"public_web",
      authorityRef:"contract:reviewed-rights",originKey:host==="www.loc.gov"?"library:original-origin":"archive:original-origin",lineageKey:host==="www.loc.gov"?"library:independent-lineage":"archive:common-lineage",
      useBasis:"documented_contract",privateResearchAllowed:true,metadataRetentionAllowed:true,
-     excerptRetentionAllowed:host!=="api.search.brave.com",externalModelProcessingAllowed:true,
+     excerptRetentionAllowed:!["api.search.brave.com","api.tavily.com"].includes(host),externalModelProcessingAllowed:true,
      browserRenderAllowed:host!=="api.search.brave.com",visualProcessingAllowed:host!=="api.search.brave.com",validUntil:expiry});
    }
    if(fn==="mizizi_authorize_desk_search_v1")return ok({requestSha256:args.p_request_sha256,
     policyRef:"policy:public-search",validUntil:expiry,publicQueryAllowed:true,providerUseAllowed:true,zeroIncrementalSpendAllowed:true});
    if(fn==="mizizi_reserve_desk_search_v1")return ok({reservationId:EVENT,requestSha256:args.p_request_sha256,
-    provider:"brave",units:1,maximumIncrementalCostMicrousd:0,validUntil:expiry});
+    provider:useTavily?"tavily_keyless":"brave",...(useTavily?{providerHost:"api.tavily.com"}:{}),units:1,maximumIncrementalCostMicrousd:0,validUntil:expiry});
    if(fn==="mizizi_consume_desk_search_v1"||fn==="mizizi_consume_desk_resource_v1")return ok(true);
    if(fn==="mizizi_quote_desk_resource_v1"||fn==="mizizi_reserve_desk_resource_v1"){
     const b=JSON.parse(String(args.p_binding_text));
@@ -2130,12 +2131,12 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    }
    throw Error("unexpected RPC: "+fn);
   };
-  const dispatch=createDeskResearchDispatcherV1({scope,rpc,braveApiKey:"fixture-only-brave-key",
+  const dispatch=createDeskResearchDispatcherV1({scope,rpc,...(useTavily?{discovery:{search_web:{provider:"tavily_keyless" as const,host:"api.tavily.com",allocationRef:"fixture:tavily-keyless"}},discoveryTestSeams:{resolve4:async()=>["93.184.216.34"],readPinned:tavily}}:{braveApiKey:"fixture-only-brave-key"}),
    nativeAccountFingerprint:"a".repeat(64),authorizeAcquisition:access,authorizeExamination:examination,
    searchTransport:provider as unknown as typeof fetch,nativeTestSeams:{resolve4:async()=>["93.184.216.34"],readPinned:native},
    now:()=>NOW,...browserOptions});
   const execute=(c:ReturnType<typeof call>)=>dispatch.executeTool(scope,c,hash(JSON.stringify({scope,call:c})));
-  return {dispatch,execute,calls,receipts,leadRows,disabled,provider,native,access,examination,rpc};
+  return {dispatch,execute,calls,receipts,leadRows,disabled,provider,tavily,native,access,examination,rpc};
  }
  it("connects actual search, budget, native reader and parser to private opaque custody and source readback",async()=>{
   const h=fixture(),search=call("search_web",{query:"Nairobi recording archive"});
@@ -2178,11 +2179,11 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   await expect(guarded.append(identity,1,null,pass)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
   expect(base.append).toHaveBeenCalledTimes(1);
  },20000);
- it("composes one investigation across open-web discovery, two independent native sources, model authority, finance and guarded journal",async()=>{
-  const h=fixture(),question="Which recording credits are supported by the original archival sources?";
+ it("composes one Tavily-only investigation across open-web discovery, two independent native sources, model authority, finance and guarded journal",async()=>{
+  const h=fixture(textBytes,"text/plain",{},true),question="Which recording credits are supported by the original archival sources?";
   const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:question};
-  h.provider.mockResolvedValueOnce(new Response(JSON.stringify({web:{results:[
-   {url,title:"Original programme"},{url:"https://www.loc.gov/item/fixture",title:"Independent catalogue"}]}}),{headers:{"content-type":"application/json"}}));
+  h.tavily.mockResolvedValueOnce({status:200,contentType:"application/json",body:new TextEncoder().encode(JSON.stringify({results:[
+   {url,title:"Original programme"},{url:"https://www.loc.gov/item/fixture",title:"Independent catalogue"}]})),headers:{}});
   h.native.mockResolvedValueOnce({status:200,contentType:"text/plain",body:textBytes});
   h.native.mockResolvedValueOnce({status:200,contentType:"text/plain",body:new TextEncoder().encode("The independent catalogue reports a different performer; the exact recording version must be checked.")});
   const authority=createDurableDeskModelAuthorityV1({rpc:h.rpc,scope,now:()=>NOW,
@@ -2222,7 +2223,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    readSources:async()=>{throw Error("LEGACY_READER");},analyze:async()=>{throw Error("LEGACY_MODEL");},
    authorizeModelProcessing:h.dispatch.authorizeModelProcessing,verifyFinding:verify,maxNewPasses:1,maxTotalPasses:1,costBudgetUnits:20,now:()=>NOW});
   expect(result).toMatchObject({passesAdded:1,disposition:"paused"});
-  expect(transport).toHaveBeenCalledTimes(4);expect(h.provider).toHaveBeenCalledTimes(1);expect(h.native).toHaveBeenCalledTimes(2);
+  expect(transport).toHaveBeenCalledTimes(4);expect(h.tavily).toHaveBeenCalledTimes(1);expect(h.provider).not.toHaveBeenCalled();expect(h.native).toHaveBeenCalledTimes(2);
   expect(h.receipts.size).toBe(3);expect(events).toEqual(Array.from({length:4},()=>["send_pending","response_metered"]).flat());
   expect(passes[0].deskToolReceipts).toHaveLength(3);expect(passes[0].sourceReceipts).toHaveLength(2);
   expect(new Set(passes[0].sourceReceipts.map(s=>s.lineageKey)).size).toBe(2);
