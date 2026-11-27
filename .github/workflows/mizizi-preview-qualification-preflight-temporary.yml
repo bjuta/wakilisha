@@ -1,4 +1,4 @@
-name: MIZIZI Preview Connected Browser and Provider Protocol Qualification
+name: MIZIZI Preview Connected Browser Startup Diagnosis
 on:
   push:
     branches:
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 74aa794ed66758a0d091b6be546f1aa0c55ccae2
+          ref: 3c6841078c9f9f0db4d0b7d3a80a8bdf3fdcb2af
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 74aa794ed66758a0d091b6be546f1aa0c55ccae2
+          test "$(git rev-parse HEAD)" = 3c6841078c9f9f0db4d0b7d3a80a8bdf3fdcb2af
           image=mcr.microsoft.com/playwright:v1.63.0-noble
           docker pull "$image"
           export MIZIZI_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$image")"
@@ -75,37 +75,3 @@ jobs:
           JS
           test -z "$(docker ps -a --filter name=mizizi-browser- --format '{{.Names}}')"
           echo MIZIZI_CONNECTED_HOST_NO_RESIDUE=PASS
-  protocol:
-    if: github.repository == 'bjuta/wakilisha' && github.ref == 'refs/heads/ops/mizizi-preview-qualification-preflight-20261127'
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    steps:
-      - name: Test documented free token counting for public synthetic text only
-        env:
-          MIZIZI_PREVIEW_ANTHROPIC_API_KEY: ${{ secrets.MIZIZI_PREVIEW_ANTHROPIC_API_KEY }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json,os,urllib.request,urllib.error
-          key=os.environ.get("MIZIZI_PREVIEW_ANTHROPIC_API_KEY","")
-          if not key or key.strip()!=key: raise SystemExit("MIZIZI_TOKEN_PROTOCOL_CREDENTIAL=STOP")
-          class NoRedirect(urllib.request.HTTPRedirectHandler):
-              def redirect_request(self,*args,**kwargs): raise ValueError("redirect denied")
-          opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
-          data=json.dumps({"model":"claude-haiku-5-5","messages":[{"role":"user","content":"Public synthetic token counting qualification."}]}).encode()
-          req=urllib.request.Request("https://api.anthropic.com/v1/messages/count_tokens",headers={"x-api-key":key,"anthropic-version":"2023-06-01","Content-Type":"application/json","Accept":"application/json"},data=data,method="POST")
-          try:
-              with opener.open(req,timeout=20) as response:
-                  if response.status!=200: raise ValueError("status")
-                  body=response.read(100001)
-              if len(body)>100000: raise ValueError("bound")
-              count=json.loads(body).get("input_tokens")
-              if type(count) is not int or count<1 or count>1000: raise ValueError("shape")
-              print("MIZIZI_TOKEN_PROTOCOL_COUNT="+str(count))
-              print("MIZIZI_TOKEN_PROTOCOL_FREE_COUNT=PASS")
-              print("MIZIZI_NO_BILLABLE_INFERENCE_REQUEST=PASS")
-          except urllib.error.HTTPError as e:
-              raise SystemExit("MIZIZI_TOKEN_PROTOCOL_HTTP="+str(e.code))
-          except Exception:
-              raise SystemExit("MIZIZI_TOKEN_PROTOCOL=STOP")
-          PY
