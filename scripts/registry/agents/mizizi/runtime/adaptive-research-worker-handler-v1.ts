@@ -3,6 +3,7 @@
  * investigation or cultural question is definitively resolved.
  */
 import {createHash} from "node:crypto";
+import {discoverMusicBrainzCoreCohortV1} from "./musicbrainz-core-cohort-v1.mjs";
 import {createCharts2RegistryCatalogueCohortV1} from "../../../../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
 import {runAdaptiveInvestigationV1, type InvestigationIdentityV1,
@@ -408,14 +409,23 @@ export function runOperationalNativeDeskResearchWorkerCycleV1(input:Omit<Paramet
  * supplies already authorized exact job scopes; this does not admit jobs,
  * combine recording identities, reuse cross-case evidence, or create a queue.
  * Sequential execution preserves existing per-case lease and finance checks.
- * The only shared state is the active Registry title discovery index.
+ * Share the Registry title discovery index and optionally derive an offline
+ * core-source gap plan before claims. Plan ordering is advisory only;
+ * neither source acquisition nor disclosure authority is obtained here.
  */
 export async function runDurableDeskResearchWorkerCohortV1(input:Readonly<
  Omit<Parameters<typeof runDurableDeskResearchWorkerCycleV1>[0],"chartScope">&{
   chartScopes:readonly ChartResearchScopeV1[];
+  /** Trusted caller's exact case observations from current private material.
+   * Archive publisher/signature qualification remains the caller's duty.
+   * No ISRC from chart labels; never turn an offline hit into identity. */
+  corePlanning?:Readonly<{
+   directory:string;manifest:Parameters<typeof discoverMusicBrainzCoreCohortV1>[0]["manifest"];
+   observations:readonly Readonly<{caseId:string;membershipSha256:string;observationSha256:string;title:string;artist:string|null}>[];
+  }>;
  }
 >){
- const {chartScopes,...worker}=input;
+ const {chartScopes,corePlanning,...worker}=input;
  if(!Array.isArray(chartScopes)||chartScopes.length<1||chartScopes.length>1000||
   chartScopes.some(s=>!s||s.registryCatalogueCohort!==undefined||
     s.workspaceId!==chartScopes[0].workspaceId||s.registryClient!==chartScopes[0].registryClient)||
@@ -423,13 +433,48 @@ export async function runDurableDeskResearchWorkerCohortV1(input:Readonly<
   new Set(chartScopes.map(s=>s.caseId)).size!==chartScopes.length)
    throw Error("MIZIZI_DESK_COHORT_SCOPE_DENIED");
  const catalogue=createCharts2RegistryCatalogueCohortV1(chartScopes[0].registryClient,{now:input.now??Date.now});
+ let orderedScopes=[...chartScopes],planningSummary:Readonly<{snapshotRef:string;tasks:number;sharedTasks:number;subjects:number}>|undefined;
+ const observationByCase=new Map<string,NonNullable<typeof corePlanning>["observations"][number]>();
+ if(corePlanning!==undefined){
+  const observations=corePlanning?.observations;
+  const sha=/^[a-f0-9]{64}$/;
+  if(!Array.isArray(observations)||observations.length!==chartScopes.length)
+   throw Error("MIZIZI_DESK_COHORT_PLAN_SCOPE_DENIED");
+  const scopeIds=new Set(chartScopes.map(s=>s.caseId));
+  for(const o of observations){
+   if(!o||!scopeIds.has(o.caseId)||observationByCase.has(o.caseId)||
+    !sha.test(o.membershipSha256)||!sha.test(o.observationSha256)||
+    typeof o.title!=="string"||(o.artist!==null&&typeof o.artist!=="string"))
+    throw Error("MIZIZI_DESK_COHORT_PLAN_SCOPE_DENIED");
+   observationByCase.set(o.caseId,Object.freeze({...o}));
+  }
+  const result=await discoverMusicBrainzCoreCohortV1({directory:corePlanning.directory,manifest:corePlanning.manifest,
+   recordings:[...observationByCase.values()].sort((a,b)=>a.caseId.localeCompare(b.caseId)).map(o=>({
+    recordingId:o.caseId,title:o.title,artist:o.artist,isrc:null}))});
+  const plan=result.acquisitionPlan,scopeById=new Map(chartScopes.map(s=>[s.caseId,s]));
+  if(plan.orderedSubjectIds.length!==chartScopes.length||new Set(plan.orderedSubjectIds).size!==chartScopes.length||
+   plan.orderedSubjectIds.some(id=>!scopeById.has(id)))
+   throw Error("MIZIZI_DESK_COHORT_PLAN_PARTITION_DENIED");
+  orderedScopes=plan.orderedSubjectIds.map(id=>scopeById.get(id)!);
+  planningSummary=Object.freeze({snapshotRef:plan.snapshotRef,tasks:plan.tasks.length,
+   sharedTasks:plan.tasks.filter(t=>t.subjectIds.length>1).length,subjects:plan.subjects.length});
+ }
  const totals={recovered:0,claimed:0,succeeded:0,failed:0,continued:0};
- for(const scope of chartScopes){
+ for(const scope of orderedScopes){
   const result=await runDurableDeskResearchWorkerCycleV1({...worker,
+    configurationForJob:async job=>{
+     if(corePlanning!==undefined){
+      const o=observationByCase.get(job.caseId),c=job.chartContext;
+      if(!o||!c||c.membershipSha256!==o.membershipSha256||c.observationSha256!==o.observationSha256||
+       !c.positions.some(p=>p.title===o.title&&p.artist===o.artist))
+       throw Error("MIZIZI_DESK_COHORT_PLAN_CONTEXT_CHANGED");
+     }
+     return worker.configurationForJob(job);
+    },
     chartScope:{...scope,registryCatalogueCohort:catalogue}});
   totals.recovered+=result.recovered;totals.claimed+=result.claimed;
   totals.succeeded+=result.succeeded;totals.failed+=result.failed;totals.continued+=result.continued??0;
  }
  return Object.freeze({contract:"mizizi.durable_desk_cohort.v1" as const,
-  requested:chartScopes.length,...totals});
+  requested:chartScopes.length,...totals,...(planningSummary?{planning:planningSummary}:{})});
 }

@@ -241,12 +241,56 @@ export async function discoverMusicBrainzCoreCohortV1({directory,manifest,record
   candidateOnly:true,identityVerified:false,custodyAuthorized:false,modelDisclosureAuthorized:false,
   canonicalWriteAuthorized:false,
   rowProjections:[...sourceRows.values()].sort((a,b)=>a.projectionId.localeCompare(b.projectionId)),subjects};
+ // Plan the shared source/information gap, not a merged identity. A
+ // snapshot-specific artist-credit row is an exact source relationship;
+ // it is not a Registry artist identifier or even proof of the subject.
+ // Conflict/overflow/unmatched cases retain independent work. Ambiguous
+ // candidates can share examination of a credit only if all point to it.
+ const work=new Map(),subjectTasks=new Map();
+ function task(kind,anchor,subject,fieldKeys){
+  const taskId=digest(JSON.stringify(["mizizi.core_gap_task.v1",snapshotRef,kind,anchor,fieldKeys]));
+  let entry=work.get(taskId);
+  if(!entry){
+   entry={taskId,kind,anchor,fieldKeys,subjectIds:[]};
+   retain({taskId,kind,anchor,fieldKeys});work.set(taskId,entry);
+  }
+  retain(subject.recordingId);entry.subjectIds.push(subject.recordingId);
+  const refs=subjectTasks.get(subject.recordingId)??[];
+  retain(taskId);refs.push(taskId);subjectTasks.set(subject.recordingId,refs);
+ }
+ for(const subject of subjects){
+  // Every recording retains its own unresolved identity question. Reuse
+  // can reduce acquisition/examination, never suppress adjudication.
+  task("subject_identity",subject.recordingId,subject,["recording_identity"]);
+  if(!["single_candidate","ambiguous"].includes(subject.disposition))continue;
+  const credits=new Set(subject.candidates.map(c=>c.fieldRefs.artistCredit));
+  if(credits.size===1){
+   // These fields are gaps, not inferred release/label/distributor edges.
+   task("credit_catalogue_gap",credits.values().next().value,subject,["release_title","release_date","label","distributor"]);
+  }
+  const unique=new Set(subject.candidates.map(c=>c.fieldRefs.title));
+  for(const ref of unique)task("recording_source_examination",ref,subject,["recording_title","artist_credit","duration","isrc"]);
+ }
+ const tasks=[...work.values()].map(t=>({...t,subjectIds:t.subjectIds.sort()}))
+  .sort((a,b)=>b.subjectIds.length-a.subjectIds.length||a.kind.localeCompare(b.kind)||a.taskId.localeCompare(b.taskId));
+ // First work shared catalogue/source neighborhoods, then every remaining
+ // independent subject exactly once. Stable tie breaking, no hidden drops.
+ const seen=new Set(),orderedSubjectIds=[];
+ for(const item of tasks)for(const subjectId of item.subjectIds)if(!seen.has(subjectId)){
+  seen.add(subjectId);orderedSubjectIds.push(subjectId);
+ }
+ if(orderedSubjectIds.length!==inputs.length)fail("PLAN_PARTITION_INCOMPLETE");
+ const acquisitionPlan={contract:"mizizi.core_cohort_gap_plan.v1",snapshotRef,candidateOnly:true,
+  identityVerified:false,custodyAuthorized:false,modelDisclosureAuthorized:false,canonicalWriteAuthorized:false,
+  tasks,orderedSubjectIds,subjects:subjects.map(s=>({recordingId:s.recordingId,inputSha256:s.inputSha256,
+   disposition:s.disposition,taskIds:subjectTasks.get(s.recordingId).sort()}))};
+ retain(acquisitionPlan);
  const summary={requested:inputs.length,uniqueSourceRecordings:sources.length,
   unmatched:0,single_candidate:0,ambiguous:0,identifier_metadata_conflict:0,candidate_overflow:0};
  for(const row of projected)summary[row.disposition]++;
  return {contract:"mizizi.musicbrainz_core_cohort.v1",candidateOnly:true,identityVerified:false,canPublish:false,
   source:{...m,license:"CC0-1.0",lineage:"musicbrainz:community-core",archiveSignatureVerifiedByReader:false,
-   tableDigestsVerified:true},inputSha256:digest(JSON.stringify(inputs)),scans,summary,sources,recordings:projected,sharedEvidence};
+   tableDigestsVerified:true},inputSha256:digest(JSON.stringify(inputs)),scans,summary,sources,recordings:projected,sharedEvidence,acquisitionPlan};
 }
 async function smallJson(path,max){
  const info=await stat(path);

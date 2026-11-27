@@ -2189,6 +2189,20 @@ describe("MusicBrainz core CC0 offline cohort discovery",()=>{
    expect(result.sources).toHaveLength(2);
    expect(result.recordings).toHaveLength(1000);
    expect(new Set(result.recordings.map(s=>s.recordingId)).size).toBe(1000);
+   const plan=result.acquisitionPlan;
+   expect(plan).toMatchObject({candidateOnly:true,identityVerified:false,custodyAuthorized:false,
+    modelDisclosureAuthorized:false,canonicalWriteAuthorized:false,snapshotRef:result.sharedEvidence.snapshotRef});
+   expect(plan.orderedSubjectIds).toHaveLength(1000);
+   expect(new Set(plan.orderedSubjectIds).size).toBe(1000);
+   expect(plan.tasks.filter(t=>t.kind==="subject_identity")).toHaveLength(1000);
+   const shared=plan.tasks.filter(t=>t.subjectIds.length>1);
+   expect(shared.map(t=>t.kind).sort()).toEqual(["credit_catalogue_gap","recording_source_examination","recording_source_examination"]);
+   expect(shared.every(t=>t.subjectIds.length===1000)).toBe(true);
+   expect(shared.find(t=>t.kind==="credit_catalogue_gap")?.fieldKeys).toEqual(["release_title","release_date","label","distributor"]);
+   expect(plan.subjects.every(s=>s.taskIds.length===4)).toBe(true);
+   const reversed=await discoverMusicBrainzCoreCohortV1({directory,manifest,recordings:[...recordings].reverse()});
+   expect(reversed.acquisitionPlan.tasks).toEqual(plan.tasks);
+   expect(reversed.acquisitionPlan.orderedSubjectIds).toEqual(plan.orderedSubjectIds);
    expect(result.recordings[0].matches).toEqual([
     {mbid:mbidA,exactIsrc:true,titleArtistMatch:true,titleAgrees:true,artistAgrees:true},
     {mbid:mbidB,exactIsrc:false,titleArtistMatch:true,titleAgrees:true,artistAgrees:true}]);
@@ -2231,12 +2245,42 @@ describe("MusicBrainz core CC0 offline cohort discovery",()=>{
    expect(next.sharedEvidence.subjects[0].candidates[0].fieldRefs.title).not.toBe(first[0].fieldRefs.title);
   });
  });
+ it("orders existing exact cohort claims by common source gaps without granting source or identity authority",async()=>{
+  await fixture(async(directory,manifest)=>{
+   const registryClient={from:vi.fn()},claimed:string[]=[];
+   const ids=[cohortId(3),cohortId(1),cohortId(2)];
+   const scopes=ids.map((caseId,i)=>({caseId,jobId:cohortId(100+i),workspaceId:WORKSPACE,expectedRevision:2,
+    registryClient,preflight:async()=>true,readOriginal:async()=>new Uint8Array()}));
+   const observations=scopes.map(s=>({caseId:s.caseId,membershipSha256:"a".repeat(64),observationSha256:"b".repeat(64),
+    title:s.caseId===ids[0]?"Absent":"Home Bound",artist:s.caseId===ids[0]?null:"Artist A"}));
+   const rpc:WorkerRpc=async(fn,args)=>{
+    if(fn==="mizizi_recover_expired_chart_research_job_v1")return {data:0,error:null};
+    if(fn==="mizizi_claim_exact_chart_research_job_v1"){claimed.push(String(args.p_case_id));return {data:[],error:null};}
+    throw Error("UNEXPECTED_COHORT_RPC");
+   };
+   const configurationForJob=vi.fn(async()=>{throw Error("NO_LEASE");});
+   const args={rpc,workerId:"mizizi-chart:"+JOB,chartScopes:scopes,configurationForJob,
+    openingQuestion:async()=>"Bounded research",verifyFinding:async()=>false,maxNewPasses:1,maxTotalPasses:3,costBudgetUnits:5,
+    corePlanning:{directory,manifest,observations}};
+   const result=await runDurableDeskResearchWorkerCohortV1(args as never);
+   expect(claimed).toEqual([ids[1],ids[2],ids[0]]);
+   expect(result).toMatchObject({requested:3,claimed:0,planning:{subjects:3,tasks:6,sharedTasks:3}});
+   expect(configurationForJob).not.toHaveBeenCalled();
+   expect(registryClient.from).not.toHaveBeenCalled();
+   claimed.length=0;
+   await expect(runDurableDeskResearchWorkerCohortV1({...args,corePlanning:{directory,manifest,
+    observations:[observations[0],observations[1],observations[1]]}} as never)).rejects.toThrow("COHORT_PLAN_SCOPE_DENIED");
+   expect(claimed).toEqual([]);
+  });
+ });
  it("distinguishes identifier metadata conflict, missing candidates, and duplicate subject or tampered snapshot",async()=>{
   await fixture(async(directory,manifest)=>{
    const recordings=[{recordingId:cohortId(1),title:"Different label",artist:"Unknown",isrc:"KE-ABC-26-00001"},
     {recordingId:cohortId(2),title:"Absent",artist:null,isrc:null}];
    const result=await discoverMusicBrainzCoreCohortV1({directory,manifest,recordings});
    expect(result.recordings.map(s=>s.disposition)).toEqual(["identifier_metadata_conflict","unmatched"]);
+   expect(result.acquisitionPlan.tasks.map(t=>t.kind)).toEqual(["subject_identity","subject_identity"]);
+   expect(new Set(result.acquisitionPlan.orderedSubjectIds)).toEqual(new Set(recordings.map(r=>r.recordingId)));
    expect(result.sharedEvidence.subjects.map(s=>[s.disposition,s.candidates.length]))
     .toEqual([["identifier_metadata_conflict",1],["unmatched",0]]);
    expect(result.sharedEvidence.identityVerified).toBe(false);
