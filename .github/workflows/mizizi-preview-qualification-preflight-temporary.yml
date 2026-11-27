@@ -1,4 +1,4 @@
-name: MIZIZI Preview Connected Browser Startup Diagnosis
+name: MIZIZI Preview Connected Browser Acceptance
 on:
   push:
     branches:
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 0ee971d3a99ee8bf46f996c0b14ba5b5d6a93ecd
+          ref: 14255d44e7d568bb0769882a9c6b2490f8a2f908
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 0ee971d3a99ee8bf46f996c0b14ba5b5d6a93ecd
+          test "$(git rev-parse HEAD)" = 14255d44e7d568bb0769882a9c6b2490f8a2f908
           image=mcr.microsoft.com/playwright:v1.63.0-noble
           docker pull "$image"
           export MIZIZI_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$image")"
