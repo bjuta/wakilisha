@@ -1,17 +1,17 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-27T06:33:38Z",
+  "generatedAt": "2026-11-27T07:53:02Z",
   "typesSha256": "d3f8200df45b4669119ed4f7a60d6fc1c8d68afa2ab3c798755678b995ddfdf8",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 300,
-  "latestMigration": "20261127060705_mizizi_desk_async_batch.sql",
+  "migrationCount": 301,
+  "latestMigration": "20261127073652_mizizi_desk_metered_sync_reconciliation.sql",
   "schemaSeal": {
     "mode": "disposable_ci",
     "sourceProjectRef": "unlinked-local-ci",
     "baseMainSha": "9847216a6946ae89f0eb52684a27231ce6e4b15d",
-    "replayCandidateHeadSha": "c8109a979340a7311b2bd3e357ff3ee827bdc4e1",
-    "workflowRunId": 45952125537,
-    "migrationHead": "20261127060705"
+    "replayCandidateHeadSha": "a160646028abb477d156dd58c6881024fb3b045a",
+    "workflowRunId": 45960953842,
+    "migrationHead": "20261127073652"
   }
 }
