@@ -2708,6 +2708,7 @@ describe("MIZIZI source-first discovery-only pass",()=>{
   const result=await runAdaptiveInvestigationV1({identity,store:{read:async()=>rows.slice(),
    append:async(_id,_ordinal,_prior,pass)=>{rows.push(pass);}},
    prepareDeskPass:()=>runDeskDiscoveryOnlyPassV1(input),readSources,analyze,
+   authorizeModelProcessing:async()=>false,
    verifyFinding:async()=>({verified:false,verificationRef:null}),now:()=>NOW,maxNewPasses:1,maxTotalPasses:1,costBudgetUnits:1});
   expect(result).toMatchObject({passesAdded:1,disposition:"paused"});
   expect(input.executeTool).toHaveBeenCalledTimes(1);
