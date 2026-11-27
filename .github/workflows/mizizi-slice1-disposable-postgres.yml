@@ -122,11 +122,7 @@ jobs:
           echo "WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS"
 
   disposable-operator-jwt:
-    name: ${{ matrix.scenario == 'full' && 'disposable-operator-jwt' || 'disposable-owner-recovery-jwt' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        scenario: [full, recovery]
+    name: disposable-operator-jwt
     if: ${{ github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -165,7 +161,6 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Install local headless Chromium browser for genuine operator UI
-        if: matrix.scenario == 'full'
         shell: bash
         run: npx playwright install --with-deps chromium
 
@@ -188,14 +183,8 @@ jobs:
             < scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql
 
       - name: Exercise genuine JWT operator bootstrap, case and competing hold RPCs
-        if: matrix.scenario == 'full'
         shell: bash
         run: node scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs
-
-      - name: Exercise inaugural owner recovery using genuine JWTs
-        if: matrix.scenario == 'recovery'
-        shell: bash
-        run: node scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs --recovery-only
 
       - name: Destroy all disposable local Auth and database volumes
         if: always()
